@@ -694,37 +694,34 @@ export class ChatRecordingService {
     if (!this.conversationFile) return;
 
     try {
-      this.updateConversation((conversation) => {
-        // Create a map of tool results from the API history for quick lookup by call ID.
-        // We store the full list of parts associated with each tool call ID to preserve
-        // multi-modal data and proper trajectory structure.
-        const partsMap = new Map<string, Part[]>();
-        for (const content of history) {
-          if (content.role === 'user' && content.parts) {
-            // Find all unique call IDs in this message
-            const callIds = content.parts
-              .map((p) => p.functionResponse?.id)
-              .filter((id): id is string => !!id);
+      // Build the parts map from the API history BEFORE touching the file.
+      const partsMap = new Map<string, Part[]>();
+      for (const content of history) {
+        if (content.role === 'user' && content.parts) {
+          const callIds = content.parts
+            .map((p) => p.functionResponse?.id)
+            .filter((id): id is string => !!id);
 
-            if (callIds.length === 0) continue;
+          if (callIds.length === 0) continue;
 
-            // Use the first ID as a seed to capture any "leading" non-ID parts
-            // in this specific content block.
-            let currentCallId = callIds[0];
-            for (const part of content.parts) {
-              if (part.functionResponse?.id) {
-                currentCallId = part.functionResponse.id;
-              }
-
-              if (!partsMap.has(currentCallId)) {
-                partsMap.set(currentCallId, []);
-              }
-              partsMap.get(currentCallId)!.push(part);
+          let currentCallId = callIds[0];
+          for (const part of content.parts) {
+            if (part.functionResponse?.id) {
+              currentCallId = part.functionResponse.id;
             }
+
+            if (!partsMap.has(currentCallId)) {
+              partsMap.set(currentCallId, []);
+            }
+            partsMap.get(currentCallId)!.push(part);
           }
         }
+      }
 
-        // Update the conversation records tool results if they've changed.
+      // Nothing to sync — skip the read/write entirely.
+      if (partsMap.size === 0) return;
+
+      this.updateConversation((conversation) => {
         for (const message of conversation.messages) {
           if (message.type === 'gemini' && message.toolCalls) {
             for (const toolCall of message.toolCalls) {
