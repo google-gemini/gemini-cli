@@ -160,7 +160,7 @@ describe('mcpToolWrapper', () => {
   });
 
   describe('McpToolInvocation.execute', () => {
-    it('should call browserManager.callTool with correct params', async () => {
+    it('should inject animation for click by uid', async () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
@@ -174,6 +174,14 @@ describe('mcpToolWrapper', () => {
         {
           uid: 'elem-123',
         },
+        expect.any(AbortSignal),
+      );
+
+      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
+        'evaluate_script',
+        expect.objectContaining({
+          function: expect.stringContaining('[data-uid="elem-123"]'),
+        }),
         expect.any(AbortSignal),
       );
     });
@@ -196,7 +204,7 @@ describe('mcpToolWrapper', () => {
       expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
         'evaluate_script',
         expect.objectContaining({
-          script: expect.stringContaining('__gemini_click'),
+          function: expect.stringContaining('__gemini_click'),
         }),
         expect.any(AbortSignal),
       );
@@ -214,7 +222,7 @@ describe('mcpToolWrapper', () => {
       expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
         'evaluate_script',
         expect.objectContaining({
-          script: expect.stringContaining('__gemini_click'),
+          function: expect.stringContaining('__gemini_click'),
         }),
         expect.any(AbortSignal),
       );
@@ -232,7 +240,7 @@ describe('mcpToolWrapper', () => {
       expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
         'evaluate_script',
         expect.objectContaining({
-          script: expect.stringContaining('__gemini_scroll_down'),
+          function: expect.stringContaining('__gemini_scroll_down'),
         }),
         expect.any(AbortSignal),
       );

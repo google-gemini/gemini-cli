@@ -32,6 +32,7 @@ import type { BrowserManager, McpToolCallResult } from './browserManager.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import {
   generateClickAnimationScript,
+  generateClickAnimationByUidScript,
   generateScrollAnimationScript,
 } from './cursorAnimations.js';
 
@@ -114,7 +115,7 @@ class McpToolInvocation extends BaseToolInvocation<
       }
 
       if (!result.isError && !signal.aborted) {
-        await this.injectAnimationIfApplicable(signal);
+        await this.injectPostCallAnimationIfApplicable(signal);
       }
 
       // Post-process to add contextual hints for common error patterns
@@ -153,7 +154,11 @@ class McpToolInvocation extends BaseToolInvocation<
     }
   }
 
-  private async injectAnimationIfApplicable(
+  /**
+   * Injects post-call animations for click_at (known coordinates) and
+   * press_key scroll animations.
+   */
+  private async injectPostCallAnimationIfApplicable(
     signal: AbortSignal,
   ): Promise<void> {
     const config = this.browserManager.getConfig().getBrowserAgentConfig();
@@ -165,7 +170,17 @@ class McpToolInvocation extends BaseToolInvocation<
     }
 
     try {
-      if (this.toolName === 'click_at') {
+      if (this.toolName === 'click') {
+        const uid = this.params['uid'];
+        if (uid != null) {
+          const script = generateClickAnimationByUidScript(String(uid));
+          await this.browserManager.callTool(
+            'evaluate_script',
+            { function: script },
+            signal,
+          );
+        }
+      } else if (this.toolName === 'click_at') {
         const [x, y] =
           this.params['x'] != null && this.params['y'] != null
             ? [Number(this.params['x']), Number(this.params['y'])]
@@ -187,7 +202,6 @@ class McpToolInvocation extends BaseToolInvocation<
         }
       }
     } catch (error) {
-      // Ignore animation injection errors so they don't fail the main action
       debugLogger.warn(`Failed to inject cursor animation: ${error}`);
     }
   }
@@ -198,7 +212,11 @@ class McpToolInvocation extends BaseToolInvocation<
     signal: AbortSignal,
   ): Promise<void> {
     const script = generateClickAnimationScript(x, y);
-    await this.browserManager.callTool('evaluate_script', { script }, signal);
+    await this.browserManager.callTool(
+      'evaluate_script',
+      { function: script },
+      signal,
+    );
   }
 
   private async injectScrollAnimation(
@@ -206,7 +224,11 @@ class McpToolInvocation extends BaseToolInvocation<
     signal: AbortSignal,
   ): Promise<void> {
     const script = generateScrollAnimationScript(direction);
-    await this.browserManager.callTool('evaluate_script', { script }, signal);
+    await this.browserManager.callTool(
+      'evaluate_script',
+      { function: script },
+      signal,
+    );
   }
 }
 
