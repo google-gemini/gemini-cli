@@ -283,19 +283,18 @@ export const AppContainer = (props: AppContainerProps) => {
    * Manages the visibility and x-second timer for the expansion hint.
    *
    * This effect triggers the timer countdown whenever an overflow is detected
-   * or the user manually toggles the expansion state with Ctrl+O. We use a stable
-   * boolean dependency (hasOverflowState) to ensure the timer only resets on
-   * genuine state transitions, preventing it from infinitely resetting during
-   * active text streaming.
+   * or the user manually toggles the expansion state with Ctrl+O.
+   * By depending on overflowingIdsSize, the timer resets when *new* views
+   * overflow, but avoids infinitely resetting during single-view streaming.
    *
    * In alternate buffer mode, we don't trigger the hint automatically on overflow
    * to avoid noise, but the user can still trigger it manually with Ctrl+O.
    */
   useEffect(() => {
-    if (hasOverflowState && !isAlternateBuffer) {
+    if (hasOverflowState) {
       triggerExpandHint(true);
     }
-  }, [hasOverflowState, isAlternateBuffer, triggerExpandHint]);
+  }, [hasOverflowState, overflowingIdsSize, triggerExpandHint]);
 
   const [defaultBannerText, setDefaultBannerText] = useState('');
   const [warningBannerText, setWarningBannerText] = useState('');
