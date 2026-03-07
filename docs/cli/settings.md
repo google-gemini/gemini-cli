@@ -57,7 +57,7 @@ they appear in the UI.
 | Show Shortcuts Hint                  | `ui.showShortcutsHint`                 | Show the "? for shortcuts" hint above the input.                                                                                                                  | `true`   |
 | Hide Banner                          | `ui.hideBanner`                        | Hide the application banner                                                                                                                                       | `false`  |
 | Hide Context Summary                 | `ui.hideContextSummary`                | Hide the context summary (GEMINI.md, MCP servers) above the input.                                                                                                | `false`  |
-| Hide CWD                             | `ui.footer.hideCWD`                    | Hide the current working directory path in the footer.                                                                                                            | `false`  |
+| Hide CWD                             | `ui.footer.hideCWD`                    | Hide the current working directory in the footer.                                                                                                                 | `false`  |
 | Hide Sandbox Status                  | `ui.footer.hideSandboxStatus`          | Hide the sandbox status indicator in the footer.                                                                                                                  | `false`  |
 | Hide Model Info                      | `ui.footer.hideModelInfo`              | Hide the model name and context usage in the footer.                                                                                                              | `false`  |
 | Hide Context Window Percentage       | `ui.footer.hideContextPercentage`      | Hides the context window usage percentage.                                                                                                                        | `true`   |
@@ -147,7 +147,6 @@ they appear in the UI.
 | Plan                       | `experimental.plan`                      | Enable planning features (Plan Mode and tools).                                                                                                           | `false` |
 | Model Steering             | `experimental.modelSteering`             | Enable model steering (user hints) to guide the model during tool execution.                                                                              | `false` |
 | Direct Web Fetch           | `experimental.directWebFetch`            | Enable web fetch behavior that bypasses LLM summarization.                                                                                                | `false` |
-| Enable Gemma Model Router  | `experimental.gemmaModelRouter.enabled`  | Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.                                           | `false` |
 
 ### Skills
 
