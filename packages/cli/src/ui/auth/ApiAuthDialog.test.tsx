@@ -29,9 +29,16 @@ vi.mock('../hooks/useKeypress.js', () => ({
   useKeypress: vi.fn(),
 }));
 
-vi.mock('../components/shared/text-buffer.js', () => ({
-  useTextBuffer: vi.fn(),
-}));
+vi.mock('../components/shared/text-buffer.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import('../components/shared/text-buffer.js')
+    >();
+  return {
+    ...actual,
+    useTextBuffer: vi.fn(),
+  };
+});
 
 vi.mock('../contexts/UIStateContext.js', () => ({
   useUIState: vi.fn(() => ({
