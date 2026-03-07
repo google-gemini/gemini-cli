@@ -23,6 +23,7 @@ export interface HookEntry {
     timeout?: number;
   };
   source: string;
+  extensionName?: string;
   eventName: string;
   matcher?: string;
   sequential?: boolean;
@@ -210,6 +211,7 @@ export const HooksDialog: React.FC<HooksDialogProps> = ({
                     )}
                     <Text color={theme.text.secondary} wrap="wrap">
                       Source: {hook.source}
+                      {hook.extensionName && ` (${hook.extensionName})`}
                       {hook.config.name &&
                         hook.config.command &&
                         ` | Command: ${hook.config.command}`}

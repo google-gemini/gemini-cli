@@ -22,6 +22,7 @@ import { coreEvents } from '../utils/events.js';
 export interface HookRegistryEntry {
   config: HookConfig;
   source: ConfigSource;
+  extensionName?: string;
   eventName: HookEventName;
   matcher?: string;
   sequential?: boolean;
@@ -193,6 +194,7 @@ please review the project settings (.gemini/settings.json) and remove them.`;
         this.processHooksConfiguration(
           extension.hooks,
           ConfigSource.Extensions,
+          extension.name,
         );
       }
     }
@@ -204,6 +206,7 @@ please review the project settings (.gemini/settings.json) and remove them.`;
   private processHooksConfiguration(
     hooksConfig: { [K in HookEventName]?: HookDefinition[] },
     source: ConfigSource,
+    extensionName?: string,
   ): void {
     for (const [eventName, definitions] of Object.entries(hooksConfig)) {
       if (HOOKS_CONFIG_FIELDS.includes(eventName)) {
@@ -228,7 +231,12 @@ please review the project settings (.gemini/settings.json) and remove them.`;
       }
 
       for (const definition of definitions) {
-        this.processHookDefinition(definition, typedEventName, source);
+        this.processHookDefinition(
+          definition,
+          typedEventName,
+          source,
+          extensionName,
+        );
       }
     }
   }
@@ -240,6 +248,7 @@ please review the project settings (.gemini/settings.json) and remove them.`;
     definition: HookDefinition,
     eventName: HookEventName,
     source: ConfigSource,
+    extensionName?: string,
   ): void {
     if (
       !definition ||
@@ -275,6 +284,7 @@ please review the project settings (.gemini/settings.json) and remove them.`;
         this.entries.push({
           config: hookConfig,
           source,
+          extensionName,
           eventName,
           matcher: definition.matcher,
           sequential: definition.sequential,
