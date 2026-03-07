@@ -25,7 +25,7 @@ import {
 } from '../../utils/textUtils.js';
 import { parsePastedPaths } from '../../utils/clipboardUtils.js';
 import type { Key } from '../../contexts/KeypressContext.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command, type KeyMatchers } from '../../keyMatchers.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../../constants.js';
@@ -3145,33 +3145,33 @@ export function useTextBuffer({
   }, [text, pastedContent, stdin, setRawMode, getPreferredEditor]);
 
   const handleInput = useCallback(
-    (key: Key): boolean => {
+    (key: Key, matchers: KeyMatchers): boolean => {
       const { sequence: input } = key;
 
       if (key.name === 'paste') {
         insert(input, { paste: true });
         return true;
       }
-      if (keyMatchers[Command.RETURN](key)) {
+      if (matchers[Command.RETURN](key)) {
         if (singleLine) {
           return false;
         }
         newline();
         return true;
       }
-      if (keyMatchers[Command.NEWLINE](key)) {
+      if (matchers[Command.NEWLINE](key)) {
         if (singleLine) {
           return false;
         }
         newline();
         return true;
       }
-      if (keyMatchers[Command.MOVE_LEFT](key)) {
+      if (matchers[Command.MOVE_LEFT](key)) {
         if (cursorRow === 0 && cursorCol === 0) return false;
         move('left');
         return true;
       }
-      if (keyMatchers[Command.MOVE_RIGHT](key)) {
+      if (matchers[Command.MOVE_RIGHT](key)) {
         const lastLineIdx = lines.length - 1;
         if (
           cursorRow === lastLineIdx &&
@@ -3182,52 +3182,52 @@ export function useTextBuffer({
         move('right');
         return true;
       }
-      if (keyMatchers[Command.MOVE_UP](key)) {
+      if (matchers[Command.MOVE_UP](key)) {
         if (visualCursor[0] === 0) return false;
         move('up');
         return true;
       }
-      if (keyMatchers[Command.MOVE_DOWN](key)) {
+      if (matchers[Command.MOVE_DOWN](key)) {
         if (visualCursor[0] === visualLines.length - 1) return false;
         move('down');
         return true;
       }
-      if (keyMatchers[Command.MOVE_WORD_LEFT](key)) {
+      if (matchers[Command.MOVE_WORD_LEFT](key)) {
         move('wordLeft');
         return true;
       }
-      if (keyMatchers[Command.MOVE_WORD_RIGHT](key)) {
+      if (matchers[Command.MOVE_WORD_RIGHT](key)) {
         move('wordRight');
         return true;
       }
-      if (keyMatchers[Command.HOME](key)) {
+      if (matchers[Command.HOME](key)) {
         move('home');
         return true;
       }
-      if (keyMatchers[Command.END](key)) {
+      if (matchers[Command.END](key)) {
         move('end');
         return true;
       }
-      if (keyMatchers[Command.CLEAR_INPUT](key)) {
+      if (matchers[Command.CLEAR_INPUT](key)) {
         if (text.length > 0) {
           setText('');
           return true;
         }
         return false;
       }
-      if (keyMatchers[Command.DELETE_WORD_BACKWARD](key)) {
+      if (matchers[Command.DELETE_WORD_BACKWARD](key)) {
         deleteWordLeft();
         return true;
       }
-      if (keyMatchers[Command.DELETE_WORD_FORWARD](key)) {
+      if (matchers[Command.DELETE_WORD_FORWARD](key)) {
         deleteWordRight();
         return true;
       }
-      if (keyMatchers[Command.DELETE_CHAR_LEFT](key)) {
+      if (matchers[Command.DELETE_CHAR_LEFT](key)) {
         backspace();
         return true;
       }
-      if (keyMatchers[Command.DELETE_CHAR_RIGHT](key)) {
+      if (matchers[Command.DELETE_CHAR_RIGHT](key)) {
         const lastLineIdx = lines.length - 1;
         if (
           cursorRow === lastLineIdx &&
@@ -3238,11 +3238,11 @@ export function useTextBuffer({
         del();
         return true;
       }
-      if (keyMatchers[Command.UNDO](key)) {
+      if (matchers[Command.UNDO](key)) {
         undo();
         return true;
       }
-      if (keyMatchers[Command.REDO](key)) {
+      if (matchers[Command.REDO](key)) {
         redo();
         return true;
       }
@@ -3745,7 +3745,7 @@ export interface TextBuffer {
   /**
    * High level "handleInput" – receives what Ink gives us.
    */
-  handleInput: (key: Key) => boolean;
+  handleInput: (key: Key, matchers: KeyMatchers) => boolean;
   /**
    * Opens the current buffer contents in the user's preferred terminal text
    * editor ($VISUAL or $EDITOR, falling back to "vi").  The method blocks

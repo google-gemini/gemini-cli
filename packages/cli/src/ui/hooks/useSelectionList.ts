@@ -6,7 +6,7 @@
 
 import { useReducer, useRef, useEffect, useCallback } from 'react';
 import { useKeypress, type Key } from './useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command, type KeyMatchers } from '../keyMatchers.js';
 import { debugLogger } from '@google/gemini-cli-core';
 
 export interface SelectionListItem<T> {
@@ -386,7 +386,7 @@ export function useSelectionList<T>({
 
   const itemsLength = items.length;
   const handleKeypress = useCallback(
-    (key: Key) => {
+    (key: Key, matchers: KeyMatchers) => {
       const { sequence } = key;
       const isNumeric = showNumbers && /^[0-9]$/.test(sequence);
 
@@ -396,17 +396,17 @@ export function useSelectionList<T>({
         numberInputRef.current = '';
       }
 
-      if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
+      if (matchers[Command.DIALOG_NAVIGATION_UP](key)) {
         dispatch({ type: 'MOVE_UP' });
         return true;
       }
 
-      if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
+      if (matchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
         dispatch({ type: 'MOVE_DOWN' });
         return true;
       }
 
-      if (keyMatchers[Command.RETURN](key)) {
+      if (matchers[Command.RETURN](key)) {
         dispatch({ type: 'SELECT_CURRENT' });
         return true;
       }
@@ -463,7 +463,7 @@ export function useSelectionList<T>({
     [dispatch, itemsLength, showNumbers],
   );
 
-  useKeypress(handleKeypress, {
+  useKeypress((key, matchers) => handleKeypress(key, matchers), {
     isActive: !!(isFocused && itemsLength > 0),
     priority,
   });

@@ -18,6 +18,7 @@ import {
 import { ValidationDialog } from './ValidationDialog.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import type { Key } from '../hooks/useKeypress.js';
+import { defaultKeyMatchers, type KeyMatchers } from '../keyMatchers.js';
 
 // Mock the child components and utilities
 vi.mock('./shared/RadioButtonSelect.js', () => ({
@@ -43,14 +44,16 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 });
 
 // Capture keypress handler to test it
-let mockKeypressHandler: (key: Key) => void;
+let mockKeypressHandler: (key: Key, matchers: KeyMatchers) => void;
 let mockKeypressOptions: { isActive: boolean };
 
 vi.mock('../hooks/useKeypress.js', () => ({
-  useKeypress: vi.fn((handler, options) => {
-    mockKeypressHandler = handler;
-    mockKeypressOptions = options;
-  }),
+  useKeypress: vi.fn(
+    (handler: (key: Key, matchers: KeyMatchers) => void, options) => {
+      mockKeypressHandler = handler;
+      mockKeypressOptions = options;
+    },
+  ),
 }));
 
 describe('ValidationDialog', () => {
@@ -121,15 +124,18 @@ describe('ValidationDialog', () => {
 
       // Simulate ESCAPE key press
       await act(async () => {
-        mockKeypressHandler({
-          name: 'escape',
-          ctrl: false,
-          shift: false,
-          alt: false,
-          cmd: false,
-          insertable: false,
-          sequence: '\x1b',
-        });
+        mockKeypressHandler(
+          {
+            name: 'escape',
+            ctrl: false,
+            shift: false,
+            alt: false,
+            cmd: false,
+            insertable: false,
+            sequence: '\x1b',
+          },
+          defaultKeyMatchers,
+        );
       });
       // Escape key has a 50ms timeout in KeypressContext, so we need to wrap waitUntilReady in act
       await act(async () => {

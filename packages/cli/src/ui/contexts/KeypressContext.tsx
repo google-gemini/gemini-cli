@@ -21,6 +21,7 @@ import { parseMouseEvent } from '../utils/mouse.js';
 import { FOCUS_IN, FOCUS_OUT } from '../hooks/useFocus.js';
 import { appEvents, AppEvent } from '../../utils/events.js';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
+import { defaultKeyMatchers, type KeyMatchers } from '../keyMatchers.js';
 
 export const BACKSLASH_ENTER_TIMEOUT = 5;
 export const ESC_TIMEOUT = 50;
@@ -166,13 +167,13 @@ const MAC_ALT_KEY_CHARACTER_MAP: Record<string, string> = {
 function nonKeyboardEventFilter(
   keypressHandler: KeypressHandler,
 ): KeypressHandler {
-  return (key: Key) => {
+  return (key: Key, matchers: KeyMatchers) => {
     if (
       !parseMouseEvent(key.sequence) &&
       key.sequence !== FOCUS_IN &&
       key.sequence !== FOCUS_OUT
     ) {
-      keypressHandler(key);
+      keypressHandler(key, matchers);
     }
   };
 }
@@ -184,21 +185,24 @@ function nonKeyboardEventFilter(
  */
 function bufferFastReturn(keypressHandler: KeypressHandler): KeypressHandler {
   let lastKeyTime = 0;
-  return (key: Key) => {
+  return (key: Key, matchers: KeyMatchers) => {
     const now = Date.now();
     if (key.name === 'return' && now - lastKeyTime <= FAST_RETURN_TIMEOUT) {
-      keypressHandler({
-        ...key,
-        name: 'return',
-        shift: true, // to make it a newline, not a submission
-        alt: false,
-        ctrl: false,
-        cmd: false,
-        sequence: '\r',
-        insertable: true,
-      });
+      keypressHandler(
+        {
+          ...key,
+          name: 'return',
+          shift: true, // to make it a newline, not a submission
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          sequence: '\r',
+          insertable: true,
+        },
+        matchers,
+      );
     } else {
-      keypressHandler(key);
+      keypressHandler(key, matchers);
     }
     lastKeyTime = key.insertable ? now : 0;
   };
@@ -212,14 +216,21 @@ function bufferFastReturn(keypressHandler: KeypressHandler): KeypressHandler {
 function bufferBackslashEnter(
   keypressHandler: KeypressHandler,
 ): KeypressHandler {
-  const bufferer = (function* (): Generator<void, void, Key | null> {
+  const bufferer = (function* (): Generator<
+    void,
+    void,
+    { key: Key; matchers: KeyMatchers } | null
+  > {
     while (true) {
-      const key = yield;
+      const input = yield;
 
-      if (key == null) {
+      if (input == null) {
         continue;
-      } else if (key.sequence !== '\\') {
-        keypressHandler(key);
+      }
+      const { key, matchers } = input;
+
+      if (key.sequence !== '\\') {
+        keypressHandler(key, matchers);
         continue;
       }
 
@@ -227,28 +238,31 @@ function bufferBackslashEnter(
         () => bufferer.next(null),
         BACKSLASH_ENTER_TIMEOUT,
       );
-      const nextKey = yield;
+      const nextInput = yield;
       clearTimeout(timeoutId);
 
-      if (nextKey === null) {
-        keypressHandler(key);
-      } else if (nextKey.name === 'return') {
-        keypressHandler({
-          ...nextKey,
-          shift: true,
-          sequence: '\r', // Corrected escaping for newline
-        });
+      if (nextInput === null) {
+        keypressHandler(key, matchers);
+      } else if (nextInput.key.name === 'return') {
+        keypressHandler(
+          {
+            ...nextInput.key,
+            shift: true,
+            sequence: '\r', // Corrected escaping for newline
+          },
+          matchers,
+        );
       } else {
-        keypressHandler(key);
-        keypressHandler(nextKey);
+        keypressHandler(key, matchers);
+        keypressHandler(nextInput.key, nextInput.matchers);
       }
     }
   })();
 
   bufferer.next(); // prime the generator so it starts listening.
 
-  return (key: Key) => {
-    bufferer.next(key);
+  return (key: Key, matchers: KeyMatchers) => {
+    bufferer.next({ key, matchers });
   };
 }
 
@@ -258,27 +272,37 @@ function bufferBackslashEnter(
  * when a null key is received.
  */
 function bufferPaste(keypressHandler: KeypressHandler): KeypressHandler {
-  const bufferer = (function* (): Generator<void, void, Key | null> {
+  const bufferer = (function* (): Generator<
+    void,
+    void,
+    { key: Key; matchers: KeyMatchers } | null
+  > {
     while (true) {
-      let key = yield;
+      let input = yield;
 
-      if (key === null) {
+      if (input === null) {
         continue;
-      } else if (key.name !== 'paste-start') {
-        keypressHandler(key);
+      }
+      let { key, matchers } = input;
+
+      if (key.name !== 'paste-start') {
+        keypressHandler(key, matchers);
         continue;
       }
 
       let buffer = '';
       while (true) {
         const timeoutId = setTimeout(() => bufferer.next(null), PASTE_TIMEOUT);
-        key = yield;
+        input = yield;
         clearTimeout(timeoutId);
 
-        if (key === null) {
+        if (input === null) {
           appEvents.emit(AppEvent.PasteTimeout);
           break;
         }
+
+        key = input.key;
+        matchers = input.matchers;
 
         if (key.name === 'paste-end') {
           break;
@@ -287,22 +311,25 @@ function bufferPaste(keypressHandler: KeypressHandler): KeypressHandler {
       }
 
       if (buffer.length > 0) {
-        keypressHandler({
-          name: 'paste',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: true,
-          sequence: buffer,
-        });
+        keypressHandler(
+          {
+            name: 'paste',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: true,
+            sequence: buffer,
+          },
+          matchers,
+        );
       }
     }
   })();
   bufferer.next(); // prime the generator so it starts listening.
 
-  return (key: Key) => {
-    bufferer.next(key);
+  return (key: Key, matchers: KeyMatchers) => {
+    bufferer.next({ key, matchers });
   };
 }
 
@@ -311,8 +338,11 @@ function bufferPaste(keypressHandler: KeypressHandler): KeypressHandler {
  * Buffers escape sequences until a full sequence is received or
  * until a timeout occurs.
  */
-function createDataListener(keypressHandler: KeypressHandler) {
-  const parser = emitKeys(keypressHandler);
+function createDataListener(
+  keypressHandler: KeypressHandler,
+  matchers: KeyMatchers,
+) {
+  const parser = emitKeys(keypressHandler, matchers);
   parser.next(); // prime the generator so it starts listening.
 
   let timeoutId: NodeJS.Timeout;
@@ -334,6 +364,7 @@ function createDataListener(keypressHandler: KeypressHandler) {
  */
 function* emitKeys(
   keypressHandler: KeypressHandler,
+  matchers: KeyMatchers,
 ): Generator<void, void, string> {
   const lang = process.env['LANG'] || '';
   const lcAll = process.env['LC_ALL'] || '';
@@ -397,15 +428,18 @@ function* emitKeys(
           try {
             const base64Data = match[1];
             const decoded = Buffer.from(base64Data, 'base64').toString('utf-8');
-            keypressHandler({
-              name: 'paste',
-              shift: false,
-              alt: false,
-              ctrl: false,
-              cmd: false,
-              insertable: true,
-              sequence: decoded,
-            });
+            keypressHandler(
+              {
+                name: 'paste',
+                shift: false,
+                alt: false,
+                ctrl: false,
+                cmd: false,
+                insertable: true,
+                sequence: decoded,
+              },
+              matchers,
+            );
           } catch (_e) {
             debugLogger.log('Failed to decode OSC 52 clipboard data');
           }
@@ -632,15 +666,18 @@ function* emitKeys(
       alt = false;
 
       // Emit first escape key here, then continue processing
-      keypressHandler({
-        name: 'escape',
-        shift,
-        alt,
-        ctrl,
-        cmd,
-        insertable: false,
-        sequence: ESC,
-      });
+      keypressHandler(
+        {
+          name: 'escape',
+          shift,
+          alt,
+          ctrl,
+          cmd,
+          insertable: false,
+          sequence: ESC,
+        },
+        matchers,
+      );
     } else if (escaped) {
       // Escape sequence timeout
       name = ch.length ? undefined : 'escape';
@@ -654,15 +691,18 @@ function* emitKeys(
       (sequence.length !== 0 && (name !== undefined || escaped)) ||
       charLengthAt(sequence, 0) === sequence.length
     ) {
-      keypressHandler({
-        name: name || '',
-        shift,
-        alt,
-        ctrl,
-        cmd,
-        insertable,
-        sequence,
-      });
+      keypressHandler(
+        {
+          name: name || '',
+          shift,
+          alt,
+          ctrl,
+          cmd,
+          insertable,
+          sequence,
+        },
+        matchers,
+      );
     }
     // Unrecognized or broken escape sequence, don't emit anything
   }
@@ -678,7 +718,10 @@ export interface Key {
   sequence: string;
 }
 
-export type KeypressHandler = (key: Key) => boolean | void;
+export type KeypressHandler = (
+  key: Key,
+  matchers: KeyMatchers,
+) => boolean | void;
 
 interface KeypressContextValue {
   subscribe: (
@@ -766,7 +809,7 @@ export function KeypressProvider({
   );
 
   const broadcast = useCallback(
-    (key: Key) => {
+    (key: Key, matchers: KeyMatchers) => {
       // Use cached sorted priorities to avoid sorting on every keypress
       for (const p of sortedPriorities.current) {
         const set = subscribers.get(p);
@@ -775,7 +818,7 @@ export function KeypressProvider({
         // Within a priority level, use stack behavior (last subscribed is first to handle)
         const handlers = Array.from(set).reverse();
         for (const handler of handlers) {
-          if (handler(key) === true) {
+          if (handler(key, matchers) === true) {
             return;
           }
         }
@@ -800,7 +843,7 @@ export function KeypressProvider({
     }
     processor = bufferBackslashEnter(processor);
     processor = bufferPaste(processor);
-    let dataListener = createDataListener(processor);
+    let dataListener = createDataListener(processor, defaultKeyMatchers);
 
     if (debugKeystrokeLogging) {
       const old = dataListener;

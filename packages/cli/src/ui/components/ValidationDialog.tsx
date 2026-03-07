@@ -16,7 +16,7 @@ import {
   type ValidationIntent,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../keyMatchers.js';
 
 interface ValidationDialogProps {
   validationLink?: string;
@@ -50,11 +50,11 @@ export function ValidationDialog({
 
   // Handle keypresses globally for cancellation, and specific logic for waiting state
   useKeypress(
-    (key) => {
-      if (keyMatchers[Command.ESCAPE](key) || keyMatchers[Command.QUIT](key)) {
+    (key, matchers) => {
+      if (matchers[Command.ESCAPE](key) || matchers[Command.QUIT](key)) {
         onChoice('cancel');
         return true;
-      } else if (state === 'waiting' && keyMatchers[Command.RETURN](key)) {
+      } else if (state === 'waiting' && matchers[Command.RETURN](key)) {
         // User confirmed verification is complete - transition to 'complete' state
         setState('complete');
         return true;

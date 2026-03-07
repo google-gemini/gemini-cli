@@ -24,7 +24,7 @@ import {
   cpIndexToOffset,
 } from '../../utils/textUtils.js';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command, type KeyMatchers } from '../../keyMatchers.js';
 import { formatCommand } from '../../utils/keybindingUtils.js';
 
 /**
@@ -103,6 +103,7 @@ export interface BaseSettingsDialogProps {
   /** Optional custom key handler for parent-specific keys. Return true if handled. */
   onKeyPress?: (
     key: Key,
+    matchers: KeyMatchers,
     currentItem: SettingsDialogItem | undefined,
   ) => boolean;
 
@@ -247,9 +248,9 @@ export function BaseSettingsDialog({
 
   // Keyboard handling
   useKeypress(
-    (key: Key) => {
+    (key, matchers) => {
       // Let parent handle custom keys first
-      if (onKeyPress?.(key, currentItem)) {
+      if (onKeyPress?.(key, matchers, currentItem)) {
         return;
       }
 
@@ -259,25 +260,25 @@ export function BaseSettingsDialog({
         const type = item?.type ?? 'string';
 
         // Navigation within edit buffer
-        if (keyMatchers[Command.MOVE_LEFT](key)) {
+        if (matchers[Command.MOVE_LEFT](key)) {
           setEditCursorPos((p) => Math.max(0, p - 1));
           return;
         }
-        if (keyMatchers[Command.MOVE_RIGHT](key)) {
+        if (matchers[Command.MOVE_RIGHT](key)) {
           setEditCursorPos((p) => Math.min(cpLen(editBuffer), p + 1));
           return;
         }
-        if (keyMatchers[Command.HOME](key)) {
+        if (matchers[Command.HOME](key)) {
           setEditCursorPos(0);
           return;
         }
-        if (keyMatchers[Command.END](key)) {
+        if (matchers[Command.END](key)) {
           setEditCursorPos(cpLen(editBuffer));
           return;
         }
 
         // Backspace
-        if (keyMatchers[Command.DELETE_CHAR_LEFT](key)) {
+        if (matchers[Command.DELETE_CHAR_LEFT](key)) {
           if (editCursorPos > 0) {
             setEditBuffer((b) => {
               const before = cpSlice(b, 0, editCursorPos - 1);
@@ -290,7 +291,7 @@ export function BaseSettingsDialog({
         }
 
         // Delete
-        if (keyMatchers[Command.DELETE_CHAR_RIGHT](key)) {
+        if (matchers[Command.DELETE_CHAR_RIGHT](key)) {
           if (editCursorPos < cpLen(editBuffer)) {
             setEditBuffer((b) => {
               const before = cpSlice(b, 0, editCursorPos);
@@ -302,19 +303,19 @@ export function BaseSettingsDialog({
         }
 
         // Escape in edit mode - commit (consistent with SettingsDialog)
-        if (keyMatchers[Command.ESCAPE](key)) {
+        if (matchers[Command.ESCAPE](key)) {
           commitEdit();
           return;
         }
 
         // Enter in edit mode - commit
-        if (keyMatchers[Command.RETURN](key)) {
+        if (matchers[Command.RETURN](key)) {
           commitEdit();
           return;
         }
 
         // Up/Down in edit mode - commit and navigate
-        if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
+        if (matchers[Command.DIALOG_NAVIGATION_UP](key)) {
           commitEdit();
           const newIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
           setActiveIndex(newIndex);
@@ -325,7 +326,7 @@ export function BaseSettingsDialog({
           }
           return;
         }
-        if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
+        if (matchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
           commitEdit();
           const newIndex = activeIndex < items.length - 1 ? activeIndex + 1 : 0;
           setActiveIndex(newIndex);
@@ -362,7 +363,7 @@ export function BaseSettingsDialog({
       // Not in edit mode - handle navigation and actions
       if (focusSection === 'settings') {
         // Up/Down navigation with wrap-around
-        if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
+        if (matchers[Command.DIALOG_NAVIGATION_UP](key)) {
           const newIndex = activeIndex > 0 ? activeIndex - 1 : items.length - 1;
           setActiveIndex(newIndex);
           if (newIndex === items.length - 1) {
@@ -372,7 +373,7 @@ export function BaseSettingsDialog({
           }
           return true;
         }
-        if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
+        if (matchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
           const newIndex = activeIndex < items.length - 1 ? activeIndex + 1 : 0;
           setActiveIndex(newIndex);
           if (newIndex === 0) {
@@ -384,7 +385,7 @@ export function BaseSettingsDialog({
         }
 
         // Enter - toggle or start edit
-        if (keyMatchers[Command.RETURN](key) && currentItem) {
+        if (matchers[Command.RETURN](key) && currentItem) {
           if (currentItem.type === 'boolean' || currentItem.type === 'enum') {
             onItemToggle(currentItem.key, currentItem);
           } else {
@@ -399,7 +400,7 @@ export function BaseSettingsDialog({
         }
 
         // Ctrl+L - clear/reset to default (using only Ctrl+L to avoid Ctrl+C exit conflict)
-        if (keyMatchers[Command.CLEAR_SCREEN](key) && currentItem) {
+        if (matchers[Command.CLEAR_SCREEN](key) && currentItem) {
           onItemClear(currentItem.key, currentItem);
           return true;
         }
@@ -418,7 +419,7 @@ export function BaseSettingsDialog({
       }
 
       // Escape - close dialog
-      if (keyMatchers[Command.ESCAPE](key)) {
+      if (matchers[Command.ESCAPE](key)) {
         onClose();
         return;
       }

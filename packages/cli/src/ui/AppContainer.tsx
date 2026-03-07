@@ -119,7 +119,7 @@ import { type InitializationResult } from '../core/initializer.js';
 import { useFocus } from './hooks/useFocus.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { KeypressPriority } from './contexts/KeypressContext.js';
-import { keyMatchers, Command } from './keyMatchers.js';
+import { Command, type KeyMatchers } from './keyMatchers.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
@@ -1648,36 +1648,39 @@ Logging in with Google... Restarting Gemini CLI to continue.
   });
 
   const handleGlobalKeypress = useCallback(
-    (key: Key): boolean => {
+    (key: Key, matchers: KeyMatchers): boolean => {
       // Debug log keystrokes if enabled
       if (settings.merged.general.debugKeystrokeLogging) {
         debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
       }
 
-      if (shortcutsHelpVisible && shouldDismissShortcutsHelpOnHotkey(key)) {
+      if (
+        shortcutsHelpVisible &&
+        shouldDismissShortcutsHelpOnHotkey(key, matchers)
+      ) {
         setShortcutsHelpVisible(false);
       }
 
-      if (isAlternateBuffer && keyMatchers[Command.TOGGLE_COPY_MODE](key)) {
+      if (isAlternateBuffer && matchers[Command.TOGGLE_COPY_MODE](key)) {
         setCopyModeEnabled(true);
         disableMouseEvents();
         return true;
       }
 
-      if (keyMatchers[Command.QUIT](key)) {
+      if (matchers[Command.QUIT](key)) {
         // If the user presses Ctrl+C, we want to cancel any ongoing requests.
         // This should happen regardless of the count.
         cancelOngoingRequest?.();
 
         handleCtrlCPress();
         return true;
-      } else if (keyMatchers[Command.EXIT](key)) {
+      } else if (matchers[Command.EXIT](key)) {
         handleCtrlDPress();
         return true;
-      } else if (keyMatchers[Command.SUSPEND_APP](key)) {
+      } else if (matchers[Command.SUSPEND_APP](key)) {
         handleSuspend();
       } else if (
-        keyMatchers[Command.TOGGLE_COPY_MODE](key) &&
+        matchers[Command.TOGGLE_COPY_MODE](key) &&
         !isAlternateBuffer
       ) {
         showTransientMessage({
@@ -1691,7 +1694,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (!constrainHeight) {
         enteringConstrainHeightMode = true;
         setConstrainHeight(true);
-        if (keyMatchers[Command.SHOW_MORE_LINES](key)) {
+        if (matchers[Command.SHOW_MORE_LINES](key)) {
           // If the user manually collapses the view, show the hint and reset the x-second timer.
           triggerExpandHint(true);
         }
@@ -1700,7 +1703,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
       }
 
-      if (keyMatchers[Command.SHOW_ERROR_DETAILS](key)) {
+      if (matchers[Command.SHOW_ERROR_DETAILS](key)) {
         if (settings.merged.general.devtools) {
           void (async () => {
             const { toggleDevToolsPanel } = await import(
@@ -1717,10 +1720,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
           setShowErrorDetails((prev) => !prev);
         }
         return true;
-      } else if (keyMatchers[Command.SHOW_FULL_TODOS](key)) {
+      } else if (matchers[Command.SHOW_FULL_TODOS](key)) {
         setShowFullTodos((prev) => !prev);
         return true;
-      } else if (keyMatchers[Command.TOGGLE_MARKDOWN](key)) {
+      } else if (matchers[Command.TOGGLE_MARKDOWN](key)) {
         setRenderMarkdown((prev) => {
           const newValue = !prev;
           // Force re-render of static content
@@ -1729,7 +1732,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         });
         return true;
       } else if (
-        keyMatchers[Command.SHOW_IDE_CONTEXT_DETAIL](key) &&
+        matchers[Command.SHOW_IDE_CONTEXT_DETAIL](key) &&
         config.getIdeMode() &&
         ideContextState
       ) {
@@ -1737,7 +1740,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         handleSlashCommand('/ide status');
         return true;
       } else if (
-        keyMatchers[Command.SHOW_MORE_LINES](key) &&
+        matchers[Command.SHOW_MORE_LINES](key) &&
         !enteringConstrainHeightMode
       ) {
         setConstrainHeight(false);
@@ -1748,8 +1751,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
         return true;
       } else if (
-        (keyMatchers[Command.FOCUS_SHELL_INPUT](key) ||
-          keyMatchers[Command.UNFOCUS_BACKGROUND_SHELL_LIST](key)) &&
+        (matchers[Command.FOCUS_SHELL_INPUT](key) ||
+          matchers[Command.UNFOCUS_BACKGROUND_SHELL_LIST](key)) &&
         (activePtyId || (isBackgroundShellVisible && backgroundShells.size > 0))
       ) {
         if (embeddedShellFocused) {
@@ -1783,15 +1786,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setEmbeddedShellFocused(true);
         return true;
       } else if (
-        keyMatchers[Command.UNFOCUS_SHELL_INPUT](key) ||
-        keyMatchers[Command.UNFOCUS_BACKGROUND_SHELL](key)
+        matchers[Command.UNFOCUS_SHELL_INPUT](key) ||
+        matchers[Command.UNFOCUS_BACKGROUND_SHELL](key)
       ) {
         if (embeddedShellFocused) {
           setEmbeddedShellFocused(false);
           return true;
         }
         return false;
-      } else if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
+      } else if (matchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
         if (activePtyId) {
           backgroundCurrentShell();
           // After backgrounding, we explicitly do NOT show or focus the background UI.
@@ -1808,7 +1811,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
           }
         }
         return true;
-      } else if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL_LIST](key)) {
+      } else if (matchers[Command.TOGGLE_BACKGROUND_SHELL_LIST](key)) {
         if (backgroundShells.size > 0 && isBackgroundShellVisible) {
           if (!embeddedShellFocused) {
             setEmbeddedShellFocused(true);
@@ -1851,7 +1854,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ],
   );
 
-  useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
+  useKeypress((key, matchers) => handleGlobalKeypress(key, matchers), {
+    isActive: true,
+    priority: true,
+  });
 
   useKeypress(
     () => {

@@ -13,6 +13,7 @@ import {
   type SelectionListItem,
 } from './useSelectionList.js';
 import { useKeypress } from './useKeypress.js';
+import { defaultKeyMatchers } from '../keyMatchers.js';
 
 import type { KeypressHandler, Key } from '../contexts/KeypressContext.js';
 
@@ -64,7 +65,7 @@ describe('useSelectionList', () => {
           shift: options.shift ?? false,
           insertable: false,
         };
-        activeKeypressHandler(key);
+        activeKeypressHandler(key, defaultKeyMatchers);
       } else {
         throw new Error(
           `Test attempted to press key (${name}) but the keypress handler is not active. Ensure the hook is focused (isFocused=true) and the list is not empty.`,
@@ -400,7 +401,7 @@ describe('useSelectionList', () => {
           shift: false,
           insertable: true,
         };
-        handler(key);
+        handler(key, defaultKeyMatchers);
       };
 
       // 1. Press Down. Should move 0 (A) -> 2 (C).
@@ -453,7 +454,7 @@ describe('useSelectionList', () => {
             shift: false,
             insertable: false,
           };
-          handler(key);
+          handler(key, defaultKeyMatchers);
         };
 
         // All presses happen in same render cycle - React batches the state updates

@@ -11,7 +11,7 @@ import { useSelectionList } from '../../hooks/useSelectionList.js';
 import { TextInput } from './TextInput.js';
 import type { TextBuffer } from './text-buffer.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../keyMatchers.js';
 
 /**
  * Generic interface for items in a searchable list.
@@ -148,8 +148,8 @@ export function SearchableList<T extends GenericListItem>({
 
   // Handle global Escape key to close the list
   useKeypress(
-    (key) => {
-      if (keyMatchers[Command.ESCAPE](key)) {
+    (key, matchers) => {
+      if (matchers[Command.ESCAPE](key)) {
         onClose();
         return true;
       }

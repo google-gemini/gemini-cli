@@ -41,6 +41,7 @@ import {
   getTransformedImagePath,
 } from './text-buffer.js';
 import { cpLen } from '../../utils/textUtils.js';
+import { defaultKeyMatchers } from '../../keyMatchers.js';
 import { escapePath } from '@google/gemini-cli-core';
 
 const defaultVisualLayout: VisualLayout = {
@@ -1442,15 +1443,18 @@ describe('useTextBuffer', () => {
       // This currently fails because handleInput returns false if cursorRow === 0
       let handledUp = false;
       act(() => {
-        handledUp = result.current.handleInput({
-          name: 'up',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: false,
-          sequence: '\x1b[A',
-        });
+        handledUp = result.current.handleInput(
+          {
+            name: 'up',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: false,
+            sequence: '\x1b[A',
+          },
+          defaultKeyMatchers,
+        );
       });
       expect(handledUp).toBe(true);
       expect(getBufferState(result).visualCursor[0]).toBe(0);
@@ -1459,15 +1463,18 @@ describe('useTextBuffer', () => {
       // This would also fail if cursorRow is the last logical row
       let handledDown = false;
       act(() => {
-        handledDown = result.current.handleInput({
-          name: 'down',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: false,
-          sequence: '\x1b[B',
-        });
+        handledDown = result.current.handleInput(
+          {
+            name: 'down',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: false,
+            sequence: '\x1b[B',
+          },
+          defaultKeyMatchers,
+        );
       });
       expect(handledDown).toBe(true);
       expect(getBufferState(result).visualCursor[0]).toBe(1);
@@ -1505,26 +1512,32 @@ describe('useTextBuffer', () => {
     it('should insert printable characters', () => {
       const { result } = renderHook(() => useTextBuffer({ viewport }));
       act(() => {
-        result.current.handleInput({
-          name: 'h',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: true,
-          sequence: 'h',
-        });
+        result.current.handleInput(
+          {
+            name: 'h',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: true,
+            sequence: 'h',
+          },
+          defaultKeyMatchers,
+        );
       });
       void act(() =>
-        result.current.handleInput({
-          name: 'i',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: true,
-          sequence: 'i',
-        }),
+        result.current.handleInput(
+          {
+            name: 'i',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: true,
+            sequence: 'i',
+          },
+          defaultKeyMatchers,
+        ),
       );
       expect(getBufferState(result).text).toBe('hi');
     });
@@ -1532,15 +1545,18 @@ describe('useTextBuffer', () => {
     it('should handle "Enter" key as newline', () => {
       const { result } = renderHook(() => useTextBuffer({ viewport }));
       act(() => {
-        result.current.handleInput({
-          name: 'return',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: true,
-          sequence: '\r',
-        });
+        result.current.handleInput(
+          {
+            name: 'return',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: true,
+            sequence: '\r',
+          },
+          defaultKeyMatchers,
+        );
       });
       expect(getBufferState(result).lines).toEqual(['', '']);
     });
@@ -1548,15 +1564,18 @@ describe('useTextBuffer', () => {
     it('should handle Ctrl+J as newline', () => {
       const { result } = renderHook(() => useTextBuffer({ viewport }));
       act(() => {
-        result.current.handleInput({
-          name: 'j',
-          shift: false,
-          alt: false,
-          ctrl: true,
-          cmd: false,
-          insertable: false,
-          sequence: '\n',
-        });
+        result.current.handleInput(
+          {
+            name: 'j',
+            shift: false,
+            alt: false,
+            ctrl: true,
+            cmd: false,
+            insertable: false,
+            sequence: '\n',
+          },
+          defaultKeyMatchers,
+        );
       });
       expect(getBufferState(result).lines).toEqual(['', '']);
     });
@@ -1564,15 +1583,18 @@ describe('useTextBuffer', () => {
     it('should do nothing for a tab key press', () => {
       const { result } = renderHook(() => useTextBuffer({ viewport }));
       act(() => {
-        result.current.handleInput({
-          name: 'tab',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: false,
-          sequence: '\t',
-        });
+        result.current.handleInput(
+          {
+            name: 'tab',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: false,
+            sequence: '\t',
+          },
+          defaultKeyMatchers,
+        );
       });
       expect(getBufferState(result).text).toBe('');
     });
@@ -1580,15 +1602,18 @@ describe('useTextBuffer', () => {
     it('should do nothing for a shift tab key press', () => {
       const { result } = renderHook(() => useTextBuffer({ viewport }));
       act(() => {
-        result.current.handleInput({
-          name: 'tab',
-          shift: true,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: false,
-          sequence: '\u001b[9;2u',
-        });
+        result.current.handleInput(
+          {
+            name: 'tab',
+            shift: true,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: false,
+            sequence: '\u001b[9;2u',
+          },
+          defaultKeyMatchers,
+        );
       });
       expect(getBufferState(result).text).toBe('');
     });
@@ -1603,15 +1628,18 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).text).toBe('hello');
       let handled = false;
       act(() => {
-        handled = result.current.handleInput({
-          name: 'c',
-          shift: false,
-          alt: false,
-          ctrl: true,
-          cmd: false,
-          insertable: false,
-          sequence: '\u0003',
-        });
+        handled = result.current.handleInput(
+          {
+            name: 'c',
+            shift: false,
+            alt: false,
+            ctrl: true,
+            cmd: false,
+            insertable: false,
+            sequence: '\u0003',
+          },
+          defaultKeyMatchers,
+        );
       });
       expect(handled).toBe(true);
       expect(getBufferState(result).text).toBe('');
@@ -1621,15 +1649,18 @@ describe('useTextBuffer', () => {
       const { result } = renderHook(() => useTextBuffer({ viewport }));
       let handled = true;
       act(() => {
-        handled = result.current.handleInput({
-          name: 'c',
-          shift: false,
-          alt: false,
-          ctrl: true,
-          cmd: false,
-          insertable: false,
-          sequence: '\u0003',
-        });
+        handled = result.current.handleInput(
+          {
+            name: 'c',
+            shift: false,
+            alt: false,
+            ctrl: true,
+            cmd: false,
+            insertable: false,
+            sequence: '\u0003',
+          },
+          defaultKeyMatchers,
+        );
       });
       expect(handled).toBe(false);
     });
@@ -1643,15 +1674,18 @@ describe('useTextBuffer', () => {
       );
       act(() => result.current.move('end'));
       act(() => {
-        result.current.handleInput({
-          name: 'backspace',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: false,
-          sequence: '\x7f',
-        });
+        result.current.handleInput(
+          {
+            name: 'backspace',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: false,
+            sequence: '\x7f',
+          },
+          defaultKeyMatchers,
+        );
       });
       expect(getBufferState(result).text).toBe('');
     });
@@ -1667,33 +1701,42 @@ describe('useTextBuffer', () => {
       expect(getBufferState(result).cursor).toEqual([0, 5]);
 
       act(() => {
-        result.current.handleInput({
-          name: 'backspace',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: false,
-          sequence: '\x7f',
-        });
-        result.current.handleInput({
-          name: 'backspace',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: false,
-          sequence: '\x7f',
-        });
-        result.current.handleInput({
-          name: 'backspace',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: false,
-          sequence: '\x7f',
-        });
+        result.current.handleInput(
+          {
+            name: 'backspace',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: false,
+            sequence: '\x7f',
+          },
+          defaultKeyMatchers,
+        );
+        result.current.handleInput(
+          {
+            name: 'backspace',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: false,
+            sequence: '\x7f',
+          },
+          defaultKeyMatchers,
+        );
+        result.current.handleInput(
+          {
+            name: 'backspace',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: false,
+            sequence: '\x7f',
+          },
+          defaultKeyMatchers,
+        );
       });
       expect(getBufferState(result).text).toBe('ab');
       expect(getBufferState(result).cursor).toEqual([0, 2]);
@@ -1742,27 +1785,33 @@ describe('useTextBuffer', () => {
       );
       act(() => result.current.move('end')); // cursor [0,2]
       act(() => {
-        result.current.handleInput({
-          name: 'left',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: false,
-          sequence: '\x1b[D',
-        });
+        result.current.handleInput(
+          {
+            name: 'left',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: false,
+            sequence: '\x1b[D',
+          },
+          defaultKeyMatchers,
+        );
       });
       expect(getBufferState(result).cursor).toEqual([0, 1]);
       act(() => {
-        result.current.handleInput({
-          name: 'right',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: false,
-          sequence: '\x1b[C',
-        });
+        result.current.handleInput(
+          {
+            name: 'right',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: false,
+            sequence: '\x1b[C',
+          },
+          defaultKeyMatchers,
+        );
       });
       expect(getBufferState(result).cursor).toEqual([0, 2]);
     });
@@ -1772,15 +1821,18 @@ describe('useTextBuffer', () => {
       const textWithAnsi = '\x1B[31mHello\x1B[0m \x1B[32mWorld\x1B[0m';
       // Simulate pasting by calling handleInput with a string longer than 1 char
       act(() => {
-        result.current.handleInput({
-          name: '',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: true,
-          sequence: textWithAnsi,
-        });
+        result.current.handleInput(
+          {
+            name: '',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: true,
+            sequence: textWithAnsi,
+          },
+          defaultKeyMatchers,
+        );
       });
       expect(getBufferState(result).text).toBe('Hello World');
     });
@@ -1788,15 +1840,18 @@ describe('useTextBuffer', () => {
     it('should handle VSCode terminal Shift+Enter as newline', () => {
       const { result } = renderHook(() => useTextBuffer({ viewport }));
       act(() => {
-        result.current.handleInput({
-          name: 'return',
-          shift: true,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: true,
-          sequence: '\r',
-        });
+        result.current.handleInput(
+          {
+            name: 'return',
+            shift: true,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: true,
+            sequence: '\r',
+          },
+          defaultKeyMatchers,
+        );
       }); // Simulates Shift+Enter in VSCode terminal
       expect(getBufferState(result).lines).toEqual(['', '']);
     });
@@ -2024,7 +2079,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
     ])('should strip $desc from input', ({ input, expected }) => {
       const { result } = renderHook(() => useTextBuffer({ viewport }));
       act(() => {
-        result.current.handleInput(createInput(input));
+        result.current.handleInput(createInput(input), defaultKeyMatchers);
       });
       expect(getBufferState(result).text).toBe(expected);
     });
@@ -2033,7 +2088,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       const { result } = renderHook(() => useTextBuffer({ viewport }));
       const validText = 'Hello World\nThis is a test.';
       act(() => {
-        result.current.handleInput(createInput(validText));
+        result.current.handleInput(createInput(validText), defaultKeyMatchers);
       });
       expect(getBufferState(result).text).toBe(validText);
     });
@@ -2047,15 +2102,18 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(largeTextWithUnsafe.length).toBeGreaterThan(5000);
 
       act(() => {
-        result.current.handleInput({
-          name: '',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: true,
-          sequence: largeTextWithUnsafe,
-        });
+        result.current.handleInput(
+          {
+            name: '',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: true,
+            sequence: largeTextWithUnsafe,
+          },
+          defaultKeyMatchers,
+        );
       });
 
       const resultText = getBufferState(result).text;
@@ -2080,15 +2138,18 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       expect(largeTextWithAnsi.length).toBeGreaterThan(5000);
 
       act(() => {
-        result.current.handleInput({
-          name: '',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: true,
-          sequence: largeTextWithAnsi,
-        });
+        result.current.handleInput(
+          {
+            name: '',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: true,
+            sequence: largeTextWithAnsi,
+          },
+          defaultKeyMatchers,
+        );
       });
 
       const resultText = getBufferState(result).text;
@@ -2103,15 +2164,18 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       const { result } = renderHook(() => useTextBuffer({ viewport }));
       const emojis = '🐍🐳🦀🦄';
       act(() => {
-        result.current.handleInput({
-          name: '',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: true,
-          sequence: emojis,
-        });
+        result.current.handleInput(
+          {
+            name: '',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: true,
+            sequence: emojis,
+          },
+          defaultKeyMatchers,
+        );
       });
       expect(getBufferState(result).text).toBe(emojis);
     });
@@ -2289,15 +2353,18 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
         }),
       );
       act(() => {
-        result.current.handleInput({
-          name: 'return',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: true,
-          sequence: '\r',
-        });
+        result.current.handleInput(
+          {
+            name: 'return',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: true,
+            sequence: '\r',
+          },
+          defaultKeyMatchers,
+        );
       });
       expect(getBufferState(result).lines).toEqual(['']);
     });
@@ -2311,15 +2378,18 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
         }),
       );
       act(() => {
-        result.current.handleInput({
-          name: 'f1',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: false,
-          sequence: '\u001bOP',
-        });
+        result.current.handleInput(
+          {
+            name: 'f1',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: false,
+            sequence: '\u001bOP',
+          },
+          defaultKeyMatchers,
+        );
       });
       expect(getBufferState(result).lines).toEqual(['']);
     });

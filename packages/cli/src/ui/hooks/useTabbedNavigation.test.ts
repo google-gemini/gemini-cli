@@ -27,7 +27,7 @@ const createKey = (partial: Partial<Key>): Key => ({
 });
 
 vi.mock('../keyMatchers.js', () => ({
-  keyMatchers: {
+  defaultKeyMatchers: {
     'cursor.left': vi.fn((key) => key.name === 'left'),
     'cursor.right': vi.fn((key) => key.name === 'right'),
     'dialog.next': vi.fn((key) => key.name === 'tab' && !key.shift),
@@ -40,6 +40,8 @@ vi.mock('../keyMatchers.js', () => ({
     DIALOG_PREV: 'dialog.previous',
   },
 }));
+
+import { defaultKeyMatchers } from '../keyMatchers.js';
 
 describe('useTabbedNavigation', () => {
   let capturedHandler: KeypressHandler;
@@ -61,7 +63,7 @@ describe('useTabbedNavigation', () => {
       );
 
       act(() => {
-        capturedHandler(createKey({ name: 'right' }));
+        capturedHandler(createKey({ name: 'right' }), defaultKeyMatchers);
       });
 
       expect(result.current.currentIndex).toBe(1);
@@ -77,7 +79,7 @@ describe('useTabbedNavigation', () => {
       );
 
       act(() => {
-        capturedHandler(createKey({ name: 'left' }));
+        capturedHandler(createKey({ name: 'left' }), defaultKeyMatchers);
       });
 
       expect(result.current.currentIndex).toBe(0);
@@ -89,7 +91,10 @@ describe('useTabbedNavigation', () => {
       );
 
       act(() => {
-        capturedHandler(createKey({ name: 'tab', shift: false }));
+        capturedHandler(
+          createKey({ name: 'tab', shift: false }),
+          defaultKeyMatchers,
+        );
       });
 
       expect(result.current.currentIndex).toBe(1);
@@ -105,7 +110,10 @@ describe('useTabbedNavigation', () => {
       );
 
       act(() => {
-        capturedHandler(createKey({ name: 'tab', shift: true }));
+        capturedHandler(
+          createKey({ name: 'tab', shift: true }),
+          defaultKeyMatchers,
+        );
       });
 
       expect(result.current.currentIndex).toBe(0);
@@ -121,7 +129,7 @@ describe('useTabbedNavigation', () => {
       );
 
       act(() => {
-        capturedHandler(createKey({ name: 'right' }));
+        capturedHandler(createKey({ name: 'right' }), defaultKeyMatchers);
       });
 
       expect(result.current.currentIndex).toBe(0);

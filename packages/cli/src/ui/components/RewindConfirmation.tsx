@@ -13,7 +13,7 @@ import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import type { FileChangeStats } from '../utils/rewindFileOps.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { formatTimeAgo } from '../utils/formatters.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../keyMatchers.js';
 
 export enum RewindOutcome {
   RewindAndRevert = 'rewind_and_revert',
@@ -60,8 +60,8 @@ export const RewindConfirmation: React.FC<RewindConfirmationProps> = ({
 }) => {
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
   useKeypress(
-    (key) => {
-      if (keyMatchers[Command.ESCAPE](key)) {
+    (key, matchers) => {
+      if (matchers[Command.ESCAPE](key)) {
         onConfirm(RewindOutcome.Cancel);
         return true;
       }

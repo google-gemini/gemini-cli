@@ -99,6 +99,7 @@ import { mergeSettings, type LoadedSettings } from '../config/settings.js';
 import type { InitializationResult } from '../core/initializer.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
 import { StreamingState } from './types.js';
+import { defaultKeyMatchers, type KeyMatchers } from './keyMatchers.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
 import {
   UIActionsContext,
@@ -2529,7 +2530,7 @@ describe('AppContainer State Management', () => {
   });
 
   describe('Shortcuts Help Visibility', () => {
-    let handleGlobalKeypress: (key: Key) => boolean;
+    let handleGlobalKeypress: (key: Key, matchers: KeyMatchers) => boolean;
     let mockedUseKeypress: Mock;
     let rerender: () => void;
     let unmount: () => void;
@@ -2545,16 +2546,19 @@ describe('AppContainer State Management', () => {
 
     const pressKey = (key: Partial<Key>) => {
       act(() => {
-        handleGlobalKeypress({
-          name: 'r',
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-          insertable: false,
-          sequence: '',
-          ...key,
-        } as Key);
+        handleGlobalKeypress(
+          {
+            name: 'r',
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+            insertable: false,
+            sequence: '',
+            ...key,
+          } as Key,
+          defaultKeyMatchers,
+        );
       });
       rerender();
     };
@@ -2562,7 +2566,10 @@ describe('AppContainer State Management', () => {
     beforeEach(() => {
       mockedUseKeypress = vi.spyOn(useKeypressModule, 'useKeypress') as Mock;
       mockedUseKeypress.mockImplementation(
-        (callback: (key: Key) => boolean, options: { isActive: boolean }) => {
+        (
+          callback: (key: Key, matchers: KeyMatchers) => boolean,
+          options: { isActive: boolean },
+        ) => {
           // AppContainer registers multiple keypress handlers; capture only
           // active handlers so inactive copy-mode handler doesn't override.
           if (options?.isActive) {

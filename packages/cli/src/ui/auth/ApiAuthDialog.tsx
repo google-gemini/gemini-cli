@@ -13,7 +13,7 @@ import { useTextBuffer } from '../components/shared/text-buffer.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { clearApiKey, debugLogger } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../keyMatchers.js';
 
 interface ApiAuthDialogProps {
   onSubmit: (apiKey: string) => void;
@@ -85,8 +85,8 @@ export function ApiAuthDialog({
   };
 
   useKeypress(
-    (key) => {
-      if (keyMatchers[Command.CLEAR_INPUT](key)) {
+    (key, matchers) => {
+      if (matchers[Command.CLEAR_INPUT](key)) {
         void handleClear();
         return true;
       }

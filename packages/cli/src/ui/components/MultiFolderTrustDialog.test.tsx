@@ -21,6 +21,7 @@ import * as directoryUtils from '../utils/directoryUtils.js';
 import type { Config } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { defaultKeyMatchers } from '../keyMatchers.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import * as path from 'node:path';
 
@@ -95,15 +96,18 @@ describe('MultiFolderTrustDialog', () => {
 
     const keypressCallback = mockedUseKeypress.mock.calls[0][0];
     await act(async () => {
-      keypressCallback({
-        name: 'escape',
-        shift: false,
-        alt: false,
-        ctrl: false,
-        cmd: false,
-        sequence: '',
-        insertable: false,
-      });
+      keypressCallback(
+        {
+          name: 'escape',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          sequence: '',
+          insertable: false,
+        },
+        defaultKeyMatchers,
+      );
     });
     await waitUntilReady();
 

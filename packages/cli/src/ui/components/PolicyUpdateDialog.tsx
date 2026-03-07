@@ -16,7 +16,7 @@ import { theme } from '../semantic-colors.js';
 import type { RadioSelectItem } from './shared/RadioButtonSelect.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../keyMatchers.js';
 
 export enum PolicyUpdateChoice {
   ACCEPT = 'accept',
@@ -62,8 +62,8 @@ export const PolicyUpdateDialog: React.FC<PolicyUpdateDialogProps> = ({
   );
 
   useKeypress(
-    (key) => {
-      if (keyMatchers[Command.ESCAPE](key)) {
+    (key, matchers) => {
+      if (matchers[Command.ESCAPE](key)) {
         onClose();
         return true;
       }

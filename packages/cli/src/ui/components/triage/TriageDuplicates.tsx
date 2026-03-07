@@ -10,7 +10,7 @@ import Spinner from 'ink-spinner';
 import type { Config } from '@google/gemini-cli-core';
 import { debugLogger, spawnAsync, LlmRole } from '@google/gemini-cli-core';
 import { useKeypress } from '../../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../keyMatchers.js';
 
 interface Issue {
   number: number;
@@ -574,7 +574,7 @@ Return a JSON object with:
   };
 
   useKeypress(
-    (key) => {
+    (key, matchers) => {
       const input = key.sequence;
 
       // History Toggle
@@ -584,11 +584,7 @@ Return a JSON object with:
       }
 
       if (showHistory) {
-        if (
-          keyMatchers[Command.ESCAPE](key) ||
-          input === 'h' ||
-          input === 'q'
-        ) {
+        if (matchers[Command.ESCAPE](key) || input === 'h' || input === 'q') {
           setShowHistory(false);
         }
         return;
@@ -596,7 +592,7 @@ Return a JSON object with:
 
       // Global Quit/Cancel
       if (
-        keyMatchers[Command.ESCAPE](key) ||
+        matchers[Command.ESCAPE](key) ||
         (input === 'q' && focusSection !== 'candidate_detail')
       ) {
         if (focusSection === 'candidate_detail') {
@@ -614,7 +610,7 @@ Return a JSON object with:
       const isInteraction = state.status === 'interaction';
 
       // Priority 1: Action Confirmation (Enter)
-      if (keyMatchers[Command.RETURN](key) && inputAction) {
+      if (matchers[Command.RETURN](key) && inputAction) {
         if (inputAction === 's') {
           setProcessedHistory((prev) => [
             ...prev,
@@ -668,7 +664,7 @@ Return a JSON object with:
           setTargetExpanded((prev) => !prev);
           setTargetScrollOffset(0);
         }
-        if (keyMatchers[Command.NAVIGATION_DOWN](key)) {
+        if (matchers[Command.NAVIGATION_DOWN](key)) {
           const targetBody = state.currentIssue?.body || '';
           const targetLines = targetBody.split('\n');
           const visibleLines = targetExpanded
@@ -677,21 +673,21 @@ Return a JSON object with:
           const maxScroll = Math.max(0, targetLines.length - visibleLines);
           setTargetScrollOffset((prev) => Math.min(prev + 1, maxScroll));
         }
-        if (keyMatchers[Command.NAVIGATION_UP](key)) {
+        if (matchers[Command.NAVIGATION_UP](key)) {
           setTargetScrollOffset((prev) => Math.max(0, prev - 1));
         }
       } else if (focusSection === 'candidates') {
-        if (keyMatchers[Command.NAVIGATION_DOWN](key)) {
+        if (matchers[Command.NAVIGATION_DOWN](key)) {
           setSelectedCandidateIndex((prev) =>
             Math.min((state.candidates?.length || 1) - 1, prev + 1),
           );
         }
-        if (keyMatchers[Command.NAVIGATION_UP](key)) {
+        if (matchers[Command.NAVIGATION_UP](key)) {
           setSelectedCandidateIndex((prev) => Math.max(0, prev - 1));
         }
         if (
-          keyMatchers[Command.MOVE_RIGHT](key) ||
-          (keyMatchers[Command.RETURN](key) && !inputAction)
+          matchers[Command.MOVE_RIGHT](key) ||
+          (matchers[Command.RETURN](key) && !inputAction)
         ) {
           setFocusSection('candidate_detail');
           setCandidateScrollOffset(0);
@@ -702,13 +698,13 @@ Return a JSON object with:
         const candLines = candBody.split('\n');
         const maxScroll = Math.max(0, candLines.length - VISIBLE_LINES_DETAIL);
 
-        if (keyMatchers[Command.MOVE_LEFT](key)) {
+        if (matchers[Command.MOVE_LEFT](key)) {
           setFocusSection('candidates');
         }
-        if (keyMatchers[Command.NAVIGATION_DOWN](key)) {
+        if (matchers[Command.NAVIGATION_DOWN](key)) {
           setCandidateScrollOffset((prev) => Math.min(prev + 1, maxScroll));
         }
-        if (keyMatchers[Command.NAVIGATION_UP](key)) {
+        if (matchers[Command.NAVIGATION_UP](key)) {
           setCandidateScrollOffset((prev) => Math.max(0, prev - 1));
         }
       }

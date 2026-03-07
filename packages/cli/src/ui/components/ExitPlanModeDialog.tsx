@@ -22,7 +22,7 @@ import { useConfig } from '../contexts/ConfigContext.js';
 import { AskUserDialog } from './AskUserDialog.js';
 import { openFileInEditor } from '../utils/editorUtils.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../keyMatchers.js';
 import { formatCommand } from '../utils/keybindingUtils.js';
 
 export interface ExitPlanModeDialogProps {
@@ -167,8 +167,8 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
   }, [planPath, stdin, setRawMode, getPreferredEditor, refresh, onFeedback]);
 
   useKeypress(
-    (key) => {
-      if (keyMatchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
+    (key, matchers) => {
+      if (matchers[Command.OPEN_EXTERNAL_EDITOR](key)) {
         void handleOpenEditor();
         return true;
       }

@@ -7,6 +7,7 @@
 import { render } from '../../test-utils/render.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BackgroundShellDisplay } from './BackgroundShellDisplay.js';
+import { defaultKeyMatchers } from '../keyMatchers.js';
 import { type BackgroundShell } from '../hooks/shellCommandProcessor.js';
 import { ShellExecutionService } from '@google/gemini-cli-core';
 import { act } from 'react';
@@ -61,7 +62,7 @@ const simulateKey = (key: Partial<Key>) => {
   const fullKey: Key = createMockKey(key);
   keypressHandlers.forEach(({ handler, isActive }) => {
     if (isActive) {
-      handler(fullKey);
+      handler(fullKey, defaultKeyMatchers);
     }
   });
 };

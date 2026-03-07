@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { act } from 'react';
 import { TextInput } from './TextInput.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
+import { defaultKeyMatchers, type KeyMatchers } from '../../keyMatchers.js';
 import { useTextBuffer, type TextBuffer } from './text-buffer.js';
 
 // Mocks
@@ -25,7 +26,7 @@ vi.mock('./text-buffer.js', async (importOriginal) => {
     cursor: [0, 0],
     visualCursor: [0, 0],
     viewportVisualLines: [''],
-    handleInput: vi.fn((key) => {
+    handleInput: vi.fn((key, _matchers: KeyMatchers) => {
       // Simulate basic input for testing
       if (key.sequence) {
         mockTextBuffer.text += key.sequence;
@@ -85,7 +86,7 @@ describe('TextInput', () => {
       visualCursor: [0, 0],
       viewportVisualLines: [''],
       pastedContent: {} as Record<string, string>,
-      handleInput: vi.fn((key) => {
+      handleInput: vi.fn((key, _matchers: KeyMatchers) => {
         if (key.sequence) {
           buffer.text += key.sequence;
           buffer.viewportVisualLines = [buffer.text];
@@ -172,25 +173,31 @@ describe('TextInput', () => {
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
     await act(async () => {
-      keypressHandler({
+      keypressHandler(
+        {
+          name: 'a',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          sequence: 'a',
+        },
+        defaultKeyMatchers,
+      );
+    });
+    await waitUntilReady();
+
+    expect(mockBuffer.handleInput).toHaveBeenCalledWith(
+      {
         name: 'a',
         shift: false,
         alt: false,
         ctrl: false,
         cmd: false,
         sequence: 'a',
-      });
-    });
-    await waitUntilReady();
-
-    expect(mockBuffer.handleInput).toHaveBeenCalledWith({
-      name: 'a',
-      shift: false,
-      alt: false,
-      ctrl: false,
-      cmd: false,
-      sequence: 'a',
-    });
+      },
+      expect.anything(),
+    );
     expect(mockBuffer.text).toBe('a');
     unmount();
   });
@@ -204,25 +211,31 @@ describe('TextInput', () => {
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
     await act(async () => {
-      keypressHandler({
+      keypressHandler(
+        {
+          name: 'backspace',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          sequence: '',
+        },
+        defaultKeyMatchers,
+      );
+    });
+    await waitUntilReady();
+
+    expect(mockBuffer.handleInput).toHaveBeenCalledWith(
+      {
         name: 'backspace',
         shift: false,
         alt: false,
         ctrl: false,
         cmd: false,
         sequence: '',
-      });
-    });
-    await waitUntilReady();
-
-    expect(mockBuffer.handleInput).toHaveBeenCalledWith({
-      name: 'backspace',
-      shift: false,
-      alt: false,
-      ctrl: false,
-      cmd: false,
-      sequence: '',
-    });
+      },
+      expect.anything(),
+    );
     expect(mockBuffer.text).toBe('tes');
     unmount();
   });
@@ -236,14 +249,17 @@ describe('TextInput', () => {
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
     await act(async () => {
-      keypressHandler({
-        name: 'left',
-        shift: false,
-        alt: false,
-        ctrl: false,
-        cmd: false,
-        sequence: '',
-      });
+      keypressHandler(
+        {
+          name: 'left',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          sequence: '',
+        },
+        defaultKeyMatchers,
+      );
     });
     await waitUntilReady();
 
@@ -262,14 +278,17 @@ describe('TextInput', () => {
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
     await act(async () => {
-      keypressHandler({
-        name: 'right',
-        shift: false,
-        alt: false,
-        ctrl: false,
-        cmd: false,
-        sequence: '',
-      });
+      keypressHandler(
+        {
+          name: 'right',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          sequence: '',
+        },
+        defaultKeyMatchers,
+      );
     });
     await waitUntilReady();
 
@@ -286,14 +305,17 @@ describe('TextInput', () => {
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
     await act(async () => {
-      keypressHandler({
-        name: 'return',
-        shift: false,
-        alt: false,
-        ctrl: false,
-        cmd: false,
-        sequence: '',
-      });
+      keypressHandler(
+        {
+          name: 'return',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          sequence: '',
+        },
+        defaultKeyMatchers,
+      );
     });
     await waitUntilReady();
 
@@ -313,14 +335,17 @@ describe('TextInput', () => {
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
     await act(async () => {
-      keypressHandler({
-        name: 'return',
-        shift: false,
-        alt: false,
-        ctrl: false,
-        cmd: false,
-        sequence: '',
-      });
+      keypressHandler(
+        {
+          name: 'return',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          sequence: '',
+        },
+        defaultKeyMatchers,
+      );
     });
     await waitUntilReady();
 
@@ -338,14 +363,17 @@ describe('TextInput', () => {
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
     await act(async () => {
-      keypressHandler({
-        name: 'return',
-        shift: false,
-        alt: false,
-        ctrl: false,
-        cmd: false,
-        sequence: '',
-      });
+      keypressHandler(
+        {
+          name: 'return',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          sequence: '',
+        },
+        defaultKeyMatchers,
+      );
     });
     await waitUntilReady();
 
@@ -362,14 +390,17 @@ describe('TextInput', () => {
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
     await act(async () => {
-      keypressHandler({
-        name: 'escape',
-        shift: false,
-        alt: false,
-        ctrl: false,
-        cmd: false,
-        sequence: '',
-      });
+      keypressHandler(
+        {
+          name: 'escape',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          sequence: '',
+        },
+        defaultKeyMatchers,
+      );
     });
     // Escape key has a 50ms timeout in KeypressContext, so we need to wrap waitUntilReady in act
     await act(async () => {

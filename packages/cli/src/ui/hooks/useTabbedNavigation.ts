@@ -6,7 +6,7 @@
 
 import { useReducer, useCallback, useEffect, useRef } from 'react';
 import { useKeypress, type Key } from './useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command, type KeyMatchers } from '../keyMatchers.js';
 
 /**
  * Options for the useTabbedNavigation hook.
@@ -200,26 +200,26 @@ export function useTabbedNavigation({
   );
 
   const handleKeypress = useCallback(
-    (key: Key) => {
+    (key: Key, matchers: KeyMatchers) => {
       if (isNavigationBlocked?.()) return;
 
       if (enableArrowNavigation) {
-        if (keyMatchers[Command.MOVE_RIGHT](key)) {
+        if (matchers[Command.MOVE_RIGHT](key)) {
           goToNextTab();
           return;
         }
-        if (keyMatchers[Command.MOVE_LEFT](key)) {
+        if (matchers[Command.MOVE_LEFT](key)) {
           goToPrevTab();
           return;
         }
       }
 
       if (enableTabKey) {
-        if (keyMatchers[Command.DIALOG_NEXT](key)) {
+        if (matchers[Command.DIALOG_NEXT](key)) {
           goToNextTab();
           return;
         }
-        if (keyMatchers[Command.DIALOG_PREV](key)) {
+        if (matchers[Command.DIALOG_PREV](key)) {
           goToPrevTab();
           return;
         }
@@ -234,7 +234,9 @@ export function useTabbedNavigation({
     ],
   );
 
-  useKeypress(handleKeypress, { isActive: isActive && tabCount > 1 });
+  useKeypress((key, matchers) => handleKeypress(key, matchers), {
+    isActive: isActive && tabCount > 1,
+  });
 
   return {
     currentIndex: state.currentIndex,

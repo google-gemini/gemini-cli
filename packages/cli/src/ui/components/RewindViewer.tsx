@@ -19,7 +19,7 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { useRewind } from '../hooks/useRewind.js';
 import { RewindConfirmation, RewindOutcome } from './RewindConfirmation.js';
 import { stripReferenceContent } from '../utils/formatters.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../keyMatchers.js';
 import { CliSpinner } from './CliSpinner.js';
 import { ExpandableText } from './shared/ExpandableText.js';
 
@@ -95,13 +95,13 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
   }, [interactions]);
 
   useKeypress(
-    (key) => {
+    (key, matchers) => {
       if (!selectedMessageId) {
-        if (keyMatchers[Command.ESCAPE](key)) {
+        if (matchers[Command.ESCAPE](key)) {
           onExit();
           return true;
         }
-        if (keyMatchers[Command.EXPAND_SUGGESTION](key)) {
+        if (matchers[Command.EXPAND_SUGGESTION](key)) {
           if (
             highlightedMessageId &&
             highlightedMessageId !== 'current-position'
@@ -110,7 +110,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
             return true;
           }
         }
-        if (keyMatchers[Command.COLLAPSE_SUGGESTION](key)) {
+        if (matchers[Command.COLLAPSE_SUGGESTION](key)) {
           setExpandedMessageId(null);
           return true;
         }

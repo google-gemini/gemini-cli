@@ -11,6 +11,7 @@ import { useVim } from './vim.js';
 import type { VimMode } from './vim.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import type { Key } from './useKeypress.js';
+import { defaultKeyMatchers } from '../keyMatchers.js';
 
 // Mock the VimModeContext
 const mockVimContext = {
@@ -77,7 +78,7 @@ describe('useVim passthrough', () => {
 
     let handled = true;
     act(() => {
-      handled = result.current.handleInput(key);
+      handled = result.current.handleInput(key, defaultKeyMatchers);
     });
 
     expect(handled).toBe(false);

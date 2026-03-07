@@ -10,7 +10,7 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { ExitPlanModeDialog } from './ExitPlanModeDialog.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { defaultKeyMatchers, Command } from '../keyMatchers.js';
 import {
   ApprovalMode,
   validatePlanContent,
@@ -404,7 +404,7 @@ Implement a comprehensive authentication system with multiple providers.
         }) => {
           useKeypress(
             (key) => {
-              if (keyMatchers[Command.QUIT](key)) {
+              if (defaultKeyMatchers[Command.QUIT](key)) {
                 onBubbledQuit();
               }
               return false;

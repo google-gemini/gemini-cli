@@ -8,14 +8,14 @@ import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
-import { Command, keyMatchers } from '../keyMatchers.js';
+import { Command } from '../keyMatchers.js';
 
 export const AdminSettingsChangedDialog = () => {
   const { handleRestart } = useUIActions();
 
   useKeypress(
-    (key) => {
-      if (keyMatchers[Command.RESTART_APP](key)) {
+    (key, matchers) => {
+      if (matchers[Command.RESTART_APP](key)) {
         handleRestart();
         return true;
       }

@@ -40,6 +40,7 @@ import {
   BaseSettingsDialog,
   type SettingsDialogItem,
 } from './shared/BaseSettingsDialog.js';
+import { type KeyMatchers } from '../keyMatchers.js';
 
 interface FzfResult {
   item: string;
@@ -335,7 +336,11 @@ export function SettingsDialog({
 
   // Custom key handler for restart key
   const handleKeyPress = useCallback(
-    (key: Key, _currentItem: SettingsDialogItem | undefined): boolean => {
+    (
+      key: Key,
+      _matchers: KeyMatchers,
+      _currentItem: SettingsDialogItem | undefined,
+    ): boolean => {
       // 'r' key for restart
       if (showRestartPrompt && key.sequence === 'r') {
         if (onRestartRequest) onRestartRequest();

@@ -20,7 +20,7 @@ import { BaseSelectionList } from './shared/BaseSelectionList.js';
 import type { SelectionListItem } from '../hooks/useSelectionList.js';
 import { TabHeader, type Tab } from './shared/TabHeader.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command, type KeyMatchers } from '../keyMatchers.js';
 import { checkExhaustive } from '@google/gemini-cli-core';
 import { TextInput } from './shared/TextInput.js';
 import { formatCommand } from '../utils/keybindingUtils.js';
@@ -213,8 +213,8 @@ const ReviewView: React.FC<ReviewViewProps> = ({
 
   // Handle Enter to submit
   useKeypress(
-    (key: Key) => {
-      if (keyMatchers[Command.RETURN](key)) {
+    (key, matchers) => {
+      if (matchers[Command.RETURN](key)) {
         onSubmit();
         return true;
       }
@@ -315,8 +315,8 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
 
   // Handle Ctrl+C to clear all text
   const handleExtraKeys = useCallback(
-    (key: Key) => {
-      if (keyMatchers[Command.QUIT](key)) {
+    (key: Key, matchers: KeyMatchers) => {
+      if (matchers[Command.QUIT](key)) {
         if (textValue === '') {
           return false;
         }
@@ -627,9 +627,9 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
   // Handle "Type-to-Jump" and Ctrl+C for custom buffer
   const handleExtraKeys = useCallback(
-    (key: Key) => {
+    (key: Key, matchers: KeyMatchers) => {
       // If focusing custom option, handle Ctrl+C
-      if (isCustomOptionFocused && keyMatchers[Command.QUIT](key)) {
+      if (isCustomOptionFocused && matchers[Command.QUIT](key)) {
         if (customOptionText === '') {
           return false;
         }
@@ -639,15 +639,15 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
 
       // Don't jump if a navigation or selection key is pressed
       if (
-        keyMatchers[Command.DIALOG_NAVIGATION_UP](key) ||
-        keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key) ||
-        keyMatchers[Command.DIALOG_NEXT](key) ||
-        keyMatchers[Command.DIALOG_PREV](key) ||
-        keyMatchers[Command.MOVE_LEFT](key) ||
-        keyMatchers[Command.MOVE_RIGHT](key) ||
-        keyMatchers[Command.RETURN](key) ||
-        keyMatchers[Command.ESCAPE](key) ||
-        keyMatchers[Command.QUIT](key)
+        matchers[Command.DIALOG_NAVIGATION_UP](key) ||
+        matchers[Command.DIALOG_NAVIGATION_DOWN](key) ||
+        matchers[Command.DIALOG_NEXT](key) ||
+        matchers[Command.DIALOG_PREV](key) ||
+        matchers[Command.MOVE_LEFT](key) ||
+        matchers[Command.MOVE_RIGHT](key) ||
+        matchers[Command.RETURN](key) ||
+        matchers[Command.ESCAPE](key) ||
+        matchers[Command.QUIT](key)
       ) {
         return false;
       }
@@ -985,12 +985,12 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   }, [isEditingCustomOption, onActiveTextInputChange]);
 
   const handleCancel = useCallback(
-    (key: Key) => {
+    (key: Key, matchers: KeyMatchers) => {
       if (submitted) return false;
-      if (keyMatchers[Command.ESCAPE](key)) {
+      if (matchers[Command.ESCAPE](key)) {
         onCancel();
         return true;
-      } else if (keyMatchers[Command.QUIT](key)) {
+      } else if (matchers[Command.QUIT](key)) {
         if (!isEditingCustomOption) {
           onCancel();
         }
@@ -1002,21 +1002,21 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
     [onCancel, submitted, isEditingCustomOption],
   );
 
-  useKeypress(handleCancel, {
+  useKeypress((key, matchers) => handleCancel(key, matchers), {
     isActive: !submitted,
   });
 
   const isOnReviewTab = currentQuestionIndex === reviewTabIndex;
 
   const handleNavigation = useCallback(
-    (key: Key) => {
+    (key: Key, matchers: KeyMatchers) => {
       if (submitted || questions.length <= 1) return false;
 
-      const isNextKey = keyMatchers[Command.DIALOG_NEXT](key);
-      const isPrevKey = keyMatchers[Command.DIALOG_PREV](key);
+      const isNextKey = matchers[Command.DIALOG_NEXT](key);
+      const isPrevKey = matchers[Command.DIALOG_PREV](key);
 
-      const isRight = keyMatchers[Command.MOVE_RIGHT](key);
-      const isLeft = keyMatchers[Command.MOVE_LEFT](key);
+      const isRight = matchers[Command.MOVE_RIGHT](key);
+      const isLeft = matchers[Command.MOVE_LEFT](key);
 
       // Tab keys always trigger navigation.
       // Arrows trigger navigation if NOT in a text input OR if the input bubbles the event (already at edge).
@@ -1035,7 +1035,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
     [questions.length, submitted, goToNextTab, goToPrevTab],
   );
 
-  useKeypress(handleNavigation, {
+  useKeypress((key, matchers) => handleNavigation(key, matchers), {
     isActive: questions.length > 1 && !submitted,
   });
 

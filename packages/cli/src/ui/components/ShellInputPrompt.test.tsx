@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act } from 'react';
 import { ShellExecutionService } from '@google/gemini-cli-core';
 import { useUIActions, type UIActions } from '../contexts/UIActionsContext.js';
+import { defaultKeyMatchers } from '../keyMatchers.js';
 
 // Mock useUIActions
 vi.mock('../contexts/UIActionsContext.js', () => ({
@@ -65,14 +66,17 @@ describe('ShellInputPrompt', () => {
     const handler = mockUseKeypress.mock.calls[0][0];
 
     await act(async () => {
-      handler({
-        name: 'tab',
-        shift: false,
-        alt: false,
-        ctrl: false,
-        cmd: false,
-        sequence: '\t',
-      });
+      handler(
+        {
+          name: 'tab',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          sequence: '\t',
+        },
+        defaultKeyMatchers,
+      );
     });
     await waitUntilReady();
 
@@ -94,14 +98,17 @@ describe('ShellInputPrompt', () => {
 
     // Simulate keypress
     await act(async () => {
-      handler({
-        name,
-        shift: false,
-        alt: false,
-        ctrl: false,
-        cmd: false,
-        sequence,
-      });
+      handler(
+        {
+          name,
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          sequence,
+        },
+        defaultKeyMatchers,
+      );
     });
     await waitUntilReady();
 
@@ -121,7 +128,10 @@ describe('ShellInputPrompt', () => {
     const handler = mockUseKeypress.mock.calls[0][0];
 
     await act(async () => {
-      handler({ name: key, shift: true, alt: false, ctrl: false, cmd: false });
+      handler(
+        { name: key, shift: true, alt: false, ctrl: false, cmd: false },
+        defaultKeyMatchers,
+      );
     });
     await waitUntilReady();
 
@@ -143,13 +153,16 @@ describe('ShellInputPrompt', () => {
       const handler = mockUseKeypress.mock.calls[0][0];
 
       await act(async () => {
-        handler({
-          name: key,
-          shift: false,
-          alt: false,
-          ctrl: false,
-          cmd: false,
-        });
+        handler(
+          {
+            name: key,
+            shift: false,
+            alt: false,
+            ctrl: false,
+            cmd: false,
+          },
+          defaultKeyMatchers,
+        );
       });
       await waitUntilReady();
 
@@ -172,26 +185,32 @@ describe('ShellInputPrompt', () => {
 
     // PageDown
     await act(async () => {
-      handler({
-        name: 'pagedown',
-        shift: false,
-        alt: false,
-        ctrl: false,
-        cmd: false,
-      });
+      handler(
+        {
+          name: 'pagedown',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+        },
+        defaultKeyMatchers,
+      );
     });
     await waitUntilReady();
     expect(mockScrollPty).toHaveBeenCalledWith(1, 10);
 
     // PageUp
     await act(async () => {
-      handler({
-        name: 'pageup',
-        shift: false,
-        alt: false,
-        ctrl: false,
-        cmd: false,
-      });
+      handler(
+        {
+          name: 'pageup',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+        },
+        defaultKeyMatchers,
+      );
     });
     await waitUntilReady();
     expect(mockScrollPty).toHaveBeenCalledWith(1, -10);
@@ -207,14 +226,17 @@ describe('ShellInputPrompt', () => {
     const handler = mockUseKeypress.mock.calls[0][0];
 
     await act(async () => {
-      handler({
-        name: 'a',
-        shift: false,
-        alt: false,
-        ctrl: false,
-        cmd: false,
-        sequence: 'a',
-      });
+      handler(
+        {
+          name: 'a',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          sequence: 'a',
+        },
+        defaultKeyMatchers,
+      );
     });
     await waitUntilReady();
 
@@ -231,14 +253,17 @@ describe('ShellInputPrompt', () => {
     const handler = mockUseKeypress.mock.calls[0][0];
 
     await act(async () => {
-      handler({
-        name: 'a',
-        shift: false,
-        alt: false,
-        ctrl: false,
-        cmd: false,
-        sequence: 'a',
-      });
+      handler(
+        {
+          name: 'a',
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          sequence: 'a',
+        },
+        defaultKeyMatchers,
+      );
     });
     await waitUntilReady();
 
@@ -256,13 +281,16 @@ describe('ShellInputPrompt', () => {
 
     let result: boolean | undefined;
     await act(async () => {
-      result = handler({
-        name: 'tab',
-        shift: true,
-        alt: false,
-        ctrl: false,
-        cmd: false,
-      });
+      result = handler(
+        {
+          name: 'tab',
+          shift: true,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+        },
+        defaultKeyMatchers,
+      );
     });
     await waitUntilReady();
 

@@ -44,7 +44,7 @@ import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js
 import type { UIState } from '../contexts/UIStateContext.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { cpLen } from '../utils/textUtils.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { defaultKeyMatchers, Command } from '../keyMatchers.js';
 import type { Key } from '../hooks/useKeypress.js';
 import {
   appEvents,
@@ -197,7 +197,7 @@ describe('InputPrompt', () => {
       visualCursor: [0, 0],
       visualScrollRow: 0,
       handleInput: vi.fn((key: Key) => {
-        if (keyMatchers[Command.CLEAR_INPUT](key)) {
+        if (defaultKeyMatchers[Command.CLEAR_INPUT](key)) {
           if (mockBuffer.text.length > 0) {
             mockBuffer.setText('');
             return true;
@@ -1980,6 +1980,7 @@ describe('InputPrompt', () => {
             name: 'paste',
             sequence: 'pasted text',
           }),
+          expect.anything(),
         );
       });
       unmount();
@@ -2248,6 +2249,7 @@ describe('InputPrompt', () => {
             name: 'paste',
             sequence: pastedText,
           }),
+          expect.anything(),
         );
       });
 

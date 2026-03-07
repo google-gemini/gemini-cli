@@ -9,6 +9,7 @@ import { render } from '../../test-utils/render.js';
 import { act } from 'react';
 import { AuthInProgress } from './AuthInProgress.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
+import { defaultKeyMatchers } from '../keyMatchers.js';
 import { debugLogger } from '@google/gemini-cli-core';
 
 // Mock dependencies
@@ -72,7 +73,7 @@ describe('AuthInProgress', () => {
     const keypressHandler = vi.mocked(useKeypress).mock.calls[0][0];
 
     await act(async () => {
-      keypressHandler({ name: 'escape' } as unknown as Key);
+      keypressHandler({ name: 'escape' } as unknown as Key, defaultKeyMatchers);
     });
     // Escape key has a 50ms timeout in KeypressContext, so we need to wrap waitUntilReady in act
     await act(async () => {
@@ -91,7 +92,10 @@ describe('AuthInProgress', () => {
     const keypressHandler = vi.mocked(useKeypress).mock.calls[0][0];
 
     await act(async () => {
-      keypressHandler({ name: 'c', ctrl: true } as unknown as Key);
+      keypressHandler(
+        { name: 'c', ctrl: true } as unknown as Key,
+        defaultKeyMatchers,
+      );
     });
     await waitUntilReady();
 

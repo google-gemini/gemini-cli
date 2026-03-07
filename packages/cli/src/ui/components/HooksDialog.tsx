@@ -9,7 +9,7 @@ import { useState, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../keyMatchers.js';
 
 /**
  * Hook entry type matching HookRegistryEntry from core
@@ -88,19 +88,19 @@ export const HooksDialog: React.FC<HooksDialogProps> = ({
 
   // Handle keyboard navigation
   useKeypress(
-    (key) => {
-      if (keyMatchers[Command.ESCAPE](key)) {
+    (key, matchers) => {
+      if (matchers[Command.ESCAPE](key)) {
         onClose();
         return true;
       }
 
       // Scroll navigation
       if (needsScrolling) {
-        if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
+        if (matchers[Command.DIALOG_NAVIGATION_UP](key)) {
           setScrollOffset((prev) => Math.max(0, prev - 1));
           return true;
         }
-        if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
+        if (matchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
           setScrollOffset((prev) => Math.min(maxScrollOffset, prev + 1));
           return true;
         }

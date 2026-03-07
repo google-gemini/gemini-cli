@@ -15,12 +15,12 @@ import {
   useId,
 } from 'react';
 import { Box, ResizeObserver, type DOMElement } from 'ink';
-import { useKeypress, type Key } from '../../hooks/useKeypress.js';
+import { useKeypress } from '../../hooks/useKeypress.js';
 import { useScrollable } from '../../contexts/ScrollProvider.js';
 import { useAnimatedScrollbar } from '../../hooks/useAnimatedScrollbar.js';
 import { useBatchedScroll } from '../../hooks/useBatchedScroll.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
 import { useOverflowActions } from '../../contexts/OverflowContext.js';
+import { Command } from '../../keyMatchers.js';
 
 interface ScrollableProps {
   children?: React.ReactNode;
@@ -170,7 +170,7 @@ export const Scrollable: React.FC<ScrollableProps> = ({
     useAnimatedScrollbar(hasFocus, scrollBy);
 
   useKeypress(
-    (key: Key) => {
+    (key, matchers) => {
       const { scrollHeight, innerHeight } = sizeRef.current;
       const scrollTop = getScrollTop();
       const maxScroll = Math.max(0, scrollHeight - innerHeight);
@@ -179,11 +179,11 @@ export const Scrollable: React.FC<ScrollableProps> = ({
       // Only capture scroll-up events if there's room;
       // otherwise allow events to bubble.
       if (actualScrollTop > 0) {
-        if (keyMatchers[Command.PAGE_UP](key)) {
+        if (matchers[Command.PAGE_UP](key)) {
           scrollByWithAnimation(-innerHeight);
           return true;
         }
-        if (keyMatchers[Command.SCROLL_UP](key)) {
+        if (matchers[Command.SCROLL_UP](key)) {
           scrollByWithAnimation(-1);
           return true;
         }
@@ -192,11 +192,11 @@ export const Scrollable: React.FC<ScrollableProps> = ({
       // Only capture scroll-down events if there's room;
       // otherwise allow events to bubble.
       if (actualScrollTop < maxScroll) {
-        if (keyMatchers[Command.PAGE_DOWN](key)) {
+        if (matchers[Command.PAGE_DOWN](key)) {
           scrollByWithAnimation(innerHeight);
           return true;
         }
-        if (keyMatchers[Command.SCROLL_DOWN](key)) {
+        if (matchers[Command.SCROLL_DOWN](key)) {
           scrollByWithAnimation(1);
           return true;
         }

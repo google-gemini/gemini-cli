@@ -9,6 +9,7 @@ import { waitFor } from '../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { ApiAuthDialog } from './ApiAuthDialog.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { defaultKeyMatchers } from '../keyMatchers.js';
 import {
   useTextBuffer,
   type TextBuffer,
@@ -121,14 +122,17 @@ describe('ApiAuthDialog', () => {
       // calls[1] is the TextInput's useKeypress (typing handler)
       const keypressHandler = mockedUseKeypress.mock.calls[1][0];
 
-      keypressHandler({
-        name: keyName,
-        shift: false,
-        alt: false,
-        ctrl: false,
-        cmd: false,
-        sequence,
-      });
+      keypressHandler(
+        {
+          name: keyName,
+          shift: false,
+          alt: false,
+          ctrl: false,
+          cmd: false,
+          sequence,
+        },
+        defaultKeyMatchers,
+      );
 
       expect(expectedCall).toHaveBeenCalledWith(...args);
       unmount();
@@ -158,12 +162,15 @@ describe('ApiAuthDialog', () => {
     // Call 1 is TextInput (isActive: true, priority: true)
     const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
-    keypressHandler({
-      name: 'c',
-      shift: false,
-      ctrl: true,
-      cmd: false,
-    });
+    keypressHandler(
+      {
+        name: 'c',
+        shift: false,
+        ctrl: true,
+        cmd: false,
+      },
+      defaultKeyMatchers,
+    );
 
     await waitFor(() => {
       expect(clearApiKey).toHaveBeenCalled();

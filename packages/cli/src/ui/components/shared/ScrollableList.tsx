@@ -21,8 +21,8 @@ import {
 import { useScrollable } from '../../contexts/ScrollProvider.js';
 import { Box, type DOMElement } from 'ink';
 import { useAnimatedScrollbar } from '../../hooks/useAnimatedScrollbar.js';
-import { useKeypress, type Key } from '../../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { useKeypress } from '../../hooks/useKeypress.js';
+import { Command } from '../../keyMatchers.js';
 
 const ANIMATION_FRAME_DURATION_MS = 33;
 
@@ -195,20 +195,20 @@ function ScrollableList<T>(
   );
 
   useKeypress(
-    (key: Key) => {
-      if (keyMatchers[Command.SCROLL_UP](key)) {
+    (key, matchers) => {
+      if (matchers[Command.SCROLL_UP](key)) {
         stopSmoothScroll();
         scrollByWithAnimation(-1);
         return true;
-      } else if (keyMatchers[Command.SCROLL_DOWN](key)) {
+      } else if (matchers[Command.SCROLL_DOWN](key)) {
         stopSmoothScroll();
         scrollByWithAnimation(1);
         return true;
       } else if (
-        keyMatchers[Command.PAGE_UP](key) ||
-        keyMatchers[Command.PAGE_DOWN](key)
+        matchers[Command.PAGE_UP](key) ||
+        matchers[Command.PAGE_DOWN](key)
       ) {
-        const direction = keyMatchers[Command.PAGE_UP](key) ? -1 : 1;
+        const direction = matchers[Command.PAGE_UP](key) ? -1 : 1;
         const scrollState = getScrollState();
         const maxScroll = Math.max(
           0,
@@ -220,10 +220,10 @@ function ScrollableList<T>(
         const innerHeight = scrollState.innerHeight;
         smoothScrollTo(current + direction * innerHeight);
         return true;
-      } else if (keyMatchers[Command.SCROLL_HOME](key)) {
+      } else if (matchers[Command.SCROLL_HOME](key)) {
         smoothScrollTo(0);
         return true;
-      } else if (keyMatchers[Command.SCROLL_END](key)) {
+      } else if (matchers[Command.SCROLL_END](key)) {
         smoothScrollTo(SCROLL_TO_ITEM_END);
         return true;
       }

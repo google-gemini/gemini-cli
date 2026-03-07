@@ -29,7 +29,7 @@ import {
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../keyMatchers.js';
 import { formatCommand } from '../../utils/keybindingUtils.js';
 import { AskUserDialog } from '../AskUserDialog.js';
 import { ExitPlanModeDialog } from '../ExitPlanModeDialog.js';
@@ -163,12 +163,12 @@ export const ToolConfirmationMessage: React.FC<
   const expandDetailsHintKey = formatCommand(Command.SHOW_MORE_LINES);
 
   useKeypress(
-    (key) => {
+    (key, matchers) => {
       if (!isFocused) return false;
       if (
         confirmationDetails.type === 'mcp' &&
         hasMcpToolDetails &&
-        keyMatchers[Command.SHOW_MORE_LINES](key)
+        matchers[Command.SHOW_MORE_LINES](key)
       ) {
         setMcpDetailsExpansionState({
           callId,
@@ -176,11 +176,11 @@ export const ToolConfirmationMessage: React.FC<
         });
         return true;
       }
-      if (keyMatchers[Command.ESCAPE](key)) {
+      if (matchers[Command.ESCAPE](key)) {
         handleConfirm(ToolConfirmationOutcome.Cancel);
         return true;
       }
-      if (keyMatchers[Command.QUIT](key)) {
+      if (matchers[Command.QUIT](key)) {
         // Return false to let ctrl-C bubble up to AppContainer for exit flow.
         // AppContainer will call cancelOngoingRequest which will cancel the tool.
         return false;

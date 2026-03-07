@@ -16,7 +16,7 @@ import {
 } from '@google/gemini-cli-core';
 import { cpLen, cpSlice, getCachedStringWidth } from '../utils/textUtils.js';
 import { type BackgroundShell } from '../hooks/shellCommandProcessor.js';
-import { Command, keyMatchers } from '../keyMatchers.js';
+import { Command } from '../keyMatchers.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { formatCommand } from '../utils/keybindingUtils.js';
 import {
@@ -133,7 +133,7 @@ export const BackgroundShellDisplay = ({
   }, [isListOpenProp, activePid]);
 
   useKeypress(
-    (key) => {
+    (key, matchers) => {
       if (!activeShell) return;
 
       if (isListOpenProp) {
@@ -141,12 +141,12 @@ export const BackgroundShellDisplay = ({
         // We only handle special keys not consumed by RadioButtonSelect or overriding them if needed
         // RadioButtonSelect handles Enter -> onSelect
 
-        if (keyMatchers[Command.BACKGROUND_SHELL_ESCAPE](key)) {
+        if (matchers[Command.BACKGROUND_SHELL_ESCAPE](key)) {
           setIsBackgroundShellListOpen(false);
           return true;
         }
 
-        if (keyMatchers[Command.KILL_BACKGROUND_SHELL](key)) {
+        if (matchers[Command.KILL_BACKGROUND_SHELL](key)) {
           if (highlightedPid) {
             dismissBackgroundShell(highlightedPid);
             // If we killed the active one, the list might update via props
@@ -154,7 +154,7 @@ export const BackgroundShellDisplay = ({
           return true;
         }
 
-        if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL_LIST](key)) {
+        if (matchers[Command.TOGGLE_BACKGROUND_SHELL_LIST](key)) {
           if (highlightedPid) {
             setActiveBackgroundShellPid(highlightedPid);
           }
@@ -164,24 +164,24 @@ export const BackgroundShellDisplay = ({
         return false;
       }
 
-      if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
+      if (matchers[Command.TOGGLE_BACKGROUND_SHELL](key)) {
         return false;
       }
 
-      if (keyMatchers[Command.KILL_BACKGROUND_SHELL](key)) {
+      if (matchers[Command.KILL_BACKGROUND_SHELL](key)) {
         dismissBackgroundShell(activeShell.pid);
         return true;
       }
 
-      if (keyMatchers[Command.TOGGLE_BACKGROUND_SHELL_LIST](key)) {
+      if (matchers[Command.TOGGLE_BACKGROUND_SHELL_LIST](key)) {
         setIsBackgroundShellListOpen(true);
         return true;
       }
 
-      if (keyMatchers[Command.BACKGROUND_SHELL_SELECT](key)) {
+      if (matchers[Command.BACKGROUND_SHELL_SELECT](key)) {
         ShellExecutionService.writeToPty(activeShell.pid, '\r');
         return true;
-      } else if (keyMatchers[Command.DELETE_CHAR_LEFT](key)) {
+      } else if (matchers[Command.DELETE_CHAR_LEFT](key)) {
         ShellExecutionService.writeToPty(activeShell.pid, '\b');
         return true;
       } else if (key.sequence) {

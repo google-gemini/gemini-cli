@@ -105,6 +105,7 @@ describe('KeypressContext', () => {
           ctrl: false,
           cmd: false,
         }),
+        expect.anything(),
       );
     });
 
@@ -120,6 +121,7 @@ describe('KeypressContext', () => {
           ctrl: false,
           cmd: false,
         }),
+        expect.anything(),
       );
     });
 
@@ -151,6 +153,7 @@ describe('KeypressContext', () => {
             name: 'return',
             ...expected,
           }),
+          expect.anything(),
         );
       },
     );
@@ -167,6 +170,7 @@ describe('KeypressContext', () => {
           ctrl: true,
           cmd: false,
         }),
+        expect.anything(),
       );
     });
 
@@ -183,6 +187,7 @@ describe('KeypressContext', () => {
           ctrl: false,
           cmd: false,
         }),
+        expect.anything(),
       );
     });
   });
@@ -210,6 +215,7 @@ describe('KeypressContext', () => {
           ctrl: false,
           cmd: false,
         }),
+        expect.anything(),
       );
 
       act(() => stdin.write('\r'));
@@ -224,6 +230,7 @@ describe('KeypressContext', () => {
           ctrl: false,
           cmd: false,
         }),
+        expect.anything(),
       );
     });
 
@@ -244,6 +251,7 @@ describe('KeypressContext', () => {
           ctrl: false,
           cmd: false,
         }),
+        expect.anything(),
       );
     });
   });
@@ -265,6 +273,7 @@ describe('KeypressContext', () => {
           ctrl: false,
           cmd: false,
         }),
+        expect.anything(),
       );
     });
 
@@ -291,6 +300,7 @@ describe('KeypressContext', () => {
             alt: false,
             cmd: false,
           }),
+          expect.anything(),
         );
         expect(keyHandler).toHaveBeenNthCalledWith(
           2,
@@ -300,6 +310,7 @@ describe('KeypressContext', () => {
             alt: false,
             cmd: false,
           }),
+          expect.anything(),
         );
       });
     });
@@ -329,6 +340,7 @@ describe('KeypressContext', () => {
             alt: false,
             cmd: false,
           }),
+          expect.anything(),
         );
       });
     });
@@ -394,6 +406,7 @@ describe('KeypressContext', () => {
           expect.objectContaining({
             ...expected,
           }),
+          expect.anything(),
         );
       },
     );
@@ -448,6 +461,7 @@ describe('KeypressContext', () => {
           name: 'paste',
           sequence: pastedText,
         }),
+        expect.anything(),
       );
     });
 
@@ -468,6 +482,7 @@ describe('KeypressContext', () => {
             name: 'paste',
             sequence: 'Hello OSC 52',
           }),
+          expect.anything(),
         );
       });
     });
@@ -494,6 +509,7 @@ describe('KeypressContext', () => {
             name: 'paste',
             sequence: 'Split Paste',
           }),
+          expect.anything(),
         );
       });
     });
@@ -515,6 +531,7 @@ describe('KeypressContext', () => {
             name: 'paste',
             sequence: 'Terminated by ST',
           }),
+          expect.anything(),
         );
       });
     });
@@ -753,6 +770,7 @@ describe('KeypressContext', () => {
 
         expect(keyHandler).toHaveBeenCalledWith(
           expect.objectContaining(expected),
+          expect.anything(),
         );
       },
     );
@@ -827,6 +845,7 @@ describe('KeypressContext', () => {
         act(() => stdin.write(sequence));
         expect(keyHandler).toHaveBeenCalledWith(
           expect.objectContaining(expected),
+          expect.anything(),
         );
       },
     );
@@ -848,6 +867,7 @@ describe('KeypressContext', () => {
           ctrl: false,
           cmd: false,
         }),
+        expect.anything(),
       );
       expect(keyHandler).toHaveBeenNthCalledWith(
         2,
@@ -858,6 +878,7 @@ describe('KeypressContext', () => {
           ctrl: false,
           cmd: false,
         }),
+        expect.anything(),
       );
     });
 
@@ -868,9 +889,11 @@ describe('KeypressContext', () => {
 
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'delete' }),
+        expect.anything(),
       );
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({ name: 'pageup' }),
+        expect.anything(),
       );
     });
   });
@@ -979,6 +1002,7 @@ describe('KeypressContext', () => {
 
         expect(keyHandler).toHaveBeenCalledWith(
           expect.objectContaining(expected),
+          expect.anything(),
         );
       },
     );
@@ -1003,6 +1027,7 @@ describe('KeypressContext', () => {
           ctrl: false,
           cmd: false,
         }),
+        expect.anything(),
       );
     });
   });
@@ -1039,6 +1064,7 @@ describe('KeypressContext', () => {
         ctrl: false,
         cmd: false,
       }),
+      expect.anything(),
     );
   });
 
@@ -1061,6 +1087,7 @@ describe('KeypressContext', () => {
         ctrl: false,
         cmd: false,
       }),
+      expect.anything(),
     );
   });
 
@@ -1079,6 +1106,7 @@ describe('KeypressContext', () => {
         name: 'a',
         ctrl: true,
       }),
+      expect.anything(),
     );
   });
 
@@ -1099,6 +1127,7 @@ describe('KeypressContext', () => {
         name: 'a',
         ctrl: true,
       }),
+      expect.anything(),
     );
     expect(keyHandler).toHaveBeenNthCalledWith(
       2,
@@ -1106,6 +1135,7 @@ describe('KeypressContext', () => {
         name: 'b',
         ctrl: true,
       }),
+      expect.anything(),
     );
   });
 
@@ -1126,12 +1156,14 @@ describe('KeypressContext', () => {
       expect.objectContaining({
         name: 'return',
       }),
+      expect.anything(),
     );
     expect(keyHandler).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         sequence: '\x1b[!',
       }),
+      expect.anything(),
     );
   });
 
@@ -1156,6 +1188,7 @@ describe('KeypressContext', () => {
           expect.objectContaining({
             name: 'escape',
           }),
+          expect.anything(),
         );
       });
     },
@@ -1192,6 +1225,7 @@ describe('KeypressContext', () => {
       expect.objectContaining({
         name: 'a',
       }),
+      expect.anything(),
     );
   });
 
@@ -1237,6 +1271,7 @@ describe('KeypressContext', () => {
           ctrl: false,
           cmd: false,
         }),
+        expect.anything(),
       );
     });
 
@@ -1292,10 +1327,12 @@ describe('KeypressContext', () => {
       expect(keyHandler).toHaveBeenNthCalledWith(
         1,
         expect.objectContaining({ name: 'h', sequence: 'H', shift: true }),
+        expect.anything(),
       );
       expect(keyHandler).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({ name: 'i', sequence: 'I', shift: true }),
+        expect.anything(),
       );
     });
   });
@@ -1330,10 +1367,12 @@ describe('KeypressContext', () => {
       expect(keyHandler).toHaveBeenNthCalledWith(
         1,
         expect.objectContaining({ name: 'h', sequence: 'H', shift: true }),
+        expect.anything(),
       );
       expect(keyHandler).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({ name: 'i', sequence: 'I', shift: true }),
+        expect.anything(),
       );
     });
 
@@ -1358,6 +1397,7 @@ describe('KeypressContext', () => {
           ctrl: false,
           cmd: false,
         }),
+        expect.anything(),
       );
     });
   });
@@ -1380,6 +1420,7 @@ describe('KeypressContext', () => {
       for (const char of inputString) {
         expect(keyHandler).toHaveBeenCalledWith(
           expect.objectContaining({ sequence: char }),
+          expect.anything(),
         );
       }
     });
@@ -1433,6 +1474,7 @@ describe('KeypressContext', () => {
             ...expected,
             sequence: char,
           }),
+          expect.anything(),
         );
       },
     );

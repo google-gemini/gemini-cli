@@ -6,6 +6,7 @@
 
 import { createContext, useContext } from 'react';
 import { type Key } from '../hooks/useKeypress.js';
+import { type KeyMatchers } from '../keyMatchers.js';
 import { type IdeIntegrationNudgeResult } from '../IdeIntegrationNudge.js';
 import { type FolderTrustChoice } from '../components/FolderTrustDialog.js';
 import {
@@ -50,7 +51,7 @@ export interface UIActions {
   openPermissionsDialog: (props?: PermissionsDialogProps) => void;
   closePermissionsDialog: () => void;
   setShellModeActive: (value: boolean) => void;
-  vimHandleInput: (key: Key) => boolean;
+  vimHandleInput: (key: Key, matchers: KeyMatchers) => boolean;
   handleIdePromptComplete: (result: IdeIntegrationNudgeResult) => void;
   handleFolderTrustSelect: (choice: FolderTrustChoice) => void;
   setIsPolicyUpdateDialogOpen: (value: boolean) => void;

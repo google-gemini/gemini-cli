@@ -9,7 +9,7 @@ import type { Key } from './useKeypress.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { debugLogger } from '@google/gemini-cli-core';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command, type KeyMatchers } from '../keyMatchers.js';
 
 export type VimMode = 'NORMAL' | 'INSERT';
 
@@ -381,8 +381,8 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
    * @returns boolean indicating if the key was handled
    */
   const handleInsertModeInput = useCallback(
-    (normalizedKey: Key): boolean => {
-      if (keyMatchers[Command.ESCAPE](normalizedKey)) {
+    (normalizedKey: Key, matchers: KeyMatchers): boolean => {
+      if (matchers[Command.ESCAPE](normalizedKey)) {
         // Record for double-escape detection (clearing happens in NORMAL mode)
         checkDoubleEscape();
         buffer.vimEscapeInsertMode();
@@ -437,7 +437,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
         return true; // Handled by vim (even if no onSubmit callback)
       }
 
-      return buffer.handleInput(normalizedKey);
+      return buffer.handleInput(normalizedKey, matchers);
     },
     [buffer, dispatch, updateMode, onSubmit, checkDoubleEscape],
   );
@@ -568,7 +568,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
   );
 
   const handleInput = useCallback(
-    (key: Key): boolean => {
+    (key: Key, matchers: KeyMatchers): boolean => {
       if (!vimEnabled) {
         return false; // Let InputPrompt handle it
       }
@@ -583,18 +583,18 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       }
 
       // Let InputPrompt handle Ctrl+C for clearing input (works in all modes)
-      if (keyMatchers[Command.CLEAR_INPUT](normalizedKey)) {
+      if (matchers[Command.CLEAR_INPUT](normalizedKey)) {
         return false;
       }
 
       // Handle INSERT mode
       if (state.mode === 'INSERT') {
-        return handleInsertModeInput(normalizedKey);
+        return handleInsertModeInput(normalizedKey, matchers);
       }
 
       // Handle NORMAL mode
       if (state.mode === 'NORMAL') {
-        if (keyMatchers[Command.ESCAPE](normalizedKey)) {
+        if (matchers[Command.ESCAPE](normalizedKey)) {
           if (state.pendingOperator) {
             dispatch({ type: 'CLEAR_PENDING_STATES' });
             lastEscapeTimestampRef.current = 0;
