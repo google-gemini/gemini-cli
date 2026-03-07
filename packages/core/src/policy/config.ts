@@ -708,9 +708,18 @@ export function createPolicyUpdater(
             } catch (error) {
               if (isNodeError(error) && error.code === 'ENOENT') {
                 // File doesn't exist yet, start fresh
+              } else if (!isNodeError(error)) {
+                // TOML parse error — back up corrupted file and recover
+                coreEvents.emitFeedback(
+                  'warning',
+                  `Syntax error found in policy file. Backing up corrupted file to ${policyFile}.bak and starting fresh.`,
+                );
+                await fs
+                  .copyFile(policyFile, `${policyFile}.bak`)
+                  .catch(() => {});
+                existingData = {};
               } else {
-                // Non-ENOENT read errors (e.g. EACCES) should abort persistence
-                // to avoid silently overwriting the existing file with empty data
+                // Real filesystem error (e.g. EACCES) — throw to prevent silent failure
                 throw error;
               }
             }
@@ -774,7 +783,10 @@ export function createPolicyUpdater(
             } catch (renameError) {
               // Cross-device rename fails with EXDEV on some Linux mount configurations.
               // Fall back to copy + unlink which works across filesystems.
-              if (isNodeError(renameError) && renameError.code === 'EXDEV') {
+              if (
+                isNodeError(renameError) &&
+                (renameError.code === 'EXDEV' || renameError.code === 'EBUSY')
+              ) {
                 await fs.copyFile(tmpFile, policyFile);
                 await fs.unlink(tmpFile).catch(() => {});
               } else {
