@@ -26,7 +26,6 @@ import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { isNodeError } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
-import { type ApprovalMode } from '../policy/types.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
 
 import { DEFAULT_DIFF_OPTIONS, getDiffStat } from './diffOptions.js';
@@ -449,7 +448,16 @@ class EditToolInvocation
     toolName?: string,
     displayName?: string,
   ) {
-    super(params, messageBus, toolName, displayName);
+    super(
+      params,
+      messageBus,
+      toolName,
+      displayName,
+      undefined,
+      undefined,
+      true,
+      () => this.config.getApprovalMode(),
+    );
   }
 
   override toolLocations(): ToolLocation[] {
@@ -697,14 +705,6 @@ class EditToolInvocation
       abortSignal,
       originalLineEnding,
     );
-  }
-
-  protected override get respectsAutoEdit(): boolean {
-    return true;
-  }
-
-  protected override getApprovalMode(): ApprovalMode {
-    return this.config.getApprovalMode();
   }
 
   /**

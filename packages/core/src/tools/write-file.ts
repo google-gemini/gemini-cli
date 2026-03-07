@@ -11,7 +11,6 @@ import os from 'node:os';
 import * as Diff from 'diff';
 import { WRITE_FILE_TOOL_NAME, WRITE_FILE_DISPLAY_NAME } from './tool-names.js';
 import type { Config } from '../config/config.js';
-import { type ApprovalMode } from '../policy/types.js';
 
 import {
   BaseDeclarativeTool,
@@ -153,7 +152,16 @@ class WriteFileToolInvocation extends BaseToolInvocation<
     toolName?: string,
     displayName?: string,
   ) {
-    super(params, messageBus, toolName, displayName);
+    super(
+      params,
+      messageBus,
+      toolName,
+      displayName,
+      undefined,
+      undefined,
+      true,
+      () => this.config.getApprovalMode(),
+    );
     this.resolvedPath = path.resolve(
       this.config.getTargetDir(),
       this.params.file_path,
@@ -170,14 +178,6 @@ class WriteFileToolInvocation extends BaseToolInvocation<
       this.config.getTargetDir(),
     );
     return `Writing to ${shortenPath(relativePath)}`;
-  }
-
-  protected override get respectsAutoEdit(): boolean {
-    return true;
-  }
-
-  protected override getApprovalMode(): ApprovalMode {
-    return this.config.getApprovalMode();
   }
 
   protected override async getConfirmationDetails(

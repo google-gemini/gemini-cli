@@ -99,6 +99,8 @@ export abstract class BaseToolInvocation<
     readonly _toolDisplayName?: string,
     readonly _serverName?: string,
     readonly _toolAnnotations?: Record<string, unknown>,
+    readonly respectsAutoEdit: boolean = false,
+    readonly getApprovalMode: () => ApprovalMode = () => ApprovalMode.DEFAULT,
   ) {}
 
   abstract getDescription(): string;
@@ -139,23 +141,6 @@ export abstract class BaseToolInvocation<
 
     // Default to confirmation details if decision is unknown (should not happen with exhaustive policy)
     return this.getConfirmationDetails(abortSignal);
-  }
-
-  /**
-   * Whether this tool respects the AUTO_EDIT approval mode.
-   * Subclasses should override this and return true if they want to skip
-   * confirmation when the session is in AUTO_EDIT mode.
-   */
-  protected get respectsAutoEdit(): boolean {
-    return false;
-  }
-
-  /**
-   * Returns the current approval mode from the tool configuration.
-   * Subclasses should override this and return the actual approval mode.
-   */
-  protected getApprovalMode(): ApprovalMode {
-    return ApprovalMode.DEFAULT;
   }
 
   /**

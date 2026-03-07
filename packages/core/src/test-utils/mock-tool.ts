@@ -19,7 +19,7 @@ import {
 } from '../tools/tools.js';
 import { createMockMessageBus } from './mock-message-bus.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import type { ShellExecutionConfig } from 'src/services/shellExecutionService.js';
+import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 
 interface MockToolOptions {
   name: string;

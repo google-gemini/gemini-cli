@@ -17,7 +17,6 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { Config } from '../config/config.js';
-import { type ApprovalMode } from '../policy/types.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
 import { truncateString } from '../utils/textUtils.js';
@@ -181,7 +180,16 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+      undefined,
+      undefined,
+      true,
+      () => this.config.getApprovalMode(),
+    );
   }
 
   private async executeFallback(signal: AbortSignal): Promise<ToolResult> {
@@ -289,14 +297,6 @@ ${textContent}
     const displayPrompt =
       prompt.length > 100 ? prompt.substring(0, 97) + '...' : prompt;
     return `Processing URLs and instructions from prompt: "${displayPrompt}"`;
-  }
-
-  protected override get respectsAutoEdit(): boolean {
-    return true;
-  }
-
-  protected override getApprovalMode(): ApprovalMode {
-    return this.config.getApprovalMode();
   }
 
   protected override async getConfirmationDetails(
