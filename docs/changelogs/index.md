@@ -18,6 +18,30 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.32.0 - 2026-03-03
+
+- **Generalist Agent:** The generalist agent is now enabled to improve task
+  delegation and routing
+  ([#19665](https://github.com/google-gemini/gemini-cli/pull/19665) by
+  @joshualitt).
+- **Model Steering in Workspace:** Added support for model steering directly in
+  the workspace
+  ([#20343](https://github.com/google-gemini/gemini-cli/pull/20343) by
+  @joshualitt).
+- **Plan Mode Enhancements:** Users can now open and modify plans in an external
+  editor, and the planning workflow has been adapted to handle complex tasks
+  more effectively with multi-select options
+  ([#20348](https://github.com/google-gemini/gemini-cli/pull/20348) by @Adib234,
+  [#20465](https://github.com/google-gemini/gemini-cli/pull/20465) by @jerop).
+- **Interactive Shell Autocompletion:** Introduced interactive shell
+  autocompletion for a more seamless experience
+  ([#20082](https://github.com/google-gemini/gemini-cli/pull/20082) by
+  @mrpmohiburrahman).
+- **Parallel Extension Loading:** Extensions are now loaded in parallel to
+  improve startup times
+  ([#20229](https://github.com/google-gemini/gemini-cli/pull/20229) by
+  @scidomino).
+
 ## Announcements: v0.31.0 - 2026-02-27
 
 - **Gemini 3.1 Pro Preview:** Gemini CLI now supports the new Gemini 3.1 Pro
@@ -464,8 +488,9 @@ on GitHub.
   page in their default browser directly from the CLI using the `/extension`
   explore command. ([pr](https://github.com/google-gemini/gemini-cli/pull/11846)
   by [@JayadityaGit](https://github.com/JayadityaGit)).
-- **Configurable compression:** Users can modify the compression threshold in
-  `/settings`. The default has been made more proactive
+- **Configurable compression:** Users can modify the context compression
+  threshold in `/settings` (decimal with percentage display). The default has
+  been made more proactive
   ([pr](https://github.com/google-gemini/gemini-cli/pull/12317) by
   [@scidomino](https://github.com/scidomino)).
 - **API key authentication:** Users can now securely enter and store their

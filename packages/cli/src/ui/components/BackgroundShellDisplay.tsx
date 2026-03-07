@@ -427,7 +427,7 @@ export const BackgroundShellDisplay = ({
       height="100%"
       width="100%"
       borderStyle="single"
-      borderColor={isFocused ? theme.border.focused : undefined}
+      borderColor={isFocused ? theme.ui.focus : undefined}
     >
       <Box
         flexDirection="row"
@@ -438,7 +438,7 @@ export const BackgroundShellDisplay = ({
         borderRight={false}
         borderTop={false}
         paddingX={1}
-        borderColor={isFocused ? theme.border.focused : undefined}
+        borderColor={isFocused ? theme.ui.focus : undefined}
       >
         <Box flexDirection="row">
           {renderTabs()}
