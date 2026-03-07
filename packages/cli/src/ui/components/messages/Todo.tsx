@@ -11,6 +11,8 @@ import { useMemo } from 'react';
 import type { HistoryItemToolGroup } from '../../types.js';
 import { Checklist } from '../Checklist.js';
 import type { ChecklistItemData } from '../ChecklistItem.js';
+import { formatCommand } from '../../utils/keybindingUtils.js';
+import { Command } from '../../../config/keyBindings.js';
 
 export const TodoTray: React.FC = () => {
   const uiState = useUIState();
@@ -55,7 +57,7 @@ export const TodoTray: React.FC = () => {
       title="Todo"
       items={checklistItems}
       isExpanded={uiState.showFullTodos}
-      toggleHint="ctrl+t to toggle"
+      toggleHint={`${formatCommand(Command.SHOW_FULL_TODOS)} to toggle`}
     />
   );
 };
