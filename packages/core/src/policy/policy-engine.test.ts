@@ -3107,7 +3107,6 @@ describe('PolicyEngine', () => {
       expect(checkers[0].checker.name).toBe('c2');
     });
   });
-
   describe('Tool Annotations', () => {
     it('should match tools by semantic annotations', async () => {
       engine = new PolicyEngine({
@@ -3171,7 +3170,6 @@ describe('PolicyEngine', () => {
       ).toBe(PolicyDecision.ALLOW);
     });
   });
-
   describe('hook checkers', () => {
     it('should add and retrieve hook checkers in priority order', () => {
       engine.addHookChecker({

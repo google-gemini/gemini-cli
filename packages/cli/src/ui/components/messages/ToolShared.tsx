@@ -192,6 +192,7 @@ type ToolInfoProps = {
   description: string;
   status: CoreToolCallStatus;
   emphasis: TextEmphasis;
+  progressMessage?: string;
   originalRequestName?: string;
 };
 
@@ -200,6 +201,7 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
   description,
   status: coreStatus,
   emphasis,
+  progressMessage: _progressMessage,
   originalRequestName,
 }) => {
   const status = mapCoreStatusToDisplayStatus(coreStatus);
