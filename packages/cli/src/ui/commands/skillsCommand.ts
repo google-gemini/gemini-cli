@@ -22,6 +22,7 @@ import { getAdminErrorMessage } from '@google/gemini-cli-core';
 import {
   linkSkill,
   renderSkillActionFeedback,
+  syncSkills,
 } from '../../utils/skillUtils.js';
 import { SettingScope } from '../../config/settings.js';
 import {
@@ -330,6 +331,63 @@ async function reloadAction(
   }
 }
 
+async function syncAction(
+  context: CommandContext,
+): Promise<void | SlashCommandActionReturn> {
+  const config = context.services.config;
+  if (!config) {
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: 'Could not retrieve configuration.',
+    });
+    return;
+  }
+
+  try {
+    const result = await syncSkills((msg) =>
+      context.ui.addItem({
+        type: MessageType.INFO,
+        text: msg,
+      }),
+    );
+
+    const details: string[] = [];
+    if (result.synced.length > 0) {
+      details.push(
+        `Synced ${result.synced.length} skill${result.synced.length > 1 ? 's' : ''} (${result.synced.join(', ')}).`,
+      );
+    }
+    if (result.cleaned.length > 0) {
+      details.push(
+        `Cleaned up ${result.cleaned.length} stale link${result.cleaned.length > 1 ? 's' : ''}.`,
+      );
+    }
+    if (result.conflicts.length > 0) {
+      details.push(
+        `Skipped ${result.conflicts.length} conflicting skill${result.conflicts.length > 1 ? 's' : ''} (${result.conflicts.join(', ')}).`,
+      );
+    }
+
+    if (details.length === 0) {
+      context.ui.addItem({
+        type: MessageType.INFO,
+        text: 'Skills are already in sync. No changes needed.',
+      });
+    } else {
+      context.ui.addItem({
+        type: MessageType.INFO,
+        text: `Sync complete.\n${details.join('\n')}`,
+      });
+      await config.reloadSkills();
+    }
+  } catch (error) {
+    context.ui.addItem({
+      type: MessageType.ERROR,
+      text: `Failed to sync skills: ${getErrorMessage(error)}`,
+    });
+  }
+}
+
 function disableCompletion(
   context: CommandContext,
   partialArg: string,
@@ -401,6 +459,13 @@ export const skillsCommand: SlashCommand = {
         'Reload the list of discovered skills. Usage: /skills reload',
       kind: CommandKind.BUILT_IN,
       action: reloadAction,
+    },
+    {
+      name: 'sync',
+      description:
+        'Synchronize skills from external tools (Claude, OpenCode). Usage: /skills sync',
+      kind: CommandKind.BUILT_IN,
+      action: syncAction,
     },
   ],
   action: listAction,
