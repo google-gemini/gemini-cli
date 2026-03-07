@@ -1278,6 +1278,14 @@ export class Config {
     this.geminiMdFilePaths = paths;
   }
 
+  getNonInteractive(): boolean {
+    return this.policyEngine.getNonInteractive();
+  }
+
+  setNonInteractive(nonInteractive: boolean): void {
+    this.policyEngine.setNonInteractive(nonInteractive);
+  }
+
   getApprovalMode(): ApprovalMode {
     return this.policyEngine.getApprovalMode();
   }
@@ -1289,6 +1297,13 @@ export class Config {
       );
     }
     this.policyEngine.setApprovalMode(mode);
+    // Refresh tools to ensure mode switch takes effect immediately
+    void this.geminiClient?.setTools().catch((err) => {
+      debugLogger.error(
+        'Failed to update tools after approval mode change',
+        err,
+      );
+    });
   }
 
   isYoloModeDisabled(): boolean {

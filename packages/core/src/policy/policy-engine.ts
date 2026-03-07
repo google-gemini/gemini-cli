@@ -105,7 +105,7 @@ export class PolicyEngine {
   private checkers: SafetyCheckerRule[];
   private hookCheckers: HookCheckerRule[];
   private readonly defaultDecision: PolicyDecision;
-  private readonly nonInteractive: boolean;
+  private nonInteractive: boolean;
   private readonly checkerRunner?: CheckerRunner;
   private readonly allowHooks: boolean;
   private approvalMode: ApprovalMode;
@@ -125,6 +125,20 @@ export class PolicyEngine {
     this.checkerRunner = checkerRunner;
     this.allowHooks = config.allowHooks ?? true;
     this.approvalMode = config.approvalMode ?? ApprovalMode.DEFAULT;
+  }
+
+  /**
+   * Update the non-interactive mode.
+   */
+  setNonInteractive(nonInteractive: boolean): void {
+    this.nonInteractive = nonInteractive;
+  }
+
+  /**
+   * Get the current non-interactive mode.
+   */
+  getNonInteractive(): boolean {
+    return this.nonInteractive;
   }
 
   /**

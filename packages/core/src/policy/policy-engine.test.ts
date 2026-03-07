@@ -262,6 +262,62 @@ describe('PolicyEngine', () => {
         PolicyDecision.ASK_USER,
       );
     });
+
+    it('should allow toggling non-interactive mode dynamically', async () => {
+      engine = new PolicyEngine({
+        nonInteractive: false,
+        rules: [{ toolName: 'test', decision: PolicyDecision.ASK_USER }],
+      });
+
+      // Initially interactive (ASK_USER)
+      expect((await engine.check({ name: 'test' }, undefined)).decision).toBe(
+        PolicyDecision.ASK_USER,
+      );
+
+      // Enable non-interactive
+      engine.setNonInteractive(true);
+      expect(engine.getNonInteractive()).toBe(true);
+      expect((await engine.check({ name: 'test' }, undefined)).decision).toBe(
+        PolicyDecision.DENY,
+      );
+
+      // Disable non-interactive
+      engine.setNonInteractive(false);
+      expect(engine.getNonInteractive()).toBe(false);
+      expect((await engine.check({ name: 'test' }, undefined)).decision).toBe(
+        PolicyDecision.ASK_USER,
+      );
+    });
+
+    it('should support PLAN mode', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'edit',
+          decision: PolicyDecision.ASK_USER,
+          priority: 10,
+        },
+        {
+          toolName: 'edit',
+          decision: PolicyDecision.ALLOW,
+          priority: 20,
+          modes: [ApprovalMode.PLAN],
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Default mode: priority 10 wins
+      expect((await engine.check({ name: 'edit' }, undefined)).decision).toBe(
+        PolicyDecision.ASK_USER,
+      );
+
+      // Switch to PLAN mode
+      engine.setApprovalMode(ApprovalMode.PLAN);
+      expect(engine.getApprovalMode()).toBe(ApprovalMode.PLAN);
+      expect((await engine.check({ name: 'edit' }, undefined)).decision).toBe(
+        PolicyDecision.ALLOW,
+      );
+    });
   });
 
   describe('addRule', () => {

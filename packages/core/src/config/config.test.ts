@@ -108,6 +108,7 @@ vi.mock('../core/client.js', () => ({
     initialize: vi.fn().mockResolvedValue(undefined),
     stripThoughtsFromHistory: vi.fn(),
     isInitialized: vi.fn().mockReturnValue(false),
+    setTools: vi.fn().mockResolvedValue(undefined),
   })),
 }));
 
@@ -839,6 +840,31 @@ describe('Server Config (config.ts)', () => {
       };
       const config = new Config(params);
       expect(config.getShellToolInactivityTimeout()).toBe(10000);
+    });
+  });
+
+  describe('Approval Mode and Non-Interactive Toggle', () => {
+    it('should support PLAN approval mode', () => {
+      const config = new Config(baseParams);
+      config.setApprovalMode(ApprovalMode.PLAN);
+      expect(config.getApprovalMode()).toBe(ApprovalMode.PLAN);
+    });
+
+    it('should allow toggling non-interactive mode', () => {
+      const config = new Config(baseParams);
+      config.setNonInteractive(true);
+      expect(config.getNonInteractive()).toBe(true);
+      config.setNonInteractive(false);
+      expect(config.getNonInteractive()).toBe(false);
+    });
+
+    it('should trigger tool refresh on approval mode switch', async () => {
+      const config = new Config(baseParams);
+      const geminiClient = config.getGeminiClient();
+      const setToolsSpy = vi.spyOn(geminiClient, 'setTools');
+
+      config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+      expect(setToolsSpy).toHaveBeenCalled();
     });
   });
 
