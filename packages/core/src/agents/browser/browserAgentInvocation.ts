@@ -142,7 +142,7 @@ function sanitizeErrorMessage(message: string): string {
 
   // 4. Handle file path redaction
   sanitized = sanitized.replace(
-    /([\\/][a-zA-Z0-9_\-/]*[\\/][a-zA-Z0-9_-]*\.(?:key|pem|p12|pfx))/gi,
+    /((?:[\/][a-zA-Z0-9_-]+)*[\/][a-zA-Z0-9_-]*\.(?:key|pem|p12|pfx))/gi,
     '/path/to/[REDACTED].key',
   );
 
