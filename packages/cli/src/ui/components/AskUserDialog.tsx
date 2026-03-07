@@ -24,7 +24,10 @@ import { keyMatchers, Command } from '../keyMatchers.js';
 import { checkExhaustive } from '@google/gemini-cli-core';
 import { TextInput } from './shared/TextInput.js';
 import { formatCommand } from '../utils/keybindingUtils.js';
-import { useTextBuffer } from './shared/text-buffer.js';
+import {
+  useTextBuffer,
+  expandPastePlaceholders,
+} from './shared/text-buffer.js';
 import { getCachedStringWidth } from '../utils/textUtils.js';
 import { useTabbedNavigation } from '../hooks/useTabbedNavigation.js';
 import { DialogFooter } from './shared/DialogFooter.js';
@@ -303,10 +306,12 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   const lastTextValueRef = useRef(textValue);
   useEffect(() => {
     if (textValue !== lastTextValueRef.current) {
-      onSelectionChange?.(textValue);
+      onSelectionChange?.(
+        expandPastePlaceholders(textValue, buffer.pastedContent),
+      );
       lastTextValueRef.current = textValue;
     }
-  }, [textValue, onSelectionChange]);
+  }, [textValue, onSelectionChange, buffer.pastedContent]);
 
   // Handle Ctrl+C to clear all text
   const handleExtraKeys = useCallback(
@@ -589,11 +594,15 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         }
       });
       if (includeCustomOption && customOption.trim()) {
-        answers.push(customOption.trim());
+        const expanded = expandPastePlaceholders(
+          customOption,
+          customBuffer.pastedContent,
+        );
+        answers.push(expanded.trim());
       }
       return answers.join(', ');
     },
-    [questionOptions],
+    [questionOptions, customBuffer.pastedContent],
   );
 
   // Synchronize selection changes with parent - only when it actually changes
@@ -758,7 +767,12 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
         } else if (itemValue.type === 'other') {
           // In single select, selecting other submits it if it has text
           if (customOptionText.trim()) {
-            onAnswer(customOptionText.trim());
+            onAnswer(
+              expandPastePlaceholders(
+                customOptionText,
+                customBuffer.pastedContent,
+              ).trim(),
+            );
           }
         }
       }
@@ -768,6 +782,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       selectedIndices,
       isCustomOptionSelected,
       customOptionText,
+      customBuffer.pastedContent,
       onAnswer,
       buildAnswerString,
     ],
