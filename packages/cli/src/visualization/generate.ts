@@ -180,6 +180,36 @@ function normalizeGenericGeneratedCode(rawText: string, preferredLanguage?: stri
     return stripOuterCodeFence(trimmed);
 }
 
+function sanitizeSequenceDiagramLabels(spec: string): string {
+    const trimmed = spec.trimStart().toLowerCase();
+    if (!trimmed.startsWith('sequencediagram')) {
+        return spec;
+    }
+
+    const lines = spec.split(/\r?\n/);
+    const sanitizedLines = lines.map((line) => {
+        const arrowMatch = line.match(/(-->>|-->|->>|->)/);
+        if (!arrowMatch || typeof arrowMatch.index !== 'number') {
+            return line;
+        }
+
+        const colonIndex = line.indexOf(':', arrowMatch.index);
+        if (colonIndex === -1) {
+            return line;
+        }
+
+        const prefix = line.slice(0, colonIndex + 1);
+        const label = line.slice(colonIndex + 1);
+        const escapedLabel = label
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+
+        return `${prefix}${escapedLabel}`;
+    });
+
+    return sanitizedLines.join('\n');
+}
+
 const SYSTEM_PROMPT = `You are a Mermaid.js diagram expert. 
 Your goal is to translate the user's request into a valid Mermaid.js diagram.
 Follow these rules:
@@ -235,10 +265,10 @@ export async function generateMermaid(
         // If it returned pure prose, the renderer now surfaces a syntax error and
         // the command falls back to ASCII instead of caching Mermaid's error image.
         if (isLikelyMermaidSpec(cleaned)) {
-            return cleaned;
+            return sanitizeSequenceDiagramLabels(cleaned);
         }
 
-        return cleaned;
+        return sanitizeSequenceDiagramLabels(cleaned);
     } catch (error) {
         await context.services.logger.initialize();
         // Log to debug logger since core logger has no error method

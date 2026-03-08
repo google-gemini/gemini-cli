@@ -49,6 +49,24 @@ ${spec}
     
     window.__mermaidDone = false;
     window.__mermaidError = '';
+
+    const formatMermaidError = (err) => {
+      if (err && typeof err === 'object') {
+        if (typeof err.str === 'string' && err.str.trim().length > 0) {
+          return err.str.trim();
+        }
+        if (typeof err.message === 'string' && err.message.trim().length > 0) {
+          return err.message.trim();
+        }
+        try {
+          const json = JSON.stringify(err);
+          if (json && json !== '{}') {
+            return json;
+          }
+        } catch {}
+      }
+      return String(err);
+    };
     
     mermaid.initialize({
       startOnLoad: false,
@@ -67,7 +85,7 @@ ${spec}
         await mermaid.parse(source);
         await mermaid.run();
       } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
+        const message = formatMermaidError(e);
         window.__mermaidError = message;
         console.error('Mermaid render failed', message);
       } finally {
