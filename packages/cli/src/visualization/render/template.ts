@@ -21,11 +21,11 @@ export function buildMermaidHtml(spec: string, theme: Theme, widthPx: number): s
       background: ${theme === 'dark' ? '#1e1e2e' : '#ffffff'};
       margin: 0;
       padding: 0;
+      display: inline-block;
       overflow: visible;
     }
     #container {
-      padding: 50px;
-      padding-bottom: 150px; /* Strong buffer to prevent any bottom clipping */
+      padding: 10px; /* Reduced to maximize diagram size inside the box */
       display: inline-block;
       overflow: visible;
     }
