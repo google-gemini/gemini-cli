@@ -86,6 +86,8 @@ export async function renderMermaidToPng(
             if (!container) return null;
 
             return {
+                x: 0,
+                y: 0,
                 width: Math.ceil(Math.max(container.scrollWidth, container.offsetWidth)) + 20,
                 height: Math.ceil(Math.max(container.scrollHeight, container.offsetHeight)) + 20
             };
