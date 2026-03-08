@@ -25,6 +25,7 @@ const ASCII_PREVIEW_RAMP_LIGHT = '@%#*+=-:. ';
 const DEFAULT_ASCII_PREVIEW_ROWS = 32;
 const MIN_ASCII_PREVIEW_ROWS = 12;
 const MAX_ASCII_PREVIEW_ROWS = 52;
+const ASCII_BACKGROUND_EPSILON = 18;
 
 function sanitizeAsciiColumns(columns: number): number {
   if (!Number.isFinite(columns) || columns <= 0) {
@@ -65,7 +66,7 @@ async function renderPngAsciiPreview(
   columns: number,
 ): Promise<string> {
   const safeColumns = sanitizeAsciiColumns(columns);
-  const image = sharp(pngPath).grayscale().ensureAlpha();
+  const image = sharp(pngPath).trim().grayscale().normalise().ensureAlpha();
   const meta = await image.metadata();
   const sourceWidth = meta.width ?? safeColumns;
   const sourceHeight = meta.height ?? DEFAULT_ASCII_PREVIEW_ROWS;
@@ -88,6 +89,9 @@ async function renderPngAsciiPreview(
 
   let totalBrightness = 0;
   let visiblePixels = 0;
+  const topLeftGray = data[0] ?? 0;
+  const topLeftAlpha =
+    info.channels >= 2 ? (data[info.channels - 1] ?? 255) : 255;
 
   for (let i = 0; i < data.length; i += info.channels) {
     const alpha = info.channels >= 2 ? data[i + info.channels - 1] : 255;
@@ -110,7 +114,11 @@ async function renderPngAsciiPreview(
       const idx = (y * info.width + x) * info.channels;
       const gray = data[idx];
       const alpha = info.channels >= 2 ? data[idx + info.channels - 1] : 255;
-      if (alpha < 16) {
+      if (
+        alpha < 16 ||
+        (Math.abs(gray - topLeftGray) <= ASCII_BACKGROUND_EPSILON &&
+          Math.abs(alpha - topLeftAlpha) <= ASCII_BACKGROUND_EPSILON)
+      ) {
         line += ' ';
         continue;
       }
@@ -121,7 +129,11 @@ async function renderPngAsciiPreview(
     lines.push(line.replace(/\s+$/g, ''));
   }
 
-  return lines.join('\n');
+  const trimmedLines = lines
+    .filter((line) => line.trim().length > 0)
+    .slice(0, MAX_ASCII_PREVIEW_ROWS);
+
+  return trimmedLines.join('\n');
 }
 
 export interface VisualArtifactOptions {
