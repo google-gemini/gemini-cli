@@ -84,7 +84,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         ...(args as Parameters<typeof process.stdout.write>),
       ),
     ),
-    patchStdio: vi.fn(() => () => {}),
+    patchStdio: vi.fn(() => () => { }),
     createWorkingStdio: vi.fn(() => ({
       stdout: {
         write: vi.fn((...args) =>
@@ -189,7 +189,9 @@ vi.mock('./ui/utils/terminalCapabilityManager.js', () => ({
 
 vi.mock('./config/config.js', () => ({
   loadCliConfig: vi.fn().mockImplementation(async () => createMockConfig()),
-  parseArguments: vi.fn().mockResolvedValue({}),
+  parseArguments: vi.fn().mockResolvedValue({
+    visualize: undefined,
+  }),
   isDebugMode: vi.fn(() => false),
 }));
 
@@ -498,6 +500,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       rawOutput: undefined,
       acceptRawOutputRisk: undefined,
       isCommand: undefined,
+      visualize: undefined,
     });
 
     await act(async () => {
@@ -537,6 +540,7 @@ describe('gemini.tsx main function kitty protocol', () => {
 
     vi.mocked(parseArguments).mockResolvedValue({
       promptInteractive: false,
+      visualize: undefined,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
     const mockConfig = createMockConfig({
@@ -566,7 +570,7 @@ describe('gemini.tsx main function kitty protocol', () => {
 
     const debugLoggerLogSpy = vi
       .spyOn(debugLogger, 'log')
-      .mockImplementation(() => {});
+      .mockImplementation(() => { });
 
     process.env['GEMINI_API_KEY'] = 'test-key';
     try {
@@ -600,6 +604,7 @@ describe('gemini.tsx main function kitty protocol', () => {
 
     vi.mocked(parseArguments).mockResolvedValue({
       promptInteractive: false,
+      visualize: undefined,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
     vi.mocked(loadSettings).mockReturnValue(
@@ -645,7 +650,7 @@ describe('gemini.tsx main function kitty protocol', () => {
     const { themeManager } = await import('./ui/themes/theme-manager.js');
     const debugLoggerWarnSpy = vi
       .spyOn(debugLogger, 'warn')
-      .mockImplementation(() => {});
+      .mockImplementation(() => { });
     const processExitSpy = vi
       .spyOn(process, 'exit')
       .mockImplementation((code) => {
@@ -667,6 +672,7 @@ describe('gemini.tsx main function kitty protocol', () => {
 
     vi.mocked(parseArguments).mockResolvedValue({
       promptInteractive: false,
+      visualize: undefined,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     vi.mocked(loadCliConfig).mockResolvedValue(
       createMockConfig({
@@ -723,6 +729,7 @@ describe('gemini.tsx main function kitty protocol', () => {
     vi.mocked(parseArguments).mockResolvedValue({
       promptInteractive: false,
       resume: 'session-id',
+      visualize: undefined,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     vi.mocked(loadCliConfig).mockResolvedValue(
       createMockConfig({
@@ -779,6 +786,7 @@ describe('gemini.tsx main function kitty protocol', () => {
     vi.mocked(parseArguments).mockResolvedValue({
       promptInteractive: false,
       resume: 'latest',
+      visualize: undefined,
     } as unknown as CliArgs);
     vi.mocked(loadCliConfig).mockResolvedValue(
       createMockConfig({
@@ -810,7 +818,7 @@ describe('gemini.tsx main function kitty protocol', () => {
     );
     const debugLoggerErrorSpy = vi
       .spyOn(debugLogger, 'error')
-      .mockImplementation(() => {});
+      .mockImplementation(() => { });
     const processExitSpy = vi
       .spyOn(process, 'exit')
       .mockImplementation((code) => {
@@ -828,6 +836,7 @@ describe('gemini.tsx main function kitty protocol', () => {
 
     vi.mocked(parseArguments).mockResolvedValue({
       promptInteractive: false,
+      visualize: undefined,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     vi.mocked(loadCliConfig).mockResolvedValue(
       createMockConfig({
@@ -878,6 +887,7 @@ describe('gemini.tsx main function kitty protocol', () => {
 
     vi.mocked(parseArguments).mockResolvedValue({
       promptInteractive: false,
+      visualize: undefined,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     vi.mocked(loadCliConfig).mockResolvedValue(
       createMockConfig({
@@ -985,7 +995,7 @@ describe('gemini.tsx main function exit codes', () => {
         },
       }),
     );
-    vi.mocked(parseArguments).mockResolvedValue({} as CliArgs);
+    vi.mocked(parseArguments).mockResolvedValue({ visualize: undefined } as CliArgs);
 
     try {
       await main();
@@ -1051,7 +1061,7 @@ describe('gemini.tsx main function exit codes', () => {
         merged: { security: { auth: {} }, ui: {} },
       }),
     );
-    vi.mocked(parseArguments).mockResolvedValue({} as unknown as CliArgs);
+    vi.mocked(parseArguments).mockResolvedValue({ visualize: undefined } as unknown as CliArgs);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (process.stdin as any).isTTY = true;
 
@@ -1086,7 +1096,7 @@ describe('gemini.tsx main function exit codes', () => {
         merged: { security: { auth: { selectedType: undefined } }, ui: {} },
       }),
     );
-    vi.mocked(parseArguments).mockResolvedValue({} as unknown as CliArgs);
+    vi.mocked(parseArguments).mockResolvedValue({ visualize: undefined } as unknown as CliArgs);
 
     runNonInteractiveSpy.mockImplementation(() => Promise.resolve());
 
@@ -1116,7 +1126,7 @@ describe('validateDnsResolutionOrder', () => {
   beforeEach(() => {
     debugLoggerWarnSpy = vi
       .spyOn(debugLogger, 'warn')
-      .mockImplementation(() => {});
+      .mockImplementation(() => { });
   });
 
   afterEach(() => {
@@ -1156,7 +1166,7 @@ describe('project hooks loading based on trust', () => {
     const configModule = await import('./config/config.js');
     loadCliConfig = vi.mocked(configModule.loadCliConfig);
     parseArguments = vi.mocked(configModule.parseArguments);
-    parseArguments.mockResolvedValue({ startupMessages: [] });
+    parseArguments.mockResolvedValue({ startupMessages: [], visualize: undefined });
 
     const settingsModule = await import('./config/settings.js');
     loadSettings = vi.mocked(settingsModule.loadSettings);
@@ -1167,7 +1177,7 @@ describe('project hooks loading based on trust', () => {
       runNonInteractive: vi.fn().mockResolvedValue(undefined),
     }));
 
-    vi.spyOn(process, 'exit').mockImplementation((() => {}) as unknown as (
+    vi.spyOn(process, 'exit').mockImplementation((() => { }) as unknown as (
       code?: string | number | null,
     ) => never);
 

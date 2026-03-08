@@ -15,7 +15,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     writeToStdout: vi.fn(),
-    patchStdio: vi.fn(() => () => {}),
+    patchStdio: vi.fn(() => () => { }),
     createWorkingStdio: vi.fn(() => ({
       stdout: {
         write: vi.fn(),
@@ -71,7 +71,9 @@ vi.mock('./config/config.js', () => ({
     isInteractive: () => false,
     storage: { initialize: vi.fn().mockResolvedValue(undefined) },
   } as unknown as Config),
-  parseArguments: vi.fn().mockResolvedValue({}),
+  parseArguments: vi.fn().mockResolvedValue({
+    visualize: undefined,
+  }),
   isDebugMode: vi.fn(() => false),
 }));
 
@@ -189,7 +191,7 @@ describe('gemini.tsx main function cleanup', () => {
 
     const debugLoggerErrorSpy = vi
       .spyOn(debugLogger, 'error')
-      .mockImplementation(() => {});
+      .mockImplementation(() => { });
     vi.mocked(loadSettings).mockReturnValue({
       merged: { advanced: {}, security: { auth: {} }, ui: {} },
       workspace: { settings: {} },
@@ -200,6 +202,7 @@ describe('gemini.tsx main function cleanup', () => {
 
     vi.mocked(parseArguments).mockResolvedValue({
       promptInteractive: false,
+      visualize: undefined,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     vi.mocked(loadCliConfig).mockResolvedValue({
       isInteractive: vi.fn(() => false),
