@@ -120,6 +120,7 @@ export async function loadConfig(
     await loadServerHierarchicalMemory(
       workspaceDir,
       [workspaceDir],
+      configParams.debugMode || false,
       fileService,
       extensionLoader,
       folderTrust,

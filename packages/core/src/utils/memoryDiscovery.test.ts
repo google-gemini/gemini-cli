@@ -128,6 +128,7 @@ describe('memoryDiscovery', () => {
         await loadServerHierarchicalMemory(
           cwd,
           [],
+          false,
           new FileDiscoveryService(projectRoot),
           new SimpleExtensionLoader([]),
           false, // untrusted
@@ -164,6 +165,7 @@ describe('memoryDiscovery', () => {
         await loadServerHierarchicalMemory(
           cwd,
           [],
+          false,
           new FileDiscoveryService(projectRoot),
           new SimpleExtensionLoader([]),
           false, // untrusted
@@ -181,6 +183,7 @@ describe('memoryDiscovery', () => {
       await loadServerHierarchicalMemory(
         cwd,
         [],
+        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -204,6 +207,7 @@ describe('memoryDiscovery', () => {
       await loadServerHierarchicalMemory(
         cwd,
         [],
+        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -236,6 +240,7 @@ default context content
       await loadServerHierarchicalMemory(
         cwd,
         [],
+        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -269,6 +274,7 @@ custom context content
       await loadServerHierarchicalMemory(
         cwd,
         [],
+        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -306,6 +312,7 @@ cwd context content
       await loadServerHierarchicalMemory(
         cwd,
         [],
+        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -340,6 +347,7 @@ Subdir custom memory
       await loadServerHierarchicalMemory(
         cwd,
         [],
+        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -374,6 +382,7 @@ Src directory memory
       await loadServerHierarchicalMemory(
         cwd,
         [],
+        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -420,6 +429,7 @@ Subdir memory
       await loadServerHierarchicalMemory(
         cwd,
         [],
+        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -476,6 +486,7 @@ Subdir memory
       await loadServerHierarchicalMemory(
         cwd,
         [],
+        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -510,6 +521,7 @@ My code memory
     await loadServerHierarchicalMemory(
       cwd,
       [],
+      false,
       new FileDiscoveryService(projectRoot),
       new SimpleExtensionLoader([]),
       DEFAULT_FOLDER_TRUST,
@@ -529,6 +541,7 @@ My code memory
       await loadServerHierarchicalMemory(
         cwd,
         [],
+        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -552,6 +565,7 @@ My code memory
       await loadServerHierarchicalMemory(
         cwd,
         [],
+        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([
           {
@@ -586,6 +600,7 @@ Extension memory content
       await loadServerHierarchicalMemory(
         cwd,
         [includedDir],
+        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -873,6 +888,7 @@ included directory memory
         await loadServerHierarchicalMemory(
           cwd,
           [],
+          false,
           new FileDiscoveryService(projectRoot),
           new SimpleExtensionLoader([]),
           DEFAULT_FOLDER_TRUST,
@@ -912,6 +928,7 @@ included directory memory
           await loadServerHierarchicalMemory(
             cwd,
             [],
+            false,
             new FileDiscoveryService(projectRoot),
             new SimpleExtensionLoader([]),
             DEFAULT_FOLDER_TRUST,
@@ -937,6 +954,7 @@ included directory memory
         await loadServerHierarchicalMemory(
           cwd,
           [],
+          false,
           new FileDiscoveryService(projectRoot),
           new SimpleExtensionLoader([]),
           DEFAULT_FOLDER_TRUST,
@@ -984,6 +1002,7 @@ included directory memory
         await loadServerHierarchicalMemory(
           cwd,
           [],
+          false,
           new FileDiscoveryService(projectRoot),
           new SimpleExtensionLoader([]),
           DEFAULT_FOLDER_TRUST,
@@ -1173,6 +1192,7 @@ included directory memory
         config.shouldLoadMemoryFromIncludeDirectories()
           ? config.getWorkspaceContext().getDirectories()
           : [],
+        config.getDebugMode(),
         config.getFileService(),
         config.getExtensionLoader(),
         config.isTrustedFolder(),

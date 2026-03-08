@@ -593,6 +593,7 @@ export interface LoadServerHierarchicalMemoryResponse {
 export async function loadServerHierarchicalMemory(
   currentWorkingDirectory: string,
   includeDirectoriesToReadGemini: readonly string[],
+  debugMode: boolean,
   fileService: FileDiscoveryService,
   extensionLoader: ExtensionLoader,
   folderTrust: boolean,
@@ -704,6 +705,7 @@ export async function refreshServerHierarchicalMemory(config: Config) {
     config.shouldLoadMemoryFromIncludeDirectories()
       ? config.getWorkspaceContext().getDirectories()
       : [],
+    config.getDebugMode(),
     config.getFileService(),
     config.getExtensionLoader(),
     config.isTrustedFolder(),

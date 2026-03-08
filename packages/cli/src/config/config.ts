@@ -440,7 +440,7 @@ export async function loadCliConfig(
 
   const folderTrust =
     process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true' ||
-      process.env['VITEST'] === 'true'
+    process.env['VITEST'] === 'true'
       ? false
       : (settings.security?.folderTrust?.enabled ?? false);
   const trustedFolder =
@@ -505,6 +505,7 @@ export async function loadCliConfig(
       settings.context?.loadMemoryFromIncludeDirectories || false
         ? includeDirectories
         : [],
+      debugMode,
       fileService,
       extensionManager,
       trustedFolder,
