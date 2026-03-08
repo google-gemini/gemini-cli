@@ -6,6 +6,35 @@
 
 import { execSync } from 'node:child_process';
 
+function toNodeId(hash: string): string {
+    return `c_${hash}`;
+}
+
+function sanitizeLabel(text: string): string {
+    return text
+        .replace(/[\r\n\t]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, "'")
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .trim();
+}
+
+function buildCommitLabel(hash: string, subject: string, refs: string): string {
+    const shortHash = hash.slice(0, 8);
+    const cleanSubject = sanitizeLabel(subject).slice(0, 72);
+    const cleanRefs = sanitizeLabel(refs).slice(0, 96);
+
+    if (cleanRefs.length > 0) {
+        return `${shortHash}: ${cleanRefs}`;
+    }
+    if (cleanSubject.length > 0) {
+        return `${shortHash}: ${cleanSubject}`;
+    }
+    return shortHash;
+}
+
 /**
  * Generates a Mermaid graph representing the Git history.
  */
@@ -18,32 +47,37 @@ export async function getGitMermaidGraph(limit = 15): Promise<string> {
         ).toString();
 
         const lines = log.split('\n').filter(Boolean);
-        let mermaid = 'graph BT\n'; // Bottom to Top (Oldest at bottom)
+        const mermaidLines: string[] = ['graph BT']; // Bottom to Top (Oldest at bottom)
 
         const nodes = new Set<string>();
+        const edges = new Set<string>();
 
         for (const line of lines) {
             const [hash, parents, subject, refs] = line.split('|');
             if (!hash) continue;
 
-            const cleanSubject = subject.replace(/["()]/g, "'").substring(0, 40);
-            const nodeLabel = refs ? `[${hash}: ${refs}]` : `(${hash}: ${cleanSubject})`;
-
-            mermaid += `  ${hash}${nodeLabel}\n`;
+            const nodeId = toNodeId(hash);
+            const label = buildCommitLabel(hash, subject ?? '', refs ?? '');
+            mermaidLines.push(`  ${nodeId}["${label}"]`);
             nodes.add(hash);
 
             if (parents) {
                 const parentList = parents.split(' ').filter(Boolean);
                 for (const p of parentList) {
-                    mermaid += `  ${hash} --> ${p}\n`;
+                    if (!nodes.has(p)) {
+                        mermaidLines.push(
+                            `  ${toNodeId(p)}["${sanitizeLabel(p.slice(0, 8))}"]`,
+                        );
+                        nodes.add(p);
+                    }
+
+                    edges.add(`  ${nodeId} --> ${toNodeId(p)}`);
                 }
             }
         }
 
-        // Ensure we don't have dangling edges to commits outside the limit
-        // (Actually Mermaid handles this by creating empty nodes, which is okay)
-
-        return mermaid;
+        mermaidLines.push(...edges);
+        return `${mermaidLines.join('\n')}\n`;
     } catch (err) {
         return `graph TD\n  Error[Git Log Failed: ${String(err).replace(/\n/g, ' ')}]`;
     }
