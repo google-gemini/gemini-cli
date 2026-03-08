@@ -393,7 +393,9 @@ export function BaseSettingsDialog({
             const initialValue =
               currentItem.editValue ??
               (rawVal !== undefined
-                ? typeof rawVal === 'object' && rawVal !== null
+                ? typeof rawVal === 'object' &&
+                  rawVal !== null &&
+                  !Array.isArray(rawVal)
                   ? JSON.stringify(rawVal)
                   : String(rawVal)
                 : '');
