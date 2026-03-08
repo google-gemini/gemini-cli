@@ -669,6 +669,18 @@ export async function start_sandbox(
     let sandboxProcess: ChildProcess | undefined = undefined;
 
     if (proxyCommand) {
+      // Clean up any leftover proxy container from a previously crashed session.
+      // The stopProxy exit handler normally removes the container, but if the
+      // previous process was killed with SIGKILL or crashed hard (OOM, host
+      // reboot), the handler never fires and the container remains with the
+      // same fixed name, causing "name already in use" errors on next start.
+      try {
+        execSync(`${config.command} rm -f ${SANDBOX_PROXY_NAME}`, {
+          stdio: 'ignore',
+        });
+      } catch {
+        // Container does not exist — expected on clean starts.
+      }
       // run proxyCommand in its own container
       // build args array to prevent command injection
       const proxyContainerArgs = [
