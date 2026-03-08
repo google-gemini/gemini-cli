@@ -87,12 +87,19 @@ export class InterruptibleSession {
     getInput: InputProvider,
     onChunk?: (text: string) => void,
   ): Promise<void> {
+    let generationTask: Promise<string> | undefined;
+
     while (true) {
       const input = await getInput();
       if (input === null) {
         // End of input — cancel any in-flight generation and exit.
         if (this.generating) {
           this.interruptController.interrupt('Session ended');
+        }
+        if (generationTask) {
+          await generationTask.catch(() => {
+            /* ignore abort error */
+          });
         }
         break;
       }
@@ -102,9 +109,16 @@ export class InterruptibleSession {
         debugLogger.log('[voice] interruption detected');
         debugLogger.log('[voice] cancelling current response');
         this.interruptController.interrupt();
+        // Wait for the interrupted task to settle before starting a new one.
+        if (generationTask) {
+          await generationTask.catch(() => {
+            /* ignore abort error */
+          });
+        }
       }
 
-      await this.generate(input, onChunk);
+      // Fire generation without awaiting — let getInput() race against it.
+      generationTask = this.generate(input, onChunk);
     }
   }
 

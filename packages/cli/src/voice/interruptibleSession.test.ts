@@ -83,26 +83,31 @@ describe('InterruptibleSession', () => {
 
     const collected: string[] = [];
     let inputCall = 0;
-    const inputs = ['First prompt', 'Interrupting prompt', null];
 
-    // Simulate: first input starts generation, second arrives quickly
-    // (which should interrupt), third is null to end.
+    // getInput is called concurrently with generation.
+    // First call returns immediately, second arrives after a short delay
+    // (while generation is in progress), third ends the session.
     await slowSession.run(
       async () => {
-        const input = inputs[inputCall++] ?? null;
-        // Small delay before second input to let first generation start.
+        inputCall++;
+        if (inputCall === 1) return 'First prompt';
         if (inputCall === 2) {
+          // Wait long enough for generation to start but not finish.
           await new Promise((r) => setTimeout(r, 30));
+          return 'Interrupting prompt';
         }
-        return input;
+        // Wait for second generation to finish before ending.
+        await new Promise((r) => setTimeout(r, 300));
+        return null;
       },
       (chunk) => collected.push(chunk),
     );
 
-    // The interrupting prompt should have produced its own response.
-    // The exact chunks depend on timing, but we should get output from
-    // the second generation.
-    expect(inputCall).toBe(3); // All three inputs consumed
+    // All three inputs consumed. First generation was interrupted,
+    // second generation ran to completion.
+    expect(inputCall).toBe(3);
+    // Second generation should have produced all 4 chunks.
+    expect(collected).toContain('chunk4');
   });
 
   it('should run a full session loop until null input', async () => {
@@ -112,7 +117,14 @@ describe('InterruptibleSession', () => {
     await session.run(
       async () => {
         callCount++;
-        if (callCount <= 2) return `prompt ${callCount}`;
+        if (callCount === 1) return 'prompt 1';
+        if (callCount === 2) {
+          // Wait for first generation to complete before sending next.
+          await new Promise((r) => setTimeout(r, 50));
+          return 'prompt 2';
+        }
+        // Wait for second generation to complete before ending.
+        await new Promise((r) => setTimeout(r, 50));
         return null;
       },
       (chunk) => responses.push(chunk),
