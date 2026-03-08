@@ -111,7 +111,7 @@ class MapToolInvocation extends BaseToolInvocation<MapToolParams, ToolResult> {
           const imports: string[] = [];
 
           for (const line of lines) {
-            const match = line.match(/import\s+.*from\s+['"](.*)['"]/);
+            const match = line.match(/import(?:.*from)?\s+['"]([^'"]+)['"]/);
             if (match && match[1]) {
               imports.push(match[1]);
             }
