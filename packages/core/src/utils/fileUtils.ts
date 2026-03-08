@@ -224,6 +224,27 @@ const AUDIO_MIME_TYPE_NORMALIZATION: Record<string, string> = {
   'audio/x-aac': 'audio/aac',
 };
 
+function formatSupportedAudioFormats(): string {
+  const displayNames = Array.from(
+    new Set(
+      Array.from(SUPPORTED_AUDIO_MIME_TYPES_BY_EXTENSION.keys()).map((ext) => {
+        if (ext === '.aif' || ext === '.aiff') {
+          return 'AIFF';
+        }
+        return ext.slice(1).toUpperCase();
+      }),
+    ),
+  );
+
+  if (displayNames.length <= 1) {
+    return displayNames[0] ?? '';
+  }
+
+  return `${displayNames.slice(0, -1).join(', ')}, and ${displayNames.at(-1)}`;
+}
+
+const SUPPORTED_AUDIO_FORMATS_DISPLAY = formatSupportedAudioFormats();
+
 function getSupportedAudioMimeTypeForFile(
   filePath: string,
 ): string | undefined {
@@ -596,10 +617,9 @@ export async function processSingleFileContent(
             : (getSpecificMimeType(filePath) ?? 'application/octet-stream');
         if (!mimeType) {
           return {
-            llmContent:
-              'Could not read audio file because its format is not supported. Supported audio formats are MP3, WAV, AIFF, AAC, OGG, and FLAC.',
+            llmContent: `Could not read audio file because its format is not supported. Supported audio formats are ${SUPPORTED_AUDIO_FORMATS_DISPLAY}.`,
             returnDisplay: `Unsupported audio file format: ${relativePathForDisplay}`,
-            error: `Unsupported audio file format for ${filePath}. Supported audio formats are MP3, WAV, AIFF, AAC, OGG, and FLAC.`,
+            error: `Unsupported audio file format for ${filePath}. Supported audio formats are ${SUPPORTED_AUDIO_FORMATS_DISPLAY}.`,
             errorType: ToolErrorType.READ_CONTENT_FAILURE,
           };
         }
