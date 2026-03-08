@@ -243,10 +243,11 @@ export class WorkspaceContext {
         // which truncates the rest on UNC paths (e.g. WSL \\wsl.localhost\...).
         // Append the remaining non-existent segments from the original path
         // to preserve the full intended path.
+        // On case-insensitive filesystems (Windows), e.path may have different
+        // casing than fullPath, so use a case-insensitive prefix check.
         const resolvedPrefix = e.path;
-        const remainder = fullPath.substring(resolvedPrefix.length);
-        if (remainder) {
-          return resolvedPrefix + remainder;
+        if (fullPath.toLowerCase().startsWith(resolvedPrefix.toLowerCase())) {
+          return resolvedPrefix + fullPath.substring(resolvedPrefix.length);
         }
         return resolvedPrefix;
       }
