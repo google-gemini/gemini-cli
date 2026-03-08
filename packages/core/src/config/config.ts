@@ -770,7 +770,7 @@ export class Config implements McpContext {
     | undefined;
   private disabledHooks: string[];
   private experiments: Experiments | undefined;
-  private experimentsPromise: Promise<void> | undefined;
+  private experimentsPromise: Promise<Experiments | undefined> | undefined;
   private hookSystem?: HookSystem;
   private readonly onModelChange: ((model: string) => void) | undefined;
   private readonly onReload:
@@ -1255,16 +1255,18 @@ export class Config implements McpContext {
 
     const codeAssistServer = getCodeAssistServer(this);
     if (codeAssistServer?.projectId) {
-      await this.refreshUserQuota();
+      const quotaPromise = this.refreshUserQuota();
+      this.experimentsPromise = getExperiments(codeAssistServer)
+        .then((experiments) => {
+          this.setExperiments(experiments);
+          return experiments;
+        })
+        .catch((e) => {
+          debugLogger.error('Failed to fetch experiments', e);
+          return undefined;
+        });
+      await quotaPromise;
     }
-
-    this.experimentsPromise = getExperiments(codeAssistServer)
-      .then((experiments) => {
-        this.setExperiments(experiments);
-      })
-      .catch((e) => {
-        debugLogger.error('Failed to fetch experiments', e);
-      });
 
     const authType = this.contentGeneratorConfig.authType;
     if (
@@ -1281,10 +1283,10 @@ export class Config implements McpContext {
     }
 
     // Fetch admin controls
-    await this.ensureExperimentsLoaded();
+    const experiments = await this.experimentsPromise;
     const adminControlsEnabled =
-      this.experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
-        ?.boolValue ?? false;
+      experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]?.boolValue ??
+      false;
     const adminControls = await fetchAdminControls(
       codeAssistServer,
       this.getRemoteAdminSettings(),
