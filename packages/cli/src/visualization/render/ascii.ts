@@ -169,38 +169,100 @@ interface FlowEdge {
     label?: string;
 }
 
+function parseFlowNodeToken(token: string): FlowNode | null {
+    const trimmed = token.trim();
+    if (!trimmed) {
+        return null;
+    }
+
+    const match = trimmed.match(/^([\w:-]+)\s*(\[[^\]]*\]|\([^)]*\)|\{[^}]*\})?$/);
+    if (!match) {
+        return null;
+    }
+
+    const id = match[1];
+    if (!id) {
+        return null;
+    }
+
+    const raw = (match[2] ?? '').trim();
+    if (!raw) {
+        return { id, label: id, shape: 'box' };
+    }
+
+    const label = raw
+        .slice(1, -1)
+        .replace(/^["']|["']$/g, '')
+        .trim() || id;
+
+    const shape = raw.startsWith('{')
+        ? 'diamond'
+        : raw.startsWith('(')
+            ? 'round'
+            : 'box';
+
+    return { id, label, shape };
+}
+
 function parseFlowchart(spec: string): { nodes: FlowNode[]; edges: FlowEdge[] } {
     const lines = spec.split('\n').map((l) => l.trim()).filter(Boolean);
     const nodes: Map<string, FlowNode> = new Map();
     const edges: FlowEdge[] = [];
 
-    // node definition: A[Label] or A(Label) or A{Label}
-    const nodeDefRe = /^(\w+)(\[.*?\]|\(.*?\)|\{.*?\})?$/;
-    // edge: A --> B or A -->|label| B or A -- label --> B
-    const edgeRe = /^(\w+)\s*(?:--[>|]?|==\s*>)\s*(?:\|(.+?)\|)?\s*(\w+)(?:\s*:\s*(.+))?$/;
+    const upsertNode = (node: FlowNode) => {
+        const existing = nodes.get(node.id);
+        if (!existing) {
+            nodes.set(node.id, node);
+            return;
+        }
 
-    for (const line of lines) {
+        // Prefer richer labels over plain ID-only placeholders.
+        if (existing.label === existing.id && node.label !== node.id) {
+            nodes.set(node.id, node);
+        }
+    };
+
+    // node definition: A[Label] or A(Label) or A{Label}
+    const nodeDefRe = /^([\w:-]+)(\[[^\]]*\]|\([^)]*\)|\{[^}]*\})?$/;
+    // edge: A --> B or A -->|label| B or A -- label --> B
+    const edgeRe = /^([\w:-]+)\s*(?:--[>|]?|==\s*>|-\.->)\s*(?:\|(.+?)\|)?\s*([\w:-]+)(?:\s*:\s*(.+))?$/;
+    // inline node tokens used directly in edge lines (e.g. A[Start] --> B{Choice})
+    const inlineNodeRe = /\b([\w:-]+)\s*(\[[^\]]*\]|\([^)]*\)|\{[^}]*\})/g;
+
+    for (const rawLine of lines) {
+        const line = rawLine.replace(/;$/, '').trim();
         if (line.startsWith('graph') || line.startsWith('flowchart')) continue;
 
-        const eMatch = line.match(edgeRe);
+        const normalizedLine = line.replace(inlineNodeRe, (_m, id: string, rawShape: string) => {
+            const parsed = parseFlowNodeToken(`${id}${rawShape}`);
+            if (parsed) {
+                upsertNode(parsed);
+            }
+            return id;
+        });
+
+        const eMatch = normalizedLine.match(edgeRe);
         if (eMatch) {
             const fromId = eMatch[1];
             const toId = eMatch[3];
             const label = eMatch[2] ?? eMatch[4];
             edges.push({ from: fromId, to: toId, label });
 
-            if (!nodes.has(fromId)) nodes.set(fromId, { id: fromId, label: fromId, shape: 'box' });
-            if (!nodes.has(toId)) nodes.set(toId, { id: toId, label: toId, shape: 'box' });
+            if (!nodes.has(fromId)) {
+                nodes.set(fromId, { id: fromId, label: fromId, shape: 'box' });
+            }
+            if (!nodes.has(toId)) {
+                nodes.set(toId, { id: toId, label: toId, shape: 'box' });
+            }
             continue;
         }
 
-        const nMatch = line.match(nodeDefRe);
+        const nMatch = normalizedLine.match(nodeDefRe);
         if (nMatch && nMatch[1] && !['graph', 'flowchart', 'TD', 'LR', 'BT', 'RL'].includes(nMatch[1])) {
-            const id = nMatch[1];
-            const raw = nMatch[2] ?? '';
-            const label = raw.replace(/[\[\](){}"]/g, '').trim() || id;
-            const shape = raw.startsWith('{') ? 'diamond' : raw.startsWith('(') ? 'round' : 'box';
-            if (!nodes.has(id)) nodes.set(id, { id, label, shape });
+            const parsed = parseFlowNodeToken(`${nMatch[1]}${nMatch[2] ?? ''}`);
+            if (parsed) {
+                upsertNode(parsed);
+            }
         }
     }
 
