@@ -65,6 +65,7 @@ export function mockCoreDebugLogger<T extends Record<string, unknown>>(
   return {
     ...actual,
     coreEvents: {
+      // eslint-disable-next-line no-restricted-syntax
       ...(typeof actual['coreEvents'] === 'object' &&
       actual['coreEvents'] !== null
         ? actual['coreEvents']
