@@ -15,16 +15,10 @@ export interface HtmlRenderOptions {
 }
 
 function getLaunchArgs(): string[] {
-  const args = [
-    '--disable-dev-shm-usage',
-    '--disable-accelerated-2d-canvas',
-    '--no-first-run',
-    '--no-zygote',
-    '--disable-gpu',
-  ];
+  const args: string[] = [];
 
   if (process.platform === 'linux') {
-    args.unshift('--no-sandbox', '--disable-setuid-sandbox');
+    args.push('--no-sandbox', '--disable-setuid-sandbox');
   }
 
   return args;
@@ -51,11 +45,9 @@ async function launchBrowser(): Promise<Awaited<ReturnType<typeof puppeteer.laun
         label: `env executable (${envPath})`,
         useEnvExecutablePath: true,
         options: {
-          headless: 'new',
+          headless: true,
           executablePath: envPath,
           args: launchArgs,
-          pipe: true,
-          protocolTimeout: 60_000,
         },
       });
     } else {
@@ -67,23 +59,37 @@ async function launchBrowser(): Promise<Awaited<ReturnType<typeof puppeteer.laun
 
   candidates.push(
     {
-      label: 'bundled chromium (headless=new)',
-      useEnvExecutablePath: false,
-      options: {
-        headless: 'new',
-        args: launchArgs,
-        pipe: true,
-        protocolTimeout: 60_000,
-      },
-    },
-    {
       label: 'bundled chromium (headless=true)',
       useEnvExecutablePath: false,
       options: {
         headless: true,
         args: launchArgs,
-        pipe: true,
-        protocolTimeout: 60_000,
+      },
+    },
+    {
+      label: 'bundled chromium (headless=new)',
+      useEnvExecutablePath: false,
+      options: {
+        headless: 'new',
+        args: launchArgs,
+      },
+    },
+    {
+      label: 'system chrome channel (headless=true)',
+      useEnvExecutablePath: false,
+      options: {
+        headless: true,
+        channel: 'chrome',
+        args: launchArgs,
+      },
+    },
+    {
+      label: 'system chrome channel (headless=new)',
+      useEnvExecutablePath: false,
+      options: {
+        headless: 'new',
+        channel: 'chrome',
+        args: launchArgs,
       },
     },
   );
