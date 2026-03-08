@@ -238,6 +238,55 @@ describe('resolveWorkspacePolicyState', () => {
     expect(result.policyUpdateConfirmationRequest).toBeUndefined();
   });
 
+  it('should not load workspace policies when the workspace root is not trusted', async () => {
+    const repoRoot = path.join(tempDir, 'hg-repo');
+    const nestedDir = path.join(repoRoot, 'src', 'nested');
+    const repoPoliciesDir = path.join(repoRoot, '.gemini', 'policies');
+
+    fs.mkdirSync(path.join(repoRoot, '.hg'), { recursive: true });
+    fs.mkdirSync(nestedDir, { recursive: true });
+    fs.mkdirSync(repoPoliciesDir, { recursive: true });
+    fs.writeFileSync(path.join(repoPoliciesDir, 'policy.toml'), 'rules = []');
+
+    const result = await resolveWorkspacePolicyState({
+      cwd: nestedDir,
+      trustedFolder: true,
+      workspaceRootTrusted: false,
+      interactive: true,
+    });
+
+    expect(result).toEqual({
+      workspacePoliciesDir: undefined,
+      policyUpdateConfirmationRequest: undefined,
+    });
+  });
+
+  it('should resolve symlinked directories before finding the workspace root', async () => {
+    const repoRoot = path.join(tempDir, 'hg-repo');
+    const nestedDir = path.join(repoRoot, 'src', 'nested');
+    const symlinkDir = path.join(tempDir, 'linked-nested');
+    const repoPoliciesDir = path.join(repoRoot, '.gemini', 'policies');
+
+    fs.mkdirSync(path.join(repoRoot, '.hg'), { recursive: true });
+    fs.mkdirSync(nestedDir, { recursive: true });
+    fs.mkdirSync(repoPoliciesDir, { recursive: true });
+    fs.writeFileSync(path.join(repoPoliciesDir, 'policy.toml'), 'rules = []');
+    fs.symlinkSync(nestedDir, symlinkDir, 'dir');
+
+    try {
+      const result = await resolveWorkspacePolicyState({
+        cwd: symlinkDir,
+        trustedFolder: true,
+        interactive: true,
+      });
+
+      expect(result.workspacePoliciesDir).toBe(repoPoliciesDir);
+      expect(result.policyUpdateConfirmationRequest).toBeUndefined();
+    } finally {
+      fs.rmSync(symlinkDir, { force: true });
+    }
+  });
+
   it('should return empty state if cwd is a symlink to the home directory', async () => {
     const policiesDir = path.join(tempDir, '.gemini', 'policies');
     fs.mkdirSync(policiesDir, { recursive: true });

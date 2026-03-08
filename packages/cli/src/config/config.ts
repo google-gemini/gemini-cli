@@ -53,6 +53,7 @@ import { RESUME_LATEST } from '../utils/sessionUtils.js';
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import {
   createPolicyEngineConfig,
+  findWorkspaceRoot,
   resolveWorkspacePolicyState,
 } from './policy.js';
 import { ExtensionManager } from './extension-manager.js';
@@ -635,10 +636,15 @@ export async function loadCliConfig(
     policyPaths: argv.policy,
   };
 
+  const workspaceRoot = findWorkspaceRoot(cwd);
+  const workspaceRootTrusted =
+    isWorkspaceTrusted(settings, workspaceRoot).isTrusted ?? false;
+
   const { workspacePoliciesDir, policyUpdateConfirmationRequest } =
     await resolveWorkspacePolicyState({
       cwd,
       trustedFolder,
+      workspaceRootTrusted,
       interactive,
     });
 

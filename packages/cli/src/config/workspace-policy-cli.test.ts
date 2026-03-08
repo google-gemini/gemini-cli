@@ -63,6 +63,10 @@ describe('Workspace-Level Policy CLI Integration', () => {
       fileCount: 1,
     });
     vi.mocked(ServerConfig.isHeadlessMode).mockReturnValue(false);
+    vi.mocked(isWorkspaceTrusted).mockReturnValue({
+      isTrusted: true,
+      source: 'file',
+    });
   });
 
   it('should have getWorkspacePoliciesDir on Storage class', () => {
@@ -97,6 +101,25 @@ describe('Workspace-Level Policy CLI Integration', () => {
       isTrusted: false,
       source: 'file',
     });
+
+    const settings = createTestMergedSettings();
+    const argv = { query: 'test' } as unknown as CliArgs;
+
+    await loadCliConfig(settings, 'test-session', argv, { cwd: MOCK_CWD });
+
+    expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspacePoliciesDir: undefined,
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('should NOT load workspace policies when the workspace root is not trusted', async () => {
+    vi.mocked(isWorkspaceTrusted).mockImplementation((_, workspaceDir) => ({
+      isTrusted: workspaceDir === MOCK_WORKSPACE_ROOT ? false : true,
+      source: 'file',
+    }));
 
     const settings = createTestMergedSettings();
     const argv = { query: 'test' } as unknown as CliArgs;

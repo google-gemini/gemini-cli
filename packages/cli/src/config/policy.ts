@@ -23,6 +23,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { type Settings } from './settings.js';
 
+export const WORKSPACE_ROOT_MARKERS = ['.git', '.hg', '.svn'];
+
 /**
  * Temporary flag to automatically accept workspace policies to reduce friction.
  * Exported as 'let' to allow monkey patching in tests via the setter.
@@ -82,10 +84,16 @@ export interface WorkspacePolicyState {
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
 }
 
-const WORKSPACE_ROOT_MARKERS = ['.git', '.hg', '.svn'];
+export function findWorkspaceRoot(startDir: string): string {
+  let resolvedStartDir = path.resolve(startDir);
 
-function findWorkspaceRoot(startDir: string): string {
-  let currentDir = path.resolve(startDir);
+  try {
+    resolvedStartDir = fs.realpathSync(resolvedStartDir);
+  } catch {
+    // Fall back to the resolved path when the real path cannot be determined.
+  }
+
+  let currentDir = resolvedStartDir;
 
   while (true) {
     for (const marker of WORKSPACE_ROOT_MARKERS) {
@@ -96,7 +104,7 @@ function findWorkspaceRoot(startDir: string): string {
 
     const parentDir = path.dirname(currentDir);
     if (parentDir === currentDir) {
-      return path.resolve(startDir);
+      return resolvedStartDir;
     }
 
     currentDir = parentDir;
@@ -109,17 +117,20 @@ function findWorkspaceRoot(startDir: string): string {
 export async function resolveWorkspacePolicyState(options: {
   cwd: string;
   trustedFolder: boolean;
+  workspaceRootTrusted?: boolean;
   interactive: boolean;
 }): Promise<WorkspacePolicyState> {
-  const { cwd, trustedFolder, interactive } = options;
+  const { cwd, trustedFolder, workspaceRootTrusted, interactive } = options;
   const workspaceRoot = findWorkspaceRoot(cwd);
+  const shouldLoadWorkspacePolicies =
+    trustedFolder && (workspaceRootTrusted ?? trustedFolder);
 
   let workspacePoliciesDir: string | undefined;
   let policyUpdateConfirmationRequest:
     | PolicyUpdateConfirmationRequest
     | undefined;
 
-  if (trustedFolder && !disableWorkspacePolicies) {
+  if (shouldLoadWorkspacePolicies && !disableWorkspacePolicies) {
     const storage = new Storage(workspaceRoot);
 
     // If we are in the home directory (or rather, our target Gemini dir is the global one),
