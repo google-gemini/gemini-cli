@@ -124,21 +124,21 @@
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.3",
+    "@types/express": "^5.0.6",
     "@types/node": "20.x",
-    "@types/vscode": "^1.99.0",
+    "@types/vscode": "^1.109.0",
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
     "@vscode/vsce": "^3.6.0",
-    "esbuild": "^0.25.3",
+    "esbuild": "^0.27.3",
     "eslint": "^9.25.1",
     "npm-run-all2": "^8.0.2",
-    "typescript": "^5.8.3",
+    "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.23.0",
-    "cors": "^2.8.5",
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "cors": "^2.8.6",
     "express": "^5.1.0",
     "zod": "^3.25.76"
   }
