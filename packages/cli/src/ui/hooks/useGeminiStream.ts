@@ -1376,28 +1376,11 @@ export const useGeminiStream = (
               theme: 'dark',
               asciiOnly: caps.protocol === 'ascii',
             });
-            const originalVizScale = process.env['GEMINI_VIZ_SCALE'];
-            const parsedVizScale = Number.parseFloat(originalVizScale ?? '');
-            // Inline explain visuals are rendered near the prompt/footer. Cap
-            // scale so iTerm/Kitty images don't overflow and get bottom-clipped.
-            if (!Number.isFinite(parsedVizScale) || parsedVizScale > 0.58) {
-              process.env['GEMINI_VIZ_SCALE'] = '0.58';
-            }
-
-            let output: string | void;
-            try {
-              output = await renderVisualArtifact(result, {
-                spec,
-                showMeta: false,
-                stabilizeAscii: false,
-              });
-            } finally {
-              if (originalVizScale === undefined) {
-                delete process.env['GEMINI_VIZ_SCALE'];
-              } else {
-                process.env['GEMINI_VIZ_SCALE'] = originalVizScale;
-              }
-            }
+            const output = await renderVisualArtifact(result, {
+              spec,
+              showMeta: false,
+              stabilizeAscii: false,
+            });
             if (output) {
               const visualItem: HistoryItemWithoutId = {
                 type: 'visual',

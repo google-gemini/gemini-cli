@@ -16,6 +16,31 @@ interface VisualMessageProps {
   terminalWidth: number;
 }
 
+function parseGraphicRows(
+  protocol: 'kitty' | 'iterm2' | 'sixel' | 'ascii',
+  output: string,
+): number {
+  if (protocol === 'iterm2') {
+    const match = output.match(/height=(\d+)(?:;|:)/);
+    if (match?.[1]) {
+      return Number.parseInt(match[1], 10);
+    }
+  }
+
+  if (protocol === 'kitty') {
+    const match = output.match(/(?:^|[,;])r=(\d+)(?:[,;])/);
+    if (match?.[1]) {
+      return Number.parseInt(match[1], 10);
+    }
+  }
+
+  if (protocol === 'sixel') {
+    return 12;
+  }
+
+  return 0;
+}
+
 function toPlainAnsiOutput(text: string): AnsiOutput {
   return text.split('\n').map((line) => [
     {
@@ -45,7 +70,11 @@ export const VisualMessage: React.FC<VisualMessageProps> = ({
     }
 
     hasWrittenGraphicRef.current = true;
-    stdout.write(`\n${output}\n`);
+    const graphicRows = Math.max(0, parseGraphicRows(protocol, output));
+    const spacer = '\n'.repeat(Math.max(1, graphicRows));
+    // Emit the graphic and advance enough lines so the prompt/input is not
+    // painted on top of the image in iTerm/Kitty.
+    stdout.write(`\n${output}${spacer}`);
   }, [output, protocol, stdout]);
 
   const ansiOutput = useMemo(() => {
