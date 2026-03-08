@@ -42,34 +42,90 @@ function parseSequenceDiagram(spec: string): { participants: string[]; messages:
     const lines = spec.split('\n').map((l) => l.trim());
     const participants: string[] = [];
     const messages: SeqMessage[] = [];
+    const aliases = new Map<string, string>();
 
-    const participantRe = /^participant\s+(.+?)(?:\s+as\s+(.+))?$/i;
-    const msgRe = /^(\w[\w\s]*?)\s*(-->>|-->|->>|->)\s*(\w[\w\s]*?)\s*:\s*(.*)$/;
+    const participantRe = /^participant\s+([A-Za-z0-9_.:-]+)(?:\s+as\s+(.+))?$/i;
+    const msgRe = /^([A-Za-z0-9_.:-]+)\s*(-->>|-->|->>|->)\s*([A-Za-z0-9_.:-]+)\s*:\s*(.*)$/;
+
+    const registerParticipant = (id: string, label?: string) => {
+        const resolvedLabel = (label ?? id).trim();
+        aliases.set(id, resolvedLabel);
+        if (!participants.includes(resolvedLabel)) {
+            participants.push(resolvedLabel);
+        }
+        return resolvedLabel;
+    };
 
     for (const line of lines) {
         const pMatch = line.match(participantRe);
         if (pMatch) {
-            const name = pMatch[2] ?? pMatch[1];
-            if (!participants.includes(name)) participants.push(name.trim());
+            registerParticipant(pMatch[1], pMatch[2]);
             continue;
         }
         const mMatch = line.match(msgRe);
         if (mMatch) {
-            const from = mMatch[1].trim();
+            const fromId = mMatch[1].trim();
             const type = mMatch[2] as SeqMessage['type'];
-            const to = mMatch[3].trim();
+            const toId = mMatch[3].trim();
             const label = mMatch[4].trim();
-            if (!participants.includes(from)) participants.push(from);
-            if (!participants.includes(to)) participants.push(to);
+            const from = aliases.get(fromId) ?? registerParticipant(fromId);
+            const to = aliases.get(toId) ?? registerParticipant(toId);
             messages.push({ from, to, label, type });
         }
     }
     return { participants, messages };
 }
 
+function getCompactSequenceArrow(type: SeqMessage['type']): string {
+    switch (type) {
+        case '-->>':
+            return '- - >';
+        case '-->':
+            return '-->';
+        case '->>':
+            return '==>';
+        case '->':
+        default:
+            return '->';
+    }
+}
+
+function renderCompactSequenceDiagram(spec: string, termWidth = 100): string {
+    const { participants, messages } = parseSequenceDiagram(spec);
+    if (participants.length === 0) return renderGenericFallback(spec, termWidth);
+
+    const lines: string[] = ['', chalk.bold.white('  Sequence Diagram'), ''];
+    lines.push(chalk.cyan('  Participants'));
+    for (const participant of participants) {
+        lines.push(`   ${chalk.gray('•')} ${chalk.white(participant.slice(0, termWidth - 8))}`);
+    }
+
+    lines.push('');
+    lines.push(chalk.cyan('  Flow'));
+    for (const msg of messages) {
+        const arrow = getCompactSequenceArrow(msg.type);
+        const summary = `${msg.from} ${arrow} ${msg.to}`;
+        lines.push(`   ${chalk.yellow(summary.slice(0, termWidth - 6))}`);
+        if (msg.label) {
+            lines.push(`     ${chalk.white(msg.label.slice(0, termWidth - 8))}`);
+        }
+    }
+
+    lines.push('\n\n\n\n');
+    return lines.join('\n');
+}
+
 function renderSequenceDiagram(spec: string, termWidth = 100): string {
     const { participants, messages } = parseSequenceDiagram(spec);
     if (participants.length === 0) return renderGenericFallback(spec, termWidth);
+
+    const maxParticipantWidth = participants.reduce(
+        (max, participant) => Math.max(max, participant.length),
+        0,
+    );
+    if (participants.length > 4 || maxParticipantWidth > 18 || termWidth < 100) {
+        return renderCompactSequenceDiagram(spec, termWidth);
+    }
 
     const colWidth = Math.max(14, Math.floor((termWidth - 4) / participants.length));
     const lines: string[] = [];
@@ -169,6 +225,37 @@ interface FlowEdge {
     label?: string;
 }
 
+function parseFlowEdge(line: string): FlowEdge | null {
+    const labeledBarMatch = line.match(/^([\w:-]+)\s*-->\s*\|(.+?)\|\s*([\w:-]+)$/);
+    if (labeledBarMatch) {
+        return {
+            from: labeledBarMatch[1],
+            to: labeledBarMatch[3],
+            label: labeledBarMatch[2],
+        };
+    }
+
+    const labeledTextMatch = line.match(/^([\w:-]+)\s*--\s*(.+?)\s*-->\s*([\w:-]+)$/);
+    if (labeledTextMatch) {
+        return {
+            from: labeledTextMatch[1],
+            to: labeledTextMatch[3],
+            label: labeledTextMatch[2],
+        };
+    }
+
+    const simpleMatch = line.match(/^([\w:-]+)\s*(?:-->|==>|-\.->)\s*([\w:-]+)(?:\s*:\s*(.+))?$/);
+    if (simpleMatch) {
+        return {
+            from: simpleMatch[1],
+            to: simpleMatch[2],
+            label: simpleMatch[3],
+        };
+    }
+
+    return null;
+}
+
 function parseFlowNodeToken(token: string): FlowNode | null {
     const trimmed = token.trim();
     if (!trimmed) {
@@ -224,8 +311,6 @@ function parseFlowchart(spec: string): { nodes: FlowNode[]; edges: FlowEdge[] } 
 
     // node definition: A[Label] or A(Label) or A{Label}
     const nodeDefRe = /^([\w:-]+)(\[[^\]]*\]|\([^)]*\)|\{[^}]*\})?$/;
-    // edge: A --> B or A -->|label| B or A -- label --> B
-    const edgeRe = /^([\w:-]+)\s*(?:--[>|]?|==\s*>|-\.->)\s*(?:\|(.+?)\|)?\s*([\w:-]+)(?:\s*:\s*(.+))?$/;
     // inline node tokens used directly in edge lines (e.g. A[Start] --> B{Choice})
     const inlineNodeRe = /\b([\w:-]+)\s*(\[[^\]]*\]|\([^)]*\)|\{[^}]*\})/g;
 
@@ -241,11 +326,11 @@ function parseFlowchart(spec: string): { nodes: FlowNode[]; edges: FlowEdge[] } 
             return id;
         });
 
-        const eMatch = normalizedLine.match(edgeRe);
-        if (eMatch) {
-            const fromId = eMatch[1];
-            const toId = eMatch[3];
-            const label = eMatch[2] ?? eMatch[4];
+        const edge = parseFlowEdge(normalizedLine);
+        if (edge) {
+            const fromId = edge.from;
+            const toId = edge.to;
+            const label = edge.label;
             edges.push({ from: fromId, to: toId, label });
 
             if (!nodes.has(fromId)) {

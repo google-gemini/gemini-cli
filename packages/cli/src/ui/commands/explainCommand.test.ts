@@ -37,6 +37,7 @@ describe('explainCommand', () => {
           ? firstPart.text
           : '';
       expect(text).toContain('You MUST provide a visual representation');
+      expect(text).toContain('Prefer a simple top-down flowchart');
       expect(text).not.toContain('--visualize');
       expect(text).toContain('How does React reconciliation work?');
     }

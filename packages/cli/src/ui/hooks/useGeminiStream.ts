@@ -1346,6 +1346,15 @@ export const useGeminiStream = (
           }
         }
       }
+      if (visualizeEnabled && fullGeminiMessageBuffer.length > 0) {
+        const finalSpecs = collectNewMermaidSpecs(
+          fullGeminiMessageBuffer,
+          seenMermaidSpecsRef.current,
+        );
+        if (finalSpecs.length > 0) {
+          mermaidSpecsToRender.push(...finalSpecs);
+        }
+      }
       if (visualizeEnabled && mermaidSpecsToRender.length > 0) {
         if (pendingHistoryItemRef.current) {
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);

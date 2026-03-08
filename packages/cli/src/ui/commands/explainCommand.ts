@@ -44,8 +44,8 @@ export const explainCommand: SlashCommand = {
         const enhancedPrompt = `
 Explain the following code or concept in detail. 
 ${isVisualizeEnabled
-                ? "You MUST provide a visual representation (like a sequence diagram, flowchart, or class diagram) using Mermaid syntax in a ```mermaid``` block to illustrate your explanation."
-                : "If a visual representation (like a sequence diagram, flowchart, or class diagram) would help clarify the explanation, please provide one using Mermaid syntax in a ```mermaid``` block."
+                ? "You MUST provide a visual representation using Mermaid syntax in a ```mermaid``` block. Prefer a simple top-down flowchart when possible, keep labels short, and avoid Mermaid style directives or unnecessary HTML entities."
+                : "If a visual representation would help, provide one using Mermaid syntax in a ```mermaid``` block. Prefer a simple top-down flowchart with short labels."
             }
 
 Query: ${inputArg}
