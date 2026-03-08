@@ -62,13 +62,13 @@ The Gemini CLI supports three MCP transport types:
 
 ## Working with MCP resources
 
-Some MCP servers expose contextual “resources” in addition to the tools and
+Some MCP servers expose contextual "resources" in addition to the tools and
 prompts. Gemini CLI discovers these automatically and gives you the possibility
 to reference them in the chat.
 
 ### Discovery and listing
 
-- When discovery runs, the CLI fetches each server’s `resources/list` results.
+- When discovery runs, the CLI fetches each server's `resources/list` results.
 - The `/mcp` command displays a Resources section alongside Tools and Prompts
   for every connected server.
 
@@ -372,7 +372,7 @@ To authenticate with a server using Service Account Impersonation, you must set
 the `authProviderType` to `service_account_impersonation` and provide the
 following properties:
 
-- **`targetAudience`** (string): The OAuth Client ID allowslisted on the
+- **`targetAudience`** (string): The OAuth Client ID allowlisted on the
   IAP-protected application you are trying to access.
 - **`targetServiceAccount`** (string): The email address of the Google Cloud
   Service Account to impersonate.
