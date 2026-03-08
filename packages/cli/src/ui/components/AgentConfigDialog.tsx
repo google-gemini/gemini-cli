@@ -398,18 +398,6 @@ export function AgentConfigDialog({
     [pendingOverride, saveFieldValue],
   );
 
-  const footerProps =
-    modifiedFields.size > 0
-      ? {
-          footerContent: (
-            <Text color={theme.text.secondary}>
-              Changes saved automatically.
-            </Text>
-          ),
-          footerHeight: 1,
-        }
-      : {};
-
   return (
     <BaseSettingsDialog
       title={`Configure: ${displayName}`}
@@ -425,7 +413,18 @@ export function AgentConfigDialog({
       onEditCommit={handleEditCommit}
       onItemClear={handleItemClear}
       onClose={onClose}
-      {...footerProps}
+      footer={
+        modifiedFields.size > 0
+          ? {
+              content: (
+                <Text color={theme.text.secondary}>
+                  Changes saved automatically.
+                </Text>
+              ),
+              height: 1,
+            }
+          : undefined
+      }
     />
   );
 }

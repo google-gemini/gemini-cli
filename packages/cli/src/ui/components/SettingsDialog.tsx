@@ -350,18 +350,6 @@ export function SettingsDialog({
   const hasWorkspace = settings.workspace.path !== undefined;
   const showSearch = !showRestartPrompt;
 
-  const footerProps = showRestartPrompt
-    ? {
-        footerContent: (
-          <Text color={theme.status.warning}>
-            Changes that require a restart have been modified. Press r to exit
-            and apply changes now.
-          </Text>
-        ),
-        footerHeight: 1,
-      }
-    : {};
-
   return (
     <BaseSettingsDialog
       title="Settings"
@@ -380,7 +368,19 @@ export function SettingsDialog({
       onItemClear={handleItemClear}
       onClose={handleClose}
       onKeyPress={handleKeyPress}
-      {...footerProps}
+      footer={
+        showRestartPrompt
+          ? {
+              content: (
+                <Text color={theme.status.warning}>
+                  Changes that require a restart have been modified. Press r to
+                  exit and apply changes now.
+                </Text>
+              ),
+              height: 1,
+            }
+          : undefined
+      }
     />
   );
 }

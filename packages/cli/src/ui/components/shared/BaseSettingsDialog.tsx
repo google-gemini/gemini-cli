@@ -49,15 +49,14 @@ export interface SettingsDialogItem {
 }
 
 /**
- * Common props for BaseSettingsDialog component.
+ * Props for BaseSettingsDialog component.
  */
-interface BaseSettingsDialogCommonProps {
+export interface BaseSettingsDialogProps {
   // Header
   /** Dialog title displayed at the top */
   title: string;
   /** Optional border color for the dialog */
   borderColor?: string;
-
   // Search (optional feature)
   /** Whether to show the search input. Default: true */
   searchEnabled?: boolean;
@@ -105,18 +104,13 @@ interface BaseSettingsDialogCommonProps {
 
   /** Available terminal height for dynamic windowing */
   availableHeight?: number;
+
+  /** Optional footer configuration */
+  footer?: {
+    content: React.ReactNode;
+    height: number;
+  };
 }
-
-// Either footer content and height are provided, or neither are
-type FooterProps =
-  | { footerContent?: undefined; footerHeight?: undefined }
-  | {
-      footerContent: Exclude<React.ReactNode, null | undefined>;
-      footerHeight: number;
-    };
-
-export type BaseSettingsDialogProps = BaseSettingsDialogCommonProps &
-  FooterProps;
 
 /**
  * A base settings dialog component that handles rendering, layout, and keyboard navigation.
@@ -140,8 +134,7 @@ export function BaseSettingsDialog({
   onClose,
   onKeyPress,
   availableHeight,
-  footerContent,
-  footerHeight,
+  footer,
 }: BaseSettingsDialogProps): React.JSX.Element {
   // Calculate effective max items and scope visibility based on terminal height
   const { effectiveMaxItemsToShow, finalShowScopeSelector } = useMemo(() => {
@@ -164,7 +157,7 @@ export function BaseSettingsDialog({
     const ITEMS_SPACING_AFTER = 1;
     const SCOPE_SECTION_HEIGHT = 5;
     const HELP_TEXT_HEIGHT = 1;
-    const FOOTER_CONTENT_HEIGHT = footerHeight ?? 0;
+    const FOOTER_CONTENT_HEIGHT = footer?.height ?? 0;
     const ITEM_HEIGHT = 3;
 
     const currentAvailableHeight = availableHeight - DIALOG_PADDING;
@@ -215,7 +208,7 @@ export function BaseSettingsDialog({
     items.length,
     searchEnabled,
     showScopeSelector,
-    footerHeight,
+    footer,
   ]);
 
   // Internal state
@@ -616,7 +609,7 @@ export function BaseSettingsDialog({
         </Box>
 
         {/* Footer content (e.g., restart prompt) */}
-        {footerContent && <Box marginX={1}>{footerContent}</Box>}
+        {footer && <Box marginX={1}>{footer.content}</Box>}
       </Box>
     </Box>
   );
