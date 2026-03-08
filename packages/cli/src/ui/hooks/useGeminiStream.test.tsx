@@ -599,6 +599,35 @@ describe('useGeminiStream', () => {
     expect(mockSendMessageStream).not.toHaveBeenCalled(); // submitQuery uses this
   });
 
+  it('should expose activePtyId for non-shell executing tools that report pid', () => {
+    const remoteExecutingTool: TrackedExecutingToolCall = {
+      request: {
+        callId: 'remote-call-1',
+        name: 'remote_agent_call',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-remote',
+      },
+      status: CoreToolCallStatus.Executing,
+      responseSubmittedToGemini: false,
+      tool: {
+        name: 'remote_agent_call',
+        displayName: 'Remote Agent',
+        description: 'Remote agent execution',
+        build: vi.fn(),
+      } as any,
+      invocation: {
+        getDescription: () => 'Calling remote agent',
+      } as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+      liveOutput: 'working...',
+      pid: 4242,
+    };
+
+    const { result } = renderTestHook([remoteExecutingTool]);
+    expect(result.current.activePtyId).toBe(4242);
+  });
+
   it('should submit tool responses when all tool calls are completed and ready', async () => {
     const toolCall1ResponseParts: Part[] = [{ text: 'tool 1 final response' }];
     const toolCall2ResponseParts: Part[] = [{ text: 'tool 2 final response' }];

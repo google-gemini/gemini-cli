@@ -94,7 +94,7 @@ type ToolResponseWithParts = ToolCallResponseInfo & {
   llmContent?: PartListUnion;
 };
 
-interface ShellToolData {
+interface BackgroundToolData {
   pid?: number;
   command?: string;
   initialOutput?: string;
@@ -111,11 +111,11 @@ const SUPPRESSED_TOOL_ERRORS_NOTE =
 const LOW_VERBOSITY_FAILURE_NOTE =
   'This request failed. Press F12 for diagnostics, or run /settings and change "Error Verbosity" to full for full details.';
 
-function isShellToolData(data: unknown): data is ShellToolData {
+function isBackgroundToolData(data: unknown): data is BackgroundToolData {
   if (typeof data !== 'object' || data === null) {
     return false;
   }
-  const d = data as Partial<ShellToolData>;
+  const d = data as Partial<BackgroundToolData>;
   return (
     (d.pid === undefined || typeof d.pid === 'number') &&
     (d.command === undefined || typeof d.command === 'string') &&
@@ -312,12 +312,12 @@ export const useGeminiStream = (
   );
 
   const activeToolPtyId = useMemo(() => {
-    const executingShellTool = toolCalls.find(
-      (tc) =>
-        tc.status === 'executing' && tc.request.name === 'run_shell_command',
+    const executingBackgroundableTool = toolCalls.find(
+      (tc): tc is TrackedExecutingToolCall =>
+        tc.status === CoreToolCallStatus.Executing &&
+        typeof tc.pid === 'number',
     );
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return (executingShellTool as TrackedExecutingToolCall | undefined)?.pid;
+    return executingBackgroundableTool?.pid;
   }, [toolCalls]);
 
   const onExec = useCallback(async (done: Promise<void>) => {
@@ -1651,22 +1651,17 @@ export const useGeminiStream = (
           !processedMemoryToolsRef.current.has(t.request.callId),
       );
 
-      // Handle backgrounded shell tools
+      // Handle tools moved to the background (shell + remote agents).
       completedAndReadyToSubmitTools.forEach((t) => {
-        const isShell = t.request.name === 'run_shell_command';
         // Access result from the tracked tool call response
         const response = t.response as ToolResponseWithParts;
         const rawData = response?.data;
-        const data = isShellToolData(rawData) ? rawData : undefined;
-
-        // Use data.pid for shell commands moved to the background.
+        const data = isBackgroundToolData(rawData) ? rawData : undefined;
         const pid = data?.pid;
 
-        if (isShell && pid) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const command = (data?.['command'] as string) ?? 'shell';
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const initialOutput = (data?.['initialOutput'] as string) ?? '';
+        if (pid) {
+          const command = data.command ?? t.request.name;
+          const initialOutput = data.initialOutput ?? '';
 
           registerBackgroundShell(pid, command, initialOutput);
         }

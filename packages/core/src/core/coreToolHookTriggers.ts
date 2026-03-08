@@ -15,7 +15,7 @@ import type {
 import { ToolErrorType } from '../tools/tool-error.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ShellExecutionConfig } from '../index.js';
-import { ShellToolInvocation } from '../tools/shell.js';
+import type { ShellToolInvocation } from '../tools/shell.js';
 import { DiscoveredMCPToolInvocation } from '../tools/mcp-tool.js';
 
 /**
@@ -154,22 +154,23 @@ export async function executeToolWithHooks(
     }
   }
 
-  // Execute the actual tool
-  let toolResult: ToolResult;
-  if (setPidCallback && invocation instanceof ShellToolInvocation) {
-    toolResult = await invocation.execute(
-      signal,
-      liveOutputCallback,
-      shellExecutionConfig,
-      setPidCallback,
-    );
-  } else {
-    toolResult = await invocation.execute(
-      signal,
-      liveOutputCallback,
-      shellExecutionConfig,
-    );
-  }
+  // Execute the actual tool. Some tools (not just shell) can optionally expose
+  // a PID-like handle via a fourth parameter.
+  const invocationWithPidSupport = invocation as AnyToolInvocation & {
+    execute(
+      signal: AbortSignal,
+      updateOutput?: (outputChunk: ToolLiveOutput) => void,
+      shellExecutionConfig?: ShellExecutionConfig,
+      setPidCallback?: (pid: number) => void,
+    ): Promise<ToolResult>;
+  };
+
+  const toolResult: ToolResult = await invocationWithPidSupport.execute(
+    signal,
+    liveOutputCallback,
+    shellExecutionConfig,
+    setPidCallback,
+  );
 
   // Append notification if parameters were modified
   if (inputWasModified) {
