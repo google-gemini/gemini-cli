@@ -94,7 +94,7 @@ type ToolResponseWithParts = ToolCallResponseInfo & {
   llmContent?: PartListUnion;
 };
 
-interface ShellToolData {
+interface BackgroundExecutionData {
   pid?: number;
   command?: string;
   initialOutput?: string;
@@ -111,11 +111,13 @@ const SUPPRESSED_TOOL_ERRORS_NOTE =
 const LOW_VERBOSITY_FAILURE_NOTE =
   'This request failed. Press F12 for diagnostics, or run /settings and change "Error Verbosity" to full for full details.';
 
-function isShellToolData(data: unknown): data is ShellToolData {
+function isBackgroundExecutionData(
+  data: unknown,
+): data is BackgroundExecutionData {
   if (typeof data !== 'object' || data === null) {
     return false;
   }
-  const d = data as Partial<ShellToolData>;
+  const d = data as Partial<BackgroundExecutionData>;
   return (
     (d.pid === undefined || typeof d.pid === 'number') &&
     (d.command === undefined || typeof d.command === 'string') &&
@@ -311,7 +313,7 @@ export const useGeminiStream = (
     getPreferredEditor,
   );
 
-  const activeToolPtyId = useMemo(() => {
+  const activeToolExecutionId = useMemo(() => {
     const executingShellTool = toolCalls.find(
       (tc) =>
         tc.status === 'executing' && tc.request.name === 'run_shell_command',
@@ -347,7 +349,7 @@ export const useGeminiStream = (
     setShellInputFocused,
     terminalWidth,
     terminalHeight,
-    activeToolPtyId,
+    activeToolExecutionId,
   );
 
   const streamingState = useMemo(
@@ -525,7 +527,7 @@ export const useGeminiStream = (
     onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
   } | null>(null);
 
-  const activePtyId = activeShellPtyId || activeToolPtyId;
+  const activePtyId = activeShellPtyId || activeToolExecutionId;
 
   const prevActiveShellPtyIdRef = useRef<number | null>(null);
   useEffect(() => {
@@ -1657,7 +1659,7 @@ export const useGeminiStream = (
         // Access result from the tracked tool call response
         const response = t.response as ToolResponseWithParts;
         const rawData = response?.data;
-        const data = isShellToolData(rawData) ? rawData : undefined;
+        const data = isBackgroundExecutionData(rawData) ? rawData : undefined;
 
         // Use data.pid for shell commands moved to the background.
         const pid = data?.pid;
