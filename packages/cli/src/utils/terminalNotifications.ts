@@ -75,16 +75,10 @@ export function buildRunEventNotificationContent(
 
 export function isNotificationsEnabled(settings: LoadedSettings): boolean {
   const general = settings.merged.general as
-    | {
-        enableNotifications?: boolean;
-        enableMacOsNotifications?: boolean;
-      }
+    | { enableNotifications?: boolean }
     | undefined;
 
-  return (
-    general?.enableNotifications === true ||
-    general?.enableMacOsNotifications === true
-  );
+  return general?.enableNotifications === true;
 }
 
 function buildTerminalNotificationMessage(
