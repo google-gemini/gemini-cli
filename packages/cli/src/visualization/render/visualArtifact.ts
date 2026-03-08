@@ -60,26 +60,37 @@ export async function renderVisualArtifact(
   }
 
   // Graphic protocol paths — read the PNG from disk
-  const pngBuffer = await readFile(result.pngPath);
+  try {
+    const pngBuffer = await readFile(result.pngPath);
 
-  let output = '';
-  switch (protocol) {
-    case 'kitty': {
-      output = encodeKitty(pngBuffer, caps.columns, caps.rows);
-      break;
+    let output = '';
+    switch (protocol) {
+      case 'kitty': {
+        output = encodeKitty(pngBuffer, caps.columns, caps.rows);
+        break;
+      }
+      case 'iterm2': {
+        output = encodeIterm2(pngBuffer, caps.columns, caps.rows);
+        break;
+      }
+      case 'sixel': {
+        output = await encodeSixel(pngBuffer, caps.columns, caps.rows);
+        break;
+      }
+      default: {
+        output = `  PNG saved to: ${result.pngPath}\n`;
+      }
     }
-    case 'iterm2': {
-      output = encodeIterm2(pngBuffer, caps.columns, caps.rows);
-      break;
+
+    return output;
+  } catch (error) {
+    // If ANY graphic protocol fails (missing lib, terminal lie, etc), fall back to ASCII
+    process.stderr.write(
+      chalk.yellow(`  ⚠ Graphics fallback failed, defaulting to ASCII mode: ${error}\n`),
+    );
+    if (options.spec) {
+      return encodeAscii(options.spec, caps.columns);
     }
-    case 'sixel': {
-      output = await encodeSixel(pngBuffer, caps.columns, caps.rows);
-      break;
-    }
-    default: {
-      output = `  PNG saved to: ${result.pngPath}\n`;
-    }
+    return `  PNG: ${result.pngPath}\n`;
   }
-
-  return output;
 }

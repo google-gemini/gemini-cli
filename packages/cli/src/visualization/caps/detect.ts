@@ -53,7 +53,6 @@ function detectProtocol(): TerminalProtocol {
 
     if (
         term.includes('sixel') ||
-        term === 'xterm-256color' && env['COLORTERM'] === 'truecolor' ||
         termProgram === 'mlterm' ||
         term.startsWith('mlterm') ||
         // Windows Terminal supports sixel in recent versions

@@ -14,30 +14,28 @@ import sharp from 'sharp';
 // Dynamic import of sixel (ESM-only package)
 // Handles both v1 API (encode function) and v2 API (SixelEncoder class)
 async function encodeSixelData(rgbaData: Uint8ClampedArray, width: number, height: number): Promise<string> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mod = await import('sixel') as any;
-    const candidate = mod.default ?? mod;
+    try {
+        const mod = await import('sixel');
+        const candidate = (mod as any).default ?? mod;
 
-    // v1 API: mod.encode or mod.default.encode is a function
-    if (typeof candidate?.encode === 'function') {
-        return candidate.encode(rgbaData, width, height);
-    }
-    if (typeof mod.encode === 'function') {
-        return mod.encode(rgbaData, width, height);
-    }
-
-    // v2 API: SixelEncoder class
-    const EncoderClass = candidate?.SixelEncoder ?? mod.SixelEncoder;
-    if (EncoderClass) {
-        const encoder = new EncoderClass();
-        encoder.init(width, height, undefined, undefined, true);
-        for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-                const i = (y * width + x) * 4;
-                encoder.addPixel(x, rgbaData[i]!, rgbaData[i + 1]!, rgbaData[i + 2]!, rgbaData[i + 3]!);
-            }
+        if (typeof candidate?.encode === 'function') {
+            return candidate.encode(rgbaData, width, height);
         }
-        return encoder.toString();
+
+        const EncoderClass = (mod as any).SixelEncoder ?? candidate?.SixelEncoder;
+        if (EncoderClass) {
+            const encoder = new EncoderClass();
+            encoder.init(width, height, undefined, undefined, true);
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const i = (y * width + x) * 4;
+                    encoder.addPixel(x, rgbaData[i]!, rgbaData[i + 1]!, rgbaData[i + 2]!, rgbaData[i + 3]!);
+                }
+            }
+            return encoder.toString();
+        }
+    } catch (e) {
+        throw new Error(`SIXEL package load failed: ${e}`);
     }
 
     throw new Error('sixel package API not recognized — try: npm install sixel@1 -w packages/cli');
