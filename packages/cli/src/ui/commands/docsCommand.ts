@@ -14,7 +14,7 @@ import { MessageType } from '../types.js';
 import {
   isInsideSandboxEnvironment,
   isMacOsSeatbeltSandbox,
-} from '../../utils/sandboxEnvironment.js';
+} from '@google/gemini-cli-core';
 
 export const docsCommand: SlashCommand = {
   name: 'docs',

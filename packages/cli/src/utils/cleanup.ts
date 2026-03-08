@@ -11,9 +11,9 @@ import {
   shutdownTelemetry,
   isTelemetrySdkInitialized,
   ExitCodes,
+  isInsideSandboxEnvironment,
 } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
-import { isInsideSandboxEnvironment } from './sandboxEnvironment.js';
 
 const cleanupFunctions: Array<(() => void) | (() => Promise<void>)> = [];
 const syncCleanupFunctions: Array<() => void> = [];

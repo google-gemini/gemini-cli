@@ -20,15 +20,13 @@ import {
   getVersion,
   INITIAL_HISTORY_LENGTH,
   debugLogger,
+  getSandboxEnv,
+  isInsideSandboxEnvironment,
+  isMacOsSeatbeltSandbox,
 } from '@google/gemini-cli-core';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 import { exportHistoryToFile } from '../utils/historyExportUtils.js';
 import path from 'node:path';
-import {
-  getSandboxEnv,
-  isInsideSandboxEnvironment,
-  isMacOsSeatbeltSandbox,
-} from '../../utils/sandboxEnvironment.js';
 
 export const bugCommand: SlashCommand = {
   name: 'bug',

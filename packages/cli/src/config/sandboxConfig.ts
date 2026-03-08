@@ -8,13 +8,13 @@ import {
   getPackageJson,
   type SandboxConfig,
   FatalSandboxError,
+  isInsideSandboxEnvironment,
 } from '@google/gemini-cli-core';
 import commandExists from 'command-exists';
 import * as os from 'node:os';
 import type { Settings } from './settings.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { isInsideSandboxEnvironment } from '../utils/sandboxEnvironment.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

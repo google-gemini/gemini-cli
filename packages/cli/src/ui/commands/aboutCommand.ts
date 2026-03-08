@@ -13,12 +13,10 @@ import {
   UserAccountManager,
   debugLogger,
   getVersion,
-} from '@google/gemini-cli-core';
-import {
   getSandboxEnv,
   isInsideSandboxEnvironment,
   isMacOsSeatbeltSandbox,
-} from '../../utils/sandboxEnvironment.js';
+} from '@google/gemini-cli-core';
 
 export const aboutCommand: SlashCommand = {
   name: 'about',

@@ -12,6 +12,9 @@ import {
   tildeifyPath,
   getDisplayString,
   checkExhaustive,
+  getSandboxEnv,
+  isInsideSandboxEnvironment,
+  isMacOsSeatbeltSandbox,
 } from '@google/gemini-cli-core';
 import { ConsoleSummaryDisplay } from './ConsoleSummaryDisplay.js';
 import process from 'node:process';
@@ -29,11 +32,6 @@ import {
   deriveItemsFromLegacySettings,
 } from '../../config/footerItems.js';
 import { isDevelopment } from '../../utils/installationInfo.js';
-import {
-  getSandboxEnv,
-  isInsideSandboxEnvironment,
-  isMacOsSeatbeltSandbox,
-} from '../../utils/sandboxEnvironment.js';
 
 interface CwdIndicatorProps {
   targetDir: string;

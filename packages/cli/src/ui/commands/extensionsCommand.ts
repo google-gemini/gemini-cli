@@ -8,6 +8,8 @@ import {
   debugLogger,
   listExtensions,
   type ExtensionInstallMetadata,
+  isInsideSandboxEnvironment,
+  isMacOsSeatbeltSandbox,
 } from '@google/gemini-cli-core';
 import type { ExtensionUpdateInfo } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
@@ -37,10 +39,6 @@ import { ExtensionSettingScope } from '../../config/extensions/extensionSettings
 import { type ConfigLogger } from '../../commands/extensions/utils.js';
 import { ConfigExtensionDialog } from '../components/ConfigExtensionDialog.js';
 import { ExtensionRegistryView } from '../components/views/ExtensionRegistryView.js';
-import {
-  isInsideSandboxEnvironment,
-  isMacOsSeatbeltSandbox,
-} from '../../utils/sandboxEnvironment.js';
 import React from 'react';
 
 function showMessageIfNoExtensions(

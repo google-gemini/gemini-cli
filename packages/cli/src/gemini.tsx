@@ -73,6 +73,7 @@ import {
   ValidationCancelledError,
   ValidationRequiredError,
   type AdminControlsSettings,
+  isInsideSandboxEnvironment,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -110,7 +111,6 @@ import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
 import { runDeferredCommand } from './deferred.js';
 import { SlashCommandConflictHandler } from './services/SlashCommandConflictHandler.js';
-import { isInsideSandboxEnvironment } from './utils/sandboxEnvironment.js';
 
 const SLOW_RENDER_MS = 200;
 

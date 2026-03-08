@@ -8,15 +8,20 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 
-vi.mock('@google/gemini-cli-core', () => ({
-  Storage: vi.fn().mockImplementation(() => ({
-    getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
-    initialize: vi.fn().mockResolvedValue(undefined),
-  })),
-  shutdownTelemetry: vi.fn(),
-  isTelemetrySdkInitialized: vi.fn().mockReturnValue(false),
-  ExitCodes: { SUCCESS: 0 },
-}));
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    Storage: vi.fn().mockImplementation(() => ({
+      getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+      initialize: vi.fn().mockResolvedValue(undefined),
+    })),
+    shutdownTelemetry: vi.fn(),
+    isTelemetrySdkInitialized: vi.fn().mockReturnValue(false),
+    ExitCodes: { SUCCESS: 0 },
+  };
+});
 
 vi.mock('node:fs', () => ({
   promises: {
