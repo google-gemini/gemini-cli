@@ -22,6 +22,7 @@ import type { RemoteAgentDefinition } from './types.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { A2AAuthProvider } from './auth-provider/types.js';
+import { ShellExecutionService } from '../services/shellExecutionService.js';
 
 // Mock A2AClientManager
 vi.mock('./a2a-client-manager.js', () => ({
@@ -582,6 +583,88 @@ describe('RemoteAgentInvocation', () => {
       expect(updateOutput).toHaveBeenCalledWith(
         'Generating...\n\nArtifact (Result):\nPart 1 Part 2',
       );
+    });
+
+    it('should support Ctrl+B backgrounding through ShellExecutionService', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+
+      let releaseSecondChunk: (() => void) | undefined;
+      const secondChunkGate = new Promise<void>((resolve) => {
+        releaseSecondChunk = resolve;
+      });
+
+      mockClientManager.sendMessageStream.mockImplementation(
+        async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'msg-1',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Chunk 1' }],
+          };
+          await secondChunkGate;
+          yield {
+            kind: 'message',
+            messageId: 'msg-2',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Chunk 2' }],
+          };
+        },
+      );
+
+      let pid: number | undefined;
+      const onExit = vi.fn();
+      let unsubscribeOnExit: (() => void) | undefined;
+      const streamedOutputChunks: string[] = [];
+      let unsubscribeStream: (() => void) | undefined;
+
+      const updateOutput = vi.fn((output: unknown) => {
+        if (output === 'Chunk 1' && pid) {
+          ShellExecutionService.background(pid);
+          unsubscribeStream = ShellExecutionService.subscribe(pid, (event) => {
+            if (event.type === 'data' && typeof event.chunk === 'string') {
+              streamedOutputChunks.push(event.chunk);
+            }
+          });
+        }
+      });
+
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'long task' },
+        mockMessageBus,
+      );
+
+      const resultPromise = invocation.execute(
+        new AbortController().signal,
+        updateOutput,
+        undefined,
+        (newPid) => {
+          pid = newPid;
+          unsubscribeOnExit = ShellExecutionService.onExit(newPid, onExit);
+        },
+      );
+
+      const result = await resultPromise;
+      expect(pid).toBeDefined();
+      expect(result.returnDisplay).toContain(
+        'Remote agent moved to background',
+      );
+      expect(result.data).toMatchObject({
+        pid,
+        initialOutput: 'Chunk 1',
+      });
+
+      releaseSecondChunk?.();
+
+      await vi.waitFor(() => {
+        expect(onExit).toHaveBeenCalledWith(0, undefined);
+      });
+      await vi.waitFor(() => {
+        expect(streamedOutputChunks.join('')).toContain('Chunk 2');
+      });
+
+      unsubscribeStream?.();
+      unsubscribeOnExit?.();
     });
   });
 
