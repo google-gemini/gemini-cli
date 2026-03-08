@@ -6,9 +6,7 @@
 
 import { CommandKind, type SlashCommand } from './types.js';
 import { MessageType } from '../types.js';
-import {
-  runPipeline,
-} from '../../visualization/index.js';
+import { runPipeline } from '../../visualization/index.js';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -74,7 +72,9 @@ export const visualizeCommand: SlashCommand = {
       });
 
       // 2. Render the artifact
-      const { renderVisualArtifact } = await import('../../visualization/render/visualArtifact.js');
+      const { renderVisualArtifact } = await import(
+        '../../visualization/render/visualArtifact.js'
+      );
       const output = await renderVisualArtifact(result, {
         spec,
         showMeta: true,
@@ -92,11 +92,26 @@ export const visualizeCommand: SlashCommand = {
         text: `Successfully visualized diagram from ${sourceLabel}.`,
       });
     } catch (err: unknown) {
+      let errorMessage = 'Unknown error';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'object' && err !== null) {
+        try {
+          errorMessage = JSON.stringify(err);
+        } catch {
+          errorMessage = String(err);
+        }
+      } else {
+        errorMessage = String(err);
+      }
+
       context.ui.addItem({
         type: MessageType.ERROR,
-        text: `Failed to visualize diagram: ${err instanceof Error ? err.message : String(err)
-          }`,
+        text: `Failed to visualize diagram: ${errorMessage}`,
       });
+
+      // Also log to debug message if available
+      context.ui.setDebugMessage(`Visualization error detail: ${errorMessage}`);
     }
   },
 };
