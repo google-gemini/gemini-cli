@@ -638,6 +638,7 @@ included directory memory
       await loadServerHierarchicalMemory(
         cwd,
         createdFiles.map((f) => path.dirname(f)),
+        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -675,6 +676,7 @@ included directory memory
       await loadServerHierarchicalMemory(
         parentDir,
         [childDir, parentDir], // Deliberately include duplicates
+        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
