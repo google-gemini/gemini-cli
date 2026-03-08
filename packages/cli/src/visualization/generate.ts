@@ -2,6 +2,47 @@ import { MessageType } from '../ui/types.js';
 import type { CommandContext } from '../ui/commands/types.js';
 import { LlmRole, getResponseText } from '@google/gemini-cli-core';
 
+const GENERATION_TIMEOUT_MS = 45_000;
+
+class GenerationTimeoutError extends Error {
+    constructor(timeoutMs: number) {
+        super(`Generation timed out after ${timeoutMs}ms`);
+        this.name = 'GenerationTimeoutError';
+    }
+}
+
+async function runWithGenerationTimeout<T>(
+    operation: (signal: AbortSignal) => Promise<T>,
+    timeoutMs = GENERATION_TIMEOUT_MS,
+): Promise<T> {
+    const controller = new AbortController();
+    let timeoutId: NodeJS.Timeout | undefined;
+    let timedOut = false;
+
+    const operationPromise = operation(controller.signal);
+    const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+            timedOut = true;
+            controller.abort();
+            reject(new GenerationTimeoutError(timeoutMs));
+        }, timeoutMs);
+    });
+
+    try {
+        return await Promise.race([operationPromise, timeoutPromise]);
+    } finally {
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+        }
+
+        // If the timeout won the race, suppress any eventual rejection from
+        // the generation promise to avoid unhandled rejection noise.
+        if (timedOut) {
+            operationPromise.catch(() => {});
+        }
+    }
+}
+
 const MERMAID_ROOT_KEYWORDS = [
     'flowchart',
     'graph',
@@ -166,19 +207,21 @@ export async function generateMermaid(
     });
 
     try {
-        const response = await client.generateContent(
-            { model: 'auto', isChatModel: true }, // Use default chat model
-            [
-                {
-                    role: 'user',
-                    parts: [
-                        { text: `System Instruction: ${SYSTEM_PROMPT}` },
-                        { text: prompt }
-                    ]
-                }
-            ],
-            new AbortController().signal,
-            LlmRole.MAIN,
+        const response = await runWithGenerationTimeout((signal) =>
+            client.generateContent(
+                { model: 'auto', isChatModel: true }, // Use default chat model
+                [
+                    {
+                        role: 'user',
+                        parts: [
+                            { text: `System Instruction: ${SYSTEM_PROMPT}` },
+                            { text: prompt }
+                        ]
+                    }
+                ],
+                signal,
+                LlmRole.MAIN,
+            ),
         );
 
         const responseText = getResponseText(response) ?? '';
@@ -200,6 +243,14 @@ export async function generateMermaid(
         await context.services.logger.initialize();
         // Log to debug logger since core logger has no error method
         await context.services.logger.logMessage('user' as any, `Generation error: ${error}`);
+
+        if (error instanceof GenerationTimeoutError) {
+            context.ui.addItem({
+                type: MessageType.ERROR,
+                text: `Diagram generation timed out after ${Math.round(GENERATION_TIMEOUT_MS / 1000)}s. Try a shorter prompt or run again.`,
+            });
+        }
+
         return null;
     } finally {
         context.ui.setPendingItem(null);
@@ -234,19 +285,21 @@ export async function generateHtml(
     });
 
     try {
-        const response = await client.generateContent(
-            { model: 'auto', isChatModel: true }, // Use default chat model
-            [
-                {
-                    role: 'user',
-                    parts: [
-                        { text: `System Instruction: ${HTML_SYSTEM_PROMPT}` },
-                        { text: prompt }
-                    ]
-                }
-            ],
-            new AbortController().signal,
-            LlmRole.MAIN,
+        const response = await runWithGenerationTimeout((signal) =>
+            client.generateContent(
+                { model: 'auto', isChatModel: true }, // Use default chat model
+                [
+                    {
+                        role: 'user',
+                        parts: [
+                            { text: `System Instruction: ${HTML_SYSTEM_PROMPT}` },
+                            { text: prompt }
+                        ]
+                    }
+                ],
+                signal,
+                LlmRole.MAIN,
+            ),
         );
 
         const responseText = getResponseText(response) ?? '';
@@ -256,6 +309,14 @@ export async function generateHtml(
     } catch (error) {
         await context.services.logger.initialize();
         await context.services.logger.logMessage('user' as any, `Generation error: ${error}`);
+
+        if (error instanceof GenerationTimeoutError) {
+            context.ui.addItem({
+                type: MessageType.ERROR,
+                text: `Preview generation timed out after ${Math.round(GENERATION_TIMEOUT_MS / 1000)}s. Try a shorter prompt or run again.`,
+            });
+        }
+
         return null;
     } finally {
         context.ui.setPendingItem(null);
