@@ -55,6 +55,7 @@ export interface ShellToolParams {
   description?: string;
   dir_path?: string;
   is_background?: boolean;
+  encoding?: string;
 }
 
 export class ShellToolInvocation extends BaseToolInvocation<
@@ -277,6 +278,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             sanitizationConfig:
               shellExecutionConfig?.sanitizationConfig ??
               this.config.sanitizationConfig,
+            encoding: this.params.encoding,
           },
         );
 

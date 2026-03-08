@@ -21,6 +21,7 @@ import {
   PARAM_DESCRIPTION,
   PARAM_DIR_PATH,
   SHELL_PARAM_IS_BACKGROUND,
+  SHELL_PARAM_ENCODING,
   EXIT_PLAN_PARAM_PLAN_PATH,
   SKILL_PARAM_NAME,
 } from './base-declarations.js';
@@ -108,6 +109,11 @@ export function getShellDeclaration(
           type: 'boolean',
           description:
             'Set to true if this command should be run in the background (e.g. for long-running servers or watchers). The command will be started, allowed to run for a brief moment to check for immediate errors, and then moved to the background.',
+        },
+        [SHELL_PARAM_ENCODING]: {
+          type: 'string',
+          description:
+            'Optional: The encoding to use for decoding the output of the shell command (e.g., "utf-8", "gbk"). Defaults to auto-detection, but can be explicitly set if auto-detection fails.',
         },
       },
       required: [SHELL_PARAM_COMMAND],

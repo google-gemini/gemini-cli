@@ -106,6 +106,7 @@ export interface ShellExecutionConfig {
   disableDynamicLineTrimming?: boolean;
   scrollback?: number;
   maxSerializedLines?: number;
+  encoding?: string;
 }
 
 /**
@@ -251,7 +252,7 @@ export class ShellExecutionService {
       cwd,
       onOutputEvent,
       abortSignal,
-      shellExecutionConfig.sanitizationConfig,
+      shellExecutionConfig,
     );
   }
 
@@ -297,8 +298,9 @@ export class ShellExecutionService {
     cwd: string,
     onOutputEvent: (event: ShellOutputEvent) => void,
     abortSignal: AbortSignal,
-    sanitizationConfig: EnvironmentSanitizationConfig,
+    shellExecutionConfig: ShellExecutionConfig,
   ): ShellExecutionHandle {
+    const sanitizationConfig = shellExecutionConfig.sanitizationConfig;
     try {
       const isWindows = os.platform() === 'win32';
       const { executable, argsPrefix, shell } = getShellConfiguration();
@@ -350,7 +352,8 @@ export class ShellExecutionService {
 
         const handleOutput = (data: Buffer, stream: 'stdout' | 'stderr') => {
           if (!stdoutDecoder || !stderrDecoder) {
-            const encoding = getCachedEncodingForBuffer(data);
+            const encoding =
+              shellExecutionConfig.encoding || getCachedEncodingForBuffer(data);
             try {
               stdoutDecoder = new TextDecoder(encoding);
               stderrDecoder = new TextDecoder(encoding);
@@ -730,7 +733,9 @@ export class ShellExecutionService {
             () =>
               new Promise<void>((resolve) => {
                 if (!decoder) {
-                  const encoding = getCachedEncodingForBuffer(data);
+                  const encoding =
+                    shellExecutionConfig.encoding ||
+                    getCachedEncodingForBuffer(data);
                   try {
                     decoder = new TextDecoder(encoding);
                   } catch {
