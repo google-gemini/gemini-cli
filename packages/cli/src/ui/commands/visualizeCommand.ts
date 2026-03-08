@@ -6,6 +6,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { execSync } from 'node:child_process';
 import {
   type CommandContext,
   type SlashCommand,
@@ -152,12 +153,28 @@ const gitSubCommand: SlashCommand = {
   description: 'Visualize the recent git commit history and branch structure',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: (_context: CommandContext, args: string) => {
+  action: (context: CommandContext, args: string) => {
+    let gitLogOutput = '';
+    try {
+      gitLogOutput = execSync(
+        'git log --oneline --graph --decorate --all -20',
+        {
+          encoding: 'utf-8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+        },
+      );
+    } catch (error) {
+      context.ui.addItem({
+        type: MessageType.ERROR,
+        text: `Failed to execute 'git log'. Make sure you are in a git repository.\nError: ${(error as Error).message}`,
+      });
+      return;
+    }
+
     const extra = args.trim() ? ` Focus on: ${args.trim()}.` : '';
     const prompt =
-      `Run \`git log --oneline --graph --decorate --all -20\` and then generate a ` +
-      `Mermaid flowchart (graph LR) representing the recent git history, showing branch ` +
-      `names, recent commits, and merge points.${extra}\n\n` +
+      `Based on the following git log output, generate a Mermaid flowchart (graph LR) representing the recent git history, showing branch names, recent commits, and merge points.${extra}\n\n` +
+      `Git Log Output:\n\`\`\`\n${gitLogOutput}\n\`\`\`\n\n` +
       `After creating the diagram, call the \`visualize\` tool with:\n` +
       `- diagram_type: "flowchart"\n` +
       `- content: <your Mermaid graph LR definition>\n` +
