@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="700" viewBox="0 0 920 700">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="920" height="700" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="2" fill="#333333" textLength="900" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────────────────────────╮</text>
+    <text x="0" y="19" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="19" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="36" fill="#ffffff" textLength="144" lengthAdjust="spacingAndGlyphs" font-weight="bold">Configure Footer</text>
+    <text x="891" y="36" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="53" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="70" fill="#afafaf" textLength="396" lengthAdjust="spacingAndGlyphs">Select which items to display in the footer.</text>
+    <text x="891" y="70" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="87" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="27" y="102" width="9" height="17" fill="#001a00" />
+    <text x="27" y="104" fill="#00cd00" textLength="9" lengthAdjust="spacingAndGlyphs">&gt;</text>
+    <rect x="36" y="102" width="9" height="17" fill="#001a00" />
+    <rect x="45" y="102" width="27" height="17" fill="#001a00" />
+    <text x="45" y="104" fill="#d7ffd7" textLength="27" lengthAdjust="spacingAndGlyphs">[✓]</text>
+    <rect x="72" y="102" width="90" height="17" fill="#001a00" />
+    <text x="72" y="104" fill="#00cd00" textLength="90" lengthAdjust="spacingAndGlyphs"> workspace</text>
+    <rect x="162" y="102" width="711" height="17" fill="#001a00" />
+    <text x="891" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="27" y="119" width="18" height="17" fill="#001a00" />
+    <rect x="45" y="119" width="234" height="17" fill="#001a00" />
+    <text x="45" y="121" fill="#afafaf" textLength="234" lengthAdjust="spacingAndGlyphs"> Current working directory</text>
+    <rect x="279" y="119" width="594" height="17" fill="#001a00" />
+    <text x="891" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="138" fill="#d7ffd7" textLength="27" lengthAdjust="spacingAndGlyphs">[✓]</text>
+    <text x="72" y="138" fill="#ffffff" textLength="99" lengthAdjust="spacingAndGlyphs"> git-branch</text>
+    <text x="891" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="155" fill="#afafaf" textLength="477" lengthAdjust="spacingAndGlyphs"> Current git branch name (not shown when unavailable)</text>
+    <text x="891" y="155" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="172" fill="#d7ffd7" textLength="27" lengthAdjust="spacingAndGlyphs">[✓]</text>
+    <text x="72" y="172" fill="#ffffff" textLength="72" lengthAdjust="spacingAndGlyphs"> sandbox</text>
+    <text x="891" y="172" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="189" fill="#afafaf" textLength="297" lengthAdjust="spacingAndGlyphs"> Sandbox type and trust indicator</text>
+    <text x="891" y="189" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="206" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="206" fill="#d7ffd7" textLength="27" lengthAdjust="spacingAndGlyphs">[✓]</text>
+    <text x="72" y="206" fill="#ffffff" textLength="99" lengthAdjust="spacingAndGlyphs"> model-name</text>
+    <text x="891" y="206" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="223" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="223" fill="#afafaf" textLength="225" lengthAdjust="spacingAndGlyphs"> Current model identifier</text>
+    <text x="891" y="223" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="240" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="240" fill="#d7ffd7" textLength="27" lengthAdjust="spacingAndGlyphs">[✓]</text>
+    <text x="72" y="240" fill="#ffffff" textLength="54" lengthAdjust="spacingAndGlyphs"> quota</text>
+    <text x="891" y="240" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="257" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="257" fill="#afafaf" textLength="540" lengthAdjust="spacingAndGlyphs"> Remaining usage on daily limit (not shown when unavailable)</text>
+    <text x="891" y="257" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="274" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="274" fill="#afafaf" textLength="27" lengthAdjust="spacingAndGlyphs">[ ]</text>
+    <text x="72" y="274" fill="#ffffff" textLength="117" lengthAdjust="spacingAndGlyphs"> context-used</text>
+    <text x="891" y="274" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="291" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="291" fill="#afafaf" textLength="306" lengthAdjust="spacingAndGlyphs"> Percentage of context window used</text>
+    <text x="891" y="291" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="308" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="308" fill="#afafaf" textLength="27" lengthAdjust="spacingAndGlyphs">[ ]</text>
+    <text x="72" y="308" fill="#ffffff" textLength="117" lengthAdjust="spacingAndGlyphs"> memory-usage</text>
+    <text x="891" y="308" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="325" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="325" fill="#afafaf" textLength="279" lengthAdjust="spacingAndGlyphs"> Memory used by the application</text>
+    <text x="891" y="325" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="342" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="342" fill="#afafaf" textLength="27" lengthAdjust="spacingAndGlyphs">[ ]</text>
+    <text x="72" y="342" fill="#ffffff" textLength="99" lengthAdjust="spacingAndGlyphs"> session-id</text>
+    <text x="891" y="342" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="359" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="359" fill="#afafaf" textLength="378" lengthAdjust="spacingAndGlyphs"> Unique identifier for the current session</text>
+    <text x="891" y="359" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="376" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="376" fill="#afafaf" textLength="27" lengthAdjust="spacingAndGlyphs">[ ]</text>
+    <text x="72" y="376" fill="#ffffff" textLength="117" lengthAdjust="spacingAndGlyphs"> code-changes</text>
+    <text x="891" y="376" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="393" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="393" fill="#afafaf" textLength="513" lengthAdjust="spacingAndGlyphs"> Lines added/removed in the session (not shown when zero)</text>
+    <text x="891" y="393" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="410" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="410" fill="#afafaf" textLength="27" lengthAdjust="spacingAndGlyphs">[ ]</text>
+    <text x="72" y="410" fill="#ffffff" textLength="108" lengthAdjust="spacingAndGlyphs"> token-count</text>
+    <text x="891" y="410" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="427" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="427" fill="#afafaf" textLength="495" lengthAdjust="spacingAndGlyphs"> Total tokens used in the session (not shown when zero)</text>
+    <text x="891" y="427" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="444" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="444" fill="#d7ffd7" textLength="27" lengthAdjust="spacingAndGlyphs">[✓]</text>
+    <text x="72" y="444" fill="#ffffff" textLength="171" lengthAdjust="spacingAndGlyphs"> Show footer labels</text>
+    <text x="891" y="444" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="461" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="461" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="478" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="478" fill="#ffffff" textLength="207" lengthAdjust="spacingAndGlyphs">Reset to default footer</text>
+    <text x="891" y="478" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="495" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="495" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="512" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="512" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="529" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="529" fill="#afafaf" textLength="585" lengthAdjust="spacingAndGlyphs">Enter to select · ↑/↓ to navigate · ←/→ to reorder · Esc to close</text>
+    <text x="891" y="529" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="546" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="546" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="563" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="563" fill="#333333" textLength="846" lengthAdjust="spacingAndGlyphs">┌────────────────────────────────────────────────────────────────────────────────────────────┐</text>
+    <text x="891" y="563" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="580" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="580" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="580" fill="#ffffff" textLength="72" lengthAdjust="spacingAndGlyphs" font-weight="bold">Preview:</text>
+    <text x="864" y="580" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="580" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="597" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="597" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="45" y="595" width="198" height="17" fill="#001a00" />
+    <text x="45" y="597" fill="#ffffff" textLength="198" lengthAdjust="spacingAndGlyphs">workspace (/directory)</text>
+    <rect x="243" y="595" width="45" height="17" fill="#001a00" />
+    <text x="315" y="597" fill="#afafaf" textLength="54" lengthAdjust="spacingAndGlyphs">branch</text>
+    <text x="432" y="597" fill="#afafaf" textLength="63" lengthAdjust="spacingAndGlyphs">sandbox</text>
+    <text x="567" y="597" fill="#afafaf" textLength="54" lengthAdjust="spacingAndGlyphs">/model</text>
+    <text x="756" y="597" fill="#afafaf" textLength="54" lengthAdjust="spacingAndGlyphs">/stats</text>
+    <text x="864" y="597" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="597" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="614" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="614" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="45" y="612" width="126" height="17" fill="#001a00" />
+    <text x="45" y="614" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs">~/project/path</text>
+    <rect x="171" y="612" width="117" height="17" fill="#001a00" />
+    <text x="315" y="614" fill="#ffffff" textLength="36" lengthAdjust="spacingAndGlyphs">main</text>
+    <text x="432" y="614" fill="#00cd00" textLength="54" lengthAdjust="spacingAndGlyphs">docker</text>
+    <text x="567" y="614" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs">gemini-2.5-pro</text>
+    <text x="756" y="614" fill="#ffffff" textLength="27" lengthAdjust="spacingAndGlyphs">97%</text>
+    <text x="864" y="614" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="614" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="631" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="631" fill="#333333" textLength="846" lengthAdjust="spacingAndGlyphs">└────────────────────────────────────────────────────────────────────────────────────────────┘</text>
+    <text x="891" y="631" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="648" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="648" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="665" fill="#333333" textLength="900" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────────────────────────╯</text>
+  </g>
+</svg>
