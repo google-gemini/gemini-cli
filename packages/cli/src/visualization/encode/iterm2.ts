@@ -23,11 +23,11 @@ export function encodeIterm2(pngBuffer: Buffer, cols = 80, rows = 24): string {
     const b64 = pngBuffer.toString('base64');
     const size = pngBuffer.byteLength;
 
-    // Width capped up to 90% of terminal width or 120 chars, whichever is smaller.
-    const widthSpec = Math.min(Math.floor(cols * 0.9), 120).toString();
+    // Width capped up to 90% of terminal width or 140 chars, whichever is smaller.
+    const widthSpec = Math.min(Math.floor(cols * 0.9), 140).toString();
 
-    // Height capped up to roughly 50% of terminal height or 25 rows, whichever is smaller.
-    const heightSpec = Math.min(Math.floor(rows * 0.5), 25).toString();
+    // Height capped up to roughly 65% of terminal height or 35 rows, whichever is smaller.
+    const heightSpec = Math.min(Math.floor(rows * 0.65), 35).toString();
 
     const args = [
         `inline=1`,

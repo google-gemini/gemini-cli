@@ -70,17 +70,14 @@ export async function renderMermaidToPng(
 
         await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30_000 });
 
-        // Wait for Mermaid to render the SVG
-        await page.waitForSelector('.mermaid svg', { timeout: 20_000 });
-
-        // Give Mermaid a beat to finish layout animations
+        // Wait for Mermaid to set our completion flag
         await page.waitForFunction(
-            () => {
-                const svg = document.querySelector('.mermaid svg');
-                return svg && (svg as HTMLElement).getBoundingClientRect().width > 0;
-            },
-            { timeout: 10_000 },
+            () => (window as any).__mermaidDone === true,
+            { timeout: 20_000 },
         );
+
+        // Give it a tiny bit more for layout settling
+        await page.evaluate(() => new Promise(r => setTimeout(r, 100)));
 
         // Screenshot the container (includes padding and ensures full diagram is captured)
         const container = await page.$('#container');

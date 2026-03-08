@@ -9,9 +9,9 @@ import type { Theme } from '../types.js';
  * We use the official Mermaid CDN, set the theme, and inject the diagram source.
  */
 export function buildMermaidHtml(spec: string, theme: Theme, widthPx: number): string {
-    const mermaidTheme = theme === 'dark' ? 'dark' : theme === 'neutral' ? 'neutral' : 'default';
+  const mermaidTheme = theme === 'dark' ? 'dark' : theme === 'neutral' ? 'neutral' : 'default';
 
-    return /* html */ `<!DOCTYPE html>
+  return /* html */ `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8" />
@@ -25,11 +25,17 @@ export function buildMermaidHtml(spec: string, theme: Theme, widthPx: number): s
       justify-content: flex-start;
     }
     #container {
-      padding: 24px;
+      padding: 48px;
+      width: 100%;
+      min-height: 100px;
+    }
+    .mermaid {
+      display: inline-block;
       width: 100%;
     }
     .mermaid svg {
       max-width: 100% !important;
+      height: auto !important;
     }
   </style>
 </head>
@@ -41,16 +47,26 @@ ${spec}
   </div>
   <script type="module">
     import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    
+    window.__mermaidDone = false;
+    
     mermaid.initialize({
-      startOnLoad: true,
+      startOnLoad: false,
       theme: '${mermaidTheme}',
       securityLevel: 'loose',
     });
-    mermaid.init(undefined, document.querySelectorAll('.mermaid'));
-    window.__mermaidDone = false;
-    mermaid.init(undefined, document.querySelectorAll('.mermaid')).then(() => {
-      window.__mermaidDone = true;
-    });
+
+    const init = async () => {
+      try {
+        await mermaid.run();
+        window.__mermaidDone = true;
+      } catch (e) {
+        console.error('Mermaid render failed', e);
+        window.__mermaidDone = true; // Still set to true so we don't hang
+      }
+    };
+    
+    init();
   </script>
 </body>
 </html>`;
