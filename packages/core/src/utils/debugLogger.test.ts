@@ -54,17 +54,21 @@ describe('DebugLogger', () => {
 
     debugLogger.log('one', 2, true);
     expect(errorSpy).toHaveBeenCalledWith('one', 2, true);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
 
     debugLogger.warn('one', 2, false);
     expect(warnSpy).toHaveBeenCalledWith('one', 2, false);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
 
     errorSpy.mockClear();
     debugLogger.error('one', 2, null);
     expect(errorSpy).toHaveBeenCalledWith('one', 2, null);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
 
     errorSpy.mockClear();
     debugLogger.debug('one', 2, undefined);
     expect(errorSpy).toHaveBeenCalledWith('one', 2, undefined);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
   });
 
   it('should handle calls with no arguments', () => {
