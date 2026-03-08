@@ -103,6 +103,9 @@ export interface FooterRowItem {
   key: string;
   header: string;
   element: React.ReactNode;
+  flexGrow?: number;
+  flexShrink?: number;
+  isFocused?: boolean;
 }
 
 const COLUMN_GAP = 3;
@@ -123,10 +126,20 @@ export const FooterRow: React.FC<{
     }
 
     elements.push(
-      <Box key={item.key} flexDirection="column">
+      <Box
+        key={item.key}
+        flexDirection="column"
+        flexGrow={item.flexGrow ?? 0}
+        flexShrink={item.flexShrink ?? 1}
+        backgroundColor={item.isFocused ? theme.background.focus : undefined}
+      >
         {showLabels && (
           <Box height={1}>
-            <Text color={theme.ui.comment}>{item.header}</Text>
+            <Text
+              color={item.isFocused ? theme.text.primary : theme.ui.comment}
+            >
+              {item.header}
+            </Text>
           </Box>
         )}
         <Box height={1}>{item.element}</Box>
@@ -138,6 +151,7 @@ export const FooterRow: React.FC<{
     <Box
       flexDirection="row"
       flexWrap="nowrap"
+      width="100%"
       columnGap={showLabels ? COLUMN_GAP : 0}
     >
       {elements}
@@ -408,41 +422,50 @@ export const Footer: React.FC = () => {
   }
 
   // --- Width Fitting Logic ---
-  let currentWidth = 2; // Initial padding
   const columnsToRender: FooterColumn[] = [];
   let droppedAny = false;
+  let currentUsedWidth = 2; // Initial padding
 
-  for (let i = 0; i < potentialColumns.length; i++) {
-    const col = potentialColumns[i];
-    const gap = columnsToRender.length > 0 ? (showLabels ? COLUMN_GAP : 3) : 0; // Use 3 for dot separator width
+  for (const col of potentialColumns) {
+    const gap = columnsToRender.length > 0 ? (showLabels ? COLUMN_GAP : 3) : 0;
     const budgetWidth = col.id === 'workspace' ? 20 : col.width;
 
     if (
       col.isHighPriority ||
-      currentWidth + gap + budgetWidth <= terminalWidth - 2
+      currentUsedWidth + gap + budgetWidth <= terminalWidth - 2
     ) {
       columnsToRender.push(col);
-      currentWidth += gap + budgetWidth;
+      currentUsedWidth += gap + budgetWidth;
     } else {
       droppedAny = true;
     }
   }
 
-  const totalBudgeted = columnsToRender.reduce(
-    (sum, c, idx) =>
-      sum +
-      (c.id === 'workspace' ? 20 : c.width) +
-      (idx > 0 ? (showLabels ? COLUMN_GAP : 3) : 0),
-    2,
-  );
-  const excessSpace = Math.max(0, terminalWidth - totalBudgeted);
-
   const rowItems: FooterRowItem[] = columnsToRender.map((col) => {
-    const maxWidth = col.id === 'workspace' ? 20 + excessSpace : col.width;
+    const isWorkspace = col.id === 'workspace';
+
+    // Calculate exact space available for growth to prevent over-estimation truncation
+    const otherItemsWidth = columnsToRender
+      .filter((c) => c.id !== 'workspace')
+      .reduce((sum, c) => sum + c.width, 0);
+    const numItems = columnsToRender.length + (droppedAny ? 1 : 0);
+    const numGaps = numItems > 1 ? numItems - 1 : 0;
+    const gapsWidth = numGaps * (showLabels ? COLUMN_GAP : 3);
+    const ellipsisWidth = droppedAny ? 1 : 0;
+
+    const availableForWorkspace = Math.max(
+      20,
+      terminalWidth - 2 - gapsWidth - otherItemsWidth - ellipsisWidth,
+    );
+
+    const estimatedWidth = isWorkspace ? availableForWorkspace : col.width;
+
     return {
       key: col.id,
       header: col.header,
-      element: col.element(maxWidth),
+      element: col.element(estimatedWidth),
+      flexGrow: isWorkspace ? 1 : 0,
+      flexShrink: isWorkspace ? 1 : 0,
     };
   });
 
@@ -451,6 +474,8 @@ export const Footer: React.FC = () => {
       key: 'ellipsis',
       header: '',
       element: <Text color={theme.ui.comment}>…</Text>,
+      flexGrow: 0,
+      flexShrink: 0,
     });
   }
 
