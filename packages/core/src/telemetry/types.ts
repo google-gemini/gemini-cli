@@ -1014,6 +1014,43 @@ export class ConsecaVerdictEvent implements BaseTelemetryEvent {
   }
 }
 
+export const EVENT_POLICY_SUGGESTION = 'gemini_cli.policy_suggestion';
+export class PolicySuggestionEvent implements BaseTelemetryEvent {
+  'event.name': 'policy_suggestion';
+  'event.timestamp': string;
+  tool_context: string;
+  suggestion: string;
+  error?: string;
+
+  constructor(tool_context: string, suggestion: string, error?: string) {
+    this['event.name'] = 'policy_suggestion';
+    this['event.timestamp'] = new Date().toISOString();
+    this.tool_context = tool_context;
+    this.suggestion = suggestion;
+    this.error = error;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    const attributes: LogAttributes = {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_POLICY_SUGGESTION,
+      'event.timestamp': this['event.timestamp'],
+      tool_context: this.tool_context,
+      suggestion: this.suggestion,
+    };
+
+    if (this.error) {
+      attributes['error'] = this.error;
+    }
+
+    return attributes;
+  }
+
+  toLogBody(): string {
+    return `Policy suggestion generated.`;
+  }
+}
+
 export const EVENT_SLASH_COMMAND = 'gemini_cli.slash_command';
 export interface SlashCommandEvent extends BaseTelemetryEvent {
   'event.name': 'slash_command';

@@ -135,6 +135,7 @@ export enum EventNames {
   OVERAGE_OPTION_SELECTED = 'overage_option_selected',
   EMPTY_WALLET_MENU_SHOWN = 'empty_wallet_menu_shown',
   CREDIT_PURCHASE_CLICK = 'credit_purchase_click',
+  POLICY_SUGGESTION = 'policy_suggestion',
 }
 
 export interface LogResponse {

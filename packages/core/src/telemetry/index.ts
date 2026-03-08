@@ -55,6 +55,7 @@ export {
   logConsecaPolicyGeneration,
   logConsecaVerdict,
 } from './conseca-logger.js';
+export { logPolicySuggestion } from './policy-suggestion-logger.js';
 export type { SlashCommandEvent, ChatCompressionEvent } from './types.js';
 export {
   SlashCommandStatus,
@@ -76,6 +77,7 @@ export {
   OnboardingSuccessEvent,
   ConsecaPolicyGenerationEvent,
   ConsecaVerdictEvent,
+  PolicySuggestionEvent,
 } from './types.js';
 export { LlmRole } from './llmRole.js';
 export { makeSlashCommandEvent, makeChatCompressionEvent } from './types.js';

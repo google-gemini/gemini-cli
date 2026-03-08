@@ -34,6 +34,10 @@ import {
 import type { DiffUpdateResult } from '../ide/ide-client.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
+import {
+  suggestPolicyScope,
+  type PolicySuggestion,
+} from '../policy/suggestion-generator.js';
 
 export interface ConfirmationResult {
   outcome: ToolConfirmationOutcome;
@@ -46,6 +50,7 @@ export interface ConfirmationResult {
 export interface ResolutionResult {
   outcome: ToolConfirmationOutcome;
   lastDetails?: SerializableConfirmationDetails;
+  policySuggestion?: PolicySuggestion | null;
 }
 
 /**
@@ -125,6 +130,7 @@ export async function resolveConfirmation(
   const callId = toolCall.request.callId;
   let outcome = ToolConfirmationOutcome.ModifyWithEditor;
   let lastDetails: SerializableConfirmationDetails | undefined;
+  let policySuggestion: PolicySuggestion | null = null;
 
   // Loop exists to allow the user to modify the parameters and see the new
   // diff.
@@ -164,6 +170,30 @@ export async function resolveConfirmation(
       correlationId,
     });
 
+    // Fire LLM-based policy suggestion in the background (non-blocking).
+    // The suggestion is published on the message bus for the UI to display,
+    // and also captured locally for use in updatePolicy().
+    if (deps.config.enableSmartPolicyScoping) {
+      void suggestPolicyScope(
+        serializableDetails,
+        toolCall.tool.name,
+        deps.config,
+      )
+        .then((suggestion) => {
+          if (suggestion) {
+            policySuggestion = suggestion;
+            void deps.messageBus.publish({
+              type: MessageBusType.POLICY_SUGGESTION,
+              correlationId,
+              suggestion,
+            });
+          }
+        })
+        .catch((err: unknown) => {
+          debugLogger.debug('[PolicySuggestion] Failed:', err);
+        });
+    }
+
     onWaitingForConfirmation?.(true);
     const response = await waitForConfirmation(
       deps.messageBus,
@@ -195,7 +225,7 @@ export async function resolveConfirmation(
     }
   }
 
-  return { outcome, lastDetails };
+  return { outcome, lastDetails, policySuggestion };
 }
 
 /**

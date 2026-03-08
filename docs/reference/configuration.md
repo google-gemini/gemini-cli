@@ -1485,6 +1485,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`security.enableSmartPolicyScoping`** (boolean):
+  - **Description:** Use AI to suggest better-scoped policy rules when approving
+    tools. Shows a suggested scope description on approval options.
+  - **Default:** `false`
+
 #### `advanced`
 
 - **`advanced.autoConfigureMemory`** (boolean):
