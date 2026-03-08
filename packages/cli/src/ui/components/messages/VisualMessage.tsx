@@ -71,10 +71,15 @@ export const VisualMessage: React.FC<VisualMessageProps> = ({
 
     hasWrittenGraphicRef.current = true;
     const graphicRows = Math.max(0, parseGraphicRows(protocol, output));
-    const spacer = '\n'.repeat(Math.max(1, graphicRows));
+    const leadingLines = protocol === 'iterm2' ? 2 : 1;
+    const reservedRows =
+      protocol === 'iterm2'
+        ? 1
+        : Math.max(1, Math.min(36, graphicRows));
+    const spacer = '\n'.repeat(reservedRows);
     // Emit the graphic and advance enough lines so the prompt/input is not
     // painted on top of the image in iTerm/Kitty.
-    stdout.write(`\n${output}${spacer}`);
+    stdout.write(`${'\n'.repeat(leadingLines)}${output}${spacer}`);
   }, [output, protocol, stdout]);
 
   const ansiOutput = useMemo(() => {
