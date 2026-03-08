@@ -1,6 +1,6 @@
 import { computeCacheKey, getCachedPath, setCached } from '../cache/index.js';
 import { renderMermaidToPng } from '../render/mermaid.js';
-import { type PipelineOptions, type RenderResult, PIPELINE_VERSION } from '../types.js';
+import { type PipelineOptions, type RenderResult } from '../types.js';
 import sharp from 'sharp';
 
 // ---------------------------------------------------------------------------
