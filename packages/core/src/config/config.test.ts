@@ -346,6 +346,42 @@ describe('Server Config (config.ts)', () => {
       expect(storageSpy).toHaveBeenCalledTimes(1);
     });
 
+    it('should skip missing includeDirectories without failing initialization', async () => {
+      const existingDir = '/existing-shared-rules';
+      const missingDir = '/missing-shared-rules';
+      const existsSyncMock = vi.mocked(fs.existsSync);
+      const warnSpy = vi.spyOn(debugLogger, 'warn').mockImplementation(() => {
+        // expected warning path for skipped directory
+      });
+
+      existsSyncMock.mockImplementation(
+        (checkedPath) => checkedPath.toString() !== missingDir,
+      );
+
+      try {
+        const config = new Config({
+          ...baseParams,
+          checkpointing: false,
+          includeDirectories: [existingDir, missingDir],
+        });
+
+        await expect(config.initialize()).resolves.toBeUndefined();
+
+        const directories = config.getWorkspaceContext().getDirectories();
+        expect(directories).toContain(path.resolve(baseParams.targetDir));
+        expect(directories).toContain(existingDir);
+        expect(directories).not.toContain(missingDir);
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining(
+            `[WARN] Skipping unreadable directory: ${missingDir}`,
+          ),
+        );
+      } finally {
+        existsSyncMock.mockReturnValue(true);
+        warnSpy.mockRestore();
+      }
+    });
+
     it('should await MCP initialization in non-interactive mode', async () => {
       const config = new Config({
         ...baseParams,
