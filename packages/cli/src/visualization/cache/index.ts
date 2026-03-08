@@ -3,13 +3,12 @@ import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync, unlinkSync
 import { readFile, writeFile } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
-import type { CacheMeta, DiagramType, Theme } from '../types.js';
+import { type CacheMeta, type DiagramType, type Theme, PIPELINE_VERSION } from '../types.js';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const RENDERER_VERSION = '0.1.0';
 const MAX_CACHE_FILES = 100;
 const CACHE_DIR = join(homedir(), '.cache', 'termviz');
 
@@ -33,7 +32,7 @@ export function computeCacheKey(
     theme: Theme,
     widthPx: number,
 ): string {
-    const payload = JSON.stringify({ spec, diagramType, theme, widthPx, v: RENDERER_VERSION });
+    const payload = JSON.stringify({ spec, diagramType, theme, widthPx, v: PIPELINE_VERSION });
     return createHash('sha256').update(payload).digest('hex');
 }
 
@@ -92,7 +91,7 @@ export async function setCached(
         key,
         pngPath,
         createdAt: new Date().toISOString(),
-        rendererVersion: RENDERER_VERSION,
+        rendererVersion: PIPELINE_VERSION,
     };
 
     // writeFileSync for the buffer (no async overload issue with Buffer in ESM)

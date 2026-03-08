@@ -48,6 +48,7 @@ export async function renderMermaidToPng(
 
         // Set viewport wide enough, and plenty tall for the initial render
         // Set viewport wide enough, and VERY tall to avoid any early clipping
+        // Set viewport wide enough, and VERY tall to avoid any early clipping
         await page.setViewport({ width: widthPx + 200, height: 10000, deviceScaleFactor: 1 });
 
         // Block external requests other than jsdelivr (Mermaid CDN)
