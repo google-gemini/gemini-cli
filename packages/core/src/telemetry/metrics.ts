@@ -59,6 +59,21 @@ const AGENT_RECOVERY_ATTEMPT_COUNT = 'gemini_cli.agent.recovery_attempt.count';
 const AGENT_RECOVERY_ATTEMPT_DURATION =
   'gemini_cli.agent.recovery_attempt.duration';
 
+// Browser Agent Metrics
+const BROWSER_CONNECTION_DURATION =
+  'gemini_cli.browser_agent.connection.duration';
+const BROWSER_CONNECTION_FAILURE_COUNT =
+  'gemini_cli.browser_agent.connection.failure.count';
+const BROWSER_TOOLS_DISCOVERED = 'gemini_cli.browser_agent.tools.discovered';
+const BROWSER_TOOLS_MISSING_SEMANTIC =
+  'gemini_cli.browser_agent.tools.missing_semantic';
+const BROWSER_VISION_STATUS = 'gemini_cli.browser_agent.vision.status';
+const BROWSER_TASK_OUTCOME = 'gemini_cli.browser_agent.task.outcome';
+const BROWSER_TASK_DURATION = 'gemini_cli.browser_agent.task.duration';
+const BROWSER_CLEANUP_DURATION = 'gemini_cli.browser_agent.cleanup.duration';
+const BROWSER_CLEANUP_FAILURE_COUNT =
+  'gemini_cli.browser_agent.cleanup.failure.count';
+
 // OpenTelemetry GenAI Semantic Convention Metrics
 const GEN_AI_CLIENT_TOKEN_USAGE = 'gen_ai.client.token.usage';
 const GEN_AI_CLIENT_OPERATION_DURATION = 'gen_ai.client.operation.duration';
@@ -249,6 +264,66 @@ const COUNTER_DEFINITIONS = {
       success: boolean;
     },
   },
+  [BROWSER_CONNECTION_FAILURE_COUNT]: {
+    description: 'Counts browser agent MCP connection failures.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (browserConnectionFailureCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      session_mode: string;
+      headless: boolean;
+      error_type: string;
+    },
+  },
+  [BROWSER_TOOLS_DISCOVERED]: {
+    description: 'Counts tools discovered from chrome-devtools-mcp.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (browserToolsDiscoveredCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      session_mode: string;
+    },
+  },
+  [BROWSER_TOOLS_MISSING_SEMANTIC]: {
+    description: 'Counts missing required semantic browser tools.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (browserToolsMissingSemanticCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      tool_name: string;
+    },
+  },
+  [BROWSER_VISION_STATUS]: {
+    description: 'Counts browser agent vision configuration status.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (browserVisionStatusCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      enabled: boolean;
+      disabled_reason: string;
+    },
+  },
+  [BROWSER_TASK_OUTCOME]: {
+    description: 'Counts browser agent task outcomes.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (browserTaskOutcomeCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      success: boolean;
+      session_mode: string;
+      vision_enabled: boolean;
+      headless: boolean;
+    },
+  },
+  [BROWSER_CLEANUP_FAILURE_COUNT]: {
+    description: 'Counts browser agent cleanup failures.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (browserCleanupFailureCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      session_mode: string;
+    },
+  },
   [KEYCHAIN_AVAILABILITY_COUNT]: {
     description: 'Counts keychain availability checks.',
     valueType: ValueType.INT,
@@ -401,6 +476,40 @@ const HISTOGRAM_DEFINITIONS = {
       hook_event_name: string;
       hook_name: string;
       success: boolean;
+    },
+  },
+  [BROWSER_CONNECTION_DURATION]: {
+    description: 'Duration of browser agent MCP connection in milliseconds.',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (browserConnectionDurationHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      session_mode: string;
+      headless: boolean;
+      success: boolean;
+    },
+  },
+  [BROWSER_TASK_DURATION]: {
+    description:
+      'Full browser agent invocation duration (connect + agent loop + cleanup) in milliseconds.',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (browserTaskDurationHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      success: boolean;
+      session_mode: string;
+    },
+  },
+  [BROWSER_CLEANUP_DURATION]: {
+    description: 'Duration of browser agent cleanup in milliseconds.',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (browserCleanupDurationHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      session_mode: string;
     },
   },
 } as const;
@@ -628,6 +737,17 @@ let keychainAvailabilityCounter: Counter | undefined;
 let tokenStorageTypeCounter: Counter | undefined;
 let overageOptionCounter: Counter | undefined;
 let creditPurchaseCounter: Counter | undefined;
+
+// Browser Agent Metrics
+let browserConnectionDurationHistogram: Histogram | undefined;
+let browserConnectionFailureCounter: Counter | undefined;
+let browserToolsDiscoveredCounter: Counter | undefined;
+let browserToolsMissingSemanticCounter: Counter | undefined;
+let browserVisionStatusCounter: Counter | undefined;
+let browserTaskOutcomeCounter: Counter | undefined;
+let browserTaskDurationHistogram: Histogram | undefined;
+let browserCleanupDurationHistogram: Histogram | undefined;
+let browserCleanupFailureCounter: Counter | undefined;
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 let genAiClientTokenUsageHistogram: Histogram | undefined;
@@ -1389,6 +1509,123 @@ export function recordCreditPurchaseClick(
 ): void {
   if (!creditPurchaseCounter || !isMetricsInitialized) return;
   creditPurchaseCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  });
+}
+
+// --- Browser Agent Metric Recording Functions ---
+
+export function categorizeConnectionError(message: string): string {
+  const lower = message.toLowerCase();
+  if (lower.includes('already running')) return 'profile_locked';
+  if (lower.includes('timed out')) return 'timeout';
+  if (
+    lower.includes('connection refused') ||
+    lower.includes('failed to connect')
+  )
+    return 'connection_refused';
+  return 'unknown';
+}
+
+export function recordBrowserConnectionMetrics(
+  config: Config,
+  durationMs: number,
+  attributes: MetricDefinitions[typeof BROWSER_CONNECTION_DURATION]['attributes'],
+): void {
+  if (!browserConnectionDurationHistogram || !isMetricsInitialized) return;
+  browserConnectionDurationHistogram.record(durationMs, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  });
+}
+
+export function recordBrowserConnectionFailure(
+  config: Config,
+  attributes: MetricDefinitions[typeof BROWSER_CONNECTION_FAILURE_COUNT]['attributes'],
+): void {
+  if (!browserConnectionFailureCounter || !isMetricsInitialized) return;
+  browserConnectionFailureCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  });
+}
+
+export function recordBrowserToolDiscovery(
+  config: Config,
+  toolCount: number,
+  attributes: MetricDefinitions[typeof BROWSER_TOOLS_DISCOVERED]['attributes'],
+): void {
+  if (!browserToolsDiscoveredCounter || !isMetricsInitialized) return;
+  browserToolsDiscoveredCounter.add(toolCount, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  });
+}
+
+export function recordBrowserMissingSemanticTool(
+  config: Config,
+  attributes: MetricDefinitions[typeof BROWSER_TOOLS_MISSING_SEMANTIC]['attributes'],
+): void {
+  if (!browserToolsMissingSemanticCounter || !isMetricsInitialized) return;
+  browserToolsMissingSemanticCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  });
+}
+
+export function recordBrowserVisionStatus(
+  config: Config,
+  attributes: MetricDefinitions[typeof BROWSER_VISION_STATUS]['attributes'],
+): void {
+  if (!browserVisionStatusCounter || !isMetricsInitialized) return;
+  browserVisionStatusCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  });
+}
+
+export function recordBrowserTaskOutcome(
+  config: Config,
+  attributes: MetricDefinitions[typeof BROWSER_TASK_OUTCOME]['attributes'],
+): void {
+  if (!browserTaskOutcomeCounter || !isMetricsInitialized) return;
+  browserTaskOutcomeCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  });
+}
+
+export function recordBrowserTaskDuration(
+  config: Config,
+  durationMs: number,
+  attributes: MetricDefinitions[typeof BROWSER_TASK_DURATION]['attributes'],
+): void {
+  if (!browserTaskDurationHistogram || !isMetricsInitialized) return;
+  browserTaskDurationHistogram.record(durationMs, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  });
+}
+
+export function recordBrowserCleanupDuration(
+  config: Config,
+  durationMs: number,
+  attributes: MetricDefinitions[typeof BROWSER_CLEANUP_DURATION]['attributes'],
+): void {
+  if (!browserCleanupDurationHistogram || !isMetricsInitialized) return;
+  browserCleanupDurationHistogram.record(durationMs, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  });
+}
+
+export function recordBrowserCleanupFailure(
+  config: Config,
+  attributes: MetricDefinitions[typeof BROWSER_CLEANUP_FAILURE_COUNT]['attributes'],
+): void {
+  if (!browserCleanupFailureCounter || !isMetricsInitialized) return;
+  browserCleanupFailureCounter.add(1, {
     ...baseMetricDefinition.getCommonAttributes(config),
     ...attributes,
   });

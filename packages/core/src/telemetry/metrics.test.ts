@@ -106,6 +106,16 @@ describe('Telemetry Metrics', () => {
   let recordKeychainAvailabilityModule: typeof import('./metrics.js').recordKeychainAvailability;
   let recordTokenStorageInitializationModule: typeof import('./metrics.js').recordTokenStorageInitialization;
   let recordInvalidChunkModule: typeof import('./metrics.js').recordInvalidChunk;
+  let recordBrowserConnectionMetricsModule: typeof import('./metrics.js').recordBrowserConnectionMetrics;
+  let recordBrowserConnectionFailureModule: typeof import('./metrics.js').recordBrowserConnectionFailure;
+  let recordBrowserToolDiscoveryModule: typeof import('./metrics.js').recordBrowserToolDiscovery;
+  let recordBrowserMissingSemanticToolModule: typeof import('./metrics.js').recordBrowserMissingSemanticTool;
+  let recordBrowserVisionStatusModule: typeof import('./metrics.js').recordBrowserVisionStatus;
+  let recordBrowserTaskOutcomeModule: typeof import('./metrics.js').recordBrowserTaskOutcome;
+  let recordBrowserTaskDurationModule: typeof import('./metrics.js').recordBrowserTaskDuration;
+  let recordBrowserCleanupDurationModule: typeof import('./metrics.js').recordBrowserCleanupDuration;
+  let recordBrowserCleanupFailureModule: typeof import('./metrics.js').recordBrowserCleanupFailure;
+  let categorizeConnectionErrorModule: typeof import('./metrics.js').categorizeConnectionError;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -156,6 +166,22 @@ describe('Telemetry Metrics', () => {
     recordTokenStorageInitializationModule =
       metricsJsModule.recordTokenStorageInitialization;
     recordInvalidChunkModule = metricsJsModule.recordInvalidChunk;
+    recordBrowserConnectionMetricsModule =
+      metricsJsModule.recordBrowserConnectionMetrics;
+    recordBrowserConnectionFailureModule =
+      metricsJsModule.recordBrowserConnectionFailure;
+    recordBrowserToolDiscoveryModule =
+      metricsJsModule.recordBrowserToolDiscovery;
+    recordBrowserMissingSemanticToolModule =
+      metricsJsModule.recordBrowserMissingSemanticTool;
+    recordBrowserVisionStatusModule = metricsJsModule.recordBrowserVisionStatus;
+    recordBrowserTaskOutcomeModule = metricsJsModule.recordBrowserTaskOutcome;
+    recordBrowserTaskDurationModule = metricsJsModule.recordBrowserTaskDuration;
+    recordBrowserCleanupDurationModule =
+      metricsJsModule.recordBrowserCleanupDuration;
+    recordBrowserCleanupFailureModule =
+      metricsJsModule.recordBrowserCleanupFailure;
+    categorizeConnectionErrorModule = metricsJsModule.categorizeConnectionError;
 
     const otelApiModule = await import('@opentelemetry/api');
 
@@ -1576,6 +1602,332 @@ describe('Telemetry Metrics', () => {
           'session.id': 'test-session-id',
           'installation.id': 'test-installation-id',
           'user.email': 'test@example.com',
+        });
+      });
+    });
+  });
+
+  describe('Browser Agent Metrics', () => {
+    describe('categorizeConnectionError', () => {
+      it('should categorize profile_locked errors', () => {
+        expect(
+          categorizeConnectionErrorModule(
+            'Chrome is already running for the current profile',
+          ),
+        ).toBe('profile_locked');
+      });
+
+      it('should categorize timeout errors', () => {
+        expect(
+          categorizeConnectionErrorModule(
+            'Timed out connecting to chrome-devtools-mcp (60000ms)',
+          ),
+        ).toBe('timeout');
+      });
+
+      it('should categorize connection_refused errors', () => {
+        expect(categorizeConnectionErrorModule('Connection refused')).toBe(
+          'connection_refused',
+        );
+        expect(
+          categorizeConnectionErrorModule(
+            'Failed to connect to existing Chrome instance',
+          ),
+        ).toBe('connection_refused');
+      });
+
+      it('should categorize unknown errors', () => {
+        expect(
+          categorizeConnectionErrorModule('Something unexpected happened'),
+        ).toBe('unknown');
+      });
+    });
+
+    describe('recordBrowserConnectionMetrics', () => {
+      it('should not record metrics if not initialized', () => {
+        const config = makeFakeConfig({});
+        recordBrowserConnectionMetricsModule(config, 500, {
+          session_mode: 'persistent',
+          headless: false,
+          success: true,
+        });
+        expect(mockHistogramRecordFn).not.toHaveBeenCalled();
+      });
+
+      it('should record connection duration when initialized', () => {
+        const config = makeFakeConfig({});
+        initializeMetricsModule(config);
+        mockHistogramRecordFn.mockClear();
+
+        recordBrowserConnectionMetricsModule(config, 1200, {
+          session_mode: 'isolated',
+          headless: true,
+          success: true,
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(1200, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          session_mode: 'isolated',
+          headless: true,
+          success: true,
+        });
+      });
+    });
+
+    describe('recordBrowserConnectionFailure', () => {
+      it('should not record metrics if not initialized', () => {
+        const config = makeFakeConfig({});
+        recordBrowserConnectionFailureModule(config, {
+          session_mode: 'persistent',
+          headless: false,
+          error_type: 'timeout',
+        });
+        expect(mockCounterAddFn).not.toHaveBeenCalled();
+      });
+
+      it('should record connection failure when initialized', () => {
+        const config = makeFakeConfig({});
+        initializeMetricsModule(config);
+        mockCounterAddFn.mockClear();
+
+        recordBrowserConnectionFailureModule(config, {
+          session_mode: 'existing',
+          headless: false,
+          error_type: 'connection_refused',
+        });
+
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          session_mode: 'existing',
+          headless: false,
+          error_type: 'connection_refused',
+        });
+      });
+    });
+
+    describe('recordBrowserToolDiscovery', () => {
+      it('should not record metrics if not initialized', () => {
+        const config = makeFakeConfig({});
+        recordBrowserToolDiscoveryModule(config, 5, {
+          session_mode: 'persistent',
+        });
+        expect(mockCounterAddFn).not.toHaveBeenCalled();
+      });
+
+      it('should record tool count when initialized', () => {
+        const config = makeFakeConfig({});
+        initializeMetricsModule(config);
+        mockCounterAddFn.mockClear();
+
+        recordBrowserToolDiscoveryModule(config, 7, {
+          session_mode: 'persistent',
+        });
+
+        expect(mockCounterAddFn).toHaveBeenCalledWith(7, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          session_mode: 'persistent',
+        });
+      });
+    });
+
+    describe('recordBrowserMissingSemanticTool', () => {
+      it('should not record metrics if not initialized', () => {
+        const config = makeFakeConfig({});
+        recordBrowserMissingSemanticToolModule(config, {
+          tool_name: 'click',
+        });
+        expect(mockCounterAddFn).not.toHaveBeenCalled();
+      });
+
+      it('should record missing tool when initialized', () => {
+        const config = makeFakeConfig({});
+        initializeMetricsModule(config);
+        mockCounterAddFn.mockClear();
+
+        recordBrowserMissingSemanticToolModule(config, {
+          tool_name: 'navigate_page',
+        });
+
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          tool_name: 'navigate_page',
+        });
+      });
+    });
+
+    describe('recordBrowserVisionStatus', () => {
+      it('should not record metrics if not initialized', () => {
+        const config = makeFakeConfig({});
+        recordBrowserVisionStatusModule(config, {
+          enabled: true,
+          disabled_reason: '',
+        });
+        expect(mockCounterAddFn).not.toHaveBeenCalled();
+      });
+
+      it('should record vision enabled when initialized', () => {
+        const config = makeFakeConfig({});
+        initializeMetricsModule(config);
+        mockCounterAddFn.mockClear();
+
+        recordBrowserVisionStatusModule(config, {
+          enabled: true,
+          disabled_reason: '',
+        });
+
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          enabled: true,
+          disabled_reason: '',
+        });
+      });
+
+      it('should record vision disabled with reason', () => {
+        const config = makeFakeConfig({});
+        initializeMetricsModule(config);
+        mockCounterAddFn.mockClear();
+
+        recordBrowserVisionStatusModule(config, {
+          enabled: false,
+          disabled_reason: 'No visualModel configured.',
+        });
+
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          enabled: false,
+          disabled_reason: 'No visualModel configured.',
+        });
+      });
+    });
+
+    describe('recordBrowserTaskOutcome', () => {
+      it('should not record metrics if not initialized', () => {
+        const config = makeFakeConfig({});
+        recordBrowserTaskOutcomeModule(config, {
+          success: true,
+          session_mode: 'persistent',
+          vision_enabled: false,
+          headless: false,
+        });
+        expect(mockCounterAddFn).not.toHaveBeenCalled();
+      });
+
+      it('should record task outcome when initialized', () => {
+        const config = makeFakeConfig({});
+        initializeMetricsModule(config);
+        mockCounterAddFn.mockClear();
+
+        recordBrowserTaskOutcomeModule(config, {
+          success: true,
+          session_mode: 'isolated',
+          vision_enabled: true,
+          headless: true,
+        });
+
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          success: true,
+          session_mode: 'isolated',
+          vision_enabled: true,
+          headless: true,
+        });
+      });
+    });
+
+    describe('recordBrowserTaskDuration', () => {
+      it('should not record metrics if not initialized', () => {
+        const config = makeFakeConfig({});
+        recordBrowserTaskDurationModule(config, 5000, {
+          success: true,
+          session_mode: 'persistent',
+        });
+        expect(mockHistogramRecordFn).not.toHaveBeenCalled();
+      });
+
+      it('should record task duration when initialized', () => {
+        const config = makeFakeConfig({});
+        initializeMetricsModule(config);
+        mockHistogramRecordFn.mockClear();
+
+        recordBrowserTaskDurationModule(config, 8500, {
+          success: false,
+          session_mode: 'existing',
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(8500, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          success: false,
+          session_mode: 'existing',
+        });
+      });
+    });
+
+    describe('recordBrowserCleanupDuration', () => {
+      it('should not record metrics if not initialized', () => {
+        const config = makeFakeConfig({});
+        recordBrowserCleanupDurationModule(config, 200, {
+          session_mode: 'persistent',
+        });
+        expect(mockHistogramRecordFn).not.toHaveBeenCalled();
+      });
+
+      it('should record cleanup duration when initialized', () => {
+        const config = makeFakeConfig({});
+        initializeMetricsModule(config);
+        mockHistogramRecordFn.mockClear();
+
+        recordBrowserCleanupDurationModule(config, 350, {
+          session_mode: 'isolated',
+        });
+
+        expect(mockHistogramRecordFn).toHaveBeenCalledWith(350, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          session_mode: 'isolated',
+        });
+      });
+    });
+
+    describe('recordBrowserCleanupFailure', () => {
+      it('should not record metrics if not initialized', () => {
+        const config = makeFakeConfig({});
+        recordBrowserCleanupFailureModule(config, {
+          session_mode: 'persistent',
+        });
+        expect(mockCounterAddFn).not.toHaveBeenCalled();
+      });
+
+      it('should record cleanup failure when initialized', () => {
+        const config = makeFakeConfig({});
+        initializeMetricsModule(config);
+        mockCounterAddFn.mockClear();
+
+        recordBrowserCleanupFailureModule(config, {
+          session_mode: 'persistent',
+        });
+
+        expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+          'session.id': 'test-session-id',
+          'installation.id': 'test-installation-id',
+          'user.email': 'test@example.com',
+          session_mode: 'persistent',
         });
       });
     });

@@ -42,6 +42,22 @@ vi.mock('../../utils/debugLogger.js', () => ({
   },
 }));
 
+const mockRecordBrowserConnectionMetrics = vi.fn();
+const mockRecordBrowserConnectionFailure = vi.fn();
+const mockRecordBrowserToolDiscovery = vi.fn();
+const mockCategorizeConnectionError = vi.fn().mockReturnValue('unknown');
+
+vi.mock('../../telemetry/metrics.js', () => ({
+  recordBrowserConnectionMetrics: (...args: unknown[]) =>
+    mockRecordBrowserConnectionMetrics(...args),
+  recordBrowserConnectionFailure: (...args: unknown[]) =>
+    mockRecordBrowserConnectionFailure(...args),
+  recordBrowserToolDiscovery: (...args: unknown[]) =>
+    mockRecordBrowserToolDiscovery(...args),
+  categorizeConnectionError: (...args: unknown[]) =>
+    mockCategorizeConnectionError(...args),
+}));
+
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
@@ -50,6 +66,10 @@ describe('BrowserManager', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    mockRecordBrowserConnectionMetrics.mockClear();
+    mockRecordBrowserConnectionFailure.mockClear();
+    mockRecordBrowserToolDiscovery.mockClear();
+    mockCategorizeConnectionError.mockClear().mockReturnValue('unknown');
 
     // Setup mock config
     mockConfig = makeFakeConfig({
@@ -409,6 +429,102 @@ describe('BrowserManager', () => {
       await manager.close();
 
       expect(client.close).toHaveBeenCalled();
+    });
+  });
+
+  describe('metrics instrumentation', () => {
+    it('should record connection success metrics on successful connect', async () => {
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+
+      expect(mockRecordBrowserConnectionMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        expect.any(Number),
+        { session_mode: 'persistent', headless: false, success: true },
+      );
+    });
+
+    it('should record connection failure metrics on failed connect', async () => {
+      mockCategorizeConnectionError.mockReturnValue('connection_refused');
+
+      vi.mocked(Client).mockImplementation(
+        () =>
+          ({
+            connect: vi.fn().mockRejectedValue(new Error('Connection refused')),
+            close: vi.fn().mockResolvedValue(undefined),
+            listTools: vi.fn(),
+            callTool: vi.fn(),
+          }) as unknown as InstanceType<typeof Client>,
+      );
+
+      const existingConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'existing' },
+        },
+      });
+      const manager = new BrowserManager(existingConfig);
+
+      await expect(manager.ensureConnection()).rejects.toThrow();
+
+      expect(mockRecordBrowserConnectionMetrics).toHaveBeenCalledWith(
+        existingConfig,
+        expect.any(Number),
+        { session_mode: 'existing', headless: false, success: false },
+      );
+      expect(mockRecordBrowserConnectionFailure).toHaveBeenCalledWith(
+        existingConfig,
+        {
+          session_mode: 'existing',
+          headless: false,
+          error_type: 'connection_refused',
+        },
+      );
+    });
+
+    it('should record tool discovery metrics after successful connect', async () => {
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+
+      expect(mockRecordBrowserToolDiscovery).toHaveBeenCalledWith(
+        mockConfig,
+        4,
+        { session_mode: 'persistent' },
+      );
+    });
+  });
+
+  describe('helper accessors', () => {
+    it('should return session mode from config', () => {
+      const isolatedConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { sessionMode: 'isolated' },
+        },
+      });
+      const manager = new BrowserManager(isolatedConfig);
+      expect(manager.getSessionMode()).toBe('isolated');
+    });
+
+    it('should default session mode to persistent', () => {
+      const manager = new BrowserManager(mockConfig);
+      expect(manager.getSessionMode()).toBe('persistent');
+    });
+
+    it('should return headless from config', () => {
+      const headlessConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { headless: true },
+        },
+      });
+      const manager = new BrowserManager(headlessConfig);
+      expect(manager.isHeadless()).toBe(true);
+    });
+
+    it('should default headless to false', () => {
+      const manager = new BrowserManager(mockConfig);
+      expect(manager.isHeadless()).toBe(false);
     });
   });
 });
