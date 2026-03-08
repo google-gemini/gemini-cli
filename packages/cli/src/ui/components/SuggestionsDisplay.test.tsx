@@ -127,4 +127,44 @@ describe('SuggestionsDisplay', () => {
     await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });
+
+  it('renders command section separators for slash mode', async () => {
+    const groupedSuggestions = [
+      {
+        label: 'list',
+        value: 'list',
+        description: 'Browse auto-saved chats',
+        sectionTitle: 'auto',
+      },
+      {
+        label: 'list',
+        value: 'list',
+        description: 'List checkpoints',
+        sectionTitle: 'checkpoints',
+      },
+      {
+        label: 'save',
+        value: 'save',
+        description: 'Save checkpoint',
+        sectionTitle: 'checkpoints',
+      },
+    ];
+
+    const { lastFrame, waitUntilReady } = render(
+      <SuggestionsDisplay
+        suggestions={groupedSuggestions}
+        activeIndex={0}
+        isLoading={false}
+        width={100}
+        scrollOffset={0}
+        userInput="/resume"
+        mode="slash"
+      />,
+    );
+
+    await waitUntilReady();
+    const frame = lastFrame();
+    expect(frame).toContain('-- auto --');
+    expect(frame).toContain('-- checkpoints --');
+  });
 });
