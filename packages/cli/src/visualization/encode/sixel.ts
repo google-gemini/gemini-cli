@@ -11,6 +11,23 @@
 
 import sharp from 'sharp';
 
+const DEFAULT_SCALE = 1;
+const MIN_SCALE = 0.6;
+const MAX_SCALE = 2.0;
+
+function clamp(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, value));
+}
+
+function getDisplayScale(): number {
+    const raw = process.env['GEMINI_VIZ_SCALE'];
+    if (!raw) return DEFAULT_SCALE;
+
+    const parsed = Number.parseFloat(raw);
+    if (!Number.isFinite(parsed)) return DEFAULT_SCALE;
+    return clamp(parsed, MIN_SCALE, MAX_SCALE);
+}
+
 // Dynamic import of sixel (ESM-only package)
 // Handles both v1 API (encode function) and v2 API (SixelEncoder class)
 async function encodeSixelData(rgbaData: Uint8ClampedArray, width: number, height: number): Promise<string> {
@@ -47,8 +64,12 @@ async function encodeSixelData(rgbaData: Uint8ClampedArray, width: number, heigh
  * overflowing the terminal scroll buffer.
  */
 export async function encodeSixel(pngBuffer: Buffer, cols = 80, rows = 24): Promise<string> {
-    // Dynamic maxHeight: roughly 50% of terminal rows * pixels-per-row estimate (e.g. 15px)
-    const maxHeight = Math.min(Math.floor(rows * 0.5 * 15), 25 * 15);
+    // Dynamic maxHeight: default to ~78% of visible rows and allow user scaling.
+    const scale = getDisplayScale();
+    const maxRows = Math.max(12, rows - 4);
+    const targetRows = clamp(Math.round(rows * 0.78 * scale), 12, maxRows);
+    const maxHeight = targetRows * 18;
+
     // Resize: cap height and scale width proportionally
     const resized = await sharp(pngBuffer)
         .resize({ height: maxHeight, withoutEnlargement: true, fit: 'inside' })

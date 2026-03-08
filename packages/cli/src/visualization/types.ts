@@ -1,4 +1,4 @@
-export const PIPELINE_VERSION = '0.1.11';
+export const PIPELINE_VERSION = '0.1.12';
 
 /**
  * Shared types for the termviz pipeline.

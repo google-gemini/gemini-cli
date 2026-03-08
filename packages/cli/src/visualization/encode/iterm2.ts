@@ -16,19 +16,38 @@
 const OSC = '\x1b]';
 const BEL = '\x07';
 
+const DEFAULT_SCALE = 1;
+const MIN_SCALE = 0.6;
+const MAX_SCALE = 2.0;
+
+function clamp(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, value));
+}
+
+function getDisplayScale(): number {
+    const raw = process.env['GEMINI_VIZ_SCALE'];
+    if (!raw) return DEFAULT_SCALE;
+
+    const parsed = Number.parseFloat(raw);
+    if (!Number.isFinite(parsed)) return DEFAULT_SCALE;
+    return clamp(parsed, MIN_SCALE, MAX_SCALE);
+}
+
 /**
  * Encode a PNG buffer as an iTerm2 OSC 1337 inline image escape sequence.
  */
 export function encodeIterm2(pngBuffer: Buffer, cols = 80, rows = 24): string {
     const b64 = pngBuffer.toString('base64');
     const size = pngBuffer.byteLength;
+    const scale = getDisplayScale();
 
-    // Width capped up to 90% of terminal width or 120 chars, whichever is smaller.
-    const widthSpec = Math.min(Math.floor(cols * 0.9), 120).toString();
-
-    // Height capped up to roughly 50% of terminal height or 25 rows, whichever is smaller.
-    // This ensures the image fits the visible terminal area without being "enlarged".
-    const heightSpec = Math.min(Math.floor(rows * 0.5), 25).toString();
+    // Give image more area by default while preserving enough rows for prompt/input.
+    const maxCols = Math.max(20, cols - 2);
+    const maxRows = Math.max(12, rows - 4);
+    const widthCells = clamp(Math.round(cols * 0.95 * scale), 20, maxCols);
+    const heightCells = clamp(Math.round(rows * 0.78 * scale), 12, maxRows);
+    const widthSpec = widthCells.toString();
+    const heightSpec = heightCells.toString();
 
     const args = [
         `inline=1`,

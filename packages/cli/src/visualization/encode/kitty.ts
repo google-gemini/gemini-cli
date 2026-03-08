@@ -14,6 +14,23 @@ const ESC = '\x1b';
 const APC_START = `${ESC}_G`;
 const ST = `${ESC}\\`;
 
+const DEFAULT_SCALE = 1;
+const MIN_SCALE = 0.6;
+const MAX_SCALE = 2.0;
+
+function clamp(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, value));
+}
+
+function getDisplayScale(): number {
+    const raw = process.env['GEMINI_VIZ_SCALE'];
+    if (!raw) return DEFAULT_SCALE;
+
+    const parsed = Number.parseFloat(raw);
+    if (!Number.isFinite(parsed)) return DEFAULT_SCALE;
+    return clamp(parsed, MIN_SCALE, MAX_SCALE);
+}
+
 interface KittyChunkOptions {
     action?: 'T' | 'q'; // T = transmit, q = query
     format?: 100 | 32; // 100 = PNG, 32 = RGBA
@@ -49,12 +66,15 @@ function buildKittyChunk(b64: string, opts: KittyChunkOptions): string {
 export function encodeKitty(pngBuffer: Buffer, cols = 80, rows = 24): string {
     const b64 = pngBuffer.toString('base64');
     const chunks: string[] = [];
+    const scale = getDisplayScale();
 
     let offset = 0;
     let isFirst = true;
 
-    // Constrain height to roughly 50% of terminal rows (max 25)
-    const maxRows = Math.min(Math.max(1, Math.floor(rows * 0.5)), 25);
+    const maxCols = Math.max(20, cols - 2);
+    const maxRows = Math.max(12, rows - 4);
+    const targetCols = clamp(Math.round(cols * 0.95 * scale), 20, maxCols);
+    const targetRows = clamp(Math.round(rows * 0.78 * scale), 12, maxRows);
 
     while (offset < b64.length) {
         const slice = b64.slice(offset, offset + CHUNK_SIZE);
@@ -68,8 +88,8 @@ export function encodeKitty(pngBuffer: Buffer, cols = 80, rows = 24): string {
                     format: 100, // PNG
                     medium: 'd', // direct transfer
                     more,
-                    columns: cols,
-                    rows: maxRows,
+                    columns: targetCols,
+                    rows: targetRows,
                 }),
             );
             isFirst = false;
