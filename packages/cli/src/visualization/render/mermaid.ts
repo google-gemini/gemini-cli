@@ -47,7 +47,8 @@ export async function renderMermaidToPng(
         const page = await browser.newPage();
 
         // Set viewport wide enough, and plenty tall for the initial render
-        await page.setViewport({ width: widthPx + 100, height: 8000, deviceScaleFactor: 2 });
+        // Set viewport wide enough, and VERY tall to avoid any early clipping
+        await page.setViewport({ width: widthPx + 200, height: 10000, deviceScaleFactor: 1 });
 
         // Block external requests other than jsdelivr (Mermaid CDN)
         await page.setRequestInterception(true);
@@ -90,19 +91,10 @@ export async function renderMermaidToPng(
             };
         });
 
-        if (dimensions) {
-            // Resize the viewport to the exact size of the content
-            await page.setViewport({
-                width: dimensions.width,
-                height: dimensions.height,
-                deviceScaleFactor: 2
-            });
-        }
-
-        // Take a full-page screenshot of the newly sized viewport
+        // Use clip to capture exactly what we measured
         const screenshotBuffer = await page.screenshot({
             type: 'png',
-            fullPage: true,
+            clip: dimensions || undefined,
             omitBackground: theme !== 'default',
         });
 
