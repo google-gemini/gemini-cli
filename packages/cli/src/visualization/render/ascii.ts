@@ -377,7 +377,7 @@ function renderGenericFallback(spec: string, termWidth = 100): string {
 export function renderMermaidAscii(spec: string, termWidth = 100): string {
     const stripped = spec.trim().toLowerCase();
 
-    if (stripped.startsWith('equencediagram')) {
+    if (stripped.startsWith('sequencediagram')) {
         return renderSequenceDiagram(spec, termWidth);
     }
     if (stripped.startsWith('graph') || stripped.startsWith('flowchart')) {
