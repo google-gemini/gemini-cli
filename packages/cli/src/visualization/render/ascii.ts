@@ -149,7 +149,7 @@ function renderSequenceDiagram(spec: string, termWidth = 100): string {
 
     // Bottom footer (participants again)
     lines.push(footer);
-
+    lines.push('\n\n\n\n'); // Anti-Clobber Padding
     return lines.join('\n');
 }
 
@@ -213,15 +213,36 @@ function renderFlowchart(spec: string, termWidth = 100): string {
 
     const lines: string[] = [''];
     const renderedNodes = new Set<string>();
+    const indent = ' '.repeat(5);
 
-    for (let i = 0; i < nodes.length; i++) {
-        const node = nodes[i];
-        if (renderedNodes.has(node.id)) continue;
+    // 1. Sort nodes to keep a logical flow (simple greedy traversal)
+    const sortedNodes: FlowNode[] = [];
+    const visited = new Set<string>();
 
+    function traverse(nid: string) {
+        if (visited.has(nid)) return;
+        const n = nodes.find(node => node.id === nid);
+        if (!n) return;
+        visited.add(nid);
+        sortedNodes.push(n);
+        const children = edges.filter(e => e.from === nid).map(e => e.to);
+        children.forEach(c => traverse(c));
+    }
+
+    // Start with entry points (nodes with no incoming edges)
+    const inDegree = new Map<string, number>();
+    nodes.forEach(n => inDegree.set(n.id, 0));
+    edges.forEach(e => inDegree.set(e.to, (inDegree.get(e.to) || 0) + 1));
+    const roots = nodes.filter(n => inDegree.get(n.id) === 0);
+
+    roots.forEach(r => traverse(r.id));
+    nodes.forEach(n => traverse(n.id)); // Catch any cycles or unreachable parts
+
+    for (let i = 0; i < sortedNodes.length; i++) {
+        const node = sortedNodes[i];
         const label = node.label.slice(0, termWidth - 10);
         const boxWidth = label.length + 4;
         const halfBox = Math.floor(boxWidth / 2);
-        const indent = ' '.repeat(5);
 
         // Render the node box
         if (node.shape === 'diamond') {
@@ -237,28 +258,26 @@ function renderFlowchart(spec: string, termWidth = 100): string {
 
         // Find edges FROM this node
         const outTransitions = edges.filter(e => e.from === node.id);
-        const nextNode = nodes[i + 1];
+        const nextNode = sortedNodes[i + 1];
 
         for (const t of outTransitions) {
-            const isNext = nextNode && t.to === nextNode.id;
             const labelStr = t.label ? chalk.gray(` [${t.label}] `) : '';
-
-            // If pointing to the very next node, use a centered vertical arrow
-            if (isNext) {
+            if (nextNode && t.to === nextNode.id) {
+                // Vertical arrow to next rendered box
                 lines.push(indent + ' '.repeat(halfBox + 1) + chalk.gray(BOX.V));
                 lines.push(indent + ' '.repeat(halfBox + 1) + chalk.yellow(BOX.ARROW_D) + labelStr);
             } else {
-                // Diagonal/Branching (simplified as right arrow)
+                // Sideways arrow for branches
                 lines.push(indent + ' '.repeat(halfBox + 1) + chalk.gray('└─') + chalk.yellow(BOX.ARROW_R) + labelStr + chalk.bold.white(t.to));
             }
         }
 
-        if (outTransitions.length === 0 && i < nodes.length - 1) {
-            lines.push(''); // Gap between disconnected parts
+        if (outTransitions.length === 0 && i < sortedNodes.length - 1) {
+            lines.push('');
         }
     }
 
-    lines.push('\n'); // Strategic padding
+    lines.push('\n\n\n\n'); // Strategic padding
     return lines.join('\n');
 }
 
@@ -323,7 +342,25 @@ function renderStateDiagram(spec: string, termWidth = 100): string {
     const indent = '  ';
     const renderedStates = new Set<string>();
 
-    // 1. Render entry points
+    // 1. Sort states to keep a logical flow (simple greedy traversal)
+    const sortedStates: StateNode[] = [];
+    const visited = new Set<string>();
+
+    function traverse(sid: string) {
+        if (sid === '[*]' || visited.has(sid)) return;
+        const s = states.find(st => st.id === sid);
+        if (!s) return;
+        visited.add(sid);
+        sortedStates.push(s);
+        const children = transitions.filter(t => t.from === sid).map(t => t.to);
+        children.forEach(c => traverse(c));
+    }
+
+    const startPoints = transitions.filter(t => t.from === '[*]').map(t => t.to);
+    startPoints.forEach(p => traverse(p));
+    states.forEach(s => traverse(s.id)); // Catch any unreachable states
+
+    // 2. Render entry points
     const entryTransitions = transitions.filter(t => t.from === '[*]');
     for (const t of entryTransitions) {
         lines.push(indent + chalk.cyan(`● (START)`));
@@ -332,11 +369,9 @@ function renderStateDiagram(spec: string, termWidth = 100): string {
         lines.push('');
     }
 
-    // 2. Render sequence of states
-    for (let i = 0; i < states.length; i++) {
-        const state = states[i];
-        if (renderedStates.has(state.id)) continue;
-
+    // 3. Render sequence of states
+    for (let i = 0; i < sortedStates.length; i++) {
+        const state = sortedStates[i];
         const label = state.label.slice(0, termWidth - 10);
         const boxWidth = label.length + 4;
         const halfBox = Math.floor(boxWidth / 2);
@@ -349,7 +384,7 @@ function renderStateDiagram(spec: string, termWidth = 100): string {
 
         // Transitions from this state
         const out = transitions.filter(t => t.from === state.id);
-        const nextState = states[i + 1];
+        const nextState = sortedStates[i + 1];
 
         for (const t of out) {
             const labelStr = t.label ? chalk.gray(` [${t.label}] `) : '';
@@ -368,7 +403,7 @@ function renderStateDiagram(spec: string, termWidth = 100): string {
         lines.push('');
     }
 
-    lines.push('\n'); // Strategic padding
+    lines.push('\n\n\n\n'); // Premium Anti-Clobber Padding
     return lines.join('\n');
 }
 
@@ -404,7 +439,7 @@ function renderPieChart(spec: string, termWidth = 100): string {
         result.push(`  ${chalk.white(label)} | ${bar} ${chalk.bold.cyan(percent.toFixed(1) + '%')}`);
     }
 
-    result.push('');
+    result.push('\n\n\n\n'); // Anti-Clobber Padding
     return result.join('\n');
 }
 
@@ -501,6 +536,7 @@ function renderErDiagram(spec: string, termWidth = 100): string {
         lines.push('');
     }
 
+    lines.push('\n\n\n\n'); // Anti-Clobber Padding
     return lines.join('\n');
 }
 
@@ -523,7 +559,7 @@ function renderGenericFallback(spec: string, termWidth = 100): string {
                 return `  ` + chalk.red(`│`) + ` ${chalk.gray(line)} ` + chalk.red(`│`);
             }),
         `  ` + chalk.red(`╰${hr}╯`),
-        '',
+        '\n\n\n\n', // Anti-Clobber Padding
     ];
     return lines.join('\n');
 }
