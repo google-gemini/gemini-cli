@@ -6,7 +6,6 @@
 
 import { existsSync } from 'node:fs';
 import puppeteer from 'puppeteer';
-import sharp from 'sharp';
 import type { Theme } from '../types.js';
 import { buildHtmlPreview } from './template.js';
 
@@ -178,18 +177,7 @@ export async function renderHtmlToPng(
       omitBackground: theme !== 'default',
     });
 
-    const trimmedBuffer = await sharp(Buffer.from(screenshotBuffer))
-      .trim({
-        background:
-          theme === 'dark'
-            ? { r: 30, g: 30, b: 46, alpha: 1 }
-            : { r: 255, g: 255, b: 255, alpha: 1 },
-        threshold: 18,
-      })
-      .png()
-      .toBuffer();
-
-    return trimmedBuffer;
+    return Buffer.from(screenshotBuffer);
   } finally {
     try {
       await browser.close();
