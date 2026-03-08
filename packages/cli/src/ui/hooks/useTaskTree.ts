@@ -117,8 +117,15 @@ export function useTaskTree(
   // liveNodes memo when new timing data is recorded.
   const callTimesRef = useRef<Map<string, CallTiming>>(new Map());
   const [timingVersion, setTimingVersion] = useState(0);
+  const wasPreviouslyEmpty = useRef(true);
 
   useEffect(() => {
+    //if starting new turn (tool calls appeared after being empty), clear old timing
+    if (toolCalls.length > 0 && wasPreviouslyEmpty.current) {
+      callTimesRef.current.clear();
+    }
+    wasPreviouslyEmpty.current = toolCalls.length === 0;
+
     let changed = false;
     for (const tc of toolCalls) {
       const existing = callTimesRef.current.get(tc.callId);
