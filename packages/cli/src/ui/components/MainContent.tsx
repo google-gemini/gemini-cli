@@ -22,6 +22,7 @@ import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 import { TaskTree } from './TaskTree.js';
 import { useTaskTree } from '../hooks/useTaskTree.js';
 import type { IndividualToolCallDisplay } from '../types.js';
+import { escapeAnsiCtrlCodes } from '../utils/textUtils.js';
 
 const MemoizedHistoryItemDisplay = memo(HistoryItemDisplay);
 const MemoizedAppHeader = memo(AppHeader);
@@ -57,13 +58,13 @@ export const MainContent = () => {
     for (let i = lastUserPromptIndex + 1; i < uiState.history.length; i++) {
       const item = uiState.history[i];
       if (item.type === 'tool_group') {
-        calls.push(...item.tools);
+        calls.push(...item.tools.map(escapeAnsiCtrlCodes));
       }
     }
     // Live batch still pending
     for (const item of uiState.pendingHistoryItems) {
       if (item.type === 'tool_group') {
-        calls.push(...item.tools);
+        calls.push(...item.tools.map(escapeAnsiCtrlCodes));
       }
     }
     return calls;
