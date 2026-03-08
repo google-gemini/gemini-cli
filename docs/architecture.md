@@ -243,5 +243,5 @@ See the [extensions documentation](./extensions/index.md) for more details.
 
 - [Local development guide](./local-development.md) — Set up your development
   environment
-- [Contribution guide](./CONTRIBUTING.md) — How to contribute to Gemini CLI
+- [Contribution guide](../CONTRIBUTING.md) — How to contribute to Gemini CLI
 - [Extensions overview](./extensions/index.md) — Build and install extensions
