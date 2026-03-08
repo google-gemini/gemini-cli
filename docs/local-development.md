@@ -8,14 +8,20 @@ and troubleshooting common issues.
 
 Before you begin, ensure you have the following installed on your system:
 
-- **Node.js**: Version 20.0.0 or higher. You can verify your version by running:
+- **Node.js**: Version 20.0.0 or higher is required. For development, version
+  `~20.19.0` is recommended to avoid potential dependency issues. You can verify
+  your version by running:
 
   ```bash
   node --version
   ```
 
-  Download and install from [nodejs.org](https://nodejs.org/) or use a version
-  manager like [nvm](https://github.com/nvm-sh/nvm).
+  Download from [nodejs.org](https://nodejs.org/) or use a version manager like
+  [nvm](https://github.com/nvm-sh/nvm) to install the recommended version:
+
+  ```bash
+  nvm install 20.19.0 && nvm use 20.19.0
+  ```
 
 - **npm**: Comes bundled with Node.js. Verify with:
 
