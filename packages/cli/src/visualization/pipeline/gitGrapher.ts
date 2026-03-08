@@ -47,6 +47,12 @@ export async function getGitMermaidGraph(limit = 15): Promise<string> {
         ).toString();
 
         const lines = log.split('\n').filter(Boolean);
+        const inRangeHashes = new Set(
+            lines
+                .map((line) => line.split('|')[0]?.trim())
+                .filter((hash): hash is string => Boolean(hash)),
+        );
+
         const mermaidLines: string[] = ['graph BT']; // Bottom to Top (Oldest at bottom)
 
         const nodes = new Set<string>();
@@ -64,7 +70,10 @@ export async function getGitMermaidGraph(limit = 15): Promise<string> {
             if (parents) {
                 const parentList = parents.split(' ').filter(Boolean);
                 for (const p of parentList) {
-                    if (!nodes.has(p)) {
+                    // Only synthesize placeholder nodes for parents outside the
+                    // requested commit window. In-range parents will get full labels
+                    // when their own log entries are processed.
+                    if (!inRangeHashes.has(p) && !nodes.has(p)) {
                         mermaidLines.push(
                             `  ${toNodeId(p)}["${sanitizeLabel(p.slice(0, 8))}"]`,
                         );
