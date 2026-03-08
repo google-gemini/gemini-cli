@@ -1,5 +1,4 @@
 import { computeCacheKey, getCachedPath, setCached } from '../cache/index.js';
-import { renderMermaidToPng } from '../render/mermaid.js';
 import { type PipelineOptions, type RenderResult } from '../types.js';
 import sharp from 'sharp';
 
@@ -25,12 +24,12 @@ export async function runPipeline(options: PipelineOptions): Promise<RenderResul
     const theme = options.theme ?? 'dark';
     const widthPx = options.widthPx ?? 1200;
 
-    if (options.diagramType !== 'mermaid') {
-        throw new Error(`Unsupported diagram type: ${options.diagramType}. Only 'mermaid' is supported in MVP.`);
+    if (options.diagramType !== 'mermaid' && options.diagramType !== 'html') {
+        throw new Error(`Unsupported diagram type: ${options.diagramType}. Only 'mermaid' and 'html' are supported.`);
     }
 
-    // ASCII-only fast path — skip Puppeteer entirely
-    if (options.asciiOnly) {
+    // ASCII-only fast path for Mermaid — skip Puppeteer entirely
+    if (options.asciiOnly && options.diagramType === 'mermaid') {
         return { pngPath: 'ascii', widthPx: 0, heightPx: 0, fromCache: false };
     }
 
@@ -50,11 +49,20 @@ export async function runPipeline(options: PipelineOptions): Promise<RenderResul
     }
 
     // 2. Render
-    const rawBuffer = await renderMermaidToPng(options.spec, {
-        theme,
-        widthPx,
-        backgroundColor: options.backgroundColor,
-    });
+    const { renderMermaidToPng } = await import('../render/mermaid.js');
+    const { renderHtmlToPng } = await import('../render/html.js');
+
+    const rawBuffer =
+        options.diagramType === 'mermaid'
+            ? await renderMermaidToPng(options.spec, {
+                theme,
+                widthPx,
+                backgroundColor: options.backgroundColor,
+            })
+            : await renderHtmlToPng(options.spec, {
+                theme,
+                widthPx,
+            });
 
     // 3. Post-process with Sharp (optimize, enforce max width)
     const processedBuffer = await sharp(rawBuffer)

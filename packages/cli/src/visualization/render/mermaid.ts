@@ -70,6 +70,16 @@ export async function renderMermaidToPng(
             }
         });
 
+        const browserErrors: string[] = [];
+        page.on('console', (msg) => {
+            if (msg.type() === 'error') {
+                browserErrors.push(msg.text());
+            }
+        });
+        page.on('pageerror', (err) => {
+            browserErrors.push(err.message);
+        });
+
         await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30_000 });
 
         // Wait for Mermaid to set our completion flag
@@ -77,6 +87,10 @@ export async function renderMermaidToPng(
             () => (window as any).__mermaidDone === true,
             { timeout: 20_000 },
         );
+
+        if (browserErrors.length > 0) {
+            throw new Error(`Mermaid rendering failed in browser: ${browserErrors.join(' | ')}`);
+        }
 
         // Give it a VERY substantial beat for layout, fonts, and SVG settling
         await page.evaluate(() => new Promise(r => setTimeout(r, 1000)));

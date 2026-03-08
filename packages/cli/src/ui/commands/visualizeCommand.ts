@@ -19,27 +19,52 @@ export const visualizeCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, args) => {
-    const fileArg = args.trim();
-    if (!fileArg) {
+    const inputArg = args.trim();
+    if (!inputArg) {
       context.ui.addItem({
         type: MessageType.ERROR,
-        text: 'Usage: /visualize <path-to-file.mmd>',
+        text: 'Usage: /visualize <path-to-file.mmd> or /visualize "prompt"',
       });
       return;
     }
 
-    const filePath = resolve(process.cwd(), fileArg);
-    if (!existsSync(filePath)) {
+    let spec: string | null = null;
+    let sourceLabel = '';
+
+    // Strip surrounding quotes if present (common when users copy-paste prompts)
+    let processedArg = inputArg;
+    if (
+      (processedArg.startsWith('"') && processedArg.endsWith('"')) ||
+      (processedArg.startsWith("'") && processedArg.endsWith("'"))
+    ) {
+      processedArg = processedArg.substring(1, processedArg.length - 1);
+    }
+
+    // 1. Try treating it as a file if it has a common diagram extension
+    const isDiagramFile = /\.(mmd|mermaid|md|mdx)$/i.test(processedArg);
+    const filePath = resolve(process.cwd(), processedArg);
+
+    if (isDiagramFile && existsSync(filePath)) {
+      context.ui.setDebugMessage(`Visualizing file: ${filePath}...`);
+      spec = readFileSync(filePath, 'utf8');
+      sourceLabel = `file \`${processedArg}\``;
+    } else {
+      // 2. Otherwise, treat it as a prompt for generative visualization
+      const { generateMermaid } = await import('../../visualization/index.js');
+      spec = await generateMermaid(context, processedArg);
+      sourceLabel = `prompt: "${processedArg}"`;
+    }
+
+    if (!spec) {
       context.ui.addItem({
         type: MessageType.ERROR,
-        text: `File not found: ${filePath}`,
+        text: `Could not obtain diagram spec from ${sourceLabel}.`,
       });
       return;
     }
 
     try {
-      context.ui.setDebugMessage(`Visualizing ${filePath}...`);
-      const spec = readFileSync(filePath, 'utf8');
+      context.ui.setDebugMessage(`Rendering diagram...`);
 
       // 1. Run the headless browser rendering pipeline
       const result = await runPipeline({
@@ -49,10 +74,6 @@ export const visualizeCommand: SlashCommand = {
       });
 
       // 2. Render the artifact
-      // We MUST bypass Ink entirely. Ink patches process.stdout.write and
-      // escapes all terminal sequences. Writing directly to file descriptor 1
-      // via fs.writeSync bypasses both Ink's interception and Node's stream
-      // buffering, allowing iTerm2/Kitty/Sixel/ANSI to be interpreted.
       const { renderVisualArtifact } = await import('../../visualization/render/visualArtifact.js');
       const output = await renderVisualArtifact(result, {
         spec,
@@ -68,7 +89,7 @@ export const visualizeCommand: SlashCommand = {
 
       context.ui.addItem({
         type: MessageType.INFO,
-        text: `Successfully visualized \`${fileArg}\`.`,
+        text: `Successfully visualized diagram from ${sourceLabel}.`,
       });
     } catch (err: unknown) {
       context.ui.addItem({

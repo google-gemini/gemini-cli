@@ -104,6 +104,7 @@ enum StreamProcessingStatus {
   Completed,
   UserCancelled,
   Error,
+  SelfRepair,
 }
 
 const SUPPRESSED_TOOL_ERRORS_NOTE =
@@ -229,6 +230,8 @@ export const useGeminiStream = (
   const [_isFirstToolInGroup, isFirstToolInGroupRef, setIsFirstToolInGroup] =
     useStateAndRef<boolean>(true);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
+  const seenMermaidSpecsRef = useRef<Set<string>>(new Set());
+  const renderingErrorRef = useRef<{ spec: string; error: string } | null>(null);
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const storage = config.storage;
   const logger = useLogger(storage);
@@ -931,9 +934,9 @@ export const useGeminiStream = (
           const updatedTools = pendingHistoryItemRef.current.tools.map(
             (tool) =>
               tool.status === CoreToolCallStatus.Validating ||
-              tool.status === CoreToolCallStatus.Scheduled ||
-              tool.status === CoreToolCallStatus.AwaitingApproval ||
-              tool.status === CoreToolCallStatus.Executing
+                tool.status === CoreToolCallStatus.Scheduled ||
+                tool.status === CoreToolCallStatus.AwaitingApproval ||
+                tool.status === CoreToolCallStatus.Executing
                 ? { ...tool, status: CoreToolCallStatus.Cancelled }
                 : tool,
           );
@@ -1249,6 +1252,43 @@ export const useGeminiStream = (
               geminiMessageBuffer,
               userMessageTimestamp,
             );
+
+            // Auto-Pipeline: Detect and render completed Mermaid blocks
+            const mermaidRegex = /```mermaid\n([\s\S]*?)```/g;
+            let match;
+            while ((match = mermaidRegex.exec(geminiMessageBuffer)) !== null) {
+              const spec = match[1].trim();
+              if (spec && !seenMermaidSpecsRef.current.has(spec)) {
+                seenMermaidSpecsRef.current.add(spec);
+                // Fire and forget rendering to not block the stream loop
+                // (though we use writeSync, the pipeline itself is async)
+                (async () => {
+                  try {
+                    const { runPipeline, renderVisualArtifact } = await import(
+                      '../../visualization/index.js'
+                    );
+                    const result = await runPipeline({
+                      spec,
+                      diagramType: 'mermaid',
+                      theme: 'dark',
+                    });
+                    const output = await renderVisualArtifact(result, {
+                      spec,
+                      showMeta: true,
+                    });
+                    if (output) {
+                      const { writeSync } = await import('node:fs');
+                      writeSync(1, '\n');
+                      writeSync(1, output);
+                      writeSync(1, '\n');
+                    }
+                  } catch (err) {
+                    debugLogger.error(`Auto-pipeline failed: ${err}`);
+                    renderingErrorRef.current = { spec, error: String(err) };
+                  }
+                })();
+              }
+            }
             break;
           case ServerGeminiEventType.ToolCallRequest:
             toolCallRequests.push(event.value);
@@ -1323,6 +1363,9 @@ export const useGeminiStream = (
         }
         await scheduleToolCalls(toolCallRequests, signal);
       }
+      if (renderingErrorRef.current) {
+        return StreamProcessingStatus.SelfRepair;
+      }
       return StreamProcessingStatus.Completed;
     },
     [
@@ -1379,6 +1422,7 @@ export const useGeminiStream = (
             suppressedToolErrorCountRef.current = 0;
             suppressedToolErrorNoteShownRef.current = false;
             lowVerbosityFailureNoteShownRef.current = false;
+            seenMermaidSpecsRef.current.clear();
           }
 
           abortControllerRef.current = new AbortController();
@@ -1441,6 +1485,38 @@ export const useGeminiStream = (
               );
 
               if (processingStatus === StreamProcessingStatus.UserCancelled) {
+                return;
+              }
+
+              if (
+                processingStatus === StreamProcessingStatus.SelfRepair &&
+                renderingErrorRef.current
+              ) {
+                const { spec, error } = renderingErrorRef.current;
+                renderingErrorRef.current = null;
+
+                addItem({
+                  type: MessageType.INFO,
+                  text: 'Diagram rendering failed. Attempting auto-repair...',
+                });
+
+                const repairPrompt = `The Mermaid diagram you generated has a syntax error:
+${error}
+
+The failing spec was:
+\`\`\`mermaid
+${spec}
+\`\`\`
+
+Please provide a corrected version of the diagram.`.trim();
+
+                // Trigger a continuation turn
+                // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                submitQuery(
+                  [{ text: repairPrompt }],
+                  { isContinuation: true },
+                  lastPromptIdRef.current,
+                );
                 return;
               }
 

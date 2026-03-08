@@ -260,7 +260,7 @@ export async function runNonInteractive({
           query: input,
           config,
           addItem: (_item, _timestamp) => 0,
-          onDebugMessage: () => {},
+          onDebugMessage: () => { },
           messageId: Date.now(),
           signal: abortController.signal,
         });
@@ -309,6 +309,8 @@ export async function runNonInteractive({
         );
 
         let responseText = '';
+        let lastRenderingError: { spec: string; error: string } | null = null;
+        const seenMermaidSpecs = new Set<string>();
         for await (const event of responseStream) {
           if (abortController.signal.aborted) {
             handleCancellationError(config);
@@ -331,6 +333,44 @@ export async function runNonInteractive({
             } else {
               if (event.value) {
                 textOutput.write(output);
+              }
+            }
+
+            // Accumulate text for mermaid detection
+            responseText += event.value;
+
+            // Auto-Pipeline: Detect and render completed Mermaid blocks
+            if (config.getVisualize()) {
+              const mermaidRegex = /```mermaid\n([\s\S]*?)```/g;
+              let match;
+              while ((match = mermaidRegex.exec(responseText)) !== null) {
+                const spec = match[1].trim();
+                if (spec && !seenMermaidSpecs.has(spec)) {
+                  seenMermaidSpecs.add(spec);
+                  try {
+                    const { runPipeline, renderVisualArtifact } = await import(
+                      './visualization/index.js'
+                    );
+                    const result = await runPipeline({
+                      spec,
+                      diagramType: 'mermaid',
+                      theme: 'dark',
+                    });
+                    const output = await renderVisualArtifact(result, {
+                      spec,
+                      showMeta: true,
+                    });
+                    if (output) {
+                      textOutput.ensureTrailingNewline();
+                      process.stdout.write('\n');
+                      process.stdout.write(output);
+                      process.stdout.write('\n');
+                    }
+                  } catch (err) {
+                    debugLogger.error(`Auto-pipeline failed: ${err}`);
+                    lastRenderingError = { spec, error: String(err) };
+                  }
+                }
               }
             }
           } else if (event.type === GeminiEventType.ToolCallRequest) {
@@ -392,6 +432,26 @@ export async function runNonInteractive({
           }
         }
 
+        if (lastRenderingError) {
+          const { spec, error } = lastRenderingError;
+          process.stderr.write(
+            '\n[INFO] Diagram rendering failed. Attempting auto-repair...\n',
+          );
+
+          const repairPrompt = `The Mermaid diagram you generated has a syntax error:
+${error}
+
+The failing spec was:
+\`\`\`mermaid
+${spec}
+\`\`\`
+
+Please provide a corrected version of the diagram.`.trim();
+
+          currentMessages = [{ role: 'user', parts: [{ text: repairPrompt }] }];
+          continue;
+        }
+
         if (toolCallRequests.length > 0) {
           textOutput.ensureTrailingNewline();
           const completedToolCalls = await scheduler.schedule(
@@ -417,9 +477,9 @@ export async function runNonInteractive({
                     : undefined,
                 error: toolResponse.error
                   ? {
-                      type: toolResponse.errorType || 'TOOL_EXECUTION_ERROR',
-                      message: toolResponse.error.message,
-                    }
+                    type: toolResponse.errorType || 'TOOL_EXECUTION_ERROR',
+                    message: toolResponse.error.message,
+                  }
                   : undefined,
               });
             }

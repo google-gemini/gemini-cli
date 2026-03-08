@@ -70,3 +70,42 @@ ${spec}
 </body>
 </html>`;
 }
+
+/**
+ * Generate a generic HTML preview shell.
+ * Useful for rendering React components (as HTML/CSS) or plain HTML/Tailwind snippets.
+ */
+export function buildHtmlPreview(content: string, theme: Theme, widthPx: number): string {
+  return /* html */ `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: ${theme === 'dark' ? '#1e1e2e' : '#ffffff'};
+      color: ${theme === 'dark' ? '#ffffff' : '#000000'};
+      margin: 0;
+      padding: 0;
+      overflow: visible;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    }
+    #container {
+      padding: 40px;
+      display: inline-block;
+      width: ${widthPx}px;
+      overflow: visible;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    ${content}
+  </div>
+  <script>
+    window.__previewDone = true;
+  </script>
+</body>
+</html>`;
+}

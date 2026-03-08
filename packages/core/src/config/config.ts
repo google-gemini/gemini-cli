@@ -436,7 +436,7 @@ export class MCPServerConfig {
     readonly targetAudience?: string,
     /* targetServiceAccount format: <service-account-name>@<project-num>.iam.gserviceaccount.com */
     readonly targetServiceAccount?: string,
-  ) {}
+  ) { }
 }
 
 export enum AuthProviderType {
@@ -597,6 +597,7 @@ export interface ConfigParameters {
   billing?: {
     overageStrategy?: OverageStrategy;
   };
+  visualize?: boolean;
 }
 
 export class Config implements McpContext {
@@ -774,10 +775,10 @@ export class Config implements McpContext {
   private readonly onModelChange: ((model: string) => void) | undefined;
   private readonly onReload:
     | (() => Promise<{
-        disabledSkills?: string[];
-        adminSkillsEnabled?: boolean;
-        agents?: AgentSettings;
-      }>)
+      disabledSkills?: string[];
+      adminSkillsEnabled?: boolean;
+      agents?: AgentSettings;
+    }>)
     | undefined;
 
   private readonly billing: {
@@ -802,6 +803,7 @@ export class Config implements McpContext {
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
   private lastModeSwitchTime: number = performance.now();
+  private readonly visualize: boolean;
   readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
 
@@ -969,6 +971,7 @@ export class Config implements McpContext {
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
     this.enableConseca = params.enableConseca ?? false;
+    this.visualize = params.visualize ?? false;
 
     // Initialize Safety Infrastructure
     const contextBuilder = new ContextBuilder(this);
@@ -1402,6 +1405,9 @@ export class Config implements McpContext {
   getDisableLoopDetection(): boolean {
     return this.disableLoopDetection ?? false;
   }
+  getVisualize(): boolean {
+    return this.visualize;
+  }
 
   setModel(newModel: string, isTemporary: boolean = true): void {
     if (this.model !== newModel || this._activeModel !== newModel) {
@@ -1708,10 +1714,10 @@ export class Config implements McpContext {
 
   getRemainingQuotaForModel(modelId: string):
     | {
-        remainingAmount?: number;
-        remainingFraction?: number;
-        resetTime?: string;
-      }
+      remainingAmount?: number;
+      remainingFraction?: number;
+      resetTime?: string;
+    }
     | undefined {
     const bucket = this.lastRetrievedQuota?.buckets?.find(
       (b) => b.modelId === modelId,
@@ -2668,7 +2674,7 @@ export class Config implements McpContext {
     return Math.min(
       // Estimate remaining context window in characters (1 token ~= 4 chars).
       4 *
-        (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
+      (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
       this.truncateToolOutputThreshold,
     );
   }

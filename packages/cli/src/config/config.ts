@@ -93,6 +93,7 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
+  visualize: boolean | undefined;
 }
 
 export async function parseArguments(
@@ -289,6 +290,11 @@ export async function parseArguments(
         .option('accept-raw-output-risk', {
           type: 'boolean',
           description: 'Suppress the security warning when using --raw-output.',
+        })
+        .option('visualize', {
+          alias: 'V',
+          type: 'boolean',
+          description: 'Automatically render diagrams in non-interactive mode.',
         }),
     )
     // Register MCP subcommands
@@ -434,7 +440,7 @@ export async function loadCliConfig(
 
   const folderTrust =
     process.env['GEMINI_CLI_INTEGRATION_TEST'] === 'true' ||
-    process.env['VITEST'] === 'true'
+      process.env['VITEST'] === 'true'
       ? false
       : (settings.security?.folderTrust?.enabled ?? false);
   const trustedFolder =
@@ -810,6 +816,7 @@ export async function loadCliConfig(
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
     rawOutput: argv.rawOutput,
     acceptRawOutputRisk: argv.acceptRawOutputRisk,
+    visualize: argv.visualize,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
     enableHooks: settings.hooksConfig.enabled,

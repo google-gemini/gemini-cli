@@ -30,8 +30,10 @@ import { corgiCommand } from '../ui/commands/corgiCommand.js';
 import { docsCommand } from '../ui/commands/docsCommand.js';
 import { directoryCommand } from '../ui/commands/directoryCommand.js';
 import { editorCommand } from '../ui/commands/editorCommand.js';
+import { explainCommand } from '../ui/commands/explainCommand.js';
 import { extensionsCommand } from '../ui/commands/extensionsCommand.js';
 import { footerCommand } from '../ui/commands/footerCommand.js';
+import { graphCommand } from '../ui/commands/graphCommand.js';
 import { helpCommand } from '../ui/commands/helpCommand.js';
 import { shortcutsCommand } from '../ui/commands/shortcutsCommand.js';
 import { rewindCommand } from '../ui/commands/rewindCommand.js';
@@ -45,6 +47,7 @@ import { oncallCommand } from '../ui/commands/oncallCommand.js';
 import { permissionsCommand } from '../ui/commands/permissionsCommand.js';
 import { planCommand } from '../ui/commands/planCommand.js';
 import { policiesCommand } from '../ui/commands/policiesCommand.js';
+import { previewCommand } from '../ui/commands/previewCommand.js';
 import { privacyCommand } from '../ui/commands/privacyCommand.js';
 import { profileCommand } from '../ui/commands/profileCommand.js';
 import { quitCommand } from '../ui/commands/quitCommand.js';
@@ -66,7 +69,7 @@ import { visualizeCommand } from '../ui/commands/visualizeCommand.js';
  * of the Gemini CLI application.
  */
 export class BuiltinCommandLoader implements ICommandLoader {
-  constructor(private config: Config | null) {}
+  constructor(private config: Config | null) { }
 
   /**
    * Gathers all raw built-in command definitions, injects dependencies where
@@ -99,26 +102,28 @@ export class BuiltinCommandLoader implements ICommandLoader {
       docsCommand,
       directoryCommand,
       editorCommand,
+      explainCommand,
+      graphCommand,
       ...(this.config?.getExtensionsEnabled() === false
         ? [
-            {
-              name: 'extensions',
-              description: 'Manage extensions',
-              kind: CommandKind.BUILT_IN,
-              autoExecute: false,
-              subCommands: [],
-              action: async (
-                _context: CommandContext,
-              ): Promise<MessageActionReturn> => ({
-                type: 'message',
-                messageType: 'error',
-                content: getAdminErrorMessage(
-                  'Extensions',
-                  this.config ?? undefined,
-                ),
-              }),
-            },
-          ]
+          {
+            name: 'extensions',
+            description: 'Manage extensions',
+            kind: CommandKind.BUILT_IN,
+            autoExecute: false,
+            subCommands: [],
+            action: async (
+              _context: CommandContext,
+            ): Promise<MessageActionReturn> => ({
+              type: 'message',
+              messageType: 'error',
+              content: getAdminErrorMessage(
+                'Extensions',
+                this.config ?? undefined,
+              ),
+            }),
+          },
+        ]
         : [extensionsCommand(this.config?.getEnableExtensionReloading())]),
       helpCommand,
       footerCommand,
@@ -130,22 +135,22 @@ export class BuiltinCommandLoader implements ICommandLoader {
       ...(isNightlyBuild ? [oncallCommand] : []),
       ...(this.config?.getMcpEnabled() === false
         ? [
-            {
-              name: 'mcp',
-              description:
-                'Manage configured Model Context Protocol (MCP) servers',
-              kind: CommandKind.BUILT_IN,
-              autoExecute: false,
-              subCommands: [],
-              action: async (
-                _context: CommandContext,
-              ): Promise<MessageActionReturn> => ({
-                type: 'message',
-                messageType: 'error',
-                content: getAdminErrorMessage('MCP', this.config ?? undefined),
-              }),
-            },
-          ]
+          {
+            name: 'mcp',
+            description:
+              'Manage configured Model Context Protocol (MCP) servers',
+            kind: CommandKind.BUILT_IN,
+            autoExecute: false,
+            subCommands: [],
+            action: async (
+              _context: CommandContext,
+            ): Promise<MessageActionReturn> => ({
+              type: 'message',
+              messageType: 'error',
+              content: getAdminErrorMessage('MCP', this.config ?? undefined),
+            }),
+          },
+        ]
         : [mcpCommand]),
       memoryCommand,
       modelCommand,
@@ -154,6 +159,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       policiesCommand,
       privacyCommand,
       ...(isDevelopment ? [profileCommand] : []),
+      previewCommand,
       quitCommand,
       restoreCommand(this.config),
       resumeCommand,
@@ -163,24 +169,24 @@ export class BuiltinCommandLoader implements ICommandLoader {
       ...(this.config?.isSkillsSupportEnabled()
         ? this.config?.getSkillManager()?.isAdminEnabled() === false
           ? [
-              {
-                name: 'skills',
-                description: 'Manage agent skills',
-                kind: CommandKind.BUILT_IN,
-                autoExecute: false,
-                subCommands: [],
-                action: async (
-                  _context: CommandContext,
-                ): Promise<MessageActionReturn> => ({
-                  type: 'message',
-                  messageType: 'error',
-                  content: getAdminErrorMessage(
-                    'Agent skills',
-                    this.config ?? undefined,
-                  ),
-                }),
-              },
-            ]
+            {
+              name: 'skills',
+              description: 'Manage agent skills',
+              kind: CommandKind.BUILT_IN,
+              autoExecute: false,
+              subCommands: [],
+              action: async (
+                _context: CommandContext,
+              ): Promise<MessageActionReturn> => ({
+                type: 'message',
+                messageType: 'error',
+                content: getAdminErrorMessage(
+                  'Agent skills',
+                  this.config ?? undefined,
+                ),
+              }),
+            },
+          ]
           : [skillsCommand]
         : []),
       settingsCommand,
