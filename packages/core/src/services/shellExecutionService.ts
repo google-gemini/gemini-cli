@@ -554,7 +554,7 @@ export class ShellExecutionService {
     }
     // Declared outside try so catch can destroy it if spawn succeeded
     // but a later setup step threw.
-     
+
     let spawnedPty: IPty | undefined;
 
     try {
@@ -895,7 +895,6 @@ export class ShellExecutionService {
       // macOS kern.tty.ptmx_max (511).
       if (spawnedPty) {
         try {
-           
           (spawnedPty as IPty & { destroy?: () => void }).destroy?.();
         } catch {
           // Ignore errors during cleanup

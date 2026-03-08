@@ -870,6 +870,35 @@ describe('ShellExecutionService', () => {
 
       expect(ShellExecutionService['activePtys'].size).toBe(0);
     });
+
+    it('should destroy the PTY when kill() is called', async () => {
+      // Execute a command to populate activePtys
+      const abortController = new AbortController();
+      await ShellExecutionService.execute(
+        'long-running',
+        '/test/dir',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+      await new Promise((resolve) => process.nextTick(resolve));
+
+      const pid = mockPtyProcess.pid;
+      const activePty = ShellExecutionService['activePtys'].get(pid);
+      expect(activePty).toBeTruthy();
+
+      // Spy on the actual stored object's destroy
+      const storedDestroySpy = vi.spyOn(
+        activePty!.ptyProcess as never as { destroy: () => void },
+        'destroy',
+      );
+
+      ShellExecutionService.kill(pid);
+
+      expect(storedDestroySpy).toHaveBeenCalled();
+      expect(ShellExecutionService['activePtys'].has(pid)).toBe(false);
+    });
   });
 });
 
