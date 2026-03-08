@@ -33,13 +33,36 @@ export function getCachedEncodingForBuffer(buffer: Buffer): string {
     cachedSystemEncoding = getSystemEncoding();
   }
 
-  // If we have a cached system encoding, use it
+  // Always attempt to detect encoding from the buffer first.
+  // chardet is generally very good at identifying UTF-8 and other encodings
+  // from the actual content, which is more reliable than the system's
+  // default code page for modern shells and tools.
+  const detectedEncoding = detectEncodingFromBuffer(buffer);
+
+  // If we detected an encoding from the buffer, use it.
+  if (detectedEncoding) {
+    // Special case: if detected is UTF-8, we almost certainly want it,
+    // even if the system encoding is something else (like GBK).
+    if (detectedEncoding === 'utf-8') {
+      return 'utf-8';
+    }
+
+    // If the system encoding is UTF-8 but chardet thinks it's something else,
+    // we still prefer UTF-8 as it's the safest default for modern tools.
+    if (cachedSystemEncoding === 'utf-8') {
+      return 'utf-8';
+    }
+
+    return detectedEncoding;
+  }
+
+  // If buffer detection fails, fall back to cached system encoding
   if (cachedSystemEncoding) {
     return cachedSystemEncoding;
   }
 
-  // Otherwise, detect from this specific buffer (don't cache this result)
-  return detectEncodingFromBuffer(buffer) || 'utf-8';
+  // Final fallback
+  return 'utf-8';
 }
 
 /**

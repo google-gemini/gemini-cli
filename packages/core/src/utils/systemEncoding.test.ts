@@ -382,14 +382,26 @@ describe('Shell Command Processor - Encoding Functions', () => {
       expect(mockedChardetDetect).toHaveBeenCalledTimes(2);
     });
 
-    it('should handle Windows system encoding', () => {
+    it('should prioritize buffer-detected UTF-8 over system GBK encoding on Windows', () => {
       mockedOsPlatform.mockReturnValue('win32');
-      mockedExecSync.mockReturnValue('Active code page: 1252');
+      mockedExecSync.mockReturnValue('Active code page: 936'); // GBK
 
-      const buffer = Buffer.from('test');
+      const buffer = Buffer.from('你好', 'utf8');
+      mockedChardetDetect.mockReturnValue('UTF-8');
+
       const result = getCachedEncodingForBuffer(buffer);
+      expect(result).toBe('utf-8');
+    });
 
-      expect(result).toBe('windows-1252');
+    it('should use system encoding when buffer detection fails', () => {
+      mockedOsPlatform.mockReturnValue('win32');
+      mockedExecSync.mockReturnValue('Active code page: 936');
+
+      const buffer = Buffer.from([0xce, 0xd2]); // GBK for "我"
+      mockedChardetDetect.mockReturnValue(null); // chardet fails to detect
+
+      const result = getCachedEncodingForBuffer(buffer);
+      expect(result).toBe('gb2312');
     });
 
     it('should cache null system encoding result', () => {
