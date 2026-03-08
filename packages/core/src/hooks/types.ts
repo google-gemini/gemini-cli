@@ -43,12 +43,18 @@ export enum HookEventName {
   BeforeModel = 'BeforeModel',
   AfterModel = 'AfterModel',
   BeforeToolSelection = 'BeforeToolSelection',
+  Idle = 'Idle',
 }
 
 /**
  * Fields in the hooks configuration that are not hook event names
  */
-export const HOOKS_CONFIG_FIELDS = ['enabled', 'disabled', 'notifications'];
+export const HOOKS_CONFIG_FIELDS = [
+  'enabled',
+  'disabled',
+  'notifications',
+  'idleTimeout',
+];
 
 /**
  * Hook implementation types
@@ -642,14 +648,37 @@ export enum PreCompressTrigger {
  */
 export interface PreCompressInput extends HookInput {
   trigger: PreCompressTrigger;
+  history: Array<{ role: string; parts: Array<{ text?: string }> }>;
 }
-
 /**
  * PreCompress hook output
  */
 export interface PreCompressOutput {
   suppressOutput?: boolean;
   systemMessage?: string;
+  hookSpecificOutput?: {
+    hookEventName: 'PreCompress';
+    newHistory?: Array<{ role: string; parts: Array<{ text?: string }> }>;
+  };
+}
+
+/**
+ * Idle hook input
+ */
+export interface IdleInput extends HookInput {
+  idle_seconds: number;
+}
+
+/**
+ * Idle hook output
+ */
+export interface IdleOutput {
+  suppressOutput?: boolean;
+  systemMessage?: string;
+  hookSpecificOutput?: {
+    hookEventName: 'Idle';
+    prompt?: string;
+  };
 }
 
 /**

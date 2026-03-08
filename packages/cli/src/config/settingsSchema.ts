@@ -2021,6 +2021,16 @@ const SETTINGS_SCHEMA = {
         description: 'Show visual indicators when hooks are executing.',
         showInDialog: true,
       },
+      idleTimeout: {
+        type: 'number',
+        label: 'Idle Timeout',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: 0,
+        description:
+          'Time in seconds before the Idle hook fires when there is no user input. Set to 0 to disable.',
+        showInDialog: true,
+      },
     },
   },
 
@@ -2161,6 +2171,18 @@ const SETTINGS_SCHEMA = {
         default: [],
         description:
           'Hooks that execute before tool selection. Can filter or prioritize available tools dynamically.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
+      Idle: {
+        type: 'array',
+        label: 'Idle Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute after a period of inactivity. Can trigger maintenance tasks like memory consolidation.',
         showInDialog: false,
         ref: 'HookDefinitionArray',
         mergeStrategy: MergeStrategy.CONCAT,

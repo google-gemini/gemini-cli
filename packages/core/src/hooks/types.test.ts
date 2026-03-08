@@ -57,6 +57,7 @@ describe('Hook Types', () => {
         'BeforeModel',
         'AfterModel',
         'BeforeToolSelection',
+        'Idle',
       ];
 
       for (const event of expectedEvents) {

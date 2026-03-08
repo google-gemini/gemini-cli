@@ -1874,6 +1874,64 @@ export const useGeminiStream = (
     storage,
   ]);
 
+  // Idle hook timer: fires after idleTimeout seconds of no activity.
+  // If idleTimeout is explicitly set, use it. Otherwise, if any Idle hooks
+  // are registered (e.g. by an extension), use a default of 300 seconds.
+  const DEFAULT_IDLE_TIMEOUT = 300;
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const configuredIdleTimeout = settings.merged.hooksConfig?.idleTimeout ?? 0;
+  useEffect(() => {
+    // Clear any existing timer
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+    }
+
+    if (streamingState !== StreamingState.Idle || !config.getEnableHooks()) {
+      return;
+    }
+
+    // Compute effective timeout: use configured value, or default if
+    // Idle hooks are registered (e.g. by an extension).
+    let idleTimeoutSeconds = configuredIdleTimeout;
+    if (idleTimeoutSeconds <= 0) {
+      const hookSystem = config.getHookSystem();
+      const hasIdleHooks = hookSystem
+        ?.getAllHooks()
+        .some((h) => h.eventName === 'Idle' && h.enabled);
+      idleTimeoutSeconds = hasIdleHooks ? DEFAULT_IDLE_TIMEOUT : 0;
+    }
+
+    if (idleTimeoutSeconds <= 0) {
+      return;
+    }
+
+    const startTime = Date.now();
+    idleTimerRef.current = setTimeout(async () => {
+      const hookSystem = config.getHookSystem();
+      if (!hookSystem) return;
+
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      try {
+        const result = await hookSystem.fireIdleEvent(elapsed);
+        const prompt = result?.finalOutput?.hookSpecificOutput?.['prompt'];
+        if (typeof prompt === 'string' && prompt.trim()) {
+          // Auto-submit the prompt returned by the hook
+          void submitQuery(prompt);
+        }
+      } catch {
+        // Idle hook failures are non-fatal
+      }
+    }, idleTimeoutSeconds * 1000);
+
+    return () => {
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = null;
+      }
+    };
+  }, [streamingState, configuredIdleTimeout, config, submitQuery]);
+
   const lastOutputTime = Math.max(
     lastToolOutputTime,
     lastShellOutputTime,

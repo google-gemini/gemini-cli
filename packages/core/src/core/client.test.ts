@@ -141,6 +141,7 @@ const mockHookSystem = {
   fireBeforeAgentEvent: vi.fn().mockResolvedValue(undefined),
   fireAfterAgentEvent: vi.fn().mockResolvedValue(undefined),
   firePreCompressEvent: vi.fn().mockResolvedValue(undefined),
+  fireIdleEvent: vi.fn().mockResolvedValue(undefined),
 };
 
 /**

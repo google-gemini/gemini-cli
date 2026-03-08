@@ -254,11 +254,6 @@ export class ChatCompressionService {
       };
     }
 
-    // Fire PreCompress hook before compression
-    // This fires for both manual and auto compression attempts
-    const trigger = force ? PreCompressTrigger.Manual : PreCompressTrigger.Auto;
-    await config.getHookSystem()?.firePreCompressEvent(trigger);
-
     const originalTokenCount = chat.getLastPromptTokenCount();
 
     // Don't compress if not forced and we are under the limit.
@@ -276,6 +271,63 @@ export class ChatCompressionService {
           },
         };
       }
+    }
+
+    // Fire PreCompress hook — only when compression will actually proceed
+    const trigger = force ? PreCompressTrigger.Manual : PreCompressTrigger.Auto;
+
+    // Serialize history for the hook: strip non-text parts to keep payload manageable
+    const curatedForHook = curatedHistory.map((c) => ({
+      role: c.role ?? 'user',
+      parts: (c.parts ?? [])
+        .filter((p): p is { text: string } => typeof p.text === 'string')
+        .map((p) => ({ text: p.text })),
+    }));
+
+    const hookResult = await config
+      .getHookSystem()
+      ?.firePreCompressEvent(trigger, curatedForHook);
+
+    // If a hook provided replacement history, use it and skip built-in compression
+    const hookNewHistory =
+      hookResult?.finalOutput?.hookSpecificOutput?.['newHistory'];
+    if (Array.isArray(hookNewHistory) && hookNewHistory.length > 0) {
+      // Convert hook output back to Content[]
+      const replacementHistory: Content[] = hookNewHistory.map(
+        (entry: { role?: string; parts?: Array<{ text?: string }> }) => {
+          const role =
+            entry.role === 'model' || entry.role === 'user'
+              ? entry.role
+              : 'user';
+          return {
+            role,
+            parts: (entry.parts ?? []).map((p: { text?: string }) => ({
+              text: p.text ?? '',
+            })),
+          };
+        },
+      );
+
+      const newTokenCount = estimateTokenCountSync(
+        replacementHistory.flatMap((c) => c.parts || []),
+      );
+
+      logChatCompression(
+        config,
+        makeChatCompressionEvent({
+          tokens_before: originalTokenCount,
+          tokens_after: newTokenCount,
+        }),
+      );
+
+      return {
+        newHistory: replacementHistory,
+        info: {
+          originalTokenCount,
+          newTokenCount,
+          compressionStatus: CompressionStatus.HOOK_REPLACED,
+        },
+      };
     }
 
     // Apply token-based truncation to the entire history before splitting.

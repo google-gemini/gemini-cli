@@ -30,6 +30,7 @@ import {
   type PreCompressTrigger,
   type HookExecutionResult,
   type McpToolContext,
+  type IdleInput,
 } from './types.js';
 import { defaultHookTranslator } from './hookTranslator.js';
 import type {
@@ -204,14 +205,28 @@ export class HookEventHandler {
    */
   async firePreCompressEvent(
     trigger: PreCompressTrigger,
+    history: Array<{ role: string; parts: Array<{ text?: string }> }>,
   ): Promise<AggregatedHookResult> {
     const input: PreCompressInput = {
       ...this.createBaseInput(HookEventName.PreCompress),
       trigger,
+      history,
     };
 
     const context: HookEventContext = { trigger };
     return this.executeHooks(HookEventName.PreCompress, input, context);
+  }
+
+  /**
+   * Fire an Idle event
+   */
+  async fireIdleEvent(idleSeconds: number): Promise<AggregatedHookResult> {
+    const input: IdleInput = {
+      ...this.createBaseInput(HookEventName.Idle),
+      idle_seconds: idleSeconds,
+    };
+
+    return this.executeHooks(HookEventName.Idle, input);
   }
 
   /**
