@@ -488,6 +488,11 @@ describe('editor utils', () => {
         vi.stubEnv('SANDBOX', '');
         expect(allowEditorTypeInSandbox(editor)).toBe(true);
       });
+
+      it(`should allow ${editor} when SANDBOX='0'`, () => {
+        vi.stubEnv('SANDBOX', '0');
+        expect(allowEditorTypeInSandbox(editor)).toBe(true);
+      });
     }
   });
 

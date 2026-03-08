@@ -13,6 +13,7 @@ import {
   ExitCodes,
 } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
+import { isInsideSandboxEnvironment } from './sandboxEnvironment.js';
 
 const cleanupFunctions: Array<(() => void) | (() => Promise<void>)> = [];
 const syncCleanupFunctions: Array<() => void> = [];
@@ -135,7 +136,7 @@ export function setupTtyCheck(): () => void {
       return;
     }
 
-    if (process.env['SANDBOX']) {
+    if (isInsideSandboxEnvironment()) {
       return;
     }
 

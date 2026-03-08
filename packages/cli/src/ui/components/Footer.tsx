@@ -29,6 +29,11 @@ import {
   deriveItemsFromLegacySettings,
 } from '../../config/footerItems.js';
 import { isDevelopment } from '../../utils/installationInfo.js';
+import {
+  getSandboxEnv,
+  isInsideSandboxEnvironment,
+  isMacOsSeatbeltSandbox,
+} from '../../utils/sandboxEnvironment.js';
 
 interface CwdIndicatorProps {
   targetDir: string;
@@ -68,14 +73,16 @@ const SandboxIndicator: React.FC<SandboxIndicatorProps> = ({
     return <Text color={theme.status.warning}>untrusted</Text>;
   }
 
-  const sandbox = process.env['SANDBOX'];
-  if (sandbox && sandbox !== 'sandbox-exec') {
+  const sandbox = getSandboxEnv();
+  if (isInsideSandboxEnvironment(sandbox) && !isMacOsSeatbeltSandbox(sandbox)) {
     return (
-      <Text color="green">{sandbox.replace(/^gemini-(?:cli-)?/, '')}</Text>
+      <Text color="green">
+        {(sandbox ?? '').replace(/^gemini-(?:cli-)?/, '')}
+      </Text>
     );
   }
 
-  if (sandbox === 'sandbox-exec') {
+  if (isMacOsSeatbeltSandbox(sandbox)) {
     return (
       <Text color={theme.status.warning}>
         macOS Seatbelt{' '}
@@ -275,11 +282,12 @@ export const Footer: React.FC = () => {
       }
       case 'sandbox': {
         let str = 'no sandbox';
-        const sandbox = process.env['SANDBOX'];
+        const sandbox = getSandboxEnv();
         if (isTrustedFolder === false) str = 'untrusted';
-        else if (sandbox === 'sandbox-exec')
+        else if (isMacOsSeatbeltSandbox(sandbox))
           str = `macOS Seatbelt (${process.env['SEATBELT_PROFILE']})`;
-        else if (sandbox) str = sandbox.replace(/^gemini-(?:cli-)?/, '');
+        else if (isInsideSandboxEnvironment(sandbox))
+          str = (sandbox ?? '').replace(/^gemini-(?:cli-)?/, '');
 
         addCol(
           id,

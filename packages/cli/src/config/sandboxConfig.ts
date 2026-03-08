@@ -14,6 +14,7 @@ import * as os from 'node:os';
 import type { Settings } from './settings.js';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { isInsideSandboxEnvironment } from '../utils/sandboxEnvironment.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,8 +39,8 @@ function isSandboxCommand(value: string): value is SandboxConfig['command'] {
 function getSandboxCommand(
   sandbox?: boolean | string | null,
 ): SandboxConfig['command'] | '' {
-  // If the SANDBOX env var is set, we're already inside the sandbox.
-  if (process.env['SANDBOX']) {
+  // Skip sandbox setup when already running inside a sandbox.
+  if (isInsideSandboxEnvironment()) {
     return '';
   }
 

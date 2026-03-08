@@ -9,6 +9,7 @@ import { promisify } from 'node:util';
 import { once } from 'node:events';
 import { debugLogger } from './debugLogger.js';
 import { coreEvents, CoreEvent, type EditorSelectedPayload } from './events.js';
+import { isInsideSandboxEnvironment } from './sandboxEnvironment.js';
 
 const GUI_EDITORS = [
   'vscode',
@@ -157,7 +158,7 @@ export function getEditorCommand(editor: EditorType): string {
 }
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
-  const notUsingSandbox = !process.env['SANDBOX'];
+  const notUsingSandbox = !isInsideSandboxEnvironment();
   if (isGuiEditor(editor)) {
     return notUsingSandbox;
   }

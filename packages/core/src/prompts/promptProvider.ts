@@ -31,6 +31,11 @@ import {
 import { resolveModel, supportsModernFeatures } from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
+import {
+  getSandboxEnv,
+  isInsideSandboxEnvironment,
+  isMacOsSeatbeltSandbox,
+} from '../utils/sandboxEnvironment.js';
 
 /**
  * Orchestrates prompt generation by gathering context and building options.
@@ -266,7 +271,8 @@ export class PromptProvider {
 // --- Internal Context Helpers ---
 
 function getSandboxMode(): snippets.SandboxMode {
-  if (process.env['SANDBOX'] === 'sandbox-exec') return 'macos-seatbelt';
-  if (process.env['SANDBOX']) return 'generic';
+  const sandboxEnv = getSandboxEnv();
+  if (isMacOsSeatbeltSandbox(sandboxEnv)) return 'macos-seatbelt';
+  if (isInsideSandboxEnvironment(sandboxEnv)) return 'generic';
   return 'outside';
 }

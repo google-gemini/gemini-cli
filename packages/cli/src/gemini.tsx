@@ -110,6 +110,7 @@ import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
 import { runDeferredCommand } from './deferred.js';
 import { SlashCommandConflictHandler } from './services/SlashCommandConflictHandler.js';
+import { isInsideSandboxEnvironment } from './utils/sandboxEnvironment.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -504,7 +505,7 @@ export async function main() {
   await runDeferredCommand(settings.merged);
 
   // hop into sandbox if we are outside and sandboxing is enabled
-  if (!process.env['SANDBOX']) {
+  if (!isInsideSandboxEnvironment()) {
     const memoryArgs = settings.merged.advanced.autoConfigureMemory
       ? getNodeMemoryArgs(isDebugMode)
       : [];

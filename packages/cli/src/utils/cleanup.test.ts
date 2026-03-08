@@ -275,6 +275,28 @@ describe('signal and TTY handling', () => {
       process.env['SANDBOX'] = originalSandbox;
     });
 
+    it("should still check TTY when SANDBOX='0'", async () => {
+      const originalSandbox = process.env['SANDBOX'];
+      process.env['SANDBOX'] = '0';
+
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: false,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: false,
+        writable: true,
+        configurable: true,
+      });
+
+      const cleanup = setupTtyCheck();
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(process.exit).toHaveBeenCalledWith(0);
+      cleanup();
+      process.env['SANDBOX'] = originalSandbox;
+    });
+
     it('cleanup function should stop the interval', () => {
       const cleanup = setupTtyCheck();
       cleanup();

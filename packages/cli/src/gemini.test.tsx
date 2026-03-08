@@ -641,6 +641,57 @@ describe('gemini.tsx main function kitty protocol', () => {
     processExitSpy.mockRestore();
   });
 
+  it("should treat SANDBOX='0' as outside sandbox and still activate sandbox", async () => {
+    vi.stubEnv('SANDBOX', '0');
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+
+    vi.mocked(parseArguments).mockResolvedValue({
+      promptInteractive: false,
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          advanced: {},
+          security: { auth: { selectedType: 'google' } },
+          ui: {},
+        },
+        workspace: { settings: {} },
+        setValue: vi.fn(),
+        forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      }),
+    );
+
+    const mockConfig = createMockConfig({
+      isInteractive: () => false,
+      getQuestion: () => '',
+      getSandbox: () => ({ command: 'docker', image: 'test-image' }),
+    });
+
+    vi.mocked(loadCliConfig).mockResolvedValue(mockConfig);
+    vi.mocked(loadSandboxConfig).mockResolvedValue({
+      command: 'docker',
+      image: 'test-image',
+    });
+
+    process.env['GEMINI_API_KEY'] = 'test-key';
+    try {
+      await main();
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    } finally {
+      delete process.env['GEMINI_API_KEY'];
+    }
+
+    expect(start_sandbox).toHaveBeenCalled();
+    expect(processExitSpy).toHaveBeenCalledWith(0);
+    processExitSpy.mockRestore();
+  });
+
   it('should log warning when theme is not found', async () => {
     const { themeManager } = await import('./ui/themes/theme-manager.js');
     const debugLoggerWarnSpy = vi

@@ -5,13 +5,16 @@
  */
 
 import open from 'open';
-import process from 'node:process';
 import {
   type CommandContext,
   type SlashCommand,
   CommandKind,
 } from './types.js';
 import { MessageType } from '../types.js';
+import {
+  isInsideSandboxEnvironment,
+  isMacOsSeatbeltSandbox,
+} from '../../utils/sandboxEnvironment.js';
 
 export const docsCommand: SlashCommand = {
   name: 'docs',
@@ -21,7 +24,7 @@ export const docsCommand: SlashCommand = {
   action: async (context: CommandContext): Promise<void> => {
     const docsUrl = 'https://goo.gle/gemini-cli-docs';
 
-    if (process.env['SANDBOX'] && process.env['SANDBOX'] !== 'sandbox-exec') {
+    if (isInsideSandboxEnvironment() && !isMacOsSeatbeltSandbox()) {
       context.ui.addItem(
         {
           type: MessageType.INFO,

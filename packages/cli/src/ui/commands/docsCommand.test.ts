@@ -73,6 +73,26 @@ describe('docsCommand', () => {
     expect(open).not.toHaveBeenCalled();
   });
 
+  it("should open docs when SANDBOX='0'", async () => {
+    if (!docsCommand.action) {
+      throw new Error('docsCommand must have an action.');
+    }
+
+    vi.stubEnv('SANDBOX', '0');
+    const docsUrl = 'https://goo.gle/gemini-cli-docs';
+
+    await docsCommand.action(mockContext, '');
+
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+      {
+        type: MessageType.INFO,
+        text: `Opening documentation in your browser: ${docsUrl}`,
+      },
+      expect.any(Number),
+    );
+    expect(open).toHaveBeenCalledWith(docsUrl);
+  });
+
   it("should not open browser for 'sandbox-exec'", async () => {
     if (!docsCommand.action) {
       throw new Error('docsCommand must have an action.');

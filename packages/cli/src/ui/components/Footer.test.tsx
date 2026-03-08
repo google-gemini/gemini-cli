@@ -382,6 +382,20 @@ describe('<Footer />', () => {
       unmount();
     });
 
+    it("should display 'no sandbox' when SANDBOX='0'", async () => {
+      vi.stubEnv('SANDBOX', '0');
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: { isTrustedFolder: true, sessionStats: mockSessionStats },
+        },
+      );
+      await waitUntilReady();
+      expect(lastFrame()).toContain('no sandbox');
+      unmount();
+    });
+
     it('should prioritize untrusted message over sandbox info', async () => {
       vi.stubEnv('SANDBOX', 'gemini-cli-test-sandbox');
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(

@@ -37,6 +37,10 @@ import { ExtensionSettingScope } from '../../config/extensions/extensionSettings
 import { type ConfigLogger } from '../../commands/extensions/utils.js';
 import { ConfigExtensionDialog } from '../components/ConfigExtensionDialog.js';
 import { ExtensionRegistryView } from '../components/views/ExtensionRegistryView.js';
+import {
+  isInsideSandboxEnvironment,
+  isMacOsSeatbeltSandbox,
+} from '../../utils/sandboxEnvironment.js';
 import React from 'react';
 
 function showMessageIfNoExtensions(
@@ -299,10 +303,7 @@ async function exploreAction(
       type: MessageType.INFO,
       text: `Would open extensions page in your browser: ${extensionsUrl} (skipped in test environment)`,
     });
-  } else if (
-    process.env['SANDBOX'] &&
-    process.env['SANDBOX'] !== 'sandbox-exec'
-  ) {
+  } else if (isInsideSandboxEnvironment() && !isMacOsSeatbeltSandbox()) {
     context.ui.addItem({
       type: MessageType.INFO,
       text: `View available extensions at ${extensionsUrl}`,
