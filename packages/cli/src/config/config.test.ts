@@ -849,10 +849,10 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
       expect.any(String),
       [],
-      expect.any(Boolean),
       expect.any(Object),
       expect.any(ExtensionManager),
       true,
+      expect.any(Boolean),
       'tree',
       expect.objectContaining({
         respectGitIgnore: true,
@@ -878,10 +878,10 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
       expect.any(String),
       [includeDir],
-      expect.any(Boolean),
       expect.any(Object),
       expect.any(ExtensionManager),
       true,
+      expect.any(Boolean),
       'tree',
       expect.objectContaining({
         respectGitIgnore: true,
@@ -906,10 +906,10 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
       expect.any(String),
       [],
-      expect.any(Boolean),
       expect.any(Object),
       expect.any(ExtensionManager),
       true,
+      expect.any(Boolean),
       'tree',
       expect.objectContaining({
         respectGitIgnore: true,

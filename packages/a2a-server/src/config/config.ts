@@ -120,10 +120,10 @@ export async function loadConfig(
     await loadServerHierarchicalMemory(
       workspaceDir,
       [workspaceDir],
-      configParams.debugMode || false,
       fileService,
       extensionLoader,
       folderTrust,
+      configParams.debugMode || false,
     );
   configParams.userMemory = memoryContent;
   configParams.geminiMdFileCount = fileCount;

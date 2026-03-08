@@ -593,10 +593,10 @@ export interface LoadServerHierarchicalMemoryResponse {
 export async function loadServerHierarchicalMemory(
   currentWorkingDirectory: string,
   includeDirectoriesToReadGemini: readonly string[],
-  debugMode: boolean,
   fileService: FileDiscoveryService,
   extensionLoader: ExtensionLoader,
   folderTrust: boolean,
+  debugMode: boolean = false,
   importFormat: 'flat' | 'tree' = 'tree',
   fileFilteringOptions?: FileFilteringOptions,
   maxDirs: number = 200,
@@ -615,7 +615,7 @@ export async function loadServerHierarchicalMemory(
   debugLogger.debug(
     '[DEBUG] [MemoryDiscovery] Loading server hierarchical memory for CWD:',
     currentWorkingDirectory,
-    `(importFormat: ${importFormat})`,
+    `(importFormat: ${importFormat}, debugMode: ${debugMode})`,
   );
 
   // For the server, homedir() refers to the server process's home.
@@ -705,10 +705,10 @@ export async function refreshServerHierarchicalMemory(config: Config) {
     config.shouldLoadMemoryFromIncludeDirectories()
       ? config.getWorkspaceContext().getDirectories()
       : [],
-    config.getDebugMode(),
     config.getFileService(),
     config.getExtensionLoader(),
     config.isTrustedFolder(),
+    config.getDebugMode(),
     config.getImportFormat(),
     config.getFileFilteringOptions(),
     config.getDiscoveryMaxDirs(),
