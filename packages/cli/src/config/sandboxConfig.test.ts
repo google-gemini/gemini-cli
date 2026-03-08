@@ -85,6 +85,33 @@ describe('loadSandboxConfig', () => {
     expect(config).toBeUndefined();
   });
 
+  it('should not treat SANDBOX="0" as already inside sandbox', async () => {
+    process.env['SANDBOX'] = '0';
+    process.env['GEMINI_SANDBOX'] = 'docker';
+    mockedCommandExistsSync.mockImplementation((cmd) => cmd === 'docker');
+
+    const config = await loadSandboxConfig({}, {});
+    expect(config).toEqual({ command: 'docker', image: 'default/image' });
+  });
+
+  it('should not treat SANDBOX="false" as already inside sandbox', async () => {
+    process.env['SANDBOX'] = 'false';
+    process.env['GEMINI_SANDBOX'] = 'docker';
+    mockedCommandExistsSync.mockImplementation((cmd) => cmd === 'docker');
+
+    const config = await loadSandboxConfig({}, {});
+    expect(config).toEqual({ command: 'docker', image: 'default/image' });
+  });
+
+  it('should not treat SANDBOX="FALSE" (case insensitive) as already inside sandbox', async () => {
+    process.env['SANDBOX'] = 'FALSE';
+    process.env['GEMINI_SANDBOX'] = 'docker';
+    mockedCommandExistsSync.mockImplementation((cmd) => cmd === 'docker');
+
+    const config = await loadSandboxConfig({}, {});
+    expect(config).toEqual({ command: 'docker', image: 'default/image' });
+  });
+
   describe('with GEMINI_SANDBOX environment variable', () => {
     it('should use docker if GEMINI_SANDBOX=docker and it exists', async () => {
       process.env['GEMINI_SANDBOX'] = 'docker';
