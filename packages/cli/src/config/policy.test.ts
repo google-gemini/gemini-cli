@@ -218,6 +218,26 @@ describe('resolveWorkspacePolicyState', () => {
     });
   });
 
+  it('should load workspace policies from the repository root in Mercurial repositories', async () => {
+    const repoRoot = path.join(tempDir, 'hg-repo');
+    const nestedDir = path.join(repoRoot, 'src', 'nested');
+    const repoPoliciesDir = path.join(repoRoot, '.gemini', 'policies');
+
+    fs.mkdirSync(path.join(repoRoot, '.hg'), { recursive: true });
+    fs.mkdirSync(nestedDir, { recursive: true });
+    fs.mkdirSync(repoPoliciesDir, { recursive: true });
+    fs.writeFileSync(path.join(repoPoliciesDir, 'policy.toml'), 'rules = []');
+
+    const result = await resolveWorkspacePolicyState({
+      cwd: nestedDir,
+      trustedFolder: true,
+      interactive: true,
+    });
+
+    expect(result.workspacePoliciesDir).toBe(repoPoliciesDir);
+    expect(result.policyUpdateConfirmationRequest).toBeUndefined();
+  });
+
   it('should return empty state if cwd is a symlink to the home directory', async () => {
     const policiesDir = path.join(tempDir, '.gemini', 'policies');
     fs.mkdirSync(policiesDir, { recursive: true });

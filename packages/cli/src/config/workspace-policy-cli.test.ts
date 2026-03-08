@@ -51,6 +51,7 @@ vi.mock('@google/gemini-cli-core', async () => {
 
 describe('Workspace-Level Policy CLI Integration', () => {
   const MOCK_CWD = process.cwd();
+  const MOCK_WORKSPACE_ROOT = path.resolve(MOCK_CWD, '..', '..');
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -153,7 +154,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
 
     expect(mockAcceptIntegrity).toHaveBeenCalledWith(
       'workspace',
-      MOCK_CWD,
+      MOCK_WORKSPACE_ROOT,
       'new-hash',
     );
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
@@ -191,7 +192,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
     expect(config.getPolicyUpdateConfirmationRequest()).toBeUndefined();
     expect(mockAcceptIntegrity).toHaveBeenCalledWith(
       'workspace',
-      MOCK_CWD,
+      MOCK_WORKSPACE_ROOT,
       'new-hash',
     );
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
@@ -226,7 +227,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
     expect(config.getPolicyUpdateConfirmationRequest()).toBeUndefined();
     expect(mockAcceptIntegrity).toHaveBeenCalledWith(
       'workspace',
-      MOCK_CWD,
+      MOCK_WORKSPACE_ROOT,
       'new-hash',
     );
 
@@ -269,7 +270,7 @@ describe('Workspace-Level Policy CLI Integration', () => {
 
       expect(config.getPolicyUpdateConfirmationRequest()).toEqual({
         scope: 'workspace',
-        identifier: MOCK_CWD,
+        identifier: MOCK_WORKSPACE_ROOT,
         policyDir: expect.stringContaining(path.join('.gemini', 'policies')),
         newHash: 'new-hash',
       });

@@ -19,6 +19,8 @@ import {
   writeToStderr,
   debugLogger,
 } from '@google/gemini-cli-core';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { type Settings } from './settings.js';
 
 /**
@@ -80,6 +82,27 @@ export interface WorkspacePolicyState {
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
 }
 
+const WORKSPACE_ROOT_MARKERS = ['.git', '.hg', '.svn'];
+
+function findWorkspaceRoot(startDir: string): string {
+  let currentDir = path.resolve(startDir);
+
+  while (true) {
+    for (const marker of WORKSPACE_ROOT_MARKERS) {
+      if (fs.existsSync(path.join(currentDir, marker))) {
+        return currentDir;
+      }
+    }
+
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) {
+      return path.resolve(startDir);
+    }
+
+    currentDir = parentDir;
+  }
+}
+
 /**
  * Resolves the workspace policy state by checking folder trust and policy integrity.
  */
@@ -89,6 +112,7 @@ export async function resolveWorkspacePolicyState(options: {
   interactive: boolean;
 }): Promise<WorkspacePolicyState> {
   const { cwd, trustedFolder, interactive } = options;
+  const workspaceRoot = findWorkspaceRoot(cwd);
 
   let workspacePoliciesDir: string | undefined;
   let policyUpdateConfirmationRequest:
@@ -96,7 +120,7 @@ export async function resolveWorkspacePolicyState(options: {
     | undefined;
 
   if (trustedFolder && !disableWorkspacePolicies) {
-    const storage = new Storage(cwd);
+    const storage = new Storage(workspaceRoot);
 
     // If we are in the home directory (or rather, our target Gemini dir is the global one),
     // don't treat it as a workspace to avoid loading global policies twice.
@@ -108,7 +132,7 @@ export async function resolveWorkspacePolicyState(options: {
     const integrityManager = new PolicyIntegrityManager();
     const integrityResult = await integrityManager.checkIntegrity(
       'workspace',
-      cwd,
+      workspaceRoot,
       potentialWorkspacePoliciesDir,
     );
 
@@ -124,7 +148,7 @@ export async function resolveWorkspacePolicyState(options: {
       // Policies changed or are new, and we are in interactive mode and auto-accept is disabled
       policyUpdateConfirmationRequest = {
         scope: 'workspace',
-        identifier: cwd,
+        identifier: workspaceRoot,
         policyDir: potentialWorkspacePoliciesDir,
         newHash: integrityResult.hash,
       };
@@ -132,7 +156,7 @@ export async function resolveWorkspacePolicyState(options: {
       // Non-interactive mode or auto-accept is enabled: automatically accept/load
       await integrityManager.acceptIntegrity(
         'workspace',
-        cwd,
+        workspaceRoot,
         integrityResult.hash,
       );
       workspacePoliciesDir = potentialWorkspacePoliciesDir;
