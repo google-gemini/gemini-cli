@@ -3,6 +3,7 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
+import { existsSync } from 'node:fs';
 import puppeteer from 'puppeteer';
 import type { Theme } from '../types.js';
 import { buildMermaidHtml } from './template.js';
@@ -15,6 +16,112 @@ export interface MermaidRenderOptions {
   theme?: Theme;
   widthPx?: number;
   backgroundColor?: string;
+}
+
+function getLaunchArgs(): string[] {
+  const args = [
+    '--disable-dev-shm-usage',
+    '--disable-accelerated-2d-canvas',
+    '--no-first-run',
+    '--no-zygote',
+    '--disable-gpu',
+  ];
+
+  // Sandbox flags are needed on Linux CI/containers but can destabilize some local setups.
+  if (process.platform === 'linux') {
+    args.unshift('--no-sandbox', '--disable-setuid-sandbox');
+  }
+
+  return args;
+}
+
+async function launchBrowser(): Promise<Awaited<ReturnType<typeof puppeteer.launch>>> {
+  const launchArgs = getLaunchArgs();
+  const launchErrors: string[] = [];
+  const candidates: Array<{
+    label: string;
+    useEnvExecutablePath: boolean;
+    options: Parameters<typeof puppeteer.launch>[0];
+  }> = [];
+
+  const rawEnvPath = process.env['PUPPETEER_EXECUTABLE_PATH']?.trim();
+  const envPath =
+    rawEnvPath && rawEnvPath.length > 1
+      ? rawEnvPath.replace(/^"(.*)"$/, '$1')
+      : rawEnvPath;
+
+  if (envPath) {
+    if (existsSync(envPath)) {
+      candidates.push({
+        label: `env executable (${envPath})`,
+        useEnvExecutablePath: true,
+        options: {
+          headless: 'new',
+          executablePath: envPath,
+          args: launchArgs,
+          pipe: true,
+          protocolTimeout: 60_000,
+        },
+      });
+    } else {
+      launchErrors.push(
+        `PUPPETEER_EXECUTABLE_PATH is set but does not exist: ${envPath}`,
+      );
+    }
+  }
+
+  candidates.push(
+    {
+      label: 'bundled chromium (headless=new)',
+      useEnvExecutablePath: false,
+      options: {
+        headless: 'new',
+        args: launchArgs,
+        pipe: true,
+        protocolTimeout: 60_000,
+      },
+    },
+    {
+      label: 'bundled chromium (headless=true)',
+      useEnvExecutablePath: false,
+      options: {
+        headless: true,
+        args: launchArgs,
+        pipe: true,
+        protocolTimeout: 60_000,
+      },
+    },
+  );
+
+  const originalEnvExecutablePath = process.env['PUPPETEER_EXECUTABLE_PATH'];
+
+  for (const candidate of candidates) {
+    try {
+      if (candidate.useEnvExecutablePath) {
+        if (originalEnvExecutablePath !== undefined) {
+          process.env['PUPPETEER_EXECUTABLE_PATH'] = originalEnvExecutablePath;
+        }
+      } else {
+        delete process.env['PUPPETEER_EXECUTABLE_PATH'];
+      }
+
+      return await puppeteer.launch(candidate.options);
+    } catch (error) {
+      launchErrors.push(
+        `${candidate.label}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    } finally {
+      if (originalEnvExecutablePath === undefined) {
+        delete process.env['PUPPETEER_EXECUTABLE_PATH'];
+      } else {
+        process.env['PUPPETEER_EXECUTABLE_PATH'] = originalEnvExecutablePath;
+      }
+    }
+  }
+
+  throw new Error(`Puppeteer launch failed. ${launchErrors.join(' | ')}`);
 }
 
 /**
@@ -35,19 +142,7 @@ export async function renderMermaidToPng(
 
   const html = buildMermaidHtml(spec, theme, widthPx);
 
-  const browser = await puppeteer.launch({
-    headless: true,
-    executablePath: process.env['PUPPETEER_EXECUTABLE_PATH'],
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-      '--disable-gpu',
-    ],
-  });
+  const browser = await launchBrowser();
 
   try {
     const page = await browser.newPage();

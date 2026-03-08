@@ -82,7 +82,15 @@ export const visualizeCommand: SlashCommand = {
     const isDiagramFile = /\.(mmd|mermaid|md|mdx)$/i.test(processedArg);
     const filePath = resolve(process.cwd(), processedArg);
 
-    if (isDiagramFile && existsSync(filePath)) {
+    if (isDiagramFile) {
+      if (!existsSync(filePath)) {
+        context.ui.addItem({
+          type: MessageType.ERROR,
+          text: `Diagram file not found: ${processedArg}`,
+        });
+        return;
+      }
+
       context.ui.setDebugMessage(`Visualizing file: ${filePath}...`);
       spec = readFileSync(filePath, 'utf8');
       sourceLabel = `file \`${processedArg}\``;
