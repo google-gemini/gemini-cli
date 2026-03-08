@@ -11,56 +11,6 @@ import {
   type ExecutionResult,
 } from './executionLifecycleService.js';
 
-const BASE_VIRTUAL_ID = 2_000_000_000;
-
-function resetLifecycleState() {
-  (
-    ExecutionLifecycleService as unknown as {
-      activeExecutions: Map<number, unknown>;
-      activeResolvers: Map<number, unknown>;
-      activeListeners: Map<number, unknown>;
-      exitedExecutionInfo: Map<number, unknown>;
-      nextVirtualExecutionId: number;
-    }
-  ).activeExecutions.clear();
-  (
-    ExecutionLifecycleService as unknown as {
-      activeExecutions: Map<number, unknown>;
-      activeResolvers: Map<number, unknown>;
-      activeListeners: Map<number, unknown>;
-      exitedExecutionInfo: Map<number, unknown>;
-      nextVirtualExecutionId: number;
-    }
-  ).activeResolvers.clear();
-  (
-    ExecutionLifecycleService as unknown as {
-      activeExecutions: Map<number, unknown>;
-      activeResolvers: Map<number, unknown>;
-      activeListeners: Map<number, unknown>;
-      exitedExecutionInfo: Map<number, unknown>;
-      nextVirtualExecutionId: number;
-    }
-  ).activeListeners.clear();
-  (
-    ExecutionLifecycleService as unknown as {
-      activeExecutions: Map<number, unknown>;
-      activeResolvers: Map<number, unknown>;
-      activeListeners: Map<number, unknown>;
-      exitedExecutionInfo: Map<number, unknown>;
-      nextVirtualExecutionId: number;
-    }
-  ).exitedExecutionInfo.clear();
-  (
-    ExecutionLifecycleService as unknown as {
-      activeExecutions: Map<number, unknown>;
-      activeResolvers: Map<number, unknown>;
-      activeListeners: Map<number, unknown>;
-      exitedExecutionInfo: Map<number, unknown>;
-      nextVirtualExecutionId: number;
-    }
-  ).nextVirtualExecutionId = BASE_VIRTUAL_ID;
-}
-
 function createResult(
   overrides: Partial<ExecutionResult> = {},
 ): ExecutionResult {
@@ -79,11 +29,11 @@ function createResult(
 
 describe('ExecutionLifecycleService', () => {
   beforeEach(() => {
-    resetLifecycleState();
+    ExecutionLifecycleService.resetForTest();
   });
 
   it('completes virtual executions in the foreground and notifies exit subscribers', async () => {
-    const handle = ExecutionLifecycleService.createExecution();
+    const handle = ExecutionLifecycleService.createVirtualExecution();
     if (handle.pid === undefined) {
       throw new Error('Expected virtual execution ID.');
     }
@@ -93,7 +43,9 @@ describe('ExecutionLifecycleService', () => {
 
     ExecutionLifecycleService.appendOutput(handle.pid, 'Hello');
     ExecutionLifecycleService.appendOutput(handle.pid, ' World');
-    ExecutionLifecycleService.completeExecution(handle.pid, { exitCode: 0 });
+    ExecutionLifecycleService.completeVirtualExecution(handle.pid, {
+      exitCode: 0,
+    });
 
     const result = await handle.result;
     expect(result.output).toBe('Hello World');
@@ -108,7 +60,7 @@ describe('ExecutionLifecycleService', () => {
   });
 
   it('supports backgrounding virtual executions and continues streaming updates', async () => {
-    const handle = ExecutionLifecycleService.createExecution();
+    const handle = ExecutionLifecycleService.createVirtualExecution();
     if (handle.pid === undefined) {
       throw new Error('Expected virtual execution ID.');
     }
@@ -134,7 +86,9 @@ describe('ExecutionLifecycleService', () => {
     expect(backgroundResult.output).toBe('Chunk 1');
 
     ExecutionLifecycleService.appendOutput(handle.pid, '\nChunk 2');
-    ExecutionLifecycleService.completeExecution(handle.pid, { exitCode: 0 });
+    ExecutionLifecycleService.completeVirtualExecution(handle.pid, {
+      exitCode: 0,
+    });
 
     await vi.waitFor(() => {
       expect(chunks.join('')).toContain('Chunk 2');
@@ -147,7 +101,7 @@ describe('ExecutionLifecycleService', () => {
 
   it('kills virtual executions and resolves with aborted result', async () => {
     const onKill = vi.fn();
-    const handle = ExecutionLifecycleService.createExecution('', onKill);
+    const handle = ExecutionLifecycleService.createVirtualExecution('', onKill);
     if (handle.pid === undefined) {
       throw new Error('Expected virtual execution ID.');
     }
@@ -164,7 +118,6 @@ describe('ExecutionLifecycleService', () => {
 
   it('manages external executions through registration hooks', async () => {
     const writeInput = vi.fn();
-    const terminate = vi.fn();
     const isActive = vi.fn().mockReturnValue(true);
     const exitListener = vi.fn();
     const chunks: string[] = [];
@@ -177,7 +130,6 @@ describe('ExecutionLifecycleService', () => {
         getBackgroundOutput: () => output,
         getSubscriptionSnapshot: () => output,
         writeInput,
-        kill: terminate,
         isActive,
       },
     );
@@ -203,7 +155,7 @@ describe('ExecutionLifecycleService', () => {
     expect(backgroundResult.output).toBe('seed +delta');
     expect(backgroundResult.executionMethod).toBe('child_process');
 
-    ExecutionLifecycleService.finalizeExecution(
+    ExecutionLifecycleService.completeWithResult(
       4321,
       createResult({
         pid: 4321,
@@ -222,13 +174,84 @@ describe('ExecutionLifecycleService', () => {
     expect(lateExit).toHaveBeenCalledWith(0, undefined);
 
     unsubscribe();
+  });
 
-    const killHandle = ExecutionLifecycleService.registerExecution(4322, {
+  it('supports late subscription catch-up after backgrounding an external execution', async () => {
+    let output = 'seed';
+    const onExit = vi.fn();
+    const handle = ExecutionLifecycleService.registerExecution(4322, {
       executionMethod: 'child_process',
+      getBackgroundOutput: () => output,
+      getSubscriptionSnapshot: () => output,
+    });
+
+    ExecutionLifecycleService.onExit(4322, onExit);
+    ExecutionLifecycleService.background(4322);
+
+    const backgroundResult = await handle.result;
+    expect(backgroundResult.backgrounded).toBe(true);
+    expect(backgroundResult.output).toBe('seed');
+
+    output += ' +late';
+    ExecutionLifecycleService.emitEvent(4322, { type: 'data', chunk: ' +late' });
+
+    const chunks: string[] = [];
+    const unsubscribe = ExecutionLifecycleService.subscribe(4322, (event) => {
+      if (event.type === 'data' && typeof event.chunk === 'string') {
+        chunks.push(event.chunk);
+      }
+    });
+    expect(chunks[0]).toBe('seed +late');
+
+    output += ' +live';
+    ExecutionLifecycleService.emitEvent(4322, { type: 'data', chunk: ' +live' });
+    expect(chunks[chunks.length - 1]).toBe(' +live');
+
+    ExecutionLifecycleService.completeWithResult(
+      4322,
+      createResult({
+        pid: 4322,
+        output,
+        rawOutput: Buffer.from(output),
+        executionMethod: 'child_process',
+      }),
+    );
+
+    await vi.waitFor(() => {
+      expect(onExit).toHaveBeenCalledWith(0, undefined);
+    });
+    unsubscribe();
+  });
+
+  it('kills external executions and settles pending promises', async () => {
+    const terminate = vi.fn();
+    const onExit = vi.fn();
+    const handle = ExecutionLifecycleService.registerExecution(4323, {
+      executionMethod: 'child_process',
+      initialOutput: 'running',
       kill: terminate,
     });
-    expect(killHandle.pid).toBe(4322);
-    ExecutionLifecycleService.kill(4322);
+    ExecutionLifecycleService.onExit(4323, onExit);
+    ExecutionLifecycleService.kill(4323);
+
+    const result = await handle.result;
     expect(terminate).toHaveBeenCalledTimes(1);
+    expect(result.aborted).toBe(true);
+    expect(result.exitCode).toBe(130);
+    expect(result.output).toBe('running');
+    expect(result.error?.message).toContain('Operation cancelled by user');
+    expect(onExit).toHaveBeenCalledWith(130, undefined);
+  });
+
+  it('rejects duplicate execution registration for active execution IDs', () => {
+    ExecutionLifecycleService.registerExecution(4324, {
+      executionMethod: 'child_process',
+    });
+
+    expect(() => {
+      ExecutionLifecycleService.registerExecution(4324, {
+        executionMethod: 'child_process',
+      });
+    }).toThrow('Execution 4324 is already registered.');
   });
 });

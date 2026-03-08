@@ -28,7 +28,13 @@ import {
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
 import { killProcessGroup } from '../utils/process-utils.js';
-import { ExecutionLifecycleService } from './executionLifecycleService.js';
+import {
+  ExecutionLifecycleService,
+  type ExecutionCompletionOptions,
+  type ExecutionHandle,
+  type ExecutionOutputEvent,
+  type ExecutionResult,
+} from './executionLifecycleService.js';
 const { Terminal } = pkg;
 
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
@@ -67,34 +73,10 @@ function ensurePromptvarsDisabled(command: string, shell: ShellType): string {
 }
 
 /** A structured result from a shell command execution. */
-export interface ShellExecutionResult {
-  /** The raw, unprocessed output buffer. */
-  rawOutput: Buffer;
-  /** The combined, decoded output as a string. */
-  output: string;
-  /** The process exit code, or null if terminated by a signal. */
-  exitCode: number | null;
-  /** The signal that terminated the process, if any. */
-  signal: number | null;
-  /** An error object if the process failed to spawn. */
-  error: Error | null;
-  /** A boolean indicating if the command was aborted by the user. */
-  aborted: boolean;
-  /** The process ID of the spawned shell. */
-  pid: number | undefined;
-  /** The method used to execute the shell command. */
-  executionMethod: 'lydell-node-pty' | 'node-pty' | 'child_process' | 'none';
-  /** Whether the command was moved to the background. */
-  backgrounded?: boolean;
-}
+export type ShellExecutionResult = ExecutionResult;
 
 /** A handle for an ongoing shell execution. */
-export interface ShellExecutionHandle {
-  /** The process ID of the spawned shell. */
-  pid: number | undefined;
-  /** A promise that resolves with the complete execution result. */
-  result: Promise<ShellExecutionResult>;
-}
+export type ShellExecutionHandle = ExecutionHandle;
 
 export interface ShellExecutionConfig {
   terminalWidth?: number;
@@ -113,31 +95,7 @@ export interface ShellExecutionConfig {
 /**
  * Describes a structured event emitted during shell command execution.
  */
-export type ShellOutputEvent =
-  | {
-      /** The event contains a chunk of output data. */
-      type: 'data';
-      /** The decoded string chunk. */
-      chunk: string | AnsiOutput;
-    }
-  | {
-      /** Signals that the output stream has been identified as binary. */
-      type: 'binary_detected';
-    }
-  | {
-      /** Provides progress updates for a binary stream. */
-      type: 'binary_progress';
-      /** The total number of bytes received so far. */
-      bytesReceived: number;
-    }
-  | {
-      /** Signals that the process has exited. */
-      type: 'exit';
-      /** The exit code of the process, if any. */
-      exitCode: number | null;
-      /** The signal that terminated the process, if any. */
-      signal: number | null;
-    };
+export type ShellOutputEvent = ExecutionOutputEvent;
 
 interface ActivePty {
   ptyProcess: IPty;
@@ -269,7 +227,7 @@ export class ShellExecutionService {
     initialOutput = '',
     onKill?: () => void,
   ): ShellExecutionHandle {
-    return ExecutionLifecycleService.createExecution(initialOutput, onKill);
+    return ExecutionLifecycleService.createVirtualExecution(initialOutput, onKill);
   }
 
   static appendVirtualOutput(pid: number, chunk: string): void {
@@ -278,14 +236,9 @@ export class ShellExecutionService {
 
   static completeVirtualExecution(
     pid: number,
-    options?: {
-      exitCode?: number | null;
-      signal?: number | null;
-      error?: Error | null;
-      aborted?: boolean;
-    },
+    options?: ExecutionCompletionOptions,
   ): void {
-    ExecutionLifecycleService.completeExecution(pid, options);
+    ExecutionLifecycleService.completeVirtualExecution(pid, options);
   }
 
   private static childProcessFallback(
@@ -469,7 +422,7 @@ export class ShellExecutionService {
             signal: exitSignal,
           };
           onOutputEvent(event);
-          ExecutionLifecycleService.finalizeExecution(child.pid, resultPayload);
+          ExecutionLifecycleService.completeWithResult(child.pid, resultPayload);
         } else {
           resolveWithoutPid?.(resultPayload);
         }
@@ -862,7 +815,7 @@ export class ShellExecutionService {
             };
             onOutputEvent(event);
 
-            ExecutionLifecycleService.finalizeExecution(ptyPid, {
+            ExecutionLifecycleService.completeWithResult(ptyPid, {
               rawOutput: Buffer.concat(outputChunks),
               output: getFullBufferText(headlessTerminal),
               exitCode,

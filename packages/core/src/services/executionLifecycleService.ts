@@ -64,17 +64,26 @@ export interface ExternalExecutionRegistration {
   isActive?: () => boolean;
 }
 
-interface ManagedExecutionState {
+interface ManagedExecutionBase {
   executionMethod: ExecutionMethod;
   output: string;
-  isVirtual: boolean;
-  onKill?: () => void;
   getBackgroundOutput?: () => string;
   getSubscriptionSnapshot?: () => string | AnsiOutput | undefined;
+}
+
+interface VirtualExecutionState extends ManagedExecutionBase {
+  kind: 'virtual';
+  onKill?: () => void;
+}
+
+interface ExternalExecutionState extends ManagedExecutionBase {
+  kind: 'external';
   writeInput?: (input: string) => void;
   kill?: () => void;
   isActive?: () => boolean;
 }
+
+type ManagedExecutionState = VirtualExecutionState | ExternalExecutionState;
 
 /**
  * Central owner for execution backgrounding lifecycle across shell and tools.
@@ -119,20 +128,55 @@ export class ExecutionLifecycleService {
     return executionId;
   }
 
-  private static createPendingResult(executionId: number): Promise<ExecutionResult> {
+  private static createPendingResult(
+    executionId: number,
+  ): Promise<ExecutionResult> {
     return new Promise<ExecutionResult>((resolve) => {
       this.activeResolvers.set(executionId, resolve);
     });
+  }
+
+  private static createAbortedResult(
+    executionId: number,
+    execution: ManagedExecutionState,
+  ): ExecutionResult {
+    const output = execution.getBackgroundOutput?.() ?? execution.output;
+    return {
+      rawOutput: Buffer.from(output, 'utf8'),
+      output,
+      exitCode: 130,
+      signal: null,
+      error: new Error('Operation cancelled by user.'),
+      aborted: true,
+      pid: executionId,
+      executionMethod: execution.executionMethod,
+    };
+  }
+
+  /**
+   * Resets lifecycle state for isolated unit tests.
+   */
+  static resetForTest(): void {
+    this.activeExecutions.clear();
+    this.activeResolvers.clear();
+    this.activeListeners.clear();
+    this.exitedExecutionInfo.clear();
+    this.nextVirtualExecutionId = 2_000_000_000;
   }
 
   static registerExecution(
     executionId: number,
     registration: ExternalExecutionRegistration,
   ): ExecutionHandle {
+    if (this.activeExecutions.has(executionId) || this.activeResolvers.has(executionId)) {
+      throw new Error(`Execution ${executionId} is already registered.`);
+    }
+    this.exitedExecutionInfo.delete(executionId);
+
     this.activeExecutions.set(executionId, {
       executionMethod: registration.executionMethod,
       output: registration.initialOutput ?? '',
-      isVirtual: false,
+      kind: 'external',
       getBackgroundOutput: registration.getBackgroundOutput,
       getSubscriptionSnapshot: registration.getSubscriptionSnapshot,
       writeInput: registration.writeInput,
@@ -146,7 +190,7 @@ export class ExecutionLifecycleService {
     };
   }
 
-  static createExecution(
+  static createVirtualExecution(
     initialOutput = '',
     onKill?: () => void,
   ): ExecutionHandle {
@@ -155,7 +199,7 @@ export class ExecutionLifecycleService {
     this.activeExecutions.set(executionId, {
       executionMethod: 'none',
       output: initialOutput,
-      isVirtual: true,
+      kind: 'virtual',
       onKill,
       getBackgroundOutput: () => {
         const state = this.activeExecutions.get(executionId);
@@ -165,13 +209,22 @@ export class ExecutionLifecycleService {
         const state = this.activeExecutions.get(executionId);
         return state?.output ?? initialOutput;
       },
-      isActive: () => true,
     });
 
     return {
       pid: executionId,
       result: this.createPendingResult(executionId),
     };
+  }
+
+  /**
+   * @deprecated Use createVirtualExecution() for new call sites.
+   */
+  static createExecution(
+    initialOutput = '',
+    onKill?: () => void,
+  ): ExecutionHandle {
+    return this.createVirtualExecution(initialOutput, onKill);
   }
 
   static appendOutput(executionId: number, chunk: string): void {
@@ -204,7 +257,31 @@ export class ExecutionLifecycleService {
     this.activeResolvers.delete(executionId);
   }
 
-  static completeExecution(
+  private static settleExecution(
+    executionId: number,
+    result: ExecutionResult,
+  ): void {
+    if (!this.activeExecutions.has(executionId)) {
+      return;
+    }
+
+    this.resolvePending(executionId, result);
+    this.emitEvent(executionId, {
+      type: 'exit',
+      exitCode: result.exitCode,
+      signal: result.signal,
+    });
+
+    this.activeListeners.delete(executionId);
+    this.activeExecutions.delete(executionId);
+    this.storeExitInfo(
+      executionId,
+      result.exitCode ?? 0,
+      result.signal ?? undefined,
+    );
+  }
+
+  static completeVirtualExecution(
     executionId: number,
     options?: ExecutionCompletionOptions,
   ): void {
@@ -222,7 +299,7 @@ export class ExecutionLifecycleService {
 
     const output = execution.getBackgroundOutput?.() ?? execution.output;
 
-    this.resolvePending(executionId, {
+    this.settleExecution(executionId, {
       rawOutput: Buffer.from(output, 'utf8'),
       output,
       exitCode,
@@ -232,37 +309,33 @@ export class ExecutionLifecycleService {
       pid: executionId,
       executionMethod: execution.executionMethod,
     });
-
-    this.emitEvent(executionId, {
-      type: 'exit',
-      exitCode,
-      signal,
-    });
-
-    this.activeListeners.delete(executionId);
-    this.activeExecutions.delete(executionId);
-    this.storeExitInfo(executionId, exitCode ?? 0, signal ?? undefined);
   }
 
+  /**
+   * @deprecated Use completeVirtualExecution() for new call sites.
+   */
+  static completeExecution(
+    executionId: number,
+    options?: ExecutionCompletionOptions,
+  ): void {
+    this.completeVirtualExecution(executionId, options);
+  }
+
+  static completeWithResult(
+    executionId: number,
+    result: ExecutionResult,
+  ): void {
+    this.settleExecution(executionId, result);
+  }
+
+  /**
+   * @deprecated Use completeWithResult() for new call sites.
+   */
   static finalizeExecution(
     executionId: number,
     result: ExecutionResult,
   ): void {
-    this.resolvePending(executionId, result);
-
-    this.emitEvent(executionId, {
-      type: 'exit',
-      exitCode: result.exitCode,
-      signal: result.signal,
-    });
-
-    this.activeListeners.delete(executionId);
-    this.activeExecutions.delete(executionId);
-    this.storeExitInfo(
-      executionId,
-      result.exitCode ?? 0,
-      result.signal ?? undefined,
-    );
+    this.completeWithResult(executionId, result);
   }
 
   static background(executionId: number): void {
@@ -349,20 +422,18 @@ export class ExecutionLifecycleService {
       return;
     }
 
-    if (execution.isVirtual) {
+    if (execution.kind === 'virtual') {
       execution.onKill?.();
-      this.completeExecution(executionId, {
-        error: new Error('Operation cancelled by user.'),
-        aborted: true,
-        exitCode: 130,
-      });
-      return;
     }
 
-    execution.kill?.();
-    this.activeResolvers.delete(executionId);
-    this.activeListeners.delete(executionId);
-    this.activeExecutions.delete(executionId);
+    if (execution.kind === 'external') {
+      execution.kill?.();
+    }
+
+    this.completeWithResult(
+      executionId,
+      this.createAbortedResult(executionId, execution),
+    );
   }
 
   static isActive(executionId: number): boolean {
@@ -375,11 +446,11 @@ export class ExecutionLifecycleService {
       }
     }
 
-    if (execution.isVirtual) {
+    if (execution.kind === 'virtual') {
       return true;
     }
 
-    if (execution.isActive) {
+    if (execution.kind === 'external' && execution.isActive) {
       try {
         return execution.isActive();
       } catch {
@@ -395,6 +466,9 @@ export class ExecutionLifecycleService {
   }
 
   static writeInput(executionId: number, input: string): void {
-    this.activeExecutions.get(executionId)?.writeInput?.(input);
+    const execution = this.activeExecutions.get(executionId);
+    if (execution?.kind === 'external') {
+      execution.writeInput?.(input);
+    }
   }
 }
