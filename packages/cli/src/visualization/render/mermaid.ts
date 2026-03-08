@@ -1,3 +1,8 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import puppeteer from 'puppeteer';
 import type { Theme } from '../types.js';
 import { buildMermaidHtml } from './template.js';
@@ -7,9 +12,9 @@ import { buildMermaidHtml } from './template.js';
 // ---------------------------------------------------------------------------
 
 export interface MermaidRenderOptions {
-    theme?: Theme;
-    widthPx?: number;
-    backgroundColor?: string;
+  theme?: Theme;
+  widthPx?: number;
+  backgroundColor?: string;
 }
 
 /**
@@ -22,101 +27,92 @@ export interface MermaidRenderOptions {
  * 4. Screenshot the SVG element's bounding box → PNG
  */
 export async function renderMermaidToPng(
-    spec: string,
-    options: MermaidRenderOptions = {},
+  spec: string,
+  options: MermaidRenderOptions = {},
 ): Promise<Buffer> {
-    const theme = options.theme ?? 'dark';
-    const widthPx = options.widthPx ?? 1200;
+  const theme = options.theme ?? 'dark';
+  const widthPx = options.widthPx ?? 1200;
 
-    const html = buildMermaidHtml(spec, theme, widthPx);
+  const html = buildMermaidHtml(spec, theme, widthPx);
 
-    const browser = await puppeteer.launch({
-        headless: true,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--disable-gpu',
-        ],
+  const browser = await puppeteer.launch({
+    headless: true,
+    executablePath: process.env['PUPPETEER_EXECUTABLE_PATH'],
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--disable-gpu',
+    ],
+  });
+
+  try {
+    const page = await browser.newPage();
+
+    // Set viewport wide enough for the diagram
+    await page.setViewport({
+      width: widthPx + 200,
+      height: 4000,
+      deviceScaleFactor: 1,
     });
 
-    try {
-        const page = await browser.newPage();
+    const pageErrors: string[] = [];
+    page.on('pageerror', (err) => {
+      pageErrors.push(err.message);
+    });
 
-        // Set viewport wide enough, and plenty tall for the initial render
-        // Set viewport wide enough, and VERY tall to avoid any early clipping
-        // Set viewport wide enough, and VERY tall to avoid any early clipping
-        await page.setViewport({ width: widthPx + 200, height: 10000, deviceScaleFactor: 1 });
+    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30_000 });
 
-        // Block external requests other than jsdelivr (Mermaid CDN)
-        await page.setRequestInterception(true);
-        page.on('request', (req) => {
-            const url = req.url();
-            if (
-                req.isInterceptResolutionHandled()
-            ) return;
-            // Allow data URIs (our own HTML), CDN, and local
-            if (
-                url.startsWith('data:') ||
-                url.includes('cdn.jsdelivr.net') ||
-                url.startsWith('about:')
-            ) {
-                req.continue();
-            } else {
-                req.abort();
-            }
-        });
+    // Wait for Mermaid to set our completion flag
+    await page.waitForFunction(
+      () =>
+        (window as Window & { __mermaidDone?: boolean }).__mermaidDone === true,
+      { timeout: 20_000 },
+    );
 
-        const browserErrors: string[] = [];
-        page.on('console', (msg) => {
-            if (msg.type() === 'error') {
-                browserErrors.push(msg.text());
-            }
-        });
-        page.on('pageerror', (err) => {
-            browserErrors.push(err.message);
-        });
-
-        await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30_000 });
-
-        // Wait for Mermaid to set our completion flag
-        await page.waitForFunction(
-            () => (window as any).__mermaidDone === true,
-            { timeout: 20_000 },
-        );
-
-        if (browserErrors.length > 0) {
-            throw new Error(`Mermaid rendering failed in browser: ${browserErrors.join(' | ')}`);
-        }
-
-        // Give it a VERY substantial beat for layout, fonts, and SVG settling
-        await page.evaluate(() => new Promise(r => setTimeout(r, 1000)));
-
-        // MEASURE THE ACTUAL SCROLL DIMENSIONS
-        const dimensions = await page.evaluate(() => {
-            const container = document.querySelector('#container') as HTMLElement;
-            if (!container) return null;
-
-            return {
-                x: 0,
-                y: 0,
-                width: Math.ceil(Math.max(container.scrollWidth, container.offsetWidth)) + 20,
-                height: Math.ceil(Math.max(container.scrollHeight, container.offsetHeight)) + 20
-            };
-        });
-
-        // Use clip to capture exactly what we measured
-        const screenshotBuffer = await page.screenshot({
-            type: 'png',
-            clip: dimensions || undefined,
-            omitBackground: theme !== 'default',
-        });
-
-        return Buffer.from(screenshotBuffer);
-    } finally {
-        await browser.close();
+    if (pageErrors.length > 0) {
+      throw new Error(`Mermaid page error: ${pageErrors.join(' | ')}`);
     }
+
+    // Give it a VERY substantial beat for layout, fonts, and SVG settling
+    await page.evaluate(() => new Promise((r) => setTimeout(r, 1000)));
+
+    // MEASURE THE ACTUAL SCROLL DIMENSIONS
+    const dimensions = await page.evaluate(() => {
+      const el = document.querySelector('#container');
+      const container = el instanceof HTMLElement ? el : null;
+      if (!container) return null;
+
+      return {
+        x: 0,
+        y: 0,
+        width:
+          Math.ceil(Math.max(container.scrollWidth, container.offsetWidth)) +
+          20,
+        height:
+          Math.ceil(Math.max(container.scrollHeight, container.offsetHeight)) +
+          20,
+      };
+    });
+
+    // Use clip to capture exactly what we measured
+    const screenshotBuffer = await page.screenshot({
+      type: 'png',
+      clip: dimensions || undefined,
+      omitBackground: theme !== 'default',
+    });
+
+    return Buffer.from(screenshotBuffer);
+  } finally {
+    // Swallow close errors — a crashed/disconnected browser throws on close,
+    // which would otherwise overwrite the real error in the catch chain.
+    try {
+      await browser.close();
+    } catch {
+      /* ignore */
+    }
+  }
 }

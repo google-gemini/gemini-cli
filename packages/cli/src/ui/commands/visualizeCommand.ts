@@ -92,26 +92,20 @@ export const visualizeCommand: SlashCommand = {
         text: `Successfully visualized diagram from ${sourceLabel}.`,
       });
     } catch (err: unknown) {
-      let errorMessage = 'Unknown error';
+      let errMsg: string;
       if (err instanceof Error) {
-        errorMessage = err.message;
-      } else if (typeof err === 'object' && err !== null) {
-        try {
-          errorMessage = JSON.stringify(err);
-        } catch {
-          errorMessage = String(err);
-        }
+        errMsg = err.message || err.toString();
       } else {
-        errorMessage = String(err);
+        try {
+          errMsg = JSON.stringify(err);
+        } catch {
+          errMsg = String(err);
+        }
       }
-
       context.ui.addItem({
         type: MessageType.ERROR,
-        text: `Failed to visualize diagram: ${errorMessage}`,
+        text: `Failed to visualize diagram: ${errMsg}`,
       });
-
-      // Also log to debug message if available
-      context.ui.setDebugMessage(`Visualization error detail: ${errorMessage}`);
     }
   },
 };
