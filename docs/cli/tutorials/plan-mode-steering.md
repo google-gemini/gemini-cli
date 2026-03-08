@@ -5,8 +5,9 @@ structured environment with model steering's real-time feedback, you can guide
 Gemini CLI through the research and design phases to ensure the final
 implementation plan is exactly what you need.
 
-> **Note:** This is a preview feature currently under active development. As of
-> March 4, 2026, Plan Mode is only available on the preview channel.
+> **Note:** This is a preview feature under active development. Preview features
+> may only be available in the **Preview** channel or may need to be enabled
+> under `/settings`.
 
 ## Prerequisites
 
