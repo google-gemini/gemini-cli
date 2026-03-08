@@ -790,6 +790,7 @@ export class Scheduler {
       }
 
       // Loop continues, picking up the new tail call at the front of the queue.
+      this.stepTotal += 1;
       return true;
     }
 
