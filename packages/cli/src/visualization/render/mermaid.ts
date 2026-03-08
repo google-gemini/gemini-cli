@@ -18,6 +18,12 @@ export interface MermaidRenderOptions {
   backgroundColor?: string;
 }
 
+interface MermaidRenderPageStatus {
+  mermaidError: string;
+  hasSvg: boolean;
+  errorText: string;
+}
+
 function getLaunchArgs(): string[] {
   const args: string[] = [];
 
@@ -174,6 +180,44 @@ export async function renderMermaidToPng(
       { timeout: 20_000 },
     );
 
+    const renderStatus = await page.evaluate((): MermaidRenderPageStatus => {
+      const win = window as Window & { __mermaidError?: unknown };
+      const rawError =
+        typeof win.__mermaidError === 'string'
+          ? win.__mermaidError.trim()
+          : win.__mermaidError != null
+            ? String(win.__mermaidError)
+            : '';
+
+      const errorNode =
+        document.querySelector('.error-text') ??
+        document.querySelector('.error-icon') ??
+        document.querySelector('[class*="error"]');
+
+      const errorText =
+        errorNode instanceof HTMLElement
+          ? (errorNode.textContent ?? '').trim()
+          : '';
+
+      return {
+        mermaidError: rawError,
+        hasSvg: document.querySelector('.mermaid svg') !== null,
+        errorText,
+      };
+    });
+
+    if (renderStatus.mermaidError.length > 0) {
+      throw new Error(`Mermaid syntax error: ${renderStatus.mermaidError}`);
+    }
+
+    if (!renderStatus.hasSvg) {
+      throw new Error('Mermaid render failed: no SVG output was produced.');
+    }
+
+    if (renderStatus.errorText.length > 0) {
+      throw new Error(`Mermaid syntax error: ${renderStatus.errorText}`);
+    }
+
     if (pageErrors.length > 0) {
       throw new Error(`Mermaid page error: ${pageErrors.join(' | ')}`);
     }
@@ -199,10 +243,14 @@ export async function renderMermaidToPng(
       };
     });
 
+    if (!dimensions || dimensions.width <= 0 || dimensions.height <= 0) {
+      throw new Error('Mermaid render failed: invalid screenshot dimensions.');
+    }
+
     // Use clip to capture exactly what we measured
     const screenshotBuffer = await page.screenshot({
       type: 'png',
-      clip: dimensions || undefined,
+      clip: dimensions,
       omitBackground: theme !== 'default',
     });
 

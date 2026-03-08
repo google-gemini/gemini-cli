@@ -48,6 +48,7 @@ ${spec}
     import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
     
     window.__mermaidDone = false;
+    window.__mermaidError = '';
     
     mermaid.initialize({
       startOnLoad: false,
@@ -57,11 +58,20 @@ ${spec}
 
     const init = async () => {
       try {
+        const node = document.querySelector('.mermaid');
+        const source = node instanceof HTMLElement ? node.textContent ?? '' : '';
+        if (!source.trim()) {
+          throw new Error('Empty Mermaid diagram source.');
+        }
+
+        await mermaid.parse(source);
         await mermaid.run();
-        window.__mermaidDone = true;
       } catch (e) {
-        console.error('Mermaid render failed', e);
-        window.__mermaidDone = true; // Still set to true so we don't hang
+        const message = e instanceof Error ? e.message : String(e);
+        window.__mermaidError = message;
+        console.error('Mermaid render failed', message);
+      } finally {
+        window.__mermaidDone = true;
       }
     };
     
