@@ -1,3 +1,5 @@
+import chalk from 'chalk';
+
 // ---------------------------------------------------------------------------
 // ASCII / ANSI box-drawing fallback renderer
 // ---------------------------------------------------------------------------
@@ -73,26 +75,36 @@ function renderSequenceDiagram(spec: string, termWidth = 100): string {
 
     // Header row: participant boxes
     const header = participants
-        .map(() => {
-            return `${BOX.TL}${BOX.H.repeat(colWidth - 2)}${BOX.TR}`;
-        })
+        .map(() => chalk.cyan(`${BOX.TL}${BOX.H.repeat(colWidth - 2)}${BOX.TR}`))
         .join('  ');
 
     const labelRow = participants
         .map((p) => {
             const label = p.slice(0, colWidth - 4).padEnd(colWidth - 4);
-            return `${BOX.V} ${label} ${BOX.V}`;
+            return chalk.cyan(`${BOX.V}`) + chalk.bold.white(` ${label} `) + chalk.cyan(`${BOX.V}`);
         })
         .join('  ');
 
     const footer = participants
-        .map(() => `${BOX.BL}${BOX.H.repeat(colWidth - 2)}${BOX.BR}`)
+        .map(() => chalk.cyan(`${BOX.BL}${BOX.H.repeat(colWidth - 2)}${BOX.BR}`))
         .join('  ');
 
     lines.push('');
     lines.push(header);
     lines.push(labelRow);
     lines.push(footer);
+
+    /**
+     * Helper to render vertical lines for all participants
+     */
+    const renderLifelines = () => {
+        return participants.map(() => {
+            const mid = Math.floor(colWidth / 2);
+            return ' '.repeat(mid) + chalk.gray(BOX.V) + ' '.repeat(colWidth - mid - 1);
+        }).join('  ');
+    };
+
+    lines.push(renderLifelines());
 
     // Messages
     for (const msg of messages) {
@@ -106,18 +118,36 @@ function renderSequenceDiagram(spec: string, termWidth = 100): string {
 
         // Build a simple ASCII arrow row
         const rowParts = participants.map((_, i) => {
-            if (i === fromIdx) return isLeft ? `◀${BOX.H.repeat(colWidth - 2)}` : `${BOX.H.repeat(colWidth - 2)}▶`;
-            if (i === toIdx) return BOX.H.repeat(colWidth);
-            if (i > minIdx && i < maxIdx) return BOX.H.repeat(colWidth);
-            return ' '.repeat(colWidth);
+            const mid = Math.floor(colWidth / 2);
+
+            if (i === fromIdx) {
+                if (isLeft) {
+                    return chalk.yellow('◀') + chalk.yellow(BOX.H.repeat(colWidth - 1));
+                } else {
+                    return chalk.yellow(BOX.H.repeat(mid)) + chalk.yellow(BOX.H.repeat(colWidth - mid));
+                }
+            }
+            if (i === toIdx) {
+                if (isLeft) {
+                    return chalk.yellow(BOX.H.repeat(mid)) + chalk.yellow(BOX.H.repeat(colWidth - mid));
+                } else {
+                    return chalk.yellow(BOX.H.repeat(colWidth - 1)) + chalk.yellow('▶');
+                }
+            }
+            if (i > minIdx && i < maxIdx) {
+                return chalk.yellow(BOX.H.repeat(colWidth));
+            }
+            return ' '.repeat(mid) + chalk.gray(BOX.V) + ' '.repeat(colWidth - mid - 1);
         });
 
-        const labelStr = `  ${msg.label.slice(0, termWidth - 4)}  `.slice(0, termWidth);
-        lines.push('');
+        const labelStr = chalk.bold.white(msg.label.slice(0, termWidth - 4));
         lines.push(`  ${labelStr}`);
         lines.push('  ' + rowParts.join(''));
-        lines.push('');
+        lines.push(renderLifelines());
     }
+
+    // Bottom footer (participants again)
+    lines.push(footer);
 
     return lines.join('\n');
 }
@@ -188,13 +218,13 @@ function renderFlowchart(spec: string, termWidth = 100): string {
         const padding = ' ';
 
         if (node.shape === 'diamond') {
-            lines.push(`  ◇ ${label}`);
+            lines.push(`  ` + chalk.magenta(`◇ ${label}`));
         } else if (node.shape === 'round') {
-            lines.push(`  ╰──── ${label} ────╯`);
+            lines.push(`  ` + chalk.green(`╰──── ${label} ────╯`));
         } else {
-            lines.push(`  ${BOX.TL}${BOX.H.repeat(boxWidth)}${BOX.TR}`);
-            lines.push(`  ${BOX.V}${padding}${label}${padding}${BOX.V}`);
-            lines.push(`  ${BOX.BL}${BOX.H.repeat(boxWidth)}${BOX.BR}`);
+            lines.push(`  ` + chalk.blue(`${BOX.TL}${BOX.H.repeat(boxWidth)}${BOX.TR}`));
+            lines.push(`  ` + chalk.blue(`${BOX.V}`) + chalk.white(`${padding}${label}${padding}`) + chalk.blue(`${BOX.V}`));
+            lines.push(`  ` + chalk.blue(`${BOX.BL}${BOX.H.repeat(boxWidth)}${BOX.BR}`));
         }
 
         // Print edges FROM this node
@@ -203,10 +233,106 @@ function renderFlowchart(spec: string, termWidth = 100): string {
             const target = nodes.find((n) => n.id === edge.to);
             const targetLabel = target ? target.label : edge.to;
             const edgeLabel = edge.label ? ` [${edge.label}] ` : ' ';
-            lines.push(`       ${BOX.V}`);
-            lines.push(`       ${BOX.ARROW_R}${edgeLabel}${targetLabel}`);
+            lines.push(`       ` + chalk.gray(`${BOX.V}`));
+            lines.push(`       ` + chalk.yellow(`${BOX.ARROW_R}`) + chalk.gray(`${edgeLabel}`) + chalk.bold.white(`${targetLabel}`));
         }
 
+        lines.push('');
+    }
+
+    return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// ER Diagram renderer
+// ---------------------------------------------------------------------------
+
+interface ErEntity {
+    name: string;
+    attributes: string[];
+}
+
+interface ErRelationship {
+    entity1: string;
+    relationship: string;
+    entity2: string;
+    label?: string;
+}
+
+function parseErDiagram(spec: string): { entities: ErEntity[]; relationships: ErRelationship[] } {
+    const lines = spec.split('\n').map((l) => l.trim()).filter(Boolean);
+    const entities: Map<string, ErEntity> = new Map();
+    const relationships: ErRelationship[] = [];
+
+    // Simple entity: EntityName { ... }
+    // Relationship: Entity1 ||--o{ Entity2 : "label"
+    const relRe = /^(\w+)\s+([|{}o<>\-]+)\s+(\w+)(?:\s*:\s*["']?(.+?)["']?)?$/;
+
+    let currentEntity: string | null = null;
+
+    for (const line of lines) {
+        if (line.startsWith('erDiagram')) continue;
+
+        const relMatch = line.match(relRe);
+        if (relMatch) {
+            relationships.push({
+                entity1: relMatch[1],
+                relationship: relMatch[2],
+                entity2: relMatch[3],
+                label: relMatch[4],
+            });
+            if (!entities.has(relMatch[1])) entities.set(relMatch[1], { name: relMatch[1], attributes: [] });
+            if (!entities.has(relMatch[3])) entities.set(relMatch[3], { name: relMatch[3], attributes: [] });
+            continue;
+        }
+
+        if (line.includes('{')) {
+            currentEntity = line.split('{')[0].trim();
+            if (!entities.has(currentEntity)) entities.set(currentEntity, { name: currentEntity, attributes: [] });
+            continue;
+        }
+
+        if (line === '}') {
+            currentEntity = null;
+            continue;
+        }
+
+        if (currentEntity && !line.includes('}')) {
+            const attr = line.replace(/^\w+\s+/, '').trim(); // Remove type
+            entities.get(currentEntity)?.attributes.push(attr);
+        }
+    }
+
+    return { entities: Array.from(entities.values()), relationships };
+}
+
+function renderErDiagram(spec: string, termWidth = 100): string {
+    const { entities, relationships } = parseErDiagram(spec);
+    if (entities.length === 0) return renderGenericFallback(spec, termWidth);
+
+    const lines: string[] = [''];
+
+    for (const entity of entities) {
+        const maxWidth = Math.max(entity.name.length, ...entity.attributes.map(a => a.length)) + 4;
+        const hr = BOX.H.repeat(maxWidth);
+
+        lines.push(`  ` + chalk.green(`${BOX.TL}${hr}${BOX.TR}`));
+        lines.push(`  ` + chalk.green(`${BOX.V}`) + chalk.bold.white(` ${entity.name.padEnd(maxWidth - 2)} `) + chalk.green(`${BOX.V}`));
+        lines.push(`  ` + chalk.green(`${BOX.V}${BOX.H.repeat(maxWidth)}${BOX.V}`));
+
+        for (const attr of entity.attributes) {
+            lines.push(`  ` + chalk.green(`${BOX.V}`) + chalk.gray(` ${attr.padEnd(maxWidth - 2)} `) + chalk.green(`${BOX.V}`));
+        }
+
+        lines.push(`  ` + chalk.green(`${BOX.BL}${hr}${BOX.BR}`));
+
+        // Print relationships
+        const entityRels = relationships.filter(r => r.entity1 === entity.name);
+        for (const rel of entityRels) {
+            const label = rel.label ? ` (${rel.label}) ` : ' ';
+            lines.push(`       ` + chalk.gray(`${BOX.V}`));
+            lines.push(`       ` + chalk.yellow(`${rel.relationship}`) + chalk.gray(`${label}`) + chalk.bold.white(`${rel.entity2}`));
+        }
         lines.push('');
     }
 
@@ -221,14 +347,17 @@ function renderGenericFallback(spec: string, termWidth = 100): string {
     const hr = '─'.repeat(Math.min(termWidth - 4, 60));
     const lines = [
         '',
-        `  ╭${hr}╮`,
-        `  │ ⚠ ASCII fallback — diagram source:`,
-        `  │`,
+        `  ` + chalk.red(`╭${hr}╮`),
+        `  ` + chalk.red(`│`) + chalk.bold.red(` ⚠ ASCII fallback — diagram source:`) + chalk.red(` │`),
+        `  ` + chalk.red(`│`) + ' '.repeat(hr.length) + chalk.red(`│`),
         ...spec
             .split('\n')
             .slice(0, 30)
-            .map((l) => `  │ ${l}`),
-        `  ╰${hr}╯`,
+            .map((l) => {
+                const line = l.slice(0, hr.length - 2).padEnd(hr.length - 2);
+                return `  ` + chalk.red(`│`) + ` ${chalk.gray(line)} ` + chalk.red(`│`);
+            }),
+        `  ` + chalk.red(`╰${hr}╯`),
         '',
     ];
     return lines.join('\n');
@@ -248,11 +377,14 @@ function renderGenericFallback(spec: string, termWidth = 100): string {
 export function renderMermaidAscii(spec: string, termWidth = 100): string {
     const stripped = spec.trim().toLowerCase();
 
-    if (stripped.startsWith('sequencediagram')) {
+    if (stripped.startsWith('equencediagram')) {
         return renderSequenceDiagram(spec, termWidth);
     }
     if (stripped.startsWith('graph') || stripped.startsWith('flowchart')) {
         return renderFlowchart(spec, termWidth);
+    }
+    if (stripped.startsWith('erdiagram')) {
+        return renderErDiagram(spec, termWidth);
     }
 
     // For unsupported types fall back to code display
