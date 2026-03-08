@@ -138,6 +138,14 @@ describe('<ShellToolMessage />', () => {
         undefined,
       ],
       [
+        'renders in Cancelled state with partial output',
+        {
+          status: CoreToolCallStatus.Cancelled,
+          resultDisplay: 'Partial output before cancellation',
+        },
+        undefined,
+      ],
+      [
         'renders in Alternate Buffer mode while focused',
         {
           status: CoreToolCallStatus.Executing,
@@ -187,7 +195,7 @@ describe('<ShellToolMessage />', () => {
       [
         'uses ACTIVE_SHELL_MAX_LINES when availableTerminalHeight is large',
         100,
-        ACTIVE_SHELL_MAX_LINES,
+        ACTIVE_SHELL_MAX_LINES - 3,
         false,
       ],
       [
@@ -199,7 +207,7 @@ describe('<ShellToolMessage />', () => {
       [
         'defaults to ACTIVE_SHELL_MAX_LINES in alternate buffer when availableTerminalHeight is undefined',
         undefined,
-        ACTIVE_SHELL_MAX_LINES,
+        ACTIVE_SHELL_MAX_LINES - 3,
         false,
       ],
     ])('%s', async (_, availableTerminalHeight, expectedMaxLines, focused) => {
@@ -293,8 +301,8 @@ describe('<ShellToolMessage />', () => {
       await waitUntilReady();
       await waitFor(() => {
         const frame = lastFrame();
-        // Should still be constrained to ACTIVE_SHELL_MAX_LINES (15) because isExpandable is false
-        expect(frame.match(/Line \d+/g)?.length).toBe(15);
+        // Should still be constrained to 12 (15 - 3) because isExpandable is false
+        expect(frame.match(/Line \d+/g)?.length).toBe(12);
       });
       expect(lastFrame()).toMatchSnapshot();
       unmount();

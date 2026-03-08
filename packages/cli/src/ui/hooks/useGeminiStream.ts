@@ -35,7 +35,6 @@ import {
   CoreEvent,
   CoreToolCallStatus,
   buildUserSteeringHintPrompt,
-  generateSteeringAckMessage,
   GeminiCliOperation,
   getPlanModeExitMessage,
 } from '@google/gemini-cli-core';
@@ -597,7 +596,10 @@ export const useGeminiStream = (
       if (!isLowErrorVerbosity || config.getDebugMode()) {
         return;
       }
-      if (lowVerbosityFailureNoteShownRef.current) {
+      if (
+        lowVerbosityFailureNoteShownRef.current ||
+        suppressedToolErrorNoteShownRef.current
+      ) {
         return;
       }
 
@@ -903,17 +905,14 @@ export const useGeminiStream = (
   );
 
   const handleThoughtEvent = useCallback(
-    (eventValue: ThoughtSummary, userMessageTimestamp: number) => {
+    (eventValue: ThoughtSummary, _userMessageTimestamp: number) => {
       setThought(eventValue);
 
       if (getInlineThinkingMode(settings) === 'full') {
-        addItem(
-          {
-            type: 'thinking',
-            thought: eventValue,
-          } as HistoryItemThinking,
-          userMessageTimestamp,
-        );
+        addItem({
+          type: 'thinking',
+          thought: eventValue,
+        } as HistoryItemThinking);
       }
     },
     [addItem, settings, setThought],
@@ -1374,6 +1373,9 @@ export const useGeminiStream = (
           if (!options?.isContinuation) {
             setModelSwitchedFromQuotaError(false);
             config.setQuotaErrorOccurred(false);
+            config.resetBillingTurnState(
+              settings.merged.billing?.overageStrategy,
+            );
             suppressedToolErrorCountRef.current = 0;
             suppressedToolErrorNoteShownRef.current = false;
             lowVerbosityFailureNoteShownRef.current = false;
@@ -1534,6 +1536,7 @@ export const useGeminiStream = (
       setThought,
       maybeAddSuppressedToolErrorNote,
       maybeAddLowVerbosityFailureNote,
+      settings.merged.billing?.overageStrategy,
     ],
   );
 
@@ -1761,18 +1764,6 @@ export const useGeminiStream = (
           responsesToSend.unshift({
             text: buildUserSteeringHintPrompt(hintText),
           });
-          void generateSteeringAckMessage(
-            config.getBaseLlmClient(),
-            hintText,
-          ).then((ackText) => {
-            addItem({
-              type: 'info',
-              icon: '· ',
-              color: theme.text.secondary,
-              marginBottom: 1,
-              text: ackText,
-            } as HistoryItemInfo);
-          });
         }
       }
 
@@ -1809,7 +1800,6 @@ export const useGeminiStream = (
       addItem,
       registerBackgroundShell,
       consumeUserHint,
-      config,
       isLowErrorVerbosity,
       maybeAddSuppressedToolErrorNote,
       maybeAddLowVerbosityFailureNote,
