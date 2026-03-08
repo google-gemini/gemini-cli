@@ -227,8 +227,9 @@ export class WorkspaceContext {
    * if it did exist.
    */
   private fullyResolvedPath(pathToCheck: string): string {
+    const fullPath = path.resolve(this.targetDir, pathToCheck);
     try {
-      return fs.realpathSync(path.resolve(this.targetDir, pathToCheck));
+      return fs.realpathSync(fullPath);
     } catch (e: unknown) {
       if (
         isNodeError(e) &&
@@ -238,8 +239,16 @@ export class WorkspaceContext {
         // non-existent files.
         !this.isFileSymlink(e.path)
       ) {
-        // If it doesn't exist, e.path contains the fully resolved path.
-        return e.path;
+        // e.path only contains the path up to the last existing segment,
+        // which truncates the rest on UNC paths (e.g. WSL \\wsl.localhost\...).
+        // Append the remaining non-existent segments from the original path
+        // to preserve the full intended path.
+        const resolvedPrefix = e.path;
+        const remainder = fullPath.substring(resolvedPrefix.length);
+        if (remainder) {
+          return resolvedPrefix + remainder;
+        }
+        return resolvedPrefix;
       }
       throw e;
     }

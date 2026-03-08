@@ -162,6 +162,30 @@ describe('WorkspaceContext with real filesystem', () => {
       );
     });
 
+    it('should accept deeply nested non-existent paths within workspace', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const deepPath = path.join(
+        cwd,
+        'nonexistent',
+        'deeply',
+        'nested',
+        'file.txt',
+      );
+      expect(workspaceContext.isPathWithinWorkspace(deepPath)).toBe(true);
+    });
+
+    it('should reject deeply nested non-existent paths outside workspace', () => {
+      const workspaceContext = new WorkspaceContext(cwd);
+      const deepPath = path.join(
+        tempDir,
+        'outside',
+        'deeply',
+        'nested',
+        'file.txt',
+      );
+      expect(workspaceContext.isPathWithinWorkspace(deepPath)).toBe(false);
+    });
+
     describe.skipIf(os.platform() === 'win32')('with symbolic link', () => {
       describe('in the workspace', () => {
         let realDir: string;
