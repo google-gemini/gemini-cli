@@ -46,8 +46,8 @@ export async function renderMermaidToPng(
     try {
         const page = await browser.newPage();
 
-        // Set viewport wide enough so Mermaid doesn't wrap
-        await page.setViewport({ width: widthPx + 48, height: 1200, deviceScaleFactor: 2 });
+        // Set viewport wide enough so Mermaid doesn't wrap, and TALL enough so it doesn't crop
+        await page.setViewport({ width: widthPx + 48, height: 3000, deviceScaleFactor: 2 });
 
         // Block external requests other than jsdelivr (Mermaid CDN)
         await page.setRequestInterception(true);
@@ -77,18 +77,18 @@ export async function renderMermaidToPng(
         await page.waitForFunction(
             () => {
                 const svg = document.querySelector('.mermaid svg');
-                return svg && svg.getBoundingClientRect().width > 0;
+                return svg && (svg as HTMLElement).getBoundingClientRect().width > 0;
             },
             { timeout: 10_000 },
         );
 
-        // Screenshot the SVG element (high-DPI)
-        const svgElement = await page.$('.mermaid svg');
-        if (!svgElement) {
-            throw new Error('Mermaid SVG not found in page. Spec may be invalid.');
+        // Screenshot the container (includes padding and ensures full diagram is captured)
+        const container = await page.$('#container');
+        if (!container) {
+            throw new Error('Diagram container not found.');
         }
 
-        const screenshotBuffer = await svgElement.screenshot({
+        const screenshotBuffer = await container.screenshot({
             type: 'png',
             omitBackground: theme !== 'default',
         });
