@@ -747,7 +747,8 @@ export const useGeminiStream = (
           if (slashCommandResult) {
             switch (slashCommandResult.type) {
               case 'schedule_tool': {
-                const { toolName, toolArgs } = slashCommandResult;
+                const { toolName, toolArgs, postSubmitPrompt } =
+                  slashCommandResult;
                 const toolCallRequest: ToolCallRequestInfo = {
                   callId: `${toolName}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
                   name: toolName,
@@ -756,6 +757,15 @@ export const useGeminiStream = (
                   prompt_id,
                 };
                 await scheduleToolCalls([toolCallRequest], abortSignal);
+
+                if (postSubmitPrompt) {
+                  localQueryToSendToGemini = postSubmitPrompt;
+                  return {
+                    queryToSend: localQueryToSendToGemini,
+                    shouldProceed: true,
+                  };
+                }
+
                 return { queryToSend: null, shouldProceed: false };
               }
               case 'submit_prompt': {

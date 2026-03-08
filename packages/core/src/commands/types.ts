@@ -12,6 +12,11 @@ export interface ToolActionReturn {
   type: 'tool';
   toolName: string;
   toolArgs: Record<string, unknown>;
+  /**
+   * Optional content to be submitted as a prompt to the Gemini model
+   * after the tool call completes.
+   */
+  postSubmitPrompt?: PartListUnion;
 }
 
 /**
