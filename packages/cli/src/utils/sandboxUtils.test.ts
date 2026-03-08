@@ -11,6 +11,7 @@ import { readFile } from 'node:fs/promises';
 import {
   getContainerPath,
   parseImageName,
+  splitImageTag,
   ports,
   sanitizeDebugPort,
   entrypoint,
@@ -73,6 +74,54 @@ describe('sandboxUtils', () => {
       expect(parseImageName('gcr.io/my-project/my-image:v1')).toBe(
         'my-image-v1',
       );
+    });
+
+    it('should handle registry with port', () => {
+      expect(parseImageName('localhost:5000/sandbox:latest')).toBe(
+        'sandbox-latest',
+      );
+    });
+
+    it('should handle registry with port and no tag', () => {
+      expect(parseImageName('localhost:5000/sandbox')).toBe('sandbox');
+    });
+  });
+
+  describe('splitImageTag', () => {
+    it('should split standard image:tag', () => {
+      expect(splitImageTag('ubuntu:latest')).toEqual(['ubuntu', 'latest']);
+    });
+
+    it('should handle image with no tag', () => {
+      expect(splitImageTag('ubuntu')).toEqual(['ubuntu', undefined]);
+    });
+
+    it('should handle registry path with tag', () => {
+      expect(splitImageTag('gcr.io/my-project/my-image:v1')).toEqual([
+        'gcr.io/my-project/my-image',
+        'v1',
+      ]);
+    });
+
+    it('should handle registry with port and tag', () => {
+      expect(splitImageTag('localhost:5000/sandbox:latest')).toEqual([
+        'localhost:5000/sandbox',
+        'latest',
+      ]);
+    });
+
+    it('should handle registry with port and no tag', () => {
+      expect(splitImageTag('localhost:5000/sandbox')).toEqual([
+        'localhost:5000/sandbox',
+        undefined,
+      ]);
+    });
+
+    it('should handle registry with port, nested path, and tag', () => {
+      expect(splitImageTag('myregistry.io:5000/org/my-image:v2.1')).toEqual([
+        'myregistry.io:5000/org/my-image',
+        'v2.1',
+      ]);
     });
   });
 

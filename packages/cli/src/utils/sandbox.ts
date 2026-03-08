@@ -32,6 +32,7 @@ import {
   getContainerPath,
   shouldUseCurrentUserInSandbox,
   parseImageName,
+  splitImageTag,
   ports,
   sanitizeDebugPort,
   entrypoint,
@@ -1070,8 +1071,8 @@ async function imageExists(sandbox: string, image: string): Promise<boolean> {
         // console.warn(`'${sandbox} images -q ${image}' exited with code ${code}.`);
       }
       if (sandbox === 'udocker') {
-        const [targetRepo, targetTag = 'latest'] = image.split(':');
-        const targetImage = `${targetRepo}:${targetTag}`;
+        const [targetRepo, targetTag] = splitImageTag(image);
+        const targetImage = `${targetRepo}:${targetTag ?? 'latest'}`;
         const lines = stdoutData
           .trim()
           .split('\n')

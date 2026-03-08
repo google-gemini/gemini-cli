@@ -71,8 +71,41 @@ export async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
   return false; // Default to false if no other condition is met
 }
 
+/**
+ * Splits a Docker image reference into its repository and tag parts.
+ *
+ * Uses `lastIndexOf(':')` to find the tag separator, but guards against
+ * interpreting a port number as a tag by checking whether the substring
+ * after the last colon contains a `/` (which would indicate it is part
+ * of the registry path, not a tag).
+ *
+ * Examples:
+ *   'ubuntu:latest'                  → ['ubuntu', 'latest']
+ *   'localhost:5000/sandbox:latest'  → ['localhost:5000/sandbox', 'latest']
+ *   'localhost:5000/sandbox'         → ['localhost:5000/sandbox', undefined]
+ *   'ubuntu'                         → ['ubuntu', undefined]
+ */
+export function splitImageTag(
+  image: string,
+): [repo: string, tag: string | undefined] {
+  const lastColon = image.lastIndexOf(':');
+  if (lastColon === -1) {
+    return [image, undefined];
+  }
+
+  const possibleTag = image.slice(lastColon + 1);
+
+  // If the part after the last colon contains a '/', it's not a tag
+  // (e.g. 'localhost:5000/sandbox' → port, not tag).
+  if (possibleTag.includes('/')) {
+    return [image, undefined];
+  }
+
+  return [image.slice(0, lastColon), possibleTag];
+}
+
 export function parseImageName(image: string): string {
-  const [fullName, tag] = image.split(':');
+  const [fullName, tag] = splitImageTag(image);
   const name = fullName.split('/').at(-1) ?? 'unknown-image';
   return tag ? `${name}-${tag}` : name;
 }
