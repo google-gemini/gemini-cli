@@ -21,16 +21,12 @@ export function buildMermaidHtml(spec: string, theme: Theme, widthPx: number): s
       background: ${theme === 'dark' ? '#1e1e2e' : '#ffffff'};
       margin: 0;
       padding: 0;
-      width: ${widthPx}px;
-      display: inline-block;
-      overflow: hidden;
+      overflow: visible;
     }
     #container {
-      padding: 48px;
-      padding-bottom: 120px; /* Extra buffer to ensure no bottom clipping */
+      padding: 50px;
       display: inline-block;
-      width: 100%;
-      min-height: 100px;
+      overflow: visible;
     }
     .mermaid {
       display: inline-block;

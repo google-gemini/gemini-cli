@@ -76,23 +76,26 @@ export async function renderMermaidToPng(
             { timeout: 20_000 },
         );
 
-        // Give it a tiny bit more for layout settling
-        await page.evaluate(() => new Promise(r => setTimeout(r, 200)));
+        // Give it a substantial beat for layout, fonts, and SVG settling
+        await page.evaluate(() => new Promise(r => setTimeout(r, 500)));
 
-        // DYNAMICALY SIZE THE VIEWPORT TO THE CONTENT
-        // This is the key to preventing cropping for very tall/wide diagrams
+        // MEASURE THE ACTUAL SCROLL DIMENSIONS
+        // Using scrollWidth/Height is more robust for content that might overflow
         const dimensions = await page.evaluate(() => {
-            const container = document.querySelector('#container');
+            const container = document.querySelector('#container') as HTMLElement;
             if (!container) return null;
-            const rect = container.getBoundingClientRect();
-            // Add a bit of buffer
+
+            // Force layout recalculation
+            container.style.display = 'inline-block';
+
             return {
-                width: Math.ceil(rect.width) + 20,
-                height: Math.ceil(rect.height) + 20
+                width: Math.ceil(container.scrollWidth) + 10,
+                height: Math.ceil(container.scrollHeight) + 10
             };
         });
 
         if (dimensions) {
+            // Resize the viewport to the exact size of the content
             await page.setViewport({
                 width: dimensions.width,
                 height: dimensions.height,
@@ -100,15 +103,11 @@ export async function renderMermaidToPng(
             });
         }
 
-        const container = await page.$('#container');
-        if (!container) {
-            throw new Error('Diagram container not found.');
-        }
-
-        const screenshotBuffer = await container.screenshot({
+        // Take a full-page screenshot of the newly sized viewport
+        const screenshotBuffer = await page.screenshot({
             type: 'png',
+            fullPage: true,
             omitBackground: theme !== 'default',
-            captureBeyondViewport: true, // Safety net
         });
 
         return Buffer.from(screenshotBuffer);
