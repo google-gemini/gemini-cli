@@ -33,6 +33,7 @@ export interface BaseSelectionListProps<
   wrapAround?: boolean;
   focusKey?: string;
   priority?: boolean;
+  selectedIndicator?: string;
   renderItem: (item: TItem, context: RenderItemContext) => React.ReactNode;
 }
 
@@ -65,6 +66,7 @@ export function BaseSelectionList<
   wrapAround = true,
   focusKey,
   priority,
+  selectedIndicator = '●',
   renderItem,
 }: BaseSelectionListProps<T, TItem>): React.JSX.Element {
   const { activeIndex } = useSelectionList({
@@ -148,7 +150,7 @@ export function BaseSelectionList<
                 color={isSelected ? theme.ui.focus : theme.text.primary}
                 aria-hidden
               >
-                {isSelected ? '●' : ' '}
+                {isSelected ? selectedIndicator : ' '}
               </Text>
             </Box>
 

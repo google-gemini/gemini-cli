@@ -213,8 +213,7 @@ function selectionListReducer(
     case 'INITIALIZE': {
       const { initialIndex, items, wrapAround } = action.payload;
       const activeKey =
-        initialIndex === state.initialIndex &&
-        state.activeIndex !== state.initialIndex
+        initialIndex === state.initialIndex
           ? state.items[state.activeIndex]?.key
           : undefined;
 
