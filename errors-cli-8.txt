@@ -1,0 +1,6 @@
+﻿src/ui/components/Composer.tsx(133,62): error TS2339: Property 'info' does not exist on type '{ error: string; success: string; warning: string; }'.
+src/ui/components/HistoryItemDisplay.tsx(81,10): error TS2741: Property 'terminalWidth' is missing in type '{ thought: ThoughtSummary; isFirstThinking: boolean; }' but required in type 'ThinkingMessageProps'.
+src/ui/components/messages/TaskNode.tsx(14,42): error TS6196: 'HistoryItem' is declared but never used.
+src/ui/components/messages/TaskNode.tsx(44,3): error TS2578: Unused '@ts-expect-error' directive.
+src/ui/components/messages/TaskNode.tsx(46,45): error TS2353: Object literal may only specify known properties, and 'status' does not exist in type 'HistoryItemToolGroup | (HistoryItemBase & { type: "tool_group"; tools: IndividualToolCallDisplay[]; borderTop?: boolean | undefined; borderBottom?: boolean | undefined; borderColor?: string | undefined; borderDimColor?: boolean | undefined; } & { ...; }) | { ...; }'.
+src/ui/components/messages/TaskTreeDisplay.tsx(11,1): error TS6133: 'TrackedToolCall' is declared but its value is never read.

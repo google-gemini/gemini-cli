@@ -14,7 +14,9 @@ import {
   Scheduler,
   type EditorType,
   type ToolCallsUpdateMessage,
+  type ToolLiveOutput,
   CoreToolCallStatus,
+  SHELL_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import { useCallback, useState, useMemo, useEffect, useRef } from 'react';
 
@@ -272,7 +274,6 @@ function adaptToolCalls(
   return coreCalls.map((coreCall): TrackedToolCall => {
     const prev = prevMap.get(coreCall.request.callId);
     const responseSubmittedToGemini = prev?.responseSubmittedToGemini ?? false;
-
     let status = coreCall.status;
     // If a tool call has completed but scheduled a tail call, it is in a transitional
     // state. Force the UI to render it as "executing".
@@ -280,15 +281,37 @@ function adaptToolCalls(
       (status === CoreToolCallStatus.Success ||
         status === CoreToolCallStatus.Error) &&
       'tailToolCallRequest' in coreCall &&
-      coreCall.tailToolCallRequest != null
+      (coreCall as TrackedCompletedToolCall | TrackedExecutingToolCall)
+        .tailToolCallRequest != null
     ) {
       status = CoreToolCallStatus.Executing;
+    }
+
+    let liveOutput: ToolLiveOutput | undefined = undefined;
+    if (coreCall.status === CoreToolCallStatus.Executing) {
+      liveOutput = (coreCall as TrackedExecutingToolCall).liveOutput;
+    }
+
+    // Apply ring buffer to shell tool live output
+    const MAX_LINES = 1000;
+    if (
+      coreCall.status === CoreToolCallStatus.Executing &&
+      coreCall.request.name === SHELL_TOOL_NAME &&
+      typeof liveOutput === 'string'
+    ) {
+      const lines = liveOutput.split('\n');
+      if (lines.length > MAX_LINES) {
+        liveOutput =
+          `(... truncated ${lines.length - MAX_LINES} lines ...)\n` +
+          lines.slice(-MAX_LINES).join('\n');
+      }
     }
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return {
       ...coreCall,
       status,
+      liveOutput,
       responseSubmittedToGemini,
     } as TrackedToolCall;
   });

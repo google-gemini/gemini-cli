@@ -97,6 +97,10 @@ export enum Command {
   CLEAR_SCREEN = 'app.clearScreen',
   RESTART_APP = 'app.restart',
   SUSPEND_APP = 'app.suspend',
+
+  // Task Tree
+  TREE_EXPAND = 'tree.expand',
+  TREE_COLLAPSE = 'tree.collapse',
 }
 
 /**
@@ -257,6 +261,10 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
   [Command.RESTART_APP]: [{ key: 'r' }, { key: 'r', shift: true }],
   [Command.SUSPEND_APP]: [{ key: 'z', ctrl: true }],
+
+  // Task Tree
+  [Command.TREE_EXPAND]: [{ key: 'right' }],
+  [Command.TREE_COLLAPSE]: [{ key: 'left' }],
 };
 
 interface CommandCategory {
@@ -485,4 +493,6 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
   [Command.RESTART_APP]: 'Restart the application.',
   [Command.SUSPEND_APP]: 'Suspend the CLI and move it to the background.',
+  [Command.TREE_EXPAND]: 'Expand the currently focused task node.',
+  [Command.TREE_COLLAPSE]: 'Collapse the currently focused task node.',
 };

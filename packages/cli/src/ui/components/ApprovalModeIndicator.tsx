@@ -45,6 +45,13 @@ export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
       textContent = 'YOLO';
       subText = yoloHint;
       break;
+    case ApprovalMode.STEP:
+      textColor = theme.status.warning;
+      textContent = 'step-through';
+      subText = allowPlanMode
+        ? `${cycleHint} to plan`
+        : `${cycleHint} to manual`;
+      break;
     case ApprovalMode.DEFAULT:
     default:
       textColor = theme.text.accent;

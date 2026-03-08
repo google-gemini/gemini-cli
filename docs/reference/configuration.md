@@ -104,10 +104,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`general.defaultApprovalMode`** (enum):
   - **Description:** The default approval mode for tool execution. 'default'
-    prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is
-    read-only mode. 'yolo' is not supported yet.
+    prompts for approval, 'auto_edit' auto-approves edit tools, 'plan' is
+    read-only mode, and 'step' enables interactive task visualization and tool
+    stepping. 'yolo' is not supported yet.
   - **Default:** `"default"`
-  - **Values:** `"default"`, `"auto_edit"`, `"plan"`
+  - **Values:** `"default"`, `"auto_edit"`, `"plan"`, `"step"`
 
 - **`general.devtools`** (boolean):
   - **Description:** Enable DevTools inspector on launch.
@@ -332,6 +333,16 @@ their corresponding top-level category object in your `settings.json` file.
     fully shown (full).
   - **Default:** `"low"`
   - **Values:** `"low"`, `"full"`
+
+- **`ui.verbosityLevel`** (enum):
+  - **Description:** Global verbosity level for tool outputs and progress.
+  - **Default:** `"standard"`
+  - **Values:** `"quiet"`, `"standard"`, `"verbose"`, `"debug"`
+
+- **`ui.verbosityOverrides`** (object):
+  - **Description:** Per-tool or per-category verbosity overrides (e.g.,
+    {"shell": "verbose"}).
+  - **Default:** `{}`
 
 - **`ui.customWittyPhrases`** (array):
   - **Description:** Custom witty phrases to display during loading. When
@@ -1029,6 +1040,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable task tracker tools.
   - **Default:** `false`
   - **Requires restart:** Yes
+
+- **`experimental.taskTree`** (boolean):
+  - **Description:** Enable experimental task tree visualization UI in the
+    terminal.
+  - **Default:** `false`
 
 - **`experimental.modelSteering`** (boolean):
   - **Description:** Enable model steering (user hints) to guide the model

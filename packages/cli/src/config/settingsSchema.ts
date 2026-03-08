@@ -204,13 +204,15 @@ const SETTINGS_SCHEMA = {
         description: oneLine`
           The default approval mode for tool execution.
           'default' prompts for approval, 'auto_edit' auto-approves edit tools,
-          and 'plan' is read-only mode. 'yolo' is not supported yet.
+          'plan' is read-only mode, and 'step' enables interactive task visualization and tool stepping.
+          'yolo' is not supported yet.
         `,
         showInDialog: true,
         options: [
           { value: 'default', label: 'Default' },
           { value: 'auto_edit', label: 'Auto Edit' },
           { value: 'plan', label: 'Plan' },
+          { value: 'step', label: 'Step' },
         ],
       },
       devtools: {
@@ -746,6 +748,41 @@ const SETTINGS_SCHEMA = {
           { value: 'low', label: 'Low' },
           { value: 'full', label: 'Full' },
         ],
+      },
+      verbosityLevel: {
+        type: 'enum',
+        label: 'Verbosity Level',
+        category: 'UI',
+        requiresRestart: false,
+        default: 'standard',
+        description: 'Global verbosity level for tool outputs and progress.',
+        showInDialog: true,
+        options: [
+          { value: 'quiet', label: 'Quiet' },
+          { value: 'standard', label: 'Standard' },
+          { value: 'verbose', label: 'Verbose' },
+          { value: 'debug', label: 'Debug' },
+        ],
+      },
+      verbosityOverrides: {
+        type: 'object',
+        label: 'Verbosity Overrides',
+        category: 'UI',
+        requiresRestart: false,
+        default: {} as Record<string, string>,
+        description:
+          'Per-tool or per-category verbosity overrides (e.g., {"shell": "verbose"}).',
+        showInDialog: false,
+        additionalProperties: {
+          type: 'enum',
+          options: [
+            { value: 'quiet', label: 'Quiet' },
+            { value: 'standard', label: 'Standard' },
+            { value: 'verbose', label: 'Verbose' },
+            { value: 'debug', label: 'Debug' },
+          ],
+        },
+        mergeStrategy: MergeStrategy.SHALLOW_MERGE,
       },
       customWittyPhrases: {
         type: 'array',
@@ -1835,6 +1872,16 @@ const SETTINGS_SCHEMA = {
         default: false,
         description: 'Enable task tracker tools.',
         showInDialog: false,
+      },
+      taskTree: {
+        type: 'boolean',
+        label: 'Task Tree Visualization',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable experimental task tree visualization UI in the terminal.',
+        showInDialog: true,
       },
       modelSteering: {
         type: 'boolean',

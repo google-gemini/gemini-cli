@@ -14,6 +14,7 @@ import { GeminiMessage } from './messages/GeminiMessage.js';
 import { InfoMessage } from './messages/InfoMessage.js';
 import { ErrorMessage } from './messages/ErrorMessage.js';
 import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
+import { TaskTreeDisplay } from './messages/TaskTreeDisplay.js';
 import { GeminiMessageContent } from './messages/GeminiMessageContent.js';
 import { CompressionMessage } from './messages/CompressionMessage.js';
 import { WarningMessage } from './messages/WarningMessage.js';
@@ -115,7 +116,6 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       {itemForDisplay.type === 'info' && (
         <InfoMessage
           text={itemForDisplay.text}
-          secondaryText={itemForDisplay.secondaryText}
           icon={itemForDisplay.icon}
           color={itemForDisplay.color}
           marginBottom={itemForDisplay.marginBottom}
@@ -191,17 +191,26 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       {itemForDisplay.type === 'quit' && (
         <SessionSummaryDisplay duration={itemForDisplay.duration} />
       )}
-      {itemForDisplay.type === 'tool_group' && (
-        <ToolGroupMessage
-          item={itemForDisplay}
-          toolCalls={itemForDisplay.tools}
-          availableTerminalHeight={availableTerminalHeight}
-          terminalWidth={terminalWidth}
-          borderTop={itemForDisplay.borderTop}
-          borderBottom={itemForDisplay.borderBottom}
-          isExpandable={isExpandable}
-        />
-      )}
+      {itemForDisplay.type === 'tool_group' &&
+        (settings.merged.experimental?.taskTree ? (
+          <TaskTreeDisplay
+            toolCalls={itemForDisplay.tools}
+            availableTerminalHeight={availableTerminalHeight}
+            terminalWidth={terminalWidth}
+            isExpandable={isExpandable}
+            hasFocus={isPending}
+          />
+        ) : (
+          <ToolGroupMessage
+            item={itemForDisplay}
+            toolCalls={itemForDisplay.tools}
+            availableTerminalHeight={availableTerminalHeight}
+            terminalWidth={terminalWidth}
+            borderTop={itemForDisplay.borderTop}
+            borderBottom={itemForDisplay.borderBottom}
+            isExpandable={isExpandable}
+          />
+        ))}
       {itemForDisplay.type === 'compression' && (
         <CompressionMessage compression={itemForDisplay.compression} />
       )}

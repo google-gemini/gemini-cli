@@ -134,7 +134,7 @@ export const FocusHint: React.FC<{
 
 export type TextEmphasis = 'high' | 'medium' | 'low';
 
-type ToolStatusIndicatorProps = {
+export type ToolStatusIndicatorProps = {
   status: CoreToolCallStatus;
   name: string;
   isFocused?: boolean;
@@ -187,7 +187,7 @@ export const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
   );
 };
 
-type ToolInfoProps = {
+export type ToolInfoProps = {
   name: string;
   description: string;
   status: CoreToolCallStatus;

@@ -36,6 +36,7 @@ These commands are available within the interactive REPL.
 | `/memory reload`     | Reload context files (e.g., `GEMINI.md`) |
 | `/mcp reload`        | Restart and reload MCP servers           |
 | `/extensions reload` | Reload all active extensions             |
+| `/verbosity <level>` | Set UI verbosity for current session     |
 | `/help`              | Show help for all commands               |
 | `/quit`              | Exit the interactive session             |
 
@@ -50,7 +51,7 @@ These commands are available within the interactive REPL.
 | `--prompt`                       | `-p`  | string  | -         | Prompt text. Appended to stdin input if provided. **Deprecated:** Use positional arguments instead.                                                                    |
 | `--prompt-interactive`           | `-i`  | string  | -         | Execute prompt and continue in interactive mode                                                                                                                        |
 | `--sandbox`                      | `-s`  | boolean | `false`   | Run in a sandboxed environment for safer execution                                                                                                                     |
-| `--approval-mode`                | -     | string  | `default` | Approval mode for tool execution. Choices: `default`, `auto_edit`, `yolo`                                                                                              |
+| `--approval-mode`                | -     | string  | `default` | Approval mode for tool execution. Choices: `default`, `auto_edit`, `step`, `yolo`                                                                                      |
 | `--yolo`                         | `-y`  | boolean | `false`   | **Deprecated.** Auto-approve all actions. Use `--approval-mode=yolo` instead.                                                                                          |
 | `--experimental-acp`             | -     | boolean | -         | Start in ACP (Agent Code Pilot) mode. **Experimental feature.**                                                                                                        |
 | `--experimental-zed-integration` | -     | boolean | -         | Run in Zed editor integration mode. **Experimental feature.**                                                                                                          |

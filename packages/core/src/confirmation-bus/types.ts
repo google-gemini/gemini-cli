@@ -21,6 +21,8 @@ export enum MessageBusType {
   TOOL_CALLS_UPDATE = 'tool-calls-update',
   ASK_USER_REQUEST = 'ask-user-request',
   ASK_USER_RESPONSE = 'ask-user-response',
+  STEP_THROUGH_REQUEST = 'step-through-request',
+  STEP_THROUGH_RESPONSE = 'step-through-response',
 }
 
 export interface ToolCallsUpdateMessage {
@@ -178,6 +180,24 @@ export interface AskUserResponse {
   cancelled?: boolean;
 }
 
+export interface StepThroughRequest {
+  type: MessageBusType.STEP_THROUGH_REQUEST;
+  callId: string;
+  toolName: string;
+  input: string;
+  parentCallId?: string;
+  correlationId: string;
+  currentStep?: number;
+  totalSteps?: number;
+}
+
+export interface StepThroughResponse {
+  type: MessageBusType.STEP_THROUGH_RESPONSE;
+  correlationId: string;
+  callId: string;
+  action: 'run' | 'skip' | 'continue' | 'cancel';
+}
+
 export type Message =
   | ToolConfirmationRequest
   | ToolConfirmationResponse
@@ -187,4 +207,6 @@ export type Message =
   | UpdatePolicy
   | AskUserRequest
   | AskUserResponse
-  | ToolCallsUpdateMessage;
+  | ToolCallsUpdateMessage
+  | StepThroughRequest
+  | StepThroughResponse;

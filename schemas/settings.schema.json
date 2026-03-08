@@ -54,11 +54,11 @@
         },
         "defaultApprovalMode": {
           "title": "Default Approval Mode",
-          "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.",
-          "markdownDescription": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `default`",
+          "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, 'plan' is read-only mode, and 'step' enables interactive task visualization and tool stepping. 'yolo' is not supported yet.",
+          "markdownDescription": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, 'plan' is read-only mode, and 'step' enables interactive task visualization and tool stepping. 'yolo' is not supported yet.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `default`",
           "default": "default",
           "type": "string",
-          "enum": ["default", "auto_edit", "plan"]
+          "enum": ["default", "auto_edit", "plan", "step"]
         },
         "devtools": {
           "title": "DevTools",
@@ -453,6 +453,25 @@
           "default": "low",
           "type": "string",
           "enum": ["low", "full"]
+        },
+        "verbosityLevel": {
+          "title": "Verbosity Level",
+          "description": "Global verbosity level for tool outputs and progress.",
+          "markdownDescription": "Global verbosity level for tool outputs and progress.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `standard`",
+          "default": "standard",
+          "type": "string",
+          "enum": ["quiet", "standard", "verbose", "debug"]
+        },
+        "verbosityOverrides": {
+          "title": "Verbosity Overrides",
+          "description": "Per-tool or per-category verbosity overrides (e.g., {\"shell\": \"verbose\"}).",
+          "markdownDescription": "Per-tool or per-category verbosity overrides (e.g., {\"shell\": \"verbose\"}).\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["quiet", "standard", "verbose", "debug"]
+          }
         },
         "customWittyPhrases": {
           "title": "Custom Witty Phrases",
@@ -1721,6 +1740,13 @@
           "title": "Task Tracker",
           "description": "Enable task tracker tools.",
           "markdownDescription": "Enable task tracker tools.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "taskTree": {
+          "title": "Task Tree Visualization",
+          "description": "Enable experimental task tree visualization UI in the terminal.",
+          "markdownDescription": "Enable experimental task tree visualization UI in the terminal.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },

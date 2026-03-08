@@ -17,6 +17,7 @@ import { STATUS_INDICATOR_WIDTH } from './ToolShared.js';
 
 export interface SubagentProgressDisplayProps {
   progress: SubagentProgress;
+  hideToolCalls?: boolean;
 }
 
 const formatToolArgs = (args?: string): string => {
@@ -54,7 +55,7 @@ const formatToolArgs = (args?: string): string => {
 
 export const SubagentProgressDisplay: React.FC<
   SubagentProgressDisplayProps
-> = ({ progress }) => {
+> = ({ progress, hideToolCalls = false }) => {
   let headerText: string | undefined;
   let headerColor = theme.text.secondary;
 
@@ -97,7 +98,7 @@ export const SubagentProgressDisplay: React.FC<
                 </Box>
               </Box>
             );
-          } else if (item.type === 'tool_call') {
+          } else if (item.type === 'tool_call' && !hideToolCalls) {
             const statusSymbol =
               item.status === 'running' ? (
                 <Spinner type="dots" />

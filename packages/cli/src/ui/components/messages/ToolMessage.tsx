@@ -38,6 +38,7 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
   embeddedShellFocused?: boolean;
   ptyId?: number;
   config?: Config;
+  hideSubagentTools?: boolean;
 }
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({
@@ -60,6 +61,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   originalRequestName,
   progress,
   progressTotal,
+  hideSubagentTools = false,
 }) => {
   const isThisShellFocused = checkIsShellFocused(
     name,
@@ -133,6 +135,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           terminalWidth={terminalWidth}
           renderOutputAsMarkdown={renderOutputAsMarkdown}
           hasFocus={isThisShellFocused}
+          hideSubagentTools={hideSubagentTools}
         />
         {isThisShellFocused && config && (
           <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>

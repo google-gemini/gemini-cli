@@ -47,6 +47,8 @@ export interface ToolCallRequestInfo {
   traceId?: string;
   parentCallId?: string;
   schedulerId?: string;
+  retryCount?: number;
+  retryReason?: string;
 }
 
 export interface ToolCallResponseInfo {

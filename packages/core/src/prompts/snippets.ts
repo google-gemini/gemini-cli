@@ -48,6 +48,7 @@ export interface SystemPromptOptions {
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
   interactiveYoloMode?: boolean;
+  stepThroughEnabled?: boolean;
   gitRepo?: GitRepoOptions;
 }
 
@@ -131,6 +132,7 @@ ${options.taskTracker ? renderTaskTracker() : ''}
 ${renderOperationalGuidelines(options.operationalGuidelines)}
 
 ${renderInteractiveYoloMode(options.interactiveYoloMode)}
+${renderStepThroughMode(options.stepThroughEnabled)}
 
 ${renderSandbox(options.sandbox)}
 
@@ -400,6 +402,16 @@ You are operating in **autonomous mode**. The user has requested minimal interru
 - Make reasonable decisions based on context and existing code patterns
 - Follow established project conventions
 - If multiple valid approaches exist, choose the most robust option
+`.trim();
+}
+
+export function renderStepThroughMode(enabled?: boolean): string {
+  if (!enabled) return '';
+  return `
+# Step-Through Mode
+- **Paused Execution:** The user has enabled step-through mode. Every tool call you request will be paused for user inspection and manual approval.
+- **Expect Delays:** Expect significant delays between your tool requests and receiving their results.
+- **Stay Focused:** Take this time to ensure your tool calls are as precise and efficient as possible.
 `.trim();
 }
 

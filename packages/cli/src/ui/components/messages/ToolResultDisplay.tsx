@@ -37,6 +37,7 @@ export interface ToolResultDisplayProps {
   renderOutputAsMarkdown?: boolean;
   maxLines?: number;
   hasFocus?: boolean;
+  hideSubagentTools?: boolean;
 }
 
 interface FileDiffResult {
@@ -51,6 +52,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   renderOutputAsMarkdown = true,
   maxLines,
   hasFocus = false,
+  hideSubagentTools = false,
 }) => {
   const { renderMarkdown } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
@@ -173,7 +175,12 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
       </Text>
     );
   } else if (isSubagentProgress(truncatedResultDisplay)) {
-    content = <SubagentProgressDisplay progress={truncatedResultDisplay} />;
+    content = (
+      <SubagentProgressDisplay
+        progress={truncatedResultDisplay}
+        hideToolCalls={hideSubagentTools}
+      />
+    );
   } else if (
     typeof truncatedResultDisplay === 'string' &&
     renderOutputAsMarkdown

@@ -127,6 +127,8 @@ npm install -g @google/gemini-cli@nightly
   [Google Search](https://ai.google.dev/gemini-api/docs/grounding) for real-time
   information
 - Conversation checkpointing to save and resume complex sessions
+- **Interactive task tree visualization** to monitor complex multi-step agentic
+  flows
 - Custom context files (GEMINI.md) to tailor behavior for your projects
 
 ### GitHub Integration

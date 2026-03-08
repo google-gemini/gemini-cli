@@ -188,6 +188,11 @@ export class PromptProvider {
           () => true,
           isYoloMode && interactiveMode,
         ),
+        stepThroughEnabled: this.withSection(
+          'stepThrough',
+          () => true,
+          approvalMode === ApprovalMode.STEP && interactiveMode,
+        ),
         gitRepo: this.withSection(
           'git',
           () => ({ interactive: interactiveMode }),

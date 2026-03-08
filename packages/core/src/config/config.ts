@@ -109,7 +109,11 @@ import type { GenerateContentParameters } from '@google/genai';
 
 // Re-export OAuth config type
 export type { MCPOAuthConfig, AnyToolInvocation, AnyDeclarativeTool };
-import type { AnyToolInvocation, AnyDeclarativeTool } from '../tools/tools.js';
+import {
+  Kind,
+  type AnyToolInvocation,
+  type AnyDeclarativeTool,
+} from '../tools/tools.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { Storage } from './storage.js';
 import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
@@ -155,6 +159,14 @@ import { CheckerRunner } from '../safety/checker-runner.js';
 import { ContextBuilder } from '../safety/context-builder.js';
 import { CheckerRegistry } from '../safety/registry.js';
 import { ConsecaSafetyChecker } from '../safety/conseca/conseca.js';
+
+export interface UiSettings {
+  verbosityLevel?: 'quiet' | 'standard' | 'verbose' | 'debug';
+  verbosityOverrides?: Record<
+    string,
+    'quiet' | 'standard' | 'verbose' | 'debug'
+  >;
+}
 
 export interface AccessibilitySettings {
   /** @deprecated Use ui.loadingPhrases instead. */
@@ -588,6 +600,7 @@ export interface ConfigParameters {
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
   agents?: AgentSettings;
+  ui?: UiSettings;
   onReload?: () => Promise<{
     disabledSkills?: string[];
     adminSkillsEnabled?: boolean;
@@ -747,6 +760,7 @@ export class Config implements McpContext {
     | PolicyUpdateConfirmationRequest
     | undefined;
   private readonly outputSettings: OutputSettings;
+  private readonly ui: UiSettings;
 
   private readonly gemmaModelRouter: GemmaModelRouterSettings;
 
@@ -1004,6 +1018,10 @@ export class Config implements McpContext {
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
+    this.ui = {
+      verbosityLevel: params.ui?.verbosityLevel ?? 'standard',
+      verbosityOverrides: params.ui?.verbosityOverrides ?? {},
+    };
     this.gemmaModelRouter = {
       enabled: params.gemmaModelRouter?.enabled ?? false,
       classifier: {
@@ -1091,6 +1109,47 @@ export class Config implements McpContext {
 
   isInitialized(): boolean {
     return this.initialized;
+  }
+
+  getResolvedVerbosity(
+    toolName: string,
+    kind?: Kind,
+  ): 'quiet' | 'standard' | 'verbose' | 'debug' {
+    const overrides = this.ui.verbosityOverrides ?? {};
+
+    // 1. Specific tool name override (e.g., "run_shell_command": "verbose")
+    if (overrides[toolName]) return overrides[toolName];
+
+    // 2. Category override (e.g., "shell": "quiet")
+    if (kind) {
+      const category = this.getToolCategory(kind);
+      if (overrides[category]) return overrides[category];
+    }
+
+    // 3. Global level
+    return this.ui.verbosityLevel ?? 'standard';
+  }
+
+  private getToolCategory(kind: Kind): string {
+    switch (kind) {
+      case Kind.Read:
+      case Kind.Edit:
+      case Kind.Delete:
+      case Kind.Move:
+      case Kind.Search:
+        return 'file';
+      case Kind.Execute:
+        return 'shell';
+      case Kind.Agent:
+        return 'subagent';
+      case Kind.Fetch:
+      case Kind.Communicate:
+        return 'web';
+      case Kind.Plan:
+        return 'plan';
+      default:
+        return 'other';
+    }
   }
 
   /**

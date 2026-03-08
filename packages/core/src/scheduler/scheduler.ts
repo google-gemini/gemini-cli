@@ -11,6 +11,7 @@ import { resolveConfirmation } from './confirmation.js';
 import { checkPolicy, updatePolicy, getPolicyDenialError } from './policy.js';
 import { ToolExecutor } from './tool-executor.js';
 import { ToolModificationHandler } from './tool-modifier.js';
+import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import {
   type ToolCallRequestInfo,
   type ToolCall,
@@ -24,7 +25,7 @@ import {
   type ScheduledToolCall,
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
-import { PolicyDecision, type ApprovalMode } from '../policy/types.js';
+import { PolicyDecision, ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
@@ -39,6 +40,8 @@ import {
   MessageBusType,
   type SerializableConfirmationDetails,
   type ToolConfirmationRequest,
+  type StepThroughRequest,
+  type StepThroughResponse,
 } from '../confirmation-bus/types.js';
 import { runWithToolCallContext } from '../utils/toolCallContext.js';
 import {
@@ -270,6 +273,10 @@ export class Scheduler {
     this.state.cancelAllQueued('Operation cancelled by user');
   }
 
+  cancelCurrentTurn(): void {
+    this.cancelAll();
+  }
+
   get completedCalls(): CompletedToolCall[] {
     return this.state.completedBatch;
   }
@@ -470,10 +477,25 @@ export class Scheduler {
 
     let madeProgress = false;
     if (allReady && scheduledCalls.length > 0) {
-      const execResults = await Promise.all(
-        scheduledCalls.map((c) => this._execute(c, signal)),
+      const stepCalls = scheduledCalls.filter(
+        (c) => c.approvalMode === ApprovalMode.STEP,
       );
-      madeProgress = execResults.some((res) => res);
+      const nonStepCalls = scheduledCalls.filter(
+        (c) => c.approvalMode !== ApprovalMode.STEP,
+      );
+
+      if (nonStepCalls.length > 0) {
+        const execResults = await Promise.all(
+          nonStepCalls.map((c) => this._execute(c, signal)),
+        );
+        if (execResults.some((res) => res)) madeProgress = true;
+      }
+
+      for (const stepCall of stepCalls) {
+        if (this.isCancelling) break;
+        const execResult = await this._execute(stepCall, signal);
+        if (execResult) madeProgress = true;
+      }
     }
 
     // 3. Finalize terminal calls
@@ -640,6 +662,71 @@ export class Scheduler {
       );
       return false;
     }
+
+    if (toolCall.approvalMode === ApprovalMode.STEP) {
+      try {
+        const response = await this.messageBus.request<
+          StepThroughRequest,
+          StepThroughResponse
+        >(
+          {
+            type: MessageBusType.STEP_THROUGH_REQUEST,
+            callId,
+            toolName: toolCall.request.name,
+            input: safeJsonStringify(toolCall.request.args),
+            parentCallId: toolCall.request.parentCallId,
+            currentStep: this.state.completedBatch.length + 1,
+            totalSteps:
+              this.state.completedBatch.length +
+              this.state.allActiveCalls.length +
+              this.state.queueLength,
+          },
+          MessageBusType.STEP_THROUGH_RESPONSE,
+          2147483647, // Indefinite wait for user input
+        );
+
+        if (response.action === 'cancel') {
+          this.cancelCurrentTurn();
+          return false;
+        } else if (response.action === 'skip') {
+          this.state.updateStatus(callId, CoreToolCallStatus.Success, {
+            callId,
+            responseParts: [
+              {
+                text: JSON.stringify({
+                  skipped: true,
+                  toolName: toolCall.request.name,
+                  reason: 'user_skip',
+                }),
+              },
+            ],
+            resultDisplay: undefined,
+            error: undefined,
+            errorType: undefined,
+          });
+          return false;
+        } else if (response.action === 'continue') {
+          const activeCalls = this.state.allActiveCalls;
+          for (const call of activeCalls) {
+            if (call.approvalMode === ApprovalMode.STEP) {
+              call.approvalMode = ApprovalMode.DEFAULT;
+            }
+          }
+        }
+      } catch (error) {
+        this.state.updateStatus(
+          callId,
+          CoreToolCallStatus.Error,
+          createErrorResponse(
+            toolCall.request,
+            error instanceof Error ? error : new Error(String(error)),
+            ToolErrorType.UNHANDLED_EXCEPTION,
+          ),
+        );
+        return false;
+      }
+    }
+
     this.state.updateStatus(callId, CoreToolCallStatus.Executing);
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

@@ -129,6 +129,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     case ApprovalMode.DEFAULT:
       modeBleedThrough = null;
       break;
+    case ApprovalMode.STEP:
+      modeBleedThrough = { text: 'step', color: theme.text.primary };
+      break;
     default:
       checkExhaustive(showApprovalModeIndicator);
       modeBleedThrough = null;

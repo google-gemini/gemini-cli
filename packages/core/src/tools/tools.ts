@@ -598,6 +598,16 @@ export interface ToolResult {
 }
 
 /**
+ * Result returned when a tool call is explicitly skipped by the user (e.g. in step-through mode).
+ * Downstream consumers can check `skipped === true` to handle it appropriately.
+ */
+export interface SkippedToolResult extends ToolResult {
+  skipped: true;
+  toolName: string;
+  reason: string;
+}
+
+/**
  * Detects cycles in a JSON schemas due to `$ref`s.
  * @param schema The root of the JSON schema.
  * @returns `true` if a cycle is detected, `false` otherwise.
