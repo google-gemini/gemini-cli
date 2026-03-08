@@ -1380,10 +1380,6 @@ export const useGeminiStream = (
               spec,
               showMeta: false,
               stabilizeAscii: false,
-              // Explain/auto visuals are rendered inside history; keep graphics
-              // conservative so they remain readable and don't overflow layout.
-              graphicColScale: 0.86,
-              graphicRowScale: 0.45,
             });
             if (output) {
               const visualItem: HistoryItemWithoutId = {

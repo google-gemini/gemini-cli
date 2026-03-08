@@ -16,32 +16,6 @@ interface VisualMessageProps {
   terminalWidth: number;
 }
 
-function parseGraphicRows(
-  protocol: 'kitty' | 'iterm2' | 'sixel' | 'ascii',
-  output: string,
-): number {
-  if (protocol === 'ascii') {
-    return 0;
-  }
-
-  if (protocol === 'iterm2') {
-    const match = output.match(/height=(\d+)(?:;|:)/);
-    if (match?.[1]) {
-      return Number.parseInt(match[1], 10);
-    }
-  }
-
-  if (protocol === 'kitty') {
-    const match = output.match(/(?:^|[,;])r=(\d+)(?:[,;])/);
-    if (match?.[1]) {
-      return Number.parseInt(match[1], 10);
-    }
-  }
-
-  // Sixel does not carry a stable, parseable row count in the payload.
-  return protocol === 'sixel' ? 14 : 12;
-}
-
 function toPlainAnsiOutput(text: string): AnsiOutput {
   return text.split('\n').map((line) => [
     {
@@ -81,17 +55,8 @@ export const VisualMessage: React.FC<VisualMessageProps> = ({
     return toPlainAnsiOutput(output.replace(/\n+$/g, ''));
   }, [output, protocol]);
 
-  const reservedGraphicRows = useMemo(() => {
-    const rows = parseGraphicRows(protocol, output);
-    // Keep one extra row to ensure subsequent content starts below the image.
-    return Math.max(0, Math.min(120, rows + 1));
-  }, [output, protocol]);
-
   if (protocol !== 'ascii' || !ansiOutput) {
-    if (protocol === 'ascii') {
-      return null;
-    }
-    return <Box width={terminalWidth} height={reservedGraphicRows} />;
+    return null;
   }
 
   return (
