@@ -92,9 +92,24 @@ export const visualizeCommand: SlashCommand = {
         text: `Successfully visualized diagram from ${sourceLabel}.`,
       });
     } catch (err: unknown) {
+      // Dump full diagnostic to stderr so it's visible in the terminal
+      const { writeSync } = await import('node:fs');
+      writeSync(
+        2,
+        `\n[VISUALIZE DEBUG] typeof err: ${typeof err}\n` +
+          `[VISUALIZE DEBUG] instanceof Error: ${err instanceof Error}\n` +
+          `[VISUALIZE DEBUG] constructor: ${typeof err === 'object' && err !== null ? Object.getPrototypeOf(err)?.constructor?.name : 'N/A'}\n` +
+          `[VISUALIZE DEBUG] JSON.stringify: ${JSON.stringify(err, Object.getOwnPropertyNames(err instanceof Error ? err : Object(err)))}\n` +
+          `[VISUALIZE DEBUG] String: ${String(err)}\n` +
+          `[VISUALIZE DEBUG] stack: ${err instanceof Error ? err.stack : 'N/A'}\n`,
+      );
+
       let errMsg: string;
       if (err instanceof Error) {
         errMsg = err.message || err.toString();
+        if (err.stack) {
+          errMsg += `\n${err.stack}`;
+        }
       } else {
         try {
           errMsg = JSON.stringify(err);
