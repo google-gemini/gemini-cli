@@ -658,9 +658,16 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         streamingState === StreamingState.Responding ||
         streamingState === StreamingState.WaitingForConfirmation;
 
-      // Only skip Escape handling during generation if we are NOT in shell mode
-      // If we are in shell mode, we still need to process Escape to exit shell mode.
-      if (key.name === 'escape' && isGenerating && !shellModeActive) {
+      // Check if any interactive overlay is active that the user might want
+      // to dismiss with Escape. If so, let the keypress be handled locally
+      // instead of falling through to the global cancellation handler.
+      const isOverlayActive =
+        shellModeActive ||
+        reverseSearchActive ||
+        commandSearchActive ||
+        (completion.showSuggestions && isShellSuggestionsVisible);
+
+      if (key.name === 'escape' && isGenerating && !isOverlayActive) {
         return false;
       }
 
