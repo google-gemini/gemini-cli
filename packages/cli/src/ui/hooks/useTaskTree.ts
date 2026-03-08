@@ -145,8 +145,12 @@ export function useTaskTree(
   }, []);
 
   const collapseAll = useCallback(() => {
-    // Flatten the currently visible nodes (live or held) to collect all callIds.
-    const allCallIds = flattenVisibleNodes(nodes).map((n) => n.toolCall.callId);
+    const allCallIds: string[] = [];
+    function visit(node: TaskTreeNode) {
+      allCallIds.push(node.toolCall.callId);
+      node.children.forEach(visit);
+    }
+    nodes.forEach(visit);
     setCollapsedIds(new Set(allCallIds));
   }, [nodes]);
 
