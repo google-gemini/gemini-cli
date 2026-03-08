@@ -8,9 +8,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import os from 'node:os';
 import { spawn as cpSpawn } from 'node:child_process';
 import { killProcessGroup, SIGKILL_TIMEOUT_MS } from './process-utils.js';
+import { debugLogger } from './debugLogger.js';
 
 vi.mock('node:os');
 vi.mock('node:child_process');
+vi.mock('./debugLogger.js');
 
 describe('process-utils', () => {
   const mockProcessKill = vi
@@ -40,6 +42,30 @@ describe('process-utils', () => {
         '/t',
       ]);
       expect(mockProcessKill).not.toHaveBeenCalled();
+    });
+
+    it('should ignore and log error if taskkill fails to spawn', async () => {
+      vi.mocked(os.platform).mockReturnValue('win32');
+      const mockChild = { on: vi.fn() };
+      mockSpawn.mockReturnValue(
+        mockChild as unknown as ReturnType<typeof cpSpawn>,
+      );
+      const mockDebugLogger = vi.mocked(debugLogger.error);
+
+      await killProcessGroup({ pid: 1234 });
+
+      expect(mockChild.on).toHaveBeenCalledWith('error', expect.any(Function));
+      // Call the error handler
+      const errorHandler = mockChild.on.mock.calls.find(
+        (c) => c[0] === 'error',
+      )![1];
+      const error = new Error('spawn taskkill ENOENT');
+      errorHandler(error);
+
+      expect(mockDebugLogger).toHaveBeenCalledWith(
+        'taskkill failed to spawn:',
+        error,
+      );
     });
 
     it('should use pty.kill() on Windows if pty is provided and also taskkill for descendants', async () => {
