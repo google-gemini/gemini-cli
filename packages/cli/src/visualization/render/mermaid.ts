@@ -47,7 +47,7 @@ export async function renderMermaidToPng(
         const page = await browser.newPage();
 
         // Set viewport wide enough so Mermaid doesn't wrap, and TALL enough so it doesn't crop
-        await page.setViewport({ width: widthPx + 48, height: 3000, deviceScaleFactor: 2 });
+        await page.setViewport({ width: widthPx + 100, height: 5000, deviceScaleFactor: 2 });
 
         // Block external requests other than jsdelivr (Mermaid CDN)
         await page.setRequestInterception(true);
