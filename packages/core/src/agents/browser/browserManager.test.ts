@@ -156,7 +156,7 @@ describe('BrowserManager', () => {
       // Verify StdioClientTransport was created with correct args
       expect(StdioClientTransport).toHaveBeenCalledWith(
         expect.objectContaining({
-          command: 'npx',
+          command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
           args: expect.arrayContaining([
             '-y',
             expect.stringMatching(/chrome-devtools-mcp@/),
@@ -194,7 +194,7 @@ describe('BrowserManager', () => {
 
       expect(StdioClientTransport).toHaveBeenCalledWith(
         expect.objectContaining({
-          command: 'npx',
+          command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
           args: expect.arrayContaining(['--headless']),
         }),
       );
@@ -219,7 +219,7 @@ describe('BrowserManager', () => {
 
       expect(StdioClientTransport).toHaveBeenCalledWith(
         expect.objectContaining({
-          command: 'npx',
+          command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
           args: expect.arrayContaining(['--userDataDir', '/path/to/profile']),
         }),
       );
