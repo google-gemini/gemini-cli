@@ -75,6 +75,22 @@ describe('<HistoryItemDisplay />', () => {
     unmount();
   });
 
+  it('renders inline ASCII visual items', async () => {
+    const item: HistoryItem = {
+      ...baseItem,
+      type: 'visual',
+      protocol: 'ascii',
+      output: 'A --> B\nB --> C',
+    };
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <HistoryItemDisplay {...baseItem} item={item} />,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toContain('A --> B');
+    expect(lastFrame()).toContain('B --> C');
+    unmount();
+  });
+
   it.each([true, false])(
     'renders InfoMessage for "info" type with multi-line text (alternateBuffer=%s)',
     async (useAlternateBuffer) => {

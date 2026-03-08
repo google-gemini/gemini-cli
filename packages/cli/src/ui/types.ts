@@ -148,6 +148,12 @@ export type HistoryItemGeminiContent = HistoryItemBase & {
   text: string;
 };
 
+export type HistoryItemVisual = HistoryItemBase & {
+  type: 'visual';
+  protocol: 'kitty' | 'iterm2' | 'sixel' | 'ascii';
+  output: string;
+};
+
 export type HistoryItemInfo = HistoryItemBase & {
   type: 'info';
   text: string;
@@ -359,6 +365,7 @@ export type HistoryItemWithoutId =
   | HistoryItemUserShell
   | HistoryItemGemini
   | HistoryItemGeminiContent
+  | HistoryItemVisual
   | HistoryItemInfo
   | HistoryItemError
   | HistoryItemWarning

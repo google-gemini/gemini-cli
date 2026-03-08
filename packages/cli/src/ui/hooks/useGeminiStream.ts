@@ -1369,13 +1369,19 @@ export const useGeminiStream = (
             });
             const output = await renderVisualArtifact(result, {
               spec,
-              showMeta: true,
+              showMeta: false,
+              stabilizeAscii: false,
             });
             if (output) {
-              const { writeSync } = await import('node:fs');
-              writeSync(1, '\n');
-              writeSync(1, output);
-              writeSync(1, '\n');
+              const visualItem: HistoryItemWithoutId = {
+                type: 'visual',
+                protocol: caps.protocol,
+                output,
+              };
+              addItem(
+                visualItem,
+                userMessageTimestamp,
+              );
             }
           } catch (err) {
             const renderErr = formatUnknownRenderError(err);

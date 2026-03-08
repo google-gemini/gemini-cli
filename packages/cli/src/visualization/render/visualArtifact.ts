@@ -61,6 +61,8 @@ export interface VisualArtifactOptions {
   forceProtocol?: 'kitty' | 'iterm2' | 'sixel' | 'ascii';
   /** Show cache/protocol info line above the diagram */
   showMeta?: boolean;
+  /** Add trailing blank rows when printing raw ASCII directly to stdout */
+  stabilizeAscii?: boolean;
 }
 
 /**
@@ -95,6 +97,10 @@ export async function renderVisualArtifact(
         ),
       );
       return `  PNG: ${result.pngPath}\n`;
+    }
+
+    if (options.stabilizeAscii === false) {
+      return encodeAscii(options.spec, sanitizeAsciiColumns(caps.columns));
     }
 
     return encodeAsciiWithStabilizer(options.spec, caps.columns, caps.rows);
@@ -133,6 +139,9 @@ export async function renderVisualArtifact(
       ),
     );
     if (options.spec) {
+      if (options.stabilizeAscii === false) {
+        return encodeAscii(options.spec, sanitizeAsciiColumns(caps.columns));
+      }
       return encodeAsciiWithStabilizer(options.spec, caps.columns, caps.rows);
     }
     return `  PNG: ${result.pngPath}\n`;

@@ -17,6 +17,7 @@ import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 import { GeminiMessageContent } from './messages/GeminiMessageContent.js';
 import { CompressionMessage } from './messages/CompressionMessage.js';
 import { WarningMessage } from './messages/WarningMessage.js';
+import { VisualMessage } from './messages/VisualMessage.js';
 import { Box } from 'ink';
 import { AboutBox } from './AboutBox.js';
 import { StatsDisplay } from './StatsDisplay.js';
@@ -59,7 +60,10 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
 }) => {
   const settings = useSettings();
   const inlineThinkingMode = getInlineThinkingMode(settings);
-  const itemForDisplay = useMemo(() => escapeAnsiCtrlCodes(item), [item]);
+  const itemForDisplay = useMemo(
+    () => (item.type === 'visual' ? item : escapeAnsiCtrlCodes(item)),
+    [item],
+  );
 
   return (
     <Box flexDirection="column" key={itemForDisplay.id} width={terminalWidth}>
@@ -93,6 +97,13 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           availableTerminalHeight={
             availableTerminalHeightGemini ?? availableTerminalHeight
           }
+          terminalWidth={terminalWidth}
+        />
+      )}
+      {itemForDisplay.type === 'visual' && (
+        <VisualMessage
+          protocol={itemForDisplay.protocol}
+          output={itemForDisplay.output}
           terminalWidth={terminalWidth}
         />
       )}
