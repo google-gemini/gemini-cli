@@ -211,8 +211,11 @@ function renderFlowchart(spec: string, termWidth = 100): string {
     if (nodes.length === 0) return renderGenericFallback(spec, termWidth);
 
     const lines: string[] = [''];
+    const renderedNodes = new Set<string>();
 
     for (const node of nodes) {
+        if (renderedNodes.has(node.id)) continue;
+
         const label = node.label.slice(0, termWidth - 8);
         const boxWidth = label.length + 4;
         const padding = ' ';
@@ -226,21 +229,150 @@ function renderFlowchart(spec: string, termWidth = 100): string {
             lines.push(`  ` + chalk.blue(`${BOX.V}`) + chalk.white(`${padding}${label}${padding}`) + chalk.blue(`${BOX.V}`));
             lines.push(`  ` + chalk.blue(`${BOX.BL}${BOX.H.repeat(boxWidth)}${BOX.BR}`));
         }
+        renderedNodes.add(node.id);
 
         // Print edges FROM this node
         const outEdges = edges.filter((e) => e.from === node.id);
         for (const edge of outEdges) {
-            const target = nodes.find((n) => n.id === edge.to);
-            const targetLabel = target ? target.label : edge.to;
             const edgeLabel = edge.label ? ` [${edge.label}] ` : ' ';
             lines.push(`       ` + chalk.gray(`${BOX.V}`));
-            lines.push(`       ` + chalk.yellow(`${BOX.ARROW_R}`) + chalk.gray(`${edgeLabel}`) + chalk.bold.white(`${targetLabel}`));
+            lines.push(`       ` + chalk.yellow(`${BOX.ARROW_R}`) + chalk.gray(`${edgeLabel}`) + chalk.bold.white(`${edge.to}`));
         }
 
         lines.push('');
     }
 
     return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// State Diagram renderer
+// ---------------------------------------------------------------------------
+
+interface StateNode {
+    id: string;
+    label: string;
+    isStartEnd: boolean;
+}
+
+interface StateTransition {
+    from: string;
+    to: string;
+    label?: string;
+}
+
+function parseStateDiagram(spec: string): { states: StateNode[]; transitions: StateTransition[] } {
+    const lines = spec.split('\n').map((l) => l.trim()).filter(Boolean);
+    const states: Map<string, StateNode> = new Map();
+    const transitions: StateTransition[] = [];
+
+    // [*] --> State or State --> [*] or State1 --> State2 : label
+    const transRe = /^(\[\*\]|\w+)\s*-->\s*(\[\*\]|\w+)(?:\s*:\s*(.*))?$/;
+
+    for (const line of lines) {
+        if (line.startsWith('stateDiagram')) continue;
+
+        const tMatch = line.match(transRe);
+        if (tMatch) {
+            const from = tMatch[1];
+            const to = tMatch[2];
+            const label = tMatch[3];
+            transitions.push({ from, to, label });
+
+            if (from !== '[*]' && !states.has(from)) states.set(from, { id: from, label: from, isStartEnd: false });
+            if (to !== '[*]' && !states.has(to)) states.set(to, { id: to, label: to, isStartEnd: false });
+            continue;
+        }
+
+        // state "Label" as ID
+        if (line.startsWith('state')) {
+            const parts = line.split(/\s+as\s+/i);
+            if (parts.length === 2) {
+                const label = parts[0].replace(/^state\s+["']?|["']?$/g, '');
+                const id = parts[1];
+                states.set(id, { id, label, isStartEnd: false });
+            }
+        }
+    }
+
+    return { states: Array.from(states.values()), transitions };
+}
+
+function renderStateDiagram(spec: string, termWidth = 100): string {
+    const { states, transitions } = parseStateDiagram(spec);
+    if (transitions.length === 0 && states.length === 0) return renderGenericFallback(spec, termWidth);
+
+    const lines: string[] = [''];
+
+    // Start with entry points
+    const startTransitions = transitions.filter(t => t.from === '[*]');
+    for (const t of startTransitions) {
+        lines.push(`  ` + chalk.cyan(`● (START)`));
+        lines.push(`  ` + chalk.gray(`${BOX.V}`));
+        lines.push(`  ` + chalk.yellow(`${BOX.ARROW_R}`) + (t.label ? chalk.gray(` [${t.label}] `) : ' ') + chalk.bold.white(t.to));
+        lines.push('');
+    }
+
+    const renderedStates = new Set<string>();
+
+    for (const state of states) {
+        if (renderedStates.has(state.id)) continue;
+
+        const label = state.label.slice(0, termWidth - 10);
+        const boxWidth = label.length + 6;
+
+        lines.push(`  ` + chalk.blue(`╭${BOX.H.repeat(boxWidth)}╮`));
+        lines.push(`  ` + chalk.blue(`│`) + chalk.bold.white(`  ${label}  `) + chalk.blue(`│`));
+        lines.push(`  ` + chalk.blue(`╰${BOX.H.repeat(boxWidth)}╯`));
+        renderedStates.add(state.id);
+
+        const out = transitions.filter(t => t.from === state.id);
+        for (const t of out) {
+            const label = t.label ? ` [${t.label}] ` : ' ';
+            const target = t.to === '[*]' ? chalk.cyan('● (END)') : chalk.bold.white(t.to);
+            lines.push(`       ` + chalk.gray(`${BOX.V}`));
+            lines.push(`       ` + chalk.yellow(`${BOX.ARROW_R}`) + chalk.gray(label) + target);
+        }
+        lines.push('');
+    }
+
+    return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Pie Chart renderer
+// ---------------------------------------------------------------------------
+
+function renderPieChart(spec: string, termWidth = 100): string {
+    const lines = spec.split('\n').map(l => l.trim()).filter(Boolean);
+    const data: { label: string; value: number }[] = [];
+    let total = 0;
+
+    for (const line of lines) {
+        if (line.startsWith('pie')) continue;
+        const match = line.match(/^"(.+?)"\s*:\s*([\d.]+)/);
+        if (match) {
+            const val = parseFloat(match[2]);
+            data.push({ label: match[1], value: val });
+            total += val;
+        }
+    }
+
+    if (data.length === 0) return renderGenericFallback(spec, termWidth);
+
+    const result: string[] = ['', chalk.bold.white('  Pie Chart Breakdown'), ''];
+    const barMax = Math.min(termWidth - 25, 40);
+
+    for (const item of data) {
+        const percent = (item.value / total) * 100;
+        const barLen = Math.round((item.value / total) * barMax);
+        const bar = chalk.green('█'.repeat(barLen)) + chalk.gray('░'.repeat(barMax - barLen));
+        const label = item.label.slice(0, 15).padEnd(15);
+        result.push(`  ${chalk.white(label)} | ${bar} ${chalk.bold.cyan(percent.toFixed(1) + '%')}`);
+    }
+
+    result.push('');
+    return result.join('\n');
 }
 
 // ---------------------------------------------------------------------------
@@ -385,6 +517,12 @@ export function renderMermaidAscii(spec: string, termWidth = 100): string {
     }
     if (stripped.startsWith('erdiagram')) {
         return renderErDiagram(spec, termWidth);
+    }
+    if (stripped.startsWith('statediagram')) {
+        return renderStateDiagram(spec, termWidth);
+    }
+    if (stripped.startsWith('pie')) {
+        return renderPieChart(spec, termWidth);
     }
 
     // For unsupported types fall back to code display
