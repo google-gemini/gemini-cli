@@ -115,8 +115,8 @@ export function SuggestionsDisplay({
                 -- {suggestion.sectionTitle} --
               </Text>
             )}
-            
-            <Box 
+
+            <Box
               flexDirection="row"
               backgroundColor={isActive ? theme.background.focus : undefined}
             >
@@ -143,7 +143,7 @@ export function SuggestionsDisplay({
                   </Text>
                 </Box>
               )}
-              
+
               {isActive && isLong && (
                 <Box width={3} flexShrink={0}>
                   <Text color={Colors.Gray}>{isExpanded ? ' ← ' : ' → '}</Text>
