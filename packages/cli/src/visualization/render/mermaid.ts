@@ -47,7 +47,9 @@ export async function renderMermaidToPng(
         const page = await browser.newPage();
 
         // Set viewport wide enough, and plenty tall for the initial render
-        await page.setViewport({ width: widthPx + 200, height: 10000, deviceScaleFactor: 2 });
+        // Set viewport wide enough, and VERY tall to avoid any early clipping
+        // Set viewport wide enough, and VERY tall to avoid any early clipping
+        await page.setViewport({ width: widthPx + 200, height: 10000, deviceScaleFactor: 1 });
 
         // Block external requests other than jsdelivr (Mermaid CDN)
         await page.setRequestInterception(true);
@@ -77,8 +79,7 @@ export async function renderMermaidToPng(
         );
 
         // Give it a VERY substantial beat for layout, fonts, and SVG settling
-        // This prevents the "zoomed out" look caused by early capture
-        await page.evaluate(() => new Promise(r => setTimeout(r, 1500)));
+        await page.evaluate(() => new Promise(r => setTimeout(r, 1000)));
 
         // MEASURE THE ACTUAL SCROLL DIMENSIONS
         const dimensions = await page.evaluate(() => {
@@ -88,8 +89,8 @@ export async function renderMermaidToPng(
             return {
                 x: 0,
                 y: 0,
-                width: Math.ceil(Math.max(container.scrollWidth, container.offsetWidth)),
-                height: Math.ceil(Math.max(container.scrollHeight, container.offsetHeight))
+                width: Math.ceil(Math.max(container.scrollWidth, container.offsetWidth)) + 20,
+                height: Math.ceil(Math.max(container.scrollHeight, container.offsetHeight)) + 20
             };
         });
 
