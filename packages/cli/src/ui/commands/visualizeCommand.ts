@@ -10,6 +10,46 @@ import { runPipeline } from '../../visualization/index.js';
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+interface ErrorLike {
+  message?: unknown;
+  stack?: unknown;
+}
+
+function formatUnknownError(err: unknown): string {
+  if (err instanceof Error) {
+    return err.stack ?? err.message ?? err.toString();
+  }
+
+  if (typeof err === 'object' && err !== null) {
+    const errorLike = err as ErrorLike;
+    const message =
+      typeof errorLike.message === 'string' ? errorLike.message : '';
+    const stack = typeof errorLike.stack === 'string' ? errorLike.stack : '';
+
+    const details: string[] = [];
+    if (message.length > 0) details.push(message);
+    if (stack.length > 0) details.push(stack);
+
+    try {
+      const json = JSON.stringify(
+        err,
+        Object.getOwnPropertyNames(Object(err)),
+      );
+      if (json && json !== '{}') {
+        details.push(json);
+      }
+    } catch {
+      // Ignore serialization failures.
+    }
+
+    if (details.length > 0) {
+      return details.join('\n');
+    }
+  }
+
+  return String(err);
+}
+
 export const visualizeCommand: SlashCommand = {
   name: 'visualize',
   description:
@@ -64,11 +104,18 @@ export const visualizeCommand: SlashCommand = {
     try {
       context.ui.setDebugMessage(`Rendering diagram...`);
 
+      const { detectTerminalCaps } = await import(
+        '../../visualization/caps/detect.js'
+      );
+      const caps = detectTerminalCaps();
+      const asciiOnly = caps.protocol === 'ascii';
+
       // 1. Run the headless browser rendering pipeline
       const result = await runPipeline({
         spec,
         diagramType: 'mermaid',
         theme: 'dark',
+        asciiOnly,
       });
 
       // 2. Render the artifact
@@ -92,31 +139,39 @@ export const visualizeCommand: SlashCommand = {
         text: `Successfully visualized diagram from ${sourceLabel}.`,
       });
     } catch (err: unknown) {
-      // Dump full diagnostic to stderr so it's visible in the terminal
-      const { writeSync } = await import('node:fs');
-      writeSync(
-        2,
-        `\n[VISUALIZE DEBUG] typeof err: ${typeof err}\n` +
-          `[VISUALIZE DEBUG] instanceof Error: ${err instanceof Error}\n` +
-          `[VISUALIZE DEBUG] constructor: ${typeof err === 'object' && err !== null ? Object.getPrototypeOf(err)?.constructor?.name : 'N/A'}\n` +
-          `[VISUALIZE DEBUG] JSON.stringify: ${JSON.stringify(err, Object.getOwnPropertyNames(err instanceof Error ? err : Object(err)))}\n` +
-          `[VISUALIZE DEBUG] String: ${String(err)}\n` +
-          `[VISUALIZE DEBUG] stack: ${err instanceof Error ? err.stack : 'N/A'}\n`,
-      );
+      const errMsg = formatUnknownError(err);
+      context.ui.setDebugMessage(`Visualization render error:\n${errMsg}`);
+      const shortErr = errMsg.split('\n')[0]?.trim() || 'Unknown error';
 
-      let errMsg: string;
-      if (err instanceof Error) {
-        errMsg = err.message || err.toString();
-        if (err.stack) {
-          errMsg += `\n${err.stack}`;
-        }
-      } else {
+      let fallbackRendered = false;
+      try {
+        const { renderMermaidAscii } = await import(
+          '../../visualization/index.js'
+        );
+        const { writeSync } = await import('node:fs');
+        const ascii = renderMermaidAscii(spec, process.stdout.columns ?? 80);
+        writeSync(1, '\n');
+        writeSync(1, ascii);
+        writeSync(1, '\n');
+        fallbackRendered = true;
+      } catch (fallbackErr) {
         try {
-          errMsg = JSON.stringify(err);
+          context.ui.setDebugMessage(
+            `ASCII fallback failed: ${formatUnknownError(fallbackErr)}`,
+          );
         } catch {
-          errMsg = String(err);
+          // Never block on debug message formatting.
         }
       }
+
+      if (fallbackRendered) {
+        context.ui.addItem({
+          type: MessageType.WARNING,
+          text: `Graphics rendering failed (${shortErr}). Displayed ASCII fallback instead.`,
+        });
+        return;
+      }
+
       context.ui.addItem({
         type: MessageType.ERROR,
         text: `Failed to visualize diagram: ${errMsg}`,
