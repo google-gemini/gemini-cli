@@ -1,7 +1,67 @@
 # Local development guide
 
-This guide provides instructions for setting up and using local development
-features, such as tracing.
+This guide provides instructions for setting up the project for local
+development and using local development features, such as tracing.
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+- **Node.js**: Version 20.0.0 or higher
+- **npm**: Comes with Node.js
+- **Git**: For cloning the repository
+
+## Quick start
+
+Follow these steps to run the CLI locally:
+
+1.  **Clone the repository:**
+
+    ```bash
+    git clone https://github.com/google-gemini/gemini-cli.git
+    cd gemini-cli
+    ```
+
+2.  **Install dependencies:**
+
+    ```bash
+    npm install
+    ```
+
+3.  **Build the project:**
+
+    ```bash
+    npm run build
+    ```
+
+4.  **Run the CLI:**
+
+    ```bash
+    npm run start
+    ```
+
+## Troubleshooting
+
+- **Error: `MODULE_NOT_FOUND` or import errors**
+  - **Cause:** Dependencies are not installed correctly, or the project hasn't
+    been built.
+  - **Solution:** Run `npm install` followed by `npm run build`.
+
+- **Error: `EACCES` permission errors**
+  - **Cause:** Issues with npm global permissions or file system permissions.
+  - **Solution:** Ensure you have proper permissions for the project directory.
+    On macOS/Linux, you may need to fix npm permissions or use a version manager
+    like `nvm`.
+
+- **Build fails with missing dependencies**
+  - **Cause:** The node_modules directory may be incomplete.
+  - **Solution:** Delete the `node_modules` folder and `package-lock.json` file,
+    then run `npm install` again.
+
+- **TypeScript errors during development**
+  - **Cause:** Type definitions may be out of sync.
+  - **Solution:** Run `npm run typecheck` to verify types. You can also run
+    `npm run build` to rebuild the project.
 
 ## Tracing
 
