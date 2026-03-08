@@ -13,12 +13,18 @@ import { encodeSixel } from '../encode/sixel.js';
 import { encodeAscii } from '../encode/ascii.js';
 import type { RenderResult } from '../types.js';
 import chalk from 'chalk';
+import sharp from 'sharp';
 
 const DEFAULT_ASCII_COLUMNS = 80;
 const MIN_ASCII_COLUMNS = 48;
 const MAX_ASCII_COLUMNS = 140;
 const MIN_ASCII_STABILIZER_ROWS = 8;
 const MAX_ASCII_STABILIZER_ROWS = 20;
+const ASCII_PREVIEW_RAMP_DARK = ' .:-=+*#%@';
+const ASCII_PREVIEW_RAMP_LIGHT = '@%#*+=-:. ';
+const DEFAULT_ASCII_PREVIEW_ROWS = 32;
+const MIN_ASCII_PREVIEW_ROWS = 12;
+const MAX_ASCII_PREVIEW_ROWS = 52;
 
 function sanitizeAsciiColumns(columns: number): number {
   if (!Number.isFinite(columns) || columns <= 0) {
@@ -54,8 +60,72 @@ function encodeAsciiWithStabilizer(
   return `${ascii}${stabilizer}`;
 }
 
+async function renderPngAsciiPreview(
+  pngPath: string,
+  columns: number,
+): Promise<string> {
+  const safeColumns = sanitizeAsciiColumns(columns);
+  const image = sharp(pngPath).grayscale().ensureAlpha();
+  const meta = await image.metadata();
+  const sourceWidth = meta.width ?? safeColumns;
+  const sourceHeight = meta.height ?? DEFAULT_ASCII_PREVIEW_ROWS;
+  const targetRows = Math.max(
+    MIN_ASCII_PREVIEW_ROWS,
+    Math.min(
+      MAX_ASCII_PREVIEW_ROWS,
+      Math.round((sourceHeight / Math.max(sourceWidth, 1)) * safeColumns * 0.55),
+    ),
+  );
+
+  const { data, info } = await image
+    .resize({
+      width: safeColumns,
+      height: targetRows,
+      fit: 'fill',
+    })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  let totalBrightness = 0;
+  let visiblePixels = 0;
+
+  for (let i = 0; i < data.length; i += info.channels) {
+    const alpha = info.channels >= 2 ? data[i + info.channels - 1] : 255;
+    if (alpha < 16) {
+      continue;
+    }
+    totalBrightness += data[i];
+    visiblePixels += 1;
+  }
+
+  const averageBrightness =
+    visiblePixels > 0 ? totalBrightness / visiblePixels : 127;
+  const ramp =
+    averageBrightness < 128 ? ASCII_PREVIEW_RAMP_DARK : ASCII_PREVIEW_RAMP_LIGHT;
+
+  const lines: string[] = [];
+  for (let y = 0; y < info.height; y++) {
+    let line = '';
+    for (let x = 0; x < info.width; x++) {
+      const idx = (y * info.width + x) * info.channels;
+      const gray = data[idx];
+      const alpha = info.channels >= 2 ? data[idx + info.channels - 1] : 255;
+      if (alpha < 16) {
+        line += ' ';
+        continue;
+      }
+
+      const rampIndex = Math.round((gray / 255) * (ramp.length - 1));
+      line += ramp[rampIndex] ?? ' ';
+    }
+    lines.push(line.replace(/\s+$/g, ''));
+  }
+
+  return lines.join('\n');
+}
+
 export interface VisualArtifactOptions {
-  /** Original Mermaid spec; needed for ASCII fallback path */
+  /** Original Mermaid spec; needed for Mermaid ASCII fallback path */
   spec?: string;
   /** Override terminal protocol detection */
   forceProtocol?: 'kitty' | 'iterm2' | 'sixel' | 'ascii';
@@ -63,6 +133,8 @@ export interface VisualArtifactOptions {
   showMeta?: boolean;
   /** Add trailing blank rows when printing raw ASCII directly to stdout */
   stabilizeAscii?: boolean;
+  /** Original render type, used to select the right ASCII fallback */
+  diagramType?: 'mermaid' | 'html';
 }
 
 /**
@@ -89,6 +161,10 @@ export async function renderVisualArtifact(
 
   // ASCII path: we do not need to read the PNG at all.
   if (protocol === 'ascii') {
+    if (options.diagramType === 'html') {
+      return renderPngAsciiPreview(result.pngPath, caps.columns);
+    }
+
     if (!options.spec) {
       writeSync(
         2,
@@ -139,6 +215,9 @@ export async function renderVisualArtifact(
       ),
     );
     if (options.spec) {
+      if (options.diagramType === 'html') {
+        return renderPngAsciiPreview(result.pngPath, caps.columns);
+      }
       if (options.stabilizeAscii === false) {
         return encodeAscii(options.spec, sanitizeAsciiColumns(caps.columns));
       }

@@ -75,6 +75,7 @@ export const previewCommand: SlashCommand = {
             const { renderVisualArtifact } = await import('../../visualization/render/visualArtifact.js');
             const output = await renderVisualArtifact(result, {
                 spec,
+                diagramType: 'html',
                 showMeta: true,
             });
 
