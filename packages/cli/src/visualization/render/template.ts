@@ -24,8 +24,7 @@ export function buildMermaidHtml(spec: string, theme: Theme, widthPx: number): s
       overflow: visible;
     }
     #container {
-      padding: 50px;
-      padding-bottom: 150px; /* Strong buffer to prevent any bottom clipping */
+      padding: 12px;
       display: inline-block;
       overflow: visible;
     }

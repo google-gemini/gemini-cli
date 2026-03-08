@@ -162,7 +162,7 @@ export async function renderMermaidToPng(
     // Set viewport wide enough for the diagram
     await page.setViewport({
       width: widthPx + 200,
-      height: 4000,
+      height: 6000,
       deviceScaleFactor: 1,
     });
 
@@ -227,20 +227,56 @@ export async function renderMermaidToPng(
 
     // MEASURE THE ACTUAL SCROLL DIMENSIONS
     const dimensions = await page.evaluate(() => {
-      const el = document.querySelector('#container');
-      const container = el instanceof HTMLElement ? el : null;
-      if (!container) return null;
+      const clipFromRect = (rect: DOMRect, padding: number) => {
+        let x = Math.floor(rect.left - padding);
+        let y = Math.floor(rect.top - padding);
+        let width = Math.ceil(rect.width + padding * 2);
+        let height = Math.ceil(rect.height + padding * 2);
 
-      return {
-        x: 0,
-        y: 0,
-        width:
-          Math.ceil(Math.max(container.scrollWidth, container.offsetWidth)) +
-          20,
-        height:
-          Math.ceil(Math.max(container.scrollHeight, container.offsetHeight)) +
-          20,
+        const maxWidth = Math.floor(window.innerWidth);
+        const maxHeight = Math.floor(window.innerHeight);
+
+        if (x < 0) {
+          width += x;
+          x = 0;
+        }
+        if (y < 0) {
+          height += y;
+          y = 0;
+        }
+
+        if (x + width > maxWidth) {
+          width = maxWidth - x;
+        }
+        if (y + height > maxHeight) {
+          height = maxHeight - y;
+        }
+
+        if (width <= 0 || height <= 0) {
+          return null;
+        }
+
+        return { x, y, width, height };
       };
+
+      // Prefer the SVG bounds so the diagram fills the screenshot region.
+      const svg = document.querySelector('.mermaid svg');
+      if (svg instanceof SVGSVGElement) {
+        const svgRect = svg.getBoundingClientRect();
+        const svgClip = clipFromRect(svgRect, 12);
+        if (svgClip) {
+          return svgClip;
+        }
+      }
+
+      // Fallback to container bounds if SVG bounds are unavailable.
+      const container = document.querySelector('#container');
+      if (container instanceof HTMLElement) {
+        const containerRect = container.getBoundingClientRect();
+        return clipFromRect(containerRect, 8);
+      }
+
+      return null;
     });
 
     if (!dimensions || dimensions.width <= 0 || dimensions.height <= 0) {
