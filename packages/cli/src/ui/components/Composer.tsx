@@ -239,7 +239,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                     : uiState.currentLoadingPhrase
                 }
                 thoughtLabel={
-                  inlineThinkingMode === 'full' ? 'Thinking ...' : undefined
+                  inlineThinkingMode === 'full' ? 'Thinking...' : undefined
                 }
                 elapsedTime={uiState.elapsedTime}
               />
@@ -282,7 +282,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                       : uiState.currentLoadingPhrase
                   }
                   thoughtLabel={
-                    inlineThinkingMode === 'full' ? 'Thinking ...' : undefined
+                    inlineThinkingMode === 'full' ? 'Thinking...' : undefined
                   }
                   elapsedTime={uiState.elapsedTime}
                 />
@@ -390,7 +390,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                           marginTop={
                             (showApprovalIndicator ||
                               uiState.shellModeActive) &&
-                            isNarrow
+                            !isNarrow
                               ? 1
                               : 0
                           }
