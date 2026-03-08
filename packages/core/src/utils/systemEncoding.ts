@@ -41,18 +41,6 @@ export function getCachedEncodingForBuffer(buffer: Buffer): string {
 
   // If we detected an encoding from the buffer, use it.
   if (detectedEncoding) {
-    // Special case: if detected is UTF-8, we almost certainly want it,
-    // even if the system encoding is something else (like GBK).
-    if (detectedEncoding === 'utf-8') {
-      return 'utf-8';
-    }
-
-    // If the system encoding is UTF-8 but chardet thinks it's something else,
-    // we still prefer UTF-8 as it's the safest default for modern tools.
-    if (cachedSystemEncoding === 'utf-8') {
-      return 'utf-8';
-    }
-
     return detectedEncoding;
   }
 
