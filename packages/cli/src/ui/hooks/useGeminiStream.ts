@@ -1380,8 +1380,8 @@ export const useGeminiStream = (
             const parsedVizScale = Number.parseFloat(originalVizScale ?? '');
             // Inline explain visuals are rendered near the prompt/footer. Cap
             // scale so iTerm/Kitty images don't overflow and get bottom-clipped.
-            if (!Number.isFinite(parsedVizScale) || parsedVizScale > 0.72) {
-              process.env['GEMINI_VIZ_SCALE'] = '0.72';
+            if (!Number.isFinite(parsedVizScale) || parsedVizScale > 0.58) {
+              process.env['GEMINI_VIZ_SCALE'] = '0.58';
             }
 
             let output: string | void;
