@@ -313,9 +313,9 @@ export const useGeminiStream = (
 
   const activeToolPtyId = useMemo(() => {
     const executingBackgroundableTool = toolCalls.find(
-      (tc): tc is TrackedExecutingToolCall =>
-        tc.status === CoreToolCallStatus.Executing &&
-        typeof tc.pid === 'number',
+      (toolCall): toolCall is TrackedExecutingToolCall =>
+        toolCall.status === CoreToolCallStatus.Executing &&
+        typeof toolCall.pid === 'number',
     );
     return executingBackgroundableTool?.pid;
   }, [toolCalls]);

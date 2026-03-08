@@ -152,10 +152,21 @@ interface ActiveChildProcess {
   };
 }
 
-interface ActiveVirtualProcess {
+interface ActiveVirtualProcessState {
   output: string;
   onKill?: () => void;
 }
+
+type ActiveManagedProcess =
+  | {
+      kind: 'child';
+      process: ChildProcess;
+      state: ActiveChildProcess['state'];
+    }
+  | {
+      kind: 'virtual';
+      state: ActiveVirtualProcessState;
+    };
 
 const getFullBufferText = (terminal: pkg.Terminal): string => {
   const buffer = terminal.buffer.active;
@@ -202,11 +213,7 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
 
 export class ShellExecutionService {
   private static activePtys = new Map<number, ActivePty>();
-  private static activeChildProcesses = new Map<number, ActiveChildProcess>();
-  private static activeVirtualProcesses = new Map<
-    number,
-    ActiveVirtualProcess
-  >();
+  private static activeProcesses = new Map<number, ActiveManagedProcess>();
   private static exitedPtyInfo = new Map<
     number,
     { exitCode: number; signal?: number }
@@ -302,13 +309,29 @@ export class ShellExecutionService {
     }
   }
 
+  private static getActiveChildProcess(
+    pid: number,
+  ): ActiveChildProcess | undefined {
+    const activeProcess = this.activeProcesses.get(pid);
+    if (activeProcess?.kind !== 'child') {
+      return undefined;
+    }
+    return { process: activeProcess.process, state: activeProcess.state };
+  }
+
+  private static getActiveVirtualProcess(
+    pid: number,
+  ): ActiveVirtualProcessState | undefined {
+    const activeProcess = this.activeProcesses.get(pid);
+    if (activeProcess?.kind !== 'virtual') {
+      return undefined;
+    }
+    return activeProcess.state;
+  }
+
   private static allocateVirtualPid(): number {
     let pid = ++this.nextVirtualPid;
-    while (
-      this.activePtys.has(pid) ||
-      this.activeChildProcesses.has(pid) ||
-      this.activeVirtualProcesses.has(pid)
-    ) {
+    while (this.activePtys.has(pid) || this.activeProcesses.has(pid)) {
       pid = ++this.nextVirtualPid;
     }
     return pid;
@@ -319,9 +342,12 @@ export class ShellExecutionService {
     onKill?: () => void,
   ): ShellExecutionHandle {
     const pid = this.allocateVirtualPid();
-    this.activeVirtualProcesses.set(pid, {
-      output: initialOutput,
-      onKill,
+    this.activeProcesses.set(pid, {
+      kind: 'virtual',
+      state: {
+        output: initialOutput,
+        onKill,
+      },
     });
 
     const result = new Promise<ShellExecutionResult>((resolve) => {
@@ -332,7 +358,7 @@ export class ShellExecutionService {
   }
 
   static appendVirtualOutput(pid: number, chunk: string): void {
-    const virtual = this.activeVirtualProcesses.get(pid);
+    const virtual = this.getActiveVirtualProcess(pid);
     if (!virtual || chunk.length === 0) {
       return;
     }
@@ -349,7 +375,7 @@ export class ShellExecutionService {
       aborted?: boolean;
     },
   ): void {
-    const virtual = this.activeVirtualProcesses.get(pid);
+    const virtual = this.getActiveVirtualProcess(pid);
     if (!virtual) {
       return;
     }
@@ -382,7 +408,7 @@ export class ShellExecutionService {
       signal,
     });
     this.activeListeners.delete(pid);
-    this.activeVirtualProcesses.delete(pid);
+    this.activeProcesses.delete(pid);
 
     this.exitedPtyInfo.set(pid, {
       exitCode: exitCode ?? 0,
@@ -432,7 +458,8 @@ export class ShellExecutionService {
       };
 
       if (child.pid) {
-        this.activeChildProcesses.set(child.pid, {
+        this.activeProcesses.set(child.pid, {
+          kind: 'child',
           process: child,
           state,
         });
@@ -542,7 +569,7 @@ export class ShellExecutionService {
             onOutputEvent(event);
             ShellExecutionService.emitEvent(child.pid, event);
 
-            this.activeChildProcesses.delete(child.pid);
+            this.activeProcesses.delete(child.pid);
             this.activeResolvers.delete(child.pid);
             this.activeListeners.delete(child.pid);
           }
@@ -1018,11 +1045,9 @@ export class ShellExecutionService {
    * @param input The string to write to the terminal.
    */
   static writeToPty(pid: number, input: string): void {
-    if (this.activeChildProcesses.has(pid)) {
-      const activeChild = this.activeChildProcesses.get(pid);
-      if (activeChild) {
-        activeChild.process.stdin?.write(input);
-      }
+    const activeChild = this.getActiveChildProcess(pid);
+    if (activeChild) {
+      activeChild.process.stdin?.write(input);
       return;
     }
 
@@ -1037,11 +1062,11 @@ export class ShellExecutionService {
   }
 
   static isPtyActive(pid: number): boolean {
-    if (this.activeVirtualProcesses.has(pid)) {
+    if (this.getActiveVirtualProcess(pid)) {
       return true;
     }
 
-    if (this.activeChildProcesses.has(pid)) {
+    if (this.getActiveChildProcess(pid)) {
       try {
         return process.kill(pid, 0);
       } catch {
@@ -1079,8 +1104,10 @@ export class ShellExecutionService {
         },
       );
       return () => disposable.dispose();
-    } else if (this.activeChildProcesses.has(pid)) {
-      const activeChild = this.activeChildProcesses.get(pid);
+    }
+
+    const activeChild = this.getActiveChildProcess(pid);
+    if (activeChild) {
       const listener = (code: number | null, signal: NodeJS.Signals | null) => {
         let signalNumber: number | undefined;
         if (signal) {
@@ -1092,7 +1119,9 @@ export class ShellExecutionService {
       return () => {
         activeChild?.process.removeListener('exit', listener);
       };
-    } else if (this.activeVirtualProcesses.has(pid)) {
+    }
+
+    if (this.getActiveVirtualProcess(pid)) {
       const listener = (event: ShellOutputEvent) => {
         if (event.type === 'exit') {
           callback(event.exitCode ?? 0, event.signal ?? undefined);
@@ -1101,14 +1130,14 @@ export class ShellExecutionService {
       };
       const unsubscribe = this.subscribe(pid, listener);
       return unsubscribe;
-    } else {
-      // Check if it already exited recently
-      const exitedInfo = this.exitedPtyInfo.get(pid);
-      if (exitedInfo) {
-        callback(exitedInfo.exitCode, exitedInfo.signal);
-      }
-      return () => {};
     }
+
+    // Check if it already exited recently
+    const exitedInfo = this.exitedPtyInfo.get(pid);
+    if (exitedInfo) {
+      callback(exitedInfo.exitCode, exitedInfo.signal);
+    }
+    return () => {};
   }
 
   /**
@@ -1118,8 +1147,8 @@ export class ShellExecutionService {
    */
   static kill(pid: number): void {
     const activePty = this.activePtys.get(pid);
-    const activeChild = this.activeChildProcesses.get(pid);
-    const activeVirtual = this.activeVirtualProcesses.get(pid);
+    const activeChild = this.getActiveChildProcess(pid);
+    const activeVirtual = this.getActiveVirtualProcess(pid);
 
     if (activeVirtual) {
       activeVirtual.onKill?.();
@@ -1131,7 +1160,7 @@ export class ShellExecutionService {
       return;
     } else if (activeChild) {
       killProcessGroup({ pid }).catch(() => {});
-      this.activeChildProcesses.delete(pid);
+      this.activeProcesses.delete(pid);
     } else if (activePty) {
       killProcessGroup({ pid, pty: activePty.ptyProcess }).catch(() => {});
       this.activePtys.delete(pid);
@@ -1154,8 +1183,8 @@ export class ShellExecutionService {
       const rawOutput = Buffer.from('');
 
       const activePty = this.activePtys.get(pid);
-      const activeChild = this.activeChildProcesses.get(pid);
-      const activeVirtual = this.activeVirtualProcesses.get(pid);
+      const activeChild = this.getActiveChildProcess(pid);
+      const activeVirtual = this.getActiveVirtualProcess(pid);
 
       if (activePty) {
         output = getFullBufferText(activePty.headlessTerminal);
@@ -1214,8 +1243,8 @@ export class ShellExecutionService {
 
     // Send current buffer content immediately
     const activePty = this.activePtys.get(pid);
-    const activeChild = this.activeChildProcesses.get(pid);
-    const activeVirtual = this.activeVirtualProcesses.get(pid);
+    const activeChild = this.getActiveChildProcess(pid);
+    const activeVirtual = this.getActiveVirtualProcess(pid);
 
     if (activePty) {
       // Use serializeTerminalToObject to preserve colors and structure
