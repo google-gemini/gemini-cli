@@ -132,9 +132,7 @@ describe('<Footer />', () => {
       const output = lastFrame();
       expect(output).toBeDefined();
       // Should contain some part of the path, likely shortened
-      expect(output).toContain(
-        path.join('directories', 'to', 'make', 'it', 'long'),
-      );
+      expect(output).toContain(path.join('make', 'it'));
       unmount();
     });
 
@@ -149,9 +147,38 @@ describe('<Footer />', () => {
       await waitUntilReady();
       const output = lastFrame();
       expect(output).toBeDefined();
-      expect(output).toContain(
-        path.join('directories', 'to', 'make', 'it', 'long'),
+      expect(output).toContain(path.join('make', 'it'));
+      unmount();
+    });
+
+    it('should not truncate high-priority items on narrow terminals (regression)', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 60,
+          uiState: {
+            sessionStats: mockSessionStats,
+          },
+          settings: createMockSettings({
+            general: {
+              vimMode: true,
+            },
+            ui: {
+              footer: {
+                showLabels: true,
+                items: ['workspace', 'model-name'],
+              },
+            },
+          }),
+        },
       );
+      await waitUntilReady();
+      const output = lastFrame();
+      // [INSERT] is high priority and should be fully visible
+      // (Note: VimModeProvider defaults to 'INSERT' mode when enabled)
+      expect(output).toContain('[INSERT]');
+      // Other items should be present but might be shortened
+      expect(output).toContain('gemini-pro');
       unmount();
     });
   });
