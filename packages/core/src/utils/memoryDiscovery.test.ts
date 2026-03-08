@@ -476,7 +476,6 @@ Subdir memory
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -511,7 +510,6 @@ My code memory
     await loadServerHierarchicalMemory(
       cwd,
       [],
-      false,
       new FileDiscoveryService(projectRoot),
       new SimpleExtensionLoader([]),
       DEFAULT_FOLDER_TRUST,
@@ -554,7 +552,6 @@ My code memory
       await loadServerHierarchicalMemory(
         cwd,
         [],
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([
           {
@@ -663,7 +660,6 @@ included directory memory
       await loadServerHierarchicalMemory(
         parentDir,
         [childDir, parentDir], // Deliberately include duplicates
-        false,
         new FileDiscoveryService(projectRoot),
         new SimpleExtensionLoader([]),
         DEFAULT_FOLDER_TRUST,
@@ -877,7 +873,6 @@ included directory memory
         await loadServerHierarchicalMemory(
           cwd,
           [],
-          false,
           new FileDiscoveryService(projectRoot),
           new SimpleExtensionLoader([]),
           DEFAULT_FOLDER_TRUST,
@@ -917,7 +912,6 @@ included directory memory
           await loadServerHierarchicalMemory(
             cwd,
             [],
-            false,
             new FileDiscoveryService(projectRoot),
             new SimpleExtensionLoader([]),
             DEFAULT_FOLDER_TRUST,
@@ -943,7 +937,6 @@ included directory memory
         await loadServerHierarchicalMemory(
           cwd,
           [],
-          false,
           new FileDiscoveryService(projectRoot),
           new SimpleExtensionLoader([]),
           DEFAULT_FOLDER_TRUST,
@@ -991,7 +984,6 @@ included directory memory
         await loadServerHierarchicalMemory(
           cwd,
           [],
-          false,
           new FileDiscoveryService(projectRoot),
           new SimpleExtensionLoader([]),
           DEFAULT_FOLDER_TRUST,
@@ -1181,7 +1173,6 @@ included directory memory
         config.shouldLoadMemoryFromIncludeDirectories()
           ? config.getWorkspaceContext().getDirectories()
           : [],
-        config.getDebugMode(),
         config.getFileService(),
         config.getExtensionLoader(),
         config.isTrustedFolder(),

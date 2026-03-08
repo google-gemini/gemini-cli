@@ -596,10 +596,10 @@ export async function loadServerHierarchicalMemory(
   fileService: FileDiscoveryService,
   extensionLoader: ExtensionLoader,
   folderTrust: boolean,
-  debugMode: boolean = false,
   importFormat: 'flat' | 'tree' = 'tree',
   fileFilteringOptions?: FileFilteringOptions,
   maxDirs: number = 200,
+  debugMode: boolean = false,
 ): Promise<LoadServerHierarchicalMemoryResponse> {
   // FIX: Use real, canonical paths for a reliable comparison to handle symlinks.
   const realCwd = normalizePath(
@@ -708,10 +708,10 @@ export async function refreshServerHierarchicalMemory(config: Config) {
     config.getFileService(),
     config.getExtensionLoader(),
     config.isTrustedFolder(),
-    config.getDebugMode(),
     config.getImportFormat(),
     config.getFileFilteringOptions(),
     config.getDiscoveryMaxDirs(),
+    config.getDebugMode(),
   );
   const mcpInstructions =
     config.getMcpClientManager()?.getMcpInstructions() || '';

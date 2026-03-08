@@ -123,6 +123,9 @@ export async function loadConfig(
       fileService,
       extensionLoader,
       folderTrust,
+      'tree',
+      undefined,
+      200,
       configParams.debugMode || false,
     );
   configParams.userMemory = memoryContent;

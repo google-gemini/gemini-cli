@@ -508,10 +508,10 @@ export async function loadCliConfig(
       fileService,
       extensionManager,
       trustedFolder,
-      debugMode,
       memoryImportFormat,
       memoryFileFiltering,
       settings.context?.discoveryMaxDirs,
+      debugMode,
     );
     memoryContent = result.memoryContent;
     fileCount = result.fileCount;
