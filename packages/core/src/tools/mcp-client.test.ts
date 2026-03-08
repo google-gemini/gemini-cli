@@ -2053,7 +2053,6 @@ describe('mcp-client', () => {
       expect(callArgs.env!['GEMINI_CLI_EXT_VAR']).toBe('ext-value');
       expect(callArgs.env!['RESOLVED_VAR']).toBe('ext-value');
     });
-
     it('should expand environment variables in mcpServerConfig.env and not redact them', async () => {
       const mockedTransport = vi
         .spyOn(SdkClientStdioLib, 'StdioClientTransport')
