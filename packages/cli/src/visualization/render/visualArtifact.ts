@@ -5,6 +5,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import { writeSync } from 'node:fs';
 import { detectTerminalCaps } from '../caps/detect.js';
 import { encodeKitty } from '../encode/kitty.js';
 import { encodeIterm2 } from '../encode/iterm2.js';
@@ -38,25 +39,16 @@ export async function renderVisualArtifact(
       ? chalk.green('● cache hit')
       : chalk.yellow('◎ rendered');
     const protocolLabel = chalk.cyan(protocol.toUpperCase());
-    process.stderr.write(
-      `  ${cacheLabel}  ${protocolLabel}  ${result.widthPx}×${result.heightPx}px\n`,
-    );
+    writeSync(2, `  ${cacheLabel}  ${protocolLabel}  ${result.widthPx}×${result.heightPx}px\n`);
   }
 
   // ASCII path — we don't need to read the PNG at all
   if (protocol === 'ascii') {
     if (!options.spec) {
-      process.stderr.write(
-        chalk.yellow(
-          '  ⚠ ASCII fallback — no spec provided, showing PNG path instead.\n',
-        ),
-      );
-      process.stdout.write(`  PNG: ${result.pngPath}\n`);
-      return;
+      writeSync(2, chalk.yellow('  ⚠ ASCII fallback — no spec provided, showing PNG path instead.\n'));
+      return `  PNG: ${result.pngPath}\n`;
     }
-    const output = encodeAscii(options.spec, caps.columns);
-    process.stdout.write(output);
-    return;
+    return encodeAscii(options.spec, caps.columns);
   }
 
   // Graphic protocol paths — read the PNG from disk
@@ -85,9 +77,7 @@ export async function renderVisualArtifact(
     return output;
   } catch (error) {
     // If ANY graphic protocol fails (missing lib, terminal lie, etc), fall back to ASCII
-    process.stderr.write(
-      chalk.yellow(`  ⚠ Graphics fallback failed, defaulting to ASCII mode: ${error}\n`),
-    );
+    writeSync(2, chalk.yellow(`  ⚠ Graphics fallback failed, defaulting to ASCII mode: ${error}\n`));
     if (options.spec) {
       return encodeAscii(options.spec, caps.columns);
     }
