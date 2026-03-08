@@ -6,6 +6,9 @@
 
 const LINE_NUMBER_PREFIX_RE = /^\s*\d+\s+/;
 const MERMAID_FENCE_RE = /```mermaid\s*\r?\n([\s\S]*?)```/gi;
+const INDENTED_LINE_RE = /^\s{2,}\S/;
+const MERMAID_START_RE =
+  /^(?:%%\{.*\}%%\s*)?(?:graph|flowchart|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|mindmap|timeline|quadrantChart|gitGraph|requirementDiagram|C4(?:Context|Container|Component|Dynamic|Deployment))\b/i;
 
 export function normalizeMermaidSpecForRendering(rawSpec: string): string {
   const normalizedNewlines = rawSpec.replace(/\r\n/g, '\n');
@@ -51,6 +54,56 @@ export function collectNewMermaidSpecs(
     specs.push(spec);
   }
 
+  // Fallback: model may emit Mermaid as an indented/numbered block without
+  // ```mermaid fences (common in long explanatory responses).
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i] ?? '';
+    const trimmedRaw = rawLine.trim();
+    if (trimmedRaw.length === 0) {
+      continue;
+    }
+
+    const lineIsCodeStyled =
+      LINE_NUMBER_PREFIX_RE.test(rawLine) || INDENTED_LINE_RE.test(rawLine);
+    if (!lineIsCodeStyled) {
+      continue;
+    }
+
+    const normalizedLine = rawLine.replace(LINE_NUMBER_PREFIX_RE, '').trim();
+    if (!MERMAID_START_RE.test(normalizedLine)) {
+      continue;
+    }
+
+    const blockLines: string[] = [];
+    let j = i;
+    while (j < lines.length) {
+      const candidate = lines[j] ?? '';
+      const candidateTrimmed = candidate.trim();
+      if (candidateTrimmed.length === 0) {
+        blockLines.push(candidate);
+        j += 1;
+        continue;
+      }
+
+      const candidateIsCodeStyled =
+        LINE_NUMBER_PREFIX_RE.test(candidate) || INDENTED_LINE_RE.test(candidate);
+      if (!candidateIsCodeStyled) {
+        break;
+      }
+      blockLines.push(candidate);
+      j += 1;
+    }
+
+    const spec = normalizeMermaidSpecForRendering(blockLines.join('\n'));
+    if (spec && !seenSpecs.has(spec)) {
+      seenSpecs.add(spec);
+      specs.push(spec);
+    }
+
+    i = j - 1;
+  }
+
   return specs;
 }
 
@@ -90,4 +143,3 @@ export function formatUnknownRenderError(error: unknown): string {
 
   return String(error);
 }
-

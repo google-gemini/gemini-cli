@@ -236,6 +236,7 @@ export const useGeminiStream = (
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
   const seenMermaidSpecsRef = useRef<Set<string>>(new Set());
   const renderingErrorRef = useRef<{ spec: string; error: string } | null>(null);
+  const visualizeCurrentTurnRef = useRef(false);
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const storage = config.storage;
   const logger = useLogger(storage);
@@ -739,10 +740,17 @@ export const useGeminiStream = (
         return { queryToSend: null, shouldProceed: false };
       }
 
+      if (typeof query === 'string') {
+        visualizeCurrentTurnRef.current = false;
+      }
+
       let localQueryToSendToGemini: PartListUnion | null = null;
 
       if (typeof query === 'string') {
         const trimmedQuery = query.trim();
+        const explainVisualizeRequested =
+          /^\/explain(?:\s|$)/i.test(trimmedQuery) &&
+          /(?:^|\s)(?:--visualize|-v)(?=\s|$)/i.test(trimmedQuery);
         await logger?.logMessage(MessageSenderType.USER, trimmedQuery);
 
         if (!shellModeActive) {
@@ -766,6 +774,7 @@ export const useGeminiStream = (
                 return { queryToSend: null, shouldProceed: false };
               }
               case 'submit_prompt': {
+                visualizeCurrentTurnRef.current = explainVisualizeRequested;
                 localQueryToSendToGemini = slashCommandResult.content;
 
                 return {
@@ -1233,8 +1242,10 @@ export const useGeminiStream = (
       stream: AsyncIterable<GeminiEvent>,
       userMessageTimestamp: number,
       signal: AbortSignal,
+      visualizeEnabled: boolean,
     ): Promise<StreamProcessingStatus> => {
       let geminiMessageBuffer = '';
+      let fullGeminiMessageBuffer = '';
       const toolCallRequests: ToolCallRequestInfo[] = [];
       const mermaidSpecsToRender: string[] = [];
       for await (const event of stream) {
@@ -1252,6 +1263,7 @@ export const useGeminiStream = (
             break;
           case ServerGeminiEventType.Content:
             setLastGeminiActivityTime(Date.now());
+            fullGeminiMessageBuffer += event.value;
             geminiMessageBuffer = handleContentEvent(
               event.value,
               geminiMessageBuffer,
@@ -1261,7 +1273,7 @@ export const useGeminiStream = (
             // Auto-Pipeline: detect Mermaid blocks during streaming, but render
             // only after the stream completes to avoid stdout/stderr interleaving.
             const newSpecs = collectNewMermaidSpecs(
-              geminiMessageBuffer,
+              fullGeminiMessageBuffer,
               seenMermaidSpecsRef.current,
             );
             if (newSpecs.length > 0) {
@@ -1334,7 +1346,7 @@ export const useGeminiStream = (
           }
         }
       }
-      if (config.getVisualize() && mermaidSpecsToRender.length > 0) {
+      if (visualizeEnabled && mermaidSpecsToRender.length > 0) {
         if (pendingHistoryItemRef.current) {
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);
           setPendingHistoryItem(null);
@@ -1496,10 +1508,14 @@ export const useGeminiStream = (
                 false,
                 query,
               );
+              const visualizeEnabledForTurn =
+                config.getVisualize() || visualizeCurrentTurnRef.current;
+              visualizeCurrentTurnRef.current = false;
               const processingStatus = await processGeminiStreamEvents(
                 stream,
                 userMessageTimestamp,
                 abortSignal,
+                visualizeEnabledForTurn,
               );
 
               if (processingStatus === StreamProcessingStatus.UserCancelled) {
@@ -1529,6 +1545,7 @@ ${spec}
 Please provide a corrected version of the diagram.`.trim();
 
                 // Trigger a continuation turn
+                visualizeCurrentTurnRef.current = true;
                 // eslint-disable-next-line @typescript-eslint/no-floating-promises
                 submitQuery(
                   [{ text: repairPrompt }],

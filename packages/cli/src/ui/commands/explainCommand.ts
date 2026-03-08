@@ -13,7 +13,21 @@ export const explainCommand: SlashCommand = {
     kind: CommandKind.BUILT_IN,
     autoExecute: true,
     action: async (context, args) => {
-        const inputArg = args.trim();
+        const rawInputArg = args.trim();
+        if (!rawInputArg) {
+            context.ui.addItem({
+                type: MessageType.ERROR,
+                text: 'Usage: /explain <query> or /explain @file',
+            });
+            return;
+        }
+
+        const visualizeRequested =
+            /(?:^|\s)(?:--visualize|-v)(?=\s|$)/i.test(rawInputArg);
+        const inputArg = rawInputArg
+            .replace(/(?:^|\s)(?:--visualize|-v)(?=\s|$)/gi, ' ')
+            .trim();
+
         if (!inputArg) {
             context.ui.addItem({
                 type: MessageType.ERROR,
@@ -22,7 +36,9 @@ export const explainCommand: SlashCommand = {
             return;
         }
 
-        const isVisualizeEnabled = context.services.config?.getVisualize() ?? false;
+        const isVisualizeEnabled =
+            visualizeRequested ||
+            (context.services.config?.getVisualize() ?? false);
 
         // Specialized prompt to encourage visualization
         const enhancedPrompt = `
