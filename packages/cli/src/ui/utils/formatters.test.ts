@@ -10,9 +10,45 @@ import {
   formatBytes,
   formatTimeAgo,
   stripReferenceContent,
+  formatResetTime,
 } from './formatters.js';
 
 describe('formatters', () => {
+  describe('formatResetTime', () => {
+    const NOW = new Date('2025-01-01T12:00:00Z');
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(NOW);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('should format full time correctly', () => {
+      const resetTime = new Date(NOW.getTime() + 90 * 60 * 1000).toISOString(); // 1h 30m
+      const result = formatResetTime(resetTime);
+      expect(result).toMatch(/1 hour 30 minutes at \d{1,2}:\d{2} [AP]M/);
+    });
+
+    it('should format terse time correctly', () => {
+      const resetTime = new Date(NOW.getTime() + 90 * 60 * 1000).toISOString(); // 1h 30m
+      expect(formatResetTime(resetTime, 'terse')).toBe('1h 30m');
+    });
+
+    it('should format column time correctly', () => {
+      const resetTime = new Date(NOW.getTime() + 90 * 60 * 1000).toISOString(); // 1h 30m
+      const result = formatResetTime(resetTime, 'column');
+      expect(result).toMatch(/\d{1,2}:\d{2} [AP]M \(1h 30m\)/);
+    });
+
+    it('should handle zero or negative diff by returning empty string', () => {
+      const resetTime = new Date(NOW.getTime() - 1000).toISOString();
+      expect(formatResetTime(resetTime)).toBe('');
+    });
+  });
+
   describe('formatBytes', () => {
     it('should format bytes into KB', () => {
       expect(formatBytes(12345)).toBe('12.1 KB');
