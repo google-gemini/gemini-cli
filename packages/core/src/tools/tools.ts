@@ -61,13 +61,55 @@ export interface ToolInvocation<
    * Executes the tool with the validated parameters.
    * @param signal AbortSignal for tool cancellation.
    * @param updateOutput Optional callback to stream output.
+   * @param setExecutionIdCallback Optional callback for tools that expose a background execution handle.
    * @returns Result of the tool execution.
    */
   execute(
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
+    setExecutionIdCallback?: (executionId: number) => void,
   ): Promise<TResult>;
+}
+
+/**
+ * Structured payload used by tools to surface background execution metadata to
+ * the CLI UI.
+ */
+export interface BackgroundExecutionData extends Record<string, unknown> {
+  /**
+   * Neutral execution identifier for background lifecycle tracking.
+   */
+  executionId?: number;
+  /**
+   * Backwards-compatible alias for executionId.
+   */
+  pid?: number;
+  command?: string;
+  initialOutput?: string;
+}
+
+export function isBackgroundExecutionData(
+  data: unknown,
+): data is BackgroundExecutionData {
+  if (typeof data !== 'object' || data === null) {
+    return false;
+  }
+
+  const value = data as Partial<BackgroundExecutionData>;
+  return (
+    (value.executionId === undefined || typeof value.executionId === 'number') &&
+    (value.pid === undefined || typeof value.pid === 'number') &&
+    (value.command === undefined || typeof value.command === 'string') &&
+    (value.initialOutput === undefined ||
+      typeof value.initialOutput === 'string')
+  );
+}
+
+export function getBackgroundExecutionId(
+  data: BackgroundExecutionData,
+): number | undefined {
+  return data.executionId ?? data.pid;
 }
 
 /**

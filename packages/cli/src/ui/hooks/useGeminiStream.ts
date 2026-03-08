@@ -94,16 +94,17 @@ type ToolResponseWithParts = ToolCallResponseInfo & {
   llmContent?: PartListUnion;
 };
 
-interface BackgroundExecutionData {
-  pid?: number;
-  command?: string;
-  initialOutput?: string;
-}
-
 interface BackgroundedShellInfo {
   pid: number;
   command: string;
   initialOutput: string;
+}
+
+interface BackgroundExecutionData {
+  executionId?: number;
+  pid?: number;
+  command?: string;
+  initialOutput?: string;
 }
 
 enum StreamProcessingStatus {
@@ -123,12 +124,31 @@ function isBackgroundExecutionData(
   if (typeof data !== 'object' || data === null) {
     return false;
   }
-  const d = data as Partial<BackgroundExecutionData>;
+
+  const executionId = 'executionId' in data ? data.executionId : undefined;
+  const pid = 'pid' in data ? data.pid : undefined;
+  const command = 'command' in data ? data.command : undefined;
+  const initialOutput =
+    'initialOutput' in data ? data.initialOutput : undefined;
+
   return (
-    (d.pid === undefined || typeof d.pid === 'number') &&
-    (d.command === undefined || typeof d.command === 'string') &&
-    (d.initialOutput === undefined || typeof d.initialOutput === 'string')
+    (executionId === undefined || typeof executionId === 'number') &&
+    (pid === undefined || typeof pid === 'number') &&
+    (command === undefined || typeof command === 'string') &&
+    (initialOutput === undefined || typeof initialOutput === 'string')
   );
+}
+
+function getBackgroundExecutionId(
+  data: BackgroundExecutionData,
+): number | undefined {
+  if (typeof data.executionId === 'number') {
+    return data.executionId;
+  }
+  if (typeof data.pid === 'number') {
+    return data.pid;
+  }
+  return undefined;
 }
 
 function getBackgroundedShellInfo(
@@ -141,13 +161,14 @@ function getBackgroundedShellInfo(
   const response = toolCall.response as ToolResponseWithParts;
   const rawData = response?.data;
   const data = isBackgroundExecutionData(rawData) ? rawData : undefined;
+  const executionId = data ? getBackgroundExecutionId(data) : undefined;
 
-  if (!data?.pid) {
+  if (!executionId) {
     return undefined;
   }
 
   return {
-    pid: data.pid,
+    pid: executionId,
     command: data.command ?? 'shell',
     initialOutput: data.initialOutput ?? '',
   };
