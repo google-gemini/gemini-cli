@@ -23,6 +23,7 @@ const BOX = {
     ARROW_R: '──▶',
     ARROW_L: '◀──',
     ARROW_BI: '◀──▶',
+    ARROW_D: '▼',
     DASH: '- - -',
 } as const;
 
@@ -213,35 +214,51 @@ function renderFlowchart(spec: string, termWidth = 100): string {
     const lines: string[] = [''];
     const renderedNodes = new Set<string>();
 
-    for (const node of nodes) {
+    for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i];
         if (renderedNodes.has(node.id)) continue;
 
-        const label = node.label.slice(0, termWidth - 8);
+        const label = node.label.slice(0, termWidth - 10);
         const boxWidth = label.length + 4;
-        const padding = ' ';
+        const halfBox = Math.floor(boxWidth / 2);
+        const indent = ' '.repeat(5);
 
+        // Render the node box
         if (node.shape === 'diamond') {
-            lines.push(`  ` + chalk.magenta(`◇ ${label}`));
+            lines.push(indent + chalk.magenta(`◇ ${label}`));
         } else if (node.shape === 'round') {
-            lines.push(`  ` + chalk.green(`╰──── ${label} ────╯`));
+            lines.push(indent + chalk.green(`( ${label} )`));
         } else {
-            lines.push(`  ` + chalk.blue(`${BOX.TL}${BOX.H.repeat(boxWidth)}${BOX.TR}`));
-            lines.push(`  ` + chalk.blue(`${BOX.V}`) + chalk.white(`${padding}${label}${padding}`) + chalk.blue(`${BOX.V}`));
-            lines.push(`  ` + chalk.blue(`${BOX.BL}${BOX.H.repeat(boxWidth)}${BOX.BR}`));
+            lines.push(indent + chalk.blue(`${BOX.TL}${BOX.H.repeat(boxWidth)}${BOX.TR}`));
+            lines.push(indent + chalk.blue(`${BOX.V}`) + chalk.white(` ${label} `) + chalk.blue(`${BOX.V}`));
+            lines.push(indent + chalk.blue(`${BOX.BL}${BOX.H.repeat(boxWidth)}${BOX.BR}`));
         }
         renderedNodes.add(node.id);
 
-        // Print edges FROM this node
-        const outEdges = edges.filter((e) => e.from === node.id);
-        for (const edge of outEdges) {
-            const edgeLabel = edge.label ? ` [${edge.label}] ` : ' ';
-            lines.push(`       ` + chalk.gray(`${BOX.V}`));
-            lines.push(`       ` + chalk.yellow(`${BOX.ARROW_R}`) + chalk.gray(`${edgeLabel}`) + chalk.bold.white(`${edge.to}`));
+        // Find edges FROM this node
+        const outTransitions = edges.filter(e => e.from === node.id);
+        const nextNode = nodes[i + 1];
+
+        for (const t of outTransitions) {
+            const isNext = nextNode && t.to === nextNode.id;
+            const labelStr = t.label ? chalk.gray(` [${t.label}] `) : '';
+
+            // If pointing to the very next node, use a centered vertical arrow
+            if (isNext) {
+                lines.push(indent + ' '.repeat(halfBox + 1) + chalk.gray(BOX.V));
+                lines.push(indent + ' '.repeat(halfBox + 1) + chalk.yellow(BOX.ARROW_D) + labelStr);
+            } else {
+                // Diagonal/Branching (simplified as right arrow)
+                lines.push(indent + ' '.repeat(halfBox + 1) + chalk.gray('└─') + chalk.yellow(BOX.ARROW_R) + labelStr + chalk.bold.white(t.to));
+            }
         }
 
-        lines.push('');
+        if (outTransitions.length === 0 && i < nodes.length - 1) {
+            lines.push(''); // Gap between disconnected parts
+        }
     }
 
+    lines.push('\n'); // Strategic padding
     return lines.join('\n');
 }
 
@@ -303,39 +320,55 @@ function renderStateDiagram(spec: string, termWidth = 100): string {
     if (transitions.length === 0 && states.length === 0) return renderGenericFallback(spec, termWidth);
 
     const lines: string[] = [''];
+    const indent = '  ';
+    const renderedStates = new Set<string>();
 
-    // Start with entry points
-    const startTransitions = transitions.filter(t => t.from === '[*]');
-    for (const t of startTransitions) {
-        lines.push(`  ` + chalk.cyan(`● (START)`));
-        lines.push(`  ` + chalk.gray(`${BOX.V}`));
-        lines.push(`  ` + chalk.yellow(`${BOX.ARROW_R}`) + (t.label ? chalk.gray(` [${t.label}] `) : ' ') + chalk.bold.white(t.to));
+    // 1. Render entry points
+    const entryTransitions = transitions.filter(t => t.from === '[*]');
+    for (const t of entryTransitions) {
+        lines.push(indent + chalk.cyan(`● (START)`));
+        lines.push(indent + '    ' + chalk.gray(BOX.V));
+        lines.push(indent + '    ' + chalk.yellow(BOX.ARROW_D) + (t.label ? chalk.gray(` [${t.label}]`) : ''));
         lines.push('');
     }
 
-    const renderedStates = new Set<string>();
-
-    for (const state of states) {
+    // 2. Render sequence of states
+    for (let i = 0; i < states.length; i++) {
+        const state = states[i];
         if (renderedStates.has(state.id)) continue;
 
         const label = state.label.slice(0, termWidth - 10);
-        const boxWidth = label.length + 6;
+        const boxWidth = label.length + 4;
+        const halfBox = Math.floor(boxWidth / 2);
 
-        lines.push(`  ` + chalk.blue(`╭${BOX.H.repeat(boxWidth)}╮`));
-        lines.push(`  ` + chalk.blue(`│`) + chalk.bold.white(`  ${label}  `) + chalk.blue(`│`));
-        lines.push(`  ` + chalk.blue(`╰${BOX.H.repeat(boxWidth)}╯`));
+        // Draw the state box
+        lines.push(indent + chalk.blue(`╭${BOX.H.repeat(boxWidth)}╮`));
+        lines.push(indent + chalk.blue(`│`) + chalk.bold.white(` ${label} `) + chalk.blue(`│`));
+        lines.push(indent + chalk.blue(`╰${BOX.H.repeat(boxWidth)}╯`));
         renderedStates.add(state.id);
 
+        // Transitions from this state
         const out = transitions.filter(t => t.from === state.id);
+        const nextState = states[i + 1];
+
         for (const t of out) {
-            const label = t.label ? ` [${t.label}] ` : ' ';
-            const target = t.to === '[*]' ? chalk.cyan('● (END)') : chalk.bold.white(t.to);
-            lines.push(`       ` + chalk.gray(`${BOX.V}`));
-            lines.push(`       ` + chalk.yellow(`${BOX.ARROW_R}`) + chalk.gray(label) + target);
+            const labelStr = t.label ? chalk.gray(` [${t.label}] `) : '';
+            if (t.to === '[*]') {
+                lines.push(indent + ' '.repeat(halfBox + 1) + chalk.gray(BOX.V));
+                lines.push(indent + ' '.repeat(halfBox + 1) + chalk.yellow(BOX.ARROW_D) + labelStr + chalk.cyan('● (END)'));
+            } else if (nextState && t.to === nextState.id) {
+                // Vertical arrow to next rendered box
+                lines.push(indent + ' '.repeat(halfBox + 1) + chalk.gray(BOX.V));
+                lines.push(indent + ' '.repeat(halfBox + 1) + chalk.yellow(BOX.ARROW_D) + labelStr);
+            } else {
+                // Sideways arrow for branches
+                lines.push(indent + ' '.repeat(halfBox + 1) + chalk.gray('└─') + chalk.yellow(BOX.ARROW_R) + labelStr + chalk.bold.white(t.to));
+            }
         }
         lines.push('');
     }
 
+    lines.push('\n'); // Strategic padding
     return lines.join('\n');
 }
 
