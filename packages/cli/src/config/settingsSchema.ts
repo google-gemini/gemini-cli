@@ -118,6 +118,10 @@ export interface SettingDefinition {
    */
   additionalProperties?: SettingCollectionDefinition;
   /**
+   * Optional unit to display after the value (e.g. '%').
+   */
+  unit?: string;
+  /**
    * Optional reference identifier for generators that emit a `$ref`.
    */
   ref?: string;
@@ -339,7 +343,7 @@ const SETTINGS_SCHEMA = {
             label: 'Enable Session Cleanup',
             category: 'General',
             requiresRestart: false,
-            default: false,
+            default: true as boolean,
             description: 'Enable automatic session cleanup',
             showInDialog: true,
           },
@@ -348,7 +352,7 @@ const SETTINGS_SCHEMA = {
             label: 'Keep chat history',
             category: 'General',
             requiresRestart: false,
-            default: undefined as string | undefined,
+            default: '30d' as string,
             description:
               'Automatically delete chats older than this time period (e.g., "30d", "7d", "24h", "1w")',
             showInDialog: true,
@@ -371,16 +375,6 @@ const SETTINGS_SCHEMA = {
             default: DEFAULT_MIN_RETENTION,
             description: `Minimum retention period (safety limit, defaults to "${DEFAULT_MIN_RETENTION}")`,
             showInDialog: false,
-          },
-          warningAcknowledged: {
-            type: 'boolean',
-            label: 'Warning Acknowledged',
-            category: 'General',
-            requiresRestart: false,
-            default: false,
-            showInDialog: false,
-            description:
-              'INTERNAL: Whether the user has acknowledged the session retention warning',
           },
         },
         description: 'Settings for automatic session cleanup.',
@@ -571,14 +565,34 @@ const SETTINGS_SCHEMA = {
         description: 'Settings for the footer.',
         showInDialog: false,
         properties: {
+          items: {
+            type: 'array',
+            label: 'Footer Items',
+            category: 'UI',
+            requiresRestart: false,
+            default: undefined as string[] | undefined,
+            description:
+              'List of item IDs to display in the footer. Rendered in order',
+            showInDialog: false,
+            items: { type: 'string' },
+          },
+          showLabels: {
+            type: 'boolean',
+            label: 'Show Footer Labels',
+            category: 'UI',
+            requiresRestart: false,
+            default: true,
+            description:
+              'Display a second line above the footer items with descriptive headers (e.g., /model).',
+            showInDialog: false,
+          },
           hideCWD: {
             type: 'boolean',
             label: 'Hide CWD',
             category: 'UI',
             requiresRestart: false,
             default: false,
-            description:
-              'Hide the current working directory path in the footer.',
+            description: 'Hide the current working directory in the footer.',
             showInDialog: true,
           },
           hideSandboxStatus: {
@@ -605,7 +619,7 @@ const SETTINGS_SCHEMA = {
             category: 'UI',
             requiresRestart: false,
             default: true,
-            description: 'Hides the context window remaining percentage.',
+            description: 'Hides the context window usage percentage.',
             showInDialog: true,
           },
         },
@@ -719,6 +733,20 @@ const SETTINGS_SCHEMA = {
           { value: 'off', label: 'Off' },
         ],
       },
+      errorVerbosity: {
+        type: 'enum',
+        label: 'Error Verbosity',
+        category: 'UI',
+        requiresRestart: false,
+        default: 'low',
+        description:
+          'Controls whether recoverable errors are hidden (low) or fully shown (full).',
+        showInDialog: true,
+        options: [
+          { value: 'low', label: 'Low' },
+          { value: 'full', label: 'Full' },
+        ],
+      },
       customWittyPhrases: {
         type: 'array',
         label: 'Custom Witty Phrases',
@@ -828,6 +856,36 @@ const SETTINGS_SCHEMA = {
     ref: 'TelemetrySettings',
   },
 
+  billing: {
+    type: 'object',
+    label: 'Billing',
+    category: 'Advanced',
+    requiresRestart: false,
+    default: {},
+    description: 'Billing and AI credits settings.',
+    showInDialog: false,
+    properties: {
+      overageStrategy: {
+        type: 'enum',
+        label: 'Overage Strategy',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: 'ask',
+        description: oneLine`
+          How to handle quota exhaustion when AI credits are available.
+          'ask' prompts each time, 'always' automatically uses credits,
+          'never' disables credit usage.
+        `,
+        showInDialog: true,
+        options: [
+          { value: 'ask', label: 'Ask each time' },
+          { value: 'always', label: 'Always use credits' },
+          { value: 'never', label: 'Never use credits' },
+        ],
+      },
+    },
+  },
+
   model: {
     type: 'object',
     label: 'Model',
@@ -879,13 +937,14 @@ const SETTINGS_SCHEMA = {
       },
       compressionThreshold: {
         type: 'number',
-        label: 'Compression Threshold',
+        label: 'Context Compression Threshold',
         category: 'Model',
         requiresRestart: true,
         default: 0.5 as number,
         description:
           'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
         showInDialog: true,
+        unit: '%',
       },
       disableLoopDetection: {
         type: 'boolean',
@@ -1165,7 +1224,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description: oneLine`
-          Controls how /memory refresh loads GEMINI.md files.
+          Controls how /memory reload loads GEMINI.md files.
           When true, include directories are scanned; when false, only the current directory is used.
         `,
         showInDialog: true,
@@ -1252,7 +1311,8 @@ const SETTINGS_SCHEMA = {
         ref: 'BooleanOrString',
         description: oneLine`
           Sandbox execution environment.
-          Set to a boolean to enable or disable the sandbox, or provide a string path to a sandbox profile.
+          Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile,
+          or specify an explicit sandbox command (e.g., "docker", "podman", "lxc").
         `,
         showInDialog: false,
       },
@@ -1822,6 +1882,15 @@ const SETTINGS_SCHEMA = {
         description: 'Enable planning features (Plan Mode and tools).',
         showInDialog: true,
       },
+      taskTracker: {
+        type: 'boolean',
+        label: 'Task Tracker',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable task tracker tools.',
+        showInDialog: false,
+      },
       modelSteering: {
         type: 'boolean',
         label: 'Model Steering',
@@ -1851,6 +1920,57 @@ const SETTINGS_SCHEMA = {
         description:
           'Enable dynamic model configuration (definitions, resolutions, and chains) via settings.',
         showInDialog: true,
+      },
+      gemmaModelRouter: {
+        type: 'object',
+        label: 'Gemma Model Router',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: {},
+        description: 'Enable Gemma model router (experimental).',
+        showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Gemma Model Router',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Enable the Gemma Model Router (experimental). Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
+            showInDialog: false,
+          },
+          classifier: {
+            type: 'object',
+            label: 'Classifier',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: {},
+            description: 'Classifier configuration.',
+            showInDialog: false,
+            properties: {
+              host: {
+                type: 'string',
+                label: 'Host',
+                category: 'Experimental',
+                requiresRestart: true,
+                default: 'http://localhost:9379',
+                description: 'The host of the classifier.',
+                showInDialog: false,
+              },
+              model: {
+                type: 'string',
+                label: 'Model',
+                category: 'Experimental',
+                requiresRestart: true,
+                default: 'gemma3-1b-gpu-custom',
+                description:
+                  'The model to use for the classifier. Only tested on `gemma3-1b-gpu-custom`.',
+                showInDialog: false,
+              },
+            },
+          },
+        },
       },
     },
   },
@@ -2657,7 +2777,9 @@ type InferSettings<T extends SettingsSchema> = {
         : T[K]['default']
       : T[K]['default'] extends boolean
         ? boolean
-        : T[K]['default'];
+        : T[K]['default'] extends string
+          ? string
+          : T[K]['default'];
 };
 
 type InferMergedSettings<T extends SettingsSchema> = {
@@ -2669,7 +2791,9 @@ type InferMergedSettings<T extends SettingsSchema> = {
         : T[K]['default']
       : T[K]['default'] extends boolean
         ? boolean
-        : T[K]['default'];
+        : T[K]['default'] extends string
+          ? string
+          : T[K]['default'];
 };
 
 export type Settings = InferSettings<SettingsSchemaType>;

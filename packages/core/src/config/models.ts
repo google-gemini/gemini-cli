@@ -46,6 +46,7 @@ export const DEFAULT_THINKING_MODE = 8192;
  * @param requestedModel The model alias or concrete model name requested by the user.
  * @param useGemini3_1 Whether to use Gemini 3.1 Pro Preview for auto/pro aliases.
  * @param useCustomToolModel Whether to use the custom tool model for auto/pro aliases.
+ * @param hasAccessToPreview Whether the user has access to preview models.
  * @param config Optional config object for dynamic model configuration.
  * @returns The resolved concrete model name.
  */
@@ -53,40 +54,72 @@ export function resolveModel(
   requestedModel: string,
   useGemini3_1 = false,
   useCustomToolModel = false,
+  hasAccessToPreview: boolean = true,
   config?: Config,
 ): string {
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     return config.modelConfigService.resolveModelId(requestedModel, {
       useGemini3_1,
       useCustomTools: useCustomToolModel,
+      hasAccessToPreview,
     });
   }
 
+  let resolved: string;
   switch (requestedModel) {
     case PREVIEW_GEMINI_MODEL:
     case PREVIEW_GEMINI_MODEL_AUTO:
     case GEMINI_MODEL_ALIAS_AUTO:
     case GEMINI_MODEL_ALIAS_PRO: {
       if (useGemini3_1) {
-        return useCustomToolModel
+        resolved = useCustomToolModel
           ? PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
           : PREVIEW_GEMINI_3_1_MODEL;
+      } else {
+        resolved = PREVIEW_GEMINI_MODEL;
       }
-      return PREVIEW_GEMINI_MODEL;
+      break;
     }
     case DEFAULT_GEMINI_MODEL_AUTO: {
-      return DEFAULT_GEMINI_MODEL;
+      resolved = DEFAULT_GEMINI_MODEL;
+      break;
     }
     case GEMINI_MODEL_ALIAS_FLASH: {
-      return PREVIEW_GEMINI_FLASH_MODEL;
+      resolved = PREVIEW_GEMINI_FLASH_MODEL;
+      break;
     }
     case GEMINI_MODEL_ALIAS_FLASH_LITE: {
-      return DEFAULT_GEMINI_FLASH_LITE_MODEL;
+      resolved = DEFAULT_GEMINI_FLASH_LITE_MODEL;
+      break;
     }
     default: {
-      return requestedModel;
+      resolved = requestedModel;
+      break;
     }
   }
+
+  if (!hasAccessToPreview && isPreviewModel(resolved)) {
+    // Downgrade to stable models if user lacks preview access.
+    switch (resolved) {
+      case PREVIEW_GEMINI_FLASH_MODEL:
+        return DEFAULT_GEMINI_FLASH_MODEL;
+      case PREVIEW_GEMINI_MODEL:
+      case PREVIEW_GEMINI_3_1_MODEL:
+      case PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL:
+        return DEFAULT_GEMINI_MODEL;
+      default:
+        // Fallback for unknown preview models, preserving original logic.
+        if (resolved.includes('flash-lite')) {
+          return DEFAULT_GEMINI_FLASH_LITE_MODEL;
+        }
+        if (resolved.includes('flash')) {
+          return DEFAULT_GEMINI_FLASH_MODEL;
+        }
+        return DEFAULT_GEMINI_MODEL;
+    }
+  }
+
+  return resolved;
 }
 
 /**
@@ -104,6 +137,7 @@ export function resolveClassifierModel(
   modelAlias: string,
   useGemini3_1: boolean = false,
   useCustomToolModel: boolean = false,
+  hasAccessToPreview: boolean = true,
   config?: Config,
 ): string {
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
@@ -113,6 +147,7 @@ export function resolveClassifierModel(
       {
         useGemini3_1,
         useCustomTools: useCustomToolModel,
+        hasAccessToPreview,
       },
     );
   }

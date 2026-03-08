@@ -123,7 +123,19 @@ describe('partUtils', () => {
 
     it('should return descriptive string for inlineData part', () => {
       const part = { inlineData: { mimeType: 'image/png', data: '' } } as Part;
-      expect(partToString(part, verboseOptions)).toBe('<image/png>');
+      expect(partToString(part, verboseOptions)).toBe(
+        '[Image: image/png, 0.0 KB]',
+      );
+    });
+
+    it('should show size for inlineData with non-empty base64 data', () => {
+      // 4 base64 chars → ceil(4*3/4) = 3 bytes → 3/1024 ≈ 0.0 KB
+      const part = {
+        inlineData: { mimeType: 'audio/mp3', data: 'AAAA' },
+      } as Part;
+      expect(partToString(part, verboseOptions)).toBe(
+        '[Audio: audio/mp3, 0.0 KB]',
+      );
     });
 
     it('should return an empty string for an unknown part type', () => {
@@ -142,7 +154,7 @@ describe('partUtils', () => {
         ],
       ];
       expect(partToString(parts as Part, verboseOptions)).toBe(
-        'start middle[Function Call: func1] end<audio/mp3>',
+        'start middle[Function Call: func1] end[Audio: audio/mp3, 0.0 KB]',
       );
     });
   });

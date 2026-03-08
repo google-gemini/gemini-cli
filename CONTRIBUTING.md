@@ -75,11 +75,14 @@ Replace `<PR_NUMBER>` with your pull request number. Authors are encouraged to
 run this on their own PRs for self-review, and reviewers should use it to
 augment their manual review process.
 
-### Self assigning issues
+### Self-assigning and unassigning issues
 
-To assign an issue to yourself, simply add a comment with the text `/assign`.
-The comment must contain only that text and nothing else. This command will
-assign the issue to you, provided it is not already assigned.
+To assign an issue to yourself, simply add a comment with the text `/assign`. To
+unassign yourself from an issue, add a comment with the text `/unassign`.
+
+The comment must contain only that text and nothing else. These commands will
+assign or unassign the issue as requested, provided the conditions are met
+(e.g., an issue must be unassigned to be assigned).
 
 Please note that you can have a maximum of 3 issues assigned to you at any given
 time.
@@ -317,11 +320,9 @@ npm run lint
 
 - Please adhere to the coding style, patterns, and conventions used throughout
   the existing codebase.
-- Consult
-  [GEMINI.md](https://github.com/google-gemini/gemini-cli/blob/main/GEMINI.md)
-  (typically found in the project root) for specific instructions related to
-  AI-assisted development, including conventions for React, comments, and Git
-  usage.
+- Consult [GEMINI.md](../GEMINI.md) (typically found in the project root) for
+  specific instructions related to AI-assisted development, including
+  conventions for React, comments, and Git usage.
 - **Imports:** Pay special attention to import paths. The project uses ESLint to
   enforce restrictions on relative imports between packages.
 

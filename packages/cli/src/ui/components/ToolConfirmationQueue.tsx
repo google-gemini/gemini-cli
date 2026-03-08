@@ -15,8 +15,8 @@ import type { ConfirmingToolState } from '../hooks/useConfirmingTool.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { StickyHeader } from './StickyHeader.js';
-import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import type { SerializableConfirmationDetails } from '@google/gemini-cli-core';
+import { useUIActions } from '../contexts/UIActionsContext.js';
 
 function getConfirmationHeader(
   details: SerializableConfirmationDetails | undefined,
@@ -41,7 +41,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
   confirmingTool,
 }) => {
   const config = useConfig();
-  const isAlternateBuffer = useAlternateBuffer();
+  const { getPreferredEditor } = useUIActions();
   const {
     mainAreaWidth,
     terminalHeight,
@@ -134,6 +134,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
             callId={tool.callId}
             confirmationDetails={tool.confirmationDetails}
             config={config}
+            getPreferredEditor={getPreferredEditor}
             terminalWidth={mainAreaWidth - 4} // Adjust for parent border/padding
             availableTerminalHeight={availableContentHeight}
             isFocused={true}
@@ -154,10 +155,5 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
     </>
   );
 
-  return isAlternateBuffer ? (
-    /* Shadow the global provider to maintain isolation in ASB mode. */
-    <OverflowProvider>{content}</OverflowProvider>
-  ) : (
-    content
-  );
+  return <OverflowProvider>{content}</OverflowProvider>;
 };

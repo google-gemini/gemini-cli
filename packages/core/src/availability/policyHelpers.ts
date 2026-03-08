@@ -47,17 +47,19 @@ export function resolvePolicyChain(
   const useCustomToolModel =
     useGemini31 &&
     config.getContentGeneratorConfig?.()?.authType === AuthType.USE_GEMINI;
-
+  const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? true;
+  const isAutoPreferred = preferredModel ? isAutoModel(preferredModel) : false;
+  const isAutoConfigured = isAutoModel(configuredModel);
   const resolvedModel = resolveModel(
     modelFromConfig,
     useGemini31,
     useCustomToolModel,
+    hasAccessToPreview,
     config,
   );
 
   // --- DYNAMIC PATH ---
   if (config.getExperimentalDynamicModelConfiguration?.() === true) {
-    const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? true;
     let chain;
 
     const context = {
@@ -104,12 +106,6 @@ export function resolvePolicyChain(
   }
 
   // --- LEGACY PATH ---
-  const isAutoPreferred = preferredModel
-    ? isAutoModel(preferredModel, config)
-    : false;
-  const isAutoConfigured = isAutoModel(configuredModel, config);
-  const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? true;
-
   let chain;
   if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
     chain = getFlashLitePolicyChain();
@@ -132,7 +128,7 @@ export function resolvePolicyChain(
     } else {
       // User requested Gemini 3 but has no access. Proactively downgrade
       // to the stable Gemini 2.5 chain.
-      return getModelPolicyChain({
+      chain = getModelPolicyChain({
         previewEnabled: false,
         userTier: config.getUserTier(),
         useGemini31,

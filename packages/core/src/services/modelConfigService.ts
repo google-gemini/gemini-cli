@@ -97,6 +97,7 @@ export interface ModelResolution {
 export interface ResolutionContext {
   useGemini3_1?: boolean;
   useCustomTools?: boolean;
+  hasAccessToPreview?: boolean;
   requestedModel?: string;
 }
 
@@ -104,6 +105,7 @@ export interface ResolutionContext {
 export interface ResolutionCondition {
   useGemini3_1?: boolean;
   useCustomTools?: boolean;
+  hasAccessToPreview?: boolean;
   /** Matches if the current model is in this list. */
   requestedModels?: string[];
 }
@@ -174,6 +176,12 @@ export class ModelConfigService {
     if (
       condition.useCustomTools !== undefined &&
       condition.useCustomTools !== context.useCustomTools
+    ) {
+      return false;
+    }
+    if (
+      condition.hasAccessToPreview !== undefined &&
+      condition.hasAccessToPreview !== context.hasAccessToPreview
     ) {
       return false;
     }

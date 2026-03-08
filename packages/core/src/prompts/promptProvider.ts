@@ -61,6 +61,7 @@ export class PromptProvider {
       config.getActiveModel(),
       config.getGemini31LaunchedSync?.() ?? false,
       false,
+      config.getHasAccessToPreviewModel?.() ?? true,
       config,
     );
     const isModernModel = supportsModernFeatures(desiredModel, config);
@@ -161,6 +162,7 @@ export class PromptProvider {
             approvedPlan: approvedPlanPath
               ? { path: approvedPlanPath }
               : undefined,
+            taskTracker: config.isTrackerEnabled(),
           }),
           !isPlanMode,
         ),
@@ -170,9 +172,11 @@ export class PromptProvider {
             planModeToolsList,
             plansDir: config.storage.getPlansDir(),
             approvedPlanPath: config.getApprovedPlanPath(),
+            taskTracker: config.isTrackerEnabled(),
           }),
           isPlanMode,
         ),
+        taskTracker: config.isTrackerEnabled(),
         operationalGuidelines: this.withSection(
           'operationalGuidelines',
           () => ({
@@ -231,11 +235,12 @@ export class PromptProvider {
       config.getActiveModel(),
       config.getGemini31LaunchedSync?.() ?? false,
       false,
+      config.getHasAccessToPreviewModel?.() ?? true,
       config,
     );
     const isModernModel = supportsModernFeatures(desiredModel, config);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
-    return activeSnippets.getCompressionPrompt();
+    return activeSnippets.getCompressionPrompt(config.getApprovedPlanPath());
   }
 
   private withSection<T>(

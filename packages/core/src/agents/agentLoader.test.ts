@@ -15,8 +15,11 @@ import {
   AgentLoadError,
 } from './agentLoader.js';
 import { GEMINI_MODEL_ALIAS_PRO } from '../config/models.js';
-import type { LocalAgentDefinition } from './types.js';
-import { DEFAULT_MAX_TIME_MINUTES, DEFAULT_MAX_TURNS } from './types.js';
+import {
+  DEFAULT_MAX_TIME_MINUTES,
+  DEFAULT_MAX_TURNS,
+  type LocalAgentDefinition,
+} from './types.js';
 
 describe('loader', () => {
   let tempDir: string;
@@ -435,6 +438,54 @@ auth:
           scheme: 'Basic',
           username: '$AUTH_USER',
           password: '$AUTH_PASS',
+        },
+      });
+    });
+
+    it('should parse remote agent with Digest via raw value', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: digest-agent
+agent_card_url: https://example.com/card
+auth:
+  type: http
+  scheme: Digest
+  value: username="admin", response="abc123"
+---
+`);
+      const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        kind: 'remote',
+        name: 'digest-agent',
+        auth: {
+          type: 'http',
+          scheme: 'Digest',
+          value: 'username="admin", response="abc123"',
+        },
+      });
+    });
+
+    it('should parse remote agent with generic raw auth value', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: raw-agent
+agent_card_url: https://example.com/card
+auth:
+  type: http
+  scheme: CustomScheme
+  value: raw-token-value
+---
+`);
+      const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        kind: 'remote',
+        name: 'raw-agent',
+        auth: {
+          type: 'http',
+          scheme: 'CustomScheme',
+          value: 'raw-token-value',
         },
       });
     });

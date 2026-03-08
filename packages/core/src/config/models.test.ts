@@ -70,24 +70,37 @@ describe('Dynamic Configuration Parity', () => {
   it('resolveModel should match legacy behavior', () => {
     for (const model of modelsToTest) {
       for (const flags of flagCombos) {
-        const legacy = resolveModel(
-          model,
-          flags.useGemini3_1,
-          flags.useCustomToolModel,
-          legacyConfig,
-        );
-        const dynamic = resolveModel(
-          model,
-          flags.useGemini3_1,
-          flags.useCustomToolModel,
-          dynamicConfig,
-        );
-        expect(dynamic).toBe(legacy);
+        for (const hasAccess of [true, false]) {
+          const mockLegacyConfig = {
+            ...legacyConfig,
+            getHasAccessToPreviewModel: () => hasAccess,
+          } as unknown as Config;
+          const mockDynamicConfig = {
+            ...dynamicConfig,
+            getHasAccessToPreviewModel: () => hasAccess,
+          } as unknown as Config;
+
+          const legacy = resolveModel(
+            model,
+            flags.useGemini3_1,
+            flags.useCustomToolModel,
+            hasAccess,
+            mockLegacyConfig,
+          );
+          const dynamic = resolveModel(
+            model,
+            flags.useGemini3_1,
+            flags.useCustomToolModel,
+            hasAccess,
+            mockDynamicConfig,
+          );
+          expect(dynamic).toBe(legacy);
+        }
       }
     }
   });
 
-  it('resolveClassifierModel should match legacy behavior', () => {
+  it('resolveClassifierModel should match legacy behavior (with preview access)', () => {
     const classifierTiers = [GEMINI_MODEL_ALIAS_PRO, GEMINI_MODEL_ALIAS_FLASH];
     const anchorModels = [
       PREVIEW_GEMINI_MODEL_AUTO,
@@ -95,6 +108,16 @@ describe('Dynamic Configuration Parity', () => {
       PREVIEW_GEMINI_MODEL,
       DEFAULT_GEMINI_MODEL,
     ];
+
+    const hasAccess = true;
+    const mockLegacyConfig = {
+      ...legacyConfig,
+      getHasAccessToPreviewModel: () => hasAccess,
+    } as unknown as Config;
+    const mockDynamicConfig = {
+      ...dynamicConfig,
+      getHasAccessToPreviewModel: () => hasAccess,
+    } as unknown as Config;
 
     for (const tier of classifierTiers) {
       for (const anchor of anchorModels) {
@@ -104,14 +127,60 @@ describe('Dynamic Configuration Parity', () => {
             tier,
             flags.useGemini3_1,
             flags.useCustomToolModel,
-            legacyConfig,
+            hasAccess,
+            mockLegacyConfig,
           );
           const dynamic = resolveClassifierModel(
             anchor,
             tier,
             flags.useGemini3_1,
             flags.useCustomToolModel,
-            dynamicConfig,
+            hasAccess,
+            mockDynamicConfig,
+          );
+          expect(dynamic).toBe(legacy);
+        }
+      }
+    }
+  });
+
+  it('resolveClassifierModel should match legacy behavior (without preview access)', () => {
+    const classifierTiers = [GEMINI_MODEL_ALIAS_PRO, GEMINI_MODEL_ALIAS_FLASH];
+    const anchorModels = [
+      PREVIEW_GEMINI_MODEL_AUTO,
+      DEFAULT_GEMINI_MODEL_AUTO,
+      PREVIEW_GEMINI_MODEL,
+      DEFAULT_GEMINI_MODEL,
+    ];
+
+    const hasAccess = false;
+    const mockLegacyConfig = {
+      ...legacyConfig,
+      getHasAccessToPreviewModel: () => hasAccess,
+    } as unknown as Config;
+    const mockDynamicConfig = {
+      ...dynamicConfig,
+      getHasAccessToPreviewModel: () => hasAccess,
+    } as unknown as Config;
+
+    for (const tier of classifierTiers) {
+      for (const anchor of anchorModels) {
+        for (const flags of flagCombos) {
+          const legacy = resolveClassifierModel(
+            anchor,
+            tier,
+            flags.useGemini3_1,
+            flags.useCustomToolModel,
+            hasAccess,
+            mockLegacyConfig,
+          );
+          const dynamic = resolveClassifierModel(
+            anchor,
+            tier,
+            flags.useGemini3_1,
+            flags.useCustomToolModel,
+            hasAccess,
+            mockDynamicConfig,
           );
           expect(dynamic).toBe(legacy);
         }
@@ -373,6 +442,38 @@ describe('resolveModel', () => {
       const customModel = 'custom-model-v1';
       const model = resolveModel(customModel);
       expect(model).toBe(customModel);
+    });
+  });
+
+  describe('hasAccessToPreview logic', () => {
+    it('should return default model when access to preview is false and preview model is requested', () => {
+      expect(resolveModel(PREVIEW_GEMINI_MODEL, false, false, false)).toBe(
+        DEFAULT_GEMINI_MODEL,
+      );
+    });
+
+    it('should return default flash model when access to preview is false and preview flash model is requested', () => {
+      expect(
+        resolveModel(PREVIEW_GEMINI_FLASH_MODEL, false, false, false),
+      ).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+    });
+
+    it('should return default model when access to preview is false and auto-gemini-3 is requested', () => {
+      expect(resolveModel(PREVIEW_GEMINI_MODEL_AUTO, false, false, false)).toBe(
+        DEFAULT_GEMINI_MODEL,
+      );
+    });
+
+    it('should return default model when access to preview is false and Gemini 3.1 is requested', () => {
+      expect(resolveModel(PREVIEW_GEMINI_MODEL_AUTO, true, false, false)).toBe(
+        DEFAULT_GEMINI_MODEL,
+      );
+    });
+
+    it('should still return default model when access to preview is false and auto-gemini-2.5 is requested', () => {
+      expect(resolveModel(DEFAULT_GEMINI_MODEL_AUTO, false, false, false)).toBe(
+        DEFAULT_GEMINI_MODEL,
+      );
     });
   });
 });

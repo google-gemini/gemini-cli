@@ -13,6 +13,7 @@ import type {
   RoutingDecision,
   RoutingStrategy,
 } from '../routingStrategy.js';
+import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 
 export class FallbackStrategy implements RoutingStrategy {
   readonly name = 'fallback';
@@ -21,12 +22,14 @@ export class FallbackStrategy implements RoutingStrategy {
     context: RoutingContext,
     config: Config,
     _baseLlmClient: BaseLlmClient,
+    _localLiteRtLmClient: LocalLiteRtLmClient,
   ): Promise<RoutingDecision | null> {
     const requestedModel = context.requestedModel ?? config.getModel();
     const resolvedModel = resolveModel(
       requestedModel,
       config.getGemini31LaunchedSync?.() ?? false,
       false,
+      config.getHasAccessToPreviewModel?.() ?? true,
       config,
     );
     const service = config.getModelAvailabilityService();
