@@ -147,6 +147,30 @@ export interface VisualArtifactOptions {
   stabilizeAscii?: boolean;
   /** Original render type, used to select the right ASCII fallback */
   diagramType?: 'mermaid' | 'html';
+  /** Optional graphics fit scaling for width in character cells */
+  graphicColScale?: number;
+  /** Optional graphics fit scaling for height in character cells */
+  graphicRowScale?: number;
+}
+
+function sanitizeGraphicScale(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value)) {
+    return 1;
+  }
+  return Math.max(0.35, Math.min(1, value));
+}
+
+function getGraphicCellBudget(
+  columns: number,
+  rows: number,
+  colScale?: number,
+  rowScale?: number,
+): { columns: number; rows: number } {
+  const safeColumns = Math.max(20, Math.floor(columns));
+  const safeRows = Math.max(10, Math.floor(rows));
+  const cols = Math.max(20, Math.floor(safeColumns * sanitizeGraphicScale(colScale)));
+  const rowsBudget = Math.max(10, Math.floor(safeRows * sanitizeGraphicScale(rowScale)));
+  return { columns: cols, rows: rowsBudget };
 }
 
 /**
@@ -197,19 +221,29 @@ export async function renderVisualArtifact(
   // Graphic protocol paths: read the PNG from disk.
   try {
     const pngBuffer = await readFile(result.pngPath);
+    const graphicsBudget = getGraphicCellBudget(
+      caps.columns,
+      caps.rows,
+      options.graphicColScale,
+      options.graphicRowScale,
+    );
 
     let output = '';
     switch (protocol) {
       case 'kitty': {
-        output = encodeKitty(pngBuffer, caps.columns, caps.rows);
+        output = encodeKitty(pngBuffer, graphicsBudget.columns, graphicsBudget.rows);
         break;
       }
       case 'iterm2': {
-        output = encodeIterm2(pngBuffer, caps.columns, caps.rows);
+        output = encodeIterm2(pngBuffer, graphicsBudget.columns, graphicsBudget.rows);
         break;
       }
       case 'sixel': {
-        output = await encodeSixel(pngBuffer, caps.columns, caps.rows);
+        output = await encodeSixel(
+          pngBuffer,
+          graphicsBudget.columns,
+          graphicsBudget.rows,
+        );
         break;
       }
       default: {
