@@ -699,7 +699,7 @@ export class Scheduler {
         }
         case 'next':
         default:
-          break;
+          checkExhaustive(action);
       }
     }
 
