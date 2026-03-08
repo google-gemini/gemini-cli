@@ -46,6 +46,10 @@ import {
   handleMaxTurnsExceededError,
 } from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
+import {
+  collectNewMermaidSpecs,
+  formatUnknownRenderError,
+} from './visualization/mermaidBlocks.js';
 
 interface RunNonInteractiveParams {
   config: Config;
@@ -311,6 +315,7 @@ export async function runNonInteractive({
         let responseText = '';
         let lastRenderingError: { spec: string; error: string } | null = null;
         const seenMermaidSpecs = new Set<string>();
+        const mermaidSpecsToRender: string[] = [];
         for await (const event of responseStream) {
           if (abortController.signal.aborted) {
             handleCancellationError(config);
@@ -339,38 +344,15 @@ export async function runNonInteractive({
             // Accumulate text for mermaid detection
             responseText += event.value;
 
-            // Auto-Pipeline: Detect and render completed Mermaid blocks
+            // Auto-Pipeline: detect Mermaid blocks during streaming, but render
+            // only after stream completion to avoid output interleaving.
             if (config.getVisualize()) {
-              const mermaidRegex = /```mermaid\n([\s\S]*?)```/g;
-              let match;
-              while ((match = mermaidRegex.exec(responseText)) !== null) {
-                const spec = match[1].trim();
-                if (spec && !seenMermaidSpecs.has(spec)) {
-                  seenMermaidSpecs.add(spec);
-                  try {
-                    const { runPipeline, renderVisualArtifact } = await import(
-                      './visualization/index.js'
-                    );
-                    const result = await runPipeline({
-                      spec,
-                      diagramType: 'mermaid',
-                      theme: 'dark',
-                    });
-                    const output = await renderVisualArtifact(result, {
-                      spec,
-                      showMeta: true,
-                    });
-                    if (output) {
-                      textOutput.ensureTrailingNewline();
-                      process.stdout.write('\n');
-                      process.stdout.write(output);
-                      process.stdout.write('\n');
-                    }
-                  } catch (err) {
-                    debugLogger.error(`Auto-pipeline failed: ${err}`);
-                    lastRenderingError = { spec, error: String(err) };
-                  }
-                }
+              const newSpecs = collectNewMermaidSpecs(
+                responseText,
+                seenMermaidSpecs,
+              );
+              if (newSpecs.length > 0) {
+                mermaidSpecsToRender.push(...newSpecs);
               }
             }
           } else if (event.type === GeminiEventType.ToolCallRequest) {
@@ -428,6 +410,43 @@ export async function runNonInteractive({
             const blockMessage = `Agent execution blocked: ${event.value.systemMessage?.trim() || event.value.reason}`;
             if (config.getOutputFormat() === OutputFormat.TEXT) {
               process.stderr.write(`[WARNING] ${blockMessage}\n`);
+            }
+          }
+        }
+
+        if (config.getVisualize() && mermaidSpecsToRender.length > 0) {
+          for (const spec of mermaidSpecsToRender) {
+            try {
+              const { runPipeline, renderVisualArtifact } = await import(
+                './visualization/index.js'
+              );
+              const { detectTerminalCaps } = await import(
+                './visualization/caps/detect.js'
+              );
+
+              const caps = detectTerminalCaps();
+              const result = await runPipeline({
+                spec,
+                diagramType: 'mermaid',
+                theme: 'dark',
+                asciiOnly: caps.protocol === 'ascii',
+              });
+              const output = await renderVisualArtifact(result, {
+                spec,
+                showMeta: true,
+              });
+
+              if (output) {
+                textOutput.ensureTrailingNewline();
+                process.stdout.write('\n');
+                process.stdout.write(output);
+                process.stdout.write('\n');
+              }
+            } catch (err) {
+              const renderErr = formatUnknownRenderError(err);
+              debugLogger.error(`Auto-pipeline failed: ${renderErr}`);
+              lastRenderingError = { spec, error: renderErr };
+              break;
             }
           }
         }

@@ -89,6 +89,10 @@ import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
+import {
+  collectNewMermaidSpecs,
+  formatUnknownRenderError,
+} from '../../visualization/mermaidBlocks.js';
 
 type ToolResponseWithParts = ToolCallResponseInfo & {
   llmContent?: PartListUnion;
@@ -1232,6 +1236,7 @@ export const useGeminiStream = (
     ): Promise<StreamProcessingStatus> => {
       let geminiMessageBuffer = '';
       const toolCallRequests: ToolCallRequestInfo[] = [];
+      const mermaidSpecsToRender: string[] = [];
       for await (const event of stream) {
         if (
           event.type !== ServerGeminiEventType.Thought &&
@@ -1253,41 +1258,14 @@ export const useGeminiStream = (
               userMessageTimestamp,
             );
 
-            // Auto-Pipeline: Detect and render completed Mermaid blocks
-            const mermaidRegex = /```mermaid\n([\s\S]*?)```/g;
-            let match;
-            while ((match = mermaidRegex.exec(geminiMessageBuffer)) !== null) {
-              const spec = match[1].trim();
-              if (spec && !seenMermaidSpecsRef.current.has(spec)) {
-                seenMermaidSpecsRef.current.add(spec);
-                // Fire and forget rendering to not block the stream loop
-                // (though we use writeSync, the pipeline itself is async)
-                (async () => {
-                  try {
-                    const { runPipeline, renderVisualArtifact } = await import(
-                      '../../visualization/index.js'
-                    );
-                    const result = await runPipeline({
-                      spec,
-                      diagramType: 'mermaid',
-                      theme: 'dark',
-                    });
-                    const output = await renderVisualArtifact(result, {
-                      spec,
-                      showMeta: true,
-                    });
-                    if (output) {
-                      const { writeSync } = await import('node:fs');
-                      writeSync(1, '\n');
-                      writeSync(1, output);
-                      writeSync(1, '\n');
-                    }
-                  } catch (err) {
-                    debugLogger.error(`Auto-pipeline failed: ${err}`);
-                    renderingErrorRef.current = { spec, error: String(err) };
-                  }
-                })();
-              }
+            // Auto-Pipeline: detect Mermaid blocks during streaming, but render
+            // only after the stream completes to avoid stdout/stderr interleaving.
+            const newSpecs = collectNewMermaidSpecs(
+              geminiMessageBuffer,
+              seenMermaidSpecsRef.current,
+            );
+            if (newSpecs.length > 0) {
+              mermaidSpecsToRender.push(...newSpecs);
             }
             break;
           case ServerGeminiEventType.ToolCallRequest:
@@ -1356,6 +1334,45 @@ export const useGeminiStream = (
           }
         }
       }
+      if (config.getVisualize() && mermaidSpecsToRender.length > 0) {
+        if (pendingHistoryItemRef.current) {
+          addItem(pendingHistoryItemRef.current, userMessageTimestamp);
+          setPendingHistoryItem(null);
+        }
+
+        for (const spec of mermaidSpecsToRender) {
+          try {
+            const { runPipeline, renderVisualArtifact } = await import(
+              '../../visualization/index.js'
+            );
+            const { detectTerminalCaps } = await import(
+              '../../visualization/caps/detect.js'
+            );
+            const caps = detectTerminalCaps();
+            const result = await runPipeline({
+              spec,
+              diagramType: 'mermaid',
+              theme: 'dark',
+              asciiOnly: caps.protocol === 'ascii',
+            });
+            const output = await renderVisualArtifact(result, {
+              spec,
+              showMeta: true,
+            });
+            if (output) {
+              const { writeSync } = await import('node:fs');
+              writeSync(1, '\n');
+              writeSync(1, output);
+              writeSync(1, '\n');
+            }
+          } catch (err) {
+            const renderErr = formatUnknownRenderError(err);
+            debugLogger.error(`Auto-pipeline failed: ${renderErr}`);
+            renderingErrorRef.current = { spec, error: renderErr };
+            break;
+          }
+        }
+      }
       if (toolCallRequests.length > 0) {
         if (pendingHistoryItemRef.current) {
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);
@@ -1384,6 +1401,7 @@ export const useGeminiStream = (
       handleAgentExecutionStoppedEvent,
       handleAgentExecutionBlockedEvent,
       addItem,
+      config,
       pendingHistoryItemRef,
       setPendingHistoryItem,
       setThought,
