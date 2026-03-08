@@ -14,8 +14,48 @@ import { encodeAscii } from '../encode/ascii.js';
 import type { RenderResult } from '../types.js';
 import chalk from 'chalk';
 
+const DEFAULT_ASCII_COLUMNS = 80;
+const MIN_ASCII_COLUMNS = 48;
+const MAX_ASCII_COLUMNS = 140;
+const MIN_ASCII_STABILIZER_ROWS = 8;
+const MAX_ASCII_STABILIZER_ROWS = 20;
+
+function sanitizeAsciiColumns(columns: number): number {
+  if (!Number.isFinite(columns) || columns <= 0) {
+    return DEFAULT_ASCII_COLUMNS;
+  }
+
+  const rounded = Math.floor(columns);
+  return Math.max(MIN_ASCII_COLUMNS, Math.min(MAX_ASCII_COLUMNS, rounded));
+}
+
+function getAsciiStabilizerRows(rows: number): number {
+  if (!Number.isFinite(rows) || rows <= 0) {
+    return MIN_ASCII_STABILIZER_ROWS;
+  }
+
+  const rounded = Math.floor(rows);
+  // Keep enough trailing space so Ink redraws do not overwrite the diagram.
+  const proportional = Math.ceil(rounded * 0.45);
+  return Math.max(
+    MIN_ASCII_STABILIZER_ROWS,
+    Math.min(MAX_ASCII_STABILIZER_ROWS, proportional),
+  );
+}
+
+function encodeAsciiWithStabilizer(
+  spec: string,
+  columns: number,
+  rows: number,
+): string {
+  const safeColumns = sanitizeAsciiColumns(columns);
+  const ascii = encodeAscii(spec, safeColumns);
+  const stabilizer = '\n'.repeat(getAsciiStabilizerRows(rows));
+  return `${ascii}${stabilizer}`;
+}
+
 export interface VisualArtifactOptions {
-  /** Original Mermaid spec — needed for ASCII fallback path */
+  /** Original Mermaid spec; needed for ASCII fallback path */
   spec?: string;
   /** Override terminal protocol detection */
   forceProtocol?: 'kitty' | 'iterm2' | 'sixel' | 'ascii';
@@ -39,19 +79,28 @@ export async function renderVisualArtifact(
       ? chalk.green('● cache hit')
       : chalk.yellow('◎ rendered');
     const protocolLabel = chalk.cyan(protocol.toUpperCase());
-    writeSync(2, `  ${cacheLabel}  ${protocolLabel}  ${result.widthPx}×${result.heightPx}px\n`);
+    writeSync(
+      2,
+      `  ${cacheLabel}  ${protocolLabel}  ${result.widthPx}×${result.heightPx}px\n`,
+    );
   }
 
-  // ASCII path — we don't need to read the PNG at all
+  // ASCII path: we do not need to read the PNG at all.
   if (protocol === 'ascii') {
     if (!options.spec) {
-      writeSync(2, chalk.yellow('  ⚠ ASCII fallback — no spec provided, showing PNG path instead.\n'));
+      writeSync(
+        2,
+        chalk.yellow(
+          '  ⚠ ASCII fallback - no spec provided, showing PNG path instead.\n',
+        ),
+      );
       return `  PNG: ${result.pngPath}\n`;
     }
-    return encodeAscii(options.spec, caps.columns);
+
+    return encodeAsciiWithStabilizer(options.spec, caps.columns, caps.rows);
   }
 
-  // Graphic protocol paths — read the PNG from disk
+  // Graphic protocol paths: read the PNG from disk.
   try {
     const pngBuffer = await readFile(result.pngPath);
 
@@ -76,10 +125,15 @@ export async function renderVisualArtifact(
 
     return output;
   } catch (error) {
-    // If ANY graphic protocol fails (missing lib, terminal lie, etc), fall back to ASCII
-    writeSync(2, chalk.yellow(`  ⚠ Graphics fallback failed, defaulting to ASCII mode: ${error}\n`));
+    // If any graphic protocol fails, fall back to ASCII.
+    writeSync(
+      2,
+      chalk.yellow(
+        `  ⚠ Graphics fallback failed, defaulting to ASCII mode: ${error}\n`,
+      ),
+    );
     if (options.spec) {
-      return encodeAscii(options.spec, caps.columns);
+      return encodeAsciiWithStabilizer(options.spec, caps.columns, caps.rows);
     }
     return `  PNG: ${result.pngPath}\n`;
   }
