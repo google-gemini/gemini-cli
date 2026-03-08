@@ -48,7 +48,9 @@ async function encodeSixelData(rgbaData: Uint8ClampedArray, width: number, heigh
  * Resizes to at most `maxHeight` pixels tall before encoding to avoid
  * overflowing the terminal scroll buffer.
  */
-export async function encodeSixel(pngBuffer: Buffer, cols = 80, maxHeight = 600): Promise<string> {
+export async function encodeSixel(pngBuffer: Buffer, cols = 80, rows = 24): Promise<string> {
+    // Dynamic maxHeight: roughly 50% of terminal rows * pixels-per-row estimate (e.g. 15px)
+    const maxHeight = Math.min(Math.floor(rows * 0.5 * 15), 25 * 15);
     // Resize: cap height and scale width proportionally
     const resized = await sharp(pngBuffer)
         .resize({ height: maxHeight, withoutEnlargement: true, fit: 'inside' })

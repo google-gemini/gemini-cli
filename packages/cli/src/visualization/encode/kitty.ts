@@ -46,12 +46,15 @@ function buildKittyChunk(b64: string, opts: KittyChunkOptions): string {
  * Encode a PNG buffer as a Kitty graphics protocol escape sequence.
  * Returns the full escape string ready to write to stdout.
  */
-export function encodeKitty(pngBuffer: Buffer, cols = 80): string {
+export function encodeKitty(pngBuffer: Buffer, cols = 80, rows = 24): string {
     const b64 = pngBuffer.toString('base64');
     const chunks: string[] = [];
 
     let offset = 0;
     let isFirst = true;
+
+    // Constrain height to roughly 50% of terminal rows (max 25)
+    const maxRows = Math.min(Math.max(1, Math.floor(rows * 0.5)), 25);
 
     while (offset < b64.length) {
         const slice = b64.slice(offset, offset + CHUNK_SIZE);
@@ -66,6 +69,7 @@ export function encodeKitty(pngBuffer: Buffer, cols = 80): string {
                     medium: 'd', // direct transfer
                     more,
                     columns: cols,
+                    rows: maxRows,
                 }),
             );
             isFirst = false;
