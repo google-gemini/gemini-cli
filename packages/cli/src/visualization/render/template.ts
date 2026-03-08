@@ -30,7 +30,7 @@ export function buildMermaidHtml(spec: string, theme: Theme, widthPx: number): s
     }
     .mermaid {
       display: inline-block;
-      font-size: 18px;
+      font-size: 16px;
     }
     .mermaid svg {
       max-width: none !important;
@@ -73,7 +73,7 @@ ${spec}
       theme: '${mermaidTheme}',
       securityLevel: 'loose',
       themeVariables: {
-        fontSize: '18px',
+        fontSize: '16px',
       },
     });
 

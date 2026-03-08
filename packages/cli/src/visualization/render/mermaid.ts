@@ -162,8 +162,8 @@ export async function renderMermaidToPng(
     // Set viewport wide enough for the diagram
     await page.setViewport({
       width: widthPx + 200,
-      height: 6000,
-      deviceScaleFactor: 1,
+      height: 12000,
+      deviceScaleFactor: 2,
     });
 
     const pageErrors: string[] = [];
