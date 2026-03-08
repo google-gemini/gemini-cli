@@ -25,7 +25,7 @@ export function buildMermaidHtml(spec: string, theme: Theme, widthPx: number): s
       overflow: visible;
     }
     #container {
-      padding: 10px; /* Reduced to maximize diagram size inside the box */
+      padding: 2px; /* Minimized to ensure diagram fills the available space */
       display: inline-block;
       overflow: visible;
     }
