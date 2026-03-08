@@ -19,22 +19,22 @@ export function buildMermaidHtml(spec: string, theme: Theme, widthPx: number): s
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       background: ${theme === 'dark' ? '#1e1e2e' : '#ffffff'};
-      width: ${widthPx}px;
-      display: flex;
-      align-items: flex-start;
-      justify-content: flex-start;
+      margin: 0;
+      padding: 0;
+      display: inline-block;
+      overflow: hidden;
     }
     #container {
       padding: 48px;
-      width: 100%;
+      display: inline-block;
+      min-width: 100px;
       min-height: 100px;
     }
     .mermaid {
       display: inline-block;
-      width: 100%;
     }
     .mermaid svg {
-      max-width: 100% !important;
+      max-width: none !important;
       height: auto !important;
     }
   </style>

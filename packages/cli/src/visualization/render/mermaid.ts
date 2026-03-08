@@ -77,9 +77,29 @@ export async function renderMermaidToPng(
         );
 
         // Give it a tiny bit more for layout settling
-        await page.evaluate(() => new Promise(r => setTimeout(r, 100)));
+        await page.evaluate(() => new Promise(r => setTimeout(r, 200)));
 
-        // Screenshot the container (includes padding and ensures full diagram is captured)
+        // DYNAMICALY SIZE THE VIEWPORT TO THE CONTENT
+        // This is the key to preventing cropping for very tall/wide diagrams
+        const dimensions = await page.evaluate(() => {
+            const container = document.querySelector('#container');
+            if (!container) return null;
+            const rect = container.getBoundingClientRect();
+            // Add a bit of buffer
+            return {
+                width: Math.ceil(rect.width) + 20,
+                height: Math.ceil(rect.height) + 20
+            };
+        });
+
+        if (dimensions) {
+            await page.setViewport({
+                width: dimensions.width,
+                height: dimensions.height,
+                deviceScaleFactor: 2
+            });
+        }
+
         const container = await page.$('#container');
         if (!container) {
             throw new Error('Diagram container not found.');
@@ -88,6 +108,7 @@ export async function renderMermaidToPng(
         const screenshotBuffer = await container.screenshot({
             type: 'png',
             omitBackground: theme !== 'default',
+            captureBeyondViewport: true, // Safety net
         });
 
         return Buffer.from(screenshotBuffer);
