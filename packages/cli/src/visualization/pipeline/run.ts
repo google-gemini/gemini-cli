@@ -7,7 +7,7 @@ import sharp from 'sharp';
 // Renderer version (bump when render logic changes to bust cache)
 // ---------------------------------------------------------------------------
 
-export const PIPELINE_VERSION = '0.1.4';
+export const PIPELINE_VERSION = '0.1.5';
 
 // ---------------------------------------------------------------------------
 // Pipeline orchestrator

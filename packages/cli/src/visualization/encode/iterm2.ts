@@ -26,16 +26,10 @@ export function encodeIterm2(pngBuffer: Buffer, cols = 80, rows = 24): string {
     // Width capped up to 90% of terminal width or 120 chars, whichever is smaller.
     const widthSpec = Math.min(Math.floor(cols * 0.9), 120).toString();
 
-    // Height capped up to roughly 50% of terminal height or 25 rows, whichever is smaller.
-    // By keeping this strict, we force the terminal to downscale the image to fit the 
-    // visible area, ensuring the entire diagram is visible without scrolling.
-    const heightSpec = Math.min(Math.floor(rows * 0.5), 25).toString();
-
     const args = [
         `inline=1`,
         `size=${size}`,
         `width=${widthSpec}`,
-        `height=${heightSpec}`,
         `preserveAspectRatio=1`,
     ].join(';');
 

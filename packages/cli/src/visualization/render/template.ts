@@ -25,8 +25,10 @@ export function buildMermaidHtml(spec: string, theme: Theme, widthPx: number): s
     }
     #container {
       padding: 50px;
+      padding-bottom: 200px; /* Massive buffer to ensure no bottom clipping */
       display: inline-block;
       overflow: visible;
+      border: 2px solid red; /* DEBUG BORDER - If you see this at the bottom but diagram still cropped, it's a Mermaid issue */
     }
     .mermaid {
       display: inline-block;
