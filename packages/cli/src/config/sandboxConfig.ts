@@ -38,8 +38,14 @@ function isSandboxCommand(value: string): value is SandboxConfig['command'] {
 function getSandboxCommand(
   sandbox?: boolean | string | null,
 ): SandboxConfig['command'] | '' {
-  // If the SANDBOX env var is set, we're already inside the sandbox.
-  if (process.env['SANDBOX']) {
+  // If the SANDBOX env var is set to a truthy value, we're already inside the sandbox.
+  // Note: '0' and 'false' should be treated as not inside sandbox.
+  const sandboxEnv = process.env['SANDBOX'];
+  if (
+    sandboxEnv &&
+    sandboxEnv !== '0' &&
+    sandboxEnv.toLowerCase() !== 'false'
+  ) {
     return '';
   }
 
