@@ -10,6 +10,7 @@ import type {
   ToolConfirmationPayload,
 } from '../tools/tools.js';
 import type { ToolCall } from '../scheduler/types.js';
+import type { PolicySuggestion } from '../policy/suggestion-generator.js';
 
 export enum MessageBusType {
   TOOL_CONFIRMATION_REQUEST = 'tool-confirmation-request',
@@ -21,6 +22,7 @@ export enum MessageBusType {
   TOOL_CALLS_UPDATE = 'tool-calls-update',
   ASK_USER_REQUEST = 'ask-user-request',
   ASK_USER_RESPONSE = 'ask-user-response',
+  POLICY_SUGGESTION = 'policy-suggestion',
 }
 
 export interface ToolCallsUpdateMessage {
@@ -128,6 +130,12 @@ export interface UpdatePolicy {
   mcpName?: string;
 }
 
+export interface PolicySuggestionMessage {
+  type: MessageBusType.POLICY_SUGGESTION;
+  correlationId: string;
+  suggestion: PolicySuggestion;
+}
+
 export interface ToolPolicyRejection {
   type: MessageBusType.TOOL_POLICY_REJECTION;
   toolCall: FunctionCall;
@@ -192,6 +200,7 @@ export type Message =
   | ToolExecutionSuccess
   | ToolExecutionFailure
   | UpdatePolicy
+  | PolicySuggestionMessage
   | AskUserRequest
   | AskUserResponse
   | ToolCallsUpdateMessage;

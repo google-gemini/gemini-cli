@@ -1694,6 +1694,16 @@ const SETTINGS_SCHEMA = {
           'Enable the context-aware security checker. This feature uses an LLM to dynamically generate and enforce security policies for tool use based on your prompt, providing an additional layer of protection against unintended actions.',
         showInDialog: true,
       },
+      enableSmartPolicyScoping: {
+        type: 'boolean',
+        label: 'Smart Policy Scoping',
+        category: 'Security',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Use AI to suggest better-scoped policy rules when approving tools. Shows a suggested scope description on approval options.',
+        showInDialog: true,
+      },
     },
   },
 

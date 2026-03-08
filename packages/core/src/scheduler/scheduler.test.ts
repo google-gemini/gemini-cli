@@ -845,7 +845,8 @@ describe('Scheduler (Orchestrator)', () => {
         resolution.lastDetails,
         mockConfig,
         expect.anything(),
-        expect.anything(),
+        expect.anything(), // toolInvocation
+        undefined, // policySuggestion
       );
 
       expect(mockExecutor.execute).toHaveBeenCalled();

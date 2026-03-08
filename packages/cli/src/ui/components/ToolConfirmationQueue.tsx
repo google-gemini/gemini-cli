@@ -132,6 +132,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           */}
           <ToolConfirmationMessage
             callId={tool.callId}
+            correlationId={tool.correlationId}
             confirmationDetails={tool.confirmationDetails}
             config={config}
             getPreferredEditor={getPreferredEditor}
