@@ -22,7 +22,7 @@ interface DiffLine {
 }
 
 function parseDiffWithLineNumbers(diffContent: string): DiffLine[] {
-  const lines = diffContent.split('\n');
+  const lines = diffContent.split(/\r?\n/);
   const result: DiffLine[] = [];
   let currentOldLine = 0;
   let currentNewLine = 0;
