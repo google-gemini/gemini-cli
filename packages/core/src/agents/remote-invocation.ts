@@ -273,9 +273,10 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     const onAbort = () => executionController.abort();
     signal.addEventListener('abort', onAbort, { once: true });
 
-    const { pid: executionId, result } = ExecutionLifecycleService.createVirtualExecution(
+    const { pid: executionId, result } = ExecutionLifecycleService.createExecution(
       '',
       () => executionController.abort(),
+      'remote_agent',
     );
     if (executionId === undefined) {
       signal.removeEventListener('abort', onAbort);
