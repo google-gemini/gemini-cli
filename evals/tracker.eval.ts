@@ -41,12 +41,11 @@ describe('tracker_mode', () => {
       const createCall = toolLogs.find(
         (log) => log.toolRequest.name === 'tracker_create_task',
       );
-      if (createCall) {
-        const args = JSON.parse(createCall.toolRequest.args);
-        expect(
-          args.title?.toLowerCase() || args.description?.toLowerCase(),
-        ).toContain('login');
-      }
+      expect(createCall).toBeDefined();
+      const args = JSON.parse(createCall!.toolRequest.args);
+      expect(
+        args.title?.toLowerCase() || args.description?.toLowerCase(),
+      ).toContain('login');
 
       const wasUpdateCalled = await rig.waitForToolCall('tracker_update_task');
       expect(
@@ -57,10 +56,9 @@ describe('tracker_mode', () => {
       const updateCall = toolLogs.find(
         (log) => log.toolRequest.name === 'tracker_update_task',
       );
-      if (updateCall) {
-        const args = JSON.parse(updateCall.toolRequest.args);
-        expect(args.status).toBe('closed');
-      }
+      expect(updateCall).toBeDefined();
+      const updateArgs = JSON.parse(updateCall!.toolRequest.args);
+      expect(updateArgs.status).toBe('closed');
 
       const loginContent = fs.readFileSync(
         path.join(rig.testDir!, 'src/login.js'),
