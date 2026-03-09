@@ -186,6 +186,7 @@ export interface PromptConfig {
  */
 export interface ToolConfig {
   tools: Array<string | FunctionDeclaration | AnyDeclarativeTool>;
+  allowedTools?: string[];
 }
 
 /**

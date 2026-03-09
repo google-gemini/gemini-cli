@@ -12,6 +12,7 @@ import type {
 } from '../scheduler/types.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import type { EditorType } from '../utils/editor.js';
+import { PolicyDecision } from '../policy/types.js';
 
 /**
  * Options for scheduling agent tools.
@@ -29,6 +30,8 @@ export interface AgentSchedulingOptions {
   getPreferredEditor?: () => EditorType | undefined;
   /** Optional function to be notified when the scheduler is waiting for user confirmation. */
   onWaitingForConfirmation?: (waiting: boolean) => void;
+  /** Optional list of tools to automatically approve for this agent. */
+  allowedTools?: string[];
 }
 
 /**
@@ -51,6 +54,7 @@ export async function scheduleAgentTools(
     signal,
     getPreferredEditor,
     onWaitingForConfirmation,
+    allowedTools,
   } = options;
 
   // Create a proxy/override of the config to provide the agent-specific tool registry.
@@ -58,6 +62,38 @@ export async function scheduleAgentTools(
   const agentConfig: Config = Object.create(config);
   agentConfig.getToolRegistry = () => toolRegistry;
   agentConfig.getMessageBus = () => toolRegistry.getMessageBus();
+
+  if (allowedTools && allowedTools.length > 0) {
+    const existingAllowed = config.getAllowedTools() || [];
+    const mergedAllowed = Array.from(
+      new Set([...existingAllowed, ...allowedTools]),
+    );
+    agentConfig.getAllowedTools = () => mergedAllowed;
+
+    const originalPolicyEngine = config.getPolicyEngine();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const proxyPolicyEngine = Object.create(originalPolicyEngine);
+    proxyPolicyEngine.check = async (
+      toolCall: { name: string; args?: Record<string, unknown> },
+      serverName?: string,
+      toolAnnotations?: Record<string, unknown>,
+    ) => {
+      if (allowedTools.includes(toolCall.name)) {
+        return {
+          decision: PolicyDecision.ALLOW,
+          rule: {
+            toolName: toolCall.name,
+            decision: PolicyDecision.ALLOW,
+            priority: 999,
+            source: 'Agent Allowed Tools',
+          },
+        };
+      }
+      return originalPolicyEngine.check(toolCall, serverName, toolAnnotations);
+    };
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    agentConfig.getPolicyEngine = () => proxyPolicyEngine;
+  }
 
   const scheduler = new Scheduler({
     config: agentConfig,

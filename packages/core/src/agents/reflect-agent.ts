@@ -82,6 +82,7 @@ export const ReflectAgent = (
       WRITE_FILE_TOOL_NAME,
       EDIT_TOOL_NAME,
     ],
+    allowedTools: [GET_SESSION_HISTORY_TOOL_NAME],
   },
 
   promptConfig: {
