@@ -870,6 +870,51 @@ describe('ShellExecutionService', () => {
 
       expect(ShellExecutionService['activePtys'].size).toBe(0);
     });
+
+    it('should call destroy() on PTY when kill() is invoked (#15945)', async () => {
+      mockSerializeTerminalToObject.mockReturnValue(
+        createMockSerializeTerminalToObjectReturnValue(''),
+      );
+      const abortController = new AbortController();
+      const handle = await ShellExecutionService.execute(
+        'sleep 999',
+        '/test/dir',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+
+      await new Promise((resolve) => process.nextTick(resolve));
+
+      // Get the actual ptyProcess stored in the map (may differ from mockPtyProcess
+      // due to module-level spawn mock behavior).
+      const entry = ShellExecutionService['activePtys'].get(handle.pid!);
+      expect(entry).toBeDefined();
+      const actualPty = entry!.ptyProcess;
+      const destroySpy = vi.fn(actualPty.destroy.bind(actualPty));
+      actualPty.destroy = destroySpy;
+
+      // kill() should destroy the PTY to release file descriptors
+      ShellExecutionService.kill(handle.pid!);
+
+      expect(destroySpy).toHaveBeenCalled();
+      expect(ShellExecutionService['activePtys'].size).toBe(0);
+    });
+
+    it('should clean up all resources after normal exit (#15945)', async () => {
+      await simulateExecution('echo test', (pty) => {
+        pty.onData.mock.calls[0][0]('test\n');
+        pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: undefined });
+      });
+
+      // PTY process should be destroyed (FD released)
+      expect(mockPtyProcess.destroy).toHaveBeenCalled();
+      // All maps should be empty
+      expect(ShellExecutionService['activePtys'].size).toBe(0);
+      expect(ShellExecutionService['activeResolvers'].size).toBe(0);
+      expect(ShellExecutionService['activeListeners'].size).toBe(0);
+    });
   });
 });
 
