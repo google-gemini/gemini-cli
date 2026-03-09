@@ -190,26 +190,22 @@ vi.mock('./ui/utils/terminalCapabilityManager.js', () => ({
 
 vi.mock('./config/config.js', () => ({
   loadCliConfig: vi.fn().mockImplementation(async () => createMockConfig()),
-  parseArguments: vi
-    .fn()
-    .mockResolvedValue({
-      enabled: true,
-      allowedPaths: [],
-      networkAccess: false,
-    }),
+  parseArguments: vi.fn().mockResolvedValue({
+    enabled: true,
+    allowedPaths: [],
+    networkAccess: false,
+  }),
   isDebugMode: vi.fn(() => false),
 }));
 
 vi.mock('read-package-up', () => ({
-  readPackageUp: vi
-    .fn()
-    .mockResolvedValue({
-      enabled: true,
-      allowedPaths: [],
-      networkAccess: false,
-      packageJson: { name: 'test-pkg', version: 'test-version' },
-      path: '/fake/path/package.json',
-    }),
+  readPackageUp: vi.fn().mockResolvedValue({
+    enabled: true,
+    allowedPaths: [],
+    networkAccess: false,
+    packageJson: { name: 'test-pkg', version: 'test-version' },
+    path: '/fake/path/package.json',
+  }),
 }));
 
 vi.mock('update-notifier', () => ({
@@ -243,15 +239,13 @@ vi.mock('./utils/relaunch.js', () => ({
 }));
 
 vi.mock('./config/sandboxConfig.js', () => ({
-  loadSandboxConfig: vi
-    .fn()
-    .mockResolvedValue({
-      enabled: true,
-      allowedPaths: [],
-      networkAccess: false,
-      command: 'docker',
-      image: 'test-image',
-    }),
+  loadSandboxConfig: vi.fn().mockResolvedValue({
+    enabled: true,
+    allowedPaths: [],
+    networkAccess: false,
+    command: 'docker',
+    image: 'test-image',
+  }),
 }));
 
 vi.mock('./deferred.js', () => ({

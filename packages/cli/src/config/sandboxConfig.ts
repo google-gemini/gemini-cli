@@ -23,7 +23,7 @@ const __dirname = path.dirname(__filename);
 interface SandboxCliArgs {
   sandbox?: boolean | string | null;
 }
-const VALID_SANDBOX_COMMANDS: ReadonlyArray<SandboxConfig['command']> = [
+const VALID_SANDBOX_COMMANDS = [
   'docker',
   'podman',
   'sandbox-exec',
@@ -34,7 +34,7 @@ const VALID_SANDBOX_COMMANDS: ReadonlyArray<SandboxConfig['command']> = [
 function isSandboxCommand(
   value: string,
 ): value is Exclude<SandboxConfig['command'], undefined> {
-  return (VALID_SANDBOX_COMMANDS as readonly string[]).includes(value);
+  return VALID_SANDBOX_COMMANDS.includes(value);
 }
 
 function getSandboxCommand(
