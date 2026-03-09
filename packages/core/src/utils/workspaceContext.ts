@@ -268,7 +268,8 @@ export class WorkspaceContext {
    */
   private isFileSymlink(filePath: string): boolean {
     try {
-      return !fs.readlinkSync(filePath).endsWith('/');
+      const target = fs.readlinkSync(filePath);
+      return !target.endsWith('/') && !target.endsWith('\\');
     } catch (_error) {
       return false;
     }
