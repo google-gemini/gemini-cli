@@ -11,6 +11,7 @@ import os from 'node:os';
 import { trajectoryToJson } from './teleporter.js';
 import { convertAgyToCliRecord } from './converter.js';
 import { partListUnionToString } from '../core/geminiRequest.js';
+import type { MessageRecord } from '../services/chatRecordingService.js';
 
 export interface AgySessionInfo {
   id: string;
@@ -28,6 +29,26 @@ const AGY_CONVERSATIONS_DIR = path.join(
   'conversations',
 );
 
+const AGY_KEY_PATH = path.join(os.homedir(), '.gemini', 'jetski', 'key.txt');
+
+/**
+ * Loads the Antigravity encryption key.
+ * Priority: JETSKI_TELEPORT_KEY env var > ~/.gemini/jetski/key.txt
+ */
+export async function loadAgyKey(): Promise<Buffer | undefined> {
+  const envKey = process.env['JETSKI_TELEPORT_KEY'];
+  if (envKey) {
+    return Buffer.from(envKey);
+  }
+
+  try {
+    const keyContent = await fs.readFile(AGY_KEY_PATH, 'utf-8');
+    return Buffer.from(keyContent.trim());
+  } catch (_e) {
+    return undefined;
+  }
+}
+
 /**
  * Lists all Antigravity sessions found on disk.
  * @param filterWorkspaceUri Optional filter to only return sessions matching this workspace URI (e.g. "file:///...").
@@ -38,7 +59,6 @@ export async function listAgySessions(
   try {
     const files = await fs.readdir(AGY_CONVERSATIONS_DIR);
     const sessions: AgySessionInfo[] = [];
-
     for (const file of files) {
       if (file.endsWith('.pb')) {
         const filePath = path.join(AGY_CONVERSATIONS_DIR, file);
@@ -88,7 +108,7 @@ function extractAgyDetails(json: unknown): {
     const messages = record.messages || [];
 
     // Find first user message for display name
-    const firstUserMsg = messages.find((m) => m.type === 'user');
+    const firstUserMsg = messages.find((m: MessageRecord) => m.type === 'user');
     const displayName = firstUserMsg
       ? partListUnionToString(firstUserMsg.content).slice(0, 100)
       : 'Antigravity Session';
@@ -150,4 +170,30 @@ export async function loadAgySession(id: string): Promise<Buffer | null> {
   } catch (_error) {
     return null;
   }
+}
+
+/**
+ * Returns the most recent session if it was updated within the last 10 minutes.
+ */
+export async function getRecentAgySession(
+  workspaceUri?: string,
+): Promise<AgySessionInfo | null> {
+  const sessions = await listAgySessions(workspaceUri);
+  if (sessions.length === 0) return null;
+
+  // Sort by mtime descending
+  const sorted = sessions.sort(
+    (a, b) => new Date(b.mtime).getTime() - new Date(a.mtime).getTime(),
+  );
+
+  const mostRecent = sorted[0];
+  const mtime = new Date(mostRecent.mtime).getTime();
+  const now = Date.now();
+
+  // 10 minutes threshold
+  if (now - mtime < 10 * 60 * 1000) {
+    return mostRecent;
+  }
+
+  return null;
 }

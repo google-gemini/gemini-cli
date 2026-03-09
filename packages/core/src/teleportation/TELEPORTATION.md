@@ -93,16 +93,29 @@ common tool calls, which map directly to the CLI's native tools:
 - `CORTEX_STEP_TYPE_FILE_CHANGE` -> `replace`
 - `CORTEX_STEP_TYPE_BROWSER_SUBAGENT` -> (Dropped)
 
-**2. Generic & MCP Integrations** Jetski uses `CORTEX_STEP_TYPE_GENERIC` to
-handle dynamic or MCP (Model Context Protocol) tool calls that are not hardcoded
-into the native protobuf schema.
+**2. Generic / MCP Tools**
 
-- The CLI reads the `toolName` and `argsJson` directly from the generic step
-  payload and executes them as-is (e.g. `ask_user`, `mcp_*` tools).
+- Jetski relies heavily on `CORTEX_STEP_TYPE_GENERIC` and
+  `CORTEX_STEP_TYPE_MCP_TOOL` to route non-native or dynamic tools.
+- This is fully supported! The CLI reads the `toolName` and `argsJson` directly
+  from the generic step payload. For instance, the Jetski `ask_user` tool
+  natively maps to the CLI's `ask_user` tool, and any custom MCP commands are
+  preserved as-is.
 
 **3. Unsupported Tools** Many isolated actions, sub-agent tools, and
 IDE-specific UI interactions are dropped by the teleporter to maintain strict
 CLI compatibility and preserve valid context-window state.
+
+**4. Tool UI & Context Representation** When importing dynamic/generic tools,
+the CLI UI uses internal synthesis to properly reflect tool usage and outputs
+that the user saw in JetSki without blank rendering:
+
+- **Arguments:** Arguments extracted from `argsJson` are synthesized into the
+  `.description` field enabling the CLI UI to display the exact call arguments
+  (e.g., specific files or search strings) below the tool name.
+- **Output (Result Display):** Tool outputs, like terminal output payloads or
+  file text, are iteratively extracted from the trajectory steps and rendered
+  explicitly using `resultDisplay`.
 
 <details>
 <summary><b>Click to view exhaustive list of all 75+ dropped Jetski steps</b></summary>
@@ -185,9 +198,9 @@ addressed:
 
 ### 1. Security & Key Management
 
-- **Dynamic Key Exchange:** Instead of a hardcoded key in the CLI source code,
-  the CLI should retrieve the encryption key securely (e.g., from the OS
-  Keychain, a local Jetski config file, or by querying the local Jetski daemon).
+- **Dynamic Key Exchange:** ✅ The CLI now supports loading encryption keys from
+  `JETSKI_TELEPORT_KEY` environment variables or a local
+  `~/.gemini/jetski/key.txt` file.
 - **Permission Scoping:** Ensure the CLI enforces the same file-access
   permission rules (`file_permission_request`) that Jetski enforces so the AI
   doesn't suddenly gain destructive permissions when transitioning to the
@@ -195,6 +208,9 @@ addressed:
 
 ### 2. Architecture & Build Process Decoupling
 
+- **Trajectory Provider Interface:** ✅ The CLI now uses a generic
+  `TrajectoryProvider` interface, allowing teleportation logic to be decoupled
+  into extensions.
 - **Shared NPM Package:** Publish the compiled Protobufs and parsing logic as a
   private internal package (e.g., `@google/cortex-teleporter`). The Gemini CLI
   should simply `npm install` this, rather than generating `.min.js` blobs
@@ -205,18 +221,13 @@ addressed:
 
 ### 3. User Experience (UX)
 
-- **Clear UI Indicators:** In the CLI's `/resume` menu, Jetski sessions should
-  be visually distinct from native CLI sessions (e.g., using a 🛸 icon and a
-  "Jetski" tag next to the session name).
-- **Missing Context Warnings:** Because we intentionally drop 75+ step types
-  (browser actions, IDE UI clicks, etc.), the CLI conversation history might
-  look like it has "gaps." The UI should render a small placeholder like:
-  `[ ⚠️ Jetski browser action dropped for CLI compatibility ]` so the user
-  understands the model did something in the IDE that isn't shown in the
-  terminal.
-- **Seamless Handoff Prompt:** If the user has a currently active (running)
-  Jetski session, the CLI could intelligently prompt them on startup: _"You have
-  an active session in Jetski. Type `/resume` to bring it into the terminal."_
+- **Clear UI Indicators:** ✅ Jetski sessions are now grouped in a dedicated tab
+  in the `/resume` menu.
+- **Missing Context Warnings:** ✅ The UI now synthesizes `description` and
+  `resultDisplay` for generic tool calls to ensure a smooth conversation flow.
+- **Seamless Handoff Prompt:** ✅ The CLI now intelligently prompts the user on
+  startup if a recent Jetski session is found: _"🛸 You have a recent session in
+  Antigravity. Type /resume agy:<id> to bring it into the terminal."_
 
 ### 4. Data Fidelity & Error Handling
 

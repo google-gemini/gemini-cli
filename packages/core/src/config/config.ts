@@ -9,6 +9,8 @@ import * as path from 'node:path';
 import { inspect } from 'node:util';
 import process from 'node:process';
 import { z } from 'zod';
+import type { ConversationRecord } from '../services/chatRecordingService.js';
+export type { ConversationRecord };
 import {
   AuthType,
   createContentGenerator,
@@ -228,6 +230,25 @@ export interface ResolvedExtensionSetting {
   source?: string;
 }
 
+export interface TrajectoryProvider {
+  /** Prefix used in ChatList item names e.g., 'agy:' */
+  prefix: string;
+  /** Optional display name for UI Tabs */
+  displayName?: string;
+  /** Return an array of conversational tags/ids */
+  listSessions(workspaceUri?: string): Promise<
+    Array<{
+      id: string;
+      mtime: string;
+      name?: string;
+      displayName?: string;
+      messageCount?: number;
+    }>
+  >;
+  /** Load a single conversation payload */
+  loadSession(id: string): Promise<ConversationRecord | null>;
+}
+
 export interface AgentRunConfig {
   maxTimeMinutes?: number;
   maxTurns?: number;
@@ -377,6 +398,8 @@ export interface GeminiCLIExtension {
    * Used to migrate an extension to a new repository source.
    */
   migratedTo?: string;
+  /** Loaded JS module for trajectory decoding */
+  trajectoryProviderModule?: TrajectoryProvider;
 }
 
 export interface ExtensionInstallMetadata {

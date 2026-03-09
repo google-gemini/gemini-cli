@@ -48,11 +48,14 @@ export function encrypt(data: Buffer, key: Buffer = DEFAULT_KEY): Buffer {
 /**
  * Converts Antigravity binary trajectory to JSON.
  */
-export function trajectoryToJson(data: Buffer): unknown {
+export function trajectoryToJson(
+  data: Buffer,
+  key: Buffer = DEFAULT_KEY,
+): unknown {
   let pbData: Buffer;
   try {
     // Try to decrypt first
-    pbData = decrypt(data);
+    pbData = decrypt(data, key);
   } catch (_e) {
     // Fallback to plain protobuf if decryption fails
     pbData = data;
@@ -65,8 +68,11 @@ export function trajectoryToJson(data: Buffer): unknown {
 /**
  * Converts JSON to Antigravity binary trajectory (encrypted).
  */
-export function jsonToTrajectory(json: unknown): Buffer {
+export function jsonToTrajectory(
+  json: unknown,
+  key: Buffer = DEFAULT_KEY,
+): Buffer {
   const trajectory = Trajectory.fromJson(json, { ignoreUnknownFields: true });
   const pbData = Buffer.from(trajectory.toBinary());
-  return encrypt(pbData);
+  return encrypt(pbData, key);
 }

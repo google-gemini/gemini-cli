@@ -13,8 +13,3 @@ export interface AgyTrajectory {
 
 export * from './teleporter.js';
 export { convertAgyToCliRecord } from './converter.js';
-export {
-  loadAgySession,
-  listAgySessions,
-  type AgySessionInfo,
-} from './discovery.js';

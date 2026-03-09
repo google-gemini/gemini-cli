@@ -7,7 +7,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import type { ConversationRecord, ToolCallRecord, MessageRecord } from '../types.js';
+import type {
+  ConversationRecord,
+  ToolCallRecord,
+  MessageRecord,
+} from '../services/chatRecordingService.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
 import {
   EDIT_TOOL_NAME,
@@ -19,6 +23,7 @@ import {
   WEB_FETCH_TOOL_NAME,
   WEB_SEARCH_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
+  ASK_USER_TOOL_NAME,
 } from '../tools/definitions/coreTools.js';
 
 /**
@@ -218,7 +223,15 @@ function mapAgyStepToToolCall(step: Record<string, any>): ToolCallRecord {
     args = { Task: step['browserSubagent']['task'] };
   } else if (step['generic']) {
     const generic = step['generic'] as Record<string, unknown>;
-    name = generic['toolName'] as string;
+    const rawName = generic['toolName'] as string;
+
+    // Map generic tools to official CLI constants where applicable
+    if (rawName === 'ask_user') {
+      name = ASK_USER_TOOL_NAME;
+    } else {
+      name = rawName;
+    }
+
     try {
       args = JSON.parse(generic['argsJson'] as string);
     } catch {
@@ -227,15 +240,38 @@ function mapAgyStepToToolCall(step: Record<string, any>): ToolCallRecord {
     result = [{ text: (generic['responseJson'] as string) || '' }];
   }
 
+  const safeArgs = args as Record<string, unknown>;
+  const status =
+    step['status'] === 3 || step['status'] === 'CORTEX_STEP_STATUS_DONE'
+      ? CoreToolCallStatus.Success
+      : CoreToolCallStatus.Error;
+
+  // Synthesize a UI string from the args so it isn't blank in the terminal
+  const argValues = Object.values(safeArgs)
+    .filter((v) => typeof v === 'string' || typeof v === 'number')
+    .join(', ');
+  const description = argValues || '';
+
+  // Synthesize a UI string for the result output
+  let resultDisplay: string | undefined = undefined;
+  if (Array.isArray(result) && result.length > 0) {
+    const textParts = result
+      .map((part) => part?.text)
+      .filter((text) => typeof text === 'string' && text.length > 0);
+
+    if (textParts.length > 0) {
+      resultDisplay = textParts.join('\n');
+    }
+  }
+
   return {
     id,
     name,
-    args: args as Record<string, unknown>,
+    args: safeArgs,
+    description,
     result,
-    status:
-      step['status'] === 3 || step['status'] === 'CORTEX_STEP_STATUS_DONE'
-        ? CoreToolCallStatus.Success
-        : CoreToolCallStatus.Error,
+    resultDisplay,
+    status,
     timestamp,
   };
 }

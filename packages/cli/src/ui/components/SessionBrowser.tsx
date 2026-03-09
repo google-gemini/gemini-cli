@@ -13,11 +13,7 @@ import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import {
-  listAgySessions,
-  type Config,
-  type AgySessionInfo,
-} from '@google/gemini-cli-core';
+import { type Config } from '@google/gemini-cli-core';
 import type { SessionInfo, TextMatch } from '../../utils/sessionUtils.js';
 import {
   formatRelativeTime,
@@ -48,8 +44,8 @@ export interface SessionBrowserState {
   // Data state
   /** All loaded sessions */
   sessions: SessionInfo[];
-  /** Antigravity sessions */
-  agySessions: SessionInfo[];
+  /** Extension tabs */
+  extensionTabs: Array<{ name: string; sessions: SessionInfo[] }>;
   /** Sessions after filtering and sorting */
   filteredAndSortedSessions: SessionInfo[];
 
@@ -94,8 +90,10 @@ export interface SessionBrowserState {
   // State setters
   /** Update sessions array */
   setSessions: React.Dispatch<React.SetStateAction<SessionInfo[]>>;
-  /** Update agySessions array */
-  setAgySessions: React.Dispatch<React.SetStateAction<SessionInfo[]>>;
+  /** Update extensionTabs array */
+  setExtensionTabs: React.Dispatch<
+    React.SetStateAction<Array<{ name: string; sessions: SessionInfo[] }>>
+  >;
   /** Update loading state */
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
   /** Update error state */
@@ -367,7 +365,9 @@ export const useSessionBrowserState = (
 ): SessionBrowserState => {
   const { columns: terminalWidth } = useTerminalSize();
   const [sessions, setSessions] = useState<SessionInfo[]>(initialSessions);
-  const [agySessions, setAgySessions] = useState<SessionInfo[]>([]);
+  const [extensionTabs, setExtensionTabs] = useState<
+    Array<{ name: string; sessions: SessionInfo[] }>
+  >([]);
   const [loading, setLoading] = useState(initialLoading);
   const [error, setError] = useState<string | null>(initialError);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -390,10 +390,11 @@ export const useSessionBrowserState = (
   }, []);
 
   const filteredAndSortedSessions = useMemo(() => {
-    const currentTabSessions = activeTab === 0 ? sessions : agySessions;
+    const currentTabSessions =
+      activeTab === 0 ? sessions : extensionTabs[activeTab - 1]?.sessions || [];
     const filtered = filterSessions(currentTabSessions, searchQuery);
     return sortSessions(filtered, sortOrder, sortReverse);
-  }, [sessions, agySessions, activeTab, searchQuery, sortOrder, sortReverse]);
+  }, [sessions, extensionTabs, activeTab, searchQuery, sortOrder, sortReverse]);
 
   // Reset full content flag when search is cleared
   useEffect(() => {
@@ -411,8 +412,8 @@ export const useSessionBrowserState = (
   const state: SessionBrowserState = {
     sessions,
     setSessions,
-    agySessions,
-    setAgySessions,
+    extensionTabs,
+    setExtensionTabs,
     loading,
     setLoading,
     error,
@@ -445,21 +446,30 @@ export const useSessionBrowserState = (
 };
 
 /**
- * Converts Antigravity session info to CLI SessionInfo format.
+ * Converts Antigravity or external session info to CLI SessionInfo format.
  */
-function convertAgyToSessionInfo(
-  agy: AgySessionInfo,
+type ExternalSessionInfo = {
+  id: string;
+  mtime: string;
+  name?: string;
+  displayName?: string;
+  messageCount?: number;
+  prefix?: string;
+};
+
+function convertExternalToSessionInfo(
+  ext: ExternalSessionInfo,
   index: number,
 ): SessionInfo {
   return {
-    id: agy.id,
-    file: agy.id,
-    fileName: agy.id + '.pb',
-    startTime: agy.mtime,
-    lastUpdated: agy.mtime,
-    messageCount: agy.messageCount || 0,
-    displayName: agy.displayName || 'Antigravity Session',
-    firstUserMessage: agy.displayName || '',
+    id: ext.prefix ? `${ext.prefix}${ext.id}` : ext.id,
+    file: ext.id,
+    fileName: ext.id + '.ext',
+    startTime: ext.mtime,
+    lastUpdated: ext.mtime,
+    messageCount: ext.messageCount || 0,
+    displayName: ext.displayName || ext.name || 'External Session',
+    firstUserMessage: ext.displayName || ext.name || '',
     isCurrentSession: false,
     index,
   };
@@ -471,7 +481,7 @@ function convertAgyToSessionInfo(
 const useLoadSessions = (config: Config, state: SessionBrowserState) => {
   const {
     setSessions,
-    setAgySessions,
+    setExtensionTabs,
     setLoading,
     setError,
     isSearchMode,
@@ -485,19 +495,55 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
         const chatsDir = path.join(config.storage.getProjectTempDir(), 'chats');
         const workspaceUri = pathToFileURL(process.cwd()).toString();
 
-        const [sessionData, agyData] = await Promise.all([
+        const externalTabs: Array<{ name: string; sessions: SessionInfo[] }> =
+          [];
+        if (config.getEnableExtensionReloading() !== false) {
+          /* eslint-disable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
+          const extensions = (config as any)._extensionLoader?.getExtensions
+            ? (config as any)._extensionLoader.getExtensions()
+            : [];
+          for (const extension of extensions) {
+            if (extension.trajectoryProviderModule) {
+              try {
+                const sessions =
+                  await extension.trajectoryProviderModule.listSessions(
+                    workspaceUri,
+                  );
+                const normalizedExt = sessions
+                  .map((ext: any) => ({
+                    ...ext,
+                    prefix: extension.trajectoryProviderModule.prefix,
+                  }))
+                  .sort(
+                    (a: any, b: any) =>
+                      new Date(a.mtime).getTime() - new Date(b.mtime).getTime(),
+                  )
+                  .map((ext: any, i: number) =>
+                    convertExternalToSessionInfo(ext, i + 1),
+                  );
+
+                if (normalizedExt.length > 0) {
+                  externalTabs.push({
+                    name:
+                      extension.trajectoryProviderModule.displayName ||
+                      extension.name,
+                    sessions: normalizedExt,
+                  });
+                }
+              } catch (_e) {
+                // Ignore loader errors
+              }
+            }
+          }
+          /* eslint-enable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
+        }
+
+        const [sessionData] = await Promise.all([
           getSessionFiles(chatsDir, config.getSessionId()),
-          listAgySessions(workspaceUri),
         ]);
 
         setSessions(sessionData);
-
-        const normalizedAgy = agyData
-          .sort(
-            (a, b) => new Date(a.mtime).getTime() - new Date(b.mtime).getTime(),
-          )
-          .map((agy, i) => convertAgyToSessionInfo(agy, i + 1));
-        setAgySessions(normalizedAgy);
+        setExtensionTabs(externalTabs);
 
         setLoading(false);
       } catch (err) {
@@ -510,7 +556,7 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
 
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     loadSessions();
-  }, [config, setSessions, setAgySessions, setLoading, setError]);
+  }, [config, setSessions, setExtensionTabs, setLoading, setError]);
 
   useEffect(() => {
     const loadFullContent = async () => {
@@ -750,8 +796,11 @@ export function SessionBrowserView({
   state: SessionBrowserState;
 }): React.JSX.Element {
   const tabs: Tab[] = [
-    { key: 'cli', header: 'CLI Sessions' },
-    { key: 'agy', header: 'Antigravity' },
+    { key: 'cli', header: 'Gemini CLI' },
+    ...state.extensionTabs.map((ext, i) => ({
+      key: `ext-${i}`,
+      header: ext.name,
+    })),
   ];
 
   if (state.loading) {
@@ -762,7 +811,7 @@ export function SessionBrowserView({
     return <SessionBrowserError state={state} />;
   }
 
-  if (state.sessions.length === 0 && state.agySessions.length === 0) {
+  if (state.sessions.length === 0 && state.extensionTabs.length === 0) {
     return <SessionBrowserEmpty />;
   }
 
@@ -802,8 +851,9 @@ export function SessionBrowser({
   const cycleSortOrder = useCycleSortOrder(state);
 
   useTabbedNavigation({
-    tabCount: 2,
+    tabCount: state.extensionTabs.length + 1,
     isActive: !state.isSearchMode,
+    wrapAround: true,
     onTabChange: (index) => state.setActiveTab(index),
   });
 

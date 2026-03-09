@@ -9,9 +9,6 @@ import type { HistoryItemWithoutId } from '../types.js';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import {
-  loadAgySession,
-  trajectoryToJson,
-  convertAgyToCliRecord,
   coreEvents,
   convertSessionToClientHistory,
   uiTelemetryService,
@@ -57,19 +54,38 @@ export const useSessionBrowser = (
           let conversation: ConversationRecord;
           let filePath: string;
 
-          if (session.fileName.endsWith('.pb')) {
-            // Antigravity session
-            const data = await loadAgySession(session.id);
-            if (!data) {
-              throw new Error(
-                `Could not load Antigravity session ${session.id}`,
-              );
+          if (session.fileName.endsWith('.ext')) {
+            // External session
+            let externalConv: ConversationRecord | null = null;
+            if (config.getEnableExtensionReloading() !== false) {
+              /* eslint-disable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
+              const extensions = (config as any)._extensionLoader?.getExtensions
+                ? (config as any)._extensionLoader.getExtensions()
+                : [];
+              for (const extension of extensions) {
+                if (extension.trajectoryProviderModule) {
+                  const prefix =
+                    extension.trajectoryProviderModule.prefix || '';
+                  if (session.id.startsWith(prefix)) {
+                    const originalId = prefix
+                      ? session.id.slice(prefix.length)
+                      : session.id;
+                    externalConv =
+                      await extension.trajectoryProviderModule.loadSession(
+                        originalId,
+                      );
+                    if (externalConv) break;
+                  }
+                }
+              }
+              /* eslint-enable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
             }
-            const json = trajectoryToJson(data);
-            conversation = convertAgyToCliRecord(json);
-            // Antigravity sessions don't have a local CLI file path yet,
-            // but we'll use the .pb path for reference in resumedSessionData
-            filePath = session.id + '.pb';
+
+            if (!externalConv) {
+              throw new Error(`Could not load external session ${session.id}`);
+            }
+            conversation = externalConv;
+            filePath = session.id + '.ext';
           } else {
             // Regular CLI session
             const chatsDir = path.join(

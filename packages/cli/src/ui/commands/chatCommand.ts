@@ -7,7 +7,6 @@
 import * as fsPromises from 'node:fs/promises';
 import React from 'react';
 import { Text } from 'ink';
-import { pathToFileURL } from 'node:url';
 import { theme } from '../semantic-colors.js';
 import type { Content, Part } from '@google/genai';
 import type {
@@ -20,10 +19,7 @@ import {
   decodeTagName,
   type MessageActionReturn,
   INITIAL_HISTORY_LENGTH,
-  listAgySessions,
-  loadAgySession,
-  trajectoryToJson,
-  convertAgyToCliRecord,
+  type ConversationRecord,
 } from '@google/gemini-cli-core';
 import path from 'node:path';
 import type {
@@ -69,25 +65,6 @@ const getSavedChatTags = async (
         ? b.mtime.localeCompare(a.mtime)
         : a.mtime.localeCompare(b.mtime),
     );
-
-    // Also look for Antigravity sessions matching the current workspace
-    const workspaceUri = pathToFileURL(process.cwd()).toString();
-    const agySessions = await listAgySessions(workspaceUri);
-    for (const agy of agySessions) {
-      chatDetails.push({
-        name: `agy:${agy.id}`,
-        mtime: agy.mtime,
-      });
-    }
-
-    // Re-sort if we added AGY sessions
-    if (agySessions.length > 0) {
-      chatDetails.sort((a, b) =>
-        mtSortDesc
-          ? b.mtime.localeCompare(a.mtime)
-          : a.mtime.localeCompare(b.mtime),
-      );
-    }
 
     return chatDetails;
   } catch (_err) {
@@ -203,11 +180,32 @@ const resumeCheckpointCommand: SlashCommand = {
     let conversation: Content[] = [];
     let authType: string | undefined;
 
-    const loadAgy = async (id: string): Promise<Content[] | null> => {
-      const data = await loadAgySession(id);
-      if (!data) return null;
-      const agyJson = trajectoryToJson(data);
-      const record = convertAgyToCliRecord(agyJson);
+    const loadExternalTrajectory = async (
+      prefix: string,
+      id: string,
+    ): Promise<Content[] | null> => {
+      let record: ConversationRecord | null = null;
+      if (config && config.getEnableExtensionReloading() !== false) {
+        /* eslint-disable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
+        const extensions = (config as any)._extensionLoader?.getExtensions
+          ? (config as any)._extensionLoader.getExtensions()
+          : [];
+        for (const extension of extensions) {
+          if (
+            extension.trajectoryProviderModule &&
+            extension.trajectoryProviderModule.prefix === prefix
+          ) {
+            try {
+              record = await extension.trajectoryProviderModule.loadSession(id);
+              if (record) break;
+            } catch (_err) {
+              // Ignore failure
+            }
+          }
+        }
+        /* eslint-enable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
+      }
+      if (!record) return null;
 
       const conv: Content[] = [];
       // Add a dummy system message so slice(INITIAL_HISTORY_LENGTH) works correctly
@@ -245,7 +243,10 @@ const resumeCheckpointCommand: SlashCommand = {
           conv.push({ role: 'model', parts: modelParts });
 
           // 2. User turn: Function Responses (if any)
-          if (m.toolCalls && m.toolCalls.some((tc) => tc.result)) {
+          if (
+            m.toolCalls &&
+            m.toolCalls.some((tc: { result?: unknown }) => tc.result)
+          ) {
             const responseParts: Part[] = [];
             for (const tc of m.toolCalls) {
               if (tc.result) {
@@ -267,27 +268,30 @@ const resumeCheckpointCommand: SlashCommand = {
       return conv;
     };
 
-    if (tag.startsWith('agy:')) {
-      const id = tag.slice(4);
-      const agyConv = await loadAgy(id);
-      if (!agyConv) {
+    // Check if tag format is prefix:id
+    const prefixMatch = tag.match(/^([a-zA-Z0-9_]+):(.*)$/);
+    if (prefixMatch) {
+      const prefix = prefixMatch[1] + ':';
+      const id = prefixMatch[2];
+      const externalConv = await loadExternalTrajectory(prefix, id);
+      if (!externalConv) {
         return {
           type: 'message',
           messageType: 'error',
-          content: `No Antigravity session found with id: ${id}`,
+          content: `No external session found with prefix ${prefix} and id: ${id}`,
         };
       }
-      conversation = agyConv;
+      conversation = externalConv;
     } else {
       const checkpoint = await logger.loadCheckpoint(tag);
       if (checkpoint.history.length > 0) {
         conversation = checkpoint.history;
         authType = checkpoint.authType;
       } else {
-        // Fallback: Try to load as AGY session even without prefix
-        const agyConv = await loadAgy(tag);
-        if (agyConv) {
-          conversation = agyConv;
+        // Fallback: Try to load as AGY session even without prefix just in case (legacy support)
+        const legacyConv = await loadExternalTrajectory('agy:', tag);
+        if (legacyConv) {
+          conversation = legacyConv;
         }
       }
     }
