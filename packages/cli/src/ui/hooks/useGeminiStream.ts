@@ -41,6 +41,7 @@ import {
   isBackgroundExecutionData,
 } from '@google/gemini-cli-core';
 import type {
+  BackgroundExecutionData,
   Config,
   EditorType,
   GeminiClient,
@@ -102,13 +103,6 @@ interface BackgroundedToolInfo {
   initialOutput: string;
 }
 
-type BackgroundExecutionDataLike = {
-  executionId?: number;
-  pid?: number;
-  command?: string;
-  initialOutput?: string;
-} & Record<string, unknown>;
-
 enum StreamProcessingStatus {
   Completed,
   UserCancelled,
@@ -120,38 +114,23 @@ const SUPPRESSED_TOOL_ERRORS_NOTE =
 const LOW_VERBOSITY_FAILURE_NOTE =
   'This request failed. Press F12 for diagnostics, or run /settings and change "Error Verbosity" to full for full details.';
 
-function isBackgroundExecutionDataValidator(
-  candidate: unknown,
-): candidate is (data: unknown) => data is BackgroundExecutionDataLike {
-  return typeof candidate === 'function';
-}
-
-function isBackgroundExecutionIdGetter(
-  candidate: unknown,
-): candidate is (data: BackgroundExecutionDataLike) => number | undefined {
-  return typeof candidate === 'function';
-}
-
-function isBackgroundExecutionDataFromCore(
-  data: unknown,
-): data is BackgroundExecutionDataLike {
-  const candidate: unknown = isBackgroundExecutionData;
-  if (isBackgroundExecutionDataValidator(candidate)) {
-    return candidate(data);
-  }
-
-  return false;
-}
-
-function getBackgroundExecutionIdFromCore(
-  data: BackgroundExecutionDataLike,
+function normalizeBackgroundExecutionId(
+  data: BackgroundExecutionData,
 ): number | undefined {
-  const candidate: unknown = getBackgroundExecutionId;
-  if (isBackgroundExecutionIdGetter(candidate)) {
-    return candidate(data);
-  }
+  const executionId: unknown = getBackgroundExecutionId(data);
+  return typeof executionId === 'number' ? executionId : undefined;
+}
 
-  return data.executionId ?? data.pid;
+function normalizeBackgroundCommand(data: BackgroundExecutionData): string | undefined {
+  const command: unknown = data.command;
+  return typeof command === 'string' ? command : undefined;
+}
+
+function normalizeBackgroundInitialOutput(
+  data: BackgroundExecutionData,
+): string | undefined {
+  const initialOutput: unknown = data.initialOutput;
+  return typeof initialOutput === 'string' ? initialOutput : undefined;
 }
 
 function getBackgroundedToolInfo(
@@ -159,19 +138,20 @@ function getBackgroundedToolInfo(
 ): BackgroundedToolInfo | undefined {
   const response = toolCall.response as ToolResponseWithParts;
   const rawData: unknown = response?.data;
-  if (!isBackgroundExecutionDataFromCore(rawData)) {
+  if (!isBackgroundExecutionData(rawData)) {
     return undefined;
   }
 
-  const executionId = getBackgroundExecutionIdFromCore(rawData);
+  const data: BackgroundExecutionData = rawData;
+  const executionId = normalizeBackgroundExecutionId(data);
   if (executionId === undefined) {
     return undefined;
   }
 
   return {
     executionId,
-    command: rawData.command ?? toolCall.request.name,
-    initialOutput: rawData.initialOutput ?? '',
+    command: normalizeBackgroundCommand(data) ?? toolCall.request.name,
+    initialOutput: normalizeBackgroundInitialOutput(data) ?? '',
   };
 }
 

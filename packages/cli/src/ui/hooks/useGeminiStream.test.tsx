@@ -146,11 +146,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actualCoreModule = (await importOriginal()) as any;
   return {
     ...actualCoreModule,
-    isBackgroundExecutionData:
-      actualCoreModule.isBackgroundExecutionData ??
-      mockIsBackgroundExecutionData,
-    getBackgroundExecutionId:
-      actualCoreModule.getBackgroundExecutionId ?? mockGetBackgroundExecutionId,
+    isBackgroundExecutionData: mockIsBackgroundExecutionData,
+    getBackgroundExecutionId: mockGetBackgroundExecutionId,
     GitService: vi.fn(),
     GeminiClient: MockedGeminiClientClass,
     UserPromptEvent: MockedUserPromptEvent,
