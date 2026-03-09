@@ -282,7 +282,12 @@ export function getDisplayValue(
     value = getDefaultValue(key);
   }
 
-  let valueString = String(value);
+  let valueString: string;
+  if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
+    valueString = JSON.stringify(value);
+  } else {
+    valueString = String(value);
+  }
 
   if (definition?.type === 'enum' && definition.options) {
     const option = definition.options?.find((option) => option.value === value);
