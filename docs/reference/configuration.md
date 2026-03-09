@@ -1179,6 +1179,13 @@ for compatibility. At least one of `command`, `url`, or `httpUrl` must be
 provided. If multiple are specified, the order of precedence is `httpUrl`, then
 `url`, then `command`.
 
+> **Warning:** Avoid using underscores (`_`) in your server aliases (e.g., use
+> `my-server` instead of `my_server`). The underlying policy engine parses Fully
+> Qualified Names (`mcp_server_tool`) using the first underscore after the
+> `mcp_` prefix. An underscore in your server alias will cause the parser to
+> misidentify the server name, which can cause security policies to fail
+> silently.
+
 - **`mcpServers.<SERVER_NAME>`** (object): The server parameters for the named
   server.
   - `command` (string, optional): The command to execute to start the MCP server

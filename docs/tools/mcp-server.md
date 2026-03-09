@@ -555,8 +555,8 @@ Upon successful connection:
    `excludeTools` configuration
 4. **Name sanitization:** Tool names are cleaned to meet Gemini API
    requirements:
-   - Invalid characters (non-alphanumeric, underscore, dot, hyphen) are replaced
-     with underscores
+   - Characters other than letters, numbers, underscore (`_`), hyphen (`-`), dot
+     (`.`), and colon (`:`) are replaced with underscores
    - Names longer than 63 characters are truncated with middle replacement
      (`...`)
 
@@ -576,6 +576,13 @@ every discovered MCP tool is assigned a strict namespace.
    tools, see
    [Special syntax for MCP tools](../reference/policy-engine.md#special-syntax-for-mcp-tools)
    in the Policy Engine documentation.
+
+> **Warning:** Do not use underscores (`_`) in your MCP server names (e.g., use
+> `my-server` rather than `my_server`). The policy parser splits Fully Qualified
+> Names (`mcp_server_tool`) on the _first_ underscore following the `mcp_`
+> prefix. If your server name contains an underscore, the parser will
+> misinterpret the server identity, which can cause wildcard rules and security
+> policies to fail silently.
 
 ### 4. Schema processing
 
