@@ -127,7 +127,11 @@ describe('toolsCommand', () => {
     expect(message.showDescriptions).toBe(true);
     expect(message.tools).toHaveLength(2);
     expect(message.tools[0].displayName).toBe('File Reader');
+    expect(message.tools[0].description).toBe(
+      'Reads files from the local system.',
+    );
     expect(message.tools[1].displayName).toBe('Code Editor');
+    expect(message.tools[1].description).toBe('Edits code files.');
   });
 
   it('should have "list" and "desc" subcommands', () => {
@@ -177,6 +181,10 @@ describe('toolsCommand', () => {
     expect(message.showDescriptions).toBe(true);
     expect(message.tools).toHaveLength(2);
     expect(message.tools[0].displayName).toBe('File Reader');
+    expect(message.tools[0].description).toBe(
+      'Reads files from the local system.',
+    );
     expect(message.tools[1].displayName).toBe('Code Editor');
+    expect(message.tools[1].description).toBe('Edits code files.');
   });
 });
