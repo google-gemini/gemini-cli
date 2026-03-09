@@ -277,6 +277,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             sanitizationConfig:
               shellExecutionConfig?.sanitizationConfig ??
               this.config.sanitizationConfig,
+            proxyEnvironment: this.config.getNetworkProxyManager()?.getProxyEnvironment(),
           },
         );
 

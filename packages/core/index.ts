@@ -48,3 +48,16 @@ export { getCodeAssistServer } from './src/code_assist/codeAssist.js';
 export { getExperiments } from './src/code_assist/experiments/experiments.js';
 export { ExperimentFlags } from './src/code_assist/experiments/flagNames.js';
 export { getErrorStatus, ModelNotFoundError } from './src/utils/httpErrors.js';
+
+export { NetworkProxyManager } from './src/services/networkProxy/networkProxyManager.js';
+export {
+  DomainFilterAction,
+  DEFAULT_NETWORK_PROXY_CONFIG,
+} from './src/services/networkProxy/types.js';
+export type {
+  NetworkProxyConfig,
+  DomainRule,
+  ProxyConnectionRecord,
+  ProxyServerAddresses,
+  ProxyStatus,
+} from './src/services/networkProxy/types.js';

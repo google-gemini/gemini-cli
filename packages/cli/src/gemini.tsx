@@ -594,6 +594,24 @@ export async function main() {
     const messageBus = config.getMessageBus();
     createPolicyUpdater(policyEngine, messageBus, config.storage);
 
+    // Start network proxy if enabled in settings
+    const networkProxyManager = config.getNetworkProxyManager();
+    if (networkProxyManager) {
+      try {
+        await networkProxyManager.start();
+        debugLogger.log('Network proxy started');
+        registerCleanup(async () => {
+          await networkProxyManager.stop();
+        });
+      } catch (e) {
+        debugLogger.error('Failed to start network proxy:', e);
+        writeToStderr(
+          'Warning: Network proxy failed to start — traffic filtering is NOT active. ' +
+            'Check debug logs for details.\n',
+        );
+      }
+    }
+
     // Register SessionEnd hook to fire on graceful exit
     // This runs before telemetry shutdown in runExitCleanup()
     registerCleanup(async () => {
