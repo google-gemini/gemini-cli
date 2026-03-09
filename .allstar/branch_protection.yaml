@@ -1,4 +1,4 @@
-action: 'log'
+action: 'fix'
 requireStatusChecks:
   strict: true
   contexts:
