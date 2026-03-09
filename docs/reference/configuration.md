@@ -1681,7 +1681,7 @@ conventions and context.
         extension manifest). Paths are under the extension's installation
         directory.
       - Scope: Extension-provided instructions. This layer is read-only for
-        users (visible in `/memory show`; not editable via `/memory add` or
+        users (visible in `/memory show`; not editable using `/memory add` or
         `save_memory`).
   3.  **Project root and ancestors context files:**
       - Location: The CLI searches for the configured context file in the

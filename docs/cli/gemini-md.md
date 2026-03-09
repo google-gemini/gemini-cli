@@ -35,7 +35,7 @@ order:
     - **Scope:** Provides context relevant to the projects you are currently
       working on.
 
-4.  **Just-in-time (JIT) context files:**
+4.  **Just-in-Time (JIT) context files:**
     - **Location:** When a tool accesses a file or directory, the CLI
       automatically scans for `GEMINI.md` files in that directory and its
       ancestors up to a trusted root.
