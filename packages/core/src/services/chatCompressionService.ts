@@ -360,14 +360,14 @@ export class ChatCompressionService {
           role: 'user',
           parts: [
             {
-              text: `${anchorInstruction}\n\nFirst, reason in your scratchpad. Then, generate the updated <state_snapshot>.`,
+              text: `${anchorInstruction}\\n\\nFirst, reason in your scratchpad. Then, generate the updated <state_snapshot>.`,
             },
           ],
         },
       ],
       systemInstruction: { text: getCompressionPrompt(config) },
       promptId,
-      abortSignal,
+      abortSignal: abortSignal ?? new AbortController().signal,
       role: LlmRole.UTILITY_COMPRESSOR,
     });
     const summary = getResponseText(summaryResponse) ?? '';
@@ -396,7 +396,7 @@ export class ChatCompressionService {
         systemInstruction: { text: getCompressionPrompt(config) },
         promptId: `${promptId}-verify`,
         role: LlmRole.UTILITY_COMPRESSOR,
-        abortSignal,
+        abortSignal: abortSignal ?? new AbortController().signal,
       });
 
     const finalSummary = (
