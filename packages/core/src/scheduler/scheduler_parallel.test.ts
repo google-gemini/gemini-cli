@@ -72,14 +72,14 @@ import {
   type AnyToolInvocation,
   Kind,
 } from '../tools/tools.js';
-import type {
-  ToolCallRequestInfo,
-  CompletedToolCall,
-  SuccessfulToolCall,
-  Status,
-  ToolCall,
+import {
+  ROOT_SCHEDULER_ID,
+  type ToolCallRequestInfo,
+  type CompletedToolCall,
+  type SuccessfulToolCall,
+  type Status,
+  type ToolCall,
 } from './types.js';
-import { ROOT_SCHEDULER_ID } from './types.js';
 import { GeminiCliOperation } from '../telemetry/constants.js';
 import type { EditorType } from '../utils/editor.js';
 
@@ -211,12 +211,14 @@ describe('Scheduler Parallel Execution', () => {
 
     mockConfig = {
       getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
-      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      toolRegistry: mockToolRegistry,
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(true),
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
     } as unknown as Mocked<Config>;
+
+    (mockConfig as unknown as { config: Config }).config = mockConfig as Config;
 
     mockMessageBus = {
       publish: vi.fn(),

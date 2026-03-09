@@ -79,12 +79,12 @@ import {
   type InitializationResult,
 } from './core/initializer.js';
 import { validateAuthMethod } from './config/auth.js';
-import { runZedIntegration } from './zed-integration/zedIntegration.js';
+import { runAcpClient } from './acp/acpClient.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
-import { SessionSelector } from './utils/sessionUtils.js';
+import { SessionError, SessionSelector } from './utils/sessionUtils.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
 import { MouseProvider } from './ui/contexts/MouseContext.js';
 import { StreamingState } from './ui/types.js';
@@ -243,7 +243,7 @@ export async function startInteractiveUI(
               <ScrollProvider>
                 <OverflowProvider>
                   <SessionStatsProvider>
-                    <VimModeProvider settings={settings}>
+                    <VimModeProvider>
                       <AppContainer
                         config={config}
                         startupWarnings={startupWarnings}
@@ -672,8 +672,8 @@ export async function main() {
       await getOauthClient(settings.merged.security.auth.selectedType, config);
     }
 
-    if (config.getExperimentalZedIntegration()) {
-      return runZedIntegration(config, settings, argv);
+    if (config.getAcpMode()) {
+      return runAcpClient(config, settings, argv);
     }
 
     let input = config.getQuestion();
@@ -706,12 +706,24 @@ export async function main() {
         // Use the existing session ID to continue recording to the same session
         config.setSessionId(resumedSessionData.conversation.sessionId);
       } catch (error) {
-        coreEvents.emitFeedback(
-          'error',
-          `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        );
-        await runExitCleanup();
-        process.exit(ExitCodes.FATAL_INPUT_ERROR);
+        if (
+          error instanceof SessionError &&
+          error.code === 'NO_SESSIONS_FOUND'
+        ) {
+          // No sessions to resume — start a fresh session with a warning
+          startupWarnings.push({
+            id: 'resume-no-sessions',
+            message: error.message,
+            priority: WarningPriority.High,
+          });
+        } else {
+          coreEvents.emitFeedback(
+            'error',
+            `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          );
+          await runExitCleanup();
+          process.exit(ExitCodes.FATAL_INPUT_ERROR);
+        }
       }
     }
 
