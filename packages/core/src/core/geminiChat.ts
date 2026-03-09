@@ -157,6 +157,9 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
   if (comprehensiveHistory === undefined || comprehensiveHistory.length === 0) {
     return [];
   }
+
+  const activeLoopStartIndex = findActiveLoopStartIndex(comprehensiveHistory);
+
   const curatedHistory: Content[] = [];
   const length = comprehensiveHistory.length;
   let i = 0;
@@ -168,10 +171,31 @@ function extractCuratedHistory(comprehensiveHistory: Content[]): Content[] {
       const modelOutput: Content[] = [];
       let isValid = true;
       while (i < length && comprehensiveHistory[i].role === 'model') {
-        modelOutput.push(comprehensiveHistory[i]);
-        if (isValid && !isValidContent(comprehensiveHistory[i])) {
+        const content = comprehensiveHistory[i];
+        if (isValid && !isValidContent(content)) {
           isValid = false;
         }
+
+        const isBeforeActiveLoop =
+          activeLoopStartIndex === -1 || i < activeLoopStartIndex;
+
+        // Strip thought parts (always) and thoughtSignature (only if before active loop)
+        const curatedParts = (content.parts ?? [])
+          .filter((part) => !part.thought)
+          .map((part) => {
+            if (
+              isBeforeActiveLoop &&
+              part &&
+              typeof part === 'object' &&
+              'thoughtSignature' in part
+            ) {
+              const { thoughtSignature: _, ...newPart } = part;
+              return newPart;
+            }
+            return part;
+          });
+
+        modelOutput.push({ ...content, parts: curatedParts });
         i++;
       }
       if (isValid) {
@@ -728,8 +752,7 @@ export class GeminiChat {
       if (newContent.parts) {
         newContent.parts = newContent.parts.map((part) => {
           if (part && typeof part === 'object' && 'thoughtSignature' in part) {
-            const newPart = { ...part };
-            delete (newPart as { thoughtSignature?: string }).thoughtSignature;
+            const { thoughtSignature: _, ...newPart } = part;
             return newPart;
           }
           return part;
@@ -743,16 +766,7 @@ export class GeminiChat {
   // turn within the active loop must have a `thoughtSignature` property.
   // If we do not do this, we will get back 400 errors from the API.
   ensureActiveLoopHasThoughtSignatures(requestContents: Content[]): Content[] {
-    // First, find the start of the active loop by finding the last user turn
-    // with a text message, i.e. that is not a function response.
-    let activeLoopStartIndex = -1;
-    for (let i = requestContents.length - 1; i >= 0; i--) {
-      const content = requestContents[i];
-      if (content.role === 'user' && content.parts?.some((part) => part.text)) {
-        activeLoopStartIndex = i;
-        break;
-      }
-    }
+    const activeLoopStartIndex = findActiveLoopStartIndex(requestContents);
 
     if (activeLoopStartIndex === -1) {
       return requestContents;
@@ -1036,4 +1050,18 @@ export function isSchemaDepthError(errorMessage: string): boolean {
 
 export function isInvalidArgumentError(errorMessage: string): boolean {
   return errorMessage.includes('Request contains an invalid argument');
+}
+
+/**
+ * Finds the index of the start of the active loop in a chat history.
+ * The active loop starts at the FIRST user turn with a text message.
+ */
+function findActiveLoopStartIndex(history: Content[]): number {
+  for (let i = 0; i < history.length; i++) {
+    const content = history[i];
+    if (content.role === 'user' && content.parts?.some((part) => part.text)) {
+      return i;
+    }
+  }
+  return -1;
 }

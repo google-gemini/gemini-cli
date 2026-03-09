@@ -339,8 +339,9 @@ export class ChatCompressionService {
       originalHistoryToCompress.flatMap((c) => c.parts || []),
     );
 
+    const SAFE_BUFFER_TOKENS = 20_000;
     const historyForSummarizer =
-      originalToCompressTokenCount < tokenLimit(model)
+      originalToCompressTokenCount < tokenLimit(model) - SAFE_BUFFER_TOKENS
         ? originalHistoryToCompress
         : historyToCompressTruncated;
 
@@ -352,32 +353,42 @@ export class ChatCompressionService {
       ? 'A previous <state_snapshot> exists in the history. You MUST integrate all still-relevant information from that snapshot into the new one, updating it with the more recent events. Do not lose established constraints or critical knowledge.'
       : 'Generate a new <state_snapshot> based on the provided history.';
 
-    const summaryResponse = await config.getBaseLlmClient().generateContent({
-      modelConfigKey: { model: modelStringToModelConfigAlias(model) },
-      contents: [
-        ...historyForSummarizer,
-        {
-          role: 'user',
-          parts: [
-            {
-              text: `${anchorInstruction}\n\nFirst, reason in your scratchpad. Then, generate the updated <state_snapshot>.`,
-            },
-          ],
-        },
-      ],
-      systemInstruction: { text: getCompressionPrompt(config) },
-      promptId,
-      // TODO(joshualitt): wire up a sensible abort signal,
-      abortSignal: abortSignal ?? new AbortController().signal,
-      role: LlmRole.UTILITY_COMPRESSOR,
-    });
+    let summaryResponse;
+    try {
+      summaryResponse = await config.getBaseLlmClient().generateContent({
+        modelConfigKey: { model: modelStringToModelConfigAlias(model) },
+        contents: [
+          ...historyForSummarizer,
+          {
+            role: 'user',
+            parts: [
+              {
+                text: `${anchorInstruction}\n\nFirst, reason in your scratchpad. Then, generate the updated <state_snapshot>.`,
+              },
+            ],
+          },
+        ],
+        systemInstruction: { text: getCompressionPrompt(config) },
+        promptId,
+        // TODO(joshualitt): wire up a sensible abort signal,
+        abortSignal: abortSignal ?? new AbortController().signal,
+        role: LlmRole.UTILITY_COMPRESSOR,
+      });
+    } catch (error) {
+      debugLogger.debug('Chat history compression (summarize) failed:', error);
+      return this.createCompressionFailureResponse(
+        originalTokenCount,
+        'Summarization',
+        error,
+      );
+    }
     const summary = getResponseText(summaryResponse) ?? '';
 
     // Phase 3: The "Probe" Verification (Self-Correction)
     // We perform a second lightweight turn to ensure no critical information was lost.
-    const verificationResponse = await config
-      .getBaseLlmClient()
-      .generateContent({
+    let verificationResponse;
+    try {
+      verificationResponse = await config.getBaseLlmClient().generateContent({
         modelConfigKey: { model: modelStringToModelConfigAlias(model) },
         contents: [
           ...historyForSummarizer,
@@ -399,6 +410,14 @@ export class ChatCompressionService {
         role: LlmRole.UTILITY_COMPRESSOR,
         abortSignal: abortSignal ?? new AbortController().signal,
       });
+    } catch (error) {
+      debugLogger.debug('Chat history compression (verify) failed:', error);
+      return this.createCompressionFailureResponse(
+        originalTokenCount,
+        'Verification',
+        error,
+      );
+    }
 
     const finalSummary = (
       getResponseText(verificationResponse)?.trim() || summary
@@ -471,5 +490,26 @@ export class ChatCompressionService {
         },
       };
     }
+  }
+
+  private createCompressionFailureResponse(
+    originalTokenCount: number,
+    stage: 'Summarization' | 'Verification',
+    error: unknown,
+  ): {
+    newHistory: null;
+    info: ChatCompressionInfo;
+  } {
+    return {
+      newHistory: null,
+      info: {
+        originalTokenCount,
+        newTokenCount: originalTokenCount,
+        compressionStatus: CompressionStatus.COMPRESSION_FAILED,
+        errorMessage: `${stage} failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      },
+    };
   }
 }
