@@ -37,6 +37,7 @@ import {
   buildUserSteeringHintPrompt,
   GeminiCliOperation,
   getPlanModeExitMessage,
+  SCHEDULE_WORK_TOOL_NAME,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -229,6 +230,16 @@ export const useGeminiStream = (
   const [_isFirstToolInGroup, isFirstToolInGroupRef, setIsFirstToolInGroup] =
     useStateAndRef<boolean>(true);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
+
+  // Sisyphus Mode: schedule_work auto-resume timer
+  const sisyphusTargetTimestampRef = useRef<number | null>(null);
+  const [sisyphusSecondsRemaining, setSisyphusSecondsRemaining] = useState<
+    number | null
+  >(null);
+  const submitQueryRef = useRef<(query: PartListUnion) => Promise<void>>(() =>
+    Promise.resolve(),
+  );
+
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const storage = config.storage;
   const logger = useLogger(storage);
@@ -1248,6 +1259,15 @@ export const useGeminiStream = (
             );
             break;
           case ServerGeminiEventType.ToolCallRequest:
+            if (event.value.name === SCHEDULE_WORK_TOOL_NAME) {
+              const args = event.value.args;
+              const inMinutes = Number(args?.['inMinutes'] ?? 0);
+              if (inMinutes > 0) {
+                const delayMs = inMinutes * 60 * 1000;
+                sisyphusTargetTimestampRef.current = Date.now() + delayMs;
+                setSisyphusSecondsRemaining(Math.ceil(delayMs / 1000));
+              }
+            }
             toolCallRequests.push(event.value);
             break;
           case ServerGeminiEventType.UserCancelled:
@@ -1893,7 +1913,7 @@ export const useGeminiStream = (
 
     // Compute effective timeout: use configured value, or default if
     // Idle hooks are registered (e.g. by an extension).
-    let idleTimeoutSeconds = configuredIdleTimeout;
+    let idleTimeoutSeconds: number = configuredIdleTimeout;
     if (idleTimeoutSeconds <= 0) {
       const hookSystem = config.getHookSystem();
       const hasIdleHooks = hookSystem
@@ -1932,6 +1952,46 @@ export const useGeminiStream = (
     };
   }, [streamingState, configuredIdleTimeout, config, submitQuery]);
 
+  // Keep submitQueryRef in sync for Sisyphus timer
+  useEffect(() => {
+    submitQueryRef.current = submitQuery;
+  }, [submitQuery]);
+
+  // Sisyphus: auto-resume when countdown reaches zero
+  useEffect(() => {
+    if (
+      streamingState === StreamingState.Idle &&
+      sisyphusSecondsRemaining !== null &&
+      sisyphusSecondsRemaining <= 0
+    ) {
+      sisyphusTargetTimestampRef.current = null;
+      setSisyphusSecondsRemaining(null);
+      void submitQueryRef.current(
+        'System: The scheduled break has ended. Please resume your work.',
+      );
+    }
+  }, [streamingState, sisyphusSecondsRemaining]);
+
+  // Sisyphus: countdown timer interval
+  useEffect(() => {
+    if (
+      sisyphusTargetTimestampRef.current === null ||
+      streamingState !== StreamingState.Idle
+    ) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      if (sisyphusTargetTimestampRef.current !== null) {
+        const remainingMs = sisyphusTargetTimestampRef.current - Date.now();
+        const remainingSecs = Math.max(0, Math.ceil(remainingMs / 1000));
+        setSisyphusSecondsRemaining(remainingSecs);
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [streamingState]);
+
   const lastOutputTime = Math.max(
     lastToolOutputTime,
     lastShellOutputTime,
@@ -1957,5 +2017,6 @@ export const useGeminiStream = (
     backgroundShells,
     dismissBackgroundShell,
     retryStatus,
+    sisyphusSecondsRemaining,
   };
 };
