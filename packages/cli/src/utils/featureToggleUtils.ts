@@ -36,8 +36,8 @@ export interface FeatureActionResult {
 export interface FeatureToggleStrategy {
   /**
    * Checks if the feature needs to be enabled in the given scope.
-   * For skills (blacklist): returns true if in disabled list.
-   * For agents (whitelist): returns true if NOT explicitly enabled (false or undefined).
+   * For skills (blocklist): returns true if in disabled list.
+   * For agents (allowlist): returns true if NOT explicitly enabled (false or undefined).
    */
   needsEnabling(
     settings: LoadedSettings,
@@ -56,8 +56,8 @@ export interface FeatureToggleStrategy {
 
   /**
    * Checks if the feature is explicitly disabled in the given scope.
-   * For skills (blacklist): returns true if in disabled list.
-   * For agents (whitelist): returns true if explicitly set to false.
+   * For skills (blocklist): returns true if in disabled list.
+   * For agents (allowlist): returns true if explicitly set to false.
    */
   isExplicitlyDisabled(
     settings: LoadedSettings,

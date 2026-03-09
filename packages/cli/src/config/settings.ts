@@ -78,7 +78,7 @@ export const USER_SETTINGS_PATH = Storage.getGlobalSettingsPath();
 export const USER_SETTINGS_DIR = path.dirname(USER_SETTINGS_PATH);
 export const DEFAULT_EXCLUDED_ENV_VARS = ['DEBUG', 'DEBUG_MODE'];
 
-const AUTH_ENV_VAR_WHITELIST = [
+const AUTH_ENV_VAR_ALLOWLIST = [
   'GEMINI_API_KEY',
   'GOOGLE_API_KEY',
   'GOOGLE_CLOUD_PROJECT',
@@ -589,9 +589,9 @@ export function loadEnvironment(
       for (const key in parsedEnv) {
         if (Object.hasOwn(parsedEnv, key)) {
           let value = parsedEnv[key];
-          // If the workspace is untrusted but we are sandboxed, only allow whitelisted variables.
+          // If the workspace is untrusted but we are sandboxed, only allow variables on the allowlist.
           if (!isTrusted && isSandboxed) {
-            if (!AUTH_ENV_VAR_WHITELIST.includes(key)) {
+            if (!AUTH_ENV_VAR_ALLOWLIST.includes(key)) {
               continue;
             }
             // Sanitize the value for untrusted sources

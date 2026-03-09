@@ -232,8 +232,8 @@ main().catch((err) => {
 >
 > **Union Aggregation Strategy**: `BeforeToolSelection` is unique in that it
 > combines the results of all matching hooks. If you have multiple filtering
-> hooks, the agent will receive the **union** of all whitelisted tools. Only
-> using `mode: "NONE"` will override other hooks to disable all tools.
+> hooks, the agent will receive the **union** of all allowed tools. Only using
+> `mode: "NONE"` will override other hooks to disable all tools.
 
 ## Complete example: Smart Development Workflow Assistant
 
