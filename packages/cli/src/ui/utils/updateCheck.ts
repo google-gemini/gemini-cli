@@ -49,9 +49,10 @@ function getBestAvailableUpdate(
 
 export async function checkForUpdates(
   settings: LoadedSettings,
+  force: boolean = false,
 ): Promise<UpdateObject | null> {
   try {
-    if (!settings.merged.general.enableAutoUpdateNotification) {
+    if (!force && !settings.merged.general.enableAutoUpdateNotification) {
       return null;
     }
     // Skip update check when running from source (development mode)
