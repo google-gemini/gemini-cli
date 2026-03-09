@@ -9,14 +9,18 @@ import { CoreEvent, coreEvents } from '../utils/events.js';
 import type { AgentOverride, Config } from '../config/config.js';
 import type { AgentDefinition, LocalAgentDefinition } from './types.js';
 import { loadAgentsFromDirectory } from './agentLoader.js';
+import { splitAgentCardUrl } from './a2aUtils.js';
 import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
 import { BrowserAgentDefinition } from './browser/browserAgentDefinition.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
+import { DefaultAgentCardResolver } from '@a2a-js/sdk/client';
+import { safeFetch } from '../utils/fetch.js';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { type z } from 'zod';
+import * as crypto from 'node:crypto';
 import { debugLogger } from '../utils/debugLogger.js';
 import { isAutoModel } from '../config/models.js';
 import {
@@ -155,13 +159,38 @@ export class AgentRegistry {
       const agentsToRegister: AgentDefinition[] = [];
 
       for (const agent of projectAgents.agents) {
-        // If it's a remote agent, use the agentCardUrl as the hash.
-        // This allows multiple remote agents in a single file to be tracked independently.
+        // For remote agents, we must use a content-based hash of the AgentCard
+        // to prevent Indirect Prompt Injection if the remote card is modified.
         if (agent.kind === 'remote') {
-          if (!agent.metadata) {
-            agent.metadata = {};
+          try {
+            // We use a dedicated resolver here to fetch the card for hashing.
+            // This is separate from loadAgent to keep hashing logic isolated.
+            // We provide safeFetch to ensure SSRF and DNS rebinding protection.
+            const resolver = new DefaultAgentCardResolver({
+              fetchImpl: safeFetch,
+            });
+            const { baseUrl, path } = splitAgentCardUrl(agent.agentCardUrl);
+            const rawCard = await resolver.resolve(baseUrl, path);
+            const cardContent = JSON.stringify(rawCard);
+            const contentHash = crypto
+              .createHash('sha256')
+              .update(cardContent)
+              .digest('hex');
+
+            if (!agent.metadata) {
+              agent.metadata = {};
+            }
+            // Combining URL and content hash ensures we track specific card versions at specific locations.
+            agent.metadata.hash = `${agent.agentCardUrl}#${contentHash}`;
+          } catch (e) {
+            debugLogger.warn(
+              `[AgentRegistry] Could not fetch remote card for hashing "${agent.name}":`,
+              e,
+            );
+            // If we can't fetch the card, we can't verify its acknowledgement securely.
+            unacknowledgedAgents.push(agent);
+            continue;
           }
-          agent.metadata.hash = agent.agentCardUrl;
         }
 
         if (!agent.metadata?.hash) {
@@ -178,6 +207,10 @@ export class AgentRegistry {
         if (isAcknowledged) {
           agentsToRegister.push(agent);
         } else {
+          // Register unacknowledged agents so they are visible to the LLM.
+          // They will be registered with ASK_USER policy, triggering the
+          // acknowledgement flow when the LLM tries to call them.
+          agentsToRegister.push(agent);
           unacknowledgedAgents.push(agent);
         }
       }
@@ -312,6 +345,17 @@ export class AgentRegistry {
     }
 
     const mergedDefinition = this.applyOverrides(definition, settingsOverrides);
+
+    // Ensure we don't accidentally overwrite an existing agent with a different canonical name
+    if (
+      mergedDefinition.name !== definition.name &&
+      this.agents.has(mergedDefinition.name)
+    ) {
+      throw new Error(
+        `Cannot register agent '${definition.name}' as '${mergedDefinition.name}': Name collision with an already registered agent.`,
+      );
+    }
+
     this.agents.set(mergedDefinition.name, mergedDefinition);
 
     this.registerModelConfigs(mergedDefinition);

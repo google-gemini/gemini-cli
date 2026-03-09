@@ -316,6 +316,35 @@ describe('loadConfig', () => {
       );
     });
 
+    it('should pass agent settings to Config', async () => {
+      const settings: Settings = {
+        experimental: {
+          enableAgents: false,
+        },
+        agents: {
+          overrides: {
+            test_agent: { enabled: true },
+          },
+        },
+      };
+      await loadConfig(settings, mockExtensionLoader, taskId);
+      expect(Config).toHaveBeenCalledWith(
+        expect.objectContaining({
+          enableAgents: false,
+          agents: settings.agents,
+        }),
+      );
+    });
+
+    it('should default enableAgents to true if not specified', async () => {
+      await loadConfig(mockSettings, mockExtensionLoader, taskId);
+      expect(Config).toHaveBeenCalledWith(
+        expect.objectContaining({
+          enableAgents: true,
+        }),
+      );
+    });
+
     describe('interactivity', () => {
       it('should set interactive true when not headless', async () => {
         vi.mocked(isHeadlessMode).mockReturnValue(false);

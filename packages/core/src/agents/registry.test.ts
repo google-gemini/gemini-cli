@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as crypto from 'node:crypto';
 import { AgentRegistry, getModelConfigAlias } from './registry.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import type { AgentDefinition, LocalAgentDefinition } from './types.js';
@@ -29,9 +30,22 @@ import { SimpleExtensionLoader } from '../utils/extensionLoader.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import { ThinkingLevel } from '@google/genai';
 import type { AcknowledgedAgentsService } from './acknowledgedAgents.js';
+import * as sdkClient from '@a2a-js/sdk/client';
+import { safeFetch } from '../utils/fetch.js';
 import { PolicyDecision } from '../policy/types.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { A2AAuthProvider } from './auth-provider/types.js';
+
+vi.mock('@a2a-js/sdk/client', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as Record<string, unknown>),
+    DefaultAgentCardResolver: vi.fn().mockImplementation((options) => ({
+      fetchImpl: options?.fetchImpl,
+      resolve: vi.fn().mockResolvedValue({ name: 'RemoteAgent' }),
+    })),
+  };
+});
 
 vi.mock('./agentLoader.js', () => ({
   loadAgentsFromDirectory: vi
@@ -417,7 +431,7 @@ describe('AgentRegistry', () => {
       expect(registry.getDefinition('extension-agent')).toBeUndefined();
     });
 
-    it('should use agentCardUrl as hash for acknowledgement of remote agents', async () => {
+    it('should use agentCardUrl and content-based hash for acknowledgement of remote agents', async () => {
       mockConfig = makeMockedConfig({ enableAgents: true });
       // Trust the folder so it attempts to load project agents
       vi.spyOn(mockConfig, 'isTrustedFolder').mockReturnValue(true);
@@ -453,20 +467,74 @@ describe('AgentRegistry', () => {
         clearCache: vi.fn(),
       } as unknown as A2AClientManager);
 
+      // Mock the resolver to return a consistent card content for hashing
+      const mockCardContent = { name: 'RemoteAgent' };
+      const expectedContentHash = crypto
+        .createHash('sha256')
+        .update(JSON.stringify(mockCardContent))
+        .digest('hex');
+      const expectedHash = `https://example.com/card#${expectedContentHash}`;
+
+      vi.mocked(sdkClient.DefaultAgentCardResolver).mockImplementation(
+        () =>
+          ({
+            resolve: vi.fn().mockResolvedValue(mockCardContent),
+          }) as unknown as sdkClient.DefaultAgentCardResolver,
+      );
+
       await registry.initialize();
 
-      // Verify ackService was called with the URL, not the file hash
+      // Verify ackService was called with the content-based hash
       expect(ackService.isAcknowledged).toHaveBeenCalledWith(
         expect.anything(),
         'RemoteAgent',
-        'https://example.com/card',
+        expectedHash,
       );
 
-      // Also verify that the agent's metadata was updated to use the URL as hash
-      // Use getDefinition because registerAgent might have been called
+      // Also verify that the agent's metadata was updated to use the content-based hash
       expect(registry.getDefinition('RemoteAgent')?.metadata?.hash).toBe(
-        'https://example.com/card',
+        expectedHash,
       );
+    });
+
+    it('should use safeFetch in DefaultAgentCardResolver during initialization', async () => {
+      mockConfig = makeMockedConfig({ enableAgents: true });
+      vi.spyOn(mockConfig, 'isTrustedFolder').mockReturnValue(true);
+      vi.spyOn(mockConfig, 'getFolderTrust').mockReturnValue(true);
+
+      const registry = new TestableAgentRegistry(mockConfig);
+
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'RemoteAgent',
+        description: 'A remote agent',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+      };
+
+      vi.mocked(tomlLoader.loadAgentsFromDirectory).mockResolvedValue({
+        agents: [remoteAgent],
+        errors: [],
+      });
+
+      // Track constructor calls
+      const resolverMock = vi.mocked(sdkClient.DefaultAgentCardResolver);
+
+      await registry.initialize();
+
+      // Find the call for our remote agent
+      const call = resolverMock.mock.calls.find((args) => {
+        const options = args[0] as { fetchImpl?: typeof fetch };
+        // We look for a call that was provided with a fetch implementation.
+        // In our current implementation, we wrap safeFetch.
+        return typeof options?.fetchImpl === 'function';
+      });
+
+      expect(call).toBeDefined();
+      const options = call?.[0] as { fetchImpl?: typeof fetch };
+
+      // We passed safeFetch directly
+      expect(options?.fetchImpl).toBe(safeFetch);
     });
   });
 
@@ -872,6 +940,17 @@ describe('AgentRegistry', () => {
       expect(registry.getDefinition('Agent-123_$pecial.v2')).toEqual(
         specialAgent,
       );
+    });
+
+    it('should maintain registration under canonical name', async () => {
+      const originalName = 'my-agent';
+      const definition = { ...MOCK_AGENT_V1, name: originalName };
+
+      await registry.testRegisterAgent(definition);
+
+      const registered = registry.getDefinition(originalName);
+      expect(registered).toBeDefined();
+      expect(registry.getAllAgentNames()).toEqual([originalName]);
     });
 
     it('should reject an agent definition missing a name', async () => {
