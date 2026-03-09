@@ -22,6 +22,7 @@ import {
   stripShellWrapper,
   hasRedirection,
   resolveExecutable,
+  resetShellConfiguration,
 } from './shell-utils.js';
 import path from 'node:path';
 
@@ -37,17 +38,20 @@ vi.mock('os', () => ({
 }));
 
 const mockAccess = vi.hoisted(() => vi.fn());
+const mockExistsSync = vi.hoisted(() => vi.fn());
 vi.mock('node:fs', () => ({
   default: {
     promises: {
       access: mockAccess,
     },
     constants: { X_OK: 1 },
+    existsSync: mockExistsSync,
   },
   promises: {
     access: mockAccess,
   },
   constants: { X_OK: 1 },
+  existsSync: mockExistsSync,
 }));
 
 const mockSpawnSync = vi.hoisted(() => vi.fn());
@@ -90,6 +94,8 @@ beforeEach(() => {
     status: 0,
     error: undefined,
   });
+  mockExistsSync.mockReturnValue(false);
+  resetShellConfiguration();
 });
 
 afterEach(() => {
@@ -425,7 +431,7 @@ describe('getShellConfiguration', () => {
       mockPlatform.mockReturnValue('win32');
     });
 
-    it('should return PowerShell configuration by default', () => {
+    it('should return PowerShell configuration by default (powershell.exe)', () => {
       delete process.env['ComSpec'];
       const config = getShellConfiguration();
       expect(config.executable).toBe('powershell.exe');
@@ -433,12 +439,31 @@ describe('getShellConfiguration', () => {
       expect(config.shell).toBe('powershell');
     });
 
-    it('should ignore ComSpec when pointing to cmd.exe', () => {
+    it('should prefer pwsh.exe if available in PATH', () => {
+      delete process.env['ComSpec'];
+      const pwshDir = 'C:\\Program Files\\PowerShell\\7';
+      const pwshPath = path.join(pwshDir, 'pwsh.exe');
+      process.env['PATH'] = pwshDir;
+
+      mockExistsSync.mockImplementation((p: string) => p === pwshPath);
+
+      const config = getShellConfiguration();
+      // On non-Windows tests, path.join(pwshDir, 'pwsh.exe') might use forward slashes for the last part
+      // but the mock is set to return true for exactly that.
+      expect(config.executable).toBe(pwshPath);
+      expect(config.shell).toBe('powershell');
+    });
+
+    it('should ignore ComSpec when pointing to cmd.exe and prefer pwsh.exe in PATH', () => {
       const cmdPath = 'C:\\WINDOWS\\system32\\cmd.exe';
       process.env['ComSpec'] = cmdPath;
+      const pwshPath = path.join('C:\\pwsh', 'pwsh.exe');
+      process.env['PATH'] = 'C:\\pwsh';
+
+      mockExistsSync.mockImplementation((p: string) => p === pwshPath);
+
       const config = getShellConfiguration();
-      expect(config.executable).toBe('powershell.exe');
-      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.executable).toBe(pwshPath);
       expect(config.shell).toBe('powershell');
     });
 

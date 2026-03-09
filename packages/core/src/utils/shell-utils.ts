@@ -534,6 +534,8 @@ export function parseCommandDetails(
   return null;
 }
 
+let cachedShellConfiguration: ShellConfiguration | null = null;
+
 /**
  * Determines the appropriate shell configuration for the current platform.
  *
@@ -543,6 +545,10 @@ export function parseCommandDetails(
  * @returns The ShellConfiguration for the current environment.
  */
 export function getShellConfiguration(): ShellConfiguration {
+  if (cachedShellConfiguration) {
+    return cachedShellConfiguration;
+  }
+
   if (isWindows()) {
     const comSpec = process.env['ComSpec'];
     if (comSpec) {
@@ -551,24 +557,58 @@ export function getShellConfiguration(): ShellConfiguration {
         executable.endsWith('powershell.exe') ||
         executable.endsWith('pwsh.exe')
       ) {
-        return {
+        cachedShellConfiguration = {
           executable: comSpec,
           argsPrefix: ['-NoProfile', '-Command'],
           shell: 'powershell',
         };
+        return cachedShellConfiguration;
       }
     }
 
-    // Default to PowerShell for all other Windows configurations.
-    return {
+    // Prefer pwsh.exe (PowerShell 7+) if available in PATH
+    const pathDelimiter = os.platform() === 'win32' ? ';' : path.delimiter;
+    const paths = (process.env['PATH'] || '').split(pathDelimiter);
+    for (const p of paths) {
+      const fullPath = path.join(p, 'pwsh.exe');
+      try {
+        if (fs.existsSync(fullPath)) {
+          cachedShellConfiguration = {
+            executable: fullPath,
+            argsPrefix: ['-NoProfile', '-Command'],
+            shell: 'powershell',
+          };
+          return cachedShellConfiguration;
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    // Default to Windows PowerShell (powershell.exe)
+    cachedShellConfiguration = {
       executable: 'powershell.exe',
       argsPrefix: ['-NoProfile', '-Command'],
       shell: 'powershell',
     };
+    return cachedShellConfiguration;
   }
 
   // Unix-like systems (Linux, macOS)
-  return { executable: 'bash', argsPrefix: ['-c'], shell: 'bash' };
+  cachedShellConfiguration = {
+    executable: 'bash',
+    argsPrefix: ['-c'],
+    shell: 'bash',
+  };
+  return cachedShellConfiguration;
+}
+
+/**
+ * Resets the cached shell configuration.
+ * Used for testing purposes when environment variables change.
+ */
+export function resetShellConfiguration(): void {
+  cachedShellConfiguration = null;
 }
 
 /**
