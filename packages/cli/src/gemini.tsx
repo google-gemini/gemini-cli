@@ -708,12 +708,13 @@ export async function main() {
       } catch (error) {
         if (
           error instanceof SessionError &&
-          error.code === 'NO_SESSIONS_FOUND'
+          (error.code === 'NO_SESSIONS_FOUND' ||
+            error.code === 'INVALID_SESSION_IDENTIFIER')
         ) {
-          // No sessions to resume — start a fresh session with a warning
+          // No sessions to resume or invalid session ID — start a fresh session with a warning
           startupWarnings.push({
-            id: 'resume-no-sessions',
-            message: error.message,
+            id: 'resume-failure',
+            message: 'Could not resume session. Started a new session.',
             priority: WarningPriority.High,
           });
         } else {

@@ -41,12 +41,28 @@ export async function relaunchAppInChildProcess(
   }
 
   let latestAdminSettings = remoteAdminSettings;
+  let resumeSessionId: string | undefined = undefined;
 
   const runner = () => {
     // process.argv is [node, script, ...args]
     // We want to construct [ ...nodeArgs, script, ...scriptArgs]
     const script = process.argv[1];
-    const scriptArgs = process.argv.slice(2);
+    let scriptArgs = process.argv.slice(2);
+
+    if (resumeSessionId) {
+      const filteredArgs: string[] = [];
+      for (let i = 0; i < scriptArgs.length; i++) {
+        if (scriptArgs[i] === '--resume') {
+          i++; // Skip the next argument as well
+          continue;
+        }
+        if (scriptArgs[i].startsWith('--resume=')) {
+          continue;
+        }
+        filteredArgs.push(scriptArgs[i]);
+      }
+      scriptArgs = [...filteredArgs, '--resume', resumeSessionId];
+    }
 
     const nodeArgs = [
       ...process.execArgv,
@@ -69,11 +85,16 @@ export async function relaunchAppInChildProcess(
       child.send({ type: 'admin-settings', settings: latestAdminSettings });
     }
 
-    child.on('message', (msg: { type?: string; settings?: unknown }) => {
-      if (msg.type === 'admin-settings-update' && msg.settings) {
-        latestAdminSettings = msg.settings as AdminControlsSettings;
-      }
-    });
+    child.on(
+      'message',
+      (msg: { type?: string; settings?: unknown; sessionId?: string }) => {
+        if (msg.type === 'admin-settings-update' && msg.settings) {
+          latestAdminSettings = msg.settings as AdminControlsSettings;
+        } else if (msg.type === 'relaunch-resume-session' && msg.sessionId) {
+          resumeSessionId = msg.sessionId;
+        }
+      },
+    );
 
     return new Promise<number>((resolve, reject) => {
       child.on('error', reject);

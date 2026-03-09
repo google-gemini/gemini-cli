@@ -315,6 +315,99 @@ describe('relaunchAppInChildProcess', () => {
       // Should default to exit code 1
       expect(processExitSpy).toHaveBeenCalledWith(1);
     });
+
+    it('should append --resume <sessionId> on the next spawn if relaunch-resume-session message is received', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js', '--some-flag'];
+
+      let spawnCount = 0;
+      mockedSpawn.mockImplementation(() => {
+        spawnCount++;
+        const mockChild = createMockChildProcess(0, false);
+
+        if (spawnCount === 1) {
+          // First run: send the resume session ID, then exit with RELAUNCH_EXIT_CODE
+          setImmediate(() => {
+            mockChild.emit('message', {
+              type: 'relaunch-resume-session',
+              sessionId: 'test-session-123',
+            });
+            mockChild.emit('close', RELAUNCH_EXIT_CODE);
+          });
+        } else if (spawnCount === 2) {
+          // Second run: exit normally
+          setImmediate(() => {
+            mockChild.emit('close', 0);
+          });
+        }
+
+        return mockChild;
+      });
+
+      const promise = relaunchAppInChildProcess([], []);
+      await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
+
+      expect(mockedSpawn).toHaveBeenCalledTimes(2);
+
+      // First spawn should not have --resume
+      expect(mockedSpawn.mock.calls[0][1]).not.toContain('--resume');
+
+      // Second spawn should have --resume test-session-123 appended
+      const secondArgs = mockedSpawn.mock.calls[1][1];
+      expect(secondArgs).toContain('--resume');
+      expect(secondArgs).toContain('test-session-123');
+
+      // Check exact order at the end of arguments
+      expect(secondArgs.slice(-2)).toEqual(['--resume', 'test-session-123']);
+    });
+
+    it('should strip existing --resume flags when appending new one', async () => {
+      process.argv = [
+        '/usr/bin/node',
+        '/app/cli.js',
+        '--resume',
+        'old-session',
+        '--resume=other-session',
+        '--flag',
+      ];
+
+      let spawnCount = 0;
+      mockedSpawn.mockImplementation(() => {
+        spawnCount++;
+        const mockChild = createMockChildProcess(0, false);
+
+        if (spawnCount === 1) {
+          setImmediate(() => {
+            mockChild.emit('message', {
+              type: 'relaunch-resume-session',
+              sessionId: 'new-session-456',
+            });
+            mockChild.emit('close', RELAUNCH_EXIT_CODE);
+          });
+        } else if (spawnCount === 2) {
+          setImmediate(() => {
+            mockChild.emit('close', 0);
+          });
+        }
+
+        return mockChild;
+      });
+
+      const promise = relaunchAppInChildProcess([], []);
+      await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
+
+      expect(mockedSpawn).toHaveBeenCalledTimes(2);
+
+      const secondArgs = mockedSpawn.mock.calls[1][1] as string[];
+
+      // Should not contain the old resumes
+      expect(secondArgs).not.toContain('old-session');
+      expect(secondArgs).not.toContain('--resume=other-session');
+
+      // Should contain the new resume at the end
+      expect(secondArgs.slice(-2)).toEqual(['--resume', 'new-session-456']);
+      // Should still contain other flags
+      expect(secondArgs).toContain('--flag');
+    });
   });
 });
 

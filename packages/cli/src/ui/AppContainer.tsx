@@ -791,7 +791,7 @@ export const AppContainer = (props: AppContainerProps) => {
 Logging in with Google... Restarting Gemini CLI to continue.
 ----------------------------------------------------------------
           `);
-          await relaunchApp();
+          await relaunchApp(config.getSessionId());
         }
       }
       setAuthState(AuthState.Authenticated);
@@ -2466,7 +2466,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
             });
           }
         }
-        await relaunchApp();
+        await relaunchApp(config.getSessionId());
       },
       handleNewAgentsSelect: async (choice: NewAgentsChoice) => {
         if (newAgents && choice === NewAgentsChoice.ACKNOWLEDGE) {

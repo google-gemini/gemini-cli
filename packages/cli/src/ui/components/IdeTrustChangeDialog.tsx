@@ -8,6 +8,7 @@ import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { relaunchApp } from '../../utils/processUtils.js';
+import { useConfig } from '../contexts/ConfigContext.js';
 import { type RestartReason } from '../hooks/useIdeTrustListener.js';
 import { debugLogger } from '@google/gemini-cli-core';
 
@@ -16,11 +17,12 @@ interface IdeTrustChangeDialogProps {
 }
 
 export const IdeTrustChangeDialog = ({ reason }: IdeTrustChangeDialogProps) => {
+  const config = useConfig();
   useKeypress(
     (key) => {
       if (key.name === 'r' || key.name === 'R') {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        relaunchApp();
+        relaunchApp(config.getSessionId());
         return true;
       }
       return false;

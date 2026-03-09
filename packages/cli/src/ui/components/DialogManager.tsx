@@ -230,7 +230,7 @@ export const DialogManager = ({
       <Box flexDirection="column">
         <SettingsDialog
           onSelect={() => uiActions.closeSettingsDialog()}
-          onRestartRequest={relaunchApp}
+          onRestartRequest={() => relaunchApp(config.getSessionId())}
           availableTerminalHeight={terminalHeight - staticExtraHeight}
         />
       </Box>

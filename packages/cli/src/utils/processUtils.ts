@@ -6,6 +6,7 @@
 
 import { runExitCleanup } from './cleanup.js';
 import { waitForUpdateCompletion } from './handleAutoUpdate.js';
+import { sessionId } from '@google/gemini-cli-core';
 
 /**
  * Exit code used to signal that the CLI should be relaunched.
@@ -22,10 +23,18 @@ export function _resetRelaunchStateForTesting(): void {
   isRelaunching = false;
 }
 
-export async function relaunchApp(): Promise<void> {
+export async function relaunchApp(sessionIdOverride?: string): Promise<void> {
   if (isRelaunching) return;
   isRelaunching = true;
   await waitForUpdateCompletion();
   await runExitCleanup();
+
+  if (process.send) {
+    process.send({
+      type: 'relaunch-resume-session',
+      sessionId: sessionIdOverride ?? sessionId,
+    });
+  }
+
   process.exit(RELAUNCH_EXIT_CODE);
 }
