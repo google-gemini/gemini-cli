@@ -2177,6 +2177,18 @@ const SETTINGS_SCHEMA = {
         items: { type: 'string' },
         mergeStrategy: MergeStrategy.UNION,
       },
+      trusted: {
+        type: 'array',
+        label: 'Trusted Skills',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [] as string[],
+        description:
+          'List of skill names that are automatically allowed to activate without a confirmation prompt.',
+        showInDialog: false,
+        items: { type: 'string' },
+        mergeStrategy: MergeStrategy.UNION,
+      },
     },
   },
 
