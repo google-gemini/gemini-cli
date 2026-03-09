@@ -1242,7 +1242,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const handleHintSubmit = useCallback(
     (hint: string) => {
-      const trimmed = hint.trim();
+      const trimmed = String(hint || '').trim();
       if (!trimmed) {
         return;
       }
