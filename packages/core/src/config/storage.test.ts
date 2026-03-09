@@ -24,7 +24,7 @@ vi.mock('fs', async (importOriginal) => {
 });
 
 import { Storage } from './storage.js';
-import { GEMINI_DIR, homedir } from '../utils/paths.js';
+import { GEMINI_DIR, homedir, resolveToRealPath } from '../utils/paths.js';
 import { ProjectRegistry } from './projectRegistry.js';
 import { StorageMigration } from './storageMigration.js';
 
@@ -279,8 +279,7 @@ describe('Storage – additional helpers', () => {
         name: 'custom absolute path outside throws',
         customDir: '/absolute/path/to/plans',
         expected: '',
-        expectedError:
-          "Custom plans directory '/absolute/path/to/plans' resolves to '/absolute/path/to/plans', which is outside the project root '/tmp/project'.",
+        expectedError: `Custom plans directory '/absolute/path/to/plans' resolves to '/absolute/path/to/plans', which is outside the project root '${resolveToRealPath(projectRoot)}'.`,
       },
       {
         name: 'absolute path that happens to be inside project root',
@@ -306,8 +305,7 @@ describe('Storage – additional helpers', () => {
         name: 'escaping relative path throws',
         customDir: '../escaped-plans',
         expected: '',
-        expectedError:
-          "Custom plans directory '../escaped-plans' resolves to '/tmp/escaped-plans', which is outside the project root '/tmp/project'.",
+        expectedError: `Custom plans directory '../escaped-plans' resolves to '${resolveToRealPath(path.resolve(projectRoot, '../escaped-plans'))}', which is outside the project root '${resolveToRealPath(projectRoot)}'.`,
       },
       {
         name: 'hidden directory starting with ..',
