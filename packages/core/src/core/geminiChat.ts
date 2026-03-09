@@ -174,12 +174,8 @@ export class GeminiChat {
     promptId: string,
   ): void {
     try {
-      const logDir = path.join(
-        process.cwd(),
-      );
-      const logFile = path.join(
-        logDir,
-        process.env['REQUEST_LOG_FILE'] ?? 'requests.log',
+      const logFile = process.env['REQUEST_LOG_FILE'] ?? path.join(
+         process.cwd(), 'requests.log',
       );
       if (!fs.existsSync(logFile)) {
         fs.writeFileSync(logFile, `si:\n${this.systemInstruction}\n`);
