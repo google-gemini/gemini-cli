@@ -875,7 +875,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly enableEventDrivenScheduler: boolean;
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
-  private trustedSkills?: string[];
+  private trustedSkills: string[];
   private readonly adminSkillsEnabled: boolean;
 
   private readonly experimentalJitContext: boolean;
