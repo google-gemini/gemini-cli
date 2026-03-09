@@ -6,6 +6,7 @@
 
 import {
   BaseToolInvocation,
+  type BackgroundExecutionData,
   type ToolConfirmationOutcome,
   type ToolResult,
   type ToolCallConfirmationDetails,
@@ -147,7 +148,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
   }
 
   private publishBackgroundDelta(
-    pid: number,
+    executionId: number,
     previousOutput: string,
     nextOutput: string,
   ): string {
@@ -157,7 +158,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
 
     if (nextOutput.startsWith(previousOutput)) {
       ExecutionLifecycleService.appendOutput(
-        pid,
+        executionId,
         nextOutput.slice(previousOutput.length),
       );
       return nextOutput;
@@ -166,7 +167,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     // If the reassembled output changes non-monotonically, resync by appending
     // the full latest snapshot with a clear separator.
     ExecutionLifecycleService.appendOutput(
-      pid,
+      executionId,
       `\n\n[Output updated]\n${nextOutput}`,
     );
     return nextOutput;
@@ -176,7 +177,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     _signal: AbortSignal,
     updateOutput?: (output: string | AnsiOutput) => void,
     _shellExecutionConfig?: unknown,
-    setPidCallback?: (pid: number) => void,
+    setExecutionIdCallback?: (executionId: number) => void,
   ): Promise<ToolResult> {
     const reassembler = new A2AResultReassembler();
     const executionController = new AbortController();
@@ -199,8 +200,8 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         },
       };
     }
-    const backgroundPid = pid;
-    setPidCallback?.(backgroundPid);
+    const backgroundExecutionId = pid;
+    setExecutionIdCallback?.(backgroundExecutionId);
 
     const run = async () => {
       let lastOutput = '';
@@ -244,7 +245,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
 
           const currentOutput = reassembler.toString();
           lastOutput = this.publishBackgroundDelta(
-            backgroundPid,
+            backgroundExecutionId,
             lastOutput,
             currentOutput,
           );
@@ -273,20 +274,20 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
           `[RemoteAgent] Final response from ${this.definition.name}:\n${JSON.stringify(finalResponse, null, 2)}`,
         );
 
-        ExecutionLifecycleService.completeExecution(backgroundPid, {
+        ExecutionLifecycleService.completeExecution(backgroundExecutionId, {
           exitCode: 0,
         });
       } catch (error: unknown) {
         const partialOutput = reassembler.toString();
         lastOutput = this.publishBackgroundDelta(
-          backgroundPid,
+          backgroundExecutionId,
           lastOutput,
           partialOutput,
         );
         const errorMessage = `Error calling remote agent: ${
           error instanceof Error ? error.message : String(error)
         }`;
-        ExecutionLifecycleService.completeExecution(backgroundPid, {
+        ExecutionLifecycleService.completeExecution(backgroundExecutionId, {
           error: new Error(errorMessage),
           aborted: executionController.signal.aborted,
           exitCode: executionController.signal.aborted ? 130 : 1,
@@ -306,15 +307,17 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
 
     if (executionResult.backgrounded) {
       const command = `${this.getDescription()}: ${this.params.query}`;
-      const backgroundMessage = `Remote agent moved to background (PID: ${backgroundPid}). Output hidden. Press Ctrl+B to view.`;
+      const backgroundMessage = `Remote agent moved to background (PID: ${backgroundExecutionId}). Output hidden. Press Ctrl+B to view.`;
+      const data: BackgroundExecutionData = {
+        executionId: backgroundExecutionId,
+        pid: backgroundExecutionId,
+        command,
+        initialOutput: executionResult.output,
+      };
       return {
         llmContent: [{ text: backgroundMessage }],
         returnDisplay: backgroundMessage,
-        data: {
-          pid: backgroundPid,
-          command,
-          initialOutput: executionResult.output,
-        },
+        data,
       };
     }
 

@@ -611,20 +611,23 @@ describe('RemoteAgentInvocation', () => {
         },
       );
 
-      let pid: number | undefined;
+      let executionId: number | undefined;
       const onExit = vi.fn();
       let unsubscribeOnExit: (() => void) | undefined;
       const streamedOutputChunks: string[] = [];
       let unsubscribeStream: (() => void) | undefined;
 
       const updateOutput = vi.fn((output: unknown) => {
-        if (output === 'Chunk 1' && pid) {
-          ShellExecutionService.background(pid);
-          unsubscribeStream = ShellExecutionService.subscribe(pid, (event) => {
-            if (event.type === 'data' && typeof event.chunk === 'string') {
-              streamedOutputChunks.push(event.chunk);
-            }
-          });
+        if (output === 'Chunk 1' && executionId) {
+          ShellExecutionService.background(executionId);
+          unsubscribeStream = ShellExecutionService.subscribe(
+            executionId,
+            (event) => {
+              if (event.type === 'data' && typeof event.chunk === 'string') {
+                streamedOutputChunks.push(event.chunk);
+              }
+            },
+          );
         }
       });
 
@@ -638,19 +641,23 @@ describe('RemoteAgentInvocation', () => {
         new AbortController().signal,
         updateOutput,
         undefined,
-        (newPid) => {
-          pid = newPid;
-          unsubscribeOnExit = ShellExecutionService.onExit(newPid, onExit);
+        (newExecutionId) => {
+          executionId = newExecutionId;
+          unsubscribeOnExit = ShellExecutionService.onExit(
+            newExecutionId,
+            onExit,
+          );
         },
       );
 
       const result = await resultPromise;
-      expect(pid).toBeDefined();
+      expect(executionId).toBeDefined();
       expect(result.returnDisplay).toContain(
         'Remote agent moved to background',
       );
       expect(result.data).toMatchObject({
-        pid,
+        executionId,
+        pid: executionId,
         initialOutput: 'Chunk 1',
       });
 
