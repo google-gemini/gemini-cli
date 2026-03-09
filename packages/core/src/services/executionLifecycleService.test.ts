@@ -35,7 +35,7 @@ describe('ExecutionLifecycleService', () => {
   it('completes managed executions in the foreground and notifies exit subscribers', async () => {
     const handle = ExecutionLifecycleService.createExecution();
     if (handle.pid === undefined) {
-      throw new Error('Expected virtual execution ID.');
+      throw new Error('Expected execution ID.');
     }
 
     const onExit = vi.fn();
@@ -43,7 +43,7 @@ describe('ExecutionLifecycleService', () => {
 
     ExecutionLifecycleService.appendOutput(handle.pid, 'Hello');
     ExecutionLifecycleService.appendOutput(handle.pid, ' World');
-    ExecutionLifecycleService.completeVirtualExecution(handle.pid, {
+    ExecutionLifecycleService.completeExecution(handle.pid, {
       exitCode: 0,
     });
 
@@ -66,20 +66,20 @@ describe('ExecutionLifecycleService', () => {
       'remote_agent',
     );
     if (handle.pid === undefined) {
-      throw new Error('Expected virtual execution ID.');
+      throw new Error('Expected execution ID.');
     }
 
-    ExecutionLifecycleService.completeVirtualExecution(handle.pid, {
+    ExecutionLifecycleService.completeExecution(handle.pid, {
       exitCode: 0,
     });
     const result = await handle.result;
     expect(result.executionMethod).toBe('remote_agent');
   });
 
-  it('supports backgrounding virtual executions and continues streaming updates', async () => {
-    const handle = ExecutionLifecycleService.createVirtualExecution();
+  it('supports backgrounding managed executions and continues streaming updates', async () => {
+    const handle = ExecutionLifecycleService.createExecution();
     if (handle.pid === undefined) {
-      throw new Error('Expected virtual execution ID.');
+      throw new Error('Expected execution ID.');
     }
 
     const chunks: string[] = [];
@@ -103,7 +103,7 @@ describe('ExecutionLifecycleService', () => {
     expect(backgroundResult.output).toBe('Chunk 1');
 
     ExecutionLifecycleService.appendOutput(handle.pid, '\nChunk 2');
-    ExecutionLifecycleService.completeVirtualExecution(handle.pid, {
+    ExecutionLifecycleService.completeExecution(handle.pid, {
       exitCode: 0,
     });
 
@@ -116,11 +116,11 @@ describe('ExecutionLifecycleService', () => {
     unsubscribeExit();
   });
 
-  it('kills virtual executions and resolves with aborted result', async () => {
+  it('kills managed executions and resolves with aborted result', async () => {
     const onKill = vi.fn();
-    const handle = ExecutionLifecycleService.createVirtualExecution('', onKill);
+    const handle = ExecutionLifecycleService.createExecution('', onKill);
     if (handle.pid === undefined) {
-      throw new Error('Expected virtual execution ID.');
+      throw new Error('Expected execution ID.');
     }
 
     ExecutionLifecycleService.appendOutput(handle.pid, 'work');

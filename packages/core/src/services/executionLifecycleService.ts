@@ -91,7 +91,7 @@ type ManagedExecutionState = VirtualExecutionState | ExternalExecutionState;
  */
 export class ExecutionLifecycleService {
   private static readonly EXIT_INFO_TTL_MS = 5 * 60 * 1000;
-  private static nextVirtualExecutionId = 2_000_000_000;
+  private static nextExecutionId = 2_000_000_000;
 
   private static activeExecutions = new Map<number, ManagedExecutionState>();
   private static activeResolvers = new Map<
@@ -121,10 +121,10 @@ export class ExecutionLifecycleService {
     }, this.EXIT_INFO_TTL_MS).unref();
   }
 
-  private static allocateVirtualExecutionId(): number {
-    let executionId = ++this.nextVirtualExecutionId;
+  private static allocateExecutionId(): number {
+    let executionId = ++this.nextExecutionId;
     while (this.activeExecutions.has(executionId)) {
-      executionId = ++this.nextVirtualExecutionId;
+      executionId = ++this.nextExecutionId;
     }
     return executionId;
   }
@@ -162,7 +162,7 @@ export class ExecutionLifecycleService {
     this.activeResolvers.clear();
     this.activeListeners.clear();
     this.exitedExecutionInfo.clear();
-    this.nextVirtualExecutionId = 2_000_000_000;
+    this.nextExecutionId = 2_000_000_000;
   }
 
   static registerExecution(
@@ -196,7 +196,7 @@ export class ExecutionLifecycleService {
     onKill?: () => void,
     executionMethod: ExecutionMethod = 'none',
   ): ExecutionHandle {
-    const executionId = this.allocateVirtualExecutionId();
+    const executionId = this.allocateExecutionId();
 
     this.activeExecutions.set(executionId, {
       executionMethod,
@@ -217,17 +217,6 @@ export class ExecutionLifecycleService {
       pid: executionId,
       result: this.createPendingResult(executionId),
     };
-  }
-
-  /**
-   * @deprecated Use createExecution() for new call sites.
-   */
-  static createVirtualExecution(
-    initialOutput = '',
-    onKill?: () => void,
-    executionMethod: ExecutionMethod = 'none',
-  ): ExecutionHandle {
-    return this.createExecution(initialOutput, onKill, executionMethod);
   }
 
   static appendOutput(executionId: number, chunk: string): void {
@@ -284,7 +273,7 @@ export class ExecutionLifecycleService {
     );
   }
 
-  static completeVirtualExecution(
+  static completeExecution(
     executionId: number,
     options?: ExecutionCompletionOptions,
   ): void {
@@ -312,16 +301,6 @@ export class ExecutionLifecycleService {
       pid: executionId,
       executionMethod: execution.executionMethod,
     });
-  }
-
-  /**
-   * @deprecated Use completeVirtualExecution() for new call sites.
-   */
-  static completeExecution(
-    executionId: number,
-    options?: ExecutionCompletionOptions,
-  ): void {
-    this.completeVirtualExecution(executionId, options);
   }
 
   static completeWithResult(

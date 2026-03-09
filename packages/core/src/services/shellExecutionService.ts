@@ -30,9 +30,7 @@ import {
 import { killProcessGroup } from '../utils/process-utils.js';
 import {
   ExecutionLifecycleService,
-  type ExecutionCompletionOptions,
   type ExecutionHandle,
-  type ExecutionMethod,
   type ExecutionOutputEvent,
   type ExecutionResult,
 } from './executionLifecycleService.js';
@@ -222,29 +220,6 @@ export class ShellExecutionService {
     const charsToTrim = newTotalLength - maxSize;
     const truncatedBuffer = currentBuffer.substring(charsToTrim);
     return { newBuffer: truncatedBuffer + chunk, truncated: true };
-  }
-
-  static createVirtualExecution(
-    initialOutput = '',
-    onKill?: () => void,
-    executionMethod: ExecutionMethod = 'none',
-  ): ShellExecutionHandle {
-    return ExecutionLifecycleService.createVirtualExecution(
-      initialOutput,
-      onKill,
-      executionMethod,
-    );
-  }
-
-  static appendVirtualOutput(pid: number, chunk: string): void {
-    ExecutionLifecycleService.appendOutput(pid, chunk);
-  }
-
-  static completeVirtualExecution(
-    pid: number,
-    options?: ExecutionCompletionOptions,
-  ): void {
-    ExecutionLifecycleService.completeVirtualExecution(pid, options);
   }
 
   private static childProcessFallback(
