@@ -12,14 +12,20 @@ import {
   BaseToolInvocation,
   type ToolCallConfirmationDetails,
   isTool,
+  type ToolLiveOutput,
 } from '../tools/tools.js';
-import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { AgentDefinition, AgentInputs } from './types.js';
 import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import { formatUserHintsForModel } from '../utils/fastAckHelper.js';
+import { runInDevTraceSpan } from '../telemetry/trace.js';
+import {
+  GeminiCliOperation,
+  GEN_AI_AGENT_DESCRIPTION,
+  GEN_AI_AGENT_NAME,
+} from '../telemetry/constants.js';
 
 export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
   constructor(
@@ -41,7 +47,7 @@ export class SubagentTool extends BaseDeclarativeTool<AgentInputs, ToolResult> {
       definition.name,
       definition.displayName ?? definition.name,
       definition.description,
-      Kind.Think,
+      Kind.Agent,
       inputSchema,
       messageBus,
       /* isOutputMarkdown */ true,
@@ -149,7 +155,7 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
 
   async execute(
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
   ): Promise<ToolResult> {
     const validationError = SchemaValidator.validate(
       this.definition.inputConfig.inputSchema,
@@ -167,7 +173,21 @@ class SubAgentInvocation extends BaseToolInvocation<AgentInputs, ToolResult> {
       this.withUserHints(this.params),
     );
 
-    return invocation.execute(signal, updateOutput);
+    return runInDevTraceSpan(
+      {
+        operation: GeminiCliOperation.AgentCall,
+        attributes: {
+          [GEN_AI_AGENT_NAME]: this.definition.name,
+          [GEN_AI_AGENT_DESCRIPTION]: this.definition.description,
+        },
+      },
+      async ({ metadata }) => {
+        metadata.input = this.params;
+        const result = await invocation.execute(signal, updateOutput);
+        metadata.output = result;
+        return result;
+      },
+    );
   }
 
   private withUserHints(agentArgs: AgentInputs): AgentInputs {

@@ -75,11 +75,14 @@ Replace `<PR_NUMBER>` with your pull request number. Authors are encouraged to
 run this on their own PRs for self-review, and reviewers should use it to
 augment their manual review process.
 
-### Self assigning issues
+### Self-assigning and unassigning issues
 
-To assign an issue to yourself, simply add a comment with the text `/assign`.
-The comment must contain only that text and nothing else. This command will
-assign the issue to you, provided it is not already assigned.
+To assign an issue to yourself, simply add a comment with the text `/assign`. To
+unassign yourself from an issue, add a comment with the text `/unassign`.
+
+The comment must contain only that text and nothing else. These commands will
+assign or unassign the issue as requested, provided the conditions are met
+(e.g., an issue must be unassigned to be assigned).
 
 Please note that you can have a maximum of 3 issues assigned to you at any given
 time.
@@ -317,11 +320,9 @@ npm run lint
 
 - Please adhere to the coding style, patterns, and conventions used throughout
   the existing codebase.
-- Consult
-  [GEMINI.md](https://github.com/google-gemini/gemini-cli/blob/main/GEMINI.md)
-  (typically found in the project root) for specific instructions related to
-  AI-assisted development, including conventions for React, comments, and Git
-  usage.
+- Consult [GEMINI.md](../GEMINI.md) (typically found in the project root) for
+  specific instructions related to AI-assisted development, including
+  conventions for React, comments, and Git usage.
 - **Imports:** Pay special attention to import paths. The project uses ESLint to
   enforce restrictions on relative imports between packages.
 
@@ -372,8 +373,7 @@ specific debug settings.
 
 ### React DevTools
 
-To debug the CLI's React-based UI, you can use React DevTools. Ink, the library
-used for the CLI's interface, is compatible with React DevTools version 4.x.
+To debug the CLI's React-based UI, you can use React DevTools.
 
 1.  **Start the Gemini CLI in development mode:**
 
@@ -381,20 +381,20 @@ used for the CLI's interface, is compatible with React DevTools version 4.x.
     DEV=true npm start
     ```
 
-2.  **Install and run React DevTools version 4.28.5 (or the latest compatible
-    4.x version):**
+2.  **Install and run React DevTools version 6 (which matches the CLI's
+    `react-devtools-core`):**
 
     You can either install it globally:
 
     ```bash
-    npm install -g react-devtools@4.28.5
+    npm install -g react-devtools@6
     react-devtools
     ```
 
     Or run it directly using npx:
 
     ```bash
-    npx react-devtools@4.28.5
+    npx react-devtools@6
     ```
 
     Your running CLI application should then connect to React DevTools.

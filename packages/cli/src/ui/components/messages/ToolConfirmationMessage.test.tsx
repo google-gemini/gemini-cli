@@ -52,6 +52,7 @@ describe('ToolConfirmationMessage', () => {
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
+        getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
       />,
@@ -78,6 +79,7 @@ describe('ToolConfirmationMessage', () => {
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
+        getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
       />,
@@ -101,6 +103,7 @@ describe('ToolConfirmationMessage', () => {
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
+        getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
       />,
@@ -131,6 +134,7 @@ describe('ToolConfirmationMessage', () => {
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
+        getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
       />,
@@ -161,6 +165,7 @@ describe('ToolConfirmationMessage', () => {
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
+        getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
       />,
@@ -190,6 +195,7 @@ describe('ToolConfirmationMessage', () => {
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
+        getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
       />,
@@ -219,6 +225,7 @@ describe('ToolConfirmationMessage', () => {
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
+        getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
       />,
@@ -231,6 +238,37 @@ describe('ToolConfirmationMessage', () => {
     expect(output).toContain('whoami');
     expect(output).toMatchSnapshot();
     unmount();
+  });
+
+  it('should render multiline shell scripts with correct newlines and syntax highlighting (SVG snapshot)', async () => {
+    const confirmationDetails: SerializableConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm Multiline Script',
+      command: 'echo "hello"\nfor i in 1 2 3; do\n  echo $i\ndone',
+      rootCommand: 'echo',
+      rootCommands: ['echo'],
+    };
+
+    const result = renderWithProviders(
+      <ToolConfirmationMessage
+        callId="test-call-id"
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        getPreferredEditor={vi.fn()}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
+    );
+    await result.waitUntilReady();
+
+    const output = result.lastFrame();
+    expect(output).toContain('echo "hello"');
+    expect(output).toContain('for i in 1 2 3; do');
+    expect(output).toContain('echo $i');
+    expect(output).toContain('done');
+
+    await expect(result).toMatchSvgSnapshot();
+    result.unmount();
   });
 
   describe('with folder trust', () => {
@@ -300,6 +338,7 @@ describe('ToolConfirmationMessage', () => {
             callId="test-call-id"
             confirmationDetails={details}
             config={mockConfig}
+            getPreferredEditor={vi.fn()}
             availableTerminalHeight={30}
             terminalWidth={80}
           />,
@@ -321,6 +360,7 @@ describe('ToolConfirmationMessage', () => {
             callId="test-call-id"
             confirmationDetails={details}
             config={mockConfig}
+            getPreferredEditor={vi.fn()}
             availableTerminalHeight={30}
             terminalWidth={80}
           />,
@@ -355,6 +395,7 @@ describe('ToolConfirmationMessage', () => {
           callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
           config={mockConfig}
+          getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
         />,
@@ -381,6 +422,7 @@ describe('ToolConfirmationMessage', () => {
           callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
           config={mockConfig}
+          getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
         />,
@@ -425,6 +467,7 @@ describe('ToolConfirmationMessage', () => {
           callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
           config={mockConfig}
+          getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
         />,
@@ -452,6 +495,7 @@ describe('ToolConfirmationMessage', () => {
           callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
           config={mockConfig}
+          getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
         />,
@@ -479,6 +523,7 @@ describe('ToolConfirmationMessage', () => {
           callId="test-call-id"
           confirmationDetails={editConfirmationDetails}
           config={mockConfig}
+          getPreferredEditor={vi.fn()}
           availableTerminalHeight={30}
           terminalWidth={80}
         />,
@@ -505,6 +550,7 @@ describe('ToolConfirmationMessage', () => {
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
+        getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={80}
       />,
@@ -518,6 +564,81 @@ describe('ToolConfirmationMessage', () => {
     expect(output).toContain('Allow execution of MCP tool "testtool"');
     expect(output).toContain('from server "testserver"?');
     expect(output).toMatchSnapshot();
+    unmount();
+  });
+
+  it('should show MCP tool details expand hint for MCP confirmations', async () => {
+    const confirmationDetails: ToolCallConfirmationDetails = {
+      type: 'mcp',
+      title: 'Confirm MCP Tool',
+      serverName: 'test-server',
+      toolName: 'test-tool',
+      toolDisplayName: 'Test Tool',
+      toolArgs: {
+        url: 'https://www.google.co.jp',
+      },
+      toolDescription: 'Navigates browser to a URL.',
+      toolParameterSchema: {
+        type: 'object',
+        properties: {
+          url: {
+            type: 'string',
+            description: 'Destination URL',
+          },
+        },
+        required: ['url'],
+      },
+      onConfirm: vi.fn(),
+    };
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <ToolConfirmationMessage
+        callId="test-call-id"
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        getPreferredEditor={vi.fn()}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
+    );
+    await waitUntilReady();
+
+    const output = lastFrame();
+    expect(output).toContain('MCP Tool Details:');
+    expect(output).toContain('(press Ctrl+O to expand MCP tool details)');
+    expect(output).not.toContain('https://www.google.co.jp');
+    expect(output).not.toContain('Navigates browser to a URL.');
+    unmount();
+  });
+
+  it('should omit empty MCP invocation arguments from details', async () => {
+    const confirmationDetails: ToolCallConfirmationDetails = {
+      type: 'mcp',
+      title: 'Confirm MCP Tool',
+      serverName: 'test-server',
+      toolName: 'test-tool',
+      toolDisplayName: 'Test Tool',
+      toolArgs: {},
+      toolDescription: 'No arguments required.',
+      onConfirm: vi.fn(),
+    };
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <ToolConfirmationMessage
+        callId="test-call-id"
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        getPreferredEditor={vi.fn()}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
+    );
+    await waitUntilReady();
+
+    const output = lastFrame();
+    expect(output).toContain('MCP Tool Details:');
+    expect(output).toContain('(press Ctrl+O to expand MCP tool details)');
+    expect(output).not.toContain('Invocation Arguments:');
     unmount();
   });
 });
