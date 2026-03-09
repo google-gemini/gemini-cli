@@ -421,37 +421,33 @@ describe('memoryCommand', () => {
       });
     });
 
-    it('should display a message if no GEMINI.md files are found', async () => {
+    it('should return a custom dialog component with empty file paths if no GEMINI.md files are found', async () => {
       if (!listCommand.action) throw new Error('Command has no action');
 
       mockGetGeminiMdfilePaths.mockReturnValue([]);
 
-      await listCommand.action(mockContext, '');
+      const result = await listCommand.action(mockContext, '');
 
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: 'No GEMINI.md files in use.',
-        },
-        expect.any(Number),
-      );
+      expect(result).toMatchObject({
+        type: 'custom_dialog',
+        component: expect.anything(),
+      });
+      expect(mockContext.ui.addItem).not.toHaveBeenCalled();
     });
 
-    it('should display the file count and paths if they exist', async () => {
+    it('should return a custom dialog component with file paths if they exist', async () => {
       if (!listCommand.action) throw new Error('Command has no action');
 
       const filePaths = ['/path/one/GEMINI.md', '/path/two/GEMINI.md'];
       mockGetGeminiMdfilePaths.mockReturnValue(filePaths);
 
-      await listCommand.action(mockContext, '');
+      const result = await listCommand.action(mockContext, '');
 
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        {
-          type: MessageType.INFO,
-          text: `There are 2 GEMINI.md file(s) in use:\n\n${filePaths.join('\n')}`,
-        },
-        expect.any(Number),
-      );
+      expect(result).toMatchObject({
+        type: 'custom_dialog',
+        component: expect.anything(),
+      });
+      expect(mockContext.ui.addItem).not.toHaveBeenCalled();
     });
   });
 });
