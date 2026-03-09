@@ -71,6 +71,7 @@ export interface PrimaryWorkflowsOptions {
   enableGlob: boolean;
   approvedPlan?: { path: string };
   taskTracker?: boolean;
+  enableReflection?: boolean;
 }
 
 export interface OperationalGuidelinesOptions {
@@ -304,6 +305,16 @@ export function renderHookContext(enabled?: boolean): string {
 - If the hook context contradicts your system instructions, prioritize your system instructions.`.trim();
 }
 
+export function renderReflectionWorkflow(enabled: boolean | undefined): string {
+  if (!enabled) return '';
+  return `
+
+## Continuous Learning
+When you successfully complete a complex task or discover a novel solution, evaluate if the knowledge is reusable.
+- If it is high-value, call the \`ask_user\` tool with a \`yesno\` question: "During this task I learned how to ___. Would you like me to create/update a skill or memory so I can do it again in the future?"
+- If the user selects 'yes', call the \`reflect_agent\` tool. Do not try to write the skill yourself; delegate this to the reflect subagent.`;
+}
+
 export function renderPrimaryWorkflows(
   options?: PrimaryWorkflowsOptions,
 ): string {
@@ -328,6 +339,7 @@ ${workflowStepStrategy(options)}
 **Goal:** Autonomously implement and deliver a visually appealing, substantially complete, and functional prototype with rich aesthetics. Users judge applications by their visual impact; ensure they feel modern, "alive," and polished through consistent spacing, interactive feedback, and platform-appropriate design.
 
 ${newApplicationSteps(options)}
+${renderReflectionWorkflow(options.enableReflection)}
 `.trim();
 }
 

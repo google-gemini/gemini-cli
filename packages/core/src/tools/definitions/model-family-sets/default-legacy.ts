@@ -25,6 +25,7 @@ import {
   GET_INTERNAL_DOCS_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  GET_SESSION_HISTORY_TOOL_NAME,
   // Shared parameter names
   PARAM_FILE_PATH,
   PARAM_DIR_PATH,
@@ -729,6 +730,15 @@ The agent did not use the todo list because this task could be completed by a ti
             'Short reason explaining why you are entering plan mode.',
         },
       },
+    },
+  },
+
+  get_session_history: {
+    name: GET_SESSION_HISTORY_TOOL_NAME,
+    description: 'Retrieves the complete chat history of the current session.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {},
     },
   },
 

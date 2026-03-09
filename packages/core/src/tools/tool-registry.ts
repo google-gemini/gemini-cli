@@ -472,6 +472,9 @@ export class ToolRegistry {
       ) ?? new Set([]);
     const activeTools: AnyDeclarativeTool[] = [];
     for (const tool of this.allKnownTools.values()) {
+      if (tool.name === 'get_session_history') {
+        continue;
+      }
       if (this.isActiveTool(tool, excludedTools)) {
         activeTools.push(tool);
       }

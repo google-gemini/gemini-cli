@@ -160,6 +160,7 @@ export class PromptProvider {
               ? { path: approvedPlanPath }
               : undefined,
             taskTracker: config.isTrackerEnabled(),
+            enableReflection: config.isReflectionEnabled(),
           }),
           !isPlanMode,
         ),

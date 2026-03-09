@@ -122,3 +122,6 @@ export const EXIT_PLAN_PARAM_PLAN_PATH = 'plan_path';
 // -- enter_plan_mode --
 export const ENTER_PLAN_MODE_TOOL_NAME = 'enter_plan_mode';
 export const PLAN_MODE_PARAM_REASON = 'reason';
+
+// -- get_session_history --
+export const GET_SESSION_HISTORY_TOOL_NAME = 'get_session_history';

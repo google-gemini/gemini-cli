@@ -114,6 +114,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       isTrackerEnabled: vi.fn().mockReturnValue(false),
+      isReflectionEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Config;
   });
 
@@ -413,6 +414,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         }),
         getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
         isTrackerEnabled: vi.fn().mockReturnValue(false),
+        isReflectionEnabled: vi.fn().mockReturnValue(false),
       } as unknown as Config;
 
       const prompt = getCoreSystemPrompt(testConfig);
