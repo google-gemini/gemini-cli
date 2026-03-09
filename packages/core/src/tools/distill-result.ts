@@ -18,7 +18,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { Config } from '../config/config.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { saveTruncatedToolOutput } from '../utils/tool-output-helper.js';
+import { saveTruncatedToolOutput } from '../utils/fileUtils.js';
 
 interface DistillResultParams {
   revised_text: string;

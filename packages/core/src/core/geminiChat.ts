@@ -6,10 +6,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-
-// DISCLAIMER: This is a copied version of https://github.com/googleapis/js-genai/blob/main/src/chats.ts with the intention of working around a key bug
-// where function responses are not treated as "valid" responses: https://b.corp.google.com/issues/420354090
-
 import {
   createUserContent,
   FinishReason,
@@ -179,20 +175,16 @@ export class GeminiChat {
   ): void {
     try {
       const logDir = path.join(
-        this.config.storage.getProjectTempDir(),
-        'request_history_logs',
-        this.config.getSessionId(),
+        process.cwd(),
       );
-      if (!fs.existsSync(logDir)) {
-        fs.mkdirSync(logDir, { recursive: true });
-      }
-
-      const timestamp = Date.now();
       const logFile = path.join(
         logDir,
-        `request_${timestamp}_${promptId}.json`,
+        process.env['REQUEST_LOG_FILE'] ?? 'requests.log',
       );
-      fs.writeFileSync(logFile, JSON.stringify(requestContents, null, 2));
+      if (!fs.existsSync(logFile)) {
+        fs.writeFileSync(logFile, `si:\n${this.systemInstruction}\n`);
+      }
+      fs.appendFileSync(logFile, `prompt ${promptId}:\n${JSON.stringify(requestContents, null, 2)}\n`);
       debugLogger.debug(
         `[PROJECT CLARITY] Request history logged to ${logFile}`,
       );
