@@ -449,7 +449,7 @@ When you open a project with hooks defined in `.gemini/settings.json`:
 
 Hooks inherit the environment of the Gemini CLI process, which may include
 sensitive API keys. Gemini CLI provides a
-[redaction system](/docs/reference/configuration.md#environment-variable-redaction)
+[redaction system](../reference/configuration.md#environment-variable-redaction)
 that automatically filters variables matching sensitive patterns (e.g., `KEY`,
 `TOKEN`).
 
