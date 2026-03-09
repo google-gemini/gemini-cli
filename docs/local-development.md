@@ -3,6 +3,83 @@
 This guide provides instructions for setting up and using local development
 features, such as tracing.
 
+## Prerequisites
+
+Before working with Gemini CLI locally, ensure the following tools are installed:
+
+- Node.js (version 18 or later recommended)
+- npm (included with Node.js)
+- Git
+
+You can verify the installations by running:
+
+```bash
+node -v
+npm -v
+git --version
+```
+
+If any of these commands fail, install the missing dependency before continuing.
+
+## Quick Start
+
+Follow these steps to set up and run the Gemini CLI locally.
+
+1. Clone the repository
+
+```bash
+git clone https://github.com/google-gemini/gemini-cli.git
+cd gemini-cli
+```
+
+2. Install dependencies
+
+```bash
+npm install
+```
+
+3. Build the project
+
+```bash
+npm run build
+```
+
+4. Run the CLI locally
+
+```bash
+npm start
+```
+
+After starting the CLI, you can run commands locally and begin development or debugging.
+
+## Troubleshooting
+
+### Node.js version issues
+
+Ensure you are using Node.js version 18 or later.
+
+Check your version:
+
+```bash
+node -v
+```
+If necessary, use a Node version manager such as nvm to install or switch Node versions.
+
+### Dependency installation errors
+
+If dependency installation fails, try clearing the npm cache and reinstalling dependencies:
+  
+```bash
+npm cache clean --force
+npm install
+```
+
+### Permission issues
+
+Avoid using sudo with npm commands as it may cause permission conflicts.
+Using a Node version manager such as nvm is recommended for managing Node.js environments.
+
+
 ## Tracing
 
 Traces are OpenTelemetry (OTel) records that help you debug your code by
