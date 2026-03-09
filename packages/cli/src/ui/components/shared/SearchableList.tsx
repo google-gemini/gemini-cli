@@ -11,7 +11,8 @@ import { useSelectionList } from '../../hooks/useSelectionList.js';
 import { TextInput } from './TextInput.js';
 import type { TextBuffer } from './text-buffer.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../keyMatchers.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 /**
  * Generic interface for items in a searchable list.
@@ -85,6 +86,7 @@ export function SearchableList<T extends GenericListItem>({
   onSearch,
   resetSelectionOnItemsChange = false,
 }: SearchableListProps<T>): React.JSX.Element {
+  const keyMatchers = useKeyMatchers();
   const { filteredItems, searchBuffer, maxLabelWidth } = useSearch({
     items,
     onSearch,
