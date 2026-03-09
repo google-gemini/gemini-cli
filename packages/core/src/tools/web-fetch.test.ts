@@ -9,6 +9,7 @@ import {
   WebFetchTool,
   parsePrompt,
   convertGithubUrlToRaw,
+  resetRateLimitsForTesting,
 } from './web-fetch.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
@@ -240,6 +241,7 @@ describe('WebFetchTool', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    resetRateLimitsForTesting();
     bus = createMockMessageBus();
     getMockMessageBusInstance(bus).defaultToolDecision = 'ask_user';
     mockConfig = {
@@ -312,6 +314,25 @@ describe('WebFetchTool', () => {
       it('should pass if url is valid', () => {
         const tool = new WebFetchTool(mockConfig, bus);
         expect(() => tool.build({ url: 'https://example.com' })).not.toThrow();
+      });
+
+      it('should reject non-http(s) protocols', () => {
+        const tool = new WebFetchTool(mockConfig, bus);
+        expect(() => tool.build({ url: 'ftp://example.com/file.txt' })).toThrow(
+          'Unsupported protocol',
+        );
+      });
+
+      it('should reject file:// protocol', () => {
+        const tool = new WebFetchTool(mockConfig, bus);
+        expect(() => tool.build({ url: 'file:///etc/passwd' })).toThrow(
+          'Unsupported protocol',
+        );
+      });
+
+      it('should accept http:// protocol', () => {
+        const tool = new WebFetchTool(mockConfig, bus);
+        expect(() => tool.build({ url: 'http://example.com' })).not.toThrow();
       });
     });
   });
@@ -932,6 +953,33 @@ describe('WebFetchTool', () => {
 
       expect(result.llmContent).toContain('Error: Invalid URL "not-a-url"');
       expect(result.error?.type).toBe(ToolErrorType.INVALID_TOOL_PARAMS);
+    });
+
+    it('should enforce rate limiting in experimental mode', async () => {
+      const content = 'OK';
+      mockFetch('https://ratelimit-exp.example.com/', {
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/plain' }),
+        text: () => Promise.resolve(content),
+      });
+
+      const tool = new WebFetchTool(mockConfig, bus);
+
+      // Execute 10 times to hit the per-host limit
+      for (let i = 0; i < 10; i++) {
+        const invocation = tool.build({
+          url: 'https://ratelimit-exp.example.com',
+        });
+        await invocation.execute(new AbortController().signal);
+      }
+
+      // The 11th request to the same host should be rate-limited
+      const invocation = tool.build({
+        url: 'https://ratelimit-exp.example.com',
+      });
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.error?.type).toBe(ToolErrorType.WEB_FETCH_PROCESSING_ERROR);
+      expect(result.error?.message).toContain('Rate limit exceeded for host');
     });
   });
 });
