@@ -86,7 +86,7 @@ describe('useApprovalModeIndicator', () => {
           (value: ApprovalMode) => void
         >,
         isYoloModeDisabled: vi.fn().mockReturnValue(false),
-        isPlanEnabled: vi.fn().mockReturnValue(false),
+        isPlanEnabled: vi.fn().mockReturnValue(true),
         isTrustedFolder: vi.fn().mockReturnValue(true) as Mock<() => boolean>,
         getCoreTools: vi.fn().mockReturnValue([]) as Mock<() => string[]>,
         getToolDiscoveryCommand: vi.fn().mockReturnValue(undefined) as Mock<
