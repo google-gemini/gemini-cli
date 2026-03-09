@@ -197,6 +197,46 @@ describe('Task Event-Driven Scheduler', () => {
     );
   });
 
+  it('should handle MCP Server tool operations correctly', async () => {
+    // @ts-expect-error - Calling private constructor
+    const task = new Task('task-id', 'context-id', mockConfig, mockEventBus);
+
+    const toolCall = {
+      request: { callId: '1', name: 'call_mcp_tool', args: {} },
+      status: 'awaiting_approval',
+      correlationId: 'corr-mcp-1',
+      confirmationDetails: {
+        type: 'mcp',
+        title: 'MCP Server Operation',
+        prompt: 'test_mcp',
+      },
+    };
+
+    const handler = (messageBus.subscribe as Mock).mock.calls.find(
+      (call: unknown[]) => call[0] === MessageBusType.TOOL_CALLS_UPDATE,
+    )?.[1];
+    handler({ type: MessageBusType.TOOL_CALLS_UPDATE, toolCalls: [toolCall] });
+
+    // Simulate ProceedOnce for MCP
+    const handled = await (
+      task as unknown as {
+        _handleToolConfirmationPart: (part: unknown) => Promise<boolean>;
+      }
+    )._handleToolConfirmationPart({
+      kind: 'data',
+      data: { callId: '1', outcome: 'proceed_once' },
+    });
+    expect(handled).toBe(true);
+    expect(messageBus.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: 'corr-mcp-1',
+        confirmed: true,
+        outcome: ToolConfirmationOutcome.ProceedOnce,
+      }),
+    );
+  });
+
   it('should execute without confirmation in YOLO mode', async () => {
     // Enable YOLO mode
     const yoloConfig = createMockConfig({

@@ -107,9 +107,11 @@ export class Task {
   taskState: TaskState;
   eventBus?: ExecutionEventBus;
   completedToolCalls: CompletedToolCall[];
+  processedToolCallIds: Set<string> = new Set();
   skipFinalTrueAfterInlineEdit = false;
   modelInfo?: string;
   currentPromptId: string | undefined;
+  currentAgentMessageId = uuidv4();
   promptCount = 0;
   autoExecute: boolean;
 
@@ -238,7 +240,7 @@ export class Task {
     logger.info(
       `[Task] Waiting for ${this.pendingToolCalls.size} pending tool(s)...`,
     );
-    return this.toolCompletionPromise;
+    await this.toolCompletionPromise;
   }
 
   cancelPendingTools(reason: string): void {
@@ -270,7 +272,7 @@ export class Task {
       kind: 'message',
       role,
       parts: [{ kind: 'text', text }],
-      messageId: uuidv4(),
+      messageId: role === 'agent' ? this.currentAgentMessageId : uuidv4(),
       taskId: this.id,
       contextId: this.contextId,
     };
@@ -560,7 +562,10 @@ export class Task {
     // Do not process events for tools that have already been finalized.
     // This prevents duplicate completions if the state manager emits a snapshot containing
     // already resolved tools whose IDs were removed from pendingToolCalls.
-    if (this.completedToolCalls.some((c) => c.request.callId === callId)) {
+    if (
+      this.processedToolCallIds.has(callId) ||
+      this.completedToolCalls.some((c) => c.request.callId === callId)
+    ) {
       return;
     }
 
@@ -1157,6 +1162,9 @@ export class Task {
 
   getAndClearCompletedTools(): CompletedToolCall[] {
     const tools = [...this.completedToolCalls];
+    for (const tool of tools) {
+      this.processedToolCallIds.add(tool.request.callId);
+    }
     this.completedToolCalls = [];
     return tools;
   }
@@ -1217,6 +1225,7 @@ export class Task {
     };
     // Set task state to working as we are about to call LLM
     this.setTaskStateAndPublishUpdate('working', stateChange);
+    this.currentAgentMessageId = uuidv4();
     yield* this.geminiClient.sendMessageStream(
       llmParts,
       aborted,
@@ -1256,6 +1265,7 @@ export class Task {
     if (hasContentForLlm) {
       this.currentPromptId =
         this.config.getSessionId() + '########' + this.promptCount++;
+      this.currentAgentMessageId = uuidv4();
       logger.info('[Task] Sending new parts to LLM.');
       const stateChange: StateChange = {
         kind: CoderAgentEvent.StateChangeEvent,
@@ -1301,7 +1311,6 @@ export class Task {
     if (content === '') {
       return;
     }
-    logger.info('[Task] Sending text content to event bus.');
     const message = this._createTextMessage(content);
     const textContent: TextContent = {
       kind: CoderAgentEvent.TextContentEvent,
@@ -1333,7 +1342,7 @@ export class Task {
           data: content,
         } as Part,
       ],
-      messageId: uuidv4(),
+      messageId: this.currentAgentMessageId,
       taskId: this.id,
       contextId: this.contextId,
     };
