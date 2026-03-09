@@ -15,7 +15,11 @@ import {
   type Mocked,
 } from 'vitest';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-import { DiscoveredMCPTool, generateValidName } from './mcp-tool.js'; // Added getStringifiedResultForDisplay
+import {
+  DiscoveredMCPTool,
+  generateValidName,
+  formatMcpToolName,
+} from './mcp-tool.js'; // Added getStringifiedResultForDisplay
 import { ToolConfirmationOutcome, type ToolResult } from './tools.js';
 import type { CallableTool, Part } from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
@@ -49,23 +53,23 @@ const createSdkResponse = (
 
 describe('generateValidName', () => {
   it('should return a valid name for a simple function', () => {
-    expect(generateValidName('myFunction')).toBe('myFunction');
+    expect(generateValidName('myFunction')).toBe('mcp_myFunction');
   });
 
   it('should replace invalid characters with underscores', () => {
     expect(generateValidName('invalid-name with spaces')).toBe(
-      'invalid-name_with_spaces',
+      'mcp_invalid-name_with_spaces',
     );
   });
 
   it('should truncate long names', () => {
     expect(generateValidName('x'.repeat(80))).toBe(
-      'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+      'mcp_xxxxxxxxxxxxxxxxxxxxxxxxxx...xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
     );
   });
 
   it('should handle names with only invalid characters', () => {
-    expect(generateValidName('!@#$%^&*()')).toBe('__________');
+    expect(generateValidName('!@#$%^&*()')).toBe('mcp___________');
   });
 
   it.each([
@@ -78,6 +82,30 @@ describe('generateValidName', () => {
       expect(generateValidName('a'.repeat(length)).length).toBe(expected);
     },
   );
+});
+
+describe('formatMcpToolName', () => {
+  it('should format a fully qualified name', () => {
+    expect(formatMcpToolName('github', 'list_repos')).toBe(
+      'mcp_github_list_repos',
+    );
+  });
+
+  it('should handle global wildcards', () => {
+    expect(formatMcpToolName('*')).toBe('mcp_*');
+  });
+
+  it('should handle tool-level wildcards', () => {
+    expect(formatMcpToolName('github', '*')).toBe('mcp_github_*');
+  });
+
+  it('should handle undefined toolName as a tool-level wildcard', () => {
+    expect(formatMcpToolName('github')).toBe('mcp_github_*');
+  });
+
+  it('should format explicitly global wildcard with specific tool', () => {
+    expect(formatMcpToolName('*', 'list_repos')).toBe('mcp_*_list_repos');
+  });
 });
 
 describe('DiscoveredMCPTool', () => {
@@ -116,8 +144,10 @@ describe('DiscoveredMCPTool', () => {
 
   describe('constructor', () => {
     it('should set properties correctly', () => {
-      expect(tool.name).toBe(serverToolName);
-      expect(tool.schema.name).toBe(serverToolName);
+      expect(tool.name).toBe('mcp_mock-mcp-server_actual-server-tool-name');
+      expect(tool.schema.name).toBe(
+        'mcp_mock-mcp-server_actual-server-tool-name',
+      );
       expect(tool.schema.description).toBe(baseDescription);
       expect(tool.schema.parameters).toBeUndefined();
       expect(tool.schema.parametersJsonSchema).toEqual(inputSchema);
@@ -943,31 +973,35 @@ describe('DiscoveredMCPTool', () => {
 describe('MCP Tool Naming Regression Fixes', () => {
   describe('generateValidName', () => {
     it('should replace spaces with underscores', () => {
-      expect(generateValidName('My Tool')).toBe('My_Tool');
+      expect(generateValidName('My Tool')).toBe('mcp_My_Tool');
     });
 
     it('should allow colons', () => {
-      expect(generateValidName('namespace:tool')).toBe('namespace:tool');
+      expect(generateValidName('namespace:tool')).toBe('mcp_namespace:tool');
     });
 
     it('should ensure name starts with a letter or underscore', () => {
-      expect(generateValidName('123-tool')).toBe('_123-tool');
-      expect(generateValidName('-tool')).toBe('_-tool');
-      expect(generateValidName('.tool')).toBe('_.tool');
+      expect(generateValidName('valid_tool_name')).toBe('mcp_valid_tool_name');
+      expect(generateValidName('alsoValid-123.name')).toBe(
+        'mcp_alsoValid-123.name',
+      );
+      expect(generateValidName('another:valid:name')).toBe(
+        'mcp_another:valid:name',
+      );
     });
 
     it('should handle very long names by truncating in the middle', () => {
       const longName = 'a'.repeat(40) + '__' + 'b'.repeat(40);
       const result = generateValidName(longName);
       expect(result.length).toBeLessThanOrEqual(63);
-      expect(result).toMatch(/^a{30}\.\.\.b{30}$/);
+      expect(result).toMatch(/^mcp_a{26}\.\.\.b{30}$/);
     });
 
     it('should handle very long names starting with a digit', () => {
       const longName = '1' + 'a'.repeat(80);
       const result = generateValidName(longName);
       expect(result.length).toBeLessThanOrEqual(63);
-      expect(result.startsWith('_1')).toBe(true);
+      expect(result.startsWith('mcp_1')).toBe(true);
     });
   });
 
@@ -983,7 +1017,7 @@ describe('MCP Tool Naming Regression Fixes', () => {
       );
 
       const qn = tool.getFullyQualifiedName();
-      expect(qn).toBe('My_Server__my-tool');
+      expect(qn).toBe('mcp_My_Server_my-tool');
     });
 
     it('should handle long server and tool names in qualified name', () => {
@@ -1014,7 +1048,7 @@ describe('MCP Tool Naming Regression Fixes', () => {
       );
 
       const qn = tool.getFullyQualifiedName();
-      expect(qn).toBe('_123-server__tool');
+      expect(qn).toBe('mcp_123-server_tool');
     });
   });
 });

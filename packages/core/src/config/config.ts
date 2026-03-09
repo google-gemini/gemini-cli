@@ -685,6 +685,7 @@ export class Config implements McpContext {
   fallbackModelHandler?: FallbackModelHandler;
   validationHandler?: ValidationHandler;
   private quotaErrorOccurred: boolean = false;
+  private creditsNotificationShown: boolean = false;
   private modelQuotas: Map<
     string,
     { remaining: number; limit: number; resetTime?: string }
@@ -1454,6 +1455,12 @@ export class Config implements McpContext {
     this.modelAvailabilityService.resetTurn();
   }
 
+  /** Resets billing state (overageStrategy, creditsNotificationShown) once per user prompt. */
+  resetBillingTurnState(overageStrategy?: OverageStrategy): void {
+    this.creditsNotificationShown = false;
+    this.billing.overageStrategy = overageStrategy ?? 'ask';
+  }
+
   getMaxSessionTurns(): number {
     return this.maxSessionTurns;
   }
@@ -1464,6 +1471,14 @@ export class Config implements McpContext {
 
   getQuotaErrorOccurred(): boolean {
     return this.quotaErrorOccurred;
+  }
+
+  setCreditsNotificationShown(value: boolean): void {
+    this.creditsNotificationShown = value;
+  }
+
+  getCreditsNotificationShown(): boolean {
+    return this.creditsNotificationShown;
   }
 
   setQuota(
