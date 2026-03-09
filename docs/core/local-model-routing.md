@@ -40,9 +40,9 @@ for your system.
 #### Linux
 
 1. Download
-   [lit.linux_amd64](https://github.com/google-ai-edge/LiteRT-LM/releases/download/v0.9.0-alpha03/lit.linux_amd64).
-2. Ensure the binary is executable: `chmod a+x lit.linux_amd64`
-3. (Optional) Test starting the runtime: `./lit.linux_amd64 serve --verbose`
+   [lit.linux_x86_64](https://github.com/google-ai-edge/LiteRT-LM/releases/download/v0.9.0-alpha03/lit.linux_x86_64).
+2. Ensure the binary is executable: `chmod a+x lit.linux_x86_64`
+3. (Optional) Test starting the runtime: `./lit.linux_x86_64 serve --verbose`
 
 #### MacOS
 
@@ -57,7 +57,7 @@ Before using Gemma, you will need to download the model (and agree to the Terms
 of Service). This can be done via the LiteRT-LM runtime via:
 
 ```bash
-$ ./lit.linux_amd64 pull gemma3-1b-gpu-custom
+$ ./lit.linux_x86_64 pull gemma3-1b-gpu-custom
 
 [Legal] The model you are about to download is governed by
 the Gemma Terms of Use and Prohibited Use Policy. Please review these terms and ensure you agree before continuing.
@@ -77,9 +77,9 @@ Download complete.
 
 Using the command appropriate to your system, start the LiteRT-LM runtime.
 Configure the port that you want to use for your Gemma model. For the purposes
-of this document, we will use port `8000`.
+of this document, we will use port `9379`.
 
-Example command for MacOS: `./lit.macos_arm64 serve --port=8000 --verbose`
+Example command for MacOS: `./lit.macos_arm64 serve --port=9379 --verbose`
 
 ### (Optional) Verify Model Serving
 
@@ -105,7 +105,7 @@ Invoke-RestMethod -Uri $uri -Method Post -Body $body -ContentType "application/j
 #### Linux/MacOS
 
 ```bash
-$ curl "http://localhost:8000/v1beta/models/gemma3-1b-gpu-custom:generateContent" \
+$ curl "http://localhost:9379/v1beta/models/gemma3-1b-gpu-custom:generateContent" \
   -H 'Content-Type: application/json' \
   -X POST \
   -d '{"contents":[{"role":"user","parts":[{"text":"Tell me a joke."}]}]}'
@@ -122,7 +122,7 @@ To use a local Gemma model for routing, you must explicitly enable it in your
     "gemmaModelRouter": {
       "enabled": true,
       "classifier": {
-        "host": "http://localhost:8000",
+        "host": "http://localhost:9379",
         "model": "gemma3-1b-gpu-custom"
       }
     }
