@@ -68,7 +68,8 @@ export function createKeyMatchers(
 /**
  * Default key binding matchers using the default configuration
  */
-export const keyMatchers: KeyMatchers = createKeyMatchers(defaultKeyBindings);
+export const defaultKeyMatchers: KeyMatchers =
+  createKeyMatchers(defaultKeyBindings);
 
 // Re-export Command for convenience
 export { Command };
