@@ -234,7 +234,45 @@ describe('LocalSubagentInvocation', () => {
       expect(lastCall.recentActivity).toContainEqual(
         expect.objectContaining({
           type: 'thought',
-          content: 'Analyzing... Still thinking.',
+          content: 'Analyzing...,  Still thinking.',
+        }),
+      );
+    });
+
+    it('should correctly handle growing thought headers without duplication', async () => {
+      mockExecutorInstance.run.mockImplementation(async () => {
+        const onActivity = MockLocalAgentExecutor.create.mock.calls[0][2];
+
+        if (onActivity) {
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'THOUGHT_CHUNK',
+            data: { text: 'Analy' },
+          } as SubagentActivityEvent);
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'THOUGHT_CHUNK',
+            data: { text: 'Analyzing' },
+          } as SubagentActivityEvent);
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'THOUGHT_CHUNK',
+            data: { text: 'Searching' },
+          } as SubagentActivityEvent);
+        }
+        return { result: 'Done', terminate_reason: AgentTerminateMode.GOAL };
+      });
+
+      await invocation.execute(signal, updateOutput);
+
+      const lastCall = updateOutput.mock.calls[3][0] as SubagentProgress;
+      expect(lastCall.recentActivity).toContainEqual(
+        expect.objectContaining({
+          type: 'thought',
+          content: 'Analyzing, Searching',
         }),
       );
     });
