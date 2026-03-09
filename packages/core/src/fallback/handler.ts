@@ -18,7 +18,7 @@ import {
   applyAvailabilityTransition,
 } from '../availability/policyHelpers.js';
 
-const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
+export const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
 
 export async function handleFallback(
   config: Config,
