@@ -115,6 +115,7 @@ export class Task {
 
   // For tool waiting logic
   private pendingToolCalls: Map<string, string> = new Map(); //toolCallId --> status
+  private toolsAlreadyConfirmed: Set<string> = new Set();
   private toolCompletionPromise?: Promise<void>;
   private toolCompletionNotifier?: {
     resolve: () => void;
@@ -555,6 +556,14 @@ export class Task {
 
   private handleEventDrivenToolCall(tc: ToolCall): void {
     const callId = tc.request.callId;
+
+    // Do not process events for tools that have already been finalized.
+    // This prevents duplicate completions if the state manager emits a snapshot containing
+    // already resolved tools whose IDs were removed from pendingToolCalls.
+    if (this.completedToolCalls.some((c) => c.request.callId === callId)) {
+      return;
+    }
+
     const previousStatus = this.pendingToolCalls.get(callId);
     const hasChanged = previousStatus !== tc.status;
 
@@ -569,6 +578,7 @@ export class Task {
       tc.status === 'error' ||
       tc.status === 'cancelled'
     ) {
+      this.toolsAlreadyConfirmed.delete(callId);
       if (hasChanged) {
         logger.info(
           `[Task] Tool call ${callId} completed with status: ${tc.status}`,
@@ -631,13 +641,19 @@ export class Task {
 
   private checkInputRequiredState(): void {
     // 6. Handle Input Required State
-    const allPendingStatuses = Array.from(this.pendingToolCalls.values());
-    const isAwaitingApproval = allPendingStatuses.some(
-      (status) => status === 'awaiting_approval',
-    );
-    const isExecuting = allPendingStatuses.some(
-      (status) => status === 'executing',
-    );
+    let isAwaitingApproval = false;
+    let isExecuting = false;
+
+    for (const [callId, status] of this.pendingToolCalls.entries()) {
+      if (status === 'executing' || status === 'scheduled') {
+        isExecuting = true;
+      } else if (
+        status === 'awaiting_approval' &&
+        !this.toolsAlreadyConfirmed.has(callId)
+      ) {
+        isAwaitingApproval = true;
+      }
+    }
 
     if (
       isAwaitingApproval &&
@@ -645,6 +661,8 @@ export class Task {
       !this.skipFinalTrueAfterInlineEdit
     ) {
       this.skipFinalTrueAfterInlineEdit = false;
+      const wasAlreadyInputRequired = this.taskState === 'input-required';
+
       this.setTaskStateAndPublishUpdate(
         'input-required',
         { kind: CoderAgentEvent.StateChangeEvent },
@@ -652,6 +670,12 @@ export class Task {
         undefined,
         /*final*/ true,
       );
+
+      // Unblock waitForPendingTools to correctly end the executor loop and release the HTTP response stream.
+      // The IDE client will open a new stream with the confirmation reply.
+      if (!wasAlreadyInputRequired && this.toolCompletionNotifier) {
+        this.toolCompletionNotifier.resolve();
+      }
     }
   }
 
@@ -865,7 +889,16 @@ export class Task {
     };
     this.setTaskStateAndPublishUpdate('working', stateChange);
 
-    await this.scheduler.schedule(updatedRequests, abortSignal);
+    // Pre-register tools to ensure waitForPendingTools sees them as pending
+    // before the async scheduler enqueues them and fires the event bus update.
+    for (const req of updatedRequests) {
+      if (!this.pendingToolCalls.has(req.callId)) {
+        this._registerToolCall(req.callId, 'scheduled');
+      }
+    }
+
+    // Fire and forget so we don't block the executor loop before waitForPendingTools can be called
+    void this.scheduler.schedule(updatedRequests, abortSignal);
   }
 
   async acceptAgentMessage(event: ServerGeminiStreamEvent): Promise<void> {
@@ -991,9 +1024,15 @@ export class Task {
     ) {
       return false;
     }
+    if (!part.data['outcome']) {
+      return false;
+    }
 
     const callId = part.data['callId'];
     const outcomeString = part.data['outcome'];
+
+    this.toolsAlreadyConfirmed.add(callId);
+
     let confirmationOutcome: ToolConfirmationOutcome | undefined;
 
     if (outcomeString === 'proceed_once') {
@@ -1199,6 +1238,10 @@ export class Task {
       if (confirmationHandled) {
         anyConfirmationHandled = true;
         // If a confirmation was handled, the scheduler will now run the tool (or cancel it).
+        // We resolve the toolCompletionPromise manually in checkInputRequiredState
+        // to break the original execution loop, so we must reset it here so the
+        // new loop correctly awaits the tool's final execution.
+        this._resetToolCompletionPromise();
         // We don't send anything to the LLM for this part.
         // The subsequent tool execution will eventually lead to resolveToolCall.
         continue;
