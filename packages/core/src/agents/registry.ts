@@ -312,7 +312,7 @@ export class AgentRegistry {
     }
 
     const mergedDefinition = this.applyOverrides(definition, settingsOverrides);
-    this.agents.set(mergedDefinition.name, mergedDefinition);
+    this.agents.set(definition.name, mergedDefinition);
 
     this.registerModelConfigs(mergedDefinition);
     this.addAgentPolicy(mergedDefinition);

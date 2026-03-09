@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as grpc from '@grpc/grpc-js';
 import type {
   Message,
   Part,
@@ -13,10 +14,25 @@ import type {
   Artifact,
   TaskState,
   TaskStatusUpdateEvent,
+  AgentCard,
+  AgentInterface,
 } from '@a2a-js/sdk';
 import type { SendMessageResult } from './a2a-client-manager.js';
 
 export const AUTH_REQUIRED_MSG = `[Authorization Required] The agent has indicated it requires authorization to proceed. Please follow the agent's instructions.`;
+
+/**
+ * Extended interface for Agent Card properties not yet in the core SDK.
+ */
+export interface VersionedInterface extends AgentInterface {
+  protocolBinding?: string;
+  protocolVersion?: string;
+}
+
+export interface VersionedAgentCard extends AgentCard {
+  additionalInterfaces?: VersionedInterface[];
+  supportedInterfaces?: VersionedInterface[];
+}
 
 /**
  * Reassembles incremental A2A streaming updates into a coherent result.
@@ -210,36 +226,72 @@ function extractPartText(part: Part): string {
   return '';
 }
 
-// Type Guards
+/**
+ * Normalizes an agent card by ensuring it has the required properties
+ * and resolving any inconsistencies between protocol versions.
+ */
+export function normalizeAgentCard(card: unknown): AgentCard {
+  if (!isObject(card)) {
+    throw new Error('Agent card is missing.');
+  }
 
-function isTextPart(part: Part): part is TextPart {
-  return part.kind === 'text';
-}
+  // Double-cast to bypass strict linter while bootstrapping the object.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  const result = { ...card } as unknown as AgentCard;
 
-function isDataPart(part: Part): part is DataPart {
-  return part.kind === 'data';
-}
+  // Ensure mandatory fields exist with safe defaults.
+  if (typeof result.name !== 'string') result.name = 'unknown';
+  if (typeof result.description !== 'string') result.description = '';
+  if (typeof result.url !== 'string') result.url = '';
+  if (typeof result.version !== 'string') result.version = '';
+  if (typeof result.protocolVersion !== 'string') result.protocolVersion = '';
+  if (!isObject(result.capabilities)) result.capabilities = {};
+  if (!Array.isArray(result.skills)) result.skills = [];
+  if (!Array.isArray(result.defaultInputModes)) result.defaultInputModes = [];
+  if (!Array.isArray(result.defaultOutputModes)) result.defaultOutputModes = [];
 
-function isFilePart(part: Part): part is FilePart {
-  return part.kind === 'file';
-}
+  // Normalize interfaces while preserving all other fields.
+  result.additionalInterfaces = extractNormalizedInterfaces(card);
 
-function isStatusUpdateEvent(
-  result: SendMessageResult,
-): result is TaskStatusUpdateEvent {
-  return result.kind === 'status-update';
+  return result;
 }
 
 /**
- * Returns true if the given state is a terminal state for a task.
+ * Resolves the protocol version for a specific agent interface URL.
+ * Checks the specific interface first, then falls back to the agent card's default.
  */
-export function isTerminalState(state: TaskState | undefined): boolean {
-  return (
-    state === 'completed' ||
-    state === 'failed' ||
-    state === 'canceled' ||
-    state === 'rejected'
-  );
+export function getProtocolVersion(
+  agentCard: unknown,
+  interfaceUrl: string | undefined,
+): string | undefined {
+  if (!isObject(agentCard)) {
+    return undefined;
+  }
+
+  const additionalInterfaces = agentCard['additionalInterfaces'];
+  const interfaces = Array.isArray(additionalInterfaces)
+    ? (additionalInterfaces as unknown[])
+    : undefined;
+
+  if (interfaces && interfaceUrl) {
+    for (const i of interfaces) {
+      if (isObject(i) && getString(i, 'url') === interfaceUrl) {
+        const v = getString(i, 'protocolVersion');
+        if (v) return v;
+      }
+    }
+  }
+
+  return getString(agentCard, 'protocolVersion');
+}
+
+/**
+ * Returns gRPC channel credentials based on the URL scheme.
+ */
+export function getGrpcCredentials(url: string): grpc.ChannelCredentials {
+  return url.startsWith('https://')
+    ? grpc.credentials.createSsl()
+    : grpc.credentials.createInsecure();
 }
 
 /**
@@ -278,4 +330,104 @@ export function extractIdsFromResponse(result: SendMessageResult): {
   }
 
   return { contextId, taskId, clearTaskId };
+}
+
+/**
+ * Extracts and normalizes interfaces from the card, handling protocol version fallbacks.
+ * Preserves all original fields to maintain SDK compatibility.
+ */
+function extractNormalizedInterfaces(
+  card: Record<string, unknown>,
+): AgentInterface[] {
+  const rawInterfaces =
+    getArray(card, 'additionalInterfaces') ||
+    getArray(card, 'supportedInterfaces');
+
+  if (!rawInterfaces) {
+    return [];
+  }
+
+  const mapped: AgentInterface[] = [];
+  for (const i of rawInterfaces) {
+    if (isObject(i)) {
+      // Create a copy to preserve all original fields (like protocolVersion, etc.)
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const normalized = { ...i } as unknown as VersionedInterface;
+
+      // Ensure 'url' exists
+      if (typeof normalized.url !== 'string') {
+        normalized.url = '';
+      }
+
+      // Normalize 'transport' from 'protocolBinding'
+      const transport = normalized.transport || normalized.protocolBinding;
+      if (transport) {
+        normalized.transport = transport;
+      }
+
+      mapped.push(normalized);
+    }
+  }
+  return mapped;
+}
+
+/**
+ * Safely extracts a string property from an object.
+ */
+function getString(
+  obj: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const val = obj[key];
+  return typeof val === 'string' ? val : undefined;
+}
+
+/**
+ * Safely extracts an array property from an object.
+ */
+function getArray(
+  obj: Record<string, unknown>,
+  key: string,
+): unknown[] | undefined {
+  const val = obj[key];
+  return Array.isArray(val) ? val : undefined;
+}
+
+// Type Guards
+
+function isTextPart(part: Part): part is TextPart {
+  return part.kind === 'text';
+}
+
+function isDataPart(part: Part): part is DataPart {
+  return part.kind === 'data';
+}
+
+function isFilePart(part: Part): part is FilePart {
+  return part.kind === 'file';
+}
+
+function isStatusUpdateEvent(
+  result: SendMessageResult,
+): result is TaskStatusUpdateEvent {
+  return result.kind === 'status-update';
+}
+
+/**
+ * Returns true if the given state is a terminal state for a task.
+ */
+export function isTerminalState(state: TaskState | undefined): boolean {
+  return (
+    state === 'completed' ||
+    state === 'failed' ||
+    state === 'canceled' ||
+    state === 'rejected'
+  );
+}
+
+/**
+ * Type guard to check if a value is a non-array object.
+ */
+function isObject(val: unknown): val is Record<string, unknown> {
+  return typeof val === 'object' && val !== null && !Array.isArray(val);
 }
