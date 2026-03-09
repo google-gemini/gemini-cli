@@ -1154,6 +1154,7 @@ describe('GeminiChat', () => {
         1,
       );
       expect(mockLogContentRetry).not.toHaveBeenCalled();
+      expect(mockLogContentRetryFailure).not.toHaveBeenCalled();
     });
 
     it('should yield a RETRY event when an invalid stream is encountered', async () => {
