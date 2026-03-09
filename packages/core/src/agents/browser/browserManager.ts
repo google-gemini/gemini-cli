@@ -113,6 +113,18 @@ export class BrowserManager {
       throw signal.reason ?? new Error('Operation cancelled');
     }
 
+    if (!this.checkNavigationRestrictions(toolName, args)) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Tool '${toolName}' is not permitted for the requested URL/domain based on your current browser settings. DO NOT attempt to call with same URL/domain`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
     const client = await this.getRawMcpClient();
     const callPromise = client.callTool(
       { name: toolName, arguments: args },
@@ -432,5 +444,53 @@ export class BrowserManager {
       `Discovered ${this.discoveredTools.length} tools from chrome-devtools-mcp: ` +
         this.discoveredTools.map((t) => t.name).join(', '),
     );
+  }
+
+  /**
+   * Check navigation restrictions based on tools and the args sending
+   * along with it.
+   */
+  private checkNavigationRestrictions(
+    toolName: string,
+    args: Record<string, unknown>,
+  ): boolean {
+    const pageNavigationTools = ['navigate_page', 'new_page'];
+
+    if (!pageNavigationTools.includes(toolName)) {
+      return true;
+    }
+
+    const allowedDomains =
+      this.config.getBrowserAgentConfig().customConfig.allowedDomains;
+    if (!allowedDomains || allowedDomains.length === 0) {
+      return true;
+    }
+
+    const url = args['url'];
+    if (!url) {
+      return true;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const parsedUrl = new URL(url as string);
+    const urlHostname = parsedUrl.hostname;
+
+    for (const domainPattern of allowedDomains) {
+      if (domainPattern.startsWith('*.')) {
+        const baseDomain = domainPattern.substring(2);
+        if (
+          urlHostname === baseDomain ||
+          urlHostname.endsWith(`.${baseDomain}`)
+        ) {
+          return true;
+        }
+      } else {
+        if (urlHostname === domainPattern) {
+          return true;
+        }
+      }
+    }
+    // If none matched, then deny
+    return false;
   }
 }

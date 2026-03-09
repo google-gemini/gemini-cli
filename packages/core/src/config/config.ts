@@ -316,6 +316,8 @@ export interface BrowserAgentCustomConfig {
   profilePath?: string;
   /** Model override for the visual agent. */
   visualModel?: string;
+  /** List of allowed domains for the browser agent (e.g., ["github.com", "*.google.com"]). */
+  allowedDomains?: string[];
 }
 
 /**

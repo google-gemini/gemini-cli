@@ -693,6 +693,17 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`agents.browser.allowedDomains`** (array):
+  - **Description:** A list of allowed domains for the browser agent (e.g.,
+    ["github.com", "*.google.com"]).
+  - **Default:**
+
+    ```json
+    ["github.com", "*.google.com"]
+    ```
+
+  - **Requires restart:** Yes
+
 #### `context`
 
 - **`context.fileName`** (string | string[]):

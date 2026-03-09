@@ -1095,6 +1095,19 @@ const SETTINGS_SCHEMA = {
             description: 'Model override for the visual agent.',
             showInDialog: false,
           },
+          allowedDomains: {
+            type: 'array',
+            label: 'Allowed Domains',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: ['github.com', '*.google.com'] as string[],
+            description: oneLine`
+              A list of allowed domains for the browser agent
+              (e.g., ["github.com", "*.google.com"]).
+            `,
+            showInDialog: false,
+            items: { type: 'string' },
+          },
         },
       },
     },
