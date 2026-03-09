@@ -657,7 +657,6 @@ describe('RemoteAgentInvocation', () => {
         'Remote agent moved to background',
       );
       expect(result.data).toMatchObject({
-        executionId,
         pid: executionId,
         initialOutput: 'Chunk 1',
       });

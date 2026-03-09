@@ -192,7 +192,6 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     const command = `${this.getDescription()}: ${this.params.query}`;
     const backgroundMessage = `Remote agent moved to background (Execution ID: ${executionId}). Output hidden. Press Ctrl+B to view.`;
     const data: BackgroundExecutionData = {
-      executionId,
       pid: executionId,
       command,
       initialOutput: output,
