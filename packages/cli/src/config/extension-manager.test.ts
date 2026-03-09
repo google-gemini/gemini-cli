@@ -345,4 +345,144 @@ describe('ExtensionManager', () => {
       }
     });
   });
+
+  describe('Extension Renaming', () => {
+    it('should support renaming an extension during update', async () => {
+      // 1. Setup existing extension
+      const oldName = 'old-name';
+      const newName = 'new-name';
+      const extDir = path.join(userExtensionsDir, oldName);
+      fs.mkdirSync(extDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(extDir, 'gemini-extension.json'),
+        JSON.stringify({ name: oldName, version: '1.0.0' }),
+      );
+      fs.writeFileSync(
+        path.join(extDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: extDir }),
+      );
+
+      await extensionManager.loadExtensions();
+
+      // 2. Create a temporary "new" version with a different name
+      const newSourceDir = fs.mkdtempSync(
+        path.join(tempHomeDir, 'new-source-'),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'gemini-extension.json'),
+        JSON.stringify({ name: newName, version: '1.1.0' }),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: newSourceDir }),
+      );
+
+      // 3. Update the extension
+      await extensionManager.installOrUpdateExtension(
+        { type: 'local', source: newSourceDir },
+        { name: oldName, version: '1.0.0' },
+      );
+
+      // 4. Verify old directory is gone and new one exists
+      expect(fs.existsSync(path.join(userExtensionsDir, oldName))).toBe(false);
+      expect(fs.existsSync(path.join(userExtensionsDir, newName))).toBe(true);
+
+      // Verify the loaded state is updated
+      const extensions = extensionManager.getExtensions();
+      expect(extensions.some((e) => e.name === newName)).toBe(true);
+      expect(extensions.some((e) => e.name === oldName)).toBe(false);
+    });
+
+    it('should carry over enablement status when renaming', async () => {
+      const oldName = 'old-name';
+      const newName = 'new-name';
+      const extDir = path.join(userExtensionsDir, oldName);
+      fs.mkdirSync(extDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(extDir, 'gemini-extension.json'),
+        JSON.stringify({ name: oldName, version: '1.0.0' }),
+      );
+      fs.writeFileSync(
+        path.join(extDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: extDir }),
+      );
+
+      // Enable it
+      const enablementManager = extensionManager.getEnablementManager();
+      enablementManager.enable(oldName, true, tempHomeDir);
+
+      await extensionManager.loadExtensions();
+      const extension = extensionManager.getExtensions()[0];
+      expect(extension.isActive).toBe(true);
+
+      const newSourceDir = fs.mkdtempSync(
+        path.join(tempHomeDir, 'new-source-'),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'gemini-extension.json'),
+        JSON.stringify({ name: newName, version: '1.1.0' }),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: newSourceDir }),
+      );
+
+      await extensionManager.installOrUpdateExtension(
+        { type: 'local', source: newSourceDir },
+        { name: oldName, version: '1.0.0' },
+      );
+
+      // Verify new name is enabled
+      expect(enablementManager.isEnabled(newName, tempHomeDir)).toBe(true);
+      // Verify old name is removed from enablement
+      expect(enablementManager.readConfig()[oldName]).toBeUndefined();
+    });
+
+    it('should prevent renaming if the new name conflicts with an existing extension', async () => {
+      // Setup two extensions
+      const ext1Dir = path.join(userExtensionsDir, 'ext1');
+      fs.mkdirSync(ext1Dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(ext1Dir, 'gemini-extension.json'),
+        JSON.stringify({ name: 'ext1', version: '1.0.0' }),
+      );
+      fs.writeFileSync(
+        path.join(ext1Dir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: ext1Dir }),
+      );
+
+      const ext2Dir = path.join(userExtensionsDir, 'ext2');
+      fs.mkdirSync(ext2Dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(ext2Dir, 'gemini-extension.json'),
+        JSON.stringify({ name: 'ext2', version: '1.0.0' }),
+      );
+      fs.writeFileSync(
+        path.join(ext2Dir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: ext2Dir }),
+      );
+
+      await extensionManager.loadExtensions();
+
+      // Try to update ext1 to name 'ext2'
+      const newSourceDir = fs.mkdtempSync(
+        path.join(tempHomeDir, 'new-source-'),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'gemini-extension.json'),
+        JSON.stringify({ name: 'ext2', version: '1.1.0' }),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: newSourceDir }),
+      );
+
+      await expect(
+        extensionManager.installOrUpdateExtension(
+          { type: 'local', source: newSourceDir },
+          { name: 'ext1', version: '1.0.0' },
+        ),
+      ).rejects.toThrow(/already installed/);
+    });
+  });
 });
