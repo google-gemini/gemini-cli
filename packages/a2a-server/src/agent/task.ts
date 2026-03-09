@@ -1054,7 +1054,9 @@ export class Task {
               type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
               correlationId,
               confirmed:
-                confirmationOutcome === ToolConfirmationOutcome.ProceedOnce,
+                confirmationOutcome !== ToolConfirmationOutcome.Cancel &&
+                confirmationOutcome !==
+                  ToolConfirmationOutcome.ModifyWithEditor,
               outcome: confirmationOutcome,
               payload,
             });
