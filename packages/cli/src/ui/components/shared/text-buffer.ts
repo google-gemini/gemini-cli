@@ -25,11 +25,12 @@ import {
 } from '../../utils/textUtils.js';
 import { parsePastedPaths } from '../../utils/clipboardUtils.js';
 import type { Key } from '../../contexts/KeypressContext.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../keyMatchers.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../../constants.js';
 import { openFileInEditor } from '../../utils/editorUtils.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 export const LARGE_PASTE_LINE_THRESHOLD = 5;
 export const LARGE_PASTE_CHAR_THRESHOLD = 500;
@@ -37,6 +38,17 @@ export const LARGE_PASTE_CHAR_THRESHOLD = 500;
 // Regex to match paste placeholders like [Pasted Text: 6 lines] or [Pasted Text: 501 chars #2]
 export const PASTED_TEXT_PLACEHOLDER_REGEX =
   /\[Pasted Text: \d+ (?:lines|chars)(?: #\d+)?\]/g;
+
+// Replace paste placeholder strings with their actual pasted content.
+export function expandPastePlaceholders(
+  text: string,
+  pastedContent: Record<string, string>,
+): string {
+  return text.replace(
+    PASTED_TEXT_PLACEHOLDER_REGEX,
+    (match) => pastedContent[match] || match,
+  );
+}
 
 export type Direction =
   | 'left'
@@ -2697,6 +2709,7 @@ export function useTextBuffer({
   singleLine = false,
   getPreferredEditor,
 }: UseTextBufferProps): TextBuffer {
+  const keyMatchers = useKeyMatchers();
   const initialState = useMemo((): TextBufferState => {
     const lines = initialText.split('\n');
     const [initialCursorRow, initialCursorCol] = calculateInitialCursorPosition(
@@ -3086,10 +3099,7 @@ export function useTextBuffer({
     const tmpDir = fs.mkdtempSync(pathMod.join(os.tmpdir(), 'gemini-edit-'));
     const filePath = pathMod.join(tmpDir, 'buffer.txt');
     // Expand paste placeholders so user sees full content in editor
-    const expandedText = text.replace(
-      PASTED_TEXT_PLACEHOLDER_REGEX,
-      (match) => pastedContent[match] || match,
-    );
+    const expandedText = expandPastePlaceholders(text, pastedContent);
     fs.writeFileSync(filePath, expandedText, 'utf8');
 
     dispatch({ type: 'create_undo_snapshot' });
@@ -3262,6 +3272,7 @@ export function useTextBuffer({
       text,
       visualCursor,
       visualLines,
+      keyMatchers,
     ],
   );
 

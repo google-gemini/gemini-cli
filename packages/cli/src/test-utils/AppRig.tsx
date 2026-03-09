@@ -36,7 +36,10 @@ import {
   MockShellExecutionService,
 } from './MockShellExecutionService.js';
 import { createMockSettings } from './settings.js';
-import { type LoadedSettings } from '../config/settings.js';
+import {
+  type LoadedSettings,
+  resetSettingsCacheForTesting,
+} from '../config/settings.js';
 import { AuthState, StreamingState } from '../ui/types.js';
 import { randomUUID } from 'node:crypto';
 import type {
@@ -104,6 +107,8 @@ vi.mock('../ui/auth/useAuth.js', () => ({
     onAuthError: vi.fn(),
     apiKeyDefaultValue: 'test-api-key',
     reloadApiKey: vi.fn().mockResolvedValue('test-api-key'),
+    accountSuspensionInfo: null,
+    setAccountSuspensionInfo: vi.fn(),
   }),
   validateAuthMethodWithSettings: () => null,
 }));
@@ -169,6 +174,7 @@ export class AppRig {
 
   async initialize() {
     this.setupEnvironment();
+    resetSettingsCacheForTesting();
     this.settings = this.createRigSettings();
 
     const approvalMode =
@@ -387,6 +393,7 @@ export class AppRig {
           version="test-version"
           initializationResult={{
             authError: null,
+            accountSuspensionInfo: null,
             themeError: null,
             shouldOpenAuthDialog: false,
             geminiMdFileCount: 0,
