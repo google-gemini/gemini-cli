@@ -74,10 +74,18 @@ function ruleMatches(
   serverName: string | undefined,
   currentApprovalMode: ApprovalMode,
   toolAnnotations?: Record<string, unknown>,
+  subagent?: string,
 ): boolean {
   // Check if rule applies to current approval mode
   if (rule.modes && rule.modes.length > 0) {
     if (!rule.modes.includes(currentApprovalMode)) {
+      return false;
+    }
+  }
+
+  // Check subagent if specified (only for PolicyRule, SafetyCheckerRule doesn't have it)
+  if ('subagent' in rule && rule.subagent) {
+    if (rule.subagent !== subagent) {
       return false;
     }
   }
@@ -203,6 +211,7 @@ export class PolicyEngine {
     allowRedirection?: boolean,
     rule?: PolicyRule,
     toolAnnotations?: Record<string, unknown>,
+    subagent?: string,
   ): Promise<CheckResult> {
     if (!command) {
       return {
@@ -294,6 +303,7 @@ export class PolicyEngine {
           { name: toolName, args: { command: subCmd, dir_path } },
           serverName,
           toolAnnotations,
+          subagent,
         );
 
         // subResult.decision is already filtered through applyNonInteractiveMode by this.check()
@@ -352,6 +362,7 @@ export class PolicyEngine {
     toolCall: FunctionCall,
     serverName: string | undefined,
     toolAnnotations?: Record<string, unknown>,
+    subagent?: string,
   ): Promise<CheckResult> {
     // Case 1: Metadata injection is the primary and safest way to identify an MCP server.
     // If we have explicit `_serverName` metadata (usually injected by tool-registry for active tools), use it.
@@ -419,6 +430,7 @@ export class PolicyEngine {
           serverName,
           this.approvalMode,
           toolAnnotations,
+          subagent,
         ),
       );
 
@@ -437,6 +449,7 @@ export class PolicyEngine {
             rule.allowRedirection,
             rule,
             toolAnnotations,
+            subagent,
           );
           decision = shellResult.decision;
           if (shellResult.rule) {
@@ -463,9 +476,10 @@ export class PolicyEngine {
           this.defaultDecision,
           serverName,
           shellDirPath,
-          undefined,
+          false,
           undefined,
           toolAnnotations,
+          subagent,
         );
         decision = shellResult.decision;
         matchedRule = shellResult.rule;
@@ -485,6 +499,7 @@ export class PolicyEngine {
             serverName,
             this.approvalMode,
             toolAnnotations,
+            subagent,
           )
         ) {
           debugLogger.debug(

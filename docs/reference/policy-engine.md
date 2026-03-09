@@ -219,6 +219,10 @@ Here is a breakdown of the fields available in a TOML policy rule:
 # A unique name for the tool, or an array of names.
 toolName = "run_shell_command"
 
+# (Optional) The name of a subagent. If provided, the rule only applies to tool calls
+# made by this specific subagent.
+subagent = "generalist"
+
 # (Optional) The name of an MCP server. Can be combined with toolName
 # to form a composite name like "mcpName__toolName".
 mcpName = "my-custom-server"

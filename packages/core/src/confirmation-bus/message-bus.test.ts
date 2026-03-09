@@ -160,6 +160,7 @@ describe('MessageBus', () => {
         { name: 'test-tool', args: {} },
         'test-server',
         annotations,
+        undefined,
       );
     });
 
