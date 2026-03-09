@@ -114,25 +114,6 @@ const SUPPRESSED_TOOL_ERRORS_NOTE =
 const LOW_VERBOSITY_FAILURE_NOTE =
   'This request failed. Press F12 for diagnostics, or run /settings and change "Error Verbosity" to full for full details.';
 
-function normalizeBackgroundExecutionId(
-  data: BackgroundExecutionData,
-): number | undefined {
-  const executionId: unknown = getBackgroundExecutionId(data);
-  return typeof executionId === 'number' ? executionId : undefined;
-}
-
-function normalizeBackgroundCommand(data: BackgroundExecutionData): string | undefined {
-  const command: unknown = data.command;
-  return typeof command === 'string' ? command : undefined;
-}
-
-function normalizeBackgroundInitialOutput(
-  data: BackgroundExecutionData,
-): string | undefined {
-  const initialOutput: unknown = data.initialOutput;
-  return typeof initialOutput === 'string' ? initialOutput : undefined;
-}
-
 function getBackgroundedToolInfo(
   toolCall: TrackedCompletedToolCall | TrackedCancelledToolCall,
 ): BackgroundedToolInfo | undefined {
@@ -143,15 +124,15 @@ function getBackgroundedToolInfo(
   }
 
   const data: BackgroundExecutionData = rawData;
-  const executionId = normalizeBackgroundExecutionId(data);
+  const executionId = getBackgroundExecutionId(data);
   if (executionId === undefined) {
     return undefined;
   }
 
   return {
     executionId,
-    command: normalizeBackgroundCommand(data) ?? toolCall.request.name,
-    initialOutput: normalizeBackgroundInitialOutput(data) ?? '',
+    command: data.command ?? toolCall.request.name,
+    initialOutput: data.initialOutput ?? '',
   };
 }
 
