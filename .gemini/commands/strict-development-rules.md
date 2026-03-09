@@ -107,7 +107,7 @@ Gemini CLI project.
   set.
 - **Logging**: Use `debugLogger` for rethrown errors to avoid duplicate logging.
 - **Keyboard Shortcuts**: Define all new keyboard shortcuts in
-  `packages/cli/src/config/keyBindings.ts` and document them in
+  `packages/cli/src/ui/key/keyBindings.ts` and document them in
   `docs/cli/keyboard-shortcuts.md`. Be careful of keybindings that require the
   `Meta` key, as only certain meta key shortcuts are supported on Mac. Avoid
   function keys and shortcuts commonly bound in VSCode.

@@ -19,7 +19,7 @@ import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { useScrollable } from '../../contexts/ScrollProvider.js';
 import { useAnimatedScrollbar } from '../../hooks/useAnimatedScrollbar.js';
 import { useBatchedScroll } from '../../hooks/useBatchedScroll.js';
-import { Command } from '../../keyMatchers.js';
+import { Command } from '../../key/keyMatchers.js';
 import { useOverflowActions } from '../../contexts/OverflowContext.js';
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 

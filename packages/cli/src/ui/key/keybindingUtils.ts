@@ -10,7 +10,7 @@ import {
   type KeyBinding,
   type KeyBindingConfig,
   defaultKeyBindings,
-} from '../../config/keyBindings.js';
+} from './keyBindings.js';
 
 /**
  * Maps internal key names to user-friendly display names.
@@ -30,7 +30,6 @@ const KEY_NAME_MAP: Record<string, string> = {
   end: 'End',
   tab: 'Tab',
   space: 'Space',
-  'double escape': 'Double Esc',
 };
 
 interface ModifierMap {

@@ -16,9 +16,9 @@ import {
 } from '@google/gemini-cli-core';
 import { cpLen, cpSlice, getCachedStringWidth } from '../utils/textUtils.js';
 import { type BackgroundShell } from '../hooks/shellCommandProcessor.js';
-import { Command } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { formatCommand } from '../utils/keybindingUtils.js';
+import { formatCommand } from '../key/keybindingUtils.js';
 import {
   ScrollableList,
   type ScrollableListRef,

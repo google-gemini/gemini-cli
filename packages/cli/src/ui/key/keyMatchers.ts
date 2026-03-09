@@ -4,26 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Key } from './hooks/useKeypress.js';
-import type { KeyBinding, KeyBindingConfig } from '../config/keyBindings.js';
-import { Command, defaultKeyBindings } from '../config/keyBindings.js';
-
-/**
- * Matches a KeyBinding against an actual Key press
- * Pure data-driven matching logic
- */
-function matchKeyBinding(keyBinding: KeyBinding, key: Key): boolean {
-  // Check modifiers:
-  // true = modifier must be pressed
-  // false or undefined = modifier must NOT be pressed
-  return (
-    keyBinding.key === key.name &&
-    !!key.shift === !!keyBinding.shift &&
-    !!key.alt === !!keyBinding.alt &&
-    !!key.ctrl === !!keyBinding.ctrl &&
-    !!key.cmd === !!keyBinding.cmd
-  );
-}
+import type { Key } from '../hooks/useKeypress.js';
+import type { KeyBindingConfig } from './keyBindings.js';
+import { Command, defaultKeyBindings } from './keyBindings.js';
 
 /**
  * Checks if a key matches any of the bindings for a command
@@ -33,8 +16,7 @@ function matchCommand(
   key: Key,
   config: KeyBindingConfig = defaultKeyBindings,
 ): boolean {
-  const bindings = config[command];
-  return bindings.some((binding) => matchKeyBinding(binding, key));
+  return config[command].some((binding) => binding.matches(key));
 }
 
 /**
