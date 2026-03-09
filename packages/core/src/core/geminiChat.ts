@@ -412,6 +412,7 @@ export class GeminiChat {
             }
 
             const isContentError = error instanceof InvalidStreamError;
+            const errorType = isContentError ? error.type : 'NETWORK_ERROR';
 
             if (
               (isContentError && isGemini2Model(model)) ||
@@ -420,11 +421,10 @@ export class GeminiChat {
               // Check if we have more attempts left.
               if (attempt < maxAttempts - 1) {
                 const delayMs = INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs;
-                const retryType = isContentError ? error.type : 'NETWORK_ERROR';
 
                 logContentRetry(
                   this.config,
-                  new ContentRetryEvent(attempt, retryType, delayMs, model),
+                  new ContentRetryEvent(attempt, errorType, delayMs, model),
                 );
                 coreEvents.emitRetryAttempt({
                   attempt: attempt + 1,
@@ -440,12 +440,16 @@ export class GeminiChat {
               }
             }
 
-            if (error instanceof InvalidStreamError && isGemini2Model(model)) {
-              logContentRetryFailure(
-                this.config,
-                new ContentRetryFailureEvent(maxAttempts, error.type, model),
-              );
+            // If we've aborted, we throw without logging a failure.
+            if (signal.aborted) {
+              throw error;
             }
+
+            logContentRetryFailure(
+              this.config,
+              new ContentRetryFailureEvent(attempt + 1, errorType, model),
+            );
+
             throw error;
           }
         }
