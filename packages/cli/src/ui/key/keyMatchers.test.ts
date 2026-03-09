@@ -10,9 +10,9 @@ import {
   Command,
   createKeyMatchers,
 } from './keyMatchers.js';
-import type { KeyBindingConfig } from '../config/keyBindings.js';
-import { defaultKeyBindings } from '../config/keyBindings.js';
-import type { Key } from './hooks/useKeypress.js';
+import type { KeyBindingConfig } from './keyBindings.js';
+import { defaultKeyBindings, KeyBinding } from './keyBindings.js';
+import type { Key } from '../hooks/useKeypress.js';
 
 describe('keyMatchers', () => {
   const createKey = (name: string, mods: Partial<Key> = {}): Key => ({
@@ -445,7 +445,7 @@ describe('keyMatchers', () => {
     it('should work with custom configuration', () => {
       const customConfig: KeyBindingConfig = {
         ...defaultKeyBindings,
-        [Command.HOME]: [{ key: 'h', ctrl: true }, { key: '0' }],
+        [Command.HOME]: [new KeyBinding('ctrl+h'), new KeyBinding('0')],
       };
 
       const customMatchers = createKeyMatchers(customConfig);
@@ -462,10 +462,7 @@ describe('keyMatchers', () => {
     it('should support multiple key bindings for same command', () => {
       const config: KeyBindingConfig = {
         ...defaultKeyBindings,
-        [Command.QUIT]: [
-          { key: 'q', ctrl: true },
-          { key: 'q', alt: true },
-        ],
+        [Command.QUIT]: [new KeyBinding('ctrl+q'), new KeyBinding('alt+q')],
       };
 
       const matchers = createKeyMatchers(config);

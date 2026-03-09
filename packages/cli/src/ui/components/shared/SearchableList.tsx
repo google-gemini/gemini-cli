@@ -11,7 +11,7 @@ import { useSelectionList } from '../../hooks/useSelectionList.js';
 import { TextInput } from './TextInput.js';
 import type { TextBuffer } from './text-buffer.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
-import { Command } from '../../keyMatchers.js';
+import { Command } from '../../key/keyMatchers.js';
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 /**
