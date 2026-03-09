@@ -539,8 +539,7 @@ export const ToolConfirmationMessage: React.FC<
             REDIRECTION_WARNING_NOTE_TEXT.length;
           const tipText = `Toggle auto-edit (${formatCommand(Command.CYCLE_APPROVAL_MODE)}) to allow redirection in the future.`;
           const tipLength =
-            REDIRECTION_WARNING_TIP_LABEL.length +
-            tipText.length;
+            REDIRECTION_WARNING_TIP_LABEL.length + tipText.length;
 
           const noteLines = Math.ceil(noteLength / safeWidth);
           const tipLines = Math.ceil(tipLength / safeWidth);
@@ -656,7 +655,6 @@ export const ToolConfirmationMessage: React.FC<
         );
       }
 
-
       return { question, bodyContent, options, securityWarnings, initialIndex };
     }, [
       confirmationDetails,
@@ -674,7 +672,6 @@ export const ToolConfirmationMessage: React.FC<
       allowPermanentApproval,
       settings.merged.security.autoAddToPolicyByDefault,
     ]);
-
 
   const bodyOverflowDirection: 'top' | 'bottom' =
     confirmationDetails.type === 'mcp' && isMcpToolDetailsExpanded

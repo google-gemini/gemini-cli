@@ -2891,14 +2891,10 @@ export class Config implements McpContext, AgentLoopContext {
 
     if (this.isTrackerEnabled()) {
       maybeRegister(TrackerCreateTaskTool, () =>
-        registry.registerTool(
-          new TrackerCreateTaskTool(this, this.messageBus),
-        ),
+        registry.registerTool(new TrackerCreateTaskTool(this, this.messageBus)),
       );
       maybeRegister(TrackerUpdateTaskTool, () =>
-        registry.registerTool(
-          new TrackerUpdateTaskTool(this, this.messageBus),
-        ),
+        registry.registerTool(new TrackerUpdateTaskTool(this, this.messageBus)),
       );
       maybeRegister(TrackerGetTaskTool, () =>
         registry.registerTool(new TrackerGetTaskTool(this, this.messageBus)),
