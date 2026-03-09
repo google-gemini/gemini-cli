@@ -117,6 +117,13 @@ export interface PolicyRule {
   subagent?: string;
 
   /**
+   * Identifies the MCP server this rule applies to.
+   * Enables precise rule matching against `serverName` metadata instead
+   * of parsing composite string names.
+   */
+  mcpName?: string;
+
+  /**
    * Pattern to match against tool arguments.
    * Can be used for more fine-grained control.
    */
@@ -171,6 +178,11 @@ export interface SafetyCheckerRule {
    * If undefined, the rule applies to all tools.
    */
   toolName?: string;
+
+  /**
+   * Identifies the MCP server this rule applies to.
+   */
+  mcpName?: string;
 
   /**
    * Pattern to match against tool arguments.

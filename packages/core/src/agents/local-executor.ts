@@ -116,30 +116,20 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   ): Promise<LocalAgentExecutor<TOutput>> {
     const parentMessageBus = runtimeContext.getMessageBus();
 
-    // Create a proxy to inject the subagent name into tool confirmation requests
-    const subagentMessageBus = new Proxy(parentMessageBus, {
-      get(
-        target: typeof parentMessageBus,
-        prop: string | symbol,
-        receiver: unknown,
-      ) {
-        if (prop === 'publish') {
-          return async (message: Message) => {
-            if (message.type === 'tool-confirmation-request') {
-              return target.publish({
-                ...message,
-                subagent: definition.name,
-              });
-            }
-            return target.publish(message);
-          };
-        }
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const value = Reflect.get(target, prop, receiver);
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-        return typeof value === 'function' ? value.bind(receiver) : value;
-      },
-    });
+    // Create an override object to inject the subagent name into tool confirmation requests
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const subagentMessageBus = Object.create(
+      parentMessageBus,
+    ) as typeof parentMessageBus;
+    subagentMessageBus.publish = async (message: Message) => {
+      if (message.type === 'tool-confirmation-request') {
+        return parentMessageBus.publish({
+          ...message,
+          subagent: definition.name,
+        });
+      }
+      return parentMessageBus.publish(message);
+    };
 
     // Create an isolated tool registry for this agent instance.
     const agentToolRegistry = new ToolRegistry(
@@ -930,6 +920,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         displayName,
         description,
         args,
+        callId,
       });
 
       if (toolName === TASK_COMPLETE_TOOL_NAME) {
@@ -997,6 +988,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             });
             this.emitActivity('TOOL_CALL_END', {
               name: toolName,
+              id: callId,
               output: 'Output submitted and task completed.',
             });
           } else {
@@ -1013,6 +1005,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             this.emitActivity('ERROR', {
               context: 'tool_call',
               name: toolName,
+              callId,
               error,
             });
           }
@@ -1037,6 +1030,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             });
             this.emitActivity('TOOL_CALL_END', {
               name: toolName,
+              id: callId,
               output: 'Result submitted and task completed.',
             });
           } else {
@@ -1054,6 +1048,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             this.emitActivity('ERROR', {
               context: 'tool_call',
               name: toolName,
+              callId,
               error,
             });
           }
@@ -1114,18 +1109,21 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         if (call.status === 'success') {
           this.emitActivity('TOOL_CALL_END', {
             name: toolName,
+            id: call.request.callId,
             output: call.response.resultDisplay,
           });
         } else if (call.status === 'error') {
           this.emitActivity('ERROR', {
             context: 'tool_call',
             name: toolName,
+            callId: call.request.callId,
             error: call.response.error?.message || 'Unknown error',
           });
         } else if (call.status === 'cancelled') {
           this.emitActivity('ERROR', {
             context: 'tool_call',
             name: toolName,
+            callId: call.request.callId,
             error: 'Request cancelled.',
           });
           aborted = true;

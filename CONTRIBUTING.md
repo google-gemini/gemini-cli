@@ -267,7 +267,8 @@ npm run test:e2e
 ```
 
 For more detailed information on the integration testing framework, please see
-the [Integration Tests documentation](/docs/integration-tests.md).
+the
+[Integration Tests documentation](https://geminicli.com/docs/integration-tests).
 
 ### Linting and preflight checks
 
@@ -320,11 +321,9 @@ npm run lint
 
 - Please adhere to the coding style, patterns, and conventions used throughout
   the existing codebase.
-- Consult
-  [GEMINI.md](https://github.com/google-gemini/gemini-cli/blob/main/GEMINI.md)
-  (typically found in the project root) for specific instructions related to
-  AI-assisted development, including conventions for React, comments, and Git
-  usage.
+- Consult [GEMINI.md](../GEMINI.md) (typically found in the project root) for
+  specific instructions related to AI-assisted development, including
+  conventions for React, comments, and Git usage.
 - **Imports:** Pay special attention to import paths. The project uses ESLint to
   enforce restrictions on relative imports between packages.
 
@@ -548,7 +547,7 @@ Before submitting your documentation pull request, please:
 
 If you have questions about contributing documentation:
 
-- Check our [FAQ](/docs/resources/faq.md).
+- Check our [FAQ](https://geminicli.com/docs/resources/faq).
 - Review existing documentation for examples.
 - Open [an issue](https://github.com/google-gemini/gemini-cli/issues) to discuss
   your proposed changes.

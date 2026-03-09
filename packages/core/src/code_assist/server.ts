@@ -48,6 +48,7 @@ import {
   shouldAutoUseCredits,
 } from '../billing/billing.js';
 import { logBillingEvent, logInvalidChunk } from '../telemetry/loggers.js';
+import { coreEvents } from '../utils/events.js';
 import { CreditsUsedEvent } from '../telemetry/billingEvents.js';
 import {
   fromCountTokenResponse,
@@ -99,6 +100,11 @@ export class CodeAssistServer implements ContentGenerator {
       : false;
     const modelIsEligible = isOverageEligibleModel(req.model);
     const shouldEnableCredits = modelIsEligible && autoUse;
+
+    if (shouldEnableCredits && !this.config?.getCreditsNotificationShown()) {
+      this.config?.setCreditsNotificationShown(true);
+      coreEvents.emitFeedback('info', 'Using AI Credits for this request.');
+    }
 
     const enabledCreditTypes = shouldEnableCredits
       ? ([G1_CREDIT_TYPE] as string[])
