@@ -2,4 +2,4 @@ action: 'log'
 requireStatusChecks:
   strict: true
   contexts:
-    - "docs_pr_check"
+    - 'docs_pr_check'
