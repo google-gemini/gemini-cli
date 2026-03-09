@@ -19,10 +19,11 @@ import { TextInput } from './TextInput.js';
 import type { TextBuffer } from './text-buffer.js';
 import { cpSlice, cpLen, cpIndexToOffset } from '../../utils/textUtils.js';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../keyMatchers.js';
 import { useSettingsNavigation } from '../../hooks/useSettingsNavigation.js';
 import { useInlineEditBuffer } from '../../hooks/useInlineEditBuffer.js';
 import { formatCommand } from '../../utils/keybindingUtils.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 /**
  * Represents a single item in the settings dialog.
@@ -136,6 +137,7 @@ export function BaseSettingsDialog({
   availableHeight,
   footer,
 }: BaseSettingsDialogProps): React.JSX.Element {
+  const keyMatchers = useKeyMatchers();
   // Calculate effective max items and scope visibility based on terminal height
   const { effectiveMaxItemsToShow, finalShowScopeSelector } = useMemo(() => {
     const initialShowScope = showScopeSelector;

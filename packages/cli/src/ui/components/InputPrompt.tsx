@@ -36,7 +36,7 @@ import {
 } from '../hooks/useCommandCompletion.js';
 import type { Key } from '../hooks/useKeypress.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../keyMatchers.js';
 import { formatCommand } from '../utils/keybindingUtils.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
@@ -72,8 +72,9 @@ import { useMouseClick } from '../hooks/useMouseClick.js';
 import { useMouse, type MouseEvent } from '../contexts/MouseContext.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
-import { shouldDismissShortcutsHelpOnHotkey } from '../utils/shortcutsHelp.js';
+import { useIsHelpDismissKey } from '../utils/shortcutsHelp.js';
 import { useRepeatedKeyPress } from '../hooks/useRepeatedKeyPress.js';
+import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -207,6 +208,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   suggestionsPosition = 'below',
   setBannerVisible,
 }) => {
+  const isHelpDismissKey = useIsHelpDismissKey();
+  const keyMatchers = useKeyMatchers();
   const { stdout } = useStdout();
   const { merged: settings } = useSettings();
   const kittyProtocol = useKittyKeyboardProtocol();
@@ -737,7 +740,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
-      if (shortcutsHelpVisible && shouldDismissShortcutsHelpOnHotkey(key)) {
+      if (shortcutsHelpVisible && isHelpDismissKey(key)) {
         setShortcutsHelpVisible(false);
       }
 
@@ -1265,6 +1268,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shouldShowSuggestions,
       isShellSuggestionsVisible,
       forceShowShellSuggestions,
+      keyMatchers,
+      isHelpDismissKey,
     ],
   );
 

@@ -5,7 +5,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { keyMatchers, Command, createKeyMatchers } from './keyMatchers.js';
+import {
+  defaultKeyMatchers,
+  Command,
+  createKeyMatchers,
+} from './keyMatchers.js';
 import type { KeyBindingConfig } from '../config/keyBindings.js';
 import { defaultKeyBindings } from '../config/keyBindings.js';
 import type { Key } from './hooks/useKeypress.js';
@@ -422,14 +426,14 @@ describe('keyMatchers', () => {
       it(`should match ${command} correctly`, () => {
         positive.forEach((key) => {
           expect(
-            keyMatchers[command](key),
+            defaultKeyMatchers[command](key),
             `Expected ${command} to match ${JSON.stringify(key)}`,
           ).toBe(true);
         });
 
         negative.forEach((key) => {
           expect(
-            keyMatchers[command](key),
+            defaultKeyMatchers[command](key),
             `Expected ${command} to NOT match ${JSON.stringify(key)}`,
           ).toBe(false);
         });

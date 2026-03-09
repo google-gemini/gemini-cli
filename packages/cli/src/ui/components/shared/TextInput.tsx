@@ -14,7 +14,8 @@ import { theme } from '../../semantic-colors.js';
 import type { TextBuffer } from './text-buffer.js';
 import { expandPastePlaceholders } from './text-buffer.js';
 import { cpSlice, cpIndexToOffset } from '../../utils/textUtils.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../keyMatchers.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 export interface TextInputProps {
   buffer: TextBuffer;
@@ -31,6 +32,7 @@ export function TextInput({
   onCancel,
   focus = true,
 }: TextInputProps): React.JSX.Element {
+  const keyMatchers = useKeyMatchers();
   const {
     text,
     handleInput,
@@ -55,7 +57,7 @@ export function TextInput({
       const handled = handleInput(key);
       return handled;
     },
-    [handleInput, onCancel, onSubmit, text, buffer.pastedContent],
+    [handleInput, onCancel, onSubmit, text, buffer.pastedContent, keyMatchers],
   );
 
   useKeypress(handleKeyPress, { isActive: focus, priority: true });

@@ -29,7 +29,7 @@ import {
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../keyMatchers.js';
 import { formatCommand } from '../../utils/keybindingUtils.js';
 import { AskUserDialog } from '../AskUserDialog.js';
 import { ExitPlanModeDialog } from '../ExitPlanModeDialog.js';
@@ -40,6 +40,7 @@ import {
   toUnicodeUrl,
   type DeceptiveUrlDetails,
 } from '../../utils/urlSecurityUtils.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 export interface ToolConfirmationMessageProps {
   callId: string;
@@ -67,6 +68,7 @@ export const ToolConfirmationMessage: React.FC<
   availableTerminalHeight,
   terminalWidth,
 }) => {
+  const keyMatchers = useKeyMatchers();
   const { confirm, isDiffingEnabled } = useToolActions();
   const [mcpDetailsExpansionState, setMcpDetailsExpansionState] = useState<{
     callId: string;
