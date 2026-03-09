@@ -540,7 +540,10 @@ export class GeminiChat {
         abortSignal,
       };
 
-      let contentsToUse: Content[] = supportsModernFeatures(modelToUse, this.config)
+      let contentsToUse: Content[] = supportsModernFeatures(
+        modelToUse,
+        this.config,
+      )
         ? [...contentsForPreviewModel]
         : [...requestContents];
 
