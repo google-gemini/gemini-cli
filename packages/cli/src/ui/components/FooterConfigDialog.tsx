@@ -5,119 +5,75 @@
  */
 
 import type React from 'react';
-import { useCallback, useMemo, useReducer } from 'react';
+import { useCallback, useMemo, useReducer, useState } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { useSettingsStore } from '../contexts/SettingsContext.js';
+import { useUIState } from '../contexts/UIStateContext.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../keyMatchers.js';
 import { FooterRow, type FooterRowItem } from './Footer.js';
 import { ALL_ITEMS, resolveFooterState } from '../../config/footerItems.js';
 import { SettingScope } from '../../config/settings.js';
+import { BaseSelectionList } from './shared/BaseSelectionList.js';
+import type { SelectionListItem } from '../hooks/useSelectionList.js';
+import { DialogFooter } from './shared/DialogFooter.js';
 
 interface FooterConfigDialogProps {
   onClose?: () => void;
 }
 
+interface FooterConfigItem {
+  key: string;
+  id: string;
+  label: string;
+  description?: string;
+  type: 'config' | 'labels-toggle' | 'reset';
+}
+
 interface FooterConfigState {
   orderedIds: string[];
   selectedIds: Set<string>;
-  activeIndex: number;
-  scrollOffset: number;
 }
 
 type FooterConfigAction =
-  | { type: 'MOVE_UP'; itemCount: number; maxToShow: number }
-  | { type: 'MOVE_DOWN'; itemCount: number; maxToShow: number }
-  | {
-      type: 'MOVE_LEFT';
-      items: Array<{ key: string }>;
-    }
-  | {
-      type: 'MOVE_RIGHT';
-      items: Array<{ key: string }>;
-    }
-  | { type: 'TOGGLE_ITEM'; items: Array<{ key: string }> }
-  | { type: 'SET_STATE'; payload: Partial<FooterConfigState> }
-  | { type: 'RESET_INDEX' };
+  | { type: 'MOVE_ITEM'; id: string; direction: number }
+  | { type: 'TOGGLE_ITEM'; id: string }
+  | { type: 'SET_STATE'; payload: Partial<FooterConfigState> };
 
 function footerConfigReducer(
   state: FooterConfigState,
   action: FooterConfigAction,
 ): FooterConfigState {
   switch (action.type) {
-    case 'MOVE_UP': {
-      const { itemCount, maxToShow } = action;
-      const totalSlots = itemCount + 2; // +1 for showLabels, +1 for reset
-      const newIndex =
-        state.activeIndex > 0 ? state.activeIndex - 1 : totalSlots - 1;
-      let newOffset = state.scrollOffset;
-
-      if (newIndex < itemCount) {
-        if (newIndex === itemCount - 1) {
-          newOffset = Math.max(0, itemCount - maxToShow);
-        } else if (newIndex < state.scrollOffset) {
-          newOffset = newIndex;
-        }
-      }
-      return { ...state, activeIndex: newIndex, scrollOffset: newOffset };
-    }
-    case 'MOVE_DOWN': {
-      const { itemCount, maxToShow } = action;
-      const totalSlots = itemCount + 2;
-      const newIndex =
-        state.activeIndex < totalSlots - 1 ? state.activeIndex + 1 : 0;
-      let newOffset = state.scrollOffset;
-
-      if (newIndex === 0) {
-        newOffset = 0;
-      } else if (
-        newIndex < itemCount &&
-        newIndex >= state.scrollOffset + maxToShow
+    case 'MOVE_ITEM': {
+      const currentIndex = state.orderedIds.indexOf(action.id);
+      const newIndex = currentIndex + action.direction;
+      if (
+        currentIndex === -1 ||
+        newIndex < 0 ||
+        newIndex >= state.orderedIds.length
       ) {
-        newOffset = newIndex - maxToShow + 1;
+        return state;
       }
-      return { ...state, activeIndex: newIndex, scrollOffset: newOffset };
-    }
-    case 'MOVE_LEFT':
-    case 'MOVE_RIGHT': {
-      const direction = action.type === 'MOVE_LEFT' ? -1 : 1;
-      const currentItem = action.items[state.activeIndex];
-      if (!currentItem) return state;
-
-      const currentId = currentItem.key;
-      const currentIndex = state.orderedIds.indexOf(currentId);
-      const newIndex = currentIndex + direction;
-
-      if (newIndex < 0 || newIndex >= state.orderedIds.length) return state;
-
       const newOrderedIds = [...state.orderedIds];
       [newOrderedIds[currentIndex], newOrderedIds[newIndex]] = [
         newOrderedIds[newIndex],
         newOrderedIds[currentIndex],
       ];
-
-      return { ...state, orderedIds: newOrderedIds, activeIndex: newIndex };
+      return { ...state, orderedIds: newOrderedIds };
     }
     case 'TOGGLE_ITEM': {
-      const isSystemFocused = state.activeIndex >= action.items.length;
-      if (isSystemFocused) return state;
-
-      const item = action.items[state.activeIndex];
-      if (!item) return state;
-
       const nextSelected = new Set(state.selectedIds);
-      if (nextSelected.has(item.key)) {
-        nextSelected.delete(item.key);
+      if (nextSelected.has(action.id)) {
+        nextSelected.delete(action.id);
       } else {
-        nextSelected.add(item.key);
+        nextSelected.add(action.id);
       }
       return { ...state, selectedIds: nextSelected };
     }
     case 'SET_STATE':
       return { ...state, ...action.payload };
-    case 'RESET_INDEX':
-      return { ...state, activeIndex: 0, scrollOffset: 0 };
     default:
       return state;
   }
@@ -127,40 +83,54 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
   onClose,
 }) => {
   const { settings, setSetting } = useSettingsStore();
-  const maxItemsToShow = 10;
+  const { constrainHeight, terminalHeight, staticExtraHeight } = useUIState();
+  const [state, dispatch] = useReducer(footerConfigReducer, undefined, () =>
+    resolveFooterState(settings.merged),
+  );
 
-  const [state, dispatch] = useReducer(footerConfigReducer, undefined, () => ({
-    ...resolveFooterState(settings.merged),
-    activeIndex: 0,
-    scrollOffset: 0,
-  }));
+  const { orderedIds, selectedIds } = state;
+  const [focusKey, setFocusKey] = useState<string | undefined>(orderedIds[0]);
 
-  const { orderedIds, selectedIds, activeIndex, scrollOffset } = state;
-
-  // Prepare items
-  const listItems = useMemo(
-    () =>
-      orderedIds
-        .map((id: string) => {
-          const item = ALL_ITEMS.find((i) => i.id === id);
-          if (!item) return null;
-          return {
+  const listItems = useMemo((): Array<SelectionListItem<FooterConfigItem>> => {
+    const items: Array<SelectionListItem<FooterConfigItem>> = orderedIds
+      .map((id: string) => {
+        const item = ALL_ITEMS.find((i) => i.id === id);
+        if (!item) return null;
+        return {
+          key: id,
+          value: {
             key: id,
+            id,
             label: item.id,
             description: item.description as string,
-          };
-        })
-        .filter((i): i is NonNullable<typeof i> => i !== null),
-    [orderedIds],
-  );
+            type: 'config' as const,
+          },
+        };
+      })
+      .filter((i): i is NonNullable<typeof i> => i !== null);
 
-  const maxLabelWidth = useMemo(
-    () => listItems.reduce((max, item) => Math.max(max, item.label.length), 0),
-    [listItems],
-  );
+    items.push({
+      key: 'show-labels',
+      value: {
+        key: 'show-labels',
+        id: 'show-labels',
+        label: 'Show footer labels',
+        type: 'labels-toggle',
+      },
+    });
 
-  const isResetFocused = activeIndex === listItems.length + 1;
-  const isShowLabelsFocused = activeIndex === listItems.length;
+    items.push({
+      key: 'reset',
+      value: {
+        key: 'reset',
+        id: 'reset',
+        label: 'Reset to default footer',
+        type: 'reset',
+      },
+    });
+
+    return items;
+  }, [orderedIds]);
 
   const handleSaveAndClose = useCallback(() => {
     const finalItems = orderedIds.filter((id: string) => selectedIds.has(id));
@@ -179,20 +149,32 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
 
   const handleResetToDefaults = useCallback(() => {
     setSetting(SettingScope.User, 'ui.footer.items', undefined);
-    dispatch({
-      type: 'SET_STATE',
-      payload: {
-        ...resolveFooterState(settings.merged),
-        activeIndex: 0,
-        scrollOffset: 0,
-      },
-    });
+    const newState = resolveFooterState(settings.merged);
+    dispatch({ type: 'SET_STATE', payload: newState });
+    setFocusKey(newState.orderedIds[0]);
   }, [setSetting, settings.merged]);
 
   const handleToggleLabels = useCallback(() => {
     const current = settings.merged.ui.footer.showLabels !== false;
     setSetting(SettingScope.User, 'ui.footer.showLabels', !current);
   }, [setSetting, settings.merged.ui.footer.showLabels]);
+
+  const handleSelect = useCallback(
+    (item: FooterConfigItem) => {
+      if (item.type === 'config') {
+        dispatch({ type: 'TOGGLE_ITEM', id: item.id });
+      } else if (item.type === 'labels-toggle') {
+        handleToggleLabels();
+      } else if (item.type === 'reset') {
+        handleResetToDefaults();
+      }
+    },
+    [handleResetToDefaults, handleToggleLabels],
+  );
+
+  const handleHighlight = useCallback((item: FooterConfigItem) => {
+    setFocusKey(item.key);
+  }, []);
 
   useKeypress(
     (key: Key) => {
@@ -201,43 +183,18 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
         return true;
       }
 
-      if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
-        dispatch({
-          type: 'MOVE_UP',
-          itemCount: listItems.length,
-          maxToShow: maxItemsToShow,
-        });
-        return true;
-      }
-
-      if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
-        dispatch({
-          type: 'MOVE_DOWN',
-          itemCount: listItems.length,
-          maxToShow: maxItemsToShow,
-        });
-        return true;
-      }
-
       if (keyMatchers[Command.MOVE_LEFT](key)) {
-        dispatch({ type: 'MOVE_LEFT', items: listItems });
-        return true;
+        if (focusKey && orderedIds.includes(focusKey)) {
+          dispatch({ type: 'MOVE_ITEM', id: focusKey, direction: -1 });
+          return true;
+        }
       }
 
       if (keyMatchers[Command.MOVE_RIGHT](key)) {
-        dispatch({ type: 'MOVE_RIGHT', items: listItems });
-        return true;
-      }
-
-      if (keyMatchers[Command.RETURN](key) || key.name === 'space') {
-        if (isResetFocused) {
-          handleResetToDefaults();
-        } else if (isShowLabelsFocused) {
-          handleToggleLabels();
-        } else {
-          dispatch({ type: 'TOGGLE_ITEM', items: listItems });
+        if (focusKey && orderedIds.includes(focusKey)) {
+          dispatch({ type: 'MOVE_ITEM', id: focusKey, direction: 1 });
+          return true;
         }
-        return true;
       }
 
       return false;
@@ -245,17 +202,11 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
     { isActive: true, priority: true },
   );
 
-  const visibleItems = listItems.slice(
-    scrollOffset,
-    scrollOffset + maxItemsToShow,
-  );
-
-  const activeId = listItems[activeIndex]?.key;
   const showLabels = settings.merged.ui.footer.showLabels !== false;
 
   // Preview logic
   const previewContent = useMemo(() => {
-    if (isResetFocused) {
+    if (focusKey === 'reset') {
       return (
         <Text color={theme.ui.comment} italic>
           Default footer (uses legacy settings)
@@ -269,8 +220,9 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
     if (itemsToPreview.length === 0) return null;
 
     const itemColor = showLabels ? theme.text.primary : theme.ui.comment;
+
     const getColor = (id: string, defaultColor?: string) =>
-      id === activeId ? 'white' : defaultColor || itemColor;
+      defaultColor || itemColor;
 
     // Mock data for preview (headers come from ALL_ITEMS)
     const mockData: Record<string, React.ReactNode> = {
@@ -312,16 +264,43 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
         key: id,
         header: ALL_ITEMS.find((i) => i.id === id)?.header ?? id,
         element: mockData[id],
+        flexGrow: 1,
+        isFocused: id === focusKey,
       }));
 
     return (
-      <Box overflow="hidden" flexWrap="nowrap">
-        <Box flexShrink={0}>
-          <FooterRow items={rowItems} showLabels={showLabels} />
-        </Box>
+      <Box overflow="hidden" flexWrap="nowrap" width="100%">
+        <FooterRow items={rowItems} showLabels={showLabels} />
       </Box>
     );
-  }, [orderedIds, selectedIds, activeId, isResetFocused, showLabels]);
+  }, [orderedIds, selectedIds, focusKey, showLabels]);
+
+  const availableTerminalHeight = constrainHeight
+    ? terminalHeight - staticExtraHeight
+    : Number.MAX_SAFE_INTEGER;
+
+  const BORDER_HEIGHT = 2; // Outer round border
+  const STATIC_ELEMENTS = 13; // Text, margins, preview box, dialog footer
+
+  // Default padding adds 2 lines (top and bottom)
+  let includePadding = true;
+  if (availableTerminalHeight < BORDER_HEIGHT + 2 + STATIC_ELEMENTS + 6) {
+    includePadding = false;
+  }
+
+  const effectivePaddingY = includePadding ? 2 : 0;
+  const availableListSpace = Math.max(
+    0,
+    availableTerminalHeight -
+      BORDER_HEIGHT -
+      effectivePaddingY -
+      STATIC_ELEMENTS,
+  );
+
+  const maxItemsToShow = Math.max(
+    1,
+    Math.min(listItems.length, Math.floor(availableListSpace / 2)),
+  );
 
   return (
     <Box
@@ -329,7 +308,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
       borderStyle="round"
       borderColor={theme.border.default}
       paddingX={2}
-      paddingY={1}
+      paddingY={includePadding ? 1 : 0}
       width="100%"
     >
       <Text bold>Configure Footer{'\n'}</Text>
@@ -337,59 +316,65 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
         Select which items to display in the footer.
       </Text>
 
-      <Box flexDirection="column" marginTop={1} minHeight={maxItemsToShow}>
-        {visibleItems.length === 0 ? (
-          <Text color={theme.text.secondary}>No items found.</Text>
-        ) : (
-          visibleItems.map((item, idx) => {
-            const index = scrollOffset + idx;
-            const isFocused = index === activeIndex;
-            const isChecked = selectedIds.has(item.key);
+      <Box flexDirection="column" marginTop={1} flexGrow={1}>
+        <BaseSelectionList<FooterConfigItem>
+          items={listItems}
+          onSelect={handleSelect}
+          onHighlight={handleHighlight}
+          focusKey={focusKey}
+          showNumbers={false}
+          maxItemsToShow={maxItemsToShow}
+          showScrollArrows={true}
+          selectedIndicator=">"
+          renderItem={(item, { isSelected, titleColor }) => {
+            const configItem = item.value;
+            const isChecked =
+              configItem.type === 'config'
+                ? selectedIds.has(configItem.id)
+                : configItem.type === 'labels-toggle'
+                  ? showLabels
+                  : false;
 
             return (
-              <Box key={item.key} flexDirection="row">
-                <Text color={isFocused ? theme.status.success : undefined}>
-                  {isFocused ? '> ' : '  '}
-                </Text>
-                <Text
-                  color={isFocused ? theme.status.success : theme.text.primary}
-                >
-                  [{isChecked ? '✓' : ' '}]{' '}
-                  {item.label.padEnd(maxLabelWidth + 1)}
-                </Text>
-                <Text color={theme.text.secondary}> {item.description}</Text>
+              <Box flexDirection="column" minHeight={2}>
+                <Box flexDirection="row">
+                  {configItem.type !== 'reset' && (
+                    <Text
+                      color={
+                        isChecked ? theme.status.success : theme.text.secondary
+                      }
+                    >
+                      [{isChecked ? '✓' : ' '}]
+                    </Text>
+                  )}
+                  <Text
+                    color={
+                      configItem.type === 'reset' && isSelected
+                        ? theme.status.warning
+                        : titleColor
+                    }
+                  >
+                    {configItem.type !== 'reset' ? ' ' : ''}
+                    {configItem.label}
+                  </Text>
+                </Box>
+                {configItem.description && (
+                  <Text color={theme.text.secondary} wrap="wrap">
+                    {' '}
+                    {configItem.description}
+                  </Text>
+                )}
               </Box>
             );
-          })
-        )}
+          }}
+        />
       </Box>
 
-      <Box marginTop={1} flexDirection="column">
-        <Box flexDirection="row">
-          <Text color={isShowLabelsFocused ? theme.status.success : undefined}>
-            {isShowLabelsFocused ? '> ' : '  '}
-          </Text>
-          <Text color={isShowLabelsFocused ? theme.status.success : undefined}>
-            [{showLabels ? '✓' : ' '}] Show footer labels
-          </Text>
-        </Box>
-        <Box flexDirection="row">
-          <Text color={isResetFocused ? theme.status.warning : undefined}>
-            {isResetFocused ? '> ' : '  '}
-          </Text>
-          <Text
-            color={isResetFocused ? theme.status.warning : theme.text.secondary}
-          >
-            Reset to default footer
-          </Text>
-        </Box>
-      </Box>
-
-      <Box marginTop={1} flexDirection="column">
-        <Text color={theme.text.secondary}>
-          ↑/↓ navigate · ←/→ reorder · enter/space select · esc close
-        </Text>
-      </Box>
+      <DialogFooter
+        primaryAction="Enter to select"
+        navigationActions="↑/↓ to navigate · ←/→ to reorder"
+        cancelAction="Esc to close"
+      />
 
       <Box
         marginTop={1}
@@ -399,7 +384,9 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
         flexDirection="column"
       >
         <Text bold>Preview:</Text>
-        <Box flexDirection="row">{previewContent}</Box>
+        <Box flexDirection="row" width="100%">
+          {previewContent}
+        </Box>
       </Box>
     </Box>
   );

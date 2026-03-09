@@ -98,6 +98,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           status={status}
           description={description}
           emphasis={emphasis}
+          progressMessage={progressMessage}
           originalRequestName={originalRequestName}
         />
         <FocusHint
