@@ -18,6 +18,7 @@ import {
 import { CHECKPOINT_STATE_DEFINITION } from './definitions/coreTools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { Config } from '../config/config.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 interface CheckpointStateParams {
   [CHECKPOINT_STATE_PARAM_SUMMARY]: string;
@@ -43,6 +44,7 @@ class CheckpointStateInvocation extends BaseToolInvocation<
 
   override async execute(): Promise<ToolResult> {
     const summary = this.params[CHECKPOINT_STATE_PARAM_SUMMARY];
+    debugLogger.debug(`[PROJECT CLARITY] Executing CheckpointStateTool with summary length: ${summary.length}`);
     const chat = this.config.getGeminiClient().getChat();
     const previousSummary = chat.getContinuityAnchor();
 

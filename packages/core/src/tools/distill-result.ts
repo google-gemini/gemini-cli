@@ -9,22 +9,19 @@ import {
   BaseToolInvocation,
   Kind,
   type ToolInvocation,
-  type ToolResult,
   type ToolLiveOutput,
+  type ToolResult,
 } from './tools.js';
-import {
-  DISTILL_RESULT_TOOL_NAME,
-  DISTILL_RESULT_PARAM_REVISED_TEXT,
-} from './tool-names.js';
+import { DISTILL_RESULT_TOOL_NAME } from './tool-names.js';
 import { DISTILL_RESULT_DEFINITION } from './definitions/coreTools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { Config } from '../config/config.js';
 import type { GeminiChat } from '../core/geminiChat.js';
-import { saveTruncatedToolOutput } from '../utils/fileUtils.js';
-import type { ShellExecutionConfig } from '../index.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import { saveTruncatedToolOutput } from '../utils/tool-output-helper.js';
 
 interface DistillResultParams {
-  [DISTILL_RESULT_PARAM_REVISED_TEXT]: string;
+  revised_text: string;
 }
 
 class DistillResultInvocation extends BaseToolInvocation<
@@ -43,30 +40,24 @@ class DistillResultInvocation extends BaseToolInvocation<
   }
 
   override getDescription(): string {
-    return 'Distills the last tool output to reduce context entropy.';
+    return 'Distills the most recent tool output in the history.';
   }
 
   override async execute(
     _signal: AbortSignal,
     _updateOutput?: (output: ToolLiveOutput) => void,
-    _shellExecutionConfig?: ShellExecutionConfig,
+    _shellExecutionConfig?: any,
     ownCallId?: string,
   ): Promise<ToolResult> {
-    if (!ownCallId) {
-      throw new Error('Critical error: ownCallId is required for distill_result elision.');
-    }
-    const revisedText = this.params[DISTILL_RESULT_PARAM_REVISED_TEXT];
-    const sideEffects = this.config.getSideEffectService();
-    const history = this.chat.getComprehensiveHistory();
+    const revisedText = this.params.revised_text;
 
-    // 1. Find the last tool response (user message with functionResponse parts)
+    debugLogger.debug(`[PROJECT CLARITY] Executing DistillResultTool (ownCallId: ${ownCallId})`);
+
+    // 1. Find the target: the last function response in history.
+    const history = this.chat.getHistory();
     let lastToolResponseIndex = -1;
     for (let i = history.length - 1; i >= 0; i--) {
-      const content = history[i];
-      if (
-        content.role === 'user' &&
-        content.parts?.some((p) => p.functionResponse)
-      ) {
+      if (history[i].parts?.some((p) => p.functionResponse)) {
         lastToolResponseIndex = i;
         break;
       }
@@ -90,6 +81,10 @@ class DistillResultInvocation extends BaseToolInvocation<
     if (!targetCallId) {
       throw new Error('Target call ID missing from tool response.');
     }
+
+    debugLogger.debug(`[PROJECT CLARITY] Distill target identified: ${targetCallId} at index ${lastToolResponseIndex}`);
+
+    const sideEffects = this.config.getSideEffectService();
 
     // 2. Elide all turns between that tool response and the current turn.
     if (ownCallId) {

@@ -5,6 +5,7 @@
  */
 
 import type { Content } from '@google/genai';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * Types of side-effects that can be triggered by tools or the system.
@@ -74,6 +75,12 @@ export class SideEffectService {
    * Queues a side-effect for later application.
    */
   queueSideEffect(effect: SideEffect): void {
+    debugLogger.debug(`[PROJECT CLARITY] Queuing side-effect: ${effect.type}`, {
+      payload:
+        effect.type === SideEffectType.REPLACE_HISTORY
+          ? '<history>'
+          : effect.payload,
+    });
     this.pendingSideEffects.push(effect);
   }
 

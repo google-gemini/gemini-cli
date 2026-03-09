@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
 // DISCLAIMER: This is a copied version of https://github.com/googleapis/js-genai/blob/main/src/chats.ts with the intention of working around a key bug
 // where function responses are not treated as "valid" responses: https://b.corp.google.com/issues/420354090
 
@@ -168,6 +171,39 @@ export class GeminiChat {
   }
 
   /**
+   * Logs the projected history sent to the API to a side-channel file for anomaly analysis.
+   */
+  private logRequestHistory(
+    requestContents: Content[],
+    promptId: string,
+  ): void {
+    try {
+      const logDir = path.join(
+        this.config.storage.getProjectTempDir(),
+        'request_history_logs',
+        this.config.getSessionId(),
+      );
+      if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir, { recursive: true });
+      }
+
+      const timestamp = Date.now();
+      const logFile = path.join(
+        logDir,
+        `request_${timestamp}_${promptId}.json`,
+      );
+      fs.writeFileSync(logFile, JSON.stringify(requestContents, null, 2));
+      debugLogger.debug(
+        `[PROJECT CLARITY] Request history logged to ${logFile}`,
+      );
+    } catch (error) {
+      debugLogger.warn(
+        `[PROJECT CLARITY] Failed to log request history: ${error}`,
+      );
+    }
+  }
+
+  /**
    * Marks a specific tool call ID for elision from the history.
    */
   addElidedCallId(callId: string): void {
@@ -241,6 +277,9 @@ export class GeminiChat {
 
     const requestContents =
       this.historyManager.getHistoryForRequest(userContent);
+
+    // PROJECT CLARITY: Side-channel request logging.
+    this.logRequestHistory(requestContents, prompt_id);
 
     const stream = async function* (
       this: GeminiChat,

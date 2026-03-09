@@ -20,6 +20,7 @@ import type { Config } from '../config/config.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import { CompressionStatus } from '../core/compression-status.js';
 import type { ShellExecutionConfig } from 'src/services/shellExecutionService.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 class CompressInvocation extends BaseToolInvocation<
   Record<string, never>,
@@ -50,6 +51,7 @@ class CompressInvocation extends BaseToolInvocation<
     if (!callId) {
       throw new Error('Critical error: callId is required for context compression elision.');
     }
+    debugLogger.debug(`[PROJECT CLARITY] Executing CompressTool (callId: ${callId})`);
     try {
       const continuityService = this.config.getContinuityCompressionService();
       const snapshot = await continuityService.generateSnapshot(
