@@ -218,6 +218,7 @@ export class ExtensionManager extends ExtensionLoader {
       }
 
       let tempDir: string | undefined;
+      let backupDir: string | undefined;
 
       if (
         installMetadata.type === 'git' ||
@@ -457,6 +458,9 @@ Would you like to attempt to install via "git clone" instead?`,
       } finally {
         if (tempDir) {
           await fs.promises.rm(tempDir, { recursive: true, force: true });
+        }
+        if (backupDir) {
+          await fs.promises.rm(backupDir, { recursive: true, force: true });
         }
       }
       return extension;
