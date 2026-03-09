@@ -13,7 +13,7 @@ import {
   type Mocked,
   type Mock,
 } from 'vitest';
-import { GeminiAgent } from './zedIntegration.js';
+import { GeminiAgent } from './acpClient.js';
 import * as acp from '@agentclientprotocol/sdk';
 import {
   ApprovalMode,
@@ -92,7 +92,7 @@ describe('GeminiAgent Session Resume', () => {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
       },
       getApprovalMode: vi.fn().mockReturnValue('default'),
-      isPlanEnabled: vi.fn().mockReturnValue(false),
+      isPlanEnabled: vi.fn().mockReturnValue(true),
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
       getGemini31LaunchedSync: vi.fn().mockReturnValue(false),
@@ -203,6 +203,11 @@ describe('GeminiAgent Session Resume', () => {
             id: ApprovalMode.YOLO,
             name: 'YOLO',
             description: 'Auto-approves all tools',
+          },
+          {
+            id: ApprovalMode.PLAN,
+            name: 'Plan',
+            description: 'Read-only mode',
           },
         ],
         currentModeId: ApprovalMode.DEFAULT,
