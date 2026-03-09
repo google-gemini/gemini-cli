@@ -98,7 +98,7 @@ There are three possible decisions a rule can enforce:
 - `ask_user`: The user is prompted to approve or deny the tool call. (In
   non-interactive mode, this is treated as `deny`.)
 
-> [!NOTE] The `deny` decision is the recommended way to exclude tools. The
+> **Note:** The `deny` decision is the recommended way to exclude tools. The
 > legacy `tools.exclude` setting in `settings.json` is deprecated in favor of
 > policy rules with a `deny` decision.
 
