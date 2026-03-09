@@ -6,6 +6,7 @@
 
 import type { Content } from '@google/gemini-cli-core';
 import type { Tool } from './tool.js';
+import type { Hook } from './hook.js';
 import type { SkillReference } from './skills.js';
 import type { GeminiCliAgent } from './agent.js';
 import type { GeminiCliSession } from './session.js';
@@ -18,6 +19,7 @@ export interface GeminiCliAgentOptions {
   instructions: SystemInstructions;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tools?: Array<Tool<any>>;
+  hooks?: Hook[];
   skills?: SkillReference[];
   model?: string;
   cwd?: string;

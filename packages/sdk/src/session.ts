@@ -21,6 +21,9 @@ import {
   ActivateSkillTool,
   type ResumedSessionData,
   PolicyDecision,
+  HookType,
+  SessionStartSource,
+  SessionEndReason,
 } from '@google/gemini-cli-core';
 
 import { type Tool, SdkTool } from './tool.js';
@@ -32,12 +35,14 @@ import type {
   SystemInstructions,
 } from './types.js';
 import type { SkillReference } from './skills.js';
+import type { Hook } from './hook.js';
 import type { GeminiCliAgent } from './agent.js';
 
 export class GeminiCliSession {
   private readonly config: Config;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly tools: Array<Tool<any>>;
+  private readonly hooks: Hook[];
   private readonly skillRefs: SkillReference[];
   private readonly instructions: SystemInstructions | undefined;
   private client: GeminiClient | undefined;
@@ -52,6 +57,7 @@ export class GeminiCliSession {
     this.instructions = options.instructions;
     const cwd = options.cwd || process.cwd();
     this.tools = options.tools || [];
+    this.hooks = options.hooks || [];
     this.skillRefs = options.skills || [];
 
     let initialMemory = '';
@@ -69,7 +75,7 @@ export class GeminiCliSession {
       model: options.model || PREVIEW_GEMINI_MODEL_AUTO,
       userMemory: initialMemory,
       // Minimal config
-      enableHooks: false,
+      enableHooks: this.hooks.length > 0,
       mcpEnabled: false,
       extensionsEnabled: false,
       recordResponses: options.recordResponses,
@@ -87,6 +93,22 @@ export class GeminiCliSession {
 
   get id(): string {
     return this.sessionId;
+  }
+
+  /**
+   * Returns the session context.
+   */
+  getContext(): SessionContext {
+    return {
+      sessionId: this.sessionId,
+      transcript: this.client?.getHistory() || [],
+      cwd: this.config.getWorkingDir(),
+      timestamp: new Date().toISOString(),
+      fs: new SdkAgentFilesystem(this.config),
+      shell: new SdkAgentShell(this.config),
+      agent: this.agent,
+      session: this,
+    };
   }
 
   async initialize(): Promise<void> {
@@ -143,7 +165,39 @@ export class GeminiCliSession {
       registry.registerTool(sdkTool);
     }
 
+    // Register hooks
+    if (this.hooks.length > 0) {
+      const hookSystem = this.config.getHookSystem();
+      if (hookSystem) {
+        for (const sdkHook of this.hooks) {
+          hookSystem.registerHook(
+            {
+              type: HookType.Runtime,
+              name: sdkHook.name,
+              action: async (input) =>
+                // Cast the generic HookInput to the specific EventInputMap type required by this hook.
+                // This is safe because the hook system guarantees the input matches the event name.
+                // We use 'any' for the argument to satisfy the intersection requirement of the union function type.
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
+                sdkHook.action(input as any, this.getContext()),
+            },
+            sdkHook.event,
+            {
+              matcher: sdkHook.matcher,
+              sequential: sdkHook.sequential,
+            },
+          );
+        }
+      }
+    }
+
     this.client = this.config.getGeminiClient();
+
+    // Fire SessionStart event
+    const hookSystem = this.config.getHookSystem();
+    if (hookSystem) {
+      await hookSystem.fireSessionStartEvent(SessionStartSource.Startup);
+    }
 
     if (this.resumedData) {
       const history: Content[] = this.resumedData.conversation.messages.map(
@@ -165,6 +219,17 @@ export class GeminiCliSession {
     this.initialized = true;
   }
 
+  /**
+   * Closes the session and fires the SessionEnd event.
+   */
+  async close(reason: SessionEndReason = SessionEndReason.Exit): Promise<void> {
+    const hookSystem = this.config.getHookSystem();
+    if (hookSystem) {
+      await hookSystem.fireSessionEndEvent(reason);
+    }
+    this.initialized = false;
+  }
+
   async *sendStream(
     prompt: string,
     signal?: AbortSignal,
@@ -176,25 +241,13 @@ export class GeminiCliSession {
     const abortSignal = signal ?? new AbortController().signal;
     const sessionId = this.config.getSessionId();
 
-    const fs = new SdkAgentFilesystem(this.config);
-    const shell = new SdkAgentShell(this.config);
-
     let request: Parameters<GeminiClient['sendMessageStream']>[0] = [
       { text: prompt },
     ];
 
     while (true) {
       if (typeof this.instructions === 'function') {
-        const context: SessionContext = {
-          sessionId,
-          transcript: client.getHistory(),
-          cwd: this.config.getWorkingDir(),
-          timestamp: new Date().toISOString(),
-          fs,
-          shell,
-          agent: this.agent,
-          session: this,
-        };
+        const context = this.getContext();
         const newInstructions = await this.instructions(context);
         this.config.setUserMemory(newInstructions);
         client.updateSystemInstruction();
@@ -226,17 +279,7 @@ export class GeminiCliSession {
         break;
       }
 
-      const transcript: Content[] = client.getHistory();
-      const context: SessionContext = {
-        sessionId,
-        transcript,
-        cwd: this.config.getWorkingDir(),
-        timestamp: new Date().toISOString(),
-        fs,
-        shell,
-        agent: this.agent,
-        session: this,
-      };
+      const context = this.getContext();
 
       const originalRegistry = this.config.getToolRegistry();
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment

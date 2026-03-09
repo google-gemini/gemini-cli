@@ -1,8 +1,8 @@
 # `Gemini CLI SDK`
 
-> **Implementation Status:** Core agent loop, tool execution, and session
-> context are implemented. Advanced features like hooks, skills, subagents, and
-> ACP are currently missing.
+> **Implementation Status:** Core agent loop, tool execution, session context,
+> skills, and hooks are implemented. Advanced features like subagents and ACP
+> are currently missing.
 
 # `Examples`
 
@@ -91,7 +91,8 @@ Validation:
 
 ## `Custom Hooks`
 
-> **Status:** Not Implemented.
+> **Status:** Implemented. `hook()` helper and `GeminiCliAgent` support custom
+> hook definitions and execution.
 
 SDK users can provide programmatic custom hooks
 
@@ -124,6 +125,9 @@ const myHook = hook(
   },
 );
 ```
+
+> **Note:** The `runAsCommand` functionality for standalone script execution is
+> currently **Not Implemented**.
 
 SDK Hooks can also run as standalone scripts to implement userland "command"
 style hooks:
@@ -295,7 +299,8 @@ export interface AgentShell {
     stdout: string;
     stderr: string;
   }>;
-  start(cmd: string, options?: AgentShellOptions): AgentShellProcess;
+  // TODO: start method is not yet implemented
+  // start(cmd: string, options?: AgentShellOptions): AgentShellProcess;
 }
 
 export interface AgentShellOptions {
@@ -325,16 +330,14 @@ export interface AgentShellProcess {
 
 Based on the current implementation status, we can proceed with:
 
-## Feature 3: Custom Hooks Support
+## Feature 4: Subagents Support
 
-Implement support for loading and registering custom hooks. This involves adding
-a `hooks` option to `GeminiCliAgentOptions`.
+Implement support for subagents, allowing an agent to delegate tasks to other
+specialized agents.
 
 **Tasks:**
 
-1.  Define `Hook` interface and helper functions.
-2.  Add `hooks` option to `GeminiCliAgentOptions`.
-3.  Implement hook registration logic in `GeminiCliAgent`.
-
-IMPORTANT: Hook signatures should be strongly typed all the way through. You'll
-need to create a mapping of the string event name to the request/response types.
+1.  Define `Subagent` interface.
+2.  Implement subagent registration and routing in `GeminiCliAgent`.
+3.  Support both simple prompt-based subagents and full `GeminiCliAgent`
+    instances as subagents.
