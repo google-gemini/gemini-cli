@@ -392,7 +392,13 @@ export function BaseSettingsDialog({
             const rawVal = currentItem.rawValue;
             const initialValue =
               currentItem.editValue ??
-              (rawVal !== undefined ? String(rawVal) : '');
+              (rawVal !== undefined
+                ? typeof rawVal === 'object' &&
+                  rawVal !== null &&
+                  !Array.isArray(rawVal)
+                  ? JSON.stringify(rawVal)
+                  : String(rawVal)
+                : '');
             startEditing(currentItem.key, initialValue);
           }
           return true;

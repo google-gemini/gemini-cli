@@ -734,6 +734,88 @@ describe('SettingsUtils', () => {
         );
         expect(result).toBe('false');
       });
+
+      it('should stringify objects as JSON instead of [object Object]', () => {
+        vi.mocked(getSettingsSchema).mockReturnValue({
+          experimental: {
+            properties: {
+              gemmaModelRouter: {
+                type: 'object',
+                label: 'Gemma Model Router',
+                category: 'Experimental',
+                requiresRestart: true,
+                default: {},
+                showInDialog: false,
+              },
+            },
+          },
+        } as unknown as SettingsSchemaType);
+
+        const settings = makeMockSettings({
+          experimental: {
+            gemmaModelRouter: { enabled: true, foo: 'bar' },
+          },
+        });
+        const result = getDisplayValue(
+          'experimental.gemmaModelRouter',
+          settings,
+          makeMockSettings({}),
+        );
+        expect(result).toBe('{"enabled":true,"foo":"bar"}*');
+      });
+
+      it('should display empty objects as {} instead of [object Object]', () => {
+        vi.mocked(getSettingsSchema).mockReturnValue({
+          experimental: {
+            properties: {
+              gemmaModelRouter: {
+                type: 'object',
+                label: 'Gemma Model Router',
+                category: 'Experimental',
+                requiresRestart: true,
+                default: {},
+                showInDialog: false,
+              },
+            },
+          },
+        } as unknown as SettingsSchemaType);
+
+        const result = getDisplayValue(
+          'experimental.gemmaModelRouter',
+          makeMockSettings({}),
+          makeMockSettings({}),
+        );
+        expect(result).toBe('{}');
+      });
+
+      it('should display {}* when an empty object is explicitly in scope', () => {
+        vi.mocked(getSettingsSchema).mockReturnValue({
+          experimental: {
+            properties: {
+              gemmaModelRouter: {
+                type: 'object',
+                label: 'Gemma Model Router',
+                category: 'Experimental',
+                requiresRestart: true,
+                default: {},
+                showInDialog: false,
+              },
+            },
+          },
+        } as unknown as SettingsSchemaType);
+
+        const settings = makeMockSettings({
+          experimental: {
+            gemmaModelRouter: {},
+          },
+        });
+        const result = getDisplayValue(
+          'experimental.gemmaModelRouter',
+          settings,
+          makeMockSettings({}),
+        );
+        expect(result).toBe('{}*');
+      });
     });
 
     describe('getDisplayValue with units', () => {

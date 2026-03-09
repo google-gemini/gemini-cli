@@ -608,10 +608,10 @@ export function formatTruncatedToolOutput(
   const tail = contentStr.slice(-tailChars);
   const omittedChars = contentStr.length - headChars - tailChars;
 
-  return `Output too large. Showing first ${headChars.toLocaleString()} and last ${tailChars.toLocaleString()} characters. For full output see: ${outputFile}
+  return `Output too large. Showing first ${headChars.toLocaleString('en-US')} and last ${tailChars.toLocaleString('en-US')} characters. For full output see: ${outputFile}
 ${head}
 
-... [${omittedChars.toLocaleString()} characters omitted] ...
+... [${omittedChars.toLocaleString('en-US')} characters omitted] ...
 
 ${tail}`;
 }
