@@ -31,7 +31,7 @@ export async function relaunchApp(sessionIdOverride?: string): Promise<void> {
 
   if (process.send) {
     process.send({
-      type: 'relaunch-resume-session',
+      type: 'relaunch-session',
       sessionId: sessionIdOverride ?? sessionId,
     });
   }

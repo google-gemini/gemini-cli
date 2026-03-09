@@ -37,7 +37,7 @@ describe('processUtils', () => {
     expect(handleAutoUpdate.waitForUpdateCompletion).toHaveBeenCalledTimes(1);
     expect(runExitCleanup).toHaveBeenCalledTimes(1);
     expect(process.send).toHaveBeenCalledWith({
-      type: 'relaunch-resume-session',
+      type: 'relaunch-session',
       sessionId: expect.any(String),
     });
     expect(processExit).toHaveBeenCalledWith(RELAUNCH_EXIT_CODE);
@@ -53,7 +53,7 @@ describe('processUtils', () => {
     expect(handleAutoUpdate.waitForUpdateCompletion).toHaveBeenCalledTimes(1);
     expect(runExitCleanup).toHaveBeenCalledTimes(1);
     expect(process.send).toHaveBeenCalledWith({
-      type: 'relaunch-resume-session',
+      type: 'relaunch-session',
       sessionId: 'custom-session-id',
     });
     expect(processExit).toHaveBeenCalledWith(RELAUNCH_EXIT_CODE);

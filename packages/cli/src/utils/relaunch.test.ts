@@ -316,7 +316,7 @@ describe('relaunchAppInChildProcess', () => {
       expect(processExitSpy).toHaveBeenCalledWith(1);
     });
 
-    it('should append --resume <sessionId> on the next spawn if relaunch-resume-session message is received', async () => {
+    it('should append --resume <sessionId> on the next spawn if relaunch-session message is received', async () => {
       process.argv = ['/usr/bin/node', '/app/cli.js', '--some-flag'];
 
       let spawnCount = 0;
@@ -328,7 +328,7 @@ describe('relaunchAppInChildProcess', () => {
           // First run: send the resume session ID, then exit with RELAUNCH_EXIT_CODE
           setImmediate(() => {
             mockChild.emit('message', {
-              type: 'relaunch-resume-session',
+              type: 'relaunch-session',
               sessionId: 'test-session-123',
             });
             mockChild.emit('close', RELAUNCH_EXIT_CODE);
@@ -378,7 +378,7 @@ describe('relaunchAppInChildProcess', () => {
         if (spawnCount === 1) {
           setImmediate(() => {
             mockChild.emit('message', {
-              type: 'relaunch-resume-session',
+              type: 'relaunch-session',
               sessionId: 'new-session-456',
             });
             mockChild.emit('close', RELAUNCH_EXIT_CODE);

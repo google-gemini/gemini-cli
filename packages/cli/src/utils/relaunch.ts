@@ -90,7 +90,7 @@ export async function relaunchAppInChildProcess(
       (msg: { type?: string; settings?: unknown; sessionId?: string }) => {
         if (msg.type === 'admin-settings-update' && msg.settings) {
           latestAdminSettings = msg.settings as AdminControlsSettings;
-        } else if (msg.type === 'relaunch-resume-session' && msg.sessionId) {
+        } else if (msg.type === 'relaunch-session' && msg.sessionId) {
           resumeSessionId = msg.sessionId;
         }
       },
