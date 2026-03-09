@@ -1242,7 +1242,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const handleHintSubmit = useCallback(
     (hint: string) => {
-      const trimmed = hint.trim();
+      const trimmed = String(hint || '').trim();
       if (!trimmed) {
         return;
       }
@@ -1268,7 +1268,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         }
       }
 
-      const isSlash = isSlashCommand(submittedValue.trim());
+      const isSlash = isSlashCommand(String(submittedValue || '').trim());
       const isIdle = streamingState === StreamingState.Idle;
       const isAgentRunning =
         streamingState === StreamingState.Responding ||
