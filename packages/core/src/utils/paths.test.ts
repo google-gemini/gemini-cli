@@ -484,6 +484,10 @@ describe('shortenPath', () => {
 });
 
 describe('resolveToRealPath', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it.each([
     {
       description:
@@ -541,6 +545,28 @@ describe('resolveToRealPath', () => {
     });
 
     expect(resolveToRealPath(childPath)).toBe(expectedPath);
+  });
+
+  it('should prevent infinite recursion on malicious symlink structures', () => {
+    const maliciousPath = path.resolve('malicious', 'symlink');
+
+    vi.spyOn(fs, 'realpathSync').mockImplementation(() => {
+      const err = new Error('ENOENT') as NodeJS.ErrnoException;
+      err.code = 'ENOENT';
+      throw err;
+    });
+
+    vi.spyOn(fs, 'lstatSync').mockImplementation(
+      () => ({ isSymbolicLink: () => true }) as fs.Stats,
+    );
+
+    vi.spyOn(fs, 'readlinkSync').mockImplementation(() =>
+      ['..', 'malicious', 'symlink'].join(path.sep),
+    );
+
+    expect(() => resolveToRealPath(maliciousPath)).toThrow(
+      /Infinite recursion detected/,
+    );
   });
 });
 
