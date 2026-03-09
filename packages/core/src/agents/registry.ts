@@ -416,7 +416,7 @@ export class AgentRegistry {
         const provider = await A2AAuthProviderFactory.create({
           authConfig: definition.auth,
           agentName: definition.name,
-          agentCardUrl: definition.agentCardUrl,
+          agentCardUrl: remoteDef.agentCardUrl,
         });
         if (!provider) {
           throw new Error(
@@ -430,10 +430,6 @@ export class AgentRegistry {
         remoteDef.name,
         remoteDef.agentCardUrl,
         authHandler,
-        {
-          agentCardRequiresAuth:
-            definition.auth?.agent_card_requires_auth ?? false,
-        },
       );
 
       const userDescription = remoteDef.originalDescription;

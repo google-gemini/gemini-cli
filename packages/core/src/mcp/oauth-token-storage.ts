@@ -26,15 +26,17 @@ import {
  * to store tokens in a protocol-specific file.
  */
 export class MCPOAuthTokenStorage implements TokenStorage {
-  private readonly hybridTokenStorage = new HybridTokenStorage(
-    DEFAULT_SERVICE_NAME,
-  );
+  private readonly hybridTokenStorage: HybridTokenStorage;
   private readonly useEncryptedFile =
     process.env[FORCE_ENCRYPTED_FILE_ENV_VAR] === 'true';
   private readonly customTokenFilePath?: string;
 
-  constructor(tokenFilePath?: string) {
+  constructor(
+    tokenFilePath?: string,
+    serviceName: string = DEFAULT_SERVICE_NAME,
+  ) {
     this.customTokenFilePath = tokenFilePath;
+    this.hybridTokenStorage = new HybridTokenStorage(serviceName);
   }
 
   /**

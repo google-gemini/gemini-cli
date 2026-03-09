@@ -43,15 +43,6 @@ export type SendMessageResult =
   | TaskStatusUpdateEvent
   | TaskArtifactUpdateEvent;
 
-export interface LoadAgentOptions {
-  /**
-   * Whether the agent card endpoint itself requires authentication.
-   * When false (default), the card is fetched without auth headers to avoid
-   * servers that reject unexpected credentials on the card endpoint.
-   */
-  agentCardRequiresAuth?: boolean;
-}
-
 /**
  * Manages A2A clients and caches loaded agent information.
  * Follows a singleton pattern to ensure a single client instance.
@@ -89,14 +80,12 @@ export class A2AClientManager {
    * @param name The name to assign to the agent.
    * @param agentCardUrl The full URL to the agent's card.
    * @param authHandler Optional authentication handler to use for this agent.
-   * @param loadOptions Optional settings controlling agent loading behavior.
    * @returns The loaded AgentCard.
    */
   async loadAgent(
     name: string,
     agentCardUrl: string,
     authHandler?: AuthenticationHandler,
-    loadOptions?: LoadAgentOptions,
   ): Promise<AgentCard> {
     if (this.clients.has(name) && this.agentCards.has(name)) {
       throw new Error(`Agent with name '${name}' is already loaded.`);
@@ -110,8 +99,20 @@ export class A2AClientManager {
 
     // Use unauthenticated fetch for the agent card unless explicitly required.
     // Some servers reject unexpected auth headers on the card endpoint (e.g. 400).
-    const cardFetch =
-      loadOptions?.agentCardRequiresAuth && authHandler ? authFetch : a2aFetch;
+    const cardFetch = async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ): Promise<Response> => {
+      // Try without auth first
+      const response = await a2aFetch(input, init);
+
+      // Retry with auth if we hit a 401/403
+      if ((response.status === 401 || response.status === 403) && authFetch) {
+        return authFetch(input, init);
+      }
+
+      return response;
+    };
 
     const resolver = new DefaultAgentCardResolver({ fetchImpl: cardFetch });
 
