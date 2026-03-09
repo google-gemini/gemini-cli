@@ -585,7 +585,7 @@ describe('RemoteAgentInvocation', () => {
       );
     });
 
-    it('should support Ctrl+B backgrounding through ShellExecutionService', async () => {
+    it('should support Ctrl+B backgrounding through execution lifecycle IDs', async () => {
       mockClientManager.getClient.mockReturnValue({});
 
       let releaseSecondChunk: (() => void) | undefined;
@@ -618,7 +618,7 @@ describe('RemoteAgentInvocation', () => {
       let unsubscribeStream: (() => void) | undefined;
 
       const updateOutput = vi.fn((output: unknown) => {
-        if (output === 'Chunk 1' && executionId) {
+        if (output === 'Chunk 1' && executionId !== undefined) {
           ShellExecutionService.background(executionId);
           unsubscribeStream = ShellExecutionService.subscribe(
             executionId,
