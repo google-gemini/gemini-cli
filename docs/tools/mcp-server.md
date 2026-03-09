@@ -372,7 +372,7 @@ To authenticate with a server using Service Account Impersonation, you must set
 the `authProviderType` to `service_account_impersonation` and provide the
 following properties:
 
-- **`targetAudience`** (string): The OAuth Client ID allowslisted on the
+- **`targetAudience`** (string): The OAuth Client ID allowlisted on the
   IAP-protected application you are trying to access.
 - **`targetServiceAccount`** (string): The email address of the Google Cloud
   Service Account to impersonate.
