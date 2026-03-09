@@ -377,20 +377,39 @@ describe('handleAutoUpdate', () => {
 });
 
 describe('buildWindowsDeferredUpdateCommand', () => {
-  it('should include Wait-Process with the parent PID', () => {
+  function decodeEncodedCommand(command: string): string {
+    const match = command.match(/-EncodedCommand\s+(\S+)/);
+    if (!match) return '';
+    return Buffer.from(match[1], 'base64').toString('utf16le');
+  }
+
+  it('should use -EncodedCommand with a Base64 payload', () => {
     const command = buildWindowsDeferredUpdateCommand(
       'npm install -g @google/gemini-cli@2.0.0',
       12345,
     );
-    expect(command).toContain('Wait-Process -Id 12345');
+    expect(command).toContain('-EncodedCommand');
+    // The encoded payload should decode back to a valid PowerShell script
+    const decoded = decodeEncodedCommand(command);
+    expect(decoded).toBeTruthy();
   });
 
-  it('should include the update command in the PowerShell script', () => {
+  it('should include Wait-Process with the parent PID in the decoded script', () => {
     const command = buildWindowsDeferredUpdateCommand(
       'npm install -g @google/gemini-cli@2.0.0',
       12345,
     );
-    expect(command).toContain('npm install -g @google/gemini-cli@2.0.0');
+    const decoded = decodeEncodedCommand(command);
+    expect(decoded).toContain('Wait-Process -Id 12345');
+  });
+
+  it('should include the update command in the decoded script', () => {
+    const command = buildWindowsDeferredUpdateCommand(
+      'npm install -g @google/gemini-cli@2.0.0',
+      12345,
+    );
+    const decoded = decodeEncodedCommand(command);
+    expect(decoded).toContain('npm install -g @google/gemini-cli@2.0.0');
   });
 
   it('should use hidden window style', () => {
@@ -401,12 +420,13 @@ describe('buildWindowsDeferredUpdateCommand', () => {
     expect(command).toContain('-WindowStyle Hidden');
   });
 
-  it('should include a startup delay', () => {
+  it('should include a startup delay in the decoded script', () => {
     const command = buildWindowsDeferredUpdateCommand(
       'npm install -g @google/gemini-cli@2.0.0',
       1,
     );
-    expect(command).toContain('Start-Sleep -Seconds 2');
+    const decoded = decodeEncodedCommand(command);
+    expect(decoded).toContain('Start-Sleep -Seconds 2');
   });
 });
 
@@ -486,8 +506,13 @@ describe('handleAutoUpdate on Windows', () => {
     expect(mockSpawn).toHaveBeenCalledOnce();
     const spawnedCommand = mockSpawn.mock.calls[0][0] as string;
     expect(spawnedCommand).toContain('powershell.exe');
-    expect(spawnedCommand).toContain('Wait-Process');
-    expect(spawnedCommand).toContain('npm install -g @google/gemini-cli@2.0.0');
+    expect(spawnedCommand).toContain('-EncodedCommand');
+    // Decode the Base64 payload and verify it contains the update command
+    const match = spawnedCommand.match(/-EncodedCommand\s+(\S+)/);
+    expect(match).toBeTruthy();
+    const decoded = Buffer.from(match![1], 'base64').toString('utf16le');
+    expect(decoded).toContain('npm install -g @google/gemini-cli@2.0.0');
+    expect(decoded).toContain('Wait-Process');
   });
 
   it('should use windowsHide option on Windows', () => {

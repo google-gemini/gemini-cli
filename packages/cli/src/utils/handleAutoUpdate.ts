@@ -25,15 +25,15 @@ export function buildWindowsDeferredUpdateCommand(
   updateCommand: string,
   parentPid: number,
 ): string {
-  // Use PowerShell to: wait for the parent process to exit, then run the
-  // update. -ErrorAction SilentlyContinue handles the case where the
-  // process has already exited before Wait-Process runs.
-  return (
-    `powershell.exe -NoProfile -WindowStyle Hidden -Command "` +
+  // Use PowerShell's -EncodedCommand to pass the script as a Base64 string.
+  // This avoids all quoting and special character issues that could arise
+  // from embedding the update command directly in a -Command string.
+  const psScript =
     `Start-Sleep -Seconds 2; ` +
     `try { Wait-Process -Id ${parentPid} -Timeout 60 -ErrorAction SilentlyContinue } catch {}; ` +
-    `${updateCommand}"`
-  );
+    updateCommand;
+  const encodedScript = Buffer.from(psScript, 'utf16le').toString('base64');
+  return `powershell.exe -NoProfile -WindowStyle Hidden -EncodedCommand ${encodedScript}`;
 }
 
 /** @internal */
