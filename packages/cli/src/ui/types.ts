@@ -265,6 +265,14 @@ export type HistoryItemHint = HistoryItemBase & {
   text: string;
 };
 
+export type HistoryItemDiagram = HistoryItemBase & {
+  type: 'diagram';
+  diagramType: string;
+  title?: string;
+  asciiArt: string;
+  mermaidSource?: string;
+};
+
 export type HistoryItemChatList = HistoryItemBase & {
   type: 'chat_list';
   chats: ChatDetail[];
@@ -378,7 +386,8 @@ export type HistoryItemWithoutId =
   | HistoryItemMcpStatus
   | HistoryItemChatList
   | HistoryItemThinking
-  | HistoryItemHint;
+  | HistoryItemHint
+  | HistoryItemDiagram;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
@@ -403,6 +412,7 @@ export enum MessageType {
   MCP_STATUS = 'mcp_status',
   CHAT_LIST = 'chat_list',
   HINT = 'hint',
+  DIAGRAM = 'diagram',
 }
 
 // Simplified message structure for internal feedback

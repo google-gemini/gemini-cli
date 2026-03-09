@@ -35,6 +35,7 @@ import { ChatList } from './views/ChatList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
 import { ThinkingMessage } from './messages/ThinkingMessage.js';
 import { HintMessage } from './messages/HintMessage.js';
+import { DiagramDisplay } from './DiagramDisplay.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 
@@ -232,6 +233,14 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'chat_list' && (
         <ChatList chats={itemForDisplay.chats} />
+      )}
+      {itemForDisplay.type === 'diagram' && (
+        <DiagramDisplay
+          diagramType={itemForDisplay.diagramType}
+          title={itemForDisplay.title}
+          asciiArt={itemForDisplay.asciiArt}
+          mermaidSource={itemForDisplay.mermaidSource}
+        />
       )}
     </Box>
   );
