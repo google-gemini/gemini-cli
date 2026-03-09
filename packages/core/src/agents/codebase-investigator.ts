@@ -109,8 +109,9 @@ export const CodebaseInvestigatorAgent = (
     },
 
     runConfig: {
-      maxTimeMinutes: 3,
-      maxTurns: 10,
+      maxTimeMinutes:
+        parseInt(process.env['GEMINI_CBI_TIMEOUT_MINUTES'] ?? '', 10) || 10,
+      maxTurns: parseInt(process.env['GEMINI_CBI_MAX_TURNS'] ?? '', 10) || 25,
     },
 
     toolConfig: {

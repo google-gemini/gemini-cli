@@ -77,4 +77,22 @@ describe('CodebaseInvestigatorAgent', () => {
     const agent = CodebaseInvestigatorAgent(config);
     expect(agent.promptConfig.systemPrompt).toContain('`ls -R`');
   });
+
+  it('should use default runConfig values when env vars are not set', () => {
+    delete process.env['GEMINI_CBI_TIMEOUT_MINUTES'];
+    delete process.env['GEMINI_CBI_MAX_TURNS'];
+    const agent = CodebaseInvestigatorAgent(config);
+    expect(agent.runConfig.maxTimeMinutes).toBe(10);
+    expect(agent.runConfig.maxTurns).toBe(25);
+  });
+
+  it('should respect GEMINI_CBI_TIMEOUT_MINUTES and GEMINI_CBI_MAX_TURNS env vars', () => {
+    process.env['GEMINI_CBI_TIMEOUT_MINUTES'] = '20';
+    process.env['GEMINI_CBI_MAX_TURNS'] = '50';
+    const agent = CodebaseInvestigatorAgent(config);
+    expect(agent.runConfig.maxTimeMinutes).toBe(20);
+    expect(agent.runConfig.maxTurns).toBe(50);
+    delete process.env['GEMINI_CBI_TIMEOUT_MINUTES'];
+    delete process.env['GEMINI_CBI_MAX_TURNS'];
+  });
 });
