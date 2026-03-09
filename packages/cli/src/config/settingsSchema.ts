@@ -1833,8 +1833,8 @@ const SETTINGS_SCHEMA = {
         label: 'Plan',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
-        description: 'Enable planning features (Plan Mode and tools).',
+        default: true,
+        description: 'Enable Plan Mode.',
         showInDialog: true,
       },
       taskTracker: {
