@@ -72,11 +72,15 @@ export function useApprovalModeIndicator({
             : ApprovalMode.YOLO;
       } else if (keyMatchers[Command.CYCLE_APPROVAL_MODE](key)) {
         const currentMode = config.getApprovalMode();
+        // Cycle: DEFAULT → AUTO_EDIT → STEP → [PLAN if allowed] → DEFAULT
         switch (currentMode) {
           case ApprovalMode.DEFAULT:
             nextApprovalMode = ApprovalMode.AUTO_EDIT;
             break;
           case ApprovalMode.AUTO_EDIT:
+            nextApprovalMode = ApprovalMode.STEP;
+            break;
+          case ApprovalMode.STEP:
             nextApprovalMode = allowPlanMode
               ? ApprovalMode.PLAN
               : ApprovalMode.DEFAULT;

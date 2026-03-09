@@ -20,6 +20,8 @@ export function getApprovalModeDescription(mode: ApprovalMode): string {
       return 'Plan mode (read-only planning)';
     case ApprovalMode.YOLO:
       return 'YOLO mode (all tool calls auto-approved)';
+    case ApprovalMode.STEP:
+      return 'Step-Through mode (pause before every tool call)';
     default:
       return checkExhaustive(mode);
   }
