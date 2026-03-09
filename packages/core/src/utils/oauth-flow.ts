@@ -454,6 +454,7 @@ export async function exchangeCodeForToken(
     params.append('resource', resource);
   }
 
+  // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
   const response = await fetch(config.tokenUrl, {
     method: 'POST',
     headers: {
@@ -507,6 +508,7 @@ export async function refreshAccessToken(
     params.append('resource', resource);
   }
 
+  // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
   const response = await fetch(tokenUrl, {
     method: 'POST',
     headers: {

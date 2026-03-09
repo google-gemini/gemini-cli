@@ -42,6 +42,7 @@ async function checkForUpdates(
     const currentVersion = context.extension.packageJSON.version;
 
     // Fetch extension details from the VSCode Marketplace.
+    // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
     const response = await fetch(
       'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery',
       {

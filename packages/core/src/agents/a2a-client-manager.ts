@@ -25,6 +25,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { Agent as UndiciAgent } from 'undici';
 import { debugLogger } from '../utils/debugLogger.js';
+import { safeLookup } from '../utils/fetch.js';
 
 // Remote agents can take 10+ minutes (e.g. Deep Research).
 // Use a dedicated dispatcher so the global 5-min timeout isn't affected.
@@ -32,10 +33,13 @@ const A2A_TIMEOUT = 1800000; // 30 minutes
 const a2aDispatcher = new UndiciAgent({
   headersTimeout: A2A_TIMEOUT,
   bodyTimeout: A2A_TIMEOUT,
+  connect: {
+    lookup: safeLookup, // SSRF protection at connection level
+  },
 });
 const a2aFetch: typeof fetch = (input, init) =>
-  // @ts-expect-error The `dispatcher` property is a Node.js extension to fetch not present in standard types.
-  fetch(input, { ...init, dispatcher: a2aDispatcher });
+  // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
+  fetch(input, { ...init, dispatcher: a2aDispatcher } as RequestInit);
 
 export type SendMessageResult =
   | Message
