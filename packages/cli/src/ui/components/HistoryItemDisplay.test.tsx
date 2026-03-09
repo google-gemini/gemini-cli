@@ -290,6 +290,26 @@ describe('<HistoryItemDisplay />', () => {
       unmount();
     });
 
+    it('renders "Thinking..." header when isFirstThinking is true', async () => {
+      const item: HistoryItem = {
+        ...baseItem,
+        type: 'thinking',
+        thought: { subject: 'Thinking', description: 'test' },
+      };
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <HistoryItemDisplay {...baseItem} item={item} isFirstThinking={true} />,
+        {
+          settings: createMockSettings({
+            merged: { ui: { inlineThinkingMode: 'full' } },
+          }),
+        },
+      );
+      await waitUntilReady();
+
+      expect(lastFrame()).toContain(' Thinking...');
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
     it('does not render thinking item when disabled', async () => {
       const item: HistoryItem = {
         ...baseItem,

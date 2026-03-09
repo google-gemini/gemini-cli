@@ -35,6 +35,7 @@ export interface BaseSelectionListProps<
   priority?: boolean;
   /** Horizontal padding for items when not selected. Defaults to 2. */
   horizontalPadding?: number;
+  selectedIndicator?: string;
   renderItem: (item: TItem, context: RenderItemContext) => React.ReactNode;
 }
 
@@ -68,6 +69,7 @@ export function BaseSelectionList<
   focusKey,
   priority,
   horizontalPadding = 1,
+  selectedIndicator = '●',
   renderItem,
 }: BaseSelectionListProps<T, TItem>): React.JSX.Element {
   const { activeIndex } = useSelectionList({
@@ -155,7 +157,7 @@ export function BaseSelectionList<
                 color={isSelected ? theme.ui.focus : theme.text.primary}
                 aria-hidden
               >
-                {isSelected ? '●' : ' '}
+                {isSelected ? selectedIndicator : ' '}
               </Text>
             </Box>
 
