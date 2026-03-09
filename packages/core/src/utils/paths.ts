@@ -376,10 +376,11 @@ export function resolveToRealPath(pathStr: string): string {
 }
 
 function robustRealpath(p: string, visited = new Set<string>()): string {
-  if (visited.has(p)) {
+  const key = process.platform === 'win32' ? p.toLowerCase() : p;
+  if (visited.has(key)) {
     throw new Error(`Infinite recursion detected in robustRealpath: ${p}`);
   }
-  visited.add(p);
+  visited.add(key);
   try {
     return fs.realpathSync(p);
   } catch (e: unknown) {

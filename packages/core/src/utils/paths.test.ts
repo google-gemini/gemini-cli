@@ -484,6 +484,10 @@ describe('shortenPath', () => {
 });
 
 describe('resolveToRealPath', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it.each([
     {
       description:
