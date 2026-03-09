@@ -5,7 +5,15 @@
  */
 
 import { render } from '../../test-utils/render.js';
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { LoginWithGoogleRestartDialog } from './LoginWithGoogleRestartDialog.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
@@ -35,13 +43,22 @@ describe('LoginWithGoogleRestartDialog', () => {
 
   const mockConfig = {
     getRemoteAdminSettings: vi.fn(),
+    getSessionId: vi.fn().mockReturnValue('mock-session-id'),
   } as unknown as Config;
+
+  let originalSend: typeof process.send;
 
   beforeEach(() => {
     vi.clearAllMocks();
     exitSpy.mockClear();
     vi.useRealTimers();
     _resetRelaunchStateForTesting();
+    originalSend = process.send;
+    process.send = vi.fn();
+  });
+
+  afterEach(() => {
+    process.send = originalSend;
   });
 
   it('renders correctly', async () => {
