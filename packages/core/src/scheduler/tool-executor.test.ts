@@ -534,6 +534,59 @@ describe('ToolExecutor', () => {
     );
   });
 
+  it('should report execution ID updates for non-shell backgroundable tools', async () => {
+    const mockTool = new MockTool({
+      name: 'remote_agent_call',
+      description: 'Remote agent call',
+    });
+    const invocation = mockTool.build({});
+
+    const testExecutionId = 67890;
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockImplementation(
+      async (
+        _inv,
+        _name,
+        _sig,
+        _tool,
+        _liveCb,
+        _shellCfg,
+        setExecutionIdCallback,
+      ) => {
+        setExecutionIdCallback?.(testExecutionId);
+        return { llmContent: 'done', returnDisplay: 'done' };
+      },
+    );
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-remote-pid',
+        name: 'remote_agent_call',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-remote-pid',
+      },
+      tool: mockTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    const onUpdateToolCall = vi.fn();
+
+    await executor.execute({
+      call: scheduledCall,
+      signal: new AbortController().signal,
+      onUpdateToolCall,
+    });
+
+    expect(onUpdateToolCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: CoreToolCallStatus.Executing,
+        pid: testExecutionId,
+      }),
+    );
+  });
+
   it('should return cancelled result with partial output when signal is aborted', async () => {
     const mockTool = new MockTool({
       name: 'slowTool',

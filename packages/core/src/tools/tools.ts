@@ -96,20 +96,30 @@ export function isBackgroundExecutionData(
     return false;
   }
 
-  const value = data as Partial<BackgroundExecutionData>;
+  const executionId = 'executionId' in data ? data.executionId : undefined;
+  const pid = 'pid' in data ? data.pid : undefined;
+  const command = 'command' in data ? data.command : undefined;
+  const initialOutput =
+    'initialOutput' in data ? data.initialOutput : undefined;
+
   return (
-    (value.executionId === undefined || typeof value.executionId === 'number') &&
-    (value.pid === undefined || typeof value.pid === 'number') &&
-    (value.command === undefined || typeof value.command === 'string') &&
-    (value.initialOutput === undefined ||
-      typeof value.initialOutput === 'string')
+    (executionId === undefined || typeof executionId === 'number') &&
+    (pid === undefined || typeof pid === 'number') &&
+    (command === undefined || typeof command === 'string') &&
+    (initialOutput === undefined || typeof initialOutput === 'string')
   );
 }
 
 export function getBackgroundExecutionId(
   data: BackgroundExecutionData,
 ): number | undefined {
-  return data.executionId ?? data.pid;
+  if (typeof data.executionId === 'number') {
+    return data.executionId;
+  }
+  if (typeof data.pid === 'number') {
+    return data.pid;
+  }
+  return undefined;
 }
 
 /**
