@@ -43,7 +43,7 @@ describe('terminal notifications', () => {
     });
   });
 
-  it('returns false without writing on non-macOS platforms', async () => {
+  it('emits BEL notification on non-macOS platforms', async () => {
     Object.defineProperty(process, 'platform', {
       value: 'linux',
       configurable: true,
@@ -54,8 +54,8 @@ describe('terminal notifications', () => {
       body: 'b',
     });
 
-    expect(shown).toBe(false);
-    expect(writeToStdout).not.toHaveBeenCalled();
+    expect(shown).toBe(true);
+    expect(writeToStdout).toHaveBeenCalledWith('\x07');
   });
 
   it('returns false without writing when disabled', async () => {
