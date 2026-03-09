@@ -36,7 +36,10 @@ import {
   MockShellExecutionService,
 } from './MockShellExecutionService.js';
 import { createMockSettings } from './settings.js';
-import { type LoadedSettings } from '../config/settings.js';
+import {
+  type LoadedSettings,
+  resetSettingsCacheForTesting,
+} from '../config/settings.js';
 import { AuthState, StreamingState } from '../ui/types.js';
 import { randomUUID } from 'node:crypto';
 import type {
@@ -171,6 +174,7 @@ export class AppRig {
 
   async initialize() {
     this.setupEnvironment();
+    resetSettingsCacheForTesting();
     this.settings = this.createRigSettings();
 
     const approvalMode =
