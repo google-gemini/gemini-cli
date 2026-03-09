@@ -18,8 +18,31 @@ export function getVersion(): Promise<string> {
     return versionPromise;
   }
   versionPromise = (async () => {
-    const pkgJson = await getPackageJson(__dirname);
-    return process.env['CLI_VERSION'] || pkgJson?.version || 'unknown';
+    if (process.env['CLI_VERSION']) {
+      return process.env['CLI_VERSION'];
+    }
+
+    let currentDir = __dirname;
+    let bestVersion = 'unknown';
+
+    // Traverse up to find the most relevant package.json.
+    // In a monorepo/source build, we want to prefer the root version if available.
+    while (currentDir !== path.parse(currentDir).root) {
+      const pkgJson = await getPackageJson(currentDir);
+      if (pkgJson?.version) {
+        bestVersion = pkgJson.version;
+        // If we found the root or the CLI package, we can stop.
+        if (
+          pkgJson.name === '@google/gemini-cli' ||
+          pkgJson.name === 'gemini-cli'
+        ) {
+          break;
+        }
+      }
+      currentDir = path.dirname(currentDir);
+    }
+
+    return bestVersion;
   })();
   return versionPromise;
 }

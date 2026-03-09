@@ -345,8 +345,30 @@ custom tools:
 > @database Run a query to find inactive users
 ```
 
-See the [MCP Server Integration guide](./docs/tools/mcp-server.md) for setup
-instructions.
+#### Quick Start (Example: SQLite)
+
+1. **Install an MCP server**:
+   `npm install -g @modelcontextprotocol/server-sqlite`
+2. **Add to your `~/.gemini/settings.json`**:
+   ```json
+   {
+     "mcpServers": {
+       "sqlite": {
+         "command": "npx",
+         "args": [
+           "-y",
+           "@modelcontextprotocol/server-sqlite",
+           "--db",
+           "/path/to/your.db"
+         ]
+       }
+     }
+   }
+   ```
+3. **Use it in the CLI**: `> @sqlite show tables`
+
+See the [MCP Server Integration guide](./docs/tools/mcp-server.md) for detailed
+setup instructions.
 
 ## 🤝 Contributing
 
