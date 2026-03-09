@@ -184,6 +184,54 @@ describe('Extension Update Logic', () => {
       });
     });
 
+    it('should migrate source if migratedTo is set and an update is available', async () => {
+      vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue(
+        Promise.resolve({
+          name: 'test-extension',
+          version: '1.0.0',
+        }),
+      );
+      vi.mocked(
+        mockExtensionManager.installOrUpdateExtension,
+      ).mockResolvedValue({
+        ...mockExtension,
+        version: '1.1.0',
+      });
+      vi.mocked(checkForExtensionUpdate).mockResolvedValue(
+        ExtensionUpdateState.UPDATE_AVAILABLE,
+      );
+
+      const extensionWithMigratedTo = {
+        ...mockExtension,
+        migratedTo: 'https://new-source.com/repo.git',
+      };
+
+      await updateExtension(
+        extensionWithMigratedTo,
+        mockExtensionManager,
+        ExtensionUpdateState.UPDATE_AVAILABLE,
+        mockDispatch,
+      );
+
+      expect(checkForExtensionUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          installMetadata: expect.objectContaining({
+            source: 'https://new-source.com/repo.git',
+          }),
+        }),
+        mockExtensionManager,
+      );
+
+      expect(
+        mockExtensionManager.installOrUpdateExtension,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: 'https://new-source.com/repo.git',
+        }),
+        expect.anything(),
+      );
+    });
+
     it('should set state to UPDATED if enableExtensionReloading is true', async () => {
       vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue(
         Promise.resolve({
