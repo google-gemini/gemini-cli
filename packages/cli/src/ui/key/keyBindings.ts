@@ -104,14 +104,53 @@ export enum Command {
  * Data-driven key binding structure for user configuration
  */
 export class KeyBinding {
-  private static readonly VALID_MODIFIERS = new Set([
-    'ctrl',
-    'shift',
-    'alt',
-    'option', // synonym for alt
-    'opt', // synonym for alt
-    'cmd',
-    'meta', // synonym for cmd
+  private static readonly VALID_KEYS = new Set([
+    // Letters & Numbers
+    ...'abcdefghijklmnopqrstuvwxyz0123456789',
+    // Punctuation
+    '`',
+    '-',
+    '=',
+    '[',
+    ']',
+    '\\',
+    ';',
+    "'",
+    ',',
+    '.',
+    '/',
+    // Navigation & Actions
+    'left',
+    'up',
+    'right',
+    'down',
+    'pageup',
+    'pagedown',
+    'end',
+    'home',
+    'tab',
+    'enter',
+    'escape',
+    'space',
+    'backspace',
+    'delete',
+    'pausebreak',
+    'capslock',
+    'insert',
+    'numlock',
+    'scrolllock',
+    // Function Keys
+    ...Array.from({ length: 19 }, (_, i) => `f${i + 1}`),
+    // Numpad
+    ...Array.from({ length: 10 }, (_, i) => `numpad${i}`),
+    'numpad_multiply',
+    'numpad_add',
+    'numpad_separator',
+    'numpad_subtract',
+    'numpad_decimal',
+    'numpad_divide',
+    // Gemini CLI legacy/internal support
+    'return',
   ]);
 
   /** The key name (e.g., 'a', 'return', 'tab', 'escape') */
@@ -122,25 +161,57 @@ export class KeyBinding {
   readonly cmd: boolean;
 
   constructor(pattern: string) {
-    const parts = pattern.toLowerCase().split('+');
-    const key = parts.pop()!; // The last item is always the key
+    let remains = pattern.toLowerCase().trim();
+    let shift = false;
+    let alt = false;
+    let ctrl = false;
+    let cmd = false;
 
-    for (const part of parts) {
-      if (!KeyBinding.VALID_MODIFIERS.has(part)) {
-        throw new Error(
-          `Invalid keybinding modifier: "${part}" in "${pattern}"`,
-        );
+    let matched: boolean;
+    do {
+      matched = false;
+      if (remains.startsWith('ctrl+')) {
+        ctrl = true;
+        remains = remains.slice(5);
+        matched = true;
+      } else if (remains.startsWith('shift+')) {
+        shift = true;
+        remains = remains.slice(6);
+        matched = true;
+      } else if (remains.startsWith('alt+')) {
+        alt = true;
+        remains = remains.slice(4);
+        matched = true;
+      } else if (remains.startsWith('option+')) {
+        alt = true;
+        remains = remains.slice(7);
+        matched = true;
+      } else if (remains.startsWith('opt+')) {
+        alt = true;
+        remains = remains.slice(4);
+        matched = true;
+      } else if (remains.startsWith('cmd+')) {
+        cmd = true;
+        remains = remains.slice(4);
+        matched = true;
+      } else if (remains.startsWith('meta+')) {
+        cmd = true;
+        remains = remains.slice(5);
+        matched = true;
       }
+    } while (matched);
+
+    const key = remains;
+
+    if (!KeyBinding.VALID_KEYS.has(key)) {
+      throw new Error(`Invalid keybinding key: "${key}" in "${pattern}"`);
     }
 
     this.key = key;
-    this.shift = parts.includes('shift');
-    this.alt =
-      parts.includes('alt') ||
-      parts.includes('option') ||
-      parts.includes('opt');
-    this.ctrl = parts.includes('ctrl');
-    this.cmd = parts.includes('cmd') || parts.includes('meta');
+    this.shift = shift;
+    this.alt = alt;
+    this.ctrl = ctrl;
+    this.cmd = cmd;
   }
 
   matches(key: Key): boolean {

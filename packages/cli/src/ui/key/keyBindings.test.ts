@@ -85,12 +85,19 @@ describe('KeyBinding', () => {
       expect(binding.ctrl).toBe(true);
     });
 
-    it('should throw an error for invalid modifiers', () => {
-      expect(() => new KeyBinding('super+f')).toThrow(
-        'Invalid keybinding modifier: "super" in "super+f"',
+    it('should throw an error for invalid keys or typos in modifiers', () => {
+      expect(() => new KeyBinding('ctrl+unknown')).toThrow(
+        'Invalid keybinding key: "unknown" in "ctrl+unknown"',
       );
-      expect(() => new KeyBinding('ctrl+invalid+x')).toThrow(
-        'Invalid keybinding modifier: "invalid" in "ctrl+invalid+x"',
+      expect(() => new KeyBinding('ctlr+a')).toThrow(
+        'Invalid keybinding key: "ctlr+a" in "ctlr+a"',
+      );
+    });
+
+    it('should throw an error for literal "+" as key (must use "=")', () => {
+      // VS Code style peeling logic results in "+" as the remains
+      expect(() => new KeyBinding('alt++')).toThrow(
+        'Invalid keybinding key: "+" in "alt++"',
       );
     });
   });
