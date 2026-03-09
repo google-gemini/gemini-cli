@@ -138,6 +138,12 @@ describe('stableStringify', () => {
       expect(stableStringify(obj)).toBe('null');
     });
 
+    it('handles circular reference from toJSON method', () => {
+      const obj: { a: number; toJSON?: () => unknown } = { a: 1 };
+      obj.toJSON = () => obj;
+      expect(stableStringify(obj)).toBe('"[Circular]"');
+    });
+
     it('handles toJSON that throws', () => {
       const obj = {
         a: 1,
