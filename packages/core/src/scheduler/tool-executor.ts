@@ -14,7 +14,6 @@ import {
   type ToolCallRequestInfo,
   type ToolCallResponseInfo,
   type ToolResult,
-  type ToolResultDisplay,
   type Config,
   type ToolLiveOutput,
 } from '../index.js';
@@ -216,34 +215,7 @@ export class ToolExecutor {
     const callId = call.request.callId;
     let outputFile: string | undefined;
 
-    if (toolResult.fullOutputFilePath) {
-      const threshold = this.config.getTruncateToolOutputThreshold();
-      if (
-        threshold > 0 &&
-        typeof content === 'string' &&
-        content.length > threshold
-      ) {
-        const { outputFile: savedPath } = await moveToolOutputToFile(
-          toolResult.fullOutputFilePath,
-          toolName,
-          callId,
-          this.config.storage.getProjectTempDir(),
-          this.config.getSessionId(),
-        );
-        outputFile = savedPath;
-        content = formatTruncatedToolOutput(content, outputFile, threshold);
-      } else {
-        // If the content is not truncated, we don't need the temporary file.
-        try {
-          await fsPromises.unlink(toolResult.fullOutputFilePath);
-        } catch (error) {
-          debugLogger.warn(
-            `Failed to delete temporary tool output file: ${toolResult.fullOutputFilePath}`,
-            error,
-          );
-        }
-      }
-    } else if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
+    if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
       const threshold = this.config.getTruncateToolOutputThreshold();
 
       if (threshold > 0 && content.length > threshold) {
@@ -399,11 +371,64 @@ export class ToolExecutor {
     call: ToolCall,
     toolResult: ToolResult,
   ): Promise<SuccessfulToolCall> {
-    const { truncatedContent: content, outputFile } =
-      await this.truncateOutputIfNeeded(call, toolResult.llmContent);
-
+    let content = toolResult.llmContent;
+    let outputFile: string | undefined;
     const toolName = call.request.originalRequestName || call.request.name;
     const callId = call.request.callId;
+
+    if (toolResult.fullOutputFilePath) {
+      const threshold = this.config.getTruncateToolOutputThreshold();
+      if (
+        threshold > 0 &&
+        typeof content === 'string' &&
+        content.length > threshold
+      ) {
+        const { outputFile: savedPath } = await moveToolOutputToFile(
+          toolResult.fullOutputFilePath,
+          toolName,
+          callId,
+          this.config.storage.getProjectTempDir(),
+          this.config.getSessionId(),
+        );
+        outputFile = savedPath;
+        content = formatTruncatedToolOutput(content, outputFile, threshold);
+      } else {
+        // If the content is not truncated, we don't need the temporary file.
+        try {
+          await fsPromises.unlink(toolResult.fullOutputFilePath);
+        } catch (error) {
+          debugLogger.warn(
+            `Failed to delete temporary tool output file: ${toolResult.fullOutputFilePath}`,
+            error,
+          );
+        }
+      }
+    } else if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
+      const threshold = this.config.getTruncateToolOutputThreshold();
+
+      if (threshold > 0 && content.length > threshold) {
+        const originalContentLength = content.length;
+        const { outputFile: savedPath } = await saveTruncatedToolOutput(
+          content,
+          toolName,
+          callId,
+          this.config.storage.getProjectTempDir(),
+          this.config.getSessionId(),
+        );
+        outputFile = savedPath;
+        content = formatTruncatedToolOutput(content, outputFile, threshold);
+
+        logToolOutputTruncated(
+          this.config,
+          new ToolOutputTruncatedEvent(call.request.prompt_id, {
+            toolName,
+            originalContentLength,
+            truncatedContentLength: content.length,
+            threshold,
+          }),
+        );
+      }
+    }
 
     const response = convertToFunctionResponse(
       toolName,
