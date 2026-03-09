@@ -131,4 +131,12 @@ describe('compressCommand', () => {
     await compressCommand.action!(context, '');
     expect(context.ui.setPendingItem).toHaveBeenCalledWith(null);
   });
+
+  describe('metadata', () => {
+    it('should have the correct name and aliases', () => {
+      expect(compressCommand.name).toBe('compress');
+      expect(compressCommand.altNames).toContain('summarize');
+      expect(compressCommand.altNames).toContain('compact');
+    });
+  });
 });
