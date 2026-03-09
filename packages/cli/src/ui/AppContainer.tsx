@@ -474,7 +474,7 @@ export const AppContainer = (props: AppContainerProps) => {
 
       // Kill all background shells
       for (const pid of backgroundShellsRef.current.keys()) {
-        ShellExecutionService.kill(pid);
+        await ShellExecutionService.kill(pid);
       }
 
       const ideClient = await IdeClient.getInstance();

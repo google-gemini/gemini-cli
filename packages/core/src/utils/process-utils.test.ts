@@ -4,27 +4,37 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+  type MockInstance,
+} from 'vitest';
 import os from 'node:os';
-import { spawn as cpSpawn } from 'node:child_process';
 import { killProcessGroup, SIGKILL_TIMEOUT_MS } from './process-utils.js';
+import { spawnAsync } from './shell-utils.js';
 
 vi.mock('node:os');
-vi.mock('node:child_process');
+vi.mock('./shell-utils.js');
 
 describe('process-utils', () => {
-  const mockProcessKill = vi
-    .spyOn(process, 'kill')
-    .mockImplementation(() => true);
-  const mockSpawn = vi.mocked(cpSpawn);
+  let mockProcessKill: MockInstance;
+  let mockSpawnAsync: Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    mockProcessKill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    mockSpawnAsync = vi.mocked(spawnAsync);
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   describe('killProcessGroup', () => {
@@ -33,7 +43,7 @@ describe('process-utils', () => {
 
       await killProcessGroup({ pid: 1234 });
 
-      expect(mockSpawn).toHaveBeenCalledWith('taskkill', [
+      expect(mockSpawnAsync).toHaveBeenCalledWith('taskkill', [
         '/pid',
         '1234',
         '/f',
@@ -50,7 +60,7 @@ describe('process-utils', () => {
 
       expect(mockPty.kill).toHaveBeenCalled();
       // taskkill is also called to reap orphaned descendant processes
-      expect(mockSpawn).toHaveBeenCalledWith('taskkill', [
+      expect(mockSpawnAsync).toHaveBeenCalledWith('taskkill', [
         '/pid',
         '1234',
         '/f',
@@ -149,10 +159,10 @@ describe('process-utils', () => {
 
       await killProcessGroup({ pid: 1234, pty: mockPty });
 
-      // PTY kill should be called first
-      expect(mockPty.kill).toHaveBeenCalledWith('SIGKILL');
-      // Then process group kill should be attempted to reap descendants
+      // Group kill should be called first to ensure it's hit before PTY leader dies
       expect(mockProcessKill).toHaveBeenCalledWith(-1234, 'SIGKILL');
+      // Then PTY kill should be called
+      expect(mockPty.kill).toHaveBeenCalledWith('SIGKILL');
     });
   });
 });

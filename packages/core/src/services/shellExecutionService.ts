@@ -113,29 +113,29 @@ export interface ShellExecutionConfig {
  */
 export type ShellOutputEvent =
   | {
-      /** The event contains a chunk of output data. */
-      type: 'data';
-      /** The decoded string chunk. */
-      chunk: string | AnsiOutput;
-    }
+    /** The event contains a chunk of output data. */
+    type: 'data';
+    /** The decoded string chunk. */
+    chunk: string | AnsiOutput;
+  }
   | {
-      /** Signals that the output stream has been identified as binary. */
-      type: 'binary_detected';
-    }
+    /** Signals that the output stream has been identified as binary. */
+    type: 'binary_detected';
+  }
   | {
-      /** Provides progress updates for a binary stream. */
-      type: 'binary_progress';
-      /** The total number of bytes received so far. */
-      bytesReceived: number;
-    }
+    /** Provides progress updates for a binary stream. */
+    type: 'binary_progress';
+    /** The total number of bytes received so far. */
+    bytesReceived: number;
+  }
   | {
-      /** Signals that the process has exited. */
-      type: 'exit';
-      /** The exit code of the process, if any. */
-      exitCode: number | null;
-      /** The signal that terminated the process, if any. */
-      signal: number | null;
-    };
+    /** Signals that the process has exited. */
+    type: 'exit';
+    /** The exit code of the process, if any. */
+    exitCode: number | null;
+    /** The signal that terminated the process, if any. */
+    signal: number | null;
+  };
 
 interface ActivePty {
   ptyProcess: IPty;
@@ -419,9 +419,8 @@ export class ShellExecutionService {
           let combinedOutput = state.output;
 
           if (state.truncated) {
-            const truncationMessage = `\n[GEMINI_CLI_WARNING: Output truncated. The buffer is limited to ${
-              MAX_CHILD_PROCESS_BUFFER_SIZE / (1024 * 1024)
-            }MB.]`;
+            const truncationMessage = `\n[GEMINI_CLI_WARNING: Output truncated. The buffer is limited to ${MAX_CHILD_PROCESS_BUFFER_SIZE / (1024 * 1024)
+              }MB.]`;
             combinedOutput += truncationMessage;
           }
 
@@ -1003,7 +1002,7 @@ export class ShellExecutionService {
       if (exitedInfo) {
         callback(exitedInfo.exitCode, exitedInfo.signal);
       }
-      return () => {};
+      return () => { };
     }
   }
 
@@ -1012,15 +1011,17 @@ export class ShellExecutionService {
    *
    * @param pid The process ID to kill.
    */
-  static kill(pid: number): void {
+  static async kill(pid: number): Promise<void> {
     const activePty = this.activePtys.get(pid);
     const activeChild = this.activeChildProcesses.get(pid);
 
     if (activeChild) {
-      killProcessGroup({ pid }).catch(() => {});
+      await killProcessGroup({ pid }).catch(() => { });
       this.activeChildProcesses.delete(pid);
     } else if (activePty) {
-      killProcessGroup({ pid, pty: activePty.ptyProcess }).catch(() => {});
+      await killProcessGroup({ pid, pty: activePty.ptyProcess }).catch(
+        () => { },
+      );
       try {
         (activePty.ptyProcess as IPty & { destroy?: () => void }).destroy?.();
       } catch {

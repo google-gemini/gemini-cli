@@ -5,7 +5,8 @@
  */
 
 import os from 'node:os';
-import { spawn as cpSpawn } from 'node:child_process';
+
+import { spawnAsync } from './shell-utils.js';
 
 /** Default timeout for SIGKILL escalation on Unix systems. */
 export const SIGKILL_TIMEOUT_MS = 200;
@@ -47,8 +48,8 @@ export async function killProcessGroup(options: KillOptions): Promise<void> {
     }
     // Invoke taskkill to ensure the entire tree is terminated and any orphaned descendant processes are reaped.
     try {
-      cpSpawn('taskkill', ['/pid', pid.toString(), '/f', '/t']);
-    } catch {
+      await spawnAsync('taskkill', ['/pid', pid.toString(), '/f', '/t']);
+    } catch (_e) {
       // Ignore errors if the process tree is already dead
     }
     return;
