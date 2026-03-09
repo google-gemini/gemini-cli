@@ -24,6 +24,16 @@ vi.mock('../utils/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
+// Mock @google-cloud/storage so GCSTaskStore can be instantiated without
+// a real GCS connection. This is only exercised when GCS_BUCKET_NAME is set.
+vi.mock('@google-cloud/storage', () => ({
+  Storage: vi.fn().mockImplementation(() => ({
+    getBuckets: vi
+      .fn()
+      .mockResolvedValue([[{ name: 'test-bucket-for-metadata' }]]),
+  })),
+}));
+
 // Mock Task.create to avoid its complex setup
 vi.mock('../agent/task.js', () => {
   class MockTask {
@@ -158,5 +168,33 @@ describe('Agent Server Endpoints', () => {
     expect(response.status).toBe(200);
     expect(response.body.name).toBe('Gemini SDLC Agent');
     expect(response.body.url).toBe(`http://localhost:${port}/`);
+  });
+});
+
+describe('Agent Server Endpoints (GCS Task Store)', () => {
+  let gcsApp: express.Express;
+  let gcsServer: Server;
+
+  beforeAll(async () => {
+    vi.stubEnv('GCS_BUCKET_NAME', 'test-bucket-for-metadata');
+    gcsApp = await createApp();
+    await new Promise<void>((resolve) => {
+      gcsServer = gcsApp.listen(0, () => resolve());
+    });
+  });
+
+  afterAll(async () => {
+    vi.unstubAllEnvs();
+    if (gcsServer) {
+      await new Promise<void>((resolve, reject) => {
+        gcsServer.close((err) => (err ? reject(err) : resolve()));
+      });
+    }
+  });
+
+  it('should return 501 for GET /tasks/metadata when not using InMemoryTaskStore', async () => {
+    const response = await request(gcsApp).get('/tasks/metadata');
+    expect(response.status).toBe(501);
+    expect(response.body.error).toContain('InMemoryTaskStore');
   });
 });
