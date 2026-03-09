@@ -2909,29 +2909,6 @@ export class Config implements McpContext, AgentLoopContext {
       );
     }
 
-    if (this.isTrackerEnabled()) {
-      maybeRegister(TrackerCreateTaskTool, () =>
-        registry.registerTool(new TrackerCreateTaskTool(this, this.messageBus)),
-      );
-      maybeRegister(TrackerUpdateTaskTool, () =>
-        registry.registerTool(new TrackerUpdateTaskTool(this, this.messageBus)),
-      );
-      maybeRegister(TrackerGetTaskTool, () =>
-        registry.registerTool(new TrackerGetTaskTool(this, this.messageBus)),
-      );
-      maybeRegister(TrackerListTasksTool, () =>
-        registry.registerTool(new TrackerListTasksTool(this, this.messageBus)),
-      );
-      maybeRegister(TrackerAddDependencyTool, () =>
-        registry.registerTool(
-          new TrackerAddDependencyTool(this, this.messageBus),
-        ),
-      );
-      maybeRegister(TrackerVisualizeTool, () =>
-        registry.registerTool(new TrackerVisualizeTool(this, this.messageBus)),
-      );
-    }
-
     // Register Subagents as Tools
     this.registerSubAgentTools(registry);
 
