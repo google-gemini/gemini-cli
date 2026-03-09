@@ -11,6 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { AppContainer } from '../ui/AppContainer.js';
+import { IntegrityDataStatus } from '../config/extensions/integrity.js';
 import { renderWithProviders } from './render.js';
 import {
   makeFakeConfig,
@@ -36,10 +37,7 @@ import {
   MockShellExecutionService,
 } from './MockShellExecutionService.js';
 import { createMockSettings } from './settings.js';
-import {
-  type LoadedSettings,
-  resetSettingsCacheForTesting,
-} from '../config/settings.js';
+import { type LoadedSettings } from '../config/settings.js';
 import { AuthState, StreamingState } from '../ui/types.js';
 import { randomUUID } from 'node:crypto';
 import type {
@@ -118,6 +116,12 @@ class MockExtensionManager extends ExtensionLoader {
   getExtensions = vi.fn().mockReturnValue([]);
   setRequestConsent = vi.fn();
   setRequestSetting = vi.fn();
+  integrityManager = {
+    verifyExtensionIntegrity: vi
+      .fn()
+      .mockResolvedValue(IntegrityDataStatus.VERIFIED),
+    storeExtensionIntegrity: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 // Mock GeminiRespondingSpinner to disable animations (avoiding 'act()' warnings) without triggering screen reader mode.
@@ -174,7 +178,6 @@ export class AppRig {
 
   async initialize() {
     this.setupEnvironment();
-    resetSettingsCacheForTesting();
     this.settings = this.createRigSettings();
 
     const approvalMode =

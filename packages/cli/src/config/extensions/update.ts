@@ -16,6 +16,7 @@ import * as fs from 'node:fs';
 import { getErrorMessage } from '../../utils/errors.js';
 import { copyExtension, type ExtensionManager } from '../extension-manager.js';
 import { ExtensionStorage } from './storage.js';
+import { IntegrityDataStatus } from './integrity.js';
 
 export interface ExtensionUpdateInfo {
   name: string;
@@ -48,6 +49,35 @@ export async function updateExtension(
       `Extension ${extension.name} cannot be updated, type is unknown.`,
     );
   }
+
+  try {
+    if (extensionManager.integrityManager) {
+      const status =
+        await extensionManager.integrityManager.verifyExtensionIntegrity(
+          extension.name,
+          installMetadata,
+        );
+
+      if (status === IntegrityDataStatus.MISSING) {
+        // Establish trust on first update if integrity data is missing.
+        await extensionManager.integrityManager.storeExtensionIntegrity(
+          extension.name,
+          installMetadata,
+        );
+      } else if (status === IntegrityDataStatus.INVALID) {
+        throw new Error('Extension integrity cannot be verified');
+      }
+    }
+  } catch (e) {
+    dispatchExtensionStateUpdate({
+      type: 'SET_STATE',
+      payload: { name: extension.name, state: ExtensionUpdateState.ERROR },
+    });
+    throw new Error(
+      `Extension ${extension.name} cannot be updated. ${getErrorMessage(e)}. To fix this, reinstall the extension.`,
+    );
+  }
+
   if (installMetadata?.type === 'link') {
     dispatchExtensionStateUpdate({
       type: 'SET_STATE',

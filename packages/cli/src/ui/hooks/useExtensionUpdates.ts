@@ -200,11 +200,18 @@ export const useExtensionUpdates = (
     }
     if (scheduledUpdate) {
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      Promise.all(updatePromises).then((results) => {
-        const nonNullResults = results.filter((result) => result != null);
+      Promise.allSettled(updatePromises).then((results) => {
+        const successfulUpdates = results
+          .filter(
+            (r): r is PromiseFulfilledResult<ExtensionUpdateInfo | undefined> =>
+              r.status === 'fulfilled',
+          )
+          .map((r) => r.value)
+          .filter((v): v is ExtensionUpdateInfo => v !== undefined);
+
         scheduledUpdate.onCompleteCallbacks.forEach((callback) => {
           try {
-            callback(nonNullResults);
+            callback(successfulUpdates);
           } catch (e) {
             debugLogger.warn(getErrorMessage(e));
           }

@@ -485,4 +485,30 @@ describe('ExtensionManager', () => {
       ).rejects.toThrow(/already installed/);
     });
   });
+
+  describe('extension integrity', () => {
+    it('should store integrity data during installation', async () => {
+      const storeSpy = vi.spyOn(
+        extensionManager.integrityManager,
+        'storeExtensionIntegrity',
+      );
+
+      const extDir = path.join(tempHomeDir, 'new-integrity-ext');
+      fs.mkdirSync(extDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(extDir, 'gemini-extension.json'),
+        JSON.stringify({ name: 'integrity-ext', version: '1.0.0' }),
+      );
+
+      const installMetadata = {
+        source: extDir,
+        type: 'local' as const,
+      };
+
+      await extensionManager.loadExtensions();
+      await extensionManager.installOrUpdateExtension(installMetadata);
+
+      expect(storeSpy).toHaveBeenCalledWith('integrity-ext', installMetadata);
+    });
+  });
 });
