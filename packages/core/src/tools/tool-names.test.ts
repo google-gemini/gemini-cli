@@ -58,6 +58,8 @@ describe('tool-names', () => {
     it('should validate MCP tool names (server__tool)', () => {
       expect(isValidToolName('server__tool')).toBe(true);
       expect(isValidToolName('my-server__my-tool')).toBe(true);
+      expect(isValidToolName('my.server__my:tool')).toBe(true);
+      expect(isValidToolName('my-server...truncated__tool')).toBe(true);
     });
 
     it('should validate legacy tool aliases', async () => {
