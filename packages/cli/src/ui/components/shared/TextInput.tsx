@@ -14,7 +14,7 @@ import { theme } from '../../semantic-colors.js';
 import type { TextBuffer } from './text-buffer.js';
 import { expandPastePlaceholders } from './text-buffer.js';
 import { cpSlice, cpIndexToOffset } from '../../utils/textUtils.js';
-import { Command } from '../../keyMatchers.js';
+import { Command } from '../../key/keyMatchers.js';
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 export interface TextInputProps {

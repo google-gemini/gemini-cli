@@ -5,8 +5,8 @@
  */
 
 import { useMemo } from 'react';
-import type { KeyMatchers } from '../keyMatchers.js';
-import { defaultKeyMatchers } from '../keyMatchers.js';
+import type { KeyMatchers } from '../key/keyMatchers.js';
+import { defaultKeyMatchers } from '../key/keyMatchers.js';
 
 /**
  * Hook to retrieve the currently active key matchers.

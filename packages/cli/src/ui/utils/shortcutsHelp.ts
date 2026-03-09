@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Command } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
 import type { Key } from '../hooks/useKeypress.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 

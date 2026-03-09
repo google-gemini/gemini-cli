@@ -19,10 +19,10 @@ import { TextInput } from './TextInput.js';
 import type { TextBuffer } from './text-buffer.js';
 import { cpSlice, cpLen, cpIndexToOffset } from '../../utils/textUtils.js';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
-import { Command } from '../../keyMatchers.js';
+import { Command } from '../../key/keyMatchers.js';
 import { useSettingsNavigation } from '../../hooks/useSettingsNavigation.js';
 import { useInlineEditBuffer } from '../../hooks/useInlineEditBuffer.js';
-import { formatCommand } from '../../utils/keybindingUtils.js';
+import { formatCommand } from '../../key/keybindingUtils.js';
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 /**

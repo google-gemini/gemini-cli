@@ -9,16 +9,10 @@ import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { useTabbedNavigation } from './useTabbedNavigation.js';
 import { useKeypress } from './useKeypress.js';
-import { useKeyMatchers } from './useKeyMatchers.js';
-import type { KeyMatchers } from '../keyMatchers.js';
 import type { Key, KeypressHandler } from '../contexts/KeypressContext.js';
 
 vi.mock('./useKeypress.js', () => ({
   useKeypress: vi.fn(),
-}));
-
-vi.mock('./useKeyMatchers.js', () => ({
-  useKeyMatchers: vi.fn(),
 }));
 
 const createKey = (partial: Partial<Key>): Key => ({
@@ -32,27 +26,10 @@ const createKey = (partial: Partial<Key>): Key => ({
   ...partial,
 });
 
-const mockKeyMatchers = {
-  'cursor.left': vi.fn((key) => key.name === 'left'),
-  'cursor.right': vi.fn((key) => key.name === 'right'),
-  'dialog.next': vi.fn((key) => key.name === 'tab' && !key.shift),
-  'dialog.previous': vi.fn((key) => key.name === 'tab' && key.shift),
-} as unknown as KeyMatchers;
-
-vi.mock('../keyMatchers.js', () => ({
-  Command: {
-    MOVE_LEFT: 'cursor.left',
-    MOVE_RIGHT: 'cursor.right',
-    DIALOG_NEXT: 'dialog.next',
-    DIALOG_PREV: 'dialog.previous',
-  },
-}));
-
 describe('useTabbedNavigation', () => {
   let capturedHandler: KeypressHandler;
 
   beforeEach(() => {
-    vi.mocked(useKeyMatchers).mockReturnValue(mockKeyMatchers);
     vi.mocked(useKeypress).mockImplementation((handler) => {
       capturedHandler = handler;
     });

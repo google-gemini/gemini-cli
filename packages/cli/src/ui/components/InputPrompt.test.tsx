@@ -44,7 +44,7 @@ import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js
 import type { UIState } from '../contexts/UIStateContext.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { cpLen } from '../utils/textUtils.js';
-import { defaultKeyMatchers, Command } from '../keyMatchers.js';
+import { defaultKeyMatchers, Command } from '../key/keyMatchers.js';
 import type { Key } from '../hooks/useKeypress.js';
 import {
   appEvents,
