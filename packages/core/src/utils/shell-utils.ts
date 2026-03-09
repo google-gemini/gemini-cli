@@ -551,6 +551,28 @@ export function getShellConfiguration(): ShellConfiguration {
   }
 
   if (isWindows()) {
+    // Prefer pwsh.exe (PowerShell 7+) if available in PATH
+    const pathDelimiter = os.platform() === 'win32' ? ';' : path.delimiter;
+    const paths = (process.env['PATH'] || '').split(pathDelimiter);
+    for (const p of paths) {
+      if (!p) continue;
+      const fullPath = path.resolve(p, 'pwsh.exe');
+      try {
+        if (path.isAbsolute(fullPath) && fs.existsSync(fullPath)) {
+          const canonicalPath = fs.realpathSync(fullPath);
+          cachedShellConfiguration = {
+            executable: canonicalPath,
+            argsPrefix: ['-NoProfile', '-Command'],
+            shell: 'powershell',
+          };
+          return cachedShellConfiguration;
+        }
+      } catch (e) {
+        debugLogger.debug(`Error checking for pwsh.exe in ${p}:`, e);
+        continue;
+      }
+    }
+
     const comSpec = process.env['ComSpec'];
     if (comSpec && path.isAbsolute(comSpec)) {
       // Basic security check: ensure no redirection or command chaining characters in ComSpec
@@ -574,28 +596,6 @@ export function getShellConfiguration(): ShellConfiguration {
             debugLogger.debug(`Error resolving canonical path for ComSpec: ${comSpec}`, e);
           }
         }
-      }
-    }
-
-    // Prefer pwsh.exe (PowerShell 7+) if available in PATH
-    const pathDelimiter = os.platform() === 'win32' ? ';' : path.delimiter;
-    const paths = (process.env['PATH'] || '').split(pathDelimiter);
-    for (const p of paths) {
-      if (!p) continue;
-      const fullPath = path.resolve(p, 'pwsh.exe');
-      try {
-        if (path.isAbsolute(fullPath) && fs.existsSync(fullPath)) {
-          const canonicalPath = fs.realpathSync(fullPath);
-          cachedShellConfiguration = {
-            executable: canonicalPath,
-            argsPrefix: ['-NoProfile', '-Command'],
-            shell: 'powershell',
-          };
-          return cachedShellConfiguration;
-        }
-      } catch (e) {
-        debugLogger.debug(`Error checking for pwsh.exe in ${p}:`, e);
-        continue;
       }
     }
 

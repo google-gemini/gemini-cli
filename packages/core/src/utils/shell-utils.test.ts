@@ -471,10 +471,26 @@ describe('getShellConfiguration', () => {
       expect(config.shell).toBe('powershell');
     });
 
-    it('should return PowerShell configuration if ComSpec points to powershell.exe', () => {
+    it('should prefer pwsh.exe in PATH even if ComSpec points to powershell.exe', () => {
+      const psPath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+      const pwshPath = path.resolve('C:\\pwsh', 'pwsh.exe');
+      process.env['ComSpec'] = psPath;
+      process.env['PATH'] = 'C:\\pwsh';
+
+      mockExistsSync.mockImplementation((p: string) => p === pwshPath);
+
+      const config = getShellConfiguration();
+      expect(config.executable).toBe(pwshPath);
+      expect(config.shell).toBe('powershell');
+    });
+
+    it('should return PowerShell configuration if ComSpec points to powershell.exe and pwsh.exe is NOT in PATH', () => {
       const psPath =
         'C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
       process.env['ComSpec'] = psPath;
+      process.env['PATH'] = ''; // Ensure pwsh is not found
+      mockExistsSync.mockReturnValue(false);
+
       const config = getShellConfiguration();
       expect(config.executable).toBe(psPath);
       expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
