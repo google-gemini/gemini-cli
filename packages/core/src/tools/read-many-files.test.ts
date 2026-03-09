@@ -776,7 +776,7 @@ Content of file[1]
 
       // Mock to track concurrent vs sequential execution
       detectFileTypeSpy.mockImplementation(async (filePath: string) => {
-        const fileName = filePath.split('/').pop() || '';
+        const fileName = path.basename(filePath);
         executionOrder.push(`start:${fileName}`);
 
         // Add delay to make timing differences visible
