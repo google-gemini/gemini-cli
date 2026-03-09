@@ -6,7 +6,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import { inspect } from 'node:util';
 import process from 'node:process';
 import {
@@ -146,7 +145,7 @@ import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
-import { isSubpath } from '../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import { UserHintService } from './userHintService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
 import { loadPoliciesFromToml } from '../policy/toml-loader.js';
@@ -2389,17 +2388,7 @@ export class Config implements McpContext {
    * @returns true if the path is allowed, false otherwise.
    */
   isPathAllowed(absolutePath: string): boolean {
-    const realpath = (p: string) => {
-      let resolved: string;
-      try {
-        resolved = fs.realpathSync(p);
-      } catch {
-        resolved = path.resolve(p);
-      }
-      return os.platform() === 'win32' ? resolved.toLowerCase() : resolved;
-    };
-
-    const resolvedPath = realpath(absolutePath);
+    const resolvedPath = resolveToRealPath(absolutePath);
 
     const workspaceContext = this.getWorkspaceContext();
     if (workspaceContext.isPathWithinWorkspace(resolvedPath)) {
@@ -2407,7 +2396,7 @@ export class Config implements McpContext {
     }
 
     const projectTempDir = this.storage.getProjectTempDir();
-    const resolvedTempDir = realpath(projectTempDir);
+    const resolvedTempDir = resolveToRealPath(projectTempDir);
 
     return isSubpath(resolvedTempDir, resolvedPath);
   }
