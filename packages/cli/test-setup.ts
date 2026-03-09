@@ -37,7 +37,7 @@ import './src/test-utils/customMatchers.js';
 export const server = setupServer();
 
 beforeAll(() => {
-  server.listen({});
+  server.listen({ onUnhandledRequest: 'error' });
 });
 
 let consoleErrorSpy: vi.SpyInstance;
