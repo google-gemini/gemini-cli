@@ -108,4 +108,18 @@ describe('SkillCommandLoader', () => {
       postSubmitPrompt: 'hello world',
     });
   });
+
+  it('should sanitize skill names with spaces', async () => {
+    const mockSkills = [{ name: 'my awesome skill', description: 'Desc' }];
+    mockSkillManager.getDisplayableSkills.mockReturnValue(mockSkills);
+
+    const loader = new SkillCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+
+    expect(commands[0].name).toBe('my-awesome-skill');
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const actionResult = await commands[0].action!({} as any, '');
+    expect(actionResult.toolArgs).toEqual({ name: 'my awesome skill' });
+  });
 });

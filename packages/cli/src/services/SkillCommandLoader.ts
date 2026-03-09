@@ -31,23 +31,23 @@ export class SkillCommandLoader implements ICommandLoader {
       return [];
     }
 
-    // Only include enabled skills that are not built-in (since built-in skills
-    // are usually internal or have dedicated slash commands).
-    // Actually, the user says "if you have a skill called google-foo", so we
-    // should probably include all user/workspace/extension skills.
+    // Convert all displayable skills into slash commands.
     const skills = skillManager.getDisplayableSkills();
 
-    return skills.map((skill) => ({
-      name: skill.name,
-      description: skill.description || `Activate the ${skill.name} skill`,
-      kind: CommandKind.SKILL,
-      autoExecute: true,
-      action: async (_context, args) => ({
+    return skills.map((skill) => {
+      const commandName = skill.name.trim().replace(/\s+/g, '-');
+      return {
+        name: commandName,
+        description: skill.description || `Activate the ${skill.name} skill`,
+        kind: CommandKind.SKILL,
+        autoExecute: true,
+        action: async (_context, args) => ({
           type: 'tool',
           toolName: ACTIVATE_SKILL_TOOL_NAME,
           toolArgs: { name: skill.name },
           postSubmitPrompt: args.trim().length > 0 ? args.trim() : undefined,
         }),
-    }));
+      };
+    });
   }
 }
