@@ -257,8 +257,18 @@ their corresponding top-level category object in your `settings.json` file.
     input.
   - **Default:** `false`
 
+- **`ui.footer.items`** (array):
+  - **Description:** List of item IDs to display in the footer. Rendered in
+    order
+  - **Default:** `undefined`
+
+- **`ui.footer.showLabels`** (boolean):
+  - **Description:** Display a second line above the footer items with
+    descriptive headers (e.g., /model).
+  - **Default:** `true`
+
 - **`ui.footer.hideCWD`** (boolean):
-  - **Description:** Hide the current working directory path in the footer.
+  - **Description:** Hide the current working directory in the footer.
   - **Default:** `false`
 
 - **`ui.footer.hideSandboxStatus`** (boolean):
@@ -270,7 +280,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`ui.footer.hideContextPercentage`** (boolean):
-  - **Description:** Hides the context window remaining percentage.
+  - **Description:** Hides the context window usage percentage.
   - **Default:** `true`
 
 - **`ui.hideFooter`** (boolean):
@@ -716,7 +726,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `[]`
 
 - **`context.loadMemoryFromIncludeDirectories`** (boolean):
-  - **Description:** Controls how /memory refresh loads GEMINI.md files. When
+  - **Description:** Controls how /memory reload loads GEMINI.md files. When
     true, include directories are scanned; when false, only the current
     directory is used.
   - **Default:** `false`
@@ -754,7 +764,8 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`tools.sandbox`** (boolean | string):
   - **Description:** Sandbox execution environment. Set to a boolean to enable
-    or disable the sandbox, or provide a string path to a sandbox profile.
+    or disable the sandbox, provide a string path to a sandbox profile, or
+    specify an explicit sandbox command (e.g., "docker", "podman", "lxc").
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
@@ -1017,7 +1028,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`experimental.plan`** (boolean):
-  - **Description:** Enable planning features (Plan Mode and tools).
+  - **Description:** Enable Plan Mode.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`experimental.taskTracker`** (boolean):
+  - **Description:** Enable task tracker tools.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -1032,8 +1048,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`experimental.gemmaModelRouter.enabled`** (boolean):
-  - **Description:** Enable the Gemma Model Router. Requires a local endpoint
-    serving Gemma via the Gemini API using LiteRT-LM shim.
+  - **Description:** Enable the Gemma Model Router (experimental). Requires a
+    local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -1696,7 +1712,7 @@ conventions and context.
     loaded, allowing you to verify the hierarchy and content being used by the
     AI.
   - See the [Commands documentation](./commands.md#memory) for full details on
-    the `/memory` command and its sub-commands (`show` and `refresh`).
+    the `/memory` command and its sub-commands (`show` and `reload`).
 
 By understanding and utilizing these configuration layers and the hierarchical
 nature of context files, you can effectively manage the AI's memory and tailor
