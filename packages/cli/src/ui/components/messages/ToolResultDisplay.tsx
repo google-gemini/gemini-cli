@@ -236,6 +236,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         maxHeight={maxLines ?? availableHeight}
         hasFocus={hasFocus} // Allow scrolling via keyboard (Shift+Up/Down)
         scrollToBottom={true}
+        reportOverflow={true}
       >
         {content}
       </Scrollable>
