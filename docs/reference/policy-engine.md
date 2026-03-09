@@ -76,9 +76,13 @@ The `toolName` in the rule must match the name of the tool being called.
 
 - **Wildcards**: You can use wildcards to match multiple tools.
   - `*`: Matches **any tool** (built-in or MCP).
-  - `server__*`: Matches any tool from a specific MCP server.
-  - `*__toolName`: Matches a specific tool name across **all** MCP servers.
-  - `*__*`: Matches **any tool from any MCP server**.
+  - `mcp_server_*`: Matches any tool from a specific MCP server.
+  - `mcp_*_toolName`: Matches a specific tool name across **all** MCP servers.
+  - `mcp_*`: Matches **any tool from any MCP server**.
+
+> **Recommendation:** While FQN wildcards are supported, the recommended
+> approach for MCP tools is to use the `mcpName` field in your TOML rules. See
+> [Special syntax for MCP tools](#special-syntax-for-mcp-tools).
 
 #### Arguments pattern
 
@@ -157,8 +161,8 @@ A rule matches a tool call if all of its conditions are met:
 
 1.  **Tool name**: The `toolName` in the rule must match the name of the tool
     being called.
-    - **Wildcards**: You can use wildcards like `*`, `server__*`, or
-      `*__toolName` to match multiple tools. See [Tool Name](#tool-name) for
+    - **Wildcards**: You can use wildcards like `*`, `mcp_server_*`, or
+      `mcp_*_toolName` to match multiple tools. See [Tool Name](#tool-name) for
       details.
 2.  **Arguments pattern**: If `argsPattern` is specified, the tool's arguments
     are converted to a stable JSON string, which is then tested against the
@@ -213,7 +217,7 @@ Here is a breakdown of the fields available in a TOML policy rule:
 toolName = "run_shell_command"
 
 # (Optional) The name of an MCP server. Can be combined with toolName
-# to form a composite name like "mcpName__toolName".
+# to form a composite FQN internally like "mcp_mcpName_toolName".
 mcpName = "my-custom-server"
 
 # (Optional) Metadata hints provided by the tool. A rule matches if all
@@ -290,7 +294,9 @@ priority = 100
 ### Special syntax for MCP tools
 
 You can create rules that target tools from Model Context Protocol (MCP) servers
-using the `mcpName` field or composite wildcard patterns.
+using the `mcpName` field. **This is the recommended approach** for defining MCP
+policies, as it is much more robust than manually writing Fully Qualified Names
+(FQNs) or string wildcards.
 
 **1. Targeting a specific tool on a server**
 

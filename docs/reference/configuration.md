@@ -1171,13 +1171,13 @@ their corresponding top-level category object in your `settings.json` file.
 
 Configures connections to one or more Model-Context Protocol (MCP) servers for
 discovering and using custom tools. Gemini CLI attempts to connect to each
-configured MCP server to discover available tools. If multiple MCP servers
-expose a tool with the same name, the tool names will be prefixed with the
-server alias you defined in the configuration (e.g.,
-`serverAlias__actualToolName`) to avoid conflicts. Note that the system might
-strip certain schema properties from MCP tool definitions for compatibility. At
-least one of `command`, `url`, or `httpUrl` must be provided. If multiple are
-specified, the order of precedence is `httpUrl`, then `url`, then `command`.
+configured MCP server to discover available tools. Every discovered tool is
+prepended with the `mcp_` prefix and its server alias to form a fully qualified
+name (FQN) (e.g., `mcp_serverAlias_actualToolName`) to avoid conflicts. Note
+that the system might strip certain schema properties from MCP tool definitions
+for compatibility. At least one of `command`, `url`, or `httpUrl` must be
+provided. If multiple are specified, the order of precedence is `httpUrl`, then
+`url`, then `command`.
 
 - **`mcpServers.<SERVER_NAME>`** (object): The server parameters for the named
   server.
