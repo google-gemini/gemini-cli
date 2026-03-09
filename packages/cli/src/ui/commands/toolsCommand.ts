@@ -71,15 +71,14 @@ export const toolsCommand: SlashCommand = {
   autoExecute: false,
   subCommands: [listSubCommand, descSubCommand],
   action: async (context: CommandContext, args?: string): Promise<void> => {
-    const subCommand = args?.trim();
+    const subCommandName = args?.trim().split(' ')[0];
 
-    if (subCommand === 'desc') {
-      // Delegate to the subcommand's action for consistency.
-      // The action is guaranteed to exist on our own subcommand definition.
-      await descSubCommand.action!(context, '');
-    } else {
-      // Default to 'list' for no subcommand, 'list', or any other invalid subcommand.
-      await listSubCommand.action!(context, '');
-    }
+    // Find the subcommand, defaulting to 'list' if not found or not provided.
+    const subCommandToRun =
+      toolsCommand.subCommands?.find((cmd) => cmd.name === subCommandName) ??
+      listSubCommand;
+
+    // The action is guaranteed to exist on our own subcommand definitions.
+    await subCommandToRun.action!(context, '');
   },
 };
