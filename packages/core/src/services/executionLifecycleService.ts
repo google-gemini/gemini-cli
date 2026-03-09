@@ -10,6 +10,7 @@ export type ExecutionMethod =
   | 'lydell-node-pty'
   | 'node-pty'
   | 'child_process'
+  | 'remote_agent'
   | 'none';
 
 export interface ExecutionResult {
@@ -190,14 +191,15 @@ export class ExecutionLifecycleService {
     };
   }
 
-  static createVirtualExecution(
+  static createExecution(
     initialOutput = '',
     onKill?: () => void,
+    executionMethod: ExecutionMethod = 'none',
   ): ExecutionHandle {
     const executionId = this.allocateVirtualExecutionId();
 
     this.activeExecutions.set(executionId, {
-      executionMethod: 'none',
+      executionMethod,
       output: initialOutput,
       kind: 'virtual',
       onKill,
@@ -218,13 +220,14 @@ export class ExecutionLifecycleService {
   }
 
   /**
-   * @deprecated Use createVirtualExecution() for new call sites.
+   * @deprecated Use createExecution() for new call sites.
    */
-  static createExecution(
+  static createVirtualExecution(
     initialOutput = '',
     onKill?: () => void,
+    executionMethod: ExecutionMethod = 'none',
   ): ExecutionHandle {
-    return this.createVirtualExecution(initialOutput, onKill);
+    return this.createExecution(initialOutput, onKill, executionMethod);
   }
 
   static appendOutput(executionId: number, chunk: string): void {

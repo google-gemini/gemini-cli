@@ -32,6 +32,7 @@ import {
   ExecutionLifecycleService,
   type ExecutionCompletionOptions,
   type ExecutionHandle,
+  type ExecutionMethod,
   type ExecutionOutputEvent,
   type ExecutionResult,
 } from './executionLifecycleService.js';
@@ -226,8 +227,13 @@ export class ShellExecutionService {
   static createVirtualExecution(
     initialOutput = '',
     onKill?: () => void,
+    executionMethod: ExecutionMethod = 'none',
   ): ShellExecutionHandle {
-    return ExecutionLifecycleService.createVirtualExecution(initialOutput, onKill);
+    return ExecutionLifecycleService.createVirtualExecution(
+      initialOutput,
+      onKill,
+      executionMethod,
+    );
   }
 
   static appendVirtualOutput(pid: number, chunk: string): void {

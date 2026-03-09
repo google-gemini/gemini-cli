@@ -32,8 +32,8 @@ describe('ExecutionLifecycleService', () => {
     ExecutionLifecycleService.resetForTest();
   });
 
-  it('completes virtual executions in the foreground and notifies exit subscribers', async () => {
-    const handle = ExecutionLifecycleService.createVirtualExecution();
+  it('completes managed executions in the foreground and notifies exit subscribers', async () => {
+    const handle = ExecutionLifecycleService.createExecution();
     if (handle.pid === undefined) {
       throw new Error('Expected virtual execution ID.');
     }
@@ -57,6 +57,23 @@ describe('ExecutionLifecycleService', () => {
     });
 
     unsubscribe();
+  });
+
+  it('supports explicit execution methods for managed executions', async () => {
+    const handle = ExecutionLifecycleService.createExecution(
+      '',
+      undefined,
+      'remote_agent',
+    );
+    if (handle.pid === undefined) {
+      throw new Error('Expected virtual execution ID.');
+    }
+
+    ExecutionLifecycleService.completeVirtualExecution(handle.pid, {
+      exitCode: 0,
+    });
+    const result = await handle.result;
+    expect(result.executionMethod).toBe('remote_agent');
   });
 
   it('supports backgrounding virtual executions and continues streaming updates', async () => {
