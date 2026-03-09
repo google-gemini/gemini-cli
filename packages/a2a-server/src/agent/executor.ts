@@ -252,6 +252,10 @@ export class CoderAgentExecutor implements AgentExecutor {
       );
       await this.taskStore?.save(wrapper.toSDKTask());
       logger.info(`[CoderAgentExecutor] Task ${taskId} state CANCELED saved.`);
+
+      // Cleanup listener subscriptions to avoid memory leaks.
+      wrapper.task.dispose();
+      this.tasks.delete(taskId);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
@@ -610,6 +614,14 @@ export class CoderAgentExecutor implements AgentExecutor {
           `[CoderAgentExecutor] Failed to save task ${taskId} state in finally block:`,
           saveError,
         );
+      }
+
+      if (['canceled', 'failed', 'completed'].includes(currentTask.taskState)) {
+        logger.info(
+          `[CoderAgentExecutor] Task ${taskId} reached terminal state ${currentTask.taskState}. Evicting and disposing.`,
+        );
+        wrapper.task.dispose();
+        this.tasks.delete(taskId);
       }
     }
   }

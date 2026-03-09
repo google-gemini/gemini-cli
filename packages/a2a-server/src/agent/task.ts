@@ -523,6 +523,8 @@ export class Task {
     return scheduler;
   }
 
+  private messageBusListener?: (message: ToolCallsUpdateMessage) => void;
+
   private setupEventDrivenScheduler(): Scheduler {
     const messageBus = this.config.getMessageBus();
     const scheduler = new Scheduler({
@@ -532,12 +534,26 @@ export class Task {
       getPreferredEditor: () => DEFAULT_GUI_EDITOR,
     });
 
+    this.messageBusListener = this.handleEventDrivenToolCallsUpdate.bind(this);
     messageBus.subscribe<ToolCallsUpdateMessage>(
       MessageBusType.TOOL_CALLS_UPDATE,
-      this.handleEventDrivenToolCallsUpdate.bind(this),
+      this.messageBusListener,
     );
 
     return scheduler;
+  }
+
+  dispose(): void {
+    if (this.messageBusListener) {
+      this.config
+        .getMessageBus()
+        .unsubscribe(MessageBusType.TOOL_CALLS_UPDATE, this.messageBusListener);
+      this.messageBusListener = undefined;
+    }
+
+    if (this.scheduler instanceof Scheduler) {
+      this.scheduler.dispose();
+    }
   }
 
   private handleEventDrivenToolCallsUpdate(
@@ -1096,7 +1112,7 @@ export class Task {
 
         try {
           if (correlationId) {
-            void this.config.getMessageBus().publish({
+            await this.config.getMessageBus().publish({
               type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
               correlationId,
               confirmed:
