@@ -470,7 +470,7 @@ export class GeminiChat {
 
   private async makeApiCallAndProcessStream(
     modelConfigKey: ModelConfigKey,
-    requestContents: Content[],
+    requestContents: readonly Content[],
     prompt_id: string,
     abortSignal: AbortSignal,
     role: LlmRole,
@@ -489,7 +489,7 @@ export class GeminiChat {
     let currentGenerateContentConfig: GenerateContentConfig =
       newAvailabilityConfig;
     let lastConfig: GenerateContentConfig = currentGenerateContentConfig;
-    let lastContentsToUse: Content[] = requestContents;
+    let lastContentsToUse: Content[] = [...requestContents];
 
     const getAvailabilityContext = createAvailabilityContextProvider(
       this.config,
@@ -528,9 +528,9 @@ export class GeminiChat {
         abortSignal,
       };
 
-      let contentsToUse = supportsModernFeatures(modelToUse)
-        ? contentsForPreviewModel
-        : requestContents;
+      let contentsToUse: Content[] = supportsModernFeatures(modelToUse)
+        ? [...contentsForPreviewModel]
+        : [...requestContents];
 
       const hookSystem = this.config.getHookSystem();
       if (hookSystem) {
@@ -687,16 +687,10 @@ export class GeminiChat {
    * @return History contents alternating between user and model for the entire
    * chat session.
    */
-  getHistory(curated: boolean = false): Content[] {
+  getHistory(curated: boolean = false): readonly Content[] {
     const history = curated
       ? extractCuratedHistory(this.history)
       : this.history;
-    // Return a shallow copy of the array to prevent callers from mutating
-    // the internal history array (push/pop/splice). Content objects are
-    // shared references — callers MUST NOT mutate them in place.
-    // This replaces a prior structuredClone() which deep-copied the entire
-    // conversation on every call, causing O(n) memory pressure per turn
-    // that compounded into OOM crashes in long-running sessions.
     return [...history];
   }
 
@@ -714,8 +708,8 @@ export class GeminiChat {
     this.history.push(content);
   }
 
-  setHistory(history: Content[]): void {
-    this.history = history;
+  setHistory(history: readonly Content[]): void {
+    this.history = [...history];
     this.lastPromptTokenCount = estimateTokenCountSync(
       this.history.flatMap((c) => c.parts || []),
     );
@@ -742,7 +736,9 @@ export class GeminiChat {
   // To ensure our requests validate, the first function call in every model
   // turn within the active loop must have a `thoughtSignature` property.
   // If we do not do this, we will get back 400 errors from the API.
-  ensureActiveLoopHasThoughtSignatures(requestContents: Content[]): Content[] {
+  ensureActiveLoopHasThoughtSignatures(
+    requestContents: readonly Content[],
+  ): readonly Content[] {
     // First, find the start of the active loop by finding the last user turn
     // with a text message, i.e. that is not a function response.
     let activeLoopStartIndex = -1;

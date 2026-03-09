@@ -74,7 +74,9 @@ export class ContextBuilder {
   }
 
   // Helper to convert Google GenAI Content[] to Safety Protocol ConversationTurn[]
-  private convertHistoryToTurns(history: Content[]): ConversationTurn[] {
+  private convertHistoryToTurns(
+    history: readonly Content[],
+  ): ConversationTurn[] {
     const turns: ConversationTurn[] = [];
     let currentUserRequest: { text: string } | undefined;
 
