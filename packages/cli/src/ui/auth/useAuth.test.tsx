@@ -15,7 +15,11 @@ import {
 } from 'vitest';
 import { renderHook } from '../../test-utils/render.js';
 import { useAuthCommand, validateAuthMethodWithSettings } from './useAuth.js';
-import { AuthType, type Config } from '@google/gemini-cli-core';
+import {
+  AuthType,
+  type Config,
+  ProjectIdRequiredError,
+} from '@google/gemini-cli-core';
 import { AuthState } from '../types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { waitFor } from '../../test-utils/async.js';
@@ -285,6 +289,22 @@ describe('useAuth', () => {
 
       await waitFor(() => {
         expect(result.current.authError).toContain('Failed to login');
+        expect(result.current.authState).toBe(AuthState.Updating);
+      });
+    });
+
+    it('should handle ProjectIdRequiredError without "Failed to login" prefix', async () => {
+      const projectIdError = new ProjectIdRequiredError();
+      (mockConfig.refreshAuth as Mock).mockRejectedValue(projectIdError);
+      const { result } = renderHook(() =>
+        useAuthCommand(createSettings(AuthType.LOGIN_WITH_GOOGLE), mockConfig),
+      );
+
+      await waitFor(() => {
+        expect(result.current.authError).toBe(
+          'This account requires setting the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID env var. See https://goo.gle/gemini-cli-auth-docs#workspace-gca',
+        );
+        expect(result.current.authError).not.toContain('Failed to login');
         expect(result.current.authState).toBe(AuthState.Updating);
       });
     });

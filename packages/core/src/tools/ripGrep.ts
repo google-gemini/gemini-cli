@@ -9,8 +9,13 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
-import type { ToolInvocation, ToolResult } from './tools.js';
-import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+  type ToolInvocation,
+  type ToolResult,
+} from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
@@ -49,7 +54,23 @@ async function resolveExistingRgPath(): Promise<string | null> {
 }
 
 let ripgrepAcquisitionPromise: Promise<string | null> | null = null;
-
+/**
+ * Ensures a ripgrep binary is available.
+ *
+ * NOTE:
+ * - The Gemini CLI currently prefers a managed ripgrep binary downloaded
+ *   into its global bin directory.
+ * - Even if ripgrep is available on the system PATH, it is intentionally
+ *   not used at this time.
+ *
+ * Preference for system-installed ripgrep is blocked on:
+ * - checksum verification of external binaries
+ * - internalization of the get-ripgrep dependency
+ *
+ * See:
+ * - feat(core): Prefer rg in system path (#11847)
+ * - Move get-ripgrep to third_party (#12099)
+ */
 async function ensureRipgrepAvailable(): Promise<string | null> {
   const existingPath = await resolveExistingRgPath();
   if (existingPath) {
