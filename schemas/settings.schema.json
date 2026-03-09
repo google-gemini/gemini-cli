@@ -1712,9 +1712,9 @@
         },
         "plan": {
           "title": "Plan",
-          "description": "Enable planning features (Plan Mode and tools).",
-          "markdownDescription": "Enable planning features (Plan Mode and tools).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "description": "Enable Plan Mode.",
+          "markdownDescription": "Enable Plan Mode.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "taskTracker": {

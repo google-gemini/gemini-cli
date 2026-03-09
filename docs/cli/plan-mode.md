@@ -1,4 +1,4 @@
-# Plan Mode (experimental)
+# Plan Mode
 
 Plan Mode is a read-only environment for architecting robust solutions before
 implementation. With Plan Mode, you can:
@@ -8,27 +8,8 @@ implementation. With Plan Mode, you can:
 - **Design:** Understand problems, evaluate trade-offs, and choose a solution.
 - **Plan:** Align on an execution strategy before any code is modified.
 
-> **Note:** This is a preview feature currently under active development. Your
-> feedback is invaluable as we refine this feature. If you have ideas,
-> suggestions, or encounter issues:
->
-> - [Open an issue] on GitHub.
-> - Use the **/bug** command within Gemini CLI to file an issue.
-
-## How to enable Plan Mode
-
-Enable Plan Mode in **Settings** or by editing your configuration file.
-
-- **Settings:** Use the `/settings` command and set **Plan** to `true`.
-- **Configuration:** Add the following to your `settings.json`:
-
-  ```json
-  {
-    "experimental": {
-      "plan": true
-    }
-  }
-  ```
+Plan Mode is enabled by default. You can manage this setting using the
+`/settings` command.
 
 ## How to enter Plan Mode
 
