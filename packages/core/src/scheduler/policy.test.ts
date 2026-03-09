@@ -49,6 +49,9 @@ describe('policy.ts', () => {
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
       } as unknown as Mocked<Config>;
 
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
+
       const toolCall = {
         request: { name: 'test-tool', args: {} },
         tool: { name: 'test-tool' },
@@ -71,6 +74,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
 
       const mcpTool = Object.create(DiscoveredMCPTool.prototype);
       mcpTool.serverName = 'my-server';
@@ -99,6 +105,9 @@ describe('policy.ts', () => {
         isInteractive: vi.fn().mockReturnValue(false),
       } as unknown as Mocked<Config>;
 
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
+
       const toolCall = {
         request: { name: 'test-tool', args: {} },
         tool: { name: 'test-tool' },
@@ -117,6 +126,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
 
       const toolCall = {
         request: { name: 'test-tool', args: {} },
@@ -137,6 +149,9 @@ describe('policy.ts', () => {
         isInteractive: vi.fn().mockReturnValue(true),
       } as unknown as Mocked<Config>;
 
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
+
       const toolCall = {
         request: { name: 'test-tool', args: {} },
         tool: { name: 'test-tool' },
@@ -152,6 +167,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -175,6 +193,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -200,6 +221,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -225,6 +249,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -256,6 +283,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -290,6 +320,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -308,6 +341,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -325,6 +361,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -344,6 +383,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -378,6 +420,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -410,6 +455,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -447,6 +495,8 @@ describe('policy.ts', () => {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
       } as unknown as Config;
 
+      (mockConfig as unknown as { config: Config }).config = mockConfig;
+
       const { errorMessage, errorType } = getPolicyDenialError(mockConfig);
 
       expect(errorMessage).toBe('Tool execution denied by policy.');
@@ -457,6 +507,8 @@ describe('policy.ts', () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
       } as unknown as Config;
+
+      (mockConfig as unknown as { config: Config }).config = mockConfig;
       const rule = {
         decision: PolicyDecision.DENY,
         denyMessage: 'Custom Deny',
@@ -517,7 +569,8 @@ describe('Plan Mode Denial Consistency', () => {
 
     mockConfig = {
       getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
-      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      toolRegistry: mockToolRegistry,
+      getToolRegistry: () => mockToolRegistry,
       getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(false),
@@ -525,6 +578,7 @@ describe('Plan Mode Denial Consistency', () => {
       setApprovalMode: vi.fn(),
       getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Config>;
+    (mockConfig as unknown as { config: Config }).config = mockConfig as Config;
   });
 
   afterEach(() => {

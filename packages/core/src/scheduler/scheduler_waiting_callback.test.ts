@@ -36,7 +36,7 @@ describe('Scheduler waiting callback', () => {
 
     mockTool = new MockTool({ name: 'test_tool' });
     toolRegistry = new ToolRegistry(mockConfig, messageBus);
-    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(toolRegistry);
+    vi.spyOn(mockConfig, 'toolRegistry', 'get').mockReturnValue(toolRegistry);
     toolRegistry.registerTool(mockTool);
 
     vi.mocked(checkPolicy).mockResolvedValue({

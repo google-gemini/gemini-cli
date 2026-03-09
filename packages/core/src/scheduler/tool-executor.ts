@@ -13,6 +13,7 @@ import {
   type ToolCallResponseInfo,
   type ToolResult,
   type Config,
+  type AgentLoopContext,
   type ToolLiveOutput,
 } from '../index.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
@@ -49,7 +50,10 @@ export interface ToolExecutionContext {
 }
 
 export class ToolExecutor {
-  constructor(private readonly config: Config) {}
+  constructor(
+    private readonly config: Config,
+    private readonly context: AgentLoopContext,
+  ) {}
 
   async execute(context: ToolExecutionContext): Promise<CompletedToolCall> {
     const { call, signal, outputUpdateHandler, onUpdateToolCall } = context;
@@ -202,7 +206,7 @@ export class ToolExecutor {
           toolName,
           callId,
           this.config.storage.getProjectTempDir(),
-          this.config.getSessionId(),
+          this.context.promptId,
         );
         outputFile = savedPath;
         const truncatedContent = formatTruncatedToolOutput(
@@ -241,7 +245,7 @@ export class ToolExecutor {
             toolName,
             callId,
             this.config.storage.getProjectTempDir(),
-            this.config.getSessionId(),
+            this.context.promptId,
           );
           outputFile = savedPath;
           const truncatedText = formatTruncatedToolOutput(
