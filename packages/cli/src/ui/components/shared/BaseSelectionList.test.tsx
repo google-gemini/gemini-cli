@@ -12,22 +12,10 @@ import {
   type RenderItemContext,
 } from './BaseSelectionList.js';
 import { useSelectionList } from '../../hooks/useSelectionList.js';
-import { Text, getBoundingBox } from 'ink';
+import { Text } from 'ink';
 import type { theme } from '../../semantic-colors.js';
-import { useTerminalSize } from '../../hooks/useTerminalSize.js';
-import { useUIState, type UIState } from '../../contexts/UIStateContext.js';
 
 vi.mock('../../hooks/useSelectionList.js');
-vi.mock('../../hooks/useTerminalSize.js');
-vi.mock('../../contexts/UIStateContext.js');
-
-vi.mock('ink', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('ink')>();
-  return {
-    ...actual,
-    getBoundingBox: vi.fn(),
-  };
-});
 
 const mockTheme = {
   text: { primary: 'COLOR_PRIMARY', secondary: 'COLOR_SECONDARY' },
@@ -69,18 +57,6 @@ describe('BaseSelectionList', () => {
       setActiveIndex: vi.fn(),
     });
 
-    vi.mocked(useTerminalSize).mockReturnValue({
-      columns: 100,
-      rows: 40,
-    });
-
-    vi.mocked(getBoundingBox).mockReturnValue({
-      width: 100,
-      height: 10,
-      x: 0,
-      y: 0,
-    });
-
     mockRenderItem.mockImplementation(
       (
         item: { value: string; label: string; disabled?: boolean; key: string },
@@ -106,9 +82,6 @@ describe('BaseSelectionList', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useUIState).mockReturnValue({
-      mainAreaWidth: 100,
-    } as unknown as UIState);
   });
 
   describe('Rendering and Structure', () => {
@@ -119,7 +92,6 @@ describe('BaseSelectionList', () => {
       expect(lastFrame()).toContain('Item B');
       expect(lastFrame()).toContain('Item C');
 
-      // 3 items. Render count might be higher due to useLayoutEffect for offset.
       expect(mockRenderItem).toHaveBeenCalledTimes(items.length);
       expect(mockRenderItem).toHaveBeenCalledWith(items[0], expect.any(Object));
       unmount();
@@ -524,33 +496,6 @@ describe('BaseSelectionList', () => {
       );
 
       expect(lastFrame()).toMatchSnapshot();
-      unmount();
-    });
-
-    it('should apply full-width highlight and offset when horizontally shifted', async () => {
-      const horizontalOffset = 10;
-      const terminalWidth = 100;
-
-      vi.mocked(getBoundingBox).mockReturnValue({
-        width: 80,
-        height: 10,
-        x: horizontalOffset,
-        y: 0,
-      });
-
-      vi.mocked(useTerminalSize).mockReturnValue({
-        columns: terminalWidth,
-        rows: 40,
-      });
-
-      const result = await renderComponent({}, 0); // Item A selected
-      const { lastFrame, unmount, waitUntilReady } = result;
-      await waitUntilReady();
-
-      const output = lastFrame();
-      expect(output).toContain('Item A');
-
-      await expect(result).toMatchSvgSnapshot();
       unmount();
     });
 

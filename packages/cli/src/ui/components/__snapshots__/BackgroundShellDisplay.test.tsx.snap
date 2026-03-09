@@ -16,9 +16,9 @@ exports[`<BackgroundShellDisplay /> > keeps exit code status color even when sel
 │                                                                              │
 │ Select Process (Enter to select, Ctrl+K to kill, Esc to cancel):             │
 │                                                                              │
-│   1. npm start (PID: 1001)                                                   │
-│   2. tail -f log.txt (PID: 1002)                                             │
-│ ● 3. exit 0 (PID: 1003) (Exit Code: 0)                                       │
+│    1. npm start (PID: 1001)                                                  │
+│    2. tail -f log.txt (PID: 1002)                                            │
+│  ● 3. exit 0 (PID: 1003) (Exit Code: 0)                                      │
 └──────────────────────────────────────────────────────────────────────────────┘
 "
 `;
@@ -46,8 +46,8 @@ exports[`<BackgroundShellDisplay /> > renders the process list when isListOpenPr
 │                                                                              │
 │ Select Process (Enter to select, Ctrl+K to kill, Esc to cancel):             │
 │                                                                              │
-│ ● 1. npm start (PID: 1001)                                                   │
-│   2. tail -f log.txt (PID: 1002)                                             │
+│  ● 1. npm start (PID: 1001)                                                  │
+│    2. tail -f log.txt (PID: 1002)                                            │
 └──────────────────────────────────────────────────────────────────────────────┘
 "
 `;
@@ -59,8 +59,8 @@ exports[`<BackgroundShellDisplay /> > scrolls to active shell when list opens 1`
 │                                                                              │
 │ Select Process (Enter to select, Ctrl+K to kill, Esc to cancel):             │
 │                                                                              │
-│   1. npm start (PID: 1001)                                                   │
-│ ● 2. tail -f log.txt (PID: 1002)                                             │
+│    1. npm start (PID: 1001)                                                  │
+│  ● 2. tail -f log.txt (PID: 1002)                                            │
 └──────────────────────────────────────────────────────────────────────────────┘
 "
 `;

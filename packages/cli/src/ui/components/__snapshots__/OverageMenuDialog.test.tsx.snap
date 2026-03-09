@@ -14,10 +14,10 @@ exports[`OverageMenuDialog > rendering > should match snapshot with fallback ava
 │ How would you like to proceed?                                                                   │
 │                                                                                                  │
 │                                                                                                  │
-│ ● 1. Use AI Credits - Continue this request (Overage)                                            │
-│   2. Manage - View balance and purchase more credits                                             │
-│   3. Switch to gemini-3-flash-preview                                                            │
-│   4. Stop - Abort request                                                                        │
+│  ● 1. Use AI Credits - Continue this request (Overage)                                           │
+│    2. Manage - View balance and purchase more credits                                            │
+│    3. Switch to gemini-3-flash-preview                                                           │
+│    4. Stop - Abort request                                                                       │
 │                                                                                                  │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -37,9 +37,9 @@ exports[`OverageMenuDialog > rendering > should match snapshot without fallback 
 │ How would you like to proceed?                                                                   │
 │                                                                                                  │
 │                                                                                                  │
-│ ● 1. Use AI Credits - Continue this request (Overage)                                            │
-│   2. Manage - View balance and purchase more credits                                             │
-│   3. Stop - Abort request                                                                        │
+│  ● 1. Use AI Credits - Continue this request (Overage)                                           │
+│    2. Manage - View balance and purchase more credits                                            │
+│    3. Stop - Abort request                                                                       │
 │                                                                                                  │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
