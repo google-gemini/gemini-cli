@@ -22,7 +22,7 @@ import type { RemoteAgentDefinition } from './types.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { A2AAuthProvider } from './auth-provider/types.js';
-import { ShellExecutionService } from '../services/shellExecutionService.js';
+import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
 
 // Mock A2AClientManager
 vi.mock('./a2a-client-manager.js', () => ({
@@ -59,6 +59,7 @@ describe('RemoteAgentInvocation', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    ExecutionLifecycleService.resetForTest();
     (A2AClientManager.getInstance as Mock).mockReturnValue(mockClientManager);
     (
       RemoteAgentInvocation as unknown as {
@@ -619,8 +620,8 @@ describe('RemoteAgentInvocation', () => {
 
       const updateOutput = vi.fn((output: unknown) => {
         if (output === 'Chunk 1' && executionId !== undefined) {
-          ShellExecutionService.background(executionId);
-          unsubscribeStream = ShellExecutionService.subscribe(
+          ExecutionLifecycleService.background(executionId);
+          unsubscribeStream = ExecutionLifecycleService.subscribe(
             executionId,
             (event) => {
               if (event.type === 'data' && typeof event.chunk === 'string') {
@@ -643,7 +644,7 @@ describe('RemoteAgentInvocation', () => {
         undefined,
         (newExecutionId) => {
           executionId = newExecutionId;
-          unsubscribeOnExit = ShellExecutionService.onExit(
+          unsubscribeOnExit = ExecutionLifecycleService.onExit(
             newExecutionId,
             onExit,
           );
