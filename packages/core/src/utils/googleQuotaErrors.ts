@@ -110,6 +110,16 @@ const CLOUDCODE_DOMAINS = [
 ];
 
 /**
+ * Checks if the given domain belongs to a Cloud Code API endpoint.
+ * Sanitizes stray characters that SSE stream parsing can inject into the
+ * domain string before comparing.
+ */
+function isCloudCodeDomain(domain: string): boolean {
+  const sanitized = domain.replace(/[^a-zA-Z0-9.-]/g, '');
+  return CLOUDCODE_DOMAINS.includes(sanitized);
+}
+
+/**
  * Checks if a 403 error requires user validation and extracts validation details.
  *
  * @param googleApiError The parsed Google API error to check.
@@ -129,7 +139,7 @@ function classifyValidationRequiredError(
 
   if (
     !errorInfo.domain ||
-    !CLOUDCODE_DOMAINS.includes(errorInfo.domain) ||
+    !isCloudCodeDomain(errorInfo.domain) ||
     errorInfo.reason !== 'VALIDATION_REQUIRED'
   ) {
     return null;
@@ -313,12 +323,7 @@ export function classifyGoogleError(error: unknown): unknown {
 
     // New Cloud Code API quota handling
     if (errorInfo.domain) {
-      const validDomains = [
-        'cloudcode-pa.googleapis.com',
-        'staging-cloudcode-pa.googleapis.com',
-        'autopush-cloudcode-pa.googleapis.com',
-      ];
-      if (validDomains.includes(errorInfo.domain)) {
+      if (isCloudCodeDomain(errorInfo.domain)) {
         if (errorInfo.reason === 'RATE_LIMIT_EXCEEDED') {
           return new RetryableQuotaError(
             `${googleApiError.message}`,
