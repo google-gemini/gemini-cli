@@ -20,7 +20,7 @@ import { BaseSelectionList } from './shared/BaseSelectionList.js';
 import type { SelectionListItem } from '../hooks/useSelectionList.js';
 import { TabHeader, type Tab } from './shared/TabHeader.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../keyMatchers.js';
 import { checkExhaustive } from '@google/gemini-cli-core';
 import { TextInput } from './shared/TextInput.js';
 import { formatCommand } from '../utils/keybindingUtils.js';
@@ -36,6 +36,7 @@ import { RenderInline } from '../utils/InlineMarkdownRenderer.js';
 import { MaxSizedBox } from './shared/MaxSizedBox.js';
 import { UIStateContext } from '../contexts/UIStateContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
 /** Padding for dialog content to prevent text from touching edges. */
 const DIALOG_PADDING = 4;
@@ -208,6 +209,7 @@ const ReviewView: React.FC<ReviewViewProps> = ({
   progressHeader,
   extraParts,
 }) => {
+  const keyMatchers = useKeyMatchers();
   const unansweredCount = questions.length - Object.keys(answers).length;
   const hasUnanswered = unansweredCount > 0;
 
@@ -288,6 +290,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
   progressHeader,
   keyboardHints,
 }) => {
+  const keyMatchers = useKeyMatchers();
   const isAlternateBuffer = useAlternateBuffer();
   const prefix = '> ';
   const horizontalPadding = 1; // 1 for cursor
@@ -325,7 +328,7 @@ const TextQuestionView: React.FC<TextQuestionViewProps> = ({
       }
       return false;
     },
-    [buffer, textValue],
+    [buffer, textValue, keyMatchers],
   );
 
   useKeypress(handleExtraKeys, { isActive: true, priority: true });
@@ -487,6 +490,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   progressHeader,
   keyboardHints,
 }) => {
+  const keyMatchers = useKeyMatchers();
   const isAlternateBuffer = useAlternateBuffer();
   const numOptions =
     (question.options?.length ?? 0) + (question.type !== 'yesno' ? 1 : 0);
@@ -680,6 +684,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       customBuffer,
       onEditingCustomOption,
       customOptionText,
+      keyMatchers,
     ],
   );
 
@@ -950,6 +955,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
   availableHeight: availableHeightProp,
   extraParts,
 }) => {
+  const keyMatchers = useKeyMatchers();
   const uiState = useContext(UIStateContext);
   const availableHeight =
     availableHeightProp ??
@@ -999,7 +1005,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       }
       return false;
     },
-    [onCancel, submitted, isEditingCustomOption],
+    [onCancel, submitted, isEditingCustomOption, keyMatchers],
   );
 
   useKeypress(handleCancel, {
@@ -1032,7 +1038,7 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
       }
       return false;
     },
-    [questions.length, submitted, goToNextTab, goToPrevTab],
+    [questions.length, submitted, goToNextTab, goToPrevTab, keyMatchers],
   );
 
   useKeypress(handleNavigation, {

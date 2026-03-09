@@ -22,7 +22,8 @@ import { useScrollable } from '../../contexts/ScrollProvider.js';
 import { Box, type DOMElement } from 'ink';
 import { useAnimatedScrollbar } from '../../hooks/useAnimatedScrollbar.js';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../keyMatchers.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 const ANIMATION_FRAME_DURATION_MS = 33;
 
@@ -46,6 +47,7 @@ function ScrollableList<T>(
   props: ScrollableListProps<T>,
   ref: React.Ref<ScrollableListRef<T>>,
 ) {
+  const keyMatchers = useKeyMatchers();
   const { hasFocus, width } = props;
   const virtualizedListRef = useRef<VirtualizedListRef<T>>(null);
   const containerRef = useRef<DOMElement>(null);

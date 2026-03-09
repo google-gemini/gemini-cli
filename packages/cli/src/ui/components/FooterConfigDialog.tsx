@@ -11,13 +11,14 @@ import { theme } from '../semantic-colors.js';
 import { useSettingsStore } from '../contexts/SettingsContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../keyMatchers.js';
 import { FooterRow, type FooterRowItem } from './Footer.js';
 import { ALL_ITEMS, resolveFooterState } from '../../config/footerItems.js';
 import { SettingScope } from '../../config/settings.js';
 import { BaseSelectionList } from './shared/BaseSelectionList.js';
 import type { SelectionListItem } from '../hooks/useSelectionList.js';
 import { DialogFooter } from './shared/DialogFooter.js';
+import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
 interface FooterConfigDialogProps {
   onClose?: () => void;
@@ -82,6 +83,7 @@ function footerConfigReducer(
 export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
   onClose,
 }) => {
+  const keyMatchers = useKeyMatchers();
   const { settings, setSetting } = useSettingsStore();
   const { constrainHeight, terminalHeight, staticExtraHeight } = useUIState();
   const [state, dispatch] = useReducer(footerConfigReducer, undefined, () =>
