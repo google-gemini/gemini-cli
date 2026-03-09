@@ -11,7 +11,7 @@ import {
   getAdminErrorMessage,
 } from '@google/gemini-cli-core';
 import { useKeypress } from './useKeypress.js';
-import { Command } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
 import { useKeyMatchers } from './useKeyMatchers.js';
 import type { HistoryItemWithoutId } from '../types.js';
 import { MessageType } from '../types.js';

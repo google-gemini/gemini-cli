@@ -8,9 +8,9 @@ import { useCallback } from 'react';
 import type React from 'react';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { ShellExecutionService } from '@google/gemini-cli-core';
-import { keyToAnsi, type Key } from '../hooks/keyToAnsi.js';
+import { keyToAnsi, type Key } from '../key/keyToAnsi.js';
 import { ACTIVE_SHELL_MAX_LINES } from '../constants.js';
-import { Command } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
 export interface ShellInputPromptProps {
