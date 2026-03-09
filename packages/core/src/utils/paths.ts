@@ -359,8 +359,8 @@ export function isSubpath(parentPath: string, childPath: string): boolean {
  * @param pathStr The path string to resolve.
  * @returns The resolved real path.
  */
-export function resolveToRealPath(path: string): string {
-  let resolvedPath = path;
+export function resolveToRealPath(pathStr: string): string {
+  let resolvedPath = pathStr;
 
   try {
     if (resolvedPath.startsWith('file://')) {
@@ -372,11 +372,28 @@ export function resolveToRealPath(path: string): string {
     // Ignore error (e.g. malformed URI), keep path from previous step
   }
 
+  return robustRealpath(path.resolve(resolvedPath));
+}
+
+function robustRealpath(p: string): string {
   try {
-    return fs.realpathSync(resolvedPath);
-  } catch (_e) {
-    // If realpathSync fails, it might be because the path doesn't exist.
-    // In that case, we can fall back to the path processed.
-    return resolvedPath;
+    return fs.realpathSync(p);
+  } catch (e: unknown) {
+    if (e && typeof e === 'object' && 'code' in e && e.code === 'ENOENT') {
+      try {
+        const stat = fs.lstatSync(p);
+        if (stat.isSymbolicLink()) {
+          const target = fs.readlinkSync(p);
+          const resolvedTarget = path.resolve(path.dirname(p), target);
+          return robustRealpath(resolvedTarget);
+        }
+      } catch {
+        // Not a symlink, or lstat failed. Just resolve parent.
+      }
+      const parent = path.dirname(p);
+      if (parent === p) return p;
+      return path.join(robustRealpath(parent), path.basename(p));
+    }
+    throw e;
   }
 }
