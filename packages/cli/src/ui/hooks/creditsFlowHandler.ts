@@ -110,7 +110,6 @@ async function handleOverageMenu(
     isDialogPending,
     setOverageMenuRequest,
     setModelSwitchedFromQuotaError,
-    historyManager,
   } = args;
 
   logBillingEvent(
@@ -155,13 +154,6 @@ async function handleOverageMenu(
       setModelSwitchedFromQuotaError(false);
       config.setQuotaErrorOccurred(false);
       config.setOverageStrategy('always');
-      historyManager.addItem(
-        {
-          type: MessageType.INFO,
-          text: `Using AI Credits for this request.`,
-        },
-        Date.now(),
-      );
       return 'retry_with_credits';
 
     case 'use_fallback':
