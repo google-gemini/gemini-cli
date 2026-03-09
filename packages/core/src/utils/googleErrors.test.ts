@@ -361,4 +361,88 @@ describe('parseGoogleApiError', () => {
       ),
     ).toBe(true);
   });
+
+  it('should parse a gaxios error with SSE-corrupted JSON containing stray commas', () => {
+    // This reproduces the exact corruption pattern observed in production where
+    // SSE serialization injects a stray comma on a newline before "metadata".
+    const corruptedJson = JSON.stringify([
+      {
+        error: {
+          code: 429,
+          message:
+            'You have exhausted your capacity on this model. Your quota will reset after 19h14m47s.',
+          details: [
+            {
+              '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+              reason: 'QUOTA_EXHAUSTED',
+              domain: 'cloudcode-pa.googleapis.com',
+              metadata: {
+                uiMessage: 'true',
+                model: 'gemini-3-flash-preview',
+              },
+            },
+            {
+              '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+              retryDelay: '68940s',
+            },
+          ],
+        },
+      },
+    ]).replace(
+      '"domain": "cloudcode-pa.googleapis.com",',
+      '"domain": "cloudcode-pa.googleapis.com",\n ,      ',
+    );
+
+    // Test via message path (fromApiError)
+    const mockError = {
+      message: corruptedJson,
+      code: 429,
+      status: 429,
+    };
+
+    const parsed = parseGoogleApiError(mockError);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.code).toBe(429);
+    expect(parsed?.message).toContain('You have exhausted your capacity');
+    expect(parsed?.details).toHaveLength(2);
+    expect(
+      parsed?.details.some(
+        (d) => d['@type'] === 'type.googleapis.com/google.rpc.ErrorInfo',
+      ),
+    ).toBe(true);
+  });
+
+  it('should parse a gaxios error with SSE-corrupted JSON in response.data', () => {
+    const corruptedJson = JSON.stringify([
+      {
+        error: {
+          code: 429,
+          message: 'Quota exceeded',
+          details: [
+            {
+              '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+              reason: 'QUOTA_EXHAUSTED',
+              domain: 'cloudcode-pa.googleapis.com',
+              metadata: { model: 'gemini-3-flash-preview' },
+            },
+          ],
+        },
+      },
+    ]).replace(
+      '"domain": "cloudcode-pa.googleapis.com",',
+      '"domain": "cloudcode-pa.googleapis.com",\n,       ',
+    );
+
+    const mockError = {
+      response: {
+        status: 429,
+        data: corruptedJson,
+      },
+    };
+
+    const parsed = parseGoogleApiError(mockError);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.code).toBe(429);
+    expect(parsed?.message).toBe('Quota exceeded');
+  });
 });
