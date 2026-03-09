@@ -566,7 +566,7 @@ class TrackerVisualizeInvocation extends BaseToolInvocation<
 
     return {
       llmContent: output,
-      returnDisplay: 'Graph rendered.',
+      returnDisplay: output,
     };
   }
 }
