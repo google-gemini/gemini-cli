@@ -328,6 +328,22 @@ export async function startInteractiveUI(
 export async function main() {
   const cliStartupHandle = startupProfiler.start('cli_startup');
 
+  const parentStartTime = process.env['GEMINI_CLI_PARENT_START_TIME'];
+  if (parentStartTime) {
+    const startAbsMs = parseInt(parentStartTime, 10);
+    // Record how long the parent process(es) took before this child started.
+    startupProfiler.recordPhase(
+      'parent_process_duration',
+      startAbsMs,
+      performance.timeOrigin,
+    );
+    // Measure overall time from the very first process start
+    startupProfiler.start('overall_startup', {}, startAbsMs);
+    // Measure time from this child process launch
+    startupProfiler.start('child_process_to_ui_visible');
+    startupProfiler.start('child_process_to_typing_ready');
+  }
+
   // Listen for admin controls from parent process (IPC) in non-sandbox mode. In
   // sandbox mode, we re-fetch the admin controls from the server once we enter
   // the sandbox.
