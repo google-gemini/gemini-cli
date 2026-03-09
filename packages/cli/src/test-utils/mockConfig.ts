@@ -42,7 +42,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     setSessionId: vi.fn(),
     getSessionId: vi.fn().mockReturnValue('mock-session-id'),
     getContentGeneratorConfig: vi.fn(() => ({ authType: 'google' })),
-    getExperimentalZedIntegration: vi.fn(() => false),
+    getAcpMode: vi.fn(() => false),
     isBrowserLaunchSuppressed: vi.fn(() => false),
     setRemoteAdminSettings: vi.fn(),
     isYoloModeDisabled: vi.fn(() => false),
@@ -141,7 +141,10 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getMcpClientManager: vi.fn().mockReturnValue({
       getMcpInstructions: vi.fn().mockReturnValue(''),
       getMcpServers: vi.fn().mockReturnValue({}),
+      getLastError: vi.fn().mockReturnValue(undefined),
     }),
+    setUserInteractedWithMcp: vi.fn(),
+    emitMcpDiagnostic: vi.fn(),
     getEnableEventDrivenScheduler: vi.fn().mockReturnValue(false),
     getAdminSkillsEnabled: vi.fn().mockReturnValue(false),
     getDisabledSkills: vi.fn().mockReturnValue([]),
@@ -156,6 +159,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getExperiments: vi.fn().mockReturnValue(undefined),
     getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
     validatePathAccess: vi.fn().mockReturnValue(null),
+    getUseAlternateBuffer: vi.fn().mockReturnValue(false),
     ...overrides,
   }) as unknown as Config;
 

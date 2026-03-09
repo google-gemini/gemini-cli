@@ -21,6 +21,13 @@ export const TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT = 2;
 export const TOOL_RESULT_MIN_LINES_SHOWN = 2;
 
 /**
+ * The vertical space (in lines) consumed by the shell UI elements
+ * (1 line for the shell title/header and 2 lines for the top and bottom borders).
+ */
+export const SHELL_CONTENT_OVERHEAD =
+  TOOL_RESULT_STATIC_HEIGHT + TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT;
+
+/**
  * Calculates the final height available for the content of a tool result display.
  *
  * This accounts for:
@@ -88,7 +95,9 @@ export function calculateShellMaxLines(options: {
 
   // 2. Handle cases where height is unknown (Standard mode history).
   if (availableTerminalHeight === undefined) {
-    return isAlternateBuffer ? ACTIVE_SHELL_MAX_LINES : undefined;
+    return isAlternateBuffer
+      ? ACTIVE_SHELL_MAX_LINES - SHELL_CONTENT_OVERHEAD
+      : undefined;
   }
 
   const maxLinesBasedOnHeight = Math.max(1, availableTerminalHeight - 2);
@@ -103,8 +112,8 @@ export function calculateShellMaxLines(options: {
   // 4. Fall back to process-based constants.
   const isExecuting = status === CoreToolCallStatus.Executing;
   const shellMaxLinesLimit = isExecuting
-    ? ACTIVE_SHELL_MAX_LINES
-    : COMPLETED_SHELL_MAX_LINES;
+    ? ACTIVE_SHELL_MAX_LINES - SHELL_CONTENT_OVERHEAD
+    : COMPLETED_SHELL_MAX_LINES - SHELL_CONTENT_OVERHEAD;
 
   return Math.min(maxLinesBasedOnHeight, shellMaxLinesLimit);
 }

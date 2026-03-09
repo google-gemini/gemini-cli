@@ -96,6 +96,14 @@ describe('SettingsSchema', () => {
       ]);
     });
 
+    it('should have errorVerbosity enum property', () => {
+      const definition = getSettingsSchema().ui?.properties?.errorVerbosity;
+      expect(definition).toBeDefined();
+      expect(definition?.type).toBe('enum');
+      expect(definition?.default).toBe('low');
+      expect(definition?.options?.map((o) => o.value)).toEqual(['low', 'full']);
+    });
+
     it('should have checkpointing nested properties', () => {
       expect(
         getSettingsSchema().general?.properties?.checkpointing.properties
@@ -453,7 +461,7 @@ describe('SettingsSchema', () => {
       expect(gemmaModelRouter.category).toBe('Experimental');
       expect(gemmaModelRouter.default).toEqual({});
       expect(gemmaModelRouter.requiresRestart).toBe(true);
-      expect(gemmaModelRouter.showInDialog).toBe(true);
+      expect(gemmaModelRouter.showInDialog).toBe(false);
       expect(gemmaModelRouter.description).toBe(
         'Enable Gemma model router (experimental).',
       );
@@ -464,9 +472,9 @@ describe('SettingsSchema', () => {
       expect(enabled.category).toBe('Experimental');
       expect(enabled.default).toBe(false);
       expect(enabled.requiresRestart).toBe(true);
-      expect(enabled.showInDialog).toBe(true);
+      expect(enabled.showInDialog).toBe(false);
       expect(enabled.description).toBe(
-        'Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
+        'Enable the Gemma Model Router (experimental). Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
       );
 
       const classifier = gemmaModelRouter.properties.classifier;
