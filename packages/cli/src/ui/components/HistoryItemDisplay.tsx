@@ -48,6 +48,12 @@ interface HistoryItemDisplayProps {
   isExpandable?: boolean;
   isFirstThinking?: boolean;
   isFirstAfterThinking?: boolean;
+  /**
+   * When true and item is tool_group, render nothing. Used so the task tree
+   * can be the single source of truth for the most recent tool run (no duplicate
+   * linear "thought box" above the tree).
+   */
+  suppressToolGroup?: boolean;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -60,6 +66,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   isExpandable,
   isFirstThinking = false,
   isFirstAfterThinking = false,
+  suppressToolGroup = false,
 }) => {
   const settings = useSettings();
   const inlineThinkingMode = getInlineThinkingMode(settings);
@@ -67,6 +74,11 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
 
   const needsTopMarginAfterThinking =
     isFirstAfterThinking && inlineThinkingMode !== 'off';
+
+  // Task tree shows the most recent tool run; avoid duplicate linear box.
+  if (itemForDisplay.type === 'tool_group' && suppressToolGroup) {
+    return <Box key={itemForDisplay.id} width={terminalWidth} />;
+  }
 
   return (
     <Box

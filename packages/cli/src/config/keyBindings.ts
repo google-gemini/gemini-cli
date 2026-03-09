@@ -97,6 +97,11 @@ export enum Command {
   CLEAR_SCREEN = 'app.clearScreen',
   RESTART_APP = 'app.restart',
   SUSPEND_APP = 'app.suspend',
+
+  // Task tree collapse/expand
+  TOGGLE_COLLAPSE = 'tree.toggleCollapse',
+  COLLAPSE_ALL = 'tree.collapseAll',
+  EXPAND_ALL = 'tree.expandAll',
 }
 
 /**
@@ -257,6 +262,11 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
   [Command.RESTART_APP]: [{ key: 'r' }, { key: 'r', shift: true }],
   [Command.SUSPEND_APP]: [{ key: 'z', ctrl: true }],
+
+  // Task tree collapse/expand
+  [Command.TOGGLE_COLLAPSE]: [{ key: 'right' }, { key: 'left' }],
+  [Command.COLLAPSE_ALL]: [{ key: '[', ctrl: true }],
+  [Command.EXPAND_ALL]: [{ key: ']', ctrl: true }],
 };
 
 interface CommandCategory {
@@ -379,6 +389,14 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.SUSPEND_APP,
     ],
   },
+  {
+    title: 'Task Tree',
+    commands: [
+      Command.TOGGLE_COLLAPSE,
+      Command.COLLAPSE_ALL,
+      Command.EXPAND_ALL,
+    ],
+  },
 ];
 
 /**
@@ -485,4 +503,10 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
   [Command.RESTART_APP]: 'Restart the application.',
   [Command.SUSPEND_APP]: 'Suspend the CLI and move it to the background.',
+
+  // Task tree collapse/expand
+  [Command.TOGGLE_COLLAPSE]:
+    'Toggle the expanded/collapsed state of the focused task tree node.',
+  [Command.COLLAPSE_ALL]: 'Collapse all tool output sections in the task tree.',
+  [Command.EXPAND_ALL]: 'Expand all tool output sections in the task tree.',
 };

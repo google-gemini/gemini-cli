@@ -507,3 +507,23 @@ export interface ActiveHook {
   index?: number;
   total?: number;
 }
+
+/**
+ * A single node in the interactive task tree visualization.
+ * Built by useTaskTree from the flat IndividualToolCallDisplay list using
+ * parentCallId relationships.
+ */
+export interface TaskTreeNode {
+  /** The underlying tool call data. */
+  toolCall: IndividualToolCallDisplay;
+  /** Nested child calls (e.g. tools invoked by a subagent). */
+  children: TaskTreeNode[];
+  /** Nesting depth, 0 = top-level. */
+  depth: number;
+  /** When true, this node's output and children are collapsed. */
+  isCollapsed: boolean;
+  /** When true, this node has keyboard focus for expand/collapse. */
+  isFocused: boolean;
+  /** Wall-clock duration in ms from Executing → terminal state. Undefined while pending/queued. */
+  durationMs?: number;
+}
