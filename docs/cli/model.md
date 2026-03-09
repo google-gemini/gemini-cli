@@ -32,7 +32,7 @@ You can also use the `--model` flag to specify a particular Gemini model on
 startup. For more details, refer to the
 [configuration documentation](../reference/configuration.md).
 
-Changes to these settings23 will be applied to all subsequent interactions with
+Changes to these settings will be applied to all subsequent interactions with
 Gemini CLI.
 
 ## Best practices for model selection
