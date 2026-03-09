@@ -9,7 +9,7 @@ import { type VariableSchema, VARIABLE_SCHEMA } from './variableSchema.js';
 import { GEMINI_DIR } from '@google/gemini-cli-core';
 
 /**
- * Respresents a set of keys that will be considered invalid while umarshalling
+ * Represents a set of keys that will be considered invalid while unmarshalling
  * JSON in recursivelyHydrateStrings.
  */
 const UNMARSHALL_KEY_IGNORE_LIST: Set<string> = new Set<string>([
