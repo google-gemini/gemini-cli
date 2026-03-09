@@ -75,15 +75,13 @@ export interface ToolInvocation<
 /**
  * Structured payload used by tools to surface background execution metadata to
  * the CLI UI.
+ *
+ * NOTE: `pid` is used as the canonical identifier for now to stay consistent
+ * with existing types (ExecutingToolCall.pid, ExecutionHandle.pid, etc.).
+ * A future rename to `executionId` is planned once the codebase is fully
+ * migrated — not done in this PR to keep the diff focused on the abstraction.
  */
 export interface BackgroundExecutionData extends Record<string, unknown> {
-  /**
-   * Neutral execution identifier for background lifecycle tracking.
-   */
-  executionId?: number;
-  /**
-   * Backwards-compatible alias for executionId.
-   */
   pid?: number;
   command?: string;
   initialOutput?: string;
@@ -96,30 +94,16 @@ export function isBackgroundExecutionData(
     return false;
   }
 
-  const executionId = 'executionId' in data ? data.executionId : undefined;
   const pid = 'pid' in data ? data.pid : undefined;
   const command = 'command' in data ? data.command : undefined;
   const initialOutput =
     'initialOutput' in data ? data.initialOutput : undefined;
 
   return (
-    (executionId === undefined || typeof executionId === 'number') &&
     (pid === undefined || typeof pid === 'number') &&
     (command === undefined || typeof command === 'string') &&
     (initialOutput === undefined || typeof initialOutput === 'string')
   );
-}
-
-export function getBackgroundExecutionId(
-  data: BackgroundExecutionData,
-): number | undefined {
-  if (typeof data.executionId === 'number') {
-    return data.executionId;
-  }
-  if (typeof data.pid === 'number') {
-    return data.pid;
-  }
-  return undefined;
 }
 
 /**

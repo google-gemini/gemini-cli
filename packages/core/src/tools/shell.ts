@@ -347,7 +347,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
       } else if (this.params.is_background || result.backgrounded) {
         llmContent = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
         data = {
-          executionId: result.pid,
           pid: result.pid,
           command: this.params.command,
           initialOutput: result.output,

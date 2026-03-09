@@ -97,29 +97,22 @@ const MockedUserPromptEvent = vi.hoisted(() =>
 );
 const mockParseAndFormatApiError = vi.hoisted(() => vi.fn());
 const mockIsBackgroundExecutionData = vi.hoisted(
-  () => (data: unknown): data is { executionId?: number; pid?: number } => {
+  () => (data: unknown): data is { pid?: number } => {
     if (typeof data !== 'object' || data === null) {
       return false;
     }
     const value = data as {
-      executionId?: unknown;
       pid?: unknown;
       command?: unknown;
       initialOutput?: unknown;
     };
     return (
-      (value.executionId === undefined || typeof value.executionId === 'number') &&
       (value.pid === undefined || typeof value.pid === 'number') &&
       (value.command === undefined || typeof value.command === 'string') &&
       (value.initialOutput === undefined ||
         typeof value.initialOutput === 'string')
     );
   },
-);
-const mockGetBackgroundExecutionId = vi.hoisted(
-  () =>
-    (data: { executionId?: number; pid?: number }): number | undefined =>
-      data.executionId ?? data.pid,
 );
 
 const MockValidationRequiredError = vi.hoisted(
@@ -147,7 +140,6 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actualCoreModule,
     isBackgroundExecutionData: mockIsBackgroundExecutionData,
-    getBackgroundExecutionId: mockGetBackgroundExecutionId,
     GitService: vi.fn(),
     GeminiClient: MockedGeminiClientClass,
     UserPromptEvent: MockedUserPromptEvent,

@@ -37,11 +37,9 @@ import {
   buildUserSteeringHintPrompt,
   GeminiCliOperation,
   getPlanModeExitMessage,
-  getBackgroundExecutionId,
   isBackgroundExecutionData,
 } from '@google/gemini-cli-core';
 import type {
-  BackgroundExecutionData,
   Config,
   EditorType,
   GeminiClient,
@@ -98,7 +96,7 @@ type ToolResponseWithParts = ToolCallResponseInfo & {
 };
 
 interface BackgroundedToolInfo {
-  executionId: number;
+  pid: number;
   command: string;
   initialOutput: string;
 }
@@ -123,16 +121,14 @@ function getBackgroundedToolInfo(
     return undefined;
   }
 
-  const data: BackgroundExecutionData = rawData;
-  const executionId = getBackgroundExecutionId(data);
-  if (executionId === undefined) {
+  if (rawData.pid === undefined) {
     return undefined;
   }
 
   return {
-    executionId,
-    command: data.command ?? toolCall.request.name,
-    initialOutput: data.initialOutput ?? '',
+    pid: rawData.pid,
+    command: rawData.command ?? toolCall.request.name,
+    initialOutput: rawData.initialOutput ?? '',
   };
 }
 
@@ -1676,7 +1672,7 @@ export const useGeminiStream = (
         const backgroundedTool = getBackgroundedToolInfo(toolCall);
         if (backgroundedTool) {
           registerBackgroundShell(
-            backgroundedTool.executionId,
+            backgroundedTool.pid,
             backgroundedTool.command,
             backgroundedTool.initialOutput,
           );
