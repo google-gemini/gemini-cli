@@ -38,11 +38,11 @@ export const VoiceWaveformVisualizer: React.FC<
   VoiceWaveformVisualizerProps
 > = ({ state }) => {
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
-  const [heights, setHeights] = useState<number[]>(Array(BARS).fill(1));
+  const [heights, setHeights] = useState<number[]>(STATIC_HEIGHTS);
 
   useEffect(() => {
     if (state !== 'listening' && state !== 'speaking') {
-      setHeights(Array(BARS).fill(1));
+      setHeights(STATIC_HEIGHTS);
       return;
     }
     const interval = setInterval(() => {
