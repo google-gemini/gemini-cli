@@ -65,7 +65,12 @@ export function recursivelyHydrateStrings<T>(
   if (typeof obj === 'object' && obj !== null) {
     const newObj: Record<string, unknown> = {};
     for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      if (
+        key !== '__proto__' &&
+        key !== 'constructor' &&
+        key !== 'prototype' &&
+        Object.prototype.hasOwnProperty.call(obj, key)
+      ) {
         newObj[key] = recursivelyHydrateStrings(
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           (obj as Record<string, unknown>)[key],
