@@ -6,6 +6,7 @@
 
 import type { Config } from '../config/config.js';
 import { LocalAgentExecutor } from './local-executor.js';
+import { safeJsonToMarkdown } from '../utils/markdownUtils.js';
 import {
   BaseToolInvocation,
   type ToolResult,
@@ -245,6 +246,8 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
         throw cancelError;
       }
 
+      const displayResult = safeJsonToMarkdown(output.result);
+
       const resultContent = `Subagent '${this.definition.name}' finished.
 Termination Reason: ${output.terminate_reason}
 Result:
@@ -256,7 +259,7 @@ Subagent ${this.definition.name} Finished
 Termination Reason:\n ${output.terminate_reason}
 
 Result:
-${output.result}
+${displayResult}
 `;
 
       return {

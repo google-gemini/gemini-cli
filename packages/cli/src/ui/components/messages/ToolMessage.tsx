@@ -21,8 +21,9 @@ import {
   useFocusHint,
   FocusHint,
 } from './ToolShared.js';
-import { type Config, CoreToolCallStatus } from '@google/gemini-cli-core';
+import { type Config, CoreToolCallStatus, Kind } from '@google/gemini-cli-core';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
+import { SUBAGENT_MAX_LINES } from '../../constants.js';
 
 export type { TextEmphasis };
 
@@ -45,6 +46,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   description,
   resultDisplay,
   status,
+  kind,
   availableTerminalHeight,
   terminalWidth,
   emphasis = 'medium',
@@ -133,6 +135,12 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           terminalWidth={terminalWidth}
           renderOutputAsMarkdown={renderOutputAsMarkdown}
           hasFocus={isThisShellFocused}
+          maxLines={
+            kind === Kind.Agent && availableTerminalHeight !== undefined
+              ? SUBAGENT_MAX_LINES
+              : undefined
+          }
+          overflowDirection={kind === Kind.Agent ? 'bottom' : 'top'}
         />
         {isThisShellFocused && config && (
           <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
