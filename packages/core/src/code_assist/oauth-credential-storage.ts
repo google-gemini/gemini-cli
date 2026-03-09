@@ -66,12 +66,26 @@ export class OAuthCredentialStorage {
       throw new Error('Attempted to save credentials without an access token.');
     }
 
-    // Convert Google Credentials to OAuthCredentials format
+    // When Google refreshes an access token, the tokens event only contains
+    // the new access_token — the refresh_token is NOT resent. Preserve the
+    // existing refresh token so we can continue refreshing after this one
+    // expires.
+    let refreshToken = credentials.refresh_token || undefined;
+    if (!refreshToken) {
+      try {
+        const existing = await this.storage.getCredentials(MAIN_ACCOUNT_KEY);
+        refreshToken = existing?.token?.refreshToken;
+      } catch {
+        // If we can't read existing creds, proceed without — the caller
+        // may be saving a fresh full credential set.
+      }
+    }
+
     const mcpCredentials: OAuthCredentials = {
       serverName: MAIN_ACCOUNT_KEY,
       token: {
         accessToken: credentials.access_token,
-        refreshToken: credentials.refresh_token || undefined,
+        refreshToken,
         tokenType: credentials.token_type || 'Bearer',
         scope: credentials.scope || undefined,
         expiresAt: credentials.expiry_date || undefined,
