@@ -664,7 +664,7 @@ export class ChatRecordingService {
    * Updates the conversation history based on the provided API Content array.
    * This is used to persist changes made to the history (like masking) back to disk.
    */
-  updateMessagesFromHistory(history: Content[]): void {
+  updateMessagesFromHistory(history: readonly Content[]): void {
     if (!this.conversationFile) return;
 
     try {
