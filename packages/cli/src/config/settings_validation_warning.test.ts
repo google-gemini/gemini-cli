@@ -81,6 +81,7 @@ import {
   loadSettings,
   USER_SETTINGS_PATH,
   type LoadedSettings,
+  resetSettingsCacheForTesting,
 } from './settings.js';
 
 const MOCK_WORKSPACE_DIR = '/mock/workspace';
@@ -88,6 +89,7 @@ const MOCK_WORKSPACE_DIR = '/mock/workspace';
 describe('Settings Validation Warning', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetSettingsCacheForTesting();
     (fs.readFileSync as Mock).mockReturnValue('{}');
     (fs.existsSync as Mock).mockReturnValue(false);
   });
