@@ -142,6 +142,14 @@ vi.mock('../ui/commands/mcpCommand.js', () => ({
   },
 }));
 
+vi.mock('../ui/commands/upgradeCommand.js', () => ({
+  upgradeCommand: {
+    name: 'upgrade',
+    description: 'Upgrade command',
+    kind: 'BUILT_IN',
+  },
+}));
+
 describe('BuiltinCommandLoader', () => {
   let mockConfig: Config;
 
@@ -163,6 +171,9 @@ describe('BuiltinCommandLoader', () => {
         getAllSkills: vi.fn().mockReturnValue([]),
         isAdminEnabled: vi.fn().mockReturnValue(true),
       }),
+      getContentGeneratorConfig: vi.fn().mockReturnValue({
+        authType: 'other',
+      }),
     } as unknown as Config;
 
     restoreCommandMock.mockReturnValue({
@@ -170,6 +181,27 @@ describe('BuiltinCommandLoader', () => {
       description: 'Restore command',
       kind: CommandKind.BUILT_IN,
     });
+  });
+
+  it('should include upgrade command when authType is login_with_google', async () => {
+    const { AuthType } = await import('@google/gemini-cli-core');
+    (mockConfig.getContentGeneratorConfig as Mock).mockReturnValue({
+      authType: AuthType.LOGIN_WITH_GOOGLE,
+    });
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const upgradeCmd = commands.find((c) => c.name === 'upgrade');
+    expect(upgradeCmd).toBeDefined();
+  });
+
+  it('should exclude upgrade command when authType is NOT login_with_google', async () => {
+    (mockConfig.getContentGeneratorConfig as Mock).mockReturnValue({
+      authType: 'other',
+    });
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const upgradeCmd = commands.find((c) => c.name === 'upgrade');
+    expect(upgradeCmd).toBeUndefined();
   });
 
   it('should correctly pass the config object to restore command factory', async () => {
@@ -363,6 +395,9 @@ describe('BuiltinCommandLoader profile', () => {
       getSkillManager: vi.fn().mockReturnValue({
         getAllSkills: vi.fn().mockReturnValue([]),
         isAdminEnabled: vi.fn().mockReturnValue(true),
+      }),
+      getContentGeneratorConfig: vi.fn().mockReturnValue({
+        authType: 'other',
       }),
     } as unknown as Config;
   });
