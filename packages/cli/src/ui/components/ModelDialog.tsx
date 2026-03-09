@@ -55,7 +55,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
 
   const definitions = useMemo(() => {
     if (isDynamicEnabled && modelConfigService) {
-      return (modelConfigService.getModelDefinitions?.() ?? {});
+      return modelConfigService.getModelDefinitions?.() ?? {};
     }
     return {} as Record<string, ModelDefinition>;
   }, [isDynamicEnabled, modelConfigService]);

@@ -2746,22 +2746,6 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
       },
     },
   },
-  ModelPolicy: {
-    type: 'object',
-    description: 'Availability policy for a single model.',
-    properties: {
-      model: { type: 'string' },
-      isLastResort: { type: 'boolean' },
-      actions: {
-        type: 'object',
-        additionalProperties: { enum: ['silent', 'prompt'] },
-      },
-      stateTransitions: {
-        type: 'object',
-        additionalProperties: { enum: ['terminal', 'sticky_retry'] },
-      },
-    },
-  },
 };
 
 export function getSettingsSchema(): SettingsSchemaType {
