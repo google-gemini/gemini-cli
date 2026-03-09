@@ -42,7 +42,10 @@ import type {
   ResumedSessionData,
 } from '../services/chatRecordingService.js';
 import type { ContentGenerator } from './contentGenerator.js';
-import { LoopDetectionService } from '../services/loopDetectionService.js';
+import {
+  LoopDetectionService,
+  type LoopDetectionResult,
+} from '../services/loopDetectionService.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import {
@@ -1266,10 +1269,7 @@ export class GeminiClient {
     boundedTurns: number,
     isInvalidStreamRetry: boolean,
     displayContent?: PartListUnion,
-    controllerToAbort?: AbortController,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
-    controllerToAbort?.abort();
-
     // Clear the detection flag so the recursive turn can proceed, but the count remains 1.
     this.loopDetector.clearDetection();
 

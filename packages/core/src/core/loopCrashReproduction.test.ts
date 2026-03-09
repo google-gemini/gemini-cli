@@ -11,9 +11,6 @@ import { createGeminiConfigMock } from '../test-utils/configMock.js';
 import { LoopDetectionService } from '../services/loopDetectionService.js';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 
 describe('GeminiClient', () => {
   let client: GeminiClient;
@@ -158,9 +155,8 @@ describe('GeminiClient', () => {
       );
       for await (const event of stream) {
         events.push(event);
-        controller.abort(); // Trigger the 'explosion'! 💣
+        controller.abort(); // Trigger synchronous abort error
       }
-
       // The fact that we reached here means the process didn't crash.
       expect(events.length).toBeGreaterThan(0);
     });
