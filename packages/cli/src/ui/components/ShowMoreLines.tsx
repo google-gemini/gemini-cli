@@ -9,7 +9,6 @@ import { useOverflowState } from '../contexts/OverflowContext.js';
 import { useStreamingContext } from '../contexts/StreamingContext.js';
 import { StreamingState } from '../types.js';
 import { theme } from '../semantic-colors.js';
-import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 
 interface ShowMoreLinesProps {
   constrainHeight: boolean;
@@ -20,7 +19,6 @@ export const ShowMoreLines = ({
   constrainHeight,
   isOverflowing: isOverflowingProp,
 }: ShowMoreLinesProps) => {
-  const isAlternateBuffer = useAlternateBuffer();
   const overflowState = useOverflowState();
   const streamingState = useStreamingContext();
 
@@ -29,7 +27,6 @@ export const ShowMoreLines = ({
     (overflowState !== undefined && overflowState.overflowingIds.size > 0);
 
   if (
-    !isAlternateBuffer ||
     !isOverflowing ||
     !constrainHeight ||
     !(
