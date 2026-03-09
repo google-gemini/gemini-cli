@@ -110,4 +110,28 @@ describe('toolsCommand', () => {
     );
     expect(message.tools[1].description).toBe('Edits code files.');
   });
+
+  it('should expose a desc subcommand for TUI discoverability', async () => {
+    const descSubCommand = toolsCommand.subCommands?.find(
+      (cmd) => cmd.name === 'desc',
+    );
+    expect(descSubCommand).toBeDefined();
+    expect(descSubCommand?.description).toContain('descriptions');
+
+    const mockContext = createMockCommandContext({
+      services: {
+        config: {
+          getToolRegistry: () => ({ getAllTools: () => mockTools }),
+        },
+      },
+    });
+
+    if (!descSubCommand?.action) throw new Error('Action not defined');
+    await descSubCommand.action(mockContext, '');
+
+    const [message] = (mockContext.ui.addItem as ReturnType<typeof vi.fn>).mock
+      .calls[0];
+    expect(message.type).toBe(MessageType.TOOLS_LIST);
+    expect(message.showDescriptions).toBe(true);
+  });
 });

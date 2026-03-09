@@ -6,7 +6,7 @@ using the CLI.
 
 > **Note:** Looking for a high-level comparison of all available subscriptions?
 > To compare features and find the right quota for your needs, see our
-> [Plans page](/plans/).
+> [Plans page](https://geminicli.com/plans/).
 
 For most users, we recommend starting Gemini CLI and logging in with your
 personal Google account.

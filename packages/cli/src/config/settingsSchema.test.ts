@@ -424,12 +424,10 @@ describe('SettingsSchema', () => {
       expect(setting).toBeDefined();
       expect(setting.type).toBe('boolean');
       expect(setting.category).toBe('Experimental');
-      expect(setting.default).toBe(false);
+      expect(setting.default).toBe(true);
       expect(setting.requiresRestart).toBe(true);
       expect(setting.showInDialog).toBe(true);
-      expect(setting.description).toBe(
-        'Enable planning features (Plan Mode and tools).',
-      );
+      expect(setting.description).toBe('Enable Plan Mode.');
     });
 
     it('should have hooksConfig.notifications setting in schema', () => {
@@ -461,7 +459,7 @@ describe('SettingsSchema', () => {
       expect(gemmaModelRouter.category).toBe('Experimental');
       expect(gemmaModelRouter.default).toEqual({});
       expect(gemmaModelRouter.requiresRestart).toBe(true);
-      expect(gemmaModelRouter.showInDialog).toBe(true);
+      expect(gemmaModelRouter.showInDialog).toBe(false);
       expect(gemmaModelRouter.description).toBe(
         'Enable Gemma model router (experimental).',
       );
@@ -472,9 +470,9 @@ describe('SettingsSchema', () => {
       expect(enabled.category).toBe('Experimental');
       expect(enabled.default).toBe(false);
       expect(enabled.requiresRestart).toBe(true);
-      expect(enabled.showInDialog).toBe(true);
+      expect(enabled.showInDialog).toBe(false);
       expect(enabled.description).toBe(
-        'Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
+        'Enable the Gemma Model Router (experimental). Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
       );
 
       const classifier = gemmaModelRouter.properties.classifier;

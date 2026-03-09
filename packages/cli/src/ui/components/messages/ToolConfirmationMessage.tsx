@@ -29,14 +29,8 @@ import {
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../keyMatchers.js';
 import { formatCommand } from '../../utils/keybindingUtils.js';
-import {
-  REDIRECTION_WARNING_NOTE_LABEL,
-  REDIRECTION_WARNING_NOTE_TEXT,
-  REDIRECTION_WARNING_TIP_LABEL,
-  REDIRECTION_WARNING_TIP_TEXT,
-} from '../../textConstants.js';
 import { AskUserDialog } from '../AskUserDialog.js';
 import { ExitPlanModeDialog } from '../ExitPlanModeDialog.js';
 import { WarningMessage } from './WarningMessage.js';
@@ -46,6 +40,7 @@ import {
   toUnicodeUrl,
   type DeceptiveUrlDetails,
 } from '../../utils/urlSecurityUtils.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 export interface ToolConfirmationMessageProps {
   callId: string;
@@ -56,6 +51,11 @@ export interface ToolConfirmationMessageProps {
   availableTerminalHeight?: number;
   terminalWidth: number;
 }
+
+const REDIRECTION_WARNING_NOTE_LABEL = 'Note: ';
+const REDIRECTION_WARNING_NOTE_TEXT =
+  'Command contains redirection which can be undesirable.';
+const REDIRECTION_WARNING_TIP_LABEL = 'Tip:  '; // Padded to align with "Note: "
 
 export const ToolConfirmationMessage: React.FC<
   ToolConfirmationMessageProps
@@ -68,6 +68,7 @@ export const ToolConfirmationMessage: React.FC<
   availableTerminalHeight,
   terminalWidth,
 }) => {
+  const keyMatchers = useKeyMatchers();
   const { confirm, isDiffingEnabled } = useToolActions();
   const [mcpDetailsExpansionState, setMcpDetailsExpansionState] = useState<{
     callId: string;
@@ -503,12 +504,12 @@ export const ToolConfirmationMessage: React.FC<
       if (containsRedirection) {
         // Calculate lines needed for Note and Tip
         const safeWidth = Math.max(terminalWidth, 1);
+        const tipText = `Toggle auto-edit (${formatCommand(Command.CYCLE_APPROVAL_MODE)}) to allow redirection in the future.`;
+
         const noteLength =
           REDIRECTION_WARNING_NOTE_LABEL.length +
           REDIRECTION_WARNING_NOTE_TEXT.length;
-        const tipLength =
-          REDIRECTION_WARNING_TIP_LABEL.length +
-          REDIRECTION_WARNING_TIP_TEXT.length;
+        const tipLength = REDIRECTION_WARNING_TIP_LABEL.length + tipText.length;
 
         const noteLines = Math.ceil(noteLength / safeWidth);
         const tipLines = Math.ceil(tipLength / safeWidth);
@@ -534,7 +535,7 @@ export const ToolConfirmationMessage: React.FC<
             <Box>
               <Text color={theme.border.default}>
                 <Text bold>{REDIRECTION_WARNING_TIP_LABEL}</Text>
-                {REDIRECTION_WARNING_TIP_TEXT}
+                {tipText}
               </Text>
             </Box>
           </>
