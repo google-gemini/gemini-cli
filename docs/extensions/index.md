@@ -9,6 +9,16 @@ shareable.
 To see what's possible, browse the
 [Gemini CLI extension gallery](https://geminicli.com/extensions/browse/).
 
+## Recommended extensions
+
+The community maintains several extensions to add support for various file
+formats and workflows:
+
+| Extension   | Description                          | Install Command                                             |
+| ----------- | ------------------------------------ | ----------------------------------------------------------- |
+| `safe-docx` | Read and edit Word documents (.docx) | `gemini extensions install usejunior/safe-docx`             |
+| `workspace` | Project-wide context and search      | `gemini extensions install gemini-cli-extensions/workspace` |
+
 ## Choose your path
 
 Choose the guide that best fits your needs.
