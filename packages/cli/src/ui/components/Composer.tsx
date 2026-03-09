@@ -34,6 +34,7 @@ import { useVimMode } from '../contexts/VimModeContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { useTerminalBell } from '../hooks/useTerminalBell.js';
 import { StreamingState, type HistoryItemToolGroup } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
@@ -55,6 +56,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const [suggestionsVisible, setSuggestionsVisible] = useState(false);
 
   const isAlternateBuffer = useAlternateBuffer();
+  useTerminalBell(uiState.streamingState);
   const { showApprovalModeIndicator } = uiState;
   const showUiDetails = uiState.cleanUiDetailsVisible;
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
