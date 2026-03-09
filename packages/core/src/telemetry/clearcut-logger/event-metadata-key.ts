@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 176
+  // Next ID: 177
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -507,6 +507,9 @@ export enum EventMetadataKey {
 
   // Logs the reason for an agent recovery attempt.
   GEMINI_CLI_AGENT_RECOVERY_REASON = 122,
+
+  // Logs the original recoverable reason for an agent that ultimately finished after recovery.
+  GEMINI_CLI_AGENT_RECOVERED_FROM = 176,
 
   // Logs the duration of an agent recovery attempt in milliseconds.
   GEMINI_CLI_AGENT_RECOVERY_DURATION_MS = 123,

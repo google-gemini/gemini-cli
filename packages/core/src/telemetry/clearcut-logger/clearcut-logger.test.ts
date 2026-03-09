@@ -1141,6 +1141,27 @@ describe('ClearcutLogger', () => {
         'ERROR',
       ]);
     });
+
+    it('logs recovered_from when present', () => {
+      const { logger } = setup();
+      const event = new AgentFinishEvent(
+        'agent-123',
+        'TestAgent',
+        1000,
+        5,
+        AgentTerminateMode.GOAL,
+        AgentTerminateMode.MAX_TURNS,
+      );
+
+      logger?.logAgentFinishEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_AGENT_RECOVERED_FROM,
+        'MAX_TURNS',
+      ]);
+    });
   });
 
   describe('logToolCallEvent', () => {

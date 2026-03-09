@@ -624,6 +624,31 @@ describe('Telemetry Metrics', () => {
         agent_name: 'TestAgent',
       });
     });
+
+    it('should include recovered_from in agent run metrics when present', () => {
+      initializeMetricsModule(mockConfig);
+      mockCounterAddFn.mockClear();
+      mockHistogramRecordFn.mockClear();
+
+      const event = new AgentFinishEvent(
+        'agent-123',
+        'TestAgent',
+        1000,
+        5,
+        AgentTerminateMode.GOAL,
+        AgentTerminateMode.TIMEOUT,
+      );
+      recordAgentRunMetricsModule(mockConfig, event);
+
+      expect(mockCounterAddFn).toHaveBeenCalledWith(1, {
+        'session.id': 'test-session-id',
+        'installation.id': 'test-installation-id',
+        'user.email': 'test@example.com',
+        agent_name: 'TestAgent',
+        terminate_reason: 'GOAL',
+        recovered_from: 'TIMEOUT',
+      });
+    });
   });
 
   describe('OpenTelemetry GenAI Semantic Convention Metrics', () => {

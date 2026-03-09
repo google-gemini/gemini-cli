@@ -678,6 +678,7 @@ describe('LocalAgentExecutor', () => {
 
       expect(output.result).toBe('Found file1.txt');
       expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      expect(output).not.toHaveProperty('recovered_from');
 
       // Telemetry checks
       expect(mockedLogAgentStart).toHaveBeenCalledTimes(1);
@@ -692,6 +693,7 @@ describe('LocalAgentExecutor', () => {
       );
       const finishEvent = mockedLogAgentFinish.mock.calls[0][1];
       expect(finishEvent.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      expect(finishEvent.recovered_from).toBeUndefined();
 
       // Context checks
       expect(mockedPromptIdContext.run).toHaveBeenCalledTimes(2); // Two turns
@@ -1693,6 +1695,7 @@ describe('LocalAgentExecutor', () => {
       const output = await executor.run({ goal: 'Turns recovery' }, signal);
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      expect(output.recovered_from).toBe(AgentTerminateMode.MAX_TURNS);
       expect(output.result).toBe('Recovered!');
       expect(mockSendMessageStream).toHaveBeenCalledTimes(MAX + 1); // 1 regular + 1 recovery
 
@@ -1781,6 +1784,9 @@ describe('LocalAgentExecutor', () => {
 
       expect(mockSendMessageStream).toHaveBeenCalledTimes(3);
       expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      expect(output.recovered_from).toBe(
+        AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL,
+      );
       expect(output.result).toBe('Recovered from violation!');
 
       expect(activities).toContainEqual(
@@ -1879,6 +1885,7 @@ describe('LocalAgentExecutor', () => {
 
       expect(mockSendMessageStream).toHaveBeenCalledTimes(2); // 1 failed + 1 recovery
       expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      expect(output.recovered_from).toBe(AgentTerminateMode.TIMEOUT);
       expect(output.result).toBe('Recovered from timeout!');
 
       expect(activities).toContainEqual(

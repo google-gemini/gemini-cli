@@ -245,17 +245,30 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
         throw cancelError;
       }
 
-      const resultContent = `Subagent '${this.definition.name}' finished.
+      const statusHeader = output.recovered_from
+        ? `Subagent '${this.definition.name}' finished after recovery.`
+        : `Subagent '${this.definition.name}' finished.`;
+      const recoveredLine = output.recovered_from
+        ? `Recovered From: ${output.recovered_from}\n`
+        : '';
+      const displayHeader = output.recovered_from
+        ? `Subagent ${this.definition.name} Finished After Recovery`
+        : `Subagent ${this.definition.name} Finished`;
+      const displayRecoveredLine = output.recovered_from
+        ? `Recovered From:\n ${output.recovered_from}\n\n`
+        : '';
+
+      const resultContent = `${statusHeader}
 Termination Reason: ${output.terminate_reason}
-Result:
+${recoveredLine}Result:
 ${output.result}`;
 
       const displayContent = `
-Subagent ${this.definition.name} Finished
+${displayHeader}
 
 Termination Reason:\n ${output.terminate_reason}
 
-Result:
+${displayRecoveredLine}Result:
 ${output.result}
 `;
 

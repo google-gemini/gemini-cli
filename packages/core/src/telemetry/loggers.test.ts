@@ -2323,6 +2323,37 @@ describe('loggers', () => {
         event,
       );
     });
+
+    it('should include recovered_from when an agent finishes after recovery', () => {
+      const event = new AgentFinishEvent(
+        'agent-123',
+        'TestAgent',
+        1000,
+        5,
+        AgentTerminateMode.GOAL,
+        AgentTerminateMode.MAX_TURNS,
+      );
+
+      logAgentFinish(mockConfig, event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Agent TestAgent finished. Reason: GOAL. Recovered from: MAX_TURNS. Duration: 1000ms. Turns: 5.',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
+          'event.name': EVENT_AGENT_FINISH,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
+          agent_id: 'agent-123',
+          agent_name: 'TestAgent',
+          duration_ms: 1000,
+          turn_count: 5,
+          terminate_reason: 'GOAL',
+          recovered_from: 'MAX_TURNS',
+        },
+      });
+    });
   });
 
   describe('logWebFetchFallbackAttempt', () => {

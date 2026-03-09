@@ -18,6 +18,7 @@ import {
   type LocalAgentDefinition,
   type SubagentActivityEvent,
   type AgentInputs,
+  type RecoverableAgentTerminateMode,
   type SubagentProgress,
 } from './types.js';
 import { LocalSubagentInvocation } from './local-invocation.js';
@@ -204,6 +205,30 @@ describe('LocalSubagentInvocation', () => {
       ]);
       expect(result.returnDisplay).toContain('Result:\nAnalysis complete.');
       expect(result.returnDisplay).toContain('Termination Reason:\n GOAL');
+    });
+
+    it('should render recovered subagent completions distinctly', async () => {
+      const mockOutput = {
+        result: 'Best effort analysis.',
+        terminate_reason: AgentTerminateMode.GOAL,
+        recovered_from:
+          AgentTerminateMode.MAX_TURNS as RecoverableAgentTerminateMode,
+      };
+      mockExecutorInstance.run.mockResolvedValue(mockOutput);
+
+      const result = await invocation.execute(signal, updateOutput);
+
+      expect(result.llmContent).toEqual([
+        {
+          text: expect.stringContaining(
+            "Subagent 'MockAgent' finished after recovery.\nTermination Reason: GOAL\nRecovered From: MAX_TURNS\nResult:\nBest effort analysis.",
+          ),
+        },
+      ]);
+      expect(result.returnDisplay).toContain(
+        'Subagent MockAgent Finished After Recovery',
+      );
+      expect(result.returnDisplay).toContain('Recovered From:\n MAX_TURNS');
     });
 
     it('should stream THOUGHT_CHUNK activities from the executor', async () => {
