@@ -8,8 +8,12 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 
 import nodePath from 'node:path';
 
-import type { PolicySettings } from './types.js';
-import { ApprovalMode, PolicyDecision, InProcessCheckerType } from './types.js';
+import {
+  ApprovalMode,
+  PolicyDecision,
+  InProcessCheckerType,
+  type PolicySettings,
+} from './types.js';
 import { isDirectorySecure } from '../utils/security.js';
 
 vi.unmock('../config/storage.js');
@@ -202,8 +206,7 @@ describe('createPolicyEngineConfig', () => {
       '/tmp/mock/default/policies',
     );
     const rule = config.rules?.find(
-      (r) =>
-        r.toolName === 'my-server__*' && r.decision === PolicyDecision.ALLOW,
+      (r) => r.mcpName === 'my-server' && r.decision === PolicyDecision.ALLOW,
     );
     expect(rule).toBeDefined();
     expect(rule?.priority).toBe(4.1); // MCP allowed server
@@ -220,8 +223,7 @@ describe('createPolicyEngineConfig', () => {
       '/tmp/mock/default/policies',
     );
     const rule = config.rules?.find(
-      (r) =>
-        r.toolName === 'my-server__*' && r.decision === PolicyDecision.DENY,
+      (r) => r.mcpName === 'my-server' && r.decision === PolicyDecision.DENY,
     );
     expect(rule).toBeDefined();
     expect(rule?.priority).toBe(4.9); // MCP excluded server
@@ -247,8 +249,7 @@ describe('createPolicyEngineConfig', () => {
 
     const trustedRule = config.rules?.find(
       (r) =>
-        r.toolName === 'trusted-server__*' &&
-        r.decision === PolicyDecision.ALLOW,
+        r.mcpName === 'trusted-server' && r.decision === PolicyDecision.ALLOW,
     );
     expect(trustedRule).toBeDefined();
     expect(trustedRule?.priority).toBe(4.2); // MCP trusted server
@@ -256,8 +257,7 @@ describe('createPolicyEngineConfig', () => {
     // Untrusted server should not have an allow rule
     const untrustedRule = config.rules?.find(
       (r) =>
-        r.toolName === 'untrusted-server__*' &&
-        r.decision === PolicyDecision.ALLOW,
+        r.mcpName === 'untrusted-server' && r.decision === PolicyDecision.ALLOW,
     );
     expect(untrustedRule).toBeUndefined();
   });
@@ -284,8 +284,7 @@ describe('createPolicyEngineConfig', () => {
     // Check allowed server
     const allowedRule = config.rules?.find(
       (r) =>
-        r.toolName === 'allowed-server__*' &&
-        r.decision === PolicyDecision.ALLOW,
+        r.mcpName === 'allowed-server' && r.decision === PolicyDecision.ALLOW,
     );
     expect(allowedRule).toBeDefined();
     expect(allowedRule?.priority).toBe(4.1); // MCP allowed server
@@ -293,8 +292,7 @@ describe('createPolicyEngineConfig', () => {
     // Check trusted server
     const trustedRule = config.rules?.find(
       (r) =>
-        r.toolName === 'trusted-server__*' &&
-        r.decision === PolicyDecision.ALLOW,
+        r.mcpName === 'trusted-server' && r.decision === PolicyDecision.ALLOW,
     );
     expect(trustedRule).toBeDefined();
     expect(trustedRule?.priority).toBe(4.2); // MCP trusted server
@@ -302,8 +300,7 @@ describe('createPolicyEngineConfig', () => {
     // Check excluded server
     const excludedRule = config.rules?.find(
       (r) =>
-        r.toolName === 'excluded-server__*' &&
-        r.decision === PolicyDecision.DENY,
+        r.mcpName === 'excluded-server' && r.decision === PolicyDecision.DENY,
     );
     expect(excludedRule).toBeDefined();
     expect(excludedRule?.priority).toBe(4.9); // MCP excluded server
@@ -368,7 +365,7 @@ describe('createPolicyEngineConfig', () => {
     const { createPolicyEngineConfig } = await import('./config.js');
     const settings: PolicySettings = {
       mcp: { excluded: ['my-server'] },
-      tools: { allowed: ['my-server__specific-tool'] },
+      tools: { allowed: ['mcp_my-server_specific-tool'] },
     };
     const config = await createPolicyEngineConfig(
       settings,
@@ -377,12 +374,11 @@ describe('createPolicyEngineConfig', () => {
     );
 
     const serverDenyRule = config.rules?.find(
-      (r) =>
-        r.toolName === 'my-server__*' && r.decision === PolicyDecision.DENY,
+      (r) => r.mcpName === 'my-server' && r.decision === PolicyDecision.DENY,
     );
     const toolAllowRule = config.rules?.find(
       (r) =>
-        r.toolName === 'my-server__specific-tool' &&
+        r.toolName === 'mcp_my-server_specific-tool' &&
         r.decision === PolicyDecision.ALLOW,
     );
 
@@ -404,7 +400,7 @@ describe('createPolicyEngineConfig', () => {
           trust: true,
         },
       },
-      tools: { exclude: ['my-server__dangerous-tool'] },
+      tools: { exclude: ['mcp_my-server_dangerous-tool'] },
     };
     const config = await createPolicyEngineConfig(
       settings,
@@ -413,12 +409,11 @@ describe('createPolicyEngineConfig', () => {
     );
 
     const serverAllowRule = config.rules?.find(
-      (r) =>
-        r.toolName === 'my-server__*' && r.decision === PolicyDecision.ALLOW,
+      (r) => r.mcpName === 'my-server' && r.decision === PolicyDecision.ALLOW,
     );
     const toolDenyRule = config.rules?.find(
       (r) =>
-        r.toolName === 'my-server__dangerous-tool' &&
+        r.toolName === 'mcp_my-server_dangerous-tool' &&
         r.decision === PolicyDecision.DENY,
     );
 
@@ -432,8 +427,8 @@ describe('createPolicyEngineConfig', () => {
   it('should handle complex priority scenarios correctly', async () => {
     const settings: PolicySettings = {
       tools: {
-        allowed: ['my-server__tool1', 'other-tool'], // Priority 4.3
-        exclude: ['my-server__tool2', 'glob'], // Priority 4.4
+        allowed: ['mcp_trusted-server_tool1', 'other-tool'], // Priority 4.3
+        exclude: ['mcp_trusted-server_tool2', 'glob'], // Priority 4.4
       },
       mcp: {
         allowed: ['allowed-server'], // Priority 4.1
@@ -564,13 +559,12 @@ describe('createPolicyEngineConfig', () => {
     // Neither server should have an allow rule
     const noTrustRule = config.rules?.find(
       (r) =>
-        r.toolName === 'no-trust-property__*' &&
+        r.mcpName === 'no-trust-property' &&
         r.decision === PolicyDecision.ALLOW,
     );
     const explicitFalseRule = config.rules?.find(
       (r) =>
-        r.toolName === 'explicit-false__*' &&
-        r.decision === PolicyDecision.ALLOW,
+        r.mcpName === 'explicit-false' && r.decision === PolicyDecision.ALLOW,
     );
 
     expect(noTrustRule).toBeUndefined();

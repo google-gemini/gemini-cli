@@ -80,8 +80,8 @@ import {
   type ConsentRequestPayload,
   type AgentsDiscoveredPayload,
   ChangeAuthRequestedError,
+  ProjectIdRequiredError,
   CoreToolCallStatus,
-  generateSteeringAckMessage,
   buildUserSteeringHintPrompt,
   logBillingEvent,
   ApiKeyUpdatedEvent,
@@ -129,7 +129,7 @@ import { appEvents, AppEvent, TransientMessageType } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
-import { RELAUNCH_EXIT_CODE } from '../utils/processUtils.js';
+import { relaunchApp } from '../utils/processUtils.js';
 import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useMcpStatus } from './hooks/useMcpStatus.js';
@@ -283,19 +283,18 @@ export const AppContainer = (props: AppContainerProps) => {
    * Manages the visibility and x-second timer for the expansion hint.
    *
    * This effect triggers the timer countdown whenever an overflow is detected
-   * or the user manually toggles the expansion state with Ctrl+O. We use a stable
-   * boolean dependency (hasOverflowState) to ensure the timer only resets on
-   * genuine state transitions, preventing it from infinitely resetting during
-   * active text streaming.
+   * or the user manually toggles the expansion state with Ctrl+O.
+   * By depending on overflowingIdsSize, the timer resets when *new* views
+   * overflow, but avoids infinitely resetting during single-view streaming.
    *
    * In alternate buffer mode, we don't trigger the hint automatically on overflow
    * to avoid noise, but the user can still trigger it manually with Ctrl+O.
    */
   useEffect(() => {
-    if (hasOverflowState && !isAlternateBuffer) {
+    if (hasOverflowState) {
       triggerExpandHint(true);
     }
-  }, [hasOverflowState, isAlternateBuffer, triggerExpandHint]);
+  }, [hasOverflowState, overflowingIdsSize, triggerExpandHint]);
 
   const [defaultBannerText, setDefaultBannerText] = useState('');
   const [warningBannerText, setWarningBannerText] = useState('');
@@ -771,6 +770,12 @@ export const AppContainer = (props: AppContainerProps) => {
           if (e instanceof ChangeAuthRequestedError) {
             return;
           }
+          if (e instanceof ProjectIdRequiredError) {
+            // OAuth succeeded but account setup requires project ID
+            // Show the error message directly without "Failed to authenticate" prefix
+            onAuthError(getErrorMessage(e));
+            return;
+          }
           onAuthError(
             `Failed to authenticate: ${e instanceof Error ? e.message : String(e)}`,
           );
@@ -781,13 +786,12 @@ export const AppContainer = (props: AppContainerProps) => {
           authType === AuthType.LOGIN_WITH_GOOGLE &&
           config.isBrowserLaunchSuppressed()
         ) {
-          await runExitCleanup();
           writeToStdout(`
 ----------------------------------------------------------------
 Logging in with Google... Restarting Gemini CLI to continue.
 ----------------------------------------------------------------
           `);
-          process.exit(RELAUNCH_EXIT_CODE);
+          await relaunchApp();
         }
       }
       setAuthState(AuthState.Authenticated);
@@ -1005,10 +1009,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       historyManager.addItem(
         {
           type: MessageType.INFO,
-          text: `Memory refreshed successfully. ${
+          text: `Memory reloaded successfully. ${
             flattenedMemory.length > 0
-              ? `Loaded ${flattenedMemory.length} characters from ${fileCount} file(s).`
-              : 'No memory content found.'
+              ? `Loaded ${flattenedMemory.length} characters from ${fileCount} file(s)`
+              : 'No memory content found'
           }`,
         },
         Date.now(),
@@ -1415,32 +1419,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const initialPrompt = useMemo(() => config.getQuestion(), [config]);
   const initialPromptSubmitted = useRef(false);
   const geminiClient = config.getGeminiClient();
-
-  useEffect(() => {
-    if (activePtyId) {
-      try {
-        ShellExecutionService.resizePty(
-          activePtyId,
-          Math.floor(terminalWidth * SHELL_WIDTH_FRACTION),
-          Math.max(
-            Math.floor(availableTerminalHeight - SHELL_HEIGHT_PADDING),
-            1,
-          ),
-        );
-      } catch (e) {
-        // This can happen in a race condition where the pty exits
-        // right before we try to resize it.
-        if (
-          !(
-            e instanceof Error &&
-            e.message.includes('Cannot resize a pty that has already exited')
-          )
-        ) {
-          throw e;
-        }
-      }
-    }
-  }, [terminalWidth, availableTerminalHeight, activePtyId]);
 
   useEffect(() => {
     if (
@@ -1873,10 +1851,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     ],
   );
 
-  useKeypress(handleGlobalKeypress, {
-    isActive: true,
-    priority: KeypressPriority.Low,
-  });
+  useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
 
   useKeypress(
     () => {
@@ -2106,15 +2081,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       return;
     }
 
-    void generateSteeringAckMessage(
-      config.getBaseLlmClient(),
-      pendingHint,
-    ).then((ackText) => {
-      historyManager.addItem({
-        type: 'info',
-        text: ackText,
-      });
-    });
     void submitQuery([{ text: buildUserSteeringHintPrompt(pendingHint) }]);
   }, [
     config,
@@ -2500,8 +2466,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
             });
           }
         }
-        await runExitCleanup();
-        process.exit(RELAUNCH_EXIT_CODE);
+        await relaunchApp();
       },
       handleNewAgentsSelect: async (choice: NewAgentsChoice) => {
         if (newAgents && choice === NewAgentsChoice.ACKNOWLEDGE) {

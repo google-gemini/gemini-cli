@@ -7,13 +7,13 @@
 import type { Config } from '../config/config.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
-import { Type } from '@google/genai';
-import type {
-  Content,
-  Part,
-  FunctionCall,
-  FunctionDeclaration,
-  Schema,
+import {
+  Type,
+  type Content,
+  type Part,
+  type FunctionCall,
+  type FunctionDeclaration,
+  type Schema,
 } from '@google/genai';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
@@ -33,17 +33,15 @@ import {
   LlmRole,
   RecoveryAttemptEvent,
 } from '../telemetry/types.js';
-import type {
-  LocalAgentDefinition,
-  AgentInputs,
-  OutputObject,
-  SubagentActivityEvent,
-} from './types.js';
 import {
   AgentTerminateMode,
   DEFAULT_QUERY_STRING,
   DEFAULT_MAX_TURNS,
   DEFAULT_MAX_TIME_MINUTES,
+  type LocalAgentDefinition,
+  type AgentInputs,
+  type OutputObject,
+  type SubagentActivityEvent,
 } from './types.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { templateString } from './utils.js';
@@ -904,6 +902,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         displayName,
         description,
         args,
+        callId,
       });
 
       if (toolName === TASK_COMPLETE_TOOL_NAME) {
@@ -971,6 +970,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             });
             this.emitActivity('TOOL_CALL_END', {
               name: toolName,
+              id: callId,
               output: 'Output submitted and task completed.',
             });
           } else {
@@ -987,6 +987,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             this.emitActivity('ERROR', {
               context: 'tool_call',
               name: toolName,
+              callId,
               error,
             });
           }
@@ -1011,6 +1012,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             });
             this.emitActivity('TOOL_CALL_END', {
               name: toolName,
+              id: callId,
               output: 'Result submitted and task completed.',
             });
           } else {
@@ -1028,6 +1030,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             this.emitActivity('ERROR', {
               context: 'tool_call',
               name: toolName,
+              callId,
               error,
             });
           }
@@ -1088,18 +1091,21 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         if (call.status === 'success') {
           this.emitActivity('TOOL_CALL_END', {
             name: toolName,
+            id: call.request.callId,
             output: call.response.resultDisplay,
           });
         } else if (call.status === 'error') {
           this.emitActivity('ERROR', {
             context: 'tool_call',
             name: toolName,
+            callId: call.request.callId,
             error: call.response.error?.message || 'Unknown error',
           });
         } else if (call.status === 'cancelled') {
           this.emitActivity('ERROR', {
             context: 'tool_call',
             name: toolName,
+            callId: call.request.callId,
             error: 'Request cancelled.',
           });
           aborted = true;

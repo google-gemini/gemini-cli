@@ -88,12 +88,17 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         borderColor={borderColor}
         borderDimColor={borderDimColor}
       >
-        <ToolStatusIndicator status={status} name={name} />
+        <ToolStatusIndicator
+          status={status}
+          name={name}
+          isFocused={isThisShellFocused}
+        />
         <ToolInfo
           name={name}
           status={status}
           description={description}
           emphasis={emphasis}
+          progressMessage={progressMessage}
           originalRequestName={originalRequestName}
         />
         <FocusHint
