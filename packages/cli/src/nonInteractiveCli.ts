@@ -50,7 +50,7 @@ import { TextOutput } from './ui/utils/textOutput.js';
 interface RunNonInteractiveParams {
   config: Config;
   settings: LoadedSettings;
-  input: string;
+  input?: string;
   prompt_id: string;
   resumedSessionData?: ResumedSessionData;
 }
@@ -237,56 +237,62 @@ export async function runNonInteractive({
         });
       }
 
-      let query: Part[] | undefined;
+      let currentMessages: Content[] = [];
 
-      if (isSlashCommand(input)) {
-        const slashCommandResult = await handleSlashCommand(
-          input,
-          abortController,
-          config,
-          settings,
-        );
-        // If a slash command is found and returns a prompt, use it.
-        // Otherwise, slashCommandResult falls through to the default prompt
-        // handling.
-        if (slashCommandResult) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          query = slashCommandResult as Part[];
-        }
-      }
+      // When resuming with no new input (e.g. auto-restart), skip sending
+      // a new user message — the resumed session already contains it.
+      if (input) {
+        let query: Part[] | undefined;
 
-      if (!query) {
-        const { processedQuery, error } = await handleAtCommand({
-          query: input,
-          config,
-          addItem: (_item, _timestamp) => 0,
-          onDebugMessage: () => {},
-          messageId: Date.now(),
-          signal: abortController.signal,
-        });
-
-        if (error || !processedQuery) {
-          // An error occurred during @include processing (e.g., file not found).
-          // The error message is already logged by handleAtCommand.
-          throw new FatalInputError(
-            error || 'Exiting due to an error processing the @ command.',
+        if (isSlashCommand(input)) {
+          const slashCommandResult = await handleSlashCommand(
+            input,
+            abortController,
+            config,
+            settings,
           );
+          // If a slash command is found and returns a prompt, use it.
+          // Otherwise, slashCommandResult falls through to the default prompt
+          // handling.
+          if (slashCommandResult) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            query = slashCommandResult as Part[];
+          }
         }
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        query = processedQuery as Part[];
-      }
 
-      // Emit user message event for streaming JSON
-      if (streamFormatter) {
-        streamFormatter.emitEvent({
-          type: JsonStreamEventType.MESSAGE,
-          timestamp: new Date().toISOString(),
-          role: 'user',
-          content: input,
-        });
-      }
+        if (!query) {
+          const { processedQuery, error } = await handleAtCommand({
+            query: input,
+            config,
+            addItem: (_item, _timestamp) => 0,
+            onDebugMessage: () => {},
+            messageId: Date.now(),
+            signal: abortController.signal,
+          });
 
-      let currentMessages: Content[] = [{ role: 'user', parts: query }];
+          if (error || !processedQuery) {
+            // An error occurred during @include processing (e.g., file not found).
+            // The error message is already logged by handleAtCommand.
+            throw new FatalInputError(
+              error || 'Exiting due to an error processing the @ command.',
+            );
+          }
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          query = processedQuery as Part[];
+        }
+
+        // Emit user message event for streaming JSON
+        if (streamFormatter) {
+          streamFormatter.emitEvent({
+            type: JsonStreamEventType.MESSAGE,
+            timestamp: new Date().toISOString(),
+            role: 'user',
+            content: input,
+          });
+        }
+
+        currentMessages = [{ role: 'user', parts: query }];
+      }
 
       let turnCount = 0;
       while (true) {

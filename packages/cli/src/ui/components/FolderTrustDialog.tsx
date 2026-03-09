@@ -18,6 +18,7 @@ import * as process from 'node:process';
 import * as path from 'node:path';
 import { relaunchApp } from '../../utils/processUtils.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
+import { useConfig } from '../contexts/ConfigContext.js';
 import {
   ExitCodes,
   type FolderDiscoveryResults,
@@ -45,6 +46,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
   isRestarting,
   discoveryResults,
 }) => {
+  const config = useConfig();
   const [exiting, setExiting] = useState(false);
   const { terminalHeight, terminalWidth, constrainHeight } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
@@ -54,12 +56,12 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     if (isRestarting) {
-      timer = setTimeout(relaunchApp, 250);
+      timer = setTimeout(() => relaunchApp(config.getSessionId()), 250);
     }
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [isRestarting]);
+  }, [isRestarting, config]);
 
   const handleExit = useCallback(() => {
     setExiting(true);

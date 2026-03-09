@@ -738,6 +738,14 @@ export async function main() {
       }
     }
 
+    // When this is an auto-restart (not explicit --resume), clear the
+    // original --prompt so it doesn't get submitted again — the resumed
+    // session already contains it.
+    if (isAutoRestart && resumedSessionData) {
+      config.clearQuestion();
+      input = undefined;
+    }
+
     cliStartupHandle?.end();
     // Render UI, passing necessary config values. Check that there is no command line question.
     if (config.isInteractive()) {
@@ -793,7 +801,7 @@ export async function main() {
       await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
     });
 
-    if (!input) {
+    if (!input && !resumedSessionData) {
       debugLogger.error(
         `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
       );
@@ -802,15 +810,17 @@ export async function main() {
     }
 
     const prompt_id = Math.random().toString(16).slice(2);
-    logUserPrompt(
-      config,
-      new UserPromptEvent(
-        input.length,
-        prompt_id,
-        config.getContentGeneratorConfig()?.authType,
-        input,
-      ),
-    );
+    if (input) {
+      logUserPrompt(
+        config,
+        new UserPromptEvent(
+          input.length,
+          prompt_id,
+          config.getContentGeneratorConfig()?.authType,
+          input,
+        ),
+      );
+    }
 
     const authType = await validateNonInteractiveAuth(
       settings.merged.security.auth.selectedType,
