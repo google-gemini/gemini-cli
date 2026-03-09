@@ -102,7 +102,7 @@ the default way that the CLI executes tools that might have side effects.
   to run the CLI.
   ```bash
   # Run the published sandbox image
-  docker run --rm -it us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.1
+  docker run --rm -it us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.30.0
   ```
 - **Using the `--sandbox` flag:** If you have Gemini CLI installed locally
   (using the standard installation described above), you can instruct it to run
