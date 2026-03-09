@@ -24,9 +24,13 @@ const PRIVATE_IP_RANGES = [
   /^127\./,
   /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
   /^192\.168\./,
-  /^::1$/,
-  /^fc00:/,
-  /^fe80:/,
+  /^0\.0\.0\.0$/,
+  /^169\.254\./,
+  /^\[::1\]$/,
+  /^\[::ffff:/i,
+  /^\[fc00:/,
+  /^\[fe80:/,
+  /^localhost$/i,
 ];
 
 export class FetchError extends Error {
@@ -45,7 +49,8 @@ export function isPrivateIp(url: string): boolean {
     const hostname = new URL(url).hostname;
     return PRIVATE_IP_RANGES.some((range) => range.test(hostname));
   } catch (_e) {
-    return false;
+    // Fail-closed: treat unparseable URLs as private/blocked for security.
+    return true;
   }
 }
 
