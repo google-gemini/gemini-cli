@@ -1350,7 +1350,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       shouldShowSuggestions,
       isShellSuggestionsVisible,
       forceShowShellSuggestions,
-      history,
       voiceEnabled,
       toggleRecording,
       cancelRecording,
@@ -1631,8 +1630,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
               '🎤'
             ) : voiceState.isTranscribing ? (
               <>
-                <Spinner type="dots" />
-                {' '}
+                <Spinner type="dots" />{' '}
               </>
             ) : (
               // Use two spaces for single-width icons to match double-width emoji

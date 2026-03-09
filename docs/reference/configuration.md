@@ -353,29 +353,24 @@ their corresponding top-level category object in your `settings.json` file.
 #### `voice`
 
 - **`voice.enabled`** (boolean):
-  - **Description:** Enable voice input. When enabled, double-tap Space on an
-    empty prompt to start/stop recording. Use `/voice enable` or
-    `/voice disable` to toggle.
+  - **Description:** Enable voice input support.
   - **Default:** `false`
 
-- **`voice.provider`** (string: `"gemini"` | `"whisper"`):
-  - **Description:** Transcription backend. `gemini` uses the Gemini API with
-    your existing auth (zero additional setup). `whisper` uses a locally
-    installed Whisper binary for offline/faster transcription.
-  - **Default:** `"gemini"`
-
-- **`voice.silenceThreshold`** (number, 0–1000):
-  - **Description:** RMS energy threshold for silence detection. Audio below
-    this level is discarded without an API call. Lower values capture quieter
-    speech (e.g. whispering). Set to `0` to disable silence detection and always
-    transcribe. Use `/voice sensitivity <value>` to adjust at runtime.
-  - **Default:** `80`
+- **`voice.provider`** (string):
+  - **Description:** Transcription backend: "gemini" (default, zero-install) or
+    "whisper" (local).
+  - **Default:** `undefined`
 
 - **`voice.whisperPath`** (string):
-  - **Description:** Path to the Whisper executable. Only used when
-    `voice.provider` is `"whisper"` (e.g. `/usr/local/bin/whisper` or
-    `~/.local/bin/whisper`). Use `/voice set-path <path>` to set at runtime.
+  - **Description:** Path to the whisper executable. Only used when provider is
+    "whisper".
   - **Default:** `undefined`
+
+- **`voice.silenceThreshold`** (number):
+  - **Description:** RMS energy threshold (0–1000) below which audio is
+    discarded as silence. Lower values allow quieter speech such as whispering.
+    0 disables silence detection.
+  - **Default:** `80`
 
 #### `ide`
 

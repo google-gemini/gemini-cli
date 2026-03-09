@@ -1877,8 +1877,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       settings.merged.general.devtools,
       showErrorDetails,
       triggerExpandHint,
-      tabFocusTimeoutRef,
-      handleWarning,
       voice,
     ],
   );
