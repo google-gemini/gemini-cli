@@ -367,8 +367,7 @@ export class ChatCompressionService {
       ],
       systemInstruction: { text: getCompressionPrompt(config) },
       promptId,
-      // TODO(joshualitt): wire up a sensible abort signal,
-      abortSignal: abortSignal ?? new AbortController().signal,
+      abortSignal,
       role: LlmRole.UTILITY_COMPRESSOR,
     });
     const summary = getResponseText(summaryResponse) ?? '';
@@ -397,7 +396,7 @@ export class ChatCompressionService {
         systemInstruction: { text: getCompressionPrompt(config) },
         promptId: `${promptId}-verify`,
         role: LlmRole.UTILITY_COMPRESSOR,
-        abortSignal: abortSignal ?? new AbortController().signal,
+        abortSignal,
       });
 
     const finalSummary = (
