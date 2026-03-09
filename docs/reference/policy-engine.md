@@ -10,9 +10,19 @@ confirmation.
 To create your first policy:
 
 1.  **Create the policy directory** if it doesn't exist:
+
+    **macOS/Linux**
+
     ```bash
     mkdir -p ~/.gemini/policies
     ```
+
+    **Windows (PowerShell)**
+
+    ```powershell
+    New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.gemini\policies"
+    ```
+
 2.  **Create a new policy file** (e.g., `~/.gemini/policies/my-rules.toml`). You
     can use any filename ending in `.toml`; all such files in this directory
     will be loaded and combined:
@@ -81,9 +91,16 @@ the arguments don't match the pattern, the rule does not apply.
 There are three possible decisions a rule can enforce:
 
 - `allow`: The tool call is executed automatically without user interaction.
-- `deny`: The tool call is blocked and is not executed.
+- `deny`: The tool call is blocked and is not executed. For global rules (those
+  without an `argsPattern`), tools that are denied are **completely excluded
+  from the model's memory**. This means the model will not even see the tool as
+  an option, which is more secure and saves context window space.
 - `ask_user`: The user is prompted to approve or deny the tool call. (In
   non-interactive mode, this is treated as `deny`.)
+
+> **Note:** The `deny` decision is the recommended way to exclude tools. The
+> legacy `tools.exclude` setting in `settings.json` is deprecated in favor of
+> policy rules with a `deny` decision.
 
 ### Priority system and tiers
 
@@ -97,9 +114,10 @@ has a designated number that forms the base of the final priority calculation.
 | Tier      | Base | Description                                                                |
 | :-------- | :--- | :------------------------------------------------------------------------- |
 | Default   | 1    | Built-in policies that ship with the Gemini CLI.                           |
-| Workspace | 2    | Policies defined in the current workspace's configuration directory.       |
-| User      | 3    | Custom policies defined by the user.                                       |
-| Admin     | 4    | Policies managed by an administrator (e.g., in an enterprise environment). |
+| Extension | 2    | Policies defined in extensions.                                            |
+| Workspace | 3    | Policies defined in the current workspace's configuration directory.       |
+| User      | 4    | Custom policies defined by the user.                                       |
+| Admin     | 5    | Policies managed by an administrator (e.g., in an enterprise environment). |
 
 Within a TOML policy file, you assign a priority value from **0 to 999**. The
 engine transforms this into a final priority using the following formula:
@@ -132,8 +150,8 @@ always active.
   confirmation.
 - `autoEdit`: Optimized for automated code editing; some write tools may be
   auto-approved.
-- `plan`: A strict, read-only mode for research and design. See [Customizing
-  Plan Mode Policies].
+- `plan`: A strict, read-only mode for research and design. See
+  [Customizing Plan Mode Policies](../cli/plan-mode.md#customizing-policies).
 - `yolo`: A mode where all tools are auto-approved (use with extreme caution).
 
 ## Rule matching
@@ -349,5 +367,3 @@ out-of-the-box experience.
 - In **`yolo`** mode, a high-priority rule allows all tools.
 - In **`autoEdit`** mode, rules allow certain write operations to happen without
   prompting.
-
-[Customizing Plan Mode Policies]: /docs/cli/plan-mode.md#customizing-policies

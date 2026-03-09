@@ -17,12 +17,6 @@ A test server
 exports[`McpStatus > renders correctly with a blocked server 1`] = `
 "Configured MCP servers:
 
-🟢 server-1 - Ready (1 tool)
-A test server
-  Tools:
-  - tool-1
-    A test tool
-
 🔴 server-1 (from test-extension) - Blocked
 "
 `;
@@ -60,6 +54,18 @@ A test server
 "
 `;
 
+exports[`McpStatus > renders correctly with a server error 1`] = `
+"Configured MCP servers:
+
+🟢 server-1 - Ready (1 tool)
+  Error: Failed to connect to server
+A test server
+  Tools:
+  - tool-1
+    A test tool
+"
+`;
+
 exports[`McpStatus > renders correctly with authenticated OAuth status 1`] = `
 "Configured MCP servers:
 
@@ -68,6 +74,19 @@ A test server
   Tools:
   - tool-1
     A test tool
+"
+`;
+
+exports[`McpStatus > renders correctly with both blocked and unblocked servers 1`] = `
+"Configured MCP servers:
+
+🟢 server-1 - Ready (1 tool)
+A test server
+  Tools:
+  - tool-1
+    A test tool
+
+🔴 server-2 (from test-extension) - Blocked
 "
 `;
 
@@ -158,5 +177,12 @@ A test server
   Tools:
   - tool-1
     A test tool
+"
+`;
+
+exports[`McpStatus > renders only blocked servers when no configured servers exist 1`] = `
+"Configured MCP servers:
+
+🔴 server-1 (from test-extension) - Blocked
 "
 `;

@@ -20,10 +20,18 @@ vi.mock('node:crypto', () => ({
   randomUUID: vi.fn(),
 }));
 
+const runInDevTraceSpan = vi.hoisted(() =>
+  vi.fn(async (opts, fn) => {
+    const metadata = { attributes: opts.attributes || {} };
+    return fn({
+      metadata,
+      endSpan: vi.fn(),
+    });
+  }),
+);
+
 vi.mock('../telemetry/trace.js', () => ({
-  runInDevTraceSpan: vi.fn(async (_opts, fn) =>
-    fn({ metadata: { input: {}, output: {} } }),
-  ),
+  runInDevTraceSpan,
 }));
 
 import { logToolCall } from '../telemetry/loggers.js';
@@ -67,20 +75,22 @@ import {
   type AnyDeclarativeTool,
   type AnyToolInvocation,
 } from '../tools/tools.js';
-import type {
-  ToolCallRequestInfo,
-  ValidatingToolCall,
-  SuccessfulToolCall,
-  ErroredToolCall,
-  CancelledToolCall,
-  CompletedToolCall,
-  ToolCallResponseInfo,
-  ExecutingToolCall,
-  Status,
-  ToolCall,
+import {
+  CoreToolCallStatus,
+  ROOT_SCHEDULER_ID,
+  type ToolCallRequestInfo,
+  type ValidatingToolCall,
+  type SuccessfulToolCall,
+  type ErroredToolCall,
+  type CancelledToolCall,
+  type CompletedToolCall,
+  type ToolCallResponseInfo,
+  type ExecutingToolCall,
+  type Status,
+  type ToolCall,
 } from './types.js';
-import { CoreToolCallStatus, ROOT_SCHEDULER_ID } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
+import { GeminiCliOperation } from '../telemetry/constants.js';
 import * as ToolUtils from '../utils/tool-utils.js';
 import type { EditorType } from '../utils/editor.js';
 import {
@@ -159,12 +169,14 @@ describe('Scheduler (Orchestrator)', () => {
 
     mockConfig = {
       getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
-      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      toolRegistry: mockToolRegistry,
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(true),
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
     } as unknown as Mocked<Config>;
+
+    (mockConfig as unknown as { config: Config }).config = mockConfig as Config;
 
     mockMessageBus = {
       publish: vi.fn(),
@@ -366,6 +378,21 @@ describe('Scheduler (Orchestrator)', () => {
           }),
         ]),
       );
+
+      expect(runInDevTraceSpan).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: GeminiCliOperation.ScheduleToolCalls,
+        }),
+        expect.any(Function),
+      );
+
+      const spanArgs = vi.mocked(runInDevTraceSpan).mock.calls[0];
+      const fn = spanArgs[1];
+      const metadata = { attributes: {} };
+      await fn({ metadata, endSpan: vi.fn() });
+      expect(metadata).toMatchObject({
+        input: [req1],
+      });
     });
 
     it('should set approvalMode to PLAN when config returns PLAN', async () => {
@@ -922,7 +949,7 @@ describe('Scheduler (Orchestrator)', () => {
       expect(mockStateManager.updateStatus).toHaveBeenCalledWith(
         'call-1',
         CoreToolCallStatus.Cancelled,
-        'Operation cancelled',
+        { callId: 'call-1', responseParts: [] },
       );
     });
 
@@ -1294,6 +1321,8 @@ describe('Scheduler MCP Progress', () => {
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
     } as unknown as Mocked<Config>;
+
+    (mockConfig as unknown as { config: Config }).config = mockConfig as Config;
 
     mockMessageBus = {
       publish: vi.fn(),

@@ -313,6 +313,26 @@ describe('classifyGoogleError', () => {
     expect(result).toBeInstanceOf(TerminalQuotaError);
   });
 
+  it('should return TerminalQuotaError for INSUFFICIENT_G1_CREDITS_BALANCE without domain', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message: 'Resource has been exhausted (e.g. check quota).',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'INSUFFICIENT_G1_CREDITS_BALANCE',
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+    expect((result as TerminalQuotaError).isInsufficientCredits).toBe(true);
+    expect((result as TerminalQuotaError).reason).toBe(
+      'INSUFFICIENT_G1_CREDITS_BALANCE',
+    );
+  });
+
   it('should prioritize daily limit over retry info', () => {
     const apiError: GoogleApiError = {
       code: 429,
@@ -648,5 +668,54 @@ describe('classifyGoogleError', () => {
     const result = classifyGoogleError(originalError);
     expect(result).toBe(originalError);
     expect(result).not.toBeInstanceOf(ValidationRequiredError);
+  });
+
+  it('should return TerminalQuotaError for Cloud Code QUOTA_EXHAUSTED with SSE-corrupted domain', () => {
+    // SSE serialization can inject a trailing comma into the domain string.
+    // This test verifies that the domain sanitization handles this case.
+    const apiError: GoogleApiError = {
+      code: 429,
+      message:
+        'You have exhausted your capacity on this model. Your quota will reset after 19h14m47s.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'QUOTA_EXHAUSTED',
+          domain: 'cloudcode-pa.googleapis.com,',
+          metadata: {
+            uiMessage: 'true',
+            model: 'gemini-3-flash-preview',
+          },
+        },
+        {
+          '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+          retryDelay: '68940s',
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+  });
+
+  it('should return ValidationRequiredError with SSE-corrupted domain', () => {
+    const apiError: GoogleApiError = {
+      code: 403,
+      message: 'Forbidden.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'VALIDATION_REQUIRED',
+          domain: 'cloudcode-pa.googleapis.com,',
+          metadata: {
+            validationUrl: 'https://example.com/validate',
+            validationDescription: 'Please validate',
+          },
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(ValidationRequiredError);
   });
 });

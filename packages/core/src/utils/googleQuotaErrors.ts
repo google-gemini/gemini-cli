@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ErrorInfo,
-  GoogleApiError,
-  Help,
-  QuotaFailure,
-  RetryInfo,
+import {
+  parseGoogleApiError,
+  type ErrorInfo,
+  type GoogleApiError,
+  type Help,
+  type QuotaFailure,
+  type RetryInfo,
 } from './googleErrors.js';
-import { parseGoogleApiError } from './googleErrors.js';
 import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 
 /**
@@ -19,17 +19,24 @@ import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
  */
 export class TerminalQuotaError extends Error {
   retryDelayMs?: number;
+  reason?: string;
 
   constructor(
     message: string,
     override readonly cause: GoogleApiError,
     retryDelaySeconds?: number,
+    reason?: string,
   ) {
     super(message);
     this.name = 'TerminalQuotaError';
     this.retryDelayMs = retryDelaySeconds
       ? retryDelaySeconds * 1000
       : undefined;
+    this.reason = reason;
+  }
+
+  get isInsufficientCredits(): boolean {
+    return this.reason === 'INSUFFICIENT_G1_CREDITS_BALANCE';
   }
 }
 
@@ -103,6 +110,16 @@ const CLOUDCODE_DOMAINS = [
 ];
 
 /**
+ * Checks if the given domain belongs to a Cloud Code API endpoint.
+ * Sanitizes stray characters that SSE stream parsing can inject into the
+ * domain string before comparing.
+ */
+function isCloudCodeDomain(domain: string): boolean {
+  const sanitized = domain.replace(/[^a-zA-Z0-9.-]/g, '');
+  return CLOUDCODE_DOMAINS.includes(sanitized);
+}
+
+/**
  * Checks if a 403 error requires user validation and extracts validation details.
  *
  * @param googleApiError The parsed Google API error to check.
@@ -121,7 +138,8 @@ function classifyValidationRequiredError(
   }
 
   if (
-    !CLOUDCODE_DOMAINS.includes(errorInfo.domain) ||
+    !errorInfo.domain ||
+    !isCloudCodeDomain(errorInfo.domain) ||
     errorInfo.reason !== 'VALIDATION_REQUIRED'
   ) {
     return null;
@@ -293,14 +311,19 @@ export function classifyGoogleError(error: unknown): unknown {
   }
 
   if (errorInfo) {
+    // INSUFFICIENT_G1_CREDITS_BALANCE is always terminal, regardless of domain
+    if (errorInfo.reason === 'INSUFFICIENT_G1_CREDITS_BALANCE') {
+      return new TerminalQuotaError(
+        `${googleApiError.message}`,
+        googleApiError,
+        delaySeconds,
+        errorInfo.reason,
+      );
+    }
+
     // New Cloud Code API quota handling
     if (errorInfo.domain) {
-      const validDomains = [
-        'cloudcode-pa.googleapis.com',
-        'staging-cloudcode-pa.googleapis.com',
-        'autopush-cloudcode-pa.googleapis.com',
-      ];
-      if (validDomains.includes(errorInfo.domain)) {
+      if (isCloudCodeDomain(errorInfo.domain)) {
         if (errorInfo.reason === 'RATE_LIMIT_EXCEEDED') {
           return new RetryableQuotaError(
             `${googleApiError.message}`,
@@ -313,6 +336,7 @@ export function classifyGoogleError(error: unknown): unknown {
             `${googleApiError.message}`,
             googleApiError,
             delaySeconds,
+            errorInfo.reason,
           );
         }
       }
