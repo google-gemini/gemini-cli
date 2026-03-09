@@ -1254,19 +1254,21 @@ export class Config implements McpContext {
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
 
     const codeAssistServer = getCodeAssistServer(this);
-    if (codeAssistServer?.projectId) {
-      const quotaPromise = this.refreshUserQuota();
-      this.experimentsPromise = getExperiments(codeAssistServer)
-        .then((experiments) => {
-          this.setExperiments(experiments);
-          return experiments;
-        })
-        .catch((e) => {
-          debugLogger.error('Failed to fetch experiments', e);
-          return undefined;
-        });
-      await quotaPromise;
-    }
+    const quotaPromise = codeAssistServer?.projectId
+      ? this.refreshUserQuota()
+      : Promise.resolve();
+
+    this.experimentsPromise = getExperiments(codeAssistServer)
+      .then((experiments) => {
+        this.setExperiments(experiments);
+        return experiments;
+      })
+      .catch((e) => {
+        debugLogger.error('Failed to fetch experiments', e);
+        return undefined;
+      });
+
+    await quotaPromise;
 
     const authType = this.contentGeneratorConfig.authType;
     if (
