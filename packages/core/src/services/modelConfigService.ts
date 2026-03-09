@@ -5,6 +5,7 @@
  */
 
 import type { GenerateContentConfig } from '@google/genai';
+import { deepMergeObjects } from '../utils/deepMerge.js';
 
 // The primary key for the ModelConfig is the model string. However, we also
 // support a secondary key to limit the override scope, typically an agent name.
@@ -355,31 +356,6 @@ export class ModelConfigService {
   private static genericDeepMerge(
     ...objects: Array<Record<string, unknown> | undefined>
   ): Record<string, unknown> {
-    return objects.reduce((acc: Record<string, unknown>, obj) => {
-      if (!obj) {
-        return acc;
-      }
-
-      Object.keys(obj).forEach((key) => {
-        const accValue = acc[key];
-        const objValue = obj[key];
-
-        // For now, we only deep merge objects, and not arrays. This is because
-        // If we deep merge arrays, there is no way for the user to completely
-        // override the base array.
-        // TODO(joshualitt): Consider knobs here, i.e. opt-in to deep merging
-        // arrays on a case-by-case basis.
-        if (
-          ModelConfigService.isObject(accValue) &&
-          ModelConfigService.isObject(objValue)
-        ) {
-          acc[key] = ModelConfigService.genericDeepMerge(accValue, objValue);
-        } else {
-          acc[key] = objValue;
-        }
-      });
-
-      return acc;
-    }, {});
+    return deepMergeObjects(...objects);
   }
 }
