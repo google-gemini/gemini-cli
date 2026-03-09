@@ -348,7 +348,7 @@ describe('SessionSelector', () => {
 
     const emptyConfig = {
       storage: {
-        getProjectTempDir: () => tmpDir,
+        getWorkspaceTempDir: () => tmpDir,
       },
       getSessionId: () => 'current-session-id',
     } as Partial<Config> as Config;

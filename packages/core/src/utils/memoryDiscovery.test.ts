@@ -844,12 +844,12 @@ included directory memory
   describe('case-insensitive filesystem deduplication', () => {
     it('should deduplicate files that point to the same inode (same physical file)', async () => {
       const geminiFile = await createTestFile(
-        path.join(projectRoot, 'gemini.md'),
+        path.join(workspaceRoot, 'gemini.md'),
         'Project root memory',
       );
 
       // create hard link to simulate case-insensitive filesystem behavior
-      const geminiFileLink = path.join(projectRoot, 'GEMINI.md');
+      const geminiFileLink = path.join(workspaceRoot, 'GEMINI.md');
       try {
         await fsPromises.link(geminiFile, geminiFileLink);
       } catch (error) {
@@ -876,7 +876,7 @@ included directory memory
         await loadServerHierarchicalMemory(
           cwd,
           [],
-          new FileDiscoveryService(projectRoot),
+          new FileDiscoveryService(workspaceRoot),
           new SimpleExtensionLoader([]),
           DEFAULT_FOLDER_TRUST,
         ),
@@ -897,11 +897,11 @@ included directory memory
 
     it('should handle case where files have different inodes (different files)', async () => {
       const geminiFileLower = await createTestFile(
-        path.join(projectRoot, 'gemini.md'),
+        path.join(workspaceRoot, 'gemini.md'),
         'Lowercase file content',
       );
       const geminiFileUpper = await createTestFile(
-        path.join(projectRoot, 'GEMINI.md'),
+        path.join(workspaceRoot, 'GEMINI.md'),
         'Uppercase file content',
       );
 
@@ -915,7 +915,7 @@ included directory memory
           await loadServerHierarchicalMemory(
             cwd,
             [],
-            new FileDiscoveryService(projectRoot),
+            new FileDiscoveryService(workspaceRoot),
             new SimpleExtensionLoader([]),
             DEFAULT_FOLDER_TRUST,
           ),
@@ -930,7 +930,7 @@ included directory memory
 
     it("should handle files that cannot be stat'd (missing files)", async () => {
       await createTestFile(
-        path.join(projectRoot, 'gemini.md'),
+        path.join(workspaceRoot, 'gemini.md'),
         'Valid file content',
       );
 
@@ -940,7 +940,7 @@ included directory memory
         await loadServerHierarchicalMemory(
           cwd,
           [],
-          new FileDiscoveryService(projectRoot),
+          new FileDiscoveryService(workspaceRoot),
           new SimpleExtensionLoader([]),
           DEFAULT_FOLDER_TRUST,
         ),
@@ -952,12 +952,12 @@ included directory memory
 
     it('should deduplicate multiple paths pointing to same file (3+ duplicates)', async () => {
       const geminiFile = await createTestFile(
-        path.join(projectRoot, 'gemini.md'),
+        path.join(workspaceRoot, 'gemini.md'),
         'Project root memory',
       );
 
-      const link1 = path.join(projectRoot, 'GEMINI.md');
-      const link2 = path.join(projectRoot, 'Gemini.md');
+      const link1 = path.join(workspaceRoot, 'GEMINI.md');
+      const link2 = path.join(workspaceRoot, 'Gemini.md');
 
       try {
         await fsPromises.link(geminiFile, link1);
@@ -987,7 +987,7 @@ included directory memory
         await loadServerHierarchicalMemory(
           cwd,
           [],
-          new FileDiscoveryService(projectRoot),
+          new FileDiscoveryService(workspaceRoot),
           new SimpleExtensionLoader([]),
           DEFAULT_FOLDER_TRUST,
         ),
