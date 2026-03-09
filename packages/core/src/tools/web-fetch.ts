@@ -412,6 +412,24 @@ ${textContent}
       };
     }
 
+    // Prevent SSRF by blocking private/internal IPs (consistent with the
+    // non-experimental path which falls back; here we return an error since
+    // there is no fallback mechanism in experimental mode).
+    if (isPrivateIp(url)) {
+      const errorMessage = `Fetching from private IP addresses is not allowed in direct fetch mode: ${url}`;
+      debugLogger.warn(
+        `[WebFetchTool] Private IP blocked in experimental mode: ${url}`,
+      );
+      return {
+        llmContent: `Error: ${errorMessage}`,
+        returnDisplay: `Error: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.POLICY_VIOLATION,
+        },
+      };
+    }
+
     try {
       const response = await retryWithBackoff(
         async () => {

@@ -981,5 +981,19 @@ describe('WebFetchTool', () => {
       expect(result.error?.type).toBe(ToolErrorType.WEB_FETCH_PROCESSING_ERROR);
       expect(result.error?.message).toContain('Rate limit exceeded for host');
     });
+
+    it('should block private IP addresses in experimental mode (SSRF prevention)', async () => {
+      vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(true);
+
+      const tool = new WebFetchTool(mockConfig, bus);
+      const invocation = tool.build({ url: 'https://10.0.0.1/internal' });
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error?.type).toBe(ToolErrorType.POLICY_VIOLATION);
+      expect(result.error?.message).toContain(
+        'Fetching from private IP addresses is not allowed',
+      );
+      expect(fetchUtils.fetchWithTimeout).not.toHaveBeenCalled();
+    });
   });
 });
