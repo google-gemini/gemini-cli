@@ -84,6 +84,8 @@ describe('toolsCommand', () => {
     expect(message.type).toBe(MessageType.TOOLS_LIST);
     expect(message.showDescriptions).toBe(false);
     expect(message.tools).toHaveLength(2);
+    expect(message.tools[0].displayName).toBe('File Reader');
+    expect(message.tools[1].displayName).toBe('Code Editor');
   });
 
   it('should list tools without descriptions when "list" arg is passed', async () => {
@@ -102,6 +104,9 @@ describe('toolsCommand', () => {
       .calls[0];
     expect(message.type).toBe(MessageType.TOOLS_LIST);
     expect(message.showDescriptions).toBe(false);
+    expect(message.tools).toHaveLength(2);
+    expect(message.tools[0].displayName).toBe('File Reader');
+    expect(message.tools[1].displayName).toBe('Code Editor');
   });
 
   it('should list tools with descriptions when "desc" arg is passed', async () => {
@@ -121,6 +126,8 @@ describe('toolsCommand', () => {
     expect(message.type).toBe(MessageType.TOOLS_LIST);
     expect(message.showDescriptions).toBe(true);
     expect(message.tools).toHaveLength(2);
+    expect(message.tools[0].displayName).toBe('File Reader');
+    expect(message.tools[1].displayName).toBe('Code Editor');
   });
 
   it('should have "list" and "desc" subcommands', () => {
@@ -147,6 +154,9 @@ describe('toolsCommand', () => {
     const [message] = (mockContext.ui.addItem as ReturnType<typeof vi.fn>).mock
       .calls[0];
     expect(message.showDescriptions).toBe(false);
+    expect(message.tools).toHaveLength(2);
+    expect(message.tools[0].displayName).toBe('File Reader');
+    expect(message.tools[1].displayName).toBe('Code Editor');
   });
 
   it('subcommand "desc" should display tools with descriptions', async () => {
@@ -165,5 +175,8 @@ describe('toolsCommand', () => {
     const [message] = (mockContext.ui.addItem as ReturnType<typeof vi.fn>).mock
       .calls[0];
     expect(message.showDescriptions).toBe(true);
+    expect(message.tools).toHaveLength(2);
+    expect(message.tools[0].displayName).toBe('File Reader');
+    expect(message.tools[1].displayName).toBe('Code Editor');
   });
 });

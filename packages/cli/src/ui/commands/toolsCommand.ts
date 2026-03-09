@@ -74,22 +74,12 @@ export const toolsCommand: SlashCommand = {
     const subCommand = args?.trim();
 
     if (subCommand === 'desc') {
-      const item = getToolsList(context, true);
-      if (item) {
-        context.ui.addItem(item);
-      }
-    } else if (!subCommand || subCommand === 'list') {
-      const item = getToolsList(context, false);
-      if (item) {
-        context.ui.addItem(item);
-      }
+      // Delegate to the subcommand's action for consistency.
+      // The action is guaranteed to exist on our own subcommand definition.
+      await descSubCommand.action!(context, '');
     } else {
-      // For any other argument, default to list or let the UI handle it if it was a subcommand.
-      // But since we want to be strict and simple:
-      const item = getToolsList(context, false);
-      if (item) {
-        context.ui.addItem(item);
-      }
+      // Default to 'list' for no subcommand, 'list', or any other invalid subcommand.
+      await listSubCommand.action!(context, '');
     }
   },
 };
