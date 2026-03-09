@@ -21,6 +21,7 @@ import {
   type ShellOutputEvent,
   type ShellExecutionConfig,
 } from './shellExecutionService.js';
+import { ExecutionLifecycleService } from './executionLifecycleService.js';
 import type { AnsiOutput, AnsiToken } from '../utils/terminalSerializer.js';
 
 // Hoisted Mocks
@@ -166,6 +167,7 @@ describe('ShellExecutionService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    ExecutionLifecycleService.resetForTest();
     mockSerializeTerminalToObject.mockReturnValue([]);
     mockIsBinary.mockReturnValue(false);
     mockPlatform.mockReturnValue('linux');
@@ -432,13 +434,21 @@ describe('ShellExecutionService', () => {
   });
 
   describe('pty interaction', () => {
+    let activePtysGetSpy: { mockRestore: () => void };
+
     beforeEach(() => {
-      vi.spyOn(ShellExecutionService['activePtys'], 'get').mockReturnValue({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ptyProcess: mockPtyProcess as any,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        headlessTerminal: mockHeadlessTerminal as any,
-      });
+      activePtysGetSpy = vi
+        .spyOn(ShellExecutionService['activePtys'], 'get')
+        .mockReturnValue({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ptyProcess: mockPtyProcess as any,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          headlessTerminal: mockHeadlessTerminal as any,
+        });
+    });
+
+    afterEach(() => {
+      activePtysGetSpy.mockRestore();
     });
 
     it('should write to the pty and trigger a render', async () => {
