@@ -1073,59 +1073,51 @@ export class Config implements McpContext, AgentLoopContext {
     // TODO(12593): Fix the settings loading logic to properly merge defaults and
     // remove this hack.
     let modelConfigServiceConfig = params.modelConfigServiceConfig;
+    // Version 1
+    const defaultsToApply: Partial<ModelConfigServiceConfig> = {};
     if (modelConfigServiceConfig) {
       if (!modelConfigServiceConfig.aliases) {
-        modelConfigServiceConfig = {
-          ...modelConfigServiceConfig,
-          aliases: DEFAULT_MODEL_CONFIGS.aliases,
-        };
+        defaultsToApply.aliases = DEFAULT_MODEL_CONFIGS.aliases;
       }
       if (!modelConfigServiceConfig.overrides) {
-        modelConfigServiceConfig = {
-          ...modelConfigServiceConfig,
-          overrides: DEFAULT_MODEL_CONFIGS.overrides,
-        };
+        defaultsToApply.overrides = DEFAULT_MODEL_CONFIGS.overrides;
       }
       if (
         !modelConfigServiceConfig.modelDefinitions ||
         Object.keys(modelConfigServiceConfig.modelDefinitions).length === 0
       ) {
-        modelConfigServiceConfig = {
-          ...modelConfigServiceConfig,
-          modelDefinitions: DEFAULT_MODEL_CONFIGS.modelDefinitions,
-        };
+        defaultsToApply.modelDefinitions =
+          DEFAULT_MODEL_CONFIGS.modelDefinitions;
       }
       if (
         !modelConfigServiceConfig.modelIdResolutions ||
         Object.keys(modelConfigServiceConfig.modelIdResolutions).length === 0
       ) {
-        modelConfigServiceConfig = {
-          ...modelConfigServiceConfig,
-          modelIdResolutions: DEFAULT_MODEL_CONFIGS.modelIdResolutions,
-        };
+        defaultsToApply.modelIdResolutions =
+          DEFAULT_MODEL_CONFIGS.modelIdResolutions;
       }
       if (
         !modelConfigServiceConfig.classifierIdResolutions ||
         Object.keys(modelConfigServiceConfig.classifierIdResolutions).length ===
           0
       ) {
-        modelConfigServiceConfig = {
-          ...modelConfigServiceConfig,
-          classifierIdResolutions:
-            DEFAULT_MODEL_CONFIGS.classifierIdResolutions,
-        };
+        defaultsToApply.classifierIdResolutions =
+          DEFAULT_MODEL_CONFIGS.classifierIdResolutions;
       }
       if (
         !modelConfigServiceConfig.modelChains ||
         Object.keys(modelConfigServiceConfig.modelChains).length === 0
       ) {
+        defaultsToApply.modelChains = DEFAULT_MODEL_CONFIGS.modelChains;
+      }
+
+      if (Object.keys(defaultsToApply).length > 0) {
         modelConfigServiceConfig = {
           ...modelConfigServiceConfig,
-          modelChains: DEFAULT_MODEL_CONFIGS.modelChains,
+          ...defaultsToApply,
         };
       }
     }
-
     this.modelConfigService = new ModelConfigService(
       modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
     );
