@@ -26,7 +26,12 @@ describe('processUtils', () => {
 
   beforeEach(() => {
     _resetRelaunchStateForTesting();
-    process.send = vi.fn();
+    process.send = vi.fn(
+      (_msg: unknown, callback?: (err: Error | null) => void) => {
+        if (callback) callback(null);
+        return true;
+      },
+    );
   });
 
   afterEach(() => {
@@ -46,10 +51,13 @@ describe('processUtils', () => {
     await relaunchApp('custom-session-id');
     expect(handleAutoUpdate.waitForUpdateCompletion).toHaveBeenCalledTimes(1);
     expect(runExitCleanup).toHaveBeenCalledTimes(1);
-    expect(process.send).toHaveBeenCalledWith({
-      type: 'relaunch-session',
-      sessionId: 'custom-session-id',
-    });
+    expect(process.send).toHaveBeenCalledWith(
+      {
+        type: 'relaunch-session',
+        sessionId: 'custom-session-id',
+      },
+      expect.any(Function),
+    );
     expect(processExit).toHaveBeenCalledWith(RELAUNCH_EXIT_CODE);
   });
 });

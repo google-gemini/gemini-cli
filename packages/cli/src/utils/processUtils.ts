@@ -29,9 +29,14 @@ export async function relaunchApp(sessionId?: string): Promise<void> {
   await runExitCleanup();
 
   if (process.send && sessionId) {
-    process.send({
-      type: 'relaunch-session',
-      sessionId,
+    await new Promise<void>((resolve) => {
+      process.send!(
+        {
+          type: 'relaunch-session',
+          sessionId,
+        },
+        () => resolve(),
+      );
     });
   }
 
