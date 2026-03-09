@@ -11,7 +11,8 @@ import {
   getAdminErrorMessage,
 } from '@google/gemini-cli-core';
 import { useKeypress } from './useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../keyMatchers.js';
+import { useKeyMatchers } from './useKeyMatchers.js';
 import type { HistoryItemWithoutId } from '../types.js';
 import { MessageType } from '../types.js';
 
@@ -30,6 +31,7 @@ export function useApprovalModeIndicator({
   isActive = true,
   allowPlanMode = false,
 }: UseApprovalModeIndicatorArgs): ApprovalMode {
+  const keyMatchers = useKeyMatchers();
   const currentConfigValue = config.getApprovalMode();
   const [showApprovalMode, setApprovalMode] = useState(currentConfigValue);
 
