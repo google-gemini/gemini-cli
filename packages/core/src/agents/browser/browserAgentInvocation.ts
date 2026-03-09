@@ -24,10 +24,7 @@ import {
 import { ToolErrorType } from '../../tools/tool-error.js';
 import type { AgentInputs, SubagentActivityEvent } from '../types.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
-import {
-  createBrowserAgentDefinition,
-  cleanupBrowserAgent,
-} from './browserAgentFactory.js';
+import { createBrowserAgentDefinition } from './browserAgentFactory.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -87,8 +84,6 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
   ): Promise<ToolResult> {
-    let browserManager;
-
     try {
       if (updateOutput) {
         updateOutput('🌐 Starting browser agent...\n');
@@ -105,7 +100,6 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
         printOutput,
       );
       const { definition } = result;
-      browserManager = result.browserManager;
 
       if (updateOutput) {
         updateOutput(
@@ -165,11 +159,6 @@ ${output.result}
           type: ToolErrorType.EXECUTION_FAILED,
         },
       };
-    } finally {
-      // Always cleanup browser resources
-      if (browserManager) {
-        await cleanupBrowserAgent(browserManager);
-      }
     }
   }
 }
