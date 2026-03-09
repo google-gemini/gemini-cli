@@ -20,7 +20,13 @@
 function sanitizeJsonString(jsonStr: string): string {
   // Match a comma, optional whitespace/newlines, then another comma.
   // Replace with just a comma + the captured whitespace.
-  return jsonStr.replace(/,(\s*),/g, ',$1');
+  // Loop to handle cases like `,,,` which would otherwise become `,,` on a single pass.
+  let prev: string;
+  do {
+    prev = jsonStr;
+    jsonStr = jsonStr.replace(/,(\s*),/g, ',$1');
+  } while (jsonStr !== prev);
+  return jsonStr;
 }
 
 /**
