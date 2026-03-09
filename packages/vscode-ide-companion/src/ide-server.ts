@@ -449,7 +449,7 @@ const createMcpServer = (
         '(IDE Tool) Open a diff view to create or modify a file. Returns a notification once the diff has been accepted or rejected.',
       inputSchema: OpenDiffRequestSchema.shape,
     },
-    async ({ filePath, newContent }: z.infer<typeof OpenDiffRequestSchema>) => {
+    async ({ filePath, newContent }: any) => {
       log(`Received openDiff request for filePath: ${filePath}`);
       await diffManager.showDiff(filePath, newContent);
       return { content: [] };

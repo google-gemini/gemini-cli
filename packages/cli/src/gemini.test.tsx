@@ -1265,6 +1265,7 @@ describe('startInteractiveUI', () => {
     themeError: null,
     shouldOpenAuthDialog: false,
     geminiMdFileCount: 0,
+    claudeCodeDetected: false,
   };
 
   vi.mock('./ui/utils/updateCheck.js', () => ({

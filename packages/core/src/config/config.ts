@@ -491,6 +491,7 @@ export interface ConfigParameters {
   userMemory?: string | HierarchicalMemory;
   geminiMdFileCount?: number;
   geminiMdFilePaths?: string[];
+  claudeCodeDetected?: boolean;
   approvalMode?: ApprovalMode;
   showMemoryUsage?: boolean;
   contextFileName?: string | string[];
@@ -642,6 +643,7 @@ export class Config implements McpContext {
   private userMemory: string | HierarchicalMemory;
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
+  private claudeCodeDetected: boolean;
   private readonly showMemoryUsage: boolean;
   private readonly accessibility: AccessibilitySettings;
   private readonly telemetrySettings: TelemetrySettings;
@@ -840,6 +842,7 @@ export class Config implements McpContext {
     this.userMemory = params.userMemory ?? '';
     this.geminiMdFileCount = params.geminiMdFileCount ?? 0;
     this.geminiMdFilePaths = params.geminiMdFilePaths ?? [];
+    this.claudeCodeDetected = params.claudeCodeDetected ?? false;
     this.showMemoryUsage = params.showMemoryUsage ?? false;
     this.accessibility = params.accessibility ?? {};
     this.telemetrySettings = {
@@ -1979,6 +1982,14 @@ export class Config implements McpContext {
 
   setGeminiMdFilePaths(paths: string[]): void {
     this.geminiMdFilePaths = paths;
+  }
+
+  getClaudeCodeDetected(): boolean {
+    return this.claudeCodeDetected;
+  }
+
+  setClaudeCodeDetected(detected: boolean): void {
+    this.claudeCodeDetected = detected;
   }
 
   getApprovalMode(): ApprovalMode {

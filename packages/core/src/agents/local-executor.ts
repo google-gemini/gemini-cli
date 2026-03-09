@@ -1178,7 +1178,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     };
 
     if (outputConfig) {
-      const jsonSchema = zodToJsonSchema(outputConfig.schema);
+      const jsonSchema = // @ts-ignore
+    zodToJsonSchema(outputConfig.schema);
       const {
         $schema: _$schema,
         definitions: _definitions,

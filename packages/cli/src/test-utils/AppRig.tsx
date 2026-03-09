@@ -393,6 +393,7 @@ export class AppRig {
             themeError: null,
             shouldOpenAuthDialog: false,
             geminiMdFileCount: 0,
+            claudeCodeDetected: false,
           }}
         />,
         {

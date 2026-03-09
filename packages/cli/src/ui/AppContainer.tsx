@@ -460,6 +460,16 @@ export const AppContainer = (props: AppContainerProps) => {
         }
       }
 
+      if (initializationResult.claudeCodeDetected && !resumedSessionData) {
+        historyManager.addItem(
+          {
+            type: MessageType.INFO,
+            text: "✨ Welcome to Gemini CLI! \n🔍 We noticed you've been using Claude Code in this project. \n\nWould you like to import your Claude Code environment to Gemini? (Use `/migrate claude` to start)",
+          },
+          Date.now(),
+        );
+      }
+
       // Fire-and-forget: generate summary for previous session in background
       generateSummary(config).catch((e) => {
         debugLogger.warn('Background summary generation failed:', e);
@@ -2178,6 +2188,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       loopDetectionConfirmationRequest,
       permissionConfirmationRequest,
       geminiMdFileCount,
+      claudeCodeDetected: initializationResult.claudeCodeDetected,
       streamingState,
       initError,
       pendingGeminiHistoryItems,
@@ -2306,6 +2317,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       loopDetectionConfirmationRequest,
       permissionConfirmationRequest,
       geminiMdFileCount,
+      initializationResult.claudeCodeDetected,
       streamingState,
       initError,
       pendingGeminiHistoryItems,

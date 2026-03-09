@@ -40,6 +40,7 @@ import { ideCommand } from '../ui/commands/ideCommand.js';
 import { initCommand } from '../ui/commands/initCommand.js';
 import { mcpCommand } from '../ui/commands/mcpCommand.js';
 import { memoryCommand } from '../ui/commands/memoryCommand.js';
+import { migrateCommand } from '../ui/commands/migrateCommand.js';
 import { modelCommand } from '../ui/commands/modelCommand.js';
 import { oncallCommand } from '../ui/commands/oncallCommand.js';
 import { permissionsCommand } from '../ui/commands/permissionsCommand.js';
@@ -52,6 +53,7 @@ import { restoreCommand } from '../ui/commands/restoreCommand.js';
 import { resumeCommand } from '../ui/commands/resumeCommand.js';
 import { statsCommand } from '../ui/commands/statsCommand.js';
 import { themeCommand } from '../ui/commands/themeCommand.js';
+import { thinkCommand } from '../ui/commands/thinkCommand.js';
 import { toolsCommand } from '../ui/commands/toolsCommand.js';
 import { skillsCommand } from '../ui/commands/skillsCommand.js';
 import { settingsCommand } from '../ui/commands/settingsCommand.js';
@@ -180,6 +182,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
           ]
         : [mcpCommand]),
       memoryCommand,
+      migrateCommand,
       modelCommand,
       ...(this.config?.getFolderTrust() ? [permissionsCommand] : []),
       ...(this.config?.isPlanEnabled() ? [planCommand] : []),
@@ -223,6 +226,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
       vimCommand,
       setupGithubCommand,
       terminalSetupCommand,
+      thinkCommand,
     ];
     handle?.end();
     return allDefinitions.filter((cmd): cmd is SlashCommand => cmd !== null);

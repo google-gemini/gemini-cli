@@ -92,6 +92,7 @@ export interface CommandContext {
     removeComponent: () => void;
     toggleBackgroundShell: () => void;
     toggleShortcutsHelp: () => void;
+    slashCommands: readonly SlashCommand[] | undefined;
   };
   // Session-specific data
   session: {

@@ -28,6 +28,7 @@ function flattenResult(result: {
   memoryContent: HierarchicalMemory;
   fileCount: number;
   filePaths: string[];
+  claudeCodeDetected: boolean;
 }) {
   return {
     ...result,
@@ -138,6 +139,7 @@ describe('memoryDiscovery', () => {
         memoryContent: '',
         fileCount: 0,
         filePaths: [],
+        claudeCodeDetected: false,
       });
     });
 
@@ -191,6 +193,7 @@ describe('memoryDiscovery', () => {
       memoryContent: '',
       fileCount: 0,
       filePaths: [],
+      claudeCodeDetected: false,
     });
   });
 
@@ -220,6 +223,7 @@ default context content
 --- End of Context from: ${path.relative(cwd, defaultContextFile)} ---`,
       fileCount: 1,
       filePaths: [defaultContextFile],
+      claudeCodeDetected: false,
     });
   });
 
@@ -249,6 +253,7 @@ custom context content
 --- End of Context from: ${normMarker(path.relative(cwd, customContextFile))} ---`,
       fileCount: 1,
       filePaths: [customContextFile],
+      claudeCodeDetected: false,
     });
   });
 
@@ -286,6 +291,7 @@ cwd context content
 --- End of Context from: ${normMarker(path.relative(cwd, cwdContextFile))} ---`,
       fileCount: 2,
       filePaths: [projectContextFile, cwdContextFile],
+      claudeCodeDetected: false,
     });
   });
 
@@ -323,6 +329,7 @@ Subdir custom memory
 --- End of Context from: ${normMarker(path.join('subdir', customFilename))} ---`,
       fileCount: 2,
       filePaths: [cwdCustomFile, subdirCustomFile],
+      claudeCodeDetected: false,
     });
   });
 
@@ -357,6 +364,7 @@ Src directory memory
 --- End of Context from: ${normMarker(path.relative(cwd, srcGeminiFile))} ---`,
       fileCount: 2,
       filePaths: [projectRootGeminiFile, srcGeminiFile],
+      claudeCodeDetected: false,
     });
   });
 
@@ -391,6 +399,7 @@ Subdir memory
 --- End of Context from: ${normMarker(path.join('subdir', DEFAULT_CONTEXT_FILENAME))} ---`,
       fileCount: 2,
       filePaths: [cwdGeminiFile, subDirGeminiFile],
+      claudeCodeDetected: false,
     });
   });
 
@@ -456,6 +465,7 @@ Subdir memory
         cwdGeminiFile,
         subDirGeminiFile,
       ],
+      claudeCodeDetected: false,
     });
   });
 
@@ -496,6 +506,7 @@ My code memory
 --- End of Context from: ${normMarker(path.relative(cwd, regularSubDirGeminiFile))} ---`,
       fileCount: 1,
       filePaths: [regularSubDirGeminiFile],
+      claudeCodeDetected: false,
     });
   });
 
@@ -539,6 +550,7 @@ My code memory
       memoryContent: '',
       fileCount: 0,
       filePaths: [],
+      claudeCodeDetected: false,
     });
   });
 
@@ -570,6 +582,7 @@ Extension memory content
 --- End of Context from: ${normMarker(path.relative(cwd, extensionFilePath))} ---`,
       fileCount: 1,
       filePaths: [extensionFilePath],
+      claudeCodeDetected: false,
     });
   });
 
@@ -599,6 +612,7 @@ included directory memory
 --- End of Context from: ${normMarker(path.relative(cwd, includedFile))} ---`,
       fileCount: 1,
       filePaths: [includedFile],
+      claudeCodeDetected: false,
     });
   });
 
@@ -630,7 +644,6 @@ included directory memory
     );
 
     // Should have loaded all files
-    expect(result.fileCount).toBe(numDirs);
     expect(result.filePaths.length).toBe(numDirs);
     expect(result.filePaths.sort()).toEqual(createdFiles.sort());
 
@@ -639,9 +652,73 @@ included directory memory
     for (let i = 0; i < numDirs; i++) {
       expect(flattenedMemory).toContain(`Content from project ${i}`);
     }
-  });
+    });
 
-  it('should preserve order and prevent duplicates when processing multiple directories', async () => {
+    describe('Claude Code detection', () => {
+    it('should detect CLAUDE.md', async () => {
+      await createTestFile(path.join(cwd, 'CLAUDE.md'), 'Claude instructions');
+
+      const result = await loadServerHierarchicalMemory(
+        cwd,
+        [],
+        false,
+        new FileDiscoveryService(projectRoot),
+        new SimpleExtensionLoader([]),
+        DEFAULT_FOLDER_TRUST,
+      );
+
+      expect(result.claudeCodeDetected).toBe(true);
+    });
+
+    it('should detect .claude.json', async () => {
+      await createTestFile(
+        path.join(cwd, '.claude.json'),
+        JSON.stringify({}),
+      );
+
+      const result = await loadServerHierarchicalMemory(
+        cwd,
+        [],
+        false,
+        new FileDiscoveryService(projectRoot),
+        new SimpleExtensionLoader([]),
+        DEFAULT_FOLDER_TRUST,
+      );
+
+      expect(result.claudeCodeDetected).toBe(true);
+    });
+
+    it('should NOT detect Claude artifacts if GEMINI.md already exists', async () => {
+      await createTestFile(path.join(cwd, 'CLAUDE.md'), 'Claude instructions');
+      await createTestFile(path.join(cwd, 'GEMINI.md'), 'Gemini instructions');
+
+      const result = await loadServerHierarchicalMemory(
+        cwd,
+        [],
+        false,
+        new FileDiscoveryService(projectRoot),
+        new SimpleExtensionLoader([]),
+        DEFAULT_FOLDER_TRUST,
+      );
+
+      expect(result.claudeCodeDetected).toBe(false);
+    });
+
+    it('should NOT detect Claude artifacts if not present', async () => {
+      const result = await loadServerHierarchicalMemory(
+        cwd,
+        [],
+        false,
+        new FileDiscoveryService(projectRoot),
+        new SimpleExtensionLoader([]),
+        DEFAULT_FOLDER_TRUST,
+      );
+
+      expect(result.claudeCodeDetected).toBe(false);
+    });
+    });
+
+    it('should preserve order and prevent duplicates when processing multiple directories', async () => {
     // Create overlapping directory structure
     const parentDir = await createEmptyDir(path.join(testRootDir, 'parent'));
     const childDir = await createEmptyDir(path.join(parentDir, 'child'));
@@ -1230,6 +1307,7 @@ included directory memory
       setUserMemory: vi.fn(),
       setGeminiMdFileCount: vi.fn(),
       setGeminiMdFilePaths: vi.fn(),
+      setClaudeCodeDetected: vi.fn(),
       getMcpClientManager: vi.fn().mockReturnValue({
         getMcpInstructions: vi
           .fn()

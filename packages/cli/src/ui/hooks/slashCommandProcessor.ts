@@ -243,6 +243,7 @@ export const useSlashCommandProcessor = (
         removeComponent: () => setCustomDialog(null),
         toggleBackgroundShell: actions.toggleBackgroundShell,
         toggleShortcutsHelp: actions.toggleShortcutsHelp,
+        slashCommands: commands,
       },
       session: {
         stats: session.stats,

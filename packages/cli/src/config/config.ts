@@ -491,6 +491,7 @@ export async function loadCliConfig(
   let memoryContent: string | HierarchicalMemory = '';
   let fileCount = 0;
   let filePaths: string[] = [];
+  let claudeCodeDetected = false;
 
   if (!experimentalJitContext) {
     // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
@@ -509,6 +510,7 @@ export async function loadCliConfig(
     memoryContent = result.memoryContent;
     fileCount = result.fileCount;
     filePaths = result.filePaths;
+    claudeCodeDetected = result.claudeCodeDetected;
   }
 
   const question = argv.promptInteractive || argv.prompt || '';
@@ -736,6 +738,7 @@ export async function loadCliConfig(
     userMemory: memoryContent,
     geminiMdFileCount: fileCount,
     geminiMdFilePaths: filePaths,
+    claudeCodeDetected,
     approvalMode,
     disableYoloMode:
       settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,

@@ -124,6 +124,7 @@ describe('memory commands', () => {
         memoryContent: { project: 'refreshed content' },
         fileCount: 2,
         filePaths: [],
+        claudeCodeDetected: false,
       });
 
       const result = await refreshMemory(mockConfig);
@@ -146,6 +147,7 @@ describe('memory commands', () => {
         memoryContent: { project: '' },
         fileCount: 0,
         filePaths: [],
+        claudeCodeDetected: false,
       });
 
       const result = await refreshMemory(mockConfig);

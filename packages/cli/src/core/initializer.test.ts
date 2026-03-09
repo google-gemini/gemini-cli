@@ -44,6 +44,7 @@ describe('initializer', () => {
     getToolRegistry: ReturnType<typeof vi.fn>;
     getIdeMode: ReturnType<typeof vi.fn>;
     getGeminiMdFileCount: ReturnType<typeof vi.fn>;
+    getClaudeCodeDetected: ReturnType<typeof vi.fn>;
   };
   let mockSettings: LoadedSettings;
   let mockIdeClient: {
@@ -56,6 +57,7 @@ describe('initializer', () => {
       getToolRegistry: vi.fn(),
       getIdeMode: vi.fn().mockReturnValue(false),
       getGeminiMdFileCount: vi.fn().mockReturnValue(5),
+      getClaudeCodeDetected: vi.fn().mockReturnValue(false),
     };
     mockSettings = {
       merged: {
@@ -91,6 +93,7 @@ describe('initializer', () => {
       themeError: null,
       shouldOpenAuthDialog: false,
       geminiMdFileCount: 5,
+      claudeCodeDetected: false,
     });
     expect(performInitialAuth).toHaveBeenCalledWith(mockConfig, 'oauth');
     expect(validateTheme).toHaveBeenCalledWith(mockSettings);
@@ -111,6 +114,7 @@ describe('initializer', () => {
       themeError: null,
       shouldOpenAuthDialog: false,
       geminiMdFileCount: 5,
+      claudeCodeDetected: false,
     });
     expect(IdeClient.getInstance).toHaveBeenCalled();
     expect(mockIdeClient.connect).toHaveBeenCalled();
@@ -152,5 +156,15 @@ describe('initializer', () => {
     );
 
     expect(result.themeError).toBe('Theme not found');
+  });
+
+  it('should report Claude Code detection', async () => {
+    mockConfig.getClaudeCodeDetected = vi.fn().mockReturnValue(true);
+    const result = await initializeApp(
+      mockConfig as unknown as Config,
+      mockSettings,
+    );
+
+    expect(result.claudeCodeDetected).toBe(true);
   });
 });

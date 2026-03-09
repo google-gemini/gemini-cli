@@ -9,6 +9,7 @@ import process from 'node:process';
 import {
   type CommandContext,
   type SlashCommand,
+  type SlashCommandActionReturn,
   CommandKind,
 } from './types.js';
 import { MessageType } from '../types.js';
@@ -27,12 +28,34 @@ import path from 'node:path';
 
 export const bugCommand: SlashCommand = {
   name: 'bug',
-  description: 'Submit a bug report',
+  description: 'Submit a bug report or fix a bug in your code (Claude style)',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
-  action: async (context: CommandContext, args?: string): Promise<void> => {
+  action: async (context: CommandContext, args?: string): Promise<void | SlashCommandActionReturn> => {
     const bugDescription = (args || '').trim();
     const { config } = context.services;
+
+    if (bugDescription) {
+      // Claude-style /bug: use agent to fix the bug
+      if (config?.isAgentsEnabled()) {
+        context.ui.addItem({
+          type: MessageType.INFO,
+          text: '*(Gemini handles bugs via agents, but `/bug` works too!)*',
+        });
+        return {
+          type: 'tool',
+          toolName: 'codebase_investigator',
+          toolArgs: {
+            objective: `Investigate and fix the following bug: ${bugDescription}`,
+          },
+        };
+      } else {
+        context.ui.addItem({
+          type: MessageType.WARNING,
+          text: 'Agents are not enabled. Reporting this as a Gemini CLI bug instead.',
+        });
+      }
+    }
 
     const osVersion = `${process.platform} ${process.version}`;
     let sandboxEnv = 'no sandbox';

@@ -17,10 +17,36 @@ import {
 } from '../types.js';
 
 /**
- * Action for the default `/commands` invocation.
- * Displays a message prompting the user to use a subcommand.
+ * Action for `/commands list`.
+ * Displays all currently registered slash commands.
  */
 async function listAction(
+  context: CommandContext,
+): Promise<void | SlashCommandActionReturn> {
+  const commands = context.ui.slashCommands;
+  if (!commands || commands.length === 0) {
+    return {
+      type: 'message',
+      messageType: 'info',
+      content: 'No slash commands loaded.',
+    };
+  }
+
+  const list = commands
+    .map((cmd: SlashCommand) => `  - **/${cmd.name}**: ${cmd.description}`)
+    .join('\n');
+
+  return {
+    type: 'message',
+    messageType: 'info',
+    content: `Available Slash Commands:\n\n${list}`,
+  };
+}
+
+/**
+ * Action for the default `/commands` invocation.
+ */
+async function defaultAction(
   _context: CommandContext,
   _args: string,
 ): Promise<void | SlashCommandActionReturn> {
@@ -28,7 +54,7 @@ async function listAction(
     type: 'message',
     messageType: 'info',
     content:
-      'Use "/commands reload" to reload custom command definitions from .toml files.',
+      'Usage: /commands [list|reload]',
   };
 }
 
@@ -63,10 +89,17 @@ async function reloadAction(
 
 export const commandsCommand: SlashCommand = {
   name: 'commands',
-  description: 'Manage custom slash commands. Usage: /commands [reload]',
+  description: 'Manage custom slash commands. Usage: /commands [list|reload]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   subCommands: [
+    {
+      name: 'list',
+      description: 'List all currently registered slash commands.',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      action: listAction,
+    },
     {
       name: 'reload',
       altNames: ['refresh'],
@@ -77,5 +110,5 @@ export const commandsCommand: SlashCommand = {
       action: reloadAction,
     },
   ],
-  action: listAction,
+  action: defaultAction,
 };

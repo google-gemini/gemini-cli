@@ -584,6 +584,7 @@ export interface LoadServerHierarchicalMemoryResponse {
   memoryContent: HierarchicalMemory;
   fileCount: number;
   filePaths: string[];
+  claudeCodeDetected: boolean;
 }
 
 /**
@@ -620,6 +621,32 @@ export async function loadServerHierarchicalMemory(
   // For the server, homedir() refers to the server process's home.
   // This is consistent with how MemoryTool already finds the global path.
   const userHomePath = homedir();
+
+  // Detect Claude Code artifacts (Step 1 of Migration UX)
+  let claudeCodeDetected = false;
+  if (currentWorkingDirectory) {
+    const geminiMdPath = path.join(currentWorkingDirectory, 'GEMINI.md');
+    let geminiMdExists = false;
+    try {
+      await fs.access(geminiMdPath, fsSync.constants.R_OK);
+      geminiMdExists = true;
+    } catch {
+      // GEMINI.md doesn't exist
+    }
+
+    if (!geminiMdExists) {
+      const claudeArtifacts = ['CLAUDE.md', '.claude.json'];
+      for (const artifact of claudeArtifacts) {
+        try {
+          await fs.access(path.join(currentWorkingDirectory, artifact), fsSync.constants.R_OK);
+          claudeCodeDetected = true;
+          break;
+        } catch {
+          // Not found, continue.
+        }
+      }
+    }
+  }
 
   // 1. SCATTER: Gather all paths
   const [discoveryResult, extensionPaths] = await Promise.all([
@@ -667,6 +694,7 @@ export async function loadServerHierarchicalMemory(
       memoryContent: { global: '', extension: '', project: '' },
       fileCount: 0,
       filePaths: [],
+      claudeCodeDetected,
     };
   }
 
@@ -689,6 +717,7 @@ export async function loadServerHierarchicalMemory(
     memoryContent: hierarchicalMemory,
     fileCount: allContents.filter((c) => c.content !== null).length,
     filePaths: allFilePaths,
+    claudeCodeDetected,
   };
 }
 
@@ -722,6 +751,7 @@ export async function refreshServerHierarchicalMemory(config: Config) {
   config.setUserMemory(finalMemory);
   config.setGeminiMdFileCount(result.fileCount);
   config.setGeminiMdFilePaths(result.filePaths);
+  config.setClaudeCodeDetected(result.claudeCodeDetected);
   coreEvents.emit(CoreEvent.MemoryChanged, { fileCount: result.fileCount });
   return result;
 }
