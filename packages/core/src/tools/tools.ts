@@ -428,7 +428,44 @@ export abstract class DeclarativeTool<
     return {
       name: this.name,
       description: this.description,
-      parametersJsonSchema: this.parameterSchema,
+      parametersJsonSchema: this.addWaitForPreviousParameter(
+        this.parameterSchema,
+      ),
+    };
+  }
+
+  /**
+   * Type guard to check if an unknown value is a plain object record.
+   */
+  private isSchemaObject(obj: unknown): obj is Record<string, unknown> {
+    return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
+  }
+
+  /**
+   * Adds the `wait_for_previous` parameter to the tool's schema.
+   * This allows the model to explicitly control parallel vs sequential execution.
+   */
+  private addWaitForPreviousParameter(schema: unknown): unknown {
+    if (!this.isSchemaObject(schema)) {
+      return schema;
+    }
+
+    const props = schema['properties'];
+
+    if (schema['type'] !== 'object' || !this.isSchemaObject(props)) {
+      return schema;
+    }
+
+    return {
+      ...schema,
+      properties: {
+        ...props,
+        wait_for_previous: {
+          type: 'boolean',
+          description:
+            'Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.',
+        },
+      },
     };
   }
 
