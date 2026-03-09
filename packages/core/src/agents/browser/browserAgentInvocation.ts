@@ -120,6 +120,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
 
         if (
           activity.type === 'THOUGHT_CHUNK' &&
+          // eslint-disable-next-line no-restricted-syntax
           typeof activity.data['text'] === 'string'
         ) {
           updateOutput(`🌐💭 ${activity.data['text']}`);

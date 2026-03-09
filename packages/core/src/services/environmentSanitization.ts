@@ -14,11 +14,9 @@ export function sanitizeEnvironment(
   processEnv: NodeJS.ProcessEnv,
   config: EnvironmentSanitizationConfig,
 ): NodeJS.ProcessEnv {
-  // Enable strict sanitization in GitHub actions.
   const isStrictSanitization =
     !!processEnv['GITHUB_SHA'] || processEnv['SURFACE'] === 'Github';
 
-  // Always sanitize when in GitHub actions.
   if (!config.enableEnvironmentVariableRedaction && !isStrictSanitization) {
     return { ...processEnv };
   }
@@ -71,6 +69,10 @@ export const ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES: ReadonlySet<string> =
     'TMPDIR',
     'USER',
     'LOGNAME',
+    // Terminal capability variables (needed by editors like vim/emacs and
+    // interactive commands like top)
+    'TERM',
+    'COLORTERM',
     // GitHub Action-related variables
     'ADDITIONAL_CONTEXT',
     'AVAILABLE_LABELS',
@@ -148,7 +150,18 @@ function shouldRedactEnvironmentVariable(
   key = key.toUpperCase();
   value = value?.toUpperCase();
 
-  // User overrides take precedence.
+  if (key.startsWith('GEMINI_CLI_')) {
+    return false;
+  }
+
+  if (value) {
+    for (const pattern of NEVER_ALLOWED_VALUE_PATTERNS) {
+      if (pattern.test(value)) {
+        return true;
+      }
+    }
+  }
+
   if (allowedSet?.has(key)) {
     return false;
   }
@@ -156,20 +169,14 @@ function shouldRedactEnvironmentVariable(
     return true;
   }
 
-  // These are never redacted.
-  if (
-    ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES.has(key) ||
-    key.startsWith('GEMINI_CLI_')
-  ) {
+  if (ALWAYS_ALLOWED_ENVIRONMENT_VARIABLES.has(key)) {
     return false;
   }
 
-  // These are always redacted.
   if (NEVER_ALLOWED_ENVIRONMENT_VARIABLES.has(key)) {
     return true;
   }
 
-  // If in strict mode (e.g. GitHub Action), and not explicitly allowed, redact it.
   if (isStrictSanitization) {
     return true;
   }
@@ -177,15 +184,6 @@ function shouldRedactEnvironmentVariable(
   for (const pattern of NEVER_ALLOWED_NAME_PATTERNS) {
     if (pattern.test(key)) {
       return true;
-    }
-  }
-
-  // Redact if the value looks like a key/cert.
-  if (value) {
-    for (const pattern of NEVER_ALLOWED_VALUE_PATTERNS) {
-      if (pattern.test(value)) {
-        return true;
-      }
     }
   }
 
