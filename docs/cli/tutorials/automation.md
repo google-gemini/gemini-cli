@@ -19,14 +19,15 @@ Headless mode runs Gemini CLI once and exits. It's perfect for:
 
 ## How to use headless mode
 
-Run Gemini CLI in headless mode by providing a prompt as a positional argument.
-This bypasses the interactive chat interface and prints the response to standard
-output (stdout).
+Run Gemini CLI in headless mode by providing a prompt with the `-p` (or
+`--prompt`) flag. This bypasses the interactive chat interface and prints the
+response to standard output (stdout). Positional arguments without the flag
+default to interactive mode, unless the input or output is piped or redirected.
 
 Run a single command:
 
 ```bash
-gemini "Write a poem about TypeScript"
+gemini -p "Write a poem about TypeScript"
 ```
 
 ## How to pipe input to Gemini CLI
@@ -40,19 +41,19 @@ Pipe a file:
 **macOS/Linux**
 
 ```bash
-cat error.log | gemini "Explain why this failed"
+cat error.log | gemini -p "Explain why this failed"
 ```
 
 **Windows (PowerShell)**
 
 ```powershell
-Get-Content error.log | gemini "Explain why this failed"
+Get-Content error.log | gemini -p "Explain why this failed"
 ```
 
 Pipe a command:
 
 ```bash
-git diff | gemini "Write a commit message for these changes"
+git diff | gemini -p "Write a commit message for these changes"
 ```
 
 ## Use Gemini CLI output in scripts
@@ -78,7 +79,7 @@ one.
       echo "Generating docs for $file..."
 
       # Ask Gemini CLI to generate the documentation and print it to stdout
-      gemini "Generate a Markdown documentation summary for @$file. Print the
+      gemini -p "Generate a Markdown documentation summary for @$file. Print the
       result to standard output." > "${file%.py}.md"
     done
     ```
@@ -92,7 +93,7 @@ one.
 
       $newName = $_.Name -replace '\.py$', '.md'
       # Ask Gemini CLI to generate the documentation and print it to stdout
-      gemini "Generate a Markdown documentation summary for @$($_.Name). Print the result to standard output." | Out-File -FilePath $newName -Encoding utf8
+      gemini -p "Generate a Markdown documentation summary for @$($_.Name). Print the result to standard output." | Out-File -FilePath $newName -Encoding utf8
     }
     ```
 
@@ -214,7 +215,7 @@ wrapper that writes the message for you.
 
       # Ask Gemini to write the message
       echo "Generating commit message..."
-      msg=$(echo "$diff" | gemini "Write a concise Conventional Commit message for this diff. Output ONLY the message.")
+      msg=$(echo "$diff" | gemini -p "Write a concise Conventional Commit message for this diff. Output ONLY the message.")
 
       # Commit with the generated message
       git commit -m "$msg"
@@ -251,7 +252,7 @@ wrapper that writes the message for you.
 
       # Ask Gemini to write the message
       Write-Host "Generating commit message..."
-      $msg = $diff | gemini "Write a concise Conventional Commit message for this diff. Output ONLY the message."
+      $msg = $diff | gemini -p "Write a concise Conventional Commit message for this diff. Output ONLY the message."
 
       # Commit with the generated message
       git commit -m "$msg"
