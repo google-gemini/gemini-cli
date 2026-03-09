@@ -104,6 +104,10 @@ export enum MCPServerStatus {
   CONNECTING = 'connecting',
   /** Server is connected and ready to use */
   CONNECTED = 'connected',
+  /** Server is blocked via configuration and cannot be used */
+  BLOCKED = 'blocked',
+  /** Server is disabled and cannot be used */
+  DISABLED = 'disabled',
 }
 
 /**
