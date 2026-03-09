@@ -693,12 +693,19 @@ export async function main() {
       })),
     ];
 
-    // Handle --resume flag
+    // Handle session resume — either from explicit --resume flag or from
+    // auto-restart via GEMINI_RESUME_SESSION_ID env var.
+    const resumeArg = argv.resume ?? process.env['GEMINI_RESUME_SESSION_ID'];
+    const isAutoRestart =
+      !argv.resume && !!process.env['GEMINI_RESUME_SESSION_ID'];
+    // Clean up the env var so it doesn't leak to further restarts
+    delete process.env['GEMINI_RESUME_SESSION_ID'];
+
     let resumedSessionData: ResumedSessionData | undefined = undefined;
-    if (argv.resume) {
+    if (resumeArg) {
       const sessionSelector = new SessionSelector(config);
       try {
-        const result = await sessionSelector.resolveSession(argv.resume);
+        const result = await sessionSelector.resolveSession(resumeArg);
         resumedSessionData = {
           conversation: result.sessionData,
           filePath: result.sessionPath,
@@ -706,14 +713,18 @@ export async function main() {
         // Use the existing session ID to continue recording to the same session
         config.setSessionId(resumedSessionData.conversation.sessionId);
       } catch (error) {
-        if (
+        if (error instanceof SessionError && isAutoRestart) {
+          // Auto-restart tried to resume a session that doesn't exist on
+          // disk yet (e.g. empty session with no messages). Silently start
+          // a new session.
+        } else if (
           error instanceof SessionError &&
           error.code === 'NO_SESSIONS_FOUND'
         ) {
           // No sessions to resume — start a fresh session with a warning
           startupWarnings.push({
             id: 'resume-failure',
-            message: 'Could not resume session. Started a new session.',
+            message: `${error.message} Started a new session.`,
             priority: WarningPriority.High,
           });
         } else {

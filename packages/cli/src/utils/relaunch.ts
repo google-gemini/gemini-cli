@@ -47,22 +47,7 @@ export async function relaunchAppInChildProcess(
     // process.argv is [node, script, ...args]
     // We want to construct [ ...nodeArgs, script, ...scriptArgs]
     const script = process.argv[1];
-    let scriptArgs = process.argv.slice(2);
-
-    if (resumeSessionId) {
-      const filteredArgs: string[] = [];
-      for (let i = 0; i < scriptArgs.length; i++) {
-        if (scriptArgs[i] === '--resume') {
-          i++; // Skip the next argument as well
-          continue;
-        }
-        if (scriptArgs[i].startsWith('--resume=')) {
-          continue;
-        }
-        filteredArgs.push(scriptArgs[i]);
-      }
-      scriptArgs = [...filteredArgs, '--resume', resumeSessionId];
-    }
+    const scriptArgs = process.argv.slice(2);
 
     const nodeArgs = [
       ...process.execArgv,
@@ -71,7 +56,11 @@ export async function relaunchAppInChildProcess(
       ...additionalScriptArgs,
       ...scriptArgs,
     ];
-    const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+    const newEnv: Record<string, string | undefined> = {
+      ...process.env,
+      GEMINI_CLI_NO_RELAUNCH: 'true',
+      GEMINI_RESUME_SESSION_ID: resumeSessionId,
+    };
 
     // The parent process should not be reading from stdin while the child is running.
     process.stdin.pause();

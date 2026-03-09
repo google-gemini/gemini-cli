@@ -22,33 +22,27 @@ describe('processUtils', () => {
     .spyOn(process, 'exit')
     .mockReturnValue(undefined as never);
   const runExitCleanup = vi.spyOn(cleanup, 'runExitCleanup');
+  const originalSend = process.send;
 
   beforeEach(() => {
     _resetRelaunchStateForTesting();
+    process.send = vi.fn();
   });
 
-  afterEach(() => vi.clearAllMocks());
-
-  it('should wait for updates, run cleanup, send resume session ID, and exit with the relaunch code', async () => {
-    const originalSend = process.send;
-    process.send = vi.fn();
-
-    await relaunchApp();
-    expect(handleAutoUpdate.waitForUpdateCompletion).toHaveBeenCalledTimes(1);
-    expect(runExitCleanup).toHaveBeenCalledTimes(1);
-    expect(process.send).toHaveBeenCalledWith({
-      type: 'relaunch-session',
-      sessionId: expect.any(String),
-    });
-    expect(processExit).toHaveBeenCalledWith(RELAUNCH_EXIT_CODE);
-
+  afterEach(() => {
+    vi.clearAllMocks();
     process.send = originalSend;
   });
 
-  it('should wait for updates, run cleanup, send override resume session ID, and exit with the relaunch code', async () => {
-    const originalSend = process.send;
-    process.send = vi.fn();
+  it('should not send IPC message when no sessionId is provided', async () => {
+    await relaunchApp();
+    expect(handleAutoUpdate.waitForUpdateCompletion).toHaveBeenCalledTimes(1);
+    expect(runExitCleanup).toHaveBeenCalledTimes(1);
+    expect(process.send).not.toHaveBeenCalled();
+    expect(processExit).toHaveBeenCalledWith(RELAUNCH_EXIT_CODE);
+  });
 
+  it('should send resume session ID via IPC when sessionId is provided', async () => {
     await relaunchApp('custom-session-id');
     expect(handleAutoUpdate.waitForUpdateCompletion).toHaveBeenCalledTimes(1);
     expect(runExitCleanup).toHaveBeenCalledTimes(1);
@@ -57,7 +51,5 @@ describe('processUtils', () => {
       sessionId: 'custom-session-id',
     });
     expect(processExit).toHaveBeenCalledWith(RELAUNCH_EXIT_CODE);
-
-    process.send = originalSend;
   });
 });
