@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import process from 'node:process';
 import {
   type Command,
   type KeyBinding,
@@ -29,18 +30,62 @@ const KEY_NAME_MAP: Record<string, string> = {
   end: 'End',
   tab: 'Tab',
   space: 'Space',
+  'double escape': 'Double Esc',
+};
+
+interface ModifierMap {
+  ctrl: string;
+  alt: string;
+  shift: string;
+  cmd: string;
+}
+
+const MODIFIER_MAPS: Record<string, ModifierMap> = {
+  darwin: {
+    ctrl: 'Ctrl',
+    alt: 'Option',
+    shift: 'Shift',
+    cmd: 'Cmd',
+  },
+  win32: {
+    ctrl: 'Ctrl',
+    alt: 'Alt',
+    shift: 'Shift',
+    cmd: 'Win',
+  },
+  linux: {
+    ctrl: 'Ctrl',
+    alt: 'Alt',
+    shift: 'Shift',
+    cmd: 'Super',
+  },
+  default: {
+    ctrl: 'Ctrl',
+    alt: 'Alt',
+    shift: 'Shift',
+    cmd: 'Cmd/Win',
+  },
 };
 
 /**
  * Formats a single KeyBinding into a human-readable string (e.g., "Ctrl+C").
  */
-export function formatKeyBinding(binding: KeyBinding): string {
+export function formatKeyBinding(
+  binding: KeyBinding,
+  platform?: string,
+): string {
+  const activePlatform =
+    platform ??
+    (process.env['FORCE_GENERIC_KEYBINDING_HINTS']
+      ? 'default'
+      : process.platform);
+  const modMap = MODIFIER_MAPS[activePlatform] || MODIFIER_MAPS['default'];
   const parts: string[] = [];
 
-  if (binding.ctrl) parts.push('Ctrl');
-  if (binding.alt) parts.push('Alt');
-  if (binding.shift) parts.push('Shift');
-  if (binding.cmd) parts.push('Cmd');
+  if (binding.ctrl) parts.push(modMap.ctrl);
+  if (binding.alt) parts.push(modMap.alt);
+  if (binding.shift) parts.push(modMap.shift);
+  if (binding.cmd) parts.push(modMap.cmd);
 
   const keyName = KEY_NAME_MAP[binding.key] || binding.key.toUpperCase();
   parts.push(keyName);
@@ -54,6 +99,7 @@ export function formatKeyBinding(binding: KeyBinding): string {
 export function formatCommand(
   command: Command,
   config: KeyBindingConfig = defaultKeyBindings,
+  platform?: string,
 ): string {
   const bindings = config[command];
   if (!bindings || bindings.length === 0) {
@@ -61,5 +107,5 @@ export function formatCommand(
   }
 
   // Use the first binding as the primary one for display
-  return formatKeyBinding(bindings[0]);
+  return formatKeyBinding(bindings[0], platform);
 }
