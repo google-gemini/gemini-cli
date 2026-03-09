@@ -115,6 +115,9 @@
             "label": "Model steering",
             "badge": "🔬",
             "slug": "docs/cli/model-steering"
+            "label": "Notifications",
+            "badge": "🔬",
+            "slug": "docs/cli/notifications"
           },
           { "label": "Plan mode", "badge": "🔬", "slug": "docs/cli/plan-mode" },
           {

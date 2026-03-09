@@ -8,7 +8,7 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { MainContent } from './MainContent.js';
 import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Box, Text } from 'ink';
 import { act, useState, type JSX } from 'react';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
@@ -22,17 +22,19 @@ import { CoreToolCallStatus } from '@google/gemini-cli-core';
 import { type IndividualToolCallDisplay } from '../types.js';
 
 // Mock dependencies
+const mockUseSettings = vi.fn().mockReturnValue({
+  merged: {
+    ui: {
+      inlineThinkingMode: 'off',
+    },
+  },
+});
+
 vi.mock('../contexts/SettingsContext.js', async () => {
   const actual = await vi.importActual('../contexts/SettingsContext.js');
   return {
     ...actual,
-    useSettings: () => ({
-      merged: {
-        ui: {
-          inlineThinkingMode: 'off',
-        },
-      },
-    }),
+    useSettings: () => mockUseSettings(),
   };
 });
 
@@ -54,10 +56,6 @@ vi.mock('./AppHeader.js', () => ({
   AppHeader: ({ showDetails = true }: { showDetails?: boolean }) => (
     <Text>{showDetails ? 'AppHeader(full)' : 'AppHeader(minimal)'}</Text>
   ),
-}));
-
-vi.mock('./ShowMoreLines.js', () => ({
-  ShowMoreLines: () => <Text>ShowMoreLines</Text>,
 }));
 
 vi.mock('./shared/ScrollableList.js', () => ({
@@ -337,6 +335,17 @@ describe('MainContent', () => {
 
   beforeEach(() => {
     vi.mocked(useAlternateBuffer).mockReturnValue(false);
+    mockUseSettings.mockReturnValue({
+      merged: {
+        ui: {
+          inlineThinkingMode: 'off',
+        },
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('renders in normal buffer mode', async () => {
@@ -457,6 +466,60 @@ describe('MainContent', () => {
     unmount();
   });
 
+  it('renders multiple history items with single line padding between them', async () => {
+    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+    const uiState = {
+      ...defaultMockUiState,
+      history: [
+        { id: 1, type: 'gemini', text: 'Gemini message 1\n'.repeat(10) },
+        { id: 2, type: 'gemini', text: 'Gemini message 2\n'.repeat(10) },
+      ],
+      constrainHeight: true,
+      staticAreaMaxItemHeight: 5,
+    };
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <MainContent />,
+      {
+        uiState: uiState as Partial<UIState>,
+        useAlternateBuffer: true,
+      },
+    );
+
+    await waitUntilReady();
+
+    const output = lastFrame();
+    expect(output).toMatchSnapshot();
+    unmount();
+  });
+
+  it('renders mixed history items (user + gemini) with single line padding between them', async () => {
+    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+    const uiState = {
+      ...defaultMockUiState,
+      history: [
+        { id: 1, type: 'user', text: 'User message' },
+        { id: 2, type: 'gemini', text: 'Gemini response\n'.repeat(10) },
+      ],
+      constrainHeight: true,
+      staticAreaMaxItemHeight: 5,
+    };
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <MainContent />,
+      {
+        uiState: uiState as unknown as Partial<UIState>,
+        useAlternateBuffer: true,
+      },
+    );
+
+    await waitUntilReady();
+
+    const output = lastFrame();
+    expect(output).toMatchSnapshot();
+    unmount();
+  });
+
   it('renders a split tool group without a gap between static and pending areas', async () => {
     const toolCalls = [
       {
@@ -514,6 +577,64 @@ describe('MainContent', () => {
     // The snapshot will be the best way to verify there is no gap (empty line) between them.
     expect(output).toMatchSnapshot();
     unmount();
+  });
+
+  it('renders multiple thinking messages sequentially correctly', async () => {
+    mockUseSettings.mockReturnValue({
+      merged: {
+        ui: {
+          inlineThinkingMode: 'expanded',
+        },
+      },
+    });
+    vi.mocked(useAlternateBuffer).mockReturnValue(true);
+
+    const uiState = {
+      ...defaultMockUiState,
+      history: [
+        { id: 0, type: 'user' as const, text: 'Plan a solution' },
+        {
+          id: 1,
+          type: 'thinking' as const,
+          thought: {
+            subject: 'Initial analysis',
+            description:
+              'This is a multiple line paragraph for the first thinking message of how the model analyzes the problem.',
+          },
+        },
+        {
+          id: 2,
+          type: 'thinking' as const,
+          thought: {
+            subject: 'Planning execution',
+            description:
+              'This a second multiple line paragraph for the second thinking message explaining the plan in detail so that it wraps around the terminal display.',
+          },
+        },
+        {
+          id: 3,
+          type: 'thinking' as const,
+          thought: {
+            subject: 'Refining approach',
+            description:
+              'And finally a third multiple line paragraph for the third thinking message to refine the solution.',
+          },
+        },
+      ],
+    };
+
+    const renderResult = renderWithProviders(<MainContent />, {
+      uiState: uiState as Partial<UIState>,
+    });
+    await renderResult.waitUntilReady();
+
+    const output = renderResult.lastFrame();
+    expect(output).toContain('Initial analysis');
+    expect(output).toContain('Planning execution');
+    expect(output).toContain('Refining approach');
+    expect(output).toMatchSnapshot();
+    await expect(renderResult).toMatchSvgSnapshot();
+    renderResult.unmount();
   });
 
   describe('MainContent Tool Output Height Logic', () => {

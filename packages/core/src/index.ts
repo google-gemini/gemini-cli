@@ -6,6 +6,7 @@
 
 // Export config
 export * from './config/config.js';
+export * from './config/agent-loop-context.js';
 export * from './config/memory.js';
 export * from './config/defaultModelConfigs.js';
 export * from './config/models.js';
@@ -112,6 +113,7 @@ export * from './utils/apiConversionUtils.js';
 export * from './utils/channel.js';
 export * from './utils/constants.js';
 export * from './utils/sessionUtils.js';
+export * from './utils/cache.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
@@ -123,6 +125,8 @@ export * from './services/sessionSummaryUtils.js';
 export * from './services/contextManager.js';
 export * from './services/trackerService.js';
 export * from './services/trackerTypes.js';
+export * from './services/keychainService.js';
+export * from './services/keychainTypes.js';
 export * from './skills/skillManager.js';
 export * from './skills/skillLoader.js';
 
