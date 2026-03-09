@@ -218,14 +218,6 @@ export class HistoryManager {
   }
 
   /**
-   * Clears elision markers. Usually called at the start of a new root-level turn.
-   */
-  clearElisions(): void {
-    this.elidedCallIds.clear();
-    this.elidedIndices.clear();
-  }
-
-  /**
    * Records a distilled result for a tool call.
    */
   addDistilledResult(callId: string, result: any): void {
@@ -246,6 +238,21 @@ export class HistoryManager {
   getHistoryForRequest(userContent: Content): Content[] {
     const projection = this.getProjection({ curated: true, addMetadata: true });
 
+    // PROJECT CLARITY: Filter the userContent being sent to ensure elided parts (e.g. meta-tool responses)
+    // are not sent to the model even if they are part of the current turn.
+    const filteredParts = this.filterParts(userContent.parts || []);
+
+    // If the turn is empty after filtering (or was empty to begin with, like a re-prompt),
+    // we just return the projection as-is. This avoids sending a vestigial empty turn.
+    if (filteredParts.length === 0) {
+      return projection;
+    }
+
+    const filteredUserContent: Content = {
+      ...userContent,
+      parts: filteredParts,
+    };
+
     if (
       projection.length > 0 &&
       projection[projection.length - 1].role === 'user'
@@ -254,12 +261,12 @@ export class HistoryManager {
       const lastTurn = projection[projection.length - 1];
       const mergedTurn: Content = {
         ...lastTurn,
-        parts: [...(lastTurn.parts || []), ...(userContent.parts || [])],
+        parts: [...(lastTurn.parts || []), ...(filteredUserContent.parts || [])],
       };
       return [...projection.slice(0, -1), mergedTurn];
     }
 
-    return [...projection, userContent];
+    return [...projection, filteredUserContent];
   }
 
   /**
@@ -355,7 +362,10 @@ export class HistoryManager {
           if (nextFilteredParts.length === 0) continue;
 
           modelOutput.push({ ...nextContent, parts: nextFilteredParts });
-          if (isValid && !isValidContent({ ...nextContent, parts: nextFilteredParts })) {
+          if (
+            isValid &&
+            !isValidContent({ ...nextContent, parts: nextFilteredParts })
+          ) {
             isValid = false;
           }
         }

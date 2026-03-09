@@ -19,7 +19,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { Config } from '../config/config.js';
 import type { GeminiChat } from '../core/geminiChat.js';
 import { CompressionStatus } from '../core/compression-status.js';
-import type { ShellExecutionConfig } from 'src/services/shellExecutionService.js';
+import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
 class CompressInvocation extends BaseToolInvocation<
