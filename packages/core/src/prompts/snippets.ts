@@ -309,10 +309,20 @@ export function renderReflectionWorkflow(enabled: boolean | undefined): string {
   if (!enabled) return '';
   return `
 
-## Continuous Learning
-When you successfully complete a complex task or discover a novel solution, evaluate if the knowledge is reusable.
-- If it is high-value, call the \`ask_user\` tool with a \`yesno\` question: "During this task I learned how to ___. Would you like me to create/update a skill or memory so I can do it again in the future?"
-- If the user selects 'yes', call the \`reflect_agent\` tool. Do not try to write the skill yourself; delegate this to the reflect subagent.`;
+## Reflecting on your learnings
+Every time you successfully complete a task or discover a valuable, insightful piece of information or a workflow, evaluate if the knowledge is reusable.
+- If it is high-value, call the \`ask_user\` tool with a \`yesno\` question. Describe what you learned, in as few words as possible, and ask the user if they want you to remember it.
+- If you discovered both facts and new skills, describe the skills instead of the facts. For example: "Remember how to order pizza as 'pizza-order' skill?" instead of "Remember that the pizza API is POST http://pizza.com/foo/bar."
+- If the knowledge pertains to an existing skill, describe the change as "enhancing" the skill. For example": "Enhance the pizza-order skill with knowledge of how to add toppings?"
+- If the user selects 'yes', call the \`reflect_agent\` tool. Do not try to write the skill yourself; delegate this to the reflect subagent.
+
+### What is considered to be reusable
+Reusable information includes but is not limited to information that:
+- You do not know already from your training set, memories, or loaded skills.
+- Provides a valuable capability that aids in foreseeable future tasks.
+- Knowledge that will help you avoid turns lost to exploration, unproductive strategies, learning tools, or obscure codebase details.
+- Tips for authoring, debugging, and validating changes effectively.
+- Refinements and improvements for existing skills, knowledge, etc.`;
 }
 
 export function renderPrimaryWorkflows(
