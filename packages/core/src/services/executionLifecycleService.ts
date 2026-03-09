@@ -86,12 +86,14 @@ interface ExternalExecutionState extends ManagedExecutionBase {
 
 type ManagedExecutionState = VirtualExecutionState | ExternalExecutionState;
 
+const NON_PROCESS_EXECUTION_ID_START = 2_000_000_000;
+
 /**
  * Central owner for execution backgrounding lifecycle across shell and tools.
  */
 export class ExecutionLifecycleService {
   private static readonly EXIT_INFO_TTL_MS = 5 * 60 * 1000;
-  private static nextExecutionId = 2_000_000_000;
+  private static nextExecutionId = NON_PROCESS_EXECUTION_ID_START;
 
   private static activeExecutions = new Map<number, ManagedExecutionState>();
   private static activeResolvers = new Map<
@@ -162,7 +164,7 @@ export class ExecutionLifecycleService {
     this.activeResolvers.clear();
     this.activeListeners.clear();
     this.exitedExecutionInfo.clear();
-    this.nextExecutionId = 2_000_000_000;
+    this.nextExecutionId = NON_PROCESS_EXECUTION_ID_START;
   }
 
   static registerExecution(
