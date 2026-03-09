@@ -10,8 +10,8 @@ import { theme } from '../semantic-colors.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { SectionHeader } from './shared/SectionHeader.js';
 import { useUIState } from '../contexts/UIStateContext.js';
-import { Command } from '../../config/keyBindings.js';
-import { formatCommand } from '../utils/keybindingUtils.js';
+import { Command } from '../key/keyBindings.js';
+import { formatCommand } from '../key/keybindingUtils.js';
 
 type ShortcutItem = {
   key: string;
@@ -21,7 +21,7 @@ type ShortcutItem = {
 const buildShortcutItems = (): ShortcutItem[] => [
   { key: '!', description: 'shell mode' },
   { key: '@', description: 'select file or folder' },
-  { key: formatCommand(Command.REWIND), description: 'clear & rewind' },
+  { key: 'Double Esc', description: 'clear & rewind' },
   { key: formatCommand(Command.FOCUS_SHELL_INPUT), description: 'focus UI' },
   { key: formatCommand(Command.TOGGLE_YOLO), description: 'YOLO mode' },
   {
