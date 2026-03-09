@@ -44,5 +44,7 @@ export const upgradeCommand: SlashCommand = {
         content: `Failed to open upgrade page: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
+
+    return undefined;
   },
 };

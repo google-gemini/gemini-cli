@@ -61,7 +61,7 @@ describe('upgradeCommand', () => {
     vi.mocked(
       mockContext.services.config!.getContentGeneratorConfig,
     ).mockReturnValue({
-      authType: 'other',
+      authType: AuthType.USE_GEMINI,
     });
 
     if (!upgradeCommand.action) {
