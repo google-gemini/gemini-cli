@@ -50,6 +50,18 @@ export const ACTIVE_SHELL_MAX_LINES = 15;
 // Max lines to preserve in history for completed shell commands
 export const COMPLETED_SHELL_MAX_LINES = 15;
 
+// Maximum size of shell output string (in characters) to prevent RangeError:
+// Invalid string length after extended inactivity in long-running sessions.
+// When exceeded, the oldest output is discarded and only the most recent
+// MAX_SHELL_OUTPUT_SIZE characters are retained.
+export const MAX_SHELL_OUTPUT_SIZE = 10_000_000;
+
+// Amortization buffer: truncation is only triggered when output exceeds
+// MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER, then sliced back to
+// MAX_SHELL_OUTPUT_SIZE. This avoids an O(n) string copy on every appended
+// chunk once the cap is reached.
+export const SHELL_OUTPUT_TRUNCATION_BUFFER = 1_000_000;
+
 /** Minimum terminal width required to show the full context used label */
 export const MIN_TERMINAL_WIDTH_FOR_FULL_LABEL = 100;
 
