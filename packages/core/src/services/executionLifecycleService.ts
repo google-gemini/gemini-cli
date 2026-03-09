@@ -167,12 +167,12 @@ export class ExecutionLifecycleService {
     this.nextExecutionId = NON_PROCESS_EXECUTION_ID_START;
   }
 
-  static registerExecution(
+  static attachExecution(
     executionId: number,
     registration: ExternalExecutionRegistration,
   ): ExecutionHandle {
     if (this.activeExecutions.has(executionId) || this.activeResolvers.has(executionId)) {
-      throw new Error(`Execution ${executionId} is already registered.`);
+      throw new Error(`Execution ${executionId} is already attached.`);
     }
     this.exitedExecutionInfo.delete(executionId);
 

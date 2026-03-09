@@ -155,7 +155,7 @@ describe('ExecutionLifecycleService', () => {
     const chunks: string[] = [];
 
     let output = 'seed';
-    const handle: ExecutionHandle = ExecutionLifecycleService.registerExecution(
+    const handle: ExecutionHandle = ExecutionLifecycleService.attachExecution(
       4321,
       {
         executionMethod: 'child_process',
@@ -211,7 +211,7 @@ describe('ExecutionLifecycleService', () => {
   it('supports late subscription catch-up after backgrounding an external execution', async () => {
     let output = 'seed';
     const onExit = vi.fn();
-    const handle = ExecutionLifecycleService.registerExecution(4322, {
+    const handle = ExecutionLifecycleService.attachExecution(4322, {
       executionMethod: 'child_process',
       getBackgroundOutput: () => output,
       getSubscriptionSnapshot: () => output,
@@ -258,7 +258,7 @@ describe('ExecutionLifecycleService', () => {
   it('kills external executions and settles pending promises', async () => {
     const terminate = vi.fn();
     const onExit = vi.fn();
-    const handle = ExecutionLifecycleService.registerExecution(4323, {
+    const handle = ExecutionLifecycleService.attachExecution(4323, {
       executionMethod: 'child_process',
       initialOutput: 'running',
       kill: terminate,
@@ -276,14 +276,14 @@ describe('ExecutionLifecycleService', () => {
   });
 
   it('rejects duplicate execution registration for active execution IDs', () => {
-    ExecutionLifecycleService.registerExecution(4324, {
+    ExecutionLifecycleService.attachExecution(4324, {
       executionMethod: 'child_process',
     });
 
     expect(() => {
-      ExecutionLifecycleService.registerExecution(4324, {
+      ExecutionLifecycleService.attachExecution(4324, {
         executionMethod: 'child_process',
       });
-    }).toThrow('Execution 4324 is already registered.');
+    }).toThrow('Execution 4324 is already attached.');
   });
 });

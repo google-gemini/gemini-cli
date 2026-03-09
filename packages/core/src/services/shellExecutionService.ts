@@ -258,7 +258,7 @@ export class ShellExecutionService {
       };
 
       const lifecycleHandle = child.pid
-        ? ExecutionLifecycleService.registerExecution(child.pid, {
+        ? ExecutionLifecycleService.attachExecution(child.pid, {
             executionMethod: 'child_process',
             getBackgroundOutput: () => state.output,
             getSubscriptionSnapshot: () => state.output || undefined,
@@ -554,7 +554,7 @@ export class ShellExecutionService {
         maxSerializedLines: shellExecutionConfig.maxSerializedLines,
       });
 
-      const result = ExecutionLifecycleService.registerExecution(ptyPid, {
+      const result = ExecutionLifecycleService.attachExecution(ptyPid, {
         executionMethod: ptyInfo?.name ?? 'node-pty',
         writeInput: (input) => {
           if (!ExecutionLifecycleService.isActive(ptyPid)) {
