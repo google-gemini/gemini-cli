@@ -5,9 +5,7 @@
  */
 
 import {
-  afterAll,
   afterEach,
-  beforeAll,
   beforeEach,
   describe,
   expect,
@@ -25,22 +23,7 @@ import {
 import { createTestMergedSettings } from './settings.js';
 import { http, HttpResponse } from 'msw';
 
-import { setupServer } from 'msw/node';
-
-export const server = setupServer();
-
-// TODO(richieforeman): Consider moving this to test setup globally.
-beforeAll(() => {
-  server.listen({});
-});
-
-afterEach(() => {
-  server.resetHandlers();
-});
-
-afterAll(() => {
-  server.close();
-});
+import { server } from '../../test-setup.js';
 
 const CLEARCUT_URL = 'https://play.googleapis.com/log';
 
