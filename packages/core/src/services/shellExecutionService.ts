@@ -146,7 +146,6 @@ interface ActivePty {
   ptyProcess: IPty;
   headlessTerminal: pkg.Terminal;
   maxSerializedLines?: number;
-  lastSyncedLine: number;
 }
 
 interface ActiveChildProcess {
@@ -155,7 +154,6 @@ interface ActiveChildProcess {
     output: string;
     truncated: boolean;
     outputChunks: Buffer[];
-    lastSyncedOffset: number;
   };
 }
 
@@ -246,9 +244,12 @@ const writeBufferToLogStream = (
     }
   }
 
-  // Ensure it ends with a newline if we wrote anything
+  // Ensure it ends with a newline if we wrote anything and the next line is not wrapped
   if (lastContentLine >= startLine) {
-    stream.write('\n');
+    const nextLine = terminal.buffer.active.getLine(lastContentLine + 1);
+    if (!nextLine?.isWrapped) {
+      stream.write('\n');
+    }
   }
 
   return lastContentLine + 1;
@@ -423,7 +424,6 @@ export class ShellExecutionService {
         output: '',
         truncated: false,
         outputChunks: [] as Buffer[],
-        lastSyncedOffset: 0,
       };
 
       if (child.pid) {
@@ -496,18 +496,10 @@ export class ShellExecutionService {
               if (child.pid) {
                 ShellExecutionService.emitEvent(child.pid, event);
                 if (ShellExecutionService.backgroundLogPids.has(child.pid)) {
-                  const activeChild =
-                    ShellExecutionService.activeChildProcesses.get(child.pid);
-                  if (activeChild) {
-                    const delta = activeChild.state.output.substring(
-                      activeChild.state.lastSyncedOffset,
-                    );
-                    if (delta) {
-                      ShellExecutionService.syncBackgroundLog(child.pid, delta);
-                      activeChild.state.lastSyncedOffset =
-                        activeChild.state.output.length;
-                    }
-                  }
+                  ShellExecutionService.syncBackgroundLog(
+                    child.pid,
+                    decodedChunk,
+                  );
                 }
               }
             }
@@ -719,7 +711,6 @@ export class ShellExecutionService {
           ptyProcess,
           headlessTerminal,
           maxSerializedLines: shellExecutionConfig.maxSerializedLines,
-          lastSyncedLine: 0,
         });
 
         let processingChain = Promise.resolve();
@@ -815,26 +806,6 @@ export class ShellExecutionService {
             };
             onOutputEvent(event);
             ShellExecutionService.emitEvent(ptyProcess.pid, event);
-
-            if (ShellExecutionService.backgroundLogPids.has(ptyProcess.pid)) {
-              const activePty = ShellExecutionService.activePtys.get(
-                ptyProcess.pid,
-              );
-              const stream = ShellExecutionService.backgroundLogStreams.get(
-                ptyProcess.pid,
-              );
-              if (activePty && stream) {
-                const terminal = activePty.headlessTerminal;
-                const currentLine = terminal.buffer.active.length;
-                if (currentLine > activePty.lastSyncedLine) {
-                  activePty.lastSyncedLine = writeBufferToLogStream(
-                    terminal,
-                    stream,
-                    activePty.lastSyncedLine,
-                  );
-                }
-              }
-            }
           }
         };
 
@@ -896,6 +867,16 @@ export class ShellExecutionService {
                     resolve();
                     return;
                   }
+
+                  if (
+                    ShellExecutionService.backgroundLogPids.has(ptyProcess.pid)
+                  ) {
+                    ShellExecutionService.syncBackgroundLog(
+                      ptyProcess.pid,
+                      decodedChunk,
+                    );
+                  }
+
                   isWriting = true;
                   headlessTerminal.write(decodedChunk, () => {
                     render();
@@ -1174,30 +1155,28 @@ export class ShellExecutionService {
       : (activeChild?.state.output ?? '');
     const executionMethod = activePty ? 'node-pty' : 'child_process';
 
-    this.backgroundLogPids.add(pid);
-
     const logPath = this.getLogFilePath(pid);
     const logDir = this.getLogDir();
     try {
       mkdirSync(logDir, { recursive: true });
       const stream = fs.createWriteStream(logPath, { flags: 'w' });
+      stream.on('error', (err) => {
+        debugLogger.warn('Background log stream error:', err);
+      });
       this.backgroundLogStreams.set(pid, stream);
 
       if (activePty) {
-        activePty.lastSyncedLine = writeBufferToLogStream(
-          activePty.headlessTerminal,
-          stream,
-          0,
-        );
+        writeBufferToLogStream(activePty.headlessTerminal, stream, 0);
       } else if (activeChild) {
         if (output) {
           stream.write(stripAnsi(output) + '\n');
         }
-        activeChild.state.lastSyncedOffset = activeChild.state.output.length;
       }
     } catch (e) {
       debugLogger.warn('Failed to setup background logging:', e);
     }
+
+    this.backgroundLogPids.add(pid);
 
     resolve({
       rawOutput: Buffer.from(''),

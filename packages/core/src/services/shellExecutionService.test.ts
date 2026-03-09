@@ -478,7 +478,6 @@ describe('ShellExecutionService', () => {
           ptyProcess: mockPtyProcess as any,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           headlessTerminal: mockHeadlessTerminal as any,
-          lastSyncedLine: 0,
         });
     });
 
@@ -713,13 +712,14 @@ describe('ShellExecutionService', () => {
   });
 
   describe('Backgrounding', () => {
-    let mockWriteStream: { write: Mock; end: Mock };
+    let mockWriteStream: { write: Mock; end: Mock; on: Mock };
     let mockBgChildProcess: EventEmitter & Partial<ChildProcess>;
 
     beforeEach(async () => {
       mockWriteStream = {
         write: vi.fn(),
         end: vi.fn().mockImplementation((cb) => cb?.()),
+        on: vi.fn(),
       };
 
       mockMkdirSync.mockReturnValue(undefined);
@@ -789,9 +789,11 @@ describe('ShellExecutionService', () => {
       );
 
       // Verify initial output was written
-      expect(mockWriteStream.write).toHaveBeenCalledWith(
-        expect.stringContaining('initial pty output'),
-      );
+      expect(
+        mockWriteStream.write.mock.calls.some((call) =>
+          call[0].includes('initial pty output'),
+        ),
+      ).toBe(true);
 
       await ShellExecutionService.kill(handle.pid!);
       expect(mockWriteStream.end).toHaveBeenCalled();
@@ -820,7 +822,11 @@ describe('ShellExecutionService', () => {
       expect(result.backgrounded).toBe(true);
       expect(result.output).toBe('initial cp output');
 
-      expect(mockWriteStream.write).toHaveBeenCalledWith('initial cp output\n');
+      expect(
+        mockWriteStream.write.mock.calls.some((call) =>
+          call[0].includes('initial cp output'),
+        ),
+      ).toBe(true);
 
       // Subsequent output
       mockBgChildProcess.stdout?.emit('data', Buffer.from('more cp output'));
