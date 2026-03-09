@@ -25,6 +25,7 @@ import { parseCustomHeaders } from '../utils/customHeaderUtils.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
+import { CachingContentGenerator } from './cachingContentGenerator.js';
 
 /**
  * Interface abstracting the core functionalities for generating content and counting tokens.
@@ -231,6 +232,11 @@ export async function createContentGenerator(
 
   if (gcConfig.recordResponses) {
     return new RecordingContentGenerator(generator, gcConfig.recordResponses);
+  }
+
+  // Wrap with the prompt replay cache unless explicitly disabled
+  if (!gcConfig.getDisablePromptCache()) {
+    return new CachingContentGenerator(generator, gcConfig.getTargetDir());
   }
 
   return generator;

@@ -32,6 +32,8 @@ const mockConfig = {
   getModel: vi.fn().mockReturnValue('gemini-pro'),
   getProxy: vi.fn().mockReturnValue(undefined),
   getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
+  getDisablePromptCache: () => true,
+  getTargetDir: () => '/mock',
 } as unknown as Config;
 
 describe('createContentGenerator', () => {
@@ -52,6 +54,8 @@ describe('createContentGenerator', () => {
     const fakeResponsesFile = 'fake/responses.yaml';
     const mockConfigWithFake = {
       fakeResponses: fakeResponsesFile,
+      getDisablePromptCache: () => true,
+      getTargetDir: () => '/mock',
     } as unknown as Config;
     const generator = await createContentGenerator(
       {
@@ -73,6 +77,8 @@ describe('createContentGenerator', () => {
     const mockConfigWithRecordResponses = {
       fakeResponses: fakeResponsesFile,
       recordResponses: recordResponsesFile,
+      getDisablePromptCache: () => true,
+      getTargetDir: () => '/mock',
     } as unknown as Config;
     const generator = await createContentGenerator(
       {
@@ -122,6 +128,8 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => true,
+      getDisablePromptCache: () => true,
+      getTargetDir: () => '/mock',
     } as unknown as Config;
 
     // Set a fixed version for testing
@@ -188,6 +196,8 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getDisablePromptCache: () => true,
+      getTargetDir: () => '/mock',
     } as unknown as Config;
 
     const mockGenerator = {
@@ -234,6 +244,8 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getDisablePromptCache: () => true,
+      getTargetDir: () => '/mock',
     } as unknown as Config;
 
     const mockGenerator = {
@@ -267,6 +279,8 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getDisablePromptCache: () => true,
+      getTargetDir: () => '/mock',
     } as unknown as Config;
 
     const mockGenerator = {
@@ -308,6 +322,8 @@ describe('createContentGenerator', () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getUsageStatisticsEnabled: () => false,
+      getDisablePromptCache: () => true,
+      getTargetDir: () => '/mock',
     } as unknown as Config;
     const mockGenerator = {
       models: {},
@@ -339,6 +355,8 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getDisablePromptCache: () => true,
+      getTargetDir: () => '/mock',
     } as unknown as Config;
 
     const mockGenerator = {
@@ -372,6 +390,8 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getDisablePromptCache: () => true,
+      getTargetDir: () => '/mock',
     } as unknown as Config;
 
     const mockGenerator = {
@@ -409,6 +429,8 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getDisablePromptCache: () => true,
+      getTargetDir: () => '/mock',
     } as unknown as Config;
 
     const mockGenerator = {
@@ -447,6 +469,8 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getDisablePromptCache: () => true,
+      getTargetDir: () => '/mock',
     } as unknown as Config;
 
     const mockGenerator = {
@@ -483,6 +507,8 @@ describe('createContentGeneratorConfig', () => {
     setModel: vi.fn(),
     flashFallbackHandler: vi.fn(),
     getProxy: vi.fn(),
+    getDisablePromptCache: () => true,
+    getTargetDir: () => '/mock',
   } as unknown as Config;
 
   beforeEach(() => {
