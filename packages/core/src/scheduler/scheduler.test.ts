@@ -169,12 +169,14 @@ describe('Scheduler (Orchestrator)', () => {
 
     mockConfig = {
       getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
-      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      toolRegistry: mockToolRegistry,
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(true),
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
     } as unknown as Mocked<Config>;
+
+    (mockConfig as unknown as { config: Config }).config = mockConfig as Config;
 
     mockMessageBus = {
       publish: vi.fn(),
@@ -1319,6 +1321,8 @@ describe('Scheduler MCP Progress', () => {
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
     } as unknown as Mocked<Config>;
+
+    (mockConfig as unknown as { config: Config }).config = mockConfig as Config;
 
     mockMessageBus = {
       publish: vi.fn(),
