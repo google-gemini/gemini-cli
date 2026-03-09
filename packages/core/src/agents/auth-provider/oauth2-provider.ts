@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { HttpHeaders } from '@a2a-js/sdk/client';
+import { type HttpHeaders, DefaultAgentCardResolver } from '@a2a-js/sdk/client';
 import type { AgentCard } from '@a2a-js/sdk';
 import { BaseA2AAuthProvider } from './base-provider.js';
 import type { OAuth2AuthConfig } from './types.js';
@@ -184,8 +184,8 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
   }
 
   /**
-   * Fetch the agent card from `agentCardUrl` (unauthenticated) and extract
-   * OAuth2 authorization/token URLs from its security schemes.
+   * Fetch the agent card from `agentCardUrl` using `DefaultAgentCardResolver`
+   * (which normalizes proto-format cards) and extract OAuth2 URLs.
    */
   private async fetchAgentCardDefaults(): Promise<void> {
     if (!this.agentCardUrl) return;
@@ -194,52 +194,13 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
       debugLogger.debug(
         `[OAuth2AuthProvider] Fetching agent card from ${this.agentCardUrl}`,
       );
-      const response = await fetch(this.agentCardUrl);
-      if (!response.ok) {
-        debugLogger.warn(
-          `[OAuth2AuthProvider] Failed to fetch agent card: ${response.status} ${response.statusText}`,
-        );
-        return;
-      }
-      const json: unknown = await response.json();
-      this.extractOAuthUrlsFromJson(json);
+      const resolver = new DefaultAgentCardResolver();
+      const card = await resolver.resolve(this.agentCardUrl, '');
+      this.mergeAgentCardDefaults(card);
     } catch (error) {
       debugLogger.warn(
         `[OAuth2AuthProvider] Could not fetch agent card for OAuth URL discovery: ${getErrorMessage(error)}`,
       );
-    }
-  }
-
-  /**
-   * Walk raw agent card JSON to extract OAuth2 authorization code flow URLs.
-   * Uses runtime type checks only — no type assertions.
-   */
-  private extractOAuthUrlsFromJson(json: unknown): void {
-    if (!isNonNullObject(json)) return;
-    const schemes = json['securitySchemes'];
-    if (!isNonNullObject(schemes)) return;
-
-    for (const scheme of Object.values(schemes)) {
-      if (!isNonNullObject(scheme)) continue;
-      if (scheme['type'] !== 'oauth2') continue;
-      const flows = scheme['flows'];
-      if (!isNonNullObject(flows)) continue;
-      const authCode = flows['authorizationCode'];
-      if (!isNonNullObject(authCode)) continue;
-
-      const authUrl = authCode['authorizationUrl'];
-      if (typeof authUrl === 'string') {
-        this.authorizationUrl ??= authUrl;
-      }
-      const tokenUrl = authCode['tokenUrl'];
-      if (typeof tokenUrl === 'string') {
-        this.tokenUrl ??= tokenUrl;
-      }
-      const scopes = authCode['scopes'];
-      if (isNonNullObject(scopes) && !this.scopes) {
-        this.scopes = Object.keys(scopes);
-      }
-      break; // Use the first matching scheme.
     }
   }
 
@@ -375,9 +336,4 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
       this.tokenUrl,
     );
   }
-}
-
-/** Type guard for non-null objects used in JSON parsing. */
-function isNonNullObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
 }

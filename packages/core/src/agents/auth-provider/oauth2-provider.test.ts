@@ -9,6 +9,18 @@ import { OAuth2AuthProvider } from './oauth2-provider.js';
 import type { OAuth2AuthConfig } from './types.js';
 import type { AgentCard } from '@a2a-js/sdk';
 
+// Mock DefaultAgentCardResolver from @a2a-js/sdk/client.
+const mockResolve = vi.fn();
+vi.mock('@a2a-js/sdk/client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@a2a-js/sdk/client')>();
+  return {
+    ...actual,
+    DefaultAgentCardResolver: vi.fn().mockImplementation(() => ({
+      resolve: mockResolve,
+    })),
+  };
+});
+
 // Mock all external dependencies.
 vi.mock('../../mcp/oauth-token-storage.js', () => {
   const MCPOAuthTokenStorage = vi.fn().mockImplementation(() => ({
@@ -555,6 +567,55 @@ describe('OAuth2AuthProvider', () => {
           authorizationUrl: 'https://card.example.com/auth',
           tokenUrl: 'https://card.example.com/token',
           scopes: ['profile', 'email'],
+        }),
+        expect.anything(),
+        expect.anything(),
+        undefined,
+      );
+    });
+
+    it('should discover URLs from agentCardUrl via DefaultAgentCardResolver during initialize', async () => {
+      const config = createConfig({
+        authorization_url: undefined,
+        token_url: undefined,
+        scopes: undefined,
+      });
+
+      // Simulate a normalized agent card returned by DefaultAgentCardResolver.
+      mockResolve.mockResolvedValue({
+        securitySchemes: {
+          myOauth: {
+            type: 'oauth2' as const,
+            flows: {
+              authorizationCode: {
+                authorizationUrl: 'https://discovered.example.com/auth',
+                tokenUrl: 'https://discovered.example.com/token',
+                scopes: { openid: 'OpenID', profile: 'Profile' },
+              },
+            },
+          },
+        },
+      } as unknown as AgentCard);
+
+      // No agentCard passed to constructor — only agentCardUrl.
+      const provider = new OAuth2AuthProvider(
+        config,
+        'discover-agent',
+        undefined,
+        'https://example.com/.well-known/agent-card.json',
+      );
+      await provider.initialize();
+      await provider.headers();
+
+      expect(mockResolve).toHaveBeenCalledWith(
+        'https://example.com/.well-known/agent-card.json',
+        '',
+      );
+      expect(vi.mocked(buildAuthorizationUrl)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          authorizationUrl: 'https://discovered.example.com/auth',
+          tokenUrl: 'https://discovered.example.com/token',
+          scopes: ['openid', 'profile'],
         }),
         expect.anything(),
         expect.anything(),
