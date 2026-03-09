@@ -1,4 +1,4 @@
-name: docs_pr_check
+name: 'docs_pr_check'
 
 on:
   pull_request:
@@ -7,7 +7,6 @@ on:
 
 jobs:
   docs_pr_check:
-    runs-on: ubuntu-latest
+    runs-on: 'ubuntu-latest'
     steps:
-      - run: echo 'Bypassing docs_pr_check because docs/ was not changed.'
-    
+      - run: 'echo ''Bypassing docs_pr_check because docs/ was not changed.'''
