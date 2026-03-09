@@ -67,7 +67,7 @@ Finds files matching specific glob patterns across the workspace.
   `Found 5 file(s) matching "*.ts" within src, sorted by modification time (newest first):\nsrc/file1.ts\nsrc/subdir/file2.ts...`
 - **Confirmation:** No.
 
-## 5. `grep_search` (SearchText)
+### `grep_search` (SearchText)
 
 `grep_search` searches for a regular expression pattern within the content of
 files in a specified directory. Can filter files by a glob pattern. Returns the
@@ -103,7 +103,7 @@ lines containing matches, along with their file paths and line numbers.
   ```
 - **Confirmation:** No.
 
-## 6. `replace` (Edit)
+### `replace` (Edit)
 
 `replace` replaces text within a file. By default, the tool expects to find and
 replace exactly ONE occurrence of `old_string`. If you want to replace multiple
