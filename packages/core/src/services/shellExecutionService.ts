@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -22,10 +22,8 @@ import {
   serializeTerminalToObject,
   type AnsiOutput,
 } from '../utils/terminalSerializer.js';
-import {
-  sanitizeEnvironment,
-  type EnvironmentSanitizationConfig,
-} from './environmentSanitization.js';
+import { type EnvironmentSanitizationConfig } from './environmentSanitization.js';
+import { type SandboxManager } from './sandboxManager.js';
 import { killProcessGroup } from '../utils/process-utils.js';
 const { Terminal } = pkg;
 
@@ -102,6 +100,7 @@ export interface ShellExecutionConfig {
   defaultFg?: string;
   defaultBg?: string;
   sanitizationConfig: EnvironmentSanitizationConfig;
+  sandboxManager: SandboxManager;
   // Used for testing
   disableDynamicLineTrimming?: boolean;
   scrollback?: number;
@@ -251,7 +250,7 @@ export class ShellExecutionService {
       cwd,
       onOutputEvent,
       abortSignal,
-      shellExecutionConfig.sanitizationConfig,
+      shellExecutionConfig,
     );
   }
 
@@ -292,33 +291,68 @@ export class ShellExecutionService {
     }
   }
 
-  private static childProcessFallback(
+  private static async prepareExecution(
+    executable: string,
+    args: string[],
+    cwd: string,
+    env: NodeJS.ProcessEnv,
+    shellExecutionConfig: ShellExecutionConfig,
+  ): Promise<{ program: string; args: string[]; env: NodeJS.ProcessEnv }> {
+    const resolvedExecutable =
+      (await resolveExecutable(executable)) ?? executable;
+
+    return shellExecutionConfig.sandboxManager.prepareCommand({
+      command: resolvedExecutable,
+      args,
+      cwd,
+      env,
+      config: {
+        sanitizationConfig: shellExecutionConfig.sanitizationConfig,
+      },
+    });
+  }
+
+  private static async childProcessFallback(
     commandToExecute: string,
     cwd: string,
     onOutputEvent: (event: ShellOutputEvent) => void,
     abortSignal: AbortSignal,
-    sanitizationConfig: EnvironmentSanitizationConfig,
-  ): ShellExecutionHandle {
+    shellExecutionConfig: ShellExecutionConfig,
+  ): Promise<ShellExecutionHandle> {
     try {
       const isWindows = os.platform() === 'win32';
       const { executable, argsPrefix, shell } = getShellConfiguration();
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
       const spawnArgs = [...argsPrefix, guardedCommand];
 
-      const child = cpSpawn(executable, spawnArgs, {
+      const env = {
+        ...process.env,
+        [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
+          GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
+        TERM: 'xterm-256color',
+        PAGER: 'cat',
+        GIT_PAGER: 'cat',
+      };
+
+      const {
+        program: finalExecutable,
+        args: finalArgs,
+        env: finalEnv,
+      } = await this.prepareExecution(
+        executable,
+        spawnArgs,
+        cwd,
+        env,
+        shellExecutionConfig,
+      );
+
+      const child = cpSpawn(finalExecutable, finalArgs, {
         cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsVerbatimArguments: isWindows ? false : undefined,
         shell: false,
         detached: !isWindows,
-        env: {
-          ...sanitizeEnvironment(process.env, sanitizationConfig),
-          [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
-            GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
-          TERM: 'xterm-256color',
-          PAGER: 'cat',
-          GIT_PAGER: 'cat',
-        },
+        env: finalEnv,
       });
 
       const state = {
@@ -557,32 +591,36 @@ export class ShellExecutionService {
       const rows = shellExecutionConfig.terminalHeight ?? 30;
       const { executable, argsPrefix, shell } = getShellConfiguration();
 
-      const resolvedExecutable = await resolveExecutable(executable);
-      if (!resolvedExecutable) {
-        throw new Error(
-          `Shell executable "${executable}" not found in PATH or at absolute location. Please ensure the shell is installed and available in your environment.`,
-        );
-      }
-
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
       const args = [...argsPrefix, guardedCommand];
 
+      const env = {
+        ...process.env,
+        GEMINI_CLI: '1',
+        TERM: 'xterm-256color',
+        PAGER: shellExecutionConfig.pager ?? 'cat',
+        GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
+      };
+
+      const {
+        program: finalExecutable,
+        args: finalArgs,
+        env: finalEnv,
+      } = await this.prepareExecution(
+        executable,
+        args,
+        cwd,
+        env,
+        shellExecutionConfig,
+      );
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const ptyProcess = ptyInfo.module.spawn(executable, args, {
+      const ptyProcess = ptyInfo.module.spawn(finalExecutable, finalArgs, {
         cwd,
         name: 'xterm-256color',
         cols,
         rows,
-        env: {
-          ...sanitizeEnvironment(
-            process.env,
-            shellExecutionConfig.sanitizationConfig,
-          ),
-          GEMINI_CLI: '1',
-          TERM: 'xterm-256color',
-          PAGER: shellExecutionConfig.pager ?? 'cat',
-          GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
-        },
+        env: finalEnv,
         handleFlowControl: true,
       });
 

@@ -277,6 +277,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             sanitizationConfig:
               shellExecutionConfig?.sanitizationConfig ??
               this.config.sanitizationConfig,
+            sandboxManager: this.config.sandboxManager,
           },
         );
 

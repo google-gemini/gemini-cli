@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -64,7 +64,9 @@ export class NoopSandboxManager implements SandboxManager {
         req.config?.sanitizationConfig?.allowedEnvironmentVariables ?? [],
       blockedEnvironmentVariables:
         req.config?.sanitizationConfig?.blockedEnvironmentVariables ?? [],
-      enableEnvironmentVariableRedaction: true, // Forced for safety
+      enableEnvironmentVariableRedaction:
+        req.config?.sanitizationConfig?.enableEnvironmentVariableRedaction ??
+        true,
     };
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
