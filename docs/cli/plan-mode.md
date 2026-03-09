@@ -1,4 +1,4 @@
-# Plan Mode (experimental)
+# Plan Mode
 
 Plan Mode is a read-only environment for architecting robust solutions before
 implementation. It allows you to:
@@ -8,6 +8,7 @@ implementation. It allows you to:
 - **Design:** Understand problems, evaluate trade-offs, and choose a solution.
 - **Plan:** Align on an execution strategy before any code is modified.
 
+<<<<<<< HEAD
 > **Note:** This is a preview feature currently under active development. Your
 > feedback is invaluable as we refine this feature. If you have ideas,
 > suggestions, or encounter issues:
@@ -67,6 +68,10 @@ manually during a session.
     }
   }
   ```
+=======
+Plan Mode is enabled by default. You can manage this setting using the
+`/settings` command.
+>>>>>>> 35ee2a841 (feat(plan): enable Plan Mode by default (#21713))
 
 - **Keyboard Shortcut:** Press `Shift+Tab` to cycle through approval modes
   (`Default` -> `Auto-Edit` -> `Plan`).
