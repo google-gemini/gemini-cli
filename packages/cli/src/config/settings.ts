@@ -18,6 +18,7 @@ import {
   coreEvents,
   homedir,
   type AdminControlsSettings,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
@@ -1030,6 +1031,12 @@ export function migrateDeprecatedSettings(
 
 export function saveSettings(settingsFile: SettingsFile): void {
   try {
+    if (!settingsFile.path) {
+      debugLogger.warn(
+        'Skipping settings save: no settings file path available',
+      );
+      return;
+    }
     // Ensure the directory exists
     const dirPath = path.dirname(settingsFile.path);
     if (!fs.existsSync(dirPath)) {
