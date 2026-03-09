@@ -14,8 +14,6 @@ CLI works in the background.
 
 ## Requirements
 
-Currently, system notifications are only supported on macOS.
-
 ### Terminal support
 
 The CLI uses the OSC 9 terminal escape sequence to trigger system notifications.
