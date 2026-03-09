@@ -106,7 +106,7 @@ describe('BaseSettingsDialog', () => {
     const defaultProps: BaseSettingsDialogProps = {
       title: 'Test Settings',
       items: createMockItems(),
-      selectedScope: SettingScope.User as const,
+      selectedScope: SettingScope.User,
       maxItemsToShow: 8,
       onItemToggle: mockOnItemToggle,
       onEditCommit: mockOnEditCommit,
