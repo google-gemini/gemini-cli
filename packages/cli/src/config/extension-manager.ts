@@ -129,6 +129,10 @@ export class ExtensionManager extends ExtensionLoader {
     this.requestSetting = options.requestSetting ?? undefined;
   }
 
+  getEnablementManager(): ExtensionEnablementManager {
+    return this.extensionEnablementManager;
+  }
+
   setRequestConsent(
     requestConsent: (consent: string) => Promise<boolean>,
   ): void {
@@ -271,16 +275,27 @@ Would you like to attempt to install via "git clone" instead?`,
         newExtensionConfig = await this.loadExtensionConfig(localSourcePath);
 
         const newExtensionName = newExtensionConfig.name;
+        const previousName = previousExtensionConfig?.name ?? newExtensionName;
         const previous = this.getExtensions().find(
-          (installed) => installed.name === newExtensionName,
+          (installed) => installed.name === previousName,
         );
+        const nameConflict = this.getExtensions().find(
+          (installed) =>
+            installed.name === newExtensionName &&
+            installed.name !== previousName,
+        );
+
         if (isUpdate && !previous) {
           throw new Error(
-            `Extension "${newExtensionName}" was not already installed, cannot update it.`,
+            `Extension "${previousName}" was not already installed, cannot update it.`,
           );
         } else if (!isUpdate && previous) {
           throw new Error(
             `Extension "${newExtensionName}" is already installed. Please uninstall it first.`,
+          );
+        } else if (isUpdate && nameConflict) {
+          throw new Error(
+            `Cannot update to "${newExtensionName}" because an extension with that name is already installed.`,
           );
         }
 
@@ -298,6 +313,11 @@ Would you like to attempt to install via "git clone" instead?`,
           path.join(localSourcePath, 'skills'),
         );
         const previousSkills = previous?.skills ?? [];
+        const isMigrating = Boolean(
+          previous &&
+            previous.installMetadata &&
+            previous.installMetadata.source !== installMetadata.source,
+        );
 
         await maybeRequestConsentOrFail(
           newExtensionConfig,
@@ -307,19 +327,46 @@ Would you like to attempt to install via "git clone" instead?`,
           previousHasHooks,
           newSkills,
           previousSkills,
+          isMigrating,
         );
         const extensionId = getExtensionId(newExtensionConfig, installMetadata);
         const destinationPath = new ExtensionStorage(
           newExtensionName,
         ).getExtensionDir();
+
+        if (
+          (!isUpdate || newExtensionName !== previousName) &&
+          fs.existsSync(destinationPath)
+        ) {
+          throw new Error(
+            `Cannot install extension "${newExtensionName}" because a directory with that name already exists. Please remove it manually.`,
+          );
+        }
+
         let previousSettings: Record<string, string> | undefined;
-        if (isUpdate) {
+        let wasEnabledGlobally = false;
+        let wasEnabledWorkspace = false;
+        if (isUpdate && previousExtensionConfig) {
+          const previousExtensionId = previous?.installMetadata
+            ? getExtensionId(previousExtensionConfig, previous.installMetadata)
+            : extensionId;
           previousSettings = await getEnvContents(
             previousExtensionConfig,
-            extensionId,
+            previousExtensionId,
             this.workspaceDir,
           );
-          await this.uninstallExtension(newExtensionName, isUpdate);
+          if (newExtensionName !== previousName) {
+            wasEnabledGlobally = this.extensionEnablementManager.isEnabled(
+              previousName,
+              homedir(),
+            );
+            wasEnabledWorkspace = this.extensionEnablementManager.isEnabled(
+              previousName,
+              this.workspaceDir,
+            );
+            this.extensionEnablementManager.remove(previousName);
+          }
+          await this.uninstallExtension(previousName, isUpdate);
         }
 
         await fs.promises.mkdir(destinationPath, { recursive: true });
@@ -392,6 +439,18 @@ Would you like to attempt to install via "git clone" instead?`,
               CoreToolCallStatus.Success,
             ),
           );
+
+          if (newExtensionName !== previousName) {
+            if (wasEnabledGlobally) {
+              await this.enableExtension(newExtensionName, SettingScope.User);
+            }
+            if (wasEnabledWorkspace) {
+              await this.enableExtension(
+                newExtensionName,
+                SettingScope.Workspace,
+              );
+            }
+          }
         } else {
           await logExtensionInstallEvent(
             this.telemetryConfig,
@@ -873,6 +932,7 @@ Would you like to attempt to install via "git clone" instead?`,
         path: effectiveExtensionPath,
         contextFiles,
         installMetadata,
+        migratedTo: config.migratedTo,
         mcpServers: config.mcpServers,
         excludeTools: config.excludeTools,
         hooks,
