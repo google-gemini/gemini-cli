@@ -365,6 +365,10 @@ export interface GeminiCLIExtension {
      */
     directory?: string;
   };
+  /**
+   * Used to migrate an extension to a new repository source.
+   */
+  migratedTo?: string;
 }
 
 export interface ExtensionInstallMetadata {
