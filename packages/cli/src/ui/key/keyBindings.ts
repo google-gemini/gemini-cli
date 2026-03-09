@@ -148,9 +148,7 @@ export class KeyBinding {
     'numpad_separator',
     'numpad_subtract',
     'numpad_decimal',
-    'numpad_divide',
-    // Gemini CLI legacy/internal support
-    'return',
+    'numpad_divide'
   ]);
 
   /** The key name (e.g., 'a', 'return', 'tab', 'escape') */
