@@ -885,7 +885,7 @@ export class Config implements McpContext {
     this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
-    this.planEnabled = params.plan ?? false;
+    this.planEnabled = params.plan ?? true;
     this.trackerEnabled = params.tracker ?? false;
     this.planModeRoutingEnabled = params.planSettings?.modelRouting ?? true;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
