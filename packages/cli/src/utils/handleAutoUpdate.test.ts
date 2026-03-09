@@ -18,6 +18,7 @@ import {
   isUpdateInProgress,
   waitForUpdateCompletion,
   _setUpdateStateForTesting,
+  buildWindowsDeferredUpdateCommand,
 } from './handleAutoUpdate.js';
 import { MessageType } from '../ui/types.js';
 
@@ -36,6 +37,7 @@ vi.mock('./updateEventEmitter.js', async (importOriginal) =>
 const mockGetInstallationInfo = vi.mocked(getInstallationInfo);
 
 describe('handleAutoUpdate', () => {
+  const originalPlatform = process.platform;
   let mockSpawn: Mock;
   let mockUpdateInfo: UpdateObject;
   let mockSettings: LoadedSettings;
@@ -44,6 +46,13 @@ describe('handleAutoUpdate', () => {
   beforeEach(() => {
     vi.stubEnv('GEMINI_SANDBOX', '');
     vi.stubEnv('SANDBOX', '');
+    // Use a non-Windows platform so the existing tests exercise the
+    // standard (non-deferred) update path. Windows-specific behavior
+    // is covered in a dedicated describe block.
+    Object.defineProperty(process, 'platform', {
+      value: 'linux',
+      configurable: true,
+    });
     mockSpawn = vi.fn();
     vi.clearAllMocks();
     vi.spyOn(updateEventEmitter, 'emit');
@@ -83,6 +92,10 @@ describe('handleAutoUpdate', () => {
   });
 
   afterEach(() => {
+    Object.defineProperty(process, 'platform', {
+      value: originalPlatform,
+      configurable: true,
+    });
     vi.unstubAllEnvs();
     vi.clearAllMocks();
     _setUpdateStateForTesting(false);
@@ -359,6 +372,163 @@ describe('handleAutoUpdate', () => {
     expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-success', {
       message:
         'Update successful! The new version will be used on your next run.',
+    });
+  });
+});
+
+describe('buildWindowsDeferredUpdateCommand', () => {
+  it('should include Wait-Process with the parent PID', () => {
+    const command = buildWindowsDeferredUpdateCommand(
+      'npm install -g @google/gemini-cli@2.0.0',
+      12345,
+    );
+    expect(command).toContain('Wait-Process -Id 12345');
+  });
+
+  it('should include the update command in the PowerShell script', () => {
+    const command = buildWindowsDeferredUpdateCommand(
+      'npm install -g @google/gemini-cli@2.0.0',
+      12345,
+    );
+    expect(command).toContain('npm install -g @google/gemini-cli@2.0.0');
+  });
+
+  it('should use hidden window style', () => {
+    const command = buildWindowsDeferredUpdateCommand(
+      'npm install -g @google/gemini-cli@2.0.0',
+      1,
+    );
+    expect(command).toContain('-WindowStyle Hidden');
+  });
+
+  it('should include a startup delay', () => {
+    const command = buildWindowsDeferredUpdateCommand(
+      'npm install -g @google/gemini-cli@2.0.0',
+      1,
+    );
+    expect(command).toContain('Start-Sleep -Seconds 2');
+  });
+});
+
+describe('handleAutoUpdate on Windows', () => {
+  const originalPlatform = process.platform;
+  let mockSpawn: Mock;
+  let mockSettings: LoadedSettings;
+  let mockChildProcess: ChildProcess;
+  let mockUpdateInfo: UpdateObject;
+
+  beforeEach(() => {
+    vi.stubEnv('GEMINI_SANDBOX', '');
+    vi.stubEnv('SANDBOX', '');
+    Object.defineProperty(process, 'platform', {
+      value: 'win32',
+      configurable: true,
+    });
+    mockSpawn = vi.fn();
+    vi.clearAllMocks();
+    vi.spyOn(updateEventEmitter, 'emit');
+
+    mockUpdateInfo = {
+      update: {
+        latest: '2.0.0',
+        current: '1.0.0',
+        type: 'major',
+        name: '@google/gemini-cli',
+      },
+      message: 'An update is available!',
+    };
+
+    mockSettings = {
+      merged: {
+        general: {
+          enableAutoUpdate: true,
+          enableAutoUpdateNotification: true,
+        },
+        tools: {
+          sandbox: false,
+        },
+      },
+    } as LoadedSettings;
+
+    mockChildProcess = Object.assign(new EventEmitter(), {
+      stdin: Object.assign(new EventEmitter(), {
+        write: vi.fn(),
+        end: vi.fn(),
+      }),
+      unref: vi.fn(),
+    }) as unknown as ChildProcess;
+
+    mockSpawn.mockReturnValue(
+      mockChildProcess as unknown as ReturnType<typeof mockSpawn>,
+    );
+  });
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', {
+      value: originalPlatform,
+      configurable: true,
+    });
+    vi.unstubAllEnvs();
+    vi.clearAllMocks();
+    _setUpdateStateForTesting(false);
+  });
+
+  it('should spawn a deferred PowerShell command on Windows', () => {
+    mockGetInstallationInfo.mockReturnValue({
+      updateCommand: 'npm install -g @google/gemini-cli@latest',
+      updateMessage: 'Attempting to update...',
+      isGlobal: true,
+      packageManager: PackageManager.NPM,
+    });
+
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+
+    expect(mockSpawn).toHaveBeenCalledOnce();
+    const spawnedCommand = mockSpawn.mock.calls[0][0] as string;
+    expect(spawnedCommand).toContain('powershell.exe');
+    expect(spawnedCommand).toContain('Wait-Process');
+    expect(spawnedCommand).toContain('npm install -g @google/gemini-cli@2.0.0');
+  });
+
+  it('should use windowsHide option on Windows', () => {
+    mockGetInstallationInfo.mockReturnValue({
+      updateCommand: 'npm install -g @google/gemini-cli@latest',
+      updateMessage: 'Attempting to update...',
+      isGlobal: true,
+      packageManager: PackageManager.NPM,
+    });
+
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+
+    const spawnOptions = mockSpawn.mock.calls[0][1];
+    expect(spawnOptions.windowsHide).toBe(true);
+  });
+
+  it('should not mark update as in-progress on Windows', () => {
+    mockGetInstallationInfo.mockReturnValue({
+      updateCommand: 'npm install -g @google/gemini-cli@latest',
+      updateMessage: 'Attempting to update...',
+      isGlobal: true,
+      packageManager: PackageManager.NPM,
+    });
+
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+
+    expect(isUpdateInProgress()).toBe(false);
+  });
+
+  it('should emit update-info with deferred message on Windows', () => {
+    mockGetInstallationInfo.mockReturnValue({
+      updateCommand: 'npm install -g @google/gemini-cli@latest',
+      updateMessage: 'Attempting to update...',
+      isGlobal: true,
+      packageManager: PackageManager.NPM,
+    });
+
+    handleAutoUpdate(mockUpdateInfo, mockSettings, '/root', mockSpawn);
+
+    expect(updateEventEmitter.emit).toHaveBeenCalledWith('update-info', {
+      message: expect.stringContaining('deferred'),
     });
   });
 });

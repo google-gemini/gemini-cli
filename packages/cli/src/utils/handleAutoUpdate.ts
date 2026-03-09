@@ -16,6 +16,26 @@ import { debugLogger } from '@google/gemini-cli-core';
 
 let _updateInProgress = false;
 
+/**
+ * Builds a PowerShell command that waits for the given process to exit
+ * before running the update command. This avoids file-locking errors on
+ * Windows where the running CLI executable cannot be overwritten.
+ */
+export function buildWindowsDeferredUpdateCommand(
+  updateCommand: string,
+  parentPid: number,
+): string {
+  // Use PowerShell to: wait for the parent process to exit, then run the
+  // update. -ErrorAction SilentlyContinue handles the case where the
+  // process has already exited before Wait-Process runs.
+  return (
+    `powershell.exe -NoProfile -WindowStyle Hidden -Command "` +
+    `Start-Sleep -Seconds 2; ` +
+    `try { Wait-Process -Id ${parentPid} -Timeout 60 -ErrorAction SilentlyContinue } catch {}; ` +
+    `${updateCommand}"`
+  );
+}
+
 /** @internal */
 export function _setUpdateStateForTesting(value: boolean) {
   _updateInProgress = value;
@@ -121,6 +141,33 @@ export function handleAutoUpdate(
     '@latest',
     isNightly ? '@nightly' : `@${info.update.latest}`,
   );
+
+  if (process.platform === 'win32') {
+    // On Windows, the CLI executable is locked while the process is running.
+    // Running npm install -g in the background will fail because it cannot
+    // overwrite the locked files. Instead, spawn a detached PowerShell
+    // process that waits for this process to exit before running the update.
+    const deferredCommand = buildWindowsDeferredUpdateCommand(
+      updateCommand,
+      process.pid,
+    );
+    const updateProcess = spawnFn(deferredCommand, {
+      stdio: 'ignore',
+      shell: true,
+      detached: true,
+      windowsHide: true,
+    });
+    updateProcess.unref();
+
+    // The actual update happens after exit, so we cannot track its progress.
+    // Notify the user that the update will be applied on next launch.
+    updateEventEmitter.emit('update-info', {
+      message:
+        'Update will be applied after you exit the CLI (deferred to avoid Windows file locking).',
+    });
+    return updateProcess;
+  }
+
   const updateProcess = spawnFn(updateCommand, {
     stdio: 'ignore',
     shell: true,
