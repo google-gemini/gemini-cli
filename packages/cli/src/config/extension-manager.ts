@@ -218,6 +218,7 @@ export class ExtensionManager extends ExtensionLoader {
       }
 
       let tempDir: string | undefined;
+      let backupDir: string | undefined;
 
       if (
         installMetadata.type === 'git' ||
@@ -313,12 +314,20 @@ Would you like to attempt to install via "git clone" instead?`,
           newExtensionName,
         ).getExtensionDir();
         let previousSettings: Record<string, string> | undefined;
+        let backupDir: string | undefined;
         if (isUpdate) {
           previousSettings = await getEnvContents(
             previousExtensionConfig,
             extensionId,
             this.workspaceDir,
           );
+          // Back up the old extension before uninstalling so we can restore
+          // it if the new extension fails to load.
+          backupDir = await ExtensionStorage.createTmpDir();
+          const oldExtensionDir = new ExtensionStorage(
+            newExtensionName,
+          ).getExtensionDir();
+          await fs.promises.cp(oldExtensionDir, backupDir, { recursive: true });
           await this.uninstallExtension(newExtensionName, isUpdate);
         }
 
@@ -373,11 +382,48 @@ Would you like to attempt to install via "git clone" instead?`,
         );
         await fs.promises.writeFile(metadataPath, metadataString);
 
-        // TODO: Gracefully handle this call failing, we should back up the old
-        // extension prior to overwriting it and then restore and restart it.
-        extension = await this.loadExtension(destinationPath);
-        if (!extension) {
-          throw new Error(`Extension not found`);
+        try {
+          extension = await this.loadExtension(destinationPath);
+          if (!extension) {
+            throw new Error(`Extension not found`);
+          }
+        } catch (loadError) {
+          // If loading the new extension fails and this is an update,
+          // restore the backed-up old extension so the user is not left
+          // without a working extension.
+          if (isUpdate && backupDir) {
+            debugLogger.warn(
+              `Failed to load updated extension, restoring previous version: ${getErrorMessage(loadError)}`,
+            );
+            try {
+              await fs.promises.rm(destinationPath, {
+                recursive: true,
+                force: true,
+              });
+              await fs.promises.mkdir(destinationPath, { recursive: true });
+              await fs.promises.cp(backupDir, destinationPath, {
+                recursive: true,
+              });
+              extension = await this.loadExtension(destinationPath);
+              if (!extension) {
+                throw new Error(`Extension not found after restore`);
+              }
+              coreEvents.emitFeedback(
+                'warning',
+                `Extension update failed. Previous version of "${newExtensionName}" has been restored.`,
+              );
+            } catch (restoreError) {
+              throw new Error(
+                `Extension update failed and restore also failed: ${getErrorMessage(restoreError)}`,
+              );
+            }
+          } else {
+            throw loadError;
+          }
+        } finally {
+          if (isUpdate && backupDir) {
+            await fs.promises.rm(backupDir, { recursive: true, force: true });
+          }
         }
         if (isUpdate) {
           await logExtensionUpdateEvent(
@@ -412,6 +458,9 @@ Would you like to attempt to install via "git clone" instead?`,
       } finally {
         if (tempDir) {
           await fs.promises.rm(tempDir, { recursive: true, force: true });
+        }
+        if (backupDir) {
+          await fs.promises.rm(backupDir, { recursive: true, force: true });
         }
       }
       return extension;

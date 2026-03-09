@@ -193,6 +193,116 @@ describe('ExtensionManager', () => {
     });
   });
 
+  describe('extension update backup and restore', () => {
+    it('restores the previous extension if loadExtension fails during update', async () => {
+      // Install v1 of the extension
+      const sourceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ext-source-'));
+      fs.writeFileSync(
+        path.join(sourceDir, 'gemini-extension.json'),
+        JSON.stringify({ name: 'backup-test-ext', version: '1.0.0' }),
+      );
+      fs.writeFileSync(
+        path.join(sourceDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: sourceDir }),
+      );
+
+      await extensionManager.loadExtensions();
+      await extensionManager.installOrUpdateExtension({
+        source: sourceDir,
+        type: 'local',
+      });
+
+      // Confirm v1 is installed
+      let extensions = extensionManager.getExtensions();
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].version).toBe('1.0.0');
+
+      // Prepare v2 source with a broken gemini-extension.json to force loadExtension to fail
+      const sourceV2Dir = fs.mkdtempSync(
+        path.join(os.tmpdir(), 'ext-source-v2-'),
+      );
+      fs.writeFileSync(
+        path.join(sourceV2Dir, 'gemini-extension.json'),
+        'THIS IS NOT VALID JSON {{{',
+      );
+      fs.writeFileSync(
+        path.join(sourceV2Dir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: sourceV2Dir }),
+      );
+
+      // Attempt update � should fail to load but restore v1
+      await expect(
+        extensionManager.installOrUpdateExtension(
+          { source: sourceV2Dir, type: 'local' },
+          { name: 'backup-test-ext', version: '1.0.0' },
+        ),
+      ).rejects.toThrow();
+
+      // v1 should be restored
+      extensions = extensionManager.getExtensions();
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].version).toBe('1.0.0');
+      expect(extensions[0].name).toBe('backup-test-ext');
+
+      fs.rmSync(sourceDir, { recursive: true, force: true });
+      fs.rmSync(sourceV2Dir, { recursive: true, force: true });
+    });
+
+    it('cleans up backup dir on successful update', async () => {
+      const sourceDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ext-source-'));
+      fs.writeFileSync(
+        path.join(sourceDir, 'gemini-extension.json'),
+        JSON.stringify({ name: 'cleanup-test-ext', version: '1.0.0' }),
+      );
+      fs.writeFileSync(
+        path.join(sourceDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: sourceDir }),
+      );
+
+      await extensionManager.loadExtensions();
+      await extensionManager.installOrUpdateExtension({
+        source: sourceDir,
+        type: 'local',
+      });
+
+      // Prepare v2 source
+      const sourceV2Dir = fs.mkdtempSync(
+        path.join(os.tmpdir(), 'ext-source-v2-'),
+      );
+      fs.writeFileSync(
+        path.join(sourceV2Dir, 'gemini-extension.json'),
+        JSON.stringify({ name: 'cleanup-test-ext', version: '2.0.0' }),
+      );
+      fs.writeFileSync(
+        path.join(sourceV2Dir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: sourceV2Dir }),
+      );
+
+      const tmpDirsBefore = fs
+        .readdirSync(os.tmpdir())
+        .filter((d) => d.startsWith('gemini-extension'));
+
+      await extensionManager.installOrUpdateExtension(
+        { source: sourceV2Dir, type: 'local' },
+        { name: 'cleanup-test-ext', version: '1.0.0' },
+      );
+
+      // v2 should now be installed
+      const extensions = extensionManager.getExtensions();
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].version).toBe('2.0.0');
+
+      // No new backup dirs should remain in tmpdir
+      const tmpDirsAfter = fs
+        .readdirSync(os.tmpdir())
+        .filter((d) => d.startsWith('gemini-extension'));
+      expect(tmpDirsAfter.length).toBe(tmpDirsBefore.length);
+
+      fs.rmSync(sourceDir, { recursive: true, force: true });
+      fs.rmSync(sourceV2Dir, { recursive: true, force: true });
+    });
+  });
+
   describe('symlink handling', () => {
     let extensionDir: string;
     let symlinkDir: string;
