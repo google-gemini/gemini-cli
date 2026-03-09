@@ -1,0 +1,40 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ToolGroupMessage Compact Rendering > adds an empty line between a compact tool and a standard tool 1`] = `
+"
+  ✓  list_directory   → file1.txt
+
+╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  non-compact-tool                                                      │
+│                                                                          │
+│ some large output                                                        │
+╰──────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
+exports[`ToolGroupMessage Compact Rendering > adds an empty line between a standard tool and a compact tool 1`] = `
+"
+╭──────────────────────────────────────────────────────────────────────────╮
+│ ✓  non-compact-tool                                                      │
+│                                                                          │
+│ some large output                                                        │
+╰──────────────────────────────────────────────────────────────────────────╯
+
+  ✓  list_directory   → file1.txt
+"
+`;
+
+exports[`ToolGroupMessage Compact Rendering > adds an empty line if a compact tool has a dense payload 1`] = `
+"
+  ✓  list_directory   → file1.txt
+
+  ✓  ReadFile   → read file
+"
+`;
+
+exports[`ToolGroupMessage Compact Rendering > renders consecutive compact tools without empty lines between them 1`] = `
+"
+  ✓  list_directory   → file1.txt file2.txt
+  ✓  list_directory   → file3.txt
+"
+`;

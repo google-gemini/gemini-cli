@@ -183,6 +183,11 @@ export const EDIT_DISPLAY_NAME = 'Edit';
 export const ASK_USER_DISPLAY_NAME = 'Ask User';
 export const READ_FILE_DISPLAY_NAME = 'ReadFile';
 export const GLOB_DISPLAY_NAME = 'FindFiles';
+export const LS_DISPLAY_NAME = 'ReadFolder';
+export const GREP_DISPLAY_NAME = 'SearchText';
+export const WEB_SEARCH_DISPLAY_NAME = 'GoogleSearch';
+export const WEB_FETCH_DISPLAY_NAME = 'WebFetch';
+export const READ_MANY_FILES_DISPLAY_NAME = 'ReadManyFiles';
 
 /**
  * Mapping of legacy tool names to their current names.

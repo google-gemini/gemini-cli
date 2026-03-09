@@ -20,7 +20,7 @@ import { makeRelative, shortenPath } from '../utils/paths.js';
 import type { Config } from '../config/config.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { ToolErrorType } from './tool-error.js';
-import { LS_TOOL_NAME } from './tool-names.js';
+import { LS_TOOL_NAME, LS_DISPLAY_NAME } from './tool-names.js';
 import { buildDirPathArgsPattern } from '../policy/utils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { LS_DEFINITION } from './definitions/coreTools.js';
@@ -284,7 +284,10 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
 
       return {
         llmContent: resultMessage,
-        returnDisplay: displayMessage,
+        returnDisplay: {
+          summary: displayMessage,
+          files: entries.map((e) => (e.isDirectory ? `${e.name}/` : e.name)),
+        },
       };
     } catch (error) {
       const errorMsg = `Error listing directory: ${error instanceof Error ? error.message : String(error)}`;
@@ -309,7 +312,7 @@ export class LSTool extends BaseDeclarativeTool<LSToolParams, ToolResult> {
   ) {
     super(
       LSTool.Name,
-      'ReadFolder',
+      LS_DISPLAY_NAME,
       LS_DEFINITION.base.description!,
       Kind.Search,
       LS_DEFINITION.base.parametersJsonSchema,

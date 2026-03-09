@@ -36,7 +36,10 @@ import { getProgrammingLanguage } from '../telemetry/telemetry-utils.js';
 import { logFileOperation } from '../telemetry/loggers.js';
 import { FileOperationEvent } from '../telemetry/types.js';
 import { ToolErrorType } from './tool-error.js';
-import { READ_MANY_FILES_TOOL_NAME } from './tool-names.js';
+import {
+  READ_MANY_FILES_TOOL_NAME,
+  READ_MANY_FILES_DISPLAY_NAME,
+} from './tool-names.js';
 import { READ_MANY_FILES_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 
@@ -502,7 +505,7 @@ export class ReadManyFilesTool extends BaseDeclarativeTool<
   ) {
     super(
       ReadManyFilesTool.Name,
-      'ReadManyFiles',
+      READ_MANY_FILES_DISPLAY_NAME,
       READ_MANY_FILES_DEFINITION.base.description!,
       Kind.Read,
       READ_MANY_FILES_DEFINITION.base.parametersJsonSchema,

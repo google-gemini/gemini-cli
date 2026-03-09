@@ -317,6 +317,13 @@
           "default": true,
           "type": "boolean"
         },
+        "compactToolOutput": {
+          "title": "Compact Tool Output",
+          "description": "Display tool outputs (like directory listings and file reads) in a compact, structured format.",
+          "markdownDescription": "Display tool outputs (like directory listings and file reads) in a compact, structured format.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "hideBanner": {
           "title": "Hide Banner",
           "description": "Hide the application banner",
