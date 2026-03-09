@@ -55,6 +55,7 @@ interface CommandParserResult {
   currentLevel: readonly SlashCommand[] | undefined;
   leafCommand: SlashCommand | null;
   exactMatchAsParent: SlashCommand | undefined;
+  usedPrefixParentDescent: boolean;
   isArgumentCompletion: boolean;
 }
 
@@ -71,6 +72,7 @@ function useCommandParser(
         currentLevel: slashCommands,
         leafCommand: null,
         exactMatchAsParent: undefined,
+        usedPrefixParentDescent: false,
         isArgumentCompletion: false,
       };
     }
@@ -88,6 +90,7 @@ function useCommandParser(
 
     let currentLevel: readonly SlashCommand[] | undefined = slashCommands;
     let leafCommand: SlashCommand | null = null;
+    let usedPrefixParentDescent = false;
 
     for (const part of commandPathParts) {
       if (!currentLevel) {
@@ -138,6 +141,32 @@ function useCommandParser(
           partial = '';
         }
       }
+
+      // Phase-one alias UX: allow unique prefix descent for /chat and /resume
+      // so `/cha` and `/resum` expose the same grouped menu immediately.
+      if (!exactMatchAsParent && partial && currentLevel) {
+        const prefixParentMatches = currentLevel.filter(
+          (cmd) =>
+            !!cmd.subCommands &&
+            (cmd.name.toLowerCase().startsWith(partial.toLowerCase()) ||
+              cmd.altNames?.some((alt) =>
+                alt.toLowerCase().startsWith(partial.toLowerCase()),
+              )),
+        );
+
+        if (prefixParentMatches.length === 1) {
+          const candidate = prefixParentMatches[0];
+          if (candidate.name === 'chat' || candidate.name === 'resume') {
+            exactMatchAsParent = candidate;
+            leafCommand = candidate;
+            usedPrefixParentDescent = true;
+            currentLevel = candidate.subCommands as
+              | readonly SlashCommand[]
+              | undefined;
+            partial = '';
+          }
+        }
+      }
     }
 
     const depth = commandPathParts.length;
@@ -154,6 +183,7 @@ function useCommandParser(
       currentLevel,
       leafCommand,
       exactMatchAsParent,
+      usedPrefixParentDescent,
       isArgumentCompletion,
     };
   }, [query, slashCommands]);
@@ -312,12 +342,53 @@ function useCommandSuggestions(
             return 0;
           });
 
-          const finalSuggestions = sortedSuggestions.map((cmd) => ({
-            label: cmd.name,
-            value: cmd.name,
-            description: cmd.description,
-            commandKind: cmd.kind,
-          }));
+          const finalSuggestions = sortedSuggestions.map((cmd) => {
+            const canonicalParentName =
+              parserResult.usedPrefixParentDescent &&
+              leafCommand &&
+              (leafCommand.name === 'chat' || leafCommand.name === 'resume')
+                ? leafCommand.name
+                : undefined;
+
+            const suggestion: Suggestion = {
+              label: cmd.name,
+              value: cmd.name,
+              insertValue: canonicalParentName
+                ? `${canonicalParentName} ${cmd.name}`
+                : undefined,
+              description: cmd.description,
+              commandKind: cmd.kind,
+            };
+
+            if (cmd.suggestionGroup) {
+              suggestion.sectionTitle = cmd.suggestionGroup;
+            }
+
+            return suggestion;
+          });
+
+          const isTopLevelChatOrResumeContext = !!(
+            leafCommand &&
+            (leafCommand.name === 'chat' || leafCommand.name === 'resume') &&
+            (commandPathParts.length === 0 ||
+              (commandPathParts.length === 1 &&
+                matchesCommand(leafCommand, commandPathParts[0])))
+          );
+
+          if (isTopLevelChatOrResumeContext) {
+            const canonicalParentName = leafCommand.name;
+            const autoSectionSuggestion: Suggestion = {
+              label: 'list',
+              value: 'list',
+              insertValue: canonicalParentName,
+              description: 'Browse auto-saved chats',
+              commandKind: CommandKind.BUILT_IN,
+              sectionTitle: 'auto',
+              submitValue: `/${leafCommand.name}`,
+            };
+            setSuggestions([autoSectionSuggestion, ...finalSuggestions]);
+            return;
+          }
 
           setSuggestions(finalSuggestions);
         }
@@ -359,7 +430,9 @@ function useCompletionPositions(
     const { hasTrailingSpace, partial, exactMatchAsParent } = parserResult;
 
     // Set completion start/end positions
-    if (hasTrailingSpace || exactMatchAsParent) {
+    if (parserResult.usedPrefixParentDescent) {
+      return { start: 1, end: query.length };
+    } else if (hasTrailingSpace || exactMatchAsParent) {
       return { start: query.length, end: query.length };
     } else if (partial) {
       if (parserResult.isArgumentCompletion) {
@@ -388,7 +461,12 @@ function usePerfectMatch(
       return { isPerfectMatch: false };
     }
 
-    if (leafCommand && partial === '' && leafCommand.action) {
+    if (
+      leafCommand &&
+      partial === '' &&
+      leafCommand.action &&
+      !parserResult.usedPrefixParentDescent
+    ) {
       return { isPerfectMatch: true };
     }
 
