@@ -23,6 +23,7 @@ import {
 } from './gemini.js';
 import { loadCliConfig, parseArguments } from './config/config.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
+import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
 import { terminalCapabilityManager } from './ui/utils/terminalCapabilityManager.js';
 import { start_sandbox } from './utils/sandbox.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
@@ -189,15 +190,26 @@ vi.mock('./ui/utils/terminalCapabilityManager.js', () => ({
 
 vi.mock('./config/config.js', () => ({
   loadCliConfig: vi.fn().mockImplementation(async () => createMockConfig()),
-  parseArguments: vi.fn().mockResolvedValue({}),
+  parseArguments: vi
+    .fn()
+    .mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
+    }),
   isDebugMode: vi.fn(() => false),
 }));
 
 vi.mock('read-package-up', () => ({
-  readPackageUp: vi.fn().mockResolvedValue({
-    packageJson: { name: 'test-pkg', version: 'test-version' },
-    path: '/fake/path/package.json',
-  }),
+  readPackageUp: vi
+    .fn()
+    .mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
+      packageJson: { name: 'test-pkg', version: 'test-version' },
+      path: '/fake/path/package.json',
+    }),
 }));
 
 vi.mock('update-notifier', () => ({
@@ -231,10 +243,15 @@ vi.mock('./utils/relaunch.js', () => ({
 }));
 
 vi.mock('./config/sandboxConfig.js', () => ({
-  loadSandboxConfig: vi.fn().mockResolvedValue({
-    command: 'docker',
-    image: 'test-image',
-  }),
+  loadSandboxConfig: vi
+    .fn()
+    .mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
+      command: 'docker',
+      image: 'test-image',
+    }),
 }));
 
 vi.mock('./deferred.js', () => ({
@@ -536,6 +553,9 @@ describe('gemini.tsx main function kitty protocol', () => {
     );
 
     vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
       promptInteractive: false,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -599,6 +619,9 @@ describe('gemini.tsx main function kitty protocol', () => {
       });
 
     vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
       promptInteractive: false,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -618,14 +641,17 @@ describe('gemini.tsx main function kitty protocol', () => {
     const mockConfig = createMockConfig({
       isInteractive: () => false,
       getQuestion: () => '',
-      getSandbox: () => ({ command: 'docker', image: 'test-image' }),
+      getSandbox: () =>
+        createMockSandboxConfig({ command: 'docker', image: 'test-image' }),
     });
 
     vi.mocked(loadCliConfig).mockResolvedValue(mockConfig);
-    vi.mocked(loadSandboxConfig).mockResolvedValue({
-      command: 'docker',
-      image: 'test-image',
-    });
+    vi.mocked(loadSandboxConfig).mockResolvedValue(
+      createMockSandboxConfig({
+        command: 'docker',
+        image: 'test-image',
+      }),
+    );
 
     process.env['GEMINI_API_KEY'] = 'test-key';
     try {
@@ -666,6 +692,9 @@ describe('gemini.tsx main function kitty protocol', () => {
     );
 
     vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
       promptInteractive: false,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     vi.mocked(loadCliConfig).mockResolvedValue(
@@ -721,6 +750,9 @@ describe('gemini.tsx main function kitty protocol', () => {
     );
 
     vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
       promptInteractive: false,
       resume: 'session-id',
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -777,6 +809,9 @@ describe('gemini.tsx main function kitty protocol', () => {
     );
 
     vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
       promptInteractive: false,
       resume: 'latest',
     } as unknown as CliArgs);
@@ -827,6 +862,9 @@ describe('gemini.tsx main function kitty protocol', () => {
     );
 
     vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
       promptInteractive: false,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     vi.mocked(loadCliConfig).mockResolvedValue(
@@ -877,6 +915,9 @@ describe('gemini.tsx main function kitty protocol', () => {
     );
 
     vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
       promptInteractive: false,
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
     vi.mocked(loadCliConfig).mockResolvedValue(
@@ -951,6 +992,9 @@ describe('gemini.tsx main function exit codes', () => {
       }),
     );
     vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
       promptInteractive: true,
     } as unknown as CliArgs);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -967,10 +1011,12 @@ describe('gemini.tsx main function exit codes', () => {
 
   it('should exit with 41 for auth failure during sandbox setup', async () => {
     vi.stubEnv('SANDBOX', '');
-    vi.mocked(loadSandboxConfig).mockResolvedValue({
-      command: 'docker',
-      image: 'test-image',
-    });
+    vi.mocked(loadSandboxConfig).mockResolvedValue(
+      createMockSandboxConfig({
+        command: 'docker',
+        image: 'test-image',
+      }),
+    );
     vi.mocked(loadCliConfig).mockResolvedValue(
       createMockConfig({
         refreshAuth: vi.fn().mockRejectedValue(new Error('Auth failed')),
@@ -1010,6 +1056,9 @@ describe('gemini.tsx main function exit codes', () => {
       }),
     );
     vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
       resume: 'invalid-session',
     } as unknown as CliArgs);
 
@@ -1051,7 +1100,11 @@ describe('gemini.tsx main function exit codes', () => {
         merged: { security: { auth: {} }, ui: {} },
       }),
     );
-    vi.mocked(parseArguments).mockResolvedValue({} as unknown as CliArgs);
+    vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
+    } as unknown as CliArgs);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (process.stdin as any).isTTY = true;
 
@@ -1086,7 +1139,11 @@ describe('gemini.tsx main function exit codes', () => {
         merged: { security: { auth: { selectedType: undefined } }, ui: {} },
       }),
     );
-    vi.mocked(parseArguments).mockResolvedValue({} as unknown as CliArgs);
+    vi.mocked(parseArguments).mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
+    } as unknown as CliArgs);
 
     runNonInteractiveSpy.mockImplementation(() => Promise.resolve());
 
@@ -1156,7 +1213,12 @@ describe('project hooks loading based on trust', () => {
     const configModule = await import('./config/config.js');
     loadCliConfig = vi.mocked(configModule.loadCliConfig);
     parseArguments = vi.mocked(configModule.parseArguments);
-    parseArguments.mockResolvedValue({ startupMessages: [] });
+    parseArguments.mockResolvedValue({
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
+      startupMessages: [],
+    });
 
     const settingsModule = await import('./config/settings.js');
     loadSettings = vi.mocked(settingsModule.loadSettings);

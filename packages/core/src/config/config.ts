@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { inspect } from 'node:util';
 import process from 'node:process';
+import { z } from 'zod';
 import {
   AuthType,
   createContentGenerator,
@@ -96,7 +97,6 @@ import type {
 import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
 import { OutputFormat } from '../output/types.js';
-//import { type AgentLoopContext } from './agent-loop-context.js';
 import {
   ModelConfigService,
   type ModelConfig,
@@ -447,9 +447,26 @@ export enum AuthProviderType {
 }
 
 export interface SandboxConfig {
-  command: 'docker' | 'podman' | 'sandbox-exec' | 'runsc' | 'lxc';
-  image: string;
+  enabled: boolean;
+  allowedPaths: string[];
+  networkAccess: boolean;
+  command?: 'docker' | 'podman' | 'sandbox-exec' | 'runsc' | 'lxc';
+  image?: string;
 }
+
+export const ConfigSchema = z.object({
+  sandbox: z
+    .object({
+      enabled: z.boolean().default(false),
+      allowedPaths: z.array(z.string()).default([]),
+      networkAccess: z.boolean().default(false),
+      command: z
+        .enum(['docker', 'podman', 'sandbox-exec', 'runsc', 'lxc'])
+        .optional(),
+      image: z.string().optional(),
+    })
+    .optional(),
+});
 
 /**
  * Callbacks for checking MCP server enablement status.
@@ -814,7 +831,19 @@ export class Config implements McpContext, AgentLoopContext {
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.fileSystemService = new StandardFileSystemService();
-    this.sandbox = params.sandbox;
+    this.sandbox = params.sandbox
+      ? {
+          enabled: params.sandbox.enabled ?? false,
+          allowedPaths: params.sandbox.allowedPaths ?? [],
+          networkAccess: params.sandbox.networkAccess ?? false,
+          command: params.sandbox.command,
+          image: params.sandbox.image,
+        }
+      : {
+          enabled: false,
+          allowedPaths: [],
+          networkAccess: false,
+        };
     this.targetDir = path.resolve(params.targetDir);
     this.folderTrust = params.folderTrust ?? false;
     this.workspaceContext = new WorkspaceContext(this.targetDir, []);
@@ -948,7 +977,6 @@ export class Config implements McpContext, AgentLoopContext {
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
-    // // TODO(joshualitt): Re-evaluate the todo tool for 3 family.
     this.useWriteTodos = isPreviewModel(this.model)
       ? false
       : (params.useWriteTodos ?? true);
@@ -1597,6 +1625,18 @@ export class Config implements McpContext, AgentLoopContext {
 
   getSandbox(): SandboxConfig | undefined {
     return this.sandbox;
+  }
+
+  getSandboxEnabled(): boolean {
+    return this.sandbox?.enabled ?? false;
+  }
+
+  getSandboxAllowedPaths(): string[] {
+    return this.sandbox?.allowedPaths ?? [];
+  }
+
+  getSandboxNetworkAccess(): boolean {
+    return this.sandbox?.networkAccess ?? false;
   }
 
   isRestrictiveSandbox(): boolean {

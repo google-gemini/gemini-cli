@@ -217,6 +217,7 @@ export async function start_sandbox(
 
     // runsc uses docker with --runtime=runsc
     const command = config.command === 'runsc' ? 'docker' : config.command;
+    if (!command) throw new FatalSandboxError('Sandbox command is required');
 
     debugLogger.log(`hopping into sandbox (command: ${command}) ...`);
 
@@ -230,6 +231,7 @@ export async function start_sandbox(
     const isCustomProjectSandbox = fs.existsSync(projectSandboxDockerfile);
 
     const image = config.image;
+    if (!image) throw new FatalSandboxError('Sandbox image is required');
     const workdir = path.resolve(process.cwd());
     const containerWorkdir = getContainerPath(workdir);
 

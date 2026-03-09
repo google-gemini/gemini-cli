@@ -31,7 +31,9 @@ const VALID_SANDBOX_COMMANDS: ReadonlyArray<SandboxConfig['command']> = [
   'lxc',
 ];
 
-function isSandboxCommand(value: string): value is SandboxConfig['command'] {
+function isSandboxCommand(
+  value: string,
+): value is Exclude<SandboxConfig['command'], undefined> {
   return (VALID_SANDBOX_COMMANDS as readonly string[]).includes(value);
 }
 
@@ -124,5 +126,7 @@ export async function loadSandboxConfig(
     process.env['GEMINI_SANDBOX_IMAGE_DEFAULT'] ??
     packageJson?.config?.sandboxImageUri;
 
-  return command && image ? { command, image } : undefined;
+  return command && image
+    ? { enabled: true, allowedPaths: [], networkAccess: false, command, image }
+    : undefined;
 }
