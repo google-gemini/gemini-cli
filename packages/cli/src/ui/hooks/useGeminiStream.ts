@@ -94,8 +94,8 @@ type ToolResponseWithParts = ToolCallResponseInfo & {
   llmContent?: PartListUnion;
 };
 
-interface BackgroundedShellInfo {
-  pid: number;
+interface BackgroundedToolInfo {
+  executionId: number;
   command: string;
   initialOutput: string;
 }
@@ -151,27 +151,32 @@ function getBackgroundExecutionId(
   return undefined;
 }
 
-function getBackgroundedShellInfo(
+function getBackgroundedToolInfo(
   toolCall: TrackedCompletedToolCall | TrackedCancelledToolCall,
-): BackgroundedShellInfo | undefined {
-  if (toolCall.request.name !== SHELL_COMMAND_NAME) {
-    return undefined;
-  }
-
+): BackgroundedToolInfo | undefined {
   const response = toolCall.response as ToolResponseWithParts;
   const rawData = response?.data;
   const data = isBackgroundExecutionData(rawData) ? rawData : undefined;
   const executionId = data ? getBackgroundExecutionId(data) : undefined;
 
-  if (!executionId) {
+  if (executionId === undefined) {
     return undefined;
   }
 
   return {
-    pid: executionId,
-    command: data.command ?? 'shell',
+    executionId,
+    command: data.command ?? toolCall.request.name,
     initialOutput: data.initialOutput ?? '',
   };
+}
+
+function isBackgroundableExecutingToolCall(
+  toolCall: TrackedToolCall,
+): toolCall is TrackedExecutingToolCall {
+  return (
+    toolCall.status === CoreToolCallStatus.Executing &&
+    typeof toolCall.pid === 'number'
+  );
 }
 
 function showCitations(settings: LoadedSettings): boolean {
@@ -362,13 +367,11 @@ export const useGeminiStream = (
     getPreferredEditor,
   );
 
-  const activeToolExecutionId = useMemo(() => {
-    const executingShellTool = toolCalls.find(
-      (tc): tc is TrackedExecutingToolCall =>
-        tc.status === CoreToolCallStatus.Executing &&
-        tc.request.name === SHELL_COMMAND_NAME,
+  const activeBackgroundExecutionId = useMemo(() => {
+    const executingBackgroundableTool = toolCalls.find(
+      isBackgroundableExecutingToolCall,
     );
-    return executingShellTool?.pid;
+    return executingBackgroundableTool?.pid;
   }, [toolCalls]);
 
   const onExec = useCallback(async (done: Promise<void>) => {
@@ -398,7 +401,7 @@ export const useGeminiStream = (
     setShellInputFocused,
     terminalWidth,
     terminalHeight,
-    activeToolExecutionId,
+    activeBackgroundExecutionId,
   );
 
   const streamingState = useMemo(
@@ -576,7 +579,8 @@ export const useGeminiStream = (
     onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
   } | null>(null);
 
-  const activePtyId = activeShellPtyId || activeToolExecutionId;
+  const activePtyId =
+    activeShellPtyId ?? activeBackgroundExecutionId ?? undefined;
 
   const prevActiveShellPtyIdRef = useRef<number | null>(null);
   useEffect(() => {
@@ -1703,12 +1707,12 @@ export const useGeminiStream = (
       );
 
       for (const toolCall of completedAndReadyToSubmitTools) {
-        const backgroundedShell = getBackgroundedShellInfo(toolCall);
-        if (backgroundedShell) {
+        const backgroundedTool = getBackgroundedToolInfo(toolCall);
+        if (backgroundedTool) {
           registerBackgroundShell(
-            backgroundedShell.pid,
-            backgroundedShell.command,
-            backgroundedShell.initialOutput,
+            backgroundedTool.executionId,
+            backgroundedTool.command,
+            backgroundedTool.initialOutput,
           );
         }
       }
