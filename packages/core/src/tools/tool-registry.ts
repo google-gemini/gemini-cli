@@ -5,12 +5,14 @@
  */
 
 import type { FunctionDeclaration } from '@google/genai';
-import type {
-  AnyDeclarativeTool,
-  ToolResult,
-  ToolInvocation,
+import {
+  Kind,
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  type AnyDeclarativeTool,
+  type ToolResult,
+  type ToolInvocation,
 } from './tools.js';
-import { Kind, BaseDeclarativeTool, BaseToolInvocation } from './tools.js';
 import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import { spawn } from 'node:child_process';
@@ -443,13 +445,15 @@ export class ToolRegistry {
   private buildToolMetadata(): Map<string, Record<string, unknown>> {
     const toolMetadata = new Map<string, Record<string, unknown>>();
     for (const [name, tool] of this.allKnownTools) {
-      if (tool.toolAnnotations) {
-        const metadata: Record<string, unknown> = { ...tool.toolAnnotations };
-        // Include server name so the policy engine can resolve composite
-        // wildcard patterns (e.g. "*__*") against unqualified tool names.
-        if (tool instanceof DiscoveredMCPTool) {
-          metadata['_serverName'] = tool.serverName;
-        }
+      const metadata: Record<string, unknown> = tool.toolAnnotations
+        ? { ...tool.toolAnnotations }
+        : {};
+      // Include server name so the policy engine can resolve composite
+      // wildcard patterns (e.g. "*__*") against unqualified tool names.
+      if (tool instanceof DiscoveredMCPTool) {
+        metadata['_serverName'] = tool.serverName;
+      }
+      if (Object.keys(metadata).length > 0) {
         toolMetadata.set(name, metadata);
       }
     }
@@ -539,11 +543,32 @@ export class ToolRegistry {
     const plansDir = this.config.storage.getPlansDir();
 
     const declarations: FunctionDeclaration[] = [];
+    const seenNames = new Set<string>();
+
     this.getActiveTools().forEach((tool) => {
+      const toolName =
+        tool instanceof DiscoveredMCPTool
+          ? tool.getFullyQualifiedName()
+          : tool.name;
+
+      if (seenNames.has(toolName)) {
+        return;
+      }
+      seenNames.add(toolName);
+
       let schema = tool.getSchema(modelId);
+
+      // Ensure the schema name matches the qualified name for MCP tools
+      if (tool instanceof DiscoveredMCPTool) {
+        schema = {
+          ...schema,
+          name: toolName,
+        };
+      }
+
       if (
         isPlanMode &&
-        (tool.name === WRITE_FILE_TOOL_NAME || tool.name === EDIT_TOOL_NAME)
+        (toolName === WRITE_FILE_TOOL_NAME || toolName === EDIT_TOOL_NAME)
       ) {
         schema = {
           ...schema,
@@ -576,20 +601,42 @@ export class ToolRegistry {
   }
 
   /**
-   * Returns an array of all registered and discovered tool names which are not
-   * excluded via configuration.
+   * Returns an array of names for all active tools.
+   * For MCP tools, this returns their fully qualified names.
+   * The list is deduplicated.
    */
   getAllToolNames(): string[] {
-    return this.getActiveTools().map((tool) => tool.name);
+    const names = new Set<string>();
+    for (const tool of this.getActiveTools()) {
+      if (tool instanceof DiscoveredMCPTool) {
+        names.add(tool.getFullyQualifiedName());
+      } else {
+        names.add(tool.name);
+      }
+    }
+    return Array.from(names);
   }
 
   /**
    * Returns an array of all registered and discovered tool instances.
    */
   getAllTools(): AnyDeclarativeTool[] {
-    return this.getActiveTools().sort((a, b) =>
+    const seen = new Set<string>();
+    const tools: AnyDeclarativeTool[] = [];
+
+    for (const tool of this.getActiveTools().sort((a, b) =>
       a.displayName.localeCompare(b.displayName),
-    );
+    )) {
+      const name =
+        tool instanceof DiscoveredMCPTool
+          ? tool.getFullyQualifiedName()
+          : tool.name;
+      if (!seen.has(name)) {
+        seen.add(name);
+        tools.push(tool);
+      }
+    }
+    return tools;
   }
 
   /**

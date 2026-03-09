@@ -122,7 +122,10 @@ The manifest file defines the extension's behavior and configuration.
     }
   },
   "contextFileName": "GEMINI.md",
-  "excludeTools": ["run_shell_command"]
+  "excludeTools": ["run_shell_command"],
+  "plan": {
+    "directory": ".gemini/plans"
+  }
 }
 ```
 
@@ -157,6 +160,11 @@ The manifest file defines the extension's behavior and configuration.
   `"excludeTools": ["run_shell_command(rm -rf)"]` will block the `rm -rf`
   command. Note that this differs from the MCP server `excludeTools`
   functionality, which can be listed in the MCP server config.
+- `plan`: Planning features configuration.
+  - `directory`: The directory where planning artifacts are stored. This serves
+    as a fallback if the user hasn't specified a plan directory in their
+    settings. If not specified by either the extension or the user, the default
+    is `~/.gemini/tmp/<project>/<session-id>/plans/`.
 
 When Gemini CLI starts, it loads all the extensions and merges their
 configurations. If there are any conflicts, the workspace configuration takes

@@ -12,6 +12,54 @@ import type { HistoryItem } from '../ui/types.js';
 import { MessageType } from '../ui/types.js';
 import { spawnWrapper } from './spawnWrapper.js';
 import type { spawn } from 'node:child_process';
+import { debugLogger } from '@google/gemini-cli-core';
+
+let _updateInProgress = false;
+
+/** @internal */
+export function _setUpdateStateForTesting(value: boolean) {
+  _updateInProgress = value;
+}
+
+export function isUpdateInProgress() {
+  return _updateInProgress;
+}
+
+/**
+ * Returns a promise that resolves when the update process completes or times out.
+ */
+export async function waitForUpdateCompletion(
+  timeoutMs = 30000,
+): Promise<void> {
+  if (!_updateInProgress) {
+    return;
+  }
+
+  debugLogger.log(
+    '\nGemini CLI is waiting for a background update to complete before restarting...',
+  );
+
+  return new Promise((resolve) => {
+    // Re-check the condition inside the promise executor to avoid a race condition.
+    // If the update finished between the initial check and now, resolve immediately.
+    if (!_updateInProgress) {
+      resolve();
+      return;
+    }
+
+    const timer = setTimeout(cleanup, timeoutMs);
+
+    function cleanup() {
+      clearTimeout(timer);
+      updateEventEmitter.off('update-success', cleanup);
+      updateEventEmitter.off('update-failed', cleanup);
+      resolve();
+    }
+
+    updateEventEmitter.once('update-success', cleanup);
+    updateEventEmitter.once('update-failed', cleanup);
+  });
+}
 
 export function handleAutoUpdate(
   info: UpdateObject | null,
@@ -62,6 +110,11 @@ export function handleAutoUpdate(
   ) {
     return;
   }
+
+  if (_updateInProgress) {
+    return;
+  }
+
   const isNightly = info.update.latest.includes('nightly');
 
   const updateCommand = installationInfo.updateCommand.replace(
@@ -73,10 +126,14 @@ export function handleAutoUpdate(
     shell: true,
     detached: true,
   });
+
+  _updateInProgress = true;
+
   // Un-reference the child process to allow the parent to exit independently.
   updateProcess.unref();
 
   updateProcess.on('close', (code) => {
+    _updateInProgress = false;
     if (code === 0) {
       updateEventEmitter.emit('update-success', {
         message:
@@ -90,6 +147,7 @@ export function handleAutoUpdate(
   });
 
   updateProcess.on('error', (err) => {
+    _updateInProgress = false;
     updateEventEmitter.emit('update-failed', {
       message: `Automatic update failed. Please try updating manually. (error: ${err.message})`,
     });

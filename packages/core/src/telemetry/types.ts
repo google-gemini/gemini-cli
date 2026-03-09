@@ -31,13 +31,13 @@ import type { AgentTerminateMode } from '../agents/types.js';
 import { getCommonAttributes } from './telemetryAttributes.js';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
-import type { OTelFinishReason } from './semantic.js';
 import {
   toInputMessages,
   toOutputMessages,
   toFinishReasons,
   toOutputType,
   toSystemInstruction,
+  type OTelFinishReason,
 } from './semantic.js';
 import { sanitizeHookName } from './sanitize.js';
 import { getFileDiffFromResultDisplay } from '../utils/fileDiffUtils.js';
@@ -790,25 +790,36 @@ export enum LoopType {
   CONSECUTIVE_IDENTICAL_TOOL_CALLS = 'consecutive_identical_tool_calls',
   CHANTING_IDENTICAL_SENTENCES = 'chanting_identical_sentences',
   LLM_DETECTED_LOOP = 'llm_detected_loop',
+  // Aliases for tests/internal use
+  TOOL_CALL_LOOP = CONSECUTIVE_IDENTICAL_TOOL_CALLS,
+  CONTENT_CHANTING_LOOP = CHANTING_IDENTICAL_SENTENCES,
 }
-
 export class LoopDetectedEvent implements BaseTelemetryEvent {
   'event.name': 'loop_detected';
   'event.timestamp': string;
   loop_type: LoopType;
   prompt_id: string;
+  count: number;
   confirmed_by_model?: string;
+  analysis?: string;
+  confidence?: number;
 
   constructor(
     loop_type: LoopType,
     prompt_id: string,
+    count: number,
     confirmed_by_model?: string,
+    analysis?: string,
+    confidence?: number,
   ) {
     this['event.name'] = 'loop_detected';
     this['event.timestamp'] = new Date().toISOString();
     this.loop_type = loop_type;
     this.prompt_id = prompt_id;
+    this.count = count;
     this.confirmed_by_model = confirmed_by_model;
+    this.analysis = analysis;
+    this.confidence = confidence;
   }
 
   toOpenTelemetryAttributes(config: Config): LogAttributes {
@@ -818,17 +829,28 @@ export class LoopDetectedEvent implements BaseTelemetryEvent {
       'event.timestamp': this['event.timestamp'],
       loop_type: this.loop_type,
       prompt_id: this.prompt_id,
+      count: this.count,
     };
 
     if (this.confirmed_by_model) {
       attributes['confirmed_by_model'] = this.confirmed_by_model;
     }
 
+    if (this.analysis) {
+      attributes['analysis'] = this.analysis;
+    }
+
+    if (this.confidence !== undefined) {
+      attributes['confidence'] = this.confidence;
+    }
+
     return attributes;
   }
 
   toLogBody(): string {
-    return `Loop detected. Type: ${this.loop_type}.${this.confirmed_by_model ? ` Confirmed by: ${this.confirmed_by_model}` : ''}`;
+    const status =
+      this.count === 1 ? 'Attempting recovery' : 'Terminating session';
+    return `Loop detected (Strike ${this.count}: ${status}). Type: ${this.loop_type}.${this.confirmed_by_model ? ` Confirmed by: ${this.confirmed_by_model}` : ''}`;
   }
 }
 

@@ -5,8 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { ReadFileToolParams } from './read-file.js';
-import { ReadFileTool } from './read-file.js';
+import { ReadFileTool, type ReadFileToolParams } from './read-file.js';
 import { ToolErrorType } from './tool-error.js';
 import path from 'node:path';
 import { isSubpath } from '../utils/paths.js';
@@ -587,6 +586,14 @@ describe('ReadFileTool', () => {
       const schema = tool.getSchema(modelId);
       expect(schema.name).toBe(ReadFileTool.Name);
       expect(schema.description).toMatchSnapshot();
+    });
+
+    it('should return the Gemini 3 schema when a Gemini 3 modelId is provided', () => {
+      const modelId = 'gemini-3-pro-preview';
+      const schema = tool.getSchema(modelId);
+      expect(schema.name).toBe(ReadFileTool.Name);
+      expect(schema.description).toMatchSnapshot();
+      expect(schema.description).toContain('surgical reads');
     });
   });
 });

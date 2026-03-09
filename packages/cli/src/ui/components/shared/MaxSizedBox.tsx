@@ -20,7 +20,7 @@ import { formatCommand } from '../../utils/keybindingUtils.js';
  */
 export const MINIMUM_MAX_HEIGHT = 2;
 
-interface MaxSizedBoxProps {
+export interface MaxSizedBoxProps {
   children?: React.ReactNode;
   maxWidth?: number;
   maxHeight?: number;
@@ -96,11 +96,14 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
     } else {
       removeOverflowingId?.(id);
     }
-
-    return () => {
-      removeOverflowingId?.(id);
-    };
   }, [id, totalHiddenLines, addOverflowingId, removeOverflowingId]);
+
+  useEffect(
+    () => () => {
+      removeOverflowingId?.(id);
+    },
+    [id, removeOverflowingId],
+  );
 
   if (effectiveMaxHeight === undefined) {
     return (

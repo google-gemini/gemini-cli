@@ -24,7 +24,7 @@ vi.mock('fs', async (importOriginal) => {
 });
 
 import { Storage } from './storage.js';
-import { GEMINI_DIR, homedir } from '../utils/paths.js';
+import { GEMINI_DIR, homedir, resolveToRealPath } from '../utils/paths.js';
 import { ProjectRegistry } from './projectRegistry.js';
 import { StorageMigration } from './storageMigration.js';
 

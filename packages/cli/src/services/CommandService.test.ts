@@ -17,21 +17,9 @@ const createMockCommand = (name: string, kind: CommandKind): SlashCommand => ({
   action: vi.fn(),
 });
 
-const mockCommandA = createMockCommand('command-a', CommandKind.BUILT_IN);
-const mockCommandB = createMockCommand('command-b', CommandKind.BUILT_IN);
-const mockCommandC = createMockCommand('command-c', CommandKind.FILE);
-const mockCommandB_Override = createMockCommand('command-b', CommandKind.FILE);
-
 class MockCommandLoader implements ICommandLoader {
-  private commandsToLoad: SlashCommand[];
-
-  constructor(commandsToLoad: SlashCommand[]) {
-    this.commandsToLoad = commandsToLoad;
-  }
-
-  loadCommands = vi.fn(
-    async (): Promise<SlashCommand[]> => Promise.resolve(this.commandsToLoad),
-  );
+  constructor(private readonly commands: SlashCommand[]) {}
+  loadCommands = vi.fn(async () => Promise.resolve(this.commands));
 }
 
 describe('CommandService', () => {
@@ -43,39 +31,52 @@ describe('CommandService', () => {
     vi.restoreAllMocks();
   });
 
-  it('should load commands from a single loader', async () => {
-    const mockLoader = new MockCommandLoader([mockCommandA, mockCommandB]);
-    const service = await CommandService.create(
-      [mockLoader],
-      new AbortController().signal,
-    );
+  describe('basic loading', () => {
+    it('should aggregate commands from multiple successful loaders', async () => {
+      const cmdA = createMockCommand('a', CommandKind.BUILT_IN);
+      const cmdB = createMockCommand('b', CommandKind.USER_FILE);
+      const service = await CommandService.create(
+        [new MockCommandLoader([cmdA]), new MockCommandLoader([cmdB])],
+        new AbortController().signal,
+      );
 
-    const commands = service.getCommands();
+      expect(service.getCommands()).toHaveLength(2);
+      expect(service.getCommands()).toEqual(
+        expect.arrayContaining([cmdA, cmdB]),
+      );
+    });
 
-    expect(mockLoader.loadCommands).toHaveBeenCalledTimes(1);
-    expect(commands).toHaveLength(2);
-    expect(commands).toEqual(
-      expect.arrayContaining([mockCommandA, mockCommandB]),
-    );
-  });
+    it('should handle empty loaders and failed loaders gracefully', async () => {
+      const cmdA = createMockCommand('a', CommandKind.BUILT_IN);
+      const failingLoader = new MockCommandLoader([]);
+      vi.spyOn(failingLoader, 'loadCommands').mockRejectedValue(
+        new Error('fail'),
+      );
 
-  it('should aggregate commands from multiple loaders', async () => {
-    const loader1 = new MockCommandLoader([mockCommandA]);
-    const loader2 = new MockCommandLoader([mockCommandC]);
-    const service = await CommandService.create(
-      [loader1, loader2],
-      new AbortController().signal,
-    );
+      const service = await CommandService.create(
+        [
+          new MockCommandLoader([cmdA]),
+          new MockCommandLoader([]),
+          failingLoader,
+        ],
+        new AbortController().signal,
+      );
 
-    const commands = service.getCommands();
+      expect(service.getCommands()).toHaveLength(1);
+      expect(service.getCommands()[0].name).toBe('a');
+      expect(debugLogger.debug).toHaveBeenCalledWith(
+        'A command loader failed:',
+        expect.any(Error),
+      );
+    });
 
-    expect(loader1.loadCommands).toHaveBeenCalledTimes(1);
-    expect(loader2.loadCommands).toHaveBeenCalledTimes(1);
-    expect(commands).toHaveLength(2);
-    expect(commands).toEqual(
-      expect.arrayContaining([mockCommandA, mockCommandC]),
-    );
-  });
+    it('should return a readonly array of commands', async () => {
+      const service = await CommandService.create(
+        [new MockCommandLoader([createMockCommand('a', CommandKind.BUILT_IN)])],
+        new AbortController().signal,
+      );
+      expect(() => (service.getCommands() as unknown[]).push({})).toThrow();
+    });
 
   it('should override commands from earlier loaders with those from later loaders', async () => {
     const loader1 = new MockCommandLoader([mockCommandA, mockCommandB]);
@@ -386,81 +387,19 @@ describe('CommandService', () => {
     });
   });
 
-  it('should report extension vs extension conflicts correctly', async () => {
-    // Both extensions try to register 'deploy'
-    const extension1Command = {
-      ...createMockCommand('deploy', CommandKind.FILE),
-      extensionName: 'firebase',
-    };
-    const extension2Command = {
-      ...createMockCommand('deploy', CommandKind.FILE),
-      extensionName: 'aws',
-    };
+  describe('conflict delegation', () => {
+    it('should delegate conflict resolution to SlashCommandResolver', async () => {
+      const builtin = createMockCommand('help', CommandKind.BUILT_IN);
+      const user = createMockCommand('help', CommandKind.USER_FILE);
 
-    const mockLoader = new MockCommandLoader([
-      extension1Command,
-      extension2Command,
-    ]);
+      const service = await CommandService.create(
+        [new MockCommandLoader([builtin, user])],
+        new AbortController().signal,
+      );
 
-    const service = await CommandService.create(
-      [mockLoader],
-      new AbortController().signal,
-    );
-
-    const conflicts = service.getConflicts();
-    expect(conflicts).toHaveLength(1);
-
-    expect(conflicts[0]).toMatchObject({
-      name: 'deploy',
-      winner: expect.objectContaining({
-        name: 'deploy',
-        extensionName: 'firebase',
-      }),
-      losers: [
-        {
-          renamedTo: 'aws.deploy', // ext2 is 'aws' and it lost because it was second in the list
-          command: expect.objectContaining({
-            name: 'deploy',
-            extensionName: 'aws',
-          }),
-        },
-      ],
+      expect(service.getCommands().map((c) => c.name)).toContain('help');
+      expect(service.getCommands().map((c) => c.name)).toContain('user.help');
+      expect(service.getConflicts()).toHaveLength(1);
     });
-  });
-
-  it('should report multiple conflicts for the same command name', async () => {
-    const builtinCommand = createMockCommand('deploy', CommandKind.BUILT_IN);
-    const ext1 = {
-      ...createMockCommand('deploy', CommandKind.FILE),
-      extensionName: 'ext1',
-    };
-    const ext2 = {
-      ...createMockCommand('deploy', CommandKind.FILE),
-      extensionName: 'ext2',
-    };
-
-    const mockLoader = new MockCommandLoader([builtinCommand, ext1, ext2]);
-
-    const service = await CommandService.create(
-      [mockLoader],
-      new AbortController().signal,
-    );
-
-    const conflicts = service.getConflicts();
-    expect(conflicts).toHaveLength(1);
-    expect(conflicts[0].name).toBe('deploy');
-    expect(conflicts[0].losers).toHaveLength(2);
-    expect(conflicts[0].losers).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          renamedTo: 'ext1.deploy',
-          command: expect.objectContaining({ extensionName: 'ext1' }),
-        }),
-        expect.objectContaining({
-          renamedTo: 'ext2.deploy',
-          command: expect.objectContaining({ extensionName: 'ext2' }),
-        }),
-      ]),
-    );
   });
 });

@@ -297,7 +297,7 @@ describe('KeypressContext', () => {
           expect.objectContaining({
             name: 'escape',
             shift: false,
-            alt: true,
+            alt: false,
             cmd: false,
           }),
         );
@@ -306,7 +306,7 @@ describe('KeypressContext', () => {
           expect.objectContaining({
             name: 'escape',
             shift: false,
-            alt: true,
+            alt: false,
             cmd: false,
           }),
         );
@@ -335,7 +335,7 @@ describe('KeypressContext', () => {
           expect.objectContaining({
             name: 'escape',
             shift: false,
-            alt: true,
+            alt: false,
             cmd: false,
           }),
         );

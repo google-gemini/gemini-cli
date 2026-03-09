@@ -21,9 +21,8 @@ import {
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { AuthState } from '../types.js';
-import { runExitCleanup } from '../../utils/cleanup.js';
 import { validateAuthMethodWithSettings } from './useAuth.js';
-import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
+import { relaunchApp } from '../../utils/processUtils.js';
 
 interface AuthDialogProps {
   config: Config;
@@ -133,10 +132,7 @@ export function AuthDialog({
           config.isBrowserLaunchSuppressed()
         ) {
           setExiting(true);
-          setTimeout(async () => {
-            await runExitCleanup();
-            process.exit(RELAUNCH_EXIT_CODE);
-          }, 100);
+          setTimeout(relaunchApp, 100);
           return;
         }
 
@@ -193,7 +189,7 @@ export function AuthDialog({
     return (
       <Box
         borderStyle="round"
-        borderColor={theme.border.focused}
+        borderColor={theme.ui.focus}
         flexDirection="row"
         padding={1}
         width="100%"
@@ -209,7 +205,7 @@ export function AuthDialog({
   return (
     <Box
       borderStyle="round"
-      borderColor={theme.border.focused}
+      borderColor={theme.ui.focus}
       flexDirection="row"
       padding={1}
       width="100%"

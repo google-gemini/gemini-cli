@@ -130,7 +130,7 @@ export function modelStringToModelConfigAlias(model: string): string {
  * contain massive tool outputs (like large grep results or logs).
  */
 async function truncateHistoryToBudget(
-  history: Content[],
+  history: readonly Content[],
   config: Config,
 ): Promise<Content[]> {
   let functionResponseTokenCounter = 0;
@@ -156,11 +156,13 @@ async function truncateHistoryToBudget(
           } else if (responseObj && typeof responseObj === 'object') {
             if (
               'output' in responseObj &&
+              // eslint-disable-next-line no-restricted-syntax
               typeof responseObj['output'] === 'string'
             ) {
               contentStr = responseObj['output'];
             } else if (
               'content' in responseObj &&
+              // eslint-disable-next-line no-restricted-syntax
               typeof responseObj['content'] === 'string'
             ) {
               contentStr = responseObj['content'];

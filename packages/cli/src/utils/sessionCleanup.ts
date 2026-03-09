@@ -118,6 +118,17 @@ export async function cleanupExpiredSessions(
           } catch {
             /* ignore if doesn't exist */
           }
+
+          // ALSO cleanup the session-specific directory (contains plans, tasks, etc.)
+          const sessionDir = path.join(
+            config.storage.getProjectTempDir(),
+            sessionId,
+          );
+          try {
+            await fs.rm(sessionDir, { recursive: true, force: true });
+          } catch {
+            /* ignore if doesn't exist */
+          }
         }
 
         if (config.getDebugMode()) {

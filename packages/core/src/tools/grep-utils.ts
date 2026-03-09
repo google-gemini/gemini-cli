@@ -6,6 +6,7 @@
 
 import fsPromises from 'node:fs/promises';
 import { debugLogger } from '../utils/debugLogger.js';
+import { MAX_LINE_LENGTH_TEXT_FILE } from '../utils/constants.js';
 
 /**
  * Result object for a single grep match
@@ -198,7 +199,14 @@ export async function formatGrepResults(
       // If isContext is undefined, assume it's a match (false)
       const separator = match.isContext ? '-' : ':';
       // trimEnd to avoid double newlines if line has them, but we want to preserve indentation
-      llmContent += `L${match.lineNumber}${separator} ${match.line.trimEnd()}\n`;
+      let lineContent = match.line.trimEnd();
+      const graphemes = Array.from(lineContent);
+      if (graphemes.length > MAX_LINE_LENGTH_TEXT_FILE) {
+        lineContent =
+          graphemes.slice(0, MAX_LINE_LENGTH_TEXT_FILE).join('') +
+          '... [truncated]';
+      }
+      llmContent += `L${match.lineNumber}${separator} ${lineContent}\n`;
     });
     llmContent += '---\n';
   }

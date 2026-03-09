@@ -13,8 +13,12 @@ import {
   afterAll,
   vi,
 } from 'vitest';
-import type { RipGrepToolParams } from './ripGrep.js';
-import { canUseRipgrep, RipGrepTool, ensureRgPath } from './ripGrep.js';
+import {
+  canUseRipgrep,
+  RipGrepTool,
+  ensureRgPath,
+  type RipGrepToolParams,
+} from './ripGrep.js';
 import path from 'node:path';
 import { isSubpath } from '../utils/paths.js';
 import fs from 'node:fs/promises';
@@ -23,8 +27,7 @@ import type { Config } from '../config/config.js';
 import { Storage } from '../config/storage.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
-import type { ChildProcess } from 'node:child_process';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { PassThrough, Readable } from 'node:stream';
 import EventEmitter from 'node:events';
 import { downloadRipGrep } from '@joshua.litt/get-ripgrep';
@@ -2024,6 +2027,32 @@ describe('RipGrepTool', () => {
       expect(result.llmContent).toContain('fileA.txt');
       expect(result.llmContent).not.toContain('fileB.txt');
       expect(result.llmContent).toContain('Copyright 2025 Google LLC');
+    });
+
+    it('should truncate excessively long lines', async () => {
+      const longString = 'a'.repeat(3000);
+      mockSpawn.mockImplementation(
+        createMockSpawn({
+          outputData:
+            JSON.stringify({
+              type: 'match',
+              data: {
+                path: { text: 'longline.txt' },
+                line_number: 1,
+                lines: { text: `Target match ${longString}\n` },
+              },
+            }) + '\n',
+          exitCode: 0,
+        }),
+      );
+
+      const params: RipGrepToolParams = { pattern: 'Target match', context: 0 };
+      const invocation = grepTool.build(params);
+      const result = await invocation.execute(abortSignal);
+
+      // MAX_LINE_LENGTH_TEXT_FILE is 2000. It should be truncated.
+      expect(result.llmContent).toContain('... [truncated]');
+      expect(result.llmContent).not.toContain(longString);
     });
   });
 });

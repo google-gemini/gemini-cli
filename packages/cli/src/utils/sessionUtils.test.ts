@@ -341,6 +341,29 @@ describe('SessionSelector', () => {
     );
   });
 
+  it('should throw SessionError with NO_SESSIONS_FOUND when resolving latest with no sessions', async () => {
+    // Empty chats directory — no session files
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const emptyConfig = {
+      storage: {
+        getProjectTempDir: () => tmpDir,
+      },
+      getSessionId: () => 'current-session-id',
+    } as Partial<Config> as Config;
+
+    const sessionSelector = new SessionSelector(emptyConfig);
+
+    await expect(sessionSelector.resolveSession('latest')).rejects.toSatisfy(
+      (error) => {
+        expect(error).toBeInstanceOf(SessionError);
+        expect((error as SessionError).code).toBe('NO_SESSIONS_FOUND');
+        return true;
+      },
+    );
+  });
+
   it('should not list sessions with only system messages', async () => {
     const sessionIdWithUser = randomUUID();
     const sessionIdSystemOnly = randomUUID();
