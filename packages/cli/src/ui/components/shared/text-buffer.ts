@@ -25,11 +25,12 @@ import {
 } from '../../utils/textUtils.js';
 import { parsePastedPaths } from '../../utils/clipboardUtils.js';
 import type { Key } from '../../contexts/KeypressContext.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../keyMatchers.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../../constants.js';
 import { openFileInEditor } from '../../utils/editorUtils.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 export const LARGE_PASTE_LINE_THRESHOLD = 5;
 export const LARGE_PASTE_CHAR_THRESHOLD = 500;
@@ -2708,6 +2709,7 @@ export function useTextBuffer({
   singleLine = false,
   getPreferredEditor,
 }: UseTextBufferProps): TextBuffer {
+  const keyMatchers = useKeyMatchers();
   const initialState = useMemo((): TextBufferState => {
     const lines = initialText.split('\n');
     const [initialCursorRow, initialCursorCol] = calculateInitialCursorPosition(
@@ -3270,6 +3272,7 @@ export function useTextBuffer({
       text,
       visualCursor,
       visualLines,
+      keyMatchers,
     ],
   );
 
