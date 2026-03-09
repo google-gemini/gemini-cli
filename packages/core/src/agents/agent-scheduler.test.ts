@@ -30,7 +30,7 @@ describe('agent-scheduler', () => {
     } as unknown as Mocked<ToolRegistry>;
     mockConfig = {
       getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
-      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      toolRegistry: mockToolRegistry,
     } as unknown as Mocked<Config>;
   });
 
@@ -69,6 +69,6 @@ describe('agent-scheduler', () => {
 
     // Verify that the scheduler's config has the overridden tool registry
     const schedulerConfig = vi.mocked(Scheduler).mock.calls[0][0].config;
-    expect(schedulerConfig.getToolRegistry()).toBe(mockToolRegistry);
+    expect(schedulerConfig.toolRegistry).toBe(mockToolRegistry);
   });
 });
