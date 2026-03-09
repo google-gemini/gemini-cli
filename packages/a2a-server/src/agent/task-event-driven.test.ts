@@ -151,7 +151,7 @@ describe('Task Event-Driven Scheduler', () => {
     handler({ type: MessageBusType.TOOL_CALLS_UPDATE, toolCalls: [toolCall] });
 
     // Simulate Rejection (Cancel)
-    let handled = await (
+    const handled = await (
       task as unknown as {
         _handleToolConfirmationPart: (part: unknown) => Promise<boolean>;
       }
@@ -177,7 +177,7 @@ describe('Task Event-Driven Scheduler', () => {
     handler({ type: MessageBusType.TOOL_CALLS_UPDATE, toolCalls: [toolCall2] });
 
     // Simulate ModifyWithEditor
-    handled = await (
+    const handled2 = await (
       task as unknown as {
         _handleToolConfirmationPart: (part: unknown) => Promise<boolean>;
       }
@@ -185,7 +185,7 @@ describe('Task Event-Driven Scheduler', () => {
       kind: 'data',
       data: { callId: '2', outcome: 'modify_with_editor' },
     });
-    expect(handled).toBe(true);
+    expect(handled2).toBe(true);
     expect(messageBus.publish).toHaveBeenCalledWith(
       expect.objectContaining({
         type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
@@ -233,6 +233,123 @@ describe('Task Event-Driven Scheduler', () => {
         correlationId: 'corr-mcp-1',
         confirmed: true,
         outcome: ToolConfirmationOutcome.ProceedOnce,
+      }),
+    );
+  });
+
+  it('should handle MCP Server tool ProceedAlwaysServer outcome', async () => {
+    // @ts-expect-error - Calling private constructor
+    const task = new Task('task-id', 'context-id', mockConfig, mockEventBus);
+
+    const toolCall = {
+      request: { callId: '1', name: 'call_mcp_tool', args: {} },
+      status: 'awaiting_approval',
+      correlationId: 'corr-mcp-2',
+      confirmationDetails: {
+        type: 'mcp',
+        title: 'MCP Server Operation',
+        prompt: 'test_mcp',
+      },
+    };
+
+    const handler = (messageBus.subscribe as Mock).mock.calls.find(
+      (call: unknown[]) => call[0] === MessageBusType.TOOL_CALLS_UPDATE,
+    )?.[1];
+    handler({ type: MessageBusType.TOOL_CALLS_UPDATE, toolCalls: [toolCall] });
+
+    const handled = await (
+      task as unknown as {
+        _handleToolConfirmationPart: (part: unknown) => Promise<boolean>;
+      }
+    )._handleToolConfirmationPart({
+      kind: 'data',
+      data: { callId: '1', outcome: 'proceed_always_server' },
+    });
+    expect(handled).toBe(true);
+    expect(messageBus.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: 'corr-mcp-2',
+        confirmed: true,
+        outcome: ToolConfirmationOutcome.ProceedAlwaysServer,
+      }),
+    );
+  });
+
+  it('should handle MCP Server tool ProceedAlwaysTool outcome', async () => {
+    // @ts-expect-error - Calling private constructor
+    const task = new Task('task-id', 'context-id', mockConfig, mockEventBus);
+
+    const toolCall = {
+      request: { callId: '1', name: 'call_mcp_tool', args: {} },
+      status: 'awaiting_approval',
+      correlationId: 'corr-mcp-3',
+      confirmationDetails: {
+        type: 'mcp',
+        title: 'MCP Server Operation',
+        prompt: 'test_mcp',
+      },
+    };
+
+    const handler = (messageBus.subscribe as Mock).mock.calls.find(
+      (call: unknown[]) => call[0] === MessageBusType.TOOL_CALLS_UPDATE,
+    )?.[1];
+    handler({ type: MessageBusType.TOOL_CALLS_UPDATE, toolCalls: [toolCall] });
+
+    const handled = await (
+      task as unknown as {
+        _handleToolConfirmationPart: (part: unknown) => Promise<boolean>;
+      }
+    )._handleToolConfirmationPart({
+      kind: 'data',
+      data: { callId: '1', outcome: 'proceed_always_tool' },
+    });
+    expect(handled).toBe(true);
+    expect(messageBus.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: 'corr-mcp-3',
+        confirmed: true,
+        outcome: ToolConfirmationOutcome.ProceedAlwaysTool,
+      }),
+    );
+  });
+
+  it('should handle MCP Server tool ProceedAlwaysAndSave outcome', async () => {
+    // @ts-expect-error - Calling private constructor
+    const task = new Task('task-id', 'context-id', mockConfig, mockEventBus);
+
+    const toolCall = {
+      request: { callId: '1', name: 'call_mcp_tool', args: {} },
+      status: 'awaiting_approval',
+      correlationId: 'corr-mcp-4',
+      confirmationDetails: {
+        type: 'mcp',
+        title: 'MCP Server Operation',
+        prompt: 'test_mcp',
+      },
+    };
+
+    const handler = (messageBus.subscribe as Mock).mock.calls.find(
+      (call: unknown[]) => call[0] === MessageBusType.TOOL_CALLS_UPDATE,
+    )?.[1];
+    handler({ type: MessageBusType.TOOL_CALLS_UPDATE, toolCalls: [toolCall] });
+
+    const handled = await (
+      task as unknown as {
+        _handleToolConfirmationPart: (part: unknown) => Promise<boolean>;
+      }
+    )._handleToolConfirmationPart({
+      kind: 'data',
+      data: { callId: '1', outcome: 'proceed_always_and_save' },
+    });
+    expect(handled).toBe(true);
+    expect(messageBus.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: 'corr-mcp-4',
+        confirmed: true,
+        outcome: ToolConfirmationOutcome.ProceedAlwaysAndSave,
       }),
     );
   });
@@ -339,5 +456,47 @@ describe('Task Event-Driven Scheduler', () => {
     };
     expect(internalTask.completedToolCalls.length).toBe(1);
     expect(internalTask.pendingToolCalls.size).toBe(0);
+  });
+
+  it('should preserve messageId across multiple text chunks to prevent UI duplication', async () => {
+    // @ts-expect-error - Calling private constructor
+    const task = new Task('task-id', 'context-id', mockConfig, mockEventBus);
+
+    // Initialize the ID for the first turn (happens internally upon LLM stream)
+    task.currentAgentMessageId = 'test-id-123';
+
+    // Simulate sending multiple text chunks
+    task._sendTextContent('chunk 1');
+    task._sendTextContent('chunk 2');
+
+    // Both text contents should have been published with the same messageId
+    const textCalls = (mockEventBus.publish as Mock).mock.calls.filter(
+      (call) => call[0].status?.message?.kind === 'message',
+    );
+    expect(textCalls.length).toBe(2);
+    expect(textCalls[0][0].status.message.messageId).toBe('test-id-123');
+    expect(textCalls[1][0].status.message.messageId).toBe('test-id-123');
+
+    // Simulate starting a new turn by calling getAndClearCompletedTools
+    // (which precedes sendCompletedToolsToLlm where a new ID is minted)
+    task.getAndClearCompletedTools();
+
+    // sendCompletedToolsToLlm internally rolls the ID forward.
+    // Simulate what sendCompletedToolsToLlm does:
+    const internalTask = task as unknown as {
+      setTaskStateAndPublishUpdate: (state: string, change: unknown) => void;
+    };
+    internalTask.setTaskStateAndPublishUpdate('working', {});
+
+    // Simulate what sendCompletedToolsToLlm does: generate a new UUID for the next turn
+    task.currentAgentMessageId = 'test-id-456';
+
+    task._sendTextContent('chunk 3');
+
+    const secondTurnCalls = (mockEventBus.publish as Mock).mock.calls.filter(
+      (call) => call[0].status?.message?.messageId === 'test-id-456',
+    );
+    expect(secondTurnCalls.length).toBe(1);
+    expect(secondTurnCalls[0][0].status.message.parts[0].text).toBe('chunk 3');
   });
 });

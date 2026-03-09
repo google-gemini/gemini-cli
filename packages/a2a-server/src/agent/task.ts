@@ -1050,6 +1050,8 @@ export class Task {
       confirmationOutcome = ToolConfirmationOutcome.ProceedAlwaysServer;
     } else if (outcomeString === 'proceed_always_tool') {
       confirmationOutcome = ToolConfirmationOutcome.ProceedAlwaysTool;
+    } else if (outcomeString === 'proceed_always_and_save') {
+      confirmationOutcome = ToolConfirmationOutcome.ProceedAlwaysAndSave;
     } else if (outcomeString === 'modify_with_editor') {
       confirmationOutcome = ToolConfirmationOutcome.ModifyWithEditor;
     } else {
