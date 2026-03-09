@@ -439,6 +439,12 @@ Slash commands provide meta-level control over the CLI itself.
   - **`nodesc`** or **`nodescriptions`**:
     - **Description:** Hide tool descriptions, showing only the tool names.
 
+### `/upgrade`
+
+- **Description:** Open the Gemini Code Assist upgrade page in your browser.
+  This lets you upgrade your tier for higher usage limits.
+- **Note:** This command is only available when logged in with Google.
+
 ### `/vim`
 
 - **Description:** Toggle vim mode on or off. When vim mode is enabled, the
