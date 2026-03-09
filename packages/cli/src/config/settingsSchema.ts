@@ -2006,7 +2006,7 @@ const SETTINGS_SCHEMA = {
           'List of skill names that are automatically allowed to activate without a confirmation prompt.',
         showInDialog: false,
         items: { type: 'string' },
-        mergeStrategy: MergeStrategy.UNION,
+        mergeStrategy: MergeStrategy.REPLACE,
       },
     },
   },

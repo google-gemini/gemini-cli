@@ -87,7 +87,7 @@ class ActivateSkillToolInvocation extends BaseToolInvocation<
     }
 
     const trustedSkills = this.config.getTrustedSkills();
-    if (trustedSkills.includes(skillName)) {
+    if (this.config.isTrustedFolder() && trustedSkills.includes(skillName)) {
       return false;
     }
 
