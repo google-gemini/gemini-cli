@@ -20,7 +20,7 @@ import { formatCommand } from '../../utils/keybindingUtils.js';
  */
 export const MINIMUM_MAX_HEIGHT = 2;
 
-interface MaxSizedBoxProps {
+export interface MaxSizedBoxProps {
   children?: React.ReactNode;
   maxWidth?: number;
   maxHeight?: number;
