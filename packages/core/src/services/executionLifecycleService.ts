@@ -312,16 +312,6 @@ export class ExecutionLifecycleService {
     this.settleExecution(executionId, result);
   }
 
-  /**
-   * @deprecated Use completeWithResult() for new call sites.
-   */
-  static finalizeExecution(
-    executionId: number,
-    result: ExecutionResult,
-  ): void {
-    this.completeWithResult(executionId, result);
-  }
-
   static background(executionId: number): void {
     const resolve = this.activeResolvers.get(executionId);
     if (!resolve) {
@@ -423,6 +413,9 @@ export class ExecutionLifecycleService {
   static isActive(executionId: number): boolean {
     const execution = this.activeExecutions.get(executionId);
     if (!execution) {
+      if (executionId >= NON_PROCESS_EXECUTION_ID_START) {
+        return false;
+      }
       try {
         return process.kill(executionId, 0);
       } catch {

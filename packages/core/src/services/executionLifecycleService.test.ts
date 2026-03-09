@@ -133,6 +133,21 @@ describe('ExecutionLifecycleService', () => {
     expect(result.error?.message).toContain('Operation cancelled by user');
   });
 
+  it('does not probe OS process state for completed non-process execution IDs', async () => {
+    const handle = ExecutionLifecycleService.createExecution();
+    if (handle.pid === undefined) {
+      throw new Error('Expected execution ID.');
+    }
+
+    ExecutionLifecycleService.completeExecution(handle.pid, { exitCode: 0 });
+    await handle.result;
+
+    const processKillSpy = vi.spyOn(process, 'kill');
+    expect(ExecutionLifecycleService.isActive(handle.pid)).toBe(false);
+    expect(processKillSpy).not.toHaveBeenCalled();
+    processKillSpy.mockRestore();
+  });
+
   it('manages external executions through registration hooks', async () => {
     const writeInput = vi.fn();
     const isActive = vi.fn().mockReturnValue(true);
