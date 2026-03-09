@@ -231,7 +231,7 @@ const createMockConfig = (overrides = {}): Config =>
     getDebugMode: vi.fn(() => false),
     getAccessibility: vi.fn(() => ({})),
     getMcpServers: vi.fn(() => ({})),
-    isPlanEnabled: vi.fn(() => false),
+    isPlanEnabled: vi.fn(() => true),
     getToolRegistry: () => ({
       getTool: vi.fn(),
     }),

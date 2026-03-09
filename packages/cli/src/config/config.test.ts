@@ -2622,13 +2622,13 @@ describe('loadCliConfig approval mode', () => {
     expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
   });
 
-  it('should throw error when --approval-mode=plan is used but experimental.plan setting is missing', async () => {
+  it('should allow plan approval mode by default when --approval-mode=plan is used', async () => {
     process.argv = ['node', 'script.js', '--approval-mode', 'plan'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({});
 
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.PLAN);
   });
 
   it('should pass planSettings.directory from settings to config', async () => {
