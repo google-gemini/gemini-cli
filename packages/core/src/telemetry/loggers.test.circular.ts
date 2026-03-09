@@ -14,6 +14,7 @@ import { ToolCallEvent } from './types.js';
 import type { Config } from '../config/config.js';
 import type { CompletedToolCall } from '../core/coreToolScheduler.js';
 import {
+  CoreToolCallStatus,
   type ToolCallRequestInfo,
   type ToolCallResponseInfo,
 } from '../scheduler/types.js';
@@ -38,8 +39,10 @@ describe('Circular Reference Handling', () => {
       sockets: {},
       agent: null,
     };
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     circularObject.agent = circularObject; // Create circular reference
     circularObject.sockets['test-host'] = [
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       { _httpMessage: { agent: circularObject } },
     ];
 
@@ -47,6 +50,7 @@ describe('Circular Reference Handling', () => {
     const mockRequest: ToolCallRequestInfo = {
       callId: 'test-call-id',
       name: 'ReadFile',
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       args: circularObject, // This would cause the original error
       isClientInitiated: false,
       prompt_id: 'test-prompt-id',
@@ -62,7 +66,7 @@ describe('Circular Reference Handling', () => {
 
     const tool = new MockTool({ name: 'mock-tool' });
     const mockCompletedToolCall: CompletedToolCall = {
-      status: 'success',
+      status: CoreToolCallStatus.Success,
       request: mockRequest,
       response: mockResponse,
       tool,
@@ -112,7 +116,7 @@ describe('Circular Reference Handling', () => {
 
     const tool = new MockTool({ name: 'mock-tool' });
     const mockCompletedToolCall: CompletedToolCall = {
-      status: 'success',
+      status: CoreToolCallStatus.Success,
       request: mockRequest,
       response: mockResponse,
       tool,

@@ -11,6 +11,7 @@ import { loadCliConfig, parseArguments } from './config/config.js';
 import * as cliConfig from './config/config.js';
 import { readStdin } from './utils/readStdin.js';
 import { basename } from 'node:path';
+import { createHash } from 'node:crypto';
 import v8 from 'node:v8';
 import os from 'node:os';
 import dns from 'node:dns';
@@ -31,12 +32,16 @@ import {
   registerSyncCleanup,
   runExitCleanup,
   registerTelemetryConfig,
+  setupSignalHandlers,
+  setupTtyCheck,
 } from './utils/cleanup.js';
 import {
   cleanupToolOutputFiles,
   cleanupExpiredSessions,
 } from './utils/sessionCleanup.js';
 import {
+  type StartupWarning,
+  WarningPriority,
   type Config,
   type ResumedSessionData,
   type OutputPayload,
@@ -74,12 +79,12 @@ import {
   type InitializationResult,
 } from './core/initializer.js';
 import { validateAuthMethod } from './config/auth.js';
-import { runZedIntegration } from './zed-integration/zedIntegration.js';
+import { runAcpClient } from './acp/acpClient.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
-import { SessionSelector } from './utils/sessionUtils.js';
+import { SessionError, SessionSelector } from './utils/sessionUtils.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
 import { MouseProvider } from './ui/contexts/MouseContext.js';
 import { StreamingState } from './ui/types.js';
@@ -89,7 +94,6 @@ import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
 import { KeypressProvider } from './ui/contexts/KeypressContext.js';
 import { useKittyKeyboardProtocol } from './ui/hooks/useKittyKeyboardProtocol.js';
-import { useTerminalSize } from './ui/hooks/useTerminalSize.js';
 import {
   relaunchAppInChildProcess,
   relaunchOnExitCode,
@@ -98,12 +102,14 @@ import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { deleteSession, listSessions } from './utils/sessions.js';
 import { createPolicyUpdater } from './config/policy.js';
 import { ScrollProvider } from './ui/contexts/ScrollProvider.js';
-import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
 import { TerminalProvider } from './ui/contexts/TerminalContext.js';
+import { isAlternateBufferEnabled } from './ui/hooks/useAlternateBuffer.js';
+import { OverflowProvider } from './ui/contexts/OverflowContext.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
 import { runDeferredCommand } from './deferred.js';
+import { SlashCommandConflictHandler } from './services/SlashCommandConflictHandler.js';
 
 const SLOW_RENDER_MS = 200;
 
@@ -180,7 +186,7 @@ ${reason.stack}`
 export async function startInteractiveUI(
   config: Config,
   settings: LoadedSettings,
-  startupWarnings: string[],
+  startupWarnings: StartupWarning[],
   workspaceRoot: string = process.cwd(),
   resumedSessionData: ResumedSessionData | undefined,
   initializationResult: InitializationResult,
@@ -190,7 +196,7 @@ export async function startInteractiveUI(
   // and the Ink alternate buffer mode requires line wrapping harmful to
   // screen readers.
   const useAlternateBuffer = shouldEnterAlternateScreen(
-    isAlternateBufferEnabled(settings),
+    isAlternateBufferEnabled(config),
     config.getScreenReader(),
   );
   const mouseEventsEnabled = useAlternateBuffer;
@@ -220,7 +226,6 @@ export async function startInteractiveUI(
   // Create wrapper component to use hooks inside render
   const AppWrapper = () => {
     useKittyKeyboardProtocol();
-    const { columns, rows } = useTerminalSize();
 
     return (
       <SettingsContext.Provider value={settings}>
@@ -236,18 +241,19 @@ export async function startInteractiveUI(
           >
             <TerminalProvider>
               <ScrollProvider>
-                <SessionStatsProvider>
-                  <VimModeProvider settings={settings}>
-                    <AppContainer
-                      key={`${columns}-${rows}`}
-                      config={config}
-                      startupWarnings={startupWarnings}
-                      version={version}
-                      resumedSessionData={resumedSessionData}
-                      initializationResult={initializationResult}
-                    />
-                  </VimModeProvider>
-                </SessionStatsProvider>
+                <OverflowProvider>
+                  <SessionStatsProvider>
+                    <VimModeProvider>
+                      <AppContainer
+                        config={config}
+                        startupWarnings={startupWarnings}
+                        version={version}
+                        resumedSessionData={resumedSessionData}
+                        initializationResult={initializationResult}
+                      />
+                    </VimModeProvider>
+                  </SessionStatsProvider>
+                </OverflowProvider>
               </ScrollProvider>
             </TerminalProvider>
           </MouseProvider>
@@ -315,6 +321,8 @@ export async function startInteractiveUI(
     });
 
   registerCleanup(() => instance.unmount());
+
+  registerCleanup(setupTtyCheck());
 }
 
 export async function main() {
@@ -335,6 +343,13 @@ export async function main() {
   });
 
   setupUnhandledRejectionHandler();
+
+  setupSignalHandlers();
+
+  const slashCommandConflictHandler = new SlashCommandConflictHandler();
+  slashCommandConflictHandler.start();
+  registerCleanup(() => slashCommandConflictHandler.stop());
+
   const loadSettingsHandle = startupProfiler.start('load_settings');
   const settings = loadSettings();
   loadSettingsHandle?.end();
@@ -360,6 +375,26 @@ export async function main() {
   const parseArgsHandle = startupProfiler.start('parse_arguments');
   const argv = await parseArguments(settings.merged);
   parseArgsHandle?.end();
+
+  if (
+    (argv.allowedTools && argv.allowedTools.length > 0) ||
+    (settings.merged.tools?.allowed && settings.merged.tools.allowed.length > 0)
+  ) {
+    coreEvents.emitFeedback(
+      'warning',
+      'Warning: --allowed-tools cli argument and tools.allowed in settings.json are deprecated and will be removed in 1.0: Migrate to Policy Engine: https://geminicli.com/docs/core/policy-engine/',
+    );
+  }
+
+  if (
+    settings.merged.tools?.exclude &&
+    settings.merged.tools.exclude.length > 0
+  ) {
+    coreEvents.emitFeedback(
+      'warning',
+      'Warning: tools.exclude in settings.json is deprecated and will be removed in 1.0. Migrate to Policy Engine: https://geminicli.com/docs/core/policy-engine/',
+    );
+  }
 
   if (argv.startupMessages) {
     argv.startupMessages.forEach((msg) => {
@@ -557,7 +592,7 @@ export async function main() {
 
     const policyEngine = config.getPolicyEngine();
     const messageBus = config.getMessageBus();
-    createPolicyUpdater(policyEngine, messageBus);
+    createPolicyUpdater(policyEngine, messageBus, config.storage);
 
     // Register SessionEnd hook to fire on graceful exit
     // This runs before telemetry shutdown in runExitCleanup()
@@ -617,10 +652,7 @@ export async function main() {
       process.stdin.setRawMode(true);
 
       // This cleanup isn't strictly needed but may help in certain situations.
-      process.on('SIGTERM', () => {
-        process.stdin.setRawMode(wasRaw);
-      });
-      process.on('SIGINT', () => {
+      registerSyncCleanup(() => {
         process.stdin.setRawMode(wasRaw);
       });
     }
@@ -640,14 +672,25 @@ export async function main() {
       await getOauthClient(settings.merged.security.auth.selectedType, config);
     }
 
-    if (config.getExperimentalZedIntegration()) {
-      return runZedIntegration(config, settings, argv);
+    if (config.getAcpMode()) {
+      return runAcpClient(config, settings, argv);
     }
 
     let input = config.getQuestion();
-    const startupWarnings = [
-      ...(await getStartupWarnings()),
-      ...(await getUserStartupWarnings(settings.merged)),
+    const useAlternateBuffer = shouldEnterAlternateScreen(
+      isAlternateBufferEnabled(config),
+      config.getScreenReader(),
+    );
+    const rawStartupWarnings = await getStartupWarnings();
+    const startupWarnings: StartupWarning[] = [
+      ...rawStartupWarnings.map((message) => ({
+        id: `startup-${createHash('sha256').update(message).digest('hex').substring(0, 16)}`,
+        message,
+        priority: WarningPriority.High,
+      })),
+      ...(await getUserStartupWarnings(settings.merged, undefined, {
+        isAlternateBuffer: useAlternateBuffer,
+      })),
     ];
 
     // Handle --resume flag
@@ -663,12 +706,24 @@ export async function main() {
         // Use the existing session ID to continue recording to the same session
         config.setSessionId(resumedSessionData.conversation.sessionId);
       } catch (error) {
-        coreEvents.emitFeedback(
-          'error',
-          `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        );
-        await runExitCleanup();
-        process.exit(ExitCodes.FATAL_INPUT_ERROR);
+        if (
+          error instanceof SessionError &&
+          error.code === 'NO_SESSIONS_FOUND'
+        ) {
+          // No sessions to resume — start a fresh session with a warning
+          startupWarnings.push({
+            id: 'resume-no-sessions',
+            message: error.message,
+            priority: WarningPriority.High,
+          });
+        } else {
+          coreEvents.emitFeedback(
+            'error',
+            `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          );
+          await runExitCleanup();
+          process.exit(ExitCodes.FATAL_INPUT_ERROR);
+        }
       }
     }
 

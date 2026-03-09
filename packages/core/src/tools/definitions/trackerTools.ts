@@ -6,7 +6,6 @@
 
 import type { ToolDefinition } from './types.js';
 import {
-  TRACKER_INIT_TOOL_NAME,
   TRACKER_CREATE_TASK_TOOL_NAME,
   TRACKER_UPDATE_TASK_TOOL_NAME,
   TRACKER_GET_TASK_TOOL_NAME,
@@ -14,18 +13,6 @@ import {
   TRACKER_ADD_DEPENDENCY_TOOL_NAME,
   TRACKER_VISUALIZE_TOOL_NAME,
 } from '../tool-names.js';
-
-export const TRACKER_INIT_DEFINITION: ToolDefinition = {
-  base: {
-    name: TRACKER_INIT_TOOL_NAME,
-    description:
-      'Initializes the task tracker in the current workspace by creating the .tracker directory.',
-    parametersJsonSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-};
 
 export const TRACKER_CREATE_TASK_DEFINITION: ToolDefinition = {
   base: {

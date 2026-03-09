@@ -6,16 +6,20 @@
 
 import { z } from 'zod';
 
-export const TaskTypeSchema = z.enum(['epic', 'task', 'bug']);
-export type TaskType = z.infer<typeof TaskTypeSchema>;
+export enum TaskType {
+  EPIC = 'epic',
+  TASK = 'task',
+  BUG = 'bug',
+}
+export const TaskTypeSchema = z.nativeEnum(TaskType);
 
-export const TaskStatusSchema = z.enum([
-  'open',
-  'in_progress',
-  'blocked',
-  'closed',
-]);
-export type TaskStatus = z.infer<typeof TaskStatusSchema>;
+export enum TaskStatus {
+  OPEN = 'open',
+  IN_PROGRESS = 'in_progress',
+  BLOCKED = 'blocked',
+  CLOSED = 'closed',
+}
+export const TaskStatusSchema = z.nativeEnum(TaskStatus);
 
 export const TrackerTaskSchema = z.object({
   id: z.string().length(6),

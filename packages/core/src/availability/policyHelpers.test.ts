@@ -15,12 +15,17 @@ import type { Config } from '../config/config.js';
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL,
 } from '../config/models.js';
+import { AuthType } from '../core/contentGenerator.js';
 
 const createMockConfig = (overrides: Partial<Config> = {}): Config =>
   ({
     getUserTier: () => undefined,
     getModel: () => 'gemini-2.5-pro',
+    getGemini31LaunchedSync: () => false,
+    getContentGeneratorConfig: () => ({ authType: undefined }),
     ...overrides,
   }) as unknown as Config;
 
@@ -115,6 +120,40 @@ describe('policyHelpers', () => {
       expect(chain[0]?.model).toBe('gemini-2.5-flash');
       expect(chain[1]?.model).toBe('gemini-2.5-pro');
     });
+
+    it('proactively returns Gemini 2.5 chain if Gemini 3 requested but user lacks access', () => {
+      const config = createMockConfig({
+        getModel: () => 'auto-gemini-3',
+        getHasAccessToPreviewModel: () => false,
+      });
+      const chain = resolvePolicyChain(config);
+
+      // Should downgrade to [Pro 2.5, Flash 2.5]
+      expect(chain).toHaveLength(2);
+      expect(chain[0]?.model).toBe('gemini-2.5-pro');
+      expect(chain[1]?.model).toBe('gemini-2.5-flash');
+    });
+
+    it('returns Gemini 3.1 Pro chain when launched and auto-gemini-3 requested', () => {
+      const config = createMockConfig({
+        getModel: () => 'auto-gemini-3',
+        getGemini31LaunchedSync: () => true,
+      });
+      const chain = resolvePolicyChain(config);
+      expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_MODEL);
+      expect(chain[1]?.model).toBe('gemini-3-flash-preview');
+    });
+
+    it('returns Gemini 3.1 Pro Custom Tools chain when launched, auth is Gemini, and auto-gemini-3 requested', () => {
+      const config = createMockConfig({
+        getModel: () => 'auto-gemini-3',
+        getGemini31LaunchedSync: () => true,
+        getContentGeneratorConfig: () => ({ authType: AuthType.USE_GEMINI }),
+      });
+      const chain = resolvePolicyChain(config);
+      expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
+      expect(chain[1]?.model).toBe('gemini-3-flash-preview');
+    });
   });
 
   describe('buildFallbackPolicyContext', () => {
@@ -183,7 +222,10 @@ describe('policyHelpers', () => {
         selectedModel: 'gemini-pro',
       });
 
-      const result = applyModelSelection(config, { model: 'gemini-pro' });
+      const result = applyModelSelection(config, {
+        model: 'gemini-pro',
+        isChatModel: true,
+      });
       expect(result.model).toBe('gemini-pro');
       expect(result.maxAttempts).toBeUndefined();
       expect(config.setActiveModel).toHaveBeenCalledWith('gemini-pro');
@@ -204,7 +246,10 @@ describe('policyHelpers', () => {
         selectedModel: 'gemini-flash',
       });
 
-      const result = applyModelSelection(config, { model: 'gemini-pro' });
+      const result = applyModelSelection(config, {
+        model: 'gemini-pro',
+        isChatModel: true,
+      });
 
       expect(result.model).toBe('gemini-flash');
       expect(result.config).toEqual({
@@ -214,14 +259,33 @@ describe('policyHelpers', () => {
 
       expect(mockModelConfigService.getResolvedConfig).toHaveBeenCalledWith({
         model: 'gemini-pro',
+        isChatModel: true,
       });
       expect(mockModelConfigService.getResolvedConfig).toHaveBeenCalledWith({
         model: 'gemini-flash',
+        isChatModel: true,
       });
       expect(config.setActiveModel).toHaveBeenCalledWith('gemini-flash');
     });
 
-    it('consumes sticky attempt if indicated', () => {
+    it('does not call setActiveModel if isChatModel is false', () => {
+      const config = createExtendedMockConfig();
+      mockModelConfigService.getResolvedConfig.mockReturnValue({
+        model: 'gemini-pro',
+        generateContentConfig: {},
+      });
+      mockAvailabilityService.selectFirstAvailable.mockReturnValue({
+        selectedModel: 'gemini-pro',
+      });
+
+      applyModelSelection(config, {
+        model: 'gemini-pro',
+        isChatModel: false,
+      });
+      expect(config.setActiveModel).not.toHaveBeenCalled();
+    });
+
+    it('consumes sticky attempt if indicated and isChatModel is true', () => {
       const config = createExtendedMockConfig();
       mockModelConfigService.getResolvedConfig.mockReturnValue({
         model: 'gemini-pro',
@@ -232,10 +296,36 @@ describe('policyHelpers', () => {
         attempts: 1,
       });
 
-      const result = applyModelSelection(config, { model: 'gemini-pro' });
+      const result = applyModelSelection(config, {
+        model: 'gemini-pro',
+        isChatModel: true,
+      });
       expect(mockAvailabilityService.consumeStickyAttempt).toHaveBeenCalledWith(
         'gemini-pro',
       );
+      expect(config.setActiveModel).toHaveBeenCalledWith('gemini-pro');
+      expect(result.maxAttempts).toBe(1);
+    });
+
+    it('consumes sticky attempt if indicated but does not call setActiveModel if isChatModel is false', () => {
+      const config = createExtendedMockConfig();
+      mockModelConfigService.getResolvedConfig.mockReturnValue({
+        model: 'gemini-pro',
+        generateContentConfig: {},
+      });
+      mockAvailabilityService.selectFirstAvailable.mockReturnValue({
+        selectedModel: 'gemini-pro',
+        attempts: 1,
+      });
+
+      const result = applyModelSelection(config, {
+        model: 'gemini-pro',
+        isChatModel: false,
+      });
+      expect(mockAvailabilityService.consumeStickyAttempt).toHaveBeenCalledWith(
+        'gemini-pro',
+      );
+      expect(config.setActiveModel).not.toHaveBeenCalled();
       expect(result.maxAttempts).toBe(1);
     });
 
@@ -252,7 +342,7 @@ describe('policyHelpers', () => {
 
       const result = applyModelSelection(
         config,
-        { model: 'gemini-pro' },
+        { model: 'gemini-pro', isChatModel: true },
         {
           consumeAttempt: false,
         },
@@ -260,6 +350,7 @@ describe('policyHelpers', () => {
       expect(
         mockAvailabilityService.consumeStickyAttempt,
       ).not.toHaveBeenCalled();
+      expect(config.setActiveModel).toHaveBeenCalledWith('gemini-pro');
       expect(result.maxAttempts).toBe(1);
     });
   });

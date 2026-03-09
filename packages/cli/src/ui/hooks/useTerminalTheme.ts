@@ -5,14 +5,13 @@
  */
 
 import { useEffect } from 'react';
-import { useStdout } from 'ink';
 import {
   getLuminance,
   parseColor,
   shouldSwitchTheme,
 } from '../themes/color-utils.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
-import { DefaultLight } from '../themes/default-light.js';
+import { DefaultLight } from '../themes/builtin/light/default-light.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import type { Config } from '@google/gemini-cli-core';
 import { useTerminalContext } from '../contexts/TerminalContext.js';
@@ -22,10 +21,11 @@ import type { UIActions } from '../contexts/UIActionsContext.js';
 export function useTerminalTheme(
   handleThemeSelect: UIActions['handleThemeSelect'],
   config: Config,
+  refreshStatic: () => void,
 ) {
-  const { stdout } = useStdout();
   const settings = useSettings();
-  const { subscribe, unsubscribe } = useTerminalContext();
+  const { subscribe, unsubscribe, queryTerminalBackground } =
+    useTerminalContext();
 
   useEffect(() => {
     if (settings.merged.ui.autoThemeSwitching === false) {
@@ -44,7 +44,7 @@ export function useTerminalTheme(
         return;
       }
 
-      stdout.write('\x1b]11;?\x1b\\');
+      void queryTerminalBackground();
     }, settings.merged.ui.terminalBackgroundPollingInterval * 1000);
 
     const handleTerminalBackground = (colorStr: string) => {
@@ -56,9 +56,10 @@ export function useTerminalTheme(
       if (!match) return;
 
       const hexColor = parseColor(match[1], match[2], match[3]);
-      const luminance = getLuminance(hexColor);
-      config.setTerminalBackground(hexColor);
+      if (!hexColor) return;
 
+      const previousColor = config.getTerminalBackground();
+      const luminance = getLuminance(hexColor);
       const currentThemeName = settings.merged.ui.theme;
 
       const newTheme = shouldSwitchTheme(
@@ -68,8 +69,23 @@ export function useTerminalTheme(
         DefaultLight.name,
       );
 
+      if (previousColor === hexColor) {
+        if (newTheme) {
+          void handleThemeSelect(newTheme, SettingScope.User);
+        }
+        return;
+      }
+
+      config.setTerminalBackground(hexColor);
+      themeManager.setTerminalBackground(hexColor);
+
       if (newTheme) {
-        handleThemeSelect(newTheme, SettingScope.User);
+        void handleThemeSelect(newTheme, SettingScope.User);
+      } else {
+        // The existing theme had its background changed so refresh because
+        // there may be existing static UI rendered that relies on the old
+        // background color.
+        refreshStatic();
       }
     };
 
@@ -83,10 +99,11 @@ export function useTerminalTheme(
     settings.merged.ui.theme,
     settings.merged.ui.autoThemeSwitching,
     settings.merged.ui.terminalBackgroundPollingInterval,
-    stdout,
     config,
     handleThemeSelect,
     subscribe,
     unsubscribe,
+    queryTerminalBackground,
+    refreshStatic,
   ]);
 }

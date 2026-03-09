@@ -264,6 +264,40 @@ describe('McpClientManager', () => {
         'No MCP server registered with the name "non-existent"',
       );
     });
+
+    it('should create a new McpClient with updated config on restart', async () => {
+      const originalConfig = { command: 'node', args: ['--port', '8000'] };
+      const updatedConfig = { command: 'node', args: ['--port', '9000'] };
+
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': originalConfig,
+      });
+
+      // Track McpClient constructor calls
+      const constructorCalls: unknown[][] = [];
+      vi.mocked(McpClient).mockImplementation((...args: unknown[]) => {
+        constructorCalls.push(args);
+        return mockedMcpClient;
+      });
+      mockedMcpClient.getServerConfig.mockReturnValue(originalConfig);
+
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      await manager.startConfiguredMcpServers();
+
+      // First call should use the original config
+      expect(constructorCalls).toHaveLength(1);
+      expect(constructorCalls[0][1]).toBe(originalConfig);
+
+      // Simulate config file change and hot-reload
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': updatedConfig,
+      });
+      await manager.startConfiguredMcpServers();
+
+      // A NEW McpClient should have been constructed with the updated config
+      expect(constructorCalls).toHaveLength(2);
+      expect(constructorCalls[1][1]).toBe(updatedConfig);
+    });
   });
 
   describe('getMcpInstructions', () => {
@@ -381,6 +415,36 @@ describe('McpClientManager', () => {
       expect(manager.getMcpServers()).not.toHaveProperty('test-server');
     });
 
+    it('should ignore an extension attempting to register a server with an existing name', async () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      const userConfig = { command: 'node', args: ['user-server.js'] };
+
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': userConfig,
+      });
+      mockedMcpClient.getServerConfig.mockReturnValue(userConfig);
+
+      await manager.startConfiguredMcpServers();
+      expect(mockedMcpClient.connect).toHaveBeenCalledTimes(1);
+
+      const extension: GeminiCLIExtension = {
+        name: 'test-extension',
+        mcpServers: {
+          'test-server': { command: 'node', args: ['ext-server.js'] },
+        },
+        isActive: true,
+        version: '1.0.0',
+        path: '/some-path',
+        contextFiles: [],
+        id: '123',
+      };
+
+      await manager.startExtension(extension);
+
+      expect(mockedMcpClient.disconnect).not.toHaveBeenCalled();
+      expect(mockedMcpClient.connect).toHaveBeenCalledTimes(1);
+    });
+
     it('should remove servers from blockedMcpServers when stopExtension is called', async () => {
       mockConfig.getBlockedMcpServers.mockReturnValue(['blocked-server']);
       const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
@@ -408,6 +472,100 @@ describe('McpClientManager', () => {
         name: 'blocked-server',
         extensionName: 'test-extension',
       });
+    });
+  });
+
+  describe('diagnostic reporting', () => {
+    let coreEventsMock: typeof import('../utils/events.js').coreEvents;
+
+    beforeEach(async () => {
+      const eventsModule = await import('../utils/events.js');
+      coreEventsMock = eventsModule.coreEvents;
+      vi.spyOn(coreEventsMock, 'emitFeedback').mockImplementation(() => {});
+    });
+
+    it('should emit hint instead of full error when user has not interacted with MCP', () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      manager.emitDiagnostic(
+        'error',
+        'Something went wrong',
+        new Error('boom'),
+      );
+
+      expect(coreEventsMock.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        'MCP issues detected. Run /mcp list for status.',
+      );
+      expect(coreEventsMock.emitFeedback).not.toHaveBeenCalledWith(
+        'error',
+        'Something went wrong',
+        expect.anything(),
+      );
+    });
+
+    it('should emit full error when user has interacted with MCP', () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      manager.setUserInteractedWithMcp();
+      manager.emitDiagnostic(
+        'error',
+        'Something went wrong',
+        new Error('boom'),
+      );
+
+      expect(coreEventsMock.emitFeedback).toHaveBeenCalledWith(
+        'error',
+        'Something went wrong',
+        expect.any(Error),
+      );
+    });
+
+    it('should still deduplicate diagnostic messages after user interaction', () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      manager.setUserInteractedWithMcp();
+
+      manager.emitDiagnostic('error', 'Same error');
+      manager.emitDiagnostic('error', 'Same error');
+
+      expect(coreEventsMock.emitFeedback).toHaveBeenCalledTimes(1);
+    });
+
+    it('should only show hint once per session', () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+
+      manager.emitDiagnostic('error', 'Error 1');
+      manager.emitDiagnostic('error', 'Error 2');
+
+      expect(coreEventsMock.emitFeedback).toHaveBeenCalledTimes(1);
+      expect(coreEventsMock.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        'MCP issues detected. Run /mcp list for status.',
+      );
+    });
+
+    it('should capture last error for a server even when silenced', () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+
+      manager.emitDiagnostic(
+        'error',
+        'Error in server (test-server)',
+        undefined,
+        'test-server',
+      );
+
+      expect(manager.getLastError('test-server')).toBe(
+        'Error in server (test-server)',
+      );
+    });
+
+    it('should show previously deduplicated errors after interaction clears state', () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+
+      manager.emitDiagnostic('error', 'Same error');
+      expect(coreEventsMock.emitFeedback).toHaveBeenCalledTimes(1); // The hint
+
+      manager.setUserInteractedWithMcp();
+      manager.emitDiagnostic('error', 'Same error');
+      expect(coreEventsMock.emitFeedback).toHaveBeenCalledTimes(2); // Now the actual error
     });
   });
 });

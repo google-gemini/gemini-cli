@@ -88,6 +88,7 @@ describe('getEnvironmentContext', () => {
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
       getFileService: vi.fn(),
+      getIncludeDirectoryTree: vi.fn().mockReturnValue(true),
       getEnvironmentMemory: vi.fn().mockReturnValue('Mock Environment Memory'),
 
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
@@ -144,6 +145,24 @@ describe('getEnvironmentContext', () => {
     );
     expect(context).toContain('</session_context>');
     expect(getFolderStructure).toHaveBeenCalledTimes(2);
+  });
+
+  it('should omit directory structure when getIncludeDirectoryTree is false', async () => {
+    (vi.mocked(mockConfig.getIncludeDirectoryTree!) as Mock).mockReturnValue(
+      false,
+    );
+
+    const parts = await getEnvironmentContext(mockConfig as Config);
+
+    expect(parts.length).toBe(1);
+    const context = parts[0].text;
+
+    expect(context).toContain('<session_context>');
+    expect(context).not.toContain('Directory Structure:');
+    expect(context).not.toContain('Mock Folder Structure');
+    expect(context).toContain('Mock Environment Memory');
+    expect(context).toContain('</session_context>');
+    expect(getFolderStructure).not.toHaveBeenCalled();
   });
 
   it('should handle read_many_files returning no content', async () => {

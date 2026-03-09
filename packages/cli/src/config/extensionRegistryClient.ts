@@ -79,9 +79,11 @@ export class ExtensionRegistryClient {
     const fzf = new AsyncFzf(allExtensions, {
       selector: (ext: RegistryExtension) =>
         `${ext.extensionName} ${ext.extensionDescription} ${ext.fullName}`,
-      fuzzy: 'v2',
+      fuzzy: true,
     });
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const results = await fzf.find(query);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return results.map((r: { item: RegistryExtension }) => r.item);
   }
 
@@ -108,7 +110,6 @@ export class ExtensionRegistryClient {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         return (await response.json()) as RegistryExtension[];
       } catch (error) {
-        // Clear the promise on failure so that subsequent calls can try again
         ExtensionRegistryClient.fetchPromise = null;
         throw error;
       }

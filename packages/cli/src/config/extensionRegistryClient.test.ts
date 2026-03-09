@@ -224,4 +224,59 @@ describe('ExtensionRegistryClient', () => {
       'Failed to fetch extensions: Not Found',
     );
   });
+
+  it('should not return irrelevant results', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => [
+        ...mockExtensions,
+        {
+          id: 'dataplex',
+          extensionName: 'dataplex',
+          extensionDescription: 'Connect to Dataplex Universal Catalog...',
+          fullName: 'google-cloud/dataplex',
+          rank: 6,
+          stars: 6,
+          url: '',
+          repoDescription: '',
+          lastUpdated: '',
+          extensionVersion: '1.0.0',
+          avatarUrl: '',
+          hasMCP: false,
+          hasContext: false,
+          isGoogleOwned: true,
+          licenseKey: '',
+          hasHooks: false,
+          hasCustomCommands: false,
+          hasSkills: false,
+        },
+        {
+          id: 'conductor',
+          extensionName: 'conductor',
+          extensionDescription: 'A conductor extension that actually matches.',
+          fullName: 'someone/conductor',
+          rank: 100,
+          stars: 100,
+          url: '',
+          repoDescription: '',
+          lastUpdated: '',
+          extensionVersion: '1.0.0',
+          avatarUrl: '',
+          hasMCP: false,
+          hasContext: false,
+          isGoogleOwned: false,
+          licenseKey: '',
+          hasHooks: false,
+          hasCustomCommands: false,
+          hasSkills: false,
+        },
+      ],
+    });
+
+    const results = await client.searchExtensions('conductor');
+    const ids = results.map((r) => r.id);
+
+    expect(ids).not.toContain('dataplex');
+    expect(ids).toContain('conductor');
+  });
 });

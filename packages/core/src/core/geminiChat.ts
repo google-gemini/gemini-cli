@@ -7,28 +7,25 @@
 // DISCLAIMER: This is a copied version of https://github.com/googleapis/js-genai/blob/main/src/chats.ts with the intention of working around a key bug
 // where function responses are not treated as "valid" responses: https://b.corp.google.com/issues/420354090
 
-import type {
-  GenerateContentResponse,
-  Content,
-  Part,
-  Tool,
-  PartListUnion,
-  GenerateContentConfig,
-  GenerateContentParameters,
+import {
+  createUserContent,
+  FinishReason,
+  type GenerateContentResponse,
+  type Content,
+  type Part,
+  type Tool,
+  type PartListUnion,
+  type GenerateContentConfig,
+  type GenerateContentParameters,
 } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
-import { createUserContent, FinishReason } from '@google/genai';
-import {
-  retryWithBackoff,
-  isRetryableError,
-  DEFAULT_MAX_ATTEMPTS,
-} from '../utils/retry.js';
+import { retryWithBackoff, isRetryableError } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import type { Config } from '../config/config.js';
 import {
   resolveModel,
   isGemini2Model,
-  isPreviewModel,
+  supportsModernFeatures,
 } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
@@ -44,6 +41,7 @@ import {
 import {
   ContentRetryEvent,
   ContentRetryFailureEvent,
+  type LlmRole,
 } from '../telemetry/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
@@ -192,11 +190,16 @@ export class InvalidStreamError extends Error {
   readonly type:
     | 'NO_FINISH_REASON'
     | 'NO_RESPONSE_TEXT'
-    | 'MALFORMED_FUNCTION_CALL';
+    | 'MALFORMED_FUNCTION_CALL'
+    | 'UNEXPECTED_TOOL_CALL';
 
   constructor(
     message: string,
-    type: 'NO_FINISH_REASON' | 'NO_RESPONSE_TEXT' | 'MALFORMED_FUNCTION_CALL',
+    type:
+      | 'NO_FINISH_REASON'
+      | 'NO_RESPONSE_TEXT'
+      | 'MALFORMED_FUNCTION_CALL'
+      | 'UNEXPECTED_TOOL_CALL',
   ) {
     super(message);
     this.name = 'InvalidStreamError';
@@ -248,10 +251,11 @@ export class GeminiChat {
     private history: Content[] = [],
     resumedSessionData?: ResumedSessionData,
     private readonly onModelChanged?: (modelId: string) => Promise<Tool[]>,
+    kind: 'main' | 'subagent' = 'main',
   ) {
     validateHistory(history);
     this.chatRecordingService = new ChatRecordingService(config);
-    this.chatRecordingService.initialize(resumedSessionData);
+    this.chatRecordingService.initialize(resumedSessionData, kind);
     this.lastPromptTokenCount = estimateTokenCountSync(
       this.history.flatMap((c) => c.parts || []),
     );
@@ -292,6 +296,7 @@ export class GeminiChat {
     message: PartListUnion,
     prompt_id: string,
     signal: AbortSignal,
+    role: LlmRole,
     displayContent?: PartListUnion,
   ): Promise<AsyncGenerator<StreamEvent>> {
     await this.sendPromise;
@@ -362,6 +367,7 @@ export class GeminiChat {
               requestContents,
               prompt_id,
               signal,
+              role,
             );
             isConnectionPhase = false;
             for await (const chunk of stream) {
@@ -467,6 +473,7 @@ export class GeminiChat {
     requestContents: Content[],
     prompt_id: string,
     abortSignal: AbortSignal,
+    role: LlmRole,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const contentsForPreviewModel =
       this.ensureActiveLoopHasThoughtSignatures(requestContents);
@@ -492,13 +499,14 @@ export class GeminiChat {
     const initialActiveModel = this.config.getActiveModel();
 
     const apiCall = async () => {
+      const useGemini3_1 = (await this.config.getGemini31Launched?.()) ?? false;
       // Default to the last used model (which respects arguments/availability selection)
-      let modelToUse = resolveModel(lastModelToUse);
+      let modelToUse = resolveModel(lastModelToUse, useGemini3_1);
 
       // If the active model has changed (e.g. due to a fallback updating the config),
       // we switch to the new active model.
       if (this.config.getActiveModel() !== initialActiveModel) {
-        modelToUse = resolveModel(this.config.getActiveModel());
+        modelToUse = resolveModel(this.config.getActiveModel(), useGemini3_1);
       }
 
       if (modelToUse !== lastModelToUse) {
@@ -520,7 +528,7 @@ export class GeminiChat {
         abortSignal,
       };
 
-      let contentsToUse = isPreviewModel(modelToUse)
+      let contentsToUse = supportsModernFeatures(modelToUse)
         ? contentsForPreviewModel
         : requestContents;
 
@@ -599,6 +607,7 @@ export class GeminiChat {
           config,
         },
         prompt_id,
+        role,
       );
     };
 
@@ -628,12 +637,12 @@ export class GeminiChat {
       authType: this.config.getContentGeneratorConfig()?.authType,
       retryFetchErrors: this.config.getRetryFetchErrors(),
       signal: abortSignal,
-      maxAttempts: availabilityMaxAttempts,
+      maxAttempts: availabilityMaxAttempts ?? this.config.getMaxAttempts(),
       getAvailabilityContext,
       onRetry: (attempt, error, delayMs) => {
         coreEvents.emitRetryAttempt({
           attempt,
-          maxAttempts: availabilityMaxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+          maxAttempts: availabilityMaxAttempts ?? this.config.getMaxAttempts(),
           delayMs,
           error: error instanceof Error ? error.message : String(error),
           model: lastModelToUse,
@@ -682,9 +691,13 @@ export class GeminiChat {
     const history = curated
       ? extractCuratedHistory(this.history)
       : this.history;
-    // Deep copy the history to avoid mutating the history outside of the
-    // chat session.
-    return structuredClone(history);
+    // Return a shallow copy of the array to prevent callers from mutating
+    // the internal history array (push/pop/splice). Content objects are
+    // shared references — callers MUST NOT mutate them in place.
+    // This replaces a prior structuredClone() which deep-copied the entire
+    // conversation on every call, causing O(n) memory pressure per turn
+    // that compounded into OOM crashes in long-running sessions.
+    return [...history];
   }
 
   /**
@@ -815,6 +828,7 @@ export class GeminiChat {
     const modelResponseParts: Part[] = [];
 
     let hasToolCall = false;
+    let hasThoughts = false;
     let finishReason: FinishReason | undefined;
 
     for await (const chunk of streamResponse) {
@@ -831,6 +845,7 @@ export class GeminiChat {
         if (content?.parts) {
           if (content.parts.some((part) => part.thought)) {
             // Record thoughts
+            hasThoughts = true;
             this.recordThoughtFromContent(content);
           }
           if (content.parts.some((part) => part.functionCall)) {
@@ -898,8 +913,10 @@ export class GeminiChat {
       .join('')
       .trim();
 
-    // Record model response text from the collected parts
-    if (responseText) {
+    // Record model response text from the collected parts.
+    // Also flush when there are thoughts or a tool call (even with no text)
+    // so that BeforeTool hooks always see the latest transcript state.
+    if (responseText || hasThoughts || hasToolCall) {
       this.chatRecordingService.recordMessage({
         model,
         type: 'gemini',
@@ -926,6 +943,12 @@ export class GeminiChat {
         throw new InvalidStreamError(
           'Model stream ended with malformed function call.',
           'MALFORMED_FUNCTION_CALL',
+        );
+      }
+      if (finishReason === FinishReason.UNEXPECTED_TOOL_CALL) {
+        throw new InvalidStreamError(
+          'Model stream ended with unexpected tool call.',
+          'UNEXPECTED_TOOL_CALL',
         );
       }
       if (!responseText) {

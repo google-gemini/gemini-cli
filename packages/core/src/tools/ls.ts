@@ -7,8 +7,13 @@
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { ToolInvocation, ToolResult } from './tools.js';
-import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+  type ToolInvocation,
+  type ToolResult,
+} from './tools.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import type { Config } from '../config/config.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
@@ -241,7 +246,12 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
 
       // Create formatted content for LLM
       const directoryContent = entries
-        .map((entry) => `${entry.isDirectory ? '[DIR] ' : ''}${entry.name}`)
+        .map((entry) => {
+          if (entry.isDirectory) {
+            return `[DIR] ${entry.name}`;
+          }
+          return `${entry.name} (${entry.size} bytes)`;
+        })
         .join('\n');
 
       let resultMessage = `Directory listing for ${resolvedDirPath}:\n${directoryContent}`;

@@ -373,6 +373,182 @@ describe('EditTool', () => {
       expect(result.occurrences).toBe(1);
     });
 
+    it('should perform a fuzzy replacement when exact match fails but similarity is high', async () => {
+      const content =
+        'const myConfig = {\n  enableFeature: true,\n  retries: 3\n};';
+      // Typo: missing comma after true
+      const oldString =
+        'const myConfig = {\n  enableFeature: true\n  retries: 3\n};';
+      const newString =
+        'const myConfig = {\n  enableFeature: false,\n  retries: 5\n};';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'config.ts',
+          instruction: 'update config',
+          old_string: oldString,
+          new_string: newString,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.occurrences).toBe(1);
+      expect(result.newContent).toBe(newString);
+    });
+
+    it('should NOT perform a fuzzy replacement when similarity is below threshold', async () => {
+      const content =
+        'const myConfig = {\n  enableFeature: true,\n  retries: 3\n};';
+      // Completely different string
+      const oldString = 'function somethingElse() {\n  return false;\n}';
+      const newString =
+        'const myConfig = {\n  enableFeature: false,\n  retries: 5\n};';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'config.ts',
+          instruction: 'update config',
+          old_string: oldString,
+          new_string: newString,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.occurrences).toBe(0);
+      expect(result.newContent).toBe(content);
+    });
+
+    it('should NOT perform a fuzzy replacement when the complexity (length * size) is too high', async () => {
+      // 2000 chars
+      const longString = 'a'.repeat(2000);
+
+      // Create a file with enough lines to trigger the complexity limit
+      // Complexity = Lines * Length^2
+      // Threshold = 500,000,000
+      // 2000^2 = 4,000,000.
+      // Need > 125 lines. Let's use 200 lines.
+      const lines = Array(200).fill(longString);
+      const content = lines.join('\n');
+
+      // Mismatch at the end (making it a fuzzy match candidate)
+      const oldString = longString + 'c';
+      const newString = 'replacement';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          instruction: 'update',
+          old_string: oldString,
+          new_string: newString,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      // Should return 0 occurrences because fuzzy match is skipped
+      expect(result.occurrences).toBe(0);
+      expect(result.newContent).toBe(content);
+    });
+
+    it('should perform multiple fuzzy replacements if multiple valid matches are found', async () => {
+      const content = `
+function doIt() {
+  console.log("hello");
+}
+
+function doIt() {
+  console.log("hello");
+}
+`;
+      // old_string uses single quotes, file uses double.
+      // This is a fuzzy match (quote difference).
+      const oldString = `
+function doIt() {
+  console.log('hello');
+}
+`.trim();
+
+      const newString = `
+function doIt() {
+  console.log("bye");
+}
+`.trim();
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          instruction: 'update',
+          old_string: oldString,
+          new_string: newString,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.occurrences).toBe(2);
+      const expectedContent = `
+function doIt() {
+  console.log("bye");
+}
+
+function doIt() {
+  console.log("bye");
+}
+`;
+      expect(result.newContent).toBe(expectedContent);
+    });
+
+    it('should correctly rebase indentation in flexible replacement without double-indenting', async () => {
+      const content = '    if (a) {\n        foo();\n    }\n';
+      // old_string and new_string are unindented. They should be rebased to 4-space.
+      const oldString = 'if (a) {\n    foo();\n}';
+      const newString = 'if (a) {\n    bar();\n}';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string: oldString,
+          new_string: newString,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.occurrences).toBe(1);
+      // foo() was at 8 spaces (4 base + 4 indent).
+      // newString has bar() at 4 spaces (0 base + 4 indent).
+      // Rebased to 4 base, it should be 4 + 4 = 8 spaces.
+      const expectedContent = '    if (a) {\n        bar();\n    }\n';
+      expect(result.newContent).toBe(expectedContent);
+    });
+
+    it('should correctly rebase indentation in fuzzy replacement without double-indenting', async () => {
+      const content =
+        '    const myConfig = {\n      enableFeature: true,\n      retries: 3\n    };';
+      // Typo: missing comma. old_string/new_string are unindented.
+      const fuzzyOld =
+        'const myConfig = {\n  enableFeature: true\n  retries: 3\n};';
+      const fuzzyNew =
+        'const myConfig = {\n  enableFeature: false,\n  retries: 5\n};';
+
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.ts',
+          old_string: fuzzyOld,
+          new_string: fuzzyNew,
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.strategy).toBe('fuzzy');
+      const expectedContent =
+        '    const myConfig = {\n      enableFeature: false,\n      retries: 5\n    };';
+      expect(result.newContent).toBe(expectedContent);
+    });
+
     it('should NOT insert extra newlines when replacing a block preceded by a blank line (regression)', async () => {
       const content = '\n  function oldFunc() {\n    // some code\n  }';
       const result = await calculateReplacement(mockConfig, {
@@ -430,6 +606,53 @@ describe('EditTool', () => {
         new_string: 'new',
       };
       expect(tool.validateToolParams(params)).toMatch(/Path not in workspace/);
+    });
+
+    it('should reject omission placeholder in new_string when old_string does not contain that placeholder', () => {
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'test.txt'),
+        instruction: 'An instruction',
+        old_string: 'old content',
+        new_string: '(rest of methods ...)',
+      };
+      expect(tool.validateToolParams(params)).toBe(
+        "`new_string` contains an omission placeholder (for example 'rest of methods ...'). Provide exact literal replacement text.",
+      );
+    });
+
+    it('should reject new_string when it contains an additional placeholder not present in old_string', () => {
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'test.txt'),
+        instruction: 'An instruction',
+        old_string: '(rest of methods ...)',
+        new_string: `(rest of methods ...)
+(unchanged code ...)`,
+      };
+      expect(tool.validateToolParams(params)).toBe(
+        "`new_string` contains an omission placeholder (for example 'rest of methods ...'). Provide exact literal replacement text.",
+      );
+    });
+
+    it('should allow omission placeholders when all are already present in old_string', () => {
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'test.txt'),
+        instruction: 'An instruction',
+        old_string: `(rest of methods ...)
+(unchanged code ...)`,
+        new_string: `(unchanged code ...)
+(rest of methods ...)`,
+      };
+      expect(tool.validateToolParams(params)).toBeNull();
+    });
+
+    it('should allow normal code that contains placeholder text in a string literal', () => {
+      const params: EditToolParams = {
+        file_path: path.join(rootDir, 'test.ts'),
+        instruction: 'Update string literal',
+        old_string: 'const msg = "old";',
+        new_string: 'const msg = "(rest of methods ...)";',
+      };
+      expect(tool.validateToolParams(params)).toBeNull();
     });
   });
 
@@ -711,7 +934,7 @@ describe('EditTool', () => {
     );
   });
 
-  describe('expected_replacements', () => {
+  describe('allow_multiple', () => {
     const testFile = 'replacements_test.txt';
     let filePath: string;
 
@@ -721,34 +944,70 @@ describe('EditTool', () => {
 
     it.each([
       {
-        name: 'succeed when occurrences match expected_replacements',
+        name: 'succeed when allow_multiple is true and there are multiple occurrences',
         content: 'foo foo foo',
-        expected: 3,
+        allow_multiple: true,
         shouldSucceed: true,
         finalContent: 'bar bar bar',
       },
       {
-        name: 'fail when occurrences do not match expected_replacements',
-        content: 'foo foo foo',
-        expected: 2,
-        shouldSucceed: false,
+        name: 'succeed when allow_multiple is true and there is exactly 1 occurrence',
+        content: 'foo',
+        allow_multiple: true,
+        shouldSucceed: true,
+        finalContent: 'bar',
       },
       {
-        name: 'default to 1 expected replacement if not specified',
-        content: 'foo foo',
-        expected: undefined,
+        name: 'fail when allow_multiple is false and there are multiple occurrences',
+        content: 'foo foo foo',
+        allow_multiple: false,
         shouldSucceed: false,
+        expectedError: ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
+      },
+      {
+        name: 'default to 1 expected replacement if allow_multiple not specified',
+        content: 'foo foo',
+        allow_multiple: undefined,
+        shouldSucceed: false,
+        expectedError: ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
+      },
+      {
+        name: 'succeed when allow_multiple is false and there is exactly 1 occurrence',
+        content: 'foo',
+        allow_multiple: false,
+        shouldSucceed: true,
+        finalContent: 'bar',
+      },
+      {
+        name: 'fail when allow_multiple is true but there are 0 occurrences',
+        content: 'baz',
+        allow_multiple: true,
+        shouldSucceed: false,
+        expectedError: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
+      },
+      {
+        name: 'fail when allow_multiple is false but there are 0 occurrences',
+        content: 'baz',
+        allow_multiple: false,
+        shouldSucceed: false,
+        expectedError: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
       },
     ])(
       'should $name',
-      async ({ content, expected, shouldSucceed, finalContent }) => {
+      async ({
+        content,
+        allow_multiple,
+        shouldSucceed,
+        finalContent,
+        expectedError,
+      }) => {
         fs.writeFileSync(filePath, content, 'utf8');
         const params: EditToolParams = {
           file_path: filePath,
           instruction: 'Replace all foo with bar',
           old_string: 'foo',
           new_string: 'bar',
-          ...(expected !== undefined && { expected_replacements: expected }),
+          ...(allow_multiple !== undefined && { allow_multiple }),
         };
         const invocation = tool.build(params);
         const result = await invocation.execute(new AbortController().signal);
@@ -758,9 +1017,7 @@ describe('EditTool', () => {
           if (finalContent)
             expect(fs.readFileSync(filePath, 'utf8')).toBe(finalContent);
         } else {
-          expect(result.error?.type).toBe(
-            ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
-          );
+          expect(result.error?.type).toBe(expectedError);
         }
       },
     );

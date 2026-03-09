@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 152
+  // Next ID: 176
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -53,6 +53,22 @@ export enum EventMetadataKey {
 
   // Logs the output format of the session.
   GEMINI_CLI_START_SESSION_OUTPUT_FORMAT = 94,
+
+  // ==========================================================================
+  // Startup Stats Event Keys
+  // ==========================================================================
+
+  // Logs the array of startup phases.
+  GEMINI_CLI_STARTUP_PHASES = 172,
+
+  // Logs the OS platform for startup stats.
+  GEMINI_CLI_STARTUP_OS_PLATFORM = 173,
+
+  // Logs the OS release for startup stats.
+  GEMINI_CLI_STARTUP_OS_RELEASE = 174,
+
+  // Logs whether the CLI is running in docker for startup stats.
+  GEMINI_CLI_STARTUP_IS_DOCKER = 175,
 
   // ==========================================================================
   // User Prompt Event Keys
@@ -136,6 +152,21 @@ export enum EventMetadataKey {
 
   // Logs the tool use token count of the API call.
   GEMINI_CLI_API_RESPONSE_TOOL_TOKEN_COUNT = 29,
+
+  // Logs the token count for system instructions.
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_SYSTEM_INSTRUCTIONS = 167,
+
+  // Logs the token count for tool definitions.
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_TOOL_DEFINITIONS = 168,
+
+  // Logs the token count for conversation history.
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_HISTORY = 169,
+
+  // Logs the token count for tool calls (JSON map of tool name to tokens).
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_TOOL_CALLS = 170,
+
+  // Logs the token count from MCP servers (tool definitions + tool inputs/outputs).
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_MCP_SERVERS = 171,
 
   // ==========================================================================
   // GenAI API Error Event Keys
@@ -577,4 +608,58 @@ export enum EventMetadataKey {
 
   // Logs the total prunable tokens identified at the trigger point.
   GEMINI_CLI_TOOL_OUTPUT_MASKING_TOTAL_PRUNABLE_TOKENS = 151,
+
+  // Ask User Stats Event Keys
+  // ==========================================================================
+
+  // Logs the types of questions asked in the ask_user tool.
+  GEMINI_CLI_ASK_USER_QUESTION_TYPES = 152,
+
+  // Logs whether the ask_user dialog was dismissed.
+  GEMINI_CLI_ASK_USER_DISMISSED = 153,
+
+  // Logs whether the ask_user dialog was submitted empty.
+  GEMINI_CLI_ASK_USER_EMPTY_SUBMISSION = 154,
+
+  // Logs the number of questions answered in the ask_user tool.
+  GEMINI_CLI_ASK_USER_ANSWER_COUNT = 155,
+
+  // ==========================================================================
+  // Keychain & Token Storage Event Keys
+  // ==========================================================================
+
+  // Logs whether the keychain is available.
+  GEMINI_CLI_KEYCHAIN_AVAILABLE = 156,
+
+  // Logs the type of token storage initialized.
+  GEMINI_CLI_TOKEN_STORAGE_TYPE = 157,
+
+  // Logs whether the token storage type was forced by an environment variable.
+  GEMINI_CLI_TOKEN_STORAGE_FORCED = 158,
+  // Conseca Event Keys
+  // ==========================================================================
+
+  // Logs the policy generation event.
+  CONSECA_POLICY_GENERATION = 159,
+
+  // Logs the verdict event.
+  CONSECA_VERDICT = 160,
+
+  // Logs the generated policy content.
+  CONSECA_GENERATED_POLICY = 161,
+
+  // Logs the verdict result (e.g. ALLOW/BLOCK).
+  CONSECA_VERDICT_RESULT = 162,
+
+  // Logs the verdict rationale.
+  CONSECA_VERDICT_RATIONALE = 163,
+
+  // Logs the trusted content used.
+  CONSECA_TRUSTED_CONTENT = 164,
+
+  // Logs the user prompt for Conseca events.
+  CONSECA_USER_PROMPT = 165,
+
+  // Logs the error message for Conseca events.
+  CONSECA_ERROR = 166,
 }

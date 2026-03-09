@@ -129,32 +129,17 @@ export type KeyBindingConfig = {
 export const defaultKeyBindings: KeyBindingConfig = {
   // Basic Controls
   [Command.RETURN]: [{ key: 'return' }],
-  [Command.ESCAPE]: [{ key: 'escape' }],
+  [Command.ESCAPE]: [{ key: 'escape' }, { key: '[', ctrl: true }],
   [Command.QUIT]: [{ key: 'c', ctrl: true }],
   [Command.EXIT]: [{ key: 'd', ctrl: true }],
 
   // Cursor Movement
-  [Command.HOME]: [
-    { key: 'a', ctrl: true },
-    { key: 'home', shift: false, ctrl: false },
-  ],
-  [Command.END]: [
-    { key: 'e', ctrl: true },
-    { key: 'end', shift: false, ctrl: false },
-  ],
-  [Command.MOVE_UP]: [
-    { key: 'up', shift: false, alt: false, ctrl: false, cmd: false },
-  ],
-  [Command.MOVE_DOWN]: [
-    { key: 'down', shift: false, alt: false, ctrl: false, cmd: false },
-  ],
-  [Command.MOVE_LEFT]: [
-    { key: 'left', shift: false, alt: false, ctrl: false, cmd: false },
-  ],
-  [Command.MOVE_RIGHT]: [
-    { key: 'right', shift: false, alt: false, ctrl: false, cmd: false },
-    { key: 'f', ctrl: true },
-  ],
+  [Command.HOME]: [{ key: 'a', ctrl: true }, { key: 'home' }],
+  [Command.END]: [{ key: 'e', ctrl: true }, { key: 'end' }],
+  [Command.MOVE_UP]: [{ key: 'up' }],
+  [Command.MOVE_DOWN]: [{ key: 'down' }],
+  [Command.MOVE_LEFT]: [{ key: 'left' }],
+  [Command.MOVE_RIGHT]: [{ key: 'right' }, { key: 'f', ctrl: true }],
   [Command.MOVE_WORD_LEFT]: [
     { key: 'left', ctrl: true },
     { key: 'left', alt: true },
@@ -178,12 +163,13 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.DELETE_WORD_FORWARD]: [
     { key: 'delete', ctrl: true },
     { key: 'delete', alt: true },
+    { key: 'd', alt: true },
   ],
   [Command.DELETE_CHAR_LEFT]: [{ key: 'backspace' }, { key: 'h', ctrl: true }],
   [Command.DELETE_CHAR_RIGHT]: [{ key: 'delete' }, { key: 'd', ctrl: true }],
   [Command.UNDO]: [
-    { key: 'z', cmd: true, shift: false },
-    { key: 'z', alt: true, shift: false },
+    { key: 'z', cmd: true },
+    { key: 'z', alt: true },
   ],
   [Command.REDO]: [
     { key: 'z', ctrl: true, shift: true },
@@ -206,53 +192,33 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.PAGE_DOWN]: [{ key: 'pagedown' }],
 
   // History & Search
-  [Command.HISTORY_UP]: [{ key: 'p', shift: false, ctrl: true }],
-  [Command.HISTORY_DOWN]: [{ key: 'n', shift: false, ctrl: true }],
+  [Command.HISTORY_UP]: [{ key: 'p', ctrl: true }],
+  [Command.HISTORY_DOWN]: [{ key: 'n', ctrl: true }],
   [Command.REVERSE_SEARCH]: [{ key: 'r', ctrl: true }],
-  [Command.REWIND]: [{ key: 'double escape' }],
-  [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return', ctrl: false }],
+  [Command.REWIND]: [{ key: 'double escape' }], // for documentation only
+  [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return' }],
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab' }],
 
   // Navigation
-  [Command.NAVIGATION_UP]: [{ key: 'up', shift: false }],
-  [Command.NAVIGATION_DOWN]: [{ key: 'down', shift: false }],
+  [Command.NAVIGATION_UP]: [{ key: 'up' }],
+  [Command.NAVIGATION_DOWN]: [{ key: 'down' }],
   // Navigation shortcuts appropriate for dialogs where we do not need to accept
   // text input.
-  [Command.DIALOG_NAVIGATION_UP]: [
-    { key: 'up', shift: false },
-    { key: 'k', shift: false },
-  ],
-  [Command.DIALOG_NAVIGATION_DOWN]: [
-    { key: 'down', shift: false },
-    { key: 'j', shift: false },
-  ],
-  [Command.DIALOG_NEXT]: [{ key: 'tab', shift: false }],
+  [Command.DIALOG_NAVIGATION_UP]: [{ key: 'up' }, { key: 'k' }],
+  [Command.DIALOG_NAVIGATION_DOWN]: [{ key: 'down' }, { key: 'j' }],
+  [Command.DIALOG_NEXT]: [{ key: 'tab' }],
   [Command.DIALOG_PREV]: [{ key: 'tab', shift: true }],
 
   // Suggestions & Completions
-  [Command.ACCEPT_SUGGESTION]: [{ key: 'tab' }, { key: 'return', ctrl: false }],
-  [Command.COMPLETION_UP]: [
-    { key: 'up', shift: false },
-    { key: 'p', shift: false, ctrl: true },
-  ],
-  [Command.COMPLETION_DOWN]: [
-    { key: 'down', shift: false },
-    { key: 'n', shift: false, ctrl: true },
-  ],
+  [Command.ACCEPT_SUGGESTION]: [{ key: 'tab' }, { key: 'return' }],
+  [Command.COMPLETION_UP]: [{ key: 'up' }, { key: 'p', ctrl: true }],
+  [Command.COMPLETION_DOWN]: [{ key: 'down' }, { key: 'n', ctrl: true }],
   [Command.EXPAND_SUGGESTION]: [{ key: 'right' }],
   [Command.COLLAPSE_SUGGESTION]: [{ key: 'left' }],
 
   // Text Input
   // Must also exclude shift to allow shift+enter for newline
-  [Command.SUBMIT]: [
-    {
-      key: 'return',
-      shift: false,
-      alt: false,
-      ctrl: false,
-      cmd: false,
-    },
-  ],
+  [Command.SUBMIT]: [{ key: 'return' }],
   [Command.NEWLINE]: [
     { key: 'return', ctrl: true },
     { key: 'return', cmd: true },
@@ -279,22 +245,17 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.TOGGLE_BACKGROUND_SHELL_LIST]: [{ key: 'l', ctrl: true }],
   [Command.KILL_BACKGROUND_SHELL]: [{ key: 'k', ctrl: true }],
   [Command.UNFOCUS_BACKGROUND_SHELL]: [{ key: 'tab', shift: true }],
-  [Command.UNFOCUS_BACKGROUND_SHELL_LIST]: [{ key: 'tab', shift: false }],
-  [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]: [
-    { key: 'tab', shift: false },
-  ],
-  [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]: [{ key: 'tab', shift: false }],
+  [Command.UNFOCUS_BACKGROUND_SHELL_LIST]: [{ key: 'tab' }],
+  [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]: [{ key: 'tab' }],
+  [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]: [{ key: 'tab' }],
   [Command.BACKGROUND_SHELL_SELECT]: [{ key: 'return' }],
   [Command.BACKGROUND_SHELL_ESCAPE]: [{ key: 'escape' }],
-  [Command.SHOW_MORE_LINES]: [
-    { key: 'o', ctrl: true },
-    { key: 's', ctrl: true },
-  ],
+  [Command.SHOW_MORE_LINES]: [{ key: 'o', ctrl: true }],
   [Command.EXPAND_PASTE]: [{ key: 'o', ctrl: true }],
-  [Command.FOCUS_SHELL_INPUT]: [{ key: 'tab', shift: false }],
+  [Command.FOCUS_SHELL_INPUT]: [{ key: 'tab' }],
   [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'tab', shift: true }],
   [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
-  [Command.RESTART_APP]: [{ key: 'r' }],
+  [Command.RESTART_APP]: [{ key: 'r' }, { key: 'r', shift: true }],
   [Command.SUSPEND_APP]: [{ key: 'z', ctrl: true }],
 };
 
@@ -488,7 +449,7 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SUBMIT]: 'Submit the current prompt.',
   [Command.NEWLINE]: 'Insert a newline without submitting.',
   [Command.OPEN_EXTERNAL_EDITOR]:
-    'Open the current prompt in an external editor.',
+    'Open the current prompt or the plan in an external editor.',
   [Command.PASTE_CLIPBOARD]: 'Paste from the clipboard.',
 
   // App Controls
@@ -499,9 +460,9 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.TOGGLE_COPY_MODE]: 'Toggle copy mode when in alternate buffer mode.',
   [Command.TOGGLE_YOLO]: 'Toggle YOLO (auto-approval) mode for tool calls.',
   [Command.CYCLE_APPROVAL_MODE]:
-    'Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only).',
+    'Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). Plan mode is skipped when the agent is busy.',
   [Command.SHOW_MORE_LINES]:
-    'Expand a height-constrained response to show additional lines when not in alternate buffer mode.',
+    'Expand and collapse blocks of content when not in alternate buffer mode.',
   [Command.EXPAND_PASTE]:
     'Expand or collapse a paste placeholder when cursor is over placeholder.',
   [Command.BACKGROUND_SHELL_SELECT]:
@@ -516,12 +477,12 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.UNFOCUS_BACKGROUND_SHELL_LIST]:
     'Move focus from background shell list to Gemini.',
   [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]:
-    'Show warning when trying to unfocus background shell via Tab.',
+    'Show warning when trying to move focus away from background shell.',
   [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]:
-    'Show warning when trying to unfocus shell input via Tab.',
+    'Show warning when trying to move focus away from shell input.',
   [Command.FOCUS_SHELL_INPUT]: 'Move focus from Gemini to the active shell.',
   [Command.UNFOCUS_SHELL_INPUT]: 'Move focus from the shell back to Gemini.',
   [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
   [Command.RESTART_APP]: 'Restart the application.',
-  [Command.SUSPEND_APP]: 'Suspend the application (not yet implemented).',
+  [Command.SUSPEND_APP]: 'Suspend the CLI and move it to the background.',
 };

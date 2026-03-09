@@ -10,7 +10,6 @@ import {
   TRACKER_ADD_DEPENDENCY_DEFINITION,
   TRACKER_CREATE_TASK_DEFINITION,
   TRACKER_GET_TASK_DEFINITION,
-  TRACKER_INIT_DEFINITION,
   TRACKER_LIST_TASKS_DEFINITION,
   TRACKER_UPDATE_TASK_DEFINITION,
   TRACKER_VISUALIZE_DEFINITION,
@@ -20,7 +19,6 @@ import {
   TRACKER_ADD_DEPENDENCY_TOOL_NAME,
   TRACKER_CREATE_TASK_TOOL_NAME,
   TRACKER_GET_TASK_TOOL_NAME,
-  TRACKER_INIT_TOOL_NAME,
   TRACKER_LIST_TASKS_TOOL_NAME,
   TRACKER_UPDATE_TASK_TOOL_NAME,
   TRACKER_VISUALIZE_TOOL_NAME,
@@ -28,85 +26,8 @@ import {
 import type { ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
-import type {
-  TrackerTask,
-  TaskStatus,
-  TaskType,
-} from '../services/trackerTypes.js';
-
-// --- Shared Base ---
-
-abstract class BaseTrackerInvocation<
-  P extends object,
-  R extends ToolResult,
-> extends BaseToolInvocation<P, R> {
-  constructor(
-    protected readonly config: Config,
-    params: P,
-    messageBus: MessageBus,
-    toolName: string,
-  ) {
-    super(params, messageBus, toolName);
-  }
-
-  protected get service() {
-    return this.config.getTrackerService();
-  }
-
-  abstract override getDescription(): string;
-}
-
-// --- tracker_init ---
-
-class TrackerInitInvocation extends BaseTrackerInvocation<
-  Record<string, never>,
-  ToolResult
-> {
-  getDescription(): string {
-    return 'Initializing the task tracker storage.';
-  }
-
-  override async execute(_signal: AbortSignal): Promise<ToolResult> {
-    return {
-      llmContent: `Task tracker initialized successfully. Storage is ready at ${this.service.trackerDir}`,
-      returnDisplay: 'Tracker initialized.',
-    };
-  }
-}
-
-export class TrackerInitTool extends BaseDeclarativeTool<
-  Record<string, never>,
-  ToolResult
-> {
-  static readonly Name = TRACKER_INIT_TOOL_NAME;
-  constructor(
-    private config: Config,
-    messageBus: MessageBus,
-  ) {
-    super(
-      TrackerInitTool.Name,
-      'Initialize Tracker',
-      TRACKER_INIT_DEFINITION.base.description!,
-      Kind.Edit,
-      TRACKER_INIT_DEFINITION.base.parametersJsonSchema,
-      messageBus,
-    );
-  }
-  protected createInvocation(
-    params: Record<string, never>,
-    messageBus: MessageBus,
-  ) {
-    return new TrackerInitInvocation(
-      this.config,
-      params,
-      messageBus,
-      this.name,
-    );
-  }
-  override getSchema(modelId?: string) {
-    return resolveToolDeclaration(TRACKER_INIT_DEFINITION, modelId);
-  }
-}
+import type { TrackerTask, TaskType } from '../services/trackerTypes.js';
+import { TaskStatus } from '../services/trackerTypes.js';
 
 // --- tracker_create_task ---
 
@@ -118,27 +39,52 @@ interface CreateTaskParams {
   dependencies?: string[];
 }
 
-class TrackerCreateTaskInvocation extends BaseTrackerInvocation<
+class TrackerCreateTaskInvocation extends BaseToolInvocation<
   CreateTaskParams,
   ToolResult
 > {
+  constructor(
+    private readonly config: Config,
+    params: CreateTaskParams,
+    messageBus: MessageBus,
+    toolName: string,
+  ) {
+    super(params, messageBus, toolName);
+  }
+
+  private get service() {
+    return this.config.getTrackerService();
+  }
   getDescription(): string {
     return `Creating task: ${this.params.title}`;
   }
 
   override async execute(_signal: AbortSignal): Promise<ToolResult> {
-    const task = await this.service.createTask({
-      title: this.params.title,
-      description: this.params.description,
-      type: this.params.type,
-      status: 'open',
-      parentId: this.params.parentId,
-      dependencies: this.params.dependencies ?? [],
-    });
-    return {
-      llmContent: `Created task ${task.id}: ${task.title}`,
-      returnDisplay: `Created task ${task.id}.`,
-    };
+    try {
+      const task = await this.service.createTask({
+        title: this.params.title,
+        description: this.params.description,
+        type: this.params.type,
+        status: TaskStatus.OPEN,
+        parentId: this.params.parentId,
+        dependencies: this.params.dependencies ?? [],
+      });
+      return {
+        llmContent: `Created task ${task.id}: ${task.title}`,
+        returnDisplay: `Created task ${task.id}.`,
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      return {
+        llmContent: `Error creating task: ${errorMessage}`,
+        returnDisplay: 'Failed to create task.',
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.EXECUTION_FAILED,
+        },
+      };
+    }
   }
 }
 
@@ -183,10 +129,22 @@ interface UpdateTaskParams {
   dependencies?: string[];
 }
 
-class TrackerUpdateTaskInvocation extends BaseTrackerInvocation<
+class TrackerUpdateTaskInvocation extends BaseToolInvocation<
   UpdateTaskParams,
   ToolResult
 > {
+  constructor(
+    private readonly config: Config,
+    params: UpdateTaskParams,
+    messageBus: MessageBus,
+    toolName: string,
+  ) {
+    super(params, messageBus, toolName);
+  }
+
+  private get service() {
+    return this.config.getTrackerService();
+  }
   getDescription(): string {
     return `Updating task ${this.params.id}`;
   }
@@ -251,10 +209,22 @@ interface GetTaskParams {
   id: string;
 }
 
-class TrackerGetTaskInvocation extends BaseTrackerInvocation<
+class TrackerGetTaskInvocation extends BaseToolInvocation<
   GetTaskParams,
   ToolResult
 > {
+  constructor(
+    private readonly config: Config,
+    params: GetTaskParams,
+    messageBus: MessageBus,
+    toolName: string,
+  ) {
+    super(params, messageBus, toolName);
+  }
+
+  private get service() {
+    return this.config.getTrackerService();
+  }
   getDescription(): string {
     return `Retrieving task ${this.params.id}`;
   }
@@ -313,10 +283,22 @@ interface ListTasksParams {
   parentId?: string;
 }
 
-class TrackerListTasksInvocation extends BaseTrackerInvocation<
+class TrackerListTasksInvocation extends BaseToolInvocation<
   ListTasksParams,
   ToolResult
 > {
+  constructor(
+    private readonly config: Config,
+    params: ListTasksParams,
+    messageBus: MessageBus,
+    toolName: string,
+  ) {
+    super(params, messageBus, toolName);
+  }
+
+  private get service() {
+    return this.config.getTrackerService();
+  }
   getDescription(): string {
     return 'Listing tasks.';
   }
@@ -388,23 +370,49 @@ interface AddDependencyParams {
   dependencyId: string;
 }
 
-class TrackerAddDependencyInvocation extends BaseTrackerInvocation<
+class TrackerAddDependencyInvocation extends BaseToolInvocation<
   AddDependencyParams,
   ToolResult
 > {
+  constructor(
+    private readonly config: Config,
+    params: AddDependencyParams,
+    messageBus: MessageBus,
+    toolName: string,
+  ) {
+    super(params, messageBus, toolName);
+  }
+
+  private get service() {
+    return this.config.getTrackerService();
+  }
   getDescription(): string {
     return `Adding dependency: ${this.params.taskId} depends on ${this.params.dependencyId}`;
   }
 
   override async execute(_signal: AbortSignal): Promise<ToolResult> {
-    const task = await this.service.getTask(this.params.taskId);
+    if (this.params.taskId === this.params.dependencyId) {
+      return {
+        llmContent: `Error: Task ${this.params.taskId} cannot depend on itself.`,
+        returnDisplay: 'Self-referential dependency rejected.',
+        error: {
+          message: 'Task cannot depend on itself',
+          type: ToolErrorType.EXECUTION_FAILED,
+        },
+      };
+    }
+
+    const [task, dep] = await Promise.all([
+      this.service.getTask(this.params.taskId),
+      this.service.getTask(this.params.dependencyId),
+    ]);
+
     if (!task) {
       return {
         llmContent: `Task ${this.params.taskId} not found.`,
         returnDisplay: 'Task not found.',
       };
     }
-    const dep = await this.service.getTask(this.params.dependencyId);
     if (!dep) {
       return {
         llmContent: `Dependency task ${this.params.dependencyId} not found.`,
@@ -422,11 +430,15 @@ class TrackerAddDependencyInvocation extends BaseTrackerInvocation<
         returnDisplay: 'Dependency added.',
       };
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       return {
-        llmContent: `Error adding dependency: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        llmContent: `Error adding dependency: ${errorMessage}`,
         returnDisplay: 'Failed to add dependency.',
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.EXECUTION_FAILED,
+        },
       };
     }
   }
@@ -468,10 +480,22 @@ export class TrackerAddDependencyTool extends BaseDeclarativeTool<
 
 // --- tracker_visualize ---
 
-class TrackerVisualizeInvocation extends BaseTrackerInvocation<
+class TrackerVisualizeInvocation extends BaseToolInvocation<
   Record<string, never>,
   ToolResult
 > {
+  constructor(
+    private readonly config: Config,
+    params: Record<string, never>,
+    messageBus: MessageBus,
+    toolName: string,
+  ) {
+    super(params, messageBus, toolName);
+  }
+
+  private get service() {
+    return this.config.getTrackerService();
+  }
   getDescription(): string {
     return 'Visualizing the task graph.';
   }
@@ -498,30 +522,51 @@ class TrackerVisualizeInvocation extends BaseTrackerInvocation<
       bug: '[BUG]',
     };
 
-    // Simple list-based visualization for now (can enhance to tree later if needed)
-    // We'll organize by epic/parent
-    const roots = tasks.filter((t) => !t.parentId);
+    const childrenMap = new Map<string, TrackerTask[]>();
+    const roots: TrackerTask[] = [];
+
+    for (const task of tasks) {
+      if (task.parentId) {
+        if (!childrenMap.has(task.parentId)) {
+          childrenMap.set(task.parentId, []);
+        }
+        childrenMap.get(task.parentId)!.push(task);
+      } else {
+        roots.push(task);
+      }
+    }
+
     let output = 'Task Tracker Graph:\n';
 
-    const renderTask = (task: TrackerTask, depth: number) => {
+    const renderTask = (
+      task: TrackerTask,
+      depth: number,
+      visited: Set<string>,
+    ) => {
+      if (visited.has(task.id)) {
+        output += `${'  '.repeat(depth)}[CYCLE DETECTED: ${task.id}]\n`;
+        return;
+      }
+      visited.add(task.id);
+
       const indent = '  '.repeat(depth);
       output += `${indent}${statusEmojis[task.status]} ${task.id} ${typeLabels[task.type]} ${task.title}\n`;
       if (task.dependencies.length > 0) {
         output += `${indent}  └─ Depends on: ${task.dependencies.join(', ')}\n`;
       }
-      const children = tasks.filter((t) => t.parentId === task.id);
+      const children = childrenMap.get(task.id) ?? [];
       for (const child of children) {
-        renderTask(child, depth + 1);
+        renderTask(child, depth + 1, new Set(visited));
       }
     };
 
     for (const root of roots) {
-      renderTask(root, 0);
+      renderTask(root, 0, new Set());
     }
 
     return {
       llmContent: output,
-      returnDisplay: 'Graph rendered.',
+      returnDisplay: output,
     };
   }
 }
