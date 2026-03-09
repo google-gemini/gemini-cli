@@ -49,9 +49,13 @@ class CompressInvocation extends BaseToolInvocation<
     callId?: string,
   ): Promise<ToolResult> {
     if (!callId) {
-      throw new Error('Critical error: callId is required for context compression elision.');
+      throw new Error(
+        'Critical error: callId is required for context compression elision.',
+      );
     }
-    debugLogger.debug(`[PROJECT CLARITY] Executing CompressTool (callId: ${callId})`);
+    debugLogger.debug(
+      `[PROJECT CLARITY] Executing CompressTool (callId: ${callId})`,
+    );
     try {
       const continuityService = this.config.getContinuityCompressionService();
       const snapshot = await continuityService.generateSnapshot(
@@ -61,14 +65,10 @@ class CompressInvocation extends BaseToolInvocation<
       );
 
       // Queue the history replacement via SideEffectService
-      const sideEffects = this.config.getSideEffectService()
+      const sideEffects = this.config.getSideEffectService();
       sideEffects.replaceHistory([]);
       sideEffects.setContinuityAnchor(snapshot);
-      
-      if (callId) {
-        sideEffects.elideCall(callId);
-      }
-      sideEffects.reprompt();
+      sideEffects.elideCall(callId);
 
       return {
         llmContent: `Compression successful.`,

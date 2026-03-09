@@ -16,11 +16,7 @@ import {
   getDirectoryContextString,
   getEnvironmentContext,
 } from '../utils/environmentContext.js';
-import {
-  Turn,
-  GeminiEventType,
-  type ServerGeminiStreamEvent,
-} from './turn.js';
+import { Turn, GeminiEventType, type ServerGeminiStreamEvent } from './turn.js';
 import {
   CompressionStatus,
   type ChatCompressionInfo,
@@ -562,7 +558,7 @@ export class GeminiClient {
         if (
           'type' in hookResult &&
           (hookResult.type === GeminiEventType.AgentExecutionStopped ||
-           hookResult.type === GeminiEventType.AgentExecutionBlocked)
+            hookResult.type === GeminiEventType.AgentExecutionBlocked)
         ) {
           if (hookResult.type === GeminiEventType.AgentExecutionStopped) {
             this.getChat().addHistory(createUserContent(request));
@@ -603,7 +599,7 @@ export class GeminiClient {
         debugLogger.debug('[PROJECT CLARITY] Re-prompt requested.');
 
         yield* this.sendMessageStream(
-          [{ text: '[System: State updated. Please continue.]' }],
+          [],
           signal,
           prompt_id,
           boundedTurns - 1,

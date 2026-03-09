@@ -49,9 +49,14 @@ class DistillResultInvocation extends BaseToolInvocation<
     _shellExecutionConfig?: any,
     ownCallId?: string,
   ): Promise<ToolResult> {
+    if (!ownCallId) {
+      throw new Error('Critical error: callId is required for distill result.');
+    }
     const revisedText = this.params.revised_text;
 
-    debugLogger.debug(`[PROJECT CLARITY] Executing DistillResultTool (ownCallId: ${ownCallId})`);
+    debugLogger.debug(
+      `[PROJECT CLARITY] Executing DistillResultTool (ownCallId: ${ownCallId})`,
+    );
 
     // 1. Find the target: the last function response in history.
     const history = this.chat.getHistory();
@@ -82,15 +87,15 @@ class DistillResultInvocation extends BaseToolInvocation<
       throw new Error('Target call ID missing from tool response.');
     }
 
-    debugLogger.debug(`[PROJECT CLARITY] Distill target identified: ${targetCallId} at index ${lastToolResponseIndex}`);
+    debugLogger.debug(
+      `[PROJECT CLARITY] Distill target identified: ${targetCallId} at index ${lastToolResponseIndex}`,
+    );
 
     const sideEffects = this.config.getSideEffectService();
 
     // 2. Elide all turns between that tool response and the current turn.
-    if (ownCallId) {
-      sideEffects.elideBetween(targetCallId, ownCallId);
-      sideEffects.elideCall(ownCallId);
-    }
+    sideEffects.elideBetween(targetCallId, ownCallId);
+    sideEffects.elideCall(ownCallId);
 
     // 3. Save the raw output to a temp file for safety (to avoid "self-gaslighting")
     const toolName =
@@ -117,7 +122,6 @@ class DistillResultInvocation extends BaseToolInvocation<
     };
 
     sideEffects.distillResult(targetCallId, distilledResponse);
-    sideEffects.reprompt();
 
     return {
       llmContent: 'Result distilled successfully.',
