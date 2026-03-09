@@ -39,6 +39,7 @@ vi.mock('os', () => ({
 
 const mockAccess = vi.hoisted(() => vi.fn());
 const mockExistsSync = vi.hoisted(() => vi.fn());
+const mockRealpathSync = vi.hoisted(() => vi.fn());
 vi.mock('node:fs', () => ({
   default: {
     promises: {
@@ -46,12 +47,14 @@ vi.mock('node:fs', () => ({
     },
     constants: { X_OK: 1 },
     existsSync: mockExistsSync,
+    realpathSync: mockRealpathSync,
   },
   promises: {
     access: mockAccess,
   },
   constants: { X_OK: 1 },
   existsSync: mockExistsSync,
+  realpathSync: mockRealpathSync,
 }));
 
 const mockSpawnSync = vi.hoisted(() => vi.fn());
@@ -95,6 +98,7 @@ beforeEach(() => {
     error: undefined,
   });
   mockExistsSync.mockReturnValue(false);
+  mockRealpathSync.mockImplementation((p: string) => p);
   resetShellConfiguration();
 });
 

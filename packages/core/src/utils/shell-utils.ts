@@ -513,7 +513,8 @@ function parsePowerShellCommandDetails(
       hasError: details.length === 0,
       hasRedirection: parsed.hasRedirection,
     };
-  } catch {
+  } catch (e) {
+    debugLogger.debug('PowerShell command parsing error:', e);
     return null;
   }
 }
@@ -551,18 +552,28 @@ export function getShellConfiguration(): ShellConfiguration {
 
   if (isWindows()) {
     const comSpec = process.env['ComSpec'];
-    if (comSpec) {
-      const executable = comSpec.toLowerCase();
-      if (
-        executable.endsWith('powershell.exe') ||
-        executable.endsWith('pwsh.exe')
-      ) {
-        cachedShellConfiguration = {
-          executable: comSpec,
-          argsPrefix: ['-NoProfile', '-Command'],
-          shell: 'powershell',
-        };
-        return cachedShellConfiguration;
+    if (comSpec && path.isAbsolute(comSpec)) {
+      // Basic security check: ensure no redirection or command chaining characters in ComSpec
+      if (/[;&|<>%]/.test(comSpec)) {
+        debugLogger.warn(`Unsafe ComSpec detected: ${comSpec}`);
+      } else {
+        const executable = comSpec.toLowerCase();
+        if (
+          executable.endsWith('powershell.exe') ||
+          executable.endsWith('pwsh.exe')
+        ) {
+          try {
+            const canonicalPath = fs.realpathSync(comSpec);
+            cachedShellConfiguration = {
+              executable: canonicalPath,
+              argsPrefix: ['-NoProfile', '-Command'],
+              shell: 'powershell',
+            };
+            return cachedShellConfiguration;
+          } catch (e) {
+            debugLogger.debug(`Error resolving canonical path for ComSpec: ${comSpec}`, e);
+          }
+        }
       }
     }
 
@@ -570,17 +581,20 @@ export function getShellConfiguration(): ShellConfiguration {
     const pathDelimiter = os.platform() === 'win32' ? ';' : path.delimiter;
     const paths = (process.env['PATH'] || '').split(pathDelimiter);
     for (const p of paths) {
-      const fullPath = path.join(p, 'pwsh.exe');
+      if (!p) continue;
+      const fullPath = path.resolve(p, 'pwsh.exe');
       try {
-        if (fs.existsSync(fullPath)) {
+        if (path.isAbsolute(fullPath) && fs.existsSync(fullPath)) {
+          const canonicalPath = fs.realpathSync(fullPath);
           cachedShellConfiguration = {
-            executable: fullPath,
+            executable: canonicalPath,
             argsPrefix: ['-NoProfile', '-Command'],
             shell: 'powershell',
           };
           return cachedShellConfiguration;
         }
-      } catch {
+      } catch (e) {
+        debugLogger.debug(`Error checking for pwsh.exe in ${p}:`, e);
         continue;
       }
     }
