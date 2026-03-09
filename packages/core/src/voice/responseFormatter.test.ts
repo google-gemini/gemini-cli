@@ -189,6 +189,16 @@ describe('formatForSpeech', () => {
       expect(result).toContain('line 55');
       expect(result).not.toContain('D:\\Users\\project');
     });
+
+    it('should abbreviate a Unix path containing a scoped npm package segment', () => {
+      const result = formatForSpeech(
+        'at /home/user/project/node_modules/@google/gemini-cli-core/src/index.ts:12:3',
+        { pathDepth: 5 },
+      );
+      expect(result).toContain('line 12');
+      expect(result).not.toContain(':3');
+      expect(result).toContain('@google');
+    });
   });
 
   describe('stack trace collapsing', () => {

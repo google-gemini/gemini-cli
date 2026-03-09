@@ -56,7 +56,7 @@ const STACK_FRAME_RE = /^[ \t]+at .+$/gm;
 // Absolute Unix paths optionally ending with :line or :line:col
 // Hyphen placed at start of char class to avoid useless-escape lint error
 const UNIX_PATH_RE =
-  /(?:^|(?<=\s|[(`"']))(\/(?:[-\w.]+\/)*[-\w.]+)(:\d+(?::\d+)?)?/g;
+  /(?:^|(?<=\s|[(`"']))(\/(?:[-\w.@]+\/)*[-\w.@]+)(:\d+(?::\d+)?)?/g;
 
 // Absolute Windows paths  C:\...  or  C:/...  (any drive letter)
 const WIN_PATH_RE =
