@@ -31,6 +31,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { isNodeError } from '../utils/errors.js';
+import { MCP_TOOL_PREFIX } from '../tools/mcp-tool.js';
 
 import { isDirectorySecure } from '../utils/security.js';
 
@@ -342,7 +343,11 @@ export async function createPolicyEngineConfig(
   if (settings.mcp?.excluded) {
     for (const serverName of settings.mcp.excluded) {
       rules.push({
-        toolName: `${serverName}__*`,
+        toolName:
+          serverName === '*'
+            ? `${MCP_TOOL_PREFIX}*`
+            : `${MCP_TOOL_PREFIX}${serverName}_*`,
+        mcpName: serverName,
         decision: PolicyDecision.DENY,
         priority: MCP_EXCLUDED_PRIORITY,
         source: 'Settings (MCP Excluded)',
@@ -423,9 +428,10 @@ export async function createPolicyEngineConfig(
     )) {
       if (serverConfig.trust) {
         // Trust all tools from this MCP server
-        // Using pattern matching for MCP tool names which are formatted as "serverName__toolName"
+        // Using explicit mcpName metadata and FQN mcp_{serverName}_*
         rules.push({
-          toolName: `${serverName}__*`,
+          toolName: `${MCP_TOOL_PREFIX}${serverName}_*`,
+          mcpName: serverName,
           decision: PolicyDecision.ALLOW,
           priority: TRUSTED_MCP_SERVER_PRIORITY,
           source: 'Settings (MCP Trusted)',
@@ -439,7 +445,11 @@ export async function createPolicyEngineConfig(
   if (settings.mcp?.allowed) {
     for (const serverName of settings.mcp.allowed) {
       rules.push({
-        toolName: `${serverName}__*`,
+        toolName:
+          serverName === '*'
+            ? `${MCP_TOOL_PREFIX}*`
+            : `${MCP_TOOL_PREFIX}${serverName}_*`,
+        mcpName: serverName,
         decision: PolicyDecision.ALLOW,
         priority: ALLOWED_MCP_SERVER_PRIORITY,
         source: 'Settings (MCP Allowed)',
