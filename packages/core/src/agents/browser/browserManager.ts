@@ -118,7 +118,7 @@ export class BrowserManager {
         content: [
           {
             type: 'text',
-            text: `Tool '${toolName}' is not permitted for the requested URL/domain based on your current browser settings. DO NOT attempt to call with same URL/domain`,
+            text: `Tool '${toolName}' is not permitted for the requested URL/domain based on your current browser settings.`,
           },
         ],
         isError: true,
@@ -285,6 +285,18 @@ export class BrowserManager {
         BROWSER_PROFILE_DIR,
       );
       mcpArgs.push('--userDataDir', defaultProfilePath);
+    }
+
+    if (
+      browserConfig.customConfig.allowedDomains &&
+      browserConfig.customConfig.allowedDomains.length > 0
+    ) {
+      const exclusionRules = browserConfig.customConfig.allowedDomains
+        .map((domain) => `EXCLUDE ${domain}`)
+        .join(', ');
+      mcpArgs.push(
+        `--chromeArg="--host-rules=MAP * 127.0.0.1, ${exclusionRules}, EXCLUDE 127.0.0.1"`,
+      );
     }
 
     debugLogger.log(

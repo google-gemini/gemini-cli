@@ -152,7 +152,7 @@ describe('BrowserManager', () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0]?.text).toContain('not permitted');
+      expect((result.content || [])[0]?.text).toContain('not permitted');
       expect(Client).not.toHaveBeenCalled();
     });
 
@@ -170,7 +170,7 @@ describe('BrowserManager', () => {
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content[0]?.text).toBe('Tool result');
+      expect((result.content || [])[0]?.text).toBe('Tool result');
     });
 
     it('should allow navigate_page to subdomain when wildcard is used', async () => {
@@ -187,7 +187,7 @@ describe('BrowserManager', () => {
       });
 
       expect(result.isError).toBe(false);
-      expect(result.content[0]?.text).toBe('Tool result');
+      expect((result.content || [])[0]?.text).toBe('Tool result');
     });
 
     it('should block new_page to disallowed domain', async () => {
@@ -204,7 +204,7 @@ describe('BrowserManager', () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0]?.text).toContain('not permitted');
+      expect((result.content || [])[0]?.text).toContain('not permitted');
     });
   });
 
@@ -233,6 +233,25 @@ describe('BrowserManager', () => {
       expect(args).toContain('--userDataDir');
       const userDataDirIndex = args.indexOf('--userDataDir');
       expect(args[userDataDirIndex + 1]).toMatch(/cli-browser-profile$/);
+    });
+
+    it('should pass --host-rules when allowedDomains is configured', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['google.com', '*.openai.com'],
+          },
+        },
+      });
+
+      const manager = new BrowserManager(restrictedConfig);
+      await manager.ensureConnection();
+
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+        ?.args as string[];
+      expect(args).toContain(
+        '--chromeArg="--host-rules=MAP * 127.0.0.1, EXCLUDE google.com, EXCLUDE *.openai.com, EXCLUDE 127.0.0.1"',
+      );
     });
 
     it('should pass headless flag when configured', async () => {
