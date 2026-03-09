@@ -13,6 +13,7 @@ import {
   KeychainSchema,
   KEYCHAIN_TEST_PREFIX,
 } from './keychainTypes.js';
+import { isRecord } from '../utils/markdownUtils.js';
 
 /**
  * Service for interacting with OS-level secure storage (e.g. keytar).
@@ -111,7 +112,7 @@ export class KeychainService {
   private async loadKeychainModule(): Promise<Keychain | null> {
     const moduleName = 'keytar';
     const module: unknown = await import(moduleName);
-    const potential = (this.isRecord(module) && module['default']) || module;
+    const potential = (isRecord(module) && module['default']) || module;
 
     const result = KeychainSchema.safeParse(potential);
     if (result.success) {
@@ -124,10 +125,6 @@ export class KeychainService {
       result.error.flatten().fieldErrors,
     );
     return null;
-  }
-
-  private isRecord(obj: unknown): obj is Record<string, unknown> {
-    return typeof obj === 'object' && obj !== null;
   }
 
   // Performs a set-get-delete cycle to verify keychain functionality.

@@ -25,6 +25,7 @@ import { extractIdsFromResponse, A2AResultReassembler } from './a2aUtils.js';
 import { GoogleAuth } from 'google-auth-library';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { debugLogger } from '../utils/debugLogger.js';
+import { safeJsonToMarkdown } from '../utils/markdownUtils.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 
@@ -222,7 +223,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
 
       return {
         llmContent: [{ text: finalOutput }],
-        returnDisplay: finalOutput,
+        returnDisplay: safeJsonToMarkdown(finalOutput),
       };
     } catch (error: unknown) {
       const partialOutput = reassembler.toString();
