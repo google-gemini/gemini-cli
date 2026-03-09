@@ -54,7 +54,7 @@ const COMPACT_OUTPUT_ALLOWLIST = new Set([
 ]);
 
 // Helper to identify if a tool should use the compact view
-const isCompactTool = (
+export const isCompactTool = (
   tool: IndividualToolCallDisplay,
   isCompactModeEnabled: boolean,
 ): boolean => {
@@ -68,7 +68,7 @@ const isCompactTool = (
 };
 
 // Helper to identify if a compact tool has a payload (diff, list, etc.)
-const hasDensePayload = (tool: IndividualToolCallDisplay): boolean => {
+export const hasDensePayload = (tool: IndividualToolCallDisplay): boolean => {
   if (tool.outputFile) return true;
   const res = tool.resultDisplay;
   if (!res) return false;
@@ -121,7 +121,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   toolCalls: allToolCalls,
   availableTerminalHeight,
   terminalWidth,
-  // borderTop: borderTopOverride,
+  borderTop: borderTopOverride,
   borderBottom: borderBottomOverride,
   isExpandable,
 }) => {
@@ -207,29 +207,26 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       const prevIsCompact = prevTool
         ? isCompactTool(prevTool, isCompactModeEnabled)
         : false;
-      const hasPayload = hasDensePayload(tool);
-      const prevHasPayload = prevTool ? hasDensePayload(prevTool) : false;
 
       if (isCompact) {
         height += 1; // Base height for compact tool
         // Spacing logic (matching marginTop)
-        if (
-          isFirst ||
-          isCompact !== prevIsCompact ||
-          hasPayload ||
-          prevHasPayload
-        ) {
+        if (isFirst) {
+          height += borderTopOverride ?? true ? 1 : 0;
+        } else if (!prevIsCompact) {
           height += 1;
         }
       } else {
         height += 3; // Static overhead for standard tool
-        if (isFirst || prevIsCompact) {
-          height += 1;
+        if (isFirst) {
+          height += borderTopOverride ?? true ? 1 : 0;
+        } else {
+          height += 1; // marginTop is always 1 for non-compact tools (not first)
         }
       }
     }
     return height;
-  }, [visibleToolCalls, isCompactModeEnabled]);
+  }, [visibleToolCalls, isCompactModeEnabled, borderTopOverride]);
 
   let countToolCallsWithResults = 0;
   for (const tool of visibleToolCalls) {
@@ -273,20 +270,18 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     */
       width={terminalWidth}
       paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
-      marginBottom={1}
+      marginBottom={borderBottomOverride ?? true ? 1 : 0}
     >
       {visibleToolCalls.map((tool, index) => {
         const isFirst = index === 0;
         const isLast = index === visibleToolCalls.length - 1;
         const isShellToolCall = isShellTool(tool.name);
         const isCompact = isCompactTool(tool, isCompactModeEnabled);
-        const hasPayload = hasDensePayload(tool);
 
         const prevTool = index > 0 ? visibleToolCalls[index - 1] : null;
         const prevIsCompact = prevTool
           ? isCompactTool(prevTool, isCompactModeEnabled)
           : false;
-        const prevHasPayload = prevTool ? hasDensePayload(prevTool) : false;
 
         const nextTool = !isLast ? visibleToolCalls[index + 1] : null;
         const nextIsCompact = nextTool
@@ -295,12 +290,8 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
         let marginTop = 0;
         if (isFirst) {
-          marginTop = 1;
-        } else if (isCompact !== prevIsCompact) {
-          marginTop = 1;
-        } else if (isCompact && (hasPayload || prevHasPayload)) {
-          marginTop = 1;
-        } else if (!isCompact && prevIsCompact) {
+          marginTop = borderTopOverride ?? true ? 1 : 0;
+        } else if (!(isCompact && prevIsCompact)) {
           marginTop = 1;
         }
 
@@ -309,7 +300,11 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           availableTerminalHeight: availableTerminalHeightPerToolMessage,
           terminalWidth: contentWidth,
           emphasis: 'medium' as const,
-          isFirst: isCompact ? false : prevIsCompact || isFirst,
+          isFirst: isCompact
+            ? false
+            : isFirst
+              ? (borderTopOverride ?? true)
+              : prevIsCompact,
           borderColor,
           borderDimColor,
           isExpandable,
@@ -358,7 +353,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                 borderLeft={true}
                 borderRight={true}
                 borderTop={false}
-                borderBottom={borderBottomOverride ?? true}
+                borderBottom={isLast ? (borderBottomOverride ?? true) : true}
                 borderColor={borderColor}
                 borderDimColor={borderDimColor}
                 borderStyle="round"

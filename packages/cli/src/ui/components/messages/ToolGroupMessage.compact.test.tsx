@@ -55,7 +55,7 @@ describe('ToolGroupMessage Compact Rendering', () => {
     expect(output).toMatchSnapshot();
   });
 
-  it('adds an empty line between a compact tool and a standard tool', async () => {
+  it('does not add an extra empty line between a compact tool and a standard tool', async () => {
     const toolCalls = [
       {
         callId: 'call1',
@@ -81,7 +81,7 @@ describe('ToolGroupMessage Compact Rendering', () => {
     expect(output).toMatchSnapshot();
   });
 
-  it('adds an empty line if a compact tool has a dense payload', async () => {
+  it('does not add an extra empty line if a compact tool has a dense payload', async () => {
     const toolCalls = [
       {
         callId: 'call1',
@@ -107,7 +107,7 @@ describe('ToolGroupMessage Compact Rendering', () => {
     expect(output).toMatchSnapshot();
   });
 
-  it('adds an empty line between a standard tool and a compact tool', async () => {
+  it('does not add an extra empty line between a standard tool and a compact tool', async () => {
     const toolCalls = [
       {
         callId: 'call1',

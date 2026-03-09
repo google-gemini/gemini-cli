@@ -536,6 +536,7 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
         <Box
           marginLeft={6}
           marginTop={1}
+          marginBottom={1}
           paddingX={1}
           flexDirection="column"
           height={
@@ -562,13 +563,13 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
       )}
 
       {showPayload && (!isAlternateBuffer || !diff) && viewParts.payload && (
-        <Box marginLeft={6} marginTop={1}>
+        <Box marginLeft={6} marginTop={1} marginBottom={1}>
           {viewParts.payload}
         </Box>
       )}
 
       {showPayload && outputFile && (
-        <Box marginLeft={6} marginTop={1}>
+        <Box marginLeft={6} marginTop={1} marginBottom={1}>
           <Text color={theme.text.secondary}>
             (Output saved to: {outputFile})
           </Text>
