@@ -54,7 +54,12 @@ describe('LoginWithGoogleRestartDialog', () => {
     vi.useRealTimers();
     _resetRelaunchStateForTesting();
     originalSend = process.send;
-    process.send = vi.fn();
+    process.send = vi.fn((_message, callback) => {
+      if (typeof callback === 'function') {
+        callback(null);
+      }
+      return true;
+    });
   });
 
   afterEach(() => {
