@@ -43,7 +43,10 @@ export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
       <Box>
         <Text color={theme.text.primary} wrap="truncate-end">
           {authType === AuthType.LOGIN_WITH_GOOGLE ? (
-            <Text>{email ?? 'Logged in with Google'}</Text>
+            <Text>
+              <Text bold>Signed in with Google{email ? ':' : ''}</Text>
+              {email ? ` ${email}` : ''}
+            </Text>
           ) : (
             `Authenticated with ${authType}`
           )}
@@ -55,7 +58,7 @@ export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
       {tierName && (
         <Box>
           <Text color={theme.text.primary} wrap="truncate-end">
-            {tierName}
+            <Text bold>Plan:</Text> {tierName}
           </Text>
           <Text color={theme.text.secondary}> /upgrade</Text>
         </Box>

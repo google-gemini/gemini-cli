@@ -297,7 +297,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`ui.showUserIdentity`** (boolean):
-  - **Description:** Show the logged-in user's identity (e.g. email) in the UI.
+  - **Description:** Show the signed-in user's identity (e.g. email) in the UI.
   - **Default:** `true`
 
 - **`ui.useAlternateBuffer`** (boolean):

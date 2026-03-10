@@ -29,13 +29,13 @@ topics on:
       added to your organization's Gemini Code Assist subscription.
 
 - **Error:
-  `Failed to login. Message: Your current account is not eligible... because it is not currently available in your location.`**
+  `Failed to sign in. Message: Your current account is not eligible... because it is not currently available in your location.`**
   - **Cause:** Gemini CLI does not currently support your location. For a full
     list of supported locations, see the following pages:
     - Gemini Code Assist for individuals:
       [Available locations](https://developers.google.com/gemini-code-assist/resources/available-locations#americas)
 
-- **Error: `Failed to login. Message: Request contains an invalid argument`**
+- **Error: `Failed to sign in. Message: Request contains an invalid argument`**
   - **Cause:** Users with Google Workspace accounts or Google Cloud accounts
     associated with their Gmail accounts may not be able to activate the free
     tier of the Google Code Assist plan.

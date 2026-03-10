@@ -44,7 +44,7 @@ export function AuthDialog({
   const [exiting, setExiting] = useState(false);
   let items = [
     {
-      label: 'Login with Google',
+      label: 'Sign in with Google',
       value: AuthType.LOGIN_WITH_GOOGLE,
       key: AuthType.LOGIN_WITH_GOOGLE,
     },

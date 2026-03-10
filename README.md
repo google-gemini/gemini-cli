@@ -147,7 +147,7 @@ Integrate Gemini CLI directly into your GitHub workflows with
 
 Choose the authentication method that best fits your needs:
 
-### Option 1: Login with Google (OAuth login using your Google Account)
+### Option 1: Sign in with Google (OAuth login using your Google Account)
 
 **✨ Best for:** Individual developers as well as anyone who has a Gemini Code
 Assist License. (see
@@ -161,7 +161,7 @@ for details)
 - **No API key management** - just sign in with your Google account
 - **Automatic updates** to latest models
 
-#### Start Gemini CLI, then choose _Login with Google_ and follow the browser authentication flow when prompted
+#### Start Gemini CLI, then choose _Sign in with Google_ and follow the browser authentication flow when prompted
 
 ```bash
 gemini

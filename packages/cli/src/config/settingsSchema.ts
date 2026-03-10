@@ -676,7 +676,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: true,
         description:
-          "Show the logged-in user's identity (e.g. email) in the UI.",
+          "Show the signed-in user's identity (e.g. email) in the UI.",
         showInDialog: true,
       },
       useAlternateBuffer: {

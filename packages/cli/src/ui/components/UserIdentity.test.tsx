@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -45,7 +45,7 @@ describe('<UserIdentity />', () => {
     await waitUntilReady();
 
     const output = lastFrame();
-    expect(output).toContain('test@example.com');
+    expect(output).toContain('Signed in with Google: test@example.com');
     expect(output).toContain('/auth');
     expect(output).not.toContain('/upgrade');
     unmount();
@@ -91,7 +91,8 @@ describe('<UserIdentity />', () => {
     await waitUntilReady();
 
     const output = lastFrame();
-    expect(output).toContain('Logged in with Google');
+    expect(output).toContain('Signed in with Google');
+    expect(output).not.toContain('Signed in with Google:');
     expect(output).toContain('/auth');
     expect(output).not.toContain('/upgrade');
     unmount();
@@ -111,10 +112,19 @@ describe('<UserIdentity />', () => {
     await waitUntilReady();
 
     const output = lastFrame();
-    expect(output).toContain('test@example.com');
+    expect(output).toContain('Signed in with Google: test@example.com');
     expect(output).toContain('/auth');
-    expect(output).toContain('Premium Plan');
+    expect(output).toContain('Plan: Premium Plan');
     expect(output).toContain('/upgrade');
+
+    // Check for two lines (or more if wrapped, but here it should be separate)
+    const lines = output?.split('\n').filter((line) => line.trim().length > 0);
+    expect(lines?.some((line) => line.includes('Signed in with Google'))).toBe(
+      true,
+    );
+    expect(lines?.some((line) => line.includes('Plan: Premium Plan'))).toBe(
+      true,
+    );
 
     unmount();
   });
@@ -168,7 +178,7 @@ describe('<UserIdentity />', () => {
     await waitUntilReady();
 
     const output = lastFrame();
-    expect(output).toContain('Enterprise Tier');
+    expect(output).toContain('Plan: Enterprise Tier');
     expect(output).toContain('/upgrade');
     unmount();
   });
