@@ -160,13 +160,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       // registry and register it with the agent's isolated registry.
       const tool = parentToolRegistry.getTool(toolName);
       if (tool) {
-        if (tool instanceof DiscoveredMCPTool) {
+        // Clone the tool, so it gets its own state and subagent messageBus
+        const clonedTool = tool.clone(subagentMessageBus);
+        if (clonedTool instanceof DiscoveredMCPTool) {
           // Subagents MUST use fully qualified names for MCP tools to ensure
           // unambiguous tool calls and to comply with policy requirements.
           // We automatically "upgrade" any MCP tool to its qualified version.
-          agentToolRegistry.registerTool(tool.asFullyQualifiedTool());
+          agentToolRegistry.registerTool(clonedTool.asFullyQualifiedTool());
         } else {
-          agentToolRegistry.registerTool(tool);
+          agentToolRegistry.registerTool(clonedTool);
         }
       }
     };

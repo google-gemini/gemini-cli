@@ -380,6 +380,22 @@ export abstract class DeclarativeTool<
     readonly extensionId?: string,
   ) {}
 
+  clone(messageBus?: MessageBus): this {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const cloned = Object.assign(
+      Object.create(Object.getPrototypeOf(this)),
+      this,
+    ) as this;
+    if (messageBus) {
+      Object.defineProperty(cloned, 'messageBus', {
+        value: messageBus,
+        writable: false,
+        configurable: true,
+      });
+    }
+    return cloned;
+  }
+
   get isReadOnly(): boolean {
     return READ_ONLY_KINDS.includes(this.kind);
   }

@@ -202,10 +202,16 @@ export class ToolRegistry {
   private allKnownTools: Map<string, AnyDeclarativeTool> = new Map();
   private config: Config;
   private messageBus: MessageBus;
+  private isMainRegistry: boolean;
 
-  constructor(config: Config, messageBus: MessageBus) {
+  constructor(
+    config: Config,
+    messageBus: MessageBus,
+    isMainRegistry: boolean = false,
+  ) {
     this.config = config;
     this.messageBus = messageBus;
+    this.isMainRegistry = isMainRegistry;
   }
 
   getMessageBus(): MessageBus {
@@ -545,6 +551,10 @@ export class ToolRegistry {
     const declarations: FunctionDeclaration[] = [];
     const seenNames = new Set<string>();
 
+    const mainAgentTools = this.isMainRegistry
+      ? this.config.getMainAgentTools()
+      : undefined;
+
     this.getActiveTools().forEach((tool) => {
       const toolName =
         tool instanceof DiscoveredMCPTool
@@ -554,6 +564,16 @@ export class ToolRegistry {
       if (seenNames.has(toolName)) {
         return;
       }
+
+      if (
+        mainAgentTools &&
+        !mainAgentTools.includes(toolName) &&
+        !mainAgentTools.includes(tool.constructor.name) &&
+        !mainAgentTools.some((t) => t.startsWith(`${tool.constructor.name}(`))
+      ) {
+        return;
+      }
+
       seenNames.add(toolName);
 
       let schema = tool.getSchema(modelId);
