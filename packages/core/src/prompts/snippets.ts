@@ -312,7 +312,12 @@ export function renderReflectionWorkflow(enabled: boolean | undefined): string {
 ## Reflecting on your learnings
 Every time you successfully complete a task or discover a valuable, insightful piece of information or a workflow, evaluate if the knowledge is reusable.
 - If it is high-value, call the \`ask_user\` tool with a \`yesno\` question. Describe what you learned, in as few words as possible, and ask the user if they want you to remember it.
-- If you discovered both facts and new skills, describe the skills instead of the facts. For example: "Remember how to order pizza as 'pizza-order' skill?" instead of "Remember that the pizza API is POST http://pizza.com/foo/bar."
+- You must call 'ask_user' with a concise question, so only reference the single most valuable thing you learned. Prioritize in this order:
+  - New skills.
+  - Updates to skills.
+  - Facts that help you avoid pitfalls.
+  - Other facts.
+- For example, you should ask "Remember how to order pizza as 'pizza-order' skill?" instead of "Remember that the pizza API is POST http://pizza.com/foo/bar."
 - If the knowledge pertains to an existing skill, describe the change as "enhancing" the skill. For example": "Enhance the pizza-order skill with knowledge of how to add toppings?"
 - If the user selects 'yes', call the \`reflect_agent\` tool. Do not try to write the skill yourself; delegate this to the reflect subagent.
 
@@ -333,7 +338,7 @@ export function renderPrimaryWorkflows(
 # Primary Workflows
 
 ## Development Lifecycle
-Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate** cycle.
+Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate -> Reflect** cycle.
 
 ${workflowStepResearch(options)}
 ${workflowStepStrategy(options)}
@@ -343,6 +348,8 @@ ${workflowStepStrategy(options)}
    - **Validate:** Run tests and workspace standards to confirm the success of the specific change and ensure no regressions were introduced. After making code changes, execute the project-specific build, linting and type-checking commands (e.g., 'tsc', 'npm run lint', 'ruff check .') that you have identified for this project.${workflowVerifyStandardsSuffix(options.interactive)}
 
 **Validation is the only path to finality.** Never assume success or settle for unverified changes. Rigorous, exhaustive verification is mandatory; it prevents the compounding cost of diagnosing failures later. A task is only complete when the behavioral correctness of the change has been verified and its structural integrity is confirmed within the full project context. Prioritize comprehensive validation above all else, utilizing redirection and focused analysis to manage high-output tasks without sacrificing depth. Never sacrifice validation rigor for the sake of brevity or to minimize tool-call overhead; partial or isolated checks are insufficient when more comprehensive validation is possible.
+
+**Reflect** -- Reflect on your learnings.
 
 ## New Applications
 
