@@ -7,7 +7,7 @@ features, such as tracing.
 
 Before working with Gemini CLI locally, ensure the following tools are installed:
 
-- Node.js (version 18 or later recommended)
+- Node.js (>=20.0.0, recommended ~20.19.0 for development)
 - npm (included with Node.js)
 - Git
 
