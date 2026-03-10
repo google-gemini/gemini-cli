@@ -1095,7 +1095,7 @@ describe('ShellExecutionService', () => {
         'destroy',
       );
 
-      ShellExecutionService.kill(pid);
+      await ShellExecutionService.kill(pid);
 
       expect(storedDestroySpy).toHaveBeenCalled();
       expect(ShellExecutionService['activePtys'].has(pid)).toBe(false);
