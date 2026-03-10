@@ -74,6 +74,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         input: 0,
         duration_ms: 0,
         tool_calls: 0,
+        models: {},
       }),
     })),
     uiTelemetryService: {
