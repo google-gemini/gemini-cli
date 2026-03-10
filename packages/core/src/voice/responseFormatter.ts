@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -36,7 +36,9 @@ const CODE_FENCE_RE = /```[^\n]*\n([\s\S]*?)```/g;
 const INLINE_CODE_RE = /`([^`]+)`/g;
 
 // Bold/italic markers  **text**, *text*, __text__, _text_
-const BOLD_ITALIC_RE = /\*{1,2}([^*]+)\*{1,2}|_{1,2}([^_]+)_{1,2}/g;
+// Exclude newlines so the pattern cannot span multiple lines and accidentally
+// consume list markers that haven't been stripped yet.
+const BOLD_ITALIC_RE = /\*{1,2}([^*\n]+)\*{1,2}|_{1,2}([^_\n]+)_{1,2}/g;
 
 // Blockquote prefix  "> "
 const BLOCKQUOTE_RE = /^>\s?/gm;
@@ -50,8 +52,10 @@ const LINK_RE = /\[([^\]]+)\]\([^)]+\)/g;
 // Markdown list markers  "- " or "* " or "N. " at line start
 const LIST_MARKER_RE = /^[ \t]*(?:[-*]|\d+\.)\s+/gm;
 
-// Stack-trace frames: lines starting with "    at " (Node.js style)
-const STACK_FRAME_RE = /^[ \t]+at .+$/gm;
+// Two or more consecutive stack-trace frames (Node.js style "    at …" lines).
+// Matching blocks of ≥2 lets us replace each group in-place, preserving any
+// text that follows the trace rather than appending it to the end.
+const STACK_BLOCK_RE = /(?:^[ \t]+at [^\n]+(?:\n|$)){2,}/gm;
 
 // Absolute Unix paths optionally ending with :line or :line:col
 // Hyphen placed at start of char class to avoid useless-escape lint error
@@ -139,15 +143,16 @@ export function formatForSpeech(
     return trimmed;
   });
 
-  // 3. Collapse stack traces: keep first "at" line, count the rest
-  {
-    const frames = out.match(STACK_FRAME_RE);
-    if (frames && frames.length > 1) {
-      const rest = frames.length - 1;
-      out = out.replace(STACK_FRAME_RE, () => '').trimEnd();
-      out += ` ${frames[0].trim()} (and ${rest} more frame${rest === 1 ? '' : 's'})`;
-    }
-  }
+  // 3. Collapse stack traces: replace each contiguous block of ≥2 frames
+  //    in-place so that any text after the trace is preserved in order.
+  out = out.replace(STACK_BLOCK_RE, (block) => {
+    const lines = block
+      .trim()
+      .split('\n')
+      .map((l) => l.trim());
+    const rest = lines.length - 1;
+    return `${lines[0]} (and ${rest} more frame${rest === 1 ? '' : 's'})\n`;
+  });
 
   // 4. Strip markdown syntax
   out = out
