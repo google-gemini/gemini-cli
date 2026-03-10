@@ -172,6 +172,23 @@ describe('LoopDetectionService', () => {
       }
       expect(loggers.logLoopDetected).not.toHaveBeenCalled();
     });
+
+    it('should detect shell tool loops even when wrapper and description vary', () => {
+      let isLoop = false;
+
+      for (let i = 0; i < TOOL_CALL_LOOP_THRESHOLD; i++) {
+        const command = i % 2 === 0 ? 'bash -c "echo    hello"' : 'echo hello';
+        const event = createToolCallRequestEvent('run_shell_command', {
+          command,
+          description: `attempt-${i}`,
+          is_background: false,
+        });
+        isLoop = service.addAndCheck(event);
+      }
+
+      expect(isLoop).toBe(true);
+      expect(loggers.logLoopDetected).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('Content Loop Detection', () => {
