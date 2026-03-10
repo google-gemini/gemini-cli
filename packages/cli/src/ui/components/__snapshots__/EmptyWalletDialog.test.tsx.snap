@@ -16,9 +16,9 @@ exports[`EmptyWalletDialog > rendering > should match snapshot with fallback ava
 │ How would you like to proceed?                                                                   │
 │                                                                                                  │
 │                                                                                                  │
-│ ● 1. Get AI Credits - Open browser to purchase credits                                           │
-│   2. Switch to gemini-3-flash-preview                                                            │
-│   3. Stop - Abort request                                                                        │
+│  ● 1. Get AI Credits - Open browser to purchase credits                                          │
+│    2. Switch to gemini-3-flash-preview                                                           │
+│    3. Stop - Abort request                                                                       │
 │                                                                                                  │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -40,8 +40,8 @@ exports[`EmptyWalletDialog > rendering > should match snapshot without fallback 
 │ How would you like to proceed?                                                                   │
 │                                                                                                  │
 │                                                                                                  │
-│ ● 1. Get AI Credits - Open browser to purchase credits                                           │
-│   2. Stop - Abort request                                                                        │
+│  ● 1. Get AI Credits - Open browser to purchase credits                                          │
+│    2. Stop - Abort request                                                                       │
 │                                                                                                  │
 │                                                                                                  │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────╯

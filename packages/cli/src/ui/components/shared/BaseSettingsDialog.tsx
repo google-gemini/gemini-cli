@@ -502,12 +502,13 @@ export function BaseSettingsDialog({
               return (
                 <React.Fragment key={item.key}>
                   <Box
-                    marginX={1}
+                    marginX={isActive ? 0 : 1}
                     flexDirection="row"
                     alignItems="flex-start"
                     backgroundColor={
                       isActive ? theme.background.focus : undefined
                     }
+                    paddingX={isActive ? 1 : 0}
                   >
                     <Box minWidth={2} flexShrink={0}>
                       <Text
@@ -538,7 +539,12 @@ export function BaseSettingsDialog({
                             </Text>
                           )}
                         </Text>
-                        <Text color={theme.text.secondary} wrap="truncate">
+                        <Text
+                          color={
+                            isActive ? theme.text.primary : theme.text.secondary
+                          }
+                          wrap="truncate"
+                        >
                           {item.description ?? ''}
                         </Text>
                       </Box>

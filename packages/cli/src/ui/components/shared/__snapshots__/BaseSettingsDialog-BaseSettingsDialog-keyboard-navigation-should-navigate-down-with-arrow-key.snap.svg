@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="445" viewBox="0 0 920 445">
+  <style>
+    text { font-family: Consolas, "Courier New", monospace; font-size: 14px; dominant-baseline: text-before-edge; white-space: pre; }
+  </style>
+  <rect width="920" height="445" fill="#000000" />
+  <g transform="translate(10, 10)">
+    <text x="0" y="2" fill="#878787" textLength="900" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────────────────────────╮</text>
+    <text x="0" y="19" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="19" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="36" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="36" fill="#ffffff" textLength="144" lengthAdjust="spacingAndGlyphs" font-weight="bold">&gt; Test Settings </text>
+    <text x="891" y="36" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="53" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="53" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="70" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="70" fill="#ffffff" textLength="135" lengthAdjust="spacingAndGlyphs">Boolean Setting</text>
+    <text x="333" y="70" fill="#ffffff" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
+    <text x="891" y="70" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="87" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="87" fill="#afafaf" textLength="261" lengthAdjust="spacingAndGlyphs">A boolean setting for testing</text>
+    <text x="891" y="87" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="104" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="104" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="121" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="119" width="9" height="17" fill="#005f00" />
+    <rect x="27" y="119" width="9" height="17" fill="#005f00" />
+    <text x="27" y="121" fill="#d7ffd7" textLength="9" lengthAdjust="spacingAndGlyphs">●</text>
+    <rect x="36" y="119" width="9" height="17" fill="#005f00" />
+    <rect x="45" y="119" width="126" height="17" fill="#005f00" />
+    <text x="45" y="121" fill="#d7ffd7" textLength="126" lengthAdjust="spacingAndGlyphs">String Setting</text>
+    <rect x="171" y="119" width="153" height="17" fill="#005f00" />
+    <rect x="324" y="119" width="90" height="17" fill="#005f00" />
+    <text x="324" y="121" fill="#d7ffd7" textLength="90" lengthAdjust="spacingAndGlyphs">test-value</text>
+    <rect x="414" y="119" width="468" height="17" fill="#005f00" />
+    <text x="891" y="121" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="138" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="18" y="136" width="27" height="17" fill="#005f00" />
+    <rect x="45" y="136" width="252" height="17" fill="#005f00" />
+    <text x="45" y="138" fill="#ffffff" textLength="252" lengthAdjust="spacingAndGlyphs">A string setting for testing</text>
+    <rect x="297" y="136" width="585" height="17" fill="#005f00" />
+    <text x="891" y="138" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="155" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="155" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="172" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="172" fill="#ffffff" textLength="126" lengthAdjust="spacingAndGlyphs">Number Setting</text>
+    <text x="324" y="172" fill="#ffffff" textLength="18" lengthAdjust="spacingAndGlyphs">42</text>
+    <text x="891" y="172" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="189" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="189" fill="#afafaf" textLength="252" lengthAdjust="spacingAndGlyphs">A number setting for testing</text>
+    <text x="891" y="189" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="206" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="206" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="223" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="223" fill="#ffffff" textLength="108" lengthAdjust="spacingAndGlyphs">Enum Setting</text>
+    <text x="315" y="223" fill="#ffffff" textLength="72" lengthAdjust="spacingAndGlyphs">option-a</text>
+    <text x="891" y="223" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="240" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="45" y="240" fill="#afafaf" textLength="243" lengthAdjust="spacingAndGlyphs">An enum setting for testing</text>
+    <text x="891" y="240" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="257" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="257" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="274" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="274" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="291" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="9" y="291" fill="#ffffff" textLength="882" lengthAdjust="spacingAndGlyphs">    Apply To                                                                                      </text>
+    <text x="891" y="291" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="308" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <rect x="27" y="306" width="9" height="17" fill="#005f00" />
+    <rect x="36" y="306" width="9" height="17" fill="#005f00" />
+    <text x="36" y="308" fill="#d7ffd7" textLength="9" lengthAdjust="spacingAndGlyphs">●</text>
+    <rect x="45" y="306" width="9" height="17" fill="#005f00" />
+    <rect x="54" y="306" width="117" height="17" fill="#005f00" />
+    <text x="54" y="308" fill="#d7ffd7" textLength="117" lengthAdjust="spacingAndGlyphs">User Settings</text>
+    <rect x="171" y="306" width="702" height="17" fill="#005f00" />
+    <text x="891" y="308" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="325" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="54" y="325" fill="#ffffff" textLength="162" lengthAdjust="spacingAndGlyphs">Workspace Settings</text>
+    <text x="891" y="325" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="342" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="54" y="342" fill="#ffffff" textLength="135" lengthAdjust="spacingAndGlyphs">System Settings</text>
+    <text x="891" y="342" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="359" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="359" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="376" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="27" y="376" fill="#afafaf" textLength="657" lengthAdjust="spacingAndGlyphs">(Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)</text>
+    <text x="891" y="376" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="393" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="891" y="393" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
+    <text x="0" y="410" fill="#878787" textLength="900" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────────────────────────╯</text>
+  </g>
+</svg>

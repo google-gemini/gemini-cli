@@ -33,6 +33,8 @@ export interface BaseSelectionListProps<
   wrapAround?: boolean;
   focusKey?: string;
   priority?: boolean;
+  /** Horizontal padding for items when not selected. Defaults to 2. */
+  horizontalPadding?: number;
   selectedIndicator?: string;
   renderItem: (item: TItem, context: RenderItemContext) => React.ReactNode;
 }
@@ -66,6 +68,7 @@ export function BaseSelectionList<
   wrapAround = true,
   focusKey,
   priority,
+  horizontalPadding = 1,
   selectedIndicator = '●',
   renderItem,
 }: BaseSelectionListProps<T, TItem>): React.JSX.Element {
@@ -143,6 +146,10 @@ export function BaseSelectionList<
             key={item.key}
             alignItems="flex-start"
             backgroundColor={isSelected ? theme.background.focus : undefined}
+            marginX={isSelected ? 0 : horizontalPadding}
+            paddingX={isSelected ? horizontalPadding : 0}
+            width="100%"
+            minWidth="100%"
           >
             {/* Radio button indicator */}
             <Box minWidth={2} flexShrink={0}>

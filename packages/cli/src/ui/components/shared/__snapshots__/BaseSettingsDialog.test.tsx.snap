@@ -1,0 +1,85 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`BaseSettingsDialog > keyboard navigation > should navigate down with arrow key 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  > Test Settings                                                                                 │
+│                                                                                                  │
+│    Boolean Setting                 true                                                          │
+│    A boolean setting for testing                                                                 │
+│                                                                                                  │
+│  ● String Setting                 test-value                                                     │
+│    A string setting for testing                                                                  │
+│                                                                                                  │
+│    Number Setting                 42                                                             │
+│    A number setting for testing                                                                  │
+│                                                                                                  │
+│    Enum Setting                  option-a                                                        │
+│    An enum setting for testing                                                                   │
+│                                                                                                  │
+│                                                                                                  │
+│    Apply To                                                                                      │
+│   ● User Settings                                                                                │
+│     Workspace Settings                                                                           │
+│     System Settings                                                                              │
+│                                                                                                  │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`BaseSettingsDialog > keyboard navigation > should navigate down with arrow key 2`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  > Test Settings                                                                                 │
+│                                                                                                  │
+│    Boolean Setting                 true                                                          │
+│    A boolean setting for testing                                                                 │
+│                                                                                                  │
+│  ● String Setting                 test-value                                                     │
+│    A string setting for testing                                                                  │
+│                                                                                                  │
+│    Number Setting                 42                                                             │
+│    A number setting for testing                                                                  │
+│                                                                                                  │
+│    Enum Setting                  option-a                                                        │
+│    An enum setting for testing                                                                   │
+│                                                                                                  │
+│                                                                                                  │
+│    Apply To                                                                                      │
+│    ● User Settings                                                                               │
+│      Workspace Settings                                                                          │
+│      System Settings                                                                             │
+│                                                                                                  │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;
+
+exports[`BaseSettingsDialog > rendering > should render all items 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                                  │
+│  > Test Settings                                                                                 │
+│                                                                                                  │
+│  ● Boolean Setting                 true                                                          │
+│    A boolean setting for testing                                                                 │
+│                                                                                                  │
+│    String Setting                 test-value                                                     │
+│    A string setting for testing                                                                  │
+│                                                                                                  │
+│    Number Setting                 42                                                             │
+│    A number setting for testing                                                                  │
+│                                                                                                  │
+│    Enum Setting                  option-a                                                        │
+│    An enum setting for testing                                                                   │
+│                                                                                                  │
+│                                                                                                  │
+│    Apply To                                                                                      │
+│   ● User Settings                                                                                │
+│     Workspace Settings                                                                           │
+│     System Settings                                                                              │
+│                                                                                                  │
+│  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯"
+`;

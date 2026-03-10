@@ -37,9 +37,9 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │  ▼                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
-│  ● User Settings                                                                                 │
-│    Workspace Settings                                                                            │
-│    System Settings                                                                               │
+│   ● User Settings                                                                                │
+│     Workspace Settings                                                                           │
+│     System Settings                                                                              │
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
@@ -83,9 +83,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │  ▼                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
-│  ● User Settings                                                                                 │
-│    Workspace Settings                                                                            │
-│    System Settings                                                                               │
+│   ● User Settings                                                                                │
+│     Workspace Settings                                                                           │
+│     System Settings                                                                              │
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
@@ -129,9 +129,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │  ▼                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
-│  ● User Settings                                                                                 │
-│    Workspace Settings                                                                            │
-│    System Settings                                                                               │
+│   ● User Settings                                                                                │
+│     Workspace Settings                                                                           │
+│     System Settings                                                                              │
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
@@ -175,9 +175,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │  ▼                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
-│  ● User Settings                                                                                 │
-│    Workspace Settings                                                                            │
-│    System Settings                                                                               │
+│   ● User Settings                                                                                │
+│     Workspace Settings                                                                           │
+│     System Settings                                                                              │
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
@@ -221,9 +221,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │  ▼                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
-│  ● User Settings                                                                                 │
-│    Workspace Settings                                                                            │
-│    System Settings                                                                               │
+│   ● User Settings                                                                                │
+│     Workspace Settings                                                                           │
+│     System Settings                                                                              │
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
@@ -267,9 +267,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │  ▼                                                                                               │
 │                                                                                                  │
 │  > Apply To                                                                                      │
-│  ● 1. User Settings                                                                              │
-│    2. Workspace Settings                                                                         │
-│    3. System Settings                                                                            │
+│   ● 1. User Settings                                                                             │
+│     2. Workspace Settings                                                                        │
+│     3. System Settings                                                                           │
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
@@ -313,9 +313,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │  ▼                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
-│  ● User Settings                                                                                 │
-│    Workspace Settings                                                                            │
-│    System Settings                                                                               │
+│   ● User Settings                                                                                │
+│     Workspace Settings                                                                           │
+│     System Settings                                                                              │
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
@@ -359,9 +359,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │  ▼                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
-│  ● User Settings                                                                                 │
-│    Workspace Settings                                                                            │
-│    System Settings                                                                               │
+│   ● User Settings                                                                                │
+│     Workspace Settings                                                                           │
+│     System Settings                                                                              │
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
@@ -405,9 +405,9 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │  ▼                                                                                               │
 │                                                                                                  │
 │    Apply To                                                                                      │
-│  ● User Settings                                                                                 │
-│    Workspace Settings                                                                            │
-│    System Settings                                                                               │
+│   ● User Settings                                                                                │
+│     Workspace Settings                                                                           │
+│     System Settings                                                                              │
 │                                                                                                  │
 │  (Use Enter to select, Ctrl+L to reset, Tab to change focus, Esc to close)                       │
 │                                                                                                  │
