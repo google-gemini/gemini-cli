@@ -326,12 +326,16 @@ export class PolicyEngine {
                   };
                 }
                 if (
-                  subDecision === PolicyDecision.ASK_USER &&
-                  ruleDecision !== PolicyDecision.ALLOW
+                  subDecision === PolicyDecision.ASK_USER ||
+                  (ruleDecision === PolicyDecision.ASK_USER &&
+                    aggregateDecision === PolicyDecision.ALLOW)
                 ) {
                   aggregateDecision = PolicyDecision.ASK_USER;
                   if (!responsibleRule) {
-                    responsibleRule = subResult.rule;
+                    responsibleRule =
+                      subDecision === PolicyDecision.ASK_USER
+                        ? subResult.rule
+                        : rule;
                   }
                 }
               }
