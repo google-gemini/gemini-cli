@@ -51,6 +51,7 @@ const POTENTIALLY_NAVIGATING_TOOLS = new Set([
   'click_at', // coordinate click can also follow a link
   'navigate_page',
   'new_page',
+  'select_page', // switching pages can lose the overlay
   'press_key', // Enter on a focused link/form triggers navigation
   'handle_dialog', // confirming beforeunload can trigger navigation
 ]);
