@@ -70,5 +70,36 @@ if (invalidPackages.length > 0) {
   process.exitCode = 1;
 } else {
   console.log('Lockfile check passed.');
+}
+
+// Check that gaxios v7+ is NOT resolved in any workspace node_modules.
+// gaxios v7.x has a bug where Array.toString() joins stream chunks with
+// commas, corrupting error response JSON at TCP chunk boundaries.
+// See: https://github.com/google-gemini/gemini-cli/pull/21884
+const gaxiosViolations = [];
+for (const [location, details] of Object.entries(packages)) {
+  if (
+    location.match(/(^|\/)node_modules\/gaxios$/) &&
+    !location.includes('@google/genai/node_modules') &&
+    details.version &&
+    parseInt(details.version.split('.')[0], 10) >= 7
+  ) {
+    gaxiosViolations.push(`${location} (v${details.version})`);
+  }
+}
+
+if (gaxiosViolations.length > 0) {
+  console.error(
+    '\nError: gaxios v7+ detected in workspace node_modules. This version has a stream corruption bug.',
+  );
+  console.error('See: https://github.com/google-gemini/gemini-cli/pull/21884');
+  gaxiosViolations.forEach((v) => console.error(`- ${v}`));
+  console.error(
+    '\nDo NOT upgrade @google/genai or google-auth-library until the gaxios v7 bug is fixed upstream.',
+  );
+  process.exitCode = 1;
+}
+
+if (!process.exitCode) {
   process.exitCode = 0;
 }
