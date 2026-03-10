@@ -840,7 +840,6 @@ export function extensionsCommand(
       restartCommand,
       ...conditionalCommands,
     ],
-    action: (context, args) =>
-      listExtensionsCommand.action!(context, args),
+    action: (context, args) => listExtensionsCommand.action!(context, args),
   };
 }
