@@ -1,4 +1,17 @@
 #!/bin/bash
+
+notify() {
+  local title="$1"
+  local message="$2"
+  local pr="$3"
+  # Terminal escape sequence
+  printf "\e]9;%s | PR #%s | %s\a" "$title" "$pr" "$message"
+  # Native macOS notification
+  if [[ "$(uname)" == "Darwin" ]]; then
+    osascript -e "display notification \"$message\" with title \"$title\" subtitle \"PR #$pr\""
+  fi
+}
+
 pr_number=$1
 if [[ -z "$pr_number" ]]; then
   echo "Usage: async-review <pr_number>"
@@ -30,7 +43,7 @@ echo "📡 Fetching PR #$pr_number..." | tee -a "$log_dir/setup.log"
 if ! git fetch origin -f "pull/$pr_number/head:gemini-async-pr-$pr_number" >> "$log_dir/setup.log" 2>&1; then
   echo 1 > "$log_dir/setup.exit"
   echo "❌ Fetch failed. Check $log_dir/setup.log"
-  printf "\e]9;Async Review Failed | PR #%s | Fetch failed.\a" "$pr_number"
+  notify "Async Review Failed" "Fetch failed." "$pr_number"
   exit 1
 fi
 
@@ -41,7 +54,7 @@ if [[ ! -d "$target_dir" ]]; then
   if ! git worktree add "$target_dir" "gemini-async-pr-$pr_number" >> "$log_dir/setup.log" 2>&1; then
     echo 1 > "$log_dir/setup.exit"
     echo "❌ Worktree creation failed. Check $log_dir/setup.log"
-    printf "\e]9;Async Review Failed | PR #%s | Worktree creation failed.\a" "$pr_number"
+    notify "Async Review Failed" "Worktree creation failed." "$pr_number"
     exit 1
   fi
 else
@@ -168,10 +181,10 @@ if ! "$GEMINI_CMD" --approval-mode=yolo -p "Read the review at $log_dir/review.m
   echo $? > "$log_dir/final-assessment.exit"
   echo "❌ Final assessment synthesis failed!"
   echo "Check $log_dir/final-assessment.md for details."
-  printf "\e]9;Async Review Failed | PR #%s | Final assessment synthesis failed.\a" "$pr_number"
+  notify "Async Review Failed" "Final assessment synthesis failed." "$pr_number"
   exit 1
 fi
 
 echo 0 > "$log_dir/final-assessment.exit"
 echo "✅ Final assessment complete! Check $log_dir/final-assessment.md"
-printf "\e]9;Async Review Complete | PR #%s | Review and test execution finished successfully.\a" "$pr_number"
+notify "Async Review Complete" "Review and test execution finished successfully." "$pr_number"
