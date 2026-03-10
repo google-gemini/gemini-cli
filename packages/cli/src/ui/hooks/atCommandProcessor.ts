@@ -21,7 +21,10 @@ import {
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { Buffer } from 'node:buffer';
-import type { HistoryItem, IndividualToolCallDisplay } from '../types.js';
+import type {
+  HistoryItemToolGroup,
+  IndividualToolCallDisplay,
+} from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 
 const REF_CONTENT_HEADER = `\n${REFERENCE_CONTENT_START}`;
@@ -410,6 +413,7 @@ async function readMcpResources(
           name: `resources/read (${resource.serverName})`,
           description: resource.uri,
           status: CoreToolCallStatus.Success,
+          isClientInitiated: true,
           resultDisplay: `Successfully read resource ${resource.uri}`,
           confirmationDetails: undefined,
         } as IndividualToolCallDisplay,
@@ -424,6 +428,7 @@ async function readMcpResources(
           name: `resources/read (${resource.serverName})`,
           description: resource.uri,
           status: CoreToolCallStatus.Error,
+          isClientInitiated: true,
           resultDisplay: `Error reading resource ${resource.uri}: ${getErrorMessage(error)}`,
           confirmationDetails: undefined,
         } as IndividualToolCallDisplay,
@@ -503,6 +508,7 @@ async function readLocalFiles(
       name: readManyFilesTool.displayName,
       description: invocation.getDescription(),
       status: CoreToolCallStatus.Success,
+      isClientInitiated: true,
       resultDisplay:
         result.returnDisplay ||
         `Successfully read: ${fileLabelsForDisplay.join(', ')}`,
@@ -562,6 +568,7 @@ async function readLocalFiles(
         invocation?.getDescription() ??
         'Error attempting to execute tool to read files',
       status: CoreToolCallStatus.Error,
+      isClientInitiated: true,
       resultDisplay: `Error reading files (${fileLabelsForDisplay.join(', ')}): ${getErrorMessage(error)}`,
       confirmationDetails: undefined,
     };
@@ -697,7 +704,7 @@ export async function handleAtCommand({
       {
         type: 'tool_group',
         tools: allDisplays,
-      } as Omit<HistoryItem, 'id'>,
+      } as HistoryItemToolGroup,
       userMessageTimestamp,
     );
   }

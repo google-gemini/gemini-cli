@@ -18,9 +18,10 @@ import {
   HookSystem,
   PolicyDecision,
   tmpdir,
+  type Config,
+  type Storage,
 } from '@google/gemini-cli-core';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
-import type { Config, Storage } from '@google/gemini-cli-core';
 import { expect, vi } from 'vitest';
 
 export function createMockConfig(
@@ -71,8 +72,17 @@ export function createMockConfig(
       getMcpServers: vi.fn().mockReturnValue({}),
     }),
     getGitService: vi.fn(),
+    validatePathAccess: vi.fn().mockReturnValue(undefined),
     ...overrides,
   } as unknown as Config;
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  (mockConfig as unknown as { config: Config; promptId: string }).config =
+    mockConfig;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  (mockConfig as unknown as { config: Config; promptId: string }).promptId =
+    'test-prompt-id';
+
   mockConfig.getMessageBus = vi.fn().mockReturnValue(createMockMessageBus());
   mockConfig.getHookSystem = vi
     .fn()

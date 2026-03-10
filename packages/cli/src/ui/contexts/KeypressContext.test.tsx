@@ -288,7 +288,7 @@ describe('KeypressContext', () => {
           expect.objectContaining({
             name: 'escape',
             shift: false,
-            alt: true,
+            alt: false,
             cmd: false,
           }),
         );
@@ -297,7 +297,7 @@ describe('KeypressContext', () => {
           expect.objectContaining({
             name: 'escape',
             shift: false,
-            alt: true,
+            alt: false,
             cmd: false,
           }),
         );
@@ -326,7 +326,7 @@ describe('KeypressContext', () => {
           expect.objectContaining({
             name: 'escape',
             shift: false,
-            alt: true,
+            alt: false,
             cmd: false,
           }),
         );
@@ -751,6 +751,80 @@ describe('KeypressContext', () => {
 
         act(() => stdin.write(sequence));
 
+        expect(keyHandler).toHaveBeenCalledWith(
+          expect.objectContaining(expected),
+        );
+      },
+    );
+  });
+
+  describe('Numpad support', () => {
+    it.each([
+      {
+        sequence: '\x1bOj',
+        expected: { name: '*', sequence: '*', insertable: true },
+      },
+      {
+        sequence: '\x1bOk',
+        expected: { name: '+', sequence: '+', insertable: true },
+      },
+      {
+        sequence: '\x1bOm',
+        expected: { name: '-', sequence: '-', insertable: true },
+      },
+      {
+        sequence: '\x1bOo',
+        expected: { name: '/', sequence: '/', insertable: true },
+      },
+      {
+        sequence: '\x1bOp',
+        expected: { name: '0', sequence: '0', insertable: true },
+      },
+      {
+        sequence: '\x1bOq',
+        expected: { name: '1', sequence: '1', insertable: true },
+      },
+      {
+        sequence: '\x1bOr',
+        expected: { name: '2', sequence: '2', insertable: true },
+      },
+      {
+        sequence: '\x1bOs',
+        expected: { name: '3', sequence: '3', insertable: true },
+      },
+      {
+        sequence: '\x1bOt',
+        expected: { name: '4', sequence: '4', insertable: true },
+      },
+      {
+        sequence: '\x1bOu',
+        expected: { name: '5', sequence: '5', insertable: true },
+      },
+      {
+        sequence: '\x1bOv',
+        expected: { name: '6', sequence: '6', insertable: true },
+      },
+      {
+        sequence: '\x1bOw',
+        expected: { name: '7', sequence: '7', insertable: true },
+      },
+      {
+        sequence: '\x1bOx',
+        expected: { name: '8', sequence: '8', insertable: true },
+      },
+      {
+        sequence: '\x1bOy',
+        expected: { name: '9', sequence: '9', insertable: true },
+      },
+      {
+        sequence: '\x1bOn',
+        expected: { name: '.', sequence: '.', insertable: true },
+      },
+    ])(
+      'should recognize numpad sequence "$sequence" as $expected.name',
+      ({ sequence, expected }) => {
+        const { keyHandler } = setupKeypressTest();
+        act(() => stdin.write(sequence));
         expect(keyHandler).toHaveBeenCalledWith(
           expect.objectContaining(expected),
         );

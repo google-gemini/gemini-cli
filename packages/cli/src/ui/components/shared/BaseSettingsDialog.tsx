@@ -9,6 +9,10 @@ import { Box, Text } from 'ink';
 import chalk from 'chalk';
 import { theme } from '../../semantic-colors.js';
 import type { LoadableSettingScope } from '../../../config/settings.js';
+import type {
+  SettingsType,
+  SettingsValue,
+} from '../../../config/settingsSchema.js';
 import { getScopeItems } from '../../../utils/dialogScopeUtils.js';
 import { RadioButtonSelect } from './RadioButtonSelect.js';
 import { TextInput } from './TextInput.js';
@@ -21,6 +25,7 @@ import {
 } from '../../utils/textUtils.js';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { keyMatchers, Command } from '../../keyMatchers.js';
+import { formatCommand } from '../../utils/keybindingUtils.js';
 
 /**
  * Represents a single item in the settings dialog.
@@ -33,7 +38,7 @@ export interface SettingsDialogItem {
   /** Optional description below label */
   description?: string;
   /** Item type for determining interaction behavior */
-  type: 'boolean' | 'number' | 'string' | 'enum';
+  type: SettingsType;
   /** Pre-formatted display value (with * if modified) */
   displayValue: string;
   /** Grey out value (at default) */
@@ -41,7 +46,9 @@ export interface SettingsDialogItem {
   /** Scope message e.g., "(Modified in Workspace)" */
   scopeMessage?: string;
   /** Raw value for edit mode initialization */
-  rawValue?: string | number | boolean;
+  rawValue?: SettingsValue;
+  /** Optional pre-formatted edit buffer value for complex types */
+  editValue?: string;
 }
 
 /**
@@ -144,30 +151,28 @@ export function BaseSettingsDialog({
   useEffect(() => {
     const prevItems = prevItemsRef.current;
     if (prevItems !== items) {
-      if (items.length === 0) {
+      const prevActiveItem = prevItems[activeIndex];
+      if (prevActiveItem) {
+        const newIndex = items.findIndex((i) => i.key === prevActiveItem.key);
+        if (newIndex !== -1) {
+          // Item still exists in the filtered list, keep focus on it
+          setActiveIndex(newIndex);
+          // Adjust scroll offset to ensure the item is visible
+          let newScroll = scrollOffset;
+          if (newIndex < scrollOffset) newScroll = newIndex;
+          else if (newIndex >= scrollOffset + maxItemsToShow)
+            newScroll = newIndex - maxItemsToShow + 1;
+
+          const maxScroll = Math.max(0, items.length - maxItemsToShow);
+          setScrollOffset(Math.min(newScroll, maxScroll));
+        } else {
+          // Item was filtered out, reset to the top
+          setActiveIndex(0);
+          setScrollOffset(0);
+        }
+      } else {
         setActiveIndex(0);
         setScrollOffset(0);
-      } else {
-        const prevActiveItem = prevItems[activeIndex];
-        if (prevActiveItem) {
-          const newIndex = items.findIndex((i) => i.key === prevActiveItem.key);
-          if (newIndex !== -1) {
-            // Item still exists in the filtered list, keep focus on it
-            setActiveIndex(newIndex);
-            // Adjust scroll offset to ensure the item is visible
-            let newScroll = scrollOffset;
-            if (newIndex < scrollOffset) newScroll = newIndex;
-            else if (newIndex >= scrollOffset + maxItemsToShow)
-              newScroll = newIndex - maxItemsToShow + 1;
-
-            const maxScroll = Math.max(0, items.length - maxItemsToShow);
-            setScrollOffset(Math.min(newScroll, maxScroll));
-          } else {
-            // Item was filtered out, reset to the top
-            setActiveIndex(0);
-            setScrollOffset(0);
-          }
-        }
       }
       prevItemsRef.current = items;
     }
@@ -383,9 +388,11 @@ export function BaseSettingsDialog({
           if (currentItem.type === 'boolean' || currentItem.type === 'enum') {
             onItemToggle(currentItem.key, currentItem);
           } else {
-            // Start editing for string/number
+            // Start editing for string/number/array/object
             const rawVal = currentItem.rawValue;
-            const initialValue = rawVal !== undefined ? String(rawVal) : '';
+            const initialValue =
+              currentItem.editValue ??
+              (rawVal !== undefined ? String(rawVal) : '');
             startEditing(currentItem.key, initialValue);
           }
           return true;
@@ -453,7 +460,7 @@ export function BaseSettingsDialog({
               editingKey
                 ? theme.border.default
                 : focusSection === 'settings'
-                  ? theme.border.focused
+                  ? theme.ui.focus
                   : theme.border.default
             }
             paddingX={1}
@@ -516,12 +523,17 @@ export function BaseSettingsDialog({
 
               return (
                 <React.Fragment key={item.key}>
-                  <Box marginX={1} flexDirection="row" alignItems="flex-start">
+                  <Box
+                    marginX={1}
+                    flexDirection="row"
+                    alignItems="flex-start"
+                    backgroundColor={
+                      isActive ? theme.background.focus : undefined
+                    }
+                  >
                     <Box minWidth={2} flexShrink={0}>
                       <Text
-                        color={
-                          isActive ? theme.status.success : theme.text.secondary
-                        }
+                        color={isActive ? theme.ui.focus : theme.text.secondary}
                       >
                         {isActive ? '●' : ''}
                       </Text>
@@ -538,9 +550,7 @@ export function BaseSettingsDialog({
                         minWidth={0}
                       >
                         <Text
-                          color={
-                            isActive ? theme.status.success : theme.text.primary
-                          }
+                          color={isActive ? theme.ui.focus : theme.text.primary}
                         >
                           {item.label}
                           {item.scopeMessage && (
@@ -559,7 +569,7 @@ export function BaseSettingsDialog({
                         <Text
                           color={
                             isActive
-                              ? theme.status.success
+                              ? theme.ui.focus
                               : item.isGreyedOut
                                 ? theme.text.secondary
                                 : theme.text.primary
@@ -616,7 +626,7 @@ export function BaseSettingsDialog({
         {/* Help text */}
         <Box marginX={1}>
           <Text color={theme.text.secondary}>
-            (Use Enter to select, Ctrl+L to reset
+            (Use Enter to select, {formatCommand(Command.CLEAR_SCREEN)} to reset
             {showScopeSelector ? ', Tab to change focus' : ''}, Esc to close)
           </Text>
         </Box>

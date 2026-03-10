@@ -27,12 +27,14 @@ export class EnterPlanModeTool extends BaseDeclarativeTool<
   EnterPlanModeParams,
   ToolResult
 > {
+  static readonly Name = ENTER_PLAN_MODE_TOOL_NAME;
+
   constructor(
     private config: Config,
     messageBus: MessageBus,
   ) {
     super(
-      ENTER_PLAN_MODE_TOOL_NAME,
+      EnterPlanModeTool.Name,
       'Enter Plan Mode',
       ENTER_PLAN_MODE_DEFINITION.base.description!,
       Kind.Plan,
@@ -105,7 +107,7 @@ export class EnterPlanModeInvocation extends BaseToolInvocation<
         'This will restrict the agent to read-only tools to allow for safe planning.',
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
         this.confirmationOutcome = outcome;
-        await this.publishPolicyUpdate(outcome);
+        // Policy updates are now handled centrally by the scheduler
       },
     };
   }

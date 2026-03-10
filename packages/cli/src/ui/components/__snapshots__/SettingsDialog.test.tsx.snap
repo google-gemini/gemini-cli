@@ -19,20 +19,20 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Prompt Completion                                                               false  │
-│    Enable AI-powered prompt completion suggestions while typing.                                 │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion. …          │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
+│    Max Chat Model Attempts                                                                   10  │
+│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -65,20 +65,20 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Prompt Completion                                                               false  │
-│    Enable AI-powered prompt completion suggestions while typing.                                 │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion. …          │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
+│    Max Chat Model Attempts                                                                   10  │
+│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -111,20 +111,20 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Enable Auto Update                                                                     true*  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Prompt Completion                                                              false*  │
-│    Enable AI-powered prompt completion suggestions while typing.                                 │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion. …          │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
+│    Max Chat Model Attempts                                                                   10  │
+│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                               false*  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -157,20 +157,20 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Prompt Completion                                                               false  │
-│    Enable AI-powered prompt completion suggestions while typing.                                 │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion. …          │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
+│    Max Chat Model Attempts                                                                   10  │
+│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -203,20 +203,20 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Prompt Completion                                                               false  │
-│    Enable AI-powered prompt completion suggestions while typing.                                 │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion. …          │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
+│    Max Chat Model Attempts                                                                   10  │
+│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -249,20 +249,20 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Prompt Completion                                                               false  │
-│    Enable AI-powered prompt completion suggestions while typing.                                 │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion. …          │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
+│    Max Chat Model Attempts                                                                   10  │
+│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -295,20 +295,20 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Enable Auto Update                                                                    false*  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Prompt Completion                                                               false  │
-│    Enable AI-powered prompt completion suggestions while typing.                                 │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion. …          │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
+│    Max Chat Model Attempts                                                                   10  │
+│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -341,20 +341,20 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Enable Auto Update                                                                      true  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Prompt Completion                                                               false  │
-│    Enable AI-powered prompt completion suggestions while typing.                                 │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion. …          │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
+│    Max Chat Model Attempts                                                                   10  │
+│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                false  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │
@@ -387,20 +387,20 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Enable Auto Update                                                                    false*  │
 │    Enable automatic updates.                                                                     │
 │                                                                                                  │
-│    Enable Prompt Completion                                                               true*  │
-│    Enable AI-powered prompt completion suggestions while typing.                                 │
+│    Enable Notifications                                                                   false  │
+│    Enable run-event notifications for action-required prompts and session completion. …          │
+│                                                                                                  │
+│    Plan Directory                                                                     undefined  │
+│    The directory where planning artifacts are stored. If not specified, defaults t…              │
+│                                                                                                  │
+│    Plan Model Routing                                                                      true  │
+│    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
+│                                                                                                  │
+│    Max Chat Model Attempts                                                                   10  │
+│    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
 │                                                                                                  │
 │    Debug Keystroke Logging                                                                true*  │
 │    Enable debug logging of keystrokes to the console.                                            │
-│                                                                                                  │
-│    Enable Session Cleanup                                                                 false  │
-│    Enable automatic session cleanup                                                              │
-│                                                                                                  │
-│    Keep chat history                                                                  undefined  │
-│    Automatically delete chats older than this time period (e.g., "30d", "7d", "24h…              │
-│                                                                                                  │
-│    Output Format                                                                           Text  │
-│    The format of the CLI output. Can be \`text\` or \`json\`.                                        │
 │                                                                                                  │
 │  ▼                                                                                               │
 │                                                                                                  │

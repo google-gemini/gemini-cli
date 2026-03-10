@@ -10,6 +10,8 @@ import type {
   A2AAuthProvider,
   AuthValidationResult,
 } from './types.js';
+import { ApiKeyAuthProvider } from './api-key-provider.js';
+import { HttpAuthProvider } from './http-provider.js';
 
 export interface CreateAuthProviderOptions {
   /** Required for OAuth/OIDC token storage. */
@@ -43,13 +45,17 @@ export class A2AAuthProviderFactory {
         // TODO: Implement
         throw new Error('google-credentials auth provider not yet implemented');
 
-      case 'apiKey':
-        // TODO: Implement
-        throw new Error('apiKey auth provider not yet implemented');
+      case 'apiKey': {
+        const provider = new ApiKeyAuthProvider(authConfig);
+        await provider.initialize();
+        return provider;
+      }
 
-      case 'http':
-        // TODO: Implement
-        throw new Error('http auth provider not yet implemented');
+      case 'http': {
+        const provider = new HttpAuthProvider(authConfig);
+        await provider.initialize();
+        return provider;
+      }
 
       case 'oauth2':
         // TODO: Implement

@@ -21,6 +21,10 @@ import {
   ConfigExtensionDialog,
   type ConfigExtensionDialogProps,
 } from '../components/ConfigExtensionDialog.js';
+import {
+  ExtensionRegistryView,
+  type ExtensionRegistryViewProps,
+} from '../components/views/ExtensionRegistryView.js';
 import { type CommandContext, type SlashCommand } from './types.js';
 
 import {
@@ -39,6 +43,8 @@ import {
 } from '../../config/extension-manager.js';
 import { SettingScope } from '../../config/settings.js';
 import { stat } from 'node:fs/promises';
+import { type RegistryExtension } from '../../config/extensionRegistryClient.js';
+import { waitFor } from '../../test-utils/async.js';
 
 vi.mock('../../config/extension-manager.js', async (importOriginal) => {
   const actual =
@@ -167,6 +173,7 @@ describe('extensionsCommand', () => {
       },
       ui: {
         dispatchExtensionStateUpdate: mockDispatchExtensionState,
+        removeComponent: vi.fn(),
       },
     });
   });
@@ -290,7 +297,7 @@ describe('extensionsCommand', () => {
 
     it('should inform user if there are no extensions to update with --all', async () => {
       mockDispatchExtensionState.mockImplementationOnce(
-        (action: ExtensionUpdateAction) => {
+        async (action: ExtensionUpdateAction) => {
           if (action.type === 'SCHEDULE_UPDATE') {
             action.payload.onComplete([]);
           }
@@ -306,7 +313,7 @@ describe('extensionsCommand', () => {
 
     it('should call setPendingItem and addItem in a finally block on success', async () => {
       mockDispatchExtensionState.mockImplementationOnce(
-        (action: ExtensionUpdateAction) => {
+        async (action: ExtensionUpdateAction) => {
           if (action.type === 'SCHEDULE_UPDATE') {
             action.payload.onComplete([
               {
@@ -357,7 +364,7 @@ describe('extensionsCommand', () => {
 
     it('should update a single extension by name', async () => {
       mockDispatchExtensionState.mockImplementationOnce(
-        (action: ExtensionUpdateAction) => {
+        async (action: ExtensionUpdateAction) => {
           if (action.type === 'SCHEDULE_UPDATE') {
             action.payload.onComplete([
               {
@@ -382,7 +389,7 @@ describe('extensionsCommand', () => {
 
     it('should update multiple extensions by name', async () => {
       mockDispatchExtensionState.mockImplementationOnce(
-        (action: ExtensionUpdateAction) => {
+        async (action: ExtensionUpdateAction) => {
           if (action.type === 'SCHEDULE_UPDATE') {
             action.payload.onComplete([
               {
@@ -428,6 +435,61 @@ describe('extensionsCommand', () => {
     if (!exploreAction) {
       throw new Error('Explore action not found');
     }
+
+    it('should return ExtensionRegistryView custom dialog when experimental.extensionRegistry is true', async () => {
+      mockContext.services.settings.merged.experimental.extensionRegistry = true;
+
+      const result = await exploreAction(mockContext, '');
+
+      expect(result).toBeDefined();
+      if (result?.type !== 'custom_dialog') {
+        throw new Error('Expected custom_dialog');
+      }
+
+      const component =
+        result.component as ReactElement<ExtensionRegistryViewProps>;
+      expect(component.type).toBe(ExtensionRegistryView);
+      expect(component.props.extensionManager).toBe(mockExtensionLoader);
+    });
+
+    it('should handle onSelect and onClose in ExtensionRegistryView', async () => {
+      mockContext.services.settings.merged.experimental.extensionRegistry = true;
+
+      const result = await exploreAction(mockContext, '');
+      if (result?.type !== 'custom_dialog') {
+        throw new Error('Expected custom_dialog');
+      }
+
+      const component =
+        result.component as ReactElement<ExtensionRegistryViewProps>;
+
+      const extension = {
+        extensionName: 'test-ext',
+        url: 'https://github.com/test/ext.git',
+      } as RegistryExtension;
+
+      vi.mocked(inferInstallMetadata).mockResolvedValue({
+        source: extension.url,
+        type: 'git',
+      });
+      mockInstallExtension.mockResolvedValue({ name: extension.url });
+
+      // Call onSelect
+      component.props.onSelect?.(extension);
+
+      await waitFor(() => {
+        expect(inferInstallMetadata).toHaveBeenCalledWith(extension.url);
+        expect(mockInstallExtension).toHaveBeenCalledWith({
+          source: extension.url,
+          type: 'git',
+        });
+      });
+      expect(mockContext.ui.removeComponent).toHaveBeenCalledTimes(1);
+
+      // Call onClose
+      component.props.onClose?.();
+      expect(mockContext.ui.removeComponent).toHaveBeenCalledTimes(2);
+    });
 
     it("should add an info message and call 'open' in a non-sandbox environment", async () => {
       // Ensure no special environment variables that would affect behavior
@@ -693,7 +755,7 @@ describe('extensionsCommand', () => {
       await uninstallAction!(mockContext, '');
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.ERROR,
-        text: 'Usage: /extensions uninstall <extension-name>',
+        text: 'Usage: /extensions uninstall <extension-names...>|--all',
       });
       expect(mockUninstallExtension).not.toHaveBeenCalled();
     });
@@ -830,7 +892,7 @@ describe('extensionsCommand', () => {
     });
   });
 
-  describe('restart', () => {
+  describe('reload', () => {
     let restartAction: SlashCommand['action'];
     let mockRestartExtension: MockedFunction<
       typeof ExtensionLoader.prototype.restartExtension
@@ -838,7 +900,7 @@ describe('extensionsCommand', () => {
 
     beforeEach(() => {
       restartAction = extensionsCommand().subCommands?.find(
-        (c) => c.name === 'restart',
+        (c) => c.name === 'reload',
       )?.action;
       expect(restartAction).not.toBeNull();
 
@@ -849,7 +911,7 @@ describe('extensionsCommand', () => {
           getExtensions: mockGetExtensions,
           restartExtension: mockRestartExtension,
         }));
-      mockContext.invocation!.name = 'restart';
+      mockContext.invocation!.name = 'reload';
     });
 
     it('should show a message if no extensions are installed', async () => {
@@ -868,7 +930,7 @@ describe('extensionsCommand', () => {
       });
     });
 
-    it('restarts all active extensions when --all is provided', async () => {
+    it('reloads all active extensions when --all is provided', async () => {
       const mockExtensions = [
         { name: 'ext1', isActive: true },
         { name: 'ext2', isActive: true },
@@ -884,13 +946,13 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: 'Restarting 2 extensions...',
+          text: 'Reloading 2 extensions...',
         }),
       );
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: '2 extensions restarted successfully.',
+          text: '2 extensions reloaded successfully',
         }),
       );
       expect(mockContext.ui.dispatchExtensionStateUpdate).toHaveBeenCalledWith({
@@ -924,7 +986,7 @@ describe('extensionsCommand', () => {
       );
     });
 
-    it('restarts only specified active extensions', async () => {
+    it('reloads only specified active extensions', async () => {
       const mockExtensions = [
         { name: 'ext1', isActive: false },
         { name: 'ext2', isActive: true },
@@ -962,13 +1024,13 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.ERROR,
-          text: 'Usage: /extensions restart <extension-names>|--all',
+          text: 'Usage: /extensions reload <extension-names>|--all',
         }),
       );
       expect(mockRestartExtension).not.toHaveBeenCalled();
     });
 
-    it('handles errors during extension restart', async () => {
+    it('handles errors during extension reload', async () => {
       const mockExtensions = [
         { name: 'ext1', isActive: true },
       ] as GeminiCLIExtension[];
@@ -981,7 +1043,7 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.ERROR,
-          text: 'Failed to restart some extensions:\n  ext1: Failed to restart',
+          text: 'Failed to reload some extensions:\n  ext1: Failed to restart',
         }),
       );
     });
@@ -1004,7 +1066,7 @@ describe('extensionsCommand', () => {
       );
     });
 
-    it('does not restart any extensions if none are found', async () => {
+    it('does not reload any extensions if none are found', async () => {
       const mockExtensions = [
         { name: 'ext1', isActive: true },
       ] as GeminiCLIExtension[];
@@ -1021,8 +1083,8 @@ describe('extensionsCommand', () => {
       );
     });
 
-    it('should suggest only enabled extension names for the restart command', async () => {
-      mockContext.invocation!.name = 'restart';
+    it('should suggest only enabled extension names for the reload command', async () => {
+      mockContext.invocation!.name = 'reload';
       const mockExtensions = [
         { name: 'ext1', isActive: true },
         { name: 'ext2', isActive: false },

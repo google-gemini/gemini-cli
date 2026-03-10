@@ -98,16 +98,23 @@ export interface ToolCallEvent {
 
 export interface IndividualToolCallDisplay {
   callId: string;
+  parentCallId?: string;
   name: string;
   description: string;
   resultDisplay: ToolResultDisplay | undefined;
   status: CoreToolCallStatus;
+  // True when the tool was initiated directly by the user (slash/@/shell flows).
+  isClientInitiated?: boolean;
   confirmationDetails: SerializableConfirmationDetails | undefined;
   renderOutputAsMarkdown?: boolean;
   ptyId?: number;
   outputFile?: string;
   correlationId?: string;
   approvalMode?: ApprovalMode;
+  progressMessage?: string;
+  originalRequestName?: string;
+  progress?: number;
+  progressTotal?: number;
 }
 
 export interface CompressionProps {
@@ -144,8 +151,10 @@ export type HistoryItemGeminiContent = HistoryItemBase & {
 export type HistoryItemInfo = HistoryItemBase & {
   type: 'info';
   text: string;
+  secondaryText?: string;
   icon?: string;
   color?: string;
+  marginBottom?: number;
 };
 
 export type HistoryItemError = HistoryItemBase & {
@@ -196,6 +205,7 @@ export type HistoryItemStats = HistoryItemQuotaBase & {
   type: 'stats';
   duration: string;
   quotas?: RetrieveUserQuotaResponse;
+  creditBalance?: number;
 };
 
 export type HistoryItemModelStats = HistoryItemQuotaBase & {
@@ -221,6 +231,8 @@ export type HistoryItemToolGroup = HistoryItemBase & {
   tools: IndividualToolCallDisplay[];
   borderTop?: boolean;
   borderBottom?: boolean;
+  borderColor?: string;
+  borderDimColor?: boolean;
 };
 
 export type HistoryItemUserShell = HistoryItemBase & {
@@ -246,6 +258,11 @@ export interface ChatDetail {
 export type HistoryItemThinking = HistoryItemBase & {
   type: 'thinking';
   thought: ThoughtSummary;
+};
+
+export type HistoryItemHint = HistoryItemBase & {
+  type: 'hint';
+  text: string;
 };
 
 export type HistoryItemChatList = HistoryItemBase & {
@@ -325,23 +342,12 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
       isPersistentDisabled: boolean;
     }
   >;
+  errors: Record<string, string>;
   blockedServers: Array<{ name: string; extensionName: string }>;
   discoveryInProgress: boolean;
   connectingServers: string[];
   showDescriptions: boolean;
   showSchema: boolean;
-};
-
-export type HistoryItemHooksList = HistoryItemBase & {
-  type: 'hooks_list';
-  hooks: Array<{
-    config: { command?: string; type: string; timeout?: number };
-    source: string;
-    eventName: string;
-    matcher?: string;
-    sequential?: boolean;
-    enabled: boolean;
-  }>;
 };
 
 // Using Omit<HistoryItem, 'id'> seems to have some issues with typescript's
@@ -372,7 +378,7 @@ export type HistoryItemWithoutId =
   | HistoryItemMcpStatus
   | HistoryItemChatList
   | HistoryItemThinking
-  | HistoryItemHooksList;
+  | HistoryItemHint;
 
 export type HistoryItem = HistoryItemWithoutId & { id: number };
 
@@ -396,7 +402,7 @@ export enum MessageType {
   AGENTS_LIST = 'agents_list',
   MCP_STATUS = 'mcp_status',
   CHAT_LIST = 'chat_list',
-  HOOKS_LIST = 'hooks_list',
+  HINT = 'hint',
 }
 
 // Simplified message structure for internal feedback

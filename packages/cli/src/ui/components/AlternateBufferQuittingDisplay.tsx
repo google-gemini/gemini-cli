@@ -53,8 +53,6 @@ export const AlternateBufferQuittingDisplay = () => {
           terminalWidth={uiState.mainAreaWidth}
           item={{ ...item, id: 0 }}
           isPending={true}
-          activeShellPtyId={uiState.activePtyId}
-          embeddedShellFocused={uiState.embeddedShellFocused}
         />
       ))}
       {showPromptedTool && (

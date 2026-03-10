@@ -43,6 +43,9 @@ export const clearCommand: SlashCommand = {
       context.ui.setDebugMessage('Clearing terminal.');
     }
 
+    // Reset user steering hints
+    config?.userHintService.clear();
+
     // Start a new conversation recording with a new session ID
     if (config && chatRecordingService) {
       const newSessionId = randomUUID();

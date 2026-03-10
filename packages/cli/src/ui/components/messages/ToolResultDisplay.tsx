@@ -11,7 +11,11 @@ import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { AnsiOutputText, AnsiLineText } from '../AnsiOutput.js';
 import { MaxSizedBox } from '../shared/MaxSizedBox.js';
 import { theme } from '../../semantic-colors.js';
-import type { AnsiOutput, AnsiLine } from '@google/gemini-cli-core';
+import {
+  type AnsiOutput,
+  type AnsiLine,
+  isSubagentProgress,
+} from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { tryParseJSON } from '../../../utils/jsonoutput.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
@@ -19,10 +23,8 @@ import { Scrollable } from '../shared/Scrollable.js';
 import { ScrollableList } from '../shared/ScrollableList.js';
 import { SCROLL_TO_ITEM_END } from '../shared/VirtualizedList.js';
 import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
-
-const STATIC_HEIGHT = 1;
-const RESERVED_LINE_COUNT = 6; // for tool name, status, padding, and 'ShowMoreLines' hint
-const MIN_LINES_SHOWN = 2; // show at least this many lines
+import { calculateToolContentMaxLines } from '../../utils/toolLayoutUtils.js';
+import { SubagentProgressDisplay } from './SubagentProgressDisplay.js';
 
 // Large threshold to ensure we don't cause performance issues for very large
 // outputs that will get truncated further MaxSizedBox anyway.
@@ -53,16 +55,11 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   const { renderMarkdown } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
 
-  let availableHeight = availableTerminalHeight
-    ? Math.max(
-        availableTerminalHeight - STATIC_HEIGHT - RESERVED_LINE_COUNT,
-        MIN_LINES_SHOWN + 1, // enforce minimum lines shown
-      )
-    : undefined;
-
-  if (maxLines && availableHeight) {
-    availableHeight = Math.min(availableHeight, maxLines);
-  }
+  const availableHeight = calculateToolContentMaxLines({
+    availableTerminalHeight,
+    isAlternateBuffer,
+    maxLinesLimit: maxLines,
+  });
 
   const combinedPaddingAndBorderWidth = 4;
   const childWidth = terminalWidth - combinedPaddingAndBorderWidth;
@@ -81,7 +78,8 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     [],
   );
 
-  const truncatedResultDisplay = React.useMemo(() => {
+  const { truncatedResultDisplay, hiddenLinesCount } = React.useMemo(() => {
+    let hiddenLines = 0;
     // Only truncate string output if not in alternate buffer mode to ensure
     // we can scroll through the full output.
     if (typeof resultDisplay === 'string' && !isAlternateBuffer) {
@@ -94,14 +92,29 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         const contentText = hasTrailingNewline ? text.slice(0, -1) : text;
         const lines = contentText.split('\n');
         if (lines.length > maxLines) {
+          // We will have a label from MaxSizedBox. Reserve space for it.
+          const targetLines = Math.max(1, maxLines - 1);
+          hiddenLines = lines.length - targetLines;
           text =
-            lines.slice(-maxLines).join('\n') +
+            lines.slice(-targetLines).join('\n') +
             (hasTrailingNewline ? '\n' : '');
         }
       }
-      return text;
+      return { truncatedResultDisplay: text, hiddenLinesCount: hiddenLines };
     }
-    return resultDisplay;
+
+    if (Array.isArray(resultDisplay) && !isAlternateBuffer && maxLines) {
+      if (resultDisplay.length > maxLines) {
+        // We will have a label from MaxSizedBox. Reserve space for it.
+        const targetLines = Math.max(1, maxLines - 1);
+        return {
+          truncatedResultDisplay: resultDisplay.slice(-targetLines),
+          hiddenLinesCount: resultDisplay.length - targetLines,
+        };
+      }
+    }
+
+    return { truncatedResultDisplay: resultDisplay, hiddenLinesCount: 0 };
   }, [resultDisplay, isAlternateBuffer, maxLines]);
 
   if (!truncatedResultDisplay) return null;
@@ -159,6 +172,8 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         {formattedJSON}
       </Text>
     );
+  } else if (isSubagentProgress(truncatedResultDisplay)) {
+    content = <SubagentProgressDisplay progress={truncatedResultDisplay} />;
   } else if (
     typeof truncatedResultDisplay === 'string' &&
     renderOutputAsMarkdown
@@ -221,6 +236,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         maxHeight={maxLines ?? availableHeight}
         hasFocus={hasFocus} // Allow scrolling via keyboard (Shift+Up/Down)
         scrollToBottom={true}
+        reportOverflow={true}
       >
         {content}
       </Scrollable>
@@ -229,7 +245,11 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
 
   return (
     <Box width={childWidth} flexDirection="column">
-      <MaxSizedBox maxHeight={availableHeight} maxWidth={childWidth}>
+      <MaxSizedBox
+        maxHeight={availableHeight}
+        maxWidth={childWidth}
+        additionalHiddenLinesCount={hiddenLinesCount}
+      >
         {content}
       </MaxSizedBox>
     </Box>

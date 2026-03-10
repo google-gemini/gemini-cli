@@ -53,7 +53,9 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
     day: 'numeric',
   });
   const platform = process.platform;
-  const directoryContext = await getDirectoryContextString(config);
+  const directoryContext = config.getIncludeDirectoryTree()
+    ? await getDirectoryContextString(config)
+    : '';
   const tempDir = config.storage.getProjectTempDir();
   const environmentMemory = config.getEnvironmentMemory();
 

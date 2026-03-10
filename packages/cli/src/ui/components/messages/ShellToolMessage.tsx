@@ -15,24 +15,29 @@ import {
   ToolStatusIndicator,
   ToolInfo,
   TrailingIndicator,
-  STATUS_INDICATOR_WIDTH,
   isThisShellFocusable as checkIsShellFocusable,
   isThisShellFocused as checkIsShellFocused,
   useFocusHint,
   FocusHint,
 } from './ToolShared.js';
 import type { ToolMessageProps } from './ToolMessage.js';
-import {
-  ACTIVE_SHELL_MAX_LINES,
-  COMPLETED_SHELL_MAX_LINES,
-} from '../../constants.js';
+import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
-import { type Config, CoreToolCallStatus } from '@google/gemini-cli-core';
+import { useUIState } from '../../contexts/UIStateContext.js';
+import {
+  type Config,
+  ShellExecutionService,
+  CoreToolCallStatus,
+} from '@google/gemini-cli-core';
+import {
+  calculateShellMaxLines,
+  calculateToolContentMaxLines,
+  SHELL_CONTENT_OVERHEAD,
+} from '../../utils/toolLayoutUtils.js';
 
 export interface ShellToolMessageProps extends ToolMessageProps {
-  activeShellPtyId?: number | null;
-  embeddedShellFocused?: boolean;
   config?: Config;
+  isExpandable?: boolean;
 }
 
 export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
@@ -52,10 +57,6 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
 
   renderOutputAsMarkdown = true,
 
-  activeShellPtyId,
-
-  embeddedShellFocused,
-
   ptyId,
 
   config,
@@ -65,8 +66,18 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   borderColor,
 
   borderDimColor,
+
+  isExpandable,
+
+  originalRequestName,
 }) => {
+  const {
+    activePtyId: activeShellPtyId,
+    embeddedShellFocused,
+    constrainHeight,
+  } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
+
   const isThisShellFocused = checkIsShellFocused(
     name,
     status,
@@ -74,6 +85,47 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
     activeShellPtyId,
     embeddedShellFocused,
   );
+
+  const maxLines = calculateShellMaxLines({
+    status,
+    isAlternateBuffer,
+    isThisShellFocused,
+    availableTerminalHeight,
+    constrainHeight,
+    isExpandable,
+  });
+
+  const availableHeight = calculateToolContentMaxLines({
+    availableTerminalHeight,
+    isAlternateBuffer,
+    maxLinesLimit: maxLines,
+  });
+
+  React.useEffect(() => {
+    const isExecuting = status === CoreToolCallStatus.Executing;
+    if (isExecuting && ptyId) {
+      try {
+        const childWidth = terminalWidth - 4; // account for padding and borders
+        const finalHeight =
+          availableHeight ?? ACTIVE_SHELL_MAX_LINES - SHELL_CONTENT_OVERHEAD;
+
+        ShellExecutionService.resizePty(
+          ptyId,
+          Math.max(1, childWidth),
+          Math.max(1, finalHeight),
+        );
+      } catch (e) {
+        if (
+          !(
+            e instanceof Error &&
+            e.message.includes('Cannot resize a pty that has already exited')
+          )
+        ) {
+          throw e;
+        }
+      }
+    }
+  }, [ptyId, status, terminalWidth, availableHeight]);
 
   const { setEmbeddedShellFocused } = useUIActions();
   const wasFocusedRef = React.useRef(false);
@@ -122,13 +174,18 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
         borderDimColor={borderDimColor}
         containerRef={headerRef}
       >
-        <ToolStatusIndicator status={status} name={name} />
+        <ToolStatusIndicator
+          status={status}
+          name={name}
+          isFocused={isThisShellFocused}
+        />
 
         <ToolInfo
           name={name}
           status={status}
           description={description}
           emphasis={emphasis}
+          originalRequestName={originalRequestName}
         />
 
         <FocusHint
@@ -158,59 +215,16 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           terminalWidth={terminalWidth}
           renderOutputAsMarkdown={renderOutputAsMarkdown}
           hasFocus={isThisShellFocused}
-          maxLines={getShellMaxLines(
-            status,
-            isAlternateBuffer,
-            isThisShellFocused,
-            availableTerminalHeight,
-          )}
+          maxLines={maxLines}
         />
         {isThisShellFocused && config && (
-          <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
-            <ShellInputPrompt
-              activeShellPtyId={activeShellPtyId ?? null}
-              focus={embeddedShellFocused}
-              scrollPageSize={availableTerminalHeight ?? ACTIVE_SHELL_MAX_LINES}
-            />
-          </Box>
+          <ShellInputPrompt
+            activeShellPtyId={activeShellPtyId ?? null}
+            focus={embeddedShellFocused}
+            scrollPageSize={availableTerminalHeight ?? ACTIVE_SHELL_MAX_LINES}
+          />
         )}
       </Box>
     </>
   );
 };
-
-/**
- * Calculates the maximum number of lines to display for shell output.
- *
- * For completed processes (Success, Error, Canceled), it returns COMPLETED_SHELL_MAX_LINES.
- * For active processes, it returns the available terminal height if in alternate buffer mode
- * and focused. Otherwise, it returns ACTIVE_SHELL_MAX_LINES.
- *
- * This function ensures a finite number of lines is always returned to prevent performance issues.
- */
-function getShellMaxLines(
-  status: CoreToolCallStatus,
-  isAlternateBuffer: boolean,
-  isThisShellFocused: boolean,
-  availableTerminalHeight: number | undefined,
-): number {
-  if (
-    status === CoreToolCallStatus.Success ||
-    status === CoreToolCallStatus.Error ||
-    status === CoreToolCallStatus.Cancelled
-  ) {
-    return COMPLETED_SHELL_MAX_LINES;
-  }
-
-  if (availableTerminalHeight === undefined) {
-    return ACTIVE_SHELL_MAX_LINES;
-  }
-
-  const maxLinesBasedOnHeight = Math.max(1, availableTerminalHeight - 2);
-
-  if (isAlternateBuffer && isThisShellFocused) {
-    return maxLinesBasedOnHeight;
-  }
-
-  return Math.min(maxLinesBasedOnHeight, ACTIVE_SHELL_MAX_LINES);
-}
