@@ -49,12 +49,14 @@ export class OAuthCredentialStorage {
       // Fallback: Try to migrate from old file-based storage
       return await this.migrateFromFileStorage();
     } catch (error: unknown) {
+      // Stale or corrupt credentials should not block login.
+      // Log and return null so the auth flow starts fresh.
       coreEvents.emitFeedback(
         'error',
         'Failed to load OAuth credentials',
         error,
       );
-      throw new Error('Failed to load OAuth credentials', { cause: error });
+      return null;
     }
   }
 
@@ -93,12 +95,12 @@ export class OAuthCredentialStorage {
       const oldFilePath = path.join(homedir(), GEMINI_DIR, OAUTH_FILE);
       await fs.rm(oldFilePath, { force: true }).catch(() => {});
     } catch (error: unknown) {
+      // Clearing credentials should never block login.
       coreEvents.emitFeedback(
         'error',
         'Failed to clear OAuth credentials',
         error,
       );
-      throw new Error('Failed to clear OAuth credentials', { cause: error });
     }
   }
 
