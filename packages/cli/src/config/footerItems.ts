@@ -9,8 +9,8 @@ import type { MergedSettings } from './settings.js';
 export const ALL_ITEMS = [
   {
     id: 'workspace',
-    header: 'workspace (/directory)',
-    description: 'Current working directory',
+    header: 'workspace',
+    description: 'Current workspace path',
   },
   {
     id: 'git-branch',

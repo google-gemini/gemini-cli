@@ -38,10 +38,12 @@ async function addMcpServer(
     excludeTools,
   } = options;
 
+  const displayScope = scope === 'user' ? 'user' : 'workspace';
+
   const settings = loadSettings(process.cwd());
   const inHome = settings.workspace.path === settings.user.path;
 
-  if (scope === 'project' && inHome) {
+  if (displayScope === 'workspace' && inHome) {
     debugLogger.error(
       'Error: Please use --scope user to edit settings in the home directory.',
     );
@@ -120,7 +122,7 @@ async function addMcpServer(
   const isExistingServer = !!mcpServers[name];
   if (isExistingServer) {
     debugLogger.log(
-      `MCP server "${name}" is already configured within ${scope} settings.`,
+      `MCP server "${name}" is already configured within ${displayScope} settings.`,
     );
   }
 
@@ -129,10 +131,12 @@ async function addMcpServer(
   settings.setValue(settingsScope, 'mcpServers', mcpServers);
 
   if (isExistingServer) {
-    debugLogger.log(`MCP server "${name}" updated in ${scope} settings.`);
+    debugLogger.log(
+      `MCP server "${name}" updated in ${displayScope} settings.`,
+    );
   } else {
     debugLogger.log(
-      `MCP server "${name}" added to ${scope} settings. (${transport})`,
+      `MCP server "${name}" added to ${displayScope} settings. (${transport})`,
     );
   }
 }
@@ -159,10 +163,10 @@ export const addCommand: CommandModule = {
       })
       .option('scope', {
         alias: 's',
-        describe: 'Configuration scope (user or project)',
+        describe: 'Configuration scope (user or workspace)',
         type: 'string',
-        default: 'project',
-        choices: ['user', 'project'],
+        default: 'workspace',
+        choices: ['user', 'workspace', 'project'],
       })
       .option('transport', {
         alias: ['t', 'type'],

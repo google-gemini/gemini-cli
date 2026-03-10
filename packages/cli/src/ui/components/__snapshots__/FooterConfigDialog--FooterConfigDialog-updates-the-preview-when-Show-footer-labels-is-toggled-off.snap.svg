@@ -22,7 +22,7 @@
     <text x="72" y="104" fill="#ffffff" textLength="90" lengthAdjust="spacingAndGlyphs"> workspace</text>
     <text x="891" y="104" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="121" fill="#afafaf" textLength="234" lengthAdjust="spacingAndGlyphs"> Current working directory</text>
+    <text x="45" y="121" fill="#afafaf" textLength="207" lengthAdjust="spacingAndGlyphs"> Current workspace path</text>
     <text x="891" y="121" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="138" fill="#333333" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="45" y="138" fill="#d7ffd7" textLength="27" lengthAdjust="spacingAndGlyphs">[✓]</text>
