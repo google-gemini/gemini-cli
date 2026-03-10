@@ -5,7 +5,6 @@
  */
 
 /* eslint-disable @typescript-eslint/no-unsafe-type-assertion */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import type {
   ConversationRecord,
@@ -14,6 +13,8 @@ import type {
 } from '../services/chatRecordingService.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
 import {
+  /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return */
+
   EDIT_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,

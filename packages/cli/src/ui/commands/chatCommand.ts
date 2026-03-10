@@ -177,7 +177,7 @@ const resumeCheckpointCommand: SlashCommand = {
     const { logger, config } = context.services;
     await logger.initialize();
 
-    let conversation: Content[] = [];
+    let conversation: readonly Content[] = [];
     let authType: string | undefined;
 
     const loadExternalTrajectory = async (
@@ -186,7 +186,7 @@ const resumeCheckpointCommand: SlashCommand = {
     ): Promise<Content[] | null> => {
       let record: ConversationRecord | null = null;
       if (config && config.getEnableExtensionReloading() !== false) {
-        /* eslint-disable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
+        /* eslint-disable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
         const extensions = (config as any)._extensionLoader?.getExtensions
           ? (config as any)._extensionLoader.getExtensions()
           : [];
@@ -203,7 +203,7 @@ const resumeCheckpointCommand: SlashCommand = {
             }
           }
         }
-        /* eslint-enable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
+        /* eslint-enable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
       }
       if (!record) return null;
 

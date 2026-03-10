@@ -20,6 +20,7 @@ import { validateTheme } from './theme.js';
 import type { AccountSuspensionInfo } from '../ui/contexts/UIStateContext.js';
 
 import { pathToFileURL } from 'node:url';
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 
 export interface InitializationResult {
   authError: string | null;

@@ -21,6 +21,7 @@ import {
   type SessionInfo,
 } from '../../utils/sessionUtils.js';
 import type { Part } from '@google/genai';
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 
 export { convertSessionToHistoryFormats };
 
@@ -96,7 +97,7 @@ export const useSessionBrowser = (
             filePath = path.join(chatsDir, fileName);
 
             // Load up the conversation.
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
             conversation = JSON.parse(await fs.readFile(filePath, 'utf8'));
           }
 

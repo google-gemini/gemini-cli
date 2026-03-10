@@ -21,6 +21,7 @@ import {
 } from '../../utils/sessionUtils.js';
 import { useTabbedNavigation } from '../hooks/useTabbedNavigation.js';
 import { TabHeader, type Tab } from './shared/TabHeader.js';
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
 
 /**
  * Props for the main SessionBrowser component.

@@ -7,6 +7,7 @@
 // @ts-nocheck
 import * as crypto from 'node:crypto';
 import { Trajectory } from './exa/proto_ts/dist/exa/gemini_coder/proto/trajectory_pb.js';
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 
 const DEFAULT_KEY = Buffer.from('safeCodeiumworldKeYsecretBalloon');
 const NONCE_SIZE = 12; // GCM default nonce size
