@@ -54,6 +54,7 @@ describe('PromptProvider', () => {
         getSkills: vi.fn().mockReturnValue([]),
       }),
       getActiveModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL),
+      getUserMemory: vi.fn().mockReturnValue(''),
       getAgentRegistry: vi.fn().mockReturnValue({
         getAllDefinitions: vi.fn().mockReturnValue([]),
       }),
@@ -219,6 +220,33 @@ describe('PromptProvider', () => {
       const prompt = provider.getCompressionPrompt(mockConfig);
 
       expect(prompt).not.toContain('### APPROVED PLAN PRESERVATION');
+    });
+
+    it('should include an explicit saved_memory field in the state_snapshot schema', () => {
+      const provider = new PromptProvider();
+      const prompt = provider.getCompressionPrompt(mockConfig);
+
+      expect(prompt).toContain('<state_snapshot>');
+      expect(prompt).toContain('<overall_goal>');
+      expect(prompt).toContain('<active_constraints>');
+      expect(prompt).toContain('<key_knowledge>');
+      expect(prompt).toContain('<artifact_trail>');
+      expect(prompt).toContain('<file_system_state>');
+      expect(prompt).toContain('<recent_actions>');
+      expect(prompt).toContain('<task_state>');
+      expect(prompt).toContain('<saved_memory>');
+    });
+
+    it('should include user memory content in the compression prompt', () => {
+      const memorySentinel = 'SENTINEL_USER_MEMORY_987654321';
+      (mockConfig as unknown as { getUserMemory: () => string }).getUserMemory =
+        vi.fn().mockReturnValue(memorySentinel);
+
+      const provider = new PromptProvider();
+      const prompt = provider.getCompressionPrompt(mockConfig);
+
+      expect(prompt).toContain(memorySentinel);
+      expect(prompt).toContain('<saved_memory>');
     });
   });
 });
