@@ -8,46 +8,46 @@ import { GeminiCliSession } from './session.js';
 import type { GeminiCliAgent } from './agent.js';
 import type { GeminiCliAgentOptions } from './types.js';
 
+// Mutable mock client so individual tests can override sendMessageStream
+const mockClient = {
+  resumeChat: vi.fn().mockResolvedValue(undefined),
+  getHistory: vi.fn().mockReturnValue([]),
+  sendMessageStream: vi.fn().mockReturnValue((async function* () {})()),
+  updateSystemInstruction: vi.fn(),
+};
+
+// Mutable mock config so individual tests can spy on setUserMemory etc.
+const mockConfig = {
+  initialize: vi.fn().mockResolvedValue(undefined),
+  refreshAuth: vi.fn().mockResolvedValue(undefined),
+  getSkillManager: vi.fn().mockReturnValue({
+    getSkills: vi.fn().mockReturnValue([]),
+    addSkills: vi.fn(),
+  }),
+  getToolRegistry: vi.fn().mockReturnValue({
+    getTool: vi.fn().mockReturnValue(null),
+    registerTool: vi.fn(),
+    unregisterTool: vi.fn(),
+  }),
+  getMessageBus: vi.fn().mockReturnValue({}),
+  getGeminiClient: vi.fn().mockReturnValue(mockClient),
+  getSessionId: vi.fn().mockReturnValue('mock-session-id'),
+  getWorkingDir: vi.fn().mockReturnValue('/tmp'),
+  setUserMemory: vi.fn(),
+};
+
+// Mock scheduleAgentTools at module level so tests can override it
+const mockScheduleAgentTools = vi.fn().mockResolvedValue([]);
+
 // Mock @google/gemini-cli-core to avoid heavy filesystem/auth/telemetry setup
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
-    Config: vi.fn().mockImplementation(() => {
-      const mockSkillManager = {
-        getSkills: vi.fn().mockReturnValue([]),
-        addSkills: vi.fn(),
-      };
-      const mockRegistry = {
-        getTool: vi.fn().mockReturnValue(null),
-        registerTool: vi.fn(),
-        unregisterTool: vi.fn(),
-      };
-      const mockMessageBus = {};
-      const mockClient = {
-        resumeChat: vi.fn().mockResolvedValue(undefined),
-        getHistory: vi.fn().mockReturnValue([]),
-        sendMessageStream: vi.fn().mockReturnValue((async function* () {})()),
-        updateSystemInstruction: vi.fn(),
-      };
-      return {
-        initialize: vi.fn().mockResolvedValue(undefined),
-        refreshAuth: vi.fn().mockResolvedValue(undefined),
-        getSkillManager: vi.fn().mockReturnValue(mockSkillManager),
-        getToolRegistry: vi.fn().mockReturnValue(mockRegistry),
-        getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
-        getGeminiClient: vi.fn().mockReturnValue(mockClient),
-        getSessionId: vi.fn().mockReturnValue('mock-session-id'),
-        getWorkingDir: vi.fn().mockReturnValue('/tmp'),
-        setUserMemory: vi.fn(),
-      };
-    }),
+    Config: vi.fn().mockImplementation(() => mockConfig),
     getAuthTypeFromEnv: vi.fn().mockReturnValue(null),
-    AuthType: actual.AuthType,
-    PREVIEW_GEMINI_MODEL_AUTO: actual.PREVIEW_GEMINI_MODEL_AUTO,
-    GeminiEventType: actual.GeminiEventType,
-    scheduleAgentTools: vi.fn().mockResolvedValue([]),
+    scheduleAgentTools: (...args: unknown[]) => mockScheduleAgentTools(...args),
     loadSkillsFromDir: vi.fn().mockResolvedValue([]),
     ActivateSkillTool: class {
       static Name = 'activate_skill';
@@ -61,6 +61,13 @@ const mockAgent = {} as unknown as GeminiCliAgent;
 const baseOptions: GeminiCliAgentOptions = {
   instructions: 'You are a helpful assistant.',
 };
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  // Reset sendMessageStream to empty stream by default
+  mockClient.sendMessageStream.mockReturnValue((async function* () {})());
+  mockScheduleAgentTools.mockResolvedValue([]);
+});
 
 describe('GeminiCliSession constructor', () => {
   it('accepts string instructions', () => {
@@ -124,10 +131,6 @@ describe('GeminiCliSession id getter', () => {
 });
 
 describe('GeminiCliSession initialize()', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('initializes successfully with string instructions', async () => {
     const session = new GeminiCliSession(
       baseOptions,
@@ -148,19 +151,13 @@ describe('GeminiCliSession initialize()', () => {
   });
 
   it('initializes with empty tools array', async () => {
-    const options: GeminiCliAgentOptions = {
-      ...baseOptions,
-      tools: [],
-    };
+    const options: GeminiCliAgentOptions = { ...baseOptions, tools: [] };
     const session = new GeminiCliSession(options, 'session-init-3', mockAgent);
     await expect(session.initialize()).resolves.toBeUndefined();
   });
 
   it('initializes with empty skills array', async () => {
-    const options: GeminiCliAgentOptions = {
-      ...baseOptions,
-      skills: [],
-    };
+    const options: GeminiCliAgentOptions = { ...baseOptions, skills: [] };
     const session = new GeminiCliSession(options, 'session-init-4', mockAgent);
     await expect(session.initialize()).resolves.toBeUndefined();
   });
@@ -185,10 +182,6 @@ describe('GeminiCliSession initialize()', () => {
 });
 
 describe('GeminiCliSession sendStream()', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('auto-initializes if not yet initialized', async () => {
     const session = new GeminiCliSession(
       baseOptions,
@@ -199,7 +192,6 @@ describe('GeminiCliSession sendStream()', () => {
     for await (const event of session.sendStream('Hello')) {
       events.push(event);
     }
-    // Empty stream from mock — no events, but no throw either
     expect(events).toHaveLength(0);
   });
 
@@ -229,5 +221,111 @@ describe('GeminiCliSession sendStream()', () => {
       events.push(event);
     }
     expect(events).toHaveLength(0);
+  });
+
+  it('executes tool call loop and sends function response back to model', async () => {
+    const { GeminiEventType } = await import('@google/gemini-cli-core');
+
+    // First call: yield a ToolCallRequest, then end
+    // Second call: empty stream (model is done after tool result)
+    let callCount = 0;
+    mockClient.sendMessageStream.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return (async function* () {
+          yield {
+            type: GeminiEventType.ToolCallRequest,
+            value: {
+              callId: 'call-1',
+              name: 'testTool',
+              args: { input: 'value' },
+            },
+          };
+        })();
+      }
+      return (async function* () {})();
+    });
+
+    mockScheduleAgentTools.mockResolvedValue([
+      {
+        response: {
+          responseParts: [
+            {
+              functionResponse: {
+                name: 'testTool',
+                response: { result: 'done' },
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    const session = new GeminiCliSession(
+      baseOptions,
+      'session-stream-4',
+      mockAgent,
+    );
+    const events = [];
+    for await (const event of session.sendStream('Use the tool')) {
+      events.push(event);
+    }
+
+    // The ToolCallRequest event should have been yielded to the caller
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe(GeminiEventType.ToolCallRequest);
+
+    // scheduleAgentTools should have been called with the tool call
+    expect(mockScheduleAgentTools).toHaveBeenCalledOnce();
+
+    // sendMessageStream called twice: once for prompt, once with tool result
+    expect(mockClient.sendMessageStream).toHaveBeenCalledTimes(2);
+  });
+
+  it('calls setUserMemory and updateSystemInstruction when instructions is a function', async () => {
+    const dynamicInstructions = vi
+      .fn()
+      .mockResolvedValue('updated instructions');
+    const options: GeminiCliAgentOptions = {
+      instructions: dynamicInstructions,
+    };
+
+    const session = new GeminiCliSession(
+      options,
+      'session-stream-5',
+      mockAgent,
+    );
+    for await (const _event of session.sendStream('Hello')) {
+      // consume stream
+    }
+
+    // The instructions function should have been called with a SessionContext
+    expect(dynamicInstructions).toHaveBeenCalledOnce();
+    const context = dynamicInstructions.mock.calls[0][0];
+    expect(context).toHaveProperty('sessionId');
+    expect(context).toHaveProperty('transcript');
+    expect(context).toHaveProperty('cwd');
+    expect(context).toHaveProperty('timestamp');
+
+    // Config should have been updated with the new instructions
+    expect(mockConfig.setUserMemory).toHaveBeenCalledWith(
+      'updated instructions',
+    );
+
+    // Client system instruction should have been refreshed
+    expect(mockClient.updateSystemInstruction).toHaveBeenCalledOnce();
+  });
+
+  it('does not call setUserMemory when instructions is a string', async () => {
+    const session = new GeminiCliSession(
+      baseOptions,
+      'session-stream-6',
+      mockAgent,
+    );
+    for await (const _event of session.sendStream('Hello')) {
+      // consume stream
+    }
+    expect(mockConfig.setUserMemory).not.toHaveBeenCalled();
+    expect(mockClient.updateSystemInstruction).not.toHaveBeenCalled();
   });
 });
