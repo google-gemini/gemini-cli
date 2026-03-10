@@ -325,13 +325,18 @@ export function BaseSettingsDialog({
           return;
         }
 
-        // Up/Down in edit mode - commit and navigate
-        if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
+        // Up/Down in edit mode - commit and navigate.
+        // Only trigger on non-insertable keys (arrow keys) so that typing
+        // j/k characters into the edit buffer is not intercepted.
+        if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key) && !key.insertable) {
           commitEdit();
           moveUp();
           return;
         }
-        if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
+        if (
+          keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key) &&
+          !key.insertable
+        ) {
           commitEdit();
           moveDown();
           return;
@@ -349,13 +354,21 @@ export function BaseSettingsDialog({
       }
 
       // Not in edit mode - handle navigation and actions
-      if (effectiveFocusSection === 'settings') {
-        // Up/Down navigation with wrap-around
-        if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
+      if (focusSection === 'settings') {
+        // Up/Down navigation with wrap-around.
+        // Skip vim-style k/j shortcuts when search is enabled so those characters
+        // can be typed into the search box instead. Arrow keys always work.
+        if (
+          keyMatchers[Command.DIALOG_NAVIGATION_UP](key) &&
+          !(searchEnabled && key.insertable)
+        ) {
           moveUp();
           return true;
         }
-        if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
+        if (
+          keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key) &&
+          !(searchEnabled && key.insertable)
+        ) {
           moveDown();
           return true;
         }
