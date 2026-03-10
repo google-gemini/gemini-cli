@@ -264,6 +264,27 @@ jobs:
         run: 'npm run build'
         shell: 'pwsh'
 
+      - name: 'Ensure Chrome is available'
+        shell: 'pwsh'
+        run: |
+          $chromePaths = @(
+            "${env:ProgramFiles}\Google\Chrome\Application\chrome.exe",
+            "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe"
+          )
+          $chromeExists = $chromePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $chromeExists) {
+            Write-Host 'Chrome not found, installing via Chocolatey...'
+            choco install googlechrome -y --no-progress --ignore-checksums
+          }
+          $installed = $chromePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if ($installed) {
+            Write-Host "Chrome found at: $installed"
+            & $installed --version
+          } else {
+            Write-Error 'Chrome installation failed'
+            exit 1
+          }
+
       - name: 'Run E2E tests'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
@@ -290,6 +311,7 @@ jobs:
         with:
           ref: '${{ needs.parse_run_context.outputs.sha }}'
           repository: '${{ needs.parse_run_context.outputs.repository }}'
+          fetch-depth: 0
 
       - name: 'Set up Node.js 20.x'
         uses: 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' # ratchet:actions-node@v4
@@ -302,7 +324,14 @@ jobs:
       - name: 'Build project'
         run: 'npm run build'
 
-      - name: 'Run Evals (ALWAYS_PASSING)'
+      - name: 'Check if evals should run'
+        id: 'check_evals'
+        run: |
+          SHOULD_RUN=$(node scripts/changed_prompt.js)
+          echo "should_run=$SHOULD_RUN" >> "$GITHUB_OUTPUT"
+
+      - name: 'Run Evals (Required to pass)'
+        if: "${{ steps.check_evals.outputs.should_run == 'true' }}"
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
         run: 'npm run test:always_passing_evals'
@@ -315,6 +344,7 @@ jobs:
       - 'e2e_linux'
       - 'e2e_mac'
       - 'e2e_windows'
+      - 'evals'
       - 'merge_queue_skipper'
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
@@ -322,7 +352,8 @@ jobs:
         run: |
           if [[ ${NEEDS_E2E_LINUX_RESULT} != 'success' || \
                ${NEEDS_E2E_MAC_RESULT} != 'success' || \
-               ${NEEDS_E2E_WINDOWS_RESULT} != 'success' ]]; then
+               ${NEEDS_E2E_WINDOWS_RESULT} != 'success' || \
+               ${NEEDS_EVALS_RESULT} != 'success' ]]; then
             echo "One or more E2E jobs failed."
             exit 1
           fi
@@ -331,6 +362,7 @@ jobs:
           NEEDS_E2E_LINUX_RESULT: '${{ needs.e2e_linux.result }}'
           NEEDS_E2E_MAC_RESULT: '${{ needs.e2e_mac.result }}'
           NEEDS_E2E_WINDOWS_RESULT: '${{ needs.e2e_windows.result }}'
+          NEEDS_EVALS_RESULT: '${{ needs.evals.result }}'
 
   set_workflow_status:
     runs-on: 'gemini-cli-ubuntu-16-core'

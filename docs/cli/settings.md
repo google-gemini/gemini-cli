@@ -57,10 +57,10 @@ they appear in the UI.
 | Show Shortcuts Hint                  | `ui.showShortcutsHint`                 | Show the "? for shortcuts" hint above the input.                                                                                                                  | `true`   |
 | Hide Banner                          | `ui.hideBanner`                        | Hide the application banner                                                                                                                                       | `false`  |
 | Hide Context Summary                 | `ui.hideContextSummary`                | Hide the context summary (GEMINI.md, MCP servers) above the input.                                                                                                | `false`  |
-| Hide CWD                             | `ui.footer.hideCWD`                    | Hide the current working directory path in the footer.                                                                                                            | `false`  |
+| Hide CWD                             | `ui.footer.hideCWD`                    | Hide the current working directory in the footer.                                                                                                                 | `false`  |
 | Hide Sandbox Status                  | `ui.footer.hideSandboxStatus`          | Hide the sandbox status indicator in the footer.                                                                                                                  | `false`  |
 | Hide Model Info                      | `ui.footer.hideModelInfo`              | Hide the model name and context usage in the footer.                                                                                                              | `false`  |
-| Hide Context Window Percentage       | `ui.footer.hideContextPercentage`      | Hides the context window remaining percentage.                                                                                                                    | `true`   |
+| Hide Context Window Percentage       | `ui.footer.hideContextPercentage`      | Hides the context window usage percentage.                                                                                                                        | `true`   |
 | Hide Footer                          | `ui.hideFooter`                        | Hide the footer from the UI                                                                                                                                       | `false`  |
 | Show Memory Usage                    | `ui.showMemoryUsage`                   | Display memory usage information in the UI                                                                                                                        | `false`  |
 | Show Line Numbers                    | `ui.showLineNumbers`                   | Show line numbers in the chat.                                                                                                                                    | `true`   |
@@ -89,20 +89,20 @@ they appear in the UI.
 
 ### Model
 
-| UI Label                | Setting                      | Description                                                                            | Default     |
-| ----------------------- | ---------------------------- | -------------------------------------------------------------------------------------- | ----------- |
-| Model                   | `model.name`                 | The Gemini model to use for conversations.                                             | `undefined` |
-| Max Session Turns       | `model.maxSessionTurns`      | Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.      | `-1`        |
-| Compression Threshold   | `model.compressionThreshold` | The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3). | `0.5`       |
-| Disable Loop Detection  | `model.disableLoopDetection` | Disable automatic detection and prevention of infinite loops.                          | `false`     |
-| Skip Next Speaker Check | `model.skipNextSpeakerCheck` | Skip the next speaker check.                                                           | `true`      |
+| UI Label                      | Setting                      | Description                                                                            | Default     |
+| ----------------------------- | ---------------------------- | -------------------------------------------------------------------------------------- | ----------- |
+| Model                         | `model.name`                 | The Gemini model to use for conversations.                                             | `undefined` |
+| Max Session Turns             | `model.maxSessionTurns`      | Maximum number of user/model/tool turns to keep in a session. -1 means unlimited.      | `-1`        |
+| Context Compression Threshold | `model.compressionThreshold` | The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3). | `0.5`       |
+| Disable Loop Detection        | `model.disableLoopDetection` | Disable automatic detection and prevention of infinite loops.                          | `false`     |
+| Skip Next Speaker Check       | `model.skipNextSpeakerCheck` | Skip the next speaker check.                                                           | `true`      |
 
 ### Context
 
 | UI Label                             | Setting                                           | Description                                                                                                                                                                                                                                 | Default |
 | ------------------------------------ | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | Memory Discovery Max Dirs            | `context.discoveryMaxDirs`                        | Maximum number of directories to search for memory.                                                                                                                                                                                         | `200`   |
-| Load Memory From Include Directories | `context.loadMemoryFromIncludeDirectories`        | Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.                                                                                             | `false` |
+| Load Memory From Include Directories | `context.loadMemoryFromIncludeDirectories`        | Controls how /memory reload loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.                                                                                              | `false` |
 | Respect .gitignore                   | `context.fileFiltering.respectGitIgnore`          | Respect .gitignore files when searching.                                                                                                                                                                                                    | `true`  |
 | Respect .geminiignore                | `context.fileFiltering.respectGeminiIgnore`       | Respect .geminiignore files when searching.                                                                                                                                                                                                 | `true`  |
 | Enable Recursive File Search         | `context.fileFiltering.enableRecursiveFileSearch` | Enable recursive file search functionality when completing @ references in the prompt.                                                                                                                                                      | `true`  |
@@ -144,10 +144,9 @@ they appear in the UI.
 | Enable Tool Output Masking | `experimental.toolOutputMasking.enabled` | Enables tool output masking to save tokens.                                                                                                               | `true`  |
 | Use OSC 52 Paste           | `experimental.useOSC52Paste`             | Use OSC 52 for pasting. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
 | Use OSC 52 Copy            | `experimental.useOSC52Copy`              | Use OSC 52 for copying. This may be more robust than the default system when using remote terminal sessions (if your terminal is configured to allow it). | `false` |
-| Plan                       | `experimental.plan`                      | Enable planning features (Plan Mode and tools).                                                                                                           | `false` |
+| Plan                       | `experimental.plan`                      | Enable Plan Mode.                                                                                                                                         | `true`  |
 | Model Steering             | `experimental.modelSteering`             | Enable model steering (user hints) to guide the model during tool execution.                                                                              | `false` |
 | Direct Web Fetch           | `experimental.directWebFetch`            | Enable web fetch behavior that bypasses LLM summarization.                                                                                                | `false` |
-| Enable Gemma Model Router  | `experimental.gemmaModelRouter.enabled`  | Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.                                           | `false` |
 
 ### Skills
 

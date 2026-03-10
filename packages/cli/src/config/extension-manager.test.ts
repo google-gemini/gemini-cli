@@ -12,6 +12,13 @@ import { ExtensionManager } from './extension-manager.js';
 import { createTestMergedSettings } from './settings.js';
 import { createExtension } from '../test-utils/createExtension.js';
 import { EXTENSIONS_DIRECTORY_NAME } from './extensions/variables.js';
+import {
+  TrustLevel,
+  loadTrustedFolders,
+  isWorkspaceTrusted,
+} from './trustedFolders.js';
+import { getRealPath } from '@google/gemini-cli-core';
+import type { MergedSettings } from './settings.js';
 
 const mockHomedir = vi.hoisted(() => vi.fn(() => '/tmp/mock-home'));
 
@@ -183,6 +190,299 @@ describe('ExtensionManager', () => {
       expect(names).toEqual(['ext1', 'ext2']);
 
       fs.rmSync(externalDir, { recursive: true, force: true });
+    });
+  });
+
+  describe('symlink handling', () => {
+    let extensionDir: string;
+    let symlinkDir: string;
+
+    beforeEach(() => {
+      extensionDir = path.join(tempHomeDir, 'extension');
+      symlinkDir = path.join(tempHomeDir, 'symlink-ext');
+
+      fs.mkdirSync(extensionDir, { recursive: true });
+
+      fs.writeFileSync(
+        path.join(extensionDir, 'gemini-extension.json'),
+        JSON.stringify({ name: 'test-ext', version: '1.0.0' }),
+      );
+
+      fs.symlinkSync(extensionDir, symlinkDir, 'dir');
+    });
+
+    it('preserves symlinks in installMetadata.source when linking', async () => {
+      const manager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        settings: {
+          security: {
+            folderTrust: { enabled: false }, // Disable trust for simplicity in this test
+          },
+          experimental: { extensionConfig: false },
+          admin: { extensions: { enabled: true }, mcp: { enabled: true } },
+          hooksConfig: { enabled: true },
+        } as unknown as MergedSettings,
+        requestConsent: () => Promise.resolve(true),
+        requestSetting: null,
+      });
+
+      // Trust the workspace to allow installation
+      const trustedFolders = loadTrustedFolders();
+      await trustedFolders.setValue(tempWorkspaceDir, TrustLevel.TRUST_FOLDER);
+
+      const installMetadata = {
+        source: symlinkDir,
+        type: 'link' as const,
+      };
+
+      await manager.loadExtensions();
+      const extension = await manager.installOrUpdateExtension(installMetadata);
+
+      // Desired behavior: it preserves symlinks (if they were absolute or relative as provided)
+      expect(extension.installMetadata?.source).toBe(symlinkDir);
+    });
+
+    it('works with the new install command logic (preserves symlink but trusts real path)', async () => {
+      // This simulates the logic in packages/cli/src/commands/extensions/install.ts
+      const absolutePath = path.resolve(symlinkDir);
+      const realPath = getRealPath(absolutePath);
+
+      const settings = {
+        security: {
+          folderTrust: { enabled: true },
+        },
+        experimental: { extensionConfig: false },
+        admin: { extensions: { enabled: true }, mcp: { enabled: true } },
+        hooksConfig: { enabled: true },
+      } as unknown as MergedSettings;
+
+      // Trust the REAL path
+      const trustedFolders = loadTrustedFolders();
+      await trustedFolders.setValue(realPath, TrustLevel.TRUST_FOLDER);
+
+      // Check trust of the symlink path
+      const trustResult = isWorkspaceTrusted(settings, absolutePath);
+      expect(trustResult.isTrusted).toBe(true);
+
+      const manager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        settings,
+        requestConsent: () => Promise.resolve(true),
+        requestSetting: null,
+      });
+
+      const installMetadata = {
+        source: absolutePath,
+        type: 'link' as const,
+      };
+
+      await manager.loadExtensions();
+      const extension = await manager.installOrUpdateExtension(installMetadata);
+
+      expect(extension.installMetadata?.source).toBe(absolutePath);
+      expect(extension.installMetadata?.source).not.toBe(realPath);
+    });
+
+    it('enforces allowedExtensions using the real path', async () => {
+      const absolutePath = path.resolve(symlinkDir);
+      const realPath = getRealPath(absolutePath);
+
+      const settings = {
+        security: {
+          folderTrust: { enabled: false },
+          // Only allow the real path, not the symlink path
+          allowedExtensions: [realPath.replace(/\\/g, '\\\\')],
+        },
+        experimental: { extensionConfig: false },
+        admin: { extensions: { enabled: true }, mcp: { enabled: true } },
+        hooksConfig: { enabled: true },
+      } as unknown as MergedSettings;
+
+      const manager = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        settings,
+        requestConsent: () => Promise.resolve(true),
+        requestSetting: null,
+      });
+
+      const installMetadata = {
+        source: absolutePath,
+        type: 'link' as const,
+      };
+
+      await manager.loadExtensions();
+      // This should pass because realPath is allowed
+      const extension = await manager.installOrUpdateExtension(installMetadata);
+      expect(extension.name).toBe('test-ext');
+
+      // Now try with a settings that only allows the symlink path string
+      const settingsOnlySymlink = {
+        security: {
+          folderTrust: { enabled: false },
+          // Only allow the symlink path string explicitly
+          allowedExtensions: [absolutePath.replace(/\\/g, '\\\\')],
+        },
+        experimental: { extensionConfig: false },
+        admin: { extensions: { enabled: true }, mcp: { enabled: true } },
+        hooksConfig: { enabled: true },
+      } as unknown as MergedSettings;
+
+      const manager2 = new ExtensionManager({
+        workspaceDir: tempWorkspaceDir,
+        settings: settingsOnlySymlink,
+        requestConsent: () => Promise.resolve(true),
+        requestSetting: null,
+      });
+
+      // This should FAIL because it checks the real path against the pattern
+      // (Unless symlinkDir === extensionDir, which shouldn't happen in this test setup)
+      if (absolutePath !== realPath) {
+        await expect(
+          manager2.installOrUpdateExtension(installMetadata),
+        ).rejects.toThrow(
+          /is not allowed by the "allowedExtensions" security setting/,
+        );
+      }
+    });
+  });
+
+  describe('Extension Renaming', () => {
+    it('should support renaming an extension during update', async () => {
+      // 1. Setup existing extension
+      const oldName = 'old-name';
+      const newName = 'new-name';
+      const extDir = path.join(userExtensionsDir, oldName);
+      fs.mkdirSync(extDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(extDir, 'gemini-extension.json'),
+        JSON.stringify({ name: oldName, version: '1.0.0' }),
+      );
+      fs.writeFileSync(
+        path.join(extDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: extDir }),
+      );
+
+      await extensionManager.loadExtensions();
+
+      // 2. Create a temporary "new" version with a different name
+      const newSourceDir = fs.mkdtempSync(
+        path.join(tempHomeDir, 'new-source-'),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'gemini-extension.json'),
+        JSON.stringify({ name: newName, version: '1.1.0' }),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: newSourceDir }),
+      );
+
+      // 3. Update the extension
+      await extensionManager.installOrUpdateExtension(
+        { type: 'local', source: newSourceDir },
+        { name: oldName, version: '1.0.0' },
+      );
+
+      // 4. Verify old directory is gone and new one exists
+      expect(fs.existsSync(path.join(userExtensionsDir, oldName))).toBe(false);
+      expect(fs.existsSync(path.join(userExtensionsDir, newName))).toBe(true);
+
+      // Verify the loaded state is updated
+      const extensions = extensionManager.getExtensions();
+      expect(extensions.some((e) => e.name === newName)).toBe(true);
+      expect(extensions.some((e) => e.name === oldName)).toBe(false);
+    });
+
+    it('should carry over enablement status when renaming', async () => {
+      const oldName = 'old-name';
+      const newName = 'new-name';
+      const extDir = path.join(userExtensionsDir, oldName);
+      fs.mkdirSync(extDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(extDir, 'gemini-extension.json'),
+        JSON.stringify({ name: oldName, version: '1.0.0' }),
+      );
+      fs.writeFileSync(
+        path.join(extDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: extDir }),
+      );
+
+      // Enable it
+      const enablementManager = extensionManager.getEnablementManager();
+      enablementManager.enable(oldName, true, tempHomeDir);
+
+      await extensionManager.loadExtensions();
+      const extension = extensionManager.getExtensions()[0];
+      expect(extension.isActive).toBe(true);
+
+      const newSourceDir = fs.mkdtempSync(
+        path.join(tempHomeDir, 'new-source-'),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'gemini-extension.json'),
+        JSON.stringify({ name: newName, version: '1.1.0' }),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: newSourceDir }),
+      );
+
+      await extensionManager.installOrUpdateExtension(
+        { type: 'local', source: newSourceDir },
+        { name: oldName, version: '1.0.0' },
+      );
+
+      // Verify new name is enabled
+      expect(enablementManager.isEnabled(newName, tempHomeDir)).toBe(true);
+      // Verify old name is removed from enablement
+      expect(enablementManager.readConfig()[oldName]).toBeUndefined();
+    });
+
+    it('should prevent renaming if the new name conflicts with an existing extension', async () => {
+      // Setup two extensions
+      const ext1Dir = path.join(userExtensionsDir, 'ext1');
+      fs.mkdirSync(ext1Dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(ext1Dir, 'gemini-extension.json'),
+        JSON.stringify({ name: 'ext1', version: '1.0.0' }),
+      );
+      fs.writeFileSync(
+        path.join(ext1Dir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: ext1Dir }),
+      );
+
+      const ext2Dir = path.join(userExtensionsDir, 'ext2');
+      fs.mkdirSync(ext2Dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(ext2Dir, 'gemini-extension.json'),
+        JSON.stringify({ name: 'ext2', version: '1.0.0' }),
+      );
+      fs.writeFileSync(
+        path.join(ext2Dir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: ext2Dir }),
+      );
+
+      await extensionManager.loadExtensions();
+
+      // Try to update ext1 to name 'ext2'
+      const newSourceDir = fs.mkdtempSync(
+        path.join(tempHomeDir, 'new-source-'),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'gemini-extension.json'),
+        JSON.stringify({ name: 'ext2', version: '1.1.0' }),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: newSourceDir }),
+      );
+
+      await expect(
+        extensionManager.installOrUpdateExtension(
+          { type: 'local', source: newSourceDir },
+          { name: 'ext1', version: '1.0.0' },
+        ),
+      ).rejects.toThrow(/already installed/);
     });
   });
 });

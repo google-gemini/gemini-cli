@@ -734,6 +734,109 @@ describe('SettingsUtils', () => {
         );
         expect(result).toBe('false');
       });
+
+      it('should display objects as JSON strings, not "[object Object]"', () => {
+        vi.mocked(getSettingsSchema).mockReturnValue({
+          experimental: {
+            type: 'object',
+            label: 'Experimental',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: {},
+            description: 'Experimental settings',
+            showInDialog: false,
+            properties: {
+              gemmaModelRouter: {
+                type: 'object',
+                label: 'Gemma Model Router',
+                category: 'Experimental',
+                requiresRestart: true,
+                default: {},
+                description: 'Gemma model router settings',
+                showInDialog: true,
+              },
+            },
+          },
+        } as unknown as SettingsSchemaType);
+
+        // Test with empty object (default)
+        const emptySettings = makeMockSettings({});
+        const emptyResult = getDisplayValue(
+          'experimental.gemmaModelRouter',
+          emptySettings,
+          emptySettings,
+        );
+        expect(emptyResult).toBe('{}');
+        expect(emptyResult).not.toBe('[object Object]');
+
+        // Test with object containing values
+        const settings = makeMockSettings({
+          experimental: {
+            gemmaModelRouter: { enabled: true, host: 'localhost' },
+          },
+        });
+        const result = getDisplayValue(
+          'experimental.gemmaModelRouter',
+          settings,
+          settings,
+        );
+        expect(result).toBe('{"enabled":true,"host":"localhost"}*');
+        expect(result).not.toContain('[object Object]');
+      });
+    });
+
+    describe('getDisplayValue with units', () => {
+      it('should format percentage correctly when unit is %', () => {
+        vi.mocked(getSettingsSchema).mockReturnValue({
+          model: {
+            properties: {
+              compressionThreshold: {
+                type: 'number',
+                label: 'Context Compression Threshold',
+                category: 'Model',
+                requiresRestart: true,
+                default: 0.5,
+                unit: '%',
+              },
+            },
+          },
+        } as unknown as SettingsSchemaType);
+
+        const settings = makeMockSettings({
+          model: { compressionThreshold: 0.8 },
+        });
+        const result = getDisplayValue(
+          'model.compressionThreshold',
+          settings,
+          makeMockSettings({}),
+        );
+        expect(result).toBe('0.8 (80%)*');
+      });
+
+      it('should append unit for non-% units', () => {
+        vi.mocked(getSettingsSchema).mockReturnValue({
+          ui: {
+            properties: {
+              pollingInterval: {
+                type: 'number',
+                label: 'Polling Interval',
+                category: 'UI',
+                requiresRestart: false,
+                default: 60,
+                unit: 's',
+              },
+            },
+          },
+        } as unknown as SettingsSchemaType);
+
+        const settings = makeMockSettings({ ui: { pollingInterval: 30 } });
+        const result = getDisplayValue(
+          'ui.pollingInterval',
+          settings,
+          makeMockSettings({}),
+        );
+        expect(result).toBe('30s*');
+      });
     });
   });
 });
