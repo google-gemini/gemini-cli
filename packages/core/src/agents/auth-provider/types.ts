@@ -74,6 +74,10 @@ export interface OAuth2AuthConfig extends BaseAuthConfig {
   client_id?: string;
   client_secret?: string;
   scopes?: string[];
+  /** Override or provide the authorization endpoint URL. Discovered from agent card if omitted. */
+  authorization_url?: string;
+  /** Override or provide the token endpoint URL. Discovered from agent card if omitted. */
+  token_url?: string;
 }
 
 /** Client config corresponding to OpenIdConnectSecurityScheme. */
