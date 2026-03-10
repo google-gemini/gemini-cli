@@ -211,6 +211,87 @@ describe('ToolExecutor', () => {
     });
   });
 
+  it('should return cancelled result when executeToolWithHooks rejects with AbortError', async () => {
+    const mockTool = new MockTool({
+      name: 'webSearchTool',
+      description: 'Mock web search',
+    });
+    const invocation = mockTool.build({});
+
+    const abortErr = new Error('The user aborted a request.');
+    abortErr.name = 'AbortError';
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockRejectedValue(
+      abortErr,
+    );
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-abort',
+        name: 'webSearchTool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-abort',
+      },
+      tool: mockTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    const result = await executor.execute({
+      call: scheduledCall,
+      signal: new AbortController().signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    expect(result.status).toBe(CoreToolCallStatus.Cancelled);
+    if (result.status === CoreToolCallStatus.Cancelled) {
+      const response = result.response.responseParts[0]?.functionResponse
+        ?.response as Record<string, unknown>;
+      expect(response['error']).toContain('Operation cancelled.');
+    }
+  });
+
+  it('should return cancelled result when executeToolWithHooks rejects with "Operation cancelled by user" message', async () => {
+    const mockTool = new MockTool({
+      name: 'someTool',
+      description: 'Mock',
+    });
+    const invocation = mockTool.build({});
+
+    const cancelErr = new Error('Operation cancelled by user');
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockRejectedValue(
+      cancelErr,
+    );
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-cancel-msg',
+        name: 'someTool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-cancel-msg',
+      },
+      tool: mockTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    const result = await executor.execute({
+      call: scheduledCall,
+      signal: new AbortController().signal,
+      onUpdateToolCall: vi.fn(),
+    });
+
+    expect(result.status).toBe(CoreToolCallStatus.Cancelled);
+    if (result.status === CoreToolCallStatus.Cancelled) {
+      const response = result.response.responseParts[0]?.functionResponse
+        ?.response as Record<string, unknown>;
+      expect(response['error']).toContain('User cancelled tool execution.');
+    }
+  });
+
   it('should return cancelled result when signal is aborted', async () => {
     const mockTool = new MockTool({
       name: 'slowTool',
