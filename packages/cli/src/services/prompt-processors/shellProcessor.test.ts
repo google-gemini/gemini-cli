@@ -77,6 +77,7 @@ describe('ShellProcessor', () => {
       getTargetDir: vi.fn().mockReturnValue('/test/dir'),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
+      getEnablePersistentShell: vi.fn().mockReturnValue(false),
       getShellExecutionConfig: vi.fn().mockReturnValue({}),
       getPolicyEngine: vi.fn().mockReturnValue({
         check: mockPolicyEngineCheck,

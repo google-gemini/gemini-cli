@@ -1305,6 +1305,13 @@
               "default": true,
               "type": "boolean"
             },
+            "enablePersistentShell": {
+              "title": "Enable Persistent Shell",
+              "description": "Maintain a persistent shell session across commands to preserve environment variables, directory changes, and aliases.",
+              "markdownDescription": "Maintain a persistent shell session across commands to preserve environment variables, directory changes, and aliases.\n\n- Category: `Tools`\n- Requires restart: `yes`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
             "pager": {
               "title": "Pager",
               "description": "The pager command to use for shell output. Defaults to `cat`.",

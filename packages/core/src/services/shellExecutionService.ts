@@ -27,6 +27,7 @@ import {
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
 import { killProcessGroup } from '../utils/process-utils.js';
+import { PersistentShellSession } from './persistentShellSession.js';
 const { Terminal } = pkg;
 
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
@@ -106,6 +107,7 @@ export interface ShellExecutionConfig {
   disableDynamicLineTrimming?: boolean;
   scrollback?: number;
   maxSerializedLines?: number;
+  persistent?: boolean;
 }
 
 /**
@@ -196,6 +198,7 @@ const getFullBufferText = (terminal: pkg.Terminal): string => {
  */
 
 export class ShellExecutionService {
+  private static persistentSession: PersistentShellSession | null = null;
   private static activePtys = new Map<number, ActivePty>();
   private static activeChildProcesses = new Map<number, ActiveChildProcess>();
   private static exitedPtyInfo = new Map<
@@ -210,6 +213,13 @@ export class ShellExecutionService {
     number,
     Set<(event: ShellOutputEvent) => void>
   >();
+  static clearPersistentSession(): void {
+    if (this.persistentSession) {
+      this.persistentSession.kill();
+      this.persistentSession = null;
+    }
+  }
+
   /**
    * Executes a shell command using `node-pty`, capturing all output and lifecycle events.
    *
@@ -228,6 +238,98 @@ export class ShellExecutionService {
     shouldUseNodePty: boolean,
     shellExecutionConfig: ShellExecutionConfig,
   ): Promise<ShellExecutionHandle> {
+    if (shellExecutionConfig.persistent) {
+      if (!this.persistentSession) {
+        this.persistentSession = new PersistentShellSession({
+          sanitizationConfig: shellExecutionConfig.sanitizationConfig,
+        });
+      }
+
+      await this.persistentSession.init();
+      const pid = this.persistentSession.pid;
+
+      const cols = shellExecutionConfig.terminalWidth ?? 80;
+      const rows = shellExecutionConfig.terminalHeight ?? 30;
+
+      this.persistentSession.resize(cols, rows);
+
+      const headlessTerminal = new Terminal({
+        allowProposedApi: true,
+        cols,
+        rows,
+        scrollback: shellExecutionConfig.scrollback ?? SCROLLBACK_LIMIT,
+      });
+      headlessTerminal.scrollToTop();
+
+      let writePromise = Promise.resolve();
+      let renderTimeout: NodeJS.Timeout | null = null;
+
+      const renderFn = () => {
+        renderTimeout = null;
+        const endLine = headlessTerminal.buffer.active.length;
+        const startLine = Math.max(
+          0,
+          endLine - (shellExecutionConfig.maxSerializedLines ?? 2000),
+        );
+        const serializedData = serializeTerminalToObject(
+          headlessTerminal,
+          startLine,
+          endLine,
+        );
+        const event: ShellOutputEvent = { type: 'data', chunk: serializedData };
+        onOutputEvent(event);
+        if (pid !== undefined) {
+          ShellExecutionService.emitEvent(pid, event);
+        }
+      };
+
+      const render = (final?: boolean) => {
+        if (final) {
+          if (renderTimeout) clearTimeout(renderTimeout);
+          renderFn();
+          return;
+        }
+        if (!renderTimeout) {
+          renderTimeout = setTimeout(renderFn, 100);
+        }
+      };
+
+      const result = this.persistentSession
+        .execute(
+          commandToExecute,
+          cwd,
+          (chunk) => {
+            const bufferData = Buffer.from(chunk);
+            writePromise = writePromise.then(
+              () =>
+                new Promise<void>((resolve) => {
+                  headlessTerminal.write(bufferData, () => {
+                    render();
+                    resolve();
+                  });
+                }),
+            );
+          },
+          abortSignal,
+        )
+        .then(async (res) => {
+          await writePromise;
+          render(true);
+          return {
+            ...res,
+            rawOutput: Buffer.from(res.output),
+            output: getFullBufferText(headlessTerminal),
+            executionMethod: 'node-pty' as const,
+            pid,
+          };
+        });
+
+      return {
+        pid,
+        result,
+      };
+    }
+
     if (shouldUseNodePty) {
       const ptyInfo = await getPty();
       if (ptyInfo) {
@@ -481,6 +583,7 @@ export class ShellExecutionService {
         function cleanup() {
           exited = true;
           abortSignal.removeEventListener('abort', abortHandler);
+
           if (stdoutDecoder) {
             const remaining = stdoutDecoder.decode();
             if (remaining) {
@@ -805,41 +908,47 @@ export class ShellExecutionService {
 
             const finalize = () => {
               render(true);
+              finish();
 
-              // Store exit info for late subscribers (e.g. backgrounding race condition)
-              this.exitedPtyInfo.set(ptyProcess.pid, { exitCode, signal });
-              setTimeout(
-                () => {
-                  this.exitedPtyInfo.delete(ptyProcess.pid);
-                },
-                5 * 60 * 1000,
-              ).unref();
+              function finish() {
+                // Store exit info for late subscribers (e.g. backgrounding race condition)
+                ShellExecutionService.exitedPtyInfo.set(ptyProcess.pid, {
+                  exitCode,
+                  signal,
+                });
+                setTimeout(
+                  () => {
+                    ShellExecutionService.exitedPtyInfo.delete(ptyProcess.pid);
+                  },
+                  5 * 60 * 1000,
+                ).unref();
 
-              this.activePtys.delete(ptyProcess.pid);
-              this.activeResolvers.delete(ptyProcess.pid);
+                ShellExecutionService.activePtys.delete(ptyProcess.pid);
+                ShellExecutionService.activeResolvers.delete(ptyProcess.pid);
 
-              const event: ShellOutputEvent = {
-                type: 'exit',
-                exitCode,
-                signal: signal ?? null,
-              };
-              onOutputEvent(event);
-              ShellExecutionService.emitEvent(ptyProcess.pid, event);
-              this.activeListeners.delete(ptyProcess.pid);
+                const event: ShellOutputEvent = {
+                  type: 'exit',
+                  exitCode,
+                  signal: signal ?? null,
+                };
+                onOutputEvent(event);
+                ShellExecutionService.emitEvent(ptyProcess.pid, event);
+                ShellExecutionService.activeListeners.delete(ptyProcess.pid);
 
-              const finalBuffer = Buffer.concat(outputChunks);
+                const finalBuffer = Buffer.concat(outputChunks);
 
-              resolve({
-                rawOutput: finalBuffer,
-                output: getFullBufferText(headlessTerminal),
-                exitCode,
-                signal: signal ?? null,
-                error,
-                aborted: abortSignal.aborted,
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-                pid: ptyProcess.pid,
-                executionMethod: ptyInfo?.name ?? 'node-pty',
-              });
+                resolve({
+                  rawOutput: finalBuffer,
+                  output: getFullBufferText(headlessTerminal),
+                  exitCode,
+                  signal: signal ?? null,
+                  error,
+                  aborted: abortSignal.aborted,
+                  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+                  pid: ptyProcess.pid,
+                  executionMethod: ptyInfo?.name ?? 'node-pty',
+                });
+              }
             };
 
             if (abortSignal.aborted) {
@@ -927,6 +1036,11 @@ export class ShellExecutionService {
    * @param input The string to write to the terminal.
    */
   static writeToPty(pid: number, input: string): void {
+    if (this.persistentSession?.pid === pid) {
+      this.persistentSession.write(input);
+      return;
+    }
+
     if (this.activeChildProcesses.has(pid)) {
       const activeChild = this.activeChildProcesses.get(pid);
       if (activeChild) {
@@ -1132,6 +1246,11 @@ export class ShellExecutionService {
    * @param rows The new number of rows.
    */
   static resizePty(pid: number, cols: number, rows: number): void {
+    if (this.persistentSession?.pid === pid) {
+      this.persistentSession.resize(cols, rows);
+      return;
+    }
+
     if (!this.isPtyActive(pid)) {
       return;
     }

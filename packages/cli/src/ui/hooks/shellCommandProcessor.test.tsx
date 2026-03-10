@@ -106,6 +106,7 @@ describe('useShellCommandProcessor', () => {
     mockConfig = {
       getTargetDir: () => '/test/dir',
       getEnableInteractiveShell: () => false,
+      getEnablePersistentShell: () => false,
       getShellExecutionConfig: () => ({
         terminalHeight: 20,
         terminalWidth: 80,

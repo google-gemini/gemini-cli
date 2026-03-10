@@ -23,7 +23,7 @@ export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
 /**
  * An identifier for the shell type.
  */
-export type ShellType = 'cmd' | 'powershell' | 'bash';
+export type ShellType = 'cmd' | 'powershell' | 'bash' | 'zsh';
 
 /**
  * Defines the configuration required to execute a command string within a specific shell.

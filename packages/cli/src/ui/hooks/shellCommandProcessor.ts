@@ -283,6 +283,7 @@ export const useShellCommandProcessor = (
       let commandToExecute = rawQuery;
       let pwdFilePath: string | undefined;
 
+      const isPersistent = config.getEnablePersistentShell();
       // On non-windows, wrap the command to capture the final working directory.
       if (!isWindows) {
         let command = rawQuery.trim();
@@ -292,7 +293,11 @@ export const useShellCommandProcessor = (
         if (!command.endsWith(';') && !command.endsWith('&')) {
           command += ';';
         }
-        commandToExecute = `{ ${command} }; __code=$?; pwd > "${pwdFilePath}"; exit $__code`;
+        if (isPersistent) {
+          commandToExecute = `{ ${command} }; __code=$?; pwd > "${pwdFilePath}"; (exit $__code)`;
+        } else {
+          commandToExecute = `{ ${command} }; __code=$?; pwd > "${pwdFilePath}"; exit $__code`;
+        }
       }
 
       const executeCommand = async () => {
@@ -324,7 +329,9 @@ export const useShellCommandProcessor = (
         };
         abortSignal.addEventListener('abort', abortHandler, { once: true });
 
-        onDebugMessage(`Executing in ${targetDir}: ${commandToExecute}`);
+        onDebugMessage(
+          `Executing in ${targetDir} (persistent=${isPersistent}): ${commandToExecute}`,
+        );
 
         try {
           const activeTheme = themeManager.getActiveTheme();
@@ -334,6 +341,7 @@ export const useShellCommandProcessor = (
             terminalHeight,
             defaultFg: activeTheme.colors.Foreground,
             defaultBg: activeTheme.colors.Background,
+            persistent: isPersistent,
           };
 
           const { pid, result: resultPromise } =

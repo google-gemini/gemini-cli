@@ -176,16 +176,21 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
     const onAbort = () => combinedController.abort();
 
+    const isPersistent =
+      this.config.getEnablePersistentShell() && !this.params.is_background;
+
     try {
-      // pgrep is not available on Windows, so we can't get background PIDs
-      const commandToExecute = isWindows
-        ? strippedCommand
-        : (() => {
-            // wrap command to append subprocess pids (via pgrep) to temporary file
-            let command = strippedCommand.trim();
-            if (!command.endsWith('&')) command += ';';
-            return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
-          })();
+      // pgrep is not available on Windows, so we can't get background PIDs.
+      // Also skip wrapping for persistent shells to avoid 'exit' killing the session.
+      const commandToExecute =
+        isWindows || isPersistent
+          ? strippedCommand
+          : (() => {
+              // wrap command to append subprocess pids (via pgrep) to temporary file
+              let command = strippedCommand.trim();
+              if (!command.endsWith('&')) command += ';';
+              return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
+            })();
 
       const cwd = this.params.dir_path
         ? path.resolve(this.config.getTargetDir(), this.params.dir_path)
@@ -277,6 +282,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
             sanitizationConfig:
               shellExecutionConfig?.sanitizationConfig ??
               this.config.sanitizationConfig,
+            persistent:
+              this.config.getEnablePersistentShell() &&
+              !this.params.is_background,
           },
         );
 
@@ -296,7 +304,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       const result = await resultPromise;
 
       const backgroundPIDs: number[] = [];
-      if (os.platform() !== 'win32') {
+      if (os.platform() !== 'win32' && !isPersistent) {
         let tempFileExists = false;
         try {
           await fsPromises.access(tempFilePath);

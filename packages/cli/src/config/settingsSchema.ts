@@ -1282,6 +1282,17 @@ const SETTINGS_SCHEMA = {
             `,
             showInDialog: true,
           },
+          enablePersistentShell: {
+            type: 'boolean',
+            label: 'Enable Persistent Shell',
+            category: 'Tools',
+            requiresRestart: true,
+            default: true,
+            description: oneLine`
+              Maintain a persistent shell session across commands to preserve environment variables, directory changes, and aliases.
+            `,
+            showInDialog: true,
+          },
           pager: {
             type: 'string',
             label: 'Pager',

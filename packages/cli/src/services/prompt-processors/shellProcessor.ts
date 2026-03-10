@@ -167,6 +167,7 @@ export class ShellProcessor implements IPromptProcessor {
           ...config.getShellExecutionConfig(),
           defaultFg: activeTheme.colors.Foreground,
           defaultBg: activeTheme.colors.Background,
+          persistent: config.getEnablePersistentShell(),
         };
         const { result } = await ShellExecutionService.execute(
           injection.resolvedCommand,

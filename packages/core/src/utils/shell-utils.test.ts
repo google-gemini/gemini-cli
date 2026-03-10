@@ -406,6 +406,7 @@ describe('getShellConfiguration', () => {
 
   it('should return bash configuration on Linux', () => {
     mockPlatform.mockReturnValue('linux');
+    process.env['SHELL'] = '/bin/bash';
     const config = getShellConfiguration();
     expect(config.executable).toBe('bash');
     expect(config.argsPrefix).toEqual(['-c']);
@@ -414,6 +415,7 @@ describe('getShellConfiguration', () => {
 
   it('should return bash configuration on macOS (darwin)', () => {
     mockPlatform.mockReturnValue('darwin');
+    delete process.env['SHELL'];
     const config = getShellConfiguration();
     expect(config.executable).toBe('bash');
     expect(config.argsPrefix).toEqual(['-c']);
