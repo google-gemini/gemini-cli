@@ -167,6 +167,8 @@ export interface Question {
   multiSelect?: boolean;
   /** Placeholder hint text. For type='text', shown in the input field. For type='choice', shown in the "Other" custom input. */
   placeholder?: string;
+  /** Allow the question to consume more vertical space instead of being strictly capped. */
+  unconstrainedHeight?: boolean;
 }
 
 export interface AskUserRequest {
