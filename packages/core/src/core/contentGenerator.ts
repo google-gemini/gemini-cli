@@ -4,15 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  CountTokensResponse,
-  GenerateContentResponse,
-  GenerateContentParameters,
-  CountTokensParameters,
-  EmbedContentResponse,
-  EmbedContentParameters,
+import {
+  GoogleGenAI,
+  type CountTokensResponse,
+  type GenerateContentResponse,
+  type GenerateContentParameters,
+  type CountTokensParameters,
+  type EmbedContentResponse,
+  type EmbedContentParameters,
 } from '@google/genai';
-import { GoogleGenAI } from '@google/genai';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import type { Config } from '../config/config.js';
 import { loadApiKey } from './apiKeyCredentialStorage.js';
@@ -59,6 +59,7 @@ export enum AuthType {
   USE_VERTEX_AI = 'vertex-ai',
   LEGACY_CLOUD_SHELL = 'cloud-shell',
   COMPUTE_ADC = 'compute-default-credentials',
+  GATEWAY = 'gateway',
 }
 
 /**
@@ -93,12 +94,16 @@ export type ContentGeneratorConfig = {
   vertexai?: boolean;
   authType?: AuthType;
   proxy?: string;
+  baseUrl?: string;
+  customHeaders?: Record<string, string>;
 };
 
 export async function createContentGeneratorConfig(
   config: Config,
   authType: AuthType | undefined,
   apiKey?: string,
+  baseUrl?: string,
+  customHeaders?: Record<string, string>,
 ): Promise<ContentGeneratorConfig> {
   const geminiApiKey =
     apiKey ||
@@ -115,6 +120,8 @@ export async function createContentGeneratorConfig(
   const contentGeneratorConfig: ContentGeneratorConfig = {
     authType,
     proxy: config?.getProxy(),
+    baseUrl,
+    customHeaders,
   };
 
   // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
@@ -203,9 +210,13 @@ export async function createContentGenerator(
 
     if (
       config.authType === AuthType.USE_GEMINI ||
-      config.authType === AuthType.USE_VERTEX_AI
+      config.authType === AuthType.USE_VERTEX_AI ||
+      config.authType === AuthType.GATEWAY
     ) {
       let headers: Record<string, string> = { ...baseHeaders };
+      if (config.customHeaders) {
+        headers = { ...headers, ...config.customHeaders };
+      }
       if (gcConfig?.getUsageStatisticsEnabled()) {
         const installationManager = new InstallationManager();
         const installationId = installationManager.getInstallationId();
@@ -214,7 +225,14 @@ export async function createContentGenerator(
           'x-gemini-api-privileged-user-id': `${installationId}`,
         };
       }
-      const httpOptions = { headers };
+      const httpOptions: {
+        baseUrl?: string;
+        headers: Record<string, string>;
+      } = { headers };
+
+      if (config.baseUrl) {
+        httpOptions.baseUrl = config.baseUrl;
+      }
 
       const googleGenAI = new GoogleGenAI({
         apiKey: config.apiKey === '' ? undefined : config.apiKey,

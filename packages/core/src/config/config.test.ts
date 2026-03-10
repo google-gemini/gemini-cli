@@ -4,16 +4,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Mock } from 'vitest';
-import type { ConfigParameters, SandboxConfig } from './config.js';
-import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from './config.js';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
+import {
+  Config,
+  DEFAULT_FILE_FILTERING_OPTIONS,
+  type ConfigParameters,
+  type SandboxConfig,
+} from './config.js';
 import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { ApprovalMode } from '../policy/types.js';
-import type { HookDefinition } from '../hooks/types.js';
-import { HookType, HookEventName } from '../hooks/types.js';
+import {
+  HookType,
+  HookEventName,
+  type HookDefinition,
+} from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -23,14 +37,12 @@ import {
   DEFAULT_OTLP_ENDPOINT,
   uiTelemetryService,
 } from '../telemetry/index.js';
-import type {
-  ContentGeneratorConfig,
-  ContentGenerator,
-} from '../core/contentGenerator.js';
 import {
   AuthType,
   createContentGenerator,
   createContentGeneratorConfig,
+  type ContentGeneratorConfig,
+  type ContentGenerator,
 } from '../core/contentGenerator.js';
 import { GeminiClient } from '../core/client.js';
 import { GitService } from '../services/gitService.js';
@@ -499,6 +511,8 @@ describe('Server Config (config.ts)', () => {
       expect(createContentGeneratorConfig).toHaveBeenCalledWith(
         config,
         authType,
+        undefined,
+        undefined,
         undefined,
       );
       // Verify that contentGeneratorConfig is updated
@@ -2186,6 +2200,23 @@ describe('Config getHooks', () => {
 
       expect(onModelChange).not.toHaveBeenCalled();
     });
+
+    it('should call onModelChange when persisting a model that was previously temporary', () => {
+      const onModelChange = vi.fn();
+      const config = new Config({
+        ...baseParams,
+        model: 'some-other-model',
+        onModelChange,
+      });
+
+      // Temporary selection
+      config.setModel(DEFAULT_GEMINI_MODEL, true);
+      expect(onModelChange).not.toHaveBeenCalled();
+
+      // Persist selection of the same model
+      config.setModel(DEFAULT_GEMINI_MODEL, false);
+      expect(onModelChange).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
+    });
   });
 });
 
@@ -2394,6 +2425,65 @@ describe('Availability Service Integration', () => {
 
     config.resetTurn();
     expect(spy).toHaveBeenCalled();
+  });
+
+  it('resetTurn does NOT reset billing state', () => {
+    const config = new Config({
+      ...baseParams,
+      billing: { overageStrategy: 'ask' },
+    });
+
+    // Simulate accepting credits mid-turn
+    config.setOverageStrategy('always');
+    config.setCreditsNotificationShown(true);
+
+    // resetTurn should leave billing state intact
+    config.resetTurn();
+    expect(config.getBillingSettings().overageStrategy).toBe('always');
+    expect(config.getCreditsNotificationShown()).toBe(true);
+  });
+
+  it('resetBillingTurnState resets overageStrategy to configured value', () => {
+    const config = new Config({
+      ...baseParams,
+      billing: { overageStrategy: 'ask' },
+    });
+
+    config.setOverageStrategy('always');
+    expect(config.getBillingSettings().overageStrategy).toBe('always');
+
+    config.resetBillingTurnState('ask');
+    expect(config.getBillingSettings().overageStrategy).toBe('ask');
+  });
+
+  it('resetBillingTurnState preserves overageStrategy when configured as always', () => {
+    const config = new Config({
+      ...baseParams,
+      billing: { overageStrategy: 'always' },
+    });
+
+    config.resetBillingTurnState('always');
+    expect(config.getBillingSettings().overageStrategy).toBe('always');
+  });
+
+  it('resetBillingTurnState defaults to ask when no strategy provided', () => {
+    const config = new Config({
+      ...baseParams,
+      billing: { overageStrategy: 'always' },
+    });
+
+    config.resetBillingTurnState();
+    expect(config.getBillingSettings().overageStrategy).toBe('ask');
+  });
+
+  it('resetBillingTurnState resets creditsNotificationShown', () => {
+    const config = new Config(baseParams);
+
+    config.setCreditsNotificationShown(true);
+    expect(config.getCreditsNotificationShown()).toBe(true);
+
+    config.resetBillingTurnState();
+    expect(config.getCreditsNotificationShown()).toBe(false);
   });
 });
 
@@ -2698,9 +2788,9 @@ describe('Config Quota & Preview Model Access', () => {
   });
 
   describe('isPlanEnabled', () => {
-    it('should return false by default', () => {
+    it('should return true by default', () => {
       const config = new Config(baseParams);
-      expect(config.isPlanEnabled()).toBe(false);
+      expect(config.isPlanEnabled()).toBe(true);
     });
 
     it('should return true when plan is enabled', () => {

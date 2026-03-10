@@ -91,9 +91,16 @@ the arguments don't match the pattern, the rule does not apply.
 There are three possible decisions a rule can enforce:
 
 - `allow`: The tool call is executed automatically without user interaction.
-- `deny`: The tool call is blocked and is not executed.
+- `deny`: The tool call is blocked and is not executed. For global rules (those
+  without an `argsPattern`), tools that are denied are **completely excluded
+  from the model's memory**. This means the model will not even see the tool as
+  an option, which is more secure and saves context window space.
 - `ask_user`: The user is prompted to approve or deny the tool call. (In
   non-interactive mode, this is treated as `deny`.)
+
+> **Note:** The `deny` decision is the recommended way to exclude tools. The
+> legacy `tools.exclude` setting in `settings.json` is deprecated in favor of
+> policy rules with a `deny` decision.
 
 ### Priority system and tiers
 
@@ -143,8 +150,8 @@ always active.
   confirmation.
 - `autoEdit`: Optimized for automated code editing; some write tools may be
   auto-approved.
-- `plan`: A strict, read-only mode for research and design. See [Customizing
-  Plan Mode Policies].
+- `plan`: A strict, read-only mode for research and design. See
+  [Customizing Plan Mode Policies](../cli/plan-mode.md#customizing-policies).
 - `yolo`: A mode where all tools are auto-approved (use with extreme caution).
 
 ## Rule matching
@@ -211,6 +218,10 @@ Here is a breakdown of the fields available in a TOML policy rule:
 [[rule]]
 # A unique name for the tool, or an array of names.
 toolName = "run_shell_command"
+
+# (Optional) The name of a subagent. If provided, the rule only applies to tool calls
+# made by this specific subagent.
+subagent = "generalist"
 
 # (Optional) The name of an MCP server. Can be combined with toolName
 # to form a composite name like "mcpName__toolName".
@@ -360,5 +371,3 @@ out-of-the-box experience.
 - In **`yolo`** mode, a high-priority rule allows all tools.
 - In **`autoEdit`** mode, rules allow certain write operations to happen without
   prompting.
-
-[Customizing Plan Mode Policies]: /docs/cli/plan-mode.md#customizing-policies
