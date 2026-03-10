@@ -141,9 +141,15 @@ The validation logic is designed to be secure and flexible:
 1.  **Command chaining disabled**: The tool automatically splits commands
     chained with `&&`, `||`, or `;` and validates each part separately. If any
     part of the chain is disallowed, the entire command is blocked.
-2.  **Prefix matching**: The tool uses prefix matching. For example, if you
-    allow `git`, you can run `git status` or `git log`.
-3.  **Blocklist precedence**: The `tools.exclude` list is always checked first.
+2.  **Canonical path matching**: For enhanced security, the tool resolves
+    commands to their absolute canonical paths (e.g., resolving `ls` to
+    `/usr/bin/ls`) before matching against policies. This prevents bypasses
+    using different relative paths or missing absolute paths for the same
+    executable.
+3.  **Prefix matching**: The tool uses prefix matching against both the raw
+    command and its canonical path. For example, if you allow `git`, you can run
+    `git status` or `git log`.
+4.  **Blocklist precedence**: The `tools.exclude` list is always checked first.
     If a command matches a blocked prefix, it will be denied, even if it also
     matches an allowed prefix in `tools.core`.
 
