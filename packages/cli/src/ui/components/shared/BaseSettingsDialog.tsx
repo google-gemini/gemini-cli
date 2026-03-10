@@ -354,21 +354,13 @@ export function BaseSettingsDialog({
       }
 
       // Not in edit mode - handle navigation and actions
-      if (focusSection === 'settings') {
-        // Up/Down navigation with wrap-around.
-        // Skip vim-style k/j shortcuts when search is enabled so those characters
-        // can be typed into the search box instead. Arrow keys always work.
-        if (
-          keyMatchers[Command.DIALOG_NAVIGATION_UP](key) &&
-          !(searchEnabled && key.insertable)
-        ) {
+      if (effectiveFocusSection === 'settings') {
+        // Up/Down navigation with wrap-around
+        if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
           moveUp();
           return true;
         }
-        if (
-          keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key) &&
-          !(searchEnabled && key.insertable)
-        ) {
+        if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
           moveDown();
           return true;
         }
