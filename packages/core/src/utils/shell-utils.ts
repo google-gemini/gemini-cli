@@ -41,15 +41,30 @@ export interface ShellConfiguration {
 
 export async function resolveExecutable(
   exe: string,
+  cwd?: string,
 ): Promise<string | undefined> {
+  // If it's already an absolute path, normalize it and check access.
   if (path.isAbsolute(exe)) {
     try {
-      await fs.promises.access(exe, fs.constants.X_OK);
-      return exe;
+      const normalized = path.resolve(exe);
+      await fs.promises.access(normalized, fs.constants.X_OK);
+      return normalized;
     } catch {
       return undefined;
     }
   }
+
+  // If it contains a directory separator, resolve it relative to cwd.
+  if (exe.includes(path.sep) || (isWindows() && exe.includes('/'))) {
+    try {
+      const resolved = path.resolve(cwd ?? process.cwd(), exe);
+      await fs.promises.access(resolved, fs.constants.X_OK);
+      return resolved;
+    } catch {
+      // Fall through to PATH search just in case, though unlikely for relative paths with separators.
+    }
+  }
+
   const paths = (process.env['PATH'] || '').split(path.delimiter);
   const extensions =
     os.platform() === 'win32' ? ['.exe', '.cmd', '.bat', ''] : [''];
@@ -59,7 +74,7 @@ export async function resolveExecutable(
       const fullPath = path.join(p, exe + ext);
       try {
         await fs.promises.access(fullPath, fs.constants.X_OK);
-        return fullPath;
+        return path.resolve(fullPath);
       } catch {
         continue;
       }
@@ -139,8 +154,13 @@ export async function initializeShellParsers(): Promise<void> {
 }
 
 export interface ParsedCommandDetail {
+  /** The normalized command name (e.g. "git" from "/usr/bin/git" or "./foo/git"). */
   name: string;
+  /** The raw command name as it appears in the shell string (e.g. "/usr/bin/git"). */
+  rawName: string;
+  /** The full command string (e.g. "git status"). */
   text: string;
+  /** The starting index of the command within the original shell string. */
   startIndex: number;
 }
 
@@ -183,6 +203,7 @@ foreach ($commandAst in $commandAsts) {
   }
   $commandObjects += [PSCustomObject]@{
     name = $name
+    rawName = $name
     text = $commandAst.Extent.Text.Trim()
   }
 }
@@ -269,14 +290,19 @@ function normalizeCommandName(raw: string): string {
   return trimmed.split(/[\\/]/).pop() ?? trimmed;
 }
 
-function extractNameFromNode(node: Node): string | null {
+function extractNameFromNode(
+  node: Node,
+): { name: string; rawName: string } | null {
   switch (node.type) {
     case 'command': {
       const nameNode = node.childForFieldName('name');
       if (!nameNode) {
         return null;
       }
-      return normalizeCommandName(nameNode.text);
+      return {
+        name: normalizeCommandName(nameNode.text),
+        rawName: nameNode.text,
+      };
     }
     case 'declaration_command':
     case 'unset_command':
@@ -285,7 +311,10 @@ function extractNameFromNode(node: Node): string | null {
       if (!firstChild) {
         return null;
       }
-      return normalizeCommandName(firstChild.text);
+      return {
+        name: normalizeCommandName(firstChild.text),
+        rawName: firstChild.text,
+      };
     }
     case 'file_redirect': {
       // The first child might be a file descriptor (e.g., '2>').
@@ -293,18 +322,18 @@ function extractNameFromNode(node: Node): string | null {
       for (let i = 0; i < node.childCount; i++) {
         const child = node.child(i);
         if (child && child.text.includes('<')) {
-          return 'redirection (<)';
+          return { name: 'redirection (<)', rawName: child.text };
         }
         if (child && child.text.includes('>')) {
-          return 'redirection (>)';
+          return { name: 'redirection (>)', rawName: child.text };
         }
       }
-      return 'redirection (>)';
+      return { name: 'redirection (>)', rawName: '>' };
     }
     case 'heredoc_redirect':
-      return 'heredoc (<<)';
+      return { name: 'heredoc (<<)', rawName: '<<' };
     case 'herestring_redirect':
-      return 'herestring (<<<)';
+      return { name: 'herestring (<<<)', rawName: '<<<' };
     default:
       return null;
   }
@@ -320,10 +349,12 @@ function collectCommandDetails(
   while (stack.length > 0) {
     const current = stack.pop()!;
 
-    const name = extractNameFromNode(current);
-    if (name) {
+    const result = extractNameFromNode(current);
+    if (result) {
+      const { name, rawName } = result;
       details.push({
         name,
+        rawName,
         text: source.slice(current.startIndex, current.endIndex).trim(),
         startIndex: current.startIndex,
       });
@@ -495,6 +526,10 @@ function parsePowerShellCommandDetails(
         }
 
         const name = normalizeCommandName(commandDetail.name);
+        const rawName =
+          typeof commandDetail.rawName === 'string'
+            ? commandDetail.rawName
+            : commandDetail.name;
         const text =
           typeof commandDetail.text === 'string'
             ? commandDetail.text.trim()
@@ -502,6 +537,7 @@ function parsePowerShellCommandDetails(
 
         return {
           name,
+          rawName,
           text,
           startIndex: 0,
         };
@@ -699,6 +735,72 @@ export function getCommandRoots(command: string): string[] {
     .map((detail) => detail.name)
     .filter((name) => !REDIRECTION_NAMES.has(name))
     .filter(Boolean);
+}
+
+/**
+ * Returns the canonical (absolute) paths of all commands in a shell string.
+ * This is used for policy enforcement to ensure consistent representation.
+ */
+export async function getCanonicalCommandRoots(
+  command: string,
+  cwd?: string,
+): Promise<string[]> {
+  if (!command) {
+    return [];
+  }
+
+  const parsed = parseCommandDetails(command);
+  if (!parsed || parsed.hasError) {
+    return [];
+  }
+
+  const roots = await Promise.all(
+    parsed.details
+      .filter((detail) => !REDIRECTION_NAMES.has(detail.name))
+      .map(async (detail) => {
+        // Use rawName to resolve the executable accurately.
+        const rawExe = normalizeCommandName(detail.rawName);
+        const resolved = await resolveExecutable(rawExe, cwd);
+        // Fallback to normalized name if resolution fails.
+        return resolved ?? detail.name;
+      }),
+  );
+
+  return roots.filter(Boolean);
+}
+
+/**
+ * Transforms a command string into its canonical form by replacing the primary executable
+ * with its absolute path.
+ */
+export async function getCanonicalCommand(
+  command: string,
+  cwd?: string,
+): Promise<string> {
+  const parsed = parseCommandDetails(command);
+  if (!parsed || parsed.hasError || parsed.details.length === 0) {
+    return command;
+  }
+
+  // We only canonicalize the primary command of the string.
+  // If it's a complex string with pipes/&&, the PolicyEngine will split it and call this recursively.
+  const detail = parsed.details[0];
+  if (!detail || REDIRECTION_NAMES.has(detail.name)) {
+    return command;
+  }
+
+  const rawExe = normalizeCommandName(detail.rawName);
+  const resolved = await resolveExecutable(rawExe, cwd);
+
+  if (!resolved) {
+    return command;
+  }
+
+  // Replace the raw command name in the original text with the resolved path.
+  // We use the start index from the parser to be precise.
+  const before = command.substring(0, detail.startIndex);
+  const after = command.substring(detail.startIndex + detail.rawName.length);
+  return `${before}${resolved}${after}`;
 }
 
 export function stripShellWrapper(command: string): string {

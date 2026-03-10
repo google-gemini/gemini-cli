@@ -259,6 +259,11 @@ export interface HookCheckerRule {
 
 export interface PolicyEngineConfig {
   /**
+   * Base directory for path resolution (e.g. for shell tools).
+   */
+  targetDir?: string;
+
+  /**
    * List of policy rules to apply.
    */
   rules?: PolicyRule[];

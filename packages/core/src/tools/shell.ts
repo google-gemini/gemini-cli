@@ -35,6 +35,7 @@ import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
+  getCanonicalCommandRoots,
   initializeShellParsers,
   stripShellWrapper,
   parseCommandDetails,
@@ -90,15 +91,20 @@ export class ShellToolInvocation extends BaseToolInvocation<
     return description;
   }
 
-  protected override getPolicyUpdateOptions(
+  protected override async getPolicyUpdateOptions(
     outcome: ToolConfirmationOutcome,
-  ): PolicyUpdateOptions | undefined {
+  ): Promise<PolicyUpdateOptions | undefined> {
     if (
       outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave ||
       outcome === ToolConfirmationOutcome.ProceedAlways
     ) {
       const command = stripShellWrapper(this.params.command);
-      const rootCommands = [...new Set(getCommandRoots(command))];
+
+      const cwd = this.params.dir_path
+        ? path.resolve(this.config.getTargetDir(), this.params.dir_path)
+        : this.config.getTargetDir();
+
+      const rootCommands = [...new Set(await getCanonicalCommandRoots(command, cwd))];
       if (rootCommands.length > 0) {
         return { commandPrefix: rootCommands };
       }
