@@ -6,7 +6,6 @@
 
 import type { GenerateContentConfig } from '@google/genai';
 import type { Config } from '../config/config.js';
-import { AuthType } from '../core/contentGenerator.js';
 import type {
   FailureKind,
   FallbackAction,
@@ -46,9 +45,7 @@ export function resolvePolicyChain(
 
   let chain;
   const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
-  const useCustomToolModel =
-    useGemini31 &&
-    config.getContentGeneratorConfig?.()?.authType === AuthType.USE_GEMINI;
+  const useCustomToolModel = config.getUseCustomToolModelSync?.() ?? false;
   const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? true;
 
   const resolvedModel = resolveModel(
