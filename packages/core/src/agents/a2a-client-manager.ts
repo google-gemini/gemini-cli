@@ -95,19 +95,37 @@ export class A2AClientManager {
       throw new Error(`Agent with name '${name}' is already loaded.`);
     }
 
-    let fetchImpl: typeof fetch = a2aFetch;
+    // Authenticated fetch for API calls (transports).
+    let authFetch: typeof fetch = a2aFetch;
     if (authHandler) {
-      fetchImpl = createAuthenticatingFetchWithRetry(a2aFetch, authHandler);
+      authFetch = createAuthenticatingFetchWithRetry(a2aFetch, authHandler);
     }
 
-    const resolver = new DefaultAgentCardResolver({ fetchImpl });
+    // Use unauthenticated fetch for the agent card unless explicitly required.
+    // Some servers reject unexpected auth headers on the card endpoint (e.g. 400).
+    const cardFetch = async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ): Promise<Response> => {
+      // Try without auth first
+      const response = await a2aFetch(input, init);
+
+      // Retry with auth if we hit a 401/403
+      if ((response.status === 401 || response.status === 403) && authFetch) {
+        return authFetch(input, init);
+      }
+
+      return response;
+    };
+
+    const resolver = new DefaultAgentCardResolver({ fetchImpl: cardFetch });
 
     const options = ClientFactoryOptions.createFrom(
       ClientFactoryOptions.default,
       {
         transports: [
-          new RestTransportFactory({ fetchImpl }),
-          new JsonRpcTransportFactory({ fetchImpl }),
+          new RestTransportFactory({ fetchImpl: authFetch }),
+          new JsonRpcTransportFactory({ fetchImpl: authFetch }),
         ],
         cardResolver: resolver,
       },
