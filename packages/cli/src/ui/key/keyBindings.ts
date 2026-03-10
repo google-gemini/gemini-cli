@@ -7,6 +7,8 @@
 /**
  * Command enum for all available keyboard shortcuts
  */
+import type { Key } from '../hooks/useKeypress.js';
+
 export enum Command {
   // Basic Controls
   RETURN = 'basic.confirm',
@@ -49,7 +51,6 @@ export enum Command {
   REVERSE_SEARCH = 'history.search.start',
   SUBMIT_REVERSE_SEARCH = 'history.search.submit',
   ACCEPT_SUGGESTION_REVERSE_SEARCH = 'history.search.accept',
-  REWIND = 'history.rewind',
 
   // Navigation
   NAVIGATION_UP = 'nav.up',
@@ -102,17 +103,124 @@ export enum Command {
 /**
  * Data-driven key binding structure for user configuration
  */
-export interface KeyBinding {
-  /** The key name (e.g., 'a', 'return', 'tab', 'escape') */
-  key: string;
-  /** Shift key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
-  shift?: boolean;
-  /** Alt/Option key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
-  alt?: boolean;
-  /** Control key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
-  ctrl?: boolean;
-  /** Command/Windows/Super key requirement: true=must be pressed, false=must not be pressed, undefined=ignore */
-  cmd?: boolean;
+export class KeyBinding {
+  private static readonly VALID_KEYS = new Set([
+    // Letters & Numbers
+    ...'abcdefghijklmnopqrstuvwxyz0123456789',
+    // Punctuation
+    '`',
+    '-',
+    '=',
+    '[',
+    ']',
+    '\\',
+    ';',
+    "'",
+    ',',
+    '.',
+    '/',
+    // Navigation & Actions
+    'left',
+    'up',
+    'right',
+    'down',
+    'pageup',
+    'pagedown',
+    'end',
+    'home',
+    'tab',
+    'enter',
+    'escape',
+    'space',
+    'backspace',
+    'delete',
+    'pausebreak',
+    'capslock',
+    'insert',
+    'numlock',
+    'scrolllock',
+    // Function Keys
+    ...Array.from({ length: 19 }, (_, i) => `f${i + 1}`),
+    // Numpad
+    ...Array.from({ length: 10 }, (_, i) => `numpad${i}`),
+    'numpad_multiply',
+    'numpad_add',
+    'numpad_separator',
+    'numpad_subtract',
+    'numpad_decimal',
+    'numpad_divide',
+  ]);
+
+  /** The key name (e.g., 'a', 'enter', 'tab', 'escape') */
+  readonly key: string;
+  readonly shift: boolean;
+  readonly alt: boolean;
+  readonly ctrl: boolean;
+  readonly cmd: boolean;
+
+  constructor(pattern: string) {
+    let remains = pattern.toLowerCase().trim();
+    let shift = false;
+    let alt = false;
+    let ctrl = false;
+    let cmd = false;
+
+    let matched: boolean;
+    do {
+      matched = false;
+      if (remains.startsWith('ctrl+')) {
+        ctrl = true;
+        remains = remains.slice(5);
+        matched = true;
+      } else if (remains.startsWith('shift+')) {
+        shift = true;
+        remains = remains.slice(6);
+        matched = true;
+      } else if (remains.startsWith('alt+')) {
+        alt = true;
+        remains = remains.slice(4);
+        matched = true;
+      } else if (remains.startsWith('option+')) {
+        alt = true;
+        remains = remains.slice(7);
+        matched = true;
+      } else if (remains.startsWith('opt+')) {
+        alt = true;
+        remains = remains.slice(4);
+        matched = true;
+      } else if (remains.startsWith('cmd+')) {
+        cmd = true;
+        remains = remains.slice(4);
+        matched = true;
+      } else if (remains.startsWith('meta+')) {
+        cmd = true;
+        remains = remains.slice(5);
+        matched = true;
+      }
+    } while (matched);
+
+    const key = remains;
+
+    if (!KeyBinding.VALID_KEYS.has(key)) {
+      throw new Error(`Invalid keybinding key: "${key}" in "${pattern}"`);
+    }
+
+    this.key = key;
+    this.shift = shift;
+    this.alt = alt;
+    this.ctrl = ctrl;
+    this.cmd = cmd;
+  }
+
+  matches(key: Key): boolean {
+    return (
+      this.key === key.name &&
+      !!key.shift === !!this.shift &&
+      !!key.alt === !!this.alt &&
+      !!key.ctrl === !!this.ctrl &&
+      !!key.cmd === !!this.cmd
+    );
+  }
 }
 
 /**
@@ -128,135 +236,140 @@ export type KeyBindingConfig = {
  */
 export const defaultKeyBindings: KeyBindingConfig = {
   // Basic Controls
-  [Command.RETURN]: [{ key: 'return' }],
-  [Command.ESCAPE]: [{ key: 'escape' }, { key: '[', ctrl: true }],
-  [Command.QUIT]: [{ key: 'c', ctrl: true }],
-  [Command.EXIT]: [{ key: 'd', ctrl: true }],
+  [Command.RETURN]: [new KeyBinding('enter')],
+  [Command.ESCAPE]: [new KeyBinding('escape'), new KeyBinding('ctrl+[')],
+  [Command.QUIT]: [new KeyBinding('ctrl+c')],
+  [Command.EXIT]: [new KeyBinding('ctrl+d')],
 
   // Cursor Movement
-  [Command.HOME]: [{ key: 'a', ctrl: true }, { key: 'home' }],
-  [Command.END]: [{ key: 'e', ctrl: true }, { key: 'end' }],
-  [Command.MOVE_UP]: [{ key: 'up' }],
-  [Command.MOVE_DOWN]: [{ key: 'down' }],
-  [Command.MOVE_LEFT]: [{ key: 'left' }],
-  [Command.MOVE_RIGHT]: [{ key: 'right' }, { key: 'f', ctrl: true }],
+  [Command.HOME]: [new KeyBinding('ctrl+a'), new KeyBinding('home')],
+  [Command.END]: [new KeyBinding('ctrl+e'), new KeyBinding('end')],
+  [Command.MOVE_UP]: [new KeyBinding('up')],
+  [Command.MOVE_DOWN]: [new KeyBinding('down')],
+  [Command.MOVE_LEFT]: [new KeyBinding('left')],
+  [Command.MOVE_RIGHT]: [new KeyBinding('right'), new KeyBinding('ctrl+f')],
   [Command.MOVE_WORD_LEFT]: [
-    { key: 'left', ctrl: true },
-    { key: 'left', alt: true },
-    { key: 'b', alt: true },
+    new KeyBinding('ctrl+left'),
+    new KeyBinding('alt+left'),
+    new KeyBinding('alt+b'),
   ],
   [Command.MOVE_WORD_RIGHT]: [
-    { key: 'right', ctrl: true },
-    { key: 'right', alt: true },
-    { key: 'f', alt: true },
+    new KeyBinding('ctrl+right'),
+    new KeyBinding('alt+right'),
+    new KeyBinding('alt+f'),
   ],
 
   // Editing
-  [Command.KILL_LINE_RIGHT]: [{ key: 'k', ctrl: true }],
-  [Command.KILL_LINE_LEFT]: [{ key: 'u', ctrl: true }],
-  [Command.CLEAR_INPUT]: [{ key: 'c', ctrl: true }],
+  [Command.KILL_LINE_RIGHT]: [new KeyBinding('ctrl+k')],
+  [Command.KILL_LINE_LEFT]: [new KeyBinding('ctrl+u')],
+  [Command.CLEAR_INPUT]: [new KeyBinding('ctrl+c')],
   [Command.DELETE_WORD_BACKWARD]: [
-    { key: 'backspace', ctrl: true },
-    { key: 'backspace', alt: true },
-    { key: 'w', ctrl: true },
+    new KeyBinding('ctrl+backspace'),
+    new KeyBinding('alt+backspace'),
+    new KeyBinding('ctrl+w'),
   ],
   [Command.DELETE_WORD_FORWARD]: [
-    { key: 'delete', ctrl: true },
-    { key: 'delete', alt: true },
-    { key: 'd', alt: true },
+    new KeyBinding('ctrl+delete'),
+    new KeyBinding('alt+delete'),
+    new KeyBinding('alt+d'),
   ],
-  [Command.DELETE_CHAR_LEFT]: [{ key: 'backspace' }, { key: 'h', ctrl: true }],
-  [Command.DELETE_CHAR_RIGHT]: [{ key: 'delete' }, { key: 'd', ctrl: true }],
-  [Command.UNDO]: [
-    { key: 'z', cmd: true },
-    { key: 'z', alt: true },
+  [Command.DELETE_CHAR_LEFT]: [
+    new KeyBinding('backspace'),
+    new KeyBinding('ctrl+h'),
   ],
+  [Command.DELETE_CHAR_RIGHT]: [
+    new KeyBinding('delete'),
+    new KeyBinding('ctrl+d'),
+  ],
+  [Command.UNDO]: [new KeyBinding('cmd+z'), new KeyBinding('alt+z')],
   [Command.REDO]: [
-    { key: 'z', ctrl: true, shift: true },
-    { key: 'z', cmd: true, shift: true },
-    { key: 'z', alt: true, shift: true },
+    new KeyBinding('ctrl+shift+z'),
+    new KeyBinding('cmd+shift+z'),
+    new KeyBinding('alt+shift+z'),
   ],
 
   // Scrolling
-  [Command.SCROLL_UP]: [{ key: 'up', shift: true }],
-  [Command.SCROLL_DOWN]: [{ key: 'down', shift: true }],
+  [Command.SCROLL_UP]: [new KeyBinding('shift+up')],
+  [Command.SCROLL_DOWN]: [new KeyBinding('shift+down')],
   [Command.SCROLL_HOME]: [
-    { key: 'home', ctrl: true },
-    { key: 'home', shift: true },
+    new KeyBinding('ctrl+home'),
+    new KeyBinding('shift+home'),
   ],
   [Command.SCROLL_END]: [
-    { key: 'end', ctrl: true },
-    { key: 'end', shift: true },
+    new KeyBinding('ctrl+end'),
+    new KeyBinding('shift+end'),
   ],
-  [Command.PAGE_UP]: [{ key: 'pageup' }],
-  [Command.PAGE_DOWN]: [{ key: 'pagedown' }],
+  [Command.PAGE_UP]: [new KeyBinding('pageup')],
+  [Command.PAGE_DOWN]: [new KeyBinding('pagedown')],
 
   // History & Search
-  [Command.HISTORY_UP]: [{ key: 'p', ctrl: true }],
-  [Command.HISTORY_DOWN]: [{ key: 'n', ctrl: true }],
-  [Command.REVERSE_SEARCH]: [{ key: 'r', ctrl: true }],
-  [Command.REWIND]: [{ key: 'double escape' }], // for documentation only
-  [Command.SUBMIT_REVERSE_SEARCH]: [{ key: 'return' }],
-  [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [{ key: 'tab' }],
+  [Command.HISTORY_UP]: [new KeyBinding('ctrl+p')],
+  [Command.HISTORY_DOWN]: [new KeyBinding('ctrl+n')],
+  [Command.REVERSE_SEARCH]: [new KeyBinding('ctrl+r')],
+  [Command.SUBMIT_REVERSE_SEARCH]: [new KeyBinding('enter')],
+  [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [new KeyBinding('tab')],
 
   // Navigation
-  [Command.NAVIGATION_UP]: [{ key: 'up' }],
-  [Command.NAVIGATION_DOWN]: [{ key: 'down' }],
+  [Command.NAVIGATION_UP]: [new KeyBinding('up')],
+  [Command.NAVIGATION_DOWN]: [new KeyBinding('down')],
   // Navigation shortcuts appropriate for dialogs where we do not need to accept
   // text input.
-  [Command.DIALOG_NAVIGATION_UP]: [{ key: 'up' }, { key: 'k' }],
-  [Command.DIALOG_NAVIGATION_DOWN]: [{ key: 'down' }, { key: 'j' }],
-  [Command.DIALOG_NEXT]: [{ key: 'tab' }],
-  [Command.DIALOG_PREV]: [{ key: 'tab', shift: true }],
+  [Command.DIALOG_NAVIGATION_UP]: [new KeyBinding('up'), new KeyBinding('k')],
+  [Command.DIALOG_NAVIGATION_DOWN]: [
+    new KeyBinding('down'),
+    new KeyBinding('j'),
+  ],
+  [Command.DIALOG_NEXT]: [new KeyBinding('tab')],
+  [Command.DIALOG_PREV]: [new KeyBinding('shift+tab')],
 
   // Suggestions & Completions
-  [Command.ACCEPT_SUGGESTION]: [{ key: 'tab' }, { key: 'return' }],
-  [Command.COMPLETION_UP]: [{ key: 'up' }, { key: 'p', ctrl: true }],
-  [Command.COMPLETION_DOWN]: [{ key: 'down' }, { key: 'n', ctrl: true }],
-  [Command.EXPAND_SUGGESTION]: [{ key: 'right' }],
-  [Command.COLLAPSE_SUGGESTION]: [{ key: 'left' }],
+  [Command.ACCEPT_SUGGESTION]: [new KeyBinding('tab'), new KeyBinding('enter')],
+  [Command.COMPLETION_UP]: [new KeyBinding('up'), new KeyBinding('ctrl+p')],
+  [Command.COMPLETION_DOWN]: [new KeyBinding('down'), new KeyBinding('ctrl+n')],
+  [Command.EXPAND_SUGGESTION]: [new KeyBinding('right')],
+  [Command.COLLAPSE_SUGGESTION]: [new KeyBinding('left')],
 
   // Text Input
   // Must also exclude shift to allow shift+enter for newline
-  [Command.SUBMIT]: [{ key: 'return' }],
+  [Command.SUBMIT]: [new KeyBinding('enter')],
   [Command.NEWLINE]: [
-    { key: 'return', ctrl: true },
-    { key: 'return', cmd: true },
-    { key: 'return', alt: true },
-    { key: 'return', shift: true },
-    { key: 'j', ctrl: true },
+    new KeyBinding('ctrl+enter'),
+    new KeyBinding('cmd+enter'),
+    new KeyBinding('alt+enter'),
+    new KeyBinding('shift+enter'),
+    new KeyBinding('ctrl+j'),
   ],
-  [Command.OPEN_EXTERNAL_EDITOR]: [{ key: 'x', ctrl: true }],
+  [Command.OPEN_EXTERNAL_EDITOR]: [new KeyBinding('ctrl+x')],
   [Command.PASTE_CLIPBOARD]: [
-    { key: 'v', ctrl: true },
-    { key: 'v', cmd: true },
-    { key: 'v', alt: true },
+    new KeyBinding('ctrl+v'),
+    new KeyBinding('cmd+v'),
+    new KeyBinding('alt+v'),
   ],
 
   // App Controls
-  [Command.SHOW_ERROR_DETAILS]: [{ key: 'f12' }],
-  [Command.SHOW_FULL_TODOS]: [{ key: 't', ctrl: true }],
-  [Command.SHOW_IDE_CONTEXT_DETAIL]: [{ key: 'g', ctrl: true }],
-  [Command.TOGGLE_MARKDOWN]: [{ key: 'm', alt: true }],
-  [Command.TOGGLE_COPY_MODE]: [{ key: 's', ctrl: true }],
-  [Command.TOGGLE_YOLO]: [{ key: 'y', ctrl: true }],
-  [Command.CYCLE_APPROVAL_MODE]: [{ key: 'tab', shift: true }],
-  [Command.TOGGLE_BACKGROUND_SHELL]: [{ key: 'b', ctrl: true }],
-  [Command.TOGGLE_BACKGROUND_SHELL_LIST]: [{ key: 'l', ctrl: true }],
-  [Command.KILL_BACKGROUND_SHELL]: [{ key: 'k', ctrl: true }],
-  [Command.UNFOCUS_BACKGROUND_SHELL]: [{ key: 'tab', shift: true }],
-  [Command.UNFOCUS_BACKGROUND_SHELL_LIST]: [{ key: 'tab' }],
-  [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]: [{ key: 'tab' }],
-  [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]: [{ key: 'tab' }],
-  [Command.BACKGROUND_SHELL_SELECT]: [{ key: 'return' }],
-  [Command.BACKGROUND_SHELL_ESCAPE]: [{ key: 'escape' }],
-  [Command.SHOW_MORE_LINES]: [{ key: 'o', ctrl: true }],
-  [Command.EXPAND_PASTE]: [{ key: 'o', ctrl: true }],
-  [Command.FOCUS_SHELL_INPUT]: [{ key: 'tab' }],
-  [Command.UNFOCUS_SHELL_INPUT]: [{ key: 'tab', shift: true }],
-  [Command.CLEAR_SCREEN]: [{ key: 'l', ctrl: true }],
-  [Command.RESTART_APP]: [{ key: 'r' }, { key: 'r', shift: true }],
-  [Command.SUSPEND_APP]: [{ key: 'z', ctrl: true }],
+  [Command.SHOW_ERROR_DETAILS]: [new KeyBinding('f12')],
+  [Command.SHOW_FULL_TODOS]: [new KeyBinding('ctrl+t')],
+  [Command.SHOW_IDE_CONTEXT_DETAIL]: [new KeyBinding('ctrl+g')],
+  [Command.TOGGLE_MARKDOWN]: [new KeyBinding('alt+m')],
+  [Command.TOGGLE_COPY_MODE]: [new KeyBinding('ctrl+s')],
+  [Command.TOGGLE_YOLO]: [new KeyBinding('ctrl+y')],
+  [Command.CYCLE_APPROVAL_MODE]: [new KeyBinding('shift+tab')],
+  [Command.TOGGLE_BACKGROUND_SHELL]: [new KeyBinding('ctrl+b')],
+  [Command.TOGGLE_BACKGROUND_SHELL_LIST]: [new KeyBinding('ctrl+l')],
+  [Command.KILL_BACKGROUND_SHELL]: [new KeyBinding('ctrl+k')],
+  [Command.UNFOCUS_BACKGROUND_SHELL]: [new KeyBinding('shift+tab')],
+  [Command.UNFOCUS_BACKGROUND_SHELL_LIST]: [new KeyBinding('tab')],
+  [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]: [new KeyBinding('tab')],
+  [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]: [new KeyBinding('tab')],
+  [Command.BACKGROUND_SHELL_SELECT]: [new KeyBinding('enter')],
+  [Command.BACKGROUND_SHELL_ESCAPE]: [new KeyBinding('escape')],
+  [Command.SHOW_MORE_LINES]: [new KeyBinding('ctrl+o')],
+  [Command.EXPAND_PASTE]: [new KeyBinding('ctrl+o')],
+  [Command.FOCUS_SHELL_INPUT]: [new KeyBinding('tab')],
+  [Command.UNFOCUS_SHELL_INPUT]: [new KeyBinding('shift+tab')],
+  [Command.CLEAR_SCREEN]: [new KeyBinding('ctrl+l')],
+  [Command.RESTART_APP]: [new KeyBinding('r'), new KeyBinding('shift+r')],
+  [Command.SUSPEND_APP]: [new KeyBinding('ctrl+z')],
 };
 
 interface CommandCategory {
@@ -318,7 +431,6 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.REVERSE_SEARCH,
       Command.SUBMIT_REVERSE_SEARCH,
       Command.ACCEPT_SUGGESTION_REVERSE_SEARCH,
-      Command.REWIND,
     ],
   },
   {
@@ -428,7 +540,6 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.SUBMIT_REVERSE_SEARCH]: 'Submit the selected reverse-search match.',
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]:
     'Accept a suggestion while reverse searching.',
-  [Command.REWIND]: 'Browse and rewind previous interactions.',
 
   // Navigation
   [Command.NAVIGATION_UP]: 'Move selection up in lists.',
