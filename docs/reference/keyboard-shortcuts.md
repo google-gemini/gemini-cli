@@ -95,9 +95,9 @@ available combinations.
 
 #### Voice Input
 
-| Action                                                    | Keys |
-| --------------------------------------------------------- | ---- |
-| Toggle voice input recording (press space twice rapidly). |      |
+| Action                                                    | Keys          |
+| --------------------------------------------------------- | ------------- |
+| Toggle voice input recording (press space twice rapidly). | `Space Space` |
 
 #### App Controls
 

@@ -80,7 +80,7 @@ they appear in the UI.
 | UI Label                    | Setting                  | Description                                                                                                                                                  | Default     |
 | --------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
 | Enable Voice Input          | `voice.enabled`          | Enable voice input support.                                                                                                                                  | `false`     |
-| Transcription Backend       | `voice.provider`         | Transcription backend: "gemini" (default, zero-install) or "whisper" (local).                                                                                | `undefined` |
+| Transcription Backend       | `voice.provider`         | Transcription backend: "gemini" (default, zero-install) or "whisper" (local).                                                                                | `"gemini"`  |
 | Whisper Binary Path         | `voice.whisperPath`      | Path to the whisper executable. Only used when provider is "whisper".                                                                                        | `undefined` |
 | Silence Detection Threshold | `voice.silenceThreshold` | RMS energy threshold (0–1000) below which audio is discarded as silence. Lower values allow quieter speech such as whispering. 0 disables silence detection. | `80`        |
 

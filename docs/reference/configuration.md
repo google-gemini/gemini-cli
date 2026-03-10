@@ -359,7 +359,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`voice.provider`** (string):
   - **Description:** Transcription backend: "gemini" (default, zero-install) or
     "whisper" (local).
-  - **Default:** `undefined`
+  - **Default:** `"gemini"`
 
 - **`voice.whisperPath`** (string):
   - **Description:** Path to the whisper executable. Only used when provider is
