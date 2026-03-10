@@ -161,4 +161,13 @@ they appear in the UI.
 | Enable Hooks       | `hooksConfig.enabled`       | Canonical toggle for the hooks system. When disabled, no hooks will be executed. | `true`  |
 | Hook Notifications | `hooksConfig.notifications` | Show visual indicators when hooks are executing.                                 | `true`  |
 
+### Voice
+
+| UI Label          | Setting                | Description                                              | Default     |
+| ----------------- | ---------------------- | -------------------------------------------------------- | ----------- |
+| Enable Voice Mode | `voice.enabled`        | Enable the real-time, bidirectional voice interface.     | `false`     |
+| Microphone Device | `voice.inputDevice`    | The name or ID of the microphone to use for voice input. | `"default"` |
+| VAD Sensitivity   | `voice.vadSensitivity` | Sensitivity for Voice Activity Detection (0.0 to 1.0).   | `0.5`       |
+| Agent Voice       | `voice.ttsVoice`       | The voice used by Gemini for audio responses.            | `"Puck"`    |
+
 <!-- SETTINGS-AUTOGEN:END -->

@@ -1143,6 +1143,27 @@ their corresponding top-level category object in your `settings.json` file.
     prioritize available tools dynamically.
   - **Default:** `[]`
 
+#### `voice`
+
+- **`voice.enabled`** (boolean):
+  - **Description:** Enable the real-time, bidirectional voice interface.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`voice.inputDevice`** (string):
+  - **Description:** The name or ID of the microphone to use for voice input.
+  - **Default:** `"default"`
+  - **Requires restart:** Yes
+
+- **`voice.vadSensitivity`** (number):
+  - **Description:** Sensitivity for Voice Activity Detection (0.0 to 1.0).
+  - **Default:** `0.5`
+
+- **`voice.ttsVoice`** (enum):
+  - **Description:** The voice used by Gemini for audio responses.
+  - **Default:** `"Puck"`
+  - **Values:** `"Puck"`, `"Charon"`, `"Kore"`, `"Fenrir"`
+
 #### `admin`
 
 - **`admin.secureModeEnabled`** (boolean):
