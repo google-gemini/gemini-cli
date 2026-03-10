@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PromptProvider } from './promptProvider.js';
 import type { Config } from '../config/config.js';
 import {
@@ -35,6 +35,9 @@ describe('PromptProvider', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.stubEnv('GEMINI_SYSTEM_MD', '');
+    vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', '');
+
     mockConfig = {
       getToolRegistry: vi.fn().mockReturnValue({
         getAllToolNames: vi.fn().mockReturnValue([]),
@@ -58,6 +61,10 @@ describe('PromptProvider', () => {
       getApprovalMode: vi.fn(),
       isTrackerEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Config;
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('should handle multiple context filenames in the system prompt', () => {
@@ -154,7 +161,7 @@ describe('PromptProvider', () => {
       const provider = new PromptProvider();
       const prompt = provider.getCoreSystemPrompt(mockConfig);
 
-      expect(prompt).toContain('`mcp_read` (my-mcp-server)');
+      expect(prompt).toContain('`mcp_my-mcp-server_mcp_read` (my-mcp-server)');
     });
 
     it('should include write constraint message in plan mode prompt', () => {
