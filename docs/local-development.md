@@ -56,7 +56,7 @@ After starting the CLI, you can run commands locally and begin development or de
 
 ### Node.js version issues
 
-Ensure you are using Node.js version 18 or later.
+Ensure you are using the recommended Node.js version for development (~20.19.0).
 
 Check your version:
 
