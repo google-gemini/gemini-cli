@@ -14,12 +14,15 @@ import {
   Kind,
   type ToolInvocation,
   type ToolResult,
+  type PolicyUpdateOptions,
+  type ToolConfirmationOutcome,
 } from './tools.js';
 import { shortenPath, makeRelative } from '../utils/paths.js';
 import { type Config } from '../config/config.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { ToolErrorType } from './tool-error.js';
 import { GLOB_TOOL_NAME, GLOB_DISPLAY_NAME } from './tool-names.js';
+import { buildPatternArgsPattern } from '../policy/utils.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { GLOB_DEFINITION } from './definitions/coreTools.js';
@@ -116,6 +119,14 @@ class GlobToolInvocation extends BaseToolInvocation<
       description += ` within ${shortenPath(relativePath)}`;
     }
     return description;
+  }
+
+  override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    return {
+      argsPattern: buildPatternArgsPattern(this.params.pattern),
+    };
   }
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
