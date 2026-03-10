@@ -23,6 +23,7 @@ import {
   GEMINI_MODEL_ALIAS_FLASH,
   GEMINI_MODEL_ALIAS_AUTO,
   PREVIEW_GEMINI_FLASH_MODEL,
+  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL_AUTO,
   isActiveModel,
@@ -38,6 +39,7 @@ describe('isPreviewModel', () => {
     expect(isPreviewModel(PREVIEW_GEMINI_3_1_MODEL)).toBe(true);
     expect(isPreviewModel(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL)).toBe(true);
     expect(isPreviewModel(PREVIEW_GEMINI_FLASH_MODEL)).toBe(true);
+    expect(isPreviewModel(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL)).toBe(true);
     expect(isPreviewModel(PREVIEW_GEMINI_MODEL_AUTO)).toBe(true);
   });
 
@@ -168,6 +170,15 @@ describe('supportsMultimodalFunctionResponse', () => {
     expect(supportsMultimodalFunctionResponse('gemini-3-pro')).toBe(true);
   });
 
+  it('should return true for gemini-3.1 models', () => {
+    expect(supportsMultimodalFunctionResponse('gemini-3.1-pro-preview')).toBe(
+      true,
+    );
+    expect(
+      supportsMultimodalFunctionResponse('gemini-3.1-flash-lite-preview'),
+    ).toBe(true);
+  });
+
   it('should return false for gemini-2 models', () => {
     expect(supportsMultimodalFunctionResponse('gemini-2.5-pro')).toBe(false);
     expect(supportsMultimodalFunctionResponse('gemini-2.5-flash')).toBe(false);
@@ -229,6 +240,12 @@ describe('resolveModel', () => {
       expect(
         resolveModel(PREVIEW_GEMINI_FLASH_MODEL, false, false, false),
       ).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+    });
+
+    it('should return default flash lite model when access to preview is false and preview flash lite model is requested', () => {
+      expect(
+        resolveModel(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL, false, false, false),
+      ).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
     });
 
     it('should return default model when access to preview is false and auto-gemini-3 is requested', () => {
@@ -349,6 +366,7 @@ describe('isActiveModel', () => {
     expect(isActiveModel(DEFAULT_GEMINI_MODEL)).toBe(true);
     expect(isActiveModel(PREVIEW_GEMINI_MODEL)).toBe(true);
     expect(isActiveModel(DEFAULT_GEMINI_FLASH_MODEL)).toBe(true);
+    expect(isActiveModel(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL)).toBe(true);
   });
 
   it('should return true for unknown models and aliases', () => {
