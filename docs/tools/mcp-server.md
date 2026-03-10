@@ -555,21 +555,34 @@ Upon successful connection:
    `excludeTools` configuration
 4. **Name sanitization:** Tool names are cleaned to meet Gemini API
    requirements:
-   - Invalid characters (non-alphanumeric, underscore, dot, hyphen) are replaced
-     with underscores
+   - Characters other than letters, numbers, underscore (`_`), hyphen (`-`), dot
+     (`.`), and colon (`:`) are replaced with underscores
    - Names longer than 63 characters are truncated with middle replacement
-     (`___`)
+     (`...`)
 
-### 3. Conflict resolution
+### 3. Tool naming and namespaces
 
-When multiple servers expose tools with the same name:
+To prevent collisions across multiple servers or conflicting built-in tools,
+every discovered MCP tool is assigned a strict namespace.
 
-1. **First registration wins:** The first server to register a tool name gets
-   the unprefixed name
-2. **Automatic prefixing:** Subsequent servers get prefixed names:
-   `serverName__toolName`
-3. **Registry tracking:** The tool registry maintains mappings between server
-   names and their tools
+1. **Automatic FQN:** All MCP tools are unconditionally assigned a fully
+   qualified name (FQN) using the format `mcp_{serverName}_{toolName}`.
+2. **Registry tracking:** The tool registry maintains metadata mappings between
+   these FQNs and their original server identities.
+3. **Overwrites:** If two servers share the exact same alias in your
+   configuration and provide tools with the exact same name, the last registered
+   tool overwrites the previous one.
+4. **Policies:** To configure permissions (like auto-approval or denial) for MCP
+   tools, see
+   [Special syntax for MCP tools](../reference/policy-engine.md#special-syntax-for-mcp-tools)
+   in the Policy Engine documentation.
+
+> **Warning:** Do not use underscores (`_`) in your MCP server names (e.g., use
+> `my-server` rather than `my_server`). The policy parser splits Fully Qualified
+> Names (`mcp_server_tool`) on the _first_ underscore following the `mcp_`
+> prefix. If your server name contains an underscore, the parser will
+> misinterpret the server identity, which can cause wildcard rules and security
+> policies to fail silently.
 
 ### 4. Schema processing
 
@@ -695,7 +708,7 @@ MCP Servers Status:
 
 🐳 dockerizedServer (CONNECTED)
   Command: docker run -i --rm -e API_KEY my-mcp-server:latest
-  Tools: docker__deploy, docker__status
+  Tools: mcp_dockerizedServer_docker_deploy, mcp_dockerizedServer_docker_status
 
 Discovery State: COMPLETED
 ```

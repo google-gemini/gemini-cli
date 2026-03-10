@@ -89,7 +89,7 @@ don't need to learn special commands; just ask in natural language.
 The agent will:
 
 1.  Recognize the request matches a GitHub tool.
-2.  Call `github_list_pull_requests`.
+2.  Call `mcp_github_list_pull_requests`.
 3.  Present the data to you.
 
 ### Scenario: Creating an issue
