@@ -563,14 +563,10 @@ export function getShellConfiguration(): ShellConfiguration {
       }
       const fullPath = path.resolve(p, 'pwsh.exe');
       try {
-        if (path.isAbsolute(fullPath) && fs.existsSync(fullPath)) {
-          // Security: check if the file is actually executable
+        if (path.isAbsolute(fullPath)) {
+          // Security: fs.accessSync throws if file doesn't exist or isn't executable
           fs.accessSync(fullPath, fs.constants.X_OK);
           const canonicalPath = fs.realpathSync(fullPath);
-          if (!path.isAbsolute(canonicalPath)) {
-            debugLogger.debug(`Ignoring non-absolute canonical path: ${canonicalPath}`);
-            continue;
-          }
           cachedShellConfiguration = {
             executable: canonicalPath,
             argsPrefix: ['-NoProfile', '-Command'],
@@ -596,7 +592,7 @@ export function getShellConfiguration(): ShellConfiguration {
           executable.endsWith('pwsh.exe')
         ) {
           try {
-            // Security: check if the file is actually executable
+            // Security: fs.accessSync throws if file doesn't exist or isn't executable
             fs.accessSync(comSpec, fs.constants.X_OK);
             const canonicalPath = fs.realpathSync(comSpec);
             cachedShellConfiguration = {

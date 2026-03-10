@@ -37,6 +37,7 @@ vi.mock('os', () => ({
   homedir: mockHomedir,
 }));
 
+const mockAccess = vi.hoisted(() => vi.fn());
 const mockAccessSync = vi.hoisted(() => vi.fn());
 const mockExistsSync = vi.hoisted(() => vi.fn());
 const mockRealpathSync = vi.hoisted(() => vi.fn());
