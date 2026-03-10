@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import {
@@ -20,13 +20,12 @@ interface UserIdentityProps {
 
 export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
   const authType = config.getContentGeneratorConfig()?.authType;
-  const [email, setEmail] = useState<string | undefined>();
-
-  useEffect(() => {
+  const email = useMemo(() => {
     if (authType) {
       const userAccountManager = new UserAccountManager();
-      setEmail(userAccountManager.getCachedGoogleAccount() ?? undefined);
+      return userAccountManager.getCachedGoogleAccount() ?? undefined;
     }
+    return undefined;
   }, [authType]);
 
   const tierName = useMemo(
