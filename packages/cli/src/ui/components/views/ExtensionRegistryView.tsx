@@ -39,8 +39,11 @@ export function ExtensionRegistryView({
   onClose,
   extensionManager,
 }: ExtensionRegistryViewProps): React.JSX.Element {
-  const { extensions, loading, error, search } = useExtensionRegistry();
   const config = useConfig();
+  const { extensions, loading, error, search } = useExtensionRegistry(
+    '',
+    config.getExtensionRegistryURI(),
+  );
   const { terminalHeight, staticExtraHeight } = useUIState();
 
   const { extensionsUpdateState } = useExtensionUpdates(
