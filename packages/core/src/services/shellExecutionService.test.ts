@@ -870,6 +870,77 @@ describe('ShellExecutionService', () => {
 
       expect(ShellExecutionService['activePtys'].size).toBe(0);
     });
+
+    it('should destroy the PTY when kill() is called', async () => {
+      // Execute a command to populate activePtys
+      const abortController = new AbortController();
+      await ShellExecutionService.execute(
+        'long-running',
+        '/test/dir',
+        onOutputEventMock,
+        abortController.signal,
+        true,
+        shellExecutionConfig,
+      );
+      await new Promise((resolve) => process.nextTick(resolve));
+
+      const pid = mockPtyProcess.pid;
+      const activePty = ShellExecutionService['activePtys'].get(pid);
+      expect(activePty).toBeTruthy();
+
+      // Spy on the actual stored object's destroy
+      const storedDestroySpy = vi.spyOn(
+        activePty!.ptyProcess as never as { destroy: () => void },
+        'destroy',
+      );
+
+      ShellExecutionService.kill(pid);
+
+      expect(storedDestroySpy).toHaveBeenCalled();
+      expect(ShellExecutionService['activePtys'].has(pid)).toBe(false);
+    });
+
+    it('should destroy the PTY when an exception occurs after spawn in executeWithPty', async () => {
+      // Simulate: spawn succeeds, Promise executor runs fine (pid accesses 1-2),
+      // but the return statement `{ pid: ptyProcess.pid }` (access 3) throws.
+      // The catch block should call spawnedPty.destroy() to release the fd.
+      const destroySpy = vi.fn();
+      let pidAccessCount = 0;
+      const faultyPty = {
+        onData: vi.fn(),
+        onExit: vi.fn(),
+        write: vi.fn(),
+        kill: vi.fn(),
+        resize: vi.fn(),
+        destroy: destroySpy,
+        get pid() {
+          pidAccessCount++;
+          // Accesses 1-2 are inside the Promise executor (setup).
+          // Access 3 is at `return { pid: ptyProcess.pid, result }`,
+          // outside the Promise — caught by the outer try/catch.
+          if (pidAccessCount > 2) {
+            throw new Error('Simulated post-spawn failure on pid access');
+          }
+          return 77777;
+        },
+      };
+      mockPtySpawn.mockReturnValueOnce(faultyPty);
+
+      const handle = await ShellExecutionService.execute(
+        'will-fail-after-spawn',
+        '/test/dir',
+        onOutputEventMock,
+        new AbortController().signal,
+        true,
+        shellExecutionConfig,
+      );
+
+      const result = await handle.result;
+      expect(result.exitCode).toBe(1);
+      expect(result.error).toBeTruthy();
+      // The catch block must call destroy() on spawnedPty to prevent fd leak
+      expect(destroySpy).toHaveBeenCalled();
+    });
   });
 });
 
