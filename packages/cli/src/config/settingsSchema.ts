@@ -604,6 +604,15 @@ const SETTINGS_SCHEMA = {
             description: 'Hide the sandbox status indicator in the footer.',
             showInDialog: true,
           },
+          hideGitBranch: {
+            type: 'boolean',
+            label: 'Hide Git Branch',
+            category: 'UI',
+            requiresRestart: false,
+            default: false,
+            description: 'Hide the git branch name in the footer.',
+            showInDialog: true,
+          },
           hideModelInfo: {
             type: 'boolean',
             label: 'Hide Model Info',

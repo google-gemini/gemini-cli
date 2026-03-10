@@ -93,6 +93,7 @@ export function deriveItemsFromLegacySettings(
 
   if (settings.ui.footer.hideCWD) remove(items, 'workspace');
   if (settings.ui.footer.hideSandboxStatus) remove(items, 'sandbox');
+  if (settings.ui.footer.hideGitBranch) remove(items, 'git-branch');
   if (settings.ui.footer.hideModelInfo) {
     remove(items, 'model-name');
     remove(items, 'context-used');

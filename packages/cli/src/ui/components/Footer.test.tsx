@@ -469,6 +469,7 @@ describe('<Footer />', () => {
               footer: {
                 hideCWD: true,
                 hideSandboxStatus: true,
+                hideGitBranch: true,
                 hideModelInfo: true,
               },
             },
@@ -479,6 +480,29 @@ describe('<Footer />', () => {
       expect(normalizeFrame(lastFrame({ allowEmpty: true }))).toMatchSnapshot(
         'footer-minimal',
       );
+      unmount();
+    });
+
+    it('hides the git branch when hideGitBranch is true', async () => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <Footer />,
+        {
+          width: 120,
+          uiState: {
+            sessionStats: mockSessionStats,
+            branchName: 'feature-branch',
+          },
+          settings: createMockSettings({
+            ui: {
+              footer: {
+                hideGitBranch: true,
+              },
+            },
+          }),
+        },
+      );
+      await waitUntilReady();
+      expect(lastFrame()).not.toContain('feature-branch');
       unmount();
     });
 

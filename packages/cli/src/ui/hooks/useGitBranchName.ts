@@ -10,10 +10,14 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 
-export function useGitBranchName(cwd: string): string | undefined {
+export function useGitBranchName(
+  cwd: string,
+  enabled = true,
+): string | undefined {
   const [branchName, setBranchName] = useState<string | undefined>(undefined);
 
   const fetchBranchName = useCallback(async () => {
+    if (!enabled) return;
     try {
       const { stdout } = await spawnAsync(
         'git',
@@ -34,9 +38,14 @@ export function useGitBranchName(cwd: string): string | undefined {
     } catch (_error) {
       setBranchName(undefined);
     }
-  }, [cwd, setBranchName]);
+  }, [cwd, enabled]);
 
   useEffect(() => {
+    if (!enabled) {
+      setBranchName(undefined);
+      return;
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     fetchBranchName(); // Initial fetch
 
@@ -71,7 +80,7 @@ export function useGitBranchName(cwd: string): string | undefined {
       cancelled = true;
       watcher?.close();
     };
-  }, [cwd, fetchBranchName]);
+  }, [cwd, fetchBranchName, enabled]);
 
   return branchName;
 }

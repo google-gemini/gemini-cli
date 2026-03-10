@@ -351,6 +351,13 @@
               "default": false,
               "type": "boolean"
             },
+            "hideGitBranch": {
+              "title": "Hide Git Branch",
+              "description": "Hide the git branch name in the footer.",
+              "markdownDescription": "Hide the git branch name in the footer.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
             "hideModelInfo": {
               "title": "Hide Model Info",
               "description": "Hide the model name and context usage in the footer.",

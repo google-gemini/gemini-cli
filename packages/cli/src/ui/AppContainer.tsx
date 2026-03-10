@@ -136,6 +136,7 @@ import { useMcpStatus } from './hooks/useMcpStatus.js';
 import { useApprovalModeIndicator } from './hooks/useApprovalModeIndicator.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
+import { deriveItemsFromLegacySettings } from '../config/footerItems.js';
 import {
   useConfirmUpdateRequests,
   useExtensionUpdates,
@@ -413,7 +414,11 @@ export const AppContainer = (props: AppContainerProps) => {
 
   // Additional hooks moved from App.tsx
   const { stats: sessionStats } = useSessionStats();
-  const branchName = useGitBranchName(config.getTargetDir());
+  const showGitBranch = (
+    settings.merged.ui.footer.items ??
+    deriveItemsFromLegacySettings(settings.merged)
+  ).includes('git-branch');
+  const branchName = useGitBranchName(config.getTargetDir(), showGitBranch);
 
   // Layout measurements
   const mainControlsRef = useRef<DOMElement>(null);

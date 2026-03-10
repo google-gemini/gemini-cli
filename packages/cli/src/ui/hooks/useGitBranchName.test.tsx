@@ -55,10 +55,11 @@ describe('useGitBranchName', () => {
     vi.restoreAllMocks();
   });
 
-  const renderGitBranchNameHook = (cwd: string) => {
+  const renderGitBranchNameHook = (cwd: string, initialEnabled = true) => {
     let hookResult: ReturnType<typeof useGitBranchName>;
+    let currentEnabled = initialEnabled;
     function TestComponent() {
-      hookResult = useGitBranchName(cwd);
+      hookResult = useGitBranchName(cwd, currentEnabled);
       return null;
     }
     const { rerender, unmount } = render(<TestComponent />);
@@ -68,10 +69,57 @@ describe('useGitBranchName', () => {
           return hookResult;
         },
       },
-      rerender: () => rerender(<TestComponent />),
+      rerender: (enabled?: boolean) => {
+        if (enabled !== undefined) {
+          currentEnabled = enabled;
+        }
+        rerender(<TestComponent />);
+      },
       unmount,
     };
   };
+
+  it('should not fetch branch name if disabled', async () => {
+    const { result, rerender } = renderGitBranchNameHook(CWD, false);
+
+    await act(async () => {
+      rerender();
+    });
+
+    expect(result.current).toBeUndefined();
+    expect(mockSpawnAsync).not.toHaveBeenCalled();
+  });
+
+  it('should fetch new branch name when re-enabled', async () => {
+    (mockSpawnAsync as MockedFunction<typeof mockSpawnAsync>)
+      .mockResolvedValueOnce({ stdout: 'branch-A\n' } as {
+        stdout: string;
+        stderr: string;
+      })
+      .mockResolvedValueOnce({ stdout: 'branch-B\n' } as {
+        stdout: string;
+        stderr: string;
+      });
+
+    const { result, rerender } = renderGitBranchNameHook(CWD, true);
+
+    await act(async () => {
+      rerender();
+    });
+    expect(result.current).toBe('branch-A');
+
+    // Disable it
+    await act(async () => {
+      rerender(false);
+    });
+    expect(result.current).toBeUndefined();
+
+    // Re-enable it, simulating branch change while disabled
+    await act(async () => {
+      rerender(true);
+    });
+    expect(result.current).toBe('branch-B');
+  });
 
   it('should return branch name', async () => {
     (mockSpawnAsync as MockedFunction<typeof mockSpawnAsync>).mockResolvedValue(
