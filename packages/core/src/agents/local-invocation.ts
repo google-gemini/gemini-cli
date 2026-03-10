@@ -253,12 +253,15 @@ Termination Reason: ${output.terminate_reason}
 Result:
 ${output.result}`;
 
-      const displayContent = `
-Subagent ${this.definition.name} Finished
+      const displayContent =
+        output.terminate_reason === AgentTerminateMode.GOAL
+          ? displayResult
+          : `
+### Subagent ${this.definition.name} Finished Early
 
-Termination Reason:\n ${output.terminate_reason}
+**Termination Reason:** ${output.terminate_reason}
 
-Result:
+**Result/Summary:**
 ${displayResult}
 `;
 
