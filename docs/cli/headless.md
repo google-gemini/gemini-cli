@@ -6,7 +6,7 @@ structured text or JSON output without an interactive terminal UI.
 ## Technical reference
 
 Headless mode is triggered when the CLI is run in a non-TTY environment or when
-providing a query as a positional argument without the interactive flag.
+providing a query with the `-p` (or `--prompt`) flag.
 
 ### Output formats
 
