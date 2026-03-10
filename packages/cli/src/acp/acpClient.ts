@@ -886,6 +886,16 @@ export class Session {
         await invocation.shouldConfirmExecute(abortSignal);
 
       if (confirmationDetails) {
+        await this.sendUpdate({
+          sessionUpdate: 'tool_call',
+          toolCallId: callId,
+          status: 'pending',
+          title: invocation.getDescription(),
+          content: [],
+          locations: invocation.toolLocations(),
+          kind: toAcpToolKind(tool.kind),
+        });
+
         const content: acp.ToolCallContent[] = [];
 
         if (confirmationDetails.type === 'edit') {
