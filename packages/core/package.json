@@ -75,7 +75,7 @@
     "proper-lockfile": "^4.1.2",
     "read-package-up": "^11.0.0",
     "shell-quote": "^1.8.3",
-    "simple-git": "^3.28.0",
+    "simple-git": "^3.32.3",
     "strip-ansi": "^7.1.0",
     "strip-json-comments": "^3.1.1",
     "systeminformation": "^5.25.11",
