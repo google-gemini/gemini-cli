@@ -24,6 +24,12 @@ import { debugLogger } from '../../utils/debugLogger.js';
 import type { Config } from '../../config/config.js';
 import { Storage } from '../../config/storage.js';
 import * as path from 'node:path';
+import {
+  recordBrowserConnectionMetrics,
+  recordBrowserConnectionFailure,
+  recordBrowserToolDiscovery,
+  categorizeConnectionError,
+} from '../../telemetry/metrics.js';
 
 // Pin chrome-devtools-mcp version for reproducibility.
 const CHROME_DEVTOOLS_MCP_VERSION = '0.17.1';
@@ -71,6 +77,17 @@ export class BrowserManager {
   private discoveredTools: McpTool[] = [];
 
   constructor(private config: Config) {}
+
+  getSessionMode(): string {
+    return (
+      this.config.getBrowserAgentConfig().customConfig.sessionMode ??
+      'persistent'
+    );
+  }
+
+  isHeadless(): boolean {
+    return this.config.getBrowserAgentConfig().customConfig.headless ?? false;
+  }
 
   /**
    * Gets the raw MCP SDK Client for direct tool calls.
@@ -227,6 +244,7 @@ export class BrowserManager {
    */
   private async connectMcp(): Promise<void> {
     debugLogger.log('Connecting isolated MCP client to chrome-devtools-mcp...');
+    const startTime = Date.now();
 
     // Create raw MCP SDK Client (not the wrapper McpClient)
     this.rawMcpClient = new Client(
@@ -242,6 +260,7 @@ export class BrowserManager {
     // Build args for chrome-devtools-mcp
     const browserConfig = this.config.getBrowserAgentConfig();
     const sessionMode = browserConfig.customConfig.sessionMode ?? 'persistent';
+    const headless = browserConfig.customConfig.headless ?? false;
 
     const mcpArgs = [
       '-y',
@@ -261,7 +280,7 @@ export class BrowserManager {
     }
 
     // Add optional settings from config
-    if (browserConfig.customConfig.headless) {
+    if (headless) {
       mcpArgs.push('--headless');
     }
     if (browserConfig.customConfig.profilePath) {
@@ -336,14 +355,31 @@ export class BrowserManager {
           );
         }),
       ]);
+
+      recordBrowserConnectionMetrics(this.config, Date.now() - startTime, {
+        session_mode: sessionMode,
+        headless,
+        success: true,
+      });
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      recordBrowserConnectionMetrics(this.config, Date.now() - startTime, {
+        session_mode: sessionMode,
+        headless,
+        success: false,
+      });
+      recordBrowserConnectionFailure(this.config, {
+        session_mode: sessionMode,
+        headless,
+        error_type: categorizeConnectionError(errorMessage),
+      });
+
       await this.close();
 
       // Provide error-specific, session-mode-aware remediation
-      throw this.createConnectionError(
-        error instanceof Error ? error.message : String(error),
-        sessionMode,
-      );
+      throw this.createConnectionError(errorMessage, sessionMode);
     } finally {
       if (timeoutId !== undefined) {
         clearTimeout(timeoutId);
@@ -432,5 +468,9 @@ export class BrowserManager {
       `Discovered ${this.discoveredTools.length} tools from chrome-devtools-mcp: ` +
         this.discoveredTools.map((t) => t.name).join(', '),
     );
+
+    recordBrowserToolDiscovery(this.config, this.discoveredTools.length, {
+      session_mode: this.getSessionMode(),
+    });
   }
 }

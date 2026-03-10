@@ -28,6 +28,12 @@ import {
 import { createMcpDeclarativeTools } from './mcpToolWrapper.js';
 import { createAnalyzeScreenshotTool } from './analyzeScreenshot.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import {
+  recordBrowserMissingSemanticTool,
+  recordBrowserVisionStatus,
+  recordBrowserCleanupDuration,
+  recordBrowserCleanupFailure,
+} from '../../telemetry/metrics.js';
 
 /**
  * Creates a browser agent definition with MCP tools configured.
@@ -81,6 +87,9 @@ export async function createBrowserAgentDefinition(
       `Semantic tools missing (${missingSemanticTools.join(', ')}). ` +
         'Some browser interactions may not work correctly.',
     );
+    for (const toolName of missingSemanticTools) {
+      recordBrowserMissingSemanticTool(config, { tool_name: toolName });
+    }
   }
 
   // Only click_at is strictly required — text input can use press_key or fill.
@@ -116,6 +125,11 @@ export async function createBrowserAgentDefinition(
   const allTools: AnyDeclarativeTool[] = [...mcpTools];
   const visionDisabledReason = getVisionDisabledReason();
 
+  recordBrowserVisionStatus(config, {
+    enabled: !visionDisabledReason,
+    disabled_reason: visionDisabledReason ?? '',
+  });
+
   if (visionDisabledReason) {
     debugLogger.log(`Vision disabled: ${visionDisabledReason}`);
   } else {
@@ -146,10 +160,14 @@ export async function createBrowserAgentDefinition(
  * Cleans up browser resources after agent execution.
  *
  * @param browserManager The browser manager to clean up
+ * @param config Runtime configuration for metrics recording
  */
 export async function cleanupBrowserAgent(
   browserManager: BrowserManager,
+  config?: Config,
 ): Promise<void> {
+  const startTime = Date.now();
+  const sessionMode = browserManager.getSessionMode();
   try {
     await browserManager.close();
     debugLogger.log('Browser agent cleanup complete');
@@ -157,5 +175,14 @@ export async function cleanupBrowserAgent(
     debugLogger.error(
       `Error during browser cleanup: ${error instanceof Error ? error.message : String(error)}`,
     );
+    if (config) {
+      recordBrowserCleanupFailure(config, { session_mode: sessionMode });
+    }
+  } finally {
+    if (config) {
+      recordBrowserCleanupDuration(config, Date.now() - startTime, {
+        session_mode: sessionMode,
+      });
+    }
   }
 }

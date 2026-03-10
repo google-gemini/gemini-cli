@@ -28,6 +28,8 @@ const mockBrowserManager = {
   ]),
   callTool: vi.fn().mockResolvedValue({ content: [] }),
   close: vi.fn().mockResolvedValue(undefined),
+  getSessionMode: vi.fn().mockReturnValue('persistent'),
+  isHeadless: vi.fn().mockReturnValue(false),
 };
 
 // Mock dependencies
@@ -43,6 +45,22 @@ vi.mock('../../utils/debugLogger.js', () => ({
   },
 }));
 
+const mockRecordBrowserMissingSemanticTool = vi.fn();
+const mockRecordBrowserVisionStatus = vi.fn();
+const mockRecordBrowserCleanupDuration = vi.fn();
+const mockRecordBrowserCleanupFailure = vi.fn();
+
+vi.mock('../../telemetry/metrics.js', () => ({
+  recordBrowserMissingSemanticTool: (...args: unknown[]) =>
+    mockRecordBrowserMissingSemanticTool(...args),
+  recordBrowserVisionStatus: (...args: unknown[]) =>
+    mockRecordBrowserVisionStatus(...args),
+  recordBrowserCleanupDuration: (...args: unknown[]) =>
+    mockRecordBrowserCleanupDuration(...args),
+  recordBrowserCleanupFailure: (...args: unknown[]) =>
+    mockRecordBrowserCleanupFailure(...args),
+}));
+
 import {
   buildBrowserSystemPrompt,
   BROWSER_AGENT_NAME,
@@ -54,6 +72,10 @@ describe('browserAgentFactory', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRecordBrowserMissingSemanticTool.mockClear();
+    mockRecordBrowserVisionStatus.mockClear();
+    mockRecordBrowserCleanupDuration.mockClear();
+    mockRecordBrowserCleanupFailure.mockClear();
 
     // Reset mock implementations
     mockBrowserManager.ensureConnection.mockResolvedValue(undefined);
@@ -67,6 +89,8 @@ describe('browserAgentFactory', () => {
       { name: 'click_at', description: 'Click at coordinates' },
     ]);
     mockBrowserManager.close.mockResolvedValue(undefined);
+    mockBrowserManager.getSessionMode.mockReturnValue('persistent');
+    mockBrowserManager.isHeadless.mockReturnValue(false);
 
     mockConfig = makeFakeConfig({
       agents: {
@@ -262,10 +286,102 @@ describe('browserAgentFactory', () => {
     it('should handle errors during cleanup gracefully', async () => {
       const errorManager = {
         close: vi.fn().mockRejectedValue(new Error('Close failed')),
+        getSessionMode: vi.fn().mockReturnValue('persistent'),
       } as unknown as BrowserManager;
 
       // Should not throw
       await expect(cleanupBrowserAgent(errorManager)).resolves.toBeUndefined();
+    });
+
+    it('should record cleanup duration when config is provided', async () => {
+      const config = makeFakeConfig({});
+      await cleanupBrowserAgent(
+        mockBrowserManager as unknown as BrowserManager,
+        config,
+      );
+
+      expect(mockRecordBrowserCleanupDuration).toHaveBeenCalledWith(
+        config,
+        expect.any(Number),
+        { session_mode: 'persistent' },
+      );
+    });
+
+    it('should record cleanup failure when close throws and config is provided', async () => {
+      const config = makeFakeConfig({});
+      const errorManager = {
+        close: vi.fn().mockRejectedValue(new Error('Close failed')),
+        getSessionMode: vi.fn().mockReturnValue('isolated'),
+      } as unknown as BrowserManager;
+
+      await cleanupBrowserAgent(errorManager, config);
+
+      expect(mockRecordBrowserCleanupFailure).toHaveBeenCalledWith(config, {
+        session_mode: 'isolated',
+      });
+      expect(mockRecordBrowserCleanupDuration).toHaveBeenCalledWith(
+        config,
+        expect.any(Number),
+        { session_mode: 'isolated' },
+      );
+    });
+  });
+
+  describe('metrics instrumentation', () => {
+    it('should record vision disabled status when no visualModel', async () => {
+      await createBrowserAgentDefinition(mockConfig, mockMessageBus);
+
+      expect(mockRecordBrowserVisionStatus).toHaveBeenCalledWith(mockConfig, {
+        enabled: false,
+        disabled_reason: 'No visualModel configured.',
+      });
+    });
+
+    it('should record vision enabled status when visualModel is configured', async () => {
+      const configWithVision = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: {
+            headless: false,
+            visualModel: 'gemini-2.5-flash-preview',
+          },
+        },
+      });
+
+      await createBrowserAgentDefinition(configWithVision, mockMessageBus);
+
+      expect(mockRecordBrowserVisionStatus).toHaveBeenCalledWith(
+        configWithVision,
+        { enabled: true, disabled_reason: '' },
+      );
+    });
+
+    it('should record missing semantic tools when some are absent', async () => {
+      mockBrowserManager.getDiscoveredTools.mockResolvedValue([
+        { name: 'take_snapshot', description: 'Take snapshot' },
+        { name: 'click_at', description: 'Click at coordinates' },
+      ]);
+
+      await createBrowserAgentDefinition(mockConfig, mockMessageBus);
+
+      expect(mockRecordBrowserMissingSemanticTool).toHaveBeenCalledWith(
+        mockConfig,
+        { tool_name: 'click' },
+      );
+      expect(mockRecordBrowserMissingSemanticTool).toHaveBeenCalledWith(
+        mockConfig,
+        { tool_name: 'fill' },
+      );
+      expect(mockRecordBrowserMissingSemanticTool).toHaveBeenCalledWith(
+        mockConfig,
+        { tool_name: 'navigate_page' },
+      );
+    });
+
+    it('should not record missing semantic tools when all are present', async () => {
+      await createBrowserAgentDefinition(mockConfig, mockMessageBus);
+
+      expect(mockRecordBrowserMissingSemanticTool).not.toHaveBeenCalled();
     });
   });
 });

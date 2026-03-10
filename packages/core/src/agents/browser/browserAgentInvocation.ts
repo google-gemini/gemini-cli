@@ -35,6 +35,10 @@ import {
   createBrowserAgentDefinition,
   cleanupBrowserAgent,
 } from './browserAgentFactory.js';
+import {
+  recordBrowserTaskOutcome,
+  recordBrowserTaskDuration,
+} from '../../telemetry/metrics.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -223,6 +227,9 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
     updateOutput?: (output: ToolLiveOutput) => void,
   ): Promise<ToolResult> {
     let browserManager;
+    const fullStartTime = Date.now();
+    let taskSuccess = false;
+    let visionEnabled = false;
     let recentActivity: SubagentActivityItem[] = [];
 
     try {
@@ -267,6 +274,16 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
       );
       const { definition } = result;
       browserManager = result.browserManager;
+
+      // Detect vision from the presence of analyze_screenshot in tools
+      visionEnabled =
+        definition.toolConfig?.tools.some(
+          (t) =>
+            typeof t === 'object' &&
+            t !== null &&
+            'name' in t &&
+            t.name === 'analyze_screenshot',
+        ) ?? false;
 
       // Create activity callback for streaming output
       const onActivity = (activity: SubagentActivityEvent): void => {
@@ -415,6 +432,21 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
 
       const output = await executor.run(this.params, signal);
 
+      // Parse success from the structured output
+      try {
+        const parsed: unknown = JSON.parse(output.result);
+        if (parsed !== null && typeof parsed === 'object') {
+          for (const [key, value] of Object.entries(parsed)) {
+            if (key === 'success' && typeof value === 'boolean') {
+              taskSuccess = value;
+              break;
+            }
+          }
+        }
+      } catch {
+        // output.result may not be valid JSON; treat as failure
+      }
+
       const displayResult = safeJsonToMarkdown(output.result);
 
       const resultContent = `Browser agent finished.
@@ -483,9 +515,23 @@ ${displayResult}
         },
       };
     } finally {
+      const sessionMode = browserManager?.getSessionMode() ?? 'persistent';
+      const headless = browserManager?.isHeadless() ?? false;
+
+      recordBrowserTaskOutcome(this.config, {
+        success: taskSuccess,
+        session_mode: sessionMode,
+        vision_enabled: visionEnabled,
+        headless,
+      });
+      recordBrowserTaskDuration(this.config, Date.now() - fullStartTime, {
+        success: taskSuccess,
+        session_mode: sessionMode,
+      });
+
       // Always cleanup browser resources
       if (browserManager) {
-        await cleanupBrowserAgent(browserManager);
+        await cleanupBrowserAgent(browserManager, this.config);
       }
     }
   }

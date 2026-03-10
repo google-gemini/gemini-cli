@@ -23,6 +23,16 @@ vi.mock('../../utils/debugLogger.js', () => ({
   },
 }));
 
+const mockRecordBrowserTaskOutcome = vi.fn();
+const mockRecordBrowserTaskDuration = vi.fn();
+
+vi.mock('../../telemetry/metrics.js', () => ({
+  recordBrowserTaskOutcome: (...args: unknown[]) =>
+    mockRecordBrowserTaskOutcome(...args),
+  recordBrowserTaskDuration: (...args: unknown[]) =>
+    mockRecordBrowserTaskDuration(...args),
+}));
+
 vi.mock('./browserAgentFactory.js', () => ({
   createBrowserAgentDefinition: vi.fn(),
   cleanupBrowserAgent: vi.fn(),
@@ -48,6 +58,8 @@ describe('BrowserAgentInvocation', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRecordBrowserTaskOutcome.mockClear();
+    mockRecordBrowserTaskDuration.mockClear();
 
     mockConfig = makeFakeConfig({
       agents: {
@@ -159,10 +171,202 @@ describe('BrowserAgentInvocation', () => {
     });
   });
 
+  describe('execute metrics', () => {
+    const mockBrowserManager = {
+      close: vi.fn().mockResolvedValue(undefined),
+      getSessionMode: vi.fn().mockReturnValue('isolated'),
+      isHeadless: vi.fn().mockReturnValue(false),
+    };
+
+    const mockExecutorRun = vi.fn();
+
+    beforeEach(() => {
+      mockBrowserManager.close.mockResolvedValue(undefined);
+      mockBrowserManager.getSessionMode.mockReturnValue('isolated');
+      mockBrowserManager.isHeadless.mockReturnValue(false);
+
+      vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
+        definition: {
+          name: 'browser_agent',
+          kind: 'local',
+          toolConfig: {
+            tools: [{ name: 'click' }, { name: 'take_snapshot' }],
+          },
+        },
+        browserManager: mockBrowserManager,
+      } as never);
+
+      mockExecutorRun.mockResolvedValue({
+        result: JSON.stringify({ success: true, summary: 'Done' }),
+        terminate_reason: 'GOAL',
+      });
+
+      vi.mocked(LocalAgentExecutor.create).mockResolvedValue({
+        run: mockExecutorRun,
+      } as never);
+    });
+
+    it('should record task outcome with success=true on successful run', async () => {
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+      const controller = new AbortController();
+
+      await invocation.execute(controller.signal);
+
+      expect(mockRecordBrowserTaskOutcome).toHaveBeenCalledWith(mockConfig, {
+        success: true,
+        session_mode: 'isolated',
+        vision_enabled: false,
+        headless: false,
+      });
+    });
+
+    it('should record task duration on successful run', async () => {
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+      const controller = new AbortController();
+
+      await invocation.execute(controller.signal);
+
+      expect(mockRecordBrowserTaskDuration).toHaveBeenCalledWith(
+        mockConfig,
+        expect.any(Number),
+        { success: true, session_mode: 'isolated' },
+      );
+    });
+
+    it('should record task outcome with success=false when agent result is false', async () => {
+      mockExecutorRun.mockResolvedValue({
+        result: JSON.stringify({ success: false, summary: 'Failed' }),
+        terminate_reason: 'ERROR',
+      });
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+      const controller = new AbortController();
+
+      await invocation.execute(controller.signal);
+
+      expect(mockRecordBrowserTaskOutcome).toHaveBeenCalledWith(mockConfig, {
+        success: false,
+        session_mode: 'isolated',
+        vision_enabled: false,
+        headless: false,
+      });
+    });
+
+    it('should record task outcome with success=false when execute throws', async () => {
+      vi.mocked(createBrowserAgentDefinition).mockRejectedValue(
+        new Error('Connection failed'),
+      );
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+      const controller = new AbortController();
+
+      await invocation.execute(controller.signal);
+
+      expect(mockRecordBrowserTaskOutcome).toHaveBeenCalledWith(mockConfig, {
+        success: false,
+        session_mode: 'persistent',
+        vision_enabled: false,
+        headless: false,
+      });
+    });
+
+    it('should detect vision_enabled from analyze_screenshot tool', async () => {
+      vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
+        definition: {
+          name: 'browser_agent',
+          kind: 'local',
+          toolConfig: {
+            tools: [{ name: 'click' }, { name: 'analyze_screenshot' }],
+          },
+        },
+        browserManager: mockBrowserManager,
+      } as never);
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+      const controller = new AbortController();
+
+      await invocation.execute(controller.signal);
+
+      expect(mockRecordBrowserTaskOutcome).toHaveBeenCalledWith(
+        mockConfig,
+        expect.objectContaining({ vision_enabled: true }),
+      );
+    });
+
+    it('should pass config to cleanupBrowserAgent', async () => {
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+      const controller = new AbortController();
+
+      await invocation.execute(controller.signal);
+
+      expect(cleanupBrowserAgent).toHaveBeenCalledWith(
+        mockBrowserManager,
+        mockConfig,
+      );
+    });
+
+    it('should handle non-JSON result gracefully', async () => {
+      mockExecutorRun.mockResolvedValue({
+        result: 'not valid JSON',
+        terminate_reason: 'ERROR',
+      });
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+      const controller = new AbortController();
+
+      await invocation.execute(controller.signal);
+
+      expect(mockRecordBrowserTaskOutcome).toHaveBeenCalledWith(mockConfig, {
+        success: false,
+        session_mode: 'isolated',
+        vision_enabled: false,
+        headless: false,
+      });
+    });
+  });
+
   describe('execute', () => {
     let mockExecutor: { run: ReturnType<typeof vi.fn> };
 
+    const mockBrowserManagerForExec = {
+      close: vi.fn().mockResolvedValue(undefined),
+      getSessionMode: vi.fn().mockReturnValue('persistent'),
+      isHeadless: vi.fn().mockReturnValue(false),
+    };
+
     beforeEach(() => {
+      mockBrowserManagerForExec.close.mockResolvedValue(undefined);
+      mockBrowserManagerForExec.getSessionMode.mockReturnValue('persistent');
+      mockBrowserManagerForExec.isHeadless.mockReturnValue(false);
+
       vi.mocked(createBrowserAgentDefinition).mockResolvedValue({
         definition: {
           name: 'browser_agent',
@@ -176,7 +380,7 @@ describe('BrowserAgentInvocation', () => {
           promptConfig: { query: '', systemPrompt: '' },
           toolConfig: { tools: ['analyze_screenshot', 'click'] },
         },
-        browserManager: {} as never,
+        browserManager: mockBrowserManagerForExec as never,
       });
 
       mockExecutor = {
