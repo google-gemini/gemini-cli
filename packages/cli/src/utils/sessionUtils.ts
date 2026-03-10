@@ -56,8 +56,51 @@ export class SessionError extends Error {
 
   /**
    * Creates an error for when a session identifier is invalid.
+   *
+   * When `sessions` is provided, a compact summary of available sessions is
+   * included in the error message so the user can correct their command without
+   * needing to run --list-sessions separately.
    */
-  static invalidSessionIdentifier(identifier: string): SessionError {
+  static invalidSessionIdentifier(
+    identifier: string,
+    sessions?: SessionInfo[],
+  ): SessionError {
+    const MAX_DISPLAY = 10;
+
+    if (sessions && sessions.length > 0) {
+      // Sort oldest-first (consistent with --list-sessions numbering)
+      const sorted = [...sessions].sort(
+        (a, b) =>
+          new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+      );
+
+      const displaySessions = sorted.slice(0, MAX_DISPLAY);
+      const hasMore = sorted.length > MAX_DISPLAY;
+
+      const sessionLines = displaySessions
+        .map((s, i) => {
+          const title =
+            s.displayName.length > 60
+              ? s.displayName.slice(0, 57) + '...'
+              : s.displayName;
+          return `  ${i + 1}. ${title} (${formatRelativeTime(s.lastUpdated)})`;
+        })
+        .join('\n');
+
+      const moreNote = hasMore
+        ? `\n  Run --list-sessions for the full list.`
+        : '';
+
+      const indices = displaySessions
+        .map((_, i) => `--resume ${i + 1}`)
+        .join(', ');
+
+      return new SessionError(
+        'INVALID_SESSION_IDENTIFIER',
+        `Invalid session identifier "${identifier}".\n\nAvailable sessions for this project:\n${sessionLines}${moreNote}\n\nUse ${indices}, or --resume latest.`,
+      );
+    }
+
     return new SessionError(
       'INVALID_SESSION_IDENTIFIER',
       `Invalid session identifier "${identifier}".\n  Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.`,
@@ -447,7 +490,7 @@ export class SessionSelector {
       return sortedSessions[index - 1];
     }
 
-    throw SessionError.invalidSessionIdentifier(identifier);
+    throw SessionError.invalidSessionIdentifier(identifier, sortedSessions);
   }
 
   /**
