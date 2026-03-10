@@ -1,23 +1,22 @@
 # Local development guide
 
 This guide provides instructions for setting up and using local development
-features, such as tracing.
+features for Gemini CLI.
 
 ## Tracing
 
-Traces are OpenTelemetry (OTel) records that help you debug your code by
-instrumenting key events like model calls, tool scheduler operations, and tool
-calls.
+Gemini CLI uses OpenTelemetry (OTel) to record traces that help you debug agent
+behavior. Traces instrument key events like model calls, tool scheduler
+operations, and tool calls.
 
-Traces provide deep visibility into agent behavior and are invaluable for
-debugging complex issues. They are captured automatically when telemetry is
-enabled.
+Traces provide deep visibility into agent behavior and help you debug complex
+issues. They are captured automatically when you enable telemetry.
 
-### Viewing traces
+### View traces
 
-You can view traces using either Jaeger or the Genkit Developer UI.
+You can view traces using Genkit Developer UI, Jaeger, or Google Cloud.
 
-#### Using Genkit
+#### Use Genkit
 
 Genkit provides a web-based UI for viewing traces and other telemetry data.
 
@@ -29,11 +28,8 @@ Genkit provides a web-based UI for viewing traces and other telemetry data.
     npm run telemetry -- --target=genkit
     ```
 
-    The script will output the URL for the Genkit Developer UI, for example:
-
-    ```
-    Genkit Developer UI: http://localhost:4000
-    ```
+    The script will output the URL for the Genkit Developer UI. For example:
+    `Genkit Developer UI: http://localhost:4000`
 
 2.  **Run Gemini CLI:**
 
@@ -48,21 +44,22 @@ Genkit provides a web-based UI for viewing traces and other telemetry data.
     Open the Genkit Developer UI URL in your browser and navigate to the
     **Traces** tab to view the traces.
 
-#### Using Jaeger
+#### Use Jaeger
 
-You can view traces in the Jaeger UI. To get started, follow these steps:
+You can view traces in the Jaeger UI for local development.
 
 1.  **Start the telemetry collector:**
 
     Run the following command in your terminal to download and start Jaeger and
-    an OTEL collector:
+    an OTel collector:
 
     ```bash
     npm run telemetry -- --target=local
     ```
 
-    This command also configures your workspace for local telemetry and provides
-    a link to the Jaeger UI (usually `http://localhost:16686`).
+    This command configures your workspace for local telemetry and provides a
+    link to the Jaeger UI (usually `http://localhost:16686`).
+    - **Collector logs:** `~/.gemini/tmp/<projectHash>/otel/collector.log`
 
 2.  **Run Gemini CLI:**
 
@@ -77,16 +74,63 @@ You can view traces in the Jaeger UI. To get started, follow these steps:
     After running your command, open the Jaeger UI link in your browser to view
     the traces.
 
+#### Use Google Cloud
+
+You can use an OpenTelemetry collector to forward telemetry data to Google Cloud
+Trace for custom processing or routing.
+
+> **Warning:** Ensure you complete the
+> [Google Cloud telemetry prerequisites](./cli/telemetry.md#prerequisites)
+> (Project ID, authentication, IAM roles, and APIs) before using this method.
+
+1.  **Configure `.gemini/settings.json`:**
+
+    ```json
+    {
+      "telemetry": {
+        "enabled": true,
+        "target": "gcp",
+        "useCollector": true
+      }
+    }
+    ```
+
+2.  **Start the telemetry collector:**
+
+    Run the following command to start a local OTel collector that forwards to
+    Google Cloud:
+
+    ```bash
+    npm run telemetry -- --target=gcp
+    ```
+
+    The script outputs links to view traces, metrics, and logs in the Google
+    Cloud Console.
+    - **Collector logs:** `~/.gemini/tmp/<projectHash>/otel/collector-gcp.log`
+
+3.  **Run Gemini CLI:**
+
+    In a separate terminal, run your Gemini CLI command:
+
+    ```bash
+    gemini
+    ```
+
+4.  **View logs, metrics, and traces:**
+
+    After sending prompts, view your data in the Google Cloud Console. See the
+    [telemetry documentation](./cli/telemetry.md#view-google-cloud-telemetry)
+    for links to Logs, Metrics, and Trace explorers.
+
 For more detailed information on telemetry, see the
 [telemetry documentation](./cli/telemetry.md).
 
-### Instrumenting code with traces
+### Instrument code with traces
 
-You can add traces to your own code for more detailed instrumentation. This is
-useful for debugging and understanding the flow of execution.
+You can add traces to your own code for more detailed instrumentation.
 
-Use the `runInDevTraceSpan` function to wrap any section of code in a trace
-span.
+Adding traces helps you debug and understand the flow of execution. Use the
+`runInDevTraceSpan` function to wrap any section of code in a trace span.
 
 Here is a basic example:
 
@@ -102,13 +146,13 @@ await runInDevTraceSpan(
     },
   },
   async ({ metadata }) => {
-    // The `metadata` object allows you to record the input and output of the
+    // metadata allows you to record the input and output of the
     // operation as well as other attributes.
     metadata.input = { key: 'value' };
     // Set custom attributes.
     metadata.attributes['custom.attribute'] = 'custom.value';
 
-    // Your code to be traced goes here
+    // Your code to be traced goes here.
     try {
       const output = await somethingRisky();
       metadata.output = output;
