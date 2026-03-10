@@ -376,8 +376,12 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.VOICE_INPUT,
-      positive: [createKey('r', { alt: true })],
-      negative: [createKey('v'), createKey('v', { ctrl: true })],
+      positive: [],
+      negative: [
+        createKey('r', { alt: true }),
+        createKey('v'),
+        createKey('v', { ctrl: true }),
+      ],
     },
     // Shell commands
     {
