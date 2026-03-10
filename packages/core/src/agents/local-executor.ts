@@ -137,14 +137,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       // registry and register it with the agent's isolated registry.
       const tool = parentToolRegistry.getTool(toolName);
       if (tool) {
-        if (tool instanceof DiscoveredMCPTool) {
-          // Subagents MUST use fully qualified names for MCP tools to ensure
-          // unambiguous tool calls and to comply with policy requirements.
-          // We automatically "upgrade" any MCP tool to its qualified version.
-          agentToolRegistry.registerTool(tool.asFullyQualifiedTool());
-        } else {
-          agentToolRegistry.registerTool(tool);
-        }
+        agentToolRegistry.registerTool(tool);
       }
     };
 
@@ -881,13 +874,28 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       const callId = functionCall.id ?? `${promptId}-${index}`;
       const args = functionCall.args ?? {};
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const toolName = functionCall.name as string;
+      let toolName = functionCall.name as string;
 
       let displayName = toolName;
       let description: string | undefined = undefined;
 
       try {
-        const tool = this.toolRegistry.getTool(toolName);
+        let tool = this.toolRegistry.getTool(toolName);
+        if (!tool) {
+          // If the tool is not found, check if it's an unqualified MCP tool called by the LLM
+          const potentialTools = this.toolRegistry
+            .getAllTools()
+            .filter(
+              (t) =>
+                t instanceof DiscoveredMCPTool && t.serverToolName === toolName,
+            );
+          if (potentialTools.length === 1) {
+            tool = potentialTools[0];
+            // Automatically rewrite the tool name to the fully-qualified version so it passes allowlists
+            toolName = tool.name;
+          }
+        }
+
         if (tool) {
           displayName = tool.displayName ?? toolName;
           const invocation = tool.build(args);
