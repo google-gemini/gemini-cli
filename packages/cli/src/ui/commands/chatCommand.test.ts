@@ -106,8 +106,11 @@ describe('chatCommand', () => {
 
   it('should have the correct main command definition', () => {
     expect(chatCommand.name).toBe('chat');
-    expect(chatCommand.description).toBe('Manage conversation history');
-    expect(chatCommand.subCommands).toHaveLength(5);
+    expect(chatCommand.description).toBe(
+      'Browse auto-saved conversations and manage chat checkpoints',
+    );
+    expect(chatCommand.autoExecute).toBe(true);
+    expect(chatCommand.subCommands).toHaveLength(6);
   });
 
   describe('list subcommand', () => {
@@ -303,7 +306,7 @@ describe('chatCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /chat resume <tag>',
+        content: 'Missing tag. Usage: /resume resume <tag>',
       });
     });
 
@@ -441,7 +444,7 @@ describe('chatCommand', () => {
       expect(result).toEqual({
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /chat delete <tag>',
+        content: 'Missing tag. Usage: /resume delete <tag>',
       });
     });
 
