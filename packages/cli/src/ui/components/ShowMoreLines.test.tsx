@@ -45,7 +45,7 @@ describe('ShowMoreLines', () => {
     },
   );
 
-  it('renders nothing in STANDARD mode even if overflowing', async () => {
+  it('renders message in STANDARD mode when overflowing', async () => {
     mockUseAlternateBuffer.mockReturnValue(false);
     mockUseOverflowState.mockReturnValue({
       overflowingIds: new Set(['1']),
@@ -55,7 +55,9 @@ describe('ShowMoreLines', () => {
       <ShowMoreLines constrainHeight={true} />,
     );
     await waitUntilReady();
-    expect(lastFrame({ allowEmpty: true })).toBe('');
+    expect(lastFrame().toLowerCase()).toContain(
+      'press ctrl+o to show more lines',
+    );
     unmount();
   });
 

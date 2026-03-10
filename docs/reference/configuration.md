@@ -719,7 +719,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `[]`
 
 - **`context.loadMemoryFromIncludeDirectories`** (boolean):
-  - **Description:** Controls how /memory refresh loads GEMINI.md files. When
+  - **Description:** Controls how /memory reload loads GEMINI.md files. When
     true, include directories are scanned; when false, only the current
     directory is used.
   - **Default:** `false`
@@ -872,6 +872,11 @@ their corresponding top-level category object in your `settings.json` file.
     confirmation dialogs.
   - **Default:** `false`
 
+- **`security.autoAddToPolicyByDefault`** (boolean):
+  - **Description:** When enabled, the "Allow for all future sessions" option
+    becomes the default choice for low-risk tools in trusted workspaces.
+  - **Default:** `false`
+
 - **`security.blockGitExtensions`** (boolean):
   - **Description:** Blocks installing and loading extensions from Git.
   - **Default:** `false`
@@ -1021,8 +1026,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`experimental.plan`** (boolean):
-  - **Description:** Enable planning features (Plan Mode and tools).
-  - **Default:** `false`
+  - **Description:** Enable Plan Mode.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.taskTracker`** (boolean):
@@ -1041,8 +1046,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`experimental.gemmaModelRouter.enabled`** (boolean):
-  - **Description:** Enable the Gemma Model Router. Requires a local endpoint
-    serving Gemma via the Gemini API using LiteRT-LM shim.
+  - **Description:** Enable the Gemma Model Router (experimental). Requires a
+    local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -1705,7 +1710,7 @@ conventions and context.
     loaded, allowing you to verify the hierarchy and content being used by the
     AI.
   - See the [Commands documentation](./commands.md#memory) for full details on
-    the `/memory` command and its sub-commands (`show` and `refresh`).
+    the `/memory` command and its sub-commands (`show` and `reload`).
 
 By understanding and utilizing these configuration layers and the hierarchical
 nature of context files, you can effectively manage the AI's memory and tailor

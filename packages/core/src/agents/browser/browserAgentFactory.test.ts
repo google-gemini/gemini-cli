@@ -209,6 +209,45 @@ describe('browserAgentFactory', () => {
           .map((t) => t.name) ?? [];
       expect(toolNames).toContain('analyze_screenshot');
     });
+
+    it('should include all MCP navigation tools (new_page, navigate_page) in definition', async () => {
+      mockBrowserManager.getDiscoveredTools.mockResolvedValue([
+        { name: 'take_snapshot', description: 'Take snapshot' },
+        { name: 'click', description: 'Click element' },
+        { name: 'fill', description: 'Fill form field' },
+        { name: 'navigate_page', description: 'Navigate to URL' },
+        { name: 'new_page', description: 'Open a new page/tab' },
+        { name: 'close_page', description: 'Close page' },
+        { name: 'select_page', description: 'Select page' },
+        { name: 'press_key', description: 'Press key' },
+        { name: 'hover', description: 'Hover element' },
+      ]);
+
+      const { definition } = await createBrowserAgentDefinition(
+        mockConfig,
+        mockMessageBus,
+      );
+
+      const toolNames =
+        definition.toolConfig?.tools
+          ?.filter(
+            (t): t is { name: string } => typeof t === 'object' && 'name' in t,
+          )
+          .map((t) => t.name) ?? [];
+
+      // All MCP tools must be present
+      expect(toolNames).toContain('new_page');
+      expect(toolNames).toContain('navigate_page');
+      expect(toolNames).toContain('close_page');
+      expect(toolNames).toContain('select_page');
+      expect(toolNames).toContain('click');
+      expect(toolNames).toContain('take_snapshot');
+      expect(toolNames).toContain('press_key');
+      // Custom composite tool must also be present
+      expect(toolNames).toContain('type_text');
+      // Total: 9 MCP + 1 type_text (no analyze_screenshot without visualModel)
+      expect(definition.toolConfig?.tools).toHaveLength(10);
+    });
   });
 
   describe('cleanupBrowserAgent', () => {

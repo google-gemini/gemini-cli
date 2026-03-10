@@ -8,9 +8,11 @@ import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { useUIActions } from '../contexts/UIActionsContext.js';
-import { Command, keyMatchers } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
+import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
 export const AdminSettingsChangedDialog = () => {
+  const keyMatchers = useKeyMatchers();
   const { handleRestart } = useUIActions();
 
   useKeypress(
