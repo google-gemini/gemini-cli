@@ -31,7 +31,7 @@
     "express": "^5.1.0",
     "fs-extra": "^11.3.4",
     "strip-json-comments": "^3.1.1",
-    "tar": "^7.5.10",
+    "tar": "^7.5.11",
     "uuid": "^13.0.0",
     "winston": "^3.19.0"
   },
@@ -40,7 +40,7 @@
     "@types/express": "^5.0.6",
     "@types/fs-extra": "^11.0.4",
     "@types/supertest": "^7.2.0",
-    "@types/tar": "^6.1.13",
+    "@types/tar": "^7.0.87",
     "dotenv": "^16.4.5",
     "supertest": "^7.2.2",
     "typescript": "^5.9.3",
