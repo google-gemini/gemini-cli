@@ -120,6 +120,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       const provider = await A2AAuthProviderFactory.create({
         authConfig: this.definition.auth,
         agentName: this.definition.name,
+        agentCardUrl: this.definition.agentCardUrl,
       });
       if (!provider) {
         throw new Error(

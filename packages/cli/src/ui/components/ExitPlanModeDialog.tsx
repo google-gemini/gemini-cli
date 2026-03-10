@@ -345,6 +345,7 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
               ],
               multiSelect: false,
               allowCustomOption: false,
+              unconstrainedHeight: false,
             },
           ]}
           onSubmit={(answers) => {
@@ -382,6 +383,7 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
           onCancel={() => setStep(ApprovalStep.PLAN_APPROVAL)}
           width={width}
           availableHeight={availableHeight}
+          extraParts={[`${editHint} to edit plan`]}
         />
       </Box>
     );
