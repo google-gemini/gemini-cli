@@ -434,7 +434,7 @@ export class GeminiChat {
                   model,
                 });
                 await new Promise((res) =>
-                  setTimeout(res, delayMs * (attempt + 1)), 
+                  setTimeout(res, delayMs * (attempt + 1)),
                 );
                 continue;
               }

@@ -282,8 +282,10 @@ export function isGemini2Model(model: string, config?: Config): boolean {
  */
 export function isCustomModel(model: string, config?: Config): boolean {
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
+    const resolved = config.modelConfigService.resolveModelId(model);
     return (
-      config.modelConfigService.getModelDefinition(model)?.tier === 'custom'
+      config.modelConfigService.getModelDefinition(resolved)?.tier ===
+        'custom' || !resolved.startsWith('gemini-')
     );
   }
 

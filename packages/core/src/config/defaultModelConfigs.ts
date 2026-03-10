@@ -292,7 +292,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     // Aliases
     auto: {
       tier: 'auto',
-      isPreview: false,
+      isPreview: true,
       isAuto: true,
       features: { thinking: true, multimodalToolUse: false, modern: true },
     },
