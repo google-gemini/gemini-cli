@@ -873,7 +873,7 @@ export const useSessionBrowserInput = (
 
       // Handling regardless of search mode.
       if (
-        key.name === 'return' &&
+        key.name === 'enter' &&
         state.filteredAndSortedSessions[state.activeIndex]
       ) {
         const selectedSession =
