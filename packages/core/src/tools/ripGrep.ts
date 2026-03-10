@@ -29,7 +29,7 @@ import {
   COMMON_DIRECTORY_EXCLUDES,
 } from '../utils/ignorePatterns.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
-import { execStreaming } from '../utils/shell-utils.js';
+import { execStreaming, execPromise } from '../utils/shell-utils.js';
 import {
   DEFAULT_TOTAL_MAX_MATCHES,
   DEFAULT_SEARCH_TIMEOUT_MS,
@@ -42,14 +42,44 @@ function getRgCandidateFilenames(): readonly string[] {
   return process.platform === 'win32' ? ['rg.exe', 'rg'] : ['rg'];
 }
 
+async function resolveSystemRgPath(): Promise<string | null> {
+  try {
+    const { stdout } = await execPromise('command -v rg');
+    const systemPath = stdout.trim();
+    if (systemPath) {
+      return systemPath;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 async function resolveExistingRgPath(): Promise<string | null> {
   const binDir = Storage.getGlobalBinDir();
-  for (const fileName of getRgCandidateFilenames()) {
+  const candidates = getRgCandidateFilenames();
+
+  // 1. On Android (Termux), prioritize system ripgrep to avoid library compatibility issues
+  if (process.platform === 'android') {
+    const systemPath = await resolveSystemRgPath();
+    if (systemPath) {
+      return systemPath;
+    }
+  }
+
+  // 2. Otherwise, look for the managed binary downloaded into the global bin directory
+  for (const fileName of candidates) {
     const candidatePath = path.join(binDir, fileName);
     if (await fileExists(candidatePath)) {
       return candidatePath;
     }
   }
+
+  // 3. Fallback for other platforms (e.g. Linux, macOS) if managed binary is missing
+  if (process.platform !== 'android') {
+    return await resolveSystemRgPath();
+  }
+
   return null;
 }
 
