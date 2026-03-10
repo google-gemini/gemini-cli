@@ -8,7 +8,7 @@ Branch: `feature/termviz-integration`
 ## Demo Option A: Clone This Branch Directly
 
 ```bash
-git clone --single-branch --branch feature/termviz-integration https://github.com/<your-username>/gemini-cli.git
+git clone --single-branch --branch feature/termviz-integration https://github.com/Aaxhirrr/gemini-cli.git
 cd gemini-cli
 npm install
 npm run build
@@ -102,10 +102,10 @@ syntax variance.
 ## Useful Links to Share
 
 1. Branch tree:
-`https://github.com/<your-username>/gemini-cli/tree/feature/termviz-integration`
+`https://github.com/Aaxhirrr/gemini-cli/tree/feature/termviz-integration`
 2. This demo doc on branch:
-`https://github.com/<your-username>/gemini-cli/blob/feature/termviz-integration/DEMO.md`
+`https://github.com/Aaxhirrr/gemini-cli/blob/feature/termviz-integration/DEMO.md`
 3. Compare view:
-`https://github.com/google-gemini/gemini-cli/compare/main...<your-username>:feature/termviz-integration`
+`https://github.com/google-gemini/gemini-cli/compare/main...Aaxhirrr:feature/termviz-integration`
 4. Draft PR:
 `https://github.com/google-gemini/gemini-cli/pull/<PR_NUMBER>`
