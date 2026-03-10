@@ -11,8 +11,8 @@ import { useMemo } from 'react';
 import type { HistoryItemToolGroup } from '../../types.js';
 import { Checklist } from '../Checklist.js';
 import type { ChecklistItemData } from '../ChecklistItem.js';
-import { formatCommand } from '../../utils/keybindingUtils.js';
-import { Command } from '../../../config/keyBindings.js';
+import { formatCommand } from '../../key/keybindingUtils.js';
+import { Command } from '../../key/keyBindings.js';
 
 export const TodoTray: React.FC = () => {
   const uiState = useUIState();
