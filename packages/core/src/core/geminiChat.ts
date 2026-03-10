@@ -7,17 +7,18 @@
 // DISCLAIMER: This is a copied version of https://github.com/googleapis/js-genai/blob/main/src/chats.ts with the intention of working around a key bug
 // where function responses are not treated as "valid" responses: https://b.corp.google.com/issues/420354090
 
-import type {
-  GenerateContentResponse,
-  Content,
-  Part,
-  Tool,
-  PartListUnion,
-  GenerateContentConfig,
-  GenerateContentParameters,
+import {
+  createUserContent,
+  FinishReason,
+  type GenerateContentResponse,
+  type Content,
+  type Part,
+  type Tool,
+  type PartListUnion,
+  type GenerateContentConfig,
+  type GenerateContentParameters,
 } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
-import { createUserContent, FinishReason } from '@google/genai';
 import { retryWithBackoff, isRetryableError } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import type { Config } from '../config/config.js';
@@ -40,6 +41,7 @@ import {
 import {
   ContentRetryEvent,
   ContentRetryFailureEvent,
+  type LlmRole,
 } from '../telemetry/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
@@ -51,7 +53,6 @@ import {
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
 import { coreEvents } from '../utils/events.js';
-import type { LlmRole } from '../telemetry/types.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -343,8 +344,6 @@ export class GeminiChat {
       this: GeminiChat,
     ): AsyncGenerator<StreamEvent, void, void> {
       try {
-        let lastError: unknown = new Error('Request failed after all retries.');
-
         const maxAttempts = INVALID_CONTENT_RETRY_OPTIONS.maxAttempts;
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -373,15 +372,13 @@ export class GeminiChat {
               yield { type: StreamEventType.CHUNK, value: chunk };
             }
 
-            lastError = null;
-            break;
+            return;
           } catch (error) {
             if (error instanceof AgentExecutionStoppedError) {
               yield {
                 type: StreamEventType.AGENT_EXECUTION_STOPPED,
                 reason: error.reason,
               };
-              lastError = null; // Clear error as this is an expected stop
               return; // Stop the generator
             }
 
@@ -396,7 +393,6 @@ export class GeminiChat {
                   value: error.syntheticResponse,
                 };
               }
-              lastError = null; // Clear error as this is an expected stop
               return; // Stop the generator
             }
 
@@ -414,8 +410,9 @@ export class GeminiChat {
               }
               // Fall through to retry logic for retryable connection errors
             }
-            lastError = error;
+
             const isContentError = error instanceof InvalidStreamError;
+            const errorType = isContentError ? error.type : 'NETWORK_ERROR';
 
             if (
               (isContentError && isGemini2Model(model)) ||
@@ -424,11 +421,10 @@ export class GeminiChat {
               // Check if we have more attempts left.
               if (attempt < maxAttempts - 1) {
                 const delayMs = INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs;
-                const retryType = isContentError ? error.type : 'NETWORK_ERROR';
 
                 logContentRetry(
                   this.config,
-                  new ContentRetryEvent(attempt, retryType, delayMs, model),
+                  new ContentRetryEvent(attempt, errorType, delayMs, model),
                 );
                 coreEvents.emitRetryAttempt({
                   attempt: attempt + 1,
@@ -443,21 +439,19 @@ export class GeminiChat {
                 continue;
               }
             }
-            break;
-          }
-        }
 
-        if (lastError) {
-          if (
-            lastError instanceof InvalidStreamError &&
-            isGemini2Model(model)
-          ) {
+            // If we've aborted, we throw without logging a failure.
+            if (signal.aborted) {
+              throw error;
+            }
+
             logContentRetryFailure(
               this.config,
-              new ContentRetryFailureEvent(maxAttempts, lastError.type, model),
+              new ContentRetryFailureEvent(attempt + 1, errorType, model),
             );
+
+            throw error;
           }
-          throw lastError;
         }
       } finally {
         streamDoneResolver!();
@@ -469,7 +463,7 @@ export class GeminiChat {
 
   private async makeApiCallAndProcessStream(
     modelConfigKey: ModelConfigKey,
-    requestContents: Content[],
+    requestContents: readonly Content[],
     prompt_id: string,
     abortSignal: AbortSignal,
     role: LlmRole,
@@ -488,7 +482,7 @@ export class GeminiChat {
     let currentGenerateContentConfig: GenerateContentConfig =
       newAvailabilityConfig;
     let lastConfig: GenerateContentConfig = currentGenerateContentConfig;
-    let lastContentsToUse: Content[] = requestContents;
+    let lastContentsToUse: Content[] = [...requestContents];
 
     const getAvailabilityContext = createAvailabilityContextProvider(
       this.config,
@@ -527,9 +521,9 @@ export class GeminiChat {
         abortSignal,
       };
 
-      let contentsToUse = supportsModernFeatures(modelToUse)
-        ? contentsForPreviewModel
-        : requestContents;
+      let contentsToUse: Content[] = supportsModernFeatures(modelToUse)
+        ? [...contentsForPreviewModel]
+        : [...requestContents];
 
       const hookSystem = this.config.getHookSystem();
       if (hookSystem) {
@@ -686,13 +680,11 @@ export class GeminiChat {
    * @return History contents alternating between user and model for the entire
    * chat session.
    */
-  getHistory(curated: boolean = false): Content[] {
+  getHistory(curated: boolean = false): readonly Content[] {
     const history = curated
       ? extractCuratedHistory(this.history)
       : this.history;
-    // Deep copy the history to avoid mutating the history outside of the
-    // chat session.
-    return structuredClone(history);
+    return [...history];
   }
 
   /**
@@ -709,8 +701,8 @@ export class GeminiChat {
     this.history.push(content);
   }
 
-  setHistory(history: Content[]): void {
-    this.history = history;
+  setHistory(history: readonly Content[]): void {
+    this.history = [...history];
     this.lastPromptTokenCount = estimateTokenCountSync(
       this.history.flatMap((c) => c.parts || []),
     );
@@ -737,7 +729,9 @@ export class GeminiChat {
   // To ensure our requests validate, the first function call in every model
   // turn within the active loop must have a `thoughtSignature` property.
   // If we do not do this, we will get back 400 errors from the API.
-  ensureActiveLoopHasThoughtSignatures(requestContents: Content[]): Content[] {
+  ensureActiveLoopHasThoughtSignatures(
+    requestContents: readonly Content[],
+  ): readonly Content[] {
     // First, find the start of the active loop by finding the last user turn
     // with a text message, i.e. that is not a function response.
     let activeLoopStartIndex = -1;
