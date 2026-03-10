@@ -5,9 +5,14 @@
  */
 
 import { useState, useEffect } from 'react';
-import { ApprovalMode, type Config } from '@google/gemini-cli-core';
+import {
+  ApprovalMode,
+  type Config,
+  getAdminErrorMessage,
+} from '@google/gemini-cli-core';
 import { useKeypress } from './useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
+import { useKeyMatchers } from './useKeyMatchers.js';
 import type { HistoryItemWithoutId } from '../types.js';
 import { MessageType } from '../types.js';
 
@@ -16,6 +21,7 @@ export interface UseApprovalModeIndicatorArgs {
   addItem?: (item: HistoryItemWithoutId, timestamp: number) => void;
   onApprovalModeChange?: (mode: ApprovalMode) => void;
   isActive?: boolean;
+  allowPlanMode?: boolean;
 }
 
 export function useApprovalModeIndicator({
@@ -23,7 +29,9 @@ export function useApprovalModeIndicator({
   addItem,
   onApprovalModeChange,
   isActive = true,
+  allowPlanMode = false,
 }: UseApprovalModeIndicatorArgs): ApprovalMode {
+  const keyMatchers = useKeyMatchers();
   const currentConfigValue = config.getApprovalMode();
   const [showApprovalMode, setApprovalMode] = useState(currentConfigValue);
 
@@ -41,10 +49,19 @@ export function useApprovalModeIndicator({
           config.getApprovalMode() !== ApprovalMode.YOLO
         ) {
           if (addItem) {
+            let text =
+              'You cannot enter YOLO mode since it is disabled in your settings.';
+            const adminSettings = config.getRemoteAdminSettings();
+            const hasSettings =
+              adminSettings && Object.keys(adminSettings).length > 0;
+            if (hasSettings && !adminSettings.strictModeDisabled) {
+              text = getAdminErrorMessage('YOLO mode', config);
+            }
+
             addItem(
               {
                 type: MessageType.WARNING,
-                text: 'You cannot enter YOLO mode since it is disabled in your settings.',
+                text,
               },
               Date.now(),
             );
@@ -62,7 +79,7 @@ export function useApprovalModeIndicator({
             nextApprovalMode = ApprovalMode.AUTO_EDIT;
             break;
           case ApprovalMode.AUTO_EDIT:
-            nextApprovalMode = config.isPlanEnabled()
+            nextApprovalMode = allowPlanMode
               ? ApprovalMode.PLAN
               : ApprovalMode.DEFAULT;
             break;
@@ -89,6 +106,7 @@ export function useApprovalModeIndicator({
             addItem(
               {
                 type: MessageType.INFO,
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
                 text: (e as Error).message,
               },
               Date.now(),

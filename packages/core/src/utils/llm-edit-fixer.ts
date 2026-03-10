@@ -10,6 +10,7 @@ import { type BaseLlmClient } from '../core/baseLlmClient.js';
 import { LRUCache } from 'mnemonist';
 import { getPromptIdWithFallback } from './promptIdContext.js';
 import { debugLogger } from './debugLogger.js';
+import { LlmRole } from '../telemetry/types.js';
 
 const MAX_CACHE_SIZE = 50;
 const GENERATE_JSON_TIMEOUT_MS = 40000; // 40 seconds
@@ -107,6 +108,7 @@ async function generateJsonWithTimeout<T>(
         timeoutSignal,
       ]),
     });
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return result as T;
   } catch (err) {
     debugLogger.debug(
@@ -180,6 +182,7 @@ export async function FixLLMEditWithInstruction(
       systemInstruction: EDIT_SYS_PROMPT,
       promptId,
       maxAttempts: 1,
+      role: LlmRole.UTILITY_EDIT_CORRECTOR,
     },
     GENERATE_JSON_TIMEOUT_MS,
   );

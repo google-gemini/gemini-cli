@@ -47,20 +47,35 @@ powerful tool for developers.
     be relative to the workspace root, e.g.,
     `-w @google/gemini-cli-core -- src/routing/modelRouterService.test.ts`)
 - **Full Validation:** `npm run preflight` (Heaviest check; runs clean, install,
-  build, lint, type check, and tests. Recommended before submitting PRs.)
+  build, lint, type check, and tests. Recommended before submitting PRs. Due to
+  its long runtime, only run this at the very end of a code implementation task.
+  If it fails, use faster, targeted commands (e.g., `npm run test`,
+  `npm run lint`, or workspace-specific tests) to iterate on fixes before
+  re-running `preflight`. For simple, non-code changes like documentation or
+  prompting updates, skip `preflight` at the end of the task and wait for PR
+  validation.)
 - **Individual Checks:** `npm run lint` / `npm run format` / `npm run typecheck`
 
 ## Development Conventions
 
+- **Legacy Snippets:** `packages/core/src/prompts/snippets.legacy.ts` is a
+  snapshot of an older system prompt. Avoid changing the prompting verbiage to
+  preserve its historical behavior; however, structural changes to ensure
+  compilation or simplify the code are permitted.
 - **Contributions:** Follow the process outlined in `CONTRIBUTING.md`. Requires
   signing the Google CLA.
 - **Pull Requests:** Keep PRs small, focused, and linked to an existing issue.
+  Always activate the `pr-creator` skill for PR generation, even when using the
+  `gh` CLI.
 - **Commit Messages:** Follow the
   [Conventional Commits](https://www.conventionalcommits.org/) standard.
 - **Coding Style:** Adhere to existing patterns in `packages/cli` (React/Ink)
   and `packages/core` (Backend logic).
 - **Imports:** Use specific imports and avoid restricted relative imports
   between packages (enforced by ESLint).
+- **License Headers:** For all new source code files (`.ts`, `.tsx`, `.js`),
+  include the Apache-2.0 license header with the current year. (e.g.,
+  `Copyright 2026 Google LLC`). This is enforced by ESLint.
 
 ## Testing Conventions
 

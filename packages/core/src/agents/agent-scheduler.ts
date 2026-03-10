@@ -27,6 +27,8 @@ export interface AgentSchedulingOptions {
   signal: AbortSignal;
   /** Optional function to get the preferred editor for tool modifications. */
   getPreferredEditor?: () => EditorType | undefined;
+  /** Optional function to be notified when the scheduler is waiting for user confirmation. */
+  onWaitingForConfirmation?: (waiting: boolean) => void;
 }
 
 /**
@@ -48,18 +50,27 @@ export async function scheduleAgentTools(
     toolRegistry,
     signal,
     getPreferredEditor,
+    onWaitingForConfirmation,
   } = options;
 
   // Create a proxy/override of the config to provide the agent-specific tool registry.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const agentConfig: Config = Object.create(config);
   agentConfig.getToolRegistry = () => toolRegistry;
+  agentConfig.getMessageBus = () => toolRegistry.getMessageBus();
+  // Override toolRegistry property so AgentLoopContext reads the agent-specific registry.
+  Object.defineProperty(agentConfig, 'toolRegistry', {
+    get: () => toolRegistry,
+    configurable: true,
+  });
 
   const scheduler = new Scheduler({
     config: agentConfig,
-    messageBus: config.getMessageBus(),
+    messageBus: toolRegistry.getMessageBus(),
     getPreferredEditor: getPreferredEditor ?? (() => undefined),
     schedulerId,
     parentCallId,
+    onWaitingForConfirmation,
   });
 
   return scheduler.schedule(requests, signal);

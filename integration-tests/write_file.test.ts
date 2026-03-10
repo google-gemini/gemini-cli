@@ -9,7 +9,8 @@ import {
   TestRig,
   createToolCallErrorMessage,
   printDebugInfo,
-  validateModelOutput,
+  assertModelHasOutput,
+  checkModelOutputContent,
 } from './test-helper.js';
 
 describe('write_file', () => {
@@ -21,8 +22,8 @@ describe('write_file', () => {
 
   afterEach(async () => await rig.cleanup());
 
-  it('should be able to write a file', async () => {
-    await rig.setup('should be able to write a file', {
+  it('should be able to write a joke to a file', async () => {
+    await rig.setup('should be able to write a joke to a file', {
       settings: { tools: { core: ['write_file', 'read_file'] } },
     });
     const prompt = `show me an example of using the write tool. put a dad joke in dad.txt`;
@@ -46,8 +47,11 @@ describe('write_file', () => {
       ),
     ).toBeTruthy();
 
-    // Validate model output - will throw if no output, warn if missing expected content
-    validateModelOutput(result, 'dad.txt', 'Write file test');
+    assertModelHasOutput(result);
+    checkModelOutputContent(result, {
+      expectedContent: 'dad.txt',
+      testName: 'Write file test',
+    });
 
     const newFilePath = 'dad.txt';
 

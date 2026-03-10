@@ -20,17 +20,23 @@ import {
   ApprovalMode,
   parseAndFormatApiError,
   ToolConfirmationOutcome,
+  MessageBusType,
   promptIdContext,
   tokenLimit,
   debugLogger,
   runInDevTraceSpan,
   EDIT_TOOL_NAMES,
+  ASK_USER_TOOL_NAME,
   processRestorableToolCalls,
   recordToolCallInteractions,
   ToolErrorType,
   ValidationRequiredError,
   coreEvents,
   CoreEvent,
+  CoreToolCallStatus,
+  buildUserSteeringHintPrompt,
+  GeminiCliOperation,
+  getPlanModeExitMessage,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -42,24 +48,27 @@ import type {
   ServerGeminiStreamEvent as GeminiEvent,
   ThoughtSummary,
   ToolCallRequestInfo,
+  ToolCallResponseInfo,
   GeminiErrorEventValue,
   RetryAttemptPayload,
-  ToolCallConfirmationDetails,
 } from '@google/gemini-cli-core';
 import { type Part, type PartListUnion, FinishReason } from '@google/genai';
 import type {
   HistoryItem,
+  HistoryItemThinking,
   HistoryItemWithoutId,
   HistoryItemToolGroup,
+  HistoryItemInfo,
   IndividualToolCallDisplay,
   SlashCommandProcessorResult,
   HistoryItemModel,
 } from '../types.js';
-import { StreamingState, MessageType, ToolCallStatus } from '../types.js';
+import { StreamingState, MessageType } from '../types.js';
 import { isAtCommand, isSlashCommand } from '../utils/commandUtils.js';
 import { useShellCommandProcessor } from './shellCommandProcessor.js';
 import { handleAtCommand } from './atCommandProcessor.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
+import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { useStateAndRef } from './useStateAndRef.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
@@ -71,17 +80,47 @@ import {
   type TrackedCompletedToolCall,
   type TrackedCancelledToolCall,
   type TrackedWaitingToolCall,
+  type TrackedExecutingToolCall,
 } from './useToolScheduler.js';
+import { theme } from '../semantic-colors.js';
+import { getToolGroupBorderAppearance } from '../utils/borderStyles.js';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { useSessionStats } from '../contexts/SessionContext.js';
 import { useKeypress } from './useKeypress.js';
 import type { LoadedSettings } from '../../config/settings.js';
 
+type ToolResponseWithParts = ToolCallResponseInfo & {
+  llmContent?: PartListUnion;
+};
+
+interface ShellToolData {
+  pid?: number;
+  command?: string;
+  initialOutput?: string;
+}
+
 enum StreamProcessingStatus {
   Completed,
   UserCancelled,
   Error,
+}
+
+const SUPPRESSED_TOOL_ERRORS_NOTE =
+  'Some internal tool attempts failed before this final error. Press F12 for diagnostics, or run /settings and change "Error Verbosity" to full for details.';
+const LOW_VERBOSITY_FAILURE_NOTE =
+  'This request failed. Press F12 for diagnostics, or run /settings and change "Error Verbosity" to full for full details.';
+
+function isShellToolData(data: unknown): data is ShellToolData {
+  if (typeof data !== 'object' || data === null) {
+    return false;
+  }
+  const d = data as Partial<ShellToolData>;
+  return (
+    (d.pid === undefined || typeof d.pid === 'number') &&
+    (d.command === undefined || typeof d.command === 'string') &&
+    (d.initialOutput === undefined || typeof d.initialOutput === 'string')
+  );
 }
 
 function showCitations(settings: LoadedSettings): boolean {
@@ -99,16 +138,18 @@ function calculateStreamingState(
   isResponding: boolean,
   toolCalls: TrackedToolCall[],
 ): StreamingState {
-  if (toolCalls.some((tc) => tc.status === 'awaiting_approval')) {
+  if (
+    toolCalls.some((tc) => tc.status === CoreToolCallStatus.AwaitingApproval)
+  ) {
     return StreamingState.WaitingForConfirmation;
   }
 
   const isAnyToolActive = toolCalls.some((tc) => {
     // These statuses indicate active processing
     if (
-      tc.status === 'executing' ||
-      tc.status === 'scheduled' ||
-      tc.status === 'validating'
+      tc.status === CoreToolCallStatus.Executing ||
+      tc.status === CoreToolCallStatus.Scheduled ||
+      tc.status === CoreToolCallStatus.Validating
     ) {
       return true;
     }
@@ -116,9 +157,9 @@ function calculateStreamingState(
     // Terminal statuses (success, error, cancelled) still count as "Responding"
     // if the result hasn't been submitted back to Gemini yet.
     if (
-      tc.status === 'success' ||
-      tc.status === 'error' ||
-      tc.status === 'cancelled'
+      tc.status === CoreToolCallStatus.Success ||
+      tc.status === CoreToolCallStatus.Error ||
+      tc.status === CoreToolCallStatus.Cancelled
     ) {
       return !(tc as TrackedCompletedToolCall | TrackedCancelledToolCall)
         .responseSubmittedToGemini;
@@ -159,18 +200,28 @@ export const useGeminiStream = (
   terminalWidth: number,
   terminalHeight: number,
   isShellFocused?: boolean,
+  consumeUserHint?: () => string | null,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const [retryStatus, setRetryStatus] = useState<RetryAttemptPayload | null>(
     null,
   );
+  const isLowErrorVerbosity = settings.merged.ui?.errorVerbosity !== 'full';
+  const suppressedToolErrorCountRef = useRef(0);
+  const suppressedToolErrorNoteShownRef = useRef(false);
+  const lowVerbosityFailureNoteShownRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const turnCancelledRef = useRef(false);
   const activeQueryIdRef = useRef<string | null>(null);
+  const previousApprovalModeRef = useRef<ApprovalMode>(
+    config.getApprovalMode(),
+  );
   const [isResponding, setIsResponding] = useState<boolean>(false);
-  const [thought, setThought] = useState<ThoughtSummary | null>(null);
+  const [thought, thoughtRef, setThought] =
+    useStateAndRef<ThoughtSummary | null>(null);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
     useStateAndRef<HistoryItemWithoutId | null>(null);
+
   const [lastGeminiActivityTime, setLastGeminiActivityTime] =
     useState<number>(0);
   const [pushedToolCallIds, pushedToolCallIdsRef, setPushedToolCallIds] =
@@ -218,6 +269,8 @@ export const useGeminiStream = (
             mapTrackedToolCallsToDisplay(toolsToPush as TrackedToolCall[], {
               borderTop: isFirstToolInGroupRef.current,
               borderBottom: true,
+              borderColor: theme.border.default,
+              borderDimColor: false,
             }),
           );
         }
@@ -256,6 +309,45 @@ export const useGeminiStream = (
     },
     config,
     getPreferredEditor,
+  );
+
+  const activeToolPtyId = useMemo(() => {
+    const executingShellTool = toolCalls.find(
+      (tc) =>
+        tc.status === 'executing' && tc.request.name === 'run_shell_command',
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    return (executingShellTool as TrackedExecutingToolCall | undefined)?.pid;
+  }, [toolCalls]);
+
+  const onExec = useCallback(async (done: Promise<void>) => {
+    setIsResponding(true);
+    await done;
+    setIsResponding(false);
+  }, []);
+
+  const {
+    handleShellCommand,
+    activeShellPtyId,
+    lastShellOutputTime,
+    backgroundShellCount,
+    isBackgroundShellVisible,
+    toggleBackgroundShell,
+    backgroundCurrentShell,
+    registerBackgroundShell,
+    dismissBackgroundShell,
+    backgroundShells,
+  } = useShellCommandProcessor(
+    addItem,
+    setPendingHistoryItem,
+    onExec,
+    onDebugMessage,
+    config,
+    geminiClient,
+    setShellInputFocused,
+    terminalWidth,
+    terminalHeight,
+    activeToolPtyId,
   );
 
   const streamingState = useMemo(
@@ -315,6 +407,13 @@ export const useGeminiStream = (
         const historyItem = mapTrackedToolCallsToDisplay(tc, {
           borderTop: isFirst,
           borderBottom: isLastInBatch,
+          ...getToolGroupBorderAppearance(
+            { type: 'tool_group', tools: toolCalls },
+            activeShellPtyId,
+            !!isShellFocused,
+            [],
+            backgroundShells,
+          ),
         });
         addItem(historyItem);
         isFirst = false;
@@ -330,6 +429,9 @@ export const useGeminiStream = (
     setPushedToolCallIds,
     setIsFirstToolInGroup,
     addItem,
+    activeShellPtyId,
+    isShellFocused,
+    backgroundShells,
   ]);
 
   const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
@@ -339,11 +441,20 @@ export const useGeminiStream = (
 
     const items: HistoryItemWithoutId[] = [];
 
+    const appearance = getToolGroupBorderAppearance(
+      { type: 'tool_group', tools: toolCalls },
+      activeShellPtyId,
+      !!isShellFocused,
+      [],
+      backgroundShells,
+    );
+
     if (remainingTools.length > 0) {
       items.push(
         mapTrackedToolCallsToDisplay(remainingTools, {
           borderTop: pushedToolCallIds.size === 0,
           borderBottom: false, // Stay open to connect with the slice below
+          ...appearance,
         }),
       );
     }
@@ -364,10 +475,16 @@ export const useGeminiStream = (
       toolCalls.length > 0 &&
       toolCalls.every((tc) => pushedToolCallIds.has(tc.request.callId));
 
-    const isEventDriven = config.isEventDrivenSchedulerEnabled();
     const anyVisibleInHistory = pushedToolCallIds.size > 0;
     const anyVisibleInPending = remainingTools.some((tc) => {
-      if (!isEventDriven) return true;
+      // AskUser tools are rendered by AskUserDialog, not ToolGroupMessage
+      const isInProgress =
+        tc.status !== 'success' &&
+        tc.status !== 'error' &&
+        tc.status !== 'cancelled';
+      if (tc.request.name === ASK_USER_TOOL_NAME && isInProgress) {
+        return false;
+      }
       return (
         tc.status !== 'scheduled' &&
         tc.status !== 'validating' &&
@@ -385,22 +502,18 @@ export const useGeminiStream = (
         tools: [] as IndividualToolCallDisplay[],
         borderTop: false,
         borderBottom: true,
+        ...appearance,
       });
     }
 
     return items;
-  }, [toolCalls, pushedToolCallIds, config]);
-
-  const activeToolPtyId = useMemo(() => {
-    const executingShellTool = toolCalls?.find(
-      (tc) =>
-        tc.status === 'executing' && tc.request.name === 'run_shell_command',
-    );
-    if (executingShellTool) {
-      return (executingShellTool as { pid?: number }).pid;
-    }
-    return undefined;
-  }, [toolCalls]);
+  }, [
+    toolCalls,
+    pushedToolCallIds,
+    activeShellPtyId,
+    isShellFocused,
+    backgroundShells,
+  ]);
 
   const lastQueryRef = useRef<PartListUnion | null>(null);
   const lastPromptIdRef = useRef<string | null>(null);
@@ -412,31 +525,7 @@ export const useGeminiStream = (
     onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
   } | null>(null);
 
-  const onExec = useCallback(async (done: Promise<void>) => {
-    setIsResponding(true);
-    await done;
-    setIsResponding(false);
-  }, []);
-  const { handleShellCommand, activeShellPtyId, lastShellOutputTime } =
-    useShellCommandProcessor(
-      addItem,
-      setPendingHistoryItem,
-      onExec,
-      onDebugMessage,
-      config,
-      geminiClient,
-      setShellInputFocused,
-      terminalWidth,
-      terminalHeight,
-    );
-
   const activePtyId = activeShellPtyId || activeToolPtyId;
-
-  useEffect(() => {
-    if (!activePtyId) {
-      setShellInputFocused(false);
-    }
-  }, [activePtyId, setShellInputFocused]);
 
   const prevActiveShellPtyIdRef = useRef<number | null>(null);
   useEffect(() => {
@@ -478,6 +567,54 @@ export const useGeminiStream = (
     }
   }, [isResponding]);
 
+  const maybeAddSuppressedToolErrorNote = useCallback(
+    (userMessageTimestamp?: number) => {
+      if (!isLowErrorVerbosity) {
+        return;
+      }
+      if (suppressedToolErrorCountRef.current === 0) {
+        return;
+      }
+      if (suppressedToolErrorNoteShownRef.current) {
+        return;
+      }
+
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: SUPPRESSED_TOOL_ERRORS_NOTE,
+        },
+        userMessageTimestamp,
+      );
+      suppressedToolErrorNoteShownRef.current = true;
+    },
+    [addItem, isLowErrorVerbosity],
+  );
+
+  const maybeAddLowVerbosityFailureNote = useCallback(
+    (userMessageTimestamp?: number) => {
+      if (!isLowErrorVerbosity || config.getDebugMode()) {
+        return;
+      }
+      if (
+        lowVerbosityFailureNoteShownRef.current ||
+        suppressedToolErrorNoteShownRef.current
+      ) {
+        return;
+      }
+
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: LOW_VERBOSITY_FAILURE_NOTE,
+        },
+        userMessageTimestamp,
+      );
+      lowVerbosityFailureNoteShownRef.current = true;
+    },
+    [addItem, config, isLowErrorVerbosity],
+  );
+
   const cancelOngoingRequest = useCallback(() => {
     if (
       streamingState !== StreamingState.Responding &&
@@ -517,12 +654,13 @@ export const useGeminiStream = (
       // If it is a shell command, we update the status to Canceled and clear the output
       // to avoid artifacts, then add it to history immediately.
       if (isShellCommand) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const toolGroup = pendingHistoryItemRef.current as HistoryItemToolGroup;
         const updatedTools = toolGroup.tools.map((tool) => {
           if (tool.name === SHELL_COMMAND_NAME) {
             return {
               ...tool,
-              status: ToolCallStatus.Canceled,
+              status: CoreToolCallStatus.Cancelled,
               resultDisplay: tool.resultDisplay,
             };
           }
@@ -718,6 +856,7 @@ export const useGeminiStream = (
         pendingHistoryItemRef.current?.type !== 'gemini' &&
         pendingHistoryItemRef.current?.type !== 'gemini_content'
       ) {
+        // Flush any pending item before starting gemini content
         if (pendingHistoryItemRef.current) {
           addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         }
@@ -730,6 +869,7 @@ export const useGeminiStream = (
       if (splitPoint === newGeminiMessageBuffer.length) {
         // Update the existing message with accumulated content
         setPendingHistoryItem((item) => ({
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           type: item?.type as 'gemini' | 'gemini_content',
           text: newGeminiMessageBuffer,
         }));
@@ -744,21 +884,38 @@ export const useGeminiStream = (
         // broken up so that there are more "statically" rendered.
         const beforeText = newGeminiMessageBuffer.substring(0, splitPoint);
         const afterText = newGeminiMessageBuffer.substring(splitPoint);
-        addItem(
-          {
-            type: pendingHistoryItemRef.current?.type as
-              | 'gemini'
-              | 'gemini_content',
-            text: beforeText,
-          },
-          userMessageTimestamp,
-        );
+        if (beforeText.length > 0) {
+          addItem(
+            {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              type: pendingHistoryItemRef.current?.type as
+                | 'gemini'
+                | 'gemini_content',
+              text: beforeText,
+            },
+            userMessageTimestamp,
+          );
+        }
         setPendingHistoryItem({ type: 'gemini_content', text: afterText });
         newGeminiMessageBuffer = afterText;
       }
       return newGeminiMessageBuffer;
     },
     [addItem, pendingHistoryItemRef, setPendingHistoryItem],
+  );
+
+  const handleThoughtEvent = useCallback(
+    (eventValue: ThoughtSummary, _userMessageTimestamp: number) => {
+      setThought(eventValue);
+
+      if (getInlineThinkingMode(settings) === 'full') {
+        addItem({
+          type: 'thinking',
+          thought: eventValue,
+        } as HistoryItemThinking);
+      }
+    },
+    [addItem, settings, setThought],
   );
 
   const handleUserCancelledEvent = useCallback(
@@ -770,12 +927,14 @@ export const useGeminiStream = (
         if (pendingHistoryItemRef.current.type === 'tool_group') {
           const updatedTools = pendingHistoryItemRef.current.tools.map(
             (tool) =>
-              tool.status === ToolCallStatus.Pending ||
-              tool.status === ToolCallStatus.Confirming ||
-              tool.status === ToolCallStatus.Executing
-                ? { ...tool, status: ToolCallStatus.Canceled }
+              tool.status === CoreToolCallStatus.Validating ||
+              tool.status === CoreToolCallStatus.Scheduled ||
+              tool.status === CoreToolCallStatus.AwaitingApproval ||
+              tool.status === CoreToolCallStatus.Executing
+                ? { ...tool, status: CoreToolCallStatus.Cancelled }
                 : tool,
           );
+
           const pendingItem: HistoryItemToolGroup = {
             ...pendingHistoryItemRef.current,
             tools: updatedTools,
@@ -802,6 +961,7 @@ export const useGeminiStream = (
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
       }
+      maybeAddSuppressedToolErrorNote(userMessageTimestamp);
       addItem(
         {
           type: MessageType.ERROR,
@@ -815,9 +975,18 @@ export const useGeminiStream = (
         },
         userMessageTimestamp,
       );
+      maybeAddLowVerbosityFailureNote(userMessageTimestamp);
       setThought(null); // Reset thought when there's an error
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem, config, setThought],
+    [
+      addItem,
+      pendingHistoryItemRef,
+      setPendingHistoryItem,
+      config,
+      setThought,
+      maybeAddSuppressedToolErrorNote,
+      maybeAddLowVerbosityFailureNote,
+    ],
   );
 
   const handleCitationEvent = useCallback(
@@ -866,6 +1035,10 @@ export const useGeminiStream = (
           'Response stopped due to prohibited image content.',
         [FinishReason.NO_IMAGE]:
           'Response stopped because no image was generated.',
+        [FinishReason.IMAGE_RECITATION]:
+          'Response stopped due to image recitation policy.',
+        [FinishReason.IMAGE_OTHER]:
+          'Response stopped due to other image-related reasons.',
       };
 
       const message = finishReasonMessages[finishReason];
@@ -891,16 +1064,27 @@ export const useGeminiStream = (
         addItem(pendingHistoryItemRef.current, userMessageTimestamp);
         setPendingHistoryItem(null);
       }
-      return addItem({
-        type: 'info',
-        text:
-          `IMPORTANT: This conversation exceeded the compress threshold. ` +
-          `A compressed context will be sent for future messages (compressed from: ` +
-          `${eventValue?.originalTokenCount ?? 'unknown'} to ` +
-          `${eventValue?.newTokenCount ?? 'unknown'} tokens).`,
-      });
+
+      const limit = tokenLimit(config.getModel());
+      const originalPercentage = Math.round(
+        ((eventValue?.originalTokenCount ?? 0) / limit) * 100,
+      );
+      const newPercentage = Math.round(
+        ((eventValue?.newTokenCount ?? 0) / limit) * 100,
+      );
+
+      addItem(
+        {
+          type: MessageType.INFO,
+          text: `Context compressed from ${originalPercentage}% to ${newPercentage}%.`,
+          secondaryText: `Change threshold in /settings.`,
+          color: theme.status.warning,
+          marginBottom: 1,
+        } as HistoryItemInfo,
+        userMessageTimestamp,
+      );
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem],
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem, config],
   );
 
   const handleMaxSessionTurnsEvent = useCallback(
@@ -920,12 +1104,12 @@ export const useGeminiStream = (
 
       const limit = tokenLimit(config.getModel());
 
-      const isLessThan75Percent =
+      const isMoreThan25PercentUsed =
         limit > 0 && remainingTokenCount < limit * 0.75;
 
-      let text = `Sending this message (${estimatedRequestTokenCount} tokens) might exceed the remaining context window limit (${remainingTokenCount} tokens).`;
+      let text = `Sending this message (${estimatedRequestTokenCount} tokens) might exceed the context window limit (${remainingTokenCount.toLocaleString()} tokens left).`;
 
-      if (isLessThan75Percent) {
+      if (isMoreThan25PercentUsed) {
         text +=
           ' Please try reducing the size of your message or use the `/compress` command to compress the chat history.';
       }
@@ -976,6 +1160,7 @@ export const useGeminiStream = (
         },
         userMessageTimestamp,
       );
+      maybeAddLowVerbosityFailureNote(userMessageTimestamp);
       if (contextCleared) {
         addItem(
           {
@@ -987,7 +1172,13 @@ export const useGeminiStream = (
       }
       setIsResponding(false);
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem, setIsResponding],
+    [
+      addItem,
+      pendingHistoryItemRef,
+      setPendingHistoryItem,
+      setIsResponding,
+      maybeAddLowVerbosityFailureNote,
+    ],
   );
 
   const handleAgentExecutionBlockedEvent = useCallback(
@@ -1008,6 +1199,7 @@ export const useGeminiStream = (
         },
         userMessageTimestamp,
       );
+      maybeAddLowVerbosityFailureNote(userMessageTimestamp);
       if (contextCleared) {
         addItem(
           {
@@ -1018,7 +1210,12 @@ export const useGeminiStream = (
         );
       }
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem],
+    [
+      addItem,
+      pendingHistoryItemRef,
+      setPendingHistoryItem,
+      maybeAddLowVerbosityFailureNote,
+    ],
   );
 
   const processGeminiStreamEvents = useCallback(
@@ -1030,10 +1227,17 @@ export const useGeminiStream = (
       let geminiMessageBuffer = '';
       const toolCallRequests: ToolCallRequestInfo[] = [];
       for await (const event of stream) {
+        if (
+          event.type !== ServerGeminiEventType.Thought &&
+          thoughtRef.current !== null
+        ) {
+          setThought(null);
+        }
+
         switch (event.type) {
           case ServerGeminiEventType.Thought:
             setLastGeminiActivityTime(Date.now());
-            setThought(event.value);
+            handleThoughtEvent(event.value, userMessageTimestamp);
             break;
           case ServerGeminiEventType.Content:
             setLastGeminiActivityTime(Date.now());
@@ -1120,6 +1324,8 @@ export const useGeminiStream = (
     },
     [
       handleContentEvent,
+      handleThoughtEvent,
+      thoughtRef,
       handleUserCancelledEvent,
       handleErrorEvent,
       scheduleToolCalls,
@@ -1134,6 +1340,7 @@ export const useGeminiStream = (
       addItem,
       pendingHistoryItemRef,
       setPendingHistoryItem,
+      setThought,
     ],
   );
   const submitQuery = useCallback(
@@ -1143,7 +1350,11 @@ export const useGeminiStream = (
       prompt_id?: string,
     ) =>
       runInDevTraceSpan(
-        { name: 'submitQuery' },
+        {
+          operation: options?.isContinuation
+            ? GeminiCliOperation.SystemPrompt
+            : GeminiCliOperation.UserPrompt,
+        },
         async ({ metadata: spanMetadata }) => {
           spanMetadata.input = query;
 
@@ -1162,6 +1373,12 @@ export const useGeminiStream = (
           if (!options?.isContinuation) {
             setModelSwitchedFromQuotaError(false);
             config.setQuotaErrorOccurred(false);
+            config.resetBillingTurnState(
+              settings.merged.billing?.overageStrategy,
+            );
+            suppressedToolErrorCountRef.current = 0;
+            suppressedToolErrorNoteShownRef.current = false;
+            lowVerbosityFailureNoteShownRef.current = false;
           }
 
           abortControllerRef.current = new AbortController();
@@ -1213,6 +1430,9 @@ export const useGeminiStream = (
                 queryToSend,
                 abortSignal,
                 prompt_id!,
+                undefined,
+                false,
+                query,
               );
               const processingStatus = await processGeminiStreamEvents(
                 stream,
@@ -1275,6 +1495,7 @@ export const useGeminiStream = (
               ) {
                 // Error was handled by validation dialog, don't display again
               } else if (!isNodeError(error) || error.name !== 'AbortError') {
+                maybeAddSuppressedToolErrorNote(userMessageTimestamp);
                 addItem(
                   {
                     type: MessageType.ERROR,
@@ -1288,6 +1509,7 @@ export const useGeminiStream = (
                   },
                   userMessageTimestamp,
                 );
+                maybeAddLowVerbosityFailureNote(userMessageTimestamp);
               }
             } finally {
               if (activeQueryIdRef.current === queryId) {
@@ -1311,11 +1533,43 @@ export const useGeminiStream = (
       config,
       startNewPrompt,
       getPromptCount,
+      setThought,
+      maybeAddSuppressedToolErrorNote,
+      maybeAddLowVerbosityFailureNote,
+      settings.merged.billing?.overageStrategy,
     ],
   );
 
   const handleApprovalModeChange = useCallback(
     async (newApprovalMode: ApprovalMode) => {
+      if (
+        previousApprovalModeRef.current === ApprovalMode.PLAN &&
+        newApprovalMode !== ApprovalMode.PLAN &&
+        streamingState === StreamingState.Idle
+      ) {
+        if (geminiClient) {
+          try {
+            await geminiClient.addHistory({
+              role: 'user',
+              parts: [
+                {
+                  text: getPlanModeExitMessage(newApprovalMode, true),
+                },
+              ],
+            });
+          } catch (error) {
+            onDebugMessage(
+              `Failed to notify model of Plan Mode exit: ${getErrorMessage(error)}`,
+            );
+            addItem({
+              type: MessageType.ERROR,
+              text: 'Failed to update the model about exiting Plan Mode. The model might be out of sync. Please consider restarting the session if you see unexpected behavior.',
+            });
+          }
+        }
+      }
+      previousApprovalModeRef.current = newApprovalMode;
+
       // Auto-approve pending tool calls when switching to auto-approval modes
       if (
         newApprovalMode === ApprovalMode.YOLO ||
@@ -1335,13 +1589,15 @@ export const useGeminiStream = (
 
         // Process pending tool calls sequentially to reduce UI chaos
         for (const call of awaitingApprovalCalls) {
-          if (
-            (call.confirmationDetails as ToolCallConfirmationDetails)?.onConfirm
-          ) {
+          if (call.correlationId) {
             try {
-              await (
-                call.confirmationDetails as ToolCallConfirmationDetails
-              ).onConfirm(ToolConfirmationOutcome.ProceedOnce);
+              await config.getMessageBus().publish({
+                type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+                correlationId: call.correlationId,
+                confirmed: true,
+                requiresUserConfirmation: false,
+                outcome: ToolConfirmationOutcome.ProceedOnce,
+              });
             } catch (error) {
               debugLogger.warn(
                 `Failed to auto-approve tool call ${call.request.callId}:`,
@@ -1352,7 +1608,7 @@ export const useGeminiStream = (
         }
       }
     },
-    [toolCalls],
+    [config, toolCalls, geminiClient, streamingState, addItem, onDebugMessage],
   );
 
   const handleCompletedTools = useCallback(
@@ -1395,6 +1651,27 @@ export const useGeminiStream = (
           !processedMemoryToolsRef.current.has(t.request.callId),
       );
 
+      // Handle backgrounded shell tools
+      completedAndReadyToSubmitTools.forEach((t) => {
+        const isShell = t.request.name === 'run_shell_command';
+        // Access result from the tracked tool call response
+        const response = t.response as ToolResponseWithParts;
+        const rawData = response?.data;
+        const data = isShellToolData(rawData) ? rawData : undefined;
+
+        // Use data.pid for shell commands moved to the background.
+        const pid = data?.pid;
+
+        if (isShell && pid) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const command = (data?.['command'] as string) ?? 'shell';
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          const initialOutput = (data?.['initialOutput'] as string) ?? '';
+
+          registerBackgroundShell(pid, command, initialOutput);
+        }
+      });
+
       if (newSuccessfulMemorySaves.length > 0) {
         // Perform the refresh only if there are new ones.
         void performMemoryRefresh();
@@ -1408,6 +1685,13 @@ export const useGeminiStream = (
         (t) => !t.request.isClientInitiated,
       );
 
+      if (isLowErrorVerbosity) {
+        // Low-mode suppression applies only to model-initiated tool failures.
+        suppressedToolErrorCountRef.current += geminiTools.filter(
+          (tc) => tc.status === CoreToolCallStatus.Error,
+        ).length;
+      }
+
       if (geminiTools.length === 0) {
         return;
       }
@@ -1418,10 +1702,12 @@ export const useGeminiStream = (
       );
 
       if (stopExecutionTool && stopExecutionTool.response.error) {
+        maybeAddSuppressedToolErrorNote();
         addItem({
           type: MessageType.INFO,
           text: `Agent execution stopped: ${stopExecutionTool.response.error.message}`,
         });
+        maybeAddLowVerbosityFailureNote();
         setIsResponding(false);
 
         const callIdsToMarkAsSubmitted = geminiTools.map(
@@ -1433,7 +1719,7 @@ export const useGeminiStream = (
 
       // If all the tools were cancelled, don't submit a response to Gemini.
       const allToolsCancelled = geminiTools.every(
-        (tc) => tc.status === 'cancelled',
+        (tc) => tc.status === CoreToolCallStatus.Cancelled,
       );
 
       if (allToolsCancelled) {
@@ -1470,6 +1756,17 @@ export const useGeminiStream = (
       const responsesToSend: Part[] = geminiTools.flatMap(
         (toolCall) => toolCall.response.responseParts,
       );
+
+      if (consumeUserHint) {
+        const userHint = consumeUserHint();
+        if (userHint && userHint.trim().length > 0) {
+          const hintText = userHint.trim();
+          responsesToSend.unshift({
+            text: buildUserSteeringHintPrompt(hintText),
+          });
+        }
+      }
+
       const callIdsToMarkAsSubmitted = geminiTools.map(
         (toolCall) => toolCall.request.callId,
       );
@@ -1501,6 +1798,11 @@ export const useGeminiStream = (
       performMemoryRefresh,
       modelSwitchedFromQuotaError,
       addItem,
+      registerBackgroundShell,
+      consumeUserHint,
+      isLowErrorVerbosity,
+      maybeAddSuppressedToolErrorNote,
+      maybeAddLowVerbosityFailureNote,
     ],
   );
 
@@ -1520,7 +1822,7 @@ export const useGeminiStream = (
       const restorableToolCalls = toolCalls.filter(
         (toolCall) =>
           EDIT_TOOL_NAMES.has(toolCall.request.name) &&
-          toolCall.status === 'awaiting_approval',
+          toolCall.status === CoreToolCallStatus.AwaitingApproval,
       );
 
       if (restorableToolCalls.length > 0) {
@@ -1590,6 +1892,12 @@ export const useGeminiStream = (
     activePtyId,
     loopDetectionConfirmationRequest,
     lastOutputTime,
+    backgroundShellCount,
+    isBackgroundShellVisible,
+    toggleBackgroundShell,
+    backgroundCurrentShell,
+    backgroundShells,
+    dismissBackgroundShell,
     retryStatus,
   };
 };

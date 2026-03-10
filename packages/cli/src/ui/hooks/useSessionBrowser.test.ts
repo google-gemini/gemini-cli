@@ -14,17 +14,28 @@ import {
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { getSessionFiles, type SessionInfo } from '../../utils/sessionUtils.js';
-import type {
-  Config,
-  ConversationRecord,
-  MessageRecord,
+import {
+  type Config,
+  type ConversationRecord,
+  type MessageRecord,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
-import { coreEvents } from '@google/gemini-cli-core';
+import {
+  coreEvents,
+  convertSessionToClientHistory,
+} from '@google/gemini-cli-core';
 
 // Mock modules
 vi.mock('fs/promises');
 vi.mock('path');
-vi.mock('../../utils/sessionUtils.js');
+vi.mock('../../utils/sessionUtils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../../utils/sessionUtils.js')>();
+  return {
+    ...actual,
+    getSessionFiles: vi.fn(),
+  };
+});
 
 const MOCKED_PROJECT_TEMP_DIR = '/test/project/temp';
 const MOCKED_CHATS_DIR = '/test/project/temp/chats';
@@ -149,7 +160,7 @@ describe('convertSessionToHistoryFormats', () => {
   it('should convert empty messages array', () => {
     const result = convertSessionToHistoryFormats([]);
     expect(result.uiHistory).toEqual([]);
-    expect(result.clientHistory).toEqual([]);
+    expect(convertSessionToClientHistory([])).toEqual([]);
   });
 
   it('should convert basic user and model messages', () => {
@@ -167,14 +178,71 @@ describe('convertSessionToHistoryFormats', () => {
       text: 'Hi there',
     });
 
-    expect(result.clientHistory).toHaveLength(2);
-    expect(result.clientHistory[0]).toEqual({
+    const clientHistory = convertSessionToClientHistory(messages);
+    expect(clientHistory).toHaveLength(2);
+    expect(clientHistory[0]).toEqual({
       role: 'user',
       parts: [{ text: 'Hello' }],
     });
-    expect(result.clientHistory[1]).toEqual({
+    expect(clientHistory[1]).toEqual({
       role: 'model',
       parts: [{ text: 'Hi there' }],
+    });
+  });
+
+  it('should convert thinking tokens (thoughts) to thinking history items', () => {
+    const messages: MessageRecord[] = [
+      {
+        type: 'gemini',
+        content: 'Hi there',
+        thoughts: [
+          {
+            subject: 'Thinking...',
+            description: 'I should say hello.',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      } as MessageRecord,
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+
+    expect(result.uiHistory).toHaveLength(2);
+    expect(result.uiHistory[0]).toMatchObject({
+      type: 'thinking',
+      thought: {
+        subject: 'Thinking...',
+        description: 'I should say hello.',
+      },
+    });
+    expect(result.uiHistory[1]).toMatchObject({
+      type: 'gemini',
+      text: 'Hi there',
+    });
+  });
+
+  it('should prioritize displayContent for UI history but use content for client history', () => {
+    const messages: MessageRecord[] = [
+      {
+        type: 'user',
+        content: [{ text: 'Expanded content' }],
+        displayContent: [{ text: 'User input' }],
+      } as MessageRecord,
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+
+    expect(result.uiHistory).toHaveLength(1);
+    expect(result.uiHistory[0]).toMatchObject({
+      type: 'user',
+      text: 'User input',
+    });
+
+    const clientHistory = convertSessionToClientHistory(messages);
+    expect(clientHistory).toHaveLength(1);
+    expect(clientHistory[0]).toEqual({
+      role: 'user',
+      parts: [{ text: 'Expanded content' }],
     });
   });
 
@@ -193,7 +261,7 @@ describe('convertSessionToHistoryFormats', () => {
       text: 'Help text',
     });
 
-    expect(result.clientHistory).toHaveLength(0);
+    expect(convertSessionToClientHistory(messages)).toHaveLength(0);
   });
 
   it('should handle tool calls and responses', () => {
@@ -207,7 +275,7 @@ describe('convertSessionToHistoryFormats', () => {
             id: 'call_1',
             name: 'get_time',
             args: {},
-            status: 'success',
+            status: CoreToolCallStatus.Success,
             result: '12:00',
           },
         ],
@@ -227,17 +295,18 @@ describe('convertSessionToHistoryFormats', () => {
         expect.objectContaining({
           callId: 'call_1',
           name: 'get_time',
-          status: 'Success',
+          status: CoreToolCallStatus.Success,
         }),
       ],
     });
 
-    expect(result.clientHistory).toHaveLength(3); // User, Model (call), User (response)
-    expect(result.clientHistory[0]).toEqual({
+    const clientHistory = convertSessionToClientHistory(messages);
+    expect(clientHistory).toHaveLength(3); // User, Model (call), User (response)
+    expect(clientHistory[0]).toEqual({
       role: 'user',
       parts: [{ text: 'What time is it?' }],
     });
-    expect(result.clientHistory[1]).toEqual({
+    expect(clientHistory[1]).toEqual({
       role: 'model',
       parts: [
         {
@@ -249,7 +318,7 @@ describe('convertSessionToHistoryFormats', () => {
         },
       ],
     });
-    expect(result.clientHistory[2]).toEqual({
+    expect(clientHistory[2]).toEqual({
       role: 'user',
       parts: [
         {

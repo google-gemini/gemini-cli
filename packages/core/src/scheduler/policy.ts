@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { ToolErrorType } from '../tools/tool-error.js';
 import {
   ApprovalMode,
   PolicyDecision,
   type CheckResult,
+  type PolicyRule,
 } from '../policy/types.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -25,6 +27,20 @@ import { EDIT_TOOL_NAMES } from '../tools/tool-names.js';
 import type { ValidatingToolCall } from './types.js';
 
 /**
+ * Helper to format the policy denial error.
+ */
+export function getPolicyDenialError(
+  config: Config,
+  rule?: PolicyRule,
+): { errorMessage: string; errorType: ToolErrorType } {
+  const denyMessage = rule?.denyMessage ? ` ${rule.denyMessage}` : '';
+  return {
+    errorMessage: `Tool execution denied by policy.${denyMessage}`,
+    errorType: ToolErrorType.POLICY_VIOLATION,
+  };
+}
+
+/**
  * Queries the system PolicyEngine to determine tool allowance.
  * @returns The PolicyDecision.
  * @throws Error if policy requires ASK_USER but the CLI is non-interactive.
@@ -38,11 +54,14 @@ export async function checkPolicy(
       ? toolCall.tool.serverName
       : undefined;
 
+  const toolAnnotations = toolCall.tool.toolAnnotations;
+
   const result = await config
     .getPolicyEngine()
     .check(
       { name: toolCall.request.name, args: toolCall.request.args },
       serverName,
+      toolAnnotations,
     );
 
   const { decision } = result;
@@ -61,7 +80,10 @@ export async function checkPolicy(
     }
   }
 
-  return { decision, rule: result.rule };
+  return {
+    decision,
+    rule: result.rule,
+  };
 }
 
 /**

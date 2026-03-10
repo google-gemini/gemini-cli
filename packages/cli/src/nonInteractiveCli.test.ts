@@ -20,6 +20,7 @@ import {
   uiTelemetryService,
   FatalInputError,
   CoreEvent,
+  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import { runNonInteractive } from './nonInteractiveCli.js';
@@ -38,9 +39,9 @@ import type { LoadedSettings } from './config/settings.js';
 // Mock core modules
 vi.mock('./ui/hooks/atCommandProcessor.js');
 
-const mockRegisterActivityLogger = vi.hoisted(() => vi.fn());
-vi.mock('./utils/activityLogger.js', () => ({
-  registerActivityLogger: mockRegisterActivityLogger,
+const mockSetupInitialActivityLogger = vi.hoisted(() => vi.fn());
+vi.mock('./utils/devtoolsService.js', () => ({
+  setupInitialActivityLogger: mockSetupInitialActivityLogger,
 }));
 
 const mockCoreEvents = vi.hoisted(() => ({
@@ -258,14 +259,17 @@ describe('runNonInteractive', () => {
       [{ text: 'Test input' }],
       expect.any(AbortSignal),
       'prompt-id-1',
+      undefined,
+      false,
+      'Test input',
     );
     expect(getWrittenOutput()).toBe('Hello World\n');
     // Note: Telemetry shutdown is now handled in runExitCleanup() in cleanup.ts
     // so we no longer expect shutdownTelemetry to be called directly here
   });
 
-  it('should register activity logger when GEMINI_CLI_ACTIVITY_LOG_FILE is set', async () => {
-    vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_FILE', '/tmp/test.jsonl');
+  it('should register activity logger when GEMINI_CLI_ACTIVITY_LOG_TARGET is set', async () => {
+    vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_TARGET', '/tmp/test.jsonl');
     const events: ServerGeminiStreamEvent[] = [
       {
         type: GeminiEventType.Finished,
@@ -283,12 +287,12 @@ describe('runNonInteractive', () => {
       prompt_id: 'prompt-id-activity-logger',
     });
 
-    expect(mockRegisterActivityLogger).toHaveBeenCalledWith(mockConfig);
+    expect(mockSetupInitialActivityLogger).toHaveBeenCalledWith(mockConfig);
     vi.unstubAllEnvs();
   });
 
-  it('should not register activity logger when GEMINI_CLI_ACTIVITY_LOG_FILE is not set', async () => {
-    vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_FILE', '');
+  it('should not register activity logger when GEMINI_CLI_ACTIVITY_LOG_TARGET is not set', async () => {
+    vi.stubEnv('GEMINI_CLI_ACTIVITY_LOG_TARGET', '');
     const events: ServerGeminiStreamEvent[] = [
       {
         type: GeminiEventType.Finished,
@@ -306,7 +310,7 @@ describe('runNonInteractive', () => {
       prompt_id: 'prompt-id-activity-logger-off',
     });
 
-    expect(mockRegisterActivityLogger).not.toHaveBeenCalled();
+    expect(mockSetupInitialActivityLogger).not.toHaveBeenCalled();
     vi.unstubAllEnvs();
   });
 
@@ -324,7 +328,7 @@ describe('runNonInteractive', () => {
     const toolResponse: Part[] = [{ text: 'Tool response' }];
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: {
           callId: 'tool-1',
           name: 'testTool',
@@ -374,6 +378,9 @@ describe('runNonInteractive', () => {
       [{ text: 'Tool response' }],
       expect.any(AbortSignal),
       'prompt-id-2',
+      undefined,
+      false,
+      undefined,
     );
     expect(getWrittenOutput()).toBe('Final answer\n');
   });
@@ -397,7 +404,7 @@ describe('runNonInteractive', () => {
     // 2. Mock the execution of the tools. We just need them to succeed.
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: toolCallEvent.value, // This is generic enough for both calls
         tool: {} as AnyDeclarativeTool,
         invocation: {} as AnyToolInvocation,
@@ -463,7 +470,7 @@ describe('runNonInteractive', () => {
     };
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'error',
+        status: CoreToolCallStatus.Error,
         request: {
           callId: 'tool-1',
           name: 'errorTool',
@@ -531,6 +538,9 @@ describe('runNonInteractive', () => {
       ],
       expect.any(AbortSignal),
       'prompt-id-3',
+      undefined,
+      false,
+      undefined,
     );
     expect(getWrittenOutput()).toBe('Sorry, let me try again.\n');
   });
@@ -564,7 +574,7 @@ describe('runNonInteractive', () => {
     };
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'error',
+        status: CoreToolCallStatus.Error,
         request: {
           callId: 'tool-1',
           name: 'nonexistentTool',
@@ -670,6 +680,9 @@ describe('runNonInteractive', () => {
       processedParts,
       expect.any(AbortSignal),
       'prompt-id-7',
+      undefined,
+      false,
+      rawInput,
     );
 
     // 6. Assert the final output is correct
@@ -703,6 +716,9 @@ describe('runNonInteractive', () => {
       [{ text: 'Test input' }],
       expect.any(AbortSignal),
       'prompt-id-1',
+      undefined,
+      false,
+      'Test input',
     );
     expect(processStdoutSpy).toHaveBeenCalledWith(
       JSON.stringify(
@@ -733,7 +749,7 @@ describe('runNonInteractive', () => {
     const toolResponse: Part[] = [{ text: 'Tool executed successfully' }];
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: {
           callId: 'tool-1',
           name: 'testTool',
@@ -833,6 +849,9 @@ describe('runNonInteractive', () => {
       [{ text: 'Empty response test' }],
       expect.any(AbortSignal),
       'prompt-id-empty',
+      undefined,
+      false,
+      'Empty response test',
     );
 
     // This should output JSON with empty response but include stats
@@ -967,6 +986,9 @@ describe('runNonInteractive', () => {
       [{ text: 'Prompt from command' }],
       expect.any(AbortSignal),
       'prompt-id-slash',
+      undefined,
+      false,
+      '/testcommand',
     );
 
     expect(getWrittenOutput()).toBe('Response from command\n');
@@ -1010,6 +1032,9 @@ describe('runNonInteractive', () => {
       [{ text: 'Slash command output' }],
       expect.any(AbortSignal),
       'prompt-id-slash',
+      undefined,
+      false,
+      '/help',
     );
     expect(getWrittenOutput()).toBe('Response to slash command\n');
     handleSlashCommandSpy.mockRestore();
@@ -1184,6 +1209,9 @@ describe('runNonInteractive', () => {
       [{ text: '/unknowncommand' }],
       expect.any(AbortSignal),
       'prompt-id-unknown',
+      undefined,
+      false,
+      '/unknowncommand',
     );
 
     expect(getWrittenOutput()).toBe('Response to unknown\n');
@@ -1317,7 +1345,7 @@ describe('runNonInteractive', () => {
     const toolResponse: Part[] = [{ text: 'file.txt' }];
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: {
           callId: 'tool-shell-1',
           name: 'ShellTool',
@@ -1516,7 +1544,7 @@ describe('runNonInteractive', () => {
 
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: toolCallEvent.value,
         tool: {} as AnyDeclarativeTool,
         invocation: {} as AnyToolInvocation,
@@ -1708,7 +1736,7 @@ describe('runNonInteractive', () => {
     };
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         request: toolCallEvent.value,
         tool: {} as AnyDeclarativeTool,
         invocation: {} as AnyToolInvocation,
@@ -1791,7 +1819,7 @@ describe('runNonInteractive', () => {
     // Mock tool execution returning STOP_EXECUTION
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'error',
+        status: CoreToolCallStatus.Error,
         request: toolCallEvent.value,
         tool: {} as AnyDeclarativeTool,
         invocation: {} as AnyToolInvocation,
@@ -1853,7 +1881,7 @@ describe('runNonInteractive', () => {
 
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'error',
+        status: CoreToolCallStatus.Error,
         request: toolCallEvent.value,
         tool: {} as AnyDeclarativeTool,
         invocation: {} as AnyToolInvocation,
@@ -1917,7 +1945,7 @@ describe('runNonInteractive', () => {
 
     mockSchedulerSchedule.mockResolvedValue([
       {
-        status: 'error',
+        status: CoreToolCallStatus.Error,
         request: toolCallEvent.value,
         tool: {} as AnyDeclarativeTool,
         invocation: {} as AnyToolInvocation,
@@ -2160,7 +2188,7 @@ describe('runNonInteractive', () => {
       // Mock the scheduler to return a cancelled status
       mockSchedulerSchedule.mockResolvedValue([
         {
-          status: 'cancelled',
+          status: CoreToolCallStatus.Cancelled,
           request: toolCallEvent.value,
           tool: {} as AnyDeclarativeTool,
           invocation: {} as AnyToolInvocation,

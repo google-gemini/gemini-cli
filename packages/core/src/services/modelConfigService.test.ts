@@ -5,11 +5,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import type {
-  ModelConfigAlias,
-  ModelConfigServiceConfig,
+import {
+  ModelConfigService,
+  type ModelConfigAlias,
+  type ModelConfigServiceConfig,
 } from './modelConfigService.js';
-import { ModelConfigService } from './modelConfigService.js';
 
 describe('ModelConfigService', () => {
   it('should resolve a basic alias to its model and settings', () => {
@@ -726,6 +726,71 @@ describe('ModelConfigService', () => {
       expect(resolved.generateContentConfig).toEqual({
         temperature: 0.1,
       });
+    });
+  });
+
+  describe('fallback behavior', () => {
+    it('should fallback to chat-base if the requested model is completely unknown', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {
+          'chat-base': {
+            modelConfig: {
+              model: 'default-fallback-model',
+              generateContentConfig: {
+                temperature: 0.99,
+              },
+            },
+          },
+        },
+      };
+      const service = new ModelConfigService(config);
+      const resolved = service.getResolvedConfig({
+        model: 'my-custom-model',
+        isChatModel: true,
+      });
+
+      // It preserves the requested model name, but inherits the config from chat-base
+      expect(resolved.model).toBe('my-custom-model');
+      expect(resolved.generateContentConfig).toEqual({
+        temperature: 0.99,
+      });
+    });
+
+    it('should return empty config if requested model is unknown and chat-base is not defined', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {},
+      };
+      const service = new ModelConfigService(config);
+      const resolved = service.getResolvedConfig({
+        model: 'my-custom-model',
+        isChatModel: true,
+      });
+
+      expect(resolved.model).toBe('my-custom-model');
+      expect(resolved.generateContentConfig).toEqual({});
+    });
+
+    it('should NOT fallback to chat-base if the requested model is completely unknown but isChatModel is false', () => {
+      const config: ModelConfigServiceConfig = {
+        aliases: {
+          'chat-base': {
+            modelConfig: {
+              model: 'default-fallback-model',
+              generateContentConfig: {
+                temperature: 0.99,
+              },
+            },
+          },
+        },
+      };
+      const service = new ModelConfigService(config);
+      const resolved = service.getResolvedConfig({
+        model: 'my-custom-model',
+        isChatModel: false,
+      });
+
+      expect(resolved.model).toBe('my-custom-model');
+      expect(resolved.generateContentConfig).toEqual({});
     });
   });
 

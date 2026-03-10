@@ -55,6 +55,17 @@ export function isBinary(
 }
 
 /**
+ * Detects the line ending style of a string.
+ * @param content The string content to analyze.
+ * @returns '\r\n' for Windows-style, '\n' for Unix-style.
+ */
+export function detectLineEnding(content: string): '\r\n' | '\n' {
+  // If a Carriage Return is found, assume Windows-style endings.
+  // This is a simple but effective heuristic.
+  return content.includes('\r\n') ? '\r\n' : '\n';
+}
+
+/**
  * Truncates a string to a maximum length, appending a suffix if truncated.
  * @param str The string to truncate.
  * @param maxLength The maximum length of the string.
@@ -70,4 +81,25 @@ export function truncateString(
     return str;
   }
   return str.slice(0, maxLength) + suffix;
+}
+
+/**
+ * Safely replaces placeholders in a template string with values from a replacements object.
+ * This performs a single-pass replacement to prevent double-interpolation attacks.
+ *
+ * @param template The template string containing {{key}} placeholders.
+ * @param replacements A record of keys to their replacement values.
+ * @returns The resulting string with placeholders replaced.
+ */
+export function safeTemplateReplace(
+  template: string,
+  replacements: Record<string, string>,
+): string {
+  // Regex to match {{key}} in the template string. The regex enforces string naming rules.
+  const placeHolderRegex = /\{\{(\w+)\}\}/g;
+  return template.replace(placeHolderRegex, (match, key) =>
+    Object.prototype.hasOwnProperty.call(replacements, key)
+      ? replacements[key]
+      : match,
+  );
 }

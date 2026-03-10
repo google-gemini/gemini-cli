@@ -1,18 +1,18 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`ToolConfirmationMessage Overflow > should display "press ctrl-o" hint when content overflows in ToolGroupMessage 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────────╮
-│ ?  test-tool a test tool                                                   ← │
-│                                                                              │
-│ ... first 49 lines hidden ...                                                │
-│ 50  line 50                                                                  │
-│ Apply this change?                                                           │
-│                                                                              │
-│ ● 1. Allow once                                                              │
-│   2. Allow for this session                                                  │
-│   3. Modify with external editor                                             │
-│   4. No, suggest changes (esc)                                               │
-│                                                                              │
-╰──────────────────────────────────────────────────────────────────────────────╯
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ ?  test-tool a test tool                                               ← │
+│                                                                          │
+│ ... first 49 lines hidden ...                                            │
+│ 50  line 50                                                              │
+│ Apply this change?                                                       │
+│                                                                          │
+│ ● 1. Allow once                                                          │
+│   2. Allow for this session                                              │
+│   3. Modify with external editor                                         │
+│   4. No, suggest changes (esc)                                           │
+│                                                                          │
+╰──────────────────────────────────────────────────────────────────────────╯
  Press ctrl-o to show more lines"
 `;

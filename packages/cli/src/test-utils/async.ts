@@ -5,6 +5,7 @@
  */
 
 import { act } from 'react';
+import { vi } from 'vitest';
 
 // The waitFor from vitest doesn't properly wrap in act(), so we have to
 // implement our own like the one in @testing-library/react
@@ -12,14 +13,14 @@ import { act } from 'react';
 // The version of waitFor from vitest is still fine to use if you aren't waiting
 // for React state updates.
 export async function waitFor(
-  assertion: () => void,
-  { timeout = 1000, interval = 50 } = {},
+  assertion: () => void | Promise<void>,
+  { timeout = 2000, interval = 50 } = {},
 ): Promise<void> {
   const startTime = Date.now();
 
   while (true) {
     try {
-      assertion();
+      await assertion();
       return;
     } catch (error) {
       if (Date.now() - startTime > timeout) {
@@ -27,7 +28,11 @@ export async function waitFor(
       }
 
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, interval));
+        if (vi.isFakeTimers()) {
+          await vi.advanceTimersByTimeAsync(interval);
+        } else {
+          await new Promise((resolve) => setTimeout(resolve, interval));
+        }
       });
     }
   }

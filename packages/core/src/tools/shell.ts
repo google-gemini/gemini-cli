@@ -6,32 +6,31 @@
 
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
-import os, { EOL } from 'node:os';
+import os from 'node:os';
 import crypto from 'node:crypto';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../index.js';
 import { ToolErrorType } from './tool-error.js';
-import type {
-  ToolInvocation,
-  ToolResult,
-  ToolCallConfirmationDetails,
-  ToolExecuteConfirmationDetails,
-} from './tools.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
   ToolConfirmationOutcome,
   Kind,
+  type ToolInvocation,
+  type ToolResult,
+  type ToolCallConfirmationDetails,
+  type ToolExecuteConfirmationDetails,
   type PolicyUpdateOptions,
+  type ToolLiveOutput,
 } from './tools.js';
 
 import { getErrorMessage } from '../utils/errors.js';
 import { summarizeToolOutput } from '../utils/summarizer.js';
-import type {
-  ShellExecutionConfig,
-  ShellOutputEvent,
+import {
+  ShellExecutionService,
+  type ShellExecutionConfig,
+  type ShellOutputEvent,
 } from '../services/shellExecutionService.js';
-import { ShellExecutionService } from '../services/shellExecutionService.js';
 import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
@@ -43,13 +42,19 @@ import {
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { getShellDefinition } from './definitions/coreTools.js';
+import { resolveToolDeclaration } from './definitions/resolver.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
+
+// Delay so user does not see the output of the process before the process is moved to the background.
+const BACKGROUND_DELAY_MS = 200;
 
 export interface ShellToolParams {
   command: string;
   description?: string;
   dir_path?: string;
+  is_background?: boolean;
 }
 
 export class ShellToolInvocation extends BaseToolInvocation<
@@ -78,6 +83,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
     // append optional (description), replacing any line breaks with spaces
     if (this.params.description) {
       description += ` (${this.params.description.replace(/\n/g, ' ')})`;
+    }
+    if (this.params.is_background) {
+      description += ' [background]';
     }
     return description;
   }
@@ -131,8 +139,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
       command: this.params.command,
       rootCommand: rootCommandDisplay,
       rootCommands,
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        await this.publishPolicyUpdate(outcome);
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // Policy updates are now handled centrally by the scheduler
       },
     };
     return confirmationDetails;
@@ -140,7 +148,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
   async execute(
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
     setPidCallback?: (pid: number) => void,
   ): Promise<ToolResult> {
@@ -249,12 +257,14 @@ export class ShellToolInvocation extends BaseToolInvocation<
                   shouldUpdate = true;
                 }
                 break;
+              case 'exit':
+                break;
               default: {
                 throw new Error('An unhandled ShellOutputEvent was found.');
               }
             }
 
-            if (shouldUpdate) {
+            if (shouldUpdate && !this.params.is_background) {
               updateOutput(cumulativeOutput);
               lastUpdateTime = Date.now();
             }
@@ -270,8 +280,17 @@ export class ShellToolInvocation extends BaseToolInvocation<
           },
         );
 
-      if (pid && setPidCallback) {
-        setPidCallback(pid);
+      if (pid) {
+        if (setPidCallback) {
+          setPidCallback(pid);
+        }
+
+        // If the model requested to run in the background, do so after a short delay.
+        if (this.params.is_background) {
+          setTimeout(() => {
+            ShellExecutionService.background(pid);
+          }, BACKGROUND_DELAY_MS);
+        }
       }
 
       const result = await resultPromise;
@@ -288,7 +307,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
         if (tempFileExists) {
           const pgrepContent = await fsPromises.readFile(tempFilePath, 'utf8');
-          const pgrepLines = pgrepContent.split(EOL).filter(Boolean);
+          const pgrepLines = pgrepContent.split(os.EOL).filter(Boolean);
           for (const line of pgrepLines) {
             if (!/^\d+$/.test(line)) {
               debugLogger.error(`pgrep: ${line}`);
@@ -299,11 +318,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
             }
           }
         } else {
-          if (!signal.aborted) {
+          if (!signal.aborted && !result.backgrounded) {
             debugLogger.error('missing pgrep output');
           }
         }
       }
+
+      let data: Record<string, unknown> | undefined;
 
       let llmContent = '';
       let timeoutMessage = '';
@@ -322,6 +343,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
         } else {
           llmContent += ' There was no output before it was cancelled.';
         }
+      } else if (this.params.is_background || result.backgrounded) {
+        llmContent = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
+        data = {
+          pid: result.pid,
+          command: this.params.command,
+          initialOutput: result.output,
+        };
       } else {
         // Create a formatted error string for display, replacing the wrapper command
         // with the user-facing command.
@@ -356,16 +384,19 @@ export class ShellToolInvocation extends BaseToolInvocation<
       if (this.config.getDebugMode()) {
         returnDisplayMessage = llmContent;
       } else {
-        if (result.output.trim()) {
+        if (this.params.is_background || result.backgrounded) {
+          returnDisplayMessage = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
+        } else if (result.aborted) {
+          const cancelMsg = timeoutMessage || 'Command cancelled by user.';
+          if (result.output.trim()) {
+            returnDisplayMessage = `${cancelMsg}\n\nOutput before cancellation:\n${result.output}`;
+          } else {
+            returnDisplayMessage = cancelMsg;
+          }
+        } else if (result.output.trim()) {
           returnDisplayMessage = result.output;
         } else {
-          if (result.aborted) {
-            if (timeoutMessage) {
-              returnDisplayMessage = timeoutMessage;
-            } else {
-              returnDisplayMessage = 'Command cancelled by user.';
-            }
-          } else if (result.signal) {
+          if (result.signal) {
             returnDisplayMessage = `Command terminated by signal: ${result.signal}`;
           } else if (result.error) {
             returnDisplayMessage = `Command failed: ${getErrorMessage(
@@ -406,6 +437,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
       return {
         llmContent,
         returnDisplay: returnDisplayMessage,
+        data,
         ...executionError,
       };
     } finally {
@@ -418,33 +450,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
         // Ignore errors during unlink
       }
     }
-  }
-}
-
-function getShellToolDescription(): string {
-  const returnedInfo = `
-
-      The following information is returned:
-
-      Output: Combined stdout/stderr. Can be \`(empty)\` or partial on error and for any unwaited background processes.
-      Exit Code: Only included if non-zero (command failed).
-      Error: Only included if a process-level error occurred (e.g., spawn failure).
-      Signal: Only included if process was terminated by a signal.
-      Background PIDs: Only included if background processes were started.
-      Process Group PGID: Only included if available.`;
-
-  if (os.platform() === 'win32') {
-    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. Command can start background processes using PowerShell constructs such as \`Start-Process -NoNewWindow\` or \`Start-Job\`.${returnedInfo}`;
-  } else {
-    return `This tool executes a given shell command as \`bash -c <command>\`. Command can start background processes using \`&\`. Command is executed as a subprocess that leads its own process group. Command process group can be terminated as \`kill -- -PGID\` or signaled as \`kill -s SIGNAL -- -PGID\`.${returnedInfo}`;
-  }
-}
-
-function getCommandDescription(): string {
-  if (os.platform() === 'win32') {
-    return 'Exact command to execute as `powershell.exe -NoProfile -Command <command>`';
-  } else {
-    return 'Exact bash command to execute as `bash -c <command>`';
   }
 }
 
@@ -461,31 +466,16 @@ export class ShellTool extends BaseDeclarativeTool<
     void initializeShellParsers().catch(() => {
       // Errors are surfaced when parsing commands.
     });
+    const definition = getShellDefinition(
+      config.getEnableInteractiveShell(),
+      config.getEnableShellOutputEfficiency(),
+    );
     super(
       ShellTool.Name,
       'Shell',
-      getShellToolDescription(),
+      definition.base.description!,
       Kind.Execute,
-      {
-        type: 'object',
-        properties: {
-          command: {
-            type: 'string',
-            description: getCommandDescription(),
-          },
-          description: {
-            type: 'string',
-            description:
-              'Brief description of the command for the user. Be specific and concise. Ideally a single sentence. Can be up to 3 sentences for clarity. No line breaks.',
-          },
-          dir_path: {
-            type: 'string',
-            description:
-              '(OPTIONAL) The path of the directory to run the command in. If not provided, the project root directory is used. Must be a directory within the workspace and must already exist.',
-          },
-        },
-        required: ['command'],
-      },
+      definition.base.parametersJsonSchema,
       messageBus,
       false, // output is not markdown
       true, // output can be updated
@@ -522,5 +512,13 @@ export class ShellTool extends BaseDeclarativeTool<
       _toolName,
       _toolDisplayName,
     );
+  }
+
+  override getSchema(modelId?: string) {
+    const definition = getShellDefinition(
+      this.config.getEnableInteractiveShell(),
+      this.config.getEnableShellOutputEfficiency(),
+    );
+    return resolveToolDeclaration(definition, modelId);
   }
 }

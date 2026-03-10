@@ -97,10 +97,12 @@ export class OAuthUtils {
     resourceMetadataUrl: string,
   ): Promise<OAuthProtectedResourceMetadata | null> {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
       const response = await fetch(resourceMetadataUrl);
       if (!response.ok) {
         return null;
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return (await response.json()) as OAuthProtectedResourceMetadata;
     } catch (error) {
       debugLogger.debug(
@@ -120,10 +122,12 @@ export class OAuthUtils {
     authServerMetadataUrl: string,
   ): Promise<OAuthAuthorizationServerMetadata | null> {
     try {
+      // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
       const response = await fetch(authServerMetadataUrl);
       if (!response.ok) {
         return null;
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return (await response.json()) as OAuthAuthorizationServerMetadata;
     } catch (error) {
       debugLogger.debug(
@@ -144,6 +148,7 @@ export class OAuthUtils {
   ): MCPOAuthConfig {
     return {
       authorizationUrl: metadata.authorization_endpoint,
+      issuer: metadata.issuer,
       tokenUrl: metadata.token_endpoint,
       scopes: metadata.scopes_supported || [],
       registrationUrl: metadata.registration_endpoint,
@@ -406,6 +411,7 @@ export class OAuthUtils {
    */
   static parseTokenExpiry(idToken: string): number | undefined {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const payload = JSON.parse(
         Buffer.from(idToken.split('.')[1], 'base64').toString(),
       );

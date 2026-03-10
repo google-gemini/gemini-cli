@@ -7,7 +7,6 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { hooksCommand } from './hooksCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
-import { MessageType } from '../types.js';
 import type { HookRegistryEntry } from '@google/gemini-cli-core';
 import { HookType, HookEventName, ConfigSource } from '@google/gemini-cli-core';
 import type { CommandContext } from './types.js';
@@ -29,9 +28,6 @@ describe('hooksCommand', () => {
     merged: {
       hooksConfig?: {
         disabled?: string[];
-      };
-      tools?: {
-        enableHooks?: boolean;
       };
     };
     setValue: ReturnType<typeof vi.fn>;
@@ -130,13 +126,10 @@ describe('hooksCommand', () => {
         createMockHook('test-hook', HookEventName.BeforeTool, true),
       ]);
 
-      await hooksCommand.action(mockContext, '');
+      const result = await hooksCommand.action(mockContext, '');
 
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.HOOKS_LIST,
-        }),
-      );
+      expect(result).toHaveProperty('type', 'custom_dialog');
+      expect(result).toHaveProperty('component');
     });
   });
 
@@ -164,7 +157,7 @@ describe('hooksCommand', () => {
       });
     });
 
-    it('should display panel even when hook system is not enabled', async () => {
+    it('should return custom_dialog even when hook system is not enabled', async () => {
       mockConfig.getHookSystem.mockReturnValue(null);
 
       const panelCmd = hooksCommand.subCommands!.find(
@@ -174,21 +167,17 @@ describe('hooksCommand', () => {
         throw new Error('panel command must have an action');
       }
 
-      await panelCmd.action(mockContext, '');
+      const result = await panelCmd.action(mockContext, '');
 
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.HOOKS_LIST,
-          hooks: [],
-        }),
-      );
+      expect(result).toHaveProperty('type', 'custom_dialog');
+      expect(result).toHaveProperty('component');
     });
 
-    it('should display panel when no hooks are configured', async () => {
+    it('should return custom_dialog when no hooks are configured', async () => {
       mockHookSystem.getAllHooks.mockReturnValue([]);
       (mockContext.services.settings.merged as Record<string, unknown>)[
-        'tools'
-      ] = { enableHooks: true };
+        'hooksConfig'
+      ] = { enabled: true };
 
       const panelCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'panel',
@@ -197,17 +186,13 @@ describe('hooksCommand', () => {
         throw new Error('panel command must have an action');
       }
 
-      await panelCmd.action(mockContext, '');
+      const result = await panelCmd.action(mockContext, '');
 
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.HOOKS_LIST,
-          hooks: [],
-        }),
-      );
+      expect(result).toHaveProperty('type', 'custom_dialog');
+      expect(result).toHaveProperty('component');
     });
 
-    it('should display hooks list when hooks are configured', async () => {
+    it('should return custom_dialog when hooks are configured', async () => {
       const mockHooks: HookRegistryEntry[] = [
         createMockHook('echo-test', HookEventName.BeforeTool, true),
         createMockHook('notify', HookEventName.AfterAgent, false),
@@ -215,8 +200,8 @@ describe('hooksCommand', () => {
 
       mockHookSystem.getAllHooks.mockReturnValue(mockHooks);
       (mockContext.services.settings.merged as Record<string, unknown>)[
-        'tools'
-      ] = { enableHooks: true };
+        'hooksConfig'
+      ] = { enabled: true };
 
       const panelCmd = hooksCommand.subCommands!.find(
         (cmd) => cmd.name === 'panel',
@@ -225,14 +210,10 @@ describe('hooksCommand', () => {
         throw new Error('panel command must have an action');
       }
 
-      await panelCmd.action(mockContext, '');
+      const result = await panelCmd.action(mockContext, '');
 
-      expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageType.HOOKS_LIST,
-          hooks: mockHooks,
-        }),
-      );
+      expect(result).toHaveProperty('type', 'custom_dialog');
+      expect(result).toHaveProperty('component');
     });
   });
 

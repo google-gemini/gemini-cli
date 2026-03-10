@@ -4,18 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  Config,
-  ConversationRecord,
-  MessageRecord,
-} from '@google/gemini-cli-core';
 import {
+  checkExhaustive,
   partListUnionToString,
   SESSION_FILE_PREFIX,
   SessionEndReason,
   SessionStartSource,
   flushTelemetry,
   uiTelemetryService,
+  CoreToolCallStatus,
+  type Config,
+  type ConversationRecord,
+  type MessageRecord,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
@@ -23,6 +23,7 @@ import { stripUnsafeCharacters } from '../ui/utils/textUtils.js';
 import type { CommandContext } from '../ui/commands/types.js';
 import { randomUUID } from 'node:crypto';
 import { MessageType } from '../ui/types.js';
+import { MessageType, type HistoryItemWithoutId } from '../ui/types.js';
 
 /**
  * Constant for the resume "latest" identifier.
@@ -259,6 +260,7 @@ export const getAllSessionFiles = async (
       async (file): Promise<SessionFileEntry> => {
         const filePath = path.join(chatsDir, file);
         try {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const content: ConversationRecord = JSON.parse(
             await fs.readFile(filePath, 'utf8'),
           );
@@ -277,6 +279,12 @@ export const getAllSessionFiles = async (
 
           // Skip sessions that only contain system messages (info, error, warning)
           if (!hasUserOrAssistantMessage(content.messages)) {
+            return { fileName: file, sessionInfo: null };
+          }
+
+          // Skip subagent sessions - these are implementation details of a tool call
+          // and shouldn't be surfaced for resumption in the main agent history.
+          if (content.kind === 'subagent') {
             return { fileName: file, sessionInfo: null };
           }
 
@@ -462,7 +470,7 @@ export class SessionSelector {
       const sessions = await this.listSessions();
 
       if (sessions.length === 0) {
-        throw new Error('No previous sessions found for this project.');
+        throw SessionError.noSessionsFound();
       }
 
       // Sort by startTime (oldest first, so newest sessions get highest numbers)
@@ -503,6 +511,7 @@ export class SessionSelector {
     const sessionPath = path.join(chatsDir, sessionInfo.fileName);
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const sessionData: ConversationRecord = JSON.parse(
         await fs.readFile(sessionPath, 'utf8'),
       );
@@ -522,7 +531,7 @@ export class SessionSelector {
   }
 }
 
-/**
+/*
  * Creates a new chat session by resetting the client, generating a new session ID,
  * and firing the appropriate hooks.
  *
@@ -595,4 +604,94 @@ export async function createNewSession(
       Date.now(),
     );
   }
+}
+ /* 
+ Converts session/conversation data into UI history format.
+ */
+export function convertSessionToHistoryFormats(
+  messages: ConversationRecord['messages'],
+): {
+  uiHistory: HistoryItemWithoutId[];
+} {
+  const uiHistory: HistoryItemWithoutId[] = [];
+
+  for (const msg of messages) {
+    // Add thoughts if present
+    if (msg.type === 'gemini' && msg.thoughts && msg.thoughts.length > 0) {
+      for (const thought of msg.thoughts) {
+        uiHistory.push({
+          type: 'thinking',
+          thought: {
+            subject: thought.subject,
+            description: thought.description,
+          },
+        });
+      }
+    }
+
+    // Add the message only if it has content
+    const displayContentString = msg.displayContent
+      ? partListUnionToString(msg.displayContent)
+      : undefined;
+    const contentString = partListUnionToString(msg.content);
+    const uiText = displayContentString || contentString;
+
+    if (uiText.trim()) {
+      let messageType: MessageType;
+      switch (msg.type) {
+        case 'user':
+          messageType = MessageType.USER;
+          break;
+        case 'info':
+          messageType = MessageType.INFO;
+          break;
+        case 'error':
+          messageType = MessageType.ERROR;
+          break;
+        case 'warning':
+          messageType = MessageType.WARNING;
+          break;
+        case 'gemini':
+          messageType = MessageType.GEMINI;
+          break;
+        default:
+          checkExhaustive(msg);
+          messageType = MessageType.GEMINI;
+          break;
+      }
+
+      uiHistory.push({
+        type: messageType,
+        text: uiText,
+      });
+    }
+
+    // Add tool calls if present
+    if (
+      msg.type !== 'user' &&
+      'toolCalls' in msg &&
+      msg.toolCalls &&
+      msg.toolCalls.length > 0
+    ) {
+      uiHistory.push({
+        type: 'tool_group',
+        tools: msg.toolCalls.map((tool) => ({
+          callId: tool.id,
+          name: tool.displayName || tool.name,
+          description: tool.description || '',
+          renderOutputAsMarkdown: tool.renderOutputAsMarkdown ?? true,
+          status:
+            tool.status === 'success'
+              ? CoreToolCallStatus.Success
+              : CoreToolCallStatus.Error,
+          resultDisplay: tool.resultDisplay,
+          confirmationDetails: undefined,
+        })),
+      });
+    }
+  }
+
+  return {
+    uiHistory,
+  };
 }

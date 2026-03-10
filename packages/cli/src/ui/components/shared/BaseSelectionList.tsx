@@ -33,6 +33,7 @@ export interface BaseSelectionListProps<
   wrapAround?: boolean;
   focusKey?: string;
   priority?: boolean;
+  selectedIndicator?: string;
   renderItem: (item: TItem, context: RenderItemContext) => React.ReactNode;
 }
 
@@ -65,6 +66,7 @@ export function BaseSelectionList<
   wrapAround = true,
   focusKey,
   priority,
+  selectedIndicator = '●',
   renderItem,
 }: BaseSelectionListProps<T, TItem>): React.JSX.Element {
   const { activeIndex } = useSelectionList({
@@ -100,7 +102,7 @@ export function BaseSelectionList<
   return (
     <Box flexDirection="column">
       {/* Use conditional coloring instead of conditional rendering */}
-      {showScrollArrows && (
+      {showScrollArrows && items.length > maxItemsToShow && (
         <Text
           color={scrollOffset > 0 ? theme.text.primary : theme.text.secondary}
         >
@@ -117,8 +119,8 @@ export function BaseSelectionList<
         let numberColor = theme.text.primary;
 
         if (isSelected) {
-          titleColor = theme.status.success;
-          numberColor = theme.status.success;
+          titleColor = theme.ui.focus;
+          numberColor = theme.ui.focus;
         } else if (item.disabled) {
           titleColor = theme.text.secondary;
           numberColor = theme.text.secondary;
@@ -137,14 +139,18 @@ export function BaseSelectionList<
         )}.`;
 
         return (
-          <Box key={item.key} alignItems="flex-start">
+          <Box
+            key={item.key}
+            alignItems="flex-start"
+            backgroundColor={isSelected ? theme.background.focus : undefined}
+          >
             {/* Radio button indicator */}
             <Box minWidth={2} flexShrink={0}>
               <Text
-                color={isSelected ? theme.status.success : theme.text.primary}
+                color={isSelected ? theme.ui.focus : theme.text.primary}
                 aria-hidden
               >
-                {isSelected ? '●' : ' '}
+                {isSelected ? selectedIndicator : ' '}
               </Text>
             </Box>
 
@@ -172,7 +178,7 @@ export function BaseSelectionList<
         );
       })}
 
-      {showScrollArrows && (
+      {showScrollArrows && items.length > maxItemsToShow && (
         <Text
           color={
             scrollOffset + maxItemsToShow < items.length

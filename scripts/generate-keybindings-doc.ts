@@ -8,12 +8,12 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readFile, writeFile } from 'node:fs/promises';
 
-import type { KeyBinding } from '../packages/cli/src/config/keyBindings.js';
+import type { KeyBinding } from '../packages/cli/src/ui/key/keyBindings.js';
 import {
   commandCategories,
   commandDescriptions,
   defaultKeyBindings,
-} from '../packages/cli/src/config/keyBindings.js';
+} from '../packages/cli/src/ui/key/keyBindings.js';
 import {
   formatWithPrettier,
   injectBetweenMarkers,
@@ -22,38 +22,9 @@ import {
 
 const START_MARKER = '<!-- KEYBINDINGS-AUTOGEN:START -->';
 const END_MARKER = '<!-- KEYBINDINGS-AUTOGEN:END -->';
-const OUTPUT_RELATIVE_PATH = ['docs', 'cli', 'keyboard-shortcuts.md'];
+const OUTPUT_RELATIVE_PATH = ['docs', 'reference', 'keyboard-shortcuts.md'];
 
-const KEY_NAME_OVERRIDES: Record<string, string> = {
-  return: 'Enter',
-  escape: 'Esc',
-  'double escape': 'Double Esc',
-  tab: 'Tab',
-  backspace: 'Backspace',
-  delete: 'Delete',
-  up: 'Up Arrow',
-  down: 'Down Arrow',
-  left: 'Left Arrow',
-  right: 'Right Arrow',
-  home: 'Home',
-  end: 'End',
-  pageup: 'Page Up',
-  pagedown: 'Page Down',
-  clear: 'Clear',
-  insert: 'Insert',
-  f1: 'F1',
-  f2: 'F2',
-  f3: 'F3',
-  f4: 'F4',
-  f5: 'F5',
-  f6: 'F6',
-  f7: 'F7',
-  f8: 'F8',
-  f9: 'F9',
-  f10: 'F10',
-  f11: 'F11',
-  f12: 'F12',
-};
+import { formatKeyBinding } from '../packages/cli/src/ui/key/keybindingUtils.js';
 
 export interface KeybindingDocCommand {
   description: string;
@@ -143,50 +114,14 @@ function formatBindings(bindings: readonly KeyBinding[]): string[] {
   const results: string[] = [];
 
   for (const binding of bindings) {
-    const label = formatBinding(binding);
+    const label = formatKeyBinding(binding, 'default');
     if (label && !seen.has(label)) {
       seen.add(label);
-      results.push(label);
+      results.push(`\`${label}\``);
     }
   }
 
   return results;
-}
-
-function formatBinding(binding: KeyBinding): string {
-  const modifiers: string[] = [];
-  if (binding.shift) modifiers.push('Shift');
-  if (binding.alt) modifiers.push('Alt');
-  if (binding.ctrl) modifiers.push('Ctrl');
-  if (binding.cmd) modifiers.push('Cmd');
-
-  const keyName = formatKeyName(binding.key);
-  if (!keyName) {
-    return '';
-  }
-
-  const segments = [...modifiers, keyName].filter(Boolean);
-  let combo = segments.join(' + ');
-
-  const restrictions: string[] = [];
-  if (binding.shift === false) restrictions.push('Shift');
-  if (binding.alt === false) restrictions.push('Alt');
-  if (binding.ctrl === false) restrictions.push('Ctrl');
-  if (binding.cmd === false) restrictions.push('Cmd');
-
-  if (restrictions.length > 0) {
-    combo = `${combo} (no ${restrictions.join(', ')})`;
-  }
-
-  return combo ? `\`${combo}\`` : '';
-}
-
-function formatKeyName(key: string): string {
-  const normalized = key.toLowerCase();
-  if (KEY_NAME_OVERRIDES[normalized]) {
-    return KEY_NAME_OVERRIDES[normalized];
-  }
-  return key.length === 1 ? key.toUpperCase() : key;
 }
 
 if (process.argv[1]) {

@@ -8,9 +8,15 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 
 import nodePath from 'node:path';
 
-import type { PolicySettings } from './types.js';
-import { ApprovalMode, PolicyDecision, InProcessCheckerType } from './types.js';
+import {
+  ApprovalMode,
+  PolicyDecision,
+  InProcessCheckerType,
+  type PolicySettings,
+} from './types.js';
 import { isDirectorySecure } from '../utils/security.js';
+
+vi.unmock('../config/storage.js');
 
 vi.mock('../utils/security.js', () => ({
   isDirectorySecure: vi.fn().mockResolvedValue({ secure: true }),
@@ -167,7 +173,7 @@ describe('createPolicyEngineConfig', () => {
         r.decision === PolicyDecision.ALLOW,
     );
     expect(rule).toBeDefined();
-    expect(rule?.priority).toBeCloseTo(2.3, 5); // Command line allow
+    expect(rule?.priority).toBeCloseTo(4.3, 5); // Command line allow
   });
 
   it('should deny tools in tools.exclude', async () => {
@@ -186,7 +192,7 @@ describe('createPolicyEngineConfig', () => {
         r.decision === PolicyDecision.DENY,
     );
     expect(rule).toBeDefined();
-    expect(rule?.priority).toBeCloseTo(2.4, 5); // Command line exclude
+    expect(rule?.priority).toBeCloseTo(4.4, 5); // Command line exclude
   });
 
   it('should allow tools from allowed MCP servers', async () => {
@@ -200,11 +206,10 @@ describe('createPolicyEngineConfig', () => {
       '/tmp/mock/default/policies',
     );
     const rule = config.rules?.find(
-      (r) =>
-        r.toolName === 'my-server__*' && r.decision === PolicyDecision.ALLOW,
+      (r) => r.mcpName === 'my-server' && r.decision === PolicyDecision.ALLOW,
     );
     expect(rule).toBeDefined();
-    expect(rule?.priority).toBe(2.1); // MCP allowed server
+    expect(rule?.priority).toBe(4.1); // MCP allowed server
   });
 
   it('should deny tools from excluded MCP servers', async () => {
@@ -218,11 +223,10 @@ describe('createPolicyEngineConfig', () => {
       '/tmp/mock/default/policies',
     );
     const rule = config.rules?.find(
-      (r) =>
-        r.toolName === 'my-server__*' && r.decision === PolicyDecision.DENY,
+      (r) => r.mcpName === 'my-server' && r.decision === PolicyDecision.DENY,
     );
     expect(rule).toBeDefined();
-    expect(rule?.priority).toBe(2.9); // MCP excluded server
+    expect(rule?.priority).toBe(4.9); // MCP excluded server
   });
 
   it('should allow tools from trusted MCP servers', async () => {
@@ -245,17 +249,15 @@ describe('createPolicyEngineConfig', () => {
 
     const trustedRule = config.rules?.find(
       (r) =>
-        r.toolName === 'trusted-server__*' &&
-        r.decision === PolicyDecision.ALLOW,
+        r.mcpName === 'trusted-server' && r.decision === PolicyDecision.ALLOW,
     );
     expect(trustedRule).toBeDefined();
-    expect(trustedRule?.priority).toBe(2.2); // MCP trusted server
+    expect(trustedRule?.priority).toBe(4.2); // MCP trusted server
 
     // Untrusted server should not have an allow rule
     const untrustedRule = config.rules?.find(
       (r) =>
-        r.toolName === 'untrusted-server__*' &&
-        r.decision === PolicyDecision.ALLOW,
+        r.mcpName === 'untrusted-server' && r.decision === PolicyDecision.ALLOW,
     );
     expect(untrustedRule).toBeUndefined();
   });
@@ -282,29 +284,26 @@ describe('createPolicyEngineConfig', () => {
     // Check allowed server
     const allowedRule = config.rules?.find(
       (r) =>
-        r.toolName === 'allowed-server__*' &&
-        r.decision === PolicyDecision.ALLOW,
+        r.mcpName === 'allowed-server' && r.decision === PolicyDecision.ALLOW,
     );
     expect(allowedRule).toBeDefined();
-    expect(allowedRule?.priority).toBe(2.1); // MCP allowed server
+    expect(allowedRule?.priority).toBe(4.1); // MCP allowed server
 
     // Check trusted server
     const trustedRule = config.rules?.find(
       (r) =>
-        r.toolName === 'trusted-server__*' &&
-        r.decision === PolicyDecision.ALLOW,
+        r.mcpName === 'trusted-server' && r.decision === PolicyDecision.ALLOW,
     );
     expect(trustedRule).toBeDefined();
-    expect(trustedRule?.priority).toBe(2.2); // MCP trusted server
+    expect(trustedRule?.priority).toBe(4.2); // MCP trusted server
 
     // Check excluded server
     const excludedRule = config.rules?.find(
       (r) =>
-        r.toolName === 'excluded-server__*' &&
-        r.decision === PolicyDecision.DENY,
+        r.mcpName === 'excluded-server' && r.decision === PolicyDecision.DENY,
     );
     expect(excludedRule).toBeDefined();
-    expect(excludedRule?.priority).toBe(2.9); // MCP excluded server
+    expect(excludedRule?.priority).toBe(4.9); // MCP excluded server
   });
 
   it('should allow all tools in YOLO mode', async () => {
@@ -315,8 +314,8 @@ describe('createPolicyEngineConfig', () => {
       (r) => r.decision === PolicyDecision.ALLOW && !r.toolName,
     );
     expect(rule).toBeDefined();
-    // Priority 999 in default tier → 1.999
-    expect(rule?.priority).toBeCloseTo(1.999, 5);
+    // Priority 998 in default tier → 1.998 (999 reserved for ask_user exception)
+    expect(rule?.priority).toBeCloseTo(1.998, 5);
   });
 
   it('should allow edit tool in AUTO_EDIT mode', async () => {
@@ -327,7 +326,10 @@ describe('createPolicyEngineConfig', () => {
       ApprovalMode.AUTO_EDIT,
     );
     const rule = config.rules?.find(
-      (r) => r.toolName === 'replace' && r.decision === PolicyDecision.ALLOW,
+      (r) =>
+        r.toolName === 'replace' &&
+        r.decision === PolicyDecision.ALLOW &&
+        r.modes?.includes(ApprovalMode.AUTO_EDIT),
     );
     expect(rule).toBeDefined();
     // Priority 15 in default tier → 1.015
@@ -363,7 +365,7 @@ describe('createPolicyEngineConfig', () => {
     const { createPolicyEngineConfig } = await import('./config.js');
     const settings: PolicySettings = {
       mcp: { excluded: ['my-server'] },
-      tools: { allowed: ['my-server__specific-tool'] },
+      tools: { allowed: ['mcp_my-server_specific-tool'] },
     };
     const config = await createPolicyEngineConfig(
       settings,
@@ -372,21 +374,20 @@ describe('createPolicyEngineConfig', () => {
     );
 
     const serverDenyRule = config.rules?.find(
-      (r) =>
-        r.toolName === 'my-server__*' && r.decision === PolicyDecision.DENY,
+      (r) => r.mcpName === 'my-server' && r.decision === PolicyDecision.DENY,
     );
     const toolAllowRule = config.rules?.find(
       (r) =>
-        r.toolName === 'my-server__specific-tool' &&
+        r.toolName === 'mcp_my-server_specific-tool' &&
         r.decision === PolicyDecision.ALLOW,
     );
 
     expect(serverDenyRule).toBeDefined();
-    expect(serverDenyRule?.priority).toBe(2.9); // MCP excluded server
+    expect(serverDenyRule?.priority).toBe(4.9); // MCP excluded server
     expect(toolAllowRule).toBeDefined();
-    expect(toolAllowRule?.priority).toBeCloseTo(2.3, 5); // Command line allow
+    expect(toolAllowRule?.priority).toBeCloseTo(4.3, 5); // Command line allow
 
-    // Server deny (2.9) has higher priority than tool allow (2.3),
+    // Server deny (4.9) has higher priority than tool allow (4.3),
     // so server deny wins (this is expected behavior - server-level blocks are security critical)
   });
 
@@ -399,7 +400,7 @@ describe('createPolicyEngineConfig', () => {
           trust: true,
         },
       },
-      tools: { exclude: ['my-server__dangerous-tool'] },
+      tools: { exclude: ['mcp_my-server_dangerous-tool'] },
     };
     const config = await createPolicyEngineConfig(
       settings,
@@ -408,18 +409,17 @@ describe('createPolicyEngineConfig', () => {
     );
 
     const serverAllowRule = config.rules?.find(
-      (r) =>
-        r.toolName === 'my-server__*' && r.decision === PolicyDecision.ALLOW,
+      (r) => r.mcpName === 'my-server' && r.decision === PolicyDecision.ALLOW,
     );
     const toolDenyRule = config.rules?.find(
       (r) =>
-        r.toolName === 'my-server__dangerous-tool' &&
+        r.toolName === 'mcp_my-server_dangerous-tool' &&
         r.decision === PolicyDecision.DENY,
     );
 
     expect(serverAllowRule).toBeDefined();
     expect(toolDenyRule).toBeDefined();
-    // Command line exclude (2.4) has higher priority than MCP server trust (2.2)
+    // Command line exclude (4.4) has higher priority than MCP server trust (4.2)
     // This is the correct behavior - specific exclusions should beat general server trust
     expect(toolDenyRule!.priority).toBeGreaterThan(serverAllowRule!.priority!);
   });
@@ -427,16 +427,16 @@ describe('createPolicyEngineConfig', () => {
   it('should handle complex priority scenarios correctly', async () => {
     const settings: PolicySettings = {
       tools: {
-        allowed: ['my-server__tool1', 'other-tool'], // Priority 2.3
-        exclude: ['my-server__tool2', 'glob'], // Priority 2.4
+        allowed: ['mcp_trusted-server_tool1', 'other-tool'], // Priority 4.3
+        exclude: ['mcp_trusted-server_tool2', 'glob'], // Priority 4.4
       },
       mcp: {
-        allowed: ['allowed-server'], // Priority 2.1
-        excluded: ['excluded-server'], // Priority 2.9
+        allowed: ['allowed-server'], // Priority 4.1
+        excluded: ['excluded-server'], // Priority 4.9
       },
       mcpServers: {
         'trusted-server': {
-          trust: true, // Priority 90 -> 2.2
+          trust: true, // Priority 4.2
         },
       },
     };
@@ -458,6 +458,21 @@ describe('createPolicyEngineConfig', () => {
       }
       return [];
     });
+    const mockStat = vi.fn(async (p) => {
+      if (typeof p === 'string' && p.includes('/tmp/mock/default/policies')) {
+        return {
+          isDirectory: () => true,
+          isFile: () => false,
+        } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+      }
+      if (typeof p === 'string' && p.includes('default.toml')) {
+        return {
+          isDirectory: () => false,
+          isFile: () => true,
+        } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+      }
+      return actualFs.stat(p);
+    });
     const mockReadFile = vi.fn(async (p, _o) => {
       if (typeof p === 'string' && p.includes('default.toml')) {
         return '[[rule]]\ntoolName = "glob"\ndecision = "allow"\npriority = 50\n';
@@ -466,9 +481,15 @@ describe('createPolicyEngineConfig', () => {
     });
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readdir: mockReaddir, readFile: mockReadFile },
+      default: {
+        ...actualFs,
+        readdir: mockReaddir,
+        readFile: mockReadFile,
+        stat: mockStat,
+      },
       readdir: mockReaddir,
       readFile: mockReadFile,
+      stat: mockStat,
     }));
     vi.resetModules();
     const { createPolicyEngineConfig: createConfig } = await import(
@@ -491,7 +512,7 @@ describe('createPolicyEngineConfig', () => {
     expect(globDenyRule).toBeDefined();
     expect(globAllowRule).toBeDefined();
     // Deny from settings (user tier)
-    expect(globDenyRule!.priority).toBeCloseTo(2.4, 5); // Command line exclude
+    expect(globDenyRule!.priority).toBeCloseTo(4.4, 5); // Command line exclude
     // Allow from default TOML: 1 + 50/1000 = 1.05
     expect(globAllowRule!.priority).toBeCloseTo(1.05, 5);
 
@@ -504,11 +525,11 @@ describe('createPolicyEngineConfig', () => {
       }))
       .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 
-    // Check that the highest priority items are the excludes (user tier: 2.4 and 2.9)
+    // Check that the highest priority items are the excludes (user tier: 4.4 and 4.9)
     const highestPriorityExcludes = priorities?.filter(
       (p) =>
-        Math.abs(p.priority! - 2.4) < 0.01 ||
-        Math.abs(p.priority! - 2.9) < 0.01,
+        Math.abs(p.priority! - 4.4) < 0.01 ||
+        Math.abs(p.priority! - 4.9) < 0.01,
     );
     expect(
       highestPriorityExcludes?.every((p) => p.decision === PolicyDecision.DENY),
@@ -538,13 +559,12 @@ describe('createPolicyEngineConfig', () => {
     // Neither server should have an allow rule
     const noTrustRule = config.rules?.find(
       (r) =>
-        r.toolName === 'no-trust-property__*' &&
+        r.mcpName === 'no-trust-property' &&
         r.decision === PolicyDecision.ALLOW,
     );
     const explicitFalseRule = config.rules?.find(
       (r) =>
-        r.toolName === 'explicit-false__*' &&
-        r.decision === PolicyDecision.ALLOW,
+        r.mcpName === 'explicit-false' && r.decision === PolicyDecision.ALLOW,
     );
 
     expect(noTrustRule).toBeUndefined();
@@ -577,8 +597,8 @@ describe('createPolicyEngineConfig', () => {
       (r) => !r.toolName && r.decision === PolicyDecision.ALLOW,
     );
     expect(wildcardRule).toBeDefined();
-    // Priority 999 in default tier → 1.999
-    expect(wildcardRule?.priority).toBeCloseTo(1.999, 5);
+    // Priority 998 in default tier → 1.998 (999 reserved for ask_user exception)
+    expect(wildcardRule?.priority).toBeCloseTo(1.998, 5);
 
     // Write tool ASK_USER rules are present (from write.toml)
     const writeToolRules = config.rules?.filter(
@@ -600,7 +620,7 @@ describe('createPolicyEngineConfig', () => {
         r.toolName === 'dangerous-tool' && r.decision === PolicyDecision.DENY,
     );
     expect(excludeRule).toBeDefined();
-    expect(excludeRule?.priority).toBeCloseTo(2.4, 5); // Command line exclude
+    expect(excludeRule?.priority).toBeCloseTo(4.4, 5); // Command line exclude
   });
 
   it('should support argsPattern in policy rules', async () => {
@@ -658,11 +678,37 @@ priority = 150
       },
     );
 
+    const mockStat = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.stat>[0],
+        options?: Parameters<typeof actualFs.stat>[1],
+      ) => {
+        if (
+          typeof path === 'string' &&
+          nodePath
+            .normalize(path)
+            .includes(nodePath.normalize('.gemini/policies'))
+        ) {
+          return {
+            isDirectory: () => true,
+            isFile: () => false,
+          } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+        }
+        return actualFs.stat(path, options);
+      },
+    );
+
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+      default: {
+        ...actualFs,
+        readFile: mockReadFile,
+        readdir: mockReaddir,
+        stat: mockStat,
+      },
       readFile: mockReadFile,
       readdir: mockReaddir,
+      stat: mockStat,
     }));
 
     vi.resetModules();
@@ -681,8 +727,8 @@ priority = 150
         r.decision === PolicyDecision.ALLOW,
     );
     expect(rule).toBeDefined();
-    // Priority 150 in user tier → 2.150
-    expect(rule?.priority).toBeCloseTo(2.15, 5);
+    // Priority 150 in user tier → 4.150
+    expect(rule?.priority).toBeCloseTo(4.15, 5);
     expect(rule?.argsPattern).toBeInstanceOf(RegExp);
     expect(rule?.argsPattern?.test('{"command":"git status"}')).toBe(true);
     expect(rule?.argsPattern?.test('{"command":"git diff"}')).toBe(true);
@@ -761,11 +807,37 @@ required_context = ["environment"]
       },
     );
 
+    const mockStat = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.stat>[0],
+        options?: Parameters<typeof actualFs.stat>[1],
+      ) => {
+        if (
+          typeof path === 'string' &&
+          nodePath
+            .normalize(path)
+            .includes(nodePath.normalize('.gemini/policies'))
+        ) {
+          return {
+            isDirectory: () => true,
+            isFile: () => false,
+          } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+        }
+        return actualFs.stat(path, options);
+      },
+    );
+
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+      default: {
+        ...actualFs,
+        readFile: mockReadFile,
+        readdir: mockReaddir,
+        stat: mockStat,
+      },
       readFile: mockReadFile,
       readdir: mockReaddir,
+      stat: mockStat,
     }));
 
     vi.resetModules();
@@ -857,11 +929,37 @@ name = "invalid-name"
       },
     );
 
+    const mockStat = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.stat>[0],
+        options?: Parameters<typeof actualFs.stat>[1],
+      ) => {
+        if (
+          typeof path === 'string' &&
+          nodePath
+            .normalize(path)
+            .includes(nodePath.normalize('.gemini/policies'))
+        ) {
+          return {
+            isDirectory: () => true,
+            isFile: () => false,
+          } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+        }
+        return actualFs.stat(path, options);
+      },
+    );
+
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readFile: mockReadFile, readdir: mockReaddir },
+      default: {
+        ...actualFs,
+        readFile: mockReadFile,
+        readdir: mockReaddir,
+        stat: mockStat,
+      },
       readFile: mockReadFile,
       readdir: mockReaddir,
+      stat: mockStat,
     }));
 
     vi.resetModules();
@@ -942,7 +1040,149 @@ name = "invalid-name"
         r.decision === PolicyDecision.ALLOW,
     );
     expect(rule).toBeDefined();
-    expect(rule?.priority).toBeCloseTo(2.3, 5); // Command line allow
+    expect(rule?.priority).toBeCloseTo(4.3, 5); // Command line allow
+
+    vi.doUnmock('node:fs/promises');
+  });
+
+  it('should allow overriding Plan Mode deny with user policy', async () => {
+    const actualFs =
+      await vi.importActual<typeof import('node:fs/promises')>(
+        'node:fs/promises',
+      );
+
+    const mockReaddir = vi.fn(
+      async (
+        path: string | Buffer | URL,
+        options?: Parameters<typeof actualFs.readdir>[1],
+      ) => {
+        const normalizedPath = nodePath.normalize(path.toString());
+        if (normalizedPath.includes('gemini-cli-test/user/policies')) {
+          return [
+            {
+              name: 'user-plan.toml',
+              isFile: () => true,
+              isDirectory: () => false,
+            },
+          ] as unknown as Awaited<ReturnType<typeof actualFs.readdir>>;
+        }
+        return actualFs.readdir(
+          path,
+          options as Parameters<typeof actualFs.readdir>[1],
+        );
+      },
+    );
+
+    const mockStat = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.stat>[0],
+        options?: Parameters<typeof actualFs.stat>[1],
+      ) => {
+        const normalizedPath = nodePath.normalize(path.toString());
+        if (normalizedPath.includes('gemini-cli-test/user/policies')) {
+          return {
+            isDirectory: () => true,
+            isFile: () => false,
+          } as unknown as Awaited<ReturnType<typeof actualFs.stat>>;
+        }
+        return actualFs.stat(path, options);
+      },
+    );
+
+    const mockReadFile = vi.fn(
+      async (
+        path: Parameters<typeof actualFs.readFile>[0],
+        options: Parameters<typeof actualFs.readFile>[1],
+      ) => {
+        const normalizedPath = nodePath.normalize(path.toString());
+        if (normalizedPath.includes('user-plan.toml')) {
+          return `
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = ["git status", "git diff"]
+decision = "allow"
+priority = 100
+modes = ["plan"]
+
+[[rule]]
+toolName = "codebase_investigator"
+decision = "allow"
+priority = 100
+modes = ["plan"]
+`;
+        }
+        return actualFs.readFile(path, options);
+      },
+    );
+
+    vi.doMock('node:fs/promises', () => ({
+      ...actualFs,
+      default: {
+        ...actualFs,
+        readFile: mockReadFile,
+        readdir: mockReaddir,
+        stat: mockStat,
+      },
+      readFile: mockReadFile,
+      readdir: mockReaddir,
+      stat: mockStat,
+    }));
+
+    vi.resetModules();
+
+    // Robustly mock Storage using doMock to ensure it persists through imports in config.js
+    vi.doMock('../config/storage.js', async () => {
+      const actual = await vi.importActual<
+        typeof import('../config/storage.js')
+      >('../config/storage.js');
+      class MockStorage extends actual.Storage {
+        static override getUserPoliciesDir() {
+          return '/tmp/gemini-cli-test/user/policies';
+        }
+        static override getSystemPoliciesDir() {
+          return '/tmp/gemini-cli-test/system/policies';
+        }
+      }
+      return { ...actual, Storage: MockStorage };
+    });
+
+    const { createPolicyEngineConfig } = await import('./config.js');
+
+    const settings: PolicySettings = {};
+    const config = await createPolicyEngineConfig(
+      settings,
+      ApprovalMode.PLAN,
+      nodePath.join(__dirname, 'policies'),
+    );
+
+    const shellRules = config.rules?.filter(
+      (r) =>
+        r.toolName === 'run_shell_command' &&
+        r.decision === PolicyDecision.ALLOW &&
+        r.modes?.includes(ApprovalMode.PLAN) &&
+        r.argsPattern,
+    );
+    expect(shellRules).toHaveLength(2);
+    expect(
+      shellRules?.some((r) => r.argsPattern?.test('{"command":"git status"}')),
+    ).toBe(true);
+    expect(
+      shellRules?.some((r) => r.argsPattern?.test('{"command":"git diff"}')),
+    ).toBe(true);
+    expect(
+      shellRules?.every(
+        (r) => !r.argsPattern?.test('{"command":"git commit"}'),
+      ),
+    ).toBe(true);
+
+    const subagentRule = config.rules?.find(
+      (r) =>
+        r.toolName === 'codebase_investigator' &&
+        r.decision === PolicyDecision.ALLOW &&
+        r.modes?.includes(ApprovalMode.PLAN),
+    );
+    expect(subagentRule).toBeDefined();
+    expect(subagentRule?.priority).toBeCloseTo(4.1, 5);
 
     vi.doUnmock('node:fs/promises');
   });

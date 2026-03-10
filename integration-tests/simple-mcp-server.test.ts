@@ -11,7 +11,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig, poll, validateModelOutput } from './test-helper.js';
+import {
+  TestRig,
+  poll,
+  assertModelHasOutput,
+  checkModelOutputContent,
+} from './test-helper.js';
 import { join } from 'node:path';
 import { writeFileSync } from 'node:fs';
 
@@ -226,8 +231,11 @@ describe.skip('simple-mcp-server', () => {
 
     expect(foundToolCall, 'Expected to find an add tool call').toBeTruthy();
 
-    // Validate model output - will throw if no output, fail if missing expected content
-    validateModelOutput(output, '15', 'MCP server test');
+    assertModelHasOutput(output);
+    checkModelOutputContent(output, {
+      expectedContent: '15',
+      testName: 'MCP server test',
+    });
     expect(
       output.includes('15'),
       'Expected output to contain the sum (15)',

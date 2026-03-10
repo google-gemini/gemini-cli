@@ -14,8 +14,7 @@ import {
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
 import * as readline from 'node:readline';
-import type { Node, Tree } from 'web-tree-sitter';
-import { Language, Parser, Query } from 'web-tree-sitter';
+import { Language, Parser, Query, type Node, type Tree } from 'web-tree-sitter';
 import { loadWasmBinary } from './fileUtils.js';
 import { debugLogger } from './debugLogger.js';
 
@@ -237,6 +236,7 @@ function parseCommandTree(
       progressCallback: () => {
         if (performance.now() > deadline) {
           timedOut = true;
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           return true as unknown as void; // Returning true cancels parsing, but type says void
         }
       },
@@ -478,6 +478,7 @@ function parsePowerShellCommandDetails(
       hasRedirection?: boolean;
     } | null = null;
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       parsed = JSON.parse(output);
     } catch {
       return { details: [], hasError: true };
