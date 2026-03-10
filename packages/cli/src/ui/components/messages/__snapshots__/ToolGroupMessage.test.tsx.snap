@@ -36,6 +36,7 @@ exports[`<ToolGroupMessage /> > Border Color Logic > uses gray border when all t
 │ ✓  test-tool A tool for testing                                          │
 │                                                                          │
 │ Test result                                                              │
+
 │                                                                          │
 │ ✓  another-tool A tool for testing                                       │
 │                                                                          │
@@ -57,10 +58,10 @@ exports[`<ToolGroupMessage /> > Border Color Logic > uses yellow border for shel
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders empty tool calls array 1`] = `""`;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 1`] = `
-"╭──────────────────────────────────────────────────────────────────────────╮
-│ ✓  tool-1 Description 1. This is a long description that will need to b… │
+"│ ✓  tool-1 Description 1. This is a long description that will need to b… │
 │──────────────────────────────────────────────────────────────────────────│
-│                                                                          │                       ▄
+
+│                                                                          │
 │ ✓  tool-2 Description 2                                                  │                       █
 │                                                                          │                       █
 │ line1                                                                    │                       █
@@ -76,6 +77,7 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls incl
 │ ✓  read_file Read a file                                                 │
 │                                                                          │
 │ Test result                                                              │
+
 │                                                                          │
 │ ⊶  run_shell_command Run command                                         │
 │                                                                          │
@@ -94,6 +96,7 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders multiple tool calls w
 │ ✓  successful-tool This tool succeeded                                   │
 │                                                                          │
 │ Test result                                                              │
+
 │                                                                          │
 │ o  pending-tool This tool is pending                                     │
 │                                                                          │
@@ -143,6 +146,7 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders with limited terminal
 │ ✓  tool-with-result Tool with output                                     │
 │                                                                          │
 │ This is a long result that might need height constraints                 │
+
 │                                                                          │
 │ ✓  another-tool Another tool                                             │
 │                                                                          │
@@ -167,10 +171,12 @@ exports[`<ToolGroupMessage /> > Height Calculation > calculates available height
 │ ✓  test-tool A tool for testing                                          │
 │                                                                          │
 │ Result 1                                                                 │
+
 │                                                                          │
 │ ✓  test-tool A tool for testing                                          │
 │                                                                          │
 │ Result 2                                                                 │
+
 │                                                                          │
 │ ✓  test-tool A tool for testing                                          │
 │                                                                          │

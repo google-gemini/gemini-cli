@@ -17,6 +17,7 @@ import {
   mapCoreStatusToDisplayStatus,
   isFileDiff,
   isGrepResult,
+  isListResult,
 } from '../../types.js';
 import { ToolMessage } from './ToolMessage.js';
 import { ShellToolMessage } from './ShellToolMessage.js';
@@ -78,14 +79,7 @@ export const hasDensePayload = (tool: IndividualToolCallDisplay): boolean => {
   if (isGrepResult(res) && (res.matches?.length ?? 0) > 0) return true;
 
   // ReadManyFilesResult check (has 'include' and 'files')
-  if (
-    typeof res === 'object' &&
-    res !== null &&
-    'include' in res &&
-    'files' in res &&
-    Array.isArray((res as any).files) &&
-    (res as any).files.length > 0
-  ) {
+  if (isListResult(res) && 'include' in res && (res.files?.length ?? 0) > 0) {
     return true;
   }
 
@@ -212,14 +206,14 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         height += 1; // Base height for compact tool
         // Spacing logic (matching marginTop)
         if (isFirst) {
-          height += borderTopOverride ?? true ? 1 : 0;
+          height += (borderTopOverride ?? true) ? 1 : 0;
         } else if (!prevIsCompact) {
           height += 1;
         }
       } else {
         height += 3; // Static overhead for standard tool
         if (isFirst) {
-          height += borderTopOverride ?? true ? 1 : 0;
+          height += (borderTopOverride ?? true) ? 1 : 0;
         } else {
           height += 1; // marginTop is always 1 for non-compact tools (not first)
         }
@@ -270,7 +264,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     */
       width={terminalWidth}
       paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
-      marginBottom={borderBottomOverride ?? true ? 1 : 0}
+      marginBottom={(borderBottomOverride ?? true) ? 1 : 0}
     >
       {visibleToolCalls.map((tool, index) => {
         const isFirst = index === 0;
@@ -290,7 +284,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
         let marginTop = 0;
         if (isFirst) {
-          marginTop = borderTopOverride ?? true ? 1 : 0;
+          marginTop = (borderTopOverride ?? true) ? 1 : 0;
         } else if (!(isCompact && prevIsCompact)) {
           marginTop = 1;
         }

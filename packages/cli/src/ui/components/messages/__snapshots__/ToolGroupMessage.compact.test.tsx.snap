@@ -2,10 +2,10 @@
 
 exports[`ToolGroupMessage Compact Rendering > does not add an extra empty line between a compact tool and a standard tool 1`] = `
 "
-  ✓  ReadFolder   → file1.txt
+  ✓  ReadFolder  Listing files → file1.txt
 
 ╭──────────────────────────────────────────────────────────────────────────╮
-│ ✓  non-compact-tool                                                      │
+│ ✓  non-compact-tool Doing something                                      │
 │                                                                          │
 │ some large output                                                        │
 ╰──────────────────────────────────────────────────────────────────────────╯
@@ -15,25 +15,25 @@ exports[`ToolGroupMessage Compact Rendering > does not add an extra empty line b
 exports[`ToolGroupMessage Compact Rendering > does not add an extra empty line between a standard tool and a compact tool 1`] = `
 "
 ╭──────────────────────────────────────────────────────────────────────────╮
-│ ✓  non-compact-tool                                                      │
+│ ✓  non-compact-tool Doing something                                      │
 │                                                                          │
 │ some large output                                                        │
 ╰──────────────────────────────────────────────────────────────────────────╯
 
-  ✓  ReadFolder   → file1.txt
+  ✓  ReadFolder  Listing files → file1.txt
 "
 `;
 
 exports[`ToolGroupMessage Compact Rendering > does not add an extra empty line if a compact tool has a dense payload 1`] = `
 "
-  ✓  ReadFolder   → file1.txt
-  ✓  ReadFile   → read file
+  ✓  ReadFolder  Listing files → file1.txt
+  ✓  ReadFile  Reading file → read file
 "
 `;
 
 exports[`ToolGroupMessage Compact Rendering > renders consecutive compact tools without empty lines between them 1`] = `
 "
-  ✓  ReadFolder   → file1.txt file2.txt
-  ✓  ReadFolder   → file3.txt
+  ✓  ReadFolder  Listing files → file1.txt file2.txt
+  ✓  ReadFolder  Listing files → file3.txt
 "
 `;

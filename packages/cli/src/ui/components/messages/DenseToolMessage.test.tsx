@@ -118,7 +118,9 @@ describe('DenseToolMessage', () => {
         name="Edit"
         status={CoreToolCallStatus.AwaitingApproval}
         resultDisplay={undefined}
-        confirmationDetails={confirmationDetails as SerializableConfirmationDetails}
+        confirmationDetails={
+          confirmationDetails as SerializableConfirmationDetails
+        }
       />,
       { useAlternateBuffer: false },
     );
@@ -194,7 +196,9 @@ describe('DenseToolMessage', () => {
         name="Edit"
         status={CoreToolCallStatus.Cancelled}
         resultDisplay={undefined}
-        confirmationDetails={confirmationDetails as unknown as SerializableConfirmationDetails}
+        confirmationDetails={
+          confirmationDetails as unknown as SerializableConfirmationDetails
+        }
       />,
       { useAlternateBuffer: false },
     );
@@ -391,7 +395,7 @@ describe('DenseToolMessage', () => {
       <DenseToolMessage
         {...defaultProps}
         status={CoreToolCallStatus.Error}
-        resultDisplay={"Error occurred" as ToolResultDisplay}
+        resultDisplay={'Error occurred' as ToolResultDisplay}
       />,
     );
     await waitUntilReady();
@@ -497,4 +501,3 @@ describe('DenseToolMessage', () => {
     });
   });
 });
-

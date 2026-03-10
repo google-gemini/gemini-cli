@@ -5,6 +5,7 @@
  */
 
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { act } from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
 import type {
@@ -94,7 +95,9 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
@@ -119,7 +122,9 @@ describe('<ToolGroupMessage />', () => {
       );
 
       // Should now render confirming tools
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       const output = lastFrame();
       expect(output).toContain('test-tool');
       unmount();
@@ -164,7 +169,9 @@ describe('<ToolGroupMessage />', () => {
         },
       );
       // pending-tool should now be visible
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       const output = lastFrame();
       expect(output).toContain('successful-tool');
       expect(output).toContain('pending-tool');
@@ -203,7 +210,9 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       const output = lastFrame();
       expect(output).toContain('successful-tool');
       expect(output).not.toContain('error-tool');
@@ -237,7 +246,9 @@ describe('<ToolGroupMessage />', () => {
         },
       );
 
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       const output = lastFrame();
       expect(output).toContain('client-error-tool');
       unmount();
@@ -282,7 +293,9 @@ describe('<ToolGroupMessage />', () => {
         },
       );
       // write_file (Pending) should now be visible
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       const output = lastFrame();
       expect(output).toContain('read_file');
       expect(output).toContain('run_shell_command');
@@ -328,7 +341,9 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
@@ -362,7 +377,9 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
@@ -385,7 +402,9 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
@@ -424,7 +443,9 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
@@ -455,7 +476,9 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
@@ -510,7 +533,9 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
@@ -540,7 +565,9 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
@@ -570,7 +597,9 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
@@ -613,7 +642,9 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
@@ -664,7 +695,9 @@ describe('<ToolGroupMessage />', () => {
           <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
           { config: baseMockConfig, settings: fullVerbositySettings },
         );
-        await waitUntilReady();
+        await act(async () => {
+          await waitUntilReady();
+        });
 
         if (shouldHide) {
           expect(lastFrame({ allowEmpty: true })).toBe('');
@@ -695,7 +728,9 @@ describe('<ToolGroupMessage />', () => {
         { config: baseMockConfig, settings: fullVerbositySettings },
       );
 
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
@@ -723,7 +758,9 @@ describe('<ToolGroupMessage />', () => {
         { config: baseMockConfig, settings: fullVerbositySettings },
       );
       // AskUser tools in progress are rendered by AskUserDialog, so we expect nothing.
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       expect(lastFrame({ allowEmpty: true })).toBe('');
       unmount();
     });
@@ -754,7 +791,9 @@ describe('<ToolGroupMessage />', () => {
         },
       );
 
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       expect(lastFrame({ allowEmpty: true })).toBe('');
       unmount();
     });
@@ -777,7 +816,9 @@ describe('<ToolGroupMessage />', () => {
         },
       );
 
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       expect(lastFrame({ allowEmpty: true })).not.toBe('');
       unmount();
     });
@@ -808,7 +849,9 @@ describe('<ToolGroupMessage />', () => {
         },
       );
 
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       expect(lastFrame({ allowEmpty: true })).toBe('');
       unmount();
     });
@@ -841,7 +884,9 @@ describe('<ToolGroupMessage />', () => {
         },
       );
 
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       expect(lastFrame({ allowEmpty: true })).not.toBe('');
       unmount();
     });
@@ -936,7 +981,9 @@ describe('<ToolGroupMessage />', () => {
         },
       );
 
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       const output = lastFrame();
       expect(output).toContain('visible-tool');
       expect(output).not.toContain('hidden-error-0');
@@ -962,7 +1009,9 @@ describe('<ToolGroupMessage />', () => {
         },
       );
 
-      await waitUntilReady();
+      await act(async () => {
+        await waitUntilReady();
+      });
       expect(lastFrame({ allowEmpty: true })).not.toBe('');
       unmount();
     });
@@ -1000,7 +1049,9 @@ describe('<ToolGroupMessage />', () => {
           { config: baseMockConfig, settings: fullVerbositySettings },
         );
 
-        await waitUntilReady();
+        await act(async () => {
+          await waitUntilReady();
+        });
 
         if (visible) {
           expect(lastFrame()).toContain(name);

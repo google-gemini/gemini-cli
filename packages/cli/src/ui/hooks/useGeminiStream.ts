@@ -75,9 +75,7 @@ import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
 import { mapToDisplay as mapTrackedToolCallsToDisplay } from './toolMapping.js';
-import {
-  isCompactTool,
-} from '../components/messages/ToolGroupMessage.js';
+import { isCompactTool } from '../components/messages/ToolGroupMessage.js';
 import {
   useToolScheduler,
   type TrackedToolCall,
@@ -305,13 +303,11 @@ export const useGeminiStream = (
             // If the first tool in this push is non-compact but follows a compact tool,
             // we must start a new border group.
             const currentIsCompact = isCompactTool(
-              mapTrackedToolCallsToDisplay(firstToolToPush as TrackedToolCall)
-                .tools[0],
+              mapTrackedToolCallsToDisplay(firstToolToPush).tools[0],
               isCompactModeEnabled,
             );
             const prevWasCompact = isCompactTool(
-              mapTrackedToolCallsToDisplay(prevTool as TrackedToolCall)
-                .tools[0],
+              mapTrackedToolCallsToDisplay(prevTool).tools[0],
               isCompactModeEnabled,
             );
             if (!currentIsCompact && prevWasCompact) {
@@ -356,9 +352,7 @@ export const useGeminiStream = (
         }
 
         // Handle tool response submission immediately when tools complete
-        await handleCompletedTools(
-          completedToolCallsFromScheduler as TrackedToolCall[],
-        );
+        await handleCompletedTools(completedToolCallsFromScheduler);
       }
     },
     config,
