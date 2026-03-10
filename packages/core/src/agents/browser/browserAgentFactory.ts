@@ -73,11 +73,7 @@ export async function createBrowserAgentDefinition(
 
   // Create declarative tools from dynamically discovered MCP tools
   // These tools dispatch to browserManager's isolated client
-  const mcpTools = await createMcpDeclarativeTools(
-    browserManager,
-    messageBus,
-    config,
-  );
+  const mcpTools = await createMcpDeclarativeTools(browserManager, messageBus);
   const availableToolNames = mcpTools.map((t) => t.name);
 
   // Validate required semantic tools are available

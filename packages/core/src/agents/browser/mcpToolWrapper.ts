@@ -28,8 +28,6 @@ import {
   type PolicyUpdateOptions,
 } from '../../tools/tools.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
-import type { Config } from '../../config/config.js';
-import { injectAutomationOverlay } from './automationOverlay.js';
 import type { BrowserManager, McpToolCallResult } from './browserManager.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
@@ -133,29 +131,6 @@ class McpToolInvocation extends BaseToolInvocation<
         error: { message: errorMsg },
       };
     }
-  }
-}
-
-/**
- * Tool invocation for navigation tools that re-injects the automation overlay.
- */
-class NavigationalMcpToolInvocation extends McpToolInvocation {
-  override async execute(signal: AbortSignal): Promise<ToolResult> {
-    const result = await super.execute(signal);
-
-    // Re-inject overlay after navigation if successful
-    if (!result.error) {
-      try {
-        await injectAutomationOverlay(this.browserManager, signal);
-      } catch (error) {
-        debugLogger.warn(
-          'Failed to re-inject overlay after navigation:',
-          error,
-        );
-      }
-    }
-
-    return result;
   }
 }
 
@@ -336,22 +311,6 @@ class McpDeclarativeTool extends DeclarativeTool<
 }
 
 /**
- * DeclarativeTool for navigation tools that returns NavigationalMcpToolInvocation.
- */
-class NavigationalMcpDeclarativeTool extends McpDeclarativeTool {
-  override build(
-    params: Record<string, unknown>,
-  ): ToolInvocation<Record<string, unknown>, ToolResult> {
-    return new NavigationalMcpToolInvocation(
-      this.browserManager,
-      this.name,
-      params,
-      this.messageBus,
-    );
-  }
-}
-
-/**
  * DeclarativeTool for the custom type_text composite tool.
  */
 class TypeTextDeclarativeTool extends DeclarativeTool<
@@ -425,7 +384,6 @@ class TypeTextDeclarativeTool extends DeclarativeTool<
 export async function createMcpDeclarativeTools(
   browserManager: BrowserManager,
   messageBus: MessageBus,
-  config: Config,
 ): Promise<Array<McpDeclarativeTool | TypeTextDeclarativeTool>> {
   // Get dynamically discovered tools from the MCP server
   const mcpTools = await browserManager.getDiscoveredTools();
@@ -454,35 +412,11 @@ export async function createMcpDeclarativeTools(
   // Add custom composite tools
   tools.push(new TypeTextDeclarativeTool(browserManager, messageBus));
 
-  // Determine if we should use navigational wrappers
-  const navigationTools = ['navigate_page', 'new_page'];
-  const browserConfig = config.getBrowserAgentConfig();
-  const shouldInjectOverlay = !browserConfig?.customConfig?.headless;
-
-  const finalTools: Array<
-    | McpDeclarativeTool
-    | TypeTextDeclarativeTool
-    | NavigationalMcpDeclarativeTool
-  > = tools.map((tool) => {
-    if (navigationTools.includes(tool.name) && shouldInjectOverlay) {
-      // Use the navigational wrapper for these tools
-      const schema = mcpTools.find((t) => t.name === tool.name)?.inputSchema;
-      return new NavigationalMcpDeclarativeTool(
-        browserManager,
-        tool.name,
-        tool.description,
-        schema ?? { type: 'object', properties: {} },
-        messageBus,
-      );
-    }
-    return tool;
-  });
-
   debugLogger.log(
-    `Total tools registered: ${finalTools.length} (${mcpTools.length} MCP + 1 custom)`,
+    `Total tools registered: ${tools.length} (${mcpTools.length} MCP + 1 custom)`,
   );
 
-  return finalTools;
+  return tools;
 }
 
 /**

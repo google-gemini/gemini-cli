@@ -9,31 +9,14 @@ import { createMcpDeclarativeTools } from './mcpToolWrapper.js';
 import type { BrowserManager, McpToolCallResult } from './browserManager.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import type { Tool as McpTool } from '@modelcontextprotocol/sdk/types.js';
-import { makeFakeConfig } from '../../test-utils/config.js';
-import type { Config } from '../../config/config.js';
-import { injectAutomationOverlay } from './automationOverlay.js';
-
-vi.mock('./automationOverlay.js', () => ({
-  injectAutomationOverlay: vi.fn().mockResolvedValue(undefined),
-}));
 
 describe('mcpToolWrapper', () => {
   let mockBrowserManager: BrowserManager;
   let mockMessageBus: MessageBus;
   let mockMcpTools: McpTool[];
-  let mockConfig: Config;
 
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(injectAutomationOverlay).mockClear();
-
-    mockConfig = makeFakeConfig({
-      agents: {
-        browser: {
-          headless: false,
-        },
-      },
-    });
 
     // Setup mock MCP tools discovered from server
     mockMcpTools = [
@@ -85,7 +68,6 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
-        mockConfig,
       );
 
       expect(tools).toHaveLength(3);
@@ -98,7 +80,6 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
-        mockConfig,
       );
 
       // Descriptions include augmented hints, so we check they contain the original
@@ -112,7 +93,6 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
-        mockConfig,
       );
 
       const schema = tools[0].schema;
@@ -126,7 +106,6 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
-        mockConfig,
       );
 
       const invocation = tools[0].build({ verbose: true });
@@ -139,7 +118,6 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
-        mockConfig,
       );
 
       const invocation = tools[0].build({});
@@ -153,7 +131,6 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
-        mockConfig,
       );
 
       const invocation = tools[1].build({ uid: 'elem-123' });
@@ -172,7 +149,6 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
-        mockConfig,
       );
 
       const invocation = tools[0].build({ verbose: true });
@@ -191,7 +167,6 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
-        mockConfig,
       );
 
       const invocation = tools[1].build({ uid: 'invalid' });
@@ -209,7 +184,6 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
-        mockConfig,
       );
 
       const invocation = tools[0].build({});
@@ -217,59 +191,6 @@ describe('mcpToolWrapper', () => {
 
       expect(result.error).toBeDefined();
       expect(result.error?.message).toBe('Connection lost');
-    });
-
-    it('should inject automation overlay after navigation', async () => {
-      vi.mocked(mockBrowserManager.getDiscoveredTools).mockResolvedValue([
-        {
-          name: 'navigate_page',
-          description: 'Navigate to URL',
-          inputSchema: { type: 'object', properties: {} },
-        },
-      ]);
-
-      const tools = await createMcpDeclarativeTools(
-        mockBrowserManager,
-        mockMessageBus,
-        mockConfig,
-      );
-
-      const navigateTool = tools.find((t) => t.name === 'navigate_page');
-      expect(navigateTool).toBeDefined();
-
-      const invocation = navigateTool!.build({ url: 'https://example.com' });
-      await invocation.execute(new AbortController().signal);
-
-      expect(injectAutomationOverlay).toHaveBeenCalledWith(
-        mockBrowserManager,
-        expect.any(AbortSignal),
-      );
-    });
-
-    it('should not inject automation overlay after navigation if headless', async () => {
-      const headlessConfig = makeFakeConfig({
-        agents: { browser: { headless: true } },
-      });
-
-      vi.mocked(mockBrowserManager.getDiscoveredTools).mockResolvedValue([
-        {
-          name: 'navigate_page',
-          description: 'Navigate to URL',
-          inputSchema: { type: 'object', properties: {} },
-        },
-      ]);
-
-      const tools = await createMcpDeclarativeTools(
-        mockBrowserManager,
-        mockMessageBus,
-        headlessConfig,
-      );
-
-      const navigateTool = tools.find((t) => t.name === 'navigate_page');
-      const invocation = navigateTool!.build({ url: 'https://example.com' });
-      await invocation.execute(new AbortController().signal);
-
-      expect(injectAutomationOverlay).not.toHaveBeenCalled();
     });
   });
 });

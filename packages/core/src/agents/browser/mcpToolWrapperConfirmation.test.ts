@@ -15,7 +15,6 @@ import {
   type PolicyUpdateOptions,
 } from '../../tools/tools.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
-import type { Config } from '../../config/config.js';
 
 interface TestableConfirmation {
   getConfirmationDetails(
@@ -29,10 +28,9 @@ interface TestableConfirmation {
 describe('mcpToolWrapper Confirmation', () => {
   let mockBrowserManager: BrowserManager;
   let mockMessageBus: MessageBus;
-  let mockConfig: Config;
 
   beforeEach(() => {
-    mockConfig = makeFakeConfig();
+    makeFakeConfig(); // ensure config module is loaded
     mockBrowserManager = {
       getDiscoveredTools: vi
         .fn()
@@ -53,7 +51,6 @@ describe('mcpToolWrapper Confirmation', () => {
     const tools = await createMcpDeclarativeTools(
       mockBrowserManager,
       mockMessageBus,
-      mockConfig,
     );
     const invocation = tools[0].build({}) as unknown as TestableConfirmation;
 
@@ -89,7 +86,6 @@ describe('mcpToolWrapper Confirmation', () => {
     const tools = await createMcpDeclarativeTools(
       mockBrowserManager,
       mockMessageBus,
-      mockConfig,
     );
     const invocation = tools[0].build({}) as unknown as TestableConfirmation;
 
