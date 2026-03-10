@@ -695,7 +695,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`agents.browser.allowedDomains`** (array):
   - **Description:** A list of allowed domains for the browser agent (e.g.,
-    ["github.com", "*.google.com", "localhost"]).
+    ["github.com", "*.google.com"]).
   - **Default:**
 
     ```json
