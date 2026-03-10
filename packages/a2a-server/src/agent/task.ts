@@ -114,6 +114,11 @@ export class Task {
   currentAgentMessageId = uuidv4();
   promptCount = 0;
   autoExecute: boolean;
+  private get isYoloMatch(): boolean {
+    return (
+      this.autoExecute || this.config.getApprovalMode() === ApprovalMode.YOLO
+    );
+  }
 
   // For tool waiting logic
   private pendingToolCalls: Map<string, string> = new Map(); //toolCallId --> status
@@ -445,26 +450,34 @@ export class Task {
 
       // Only send an update if the status has actually changed.
       if (hasChanged) {
-        const coderAgentMessage: CoderAgentMessage =
-          tc.status === 'awaiting_approval'
-            ? { kind: CoderAgentEvent.ToolCallConfirmationEvent }
-            : { kind: CoderAgentEvent.ToolCallUpdateEvent };
-        const message = this.toolStatusMessage(tc, this.id, this.contextId);
+        // Skip sending confirmation event if we are going to auto-approve it anyway
+        if (
+          tc.status === 'awaiting_approval' &&
+          tc.confirmationDetails &&
+          this.isYoloMatch
+        ) {
+          logger.info(
+            `[Task] Skipping ToolCallConfirmationEvent for ${tc.request.callId} due to YOLO mode.`,
+          );
+        } else {
+          const coderAgentMessage: CoderAgentMessage =
+            tc.status === 'awaiting_approval'
+              ? { kind: CoderAgentEvent.ToolCallConfirmationEvent }
+              : { kind: CoderAgentEvent.ToolCallUpdateEvent };
+          const message = this.toolStatusMessage(tc, this.id, this.contextId);
 
-        const event = this._createStatusUpdateEvent(
-          this.taskState,
-          coderAgentMessage,
-          message,
-          false, // Always false for these continuous updates
-        );
-        this.eventBus?.publish(event);
+          const event = this._createStatusUpdateEvent(
+            this.taskState,
+            coderAgentMessage,
+            message,
+            false, // Always false for these continuous updates
+          );
+          this.eventBus?.publish(event);
+        }
       }
     });
 
-    if (
-      this.autoExecute ||
-      this.config.getApprovalMode() === ApprovalMode.YOLO
-    ) {
+    if (this.isYoloMatch) {
       logger.info(
         '[Task] ' +
           (this.autoExecute ? '' : 'YOLO mode enabled. ') +
@@ -628,26 +641,38 @@ export class Task {
 
     // 4. Publish Status Updates to A2A event bus
     if (hasChanged) {
-      const coderAgentMessage: CoderAgentMessage =
-        tc.status === 'awaiting_approval'
-          ? { kind: CoderAgentEvent.ToolCallConfirmationEvent }
-          : { kind: CoderAgentEvent.ToolCallUpdateEvent };
+      // Skip sending confirmation event if we are going to auto-approve it anyway
+      if (
+        tc.status === 'awaiting_approval' &&
+        tc.confirmationDetails &&
+        tc.correlationId &&
+        this.isYoloMatch
+      ) {
+        logger.info(
+          `[Task] Skipping ToolCallConfirmationEvent for ${callId} due to YOLO mode.`,
+        );
+      } else {
+        const coderAgentMessage: CoderAgentMessage =
+          tc.status === 'awaiting_approval'
+            ? { kind: CoderAgentEvent.ToolCallConfirmationEvent }
+            : { kind: CoderAgentEvent.ToolCallUpdateEvent };
 
-      const message = this.toolStatusMessage(tc, this.id, this.contextId);
-      const statusUpdate = this._createStatusUpdateEvent(
-        this.taskState,
-        coderAgentMessage,
-        message,
-        false,
-      );
-      this.eventBus?.publish(statusUpdate);
+        const message = this.toolStatusMessage(tc, this.id, this.contextId);
+        const statusUpdate = this._createStatusUpdateEvent(
+          this.taskState,
+          coderAgentMessage,
+          message,
+          false,
+        );
+        this.eventBus?.publish(statusUpdate);
+      }
     }
 
     // 5. Handle Auto-Execution (YOLO)
     if (
       tc.status === 'awaiting_approval' &&
       tc.correlationId &&
-      (this.autoExecute || this.config.getApprovalMode() === ApprovalMode.YOLO)
+      this.isYoloMatch
     ) {
       logger.info(`[Task] Auto-approving tool call ${callId}`);
       void this.config.getMessageBus().publish({
