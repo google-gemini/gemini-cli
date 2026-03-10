@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import chalk from 'chalk';
 import { theme } from '../../semantic-colors.js';
@@ -24,6 +24,7 @@ import { useSettingsNavigation } from '../../hooks/useSettingsNavigation.js';
 import { useInlineEditBuffer } from '../../hooks/useInlineEditBuffer.js';
 import { formatCommand } from '../../key/keybindingUtils.js';
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
+import { KeypressPriority } from '../../contexts/KeypressContext.js';
 
 /**
  * Represents a single item in the settings dialog.
@@ -37,7 +38,7 @@ export interface SettingsDialogItem {
   description?: string;
   /** Item type for determining interaction behavior */
   type: SettingsType;
-  /** Pre-formatted display value (with * if modified) */
+  /** Pre-formatted display value (with * if set in the selected scope) */
   displayValue: string;
   /** Grey out value (at default) */
   isGreyedOut?: boolean;
@@ -111,6 +112,9 @@ export interface BaseSettingsDialogProps {
     content: React.ReactNode;
     height: number;
   };
+
+  /** Optional extra help text shown in the footer legend area */
+  helpTextSuffix?: string;
 }
 
 /**
@@ -136,6 +140,7 @@ export function BaseSettingsDialog({
   onKeyPress,
   availableHeight,
   footer,
+  helpTextSuffix,
 }: BaseSettingsDialogProps): React.JSX.Element {
   const keyMatchers = useKeyMatchers();
   // Calculate effective max items and scope visibility based on terminal height
@@ -235,13 +240,43 @@ export function BaseSettingsDialog({
     cursorPos: editCursorPos,
   } = editState;
 
-  const [focusSection, setFocusSection] = useState<'settings' | 'scope'>(
-    'settings',
-  );
-  const effectiveFocusSection =
-    !finalShowScopeSelector && focusSection === 'scope'
-      ? 'settings'
-      : focusSection;
+  type FocusSection = 'search' | 'settings' | 'scope';
+
+  const focusableSections = useMemo(() => {
+    const sections: FocusSection[] = [];
+    if (searchEnabled && searchBuffer) {
+      sections.push('search');
+    }
+    sections.push('settings');
+    if (finalShowScopeSelector) {
+      sections.push('scope');
+    }
+    return sections;
+  }, [searchBuffer, searchEnabled, finalShowScopeSelector]);
+
+  const defaultFocusSection = focusableSections[0] ?? 'settings';
+  const [focusSection, setFocusSection] =
+    useState<FocusSection>(defaultFocusSection);
+  const effectiveFocusSection = focusableSections.includes(focusSection)
+    ? focusSection
+    : defaultFocusSection;
+
+  useEffect(() => {
+    if (!focusableSections.includes(focusSection)) {
+      setFocusSection(defaultFocusSection);
+    }
+  }, [defaultFocusSection, focusSection, focusableSections]);
+
+  const cycleFocus = useCallback(() => {
+    if (focusableSections.length <= 1) {
+      return;
+    }
+
+    const currentIndex = focusableSections.indexOf(effectiveFocusSection);
+    const nextIndex =
+      currentIndex === -1 ? 0 : (currentIndex + 1) % focusableSections.length;
+    setFocusSection(focusableSections[nextIndex] ?? defaultFocusSection);
+  }, [defaultFocusSection, effectiveFocusSection, focusableSections]);
 
   // Scope selector items
   const scopeItems = getScopeItems().map((item) => ({
@@ -273,11 +308,6 @@ export function BaseSettingsDialog({
   // Keyboard handling
   useKeypress(
     (key: Key) => {
-      // Let parent handle custom keys first (only if not editing)
-      if (!editingKey && onKeyPress?.(key, currentItem)) {
-        return;
-      }
-
       // Edit mode handling
       if (editingKey) {
         const item = items.find((i) => i.key === editingKey);
@@ -348,6 +378,43 @@ export function BaseSettingsDialog({
         return;
       }
 
+      if (key.name === 'tab') {
+        cycleFocus();
+        return true;
+      }
+
+      // Keep reset behavior consistent regardless of which non-editing section is focused.
+      if (keyMatchers[Command.CLEAR_SCREEN](key) && currentItem) {
+        onItemClear(currentItem.key, currentItem);
+        return true;
+      }
+
+      if (effectiveFocusSection === 'search') {
+        if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
+          setFocusSection('settings');
+          moveUp();
+          return true;
+        }
+        if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
+          setFocusSection('settings');
+          moveDown();
+          return true;
+        }
+
+        if (keyMatchers[Command.RETURN](key) && currentItem) {
+          setFocusSection('settings');
+          return true;
+        }
+
+        if (keyMatchers[Command.ESCAPE](key)) {
+          onClose();
+          return true;
+        }
+
+        // Let the focused text input consume normal typing and editing keys.
+        return;
+      }
+
       // Not in edit mode - handle navigation and actions
       if (effectiveFocusSection === 'settings') {
         // Up/Down navigation with wrap-around
@@ -375,12 +442,6 @@ export function BaseSettingsDialog({
           return true;
         }
 
-        // Ctrl+L - clear/reset to default (using only Ctrl+L to avoid Ctrl+C exit conflict)
-        if (keyMatchers[Command.CLEAR_SCREEN](key) && currentItem) {
-          onItemClear(currentItem.key, currentItem);
-          return true;
-        }
-
         // Number keys for quick edit on number fields
         if (currentItem?.type === 'number' && /^[0-9]$/.test(key.sequence)) {
           startEditing(currentItem.key, key.sequence);
@@ -388,10 +449,9 @@ export function BaseSettingsDialog({
         }
       }
 
-      // Tab - switch focus section
-      if (key.name === 'tab' && finalShowScopeSelector) {
-        setFocusSection((s) => (s === 'settings' ? 'scope' : 'settings'));
-        return;
+      // Let parent handle custom keys after focused text input had a chance to win.
+      if (onKeyPress?.(key, currentItem)) {
+        return true;
       }
 
       // Escape - close dialog
@@ -404,7 +464,7 @@ export function BaseSettingsDialog({
     },
     {
       isActive: true,
-      priority: effectiveFocusSection === 'settings',
+      priority: KeypressPriority.Critical,
     },
   );
 
@@ -436,7 +496,7 @@ export function BaseSettingsDialog({
             borderColor={
               editingKey
                 ? theme.border.default
-                : effectiveFocusSection === 'settings'
+                : effectiveFocusSection === 'search'
                   ? theme.ui.focus
                   : theme.border.default
             }
@@ -445,7 +505,7 @@ export function BaseSettingsDialog({
             marginTop={1}
           >
             <TextInput
-              focus={effectiveFocusSection === 'settings' && !editingKey}
+              focus={effectiveFocusSection === 'search' && !editingKey}
               buffer={searchBuffer}
               placeholder={searchPlaceholder}
             />
@@ -606,7 +666,8 @@ export function BaseSettingsDialog({
           <Text color={theme.text.secondary}>
             (Use Enter to select, {formatCommand(Command.CLEAR_SCREEN)} to reset
             {finalShowScopeSelector ? ', Tab to change focus' : ''}, Esc to
-            close)
+            close
+            {helpTextSuffix ? `, ${helpTextSuffix}` : ''})
           </Text>
         </Box>
 

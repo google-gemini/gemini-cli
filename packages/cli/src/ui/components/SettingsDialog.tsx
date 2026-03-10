@@ -226,7 +226,7 @@ export function SettingsDialog({
       const definition = getSettingDefinition(key);
       const type: SettingsType = definition?.type ?? 'string';
 
-      // Get the display value (with * indicator if modified)
+      // Get the display value (with * indicator if set in the selected scope)
       const displayValue = getDisplayValue(key, scopeSettings, mergedSettings);
 
       // Get the scope message (e.g., "(Modified in Workspace)")
@@ -348,11 +348,11 @@ export function SettingsDialog({
 
   // Decisions on what features to enable
   const hasWorkspace = settings.workspace.path !== undefined;
-  const showSearch = !showRestartPrompt;
+  const showSearch = true;
 
   return (
     <BaseSettingsDialog
-      title="Settings"
+      title="Settings (* = set in selected scope)"
       borderColor={showRestartPrompt ? theme.status.warning : undefined}
       searchEnabled={showSearch}
       searchBuffer={searchBuffer}
@@ -373,8 +373,8 @@ export function SettingsDialog({
           ? {
               content: (
                 <Text color={theme.status.warning}>
-                  Changes that require a restart have been modified. Press r to
-                  exit and apply changes now.
+                  Restart required to apply some settings changes. Press r to
+                  exit and apply them now.
                 </Text>
               ),
               height: 1,
