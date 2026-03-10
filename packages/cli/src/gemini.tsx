@@ -332,8 +332,8 @@ export async function main() {
   // sandbox mode, we re-fetch the admin controls from the server once we enter
   // the sandbox.
   // TODO: Cache settings in sandbox mode as well.
-  const adminControlsListner = setupAdminControlsListener();
-  registerCleanup(adminControlsListner.cleanup);
+  const adminControlsListener = setupAdminControlsListener();
+  registerCleanup(adminControlsListener.cleanup);
 
   const cleanupStdio = patchStdio();
   registerSyncCleanup(() => {
@@ -446,7 +446,7 @@ export async function main() {
   const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
     projectHooks: settings.workspace.settings.hooks,
   });
-  adminControlsListner.setConfig(partialConfig);
+  adminControlsListener.setConfig(partialConfig);
 
   // Refresh auth to fetch remote admin settings from CCPA and before entering
   // the sandbox because the sandbox will interfere with the Oauth2 web
@@ -577,7 +577,7 @@ export async function main() {
     // access to the project identifier.
     await config.storage.initialize();
 
-    adminControlsListner.setConfig(config);
+    adminControlsListener.setConfig(config);
 
     if (config.isInteractive() && settings.merged.general.devtools) {
       const { setupInitialActivityLogger } = await import(
