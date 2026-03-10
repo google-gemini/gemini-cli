@@ -6,7 +6,7 @@
 
 import { useReducer, useCallback, useEffect, useRef } from 'react';
 import { useKeypress, type Key } from './useKeypress.js';
-import { Command } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
 import { useKeyMatchers } from './useKeyMatchers.js';
 
 /**

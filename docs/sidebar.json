@@ -111,7 +111,7 @@
             "badge": "🔬",
             "slug": "docs/cli/notifications"
           },
-          { "label": "Plan mode", "badge": "🔬", "slug": "docs/cli/plan-mode" },
+          { "label": "Plan mode", "slug": "docs/cli/plan-mode" },
           {
             "label": "Subagents",
             "badge": "🔬",
