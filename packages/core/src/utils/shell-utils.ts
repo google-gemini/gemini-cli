@@ -555,13 +555,22 @@ export function getShellConfiguration(): ShellConfiguration {
     const pathDelimiter = os.platform() === 'win32' ? ';' : path.delimiter;
     const paths = (process.env['PATH'] || '').split(pathDelimiter);
     for (const p of paths) {
-      if (!p || !path.isAbsolute(p)) continue; // Security: ignore relative paths in PATH
+      if (!p) continue;
+      // Security: ignore relative paths in PATH
+      if (!path.isAbsolute(p)) {
+        debugLogger.debug(`Ignoring relative path in PATH: ${p}`);
+        continue;
+      }
       const fullPath = path.resolve(p, 'pwsh.exe');
       try {
         if (path.isAbsolute(fullPath) && fs.existsSync(fullPath)) {
           // Security: check if the file is actually executable
           fs.accessSync(fullPath, fs.constants.X_OK);
           const canonicalPath = fs.realpathSync(fullPath);
+          if (!path.isAbsolute(canonicalPath)) {
+            debugLogger.debug(`Ignoring non-absolute canonical path: ${canonicalPath}`);
+            continue;
+          }
           cachedShellConfiguration = {
             executable: canonicalPath,
             argsPrefix: ['-NoProfile', '-Command'],
@@ -606,8 +615,19 @@ export function getShellConfiguration(): ShellConfiguration {
     // Default to Windows PowerShell (powershell.exe) with absolute path
     const systemRoot = process.env['SystemRoot'] || 'C:\\Windows';
     const defaultPsPath = path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+    if (fs.existsSync(defaultPsPath)) {
+      cachedShellConfiguration = {
+        executable: defaultPsPath,
+        argsPrefix: ['-NoProfile', '-Command'],
+        shell: 'powershell',
+      };
+      return cachedShellConfiguration;
+    }
+
+    // Last resort fallback, but still trying to be absolute if possible
+    const fallbackPsPath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
     cachedShellConfiguration = {
-      executable: fs.existsSync(defaultPsPath) ? defaultPsPath : 'powershell.exe',
+      executable: fs.existsSync(fallbackPsPath) ? fallbackPsPath : 'powershell.exe', // if all else fails, we might still have to use the name, but this is rare
       argsPrefix: ['-NoProfile', '-Command'],
       shell: 'powershell',
     };
