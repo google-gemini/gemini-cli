@@ -401,6 +401,7 @@ describe('GeminiChat Network Retries', () => {
 
     // Should only be called once (no retry)
     expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(1);
+    expect(mockLogContentRetryFailure).not.toHaveBeenCalled();
   });
 
   it('should retry on SSL error during stream iteration (mid-stream failure)', async () => {

@@ -505,7 +505,9 @@ export const useSlashCommandProcessor = (
                       const props = result.props as Record<string, unknown>;
                       if (
                         !props ||
+                        // eslint-disable-next-line no-restricted-syntax
                         typeof props['name'] !== 'string' ||
+                        // eslint-disable-next-line no-restricted-syntax
                         typeof props['displayName'] !== 'string' ||
                         !props['definition']
                       ) {

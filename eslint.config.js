@@ -35,6 +35,11 @@ const commonRestrictedSyntaxRules = [
     message:
       'Do not throw string literals or non-Error objects. Throw new Error("...") instead.',
   },
+  {
+    selector: 'CallExpression[callee.name="fetch"]',
+    message:
+      'Use safeFetch() from "@/utils/fetch" instead of the global fetch() to ensure SSRF protection. If you are implementing a custom security layer, use an eslint-disable comment and explain why.',
+  },
 ];
 
 export default tseslint.config(
@@ -132,7 +137,16 @@ export default tseslint.config(
       'no-cond-assign': 'error',
       'no-debugger': 'error',
       'no-duplicate-case': 'error',
-      'no-restricted-syntax': ['error', ...commonRestrictedSyntaxRules],
+      'no-restricted-syntax': [
+        'error',
+        ...commonRestrictedSyntaxRules,
+        {
+          selector:
+            'UnaryExpression[operator="typeof"] > MemberExpression[computed=true][property.type="Literal"]',
+          message:
+            'Do not use typeof to check object properties. Define a TypeScript interface and a type guard function instead.',
+        },
+      ],
       'no-unsafe-finally': 'error',
       'no-unused-expressions': 'off', // Disable base rule
       '@typescript-eslint/no-unused-expressions': [
@@ -263,6 +277,7 @@ export default tseslint.config(
       ...vitest.configs.recommended.rules,
       'vitest/expect-expect': 'off',
       'vitest/no-commented-out-tests': 'off',
+      'no-restricted-syntax': ['error', ...commonRestrictedSyntaxRules],
     },
   },
   {
