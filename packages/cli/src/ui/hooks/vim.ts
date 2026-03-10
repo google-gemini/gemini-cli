@@ -396,7 +396,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       // In INSERT mode, let InputPrompt handle completion keys and special commands
       if (
         normalizedKey.name === 'tab' ||
-        (normalizedKey.name === 'return' && !normalizedKey.ctrl) ||
+        (normalizedKey.name === 'enter' && !normalizedKey.ctrl) ||
         normalizedKey.name === 'up' ||
         normalizedKey.name === 'down' ||
         (normalizedKey.ctrl && normalizedKey.name === 'r')
@@ -424,7 +424,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
       // Special handling for Enter key to allow command submission (lower priority than completion)
       if (
-        normalizedKey.name === 'return' &&
+        normalizedKey.name === 'enter' &&
         !normalizedKey.alt &&
         !normalizedKey.ctrl &&
         !normalizedKey.cmd

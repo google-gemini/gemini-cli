@@ -608,6 +608,7 @@ export class Scheduler {
       await updatePolicy(toolCall.tool, outcome, lastDetails, {
         config: this.config,
         messageBus: this.messageBus,
+        toolInvocation: toolCall.invocation,
       });
     }
 
