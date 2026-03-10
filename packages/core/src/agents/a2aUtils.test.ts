@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   extractMessageText,
   extractIdsFromResponse,
@@ -27,6 +27,7 @@ import type {
   TaskArtifactUpdateEvent,
 } from '@a2a-js/sdk';
 import * as dnsPromises from 'node:dns/promises';
+import type { LookupAddress } from 'node:dns';
 
 vi.mock('node:dns/promises', () => ({
   lookup: vi.fn(),
@@ -35,6 +36,10 @@ vi.mock('node:dns/promises', () => ({
 describe('a2aUtils', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('getGrpcCredentials', () => {
@@ -51,10 +56,12 @@ describe('a2aUtils', () => {
 
   describe('pinUrlToIp', () => {
     it('should resolve and pin hostname to IP', async () => {
-      vi.mocked(dnsPromises.lookup).mockResolvedValue([
-        { address: '93.184.216.34', family: 4 },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ] as any);
+      vi.mocked(
+        dnsPromises.lookup as unknown as (
+          hostname: string,
+          options: { all: true },
+        ) => Promise<LookupAddress[]>,
+      ).mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
 
       const { pinnedUrl, hostname } = await pinUrlToIp(
         'http://example.com:9000',
@@ -65,10 +72,12 @@ describe('a2aUtils', () => {
     });
 
     it('should handle raw host:port strings (standard for gRPC)', async () => {
-      vi.mocked(dnsPromises.lookup).mockResolvedValue([
-        { address: '93.184.216.34', family: 4 },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ] as any);
+      vi.mocked(
+        dnsPromises.lookup as unknown as (
+          hostname: string,
+          options: { all: true },
+        ) => Promise<LookupAddress[]>,
+      ).mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
 
       const { pinnedUrl, hostname } = await pinUrlToIp(
         'example.com:9000',
@@ -87,10 +96,12 @@ describe('a2aUtils', () => {
     });
 
     it('should throw error if resolved to private IP', async () => {
-      vi.mocked(dnsPromises.lookup).mockResolvedValue([
-        { address: '10.0.0.1', family: 4 },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ] as any);
+      vi.mocked(
+        dnsPromises.lookup as unknown as (
+          hostname: string,
+          options: { all: true },
+        ) => Promise<LookupAddress[]>,
+      ).mockResolvedValue([{ address: '10.0.0.1', family: 4 }]);
 
       await expect(
         pinUrlToIp('http://malicious.com', 'test-agent'),
@@ -98,10 +109,12 @@ describe('a2aUtils', () => {
     });
 
     it('should allow localhost/127.0.0.1/::1 exceptions', async () => {
-      vi.mocked(dnsPromises.lookup).mockResolvedValue([
-        { address: '127.0.0.1', family: 4 },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ] as any);
+      vi.mocked(
+        dnsPromises.lookup as unknown as (
+          hostname: string,
+          options: { all: true },
+        ) => Promise<LookupAddress[]>,
+      ).mockResolvedValue([{ address: '127.0.0.1', family: 4 }]);
 
       const { pinnedUrl, hostname } = await pinUrlToIp(
         'http://localhost:9000',
