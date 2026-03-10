@@ -34,7 +34,9 @@ There are two ways to start the DevTools inspector:
     permanently in your settings file. The server will start in the background
     every time you run the CLI.
 
-    Find `settings.json` in the `.gemini` folder in your user's home directory. Add or update the `"devtools": true` key-value pair within the `general` object. For example:
+    Find `settings.json` in the `.gemini` folder in your user's home directory.
+    Add or update the `"devtools": true` key-value pair within the `general`
+    object. For example:
 
     ```json
     "general": {
