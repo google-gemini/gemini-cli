@@ -103,8 +103,15 @@ export async function loadConfig(
     trustedFolder: true,
     extensionLoader,
     checkpointing,
+<<<<<<< HEAD
     interactive: true,
     enableInteractiveShell: true,
+=======
+    enableEventDrivenScheduler:
+      settings.experimental?.enableEventDrivenScheduler ?? true,
+    interactive: !isHeadlessMode(),
+    enableInteractiveShell: !isHeadlessMode(),
+>>>>>>> 1b6963703 (feat(a2a): switch from callback-based to event-driven tool scheduler (#21467))
     ptyInfo: 'auto',
   };
 
