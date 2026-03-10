@@ -611,23 +611,25 @@ export function getShellConfiguration(): ShellConfiguration {
     // Default to Windows PowerShell (powershell.exe) with absolute path
     const systemRoot = process.env['SystemRoot'] || 'C:\\Windows';
     const defaultPsPath = path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
-    if (fs.existsSync(defaultPsPath)) {
+    try {
+      // Security: use accessSync(X_OK) for consistency with other checks
+      fs.accessSync(defaultPsPath, fs.constants.X_OK);
       cachedShellConfiguration = {
         executable: defaultPsPath,
         argsPrefix: ['-NoProfile', '-Command'],
         shell: 'powershell',
       };
       return cachedShellConfiguration;
+    } catch {
+      // If default path fails, fall back to a hardcoded absolute path
+      const fallbackPsPath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+      cachedShellConfiguration = {
+        executable: fallbackPsPath,
+        argsPrefix: ['-NoProfile', '-Command'],
+        shell: 'powershell',
+      };
+      return cachedShellConfiguration;
     }
-
-    // Last resort fallback, strictly absolute
-    const fallbackPsPath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
-    cachedShellConfiguration = {
-      executable: fallbackPsPath,
-      argsPrefix: ['-NoProfile', '-Command'],
-      shell: 'powershell',
-    };
-    return cachedShellConfiguration;
   }
 
   // Unix-like systems (Linux, macOS)
