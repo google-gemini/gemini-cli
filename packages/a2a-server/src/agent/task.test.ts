@@ -504,13 +504,14 @@ describe('Task', () => {
     });
 
     describe('auto-approval', () => {
-      it('should auto-approve tool calls when autoExecute is true', () => {
+      it('should NOT publish ToolCallConfirmationEvent when autoExecute is true', () => {
         task.autoExecute = true;
         const onConfirmSpy = vi.fn();
         const toolCalls = [
           {
             request: { callId: '1' },
             status: 'awaiting_approval',
+            correlationId: 'test-corr-id',
             confirmationDetails: {
               type: 'edit',
               onConfirm: onConfirmSpy,
@@ -524,9 +525,17 @@ describe('Task', () => {
         expect(onConfirmSpy).toHaveBeenCalledWith(
           ToolConfirmationOutcome.ProceedOnce,
         );
+        const calls = (mockEventBus.publish as Mock).mock.calls;
+        // Search if ToolCallConfirmationEvent was published
+        const confEvent = calls.find(
+          (call) =>
+            call[0].metadata?.coderAgent?.kind ===
+            CoderAgentEvent.ToolCallConfirmationEvent,
+        );
+        expect(confEvent).toBeUndefined();
       });
 
-      it('should auto-approve tool calls when approval mode is YOLO', () => {
+      it('should NOT publish ToolCallConfirmationEvent when approval mode is YOLO', () => {
         (mockConfig.getApprovalMode as Mock).mockReturnValue(ApprovalMode.YOLO);
         task.autoExecute = false;
         const onConfirmSpy = vi.fn();
@@ -534,6 +543,7 @@ describe('Task', () => {
           {
             request: { callId: '1' },
             status: 'awaiting_approval',
+            correlationId: 'test-corr-id',
             confirmationDetails: {
               type: 'edit',
               onConfirm: onConfirmSpy,
@@ -547,6 +557,14 @@ describe('Task', () => {
         expect(onConfirmSpy).toHaveBeenCalledWith(
           ToolConfirmationOutcome.ProceedOnce,
         );
+        const calls = (mockEventBus.publish as Mock).mock.calls;
+        // Search if ToolCallConfirmationEvent was published
+        const confEvent = calls.find(
+          (call) =>
+            call[0].metadata?.coderAgent?.kind ===
+            CoderAgentEvent.ToolCallConfirmationEvent,
+        );
+        expect(confEvent).toBeUndefined();
       });
 
       it('should NOT auto-approve when autoExecute is false and mode is not YOLO', () => {
@@ -567,6 +585,14 @@ describe('Task', () => {
         task._schedulerToolCallsUpdate(toolCalls);
 
         expect(onConfirmSpy).not.toHaveBeenCalled();
+        const calls = (mockEventBus.publish as Mock).mock.calls;
+        // Search if ToolCallConfirmationEvent was published
+        const confEvent = calls.find(
+          (call) =>
+            call[0].metadata?.coderAgent?.kind ===
+            CoderAgentEvent.ToolCallConfirmationEvent,
+        );
+        expect(confEvent).toBeDefined();
       });
     });
   });
