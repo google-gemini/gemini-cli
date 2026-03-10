@@ -181,6 +181,56 @@ describe('FileExclusions', () => {
       expect(patterns).toContain('**/.git/**');
       expect(patterns).toContain('**/config-glob/**');
     });
+
+    it('should apply customExcludePatterns from config in getDefaultExcludePatterns', () => {
+      const mockConfig = {
+        getCustomExcludes: vi.fn(() => ['**/generated/**', '**/*.min.js']),
+      } as unknown as Config;
+
+      const excluder = new FileExclusions(mockConfig);
+      const patterns = excluder.getDefaultExcludePatterns();
+
+      expect(patterns).toContain('**/generated/**');
+      expect(patterns).toContain('**/*.min.js');
+      expect(patterns).toContain('**/node_modules/**');
+    });
+
+    it('should apply customExcludePatterns from config in getReadManyFilesExcludes', () => {
+      const mockConfig = {
+        getCustomExcludes: vi.fn(() => ['**/vendor/**']),
+      } as unknown as Config;
+
+      const excluder = new FileExclusions(mockConfig);
+      const patterns = excluder.getReadManyFilesExcludes();
+
+      expect(patterns).toContain('**/vendor/**');
+      expect(patterns).toContain('**/node_modules/**');
+    });
+
+    it('should combine customExcludePatterns with additional runtime patterns (UNION behaviour)', () => {
+      const mockConfig = {
+        getCustomExcludes: vi.fn(() => ['**/generated/**']),
+      } as unknown as Config;
+
+      const excluder = new FileExclusions(mockConfig);
+      const patterns = excluder.getGlobExcludes(['**/runtime-extra/**']);
+
+      expect(patterns).toContain('**/generated/**');
+      expect(patterns).toContain('**/runtime-extra/**');
+      expect(patterns).toContain('**/node_modules/**');
+    });
+
+    it('should return empty customExcludePatterns when config returns []', () => {
+      const mockConfig = {
+        getCustomExcludes: vi.fn(() => []),
+      } as unknown as Config;
+
+      const excluder = new FileExclusions(mockConfig);
+      const withPatterns = new FileExclusions().getDefaultExcludePatterns();
+      const withEmpty = excluder.getDefaultExcludePatterns();
+
+      expect(withEmpty).toEqual(withPatterns);
+    });
   });
 
   describe('buildExcludePatterns', () => {

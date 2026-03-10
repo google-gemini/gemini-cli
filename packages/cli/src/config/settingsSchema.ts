@@ -1233,6 +1233,21 @@ const SETTINGS_SCHEMA = {
             items: { type: 'string' },
             mergeStrategy: MergeStrategy.UNION,
           },
+          customExcludePatterns: {
+            type: 'array',
+            label: 'Custom Exclude Patterns',
+            category: 'Context',
+            requiresRestart: true,
+            default: [] as string[],
+            description: oneLine`
+              Additional glob patterns to exclude from file searches and tool operations
+              (e.g. read-many-files, glob). Patterns are applied on top of the built-in
+              defaults. Example: ["**/generated/**", "**/*.min.js"].
+            `,
+            showInDialog: true,
+            items: { type: 'string' },
+            mergeStrategy: MergeStrategy.UNION,
+          },
         },
       },
     },
