@@ -475,14 +475,18 @@ describe('extensionsCommand', () => {
       mockInstallExtension.mockResolvedValue({ name: extension.url });
 
       // Call onSelect
-      component.props.onSelect?.(extension);
+      await component.props.onSelect?.(extension);
 
       await waitFor(() => {
         expect(inferInstallMetadata).toHaveBeenCalledWith(extension.url);
-        expect(mockInstallExtension).toHaveBeenCalledWith({
-          source: extension.url,
-          type: 'git',
-        });
+        expect(mockInstallExtension).toHaveBeenCalledWith(
+          {
+            source: extension.url,
+            type: 'git',
+          },
+          undefined,
+          undefined,
+        );
       });
       expect(mockContext.ui.removeComponent).toHaveBeenCalledTimes(1);
 
