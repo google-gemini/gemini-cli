@@ -8,10 +8,14 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { agentsCommand } from './agentsCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { Config } from '@google/gemini-cli-core';
+import { Storage } from '@google/gemini-cli-core';
 import type { LoadedSettings } from '../../config/settings.js';
 import { MessageType } from '../types.js';
 import { enableAgent, disableAgent } from '../../utils/agentSettings.js';
 import { renderAgentActionFeedback } from '../../utils/agentUtils.js';
+import * as fs from 'node:fs/promises';
+
+vi.mock('node:fs/promises');
 
 vi.mock('../../utils/agentSettings.js', () => ({
   enableAgent: vi.fn(),
@@ -105,40 +109,34 @@ describe('agentsCommand', () => {
     );
   });
 
-  it('should reload the agent registry when reload subcommand is called', async () => {
+  it('should reload the agent registry when refresh subcommand is called', async () => {
     const reloadSpy = vi.fn().mockResolvedValue(undefined);
     mockConfig.getAgentRegistry = vi.fn().mockReturnValue({
       reload: reloadSpy,
     });
 
-    const reloadCommand = agentsCommand.subCommands?.find(
-      (cmd) => cmd.name === 'reload',
+    const refreshCommand = agentsCommand.subCommands?.find(
+      (cmd) => cmd.name === 'refresh',
     );
-    expect(reloadCommand).toBeDefined();
+    expect(refreshCommand).toBeDefined();
 
-    const result = await reloadCommand!.action!(mockContext, '');
+    const result = await refreshCommand!.action!(mockContext, '');
 
     expect(reloadSpy).toHaveBeenCalled();
-    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: MessageType.INFO,
-        text: 'Reloading agent registry...',
-      }),
-    );
     expect(result).toEqual({
       type: 'message',
       messageType: 'info',
-      content: 'Agents reloaded successfully',
+      content: 'Agents refreshed successfully.',
     });
   });
 
-  it('should show an error if agent registry is not available during reload', async () => {
+  it('should show an error if agent registry is not available during refresh', async () => {
     mockConfig.getAgentRegistry = vi.fn().mockReturnValue(undefined);
 
-    const reloadCommand = agentsCommand.subCommands?.find(
-      (cmd) => cmd.name === 'reload',
+    const refreshCommand = agentsCommand.subCommands?.find(
+      (cmd) => cmd.name === 'refresh',
     );
-    const result = await reloadCommand!.action!(mockContext, '');
+    const result = await refreshCommand!.action!(mockContext, '');
 
     expect(result).toEqual({
       type: 'message',
@@ -460,6 +458,58 @@ describe('agentsCommand', () => {
 
       const completions = await configCommand!.completion!(mockContext, 'age');
       expect(completions).toEqual(['agent1', 'agent2']);
+    });
+  });
+
+  describe('import sub-command', () => {
+    it('should import an agent with correct tool mapping', async () => {
+      vi.mocked(fs.readFile).mockResolvedValue(`---
+name: test-claude-agent
+tools: Read, Glob, Grep, Bash
+model: sonnet
+---
+System prompt content`);
+
+      vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+      vi.mocked(fs.writeFile).mockResolvedValue(undefined);
+      vi.spyOn(Storage, 'getUserAgentsDir').mockReturnValue('/mock/agents');
+
+      const importCommand = agentsCommand.subCommands?.find(
+        (cmd) => cmd.name === 'import',
+      );
+      expect(importCommand).toBeDefined();
+
+      const result = await importCommand!.action!(
+        mockContext,
+        '/path/to/claude.md',
+      );
+
+      expect(fs.readFile).toHaveBeenCalledWith('/path/to/claude.md', 'utf-8');
+      expect(fs.writeFile).toHaveBeenCalledWith(
+        expect.stringMatching(/test-claude-agent\.md$/),
+        expect.stringContaining('tools:\n  - read_file\n  - run_command\n'),
+        'utf-8',
+      );
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: expect.stringContaining(
+          "Successfully imported agent 'test-claude-agent'",
+        ),
+      });
+    });
+
+    it('should show error if no file path provided', async () => {
+      const importCommand = agentsCommand.subCommands?.find(
+        (cmd) => cmd.name === 'import',
+      );
+      const result = await importCommand!.action!(mockContext, '  ');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Usage: /agents import <file-path>',
+      });
     });
   });
 });
