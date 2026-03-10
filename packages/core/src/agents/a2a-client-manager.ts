@@ -12,21 +12,53 @@ import type {
   TaskStatusUpdateEvent,
   TaskArtifactUpdateEvent,
 } from '@a2a-js/sdk';
+import type { AuthenticationHandler, Client } from '@a2a-js/sdk/client';
 import {
-  type Client,
   ClientFactory,
   ClientFactoryOptions,
   DefaultAgentCardResolver,
-  RestTransportFactory,
   JsonRpcTransportFactory,
-  type AuthenticationHandler,
+  RestTransportFactory,
   createAuthenticatingFetchWithRetry,
 } from '@a2a-js/sdk/client';
+import { GrpcTransportFactory } from '@a2a-js/sdk/client/grpc';
 import { v4 as uuidv4 } from 'uuid';
 import { Agent as UndiciAgent } from 'undici';
+import {
+  getGrpcChannelOptions,
+  getGrpcCredentials,
+  normalizeAgentCard,
+  pinUrlToIp,
+  splitAgentCardUrl,
+} from './a2aUtils.js';
+import {
+  isPrivateIpAsync,
+  safeLookup,
+  isLoopbackHost,
+  safeFetch,
+} from '../utils/fetch.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { safeLookup } from '../utils/fetch.js';
 import { classifyAgentError } from './a2a-errors.js';
+
+/**
+ * Result of sending a message, which can be a full message, a task,
+ * or an incremental status/artifact update.
+ */
+export type SendMessageResult =
+  | Message
+  | Task
+  | TaskStatusUpdateEvent
+  | TaskArtifactUpdateEvent;
+
+/**
+ * Internal interface representing properties we inject into the SDK
+ * to enable DNS rebinding protection for gRPC connections.
+ * TODO: Replace with official SDK pinning API once available.
+ */
+interface InternalGrpcExtensions {
+  target: string;
+  grpcChannelOptions: Record<string, unknown>;
+}
 
 // Remote agents can take 10+ minutes (e.g. Deep Research).
 // Use a dedicated dispatcher so the global 5-min timeout isn't affected.
@@ -35,22 +67,16 @@ const a2aDispatcher = new UndiciAgent({
   headersTimeout: A2A_TIMEOUT,
   bodyTimeout: A2A_TIMEOUT,
   connect: {
-    lookup: safeLookup, // SSRF protection at connection level
+    // SSRF protection at the connection level (mitigates DNS rebinding)
+    lookup: safeLookup,
   },
 });
 const a2aFetch: typeof fetch = (input, init) =>
-  // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
-  fetch(input, { ...init, dispatcher: a2aDispatcher } as RequestInit);
-
-export type SendMessageResult =
-  | Message
-  | Task
-  | TaskStatusUpdateEvent
-  | TaskArtifactUpdateEvent;
+  safeFetch(input, { ...init, dispatcher: a2aDispatcher });
 
 /**
- * Manages A2A clients and caches loaded agent information.
- * Follows a singleton pattern to ensure a single client instance.
+ * Orchestrates communication with remote A2A agents.
+ * Manages protocol negotiation, authentication, and transport selection.
  */
 export class A2AClientManager {
   private static instance: A2AClientManager;
@@ -72,18 +98,9 @@ export class A2AClientManager {
   }
 
   /**
-   * Resets the singleton instance. Only for testing purposes.
-   * @internal
-   */
-  static resetInstanceForTesting() {
-    // @ts-expect-error - Resetting singleton for testing
-    A2AClientManager.instance = undefined;
-  }
-
-  /**
    * Loads an agent by fetching its AgentCard and caches the client.
    * @param name The name to assign to the agent.
-   * @param agentCardUrl The full URL to the agent's card.
+   * @param agentCardUrl {string} The full URL to the agent's card.
    * @param authHandler Optional authentication handler to use for this agent.
    * @returns The loaded AgentCard.
    */
@@ -120,20 +137,51 @@ export class A2AClientManager {
     };
 
     const resolver = new DefaultAgentCardResolver({ fetchImpl: cardFetch });
+    const agentCard = await this.resolveAgentCard(name, agentCardUrl, resolver);
 
-    const options = ClientFactoryOptions.createFrom(
+    // Pin URL to IP to prevent DNS rebinding for gRPC (connection-level SSRF protection)
+    const grpcInterface = agentCard.additionalInterfaces?.find(
+      (i) => i.transport === 'GRPC',
+    );
+    const urlToPin = grpcInterface?.url ?? agentCard.url;
+    const { pinnedUrl, hostname } = await pinUrlToIp(urlToPin, name);
+
+    // Prepare base gRPC options
+    const baseGrpcOptions: ConstructorParameters<
+      typeof GrpcTransportFactory
+    >[0] = {
+      grpcChannelCredentials: getGrpcCredentials(urlToPin),
+    };
+
+    // We inject additional properties into the transport options to force
+    // the use of a pinned IP address and matching SSL authority. This is
+    // required for robust DNS Rebinding protection.
+    const transportOptions = {
+      ...baseGrpcOptions,
+      target: pinnedUrl,
+      grpcChannelOptions: getGrpcChannelOptions(hostname),
+    } as ConstructorParameters<typeof GrpcTransportFactory>[0] &
+      InternalGrpcExtensions;
+
+    // Configure standard SDK client for tool registration and discovery
+    const clientOptions = ClientFactoryOptions.createFrom(
       ClientFactoryOptions.default,
       {
         transports: [
           new RestTransportFactory({ fetchImpl: authFetch }),
           new JsonRpcTransportFactory({ fetchImpl: authFetch }),
+          new GrpcTransportFactory(
+            transportOptions as ConstructorParameters<
+              typeof GrpcTransportFactory
+            >[0],
+          ),
         ],
         cardResolver: resolver,
       },
     );
 
     try {
-      const factory = new ClientFactory(options);
+      const factory = new ClientFactory(clientOptions);
       const client = await factory.createFromUrl(agentCardUrl, '');
       const agentCard = await client.getAgentCard();
 
@@ -173,9 +221,7 @@ export class A2AClientManager {
     options?: { contextId?: string; taskId?: string; signal?: AbortSignal },
   ): AsyncIterable<SendMessageResult> {
     const client = this.clients.get(agentName);
-    if (!client) {
-      throw new Error(`Agent '${agentName}' not found.`);
-    }
+    if (!client) throw new Error(`Agent '${agentName}' not found.`);
 
     const messageParams: MessageSendParams = {
       message: {
@@ -188,9 +234,19 @@ export class A2AClientManager {
       },
     };
 
-    yield* client.sendMessageStream(messageParams, {
-      signal: options?.signal,
-    });
+    try {
+      yield* client.sendMessageStream(messageParams, {
+        signal: options?.signal,
+      }) as AsyncIterable<SendMessageResult>;
+    } catch (error: unknown) {
+      const prefix = `[A2AClientManager] sendMessageStream Error [${agentName}]`;
+      if (error instanceof Error) {
+        throw new Error(`${prefix}: ${error.message}`, { cause: error });
+      }
+      throw new Error(
+        `${prefix}: Unexpected error during sendMessageStream: ${String(error)}`,
+      );
+    }
   }
 
   /**
@@ -219,9 +275,7 @@ export class A2AClientManager {
    */
   async getTask(agentName: string, taskId: string): Promise<Task> {
     const client = this.clients.get(agentName);
-    if (!client) {
-      throw new Error(`Agent '${agentName}' not found.`);
-    }
+    if (!client) throw new Error(`Agent '${agentName}' not found.`);
     try {
       return await client.getTask({ id: taskId });
     } catch (error: unknown) {
@@ -241,9 +295,7 @@ export class A2AClientManager {
    */
   async cancelTask(agentName: string, taskId: string): Promise<Task> {
     const client = this.clients.get(agentName);
-    if (!client) {
-      throw new Error(`Agent '${agentName}' not found.`);
-    }
+    if (!client) throw new Error(`Agent '${agentName}' not found.`);
     try {
       return await client.cancelTask({ id: taskId });
     } catch (error: unknown) {
@@ -252,6 +304,68 @@ export class A2AClientManager {
         throw new Error(`${prefix}: ${error.message}`, { cause: error });
       }
       throw new Error(`${prefix}: Unexpected error: ${String(error)}`);
+    }
+  }
+
+  /**
+   * Resolves and normalizes an agent card from a given URL.
+   * Handles splitting the URL if it already contains the standard .well-known path.
+   * Also performs basic SSRF validation to prevent internal IP access.
+   */
+  private async resolveAgentCard(
+    agentName: string,
+    url: string,
+    resolver: DefaultAgentCardResolver,
+  ): Promise<AgentCard> {
+    // Validate URL to prevent SSRF (with DNS resolution)
+    if (await isPrivateIpAsync(url)) {
+      // Local/private IPs are allowed ONLY for localhost for testing.
+      const parsed = new URL(url);
+      if (!isLoopbackHost(parsed.hostname)) {
+        throw new Error(
+          `Refusing to load agent '${agentName}' from private IP range: ${url}. Remote agents must use public URLs.`,
+        );
+      }
+    }
+
+    const { baseUrl, path } = splitAgentCardUrl(url);
+    const rawCard = await resolver.resolve(baseUrl, path);
+    const agentCard = normalizeAgentCard(rawCard);
+
+    // Deep validation of all transport URLs within the card to prevent SSRF
+    await this.validateAgentCardUrls(agentName, agentCard);
+
+    return agentCard;
+  }
+
+  /**
+   * Validates all URLs (top-level and interfaces) within an AgentCard for SSRF.
+   */
+  private async validateAgentCardUrls(
+    agentName: string,
+    card: AgentCard,
+  ): Promise<void> {
+    const urlsToValidate = [card.url];
+    if (card.additionalInterfaces) {
+      for (const intf of card.additionalInterfaces) {
+        if (intf.url) urlsToValidate.push(intf.url);
+      }
+    }
+
+    for (const url of urlsToValidate) {
+      if (!url) continue;
+
+      // Ensure URL has a scheme for the parser (gRPC often provides raw IP:port)
+      const validationUrl = url.includes('://') ? url : `http://${url}`;
+
+      if (await isPrivateIpAsync(validationUrl)) {
+        const parsed = new URL(validationUrl);
+        if (!isLoopbackHost(parsed.hostname)) {
+          throw new Error(
+            `Refusing to load agent '${agentName}': contains transport URL pointing to private IP range: ${url}.`,
+          );
+        }
+      }
     }
   }
 }

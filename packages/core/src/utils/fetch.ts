@@ -240,16 +240,16 @@ function handleFetchError(error: unknown, url: string): never {
  */
 export async function safeFetch(
   input: RequestInfo | URL,
-  init?: RequestInit,
+  init?: NodeFetchInit,
 ): Promise<Response> {
   const nodeInit: NodeFetchInit = {
-    ...init,
     dispatcher: safeDispatcher,
+    ...init,
   };
 
   try {
     // eslint-disable-next-line no-restricted-syntax
-    return await fetch(input, nodeInit);
+    return await fetch(input, nodeInit as RequestInit);
   } catch (error) {
     const url =
       input instanceof Request
