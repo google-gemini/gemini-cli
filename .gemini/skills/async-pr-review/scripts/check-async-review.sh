@@ -22,6 +22,7 @@ fi
 
 tasks=(
   "setup|setup.log"
+  "pr-diff|pr-diff.diff"
   "build-and-lint|build-and-lint.log"
   "review|review.md"
   "npm-test|npm-test.log"

@@ -41,5 +41,5 @@ If the user wants to check the status or view the final assessment of a previous
     ```
 3.  **Evaluate Output**: Read the output from the script.
     *   If the output contains `STATUS: IN_PROGRESS`, tell the user which tasks are still running.
-    *   If the output contains `STATUS: COMPLETE`, use your file reading tools (`read_file`) to retrieve the contents of `final-assessment.md`, `review.md`, `npm-test.log`, and `test-execution.log` files from the `LOG_DIR` specified in the output.
+    *   If the output contains `STATUS: COMPLETE`, use your file reading tools (`read_file`) to retrieve the contents of `final-assessment.md`, `review.md`, `pr-diff.diff`, `npm-test.log`, and `test-execution.log` files from the `LOG_DIR` specified in the output.
     *   **Final Assessment**: Read those files, synthesize their results, and give the user a concise recommendation on whether the PR builds successfully, passes tests, and if you recommend they approve it based on the review.

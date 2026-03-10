@@ -66,30 +66,74 @@ cd "$target_dir" || exit 1
 
 echo "🚀 Launching background tasks. Logs saving to: $log_dir"
 
-echo "  ↳ [1/4] Starting build and lint..."
+echo "  ↳ [1/5] Grabbing PR diff..."
+rm -f "$log_dir/pr-diff.exit"
+{ gh pr diff "$pr_number" > "$log_dir/pr-diff.diff" 2>&1; echo $? > "$log_dir/pr-diff.exit"; } &
+
+echo "  ↳ [2/5] Starting build and lint..."
 rm -f "$log_dir/build-and-lint.exit"
 { { npm run clean && npm ci && npm run format && npm run build && npm run lint:ci && npm run typecheck; } > "$log_dir/build-and-lint.log" 2>&1; echo $? > "$log_dir/build-and-lint.exit"; } &
 
 # Dynamically resolve gemini binary (fallback to your nightly path)
 GEMINI_CMD=$(which gemini || echo "$HOME/.gcli/nightly/node_modules/.bin/gemini")
 
-echo "  ↳ [2/4] Starting Gemini code review..."
+echo "  ↳ [3/5] Starting Gemini code review..."
 rm -f "$log_dir/review.exit"
 { "$GEMINI_CMD" --approval-mode=yolo /review-frontend "$pr_number" > "$log_dir/review.md" 2>&1; echo $? > "$log_dir/review.exit"; } &
 
-echo "  ↳ [3/4] Starting automated tests (waiting for build and lint)..."
+echo "  ↳ [4/5] Starting automated tests (waiting for build and lint)..."
 rm -f "$log_dir/npm-test.exit"
 { 
   while [ ! -f "$log_dir/build-and-lint.exit" ]; do sleep 1; done
   if [ "$(cat "$log_dir/build-and-lint.exit")" == "0" ]; then
-    npm run test:ci > "$log_dir/npm-test.log" 2>&1; echo $? > "$log_dir/npm-test.exit"
+    if gh pr checks "$pr_number" > "$log_dir/ci-checks.log" 2>&1; then
+      echo "CI checks passed. Skipping local npm tests." > "$log_dir/npm-test.log"
+      echo 0 > "$log_dir/npm-test.exit"
+    else
+      echo "CI checks did not pass. Failing checks:" > "$log_dir/npm-test.log"
+      gh pr checks "$pr_number" --json name,bucket -q '.[] | select(.bucket=="fail") | .name' >> "$log_dir/npm-test.log" 2>&1
+      
+      echo "Attempting to extract failing test files from CI logs..." >> "$log_dir/npm-test.log"
+      pr_branch=$(gh pr view "$pr_number" --json headRefName -q '.headRefName' 2>/dev/null)
+      run_id=$(gh run list --branch "$pr_branch" --workflow ci.yml --json databaseId -q '.[0].databaseId' 2>/dev/null)
+      
+      failed_files=""
+      if [[ -n "$run_id" ]]; then
+        failed_files=$(gh run view "$run_id" --log-failed 2>/dev/null | grep -o -E '(packages/[a-zA-Z0-9_-]+|integration-tests|evals)/[a-zA-Z0-9_/-]+\.test\.ts(x)?' | sort | uniq)
+      fi
+      
+      if [[ -n "$failed_files" ]]; then
+        echo "Found failing test files from CI:" >> "$log_dir/npm-test.log"
+        for f in $failed_files; do echo "  - $f" >> "$log_dir/npm-test.log"; done
+        echo "Running ONLY failing tests locally..." >> "$log_dir/npm-test.log"
+        
+        exit_code=0
+        for file in $failed_files; do
+           if [[ "$file" == packages/* ]]; then
+             ws_dir=$(echo "$file" | cut -d'/' -f1,2)
+           else
+             ws_dir=$(echo "$file" | cut -d'/' -f1)
+           fi
+           rel_file=${file#$ws_dir/}
+           
+           echo "--- Running $rel_file in workspace $ws_dir ---" >> "$log_dir/npm-test.log"
+           if ! npm run test:ci -w "$ws_dir" -- "$rel_file" >> "$log_dir/npm-test.log" 2>&1; then
+             exit_code=1
+           fi
+        done
+        echo $exit_code > "$log_dir/npm-test.exit"
+      else
+        echo "Could not extract specific failing files. Running full local test suite..." >> "$log_dir/npm-test.log"
+        npm run test:ci >> "$log_dir/npm-test.log" 2>&1; echo $? > "$log_dir/npm-test.exit"
+      fi
+    fi
   else
     echo "Skipped due to build-and-lint failure" > "$log_dir/npm-test.log"
     echo 1 > "$log_dir/npm-test.exit"
   fi
 } &
 
-echo "  ↳ [4/4] Starting Gemini test execution (waiting for build and lint)..."
+echo "  ↳ [5/5] Starting Gemini test execution (waiting for build and lint)..."
 rm -f "$log_dir/test-execution.exit"
 { 
   while [ ! -f "$log_dir/build-and-lint.exit" ]; do sleep 1; done
@@ -106,8 +150,8 @@ echo "You can monitor progress with: tail -f $log_dir/*.log"
 echo "Read your review later at: $log_dir/review.md"
 
 # Polling loop to wait for all background tasks to finish
-tasks=("build-and-lint" "review" "npm-test" "test-execution")
-log_files=("build-and-lint.log" "review.md" "npm-test.log" "test-execution.log")
+tasks=("pr-diff" "build-and-lint" "review" "npm-test" "test-execution")
+log_files=("pr-diff.diff" "build-and-lint.log" "review.md" "npm-test.log" "test-execution.log")
 
 declare -A task_done
 for t in "${tasks[@]}"; do task_done[$t]=0; done
