@@ -31,7 +31,8 @@ Returns a stream of newline-delimited JSON (JSONL) events.
   - `tool_use`: Tool call requests with arguments.
   - `tool_result`: Output from executed tools.
   - `error`: Non-fatal warnings and system errors.
-  - `result`: Final outcome with aggregated statistics.
+  - `result`: Final outcome with aggregated statistics and per-model token usage
+    breakdowns.
 
 ## Exit codes
 
