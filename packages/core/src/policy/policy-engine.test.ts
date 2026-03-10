@@ -333,6 +333,48 @@ describe('PolicyEngine', () => {
         PolicyDecision.ASK_USER,
       );
     });
+
+    it('should return ALLOW by default in YOLO mode when no rules match', async () => {
+      engine = new PolicyEngine({ approvalMode: ApprovalMode.YOLO });
+
+      // No rules defined, should return ALLOW in YOLO mode
+      const { decision } = await engine.check({ name: 'any-tool' }, undefined);
+      expect(decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should NOT override explicit DENY rules in YOLO mode', async () => {
+      const rules: PolicyRule[] = [
+        { toolName: 'dangerous-tool', decision: PolicyDecision.DENY },
+      ];
+      engine = new PolicyEngine({ rules, approvalMode: ApprovalMode.YOLO });
+
+      const { decision } = await engine.check(
+        { name: 'dangerous-tool' },
+        undefined,
+      );
+      expect(decision).toBe(PolicyDecision.DENY);
+
+      // But other tools still allowed
+      expect(
+        (await engine.check({ name: 'safe-tool' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should respect rule priority in YOLO mode when a match exists', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'test-tool',
+          decision: PolicyDecision.ASK_USER,
+          priority: 10,
+        },
+        { toolName: 'test-tool', decision: PolicyDecision.DENY, priority: 20 },
+      ];
+      engine = new PolicyEngine({ rules, approvalMode: ApprovalMode.YOLO });
+
+      // Priority 20 (DENY) should win over priority 10 (ASK_USER)
+      const { decision } = await engine.check({ name: 'test-tool' }, undefined);
+      expect(decision).toBe(PolicyDecision.DENY);
+    });
   });
 
   describe('addRule', () => {
