@@ -375,6 +375,15 @@ export default tseslint.config(
       },
     },
   },
+  // Docs examples should have access to standard globals
+  {
+    files: ['docs/examples/**/*.js'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
   // extra settings for scripts that we run directly with node
   {
     files: ['packages/vscode-ide-companion/scripts/**/*.js'],
