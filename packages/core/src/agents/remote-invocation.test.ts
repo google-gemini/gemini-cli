@@ -613,4 +613,75 @@ describe('RemoteAgentInvocation', () => {
       }
     });
   });
+
+  describe('Error Handling', () => {
+    it('should use A2AAgentError.userMessage for structured errors', async () => {
+      const { AgentConnectionError } = await import('./a2a-errors.js');
+      const a2aError = new AgentConnectionError(
+        'test-agent',
+        'http://test-agent/card',
+        new Error('ECONNREFUSED'),
+      );
+
+      mockClientManager.getClient.mockReturnValue(undefined);
+      mockClientManager.loadAgent.mockRejectedValue(a2aError);
+
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeDefined();
+      expect(result.returnDisplay).toContain(a2aError.userMessage);
+    });
+
+    it('should use generic message for non-A2AAgentError errors', async () => {
+      mockClientManager.getClient.mockReturnValue(undefined);
+      mockClientManager.loadAgent.mockRejectedValue(
+        new Error('something unexpected'),
+      );
+
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeDefined();
+      expect(result.returnDisplay).toContain(
+        'Error calling remote agent: something unexpected',
+      );
+    });
+
+    it('should include partial output when error occurs mid-stream', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+      mockClientManager.sendMessageStream.mockImplementation(
+        async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'msg-1',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Partial response' }],
+          };
+          // Raw errors propagate from the A2A SDK — no wrapping or classification.
+          throw new Error('connection reset');
+        },
+      );
+
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.error).toBeDefined();
+      // Should contain both the partial output and the error message
+      expect(result.returnDisplay).toContain('Partial response');
+      expect(result.returnDisplay).toContain('connection reset');
+    });
+  });
 });

@@ -26,6 +26,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Agent as UndiciAgent } from 'undici';
 import { debugLogger } from '../utils/debugLogger.js';
 import { safeLookup } from '../utils/fetch.js';
+import { classifyAgentError } from './a2a-errors.js';
 
 // Remote agents can take 10+ minutes (e.g. Deep Research).
 // Use a dedicated dispatcher so the global 5-min timeout isn't affected.
@@ -131,18 +132,22 @@ export class A2AClientManager {
       },
     );
 
-    const factory = new ClientFactory(options);
-    const client = await factory.createFromUrl(agentCardUrl, '');
-    const agentCard = await client.getAgentCard();
+    try {
+      const factory = new ClientFactory(options);
+      const client = await factory.createFromUrl(agentCardUrl, '');
+      const agentCard = await client.getAgentCard();
 
-    this.clients.set(name, client);
-    this.agentCards.set(name, agentCard);
+      this.clients.set(name, client);
+      this.agentCards.set(name, agentCard);
 
-    debugLogger.debug(
-      `[A2AClientManager] Loaded agent '${name}' from ${agentCardUrl}`,
-    );
+      debugLogger.debug(
+        `[A2AClientManager] Loaded agent '${name}' from ${agentCardUrl}`,
+      );
 
-    return agentCard;
+      return agentCard;
+    } catch (error: unknown) {
+      throw classifyAgentError(name, agentCardUrl, error);
+    }
   }
 
   /**
@@ -183,19 +188,9 @@ export class A2AClientManager {
       },
     };
 
-    try {
-      yield* client.sendMessageStream(messageParams, {
-        signal: options?.signal,
-      });
-    } catch (error: unknown) {
-      const prefix = `[A2AClientManager] sendMessageStream Error [${agentName}]`;
-      if (error instanceof Error) {
-        throw new Error(`${prefix}: ${error.message}`, { cause: error });
-      }
-      throw new Error(
-        `${prefix}: Unexpected error during sendMessageStream: ${String(error)}`,
-      );
-    }
+    yield* client.sendMessageStream(messageParams, {
+      signal: options?.signal,
+    });
   }
 
   /**

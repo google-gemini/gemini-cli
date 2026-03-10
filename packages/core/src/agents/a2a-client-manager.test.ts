@@ -302,7 +302,7 @@ describe('A2AClientManager', () => {
       expect(call.message.taskId).toBe(expectedTaskId);
     });
 
-    it('should throw prefixed error on failure', async () => {
+    it('should propagate the original error on failure', async () => {
       sendMessageStreamMock.mockImplementationOnce(() => {
         throw new Error('Network error');
       });
@@ -312,9 +312,7 @@ describe('A2AClientManager', () => {
         for await (const _ of stream) {
           // consume
         }
-      }).rejects.toThrow(
-        '[A2AClientManager] sendMessageStream Error [TestAgent]: Network error',
-      );
+      }).rejects.toThrow('Network error');
     });
 
     it('should throw an error if the agent is not found', async () => {
