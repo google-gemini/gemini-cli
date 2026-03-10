@@ -98,12 +98,26 @@ tool to augment, not replace, their manual review process.
 
 ### Self-assigning and unassigning issues
 
-To assign an issue to yourself, simply add a comment with the text `/assign`. To
-unassign yourself from an issue, add a comment with the text `/unassign`.
+We encourage contributors to self-assign issues they are working on to avoid
+duplicate effort. There are two ways to do this:
 
-The comment must contain only that text and nothing else. These commands will
-assign or unassign the issue as requested, provided the conditions are met
-(e.g., an issue must be unassigned to be assigned).
+1.  **Express interest when creating an issue:** One of the best ways to land
+    contributions is to identify issues from using Gemini CLI or exploring the
+    codebase! When filling out a bug report or feature request template, you can
+    check the box: **"I want to contribute to this issue if it is approved."**
+    If a maintainer approves the issue and adds the `help wanted` label, the
+    Gemini bot will automatically assign the issue to you, provided you haven't
+    reached your 3-issue limit.
+2.  **Using the `/assign` command:** You can also assign any issue marked with
+    the `help wanted` label to yourself by adding a comment with the text
+    `/assign`.
+
+To unassign yourself from an issue, add a comment with the text `/unassign`.
+
+The comment for these commands must contain only that text and nothing else.
+These commands will assign or unassign the issue as requested, provided the
+conditions are met (e.g., the issue must be unassigned to be assigned, and must
+have the `help wanted` label).
 
 Please note that you can have a maximum of 3 issues assigned to you at any given
 time.
@@ -173,6 +187,12 @@ standard for your commit messages.
 
 In the PR description, explain the "why" behind your changes and link to the
 relevant issue (e.g., `Fixes #123`).
+
+#### 7. Watch out for existing PRs and ongoing discussions
+
+Before opening a pull request, you should take a peak at any existing
+discussions in the linked issue. There may be someone else already assigned,
+existing PRs, or an ongoing discussion that you may consider joining.
 
 ### Forking
 
