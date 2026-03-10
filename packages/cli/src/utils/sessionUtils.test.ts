@@ -11,6 +11,7 @@ import {
   formatRelativeTime,
   hasUserOrAssistantMessage,
   SessionError,
+  type SessionInfo,
 } from './sessionUtils.js';
 import type { Config, MessageRecord } from '@google/gemini-cli-core';
 import { SESSION_FILE_PREFIX } from '@google/gemini-cli-core';
@@ -790,7 +791,7 @@ describe('SessionError.invalidSessionIdentifier', () => {
         startTime: '2024-01-02T09:00:00.000Z',
         index: 2,
       },
-    ] as Array<import('./sessionUtils.js').SessionInfo>;
+    ] as SessionInfo[];
 
     const error = SessionError.invalidSessionIdentifier('99', sessions);
     expect(error.code).toBe('INVALID_SESSION_IDENTIFIER');
@@ -822,7 +823,7 @@ describe('SessionError.invalidSessionIdentifier', () => {
         startTime: '2024-01-01T09:00:00.000Z',
         index: 1,
       },
-    ] as Array<import('./sessionUtils.js').SessionInfo>;
+    ] as SessionInfo[];
 
     const error = SessionError.invalidSessionIdentifier('bad', sessions);
     const olderPos = error.message.indexOf('Older session');
@@ -843,7 +844,7 @@ describe('SessionError.invalidSessionIdentifier', () => {
         startTime: '2024-01-01T09:00:00.000Z',
         index: 1,
       },
-    ] as Array<import('./sessionUtils.js').SessionInfo>;
+    ] as SessionInfo[];
 
     const error = SessionError.invalidSessionIdentifier('bad', sessions);
     expect(error.message).toContain('A'.repeat(57) + '...');
@@ -863,7 +864,7 @@ describe('SessionError.invalidSessionIdentifier', () => {
         startTime: '2024-01-01T09:00:00.000Z',
         index: 1,
       },
-    ] as Array<import('./sessionUtils.js').SessionInfo>;
+    ] as SessionInfo[];
 
     const error = SessionError.invalidSessionIdentifier('bad', sessions);
     // Should end with exactly 57 emojis followed by '...'
@@ -879,13 +880,13 @@ describe('SessionError.invalidSessionIdentifier', () => {
       lastUpdated: `2024-01-${String(i + 1).padStart(2, '0')}T10:00:00.000Z`,
       startTime: `2024-01-${String(i + 1).padStart(2, '0')}T09:00:00.000Z`,
       index: i + 1,
-    })) as Array<import('./sessionUtils.js').SessionInfo>;
+    })) as SessionInfo[];
 
     const error = SessionError.invalidSessionIdentifier('bad', sessions);
     expect(error.message).toContain('Run --list-sessions for the full list.');
-    // Only 10 sessions should appear in the list
-    expect(error.message).toContain('--resume 10');
-    expect(error.message).not.toContain('--resume 11');
+    // Most recent 10 sessions (2–11) shown; oldest (1) is hidden behind the note
+    expect(error.message).toContain('--resume 11');
+    expect(error.message).not.toContain('--resume 1,');
   });
 
   it('does not append overflow note when sessions are exactly 10', () => {
@@ -895,7 +896,7 @@ describe('SessionError.invalidSessionIdentifier', () => {
       lastUpdated: `2024-01-${String(i + 1).padStart(2, '0')}T10:00:00.000Z`,
       startTime: `2024-01-${String(i + 1).padStart(2, '0')}T09:00:00.000Z`,
       index: i + 1,
-    })) as Array<import('./sessionUtils.js').SessionInfo>;
+    })) as SessionInfo[];
 
     const error = SessionError.invalidSessionIdentifier('bad', sessions);
     expect(error.message).not.toContain(

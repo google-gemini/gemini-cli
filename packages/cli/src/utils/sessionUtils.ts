@@ -78,7 +78,10 @@ export class SessionError extends Error {
           new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
       );
 
-      const displaySessions = sorted.slice(0, MAX_DISPLAY);
+      // Show the most recent sessions — users are more likely to want a recent one.
+      // Preserve absolute indices so they match what --list-sessions shows.
+      const startIndex = Math.max(0, sorted.length - MAX_DISPLAY);
+      const displaySessions = sorted.slice(startIndex);
       const hasMore = sorted.length > MAX_DISPLAY;
 
       const sessionLines = displaySessions
@@ -87,7 +90,7 @@ export class SessionError extends Error {
             cpLen(s.displayName) > 60
               ? cpSlice(s.displayName, 0, 57) + '...'
               : s.displayName;
-          return `  ${i + 1}. ${title} (${formatRelativeTime(s.lastUpdated)})`;
+          return `  ${startIndex + i + 1}. ${title} (${formatRelativeTime(s.lastUpdated)})`;
         })
         .join('\n');
 
@@ -96,7 +99,7 @@ export class SessionError extends Error {
         : '';
 
       const indices = displaySessions
-        .map((_, i) => `--resume ${i + 1}`)
+        .map((_, i) => `--resume ${startIndex + i + 1}`)
         .join(', ');
 
       return new SessionError(
