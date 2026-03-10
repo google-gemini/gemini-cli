@@ -609,27 +609,37 @@ export function getShellConfiguration(): ShellConfiguration {
     }
 
     // Default to Windows PowerShell (powershell.exe) with absolute path
-    const systemRoot = process.env['SystemRoot'] || 'C:\\Windows';
-    const defaultPsPath = path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
-    try {
-      // Security: use accessSync(X_OK) for consistency with other checks
-      fs.accessSync(defaultPsPath, fs.constants.X_OK);
-      cachedShellConfiguration = {
-        executable: defaultPsPath,
-        argsPrefix: ['-NoProfile', '-Command'],
-        shell: 'powershell',
-      };
-      return cachedShellConfiguration;
-    } catch {
-      // If default path fails, fall back to a hardcoded absolute path
-      const fallbackPsPath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
-      cachedShellConfiguration = {
-        executable: fallbackPsPath,
-        argsPrefix: ['-NoProfile', '-Command'],
-        shell: 'powershell',
-      };
-      return cachedShellConfiguration;
+    const systemRoot = process.env['SystemRoot'];
+    if (systemRoot && path.isAbsolute(systemRoot)) {
+      const defaultPsPath = path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+      try {
+        // Security: use accessSync(X_OK) for consistency with other checks
+        fs.accessSync(defaultPsPath, fs.constants.X_OK);
+        cachedShellConfiguration = {
+          executable: defaultPsPath,
+          argsPrefix: ['-NoProfile', '-Command'],
+          shell: 'powershell',
+        };
+        return cachedShellConfiguration;
+      } catch (e) {
+        debugLogger.debug(`Error checking for default powershell.exe in ${defaultPsPath}:`, e);
+      }
     }
+
+    // Last resort fallback, strictly absolute to well-known system location
+    const fallbackPsPath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+    try {
+      fs.accessSync(fallbackPsPath, fs.constants.X_OK);
+    } catch {
+      debugLogger.warn('Could not find a valid PowerShell executable on Windows.');
+    }
+
+    cachedShellConfiguration = {
+      executable: fallbackPsPath,
+      argsPrefix: ['-NoProfile', '-Command'],
+      shell: 'powershell',
+    };
+    return cachedShellConfiguration;
   }
 
   // Unix-like systems (Linux, macOS)
