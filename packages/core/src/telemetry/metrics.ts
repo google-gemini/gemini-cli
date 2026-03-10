@@ -50,6 +50,8 @@ const KEYCHAIN_AVAILABILITY_COUNT = 'gemini_cli.keychain.availability.count';
 const TOKEN_STORAGE_TYPE_COUNT = 'gemini_cli.token_storage.type.count';
 const OVERAGE_OPTION_COUNT = 'gemini_cli.overage_option.count';
 const CREDIT_PURCHASE_COUNT = 'gemini_cli.credit_purchase.count';
+const EVENT_GOOGLE_AUTH_START = 'gemini_cli.google_auth.start';
+const EVENT_GOOGLE_AUTH_END = 'gemini_cli.google_auth.end';
 
 // Agent Metrics
 const AGENT_RUN_COUNT = 'gemini_cli.agent.run.count';
@@ -287,6 +289,18 @@ const COUNTER_DEFINITIONS = {
       source: string;
       model: string;
     },
+  },
+  [EVENT_GOOGLE_AUTH_START]: {
+    description: 'Counts auth "Login with Google" started.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (googleAuthStartCounter = c),
+    attributes: {} as Record<string, never>,
+  },
+  [EVENT_GOOGLE_AUTH_END]: {
+    description: 'Counts auth "Login with Google" succeeded.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (googleAuthEndCounter = c),
+    attributes: {} as Record<string, never>,
   },
 } as const;
 
@@ -536,7 +550,7 @@ const PERFORMANCE_HISTOGRAM_DEFINITIONS = {
   },
 } as const;
 
-type AllMetricDefs = typeof COUNTER_DEFINITIONS &
+export type AllMetricDefs = typeof COUNTER_DEFINITIONS &
   typeof HISTOGRAM_DEFINITIONS &
   typeof PERFORMANCE_COUNTER_DEFINITIONS &
   typeof PERFORMANCE_HISTOGRAM_DEFINITIONS;
@@ -628,6 +642,8 @@ let keychainAvailabilityCounter: Counter | undefined;
 let tokenStorageTypeCounter: Counter | undefined;
 let overageOptionCounter: Counter | undefined;
 let creditPurchaseCounter: Counter | undefined;
+let googleAuthStartCounter: Counter | undefined;
+let googleAuthEndCounter: Counter | undefined;
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 let genAiClientTokenUsageHistogram: Histogram | undefined;
@@ -799,6 +815,25 @@ export function recordLinesChanged(
 }
 
 // --- New Metric Recording Functions ---
+
+/**
+ * Records a metric for when the Google auth process starts.
+ */
+export function recordGoogleAuthStart(config: Config): void {
+  if (!googleAuthStartCounter || !isMetricsInitialized) return;
+  googleAuthStartCounter.add(
+    1,
+    baseMetricDefinition.getCommonAttributes(config),
+  );
+}
+
+/**
+ * Records a metric for when the Google auth process ends successfully.
+ */
+export function recordGoogleAuthEnd(config: Config): void {
+  if (!googleAuthEndCounter || !isMetricsInitialized) return;
+  googleAuthEndCounter.add(1, baseMetricDefinition.getCommonAttributes(config));
+}
 
 /**
  * Records a metric for when a UI frame flickers.

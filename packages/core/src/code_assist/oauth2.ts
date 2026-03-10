@@ -21,6 +21,10 @@ import { EventEmitter } from 'node:events';
 import open from 'open';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
+import {
+  recordGoogleAuthStart,
+  recordGoogleAuthEnd,
+} from '../telemetry/metrics.js';
 import type { Config } from '../config/config.js';
 import {
   getErrorMessage,
@@ -142,6 +146,11 @@ async function initOauthClient(
       proxy: config.getProxy(),
     },
   });
+
+  if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+    recordGoogleAuthStart(config);
+  }
+
   const useEncryptedStorage = getUseEncryptedStorageFlag();
 
   if (
@@ -152,6 +161,9 @@ async function initOauthClient(
       access_token: process.env['GOOGLE_CLOUD_ACCESS_TOKEN'],
     });
     await fetchAndCacheUserInfo(client);
+    if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+      recordGoogleAuthEnd(config);
+    }
     return client;
   }
 
@@ -188,6 +200,9 @@ async function initOauthClient(
         debugLogger.log('Loaded cached credentials.');
         await triggerPostAuthCallbacks(credentials as Credentials);
 
+        if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+          recordGoogleAuthEnd(config);
+        }
         return client;
       }
     } catch (error) {
@@ -279,6 +294,9 @@ async function initOauthClient(
     }
 
     await triggerPostAuthCallbacks(client.credentials);
+    if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+      recordGoogleAuthEnd(config);
+    }
   } else {
     // In ACP mode, we skip the interactive consent and directly open the browser
     if (!config.getAcpMode()) {
@@ -385,6 +403,9 @@ async function initOauthClient(
     });
 
     await triggerPostAuthCallbacks(client.credentials);
+    if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+      recordGoogleAuthEnd(config);
+    }
   }
 
   return client;
