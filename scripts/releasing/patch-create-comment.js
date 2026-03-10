@@ -145,7 +145,7 @@ async function main() {
       manualCommands = manualCommandsMatch[1].trim();
     }
 
-    commentBody = `🔒 **GitHub App Permission Issue**
+    commentBody = `🔒 **[Step 2/4] GitHub App Permission Issue**
 
 The patch creation failed due to insufficient GitHub App permissions for creating workflow files.
 
@@ -169,7 +169,7 @@ After running these commands, you can re-run the patch workflow.`
     const prMatch = logContent.match(/Found existing PR #(\d+): (.*)/);
     if (prMatch) {
       const [, prNumber, prUrl] = prMatch;
-      commentBody = `ℹ️ **Patch PR already exists!**
+      commentBody = `ℹ️ **[Step 2/4] Patch PR already exists!**
 
 A patch PR for this change already exists: [#${prNumber}](${prUrl}).
 
@@ -185,7 +185,7 @@ A patch PR for this change already exists: [#${prNumber}](${prUrl}).
     const branchMatch = logContent.match(/Hotfix branch (.*) already exists/);
     if (branchMatch) {
       const [, branch] = branchMatch;
-      commentBody = `ℹ️ **Patch branch exists but no PR found!**
+      commentBody = `ℹ️ **[Step 2/4] Patch branch exists but no PR found!**
 
 A patch branch [\`${branch}\`](https://github.com/${repository}/tree/${branch}) exists but has no open PR.
 
@@ -213,7 +213,7 @@ A patch branch [\`${branch}\`](https://github.com/${repository}/tree/${branch}) 
           logContent.includes('Cherry-pick has conflicts') ||
           logContent.includes('[CONFLICTS]');
 
-        commentBody = `🚀 **Patch PR Created!**
+        commentBody = `🚀 **[Step 2/4] Patch PR Created!**
 
 **📋 Patch Details:**
 - **Environment**: \`${environment}\`
@@ -228,7 +228,8 @@ ${hasConflicts ? '3' : '2'}. Once merged, the patch release will automatically t
 ${hasConflicts ? '4' : '3'}. You'll receive updates here when the release completes
 
 **🔗 Track Progress:**
-- [View hotfix PR #${mockPrNumber}](${mockPrUrl})`;
+- [View hotfix PR #${mockPrNumber}](${mockPrUrl})
+- [This patch creation workflow run](https://github.com/${repository}/actions/runs/${runId})`;
       } else if (hasGitHubCli) {
         // Find the actual PR for the new branch using gh CLI
         try {
@@ -269,7 +270,7 @@ ${hasConflicts ? '4' : '3'}. You'll receive updates here when the release comple
               logContent.includes('Cherry-pick has conflicts') ||
               pr.title.includes('[CONFLICTS]');
 
-            commentBody = `🚀 **Patch PR Created!**
+            commentBody = `🚀 **[Step 2/4] Patch PR Created!**
 
 **📋 Patch Details:**
 - **Environment**: \`${environment}\`
@@ -284,10 +285,11 @@ ${hasConflicts ? '3' : '2'}. Once merged, the patch release will automatically t
 ${hasConflicts ? '4' : '3'}. You'll receive updates here when the release completes
 
 **🔗 Track Progress:**
-- [View hotfix PR #${pr.number}](${pr.url})`;
+- [View hotfix PR #${pr.number}](${pr.url})
+- [This patch creation workflow run](https://github.com/${repository}/actions/runs/${runId})`;
           } else {
             // Fallback if PR not found yet
-            commentBody = `🚀 **Patch PR Created!**
+            commentBody = `🚀 **[Step 2/4] Patch PR Created!**
 
 The patch release PR for this change has been created on branch [\`${branch}\`](https://github.com/${repository}/tree/${branch}).
 
@@ -296,23 +298,25 @@ The patch release PR for this change has been created on branch [\`${branch}\`](
 2. Once merged, the patch release will automatically trigger
 
 **🔗 Links:**
-- [View all patch PRs](https://github.com/${repository}/pulls?q=is%3Apr+is%3Aopen+label%3Apatch)`;
+- [View all patch PRs](https://github.com/${repository}/pulls?q=is%3Apr+is%3Aopen+label%3Apatch)
+- [This patch creation workflow run](https://github.com/${repository}/actions/runs/${runId})`;
           }
         } catch (error) {
           console.log('Error finding PR for branch:', error.message);
           // Fallback
-          commentBody = `🚀 **Patch PR Created!**
+          commentBody = `🚀 **[Step 2/4] Patch PR Created!**
 
 The patch release PR for this change has been created.
 
 **🔗 Links:**
-- [View all patch PRs](https://github.com/${repository}/pulls?q=is%3Apr+is%3Aopen+label%3Apatch)`;
+- [View all patch PRs](https://github.com/${repository}/pulls?q=is%3Apr+is%3Aopen+label%3Apatch)
+- [This patch creation workflow run](https://github.com/${repository}/actions/runs/${runId})`;
         }
       }
     }
   } else {
     // Failure
-    commentBody = `❌ **Patch creation failed!**
+    commentBody = `❌ **[Step 2/4] Patch creation failed!**
 
 There was an error creating the patch release.
 
@@ -326,7 +330,7 @@ There was an error creating the patch release.
   }
 
   if (!commentBody) {
-    commentBody = `❌ **Patch creation failed!**
+    commentBody = `❌ **[Step 2/4] Patch creation failed!**
 
 No output was generated during patch creation.
 
