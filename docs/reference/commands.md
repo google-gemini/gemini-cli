@@ -71,9 +71,9 @@ Slash commands provide meta-level control over the CLI itself.
         [Checkpointing documentation](../cli/checkpointing.md).
       - **Equivalent:** `/resume save <tag>`
   - **`share [filename]`**
-    - **Description** Writes the current conversation to a provided Markdown or
+    - **Description:** Writes the current conversation to a provided Markdown or
       JSON file. If no filename is provided, then the CLI will generate one.
-    - **Usage** `/chat share file.md` or `/chat share file.json`.
+    - **Usage:** `/chat share file.md` or `/chat share file.json`.
     - **Equivalent:** `/resume share [filename]`
 
 ### `/clear`
@@ -279,8 +279,8 @@ Slash commands provide meta-level control over the CLI itself.
 
 - **Description:** Switch to Plan Mode (read-only) and view the current plan if
   one has been generated.
-  - **Note:** This feature requires the `experimental.plan` setting to be
-    enabled in your configuration.
+  - **Note:** This feature is enabled by default. It can be disabled via the
+    `experimental.plan` setting in your configuration.
 - **Sub-commands:**
   - **`copy`**:
     - **Description:** Copy the currently approved plan to your clipboard.
@@ -438,6 +438,12 @@ Slash commands provide meta-level control over the CLI itself.
       tool's name with its full description as provided to the model.
   - **`nodesc`** or **`nodescriptions`**:
     - **Description:** Hide tool descriptions, showing only the tool names.
+
+### `/upgrade`
+
+- **Description:** Open the Gemini Code Assist upgrade page in your browser.
+  This lets you upgrade your tier for higher usage limits.
+- **Note:** This command is only available when logged in with Google.
 
 ### `/vim`
 
