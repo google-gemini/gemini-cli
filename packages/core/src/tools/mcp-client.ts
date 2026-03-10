@@ -104,6 +104,10 @@ export enum MCPServerStatus {
   CONNECTING = 'connecting',
   /** Server is connected and ready to use */
   CONNECTED = 'connected',
+  /** Server is blocked via configuration and cannot be used */
+  BLOCKED = 'blocked',
+  /** Server is disabled and cannot be used */
+  DISABLED = 'disabled',
 }
 
 /**
@@ -1899,6 +1903,7 @@ export async function connectToMcpServer(
             acceptHeader = 'application/json';
           }
 
+          // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
           const response = await fetch(urlToFetch, {
             method: 'HEAD',
             headers: {
