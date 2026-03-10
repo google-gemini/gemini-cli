@@ -464,16 +464,35 @@ for your projects by creating the files `.gemini/sandbox.Dockerfile` and/or
 running `gemini` with `BUILD_SANDBOX=1` to trigger building of your custom
 sandbox.
 
-#### Proxied networking
+#### Network Traffic Proxy
 
 All sandboxing methods, including macOS Seatbelt using `*-proxied` profiles,
 support restricting outbound network traffic through a custom proxy server that
 can be specified as `GEMINI_SANDBOX_PROXY_COMMAND=<command>`, where `<command>`
-must start a proxy server that listens on `:::8877` for relevant requests. See
-`docs/examples/proxy-script.md` for a minimal proxy that only allows `HTTPS`
-connections to `example.com:443` (e.g. `curl https://example.com`) and declines
-all other requests. The proxy is started and stopped automatically alongside the
-sandbox.
+must start a proxy server that listens on `:::8877` for HTTP/HTTPS requests, and
+on `:::1080` for SOCKS5 requests. See `docs/examples/proxy-script.js` for a
+minimal proxy that only allows `HTTPS` connections to `example.com:443` (e.g.
+`curl https://example.com`) and declines all other requests. The proxy is
+started and stopped automatically alongside the sandbox.
+
+The proxy can be configured via the `.gemini/proxy.config.json` file. The
+following options are available:
+
+- `allowlist`: An array of domains to allow. Wildcards are supported (e.g.,
+  `*.google.com`).
+- `denylist`: An array of domains to deny. Wildcards are supported.
+- `logging`: A boolean to enable or disable traffic logging to
+  `.gemini/proxy.log`.
+
+When a request is made to a domain that is not in the allowlist or denylist,
+Gemini CLI will prompt you for permission to allow or deny the connection.
+
+To use the example proxy script, you will need to install the `socksv5`
+dependency:
+
+```bash
+npm install socksv5
+```
 
 ### Manual publish
 

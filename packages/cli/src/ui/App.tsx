@@ -12,6 +12,7 @@ import { ScreenReaderAppLayout } from './layouts/ScreenReaderAppLayout.js';
 import { DefaultAppLayout } from './layouts/DefaultAppLayout.js';
 import { AlternateBufferQuittingDisplay } from './components/AlternateBufferQuittingDisplay.js';
 import { useAlternateBuffer } from './hooks/useAlternateBuffer.js';
+import { ProxyPermissionDialog } from './components/ProxyPermissionDialog.js';
 
 export const App = () => {
   const uiState = useUIState();
@@ -33,6 +34,7 @@ export const App = () => {
   return (
     <StreamingContext.Provider value={uiState.streamingState}>
       {isScreenReaderEnabled ? <ScreenReaderAppLayout /> : <DefaultAppLayout />}
+      <ProxyPermissionDialog />
     </StreamingContext.Provider>
   );
 };
