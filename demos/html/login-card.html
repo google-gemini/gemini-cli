@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login Card Demo</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        background: radial-gradient(circle at 20% 20%, #2b3250 0%, #151923 45%, #0f1219 100%);
+        color: #e7ecf7;
+      }
+      .card {
+        width: min(92vw, 420px);
+        background: rgba(27, 33, 46, 0.9);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        border-radius: 16px;
+        padding: 28px;
+        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 1.55rem;
+      }
+      p {
+        margin: 0 0 20px;
+        color: #b2bfd8;
+      }
+      label {
+        display: block;
+        margin: 12px 0 6px;
+        font-size: 0.88rem;
+        color: #c8d3ea;
+      }
+      input {
+        width: 100%;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        border-radius: 10px;
+        padding: 11px 12px;
+        background: rgba(15, 18, 25, 0.85);
+        color: #e7ecf7;
+      }
+      button {
+        width: 100%;
+        margin-top: 18px;
+        border: 0;
+        border-radius: 10px;
+        padding: 12px;
+        font-weight: 600;
+        color: #0e1525;
+        background: linear-gradient(135deg, #7ee7f5, #8db2ff);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <h1>Welcome back</h1>
+      <p>Sign in to continue to your dashboard.</p>
+      <label for="email">Email</label>
+      <input id="email" type="email" placeholder="you@example.com" />
+      <label for="password">Password</label>
+      <input id="password" type="password" placeholder="••••••••" />
+      <button type="button">Log in</button>
+    </main>
+  </body>
+</html>

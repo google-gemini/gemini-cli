@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant Client
+    participant Server
+    participant DB as Database
+
+    Client->>Server: POST /login (username, password)
+    Server->>DB: Validate credentials
+    DB-->>Server: Credentials valid
+    Server-->>Client: Return JWT
+    Client->>Server: GET /resource (Bearer JWT)
+    Server->>Server: Verify JWT signature + expiry
+    Server-->>Client: 200 OK (Protected data)

@@ -1,0 +1,9 @@
+flowchart TD
+    A[Load Dataset] --> B[Initialize Model Weights]
+    B --> C[Forward Pass]
+    C --> D[Compute Loss]
+    D --> E[Backpropagation]
+    E --> F[Update Weights]
+    F --> G{Converged?}
+    G -- No --> C
+    G -- Yes --> H[Save Trained Model]

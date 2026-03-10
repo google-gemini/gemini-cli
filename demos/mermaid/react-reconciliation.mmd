@@ -1,0 +1,12 @@
+flowchart TD
+    A[State/Prop Change] --> B[Create New Virtual DOM]
+    B --> C[Diff Against Previous Tree]
+    C --> D{Element Type Changed?}
+    D -- Yes --> E[Replace Subtree]
+    D -- No --> F[Update Props]
+    F --> G{List Uses Keys?}
+    G -- Yes --> H[Match by Key]
+    G -- No --> I[Match by Index]
+    E --> J[Commit Updates to DOM]
+    H --> J
+    I --> J
