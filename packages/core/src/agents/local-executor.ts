@@ -19,6 +19,7 @@ import { ToolRegistry } from '../tools/tool-registry.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
+import { type Message } from '../confirmation-bus/types.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
@@ -113,10 +114,27 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     runtimeContext: Config,
     onActivity?: ActivityCallback,
   ): Promise<LocalAgentExecutor<TOutput>> {
+    const parentMessageBus = runtimeContext.getMessageBus();
+
+    // Create an override object to inject the subagent name into tool confirmation requests
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const subagentMessageBus = Object.create(
+      parentMessageBus,
+    ) as typeof parentMessageBus;
+    subagentMessageBus.publish = async (message: Message) => {
+      if (message.type === 'tool-confirmation-request') {
+        return parentMessageBus.publish({
+          ...message,
+          subagent: definition.name,
+        });
+      }
+      return parentMessageBus.publish(message);
+    };
+
     // Create an isolated tool registry for this agent instance.
     const agentToolRegistry = new ToolRegistry(
       runtimeContext,
-      runtimeContext.getMessageBus(),
+      subagentMessageBus,
     );
     const parentToolRegistry = runtimeContext.getToolRegistry();
     const allAgentNames = new Set(
@@ -902,6 +920,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         displayName,
         description,
         args,
+        callId,
       });
 
       if (toolName === TASK_COMPLETE_TOOL_NAME) {
@@ -969,6 +988,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             });
             this.emitActivity('TOOL_CALL_END', {
               name: toolName,
+              id: callId,
               output: 'Output submitted and task completed.',
             });
           } else {
@@ -985,6 +1005,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             this.emitActivity('ERROR', {
               context: 'tool_call',
               name: toolName,
+              callId,
               error,
             });
           }
@@ -1009,6 +1030,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             });
             this.emitActivity('TOOL_CALL_END', {
               name: toolName,
+              id: callId,
               output: 'Result submitted and task completed.',
             });
           } else {
@@ -1026,6 +1048,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             this.emitActivity('ERROR', {
               context: 'tool_call',
               name: toolName,
+              callId,
               error,
             });
           }
@@ -1086,18 +1109,21 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         if (call.status === 'success') {
           this.emitActivity('TOOL_CALL_END', {
             name: toolName,
+            id: call.request.callId,
             output: call.response.resultDisplay,
           });
         } else if (call.status === 'error') {
           this.emitActivity('ERROR', {
             context: 'tool_call',
             name: toolName,
+            callId: call.request.callId,
             error: call.response.error?.message || 'Unknown error',
           });
         } else if (call.status === 'cancelled') {
           this.emitActivity('ERROR', {
             context: 'tool_call',
             name: toolName,
+            callId: call.request.callId,
             error: 'Request cancelled.',
           });
           aborted = true;
