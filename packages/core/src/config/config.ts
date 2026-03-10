@@ -553,6 +553,7 @@ export interface ConfigParameters {
   truncateToolOutputThreshold?: number;
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
+  workspacePoliciesDir?: string;
   policyEngineConfig?: PolicyEngineConfig;
   directWebFetch?: boolean;
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
@@ -746,6 +747,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
   private readonly useWriteTodos: boolean;
+  private readonly workspacePoliciesDir: string | undefined;
   private readonly _messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private policyUpdateConfirmationRequest:
@@ -956,6 +958,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.useWriteTodos = isPreviewModel(this.model)
       ? false
       : (params.useWriteTodos ?? true);
+    this.workspacePoliciesDir = params.workspacePoliciesDir;
     this.enableHooksUI = params.enableHooksUI ?? true;
     this.enableHooks = params.enableHooks ?? true;
     this.disabledHooks = params.disabledHooks ?? [];
@@ -1187,7 +1190,7 @@ export class Config implements McpContext, AgentLoopContext {
         if (this.getSkillManager().getSkills().length > 0) {
           this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
           this.getToolRegistry().registerTool(
-            new ActivateSkillTool(this, this._messageBus),
+            new ActivateSkillTool(this, this.messageBus),
           );
         }
       }
@@ -1999,6 +2002,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.geminiMdFilePaths;
   }
 
+  getWorkspacePoliciesDir(): string | undefined {
+    return this.workspacePoliciesDir;
+  }
+
   setGeminiMdFilePaths(paths: string[]): void {
     this.geminiMdFilePaths = paths;
   }
@@ -2621,7 +2628,7 @@ export class Config implements McpContext, AgentLoopContext {
       if (this.getSkillManager().getSkills().length > 0) {
         this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
         this.getToolRegistry().registerTool(
-          new ActivateSkillTool(this, this._messageBus),
+          new ActivateSkillTool(this, this.messageBus),
         );
       } else {
         this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
@@ -2805,7 +2812,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
-    const registry = new ToolRegistry(this, this._messageBus);
+    const registry = new ToolRegistry(this, this.messageBus);
 
     // helper to create & register core tools that are enabled
     const maybeRegister = (
@@ -2835,10 +2842,10 @@ export class Config implements McpContext, AgentLoopContext {
     };
 
     maybeRegister(LSTool, () =>
-      registry.registerTool(new LSTool(this, this._messageBus)),
+      registry.registerTool(new LSTool(this, this.messageBus)),
     );
     maybeRegister(ReadFileTool, () =>
-      registry.registerTool(new ReadFileTool(this, this._messageBus)),
+      registry.registerTool(new ReadFileTool(this, this.messageBus)),
     );
 
     if (this.getUseRipgrep()) {
@@ -2851,85 +2858,81 @@ export class Config implements McpContext, AgentLoopContext {
       }
       if (useRipgrep) {
         maybeRegister(RipGrepTool, () =>
-          registry.registerTool(new RipGrepTool(this, this._messageBus)),
+          registry.registerTool(new RipGrepTool(this, this.messageBus)),
         );
       } else {
         logRipgrepFallback(this, new RipgrepFallbackEvent(errorString));
         maybeRegister(GrepTool, () =>
-          registry.registerTool(new GrepTool(this, this._messageBus)),
+          registry.registerTool(new GrepTool(this, this.messageBus)),
         );
       }
     } else {
       maybeRegister(GrepTool, () =>
-        registry.registerTool(new GrepTool(this, this._messageBus)),
+        registry.registerTool(new GrepTool(this, this.messageBus)),
       );
     }
 
     maybeRegister(GlobTool, () =>
-      registry.registerTool(new GlobTool(this, this._messageBus)),
+      registry.registerTool(new GlobTool(this, this.messageBus)),
     );
     maybeRegister(ActivateSkillTool, () =>
-      registry.registerTool(new ActivateSkillTool(this, this._messageBus)),
+      registry.registerTool(new ActivateSkillTool(this, this.messageBus)),
     );
     maybeRegister(EditTool, () =>
-      registry.registerTool(new EditTool(this, this._messageBus)),
+      registry.registerTool(new EditTool(this, this.messageBus)),
     );
     maybeRegister(WriteFileTool, () =>
-      registry.registerTool(new WriteFileTool(this, this._messageBus)),
+      registry.registerTool(new WriteFileTool(this, this.messageBus)),
     );
     maybeRegister(WebFetchTool, () =>
-      registry.registerTool(new WebFetchTool(this, this._messageBus)),
+      registry.registerTool(new WebFetchTool(this, this.messageBus)),
     );
     maybeRegister(ShellTool, () =>
-      registry.registerTool(new ShellTool(this, this._messageBus)),
+      registry.registerTool(new ShellTool(this, this.messageBus)),
     );
     maybeRegister(MemoryTool, () =>
-      registry.registerTool(new MemoryTool(this._messageBus)),
+      registry.registerTool(new MemoryTool(this.messageBus)),
     );
     maybeRegister(WebSearchTool, () =>
-      registry.registerTool(new WebSearchTool(this, this._messageBus)),
+      registry.registerTool(new WebSearchTool(this, this.messageBus)),
     );
     maybeRegister(AskUserTool, () =>
-      registry.registerTool(new AskUserTool(this._messageBus)),
+      registry.registerTool(new AskUserTool(this.messageBus)),
     );
     if (this.getUseWriteTodos()) {
       maybeRegister(WriteTodosTool, () =>
-        registry.registerTool(new WriteTodosTool(this._messageBus)),
+        registry.registerTool(new WriteTodosTool(this.messageBus)),
       );
     }
     if (this.isPlanEnabled()) {
       maybeRegister(ExitPlanModeTool, () =>
-        registry.registerTool(new ExitPlanModeTool(this, this._messageBus)),
+        registry.registerTool(new ExitPlanModeTool(this, this.messageBus)),
       );
       maybeRegister(EnterPlanModeTool, () =>
-        registry.registerTool(new EnterPlanModeTool(this, this._messageBus)),
+        registry.registerTool(new EnterPlanModeTool(this, this.messageBus)),
       );
     }
 
     if (this.isTrackerEnabled()) {
       maybeRegister(TrackerCreateTaskTool, () =>
-        registry.registerTool(
-          new TrackerCreateTaskTool(this, this._messageBus),
-        ),
+        registry.registerTool(new TrackerCreateTaskTool(this, this.messageBus)),
       );
       maybeRegister(TrackerUpdateTaskTool, () =>
-        registry.registerTool(
-          new TrackerUpdateTaskTool(this, this._messageBus),
-        ),
+        registry.registerTool(new TrackerUpdateTaskTool(this, this.messageBus)),
       );
       maybeRegister(TrackerGetTaskTool, () =>
-        registry.registerTool(new TrackerGetTaskTool(this, this._messageBus)),
+        registry.registerTool(new TrackerGetTaskTool(this, this.messageBus)),
       );
       maybeRegister(TrackerListTasksTool, () =>
-        registry.registerTool(new TrackerListTasksTool(this, this._messageBus)),
+        registry.registerTool(new TrackerListTasksTool(this, this.messageBus)),
       );
       maybeRegister(TrackerAddDependencyTool, () =>
         registry.registerTool(
-          new TrackerAddDependencyTool(this, this._messageBus),
+          new TrackerAddDependencyTool(this, this.messageBus),
         ),
       );
       maybeRegister(TrackerVisualizeTool, () =>
-        registry.registerTool(new TrackerVisualizeTool(this, this._messageBus)),
+        registry.registerTool(new TrackerVisualizeTool(this, this.messageBus)),
       );
     }
 
