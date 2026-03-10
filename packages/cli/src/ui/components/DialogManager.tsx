@@ -252,6 +252,7 @@ export const DialogManager = ({
           displayName={uiState.selectedAgentDisplayName}
           definition={uiState.selectedAgentDefinition}
           settings={settings}
+          availableTerminalHeight={terminalHeight - staticExtraHeight}
           onClose={uiActions.closeAgentConfigDialog}
           onSave={async () => {
             // Reload agent registry to pick up changes
