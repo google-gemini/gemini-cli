@@ -187,6 +187,35 @@ export class TrackerService {
   }
 
   /**
+   * Deletes a task by ID.
+   */
+  async deleteTask(id: string): Promise<void> {
+    await this.ensureInitialized();
+    const task = await this.getTask(id);
+    if (!task) {
+      throw new Error(`Task with ID ${id} not found.`);
+    }
+
+    // Prevent deletion if other tasks depend on this one or have it as parent
+    const allTasks = await this.listTasks();
+    const dependents = allTasks.filter((t) => t.dependencies.includes(id));
+    if (dependents.length > 0) {
+      throw new Error(
+        `Cannot delete task ${id} because it is a dependency of other tasks: ${dependents.map((t) => t.id).join(', ')}.`,
+      );
+    }
+    const children = allTasks.filter((t) => t.parentId === id);
+    if (children.length > 0) {
+      throw new Error(
+        `Cannot delete task ${id} because it has child tasks: ${children.map((t) => t.id).join(', ')}.`,
+      );
+    }
+
+    const taskPath = path.join(this.tasksDir, `${id}.json`);
+    await fs.unlink(taskPath);
+  }
+
+  /**
    * Saves a task to disk.
    */
   private async saveTask(task: TrackerTask): Promise<void> {

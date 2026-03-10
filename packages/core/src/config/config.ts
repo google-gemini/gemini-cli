@@ -76,6 +76,7 @@ import {
   TrackerListTasksTool,
   TrackerAddDependencyTool,
   TrackerVisualizeTool,
+  TrackerDeleteTaskTool,
 } from '../tools/trackerTools.js';
 import {
   logRipgrepFallback,
@@ -2906,6 +2907,11 @@ export class Config implements McpContext, AgentLoopContext {
       );
       maybeRegister(TrackerVisualizeTool, () =>
         registry.registerTool(new TrackerVisualizeTool(this, this._messageBus)),
+      );
+      maybeRegister(TrackerDeleteTaskTool, () =>
+        registry.registerTool(
+          new TrackerDeleteTaskTool(this, this._messageBus),
+        ),
       );
     }
 

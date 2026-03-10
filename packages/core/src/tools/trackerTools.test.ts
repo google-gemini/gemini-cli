@@ -14,6 +14,7 @@ import {
   TrackerUpdateTaskTool,
   TrackerVisualizeTool,
   TrackerAddDependencyTool,
+  TrackerDeleteTaskTool,
 } from './trackerTools.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -141,5 +142,36 @@ describe('Tracker Tools Integration', () => {
     expect(vizResult.llmContent).toContain('Parent Task');
     expect(vizResult.llmContent).toContain('Child Task');
     expect(vizResult.llmContent).toContain(childId);
+  });
+
+  it('deletes a task', async () => {
+    const createTool = new TrackerCreateTaskTool(config, messageBus);
+    const deleteTool = new TrackerDeleteTaskTool(config, messageBus);
+
+    // Create Task to delete
+    await createTool.buildAndExecute(
+      {
+        title: 'Delete Me',
+        description: '...',
+        type: TaskType.TASK,
+      },
+      getSignal(),
+    );
+
+    const tasks = await config.getTrackerService().listTasks();
+    const taskId = tasks.find((t) => t.title === 'Delete Me')!.id;
+
+    // Delete Task
+    const deleteResult = await deleteTool.buildAndExecute(
+      {
+        id: taskId,
+      },
+      getSignal(),
+    );
+
+    expect(deleteResult.llmContent).toContain(`Deleted task ${taskId}`);
+
+    const task = await config.getTrackerService().getTask(taskId);
+    expect(task).toBeNull();
   });
 });
