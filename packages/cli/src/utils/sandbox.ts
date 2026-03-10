@@ -232,6 +232,7 @@ export async function start_sandbox(
 
     const image = config.image;
     if (!image) throw new FatalSandboxError('Sandbox image is required');
+    if (!/^[a-zA-Z0-9_.:/-]+$/.test(image)) throw new FatalSandboxError('Invalid sandbox image name');
     const workdir = path.resolve(process.cwd());
     const containerWorkdir = getContainerPath(workdir);
 
