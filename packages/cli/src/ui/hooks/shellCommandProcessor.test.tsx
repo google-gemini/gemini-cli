@@ -50,7 +50,23 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     isBinary: mockIsBinary,
   };
 });
-vi.mock('node:fs');
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  const mocked = {
+    ...actual,
+    existsSync: vi.fn(),
+    readFileSync: vi.fn(),
+    createWriteStream: vi.fn(),
+    promises: {
+      ...actual.promises,
+      unlink: vi.fn().mockResolvedValue(undefined),
+    },
+  };
+  return {
+    ...mocked,
+    default: mocked,
+  };
+});
 vi.mock('node:os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:os')>();
   const mocked = {
@@ -110,7 +126,12 @@ describe('useShellCommandProcessor', () => {
         terminalHeight: 20,
         terminalWidth: 80,
       }),
-    } as Config;
+      getTruncateToolOutputThreshold: () => 40000,
+      storage: {
+        getProjectTempDir: () => '/tmp/project',
+      },
+      getSessionId: () => 'test-session',
+    } as unknown as Config;
     mockGeminiClient = { addHistory: vi.fn() } as unknown as GeminiClient;
 
     vi.mocked(os.platform).mockReturnValue('linux');
@@ -120,6 +141,16 @@ describe('useShellCommandProcessor', () => {
     );
     mockIsBinary.mockReturnValue(false);
     vi.mocked(fs.existsSync).mockReturnValue(false);
+
+    vi.mocked(fs.createWriteStream).mockReturnValue({
+      write: vi.fn(),
+      end: vi.fn().mockImplementation((cb: () => void) => {
+        if (cb) cb();
+      }),
+      destroy: vi.fn(),
+      bytesWritten: 0,
+      closed: false,
+    } as unknown as fs.WriteStream);
 
     mockShellExecutionService.mockImplementation((_cmd, _cwd, callback) => {
       mockShellOutputCallback = callback;
@@ -544,7 +575,7 @@ describe('useShellCommandProcessor', () => {
     });
     const tmpFile = path.join(os.tmpdir(), 'shell_pwd_abcdef.tmp');
     // Verify that the temporary file was cleaned up
-    expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(tmpFile);
+    expect(vi.mocked(fs.promises.unlink)).toHaveBeenCalledWith(tmpFile);
     expect(setShellInputFocusedMock).toHaveBeenCalledWith(false);
   });
 
@@ -572,7 +603,7 @@ describe('useShellCommandProcessor', () => {
       expect(finalHistoryItem.tools[0].resultDisplay).toContain(
         "WARNING: shell mode is stateless; the directory change to '/test/dir/new' will not persist.",
       );
-      expect(vi.mocked(fs.unlinkSync)).toHaveBeenCalledWith(tmpFile);
+      expect(vi.mocked(fs.promises.unlink)).toHaveBeenCalledWith(tmpFile);
     });
 
     it('should NOT show a warning if the directory does not change', async () => {

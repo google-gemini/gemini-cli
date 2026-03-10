@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import fsPromises from 'node:fs/promises';
+import { debugLogger } from '../utils/debugLogger.js';
 import {
   ToolErrorType,
   ToolOutputTruncatedEvent,
@@ -23,6 +25,7 @@ import { executeToolWithHooks } from '../core/coreToolHookTriggers.js';
 import {
   saveTruncatedToolOutput,
   formatTruncatedToolOutput,
+  moveToolOutputToFile,
 } from '../utils/fileUtils.js';
 import { convertToFunctionResponse } from '../utils/generateContentResponseUtilities.js';
 import {
@@ -134,6 +137,16 @@ export class ToolExecutor {
           const toolResult: ToolResult = await promise;
 
           if (signal.aborted) {
+            if (toolResult.fullOutputFilePath) {
+              await fsPromises
+                .unlink(toolResult.fullOutputFilePath)
+                .catch((error) => {
+                  debugLogger.warn(
+                    `Failed to delete temporary tool output file on abort: ${toolResult.fullOutputFilePath}`,
+                    error,
+                  );
+                });
+            }
             completedToolCall = await this.createCancelledResult(
               call,
               'User cancelled tool execution.',
@@ -145,6 +158,16 @@ export class ToolExecutor {
               toolResult,
             );
           } else {
+            if (toolResult.fullOutputFilePath) {
+              await fsPromises
+                .unlink(toolResult.fullOutputFilePath)
+                .catch((error) => {
+                  debugLogger.warn(
+                    `Failed to delete temporary tool output file on error: ${toolResult.fullOutputFilePath}`,
+                    error,
+                  );
+                });
+            }
             const displayText =
               typeof toolResult.returnDisplay === 'string'
                 ? toolResult.returnDisplay
@@ -352,17 +375,50 @@ export class ToolExecutor {
     call: ToolCall,
     toolResult: ToolResult,
   ): Promise<SuccessfulToolCall> {
-    const { truncatedContent: content, outputFile } =
-      await this.truncateOutputIfNeeded(call, toolResult.llmContent);
-
+    let content = toolResult.llmContent;
+    let outputFile: string | undefined;
     const toolName = call.request.originalRequestName || call.request.name;
     const callId = call.request.callId;
+
+    if (toolResult.fullOutputFilePath) {
+      const threshold = this.config.getTruncateToolOutputThreshold();
+      if (
+        threshold > 0 &&
+        typeof content === 'string' &&
+        content.length > threshold
+      ) {
+        const { outputFile: savedPath } = await moveToolOutputToFile(
+          toolResult.fullOutputFilePath,
+          toolName,
+          callId,
+          this.config.storage.getProjectTempDir(),
+          this.config.getSessionId(),
+        );
+        outputFile = savedPath;
+        content = formatTruncatedToolOutput(content, outputFile, threshold);
+      } else {
+        // If the content is not truncated, we don't need the temporary file.
+        try {
+          await fsPromises.unlink(toolResult.fullOutputFilePath);
+        } catch (error) {
+          debugLogger.warn(
+            `Failed to delete temporary tool output file: ${toolResult.fullOutputFilePath}`,
+            error,
+          );
+        }
+      }
+    } else {
+      const truncated = await this.truncateOutputIfNeeded(call, content);
+      content = truncated.truncatedContent;
+      outputFile = truncated.outputFile;
+    }
 
     const response = convertToFunctionResponse(
       toolName,
       callId,
       content,
       this.config.getActiveModel(),
+      outputFile,
     );
 
     const successResponse: ToolCallResponseInfo = {
