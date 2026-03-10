@@ -20,14 +20,21 @@ import {
 } from '../config/models.js';
 import { AuthType } from '../core/contentGenerator.js';
 
-const createMockConfig = (overrides: Partial<Config> = {}): Config =>
-  ({
+const createMockConfig = (overrides: Partial<Config> = {}): Config => {
+  const config = {
     getUserTier: () => undefined,
     getModel: () => 'gemini-2.5-pro',
     getGemini31LaunchedSync: () => false,
+    getUseCustomToolModelSync: () => {
+      const useGemini31 = config.getGemini31LaunchedSync();
+      const authType = config.getContentGeneratorConfig().authType;
+      return useGemini31 && authType === AuthType.USE_GEMINI;
+    },
     getContentGeneratorConfig: () => ({ authType: undefined }),
     ...overrides,
-  }) as unknown as Config;
+  } as unknown as Config;
+  return config;
+};
 
 describe('policyHelpers', () => {
   describe('resolvePolicyChain', () => {

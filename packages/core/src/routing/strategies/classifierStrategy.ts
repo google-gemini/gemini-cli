@@ -22,7 +22,6 @@ import {
 import { debugLogger } from '../../utils/debugLogger.js';
 import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 import { LlmRole } from '../../telemetry/types.js';
-import { AuthType } from '../../core/contentGenerator.js';
 
 // The number of recent history turns to provide to the router for context.
 const HISTORY_TURNS_FOR_CONTEXT = 4;
@@ -172,10 +171,10 @@ export class ClassifierStrategy implements RoutingStrategy {
 
       const reasoning = routerResponse.reasoning;
       const latencyMs = Date.now() - startTime;
-      const useGemini3_1 = (await config.getGemini31Launched?.()) ?? false;
-      const useCustomToolModel =
-        useGemini3_1 &&
-        config.getContentGeneratorConfig().authType === AuthType.USE_GEMINI;
+      const [useGemini3_1, useCustomToolModel] = await Promise.all([
+        config.getGemini31Launched(),
+        config.getUseCustomToolModel(),
+      ]);
       const selectedModel = resolveClassifierModel(
         model,
         routerResponse.model_choice,

@@ -58,6 +58,11 @@ describe('NumericalClassifierStrategy', () => {
       getNumericalRoutingEnabled: vi.fn().mockResolvedValue(true),
       getClassifierThreshold: vi.fn().mockResolvedValue(undefined),
       getGemini31Launched: vi.fn().mockResolvedValue(false),
+      getUseCustomToolModel: vi.fn().mockImplementation(async () => {
+        const launched = await mockConfig.getGemini31Launched();
+        const authType = mockConfig.getContentGeneratorConfig().authType;
+        return launched && authType === AuthType.USE_GEMINI;
+      }),
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: AuthType.LOGIN_WITH_GOOGLE,
       }),
