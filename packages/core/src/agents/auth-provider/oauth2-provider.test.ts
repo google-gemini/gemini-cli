@@ -33,6 +33,7 @@ vi.mock('../../mcp/oauth-token-storage.js', () => {
 });
 
 vi.mock('../../utils/oauth-flow.js', () => ({
+  REDIRECT_PATH: '/oauth/callback',
   generatePKCEParams: vi.fn().mockReturnValue({
     codeVerifier: 'test-verifier',
     codeChallenge: 'test-challenge',
@@ -102,8 +103,10 @@ function createConfig(
   return {
     type: 'oauth2',
     client_id: 'test-client-id',
-    authorization_url: 'https://auth.example.com/authorize',
-    token_url: 'https://auth.example.com/token',
+    endpoints: {
+      authorization_url: 'https://auth.example.com/authorize',
+      token_url: 'https://auth.example.com/token',
+    },
     scopes: ['read', 'write'],
     ...overrides,
   };
@@ -133,8 +136,10 @@ describe('OAuth2AuthProvider', () => {
 
     it('should use config values for authorization_url and token_url', () => {
       const config = createConfig({
-        authorization_url: 'https://custom.example.com/authorize',
-        token_url: 'https://custom.example.com/token',
+        endpoints: {
+          authorization_url: 'https://custom.example.com/authorize',
+          token_url: 'https://custom.example.com/token',
+        },
       });
       const provider = new OAuth2AuthProvider(config, 'test-agent');
       // Verify by calling headers which will trigger interactive flow with these URLs.
@@ -143,8 +148,10 @@ describe('OAuth2AuthProvider', () => {
 
     it('should merge agent card defaults when config values are missing', () => {
       const config = createConfig({
-        authorization_url: undefined,
-        token_url: undefined,
+        endpoints: {
+          authorization_url: undefined,
+          token_url: undefined,
+        },
         scopes: undefined,
       });
 
@@ -169,8 +176,10 @@ describe('OAuth2AuthProvider', () => {
 
     it('should prefer config values over agent card values', async () => {
       const config = createConfig({
-        authorization_url: 'https://config.example.com/authorize',
-        token_url: 'https://config.example.com/token',
+        endpoints: {
+          authorization_url: 'https://config.example.com/authorize',
+          token_url: 'https://config.example.com/token',
+        },
         scopes: ['custom-scope'],
       });
 
@@ -389,8 +398,10 @@ describe('OAuth2AuthProvider', () => {
 
     it('should throw when authorization_url and token_url are missing', async () => {
       const config = createConfig({
-        authorization_url: undefined,
-        token_url: undefined,
+        endpoints: {
+          authorization_url: undefined,
+          token_url: undefined,
+        },
       });
       const provider = new OAuth2AuthProvider(config, 'test-agent');
       await provider.initialize();
@@ -538,8 +549,10 @@ describe('OAuth2AuthProvider', () => {
   describe('agent card integration', () => {
     it('should discover URLs from agent card when not in config', async () => {
       const config = createConfig({
-        authorization_url: undefined,
-        token_url: undefined,
+        endpoints: {
+          authorization_url: undefined,
+          token_url: undefined,
+        },
         scopes: undefined,
       });
 
@@ -576,8 +589,10 @@ describe('OAuth2AuthProvider', () => {
 
     it('should discover URLs from agentCardUrl via DefaultAgentCardResolver during initialize', async () => {
       const config = createConfig({
-        authorization_url: undefined,
-        token_url: undefined,
+        endpoints: {
+          authorization_url: undefined,
+          token_url: undefined,
+        },
         scopes: undefined,
       });
 
@@ -625,8 +640,10 @@ describe('OAuth2AuthProvider', () => {
 
     it('should ignore agent card with no authorizationCode flow', () => {
       const config = createConfig({
-        authorization_url: undefined,
-        token_url: undefined,
+        endpoints: {
+          authorization_url: undefined,
+          token_url: undefined,
+        },
       });
 
       const agentCard = {

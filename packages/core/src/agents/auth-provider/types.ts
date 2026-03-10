@@ -68,17 +68,31 @@ export type HttpAuthConfig = BaseAuthConfig & {
       }
   );
 
-/** Client config corresponding to OAuth2SecurityScheme. */
-export interface OAuth2AuthConfig extends BaseAuthConfig {
-  type: 'oauth2';
-  client_id?: string;
-  client_secret?: string;
-  scopes?: string[];
-  /** Override or provide the authorization endpoint URL. Discovered from agent card if omitted. */
+export interface OAuth2Endpoints {
   authorization_url?: string;
-  /** Override or provide the token endpoint URL. Discovered from agent card if omitted. */
   token_url?: string;
+  device_authorization_url?: string;
+  registration_url?: string;
 }
+
+/** Client config corresponding to OAuth2SecurityScheme. */
+export type OAuth2AuthConfig = BaseAuthConfig & {
+  type: 'oauth2';
+  grant_type?: 'authorization_code' | 'client_credentials' | 'device_code';
+  scopes?: string[];
+  endpoints?: OAuth2Endpoints;
+} & (
+    | {
+        client_type?: 'static';
+        client_id: string;
+        client_secret?: string;
+      }
+    | {
+        client_type: 'dynamic';
+        client_name?: string;
+        registration_token?: string;
+      }
+  );
 
 /** Client config corresponding to OpenIdConnectSecurityScheme. */
 export interface OpenIdConnectAuthConfig extends BaseAuthConfig {

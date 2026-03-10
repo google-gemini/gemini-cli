@@ -215,6 +215,8 @@ describe('A2AAuthProviderFactory', () => {
       it('should match oauth2 config with oauth2 scheme', () => {
         const authConfig: A2AAuthConfig = {
           type: 'oauth2',
+          client_type: 'static',
+          client_id: 'test-client',
         };
         const securitySchemes: Record<string, SecurityScheme> = {
           oauth2Auth: {
@@ -510,8 +512,10 @@ describe('A2AAuthProviderFactory', () => {
         authConfig: {
           type: 'oauth2',
           client_id: 'my-client',
-          authorization_url: 'https://auth.example.com/authorize',
-          token_url: 'https://auth.example.com/token',
+          endpoints: {
+            authorization_url: 'https://auth.example.com/authorize',
+            token_url: 'https://auth.example.com/token',
+          },
           scopes: ['read'],
         },
       });
@@ -552,8 +556,10 @@ describe('A2AAuthProviderFactory', () => {
         authConfig: {
           type: 'oauth2',
           client_id: 'my-client',
-          authorization_url: 'https://auth.example.com/authorize',
-          token_url: 'https://auth.example.com/token',
+          endpoints: {
+            authorization_url: 'https://auth.example.com/authorize',
+            token_url: 'https://auth.example.com/token',
+          },
         },
       });
 

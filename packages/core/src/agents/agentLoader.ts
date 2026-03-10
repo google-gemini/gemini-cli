@@ -44,7 +44,7 @@ interface FrontmatterLocalAgentDefinition
  * Authentication configuration for remote agents in frontmatter format.
  */
 interface FrontmatterAuthConfig {
-  type: 'apiKey' | 'http' | 'oauth2';
+  type: string;
   agent_card_requires_auth?: boolean;
   // API Key
   key?: string;
@@ -56,11 +56,23 @@ interface FrontmatterAuthConfig {
   password?: string;
   value?: string;
   // OAuth2
+  grant_type?: 'authorization_code' | 'client_credentials' | 'device_code';
   client_id?: string;
   client_secret?: string;
   scopes?: string[];
   authorization_url?: string;
   token_url?: string;
+  registration_url?: string;
+  device_authorization_url?: string;
+  endpoints?: {
+    authorization_url?: string;
+    token_url?: string;
+    device_authorization_url?: string;
+    registration_url?: string;
+  };
+  client_type?: 'static' | 'dynamic';
+  client_name?: string;
+  registration_token?: string;
 }
 
 interface FrontmatterRemoteAgentDefinition
@@ -153,18 +165,32 @@ const httpAuthSchema = z.object({
   value: z.string().min(1).optional(),
 });
 
+const oauth2EndpointsSchema = z.object({
+  authorization_url: z.string().url().optional(),
+  token_url: z.string().url().optional(),
+  device_authorization_url: z.string().url().optional(),
+  registration_url: z.string().url().optional(),
+});
+
 /**
  * OAuth2 auth schema.
- * authorization_url and token_url can be discovered from the agent card if omitted.
+ * endpoints can be discovered from the agent card if omitted.
  */
 const oauth2AuthSchema = z.object({
   ...baseAuthFields,
   type: z.literal('oauth2'),
-  client_id: z.string().optional(),
-  client_secret: z.string().optional(),
+  grant_type: z
+    .enum(['authorization_code', 'client_credentials', 'device_code'])
+    .optional(),
   scopes: z.array(z.string()).optional(),
-  authorization_url: z.string().url().optional(),
-  token_url: z.string().url().optional(),
+  endpoints: oauth2EndpointsSchema.optional(),
+
+  // Client configuration
+  client_type: z.enum(['static', 'dynamic']).optional(),
+  client_id: z.string().optional(), // Technically required for 'static', validated at type-level
+  client_secret: z.string().optional(),
+  client_name: z.string().optional(),
+  registration_token: z.string().optional(),
 });
 
 const authConfigSchema = z
@@ -419,20 +445,41 @@ function convertFrontmatterAuthToConfig(
       }
     }
 
-    case 'oauth2':
+    case 'oauth2': {
+      const endpoints = frontmatter.endpoints || {
+        authorization_url: frontmatter.authorization_url,
+        token_url: frontmatter.token_url,
+        registration_url: frontmatter.registration_url,
+        device_authorization_url: frontmatter.device_authorization_url,
+      };
+
+      if (frontmatter.client_type === 'dynamic') {
+        return {
+          ...base,
+          type: 'oauth2',
+          grant_type: frontmatter.grant_type,
+          scopes: frontmatter.scopes,
+          endpoints,
+          client_type: 'dynamic',
+          client_name: frontmatter.client_name,
+          registration_token: frontmatter.registration_token,
+        };
+      }
+
       return {
         ...base,
         type: 'oauth2',
-        client_id: frontmatter.client_id,
-        client_secret: frontmatter.client_secret,
+        grant_type: frontmatter.grant_type,
         scopes: frontmatter.scopes,
-        authorization_url: frontmatter.authorization_url,
-        token_url: frontmatter.token_url,
+        endpoints,
+        client_type: 'static',
+        client_id: frontmatter.client_id || '',
+        client_secret: frontmatter.client_secret,
       };
+    }
 
     default: {
-      const exhaustive: never = frontmatter.type;
-      throw new Error(`Unknown auth type: ${exhaustive}`);
+      throw new Error(`Unknown auth type: ${frontmatter.type}`);
     }
   }
 }

@@ -67,6 +67,72 @@ export interface OAuthTokenResponse {
   scope?: string;
 }
 
+/**
+ * Dynamic client registration request (RFC 7591).
+ */
+export interface OAuthClientRegistrationRequest {
+  client_name: string;
+  redirect_uris: string[];
+  grant_types: string[];
+  response_types: string[];
+  token_endpoint_auth_method: string;
+  scope?: string;
+}
+
+/**
+ * Dynamic client registration response (RFC 7591).
+ */
+export interface OAuthClientRegistrationResponse {
+  client_id: string;
+  client_secret?: string;
+  client_id_issued_at?: number;
+  client_secret_expires_at?: number;
+}
+
+/**
+ * Register a client dynamically with the OAuth server.
+ *
+ * @param registrationUrl The client registration endpoint URL
+ * @param clientName The name of the client to register
+ * @param redirectUri The callback URI
+ * @param scopes Optional array of scopes
+ * @returns The registered client information
+ */
+export async function registerDynamicClient(
+  registrationUrl: string,
+  clientName: string,
+  redirectUri: string,
+  scopes?: string[],
+): Promise<OAuthClientRegistrationResponse> {
+  const registrationRequest: OAuthClientRegistrationRequest = {
+    client_name: clientName,
+    redirect_uris: [redirectUri],
+    grant_types: ['authorization_code', 'refresh_token'],
+    response_types: ['code'],
+    token_endpoint_auth_method: 'none', // Public client
+    scope: scopes?.join(' ') || '',
+  };
+
+  // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
+  const response = await fetch(registrationUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(registrationRequest),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Client registration failed: ${response.status} ${response.statusText} - ${errorText}`,
+    );
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return (await response.json()) as OAuthClientRegistrationResponse;
+}
+
 /** The path the local callback server listens on. */
 export const REDIRECT_PATH = '/oauth/callback';
 

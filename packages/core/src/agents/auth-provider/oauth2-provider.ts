@@ -13,10 +13,11 @@ import type { OAuthToken } from '../../mcp/token-storage/types.js';
 import {
   generatePKCEParams,
   startCallbackServer,
-  getPortFromUrl,
   buildAuthorizationUrl,
   exchangeCodeForToken,
   refreshAccessToken,
+  registerDynamicClient,
+  REDIRECT_PATH,
   type OAuthFlowConfig,
 } from '../../utils/oauth-flow.js';
 import { openBrowserSecurely } from '../../utils/secure-browser-launcher.js';
@@ -38,11 +39,14 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
 
   private readonly tokenStorage: MCPOAuthTokenStorage;
   private cachedToken: OAuthToken | null = null;
+  private dynamicClientId: string | undefined;
+  private dynamicClientSecret: string | undefined;
 
   /** Resolved OAuth URLs — may come from config or agent card. */
   private authorizationUrl: string | undefined;
   private tokenUrl: string | undefined;
   private scopes: string[] | undefined;
+  private registrationUrl: string | undefined;
 
   constructor(
     private readonly config: OAuth2AuthConfig,
@@ -57,8 +61,9 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
     );
 
     // Seed from user config.
-    this.authorizationUrl = config.authorization_url;
-    this.tokenUrl = config.token_url;
+    this.authorizationUrl = config.endpoints?.authorization_url;
+    this.tokenUrl = config.endpoints?.token_url;
+    this.registrationUrl = config.endpoints?.registration_url;
     this.scopes = config.scopes;
 
     // Fall back to agent card's OAuth2 security scheme if user config is incomplete.
@@ -76,12 +81,30 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
     }
 
     const credentials = await this.tokenStorage.getCredentials(this.agentName);
-    if (credentials && !this.tokenStorage.isTokenExpired(credentials.token)) {
-      this.cachedToken = credentials.token;
-      debugLogger.debug(
-        `[OAuth2AuthProvider] Loaded valid cached token for "${this.agentName}"`,
-      );
+    if (credentials) {
+      if (this.config.client_type === 'dynamic') {
+        this.dynamicClientId = credentials.clientId;
+      }
+
+      if (!this.tokenStorage.isTokenExpired(credentials.token)) {
+        this.cachedToken = credentials.token;
+        debugLogger.debug(
+          `[OAuth2AuthProvider] Loaded valid cached token for "${this.agentName}"`,
+        );
+      }
     }
+  }
+
+  private get clientId(): string | undefined {
+    return this.config.client_type === 'dynamic'
+      ? this.dynamicClientId
+      : this.config.client_id;
+  }
+
+  private get clientSecret(): string | undefined {
+    return this.config.client_type === 'dynamic'
+      ? this.dynamicClientSecret
+      : this.config.client_secret;
   }
 
   /**
@@ -98,16 +121,12 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
     }
 
     // 2. Expired but has refresh token → attempt silent refresh.
-    if (
-      this.cachedToken?.refreshToken &&
-      this.tokenUrl &&
-      this.config.client_id
-    ) {
+    if (this.cachedToken?.refreshToken && this.tokenUrl && this.clientId) {
       try {
         const refreshed = await refreshAccessToken(
           {
-            clientId: this.config.client_id,
-            clientSecret: this.config.client_secret,
+            clientId: this.clientId,
+            clientSecret: this.clientSecret,
             scopes: this.scopes,
           },
           this.cachedToken.refreshToken,
@@ -209,12 +228,6 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
    * Run a full OAuth 2.0 Authorization Code + PKCE flow through the browser.
    */
   private async authenticateInteractively(): Promise<OAuthToken> {
-    if (!this.config.client_id) {
-      throw new Error(
-        `OAuth2 authentication for agent "${this.agentName}" requires a client_id. ` +
-          'Add client_id to the auth config in your agent definition.',
-      );
-    }
     if (!this.authorizationUrl || !this.tokenUrl) {
       throw new Error(
         `OAuth2 authentication for agent "${this.agentName}" requires authorization_url and token_url. ` +
@@ -222,18 +235,65 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
       );
     }
 
+    const pkceParams = generatePKCEParams();
+
+    // We don't have a redirectUri in config yet (unlike MCP). Let's use a default one for port allocation
+    // If we want to allow configuring redirectUri, we can add it to OAuth2AuthConfig later.
+    const preferredPort = 0; // Let OS assign port
+    const callbackServer = startCallbackServer(pkceParams.state, preferredPort);
+    const redirectPort = await callbackServer.port;
+
+    if (!this.clientId) {
+      if (this.config.client_type === 'dynamic') {
+        if (!this.registrationUrl) {
+          throw new Error(
+            `OAuth2 dynamic registration for agent "${this.agentName}" requires registration_url. ` +
+              'Provide it in the auth config or ensure the agent card exposes an oauth2 security scheme with it.',
+          );
+        }
+
+        debugLogger.debug(
+          `[OAuth2AuthProvider] Attempting dynamic client registration for "${this.agentName}"...`,
+        );
+        const redirectUri = `http://localhost:${redirectPort}${REDIRECT_PATH}`;
+        const clientName =
+          this.config.client_name || `Gemini CLI A2A Agent - ${this.agentName}`;
+
+        const clientRegistration = await registerDynamicClient(
+          this.registrationUrl,
+          clientName,
+          redirectUri,
+          this.scopes,
+        );
+
+        this.dynamicClientId = clientRegistration.client_id;
+        if (clientRegistration.client_secret) {
+          this.dynamicClientSecret = clientRegistration.client_secret;
+        }
+        debugLogger.debug(
+          `[OAuth2AuthProvider] ✓ Dynamic client registration successful`,
+        );
+      } else {
+        throw new Error(
+          `OAuth2 authentication for agent "${this.agentName}" requires a client_id. ` +
+            'Add client_id to the auth config in your agent definition.',
+        );
+      }
+    }
+
+    // After dynamic registration, clientId should be populated
+    if (!this.clientId) {
+      throw new Error('Failed to resolve client_id for OAuth2 authentication');
+    }
+
     const flowConfig: OAuthFlowConfig = {
-      clientId: this.config.client_id,
-      clientSecret: this.config.client_secret,
+      clientId: this.clientId,
+      clientSecret: this.clientSecret,
       authorizationUrl: this.authorizationUrl,
       tokenUrl: this.tokenUrl,
       scopes: this.scopes,
+      redirectUri: `http://localhost:${redirectPort}${REDIRECT_PATH}`,
     };
-
-    const pkceParams = generatePKCEParams();
-    const preferredPort = getPortFromUrl(flowConfig.redirectUri);
-    const callbackServer = startCallbackServer(pkceParams.state, preferredPort);
-    const redirectPort = await callbackServer.port;
 
     const authUrl = buildAuthorizationUrl(
       flowConfig,
@@ -329,11 +389,11 @@ export class OAuth2AuthProvider extends BaseA2AAuthProvider {
    * Persist the current cached token to disk.
    */
   private async persistToken(): Promise<void> {
-    if (!this.cachedToken) return;
+    if (!this.cachedToken || !this.clientId) return;
     await this.tokenStorage.saveToken(
       this.agentName,
       this.cachedToken,
-      this.config.client_id,
+      this.clientId,
       this.tokenUrl,
     );
   }

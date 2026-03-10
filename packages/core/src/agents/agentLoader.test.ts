@@ -615,8 +615,9 @@ auth:
   scopes:
     - openid
     - profile
-  authorization_url: https://auth.example.com/authorize
-  token_url: https://auth.example.com/token
+  endpoints:
+    authorization_url: https://auth.example.com/authorize
+    token_url: https://auth.example.com/token
 ---
 `);
       const result = await parseAgentMarkdown(filePath);
@@ -629,8 +630,10 @@ auth:
           client_id: 'my-client-id',
           client_secret: 'my-client-secret',
           scopes: ['openid', 'profile'],
-          authorization_url: 'https://auth.example.com/authorize',
-          token_url: 'https://auth.example.com/token',
+          endpoints: {
+            authorization_url: 'https://auth.example.com/authorize',
+            token_url: 'https://auth.example.com/token',
+          },
         },
       });
     });
@@ -663,7 +666,8 @@ agent_card_url: https://example.com/card
 auth:
   type: oauth2
   client_id: my-client
-  authorization_url: not-a-valid-url
+  endpoints:
+    authorization_url: not-a-valid-url
 ---
 `);
       await expect(parseAgentMarkdown(filePath)).rejects.toThrow(/Invalid url/);
@@ -677,7 +681,8 @@ agent_card_url: https://example.com/card
 auth:
   type: oauth2
   client_id: my-client
-  token_url: not-a-valid-url
+  endpoints:
+    token_url: not-a-valid-url
 ---
 `);
       await expect(parseAgentMarkdown(filePath)).rejects.toThrow(/Invalid url/);
@@ -692,8 +697,10 @@ auth:
           type: 'oauth2' as const,
           client_id: '$MY_CLIENT_ID',
           scopes: ['read'],
-          authorization_url: 'https://auth.example.com/authorize',
-          token_url: 'https://auth.example.com/token',
+          endpoints: {
+            authorization_url: 'https://auth.example.com/authorize',
+            token_url: 'https://auth.example.com/token',
+          },
         },
       };
 
@@ -705,8 +712,10 @@ auth:
           type: 'oauth2',
           client_id: '$MY_CLIENT_ID',
           scopes: ['read'],
-          authorization_url: 'https://auth.example.com/authorize',
-          token_url: 'https://auth.example.com/token',
+          endpoints: {
+            authorization_url: 'https://auth.example.com/authorize',
+            token_url: 'https://auth.example.com/token',
+          },
         },
       });
     });

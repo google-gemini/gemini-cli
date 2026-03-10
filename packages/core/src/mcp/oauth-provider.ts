@@ -24,12 +24,15 @@ import {
   REDIRECT_PATH,
   type OAuthFlowConfig,
   type OAuthTokenResponse,
+  registerDynamicClient,
 } from '../utils/oauth-flow.js';
 
 // Re-export types that were moved to oauth-flow.ts for backward compatibility.
 export type {
   OAuthAuthorizationResponse,
   OAuthTokenResponse,
+  OAuthClientRegistrationRequest,
+  OAuthClientRegistrationResponse,
 } from '../utils/oauth-flow.js';
 
 /**
@@ -50,33 +53,6 @@ export interface MCPOAuthConfig {
 }
 
 /**
- * Dynamic client registration request (RFC 7591).
- */
-export interface OAuthClientRegistrationRequest {
-  client_name: string;
-  redirect_uris: string[];
-  grant_types: string[];
-  response_types: string[];
-  token_endpoint_auth_method: string;
-  scope?: string;
-}
-
-/**
- * Dynamic client registration response (RFC 7591).
- */
-export interface OAuthClientRegistrationResponse {
-  client_id: string;
-  client_secret?: string;
-  client_id_issued_at?: number;
-  client_secret_expires_at?: number;
-  redirect_uris: string[];
-  grant_types: string[];
-  response_types: string[];
-  token_endpoint_auth_method: string;
-  scope?: string;
-}
-
-/**
  * Provider for handling OAuth authentication for MCP servers.
  */
 export class MCPOAuthProvider {
@@ -84,51 +60,6 @@ export class MCPOAuthProvider {
 
   constructor(tokenStorage: MCPOAuthTokenStorage = new MCPOAuthTokenStorage()) {
     this.tokenStorage = tokenStorage;
-  }
-
-  /**
-   * Register a client dynamically with the OAuth server.
-   *
-   * @param registrationUrl The client registration endpoint URL
-   * @param config OAuth configuration
-   * @param redirectPort The port to use for the redirect URI
-   * @returns The registered client information
-   */
-  private async registerClient(
-    registrationUrl: string,
-    config: MCPOAuthConfig,
-    redirectPort: number,
-  ): Promise<OAuthClientRegistrationResponse> {
-    const redirectUri =
-      config.redirectUri || `http://localhost:${redirectPort}${REDIRECT_PATH}`;
-
-    const registrationRequest: OAuthClientRegistrationRequest = {
-      client_name: 'Gemini CLI MCP Client',
-      redirect_uris: [redirectUri],
-      grant_types: ['authorization_code', 'refresh_token'],
-      response_types: ['code'],
-      token_endpoint_auth_method: 'none', // Public client
-      scope: config.scopes?.join(' ') || '',
-    };
-
-    // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
-    const response = await fetch(registrationUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(registrationRequest),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        `Client registration failed: ${response.status} ${response.statusText} - ${errorText}`,
-      );
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return (await response.json()) as OAuthClientRegistrationResponse;
   }
 
   /**
@@ -401,10 +332,14 @@ export class MCPOAuthProvider {
 
       // Register client if registration endpoint is available
       if (registrationUrl) {
-        const clientRegistration = await this.registerClient(
+        const redirectUri =
+          config.redirectUri ||
+          `http://localhost:${redirectPort}${REDIRECT_PATH}`;
+        const clientRegistration = await registerDynamicClient(
           registrationUrl,
-          config,
-          redirectPort,
+          'Gemini CLI MCP Client',
+          redirectUri,
+          config.scopes,
         );
 
         config.clientId = clientRegistration.client_id;
