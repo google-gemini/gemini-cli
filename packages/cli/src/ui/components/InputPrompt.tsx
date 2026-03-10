@@ -36,8 +36,8 @@ import {
 } from '../hooks/useCommandCompletion.js';
 import type { Key } from '../hooks/useKeypress.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { Command } from '../keyMatchers.js';
-import { formatCommand } from '../utils/keybindingUtils.js';
+import { Command } from '../key/keyMatchers.js';
+import { formatCommand } from '../key/keybindingUtils.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { ApprovalMode, coreEvents, debugLogger } from '@google/gemini-cli-core';
@@ -972,7 +972,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             if (targetIndex < completion.suggestions.length) {
               const suggestion = completion.suggestions[targetIndex];
 
-              const isEnterKey = key.name === 'return' && !key.ctrl;
+              const isEnterKey = key.name === 'enter' && !key.ctrl;
 
               if (isEnterKey && shellModeActive) {
                 if (hasUserNavigatedSuggestions.current) {

@@ -361,6 +361,10 @@ export interface GeminiCLIExtension {
      */
     directory?: string;
   };
+  /**
+   * Used to migrate an extension to a new repository source.
+   */
+  migratedTo?: string;
 }
 
 export interface ExtensionInstallMetadata {
@@ -2523,6 +2527,26 @@ export class Config implements McpContext, AgentLoopContext {
   async getGemini31Launched(): Promise<boolean> {
     await this.ensureExperimentsLoaded();
     return this.getGemini31LaunchedSync();
+  }
+
+  /**
+   * Returns whether the custom tool model should be used.
+   */
+  async getUseCustomToolModel(): Promise<boolean> {
+    const useGemini3_1 = await this.getGemini31Launched();
+    const authType = this.contentGeneratorConfig?.authType;
+    return useGemini3_1 && authType === AuthType.USE_GEMINI;
+  }
+
+  /**
+   * Returns whether the custom tool model should be used.
+   *
+   * Note: This method should only be called after startup, once experiments have been loaded.
+   */
+  getUseCustomToolModelSync(): boolean {
+    const useGemini3_1 = this.getGemini31LaunchedSync();
+    const authType = this.contentGeneratorConfig?.authType;
+    return useGemini3_1 && authType === AuthType.USE_GEMINI;
   }
 
   /**
