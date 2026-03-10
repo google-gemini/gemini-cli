@@ -256,10 +256,10 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
     // A2AAgentError base class. Rely on that to avoid duplicating messages
     // for specific subclasses, which improves maintainability.
     if (error instanceof A2AAgentError) {
-      return `[${this.definition.name}] ${error.userMessage}`;
+      return error.userMessage;
     }
 
-    return `[${this.definition.name}] Error calling remote agent: ${
+    return `Error calling remote agent: ${
       error instanceof Error ? error.message : String(error)
     }`;
   }

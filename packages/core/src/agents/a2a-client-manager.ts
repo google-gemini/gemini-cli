@@ -166,19 +166,9 @@ export class A2AClientManager {
       },
     };
 
-    try {
-      yield* client.sendMessageStream(messageParams, {
-        signal: options?.signal,
-      });
-    } catch (error: unknown) {
-      const prefix = `[A2AClientManager] sendMessageStream Error [${agentName}]`;
-      if (error instanceof Error) {
-        throw new Error(`${prefix}: ${error.message}`, { cause: error });
-      }
-      throw new Error(
-        `${prefix}: Unexpected error during sendMessageStream: ${String(error)}`,
-      );
-    }
+    yield* client.sendMessageStream(messageParams, {
+      signal: options?.signal,
+    });
   }
 
   /**

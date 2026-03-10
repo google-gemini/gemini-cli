@@ -33,8 +33,7 @@ describe('A2A Error Types', () => {
       );
       expect(error.name).toBe('AgentCardNotFoundError');
       expect(error.agentName).toBe('my-agent');
-      expect(error.userMessage).toContain('404 Not Found');
-      expect(error.userMessage).toContain('my-agent');
+      expect(error.userMessage).toContain('404');
       expect(error.userMessage).toContain('https://example.com/card');
       expect(error.userMessage).toContain('agent_card_url');
     });
@@ -51,7 +50,6 @@ describe('A2A Error Types', () => {
       expect(error.statusCode).toBe(401);
       expect(error.userMessage).toContain('401');
       expect(error.userMessage).toContain('Unauthorized');
-      expect(error.userMessage).toContain('secure-agent');
       expect(error.userMessage).toContain('"auth" configuration');
     });
 
@@ -80,9 +78,9 @@ describe('A2A Error Types', () => {
       expect(error.name).toBe('AgentAuthConfigMissingError');
       expect(error.requiredAuth).toContain('API Key');
       expect(error.missingFields).toHaveLength(2);
-      expect(error.userMessage).toContain('api-agent');
-      expect(error.userMessage).toContain('auth');
-      expect(error.userMessage).toContain('apiKey');
+      expect(error.userMessage).toContain('API Key');
+      expect(error.userMessage).toContain('no auth is configured');
+      expect(error.userMessage).toContain('Missing:');
     });
   });
 
@@ -96,8 +94,7 @@ describe('A2A Error Types', () => {
       );
       expect(error.name).toBe('AgentConnectionError');
       expect(error.userMessage).toContain('ECONNREFUSED');
-      expect(error.userMessage).toContain('my-agent');
-      expect(error.userMessage).toContain('network connection');
+      expect(error.userMessage).toContain('https://example.com/card');
     });
 
     it('should handle non-Error causes', () => {

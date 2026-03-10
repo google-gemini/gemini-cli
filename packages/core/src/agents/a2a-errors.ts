@@ -20,8 +20,13 @@ export class A2AAgentError extends Error {
   /** The agent name associated with this error. */
   readonly agentName: string;
 
-  constructor(agentName: string, message: string, userMessage: string) {
-    super(message);
+  constructor(
+    agentName: string,
+    message: string,
+    userMessage: string,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
     this.name = 'A2AAgentError';
     this.agentName = agentName;
     this.userMessage = userMessage;
@@ -34,12 +39,7 @@ export class A2AAgentError extends Error {
 export class AgentCardNotFoundError extends A2AAgentError {
   constructor(agentName: string, agentCardUrl: string) {
     const message = `Agent card not found at ${agentCardUrl} (HTTP 404)`;
-    const userMessage =
-      `Could not find agent "${agentName}": The agent card URL returned 404 Not Found.\n` +
-      `  URL: ${agentCardUrl}\n` +
-      `  Please verify:\n` +
-      `    • The agent_card_url in your agent definition is correct\n` +
-      `    • The remote agent server is running and accessible`;
+    const userMessage = `Agent card not found (404) at ${agentCardUrl}. Verify the agent_card_url in your agent definition.`;
     super(agentName, message, userMessage);
     this.name = 'AgentCardNotFoundError';
   }
@@ -55,13 +55,7 @@ export class AgentCardAuthError extends A2AAgentError {
   constructor(agentName: string, agentCardUrl: string, statusCode: 401 | 403) {
     const statusText = statusCode === 401 ? 'Unauthorized' : 'Forbidden';
     const message = `Agent card request returned ${statusCode} ${statusText} for ${agentCardUrl}`;
-    const userMessage =
-      `Authentication failed for agent "${agentName}" (HTTP ${statusCode} ${statusText}).\n` +
-      `  URL: ${agentCardUrl}\n` +
-      `  Please verify:\n` +
-      `    • Your agent definition includes the correct "auth" configuration\n` +
-      `    • Any API keys or tokens referenced by environment variables are set\n` +
-      `    • You have permission to access this agent`;
+    const userMessage = `Authentication failed (${statusCode} ${statusText}) at ${agentCardUrl}. Check the "auth" configuration in your agent definition.`;
     super(agentName, message, userMessage);
     this.name = 'AgentCardAuthError';
     this.statusCode = statusCode;
@@ -84,15 +78,7 @@ export class AgentAuthConfigMissingError extends A2AAgentError {
     missingFields: string[],
   ) {
     const message = `Agent "${agentName}" requires authentication but none is configured`;
-    const missingList = missingFields.map((f) => `    • ${f}`).join('\n');
-    const userMessage =
-      `Agent "${agentName}" requires authentication that is not configured.\n` +
-      `  Required: ${requiredAuth}\n` +
-      `  Missing configuration:\n${missingList}\n` +
-      `  To fix, add an "auth" section to your agent definition. Example:\n` +
-      `    auth:\n` +
-      `      type: apiKey\n` +
-      `      key: $MY_API_KEY`;
+    const userMessage = `Agent requires ${requiredAuth} but no auth is configured. Missing: ${missingFields.join(', ')}`;
     super(agentName, message, userMessage);
     this.name = 'AgentAuthConfigMissingError';
     this.requiredAuth = requiredAuth;
@@ -108,15 +94,8 @@ export class AgentConnectionError extends A2AAgentError {
   constructor(agentName: string, agentCardUrl: string, cause: unknown) {
     const causeMessage = cause instanceof Error ? cause.message : String(cause);
     const message = `Failed to connect to agent "${agentName}" at ${agentCardUrl}: ${causeMessage}`;
-    const userMessage =
-      `Failed to connect to agent "${agentName}".\n` +
-      `  URL: ${agentCardUrl}\n` +
-      `  Error: ${causeMessage}\n` +
-      `  Please verify:\n` +
-      `    • The remote agent server is running and accessible\n` +
-      `    • Your network connection is working\n` +
-      `    • The agent_card_url in your agent definition is correct`;
-    super(agentName, message, userMessage);
+    const userMessage = `Connection failed for ${agentCardUrl}: ${causeMessage}`;
+    super(agentName, message, userMessage, { cause });
     this.name = 'AgentConnectionError';
   }
 }
@@ -133,51 +112,31 @@ function collectErrorMessages(error: unknown): string {
   const maxDepth = 10;
 
   while (current && depth < maxDepth) {
-    if (current instanceof Error) {
-      parts.push(current.message);
-      // Some errors (like Node's AggregateError) may have a `code` property
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const code = (current as unknown as { code?: string }).code;
-      if (code) {
-        parts.push(code);
-      }
-      // Also check for a `status` or `statusCode` property (some HTTP libs set these)
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const errRecord = current as unknown as {
-        status?: number;
-        statusCode?: number;
-      };
-      const status = errRecord.status ?? errRecord.statusCode;
-      if (typeof status === 'number') {
-        parts.push(String(status));
-      }
-      current = current.cause;
-    } else if (typeof current === 'string') {
-      parts.push(current);
-      break;
-    } else if (typeof current === 'object' && current !== null) {
-      // Handle plain objects (non-Error) that may have message/status/cause properties.
-      // Some HTTP libraries set cause to a plain object like { message: '...', status: 401 }.
+    if (typeof current === 'object' && current !== null) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const obj = current as Record<string, unknown>;
-      if (typeof obj['message'] === 'string') {
-        parts.push(obj['message']);
+
+      if (current instanceof Error) {
+        parts.push(current.message);
+      } else if (typeof obj.message === 'string') {
+        parts.push(obj.message);
       }
-      if (typeof obj['code'] === 'string') {
-        parts.push(obj['code']);
+
+      if (typeof obj.code === 'string') {
+        parts.push(obj.code);
       }
+
       const status =
-        (typeof obj['status'] === 'number' ? obj['status'] : undefined) ??
-        (typeof obj['statusCode'] === 'number' ? obj['statusCode'] : undefined);
+        (typeof obj.status === 'number' ? obj.status : undefined) ??
+        (typeof obj.statusCode === 'number' ? obj.statusCode : undefined);
       if (status !== undefined) {
         parts.push(String(status));
       }
-      // Continue walking if this object has a cause property
-      if (obj['cause']) {
-        current = obj['cause'];
-      } else {
-        break;
-      }
+
+      current = obj.cause;
+    } else if (typeof current === 'string') {
+      parts.push(current);
+      break;
     } else {
       parts.push(String(current));
       break;
@@ -208,14 +167,16 @@ export function classifyAgentError(
   const fullErrorText = collectErrorMessages(error);
 
   // Check for well-known connection error codes in the cause chain.
-  // NOTE: This must be checked BEFORE the 404 pattern because ENOTFOUND
-  // contains "NOTFOUND" which would otherwise match the 404 regex.
-  if (/ECONNREFUSED|ENOTFOUND|EHOSTUNREACH|ETIMEDOUT/i.test(fullErrorText)) {
+  // NOTE: This is checked before the 404 pattern as a defensive measure
+  // to prevent DNS errors (ENOTFOUND) from being misclassified as 404s.
+  if (
+    /\b(ECONNREFUSED|ENOTFOUND|EHOSTUNREACH|ETIMEDOUT)\b/i.test(fullErrorText)
+  ) {
     return new AgentConnectionError(agentName, agentCardUrl, error);
   }
 
   // Check for HTTP status code patterns across the full cause chain.
-  if (/\b404\b|(?<![A-Z])not.?found/i.test(fullErrorText)) {
+  if (/\b404\b|\bnot[\s_-]?found\b/i.test(fullErrorText)) {
     return new AgentCardNotFoundError(agentName, agentCardUrl);
   }
 

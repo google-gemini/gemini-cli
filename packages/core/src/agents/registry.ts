@@ -450,9 +450,12 @@ export class AgentRegistry {
             requiredAuth,
             validation.diff.missingConfig,
           );
-          coreEvents.emitFeedback('warning', authError.userMessage);
+          coreEvents.emitFeedback(
+            'warning',
+            `[${definition.name}] Agent requires authentication: ${requiredAuth}`,
+          );
           debugLogger.warn(`[AgentRegistry] ${authError.message}`);
-          // Still register the agent — it may work with ADC fallback or user can fix config.
+          // Still register the agent — the user can fix config and retry.
         }
       }
 

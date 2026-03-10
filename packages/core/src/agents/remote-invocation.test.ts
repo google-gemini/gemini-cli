@@ -633,9 +633,7 @@ describe('RemoteAgentInvocation', () => {
       const result = await invocation.execute(new AbortController().signal);
 
       expect(result.error).toBeDefined();
-      expect(result.returnDisplay).toContain(
-        `[test-agent] ${a2aError.userMessage}`,
-      );
+      expect(result.returnDisplay).toContain(a2aError.userMessage);
     });
 
     it('should use generic message for non-A2AAgentError errors', async () => {
@@ -653,12 +651,11 @@ describe('RemoteAgentInvocation', () => {
 
       expect(result.error).toBeDefined();
       expect(result.returnDisplay).toContain(
-        '[test-agent] Error calling remote agent: something unexpected',
+        'Error calling remote agent: something unexpected',
       );
     });
 
     it('should include partial output when error occurs mid-stream', async () => {
-      const { AgentConnectionError } = await import('./a2a-errors.js');
       mockClientManager.getClient.mockReturnValue({});
       mockClientManager.sendMessageStream.mockImplementation(
         async function* () {
@@ -668,11 +665,8 @@ describe('RemoteAgentInvocation', () => {
             role: 'agent',
             parts: [{ kind: 'text', text: 'Partial response' }],
           };
-          throw new AgentConnectionError(
-            'test-agent',
-            'http://test-agent/card',
-            new Error('connection reset'),
-          );
+          // Raw errors propagate from the A2A SDK — no wrapping or classification.
+          throw new Error('connection reset');
         },
       );
 
@@ -686,7 +680,7 @@ describe('RemoteAgentInvocation', () => {
       expect(result.error).toBeDefined();
       // Should contain both the partial output and the error message
       expect(result.returnDisplay).toContain('Partial response');
-      expect(result.returnDisplay).toContain('Failed to connect to agent');
+      expect(result.returnDisplay).toContain('connection reset');
     });
   });
 });
