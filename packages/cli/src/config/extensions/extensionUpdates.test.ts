@@ -74,20 +74,17 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       getPassword = vi.fn().mockResolvedValue('test-key');
       setPassword = vi.fn().mockResolvedValue(undefined);
     },
+    ExtensionIntegrityManager: class {
+      verifyExtensionIntegrity = vi.fn().mockResolvedValue('verified');
+      storeExtensionIntegrity = vi.fn().mockResolvedValue(undefined);
+    },
+    IntegrityDataStatus: {
+      VERIFIED: 'verified',
+      MISSING: 'missing',
+      INVALID: 'invalid',
+    },
   };
 });
-
-vi.mock('./integrity.js', () => ({
-  ExtensionIntegrityManager: class {
-    verifyExtensionIntegrity = vi.fn().mockResolvedValue('verified');
-    storeExtensionIntegrity = vi.fn().mockResolvedValue(undefined);
-  },
-  IntegrityDataStatus: {
-    VERIFIED: 'verified',
-    MISSING: 'missing',
-    INVALID: 'invalid',
-  },
-}));
 
 vi.mock('./consent.js', () => ({
   maybeRequestConsentOrFail: vi.fn().mockResolvedValue(undefined),

@@ -11,7 +11,6 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { AppContainer } from '../ui/AppContainer.js';
-import { IntegrityDataStatus } from '../config/extensions/integrity.js';
 import { renderWithProviders } from './render.js';
 import {
   makeFakeConfig,
@@ -31,6 +30,7 @@ import {
   IdeClient,
   debugLogger,
   CoreToolCallStatus,
+  IntegrityDataStatus,
 } from '@google/gemini-cli-core';
 import {
   type MockShellCommand,

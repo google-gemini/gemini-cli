@@ -20,11 +20,11 @@ import { checkForExtensionUpdate } from './github.js';
 import { loadInstallMetadata } from '../extension.js';
 import * as fs from 'node:fs';
 import type { ExtensionManager } from '../extension-manager.js';
-import type {
-  GeminiCLIExtension,
-  ExtensionInstallMetadata,
+import {
+  type GeminiCLIExtension,
+  type ExtensionInstallMetadata,
+  IntegrityDataStatus,
 } from '@google/gemini-cli-core';
-import { IntegrityDataStatus } from './integrity.js';
 
 vi.mock('./storage.js', () => ({
   ExtensionStorage: {

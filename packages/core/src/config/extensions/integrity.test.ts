@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { ExtensionIntegrityManager, IntegrityDataStatus } from './integrity.js';
-import type { ExtensionInstallMetadata } from '@google/gemini-cli-core';
+import type { ExtensionInstallMetadata } from '../config.js';
 
 const mockKeychainService = {
   isAvailable: vi.fn(),
@@ -16,14 +16,16 @@ const mockKeychainService = {
   setPassword: vi.fn(),
 };
 
-vi.mock('@google/gemini-cli-core', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@google/gemini-cli-core')>();
+vi.mock('../../services/keychainService.js', () => ({
+  KeychainService: vi.fn().mockImplementation(() => mockKeychainService),
+}));
+
+vi.mock('../../utils/paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../utils/paths.js')>();
   return {
     ...actual,
     homedir: () => '/mock/home',
     GEMINI_DIR: '.gemini',
-    KeychainService: vi.fn().mockImplementation(() => mockKeychainService),
   };
 });
 

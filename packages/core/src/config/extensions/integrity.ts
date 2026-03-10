@@ -13,20 +13,16 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 import {
-  homedir,
-  GEMINI_DIR,
-  type ExtensionInstallMetadata,
-  KeychainService,
-  isNodeError,
-  debugLogger,
-  getErrorMessage,
-} from '@google/gemini-cli-core';
-import {
   INTEGRITY_FILENAME,
   INTEGRITY_KEY_FILENAME,
   KEYCHAIN_SERVICE_NAME,
   SECRET_KEY_ACCOUNT,
-} from './variables.js';
+} from '../constants.js';
+import { type ExtensionInstallMetadata } from '../config.js';
+import { KeychainService } from '../../services/keychainService.js';
+import { isNodeError, getErrorMessage } from '../../utils/errors.js';
+import { debugLogger } from '../../utils/debugLogger.js';
+import { homedir, GEMINI_DIR } from '../../utils/paths.js';
 import { z } from 'zod';
 import stableStringify from 'json-stable-stringify';
 

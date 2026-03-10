@@ -9,7 +9,6 @@ import * as path from 'node:path';
 import { stat } from 'node:fs/promises';
 import chalk from 'chalk';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
-import { ExtensionIntegrityManager } from './extensions/integrity.js';
 import { type MergedSettings, SettingScope } from './settings.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { loadInstallMetadata, type ExtensionConfig } from './extension.js';
@@ -42,6 +41,7 @@ import {
   loadSkillsFromDir,
   loadAgentsFromDirectory,
   homedir,
+  ExtensionIntegrityManager,
   type ExtensionEvents,
   type MCPServerConfig,
   type ExtensionInstallMetadata,
