@@ -6,8 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { formatKeyBinding, formatCommand } from './keybindingUtils.js';
-import { Command } from '../../config/keyBindings.js';
-import type { KeyBinding } from '../../config/keyBindings.js';
+import { Command, KeyBinding } from './keyBindings.js';
 
 describe('keybindingUtils', () => {
   describe('formatKeyBinding', () => {
@@ -23,12 +22,12 @@ describe('keybindingUtils', () => {
     }> = [
       {
         name: 'simple key',
-        binding: { key: 'a' },
+        binding: new KeyBinding('a'),
         expected: { darwin: 'A', win32: 'A', linux: 'A', default: 'A' },
       },
       {
         name: 'named key (return)',
-        binding: { key: 'return' },
+        binding: new KeyBinding('enter'),
         expected: {
           darwin: 'Enter',
           win32: 'Enter',
@@ -38,12 +37,12 @@ describe('keybindingUtils', () => {
       },
       {
         name: 'named key (escape)',
-        binding: { key: 'escape' },
+        binding: new KeyBinding('escape'),
         expected: { darwin: 'Esc', win32: 'Esc', linux: 'Esc', default: 'Esc' },
       },
       {
         name: 'ctrl modifier',
-        binding: { key: 'c', ctrl: true },
+        binding: new KeyBinding('ctrl+c'),
         expected: {
           darwin: 'Ctrl+C',
           win32: 'Ctrl+C',
@@ -53,7 +52,7 @@ describe('keybindingUtils', () => {
       },
       {
         name: 'cmd modifier',
-        binding: { key: 'z', cmd: true },
+        binding: new KeyBinding('cmd+z'),
         expected: {
           darwin: 'Cmd+Z',
           win32: 'Win+Z',
@@ -63,7 +62,7 @@ describe('keybindingUtils', () => {
       },
       {
         name: 'alt/option modifier',
-        binding: { key: 'left', alt: true },
+        binding: new KeyBinding('alt+left'),
         expected: {
           darwin: 'Option+Left',
           win32: 'Alt+Left',
@@ -73,7 +72,7 @@ describe('keybindingUtils', () => {
       },
       {
         name: 'shift modifier',
-        binding: { key: 'up', shift: true },
+        binding: new KeyBinding('shift+up'),
         expected: {
           darwin: 'Shift+Up',
           win32: 'Shift+Up',
@@ -83,7 +82,7 @@ describe('keybindingUtils', () => {
       },
       {
         name: 'multiple modifiers (ctrl+shift)',
-        binding: { key: 'z', ctrl: true, shift: true },
+        binding: new KeyBinding('ctrl+shift+z'),
         expected: {
           darwin: 'Ctrl+Shift+Z',
           win32: 'Ctrl+Shift+Z',
@@ -93,7 +92,7 @@ describe('keybindingUtils', () => {
       },
       {
         name: 'all modifiers',
-        binding: { key: 'a', ctrl: true, alt: true, shift: true, cmd: true },
+        binding: new KeyBinding('ctrl+alt+shift+cmd+a'),
         expected: {
           darwin: 'Ctrl+Option+Shift+Cmd+A',
           win32: 'Ctrl+Alt+Shift+Win+A',
