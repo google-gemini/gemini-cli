@@ -27,7 +27,7 @@ describe('Background Shell Output Logging', () => {
     // Since we're in the test rig, we have to be careful with how we background.
     // The run_shell_command tool backgrounds if is_background: true is passed.
 
-    const prompt = `Please run the command "echo start && sleep 1 && echo end" in the background and tell me the PID.`;
+    const prompt = `Please run the command "echo start; sleep 1; echo end" in the background and tell me the PID.`;
 
     const result = await rig.run({
       args: [prompt],
