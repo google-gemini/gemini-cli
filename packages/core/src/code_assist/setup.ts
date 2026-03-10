@@ -189,10 +189,10 @@ async function _doSetupUser(
         return {
           projectId,
           userTier:
-            loadRes.paidTier?.id ??
             loadRes.currentTier.id ??
+            loadRes.paidTier?.id ??
             UserTierId.STANDARD,
-          userTierName: loadRes.paidTier?.name ?? loadRes.currentTier.name,
+          userTierName: loadRes.currentTier.name ?? loadRes.paidTier?.name,
           paidTier: loadRes.paidTier ?? undefined,
         };
       }
@@ -203,8 +203,8 @@ async function _doSetupUser(
     return {
       projectId: loadRes.cloudaicompanionProject,
       userTier:
-        loadRes.paidTier?.id ?? loadRes.currentTier.id ?? UserTierId.STANDARD,
-      userTierName: loadRes.paidTier?.name ?? loadRes.currentTier.name,
+        loadRes.currentTier.id ?? loadRes.paidTier?.id ?? UserTierId.STANDARD,
+      userTierName: loadRes.currentTier.name ?? loadRes.paidTier?.name,
       paidTier: loadRes.paidTier ?? undefined,
     };
   }
