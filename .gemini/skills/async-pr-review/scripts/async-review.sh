@@ -86,11 +86,17 @@ rm -f "$log_dir/npm-test.exit"
 { 
   while [ ! -f "$log_dir/build-and-lint.exit" ]; do sleep 1; done
   if [ "$(cat "$log_dir/build-and-lint.exit")" == "0" ]; then
-    if gh pr checks "$pr_number" > "$log_dir/ci-checks.log" 2>&1; then
+    gh pr checks "$pr_number" > "$log_dir/ci-checks.log" 2>&1
+    ci_status=$?
+    
+    if [ "$ci_status" -eq 0 ]; then
       echo "CI checks passed. Skipping local npm tests." > "$log_dir/npm-test.log"
       echo 0 > "$log_dir/npm-test.exit"
+    elif [ "$ci_status" -eq 8 ]; then
+      echo "CI checks are still pending. Skipping local npm tests to avoid duplicate work. Please check GitHub for final results." > "$log_dir/npm-test.log"
+      echo 0 > "$log_dir/npm-test.exit"
     else
-      echo "CI checks did not pass. Failing checks:" > "$log_dir/npm-test.log"
+      echo "CI checks failed. Failing checks:" > "$log_dir/npm-test.log"
       gh pr checks "$pr_number" --json name,bucket -q '.[] | select(.bucket=="fail") | .name' >> "$log_dir/npm-test.log" 2>&1
       
       echo "Attempting to extract failing test files from CI logs..." >> "$log_dir/npm-test.log"
