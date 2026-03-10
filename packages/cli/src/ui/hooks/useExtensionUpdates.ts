@@ -98,12 +98,13 @@ export const useExtensionUpdates = (
       return !currentState || currentState === ExtensionUpdateState.UNKNOWN;
     });
     if (extensionsToCheck.length === 0) return;
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    checkForAllExtensionUpdates(
+    void checkForAllExtensionUpdates(
       extensionsToCheck,
       extensionManager,
       dispatchExtensionStateUpdate,
-    );
+    ).catch((e) => {
+      debugLogger.warn(getErrorMessage(e));
+    });
   }, [
     extensions,
     extensionManager,
@@ -199,8 +200,7 @@ export const useExtensionUpdates = (
       );
     }
     if (scheduledUpdate) {
-      // eslint-disable-next-line @typescript-eslint/no-floating-promises
-      Promise.allSettled(updatePromises).then((results) => {
+      void Promise.allSettled(updatePromises).then((results) => {
         const successfulUpdates = results
           .filter(
             (r): r is PromiseFulfilledResult<ExtensionUpdateInfo | undefined> =>

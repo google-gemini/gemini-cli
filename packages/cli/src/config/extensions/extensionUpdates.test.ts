@@ -21,17 +21,9 @@ import { isWorkspaceTrusted } from '../trustedFolders.js';
 // --- Mocks ---
 
 vi.mock('node:fs', async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const actual = await importOriginal<any>();
+  const actual = await importOriginal<typeof import('node:fs')>();
   return {
     ...actual,
-    default: {
-      ...actual.default,
-      existsSync: vi.fn(),
-      statSync: vi.fn(),
-      lstatSync: vi.fn(),
-      realpathSync: vi.fn((p) => p),
-    },
     existsSync: vi.fn(),
     statSync: vi.fn(),
     lstatSync: vi.fn(),
@@ -162,10 +154,12 @@ describe('extensionUpdates', () => {
 
     // Allow directories to exist by default to satisfy Config/WorkspaceContext checks
     vi.mocked(fs.existsSync).mockReturnValue(true);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(fs.lstatSync).mockReturnValue({ isDirectory: () => true } as any);
+    vi.mocked(fs.statSync).mockReturnValue({
+      isDirectory: () => true,
+    } as unknown as fs.Stats);
+    vi.mocked(fs.lstatSync).mockReturnValue({
+      isDirectory: () => true,
+    } as unknown as fs.Stats);
     vi.mocked(fs.realpathSync).mockImplementation((p) => p as string);
 
     tempWorkspaceDir = '/mock/workspace';
@@ -227,11 +221,10 @@ describe('extensionUpdates', () => {
       ]);
       vi.spyOn(manager, 'uninstallExtension').mockResolvedValue(undefined);
       // Mock loadExtension to return something so the method doesn't crash at the end
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.spyOn(manager as any, 'loadExtension').mockResolvedValue({
+      vi.spyOn(manager, 'loadExtension').mockResolvedValue({
         name: 'test-ext',
         version: '1.1.0',
-      } as GeminiCLIExtension);
+      } as unknown as GeminiCLIExtension);
 
       // 4. Mock External Helpers
       // This is the key fix: we explicitly mock `getMissingSettings` to return
@@ -296,11 +289,10 @@ describe('extensionUpdates', () => {
         } as unknown as GeminiCLIExtension,
       ]);
       vi.spyOn(manager, 'uninstallExtension').mockResolvedValue(undefined);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.spyOn(manager as any, 'loadExtension').mockResolvedValue({
+      vi.spyOn(manager, 'loadExtension').mockResolvedValue({
         name: 'test-ext',
         version: '1.1.0',
-      } as GeminiCLIExtension);
+      } as unknown as GeminiCLIExtension);
 
       const storeSpy = vi.spyOn(
         manager.integrityManager,

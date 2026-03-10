@@ -31,9 +31,11 @@ vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   return {
     ...actual,
-    existsSync: vi.fn(),
-    readFileSync: vi.fn(),
-    writeFileSync: vi.fn(),
+    promises: {
+      ...actual.promises,
+      readFile: vi.fn(),
+      writeFile: vi.fn(),
+    },
   };
 });
 
@@ -69,8 +71,7 @@ describe('ExtensionIntegrityManager', () => {
 
     it('should fallback to file-based key if keychain is unavailable', async () => {
       mockKeychainService.isAvailable.mockResolvedValue(false);
-      vi.mocked(fs.existsSync).mockReturnValueOnce(true);
-      vi.mocked(fs.readFileSync).mockReturnValueOnce('file-key');
+      vi.mocked(fs.promises.readFile).mockResolvedValueOnce('file-key');
 
       const key = await manager.getSecretKey();
       expect(key).toBe('file-key');
@@ -78,11 +79,13 @@ describe('ExtensionIntegrityManager', () => {
 
     it('should generate and store file-based key if not exists', async () => {
       mockKeychainService.isAvailable.mockResolvedValue(false);
-      vi.mocked(fs.existsSync).mockReturnValue(false);
+      vi.mocked(fs.promises.readFile).mockRejectedValueOnce(
+        Object.assign(new Error(), { code: 'ENOENT' }),
+      );
 
       const key = await manager.getSecretKey();
       expect(key).toBeDefined();
-      expect(fs.writeFileSync).toHaveBeenCalledWith(
+      expect(fs.promises.writeFile).toHaveBeenCalledWith(
         path.join('/mock/home', '.gemini', 'integrity.key'),
         key,
         { mode: 0o600 },
@@ -100,19 +103,25 @@ describe('ExtensionIntegrityManager', () => {
 
     beforeEach(() => {
       storedContent = '';
-      vi.mocked(fs.writeFileSync).mockImplementation((p, content) => {
-        if (typeof p === 'string' && p.endsWith('extension_integrity.json')) {
-          storedContent = content as string;
-        }
-      });
-      vi.mocked(fs.existsSync).mockImplementation((p) => {
-        if (typeof p === 'string' && p.endsWith('extension_integrity.json')) {
-          return !!storedContent;
-        }
-        return false;
-      });
-      vi.mocked(fs.readFileSync).mockImplementation((p) => {
-        if (typeof p === 'string' && p.endsWith('extension_integrity.json')) {
+
+      const isIntegrityStore = (p: unknown) =>
+        typeof p === 'string' && p.endsWith('extension_integrity.json');
+
+      vi.mocked(fs.promises.writeFile).mockImplementation(
+        async (p, content) => {
+          if (isIntegrityStore(p)) {
+            storedContent = content as string;
+          }
+        },
+      );
+
+      vi.mocked(fs.promises.readFile).mockImplementation(async (p) => {
+        if (isIntegrityStore(p)) {
+          if (!storedContent) {
+            throw Object.assign(new Error('File not found'), {
+              code: 'ENOENT',
+            });
+          }
           return storedContent;
         }
         return '';
@@ -191,7 +200,6 @@ describe('ExtensionIntegrityManager', () => {
 
     it('should throw error in storeExtensionIntegrity if store file is corrupted', async () => {
       storedContent = 'not-json';
-      vi.mocked(fs.existsSync).mockReturnValue(true);
 
       await expect(
         manager.storeExtensionIntegrity('other-ext', metadata),

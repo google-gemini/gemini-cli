@@ -17,6 +17,7 @@ import {
   GEMINI_DIR,
   type ExtensionInstallMetadata,
   KeychainService,
+  isNodeError,
 } from '@google/gemini-cli-core';
 import {
   INTEGRITY_FILENAME,
@@ -181,29 +182,44 @@ export class ExtensionIntegrityManager {
       return this.cachedSecretKey;
     }
 
-    // Try OS keychain first (most secure)
     if (await this.keychainService.isAvailable()) {
-      let key = await this.keychainService.getPassword(SECRET_KEY_ACCOUNT);
-      if (!key) {
-        key = randomBytes(32).toString('hex');
-        await this.keychainService.setPassword(SECRET_KEY_ACCOUNT, key);
-      }
-      this.cachedSecretKey = key;
-      return key;
+      this.cachedSecretKey = await this.getSecretKeyFromKeychain();
+    } else {
+      this.cachedSecretKey = await this.getSecretKeyFromFile();
     }
 
-    // Fallback to file-based storage if OS keychain is unavailable
-    let key = fs.existsSync(this.fallbackKeyPath)
-      ? fs.readFileSync(this.fallbackKeyPath, 'utf-8').trim()
-      : null;
+    return this.cachedSecretKey;
+  }
 
+  /**
+   * Retrieves the secret key from the OS keychain, generating and storing
+   * it if it does not already exist.
+   */
+  private async getSecretKeyFromKeychain(): Promise<string> {
+    let key = await this.keychainService.getPassword(SECRET_KEY_ACCOUNT);
     if (!key) {
       key = randomBytes(32).toString('hex');
-      fs.writeFileSync(this.fallbackKeyPath, key, { mode: 0o600 });
+      await this.keychainService.setPassword(SECRET_KEY_ACCOUNT, key);
     }
-
-    this.cachedSecretKey = key;
     return key;
+  }
+
+  /**
+   * Retrieves the secret key from a restricted fallback file, generating
+   * and storing it if it does not already exist.
+   */
+  private async getSecretKeyFromFile(): Promise<string> {
+    try {
+      const key = await fs.promises.readFile(this.fallbackKeyPath, 'utf-8');
+      return key.trim();
+    } catch (e) {
+      if (this.isNotFoundError(e)) {
+        const key = randomBytes(32).toString('hex');
+        await fs.promises.writeFile(this.fallbackKeyPath, key, { mode: 0o600 });
+        return key;
+      }
+      throw e;
+    }
   }
 
   /**
@@ -212,13 +228,18 @@ export class ExtensionIntegrityManager {
    * @throws Error if the store signature is invalid or parsing fails.
    */
   private async loadAndVerifyIntegrityStore(): Promise<ExtensionIntegrityMap> {
-    if (!fs.existsSync(this.integrityStorePath)) {
-      return {};
+    let content: string;
+    try {
+      content = await fs.promises.readFile(this.integrityStorePath, 'utf-8');
+    } catch (e) {
+      if (this.isNotFoundError(e)) {
+        return {};
+      }
+      throw e;
     }
 
     let rawStore: IntegrityStore;
     try {
-      const content = fs.readFileSync(this.integrityStorePath, 'utf-8');
       rawStore = IntegrityStoreSchema.parse(JSON.parse(content));
     } catch (e) {
       throw new Error(
@@ -253,7 +274,7 @@ export class ExtensionIntegrityManager {
       signature: storeSignature,
     };
 
-    fs.writeFileSync(
+    await fs.promises.writeFile(
       this.integrityStorePath,
       JSON.stringify(finalData, null, 2),
     );
@@ -288,5 +309,12 @@ export class ExtensionIntegrityManager {
     }
 
     return timingSafeEqual(actualBuffer, expectedBuffer);
+  }
+
+  /**
+   * Returns true if the error indicates that a file or directory was not found.
+   */
+  private isNotFoundError(error: unknown): boolean {
+    return isNodeError(error) && error.code === 'ENOENT';
   }
 }
