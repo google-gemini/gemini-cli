@@ -5,8 +5,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Content, GenerateContentResponse } from '@google/genai';
-import { ApiError, ThinkingLevel } from '@google/genai';
+import {
+  ApiError,
+  ThinkingLevel,
+  type Content,
+  type GenerateContentResponse,
+} from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import {
   GeminiChat,
@@ -1150,6 +1154,7 @@ describe('GeminiChat', () => {
         1,
       );
       expect(mockLogContentRetry).not.toHaveBeenCalled();
+      expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
     });
 
     it('should yield a RETRY event when an invalid stream is encountered', async () => {

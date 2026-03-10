@@ -188,7 +188,7 @@ describe('ToastDisplay', () => {
     });
     await waitUntilReady();
     expect(lastFrame()).toContain(
-      'Ctrl+O to show more lines of the last response',
+      'Press Ctrl+O to show more lines of the last response',
     );
   });
 
