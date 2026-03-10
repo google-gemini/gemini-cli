@@ -557,26 +557,6 @@ auth:
       });
     });
 
-    it('should parse auth with agent_card_requires_auth flag', async () => {
-      const filePath = await writeAgentMarkdown(`---
-kind: remote
-name: protected-card-agent
-agent_card_url: https://example.com/card
-auth:
-  type: apiKey
-  key: $MY_API_KEY
-  agent_card_requires_auth: true
----
-`);
-      const result = await parseAgentMarkdown(filePath);
-      expect(result[0]).toMatchObject({
-        auth: {
-          type: 'apiKey',
-          agent_card_requires_auth: true,
-        },
-      });
-    });
-
     it('should parse remote agent with oauth2 auth', async () => {
       const filePath = await writeAgentMarkdown(`---
 kind: remote
