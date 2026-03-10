@@ -229,6 +229,7 @@ const renderDialog = (
           onSelect={onSelect}
           onRestartRequest={options?.onRestartRequest}
           availableTerminalHeight={options?.availableTerminalHeight}
+          settings={settings}
         />
       </KeypressProvider>
     </SettingsContext.Provider>,
@@ -945,7 +946,7 @@ describe('SettingsDialog', () => {
       // Sibling preservation is handled by LoadedSettings internally.
       const calls = setValueSpy.mock.calls;
       expect(calls.length).toBeGreaterThan(0);
-      calls.forEach((call) => {
+      calls.forEach((call: unknown[]) => {
         // Each call should target only 'tools.shell.showColor'
         expect(call[1]).toBe('tools.shell.showColor');
       });
@@ -1325,7 +1326,7 @@ describe('SettingsDialog', () => {
       const { stdin, unmount, rerender, waitUntilReady } = render(
         <SettingsContext.Provider value={settings}>
           <KeypressProvider>
-            <SettingsDialog onSelect={onSelect} />
+            <SettingsDialog onSelect={onSelect} settings={settings} />
           </KeypressProvider>
         </SettingsContext.Provider>,
       );
@@ -1367,7 +1368,7 @@ describe('SettingsDialog', () => {
       rerender(
         <SettingsContext.Provider value={settings}>
           <KeypressProvider>
-            <SettingsDialog onSelect={onSelect} />
+            <SettingsDialog onSelect={onSelect} settings={settings} />
           </KeypressProvider>
         </SettingsContext.Provider>,
       );

@@ -264,6 +264,8 @@ export function isInSettingsScope(
   return value !== undefined;
 }
 
+ feat/architecture-map
+
 /**
  * Appends a star (*) to settings that exist in the scope
  */
@@ -308,6 +310,7 @@ export function getDisplayValue(
   return valueString;
 }
 
+ main
 /**Utilities for parsing Settings that can be inline edited by the user typing out values */
 function tryParseJsonStringArray(input: string): string[] | null {
   try {
@@ -403,6 +406,64 @@ export function getEditValue(
   }
 
   return undefined;
+}
+
+/**
+ * Get the display string for a setting's value, used in the settings dialog.
+ * - Appends '*' when the value is explicitly set in the current scope's settings.
+ * - For enum types, resolves the raw value to its human-readable label.
+ * - For number settings with a '%' unit, formats as "value (percentage%)".
+ * - For number settings with other units, appends the unit directly (e.g., "30s").
+ * @param key The dot-notation setting key.
+ * @param settings The current scope's settings (used to determine whether key is explicitly set).
+ * @param mergedSettings The merged/effective settings (used to determine the actual display value).
+ */
+export function getDisplayValue(
+  key: string,
+  settings: Settings,
+  mergedSettings: Settings,
+  _modifiedSettings: Set<string>,
+  _pendingSettings: unknown,
+): string {
+  const definition = getSettingDefinition(key);
+  const inScope = isInSettingsScope(key, settings);
+
+  // Determine the value to display:
+  // - If the key is explicitly in the current scope, show the merged (effective) value.
+  // - Otherwise, show the schema default (not the inherited merged value).
+  let value: SettingsValue;
+  if (inScope) {
+    const path = key.split('.');
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    value = getNestedValue(mergedSettings, path) as SettingsValue;
+  } else {
+    value = definition?.default;
+  }
+
+  // Resolve enum labels
+  if (definition?.type === 'enum' && definition.options) {
+    const match = definition.options.find((opt) => opt.value === value);
+    const displayStr = match ? match.label : String(value ?? '');
+    return inScope ? `${displayStr}*` : displayStr;
+  }
+
+  // Format numbers with units
+  if (
+    definition?.type === 'number' &&
+    definition.unit &&
+    typeof value === 'number'
+  ) {
+    let displayStr: string;
+    if (definition.unit === '%') {
+      displayStr = `${value} (${Math.round(value * 100)}%)`;
+    } else {
+      displayStr = `${value}${definition.unit}`;
+    }
+    return inScope ? `${displayStr}*` : displayStr;
+  }
+
+  const displayStr = String(value ?? '');
+  return inScope ? `${displayStr}*` : displayStr;
 }
 
 export const TEST_ONLY = { clearFlattenedSchema };

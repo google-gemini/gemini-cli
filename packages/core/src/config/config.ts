@@ -20,6 +20,7 @@ import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { LSTool } from '../tools/ls.js';
+import { MapTool } from '../tools/map-tool.js';
 import { ReadFileTool } from '../tools/read-file.js';
 import { GrepTool } from '../tools/grep.js';
 import { canUseRipgrep, RipGrepTool } from '../tools/ripGrep.js';
@@ -2836,6 +2837,9 @@ export class Config implements McpContext, AgentLoopContext {
 
     maybeRegister(LSTool, () =>
       registry.registerTool(new LSTool(this, this._messageBus)),
+    );
+    maybeRegister(MapTool, () =>
+      registry.registerTool(new MapTool(this, this.messageBus)),
     );
     maybeRegister(ReadFileTool, () =>
       registry.registerTool(new ReadFileTool(this, this._messageBus)),

@@ -41,6 +41,8 @@ export interface LoadHistoryActionReturn<HistoryType = unknown> {
 export interface SubmitPromptActionReturn {
   type: 'submit_prompt';
   content: PartListUnion;
+  systemPromptExtension?: string;
+  tools?: string[];
 }
 
 export type CommandActionReturn<HistoryType = unknown> =

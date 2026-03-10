@@ -724,6 +724,8 @@ export const useGeminiStream = (
     ): Promise<{
       queryToSend: PartListUnion | null;
       shouldProceed: boolean;
+      systemPromptExtension?: string;
+      tools?: string[];
     }> => {
       if (turnCancelledRef.current) {
         return { queryToSend: null, shouldProceed: false };
@@ -764,6 +766,9 @@ export const useGeminiStream = (
                 return {
                   queryToSend: localQueryToSendToGemini,
                   shouldProceed: true,
+                  systemPromptExtension:
+                    slashCommandResult.systemPromptExtension,
+                  tools: slashCommandResult.tools,
                 };
               }
               case 'handled': {
@@ -1389,12 +1394,13 @@ export const useGeminiStream = (
             prompt_id = config.getSessionId() + '########' + getPromptCount();
           }
           return promptIdContext.run(prompt_id, async () => {
-            const { queryToSend, shouldProceed } = await prepareQueryForGemini(
-              query,
-              userMessageTimestamp,
-              abortSignal,
-              prompt_id!,
-            );
+            const { queryToSend, shouldProceed, systemPromptExtension, tools } =
+              await prepareQueryForGemini(
+                query,
+                userMessageTimestamp,
+                abortSignal,
+                prompt_id!,
+              );
 
             if (!shouldProceed || queryToSend === null) {
               return;
@@ -1433,6 +1439,7 @@ export const useGeminiStream = (
                 undefined,
                 false,
                 query,
+                { systemPromptExtension, tools },
               );
               const processingStatus = await processGeminiStreamEvents(
                 stream,
