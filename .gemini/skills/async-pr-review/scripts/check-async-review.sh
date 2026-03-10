@@ -21,9 +21,12 @@ if [[ ! -d "$log_dir" ]]; then
 fi
 
 tasks=(
-  "preflight|preflight.log"
+  "setup|setup.log"
+  "build-and-lint|build-and-lint.log"
   "review|review.md"
+  "npm-test|npm-test.log"
   "test-execution|test-execution.log"
+  "final-assessment|final-assessment.md"
 )
 
 all_done=true
