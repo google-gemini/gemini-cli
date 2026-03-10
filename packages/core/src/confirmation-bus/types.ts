@@ -39,6 +39,10 @@ export interface ToolConfirmationRequest {
    */
   toolAnnotations?: Record<string, unknown>;
   /**
+   * Optional subagent name, if this tool call was initiated by a subagent.
+   */
+  subagent?: string;
+  /**
    * Optional rich details for the confirmation UI (diffs, counts, etc.)
    */
   details?: SerializableConfirmationDetails;

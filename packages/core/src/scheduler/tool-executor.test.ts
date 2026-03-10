@@ -64,7 +64,7 @@ describe('ToolExecutor', () => {
   beforeEach(() => {
     // Use the standard fake config factory
     config = makeFakeConfig();
-    executor = new ToolExecutor(config);
+    executor = new ToolExecutor(config, config);
 
     // Reset mocks
     vi.resetAllMocks();

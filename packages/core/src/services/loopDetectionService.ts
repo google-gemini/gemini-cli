@@ -579,10 +579,12 @@ export class LoopDetectionService {
     }
 
     const flashConfidence =
+      // eslint-disable-next-line no-restricted-syntax
       typeof flashResult['unproductive_state_confidence'] === 'number'
         ? flashResult['unproductive_state_confidence']
         : 0;
     const flashAnalysis =
+      // eslint-disable-next-line no-restricted-syntax
       typeof flashResult['unproductive_state_analysis'] === 'string'
         ? flashResult['unproductive_state_analysis']
         : '';
@@ -628,11 +630,13 @@ export class LoopDetectionService {
 
     const mainModelConfidence =
       mainModelResult &&
+      // eslint-disable-next-line no-restricted-syntax
       typeof mainModelResult['unproductive_state_confidence'] === 'number'
         ? mainModelResult['unproductive_state_confidence']
         : 0;
     const mainModelAnalysis =
       mainModelResult &&
+      // eslint-disable-next-line no-restricted-syntax
       typeof mainModelResult['unproductive_state_analysis'] === 'string'
         ? mainModelResult['unproductive_state_analysis']
         : undefined;
@@ -681,6 +685,7 @@ export class LoopDetectionService {
 
       if (
         result &&
+        // eslint-disable-next-line no-restricted-syntax
         typeof result['unproductive_state_confidence'] === 'number'
       ) {
         return result;
