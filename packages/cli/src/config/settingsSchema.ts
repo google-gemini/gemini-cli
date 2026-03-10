@@ -1974,9 +1974,18 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      topicUpdateNarration: {
+        type: 'boolean',
+        label: 'Topic & Update Narration',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.',
+        showInDialog: true,
+      },
     },
   },
-
   extensions: {
     type: 'object',
     label: 'Extensions',
