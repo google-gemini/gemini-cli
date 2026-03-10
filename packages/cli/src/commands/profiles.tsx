@@ -13,7 +13,6 @@ import { initializeOutputListenersAndFlush } from '../gemini.js';
 
 export const profilesCommand: CommandModule = {
   command: 'profiles <command>',
-  aliases: ['profile'],
   describe: 'Manage Gemini CLI profiles.',
   builder: (yargs) =>
     yargs

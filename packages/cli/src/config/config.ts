@@ -112,7 +112,6 @@ export async function parseArguments(
     .option('profiles', {
       alias: ['profile', 'P'],
       type: 'string',
-      nargs: 1,
       global: true,
       description: 'The name of the profile to use for this session.',
     })
@@ -298,6 +297,11 @@ export async function parseArguments(
         .option('accept-raw-output-risk', {
           type: 'boolean',
           description: 'Suppress the security warning when using --raw-output.',
+        })
+        .option('profiles', {
+          alias: ['profile', 'P'],
+          type: 'string',
+          description: 'The name of the profile to use for this session.',
         }),
     )
     // Register MCP subcommands
