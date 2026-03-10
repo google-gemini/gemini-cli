@@ -872,6 +872,11 @@ their corresponding top-level category object in your `settings.json` file.
     confirmation dialogs.
   - **Default:** `false`
 
+- **`security.autoAddToPolicyByDefault`** (boolean):
+  - **Description:** When enabled, the "Allow for all future sessions" option
+    becomes the default choice for low-risk tools in trusted workspaces.
+  - **Default:** `false`
+
 - **`security.blockGitExtensions`** (boolean):
   - **Description:** Blocks installing and loading extensions from Git.
   - **Default:** `false`
@@ -1021,8 +1026,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`experimental.plan`** (boolean):
-  - **Description:** Enable planning features (Plan Mode and tools).
-  - **Default:** `false`
+  - **Description:** Enable Plan Mode.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.taskTracker`** (boolean):
