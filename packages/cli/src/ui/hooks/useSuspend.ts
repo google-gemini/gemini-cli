@@ -20,8 +20,8 @@ import {
   terminalCapabilityManager,
 } from '../utils/terminalCapabilityManager.js';
 import { WARNING_PROMPT_DURATION_MS } from '../constants.js';
-import { formatCommand } from '../utils/keybindingUtils.js';
-import { Command } from '../../config/keyBindings.js';
+import { formatCommand } from '../key/keybindingUtils.js';
+import { Command } from '../key/keyBindings.js';
 
 interface UseSuspendProps {
   handleWarning: (message: string) => void;

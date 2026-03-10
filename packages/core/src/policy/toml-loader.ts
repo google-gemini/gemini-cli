@@ -38,6 +38,7 @@ const MAX_TYPO_DISTANCE = 3;
  */
 const PolicyRuleSchema = z.object({
   toolName: z.union([z.string(), z.array(z.string())]).optional(),
+  subagent: z.string().optional(),
   mcpName: z.string().optional(),
   argsPattern: z.string().optional(),
   commandPrefix: z.union([z.string(), z.array(z.string())]).optional(),
@@ -464,6 +465,7 @@ export async function loadPoliciesFromToml(
 
                 const policyRule: PolicyRule = {
                   toolName: effectiveToolName,
+                  subagent: rule.subagent,
                   mcpName: rule.mcpName,
                   decision: rule.decision,
                   priority: transformPriority(rule.priority, tier),

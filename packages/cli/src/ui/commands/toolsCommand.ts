@@ -11,14 +11,17 @@ import {
 } from './types.js';
 import { MessageType, type HistoryItemToolsList } from '../types.js';
 
-const getToolsList = (context: CommandContext, showDescriptions: boolean) => {
+async function listTools(
+  context: CommandContext,
+  showDescriptions: boolean,
+): Promise<void> {
   const toolRegistry = context.services.config?.getToolRegistry();
   if (!toolRegistry) {
     context.ui.addItem({
       type: MessageType.ERROR,
       text: 'Could not retrieve tool registry.',
     });
-    return null;
+    return;
   }
 
   const tools = toolRegistry.getAllTools();
@@ -35,50 +38,42 @@ const getToolsList = (context: CommandContext, showDescriptions: boolean) => {
     showDescriptions,
   };
 
-  return toolsListItem;
-};
+  context.ui.addItem(toolsListItem);
+}
 
 const listSubCommand: SlashCommand = {
   name: 'list',
-  description: 'List available Gemini CLI tools',
+  description: 'List available Gemini CLI tools.',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: async (context: CommandContext): Promise<void> => {
-    const item = getToolsList(context, false);
-    if (item) {
-      context.ui.addItem(item);
-    }
-  },
+  action: async (context: CommandContext): Promise<void> =>
+    listTools(context, false),
 };
 
 const descSubCommand: SlashCommand = {
   name: 'desc',
-  description: 'List available Gemini CLI tools with descriptions',
+  altNames: ['descriptions'],
+  description: 'List available Gemini CLI tools with descriptions.',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: async (context: CommandContext): Promise<void> => {
-    const item = getToolsList(context, true);
-    if (item) {
-      context.ui.addItem(item);
-    }
-  },
+  action: async (context: CommandContext): Promise<void> =>
+    listTools(context, true),
 };
 
 export const toolsCommand: SlashCommand = {
   name: 'tools',
-  description: 'List available Gemini CLI tools',
+  description:
+    'List available Gemini CLI tools. Use /tools desc to include descriptions.',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   subCommands: [listSubCommand, descSubCommand],
   action: async (context: CommandContext, args?: string): Promise<void> => {
-    const subCommandName = args?.trim().split(' ')[0];
+    const subCommand = args?.trim();
 
-    // Find the subcommand, defaulting to 'list' if not found or not provided.
-    const subCommandToRun =
-      toolsCommand.subCommands?.find((cmd) => cmd.name === subCommandName) ??
-      listSubCommand;
+    // Keep backward compatibility for typed arguments while exposing subcommands in TUI.
+    const useShowDescriptions =
+      subCommand === 'desc' || subCommand === 'descriptions';
 
-    // The action is guaranteed to exist on our own subcommand definitions.
-    await subCommandToRun.action!(context, '');
+    await listTools(context, useShowDescriptions);
   },
 };
