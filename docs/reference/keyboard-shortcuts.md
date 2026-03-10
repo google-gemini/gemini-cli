@@ -55,14 +55,13 @@ available combinations.
 
 #### History & Search
 
-| Action                                       | Keys         |
-| -------------------------------------------- | ------------ |
-| Show the previous entry in history.          | `Ctrl+P`     |
-| Show the next entry in history.              | `Ctrl+N`     |
-| Start reverse search through history.        | `Ctrl+R`     |
-| Submit the selected reverse-search match.    | `Enter`      |
-| Accept a suggestion while reverse searching. | `Tab`        |
-| Browse and rewind previous interactions.     | `Double Esc` |
+| Action                                       | Keys     |
+| -------------------------------------------- | -------- |
+| Show the previous entry in history.          | `Ctrl+P` |
+| Show the next entry in history.              | `Ctrl+N` |
+| Start reverse search through history.        | `Ctrl+R` |
+| Submit the selected reverse-search match.    | `Enter`  |
+| Accept a suggestion while reverse searching. | `Tab`    |
 
 #### Navigation
 

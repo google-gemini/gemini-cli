@@ -44,7 +44,7 @@ import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js
 import type { UIState } from '../contexts/UIStateContext.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { cpLen } from '../utils/textUtils.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { defaultKeyMatchers, Command } from '../key/keyMatchers.js';
 import type { Key } from '../hooks/useKeypress.js';
 import {
   appEvents,
@@ -197,7 +197,7 @@ describe('InputPrompt', () => {
       visualCursor: [0, 0],
       visualScrollRow: 0,
       handleInput: vi.fn((key: Key) => {
-        if (keyMatchers[Command.CLEAR_INPUT](key)) {
+        if (defaultKeyMatchers[Command.CLEAR_INPUT](key)) {
           if (mockBuffer.text.length > 0) {
             mockBuffer.setText('');
             return true;
@@ -3344,28 +3344,28 @@ describe('InputPrompt', () => {
         name: 'first line, first char',
         relX: 0,
         relY: 0,
-        mouseCol: 4,
+        mouseCol: 5,
         mouseRow: 2,
       },
       {
         name: 'first line, middle char',
         relX: 6,
         relY: 0,
-        mouseCol: 10,
+        mouseCol: 11,
         mouseRow: 2,
       },
       {
         name: 'second line, first char',
         relX: 0,
         relY: 1,
-        mouseCol: 4,
+        mouseCol: 5,
         mouseRow: 3,
       },
       {
         name: 'second line, end char',
         relX: 5,
         relY: 1,
-        mouseCol: 9,
+        mouseCol: 10,
         mouseRow: 3,
       },
     ])(
@@ -3624,9 +3624,9 @@ describe('InputPrompt', () => {
         expect(stdout.lastFrame()).toContain('hello world');
       });
 
-      // With plain borders: 1(border) + 1(padding) + 2(prompt) = 4 offset (x=4, col=5)
+      // With plain borders: 1(border) + 1(padding) + 3(prompt) = 5 offset (x=5, col=6)
       await act(async () => {
-        stdin.write(`\x1b[<0;5;2M`); // Click at col 5, row 2
+        stdin.write(`\x1b[<0;6;2M`); // Click at col 6, row 2
       });
 
       await waitFor(() => {

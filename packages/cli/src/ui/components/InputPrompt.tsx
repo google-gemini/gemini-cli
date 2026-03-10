@@ -36,8 +36,8 @@ import {
 } from '../hooks/useCommandCompletion.js';
 import type { Key } from '../hooks/useKeypress.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
-import { formatCommand } from '../utils/keybindingUtils.js';
+import { Command } from '../key/keyMatchers.js';
+import { formatCommand } from '../key/keybindingUtils.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { ApprovalMode, coreEvents, debugLogger } from '@google/gemini-cli-core';
@@ -77,8 +77,9 @@ import {
   onVoiceTranscript,
 } from '../contexts/VoiceContext.js';
 import Spinner from 'ink-spinner';
-import { shouldDismissShortcutsHelpOnHotkey } from '../utils/shortcutsHelp.js';
+import { shouldDismissShortcutsHelpOnHotkey, useIsHelpDismissKey } from '../utils/shortcutsHelp.js';
 import { useRepeatedKeyPress } from '../hooks/useRepeatedKeyPress.js';
+import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -212,6 +213,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   suggestionsPosition = 'below',
   setBannerVisible,
 }) => {
+  const isHelpDismissKey = useIsHelpDismissKey();
+  const keyMatchers = useKeyMatchers();
   const { stdout } = useStdout();
   const { merged: settings } = useSettings();
   const kittyProtocol = useKittyKeyboardProtocol();
@@ -777,7 +780,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
-      if (shortcutsHelpVisible && shouldDismissShortcutsHelpOnHotkey(key)) {
+      if (shortcutsHelpVisible && isHelpDismissKey(key)) {
         setShortcutsHelpVisible(false);
       }
 
@@ -1361,6 +1364,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       cancelRecording,
       voiceState.isRecording,
       voiceState.isTranscribing,
+      keyMatchers,
+      isHelpDismissKey,
     ],
   );
 
