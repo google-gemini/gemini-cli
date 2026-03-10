@@ -20,12 +20,14 @@ import { reportError } from '../utils/errorReporting.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { logMalformedJsonResponse } from '../telemetry/loggers.js';
 import { MalformedJsonResponseEvent, LlmRole } from '../telemetry/types.js';
-import { retryWithBackoff } from '../utils/retry.js';
+import { retryWithBackoff, type AgentDecision } from '../utils/retry.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
+import { PREVIEW_GEMINI_FLASH_MODEL } from '../config/models.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const DEFAULT_MAX_ATTEMPTS = 5;
 
@@ -316,6 +318,92 @@ export class BaseLlmClient {
         );
       };
 
+      const onAgentDecisionCallback = async (
+        error: unknown,
+        attempt: number,
+      ): Promise<AgentDecision> => {
+        try {
+          const errorMsg =
+            error instanceof Error ? error.message : String(error);
+
+          if (errorMsg.includes('429')) {
+            return 'stop';
+          }
+
+          const lastUserMessage = [...contents]
+            .reverse()
+            .find((c) => c.role === 'user');
+          const lastUserText = lastUserMessage?.parts
+            ? lastUserMessage.parts.map((p) => p.text || '').join(' ')
+            : 'N/A';
+
+          const decisionPrompt = `You are a meta-agent deciding whether to retry an AI request that failed.
+
+Error: ${errorMsg}
+Attempt: ${attempt}
+Target Model: ${currentModel}
+Last User Request: ${lastUserText}
+
+Based on the error, should we try to retry the exact same request? 
+Some errors are transient (e.g. network blips, internal server errors), others are terminal (e.g. safety blocks, invalid arguments).
+
+Respond with a JSON object: {"action": "retry" | "stop"}`;
+
+          const decisionResponse = await this.contentGenerator.generateContent(
+            {
+              model: PREVIEW_GEMINI_FLASH_MODEL,
+              contents: [{ role: 'user', parts: [{ text: decisionPrompt }] }],
+              config: {
+                responseMimeType: 'application/json',
+              },
+            },
+            'agent-decision',
+            LlmRole.UTILITY_ROUTER,
+          );
+
+          const decisionText =
+            decisionResponse.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (decisionText) {
+            const parsed = JSON.parse(decisionText) as unknown;
+            if (
+              typeof parsed === 'object' &&
+              parsed !== null &&
+              'action' in parsed
+            ) {
+              const action = (parsed as { action: unknown }).action;
+              if (
+                action === 'retry' ||
+                action === 'stop' ||
+                action === 'modify_request'
+              ) {
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+                return action as AgentDecision;
+              }
+            }
+          }
+        } catch (agentError) {
+          debugLogger.warn('Agent decision failed:', agentError);
+        }
+
+        return 'stop';
+      };
+
+      const onAgentDecisionWrapper = async (
+        error: unknown,
+        attempt: number,
+      ): Promise<AgentDecision> => {
+        if (
+          typeof error === 'object' &&
+          error !== null &&
+          'message' in error &&
+          typeof (error as { message?: unknown }).message === 'string' &&
+          (error as { message?: unknown }).message === 'Agent Decision'
+        ) {
+          return 'stop';
+        }
+        return onAgentDecisionCallback(error, attempt);
+      };
+
       return await retryWithBackoff(apiCall, {
         shouldRetryOnContent,
         maxAttempts:
@@ -325,6 +413,7 @@ export class BaseLlmClient {
           ? (authType, error) =>
               handleFallback(this.config, currentModel, authType, error)
           : undefined,
+        onAgentDecision: onAgentDecisionWrapper,
         authType:
           this.authType ?? this.config.getContentGeneratorConfig()?.authType,
       });
