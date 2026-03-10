@@ -152,6 +152,80 @@ describe('createContentGenerator', () => {
     );
   });
 
+  it('should include surface in User-Agent from GEMINI_CLI_SURFACE env var', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    vi.stubEnv('CLI_VERSION', '1.2.3');
+    vi.stubEnv('GEMINI_CLI_SURFACE', 'my-custom-app');
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+      },
+      mockConfig,
+    );
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        httpOptions: expect.objectContaining({
+          headers: expect.objectContaining({
+            'User-Agent': expect.stringMatching(
+              /GeminiCLI\/1\.2\.3\/gemini-pro \(.+; .+; my-custom-app\)/,
+            ),
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('should include default surface "SURFACE_NOT_SET" in User-Agent when no surface is detected', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => true,
+    } as unknown as Config;
+
+    vi.stubEnv('CLI_VERSION', '1.2.3');
+    // Ensure no surface env vars are set
+    vi.stubEnv('GEMINI_CLI_SURFACE', '');
+    vi.stubEnv('SURFACE', '');
+    vi.stubEnv('TERM_PROGRAM', '');
+    vi.stubEnv('GITHUB_SHA', '');
+    vi.stubEnv('EDITOR_IN_CLOUD_SHELL', '');
+    vi.stubEnv('CLOUD_SHELL', '');
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+      },
+      mockConfig,
+    );
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        httpOptions: expect.objectContaining({
+          headers: expect.objectContaining({
+            'User-Agent': expect.stringMatching(
+              /GeminiCLI\/1\.2\.3\/gemini-pro \(.+; .+; SURFACE_NOT_SET\)/,
+            ),
+          }),
+        }),
+      }),
+    );
+  });
+
   it('should include custom headers from GEMINI_CLI_CUSTOM_HEADERS for Code Assist requests', async () => {
     const mockGenerator = {} as unknown as ContentGenerator;
     vi.mocked(createCodeAssistContentGenerator).mockResolvedValue(

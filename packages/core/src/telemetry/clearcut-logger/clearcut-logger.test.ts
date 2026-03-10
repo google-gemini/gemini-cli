@@ -484,12 +484,12 @@ describe('ClearcutLogger', () => {
       },
       {
         name: 'Cloud Shell via EDITOR_IN_CLOUD_SHELL',
-        env: { EDITOR_IN_CLOUD_SHELL: 'true' },
+        env: { EDITOR_IN_CLOUD_SHELL: 'true', GITHUB_SHA: undefined },
         expected: 'cloudshell',
       },
       {
         name: 'Cloud Shell via CLOUD_SHELL',
-        env: { CLOUD_SHELL: 'true' },
+        env: { CLOUD_SHELL: 'true', GITHUB_SHA: undefined },
         expected: 'cloudshell',
       },
       {
@@ -513,12 +513,26 @@ describe('ClearcutLogger', () => {
         expected: 'positron',
       },
       {
+        name: 'GEMINI_CLI_SURFACE env var',
+        env: { GEMINI_CLI_SURFACE: 'gca-agent' },
+        expected: 'gca-agent',
+      },
+      {
+        name: 'GEMINI_CLI_SURFACE takes precedence over SURFACE and TERM_PROGRAM',
+        env: {
+          GEMINI_CLI_SURFACE: 'gca-agent',
+          SURFACE: 'ide-1234',
+          TERM_PROGRAM: 'vscode',
+        },
+        expected: 'gca-agent',
+      },
+      {
         name: 'SURFACE env var',
         env: { SURFACE: 'ide-1234' },
         expected: 'ide-1234',
       },
       {
-        name: 'SURFACE env var takes precedence',
+        name: 'SURFACE env var takes precedence over auto-detection',
         env: { TERM_PROGRAM: 'vscode', SURFACE: 'ide-1234' },
         expected: 'ide-1234',
       },
