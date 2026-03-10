@@ -261,7 +261,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
 
 - **`ui.footer.hideCWD`** (boolean):
-  - **Description:** Hide the current working directory in the footer.
+  - **Description:** Hide the workspace path in the footer.
   - **Default:** `false`
 
 - **`ui.footer.hideSandboxStatus`** (boolean):
