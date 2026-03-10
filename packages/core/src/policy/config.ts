@@ -29,7 +29,7 @@ import { type MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
-import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
+import { SHELL_TOOL_NAME, SENSITIVE_TOOLS } from '../tools/tool-names.js';
 import { isNodeError } from '../utils/errors.js';
 import { MCP_TOOL_PREFIX } from '../tools/mcp-tool.js';
 
@@ -46,19 +46,38 @@ export const WORKSPACE_POLICY_TIER = 3;
 export const USER_POLICY_TIER = 4;
 export const ADMIN_POLICY_TIER = 5;
 
-// Specific priority offsets and derived priorities for dynamic/settings rules.
-// These are added to the tier base (e.g., USER_POLICY_TIER).
+/**
+ * The fractional priority of "Always allow" rules (e.g., 950/1000).
+ * Higher fraction within a tier wins.
+ */
+export const ALWAYS_ALLOW_PRIORITY_FRACTION = 950;
 
-// Workspace tier (3) + high priority (950/1000) = ALWAYS_ALLOW_PRIORITY
-// This ensures user "always allow" selections are high priority
-// within the workspace tier but still lose to user/admin policies.
-export const ALWAYS_ALLOW_PRIORITY = WORKSPACE_POLICY_TIER + 0.95;
+/**
+ * The fractional priority offset for "Always allow" rules (e.g., 0.95).
+ * This ensures consistency between in-memory rules and persisted rules.
+ */
+export const ALWAYS_ALLOW_PRIORITY_OFFSET =
+  ALWAYS_ALLOW_PRIORITY_FRACTION / 1000;
+
+// Specific priority offsets and derived priorities for dynamic/settings rules.
 
 export const MCP_EXCLUDED_PRIORITY = USER_POLICY_TIER + 0.9;
 export const EXCLUDE_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.4;
 export const ALLOWED_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.3;
 export const TRUSTED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.2;
 export const ALLOWED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.1;
+
+// These are added to the tier base (e.g., USER_POLICY_TIER).
+// Workspace tier (3) + high priority (950/1000) = ALWAYS_ALLOW_PRIORITY
+export const ALWAYS_ALLOW_PRIORITY =
+  WORKSPACE_POLICY_TIER + ALWAYS_ALLOW_PRIORITY_OFFSET;
+
+/**
+ * Returns the fractional priority of ALWAYS_ALLOW_PRIORITY scaled to 1000.
+ */
+export function getAlwaysAllowPriorityFraction(): number {
+  return Math.round((ALWAYS_ALLOW_PRIORITY % 1) * 1000);
+}
 
 /**
  * Gets the list of directories to search for policy files, in order of increasing priority
@@ -492,6 +511,19 @@ export function createPolicyUpdater(
       if (message.commandPrefix) {
         // Convert commandPrefix(es) to argsPatterns for in-memory rules
         const patterns = buildArgsPatterns(undefined, message.commandPrefix);
+        const tier =
+          message.persistScope === 'user'
+            ? USER_POLICY_TIER
+            : WORKSPACE_POLICY_TIER;
+        const priority = tier + getAlwaysAllowPriorityFraction() / 1000;
+
+        if (SENSITIVE_TOOLS.has(toolName) && !message.commandPrefix) {
+          debugLogger.warn(
+            `Attempted to update policy for sensitive tool '${toolName}' without a commandPrefix. Skipping.`,
+          );
+          return;
+        }
+
         for (const pattern of patterns) {
           if (pattern) {
             // Note: patterns from buildArgsPatterns are derived from escapeRegex,
@@ -499,7 +531,7 @@ export function createPolicyUpdater(
             policyEngine.addRule({
               toolName,
               decision: PolicyDecision.ALLOW,
-              priority: ALWAYS_ALLOW_PRIORITY,
+              priority,
               argsPattern: new RegExp(pattern),
               source: 'Dynamic (Confirmed)',
             });
@@ -518,10 +550,23 @@ export function createPolicyUpdater(
           ? new RegExp(message.argsPattern)
           : undefined;
 
+        const tier =
+          message.persistScope === 'user'
+            ? USER_POLICY_TIER
+            : WORKSPACE_POLICY_TIER;
+        const priority = tier + getAlwaysAllowPriorityFraction() / 1000;
+
+        if (SENSITIVE_TOOLS.has(toolName) && !message.argsPattern) {
+          debugLogger.warn(
+            `Attempted to update policy for sensitive tool '${toolName}' without an argsPattern. Skipping.`,
+          );
+          return;
+        }
+
         policyEngine.addRule({
           toolName,
           decision: PolicyDecision.ALLOW,
-          priority: ALWAYS_ALLOW_PRIORITY,
+          priority,
           argsPattern,
           source: 'Dynamic (Confirmed)',
         });
@@ -530,7 +575,10 @@ export function createPolicyUpdater(
       if (message.persist) {
         persistenceQueue = persistenceQueue.then(async () => {
           try {
-            const policyFile = storage.getAutoSavedPolicyPath();
+            const policyFile =
+              message.persistScope === 'workspace'
+                ? storage.getWorkspaceAutoSavedPolicyPath()
+                : storage.getAutoSavedPolicyPath();
             await fs.mkdir(path.dirname(policyFile), { recursive: true });
 
             // Read existing file
@@ -560,21 +608,19 @@ export function createPolicyUpdater(
             }
 
             // Create new rule object
-            const newRule: TomlRule = {};
+            const newRule: TomlRule = {
+              decision: 'allow',
+              priority: getAlwaysAllowPriorityFraction(),
+            };
 
             if (message.mcpName) {
               newRule.mcpName = message.mcpName;
               // Extract simple tool name
-              const simpleToolName = toolName.startsWith(`${message.mcpName}__`)
+              newRule.toolName = toolName.startsWith(`${message.mcpName}__`)
                 ? toolName.slice(message.mcpName.length + 2)
                 : toolName;
-              newRule.toolName = simpleToolName;
-              newRule.decision = 'allow';
-              newRule.priority = 200;
             } else {
               newRule.toolName = toolName;
-              newRule.decision = 'allow';
-              newRule.priority = 100;
             }
 
             if (message.commandPrefix) {
