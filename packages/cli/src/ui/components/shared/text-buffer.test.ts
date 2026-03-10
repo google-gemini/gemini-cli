@@ -1533,7 +1533,7 @@ describe('useTextBuffer', () => {
       const { result } = renderHook(() => useTextBuffer({ viewport }));
       act(() => {
         result.current.handleInput({
-          name: 'return',
+          name: 'enter',
           shift: false,
           alt: false,
           ctrl: false,
@@ -1789,7 +1789,7 @@ describe('useTextBuffer', () => {
       const { result } = renderHook(() => useTextBuffer({ viewport }));
       act(() => {
         result.current.handleInput({
-          name: 'return',
+          name: 'enter',
           shift: true,
           alt: false,
           ctrl: false,
@@ -2290,7 +2290,7 @@ Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots 
       );
       act(() => {
         result.current.handleInput({
-          name: 'return',
+          name: 'enter',
           shift: false,
           alt: false,
           ctrl: false,
