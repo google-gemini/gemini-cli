@@ -894,7 +894,7 @@ describe('ShellExecutionService', () => {
         'destroy',
       );
 
-      ShellExecutionService.kill(pid);
+      await ShellExecutionService.kill(pid);
 
       expect(storedDestroySpy).toHaveBeenCalled();
       expect(ShellExecutionService['activePtys'].has(pid)).toBe(false);
@@ -1194,12 +1194,11 @@ describe('ShellExecutionService child_process fallback', () => {
               expectedSignal,
             );
           } else {
-            expect(mockCpSpawn).toHaveBeenCalledWith(expectedCommand, [
-              '/pid',
-              String(mockChildProcess.pid),
-              '/f',
-              '/t',
-            ]);
+            expect(mockCpSpawn).toHaveBeenCalledWith(
+              expectedCommand,
+              ['/pid', String(mockChildProcess.pid), '/f', '/t'],
+              undefined,
+            );
           }
         });
       },
