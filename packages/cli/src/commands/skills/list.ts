@@ -11,17 +11,14 @@ import { loadCliConfig, type CliArgs } from '../../config/config.js';
 import { exitCli } from '../utils.js';
 import chalk from 'chalk';
 
-export async function handleList(args: { all?: boolean }) {
+export async function handleList(argv: CliArgs, args: { all?: boolean }) {
   const workspaceDir = process.cwd();
   const settings = loadSettings(workspaceDir);
 
   const config = await loadCliConfig(
     settings.merged,
     'skills-list-session',
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    {
-      debug: false,
-    } as Partial<CliArgs> as CliArgs,
+    argv,
     { cwd: workspaceDir },
   );
 
@@ -73,8 +70,9 @@ export const listCommand: CommandModule = {
       default: false,
     }),
   handler: async (argv) => {
+    const args = { all: Boolean(argv['all']) };
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    await handleList({ all: argv['all'] as boolean });
+    await handleList(argv as unknown as CliArgs, args);
     await exitCli();
   },
 };

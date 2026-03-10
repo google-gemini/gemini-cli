@@ -7,21 +7,29 @@
 import type { CommandModule } from 'yargs';
 import { getErrorMessage } from '../../utils/errors.js';
 import { debugLogger } from '@google/gemini-cli-core';
-import { ExtensionManager } from '../../config/extension-manager.js';
-import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
+import { loadCliConfig, type CliArgs } from '../../config/config.js';
 import { loadSettings } from '../../config/settings.js';
-import { promptForSetting } from '../../config/extensions/extensionSettings.js';
+import type { ExtensionManager } from '../../config/extension-manager.js';
 import { exitCli } from '../utils.js';
-
-export async function handleList(options?: { outputFormat?: 'text' | 'json' }) {
+export async function handleList(
+  argv: CliArgs,
+  options?: { outputFormat?: 'text' | 'json' },
+) {
   try {
     const workspaceDir = process.cwd();
-    const extensionManager = new ExtensionManager({
-      workspaceDir,
-      requestConsent: requestConsentNonInteractive,
-      requestSetting: promptForSetting,
-      settings: loadSettings(workspaceDir).merged,
-    });
+    const settings = loadSettings(workspaceDir);
+    const config = await loadCliConfig(
+      settings.merged,
+      'extensions-list-session',
+      argv,
+      { cwd: workspaceDir },
+    );
+
+    // Initialize to trigger extension loading (and profile filtering)
+    await config.initialize();
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const extensionManager = config.getExtensionLoader() as ExtensionManager;
     const extensions = await extensionManager.loadExtensions();
     if (extensions.length === 0) {
       if (options?.outputFormat === 'json') {
@@ -61,7 +69,8 @@ export const listCommand: CommandModule = {
       default: 'text',
     }),
   handler: async (argv) => {
-    await handleList({
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    await handleList(argv as unknown as CliArgs, {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       outputFormat: argv['output-format'] as 'text' | 'json',
     });

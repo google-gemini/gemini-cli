@@ -24,6 +24,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { ExtensionStorage } from '../../config/extensions/storage.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { McpServerEnablementManager } from '../../config/mcp/index.js';
+import { loadCliConfig, type CliArgs } from '../../config/config.js';
+import type { Config } from '@google/gemini-cli-core';
 
 vi.mock('../../config/settings.js', async (importOriginal) => {
   const actual =
@@ -33,6 +35,7 @@ vi.mock('../../config/settings.js', async (importOriginal) => {
     loadSettings: vi.fn(),
   };
 });
+vi.mock('../../config/config.js');
 vi.mock('../../config/extensions/storage.js', () => ({
   ExtensionStorage: {
     getUserExtensionsDir: vi.fn(),
@@ -62,6 +65,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       {
         getGlobalSettingsPath: () => '/tmp/gemini/settings.json',
         getGlobalGeminiDir: () => '/tmp/gemini',
+        getGlobalTempDir: () => '/tmp/gemini/tmp',
       },
     ),
     GEMINI_DIR: '.gemini',
@@ -138,7 +142,13 @@ describe('mcp list command', () => {
       merged: { ...defaultMergedSettings, mcpServers: {} },
     });
 
-    await listMcpServers();
+    const mockConfig = {
+      initialize: vi.fn().mockResolvedValue(undefined),
+      getExtensionLoader: vi.fn().mockReturnValue(mockExtensionManager),
+    };
+    (loadCliConfig as Mock).mockResolvedValue(mockConfig as unknown as Config);
+
+    await listMcpServers({} as unknown as CliArgs);
 
     expect(debugLogger.log).toHaveBeenCalledWith('No MCP servers configured.');
   });
@@ -162,10 +172,16 @@ describe('mcp list command', () => {
       isTrusted: true,
     });
 
+    const mockConfig = {
+      initialize: vi.fn().mockResolvedValue(undefined),
+      getExtensionLoader: vi.fn().mockReturnValue(mockExtensionManager),
+    };
+    (loadCliConfig as Mock).mockResolvedValue(mockConfig as unknown as Config);
+
     mockClient.connect.mockResolvedValue(undefined);
     mockClient.ping.mockResolvedValue(undefined);
 
-    await listMcpServers();
+    await listMcpServers({} as unknown as CliArgs);
 
     expect(debugLogger.log).toHaveBeenCalledWith('Configured MCP servers:\n');
     expect(debugLogger.log).toHaveBeenCalledWith(
@@ -206,9 +222,15 @@ describe('mcp list command', () => {
       },
     });
 
+    const mockConfig = {
+      initialize: vi.fn().mockResolvedValue(undefined),
+      getExtensionLoader: vi.fn().mockReturnValue(mockExtensionManager),
+    };
+    (loadCliConfig as Mock).mockResolvedValue(mockConfig as unknown as Config);
+
     mockClient.connect.mockRejectedValue(new Error('Connection failed'));
 
-    await listMcpServers();
+    await listMcpServers({} as unknown as CliArgs);
 
     expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(
@@ -236,10 +258,16 @@ describe('mcp list command', () => {
       },
     ]);
 
+    const mockConfig = {
+      initialize: vi.fn().mockResolvedValue(undefined),
+      getExtensionLoader: vi.fn().mockReturnValue(mockExtensionManager),
+    };
+    (loadCliConfig as Mock).mockResolvedValue(mockConfig as unknown as Config);
+
     mockClient.connect.mockResolvedValue(undefined);
     mockClient.ping.mockResolvedValue(undefined);
 
-    await listMcpServers();
+    await listMcpServers({} as unknown as CliArgs);
 
     expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(
@@ -276,13 +304,22 @@ describe('mcp list command', () => {
       merged: settingsWithAllowlist,
     });
 
+    const mockConfig = {
+      initialize: vi.fn().mockResolvedValue(undefined),
+      getExtensionLoader: vi.fn().mockReturnValue(mockExtensionManager),
+    };
+    (loadCliConfig as Mock).mockResolvedValue(mockConfig as unknown as Config);
+
     mockClient.connect.mockResolvedValue(undefined);
     mockClient.ping.mockResolvedValue(undefined);
 
-    await listMcpServers({
-      merged: settingsWithAllowlist,
-      isTrusted: true,
-    } as unknown as LoadedSettings);
+    await listMcpServers(
+      {} as unknown as CliArgs,
+      {
+        merged: settingsWithAllowlist,
+        isTrusted: true,
+      } as unknown as LoadedSettings,
+    );
 
     expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining('allowed-server'),
@@ -310,10 +347,16 @@ describe('mcp list command', () => {
       isTrusted: false,
     });
 
+    const mockConfig = {
+      initialize: vi.fn().mockResolvedValue(undefined),
+      getExtensionLoader: vi.fn().mockReturnValue(mockExtensionManager),
+    };
+    (loadCliConfig as Mock).mockResolvedValue(mockConfig as unknown as Config);
+
     // createTransport will throw in core if not trusted
     mockedCreateTransport.mockRejectedValue(new Error('Folder not trusted'));
 
-    await listMcpServers();
+    await listMcpServers({} as unknown as CliArgs);
 
     expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(
@@ -337,7 +380,13 @@ describe('mcp list command', () => {
       isTrusted: true,
     });
 
-    await listMcpServers();
+    const mockConfig = {
+      initialize: vi.fn().mockResolvedValue(undefined),
+      getExtensionLoader: vi.fn().mockReturnValue(mockExtensionManager),
+    };
+    (loadCliConfig as Mock).mockResolvedValue(mockConfig as unknown as Config);
+
+    await listMcpServers({} as unknown as CliArgs);
 
     expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(
@@ -359,12 +408,18 @@ describe('mcp list command', () => {
       isTrusted: true,
     });
 
+    const mockConfig = {
+      initialize: vi.fn().mockResolvedValue(undefined),
+      getExtensionLoader: vi.fn().mockReturnValue(mockExtensionManager),
+    };
+    (loadCliConfig as Mock).mockResolvedValue(mockConfig as unknown as Config);
+
     vi.spyOn(
       McpServerEnablementManager.prototype,
       'isFileEnabled',
     ).mockResolvedValue(false);
 
-    await listMcpServers();
+    await listMcpServers({} as unknown as CliArgs);
 
     expect(debugLogger.log).toHaveBeenCalledWith(
       expect.stringContaining(

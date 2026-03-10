@@ -17,36 +17,32 @@ import {
   debugLogger,
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
+  type GeminiCLIExtension,
+  type MCPServerConfig,
 } from '@google/gemini-cli-core';
-import type { MCPServerConfig } from '@google/gemini-cli-core';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { ExtensionManager } from '../../config/extension-manager.js';
+import type { ExtensionManager } from '../../config/extension-manager.js';
 import {
   canLoadServer,
   McpServerEnablementManager,
 } from '../../config/mcp/index.js';
-import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
-import { promptForSetting } from '../../config/extensions/extensionSettings.js';
+import { loadCliConfig, type CliArgs } from '../../config/config.js';
 import { exitCli } from '../utils.js';
 import chalk from 'chalk';
 
 export async function getMcpServersFromConfig(
-  settings?: MergedSettings,
+  settings: MergedSettings,
+  extensionManager: ExtensionManager,
 ): Promise<{
   mcpServers: Record<string, MCPServerConfig>;
   blockedServerNames: string[];
 }> {
-  if (!settings) {
-    settings = loadSettings().merged;
+  let extensions: GeminiCLIExtension[];
+  try {
+    extensions = extensionManager.getExtensions();
+  } catch {
+    extensions = await extensionManager.loadExtensions();
   }
-
-  const extensionManager = new ExtensionManager({
-    settings,
-    workspaceDir: process.cwd(),
-    requestConsent: requestConsentNonInteractive,
-    requestSetting: promptForSetting,
-  });
-  const extensions = await extensionManager.loadExtensions();
   const mcpServers = { ...settings.mcpServers };
   for (const extension of extensions) {
     Object.entries(extension.mcpServers || {}).forEach(([key, server]) => {
@@ -170,13 +166,23 @@ async function getServerStatus(
 }
 
 export async function listMcpServers(
+  argv: CliArgs,
   loadedSettingsArg?: LoadedSettings,
 ): Promise<void> {
   const loadedSettings = loadedSettingsArg ?? loadSettings();
   const activeSettings = loadedSettings.merged;
 
-  const { mcpServers, blockedServerNames } =
-    await getMcpServersFromConfig(activeSettings);
+  const config = await loadCliConfig(activeSettings, 'mcp-list-session', argv, {
+    cwd: process.cwd(),
+  });
+  await config.initialize();
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  const extensionManager = config.getExtensionLoader() as ExtensionManager;
+
+  const { mcpServers, blockedServerNames } = await getMcpServersFromConfig(
+    activeSettings,
+    extensionManager,
+  );
   const serverNames = Object.keys(mcpServers);
 
   if (blockedServerNames.length > 0) {
@@ -257,7 +263,8 @@ export const listCommand: CommandModule<object, ListArgs> = {
   command: 'list',
   describe: 'List all configured MCP servers',
   handler: async (argv) => {
-    await listMcpServers(argv.loadedSettings);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    await listMcpServers(argv as unknown as CliArgs, argv.loadedSettings);
     await exitCli();
   },
 };

@@ -9,7 +9,9 @@ import { coreEvents } from '@google/gemini-cli-core';
 import { handleList, listCommand } from './list.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
+import { loadCliConfig, type CliArgs } from '../../config/config.js';
 import { getErrorMessage } from '../../utils/errors.js';
+import type { Config } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const { mockCoreDebugLogger } = await import(
@@ -25,6 +27,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 
 vi.mock('../../config/extension-manager.js');
 vi.mock('../../config/settings.js');
+vi.mock('../../config/config.js');
 vi.mock('../../utils/errors.js');
 vi.mock('../../config/extensions/consent.js', () => ({
   requestConsentNonInteractive: vi.fn(),
@@ -40,6 +43,7 @@ describe('extensions list command', () => {
   const mockLoadSettings = vi.mocked(loadSettings);
   const mockGetErrorMessage = vi.mocked(getErrorMessage);
   const mockExtensionManager = vi.mocked(ExtensionManager);
+  const mockLoadCliConfig = vi.mocked(loadCliConfig);
 
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -55,10 +59,17 @@ describe('extensions list command', () => {
   describe('handleList', () => {
     it('should log a message if no extensions are installed', async () => {
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      const mockConfig = {
+        initialize: vi.fn().mockResolvedValue(undefined),
+        getExtensionLoader: vi
+          .fn()
+          .mockReturnValue(mockExtensionManager.prototype),
+      };
+      mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
       mockExtensionManager.prototype.loadExtensions = vi
         .fn()
         .mockResolvedValue([]);
-      await handleList();
+      await handleList({} as unknown as CliArgs);
 
       expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
@@ -69,10 +80,17 @@ describe('extensions list command', () => {
 
     it('should output empty JSON array if no extensions are installed and output-format is json', async () => {
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      const mockConfig = {
+        initialize: vi.fn().mockResolvedValue(undefined),
+        getExtensionLoader: vi
+          .fn()
+          .mockReturnValue(mockExtensionManager.prototype),
+      };
+      mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
       mockExtensionManager.prototype.loadExtensions = vi
         .fn()
         .mockResolvedValue([]);
-      await handleList({ outputFormat: 'json' });
+      await handleList({} as unknown as CliArgs, { outputFormat: 'json' });
 
       expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith('log', '[]');
       mockCwd.mockRestore();
@@ -80,6 +98,14 @@ describe('extensions list command', () => {
 
     it('should list all installed extensions', async () => {
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      const mockConfig = {
+        initialize: vi.fn().mockResolvedValue(undefined),
+        getExtensionLoader: vi
+          .fn()
+          .mockReturnValue(mockExtensionManager.prototype),
+      };
+      mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
+
       const extensions = [
         { name: 'ext1', version: '1.0.0' },
         { name: 'ext2', version: '2.0.0' },
@@ -90,7 +116,7 @@ describe('extensions list command', () => {
       mockExtensionManager.prototype.toOutputString = vi.fn(
         (ext) => `${ext.name}@${ext.version}`,
       );
-      await handleList();
+      await handleList({} as unknown as CliArgs);
 
       expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
@@ -101,6 +127,14 @@ describe('extensions list command', () => {
 
     it('should list all installed extensions in JSON format', async () => {
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      const mockConfig = {
+        initialize: vi.fn().mockResolvedValue(undefined),
+        getExtensionLoader: vi
+          .fn()
+          .mockReturnValue(mockExtensionManager.prototype),
+      };
+      mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
+
       const extensions = [
         { name: 'ext1', version: '1.0.0' },
         { name: 'ext2', version: '2.0.0' },
@@ -108,7 +142,7 @@ describe('extensions list command', () => {
       mockExtensionManager.prototype.loadExtensions = vi
         .fn()
         .mockResolvedValue(extensions);
-      await handleList({ outputFormat: 'json' });
+      await handleList({} as unknown as CliArgs, { outputFormat: 'json' });
 
       expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
@@ -124,12 +158,11 @@ describe('extensions list command', () => {
           code?: string | number | null | undefined,
         ) => never);
       const error = new Error('List failed');
-      mockExtensionManager.prototype.loadExtensions = vi
-        .fn()
-        .mockRejectedValue(error);
+      mockLoadCliConfig.mockRejectedValue(error);
       mockGetErrorMessage.mockReturnValue('List failed message');
 
-      await handleList();
+       
+      await handleList({} as unknown as CliArgs);
 
       expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'error',
@@ -167,6 +200,13 @@ describe('extensions list command', () => {
     });
 
     it('handler should call handleList with parsed arguments', async () => {
+      const mockConfig = {
+        initialize: vi.fn().mockResolvedValue(undefined),
+        getExtensionLoader: vi
+          .fn()
+          .mockReturnValue(mockExtensionManager.prototype),
+      };
+      mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
       mockExtensionManager.prototype.loadExtensions = vi
         .fn()
         .mockResolvedValue([]);
@@ -177,7 +217,7 @@ describe('extensions list command', () => {
       )({
         'output-format': 'json',
       });
-      expect(mockExtensionManager.prototype.loadExtensions).toHaveBeenCalled();
+      expect(mockLoadCliConfig).toHaveBeenCalled();
     });
   });
 });

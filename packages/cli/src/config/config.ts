@@ -109,6 +109,13 @@ export async function parseArguments(
     .usage(
       'Usage: gemini [options] [command]\n\nGemini CLI - Defaults to interactive mode. Use -p/--prompt for non-interactive (headless) mode.',
     )
+    .option('profile', {
+      alias: ['profiles', 'P'],
+      type: 'string',
+      nargs: 1,
+      global: true,
+      description: 'The name of the profile to use for this session.',
+    })
     .option('debug', {
       alias: 'd',
       type: 'boolean',
@@ -146,13 +153,6 @@ export async function parseArguments(
           type: 'boolean',
           description: 'Run in sandbox?',
         })
-        .option('profile', {
-          alias: ['profiles', 'P'],
-          type: 'string',
-          nargs: 1,
-          description: 'The name of the profile to use for this session.',
-        })
-
         .option('yolo', {
           alias: 'y',
           type: 'boolean',

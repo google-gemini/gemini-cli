@@ -8,7 +8,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { coreEvents } from '@google/gemini-cli-core';
 import { handleList, listCommand } from './list.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
-import { loadCliConfig } from '../../config/config.js';
+import { loadCliConfig, type CliArgs } from '../../config/config.js';
 import type { Config } from '@google/gemini-cli-core';
 import chalk from 'chalk';
 
@@ -55,7 +55,7 @@ describe('skills list command', () => {
       };
       mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
 
-      await handleList({});
+      await handleList({} as unknown as CliArgs, {});
 
       expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
@@ -86,7 +86,7 @@ describe('skills list command', () => {
       };
       mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
 
-      await handleList({});
+      await handleList({} as unknown as CliArgs, {});
 
       expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
@@ -135,7 +135,7 @@ describe('skills list command', () => {
       mockLoadCliConfig.mockResolvedValue(mockConfig as unknown as Config);
 
       // Default
-      await handleList({ all: false });
+      await handleList({} as unknown as CliArgs, { all: false });
       expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
         expect.stringContaining('regular'),
@@ -148,7 +148,7 @@ describe('skills list command', () => {
       vi.clearAllMocks();
 
       // With all: true
-      await handleList({ all: true });
+      await handleList({} as unknown as CliArgs, { all: true });
       expect(coreEvents.emitConsoleLog).toHaveBeenCalledWith(
         'log',
         expect.stringContaining('regular'),
@@ -166,7 +166,9 @@ describe('skills list command', () => {
     it('should throw an error when listing fails', async () => {
       mockLoadCliConfig.mockRejectedValue(new Error('List failed'));
 
-      await expect(handleList({})).rejects.toThrow('List failed');
+      await expect(handleList({} as unknown as CliArgs, {})).rejects.toThrow(
+        'List failed',
+      );
     });
   });
 
