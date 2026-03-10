@@ -100,6 +100,20 @@ export class AgentConnectionError extends A2AAgentError {
   }
 }
 
+/** Shape of an error-like object in a cause chain (Error, HTTP response, or plain object). */
+interface ErrorLikeObject {
+  message?: string;
+  code?: string;
+  status?: number;
+  statusCode?: number;
+  cause?: unknown;
+}
+
+/** Type guard for objects that may carry error metadata (message, code, status, cause). */
+function isErrorLikeObject(val: unknown): val is ErrorLikeObject {
+  return typeof val === 'object' && val !== null;
+}
+
 /**
  * Collects all error messages from an error's cause chain into a single string
  * for pattern matching. This is necessary because the A2A SDK and Node's fetch
@@ -112,9 +126,9 @@ function collectErrorMessages(error: unknown): string {
   const maxDepth = 10;
 
   while (current && depth < maxDepth) {
-    if (typeof current === 'object' && current !== null) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const obj = current as Record<string, unknown>;
+    if (isErrorLikeObject(current)) {
+      // Save reference before instanceof narrows the type from ErrorLikeObject to Error.
+      const obj = current;
 
       if (current instanceof Error) {
         parts.push(current.message);
@@ -126,11 +140,10 @@ function collectErrorMessages(error: unknown): string {
         parts.push(obj.code);
       }
 
-      const status =
-        (typeof obj.status === 'number' ? obj.status : undefined) ??
-        (typeof obj.statusCode === 'number' ? obj.statusCode : undefined);
-      if (status !== undefined) {
-        parts.push(String(status));
+      if (typeof obj.status === 'number') {
+        parts.push(String(obj.status));
+      } else if (typeof obj.statusCode === 'number') {
+        parts.push(String(obj.statusCode));
       }
 
       current = obj.cause;
