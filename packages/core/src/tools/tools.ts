@@ -68,12 +68,21 @@ export interface ToolInvocation<
     updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
   ): Promise<TResult>;
+
+  /**
+   * Returns tool-specific options for policy updates.
+   * This is used by the scheduler to narrow policy rules when a tool is approved.
+   */
+  getPolicyUpdateOptions?(
+    outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined;
 }
 
 /**
  * Options for policy updates that can be customized by tool invocations.
  */
 export interface PolicyUpdateOptions {
+  argsPattern?: string;
   commandPrefix?: string | string[];
   mcpName?: string;
 }
@@ -130,7 +139,7 @@ export abstract class BaseToolInvocation<
    * Subclasses can override this to provide additional options like
    * commandPrefix (for shell) or mcpName (for MCP tools).
    */
-  protected getPolicyUpdateOptions(
+  getPolicyUpdateOptions(
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
     return undefined;
