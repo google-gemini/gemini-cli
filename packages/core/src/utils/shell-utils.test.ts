@@ -287,7 +287,7 @@ describe('hasRedirection', () => {
 describeWindowsOnly('PowerShell integration', () => {
   beforeEach(() => {
     mockPlatform.mockReturnValue('win32');
-    const systemRoot = process.env['SystemRoot'] || 'C:\\\\Windows';
+    const systemRoot = 'C:\\\\Windows';
     vi.stubEnv('ComSpec', `${systemRoot}\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe`);
   });
 

@@ -620,10 +620,10 @@ export function getShellConfiguration(): ShellConfiguration {
       return cachedShellConfiguration;
     }
 
-    // Last resort fallback, but still trying to be absolute if possible
+    // Last resort fallback, strictly absolute
     const fallbackPsPath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
     cachedShellConfiguration = {
-      executable: fs.existsSync(fallbackPsPath) ? fallbackPsPath : 'powershell.exe', // if all else fails, we might still have to use the name, but this is rare
+      executable: fallbackPsPath,
       argsPrefix: ['-NoProfile', '-Command'],
       shell: 'powershell',
     };
