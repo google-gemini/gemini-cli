@@ -3145,7 +3145,7 @@ describe('AppContainer State Management', () => {
       });
     });
 
-    it('clears the prompt when onCancelSubmit is called with shouldRestorePrompt=false', async () => {
+    it('preserves buffer when cancelling, even if empty (user is in control)', async () => {
       let unmount: () => void;
       await act(async () => {
         const result = renderAppContainer();
@@ -3161,7 +3161,45 @@ describe('AppContainer State Management', () => {
         onCancelSubmit(false);
       });
 
-      expect(mockSetText).toHaveBeenCalledWith('');
+      // Should NOT modify buffer when cancelling - user is in control
+      expect(mockSetText).not.toHaveBeenCalled();
+
+      unmount!();
+    });
+
+    it('preserves prompt text when cancelling streaming, even if same as last message (regression test for issue #13387)', async () => {
+      // Mock buffer with text that user typed while streaming (same as last message)
+      const promptText = 'What is Python?';
+      mockedUseTextBuffer.mockReturnValue({
+        text: promptText,
+        setText: mockSetText,
+      });
+
+      // Mock input history with same message
+      mockedUseInputHistoryStore.mockReturnValue({
+        inputHistory: [promptText],
+        addInput: vi.fn(),
+        initializeFromLogger: vi.fn(),
+      });
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      const { onCancelSubmit } = extractUseGeminiStreamArgs(
+        mockedUseGeminiStream.mock.lastCall!,
+      );
+
+      act(() => {
+        // Simulate Escape key cancelling streaming (shouldRestorePrompt=false)
+        onCancelSubmit(false);
+      });
+
+      // Should NOT call setText - prompt should be preserved regardless of content
+      expect(mockSetText).not.toHaveBeenCalled();
 
       unmount!();
     });
