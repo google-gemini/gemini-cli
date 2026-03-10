@@ -96,6 +96,7 @@ function isInkRenderMetrics(
     typeof m === 'object' &&
     m !== null &&
     'output' in m &&
+    // eslint-disable-next-line no-restricted-syntax
     typeof m['output'] === 'string'
   );
 }

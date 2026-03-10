@@ -24,8 +24,9 @@ import { SettingScope } from '../../config/settings.js';
 import { AskUserDialog } from './AskUserDialog.js';
 import { openFileInEditor } from '../utils/editorUtils.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
-import { formatCommand } from '../utils/keybindingUtils.js';
+import { Command } from '../key/keyMatchers.js';
+import { formatCommand } from '../key/keybindingUtils.js';
+import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
 export interface ExitPlanModeDialogProps {
   planPath: string;
@@ -161,6 +162,7 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
   width,
   availableHeight,
 }) => {
+  const keyMatchers = useKeyMatchers();
   const config = useConfig();
   const { stdin, setRawMode } = useStdin();
   const planState = usePlanContent(planPath, config);
