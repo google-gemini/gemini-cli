@@ -11,6 +11,7 @@ import { createMockCommandContext } from '../../test-utils/mockCommandContext.js
 import {
   AuthType,
   openBrowserSecurely,
+  shouldLaunchBrowser,
   UPGRADE_URL_PAGE,
 } from '@google/gemini-cli-core';
 
@@ -20,6 +21,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     openBrowserSecurely: vi.fn(),
+    shouldLaunchBrowser: vi.fn().mockReturnValue(true),
     UPGRADE_URL_PAGE: 'https://goo.gle/set-up-gemini-code-assist',
   };
 });
@@ -95,5 +97,22 @@ describe('upgradeCommand', () => {
       messageType: 'error',
       content: 'Failed to open upgrade page: Failed to open',
     });
+  });
+
+  it('should return URL message when shouldLaunchBrowser returns false', async () => {
+    vi.mocked(shouldLaunchBrowser).mockReturnValue(false);
+
+    if (!upgradeCommand.action) {
+      throw new Error('The upgrade command must have an action.');
+    }
+
+    const result = await upgradeCommand.action(mockContext, '');
+
+    expect(result).toEqual({
+      type: 'message',
+      messageType: 'info',
+      content: `Please open this URL in a browser: ${UPGRADE_URL_PAGE}`,
+    });
+    expect(openBrowserSecurely).not.toHaveBeenCalled();
   });
 });
