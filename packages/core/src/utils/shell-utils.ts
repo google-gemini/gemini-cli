@@ -555,10 +555,12 @@ export function getShellConfiguration(): ShellConfiguration {
     const pathDelimiter = os.platform() === 'win32' ? ';' : path.delimiter;
     const paths = (process.env['PATH'] || '').split(pathDelimiter);
     for (const p of paths) {
-      if (!p) continue;
+      if (!p || !path.isAbsolute(p)) continue; // Security: ignore relative paths in PATH
       const fullPath = path.resolve(p, 'pwsh.exe');
       try {
         if (path.isAbsolute(fullPath) && fs.existsSync(fullPath)) {
+          // Security: check if the file is actually executable
+          fs.accessSync(fullPath, fs.constants.X_OK);
           const canonicalPath = fs.realpathSync(fullPath);
           cachedShellConfiguration = {
             executable: canonicalPath,
@@ -585,6 +587,8 @@ export function getShellConfiguration(): ShellConfiguration {
           executable.endsWith('pwsh.exe')
         ) {
           try {
+            // Security: check if the file is actually executable
+            fs.accessSync(comSpec, fs.constants.X_OK);
             const canonicalPath = fs.realpathSync(comSpec);
             cachedShellConfiguration = {
               executable: canonicalPath,
@@ -593,15 +597,17 @@ export function getShellConfiguration(): ShellConfiguration {
             };
             return cachedShellConfiguration;
           } catch (e) {
-            debugLogger.debug(`Error resolving canonical path for ComSpec: ${comSpec}`, e);
+            debugLogger.debug(`Error resolving canonical path or checking execution permission for ComSpec: ${comSpec}`, e);
           }
         }
       }
     }
 
-    // Default to Windows PowerShell (powershell.exe)
+    // Default to Windows PowerShell (powershell.exe) with absolute path
+    const systemRoot = process.env['SystemRoot'] || 'C:\\Windows';
+    const defaultPsPath = path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
     cachedShellConfiguration = {
-      executable: 'powershell.exe',
+      executable: fs.existsSync(defaultPsPath) ? defaultPsPath : 'powershell.exe',
       argsPrefix: ['-NoProfile', '-Command'],
       shell: 'powershell',
     };
