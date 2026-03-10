@@ -19,13 +19,18 @@ import {
   type GenerateContentParameters,
 } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
-import { retryWithBackoff, isRetryableError } from '../utils/retry.js';
+import {
+  retryWithBackoff,
+  isRetryableError,
+  type AgentDecision,
+} from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import type { Config } from '../config/config.js';
 import {
   resolveModel,
   isGemini2Model,
   supportsModernFeatures,
+  PREVIEW_GEMINI_FLASH_MODEL,
 } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
 import type { StructuredError } from './turn.js';
@@ -41,7 +46,7 @@ import {
 import {
   ContentRetryEvent,
   ContentRetryFailureEvent,
-  type LlmRole,
+  LlmRole,
 } from '../telemetry/types.js';
 import { handleFallback } from '../fallback/handler.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
@@ -53,6 +58,7 @@ import {
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
 import { coreEvents } from '../utils/events.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export enum StreamEventType {
   /** A regular content chunk from the API. */
@@ -624,9 +630,97 @@ export class GeminiChat {
       );
     };
 
+    const onAgentDecisionCallback = async (
+      error: unknown,
+      attempt: number,
+    ): Promise<AgentDecision> => {
+      try {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+
+        // Don't try to use the agent for 429s as it will likely also fail.
+        if (errorMsg.includes('429')) {
+          return 'stop';
+        }
+
+        const lastUserMessage = [...lastContentsToUse]
+          .reverse()
+          .find((c) => c.role === 'user');
+        const lastUserText = lastUserMessage?.parts
+          ? lastUserMessage.parts.map((p) => p.text || '').join(' ')
+          : 'N/A';
+
+        const decisionPrompt = `You are a meta-agent deciding whether to retry an AI request that failed.
+
+      Error: ${errorMsg}
+      Attempt: ${attempt}
+      Target Model: ${lastModelToUse}
+      Last User Request: ${lastUserText}
+
+      Based on the error, should we try to retry the exact same request? 
+      Some errors are transient (e.g. network blips, internal server errors), others are terminal (e.g. safety blocks, invalid arguments).
+
+      Respond with a JSON object: {"action": "retry" | "stop"}`;
+
+        const decisionResponse = await this.config
+          .getContentGenerator()
+          .generateContent(
+            {
+              model: PREVIEW_GEMINI_FLASH_MODEL,
+              contents: [{ role: 'user', parts: [{ text: decisionPrompt }] }],
+              config: {
+                responseMimeType: 'application/json',
+              },
+            },
+            'agent-decision',
+            LlmRole.UTILITY_ROUTER,
+          );
+
+        const decisionText =
+          decisionResponse.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (decisionText) {
+          const parsed = JSON.parse(decisionText) as unknown;
+          if (
+            typeof parsed === 'object' &&
+            parsed !== null &&
+            'action' in parsed
+          ) {
+            const action = (parsed as { action: unknown }).action;
+            if (
+              action === 'retry' ||
+              action === 'stop' ||
+              action === 'modify_request'
+            ) {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              return action as AgentDecision;
+            }
+          }
+        }
+      } catch (agentError) {
+        debugLogger.warn('Agent decision failed:', agentError);
+      }
+
+      return 'stop';
+    };
+
+    const onAgentDecisionWrapper = async (
+      error: unknown,
+      attempt: number,
+    ): Promise<AgentDecision> => {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'message' in error &&
+        typeof (error as { message?: unknown }).message === 'string' &&
+        (error as { message?: unknown }).message === 'Agent Decision'
+      ) {
+        return 'stop';
+      }
+      return onAgentDecisionCallback(error, attempt);
+    };
     const streamResponse = await retryWithBackoff(apiCall, {
       onPersistent429: onPersistent429Callback,
       onValidationRequired: onValidationRequiredCallback,
+      onAgentDecision: onAgentDecisionWrapper,
       authType: this.config.getContentGeneratorConfig()?.authType,
       retryFetchErrors: this.config.getRetryFetchErrors(),
       signal: abortSignal,
