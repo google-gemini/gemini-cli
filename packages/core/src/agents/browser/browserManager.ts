@@ -24,6 +24,7 @@ import { debugLogger } from '../../utils/debugLogger.js';
 import type { Config } from '../../config/config.js';
 import { Storage } from '../../config/storage.js';
 import * as path from 'node:path';
+import { injectAutomationOverlay } from './automationOverlay.js';
 
 // Pin chrome-devtools-mcp version for reproducibility.
 const CHROME_DEVTOOLS_MCP_VERSION = '0.17.1';
@@ -33,6 +34,27 @@ const BROWSER_PROFILE_DIR = 'cli-browser-profile';
 
 // Default timeout for MCP operations
 const MCP_TIMEOUT_MS = 60_000;
+
+/**
+ * Tools that can cause a full-page navigation (explicitly or implicitly).
+ *
+ * When any of these completes successfully, the current page DOM is replaced
+ * and the injected automation overlay is lost. BrowserManager re-injects the
+ * overlay after every successful call to one of these tools.
+ *
+ * Note: chrome-devtools-mcp is a pure request/response server and emits no
+ * MCP notifications, so listening for page-load events via the protocol is
+ * not possible. Intercepting at callTool() is the equivalent mechanism.
+ */
+const POTENTIALLY_NAVIGATING_TOOLS = new Set([
+  'click', // clicking a link navigates
+  'click_at', // coordinate click can also follow a link
+  'navigate_page',
+  'new_page',
+  'select_page', // switching pages can lose the overlay
+  'press_key', // Enter on a focused link/form triggers navigation
+  'handle_dialog', // confirming beforeunload can trigger navigation
+]);
 
 /**
  * Content item from an MCP tool call response.
@@ -70,7 +92,16 @@ export class BrowserManager {
   private mcpTransport: StdioClientTransport | undefined;
   private discoveredTools: McpTool[] = [];
 
-  constructor(private config: Config) {}
+  /**
+   * Whether to inject the automation overlay.
+   * Always false in headless mode (no visible window to decorate).
+   */
+  private readonly shouldInjectOverlay: boolean;
+
+  constructor(private config: Config) {
+    const browserConfig = config.getBrowserAgentConfig();
+    this.shouldInjectOverlay = !browserConfig?.customConfig?.headless;
+  }
 
   /**
    * Gets the raw MCP SDK Client for direct tool calls.
@@ -120,28 +151,49 @@ export class BrowserManager {
       { timeout: MCP_TIMEOUT_MS },
     );
 
+    let result: McpToolCallResult;
+
     // If no signal, just await directly
     if (!signal) {
-      return this.toResult(await callPromise);
-    }
-
-    // Race the call against the abort signal
-    let onAbort: (() => void) | undefined;
-    try {
-      const result = await Promise.race([
-        callPromise,
-        new Promise<never>((_resolve, reject) => {
-          onAbort = () =>
-            reject(signal.reason ?? new Error('Operation cancelled'));
-          signal.addEventListener('abort', onAbort, { once: true });
-        }),
-      ]);
-      return this.toResult(result);
-    } finally {
-      if (onAbort) {
-        signal.removeEventListener('abort', onAbort);
+      result = this.toResult(await callPromise);
+    } else {
+      // Race the call against the abort signal
+      let onAbort: (() => void) | undefined;
+      try {
+        const raw = await Promise.race([
+          callPromise,
+          new Promise<never>((_resolve, reject) => {
+            onAbort = () =>
+              reject(signal.reason ?? new Error('Operation cancelled'));
+            signal.addEventListener('abort', onAbort, { once: true });
+          }),
+        ]);
+        result = this.toResult(raw);
+      } finally {
+        if (onAbort) {
+          signal.removeEventListener('abort', onAbort);
+        }
       }
     }
+
+    // Re-inject the automation overlay after any tool that can cause a
+    // full-page navigation (including implicit navigations from clicking links).
+    // chrome-devtools-mcp emits no MCP notifications, so callTool() is the
+    // only interception point we have — equivalent to a page-load listener.
+    if (
+      this.shouldInjectOverlay &&
+      !result.isError &&
+      POTENTIALLY_NAVIGATING_TOOLS.has(toolName) &&
+      !signal?.aborted
+    ) {
+      try {
+        await injectAutomationOverlay(this, signal);
+      } catch {
+        // Never let overlay failures interrupt the tool result
+      }
+    }
+
+    return result;
   }
 
   /**
