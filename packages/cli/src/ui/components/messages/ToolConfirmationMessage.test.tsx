@@ -411,7 +411,7 @@ describe('ToolConfirmationMessage', () => {
       unmount();
     });
 
-    it('should show "Allow for all future sessions" when setting is true', async () => {
+    it('should show "Allow for all future sessions" when trusted', async () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
@@ -434,7 +434,10 @@ describe('ToolConfirmationMessage', () => {
       );
       await waitUntilReady();
 
-      expect(lastFrame()).toContain('Allow for all future sessions');
+      const output = lastFrame();
+      expect(output).toContain('future sessions');
+      // Verify it is the default selection (matching the indicator in the snapshot)
+      expect(output).toMatchSnapshot();
       unmount();
     });
   });
