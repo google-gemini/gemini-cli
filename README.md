@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/github/license/google-gemini/gemini-cli)](https://github.com/google-gemini/gemini-cli/blob/main/LICENSE)
 [![View Code Wiki](https://assets.codewiki.google/readme-badge/static.svg)](https://codewiki.google/github.com/google-gemini/gemini-cli?utm_source=badge&utm_medium=github&utm_campaign=github.com/google-gemini/gemini-cli)
 
-![Gemini CLI Screenshot](./docs/assets/gemini-screenshot.png)
+![Gemini CLI Screenshot](/docs/assets/gemini-screenshot.png)
 
 Gemini CLI is an open-source AI agent that brings the power of Gemini directly
 into your terminal. It provides lightweight access to Gemini, giving you the
@@ -77,7 +77,7 @@ See [Releases](./docs/releases.md) for more details.
 
 ### Preview
 
-New preview releases will be published each week at UTC 2359 on Tuesdays. These
+New preview releases will be published each week at UTC 23:59 on Tuesdays. These
 releases will not have been fully vetted and may contain regressions or other
 outstanding issues. Please help us test and install with `preview` tag.
 
@@ -87,7 +87,7 @@ npm install -g @google/gemini-cli@preview
 
 ### Stable
 
-- New stable releases will be published each week at UTC 2000 on Tuesdays, this
+- New stable releases will be published each week at UTC 20:00 on Tuesdays, this
   will be the full promotion of last week's `preview` release + any bug fixes
   and validations. Use `latest` tag.
 
@@ -97,7 +97,7 @@ npm install -g @google/gemini-cli@latest
 
 ### Nightly
 
-- New releases will be published each day at UTC 0000. This will be all changes
+- New releases will be published each day at UTC 00:00. This will be all changes
   from the main branch as represented at time of release. It should be assumed
   there are pending validations and issues. Use `nightly` tag.
 

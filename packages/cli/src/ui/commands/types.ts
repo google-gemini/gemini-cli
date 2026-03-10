@@ -190,7 +190,9 @@ export type SlashCommandActionReturn =
 
 export enum CommandKind {
   BUILT_IN = 'built-in',
-  FILE = 'file',
+  USER_FILE = 'user-file',
+  WORKSPACE_FILE = 'workspace-file',
+  EXTENSION_FILE = 'extension-file',
   MCP_PROMPT = 'mcp-prompt',
   AGENT = 'agent',
 }
@@ -201,6 +203,11 @@ export interface SlashCommand {
   altNames?: string[];
   description: string;
   hidden?: boolean;
+  /**
+   * Optional grouping label for slash completion UI sections.
+   * Commands with the same label are rendered under one separator.
+   */
+  suggestionGroup?: string;
 
   kind: CommandKind;
 
@@ -216,6 +223,9 @@ export interface SlashCommand {
   extensionName?: string;
   extensionId?: string;
 
+  // Optional metadata for MCP commands
+  mcpServerName?: string;
+
   // The action to run. Optional for parent commands that only group sub-commands.
   action?: (
     context: CommandContext,
@@ -225,7 +235,7 @@ export interface SlashCommand {
     | SlashCommandActionReturn
     | Promise<void | SlashCommandActionReturn>;
 
-  // Provides argument completion (e.g., completing a tag for `/chat resume <tag>`).
+  // Provides argument completion (e.g., completing a tag for `/resume resume <tag>`).
   completion?: (
     context: CommandContext,
     partialArg: string,
