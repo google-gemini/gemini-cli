@@ -6,7 +6,10 @@
 
 import type { Config } from '../config/config.js';
 import { AuthType } from '../core/contentGenerator.js';
-import { openBrowserSecurely } from '../utils/secure-browser-launcher.js';
+import {
+  openBrowserSecurely,
+  shouldLaunchBrowser,
+} from '../utils/secure-browser-launcher.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { FallbackIntent, FallbackRecommendation } from './types.js';
@@ -112,6 +115,12 @@ export async function handleFallback(
 }
 
 async function handleUpgrade() {
+  if (!shouldLaunchBrowser()) {
+    debugLogger.log(
+      `Cannot open browser in this environment. Please visit: ${UPGRADE_URL_PAGE}`,
+    );
+    return;
+  }
   try {
     await openBrowserSecurely(UPGRADE_URL_PAGE);
   } catch (error) {
