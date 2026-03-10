@@ -356,7 +356,7 @@ describe('useSelectionList', () => {
         initialIndex: 2,
         onSelect: mockOnSelect,
       });
-      pressKey('return');
+      pressKey('enter');
       await waitUntilReady();
       expect(mockOnSelect).toHaveBeenCalledTimes(1);
       expect(mockOnSelect).toHaveBeenCalledWith('C');
@@ -371,7 +371,7 @@ describe('useSelectionList', () => {
       act(() => result.current.setActiveIndex(1));
       await waitUntilReady();
 
-      pressKey('return');
+      pressKey('enter');
       await waitUntilReady();
       expect(mockOnSelect).not.toHaveBeenCalled();
     });
@@ -415,7 +415,7 @@ describe('useSelectionList', () => {
       await waitUntilReady();
       // 3. Press Enter. Should select D.
       act(() => {
-        press('return');
+        press('enter');
       });
       await waitUntilReady();
 
@@ -459,7 +459,7 @@ describe('useSelectionList', () => {
         // All presses happen in same render cycle - React batches the state updates
         press('down'); // Should move 0 (A) -> 2 (C)
         press('down'); // Should move 2 (C) -> 3 (D)
-        press('return'); // Should select D
+        press('enter'); // Should select D
       });
       await waitUntilReady();
 
@@ -759,7 +759,7 @@ describe('useSelectionList', () => {
       pressNumber('1');
       await waitUntilReady();
 
-      pressKey('return');
+      pressKey('enter');
       await waitUntilReady();
       expect(mockOnSelect).toHaveBeenCalledTimes(1);
 

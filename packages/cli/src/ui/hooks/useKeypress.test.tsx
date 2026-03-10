@@ -111,7 +111,7 @@ describe(`useKeypress`, () => {
 
   it('should correctly identify alt+enter (meta key)', () => {
     renderKeypressHook(true);
-    const key = { name: 'return', sequence: '\x1B\r' };
+    const key = { name: 'enter', sequence: '\x1B\r' };
     act(() => stdin.write(key.sequence));
     expect(onKeypress).toHaveBeenCalledWith(
       expect.objectContaining({

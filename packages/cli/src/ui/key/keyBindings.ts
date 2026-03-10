@@ -149,11 +149,9 @@ export class KeyBinding {
     'numpad_subtract',
     'numpad_decimal',
     'numpad_divide',
-    // Gemini CLI legacy/internal support
-    'return',
   ]);
 
-  /** The key name (e.g., 'a', 'return', 'tab', 'escape') */
+  /** The key name (e.g., 'a', 'enter', 'tab', 'escape') */
   readonly key: string;
   readonly shift: boolean;
   readonly alt: boolean;
@@ -238,7 +236,7 @@ export type KeyBindingConfig = {
  */
 export const defaultKeyBindings: KeyBindingConfig = {
   // Basic Controls
-  [Command.RETURN]: [new KeyBinding('return')],
+  [Command.RETURN]: [new KeyBinding('enter')],
   [Command.ESCAPE]: [new KeyBinding('escape'), new KeyBinding('ctrl+[')],
   [Command.QUIT]: [new KeyBinding('ctrl+c')],
   [Command.EXIT]: [new KeyBinding('ctrl+d')],
@@ -308,7 +306,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.HISTORY_UP]: [new KeyBinding('ctrl+p')],
   [Command.HISTORY_DOWN]: [new KeyBinding('ctrl+n')],
   [Command.REVERSE_SEARCH]: [new KeyBinding('ctrl+r')],
-  [Command.SUBMIT_REVERSE_SEARCH]: [new KeyBinding('return')],
+  [Command.SUBMIT_REVERSE_SEARCH]: [new KeyBinding('enter')],
   [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [new KeyBinding('tab')],
 
   // Navigation
@@ -325,10 +323,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.DIALOG_PREV]: [new KeyBinding('shift+tab')],
 
   // Suggestions & Completions
-  [Command.ACCEPT_SUGGESTION]: [
-    new KeyBinding('tab'),
-    new KeyBinding('return'),
-  ],
+  [Command.ACCEPT_SUGGESTION]: [new KeyBinding('tab'), new KeyBinding('enter')],
   [Command.COMPLETION_UP]: [new KeyBinding('up'), new KeyBinding('ctrl+p')],
   [Command.COMPLETION_DOWN]: [new KeyBinding('down'), new KeyBinding('ctrl+n')],
   [Command.EXPAND_SUGGESTION]: [new KeyBinding('right')],
@@ -336,12 +331,12 @@ export const defaultKeyBindings: KeyBindingConfig = {
 
   // Text Input
   // Must also exclude shift to allow shift+enter for newline
-  [Command.SUBMIT]: [new KeyBinding('return')],
+  [Command.SUBMIT]: [new KeyBinding('enter')],
   [Command.NEWLINE]: [
-    new KeyBinding('ctrl+return'),
-    new KeyBinding('cmd+return'),
-    new KeyBinding('alt+return'),
-    new KeyBinding('shift+return'),
+    new KeyBinding('ctrl+enter'),
+    new KeyBinding('cmd+enter'),
+    new KeyBinding('alt+enter'),
+    new KeyBinding('shift+enter'),
     new KeyBinding('ctrl+j'),
   ],
   [Command.OPEN_EXTERNAL_EDITOR]: [new KeyBinding('ctrl+x')],
@@ -366,7 +361,7 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.UNFOCUS_BACKGROUND_SHELL_LIST]: [new KeyBinding('tab')],
   [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]: [new KeyBinding('tab')],
   [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]: [new KeyBinding('tab')],
-  [Command.BACKGROUND_SHELL_SELECT]: [new KeyBinding('return')],
+  [Command.BACKGROUND_SHELL_SELECT]: [new KeyBinding('enter')],
   [Command.BACKGROUND_SHELL_ESCAPE]: [new KeyBinding('escape')],
   [Command.SHOW_MORE_LINES]: [new KeyBinding('ctrl+o')],
   [Command.EXPAND_PASTE]: [new KeyBinding('ctrl+o')],

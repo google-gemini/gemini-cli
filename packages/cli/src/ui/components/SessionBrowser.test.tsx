@@ -324,7 +324,7 @@ describe('SessionBrowser component', () => {
     await waitUntilReady();
 
     // Press Enter.
-    triggerKey({ name: 'return', sequence: '\r' });
+    triggerKey({ name: 'enter', sequence: '\r' });
     await waitUntilReady();
 
     expect(onResumeSession).toHaveBeenCalledTimes(1);
@@ -367,7 +367,7 @@ describe('SessionBrowser component', () => {
     await waitUntilReady();
 
     // Active selection is at 0 (current session).
-    triggerKey({ name: 'return', sequence: '\r' });
+    triggerKey({ name: 'enter', sequence: '\r' });
     await waitUntilReady();
     expect(onResumeSession).not.toHaveBeenCalled();
 

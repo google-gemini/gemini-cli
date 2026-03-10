@@ -287,7 +287,7 @@ describe('TextInput', () => {
 
     await act(async () => {
       keypressHandler({
-        name: 'return',
+        name: 'enter',
         shift: false,
         alt: false,
         ctrl: false,
@@ -314,7 +314,7 @@ describe('TextInput', () => {
 
     await act(async () => {
       keypressHandler({
-        name: 'return',
+        name: 'enter',
         shift: false,
         alt: false,
         ctrl: false,
@@ -339,7 +339,7 @@ describe('TextInput', () => {
 
     await act(async () => {
       keypressHandler({
-        name: 'return',
+        name: 'enter',
         shift: false,
         alt: false,
         ctrl: false,

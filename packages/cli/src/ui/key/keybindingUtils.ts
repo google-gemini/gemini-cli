@@ -16,7 +16,7 @@ import {
  * Maps internal key names to user-friendly display names.
  */
 const KEY_NAME_MAP: Record<string, string> = {
-  return: 'Enter',
+  enter: 'Enter',
   escape: 'Esc',
   backspace: 'Backspace',
   delete: 'Delete',

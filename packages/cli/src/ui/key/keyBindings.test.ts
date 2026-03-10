@@ -80,8 +80,8 @@ describe('KeyBinding', () => {
     });
 
     it('should handle named keys with modifiers', () => {
-      const binding = new KeyBinding('ctrl+return');
-      expect(binding.key).toBe('return');
+      const binding = new KeyBinding('ctrl+enter');
+      expect(binding.key).toBe('enter');
       expect(binding.ctrl).toBe(true);
     });
 
