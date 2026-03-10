@@ -21,7 +21,7 @@
     "dist"
   ],
   "dependencies": {
-    "@a2a-js/sdk": "^0.3.10",
+    "@a2a-js/sdk": "0.3.11",
     "@bufbuild/protobuf": "^2.11.0",
     "@google-cloud/logging": "^11.2.1",
     "@google-cloud/opentelemetry-cloud-monitoring-exporter": "^0.21.0",
