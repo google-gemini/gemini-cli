@@ -30,13 +30,12 @@ import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
 import { useUIActions } from '../../contexts/UIActionsContext.js';
-import { keyMatchers, Command } from '../../key/keyMatchers.js';
+import { Command } from '../../key/keyMatchers.js';
 import { formatCommand } from '../../key/keybindingUtils.js';
 import {
   REDIRECTION_WARNING_NOTE_LABEL,
   REDIRECTION_WARNING_NOTE_TEXT,
   REDIRECTION_WARNING_TIP_LABEL,
-  REDIRECTION_WARNING_TIP_TEXT,
 } from '../../textConstants.js';
 import { AskUserDialog } from '../AskUserDialog.js';
 import { ExitPlanModeDialog } from '../ExitPlanModeDialog.js';
@@ -58,11 +57,6 @@ export interface ToolConfirmationMessageProps {
   availableTerminalHeight?: number;
   terminalWidth: number;
 }
-
-const REDIRECTION_WARNING_NOTE_LABEL = 'Note: ';
-const REDIRECTION_WARNING_NOTE_TEXT =
-  'Command contains redirection which can be undesirable.';
-const REDIRECTION_WARNING_TIP_LABEL = 'Tip:  '; // Padded to align with "Note: "
 
 export const ToolConfirmationMessage: React.FC<
   ToolConfirmationMessageProps
@@ -659,7 +653,6 @@ export const ToolConfirmationMessage: React.FC<
     isMcpToolDetailsExpanded,
     expandDetailsHintKey,
     mcpToolDetailsText,
-    getPreferredEditor,
     settings,
   ]);
 

@@ -175,7 +175,7 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
     mode: ApprovalMode;
     clear: boolean;
   } | null>(null);
-  const { setSetting } = useSettingsStore();
+  const { settings, setSetting } = useSettingsStore();
 
   useEffect(() => {
     if (pendingApproval) {
@@ -294,7 +294,12 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
             }
 
             if (nextMode) {
-              const clearContext = config.getClearContextOnPlanApproval();
+              const sessionOverride =
+                config.getClearContextOnPlanApprovalSessionOverride();
+              const persistentSetting =
+                settings.merged.general?.plan?.clearContextOnApproval;
+              const clearContext = sessionOverride ?? persistentSetting;
+
               if (clearContext !== undefined) {
                 onApprove(nextMode, clearContext);
               } else {

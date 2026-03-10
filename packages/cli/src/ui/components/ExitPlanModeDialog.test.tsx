@@ -20,6 +20,8 @@ import {
 import * as fs from 'node:fs';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
+import { createMockSettings } from '../../test-utils/mockConfig.js';
+
 vi.mock('../utils/editorUtils.js', () => ({
   openFileInEditor: vi.fn(),
 }));
@@ -151,6 +153,7 @@ Implement a comprehensive authentication system with multiple providers.
       />,
       {
         ...options,
+        settings: createMockSettings(),
         config: {
           getTargetDir: () => mockTargetDir,
           getIdeMode: () => false,
@@ -165,6 +168,7 @@ Implement a comprehensive authentication system with multiple providers.
           }),
           getUseAlternateBuffer: () => options?.useAlternateBuffer ?? true,
           getClearContextOnPlanApproval: () => undefined,
+          getClearContextOnPlanApprovalSessionOverride: () => undefined,
           setClearContextOnPlanApprovalSessionOverride: vi.fn(),
         } as unknown as import('@google/gemini-cli-core').Config,
       },
@@ -459,6 +463,7 @@ Implement a comprehensive authentication system with multiple providers.
           </BubbleListener>,
           {
             useAlternateBuffer,
+            settings: createMockSettings(),
             config: {
               getTargetDir: () => mockTargetDir,
               getIdeMode: () => false,
@@ -472,6 +477,7 @@ Implement a comprehensive authentication system with multiple providers.
               }),
               getUseAlternateBuffer: () => useAlternateBuffer ?? true,
               getClearContextOnPlanApproval: () => undefined,
+              getClearContextOnPlanApprovalSessionOverride: () => undefined,
               setClearContextOnPlanApprovalSessionOverride: vi.fn(),
             } as unknown as import('@google/gemini-cli-core').Config,
           },

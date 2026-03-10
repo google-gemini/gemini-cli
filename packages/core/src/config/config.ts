@@ -2514,6 +2514,10 @@ export class Config implements McpContext, AgentLoopContext {
     );
   }
 
+  getClearContextOnPlanApprovalSessionOverride(): boolean | undefined {
+    return this.clearContextOnPlanApprovalSessionOverride;
+  }
+
   isClearContextOnPlanApprovalEnabled(): boolean {
     return this.getClearContextOnPlanApproval() ?? false;
   }

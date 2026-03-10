@@ -1052,11 +1052,16 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
     isActive: questions.length > 1 && !submitted,
   });
 
+  const onSubmitRef = useRef(onSubmit);
+  useEffect(() => {
+    onSubmitRef.current = onSubmit;
+  }, [onSubmit]);
+
   useEffect(() => {
     if (submitted) {
-      onSubmit(answers);
+      onSubmitRef.current(answers);
     }
-  }, [submitted, answers, onSubmit]);
+  }, [submitted, answers]);
 
   const handleAnswer = useCallback(
     (answer: string) => {
