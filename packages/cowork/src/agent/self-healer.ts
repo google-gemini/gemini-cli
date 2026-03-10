@@ -79,7 +79,11 @@ function runCommand(
   cwd: string,
 ): Promise<{ output: string; exitCode: number }> {
   return new Promise((resolve) => {
-    const child = spawn(command, { cwd, shell: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(command, {
+      cwd,
+      shell: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
     let output = '';
     child.stdout.on('data', (c: Buffer) => (output += c.toString()));
     child.stderr.on('data', (c: Buffer) => (output += c.toString()));
@@ -124,13 +128,14 @@ function parseErrors(output: string, cwd: string): ParsedError[] {
     locationRe.lastIndex = 0;
     while ((m = locationRe.exec(block)) !== null) {
       const [, rawFile, lineStr, colStr] = m;
-      const absFile = rawFile.startsWith('/')
-        ? rawFile
-        : resolve(cwd, rawFile);
+      const absFile = rawFile.startsWith('/') ? rawFile : resolve(cwd, rawFile);
 
       // Extract the error message: first non-empty line after the location
       const afterLoc = block.slice(m.index + m[0].length).trimStart();
-      const firstLine = afterLoc.split('\n')[0].replace(/^[-\s●×✗]+/, '').trim();
+      const firstLine = afterLoc
+        .split('\n')[0]
+        .replace(/^[-\s●×✗]+/, '')
+        .trim();
 
       errors.push({
         file: absFile,
@@ -154,11 +159,17 @@ function parseErrors(output: string, cwd: string): ParsedError[] {
   // Also grab FAIL file references even without location info
   failFileRe.lastIndex = 0;
   while ((m = failFileRe.exec(output)) !== null) {
-    const absFile = resolve(cwd, m[1]);
+    const absFile = resolve(cwd, m![1]);
     const key = `${absFile}:0`;
     if (!seen.has(key)) {
       seen.add(key);
-      errors.push({ file: absFile, line: 0, column: 0, message: 'Test file failed', context: '' });
+      errors.push({
+        file: absFile,
+        line: 0,
+        column: 0,
+        message: 'Test file failed',
+        context: '',
+      });
     }
   }
 
@@ -185,7 +196,8 @@ export class SelfHealer {
     private readonly cwd: string,
     private readonly maxRetries = 3,
   ) {
-    const apiKey = process.env['GEMINI_API_KEY'] ?? process.env['GOOGLE_API_KEY'];
+    const apiKey =
+      process.env['GEMINI_API_KEY'] ?? process.env['GOOGLE_API_KEY'];
     this.ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
   }
 
@@ -197,12 +209,18 @@ export class SelfHealer {
    * Infer the test runner from package.json devDependencies and the `test` script.
    * Returns null when no recognised runner is found.
    */
-  detectTestRunner(packageJson: Record<string, unknown> | null): 'jest' | 'vitest' | null {
+  detectTestRunner(
+    packageJson: Record<string, unknown> | null,
+  ): 'jest' | 'vitest' | null {
     if (!packageJson) return null;
 
-    const dev = (packageJson['devDependencies'] as Record<string, string> | undefined) ?? {};
-    const deps = (packageJson['dependencies'] as Record<string, string> | undefined) ?? {};
-    const scripts = (packageJson['scripts'] as Record<string, string> | undefined) ?? {};
+    const dev =
+      (packageJson['devDependencies'] as Record<string, string> | undefined) ??
+      {};
+    const deps =
+      (packageJson['dependencies'] as Record<string, string> | undefined) ?? {};
+    const scripts =
+      (packageJson['scripts'] as Record<string, string> | undefined) ?? {};
 
     if ('vitest' in dev || 'vitest' in deps) return 'vitest';
     if ('jest' in dev || 'jest' in deps || '@types/jest' in dev) return 'jest';
@@ -221,7 +239,10 @@ export class SelfHealer {
   /**
    * Run the test suite and return the raw output + pass/fail status.
    */
-  async runTests(runner: 'jest' | 'vitest', filter?: string): Promise<{ output: string; passed: boolean }> {
+  async runTests(
+    runner: 'jest' | 'vitest',
+    filter?: string,
+  ): Promise<{ output: string; passed: boolean }> {
     const filterArg = filter ? ` --reporter=verbose "${filter}"` : '';
     const cmd =
       runner === 'vitest'
@@ -262,7 +283,10 @@ export class SelfHealer {
       .join('\n---\n');
 
     const filesBlock = Object.entries(fileContents)
-      .map(([path, content]) => `### FILE: ${path}\n\`\`\`\n${content.slice(0, 4000)}\n\`\`\``)
+      .map(
+        ([path, content]) =>
+          `### FILE: ${path}\n\`\`\`\n${content.slice(0, 4000)}\n\`\`\``,
+      )
       .join('\n\n');
 
     const prompt = `You are a TypeScript debugging assistant. Fix the failing tests below.
@@ -290,7 +314,9 @@ Example: [{"path":"/app/src/foo.ts","newContent":"...","reason":"Fixed type erro
 
       const raw = (response.text ?? '').trim();
       // Strip possible markdown fences
-      const jsonStr = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+      const jsonStr = raw
+        .replace(/^```(?:json)?\n?/, '')
+        .replace(/\n?```$/, '');
       const changes = JSON.parse(jsonStr) as FileChange[];
       return Array.isArray(changes) ? changes : [];
     } catch {
@@ -323,11 +349,17 @@ Example: [{"path":"/app/src/foo.ts","newContent":"...","reason":"Fixed type erro
    * @param opts.testFilter   Optional test name / file filter.
    * @param opts.onAttempt    Callback fired after each attempt.
    */
-  async heal(opts: {
-    packageJson?: Record<string, unknown> | null;
-    testFilter?: string;
-    onAttempt?: (attempt: number, passed: boolean, errors: ParsedError[]) => void;
-  } = {}): Promise<HealResult> {
+  async heal(
+    opts: {
+      packageJson?: Record<string, unknown> | null;
+      testFilter?: string;
+      onAttempt?: (
+        attempt: number,
+        passed: boolean,
+        errors: ParsedError[],
+      ) => void;
+    } = {},
+  ): Promise<HealResult> {
     const runner = this.detectTestRunner(opts.packageJson ?? null) ?? 'vitest';
     const attempts: HealAttempt[] = [];
 
@@ -335,12 +367,23 @@ Example: [{"path":"/app/src/foo.ts","newContent":"...","reason":"Fixed type erro
       const { output, passed } = await this.runTests(runner, opts.testFilter);
       const errors = passed ? [] : parseErrors(output, this.cwd);
 
-      const attempt: HealAttempt = { attempt: i, passed, testOutput: output, errors, changes: [] };
+      const attempt: HealAttempt = {
+        attempt: i,
+        passed,
+        testOutput: output,
+        errors,
+        changes: [],
+      };
 
       if (passed) {
         attempts.push(attempt);
         opts.onAttempt?.(i, true, []);
-        return { success: true, totalAttempts: i, attempts, finalOutput: output };
+        return {
+          success: true,
+          totalAttempts: i,
+          attempts,
+          finalOutput: output,
+        };
       }
 
       // Ask Gemini for fixes and apply them

@@ -122,14 +122,14 @@ export class Orchestrator {
   private readonly maxRounds: number;
   private readonly verbose: boolean;
   private readonly coderOpts: CoworkerOptions;
-  private readonly reviewerOpts: CoworkerOptions;
   private readonly transcript: AgentMessage[] = [];
 
   constructor(opts: OrchestratorOptions = {}) {
     this.maxRounds = opts.maxRounds ?? 3;
     this.verbose = opts.verbose ?? true;
     this.coderOpts = opts.coderOptions ?? {};
-    this.reviewerOpts = opts.reviewerOptions ?? {};
+    // reviewerOptions reserved for future LLM-based reviewer; ignored for now
+    void opts.reviewerOptions;
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
@@ -157,29 +157,50 @@ export class Orchestrator {
     while (round < this.maxRounds) {
       round++;
       const spinner = this.verbose
-        ? ora({ text: chalk.blue.dim(`[Orchestrator] Round ${round}: Coder is working…`), color: 'blue' }).start()
+        ? ora({
+            text: chalk.blue.dim(
+              `[Orchestrator] Round ${round}: Coder is working…`,
+            ),
+            color: 'blue',
+          }).start()
         : null;
 
       // ── Coder round ────────────────────────────────────────────────────────
       const coderGoal = review.revisedGoal ?? goal;
       proposal = await this.runCoderRound(coderGoal, round, proposal);
-      spinner?.succeed(chalk.blue.dim(`[Round ${round}] Coder produced ${proposal.files.length} file proposal(s).`));
+      spinner?.succeed(
+        chalk.blue.dim(
+          `[Round ${round}] Coder produced ${proposal.files.length} file proposal(s).`,
+        ),
+      );
 
       this.log('coder', `Round ${round} proposal:\n${proposal.summary}`);
 
       // ── Reviewer round ─────────────────────────────────────────────────────
       const reviewSpinner = this.verbose
-        ? ora({ text: chalk.yellow.dim(`[Orchestrator] Round ${round}: Reviewer is evaluating…`), color: 'yellow' }).start()
+        ? ora({
+            text: chalk.yellow.dim(
+              `[Orchestrator] Round ${round}: Reviewer is evaluating…`,
+            ),
+            color: 'yellow',
+          }).start()
         : null;
 
       review = await this.runReviewerRound(goal, proposal);
       reviewSpinner?.succeed(
         review.decision === 'approved'
-          ? chalk.green.dim(`[Round ${round}] Reviewer: APPROVED — ${review.summary}`)
-          : chalk.yellow.dim(`[Round ${round}] Reviewer: CHANGES REQUESTED — ${review.summary}`),
+          ? chalk.green.dim(
+              `[Round ${round}] Reviewer: APPROVED — ${review.summary}`,
+            )
+          : chalk.yellow.dim(
+              `[Round ${round}] Reviewer: CHANGES REQUESTED — ${review.summary}`,
+            ),
       );
 
-      this.log('reviewer', `Round ${round} review (${review.decision}):\n${review.summary}`);
+      this.log(
+        'reviewer',
+        `Round ${round} review (${review.decision}):\n${review.summary}`,
+      );
 
       if (review.decision === 'approved') break;
 
@@ -190,7 +211,8 @@ export class Orchestrator {
           ),
         );
         for (const c of review.comments) {
-          const prefix = c.severity === 'error' ? chalk.red('✗') : chalk.yellow('⚠');
+          const prefix =
+            c.severity === 'error' ? chalk.red('✗') : chalk.yellow('⚠');
           const file = c.file ? chalk.cyan(c.file) + ': ' : '';
           console.log(`  ${prefix} ${file}${c.message}`);
         }
@@ -215,7 +237,9 @@ export class Orchestrator {
         ),
       );
     } else {
-      console.log(chalk.green(`\n✓ Proposal approved after ${round} round(s).\n`));
+      console.log(
+        chalk.green(`\n✓ Proposal approved after ${round} round(s).\n`),
+      );
     }
 
     return {
@@ -296,7 +320,10 @@ export class Orchestrator {
    * Checks the proposal against configurable heuristic rules.  Replace with
    * a Gemini model call that returns a structured `Review` object.
    */
-  private async runReviewerRound(goal: string, proposal: Proposal): Promise<Review> {
+  private async runReviewerRound(
+    goal: string,
+    proposal: Proposal,
+  ): Promise<Review> {
     const comments: ReviewComment[] = [];
 
     // ── Heuristic review rules ────────────────────────────────────────────────
@@ -306,7 +333,8 @@ export class Orchestrator {
       comments.push({
         file: null,
         severity: 'error',
-        message: 'No files were produced. The coder must generate at least one file change.',
+        message:
+          'No files were produced. The coder must generate at least one file change.',
       });
     }
 
@@ -327,7 +355,9 @@ export class Orchestrator {
       .split(/\W+/)
       .filter((w) => w.length > 3);
 
-    const proposalText = (proposal.summary + proposal.files.map((f) => f.rationale).join(' ')).toLowerCase();
+    const proposalText = (
+      proposal.summary + proposal.files.map((f) => f.rationale).join(' ')
+    ).toLowerCase();
 
     const missingKeywords = goalKeywords.filter(
       (kw) => !proposalText.includes(kw),
@@ -381,14 +411,11 @@ export class Orchestrator {
 
   // ── Logging ───────────────────────────────────────────────────────────────
 
-  private log(
-    role: AgentMessage['role'],
-    content: string,
-  ): void {
+  private log(role: AgentMessage['role'], content: string): void {
     this.transcript.push({ role, content, timestamp: new Date() });
     if (!this.verbose) return;
 
-    const colours: Record<AgentMessage['role'], chalk.Chalk> = {
+    const colours: Record<AgentMessage['role'], typeof chalk> = {
       orchestrator: chalk.cyan,
       coder: chalk.blue,
       reviewer: chalk.yellow,

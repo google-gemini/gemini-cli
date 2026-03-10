@@ -120,7 +120,7 @@ export class MCPManager {
 
     const client = new Client(
       { name: 'gemini-cowork', version: '0.3.0' },
-      { capabilities: { tools: {} } },
+      { capabilities: {} },
     );
 
     const transport =
@@ -214,11 +214,14 @@ export class MCPManager {
       );
     }
 
-    const result = await server.client.callTool({ name: toolName, arguments: args });
+    const result = await server.client.callTool({
+      name: toolName,
+      arguments: args,
+    });
 
     return {
       content: Array.isArray(result.content) ? result.content : [],
-      isError: result.isError ?? false,
+      isError: !!result.isError,
     };
   }
 

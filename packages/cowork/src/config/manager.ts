@@ -96,15 +96,15 @@ const DEFAULT_CONFIG: CoworkConfig = {
   memory: false,
   dryRun: false,
   safety: {
-    allowedDirs: [],          // populated from projectRoot at load time
+    allowedDirs: [], // populated from projectRoot at load time
     deniedCommandPatterns: [
-      'rm\\s+-rf\\s+/',       // rm -rf /
-      'dd\\s+if=',            // dd if= (disk wipe)
-      ':\\s*\\(\\)\\s*\\{',  // fork bomb: :(){
-      'mkfs',                 // format disk
+      'rm\\s+-rf\\s+/', // rm -rf /
+      'dd\\s+if=', // dd if= (disk wipe)
+      ':\\s*\\(\\)\\s*\\{', // fork bomb: :(){
+      'mkfs', // format disk
       'shutdown',
       'reboot',
-      'curl.*\\|.*sh',        // pipe-to-shell
+      'curl.*\\|.*sh', // pipe-to-shell
       'wget.*\\|.*sh',
     ],
     maxWriteBytes: 512 * 1024,
@@ -133,7 +133,12 @@ export class ConfigManager {
 
   constructor(private readonly projectRoot: string) {
     this.projectRcPath = join(projectRoot, '.coworkrc');
-    this.userRcPath = join(homedir(), '.config', 'gemini-cowork', 'config.json');
+    this.userRcPath = join(
+      homedir(),
+      '.config',
+      'gemini-cowork',
+      'config.json',
+    );
   }
 
   // ── Read ──────────────────────────────────────────────────────────────────
@@ -185,7 +190,11 @@ export class ConfigManager {
   async save(partial: Partial<CoworkConfig>): Promise<void> {
     const existing = await this.readFile(this.projectRcPath);
     const updated = { ...existing, ...partial };
-    await writeFile(this.projectRcPath, JSON.stringify(updated, null, 2) + '\n', 'utf-8');
+    await writeFile(
+      this.projectRcPath,
+      JSON.stringify(updated, null, 2) + '\n',
+      'utf-8',
+    );
   }
 
   // ── Init wizard ───────────────────────────────────────────────────────────
@@ -204,6 +213,8 @@ export class ConfigManager {
    * when the `init` subcommand is explicitly invoked.
    */
   async runInitWizard(): Promise<CoworkConfig> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // @ts-ignore — inquirer is an optional dep without bundled types
     const { default: inquirer } = await import('inquirer').catch(() => {
       throw new Error(
         'The "init" wizard requires inquirer.\n' +
@@ -261,7 +272,8 @@ export class ConfigManager {
       {
         type: 'confirm',
         name: 'dryRun',
-        message: 'Enable dry-run mode by default (preview changes without applying)?',
+        message:
+          'Enable dry-run mode by default (preview changes without applying)?',
         default: current.dryRun,
       },
       {
@@ -289,13 +301,18 @@ export class ConfigManager {
       patch.apiKey = (answers.apiKey as string).trim();
     }
 
-    if (typeof answers.projectRules === 'string' && answers.projectRules.trim()) {
+    if (
+      typeof answers.projectRules === 'string' &&
+      answers.projectRules.trim()
+    ) {
       patch.projectRules = (answers.projectRules as string).trim();
     }
 
     await this.save(patch);
 
-    console.log(`\n${chalk.green('✓')} Config saved to ${chalk.white(this.projectRcPath)}`);
+    console.log(
+      `\n${chalk.green('✓')} Config saved to ${chalk.white(this.projectRcPath)}`,
+    );
     console.log(
       chalk.dim(
         'Tip: commit .coworkrc to share project settings with your team ' +
@@ -330,7 +347,10 @@ export class ConfigManager {
     const cfg = await this.get();
     console.log(chalk.cyan.bold('\nGemini Cowork — Resolved Configuration\n'));
 
-    const display = { ...cfg, apiKey: cfg.apiKey ? '*** (set)' : '(not set — use GEMINI_API_KEY)' };
+    const display = {
+      ...cfg,
+      apiKey: cfg.apiKey ? '*** (set)' : '(not set — use GEMINI_API_KEY)',
+    };
 
     for (const [k, v] of Object.entries(display)) {
       const val = typeof v === 'object' ? JSON.stringify(v) : String(v);

@@ -138,22 +138,26 @@ function buildCli(argv: string[]) {
             })
             .option('audit', {
               type: 'boolean',
-              describe: 'Write a tamper-proof SHA-256-chained audit log to .cowork/audit.ndjson',
+              describe:
+                'Write a tamper-proof SHA-256-chained audit log to .cowork/audit.ndjson',
               default: false,
             })
             .option('no-redact', {
               type: 'boolean',
-              describe: 'Disable automatic secret/PII redaction (not recommended)',
+              describe:
+                'Disable automatic secret/PII redaction (not recommended)',
               default: false,
             })
             .option('prune-context', {
               type: 'boolean',
-              describe: 'Prune redundant blocks from the 2M-token context to reduce latency',
+              describe:
+                'Prune redundant blocks from the 2M-token context to reduce latency',
               default: false,
             })
             .option('codeowners', {
               type: 'boolean',
-              describe: 'After modifying files, suggest reviewers from CODEOWNERS',
+              describe:
+                'After modifying files, suggest reviewers from CODEOWNERS',
               default: false,
             })
             .example(
@@ -178,9 +182,7 @@ function buildCli(argv: string[]) {
           if (args.dashboard) {
             dash = new DashboardServer();
             await dash.start();
-            console.log(
-              chalk.cyan(`\n[Dashboard] Running at ${dash.url}\n`),
-            );
+            console.log(chalk.cyan(`\n[Dashboard] Running at ${dash.url}\n`));
             // Open browser on macOS/Linux.
             const opener = process.platform === 'darwin' ? 'open' : 'xdg-open';
             const { spawnSync } = await import('node:child_process');
@@ -261,7 +263,8 @@ function buildCli(argv: string[]) {
             .positional('goal', {
               type: 'string',
               describe: 'Goal to implement and review',
-              default: 'Implement the requested feature with full test coverage.',
+              default:
+                'Implement the requested feature with full test coverage.',
             })
             .option('root', {
               alias: 'r',
@@ -301,7 +304,11 @@ function buildCli(argv: string[]) {
           try {
             const result = await orch.orchestrate(args.goal);
             if (result.approved) {
-              console.log(chalk.green(`\n✓ Proposal approved after ${result.rounds} round(s).`));
+              console.log(
+                chalk.green(
+                  `\n✓ Proposal approved after ${result.rounds} round(s).`,
+                ),
+              );
             } else {
               console.log(
                 chalk.yellow(
@@ -343,24 +350,47 @@ function buildCli(argv: string[]) {
               normalize: true,
             }),
         async (args) => {
-          const { SessionManager } = await import('./collaboration/session-manager.js');
-          const mgr = new SessionManager(args.root as string);
+          const { SessionManager } = await import(
+            './collaboration/session-manager.js'
+          );
+          const mgr = new SessionManager();
 
           if (args.action === 'export') {
-            const out = await mgr.export({}, {}, args.file as string | undefined);
+            // Build a minimal AgentMemory stub for standalone CLI export
+            const stubMemory = {
+              goal: '(exported from CLI)',
+              projectRoot: args.root as string,
+              packageJson: null as null,
+              fileTree: [] as string[],
+              history: [] as import('./agent/core.js').AgentStep[],
+              contextSummary: null as null,
+              visionEnabled: false,
+            };
+            const defaultPath = `${args.root}/.cowork/session-${Date.now()}.cowork-session`;
+            const out = await mgr.export(
+              stubMemory,
+              {},
+              (args.file as string | undefined) ?? defaultPath,
+            );
             console.log(chalk.green(`\n✓ Session exported to: ${out}`));
           } else if (args.action === 'import') {
             if (!args.file) {
-              console.error(chalk.red('Error: --file <path> is required for import'));
+              console.error(
+                chalk.red('Error: --file <path> is required for import'),
+              );
               process.exit(1);
             }
             const result = await mgr.import(args.file as string);
             console.log(mgr.formatSummary(result.session));
             if (result.warnings.length > 0) {
-              result.warnings.forEach((w) => console.warn(chalk.yellow(`⚠ ${w}`)));
+              result.warnings.forEach((w) =>
+                console.warn(chalk.yellow(`⚠ ${w}`)),
+              );
             }
           } else {
-            console.log(chalk.cyan('cowork session <export|import|info> [--file <path>]'));
+            console.log(
+              chalk.cyan('cowork session <export|import|info> [--file <path>]'),
+            );
           }
         },
       )
@@ -412,21 +442,29 @@ function buildCli(argv: string[]) {
             }
           } else if (args.action === 'add') {
             if (!args.original || !args.correction) {
-              console.error(chalk.red('Error: --original and --correction are required'));
+              console.error(
+                chalk.red('Error: --original and --correction are required'),
+              );
               process.exit(1);
             }
             const pair = await fc.record({
+              goal: '(recorded via CLI)',
+              context: '',
+              accepted: true,
               original: args.original as string,
               correction: args.correction as string,
-              category: (args.category as string) as never,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              category: args.category as string as any,
             });
             console.log(chalk.green(`\n✓ Feedback recorded: ${pair.id}`));
           } else if (args.action === 'stats') {
             const s = await fc.stats();
+            const total = Object.values(s).reduce((a, b) => a + (b ?? 0), 0);
             console.log(chalk.cyan('\nFeedback dataset stats:'));
-            console.log(`  Total pairs : ${s.total}`);
-            console.log(`  Accepted    : ${s.accepted}`);
-            console.log(`  Rejected    : ${s.rejected}`);
+            console.log(`  Total pairs : ${total}`);
+            Object.entries(s).forEach(([cat, count]) => {
+              console.log(`  ${cat.padEnd(12)}: ${count}`);
+            });
           } else if (args.action === 'clear') {
             const { rm } = await import('node:fs/promises');
             await rm(`${args.root}/.cowork/feedback.jsonl`, { force: true });
@@ -464,10 +502,21 @@ function buildCli(argv: string[]) {
             console.log(chalk.cyan('Verifying audit log integrity…'));
             const result = await log.verify();
             if (result.valid) {
-              console.log(chalk.green(`\n✓ Audit log is intact. ${result.entries} entries verified.`));
+              console.log(
+                chalk.green(
+                  `\n✓ Audit log is intact. ${result.totalEntries} entries verified.`,
+                ),
+              );
             } else {
-              console.error(chalk.red(`\n✗ Audit log TAMPERED at entry #${result.firstInvalidAt}`));
-              console.error(chalk.red(`  ${result.error}`));
+              const first = result.brokenLinks[0];
+              console.error(
+                chalk.red(
+                  `\n✗ Audit log TAMPERED at entry #${first?.seq ?? '?'}`,
+                ),
+              );
+              console.error(
+                chalk.red(`  ${first?.reason ?? 'Hash chain broken'}`),
+              );
               process.exit(2);
             }
           } else if (args.action === 'export') {
@@ -476,7 +525,11 @@ function buildCli(argv: string[]) {
             if (args.out) {
               const { writeFile } = await import('node:fs/promises');
               await writeFile(args.out as string, json, 'utf8');
-              console.log(chalk.green(`✓ Exported ${entries.length} entries to ${args.out}`));
+              console.log(
+                chalk.green(
+                  `✓ Exported ${entries.length} entries to ${args.out}`,
+                ),
+              );
             } else {
               console.log(json);
             }
@@ -488,15 +541,16 @@ function buildCli(argv: string[]) {
       )
 
       // ── global options ───────────────────────────────────────────────────
-      .option('version', {
-        alias: 'v',
-        description: 'Show version number',
-      })
+      .version('0.5.0')
+      .alias('version', 'v')
       .help('help')
       .alias('help', 'h')
       .strict()
-      .wrap(Math.min(100, (process.stdout.columns ?? 100)))
-      .demandCommand(1, chalk.yellow('Please specify a command. Try: cowork run --help'))
+      .wrap(Math.min(100, process.stdout.columns ?? 100))
+      .demandCommand(
+        1,
+        chalk.yellow('Please specify a command. Try: cowork run --help'),
+      )
       .epilog(
         chalk.dim(
           'Docs: https://github.com/google-gemini/gemini-cli\n' +
@@ -523,7 +577,12 @@ if (isMain) {
 
 // ── Agent ───────────────────────────────────────────────────────────────────
 export { Coworker } from './agent/core.js';
-export type { AgentMemory, AgentStep, CoworkerOptions, ToolCall } from './agent/core.js';
+export type {
+  AgentMemory,
+  AgentStep,
+  CoworkerOptions,
+  ToolCall,
+} from './agent/core.js';
 
 export { ProjectIndexer } from './agent/context-manager.js';
 export type { FileEntry, ProjectContext } from './agent/context-manager.js';
@@ -564,7 +623,11 @@ export { ConfigManager } from './config/manager.js';
 export type { CoworkConfig, SafetyPolicy } from './config/manager.js';
 
 // ── Phase 4: Sandbox ─────────────────────────────────────────────────────────
-export { SafetyPolicy as SafetyPolicyEngine, SandboxRunner, PolicyViolation } from './sandbox/policy.js';
+export {
+  SafetyPolicy as SafetyPolicyEngine,
+  SandboxRunner,
+  PolicyViolation,
+} from './sandbox/policy.js';
 export type { SandboxRunnerOptions, SandboxResult } from './sandbox/policy.js';
 
 // ── Phase 4: Multi-Agent ─────────────────────────────────────────────────────
@@ -582,10 +645,19 @@ export type {
 
 // ── Phase 4: Dashboard ───────────────────────────────────────────────────────
 export { DashboardServer } from './dashboard/server.js';
-export type { DashboardEvent, DashboardEventType, TokenUsageStats } from './dashboard/server.js';
+export type {
+  DashboardEvent,
+  DashboardEventType,
+  TokenUsageStats,
+} from './dashboard/server.js';
 
 // ── Phase 4: Dry-run ─────────────────────────────────────────────────────────
-export { dryRunWriteFile, dryRunShellRun, computeFileDiff, renderFileDiff } from './tools/dry-run.js';
+export {
+  dryRunWriteFile,
+  dryRunShellRun,
+  computeFileDiff,
+  renderFileDiff,
+} from './tools/dry-run.js';
 export type { DiffLine, FileDiff } from './tools/dry-run.js';
 
 // ── Phase 5: Optimizer ───────────────────────────────────────────────────────
@@ -630,7 +702,10 @@ export type {
   SessionPayload,
 } from './collaboration/session-manager.js';
 
-export { CodeownersParser, ReviewerSuggester } from './collaboration/codeowners.js';
+export {
+  CodeownersParser,
+  ReviewerSuggester,
+} from './collaboration/codeowners.js';
 export type {
   CodeOwnerRule,
   FileOwnership,

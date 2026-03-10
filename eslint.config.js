@@ -38,6 +38,9 @@ export default tseslint.config(
       'dist/**',
       'evals/**',
       'packages/test-utils/**',
+      // Gemini Cowork packages — independent workspaces with separate configs
+      'packages/cowork/**',
+      'packages/desktop/**',
     ],
   },
   eslint.configs.recommended,

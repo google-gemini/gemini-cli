@@ -53,6 +53,7 @@ async function captureUrl(url: string): Promise<ImageCapture> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let puppeteer: any;
   try {
+    // @ts-expect-error — puppeteer is an optional peer dep; resolved at runtime
     puppeteer = await import('puppeteer');
   } catch {
     throw new Error(
@@ -76,7 +77,10 @@ async function captureUrl(url: string): Promise<ImageCapture> {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 30_000 });
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
-    const data: Buffer = await page.screenshot({ type: 'png', fullPage: false });
+    const data: Buffer = await page.screenshot({
+      type: 'png',
+      fullPage: false,
+    });
     return { data, mimeType: 'image/png' };
   } finally {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
@@ -120,7 +124,9 @@ async function captureDesktop(): Promise<ImageCapture> {
       if (code === 0) resolve();
       else
         reject(
-          new Error(`Desktop screenshot command exited with code ${String(code)}`),
+          new Error(
+            `Desktop screenshot command exited with code ${String(code)}`,
+          ),
         );
     });
     child.on('error', reject);
