@@ -646,26 +646,6 @@ describe('Composer', () => {
       expect(lastFrame()).toMatch(/ShellModeIndic[\s\S]*tor/);
     });
 
-    it('shows RawMarkdownIndicator when renderMarkdown is false', async () => {
-      const uiState = createMockUIState({
-        renderMarkdown: false,
-      });
-
-      const { lastFrame } = await renderComposer(uiState);
-
-      expect(lastFrame()).toContain('raw markdown mode');
-    });
-
-    it('does not show RawMarkdownIndicator when renderMarkdown is true', async () => {
-      const uiState = createMockUIState({
-        renderMarkdown: true,
-      });
-
-      const { lastFrame } = await renderComposer(uiState);
-
-      expect(lastFrame()).not.toContain('raw markdown mode');
-    });
-
     it.each([
       [ApprovalMode.YOLO, 'YOLO'],
       [ApprovalMode.PLAN, 'plan'],

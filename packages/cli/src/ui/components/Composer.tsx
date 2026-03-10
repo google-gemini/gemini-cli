@@ -17,7 +17,6 @@ import { ToastDisplay, shouldShowToast } from './ToastDisplay.js';
 import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
-import { RawMarkdownIndicator } from './RawMarkdownIndicator.js';
 import { ShortcutsHint } from './ShortcutsHint.js';
 import { ShortcutsHelp } from './ShortcutsHelp.js';
 import { InputPrompt } from './InputPrompt.js';
@@ -114,7 +113,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     suggestionsVisible && suggestionsPosition === 'above';
   const showApprovalIndicator =
     !uiState.shellModeActive && !hideUiDetailsForSuggestions;
-  const showRawMarkdownIndicator = !uiState.renderMarkdown;
   let modeBleedThrough: { text: string; color: string } | null = null;
   switch (showApprovalModeIndicator) {
     case ApprovalMode.YOLO:
@@ -376,26 +374,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                           marginTop={showApprovalIndicator && isNarrow ? 1 : 0}
                         >
                           <ShellModeIndicator />
-                        </Box>
-                      )}
-                      {showRawMarkdownIndicator && (
-                        <Box
-                          marginLeft={
-                            (showApprovalIndicator ||
-                              uiState.shellModeActive) &&
-                            !isNarrow
-                              ? 1
-                              : 0
-                          }
-                          marginTop={
-                            (showApprovalIndicator ||
-                              uiState.shellModeActive) &&
-                            !isNarrow
-                              ? 1
-                              : 0
-                          }
-                        >
-                          <RawMarkdownIndicator />
                         </Box>
                       )}
                     </>
