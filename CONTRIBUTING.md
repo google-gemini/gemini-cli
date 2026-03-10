@@ -108,6 +108,19 @@ assign or unassign the issue as requested, provided the conditions are met
 Please note that you can have a maximum of 3 issues assigned to you at any given
 time.
 
+#### Community guidelines for issue assignment
+
+- **If you file an issue:** Please indicate in your issue whether you intend to
+  work on it once it receives the `help-wanted` label. This helps other
+  contributors know your plans.
+
+- **Look out for each other:** Before self-assigning an issue, check if someone
+  has already done significant work (e.g., detailed investigation, linked a
+  draft PR) or has clearly communicated their intent to contribute. If so,
+  please respect their effort and allow them the opportunity to complete the
+  work. Not everything needs a hard rule—we can show compassion and
+  understanding toward fellow contributors.
+
 ### Pull request guidelines
 
 To help us review and merge your PRs quickly, please follow these guidelines.
