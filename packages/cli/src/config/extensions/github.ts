@@ -203,6 +203,24 @@ export async function checkForExtensionUpdate(
   ) {
     return ExtensionUpdateState.NOT_UPDATABLE;
   }
+
+  if (extension.migratedTo) {
+    const migratedState = await checkForExtensionUpdate(
+      {
+        ...extension,
+        installMetadata: { ...installMetadata, source: extension.migratedTo },
+        migratedTo: undefined,
+      },
+      extensionManager,
+    );
+    if (
+      migratedState === ExtensionUpdateState.UPDATE_AVAILABLE ||
+      migratedState === ExtensionUpdateState.UP_TO_DATE
+    ) {
+      return ExtensionUpdateState.UPDATE_AVAILABLE;
+    }
+  }
+
   try {
     if (installMetadata.type === 'git') {
       const git = simpleGit(extension.path);
