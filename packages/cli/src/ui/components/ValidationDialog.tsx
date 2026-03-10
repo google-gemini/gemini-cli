@@ -136,7 +136,7 @@ export function ValidationDialog({
           <CliSpinner />
           <Text>
             {' '}
-            Waiting for verification... (Press ESC or CTRL+C to cancel)
+            Waiting for verification... (Press Esc or Ctrl+C to cancel)
           </Text>
         </Box>
         {errorMessage && (
