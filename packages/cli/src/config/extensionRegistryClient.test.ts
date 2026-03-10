@@ -18,7 +18,7 @@ import {
   ExtensionRegistryClient,
   type RegistryExtension,
 } from './extensionRegistryClient.js';
-import { fetchWithTimeout } from '@google/gemini-cli-core';
+import { fetchWithTimeout, resolveToRealPath } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -298,7 +298,10 @@ describe('ExtensionRegistryClient', () => {
 
     const result = await clientWithFile.getExtensions();
     expect(result.extensions).toHaveLength(3);
-    expect(mockReadFile).toHaveBeenCalledWith(filePath, 'utf-8');
+    expect(mockReadFile).toHaveBeenCalledWith(
+      resolveToRealPath(filePath),
+      'utf-8',
+    );
   });
 
   it('should fetch extensions from a file:// URL', async () => {
@@ -309,9 +312,8 @@ describe('ExtensionRegistryClient', () => {
 
     const result = await clientWithFileUrl.getExtensions();
     expect(result.extensions).toHaveLength(3);
-    // On Unix, file:///path/to/extensions.json -> /path/to/extensions.json
     expect(mockReadFile).toHaveBeenCalledWith(
-      '/path/to/extensions.json',
+      resolveToRealPath(fileUrl),
       'utf-8',
     );
   });
