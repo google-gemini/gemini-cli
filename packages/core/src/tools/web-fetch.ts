@@ -185,6 +185,16 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     super(params, messageBus, _toolName, _toolDisplayName);
   }
 
+  private handleRetry(attempt: number, error: unknown, delayMs: number): void {
+    coreEvents.emitRetryAttempt({
+      attempt,
+      maxAttempts: this.config.getMaxAttempts(),
+      delayMs,
+      error: error instanceof Error ? error.message : String(error),
+      model: 'Web Fetch',
+    });
+  }
+
   private async executeFallback(signal: AbortSignal): Promise<ToolResult> {
     const { validUrls: urls } = parsePrompt(this.params.prompt!);
     // For now, we only support one URL for fallback
@@ -213,15 +223,8 @@ class WebFetchToolInvocation extends BaseToolInvocation<
         },
         {
           retryFetchErrors: this.config.getRetryFetchErrors(),
-          onRetry: (attempt, error, delayMs) => {
-            coreEvents.emitRetryAttempt({
-              attempt,
-              maxAttempts: this.config.getMaxAttempts(),
-              delayMs,
-              error: error instanceof Error ? error.message : String(error),
-              model: 'Web Fetch',
-            });
-          },
+          onRetry: (attempt, error, delayMs) =>
+            this.handleRetry(attempt, error, delayMs),
         },
       );
 
@@ -415,15 +418,8 @@ ${textContent}
         },
         {
           retryFetchErrors: this.config.getRetryFetchErrors(),
-          onRetry: (attempt, error, delayMs) => {
-            coreEvents.emitRetryAttempt({
-              attempt,
-              maxAttempts: this.config.getMaxAttempts(),
-              delayMs,
-              error: error instanceof Error ? error.message : String(error),
-              model: 'Web Fetch',
-            });
-          },
+          onRetry: (attempt, error, delayMs) =>
+            this.handleRetry(attempt, error, delayMs),
         },
       );
 
