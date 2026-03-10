@@ -143,6 +143,10 @@ export class Storage {
     return path.join(Storage.getGlobalTempDir(), BIN_DIR_NAME);
   }
 
+  static getProfilesDir(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'profiles');
+  }
+
   getGeminiDir(): string {
     return path.join(this.targetDir, GEMINI_DIR);
   }

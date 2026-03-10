@@ -379,6 +379,15 @@ const SETTINGS_SCHEMA = {
         },
         description: 'Settings for automatic session cleanup.',
       },
+      activeProfile: {
+        type: 'string',
+        label: 'Active Profile',
+        category: 'General',
+        requiresRestart: true,
+        default: undefined as string | undefined,
+        description: 'The name of the currently active profile.',
+        showInDialog: false,
+      },
     },
   },
   output: {

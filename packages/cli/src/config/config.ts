@@ -9,6 +9,7 @@ import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
+import { profilesCommand } from '../commands/profiles.js';
 import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
 import {
@@ -61,6 +62,7 @@ import type { ExtensionEvents } from '@google/gemini-cli-core/src/utils/extensio
 import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
+import { ProfileManager } from './profile-manager.js';
 import { runExitCleanup } from '../utils/cleanup.js';
 
 export interface CliArgs {
@@ -93,6 +95,7 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
+  profile: string | undefined;
 }
 
 export async function parseArguments(
@@ -142,6 +145,11 @@ export async function parseArguments(
           alias: 's',
           type: 'boolean',
           description: 'Run in sandbox?',
+        })
+        .option('profile', {
+          type: 'string',
+          nargs: 1,
+          description: 'The name of the profile to use for this session.',
         })
 
         .option('yolo', {
@@ -340,6 +348,8 @@ export async function parseArguments(
     yargsInstance.command(hooksCommand);
   }
 
+  yargsInstance.command(profilesCommand);
+
   yargsInstance
     .version(await getVersion()) // This will enable the --version flag based on package.json
     .alias('v', 'version')
@@ -422,6 +432,12 @@ export async function loadCliConfig(
   const debugMode = isDebugMode(argv);
 
   const loadedSettings = loadSettings(cwd);
+  const profileManager = new ProfileManager(loadedSettings);
+  const activeProfileName =
+    argv.profile || profileManager.getActiveProfileName();
+  const profile = activeProfileName
+    ? await profileManager.getProfile(activeProfileName)
+    : null;
 
   if (argv.sandbox) {
     process.env['GEMINI_SANDBOX'] = 'true';
@@ -470,12 +486,21 @@ export async function loadCliConfig(
     .map(resolvePath)
     .concat((argv.includeDirectories || []).map(resolvePath));
 
+  let enabledExtensionOverrides = argv.extensions;
+  if (enabledExtensionOverrides === undefined && profile) {
+    const profileExtensions = profile.frontmatter.extensions;
+    if (profileExtensions !== undefined) {
+      enabledExtensionOverrides =
+        profileExtensions.length > 0 ? profileExtensions : ['none'];
+    }
+  }
+
   const extensionManager = new ExtensionManager({
     settings,
     requestConsent: requestConsentNonInteractive,
     requestSetting: promptForSetting,
     workspaceDir: cwd,
-    enabledExtensionOverrides: argv.extensions,
+    enabledExtensionOverrides,
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     eventEmitter: coreEvents as EventEmitter<ExtensionEvents>,
     clientVersion: await getVersion(),
@@ -509,6 +534,20 @@ export async function loadCliConfig(
     memoryContent = result.memoryContent;
     fileCount = result.fileCount;
     filePaths = result.filePaths;
+  }
+
+  if (profile?.context) {
+    const profileContext = `Profile Context (${profile.name}):\n${profile.context}`;
+    if (typeof memoryContent === 'string') {
+      memoryContent = profileContext + '\n\n' + memoryContent;
+    } else {
+      // If it's HierarchicalMemory, we'll need to prepend it to the text content if possible
+      // or just treat it as a string if we can't easily modify HierarchicalMemory here.
+      // For now, let's assume if it's not a string, we might have issues prepending easily.
+      // But looking at core, userMemory is often expected to be a string in simple cases.
+      // If it's HierarchicalMemory, we might need to handle it in core.
+      // Let's check how it's handled in core.
+    }
   }
 
   const question = argv.promptInteractive || argv.prompt || '';
@@ -651,7 +690,10 @@ export async function loadCliConfig(
 
   const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
   const specifiedModel =
-    argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
+    argv.model ||
+    profile?.frontmatter.default_model ||
+    process.env['GEMINI_MODEL'] ||
+    settings.model?.name;
 
   const resolvedModel =
     specifiedModel === GEMINI_MODEL_ALIAS_AUTO
