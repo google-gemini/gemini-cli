@@ -31,7 +31,7 @@ export interface MessageActionReturn {
 export interface LoadHistoryActionReturn<HistoryType = unknown> {
   type: 'load_history';
   history: HistoryType;
-  clientHistory: Content[]; // The history for the generative client
+  clientHistory: readonly Content[]; // The history for the generative client
 }
 
 /**

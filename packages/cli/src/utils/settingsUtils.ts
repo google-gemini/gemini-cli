@@ -264,6 +264,53 @@ export function isInSettingsScope(
   return value !== undefined;
 }
 
+ feat/architecture-map
+
+/**
+ * Appends a star (*) to settings that exist in the scope
+ */
+export function getDisplayValue(
+  key: string,
+  scopeSettings: Settings,
+  _mergedSettings: Settings,
+): string {
+  const definition = getSettingDefinition(key);
+  const existsInScope = isInSettingsScope(key, scopeSettings);
+
+  let value: SettingsValue;
+  if (existsInScope) {
+    value = getEffectiveValue(key, scopeSettings);
+  } else {
+    value = getDefaultValue(key);
+  }
+
+  let valueString = String(value);
+
+  // Handle object types by stringifying them
+  if (
+    definition?.type === 'object' &&
+    value !== null &&
+    typeof value === 'object'
+  ) {
+    valueString = JSON.stringify(value);
+  } else if (definition?.type === 'enum' && definition.options) {
+    const option = definition.options?.find((option) => option.value === value);
+    valueString = option?.label ?? `${value}`;
+  }
+
+  if (definition?.unit === '%' && typeof value === 'number') {
+    valueString = `${value} (${Math.round(value * 100)}%)`;
+  } else if (definition?.unit) {
+    valueString = `${valueString}${definition.unit}`;
+  }
+  if (existsInScope) {
+    return `${valueString}*`;
+  }
+
+  return valueString;
+}
+
+ main
 /**Utilities for parsing Settings that can be inline edited by the user typing out values */
 function tryParseJsonStringArray(input: string): string[] | null {
   try {

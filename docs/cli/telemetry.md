@@ -339,6 +339,12 @@ Captures startup configuration and user prompt submissions.
     - `mcp_tools` (string, if applicable)
     - `mcp_tools_count` (int, if applicable)
     - `output_format` ("text", "json", or "stream-json")
+    - `github_workflow_name` (string, optional)
+    - `github_repository_hash` (string, optional)
+    - `github_event_name` (string, optional)
+    - `github_pr_number` (string, optional)
+    - `github_issue_number` (string, optional)
+    - `github_custom_tracking_id` (string, optional)
 
 - `gemini_cli.user_prompt`: Emitted when a user submits a prompt.
   - **Attributes**:
