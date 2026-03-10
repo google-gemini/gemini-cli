@@ -48,7 +48,12 @@ export const McpStatus: React.FC<McpStatusProps> = ({
   showDescriptions,
   showSchema,
 }) => {
-  const serverNames = Object.keys(servers);
+  const serverNames = Object.keys(servers).filter(
+    (serverName) =>
+      !blockedServers.some(
+        (blockedServer) => blockedServer.name === serverName,
+      ),
+  );
 
   if (serverNames.length === 0 && blockedServers.length === 0) {
     return (
@@ -82,7 +87,6 @@ export const McpStatus: React.FC<McpStatusProps> = ({
 
       <Text bold>Configured MCP servers:</Text>
       <Box height={1} />
-
       {serverNames.map((serverName) => {
         const server = servers[serverName];
         const serverTools = tools.filter(
