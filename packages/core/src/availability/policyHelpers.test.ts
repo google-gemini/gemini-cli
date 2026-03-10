@@ -16,6 +16,7 @@ import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL_AUTO,
   PREVIEW_GEMINI_3_1_MODEL,
 } from '../config/models.js';
 import { AuthType } from '../core/contentGenerator.js';
@@ -141,10 +142,31 @@ describe('policyHelpers', () => {
       expect(chain[1]?.model).toBe('gemini-2.5-flash');
     });
 
+    it('proactively returns Gemini 2.5 chain if auto-gemini-3.1 is requested but user lacks access', () => {
+      const config = createMockConfig({
+        getModel: () => PREVIEW_GEMINI_3_1_MODEL_AUTO,
+        getHasAccessToPreviewModel: () => false,
+      });
+      const chain = resolvePolicyChain(config);
+
+      expect(chain).toHaveLength(2);
+      expect(chain[0]?.model).toBe('gemini-2.5-pro');
+      expect(chain[1]?.model).toBe('gemini-2.5-flash');
+    });
+
     it('returns Gemini 3.1 Pro chain when launched and auto-gemini-3 requested', () => {
       const config = createMockConfig({
         getModel: () => 'auto-gemini-3',
         getGemini31LaunchedSync: () => true,
+      });
+      const chain = resolvePolicyChain(config);
+      expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_MODEL);
+      expect(chain[1]?.model).toBe('gemini-3-flash-preview');
+    });
+
+    it('returns Gemini 3.1 Pro chain when auto-gemini-3.1 is requested even if launch flag is false', () => {
+      const config = createMockConfig({
+        getModel: () => PREVIEW_GEMINI_3_1_MODEL_AUTO,
       });
       const chain = resolvePolicyChain(config);
       expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_MODEL);

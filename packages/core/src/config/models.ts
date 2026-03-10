@@ -9,6 +9,7 @@ export const PREVIEW_GEMINI_3_1_MODEL = 'gemini-3.1-pro-preview';
 export const PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL =
   'gemini-3.1-pro-preview-customtools';
 export const PREVIEW_GEMINI_FLASH_MODEL = 'gemini-3-flash-preview';
+export const PREVIEW_GEMINI_3_1_MODEL_AUTO = 'auto-gemini-3.1';
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
@@ -55,10 +56,15 @@ export function resolveModel(
   let resolved: string;
   switch (requestedModel) {
     case PREVIEW_GEMINI_MODEL:
+    case PREVIEW_GEMINI_3_1_MODEL_AUTO:
     case PREVIEW_GEMINI_MODEL_AUTO:
     case GEMINI_MODEL_ALIAS_AUTO:
     case GEMINI_MODEL_ALIAS_PRO: {
       if (useGemini3_1) {
+        resolved = useCustomToolModel
+          ? PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
+          : PREVIEW_GEMINI_3_1_MODEL;
+      } else if (requestedModel === PREVIEW_GEMINI_3_1_MODEL_AUTO) {
         resolved = useCustomToolModel
           ? PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
           : PREVIEW_GEMINI_3_1_MODEL;
@@ -143,6 +149,8 @@ export function getDisplayString(model: string) {
   switch (model) {
     case PREVIEW_GEMINI_MODEL_AUTO:
       return 'Auto (Gemini 3)';
+    case PREVIEW_GEMINI_3_1_MODEL_AUTO:
+      return 'Auto (Gemini 3.1)';
     case DEFAULT_GEMINI_MODEL_AUTO:
       return 'Auto (Gemini 2.5)';
     case GEMINI_MODEL_ALIAS_PRO:
@@ -168,6 +176,7 @@ export function isPreviewModel(model: string): boolean {
     model === PREVIEW_GEMINI_3_1_MODEL ||
     model === PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL ||
     model === PREVIEW_GEMINI_FLASH_MODEL ||
+    model === PREVIEW_GEMINI_3_1_MODEL_AUTO ||
     model === PREVIEW_GEMINI_MODEL_AUTO ||
     model === GEMINI_MODEL_ALIAS_AUTO
   );
@@ -237,6 +246,7 @@ export function isAutoModel(model: string): boolean {
   return (
     model === GEMINI_MODEL_ALIAS_AUTO ||
     model === PREVIEW_GEMINI_MODEL_AUTO ||
+    model === PREVIEW_GEMINI_3_1_MODEL_AUTO ||
     model === DEFAULT_GEMINI_MODEL_AUTO
   );
 }

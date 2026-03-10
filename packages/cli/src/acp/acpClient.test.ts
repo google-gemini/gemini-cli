@@ -99,6 +99,13 @@ vi.mock(
     const actual = await importOriginal();
     return {
       ...actual,
+      PREVIEW_GEMINI_3_1_MODEL_AUTO: 'auto-gemini-3.1',
+      getDisplayString: vi.fn((model: string) => {
+        if (model === 'auto-gemini-3.1') {
+          return 'Auto (Gemini 3.1)';
+        }
+        return actual.getDisplayString(model);
+      }),
       ReadManyFilesTool: vi.fn().mockImplementation(() => ({
         name: 'read_many_files',
         kind: 'read',
@@ -383,6 +390,10 @@ describe('GeminiAgent', () => {
         expect.objectContaining({
           modelId: 'auto-gemini-3',
           name: expect.stringContaining('Auto'),
+        }),
+        expect.objectContaining({
+          modelId: 'auto-gemini-3.1',
+          name: 'Auto (Gemini 3.1)',
         }),
         expect.objectContaining({
           modelId: 'gemini-3.1-pro-preview',

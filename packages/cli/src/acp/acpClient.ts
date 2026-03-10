@@ -43,6 +43,7 @@ import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL_AUTO,
   PREVIEW_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   PREVIEW_GEMINI_MODEL_AUTO,
@@ -1595,13 +1596,21 @@ function buildAvailableModels(
   ];
 
   if (shouldShowPreviewModels) {
-    mainOptions.unshift({
-      value: PREVIEW_GEMINI_MODEL_AUTO,
-      title: getDisplayString(PREVIEW_GEMINI_MODEL_AUTO),
-      description: useGemini31
-        ? 'Let Gemini CLI decide the best model for the task: gemini-3.1-pro, gemini-3-flash'
-        : 'Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash',
-    });
+    mainOptions.unshift(
+      {
+        value: PREVIEW_GEMINI_3_1_MODEL_AUTO,
+        title: getDisplayString(PREVIEW_GEMINI_3_1_MODEL_AUTO),
+        description:
+          'Let Gemini CLI decide the best model for the task: gemini-3.1-pro, gemini-3-flash',
+      },
+      {
+        value: PREVIEW_GEMINI_MODEL_AUTO,
+        title: getDisplayString(PREVIEW_GEMINI_MODEL_AUTO),
+        description: useGemini31
+          ? 'Let Gemini CLI decide the best model for the task: gemini-3.1-pro, gemini-3-flash'
+          : 'Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash',
+      },
+    );
   }
 
   const manualOptions = [

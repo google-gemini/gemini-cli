@@ -28,6 +28,7 @@ import {
   isActiveModel,
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL_AUTO,
   isPreviewModel,
   isProModel,
 } from './models.js';
@@ -39,6 +40,7 @@ describe('isPreviewModel', () => {
     expect(isPreviewModel(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL)).toBe(true);
     expect(isPreviewModel(PREVIEW_GEMINI_FLASH_MODEL)).toBe(true);
     expect(isPreviewModel(PREVIEW_GEMINI_MODEL_AUTO)).toBe(true);
+    expect(isPreviewModel(PREVIEW_GEMINI_3_1_MODEL_AUTO)).toBe(true);
   });
 
   it('should return false for non-preview models', () => {
@@ -115,6 +117,7 @@ describe('isGemini3Model', () => {
     expect(isGemini3Model(GEMINI_MODEL_ALIAS_AUTO)).toBe(true);
     expect(isGemini3Model(GEMINI_MODEL_ALIAS_PRO)).toBe(true);
     expect(isGemini3Model(PREVIEW_GEMINI_MODEL_AUTO)).toBe(true);
+    expect(isGemini3Model(PREVIEW_GEMINI_3_1_MODEL_AUTO)).toBe(true);
   });
 
   it('should return false for Gemini 2 models', () => {
@@ -131,6 +134,12 @@ describe('isGemini3Model', () => {
 describe('getDisplayString', () => {
   it('should return Auto (Gemini 3) for preview auto model', () => {
     expect(getDisplayString(PREVIEW_GEMINI_MODEL_AUTO)).toBe('Auto (Gemini 3)');
+  });
+
+  it('should return Auto (Gemini 3.1) for explicit Gemini 3.1 auto model', () => {
+    expect(getDisplayString(PREVIEW_GEMINI_3_1_MODEL_AUTO)).toBe(
+      'Auto (Gemini 3.1)',
+    );
   });
 
   it('should return Auto (Gemini 2.5) for default auto model', () => {
@@ -184,6 +193,16 @@ describe('resolveModel', () => {
     it('should return the Preview Pro model when auto-gemini-3 is requested', () => {
       const model = resolveModel(PREVIEW_GEMINI_MODEL_AUTO);
       expect(model).toBe(PREVIEW_GEMINI_MODEL);
+    });
+
+    it('should return Gemini 3.1 Pro when auto-gemini-3.1 is requested', () => {
+      const model = resolveModel(PREVIEW_GEMINI_3_1_MODEL_AUTO);
+      expect(model).toBe(PREVIEW_GEMINI_3_1_MODEL);
+    });
+
+    it('should return Gemini 3.1 Pro Custom Tools when auto-gemini-3.1 is requested and useCustomToolModel is true', () => {
+      const model = resolveModel(PREVIEW_GEMINI_3_1_MODEL_AUTO, false, true);
+      expect(model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
     });
 
     it('should return Gemini 3.1 Pro when auto-gemini-3 is requested and useGemini3_1 is true', () => {
@@ -248,6 +267,12 @@ describe('resolveModel', () => {
         DEFAULT_GEMINI_MODEL,
       );
     });
+
+    it('should return default model when access to preview is false and auto-gemini-3.1 is requested', () => {
+      expect(
+        resolveModel(PREVIEW_GEMINI_3_1_MODEL_AUTO, false, false, false),
+      ).toBe(DEFAULT_GEMINI_MODEL);
+    });
   });
 });
 
@@ -284,6 +309,10 @@ describe('isAutoModel', () => {
 
   it('should return true for "auto-gemini-3"', () => {
     expect(isAutoModel(PREVIEW_GEMINI_MODEL_AUTO)).toBe(true);
+  });
+
+  it('should return true for "auto-gemini-3.1"', () => {
+    expect(isAutoModel(PREVIEW_GEMINI_3_1_MODEL_AUTO)).toBe(true);
   });
 
   it('should return true for "auto-gemini-2.5"', () => {

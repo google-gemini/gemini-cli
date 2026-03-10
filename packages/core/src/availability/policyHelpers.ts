@@ -22,6 +22,9 @@ import {
 import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL,
+  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL_AUTO,
   PREVIEW_GEMINI_MODEL_AUTO,
   isAutoModel,
   isGemini3Model,
@@ -54,6 +57,12 @@ export function resolvePolicyChain(
     useCustomToolModel,
     hasAccessToPreview,
   );
+  const isExplicit31AutoRequest =
+    modelFromConfig === PREVIEW_GEMINI_3_1_MODEL_AUTO;
+  const shouldUseGemini31ForRequest =
+    isExplicit31AutoRequest ||
+    resolvedModel === PREVIEW_GEMINI_3_1_MODEL ||
+    resolvedModel === PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL;
   const isAutoPreferred = preferredModel ? isAutoModel(preferredModel) : false;
   const isAutoConfigured = isAutoModel(configuredModel);
 
@@ -72,7 +81,7 @@ export function resolvePolicyChain(
       chain = getModelPolicyChain({
         previewEnabled,
         userTier: config.getUserTier(),
-        useGemini31,
+        useGemini31: useGemini31 || shouldUseGemini31ForRequest,
         useCustomToolModel,
       });
     } else {
