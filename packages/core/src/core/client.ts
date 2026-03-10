@@ -30,7 +30,11 @@ import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
-import { getDisplayString , resolveModel, isGemini2Model } from '../config/models.js';
+import {
+  getDisplayString,
+  resolveModel,
+  isGemini2Model,
+} from '../config/models.js';
 import {
   retryWithBackoff,
   type RetryAvailabilityContext,
