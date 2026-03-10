@@ -131,8 +131,26 @@ export async function loadSandboxConfig(
     process.env['GEMINI_SANDBOX_IMAGE_DEFAULT'] ??
     packageJson?.config?.sandboxImageUri;
 
+  const networkAccess =
+    process.env['GEMINI_SANDBOX_NETWORK'] === 'true' ||
+    settings.tools?.sandboxNetworkAccess === true;
+
+  const allowedPathsEnv = process.env['GEMINI_SANDBOX_ALLOWED_PATHS']
+    ?.split(',')
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+
+  const allowedPaths =
+    allowedPathsEnv ?? settings.tools?.sandboxAllowedPaths ?? [];
+
   return command &&
     (image || command === 'sandbox-exec' || command === 'windows-native')
-    ? { enabled: true, allowedPaths: [], networkAccess: false, command, image }
+    ? {
+        enabled: true,
+        allowedPaths,
+        networkAccess,
+        command,
+        image,
+      }
     : undefined;
 }

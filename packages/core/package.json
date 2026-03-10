@@ -15,6 +15,7 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:ci": "vitest run",
+    "prepare": "node scripts/compile-windows-sandbox.js",
     "typecheck": "tsc --noEmit"
   },
   "files": [

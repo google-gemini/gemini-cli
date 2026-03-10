@@ -326,9 +326,26 @@ export class ShellExecutionService {
     try {
       const isWindows = os.platform() === 'win32';
       const { executable, argsPrefix, shell } = getShellConfiguration();
-      const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-      const spawnArgs = [...argsPrefix, guardedCommand];
+      // In Strict Sandbox mode (networkAccess = false), PowerShell will fail to load
+      // its required system DLLs due to the Restricted Code SID.
+      // We must fallback to cmd.exe for strict sandboxing.
+      const isStrictSandbox =
+        shellExecutionConfig.sandboxConfig?.enabled &&
+        shellExecutionConfig.sandboxConfig?.command === 'windows-native' &&
+        !shellExecutionConfig.sandboxConfig?.networkAccess;
 
+      const finalShell = isStrictSandbox ? 'cmd' : shell;
+      let finalArgsPrefix: string[] = [];
+      if (finalShell === 'cmd') {
+          finalArgsPrefix = ['/c'];
+      } else {
+          finalArgsPrefix = argsPrefix;
+      }
+
+      // We still use the original executable logic (e.g. searching for git)
+      // but the guard command formatting is based on the final shell.
+      const guardedCommand = ensurePromptvarsDisabled(commandToExecute, finalShell as ShellType);
+      const spawnArgs = [...finalArgsPrefix, guardedCommand];
       const env = {
         ...process.env,
         [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
@@ -455,6 +472,12 @@ export class ShellExecutionService {
           const { finalBuffer } = cleanup();
 
           let combinedOutput = state.output;
+
+          const isSandboxError = code === 3221225781 || code === -1073741515; // 0xC0000135
+          if (isSandboxError && shellExecutionConfig.sandboxConfig?.enabled) {
+              const sandboxMessage = `\\n[GEMINI_CLI_SANDBOX_ERROR: Command execution was blocked by the native Windows sandbox. This typically means the command attempted an unauthorized network request or file access.]`;
+              combinedOutput += sandboxMessage;
+          }
 
           if (state.truncated) {
             const truncationMessage = `\n[GEMINI_CLI_WARNING: Output truncated. The buffer is limited to ${
@@ -595,8 +618,21 @@ export class ShellExecutionService {
       const rows = shellExecutionConfig.terminalHeight ?? 30;
       const { executable, argsPrefix, shell } = getShellConfiguration();
 
-      const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-      const args = [...argsPrefix, guardedCommand];
+      const isStrictSandbox =
+        shellExecutionConfig.sandboxConfig?.enabled &&
+        shellExecutionConfig.sandboxConfig?.command === 'windows-native' &&
+        !shellExecutionConfig.sandboxConfig?.networkAccess;
+
+      const finalShell = isStrictSandbox ? 'cmd' : shell;
+      let finalArgsPrefix: string[] = [];
+      if (finalShell === 'cmd') {
+          finalArgsPrefix = ['/c'];
+      } else {
+          finalArgsPrefix = argsPrefix;
+      }
+
+      const guardedCommand = ensurePromptvarsDisabled(commandToExecute, finalShell as ShellType);
+      const args = [...finalArgsPrefix, guardedCommand];
 
       const env = {
         ...process.env,
@@ -846,6 +882,13 @@ export class ShellExecutionService {
 
               // Store exit info for late subscribers (e.g. backgrounding race condition)
               this.exitedPtyInfo.set(ptyProcess.pid, { exitCode, signal });
+
+              const isSandboxError = exitCode === 3221225781 || exitCode === -1073741515; // 0xC0000135
+              let finalOutput = getFullBufferText(headlessTerminal);
+              if (isSandboxError && shellExecutionConfig.sandboxConfig?.enabled) {
+                  finalOutput += `\n[GEMINI_CLI_SANDBOX_ERROR: Command execution was blocked by the native Windows sandbox. This typically means the command attempted an unauthorized network request or file access.]`;
+              }
+
               setTimeout(
                 () => {
                   this.exitedPtyInfo.delete(ptyProcess.pid);
@@ -869,7 +912,7 @@ export class ShellExecutionService {
 
               resolve({
                 rawOutput: finalBuffer,
-                output: getFullBufferText(headlessTerminal),
+                output: finalOutput,
                 exitCode,
                 signal: signal ?? null,
                 error,

@@ -162,6 +162,12 @@ public class GeminiSandbox {
         IntPtr pSidsToDisable = IntPtr.Zero;
         uint sidCount = 0;
 
+        IntPtr pSidsToRestrict = IntPtr.Zero;
+        uint restrictCount = 0;
+
+        // "networkAccess == false" implies Strict Sandbox Level 1.
+        // In Strict mode, we strip the Network SID and apply the Restricted Code SID.
+        // This blocks network access and restricts file reads, but requires cmd.exe.
         if (!networkAccess) {
             IntPtr networkSid;
             if (ConvertStringSidToSid("S-1-5-2", out networkSid)) {
@@ -173,20 +179,21 @@ public class GeminiSandbox {
                 saa.Attributes = 0;
                 Marshal.StructureToPtr(saa, pSidsToDisable, false);
             }
-        }
 
-        IntPtr pSidsToRestrict = IntPtr.Zero;
-        uint restrictCount = 0;
-        IntPtr restrictedSid;
-        if (ConvertStringSidToSid("S-1-5-12", out restrictedSid)) {
-            restrictCount = 1;
-            int saaSize = Marshal.SizeOf(typeof(SID_AND_ATTRIBUTES));
-            pSidsToRestrict = Marshal.AllocHGlobal(saaSize);
-            SID_AND_ATTRIBUTES saa = new SID_AND_ATTRIBUTES();
-            saa.Sid = restrictedSid;
-            saa.Attributes = 0;
-            Marshal.StructureToPtr(saa, pSidsToRestrict, false);
+            IntPtr restrictedSid;
+            // S-1-5-12 is Restricted Code SID
+            if (ConvertStringSidToSid("S-1-5-12", out restrictedSid)) {
+                restrictCount = 1;
+                int saaSize = Marshal.SizeOf(typeof(SID_AND_ATTRIBUTES));
+                pSidsToRestrict = Marshal.AllocHGlobal(saaSize);
+                SID_AND_ATTRIBUTES saa = new SID_AND_ATTRIBUTES();
+                saa.Sid = restrictedSid;
+                saa.Attributes = 0;
+                Marshal.StructureToPtr(saa, pSidsToRestrict, false);
+            }
         }
+        // If networkAccess == true, we are in Elevated mode (Level 2).
+        // We only strip privileges (DISABLE_MAX_PRIVILEGE), allowing network and powershell.
 
         if (!CreateRestrictedToken(hToken, DISABLE_MAX_PRIVILEGE, sidCount, pSidsToDisable, 0, IntPtr.Zero, restrictCount, pSidsToRestrict, out hRestrictedToken)) {
             Console.Error.WriteLine("Failed to create restricted token");

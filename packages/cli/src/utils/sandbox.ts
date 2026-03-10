@@ -211,6 +211,28 @@ export async function start_sandbox(
       });
     }
 
+    if (config.command === 'windows-native') {
+      debugLogger.log('using native windows sandboxing ...');
+      // process.argv is [node, script, ...args]
+      // We want to skip the first element (node) when calling spawn(process.execPath, ...)
+      const finalArgv = cliArgs.slice(1);
+      
+      const child = spawn(process.execPath, finalArgv, {
+        stdio: 'inherit',
+        env: {
+          ...process.env,
+          SANDBOX: 'windows-native',
+        },
+      });
+
+      return await new Promise((resolve, reject) => {
+        child.on('error', reject);
+        child.on('close', (code) => {
+          resolve(code ?? 1);
+        });
+      });
+    }
+
     if (config.command === 'lxc') {
       return await start_lxc_sandbox(config, nodeArgs, cliArgs);
     }
