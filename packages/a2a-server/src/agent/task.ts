@@ -657,6 +657,7 @@ export class Task {
         outcome: ToolConfirmationOutcome.ProceedOnce,
       });
       this.pendingToolConfirmationDetails.delete(callId);
+      this.toolsAlreadyConfirmed.add(callId);
     }
   }
 

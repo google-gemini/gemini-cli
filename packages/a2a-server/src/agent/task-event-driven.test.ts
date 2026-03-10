@@ -354,7 +354,7 @@ describe('Task Event-Driven Scheduler', () => {
     );
   });
 
-  it('should execute without confirmation in YOLO mode', async () => {
+  it('should execute without confirmation in YOLO mode and not transition to input-required', async () => {
     // Enable YOLO mode
     const yoloConfig = createMockConfig({
       isEventDrivenSchedulerEnabled: () => true,
@@ -363,7 +363,8 @@ describe('Task Event-Driven Scheduler', () => {
     const yoloMessageBus = yoloConfig.getMessageBus();
 
     // @ts-expect-error - Calling private constructor
-    const _task = new Task('task-id', 'context-id', yoloConfig, mockEventBus);
+    const task = new Task('task-id', 'context-id', yoloConfig, mockEventBus);
+    task.setTaskStateAndPublishUpdate = vi.fn();
 
     const toolCall = {
       request: { callId: '1', name: 'ls', args: {} },
@@ -385,6 +386,15 @@ describe('Task Event-Driven Scheduler', () => {
         confirmed: true,
         outcome: ToolConfirmationOutcome.ProceedOnce,
       }),
+    );
+
+    // Should NOT transition to input-required since it was auto-approved
+    expect(task.setTaskStateAndPublishUpdate).not.toHaveBeenCalledWith(
+      'input-required',
+      expect.anything(),
+      undefined,
+      undefined,
+      true,
     );
   });
 
@@ -498,5 +508,151 @@ describe('Task Event-Driven Scheduler', () => {
     );
     expect(secondTurnCalls.length).toBe(1);
     expect(secondTurnCalls[0][0].status.message.parts[0].text).toBe('chunk 3');
+  });
+
+  it('should handle parallel tool calls correctly', async () => {
+    // @ts-expect-error - Calling private constructor
+    const task = new Task('task-id', 'context-id', mockConfig, mockEventBus);
+
+    const toolCall1 = {
+      request: { callId: '1', name: 'ls', args: {} },
+      status: 'awaiting_approval',
+      correlationId: 'corr-1',
+      confirmationDetails: { type: 'info', title: 'test 1', prompt: 'test 1' },
+    };
+
+    const toolCall2 = {
+      request: { callId: '2', name: 'pwd', args: {} },
+      status: 'awaiting_approval',
+      correlationId: 'corr-2',
+      confirmationDetails: { type: 'info', title: 'test 2', prompt: 'test 2' },
+    };
+
+    const handler = (messageBus.subscribe as Mock).mock.calls.find(
+      (call: unknown[]) => call[0] === MessageBusType.TOOL_CALLS_UPDATE,
+    )?.[1];
+
+    // Publish update for both tool calls simultaneously
+    handler({
+      type: MessageBusType.TOOL_CALLS_UPDATE,
+      toolCalls: [toolCall1, toolCall2],
+    });
+
+    // Confirm first tool call
+    const handled1 = await (
+      task as unknown as {
+        _handleToolConfirmationPart: (part: unknown) => Promise<boolean>;
+      }
+    )._handleToolConfirmationPart({
+      kind: 'data',
+      data: { callId: '1', outcome: 'proceed_once' },
+    });
+    expect(handled1).toBe(true);
+    expect(messageBus.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: 'corr-1',
+        confirmed: true,
+      }),
+    );
+
+    // Confirm second tool call
+    const handled2 = await (
+      task as unknown as {
+        _handleToolConfirmationPart: (part: unknown) => Promise<boolean>;
+      }
+    )._handleToolConfirmationPart({
+      kind: 'data',
+      data: { callId: '2', outcome: 'cancel' },
+    });
+    expect(handled2).toBe(true);
+    expect(messageBus.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+        correlationId: 'corr-2',
+        confirmed: false,
+      }),
+    );
+  });
+
+  it('should wait for executing tools before transitioning to input-required state', async () => {
+    // @ts-expect-error - Calling private constructor
+    const task = new Task('task-id', 'context-id', mockConfig, mockEventBus);
+
+    task.setTaskStateAndPublishUpdate = vi.fn();
+
+    // Register tool 1 as executing
+    task['_registerToolCall']('1', 'executing');
+
+    const toolCall1 = {
+      request: { callId: '1', name: 'ls', args: {} },
+      status: 'executing',
+    };
+
+    const toolCall2 = {
+      request: { callId: '2', name: 'pwd', args: {} },
+      status: 'awaiting_approval',
+      correlationId: 'corr-2',
+      confirmationDetails: { type: 'info', title: 'test 2', prompt: 'test 2' },
+    };
+
+    const handler = (messageBus.subscribe as Mock).mock.calls.find(
+      (call: unknown[]) => call[0] === MessageBusType.TOOL_CALLS_UPDATE,
+    )?.[1];
+
+    handler({
+      type: MessageBusType.TOOL_CALLS_UPDATE,
+      toolCalls: [toolCall1, toolCall2],
+    });
+
+    // Should NOT transition to input-required yet
+    expect(task.setTaskStateAndPublishUpdate).not.toHaveBeenCalledWith(
+      'input-required',
+      expect.anything(),
+      undefined,
+      undefined,
+      true,
+    );
+
+    // Complete tool 1
+    const toolCall1Complete = {
+      ...toolCall1,
+      status: 'success',
+      result: { ok: true },
+    };
+
+    handler({
+      type: MessageBusType.TOOL_CALLS_UPDATE,
+      toolCalls: [toolCall1Complete, toolCall2],
+    });
+
+    // Now it should transition
+    expect(task.setTaskStateAndPublishUpdate).toHaveBeenCalledWith(
+      'input-required',
+      expect.anything(),
+      undefined,
+      undefined,
+      true,
+    );
+  });
+
+  it('should ignore confirmations for unknown tool calls', async () => {
+    // @ts-expect-error - Calling private constructor
+    const task = new Task('task-id', 'context-id', mockConfig, mockEventBus);
+
+    const handled = await (
+      task as unknown as {
+        _handleToolConfirmationPart: (part: unknown) => Promise<boolean>;
+      }
+    )._handleToolConfirmationPart({
+      kind: 'data',
+      data: { callId: 'unknown-id', outcome: 'proceed_once' },
+    });
+
+    // Should return false for unhandled tool call
+    expect(handled).toBe(false);
+
+    // Should not publish anything to the message bus
+    expect(messageBus.publish).not.toHaveBeenCalled();
   });
 });
