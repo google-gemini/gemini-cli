@@ -25,11 +25,6 @@ import {
 
 export const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
 
-type ModelQuotaStatus = {
-  remainingAmount?: number;
-  remaining?: number;
-};
-
 export async function handleFallback(
   config: Config,
   failedModel: string,
@@ -146,8 +141,7 @@ async function getQuotaAvailableCandidates(
   const unknownQuotaCandidates: ModelPolicy[] = [];
 
   for (const candidatePolicy of candidates) {
-    const quotaStatusFromAvailability = await getQuotaStatusFromService(
-      availability,
+    const quotaStatusFromAvailability = await availability.getQuotaStatus?.(
       candidatePolicy.model,
     );
     const quotaStatus =
@@ -170,48 +164,6 @@ async function getQuotaAvailableCandidates(
   }
 
   return unknownQuotaCandidates;
-}
-
-function getQuotaStatusFromService(
-  availability: ModelAvailabilityService,
-  model: string,
-): Promise<ModelQuotaStatus | undefined> | ModelQuotaStatus | undefined {
-  const getQuotaStatusValue = Reflect.get(
-    availability,
-    'getQuotaStatus',
-  ) as unknown;
-  if (typeof getQuotaStatusValue !== 'function') {
-    return undefined;
-  }
-
-  const getQuotaStatusResult: unknown = getQuotaStatusValue.call(
-    availability,
-    model,
-  );
-  if (getQuotaStatusResult instanceof Promise) {
-    return getQuotaStatusResult.then((value) => normalizeQuotaStatus(value));
-  }
-
-  return normalizeQuotaStatus(getQuotaStatusResult);
-}
-
-function normalizeQuotaStatus(quotaStatus: unknown): ModelQuotaStatus {
-  if (!quotaStatus || typeof quotaStatus !== 'object') {
-    return undefined;
-  }
-
-  const remaining = quotaStatus as {
-    remaining?: number;
-    remainingAmount?: number;
-  };
-  if (
-    remaining.remainingAmount === undefined &&
-    remaining.remaining === undefined
-  ) {
-    return undefined;
-  }
-
-  return remaining;
 }
 
 function getRemainingFromQuotaStatus(

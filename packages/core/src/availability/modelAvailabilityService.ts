@@ -41,6 +41,20 @@ export interface ModelSelectionResult {
 export class ModelAvailabilityService {
   private readonly health = new Map<ModelId, HealthState>();
 
+  getQuotaStatus?: (model: string) =>
+    | {
+        remainingAmount?: number;
+        remaining?: number;
+      }
+    | Promise<
+        | {
+            remainingAmount?: number;
+            remaining?: number;
+          }
+        | undefined
+      >
+    | undefined;
+
   markTerminal(model: ModelId, reason: TerminalUnavailabilityReason) {
     this.setState(model, {
       status: 'terminal',
