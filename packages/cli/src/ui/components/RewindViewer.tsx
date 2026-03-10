@@ -19,9 +19,10 @@ import { useKeypress } from '../hooks/useKeypress.js';
 import { useRewind } from '../hooks/useRewind.js';
 import { RewindConfirmation, RewindOutcome } from './RewindConfirmation.js';
 import { stripReferenceContent } from '../utils/formatters.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
 import { CliSpinner } from './CliSpinner.js';
 import { ExpandableText } from './shared/ExpandableText.js';
+import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
 interface RewindViewerProps {
   conversation: ConversationRecord;
@@ -48,6 +49,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
   onExit,
   onRewind,
 }) => {
+  const keyMatchers = useKeyMatchers();
   const [isRewinding, setIsRewinding] = useState(false);
   const { terminalWidth, terminalHeight } = useUIState();
   const isScreenReaderEnabled = useIsScreenReaderEnabled();
