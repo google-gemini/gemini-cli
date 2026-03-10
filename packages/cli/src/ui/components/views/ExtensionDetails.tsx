@@ -8,7 +8,8 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import type { RegistryExtension } from '../../../config/extensionRegistryClient.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../key/keyMatchers.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 import { theme } from '../../semantic-colors.js';
 
 export interface ExtensionDetailsProps {
@@ -28,6 +29,7 @@ export function ExtensionDetails({
   onInstall,
   isInstalled,
 }: ExtensionDetailsProps): React.JSX.Element {
+  const keyMatchers = useKeyMatchers();
   const [consentRequest, setConsentRequest] = useState<{
     prompt: string;
     resolve: (value: boolean) => void;
@@ -57,9 +59,12 @@ export function ExtensionDetails({
       }
       if (keyMatchers[Command.RETURN](key) && !isInstalled && !isInstalling) {
         setIsInstalling(true);
-        onInstall((prompt: string) => new Promise((resolve) => {
-            setConsentRequest({ prompt, resolve });
-          }));
+        onInstall(
+          (prompt: string) =>
+            new Promise((resolve) => {
+              setConsentRequest({ prompt, resolve });
+            }),
+        );
         return true;
       }
       return false;

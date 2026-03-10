@@ -25,7 +25,7 @@ import { useRegistrySearch } from '../../hooks/useRegistrySearch.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { ExtensionDetails } from './ExtensionDetails.js';
 
-interface ExtensionRegistryViewProps {
+export interface ExtensionRegistryViewProps {
   onSelect?: (
     extension: RegistryExtension,
     requestConsentOverride?: (consent: string) => Promise<boolean>,
