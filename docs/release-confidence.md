@@ -79,8 +79,8 @@ manually run through this checklist.
   - [ ] Verify version: `gemini --version`
 
 - **Authentication:**
-  - [ ] In interactive mode run `/auth` and verify all login flows work:
-    - [ ] Login With Google
+  - [ ] In interactive mode run `/auth` and verify all sign in flows work:
+    - [ ] Sign in with Google
     - [ ] API Key
     - [ ] Vertex AI
 

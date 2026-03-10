@@ -539,7 +539,7 @@ describe('<ModelStatsDisplay />', () => {
 
     const output = lastFrame();
     expect(output).toContain('Auth Method:');
-    expect(output).toContain('Logged in with Google');
+    expect(output).toContain('Signed in with Google');
     expect(output).toContain('(test@example.com)');
     expect(output).toContain('Tier:');
     expect(output).toContain('Pro');

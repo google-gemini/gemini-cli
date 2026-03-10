@@ -59,8 +59,8 @@ describe('AuthInProgress', () => {
       <AuthInProgress onTimeout={onTimeout} />,
     );
     await waitUntilReady();
-    expect(lastFrame()).toContain('[Spinner] Waiting for auth...');
-    expect(lastFrame()).toContain('Press ESC or CTRL+C to cancel');
+    expect(lastFrame()).toContain('[Spinner] Waiting for authentication...');
+    expect(lastFrame()).toContain('Press Esc or Ctrl+C to cancel');
     unmount();
   });
 

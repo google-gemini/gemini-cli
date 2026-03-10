@@ -405,8 +405,8 @@
         },
         "showUserIdentity": {
           "title": "Show User Identity",
-          "description": "Show the logged-in user's identity (e.g. email) in the UI.",
-          "markdownDescription": "Show the logged-in user's identity (e.g. email) in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "description": "Show the signed-in user's identity (e.g. email) in the UI.",
+          "markdownDescription": "Show the signed-in user's identity (e.g. email) in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },

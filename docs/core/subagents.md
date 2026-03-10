@@ -194,7 +194,7 @@ returns coordinates and element descriptions that the browser agent uses with
 the `click_at` tool for precise, coordinate-based interactions.
 
 > **Note:** The visual agent requires API key or Vertex AI authentication. It is
-> not available when using Google Login.
+> not available when using "Sign in with Google".
 
 ## Creating custom subagents
 
