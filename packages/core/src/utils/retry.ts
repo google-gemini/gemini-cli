@@ -17,6 +17,12 @@ import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 import type { RetryAvailabilityContext } from '../availability/modelPolicy.js';
 
 export type { RetryAvailabilityContext };
+
+export type AgentDecision =
+  | 'retry'
+  | 'stop'
+  | { action: 'retry' | 'stop' | 'modify_request'; data?: unknown };
+
 export const DEFAULT_MAX_ATTEMPTS = 10;
 
 export interface RetryOptions {
@@ -32,6 +38,7 @@ export interface RetryOptions {
   onValidationRequired?: (
     error: ValidationRequiredError,
   ) => Promise<'verify' | 'change_auth' | 'cancel'>;
+  onAgentDecision?: (error: unknown, attempt: number) => Promise<AgentDecision>;
   authType?: string;
   retryFetchErrors?: boolean;
   signal?: AbortSignal;
@@ -174,6 +181,7 @@ export async function retryWithBackoff<T>(
     maxDelayMs,
     onPersistent429,
     onValidationRequired,
+    onAgentDecision,
     authType,
     shouldRetryOnError,
     shouldRetryOnContent,
@@ -340,6 +348,30 @@ export async function retryWithBackoff<T>(
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         !shouldRetryOnError(error as Error, retryFetchErrors)
       ) {
+        if (onAgentDecision) {
+          try {
+            const decision = await onAgentDecision(error, attempt);
+            const decisionType =
+              typeof decision === 'string' ? decision : decision.action;
+
+            debugLogger.log(
+              `Agent evaluated error at attempt ${attempt}: ${decisionType}`,
+            );
+
+            if (decisionType === 'retry' || decisionType === 'modify_request') {
+              attempt = 0;
+              currentDelay = initialDelayMs;
+              continue;
+            } else if (decisionType === 'stop') {
+              throw error;
+            }
+          } catch (agentError) {
+            if (agentError !== error) {
+              debugLogger.warn('Agent decision failed:', agentError);
+            }
+            throw error;
+          }
+        }
         throw error;
       }
 
