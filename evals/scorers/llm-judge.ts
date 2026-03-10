@@ -45,10 +45,15 @@ export class LlmJudgeScorer implements Scorer {
 
     try {
       let judgeText = '';
-      const stream = await this.contentGenerator.generateContentStream({
-        model: this.judgeModel,
-        contents: [{ role: 'user', parts: [{ text: judgePrompt }] }],
-      });
+      const stream = await this.contentGenerator.generateContentStream(
+        {
+          model: this.judgeModel,
+          contents: [{ role: 'user', parts: [{ text: judgePrompt }] }],
+        },
+        '',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        'user' as import('../../packages/core/src/telemetry/llmRole.js').LlmRole,
+      );
 
       for await (const chunk of stream) {
         const part = chunk.candidates?.[0]?.content?.parts?.[0];
