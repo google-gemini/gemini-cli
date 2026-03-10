@@ -119,7 +119,7 @@ import { type InitializationResult } from '../core/initializer.js';
 import { useFocus } from './hooks/useFocus.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { KeypressPriority } from './contexts/KeypressContext.js';
-import { keyMatchers, Command } from './keyMatchers.js';
+import { Command } from './key/keyMatchers.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
@@ -164,7 +164,7 @@ import { NewAgentsChoice } from './components/NewAgentsNotification.js';
 import { isSlashCommand } from './utils/commandUtils.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useTimedMessage } from './hooks/useTimedMessage.js';
-import { shouldDismissShortcutsHelpOnHotkey } from './utils/shortcutsHelp.js';
+import { useIsHelpDismissKey } from './utils/shortcutsHelp.js';
 import { useSuspend } from './hooks/useSuspend.js';
 import { useRunEventNotifications } from './hooks/useRunEventNotifications.js';
 import { isNotificationsEnabled } from '../utils/terminalNotifications.js';
@@ -205,6 +205,7 @@ import {
   useVisibilityToggle,
   APPROVAL_MODE_REVEAL_DURATION_MS,
 } from './hooks/useVisibilityToggle.js';
+import { useKeyMatchers } from './hooks/useKeyMatchers.js';
 
 /**
  * The fraction of the terminal width to allocate to the shell.
@@ -219,6 +220,8 @@ const SHELL_WIDTH_FRACTION = 0.89;
 const SHELL_HEIGHT_PADDING = 10;
 
 export const AppContainer = (props: AppContainerProps) => {
+  const isHelpDismissKey = useIsHelpDismissKey();
+  const keyMatchers = useKeyMatchers();
   const { config, initializationResult, resumedSessionData } = props;
   const settings = useSettings();
   const { reset } = useOverflowActions()!;
@@ -1654,7 +1657,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
       }
 
-      if (shortcutsHelpVisible && shouldDismissShortcutsHelpOnHotkey(key)) {
+      if (shortcutsHelpVisible && isHelpDismissKey(key)) {
         setShortcutsHelpVisible(false);
       }
 
@@ -1848,6 +1851,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       settings.merged.general.devtools,
       showErrorDetails,
       triggerExpandHint,
+      keyMatchers,
+      isHelpDismissKey,
     ],
   );
 
