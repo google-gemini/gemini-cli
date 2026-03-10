@@ -18,7 +18,7 @@ import {
   applyAvailabilityTransition,
 } from '../availability/policyHelpers.js';
 
-const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
+export const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
 
 export async function handleFallback(
   config: Config,
@@ -138,6 +138,9 @@ async function processIntent(
       // For distinct retry (retry_once), we do NOT set the active model permanently.
       // The FallbackStrategy will handle routing to the available model for this turn
       // based on the availability service state (which is updated before this).
+      return true;
+
+    case 'retry_with_credits':
       return true;
 
     case 'stop':

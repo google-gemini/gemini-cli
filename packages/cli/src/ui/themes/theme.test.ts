@@ -37,11 +37,11 @@ describe('createCustomTheme', () => {
 
   it('should interpolate DarkGray when not provided', () => {
     const theme = createCustomTheme(baseTheme);
-    // Interpolate between Gray (#cccccc) and Background (#000000) at 0.5
+    // Interpolate between Background (#000000) and Gray (#cccccc) at 0.4
     // #cccccc is RGB(204, 204, 204)
     // #000000 is RGB(0, 0, 0)
-    // Midpoint is RGB(102, 102, 102) which is #666666
-    expect(theme.colors.DarkGray).toBe('#666666');
+    // Result is RGB(82, 82, 82) which is #525252
+    expect(theme.colors.DarkGray).toBe('#525252');
   });
 
   it('should use provided DarkGray', () => {
@@ -64,8 +64,8 @@ describe('createCustomTheme', () => {
       },
     };
     const theme = createCustomTheme(customTheme);
-    // Should be interpolated between #cccccc and #000000 at 0.5 -> #666666
-    expect(theme.colors.DarkGray).toBe('#666666');
+    // Should be interpolated between #000000 and #cccccc at 0.4 -> #525252
+    expect(theme.colors.DarkGray).toBe('#525252');
   });
 
   it('should prefer text.secondary over Gray for interpolation', () => {
@@ -81,8 +81,8 @@ describe('createCustomTheme', () => {
       },
     };
     const theme = createCustomTheme(customTheme);
-    // Interpolate between #cccccc and #000000 -> #666666
-    expect(theme.colors.DarkGray).toBe('#666666');
+    // Interpolate between #000000 and #cccccc -> #525252
+    expect(theme.colors.DarkGray).toBe('#525252');
   });
 });
 

@@ -4,20 +4,24 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, {
+import type React from 'react';
+import {
   useState,
-  useEffect,
   useRef,
-  useLayoutEffect,
   useCallback,
   useMemo,
+  useLayoutEffect,
+  useEffect,
+  useId,
 } from 'react';
-import { Box, getInnerHeight, getScrollHeight, type DOMElement } from 'ink';
+import { Box, ResizeObserver, type DOMElement } from 'ink';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import { useScrollable } from '../../contexts/ScrollProvider.js';
 import { useAnimatedScrollbar } from '../../hooks/useAnimatedScrollbar.js';
 import { useBatchedScroll } from '../../hooks/useBatchedScroll.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../key/keyMatchers.js';
+import { useOverflowActions } from '../../contexts/OverflowContext.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 interface ScrollableProps {
   children?: React.ReactNode;
@@ -28,6 +32,7 @@ interface ScrollableProps {
   hasFocus: boolean;
   scrollToBottom?: boolean;
   flexGrow?: number;
+  reportOverflow?: boolean;
 }
 
 export const Scrollable: React.FC<ScrollableProps> = ({
@@ -39,64 +44,128 @@ export const Scrollable: React.FC<ScrollableProps> = ({
   hasFocus,
   scrollToBottom,
   flexGrow,
+  reportOverflow = false,
 }) => {
+  const keyMatchers = useKeyMatchers();
   const [scrollTop, setScrollTop] = useState(0);
-  const ref = useRef<DOMElement>(null);
+  const viewportRef = useRef<DOMElement | null>(null);
+  const contentRef = useRef<DOMElement | null>(null);
+  const overflowActions = useOverflowActions();
+  const id = useId();
   const [size, setSize] = useState({
-    innerHeight: 0,
+    innerHeight: typeof height === 'number' ? height : 0,
     scrollHeight: 0,
   });
   const sizeRef = useRef(size);
-  useEffect(() => {
+  const scrollTopRef = useRef(scrollTop);
+
+  useLayoutEffect(() => {
     sizeRef.current = size;
   }, [size]);
 
-  const childrenCountRef = useRef(0);
-
-  // This effect needs to run on every render to correctly measure the container
-  // and scroll to the bottom if new children are added.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
-    if (!ref.current) {
-      return;
+    scrollTopRef.current = scrollTop;
+  }, [scrollTop]);
+
+  useEffect(() => {
+    if (reportOverflow && size.scrollHeight > size.innerHeight) {
+      overflowActions?.addOverflowingId?.(id);
+    } else {
+      overflowActions?.removeOverflowingId?.(id);
     }
-    const innerHeight = Math.round(getInnerHeight(ref.current));
-    const scrollHeight = Math.round(getScrollHeight(ref.current));
+  }, [
+    reportOverflow,
+    size.scrollHeight,
+    size.innerHeight,
+    id,
+    overflowActions,
+  ]);
 
-    const isAtBottom =
-      scrollHeight > innerHeight && scrollTop >= scrollHeight - innerHeight - 1;
+  useEffect(
+    () => () => {
+      overflowActions?.removeOverflowingId?.(id);
+    },
+    [id, overflowActions],
+  );
 
-    if (
-      size.innerHeight !== innerHeight ||
-      size.scrollHeight !== scrollHeight
-    ) {
-      setSize({ innerHeight, scrollHeight });
-      if (isAtBottom) {
-        setScrollTop(Math.max(0, scrollHeight - innerHeight));
+  const viewportObserverRef = useRef<ResizeObserver | null>(null);
+  const contentObserverRef = useRef<ResizeObserver | null>(null);
+
+  const viewportRefCallback = useCallback((node: DOMElement | null) => {
+    viewportObserverRef.current?.disconnect();
+    viewportRef.current = node;
+
+    if (node) {
+      const observer = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (entry) {
+          const innerHeight = Math.round(entry.contentRect.height);
+          setSize((prev) => {
+            const scrollHeight = prev.scrollHeight;
+            const isAtBottom =
+              scrollHeight > prev.innerHeight &&
+              scrollTopRef.current >= scrollHeight - prev.innerHeight - 1;
+
+            if (isAtBottom) {
+              setScrollTop(Number.MAX_SAFE_INTEGER);
+            }
+            return { ...prev, innerHeight };
+          });
+        }
+      });
+      observer.observe(node);
+      viewportObserverRef.current = observer;
+    }
+  }, []);
+
+  const contentRefCallback = useCallback(
+    (node: DOMElement | null) => {
+      contentObserverRef.current?.disconnect();
+      contentRef.current = node;
+
+      if (node) {
+        const observer = new ResizeObserver((entries) => {
+          const entry = entries[0];
+          if (entry) {
+            const scrollHeight = Math.round(entry.contentRect.height);
+            setSize((prev) => {
+              const innerHeight = prev.innerHeight;
+              const isAtBottom =
+                prev.scrollHeight > innerHeight &&
+                scrollTopRef.current >= prev.scrollHeight - innerHeight - 1;
+
+              if (
+                isAtBottom ||
+                (scrollToBottom && scrollHeight > prev.scrollHeight)
+              ) {
+                setScrollTop(Number.MAX_SAFE_INTEGER);
+              }
+              return { ...prev, scrollHeight };
+            });
+          }
+        });
+        observer.observe(node);
+        contentObserverRef.current = observer;
       }
-    }
-
-    const childCountCurrent = React.Children.count(children);
-    if (scrollToBottom && childrenCountRef.current !== childCountCurrent) {
-      setScrollTop(Math.max(0, scrollHeight - innerHeight));
-    }
-    childrenCountRef.current = childCountCurrent;
-  });
+    },
+    [scrollToBottom],
+  );
 
   const { getScrollTop, setPendingScrollTop } = useBatchedScroll(scrollTop);
 
   const scrollBy = useCallback(
     (delta: number) => {
       const { scrollHeight, innerHeight } = sizeRef.current;
-      const current = getScrollTop();
-      const next = Math.min(
-        Math.max(0, current + delta),
-        Math.max(0, scrollHeight - innerHeight),
-      );
+      const maxScroll = Math.max(0, scrollHeight - innerHeight);
+      const current = Math.min(getScrollTop(), maxScroll);
+      let next = Math.max(0, current + delta);
+      if (next >= maxScroll) {
+        next = Number.MAX_SAFE_INTEGER;
+      }
       setPendingScrollTop(next);
       setScrollTop(next);
     },
-    [sizeRef, getScrollTop, setPendingScrollTop],
+    [getScrollTop, setPendingScrollTop],
   );
 
   const { scrollbarColor, flashScrollbar, scrollByWithAnimation } =
@@ -107,10 +176,11 @@ export const Scrollable: React.FC<ScrollableProps> = ({
       const { scrollHeight, innerHeight } = sizeRef.current;
       const scrollTop = getScrollTop();
       const maxScroll = Math.max(0, scrollHeight - innerHeight);
+      const actualScrollTop = Math.min(scrollTop, maxScroll);
 
       // Only capture scroll-up events if there's room;
       // otherwise allow events to bubble.
-      if (scrollTop > 0) {
+      if (actualScrollTop > 0) {
         if (keyMatchers[Command.PAGE_UP](key)) {
           scrollByWithAnimation(-innerHeight);
           return true;
@@ -123,7 +193,7 @@ export const Scrollable: React.FC<ScrollableProps> = ({
 
       // Only capture scroll-down events if there's room;
       // otherwise allow events to bubble.
-      if (scrollTop < maxScroll) {
+      if (actualScrollTop < maxScroll) {
         if (keyMatchers[Command.PAGE_DOWN](key)) {
           scrollByWithAnimation(innerHeight);
           return true;
@@ -140,21 +210,21 @@ export const Scrollable: React.FC<ScrollableProps> = ({
     { isActive: hasFocus },
   );
 
-  const getScrollState = useCallback(
-    () => ({
-      scrollTop: getScrollTop(),
+  const getScrollState = useCallback(() => {
+    const maxScroll = Math.max(0, size.scrollHeight - size.innerHeight);
+    return {
+      scrollTop: Math.min(getScrollTop(), maxScroll),
       scrollHeight: size.scrollHeight,
       innerHeight: size.innerHeight,
-    }),
-    [getScrollTop, size.scrollHeight, size.innerHeight],
-  );
+    };
+  }, [getScrollTop, size.scrollHeight, size.innerHeight]);
 
   const hasFocusCallback = useCallback(() => hasFocus, [hasFocus]);
 
   const scrollableEntry = useMemo(
     () => ({
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      ref: ref as React.RefObject<DOMElement>,
+      ref: viewportRef as React.RefObject<DOMElement>,
       getScrollState,
       scrollBy: scrollByWithAnimation,
       hasFocus: hasFocusCallback,
@@ -167,7 +237,7 @@ export const Scrollable: React.FC<ScrollableProps> = ({
 
   return (
     <Box
-      ref={ref}
+      ref={viewportRefCallback}
       maxHeight={maxHeight}
       width={width ?? maxWidth}
       height={height}
@@ -183,7 +253,12 @@ export const Scrollable: React.FC<ScrollableProps> = ({
         based on the children's content. It also adds a right padding to
         make room for the scrollbar.
       */}
-      <Box flexShrink={0} paddingRight={1} flexDirection="column">
+      <Box
+        ref={contentRefCallback}
+        flexShrink={0}
+        paddingRight={1}
+        flexDirection="column"
+      >
         {children}
       </Box>
     </Box>

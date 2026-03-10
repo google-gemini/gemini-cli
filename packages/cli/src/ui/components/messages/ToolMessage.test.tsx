@@ -9,7 +9,11 @@ import { ToolMessage, type ToolMessageProps } from './ToolMessage.js';
 import { describe, it, expect, vi } from 'vitest';
 import { StreamingState } from '../../types.js';
 import { Text } from 'ink';
-import { type AnsiOutput, CoreToolCallStatus } from '@google/gemini-cli-core';
+import {
+  type AnsiOutput,
+  CoreToolCallStatus,
+  Kind,
+} from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { tryParseJSON } from '../../../utils/jsonoutput.js';
 
@@ -375,20 +379,25 @@ describe('<ToolMessage />', () => {
     unmount();
   });
 
-  it('renders progress information appended to description for executing tools', async () => {
+  it('renders McpProgressIndicator with percentage and message for executing tools', async () => {
     const { lastFrame, waitUntilReady, unmount } = renderWithContext(
       <ToolMessage
         {...baseProps}
         status={CoreToolCallStatus.Executing}
+        progress={42}
+        progressTotal={100}
         progressMessage="Working on it..."
-        progressPercent={42}
       />,
       StreamingState.Responding,
     );
     await waitUntilReady();
-    expect(lastFrame()).toContain(
-      'A tool for testing (Working on it... - 42%)',
-    );
+    const output = lastFrame();
+    expect(output).toContain('42%');
+    expect(output).toContain('Working on it...');
+    expect(output).toContain('\u2588');
+    expect(output).toContain('\u2591');
+    expect(output).not.toContain('A tool for testing (Working on it... - 42%)');
+    expect(output).toMatchSnapshot();
     unmount();
   });
 
@@ -397,12 +406,132 @@ describe('<ToolMessage />', () => {
       <ToolMessage
         {...baseProps}
         status={CoreToolCallStatus.Executing}
-        progressPercent={75}
+        progress={75}
+        progressTotal={100}
       />,
       StreamingState.Responding,
     );
     await waitUntilReady();
-    expect(lastFrame()).toContain('A tool for testing (75%)');
+    const output = lastFrame();
+    expect(output).toContain('75%');
+    expect(output).toContain('\u2588');
+    expect(output).toContain('\u2591');
+    expect(output).not.toContain('A tool for testing (75%)');
+    expect(output).toMatchSnapshot();
     unmount();
+  });
+
+  it('renders indeterminate progress when total is missing', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithContext(
+      <ToolMessage
+        {...baseProps}
+        status={CoreToolCallStatus.Executing}
+        progress={7}
+      />,
+      StreamingState.Responding,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain('7');
+    expect(output).toContain('\u2588');
+    expect(output).toContain('\u2591');
+    expect(output).not.toContain('%');
+    expect(output).toMatchSnapshot();
+    unmount();
+  });
+
+  describe('Truncation', () => {
+    it('applies truncation for Kind.Agent when availableTerminalHeight is provided', async () => {
+      const multilineString = Array.from(
+        { length: 30 },
+        (_, i) => `Line ${i + 1}`,
+      ).join('\n');
+
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <ToolMessage
+          {...baseProps}
+          kind={Kind.Agent}
+          resultDisplay={multilineString}
+          renderOutputAsMarkdown={false}
+          availableTerminalHeight={40}
+        />,
+        {
+          uiActions,
+          uiState: {
+            streamingState: StreamingState.Idle,
+            constrainHeight: true,
+          },
+          width: 80,
+          useAlternateBuffer: false,
+        },
+      );
+      await waitUntilReady();
+      const output = lastFrame();
+
+      // Since kind=Kind.Agent and availableTerminalHeight is provided, it should truncate to SUBAGENT_MAX_LINES (15)
+      // and show the FIRST lines (overflowDirection='bottom')
+      expect(output).toContain('Line 1');
+      expect(output).toContain('Line 14');
+      expect(output).not.toContain('Line 16');
+      expect(output).not.toContain('Line 30');
+      unmount();
+    });
+
+    it('does NOT apply truncation for Kind.Agent when availableTerminalHeight is undefined', async () => {
+      const multilineString = Array.from(
+        { length: 30 },
+        (_, i) => `Line ${i + 1}`,
+      ).join('\n');
+
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <ToolMessage
+          {...baseProps}
+          kind={Kind.Agent}
+          resultDisplay={multilineString}
+          renderOutputAsMarkdown={false}
+          availableTerminalHeight={undefined}
+        />,
+        {
+          uiActions,
+          uiState: { streamingState: StreamingState.Idle },
+          width: 80,
+          useAlternateBuffer: false,
+        },
+      );
+      await waitUntilReady();
+      const output = lastFrame();
+
+      expect(output).toContain('Line 1');
+      expect(output).toContain('Line 30');
+      unmount();
+    });
+
+    it('does NOT apply truncation for Kind.Read', async () => {
+      const multilineString = Array.from(
+        { length: 30 },
+        (_, i) => `Line ${i + 1}`,
+      ).join('\n');
+
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <ToolMessage
+          {...baseProps}
+          kind={Kind.Read}
+          resultDisplay={multilineString}
+          renderOutputAsMarkdown={false}
+        />,
+        {
+          uiActions,
+          uiState: { streamingState: StreamingState.Idle },
+          width: 80,
+          useAlternateBuffer: false,
+        },
+      );
+      await waitUntilReady();
+      const output = lastFrame();
+
+      expect(output).toContain('Line 1');
+      expect(output).toContain('Line 30');
+      unmount();
+    });
   });
 });

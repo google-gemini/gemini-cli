@@ -55,6 +55,8 @@ export class MessageBus extends EventEmitter {
         const { decision } = await this.policyEngine.check(
           message.toolCall,
           message.serverName,
+          message.toolAnnotations,
+          message.subagent,
         );
 
         switch (decision) {
