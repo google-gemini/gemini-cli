@@ -567,5 +567,80 @@ describe('handleFallback', () => {
         PREVIEW_GEMINI_FLASH_MODEL,
       );
     });
+
+    it('uses getRemainingQuotaForModel when the availability service does not expose getQuotaStatus', async () => {
+      const proPolicy = createDefaultPolicy(MOCK_PRO_MODEL);
+      const mockAvailabilityService = createAvailabilityServiceMock({
+        selectedModel: DEFAULT_GEMINI_FLASH_MODEL,
+        skipped: [],
+      });
+
+      mockAvailabilityService.selectFirstAvailable = vi
+        .fn()
+        .mockReturnValue({
+          selectedModel: DEFAULT_GEMINI_FLASH_MODEL,
+          skipped: [],
+        });
+
+      const getRemainingQuotaForModel = vi.fn((model: string) => {
+        if (model === DEFAULT_GEMINI_FLASH_MODEL) return { remaining: 100 };
+        if (model === PREVIEW_GEMINI_FLASH_MODEL) return { remaining: 0 };
+        return { remaining: 0 };
+      });
+
+      policyConfig = createMockConfig({
+        fallbackModelHandler: policyHandler,
+        getModelAvailabilityService: vi.fn(() => mockAvailabilityService),
+        getRemainingQuotaForModel,
+      });
+
+      vi.mocked(policyConfig.getModelAvailabilityService).mockReturnValue(
+        mockAvailabilityService,
+      );
+
+      policyHandler.mockResolvedValue('retry_always');
+
+      const buildFallbackPolicyContextSpy = vi.spyOn(
+        policyHelpers,
+        'buildFallbackPolicyContext',
+      );
+      buildFallbackPolicyContextSpy.mockReturnValue({
+        failedPolicy: proPolicy,
+        candidates: [
+          {
+            ...createDefaultPolicy(DEFAULT_GEMINI_FLASH_MODEL),
+            isLastResort: false,
+          },
+          {
+            ...createDefaultPolicy(PREVIEW_GEMINI_FLASH_MODEL),
+            isLastResort: false,
+          },
+        ],
+      });
+
+      const result = await handleFallback(
+        policyConfig,
+        MOCK_PRO_MODEL,
+        AUTH_OAUTH,
+      );
+
+      expect(result).toBe(true);
+      expect(policyHandler).toHaveBeenCalledWith(
+        MOCK_PRO_MODEL,
+        DEFAULT_GEMINI_FLASH_MODEL,
+        undefined,
+      );
+      expect(mockAvailabilityService.selectFirstAvailable).toHaveBeenCalledWith(
+        [DEFAULT_GEMINI_FLASH_MODEL],
+      );
+      expect(getRemainingQuotaForModel).toHaveBeenCalledWith(
+        DEFAULT_GEMINI_FLASH_MODEL,
+      );
+      expect(getRemainingQuotaForModel).toHaveBeenCalledWith(
+        PREVIEW_GEMINI_FLASH_MODEL,
+      );
+      expect(buildFallbackPolicyContextSpy).toHaveBeenCalled();
+      buildFallbackPolicyContextSpy.mockRestore();
+    });
   });
 });
