@@ -24,9 +24,8 @@ export interface A2AAuthProvider extends AuthenticationHandler {
   initialize?(): Promise<void>;
 }
 
-export interface BaseAuthConfig {
-  agent_card_requires_auth?: boolean;
-}
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface BaseAuthConfig {}
 
 /** Client config for google-credentials (not in A2A spec, Gemini-specific). */
 export interface GoogleCredentialsAuthConfig extends BaseAuthConfig {

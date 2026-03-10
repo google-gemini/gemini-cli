@@ -45,7 +45,6 @@ interface FrontmatterLocalAgentDefinition
  */
 interface FrontmatterAuthConfig {
   type: 'apiKey' | 'http' | 'oauth2';
-  agent_card_requires_auth?: boolean;
   // API Key
   key?: string;
   name?: string;
@@ -123,9 +122,7 @@ const localAgentSchema = z
 /**
  * Base fields shared by all auth configs.
  */
-const baseAuthFields = {
-  agent_card_requires_auth: z.boolean().optional(),
-};
+const baseAuthFields = {};
 
 /**
  * API Key auth schema.
@@ -356,9 +353,7 @@ export async function parseAgentMarkdown(
 function convertFrontmatterAuthToConfig(
   frontmatter: FrontmatterAuthConfig,
 ): A2AAuthConfig {
-  const base = {
-    agent_card_requires_auth: frontmatter.agent_card_requires_auth,
-  };
+  const base = {};
 
   switch (frontmatter.type) {
     case 'apiKey':
