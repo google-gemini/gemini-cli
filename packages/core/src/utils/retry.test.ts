@@ -82,6 +82,35 @@ describe('retryWithBackoff', () => {
     expect(mockFn).toHaveBeenCalledTimes(3);
   });
 
+  it('should ask the agent when max attempts are reached, and retry if requested', async () => {
+    let calls = 0;
+    const mockFn = vi.fn(async () => {
+      calls++;
+      if (calls <= 2) {
+        throw new Error('Generic unretryable error');
+      }
+      return 'success';
+    });
+    const mockAgentDecision = vi.fn().mockResolvedValue('retry');
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 1, // Doesn't matter because the error is unretryable and will fail immediately, OR if retryable it will fail after max attempts
+      initialDelayMs: 10,
+      onAgentDecision: mockAgentDecision,
+    });
+
+    await vi.runAllTimersAsync();
+    const result = await promise;
+
+    expect(result).toBe('success');
+    expect(mockFn).toHaveBeenCalledTimes(3); // 1 original + 2 retries
+    expect(mockAgentDecision).toHaveBeenCalledTimes(2);
+    expect(mockAgentDecision).toHaveBeenCalledWith(
+      expect.any(Error),
+      1, // the attempt number when it failed
+    );
+  });
+
   it('should throw an error if all attempts fail', async () => {
     const mockFn = createFailingFunction(3);
 

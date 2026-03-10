@@ -17,6 +17,12 @@ import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 import type { RetryAvailabilityContext } from '../availability/modelPolicy.js';
 
 export type { RetryAvailabilityContext };
+
+export type AgentDecision =
+  | 'retry'
+  | 'stop'
+  | { action: 'retry' | 'stop' | 'modify_request'; data?: unknown };
+
 export const DEFAULT_MAX_ATTEMPTS = 10;
 
 export interface RetryOptions {
@@ -32,6 +38,7 @@ export interface RetryOptions {
   onValidationRequired?: (
     error: ValidationRequiredError,
   ) => Promise<'verify' | 'change_auth' | 'cancel'>;
+  onAgentDecision?: (error: unknown, attempt: number) => Promise<AgentDecision>;
   authType?: string;
   retryFetchErrors?: boolean;
   signal?: AbortSignal;
@@ -174,6 +181,7 @@ export async function retryWithBackoff<T>(
     maxDelayMs,
     onPersistent429,
     onValidationRequired,
+    onAgentDecision,
     authType,
     shouldRetryOnError,
     shouldRetryOnContent,
@@ -189,6 +197,29 @@ export async function retryWithBackoff<T>(
 
   let attempt = 0;
   let currentDelay = initialDelayMs;
+
+  const handleTerminalError = async (errToThrow: unknown) => {
+    if (onAgentDecision) {
+      try {
+        const decision = await onAgentDecision(errToThrow, attempt);
+        const decisionType =
+          typeof decision === 'string' ? decision : decision.action;
+
+        debugLogger.log(
+          `Agent evaluated error at attempt ${attempt}: ${decisionType}`,
+        );
+
+        if (decisionType === 'retry' || decisionType === 'modify_request') {
+          return true;
+        }
+      } catch (agentError) {
+        if (agentError !== errToThrow) {
+          debugLogger.warn('Agent decision failed:', agentError);
+        }
+      }
+    }
+    throw errToThrow;
+  };
 
   while (attempt < maxAttempts) {
     if (signal?.aborted) {
@@ -248,7 +279,11 @@ export async function retryWithBackoff<T>(
           }
         }
         // Terminal/not_found already recorded; nothing else to mark here.
-        throw classifiedError; // Throw if no fallback or fallback failed.
+        if (await handleTerminalError(classifiedError)) {
+          attempt = 0;
+          currentDelay = initialDelayMs;
+          continue;
+        }
       }
 
       // Handle ValidationRequiredError - user needs to verify before proceeding
@@ -268,7 +303,11 @@ export async function retryWithBackoff<T>(
             debugLogger.warn('Validation handler failed:', validationError);
           }
         }
-        throw classifiedError;
+        if (await handleTerminalError(classifiedError)) {
+          attempt = 0;
+          currentDelay = initialDelayMs;
+          continue;
+        }
       }
 
       const is500 =
@@ -296,9 +335,15 @@ export async function retryWithBackoff<T>(
               debugLogger.warn('Model fallback failed:', fallbackError);
             }
           }
-          throw classifiedError instanceof RetryableQuotaError
-            ? classifiedError
-            : error;
+          const errToThrow =
+            classifiedError instanceof RetryableQuotaError
+              ? classifiedError
+              : error;
+          if (await handleTerminalError(errToThrow)) {
+            attempt = 0;
+            currentDelay = initialDelayMs;
+            continue;
+          }
         }
 
         if (
@@ -340,7 +385,11 @@ export async function retryWithBackoff<T>(
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         !shouldRetryOnError(error as Error, retryFetchErrors)
       ) {
-        throw error;
+        if (await handleTerminalError(error)) {
+          attempt = 0;
+          currentDelay = initialDelayMs;
+          continue;
+        }
       }
 
       const errorStatus = getErrorStatus(error);
