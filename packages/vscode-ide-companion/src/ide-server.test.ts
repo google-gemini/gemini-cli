@@ -356,6 +356,7 @@ describe('IDEServer', () => {
     });
 
     it('should reject request without auth token', async () => {
+      // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
       const response = await fetch(`http://localhost:${port}/mcp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -370,6 +371,7 @@ describe('IDEServer', () => {
     });
 
     it('should allow request with valid auth token', async () => {
+      // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
       const response = await fetch(`http://localhost:${port}/mcp`, {
         method: 'POST',
         headers: {
@@ -387,6 +389,7 @@ describe('IDEServer', () => {
     });
 
     it('should reject request with invalid auth token', async () => {
+      // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
       const response = await fetch(`http://localhost:${port}/mcp`, {
         method: 'POST',
         headers: {
@@ -413,6 +416,7 @@ describe('IDEServer', () => {
       ];
 
       for (const header of malformedHeaders) {
+        // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
         const response = await fetch(`http://localhost:${port}/mcp`, {
           method: 'POST',
           headers: {

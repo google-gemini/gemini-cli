@@ -11,7 +11,9 @@ import type { Content } from '@google/genai';
 /**
  * Serializes chat history to a Markdown string.
  */
-export function serializeHistoryToMarkdown(history: Content[]): string {
+export function serializeHistoryToMarkdown(
+  history: readonly Content[],
+): string {
   return history
     .map((item) => {
       const text =
@@ -49,7 +51,7 @@ export function serializeHistoryToMarkdown(history: Content[]): string {
  * Options for exporting chat history.
  */
 export interface ExportHistoryOptions {
-  history: Content[];
+  history: readonly Content[];
   filePath: string;
 }
 
