@@ -210,7 +210,6 @@ describe('browserAgentFactory', () => {
       expect(toolNames).toContain('analyze_screenshot');
     });
 
-<<<<<<< feat/browser-allowed-domain
     it('should include domain restrictions in system prompt when configured', async () => {
       const configWithDomains = makeFakeConfig({
         agents: {
@@ -228,7 +227,8 @@ describe('browserAgentFactory', () => {
       const systemPrompt = definition.promptConfig?.systemPrompt ?? '';
       expect(systemPrompt).toContain('SECURITY DOMAIN RESTRICTION - CRITICAL:');
       expect(systemPrompt).toContain('- restricted.com');
-=======
+    });
+
     it('should include all MCP navigation tools (new_page, navigate_page) in definition', async () => {
       mockBrowserManager.getDiscoveredTools.mockResolvedValue([
         { name: 'take_snapshot', description: 'Take snapshot' },
@@ -266,7 +266,6 @@ describe('browserAgentFactory', () => {
       expect(toolNames).toContain('type_text');
       // Total: 9 MCP + 1 type_text (no analyze_screenshot without visualModel)
       expect(definition.toolConfig?.tools).toHaveLength(10);
->>>>>>> main
     });
   });
 
