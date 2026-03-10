@@ -1175,7 +1175,10 @@ describe('ShellExecutionService child_process fallback', () => {
   // Helper function to run a standard execution simulation
   const simulateExecution = async (
     command: string,
-    simulation: (cp: typeof mockChildProcess, ac: AbortController) => void,
+    simulation: (
+      cp: typeof mockChildProcess,
+      ac: AbortController,
+    ) => void | Promise<void>,
   ) => {
     const abortController = new AbortController();
     const handle = await ShellExecutionService.execute(
@@ -1188,7 +1191,7 @@ describe('ShellExecutionService child_process fallback', () => {
     );
 
     await new Promise((resolve) => process.nextTick(resolve));
-    simulation(mockChildProcess, abortController);
+    await simulation(mockChildProcess, abortController);
     const result = await handle.result;
     return { result, handle, abortController };
   };
@@ -1516,9 +1519,9 @@ describe('ShellExecutionService child_process fallback', () => {
   describe('Platform-Specific Behavior', () => {
     it('should use powershell.exe on Windows', async () => {
       mockPlatform.mockReturnValue('win32');
-      await simulateExecution('dir "foo bar"', (cp) =>
-        cp.emit('exit', 0, null),
-      );
+      await simulateExecution('dir "foo bar"', (cp) => {
+        cp.emit('exit', 0, null);
+      });
 
       expect(mockCpSpawn).toHaveBeenCalledWith(
         'powershell.exe',
@@ -1533,7 +1536,9 @@ describe('ShellExecutionService child_process fallback', () => {
 
     it('should use bash and detached process group on Linux', async () => {
       mockPlatform.mockReturnValue('linux');
-      await simulateExecution('ls "foo bar"', (cp) => cp.emit('exit', 0, null));
+      await simulateExecution('ls "foo bar"', (cp) => {
+        cp.emit('exit', 0, null);
+      });
 
       expect(mockCpSpawn).toHaveBeenCalledWith(
         'bash',
