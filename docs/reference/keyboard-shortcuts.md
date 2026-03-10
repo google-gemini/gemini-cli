@@ -106,20 +106,25 @@ available combinations.
 | Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). Plan mode is skipped when the agent is busy. | `Shift+Tab`        |
 | Expand and collapse blocks of content when not in alternate buffer mode.                                                                           | `Ctrl+O`           |
 | Expand or collapse a paste placeholder when cursor is over placeholder.                                                                            | `Ctrl+O`           |
-| Toggle current background shell visibility.                                                                                                        | `Ctrl+B`           |
-| Toggle background shell list.                                                                                                                      | `Ctrl+L`           |
-| Kill the active background shell.                                                                                                                  | `Ctrl+K`           |
-| Confirm selection in background shell list.                                                                                                        | `Enter`            |
-| Dismiss background shell list.                                                                                                                     | `Esc`              |
-| Move focus from background shell to Gemini.                                                                                                        | `Shift+Tab`        |
-| Move focus from background shell list to Gemini.                                                                                                   | `Tab`              |
-| Show warning when trying to move focus away from background shell.                                                                                 | `Tab`              |
-| Show warning when trying to move focus away from shell input.                                                                                      | `Tab`              |
 | Move focus from Gemini to the active shell.                                                                                                        | `Tab`              |
 | Move focus from the shell back to Gemini.                                                                                                          | `Shift+Tab`        |
 | Clear the terminal screen and redraw the UI.                                                                                                       | `Ctrl+L`           |
 | Restart the application.                                                                                                                           | `R`<br />`Shift+R` |
 | Suspend the CLI and move it to the background.                                                                                                     | `Ctrl+Z`           |
+| Show warning when trying to move focus away from shell input.                                                                                      | `Tab`              |
+
+#### Background Shell Controls
+
+| Action                                                             | Keys        |
+| ------------------------------------------------------------------ | ----------- |
+| Dismiss background shell list.                                     | `Esc`       |
+| Confirm selection in background shell list.                        | `Enter`     |
+| Toggle current background shell visibility.                        | `Ctrl+B`    |
+| Toggle background shell list.                                      | `Ctrl+L`    |
+| Kill the active background shell.                                  | `Ctrl+K`    |
+| Move focus from background shell to Gemini.                        | `Shift+Tab` |
+| Move focus from background shell list to Gemini.                   | `Tab`       |
+| Show warning when trying to move focus away from background shell. | `Tab`       |
 
 <!-- KEYBINDINGS-AUTOGEN:END -->
 
