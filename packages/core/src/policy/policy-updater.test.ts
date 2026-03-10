@@ -19,6 +19,7 @@ import {
   type PolicyUpdateOptions,
 } from '../tools/tools.js';
 import * as shellUtils from '../utils/shell-utils.js';
+import { escapeRegex } from './utils.js';
 
 vi.mock('node:fs/promises');
 vi.mock('../config/storage.js');
@@ -75,7 +76,9 @@ describe('createPolicyUpdater', () => {
       expect.objectContaining({
         toolName: 'run_shell_command',
         priority: ALWAYS_ALLOW_PRIORITY,
-        argsPattern: new RegExp('"command":"echo(?:[\\s"]|\\\\")'),
+        argsPattern: new RegExp(
+          escapeRegex('"command":"echo') + '(?:[\\s"]|\\\\")',
+        ),
       }),
     );
     expect(policyEngine.addRule).toHaveBeenNthCalledWith(
@@ -83,7 +86,9 @@ describe('createPolicyUpdater', () => {
       expect.objectContaining({
         toolName: 'run_shell_command',
         priority: ALWAYS_ALLOW_PRIORITY,
-        argsPattern: new RegExp('"command":"ls(?:[\\s"]|\\\\")'),
+        argsPattern: new RegExp(
+          escapeRegex('"command":"ls') + '(?:[\\s"]|\\\\")',
+        ),
       }),
     );
   });
@@ -103,7 +108,9 @@ describe('createPolicyUpdater', () => {
       expect.objectContaining({
         toolName: 'run_shell_command',
         priority: ALWAYS_ALLOW_PRIORITY,
-        argsPattern: new RegExp('"command":"git(?:[\\s"]|\\\\")'),
+        argsPattern: new RegExp(
+          escapeRegex('"command":"git') + '(?:[\\s"]|\\\\")',
+        ),
       }),
     );
   });
