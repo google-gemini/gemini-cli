@@ -327,5 +327,31 @@ describe('AgentConfigDialog', () => {
       expect(frame).toContain('false');
       unmount();
     });
+    it('should respond to availableTerminalHeight and truncate list', async () => {
+      const settings = createMockSettings();
+      // Agent config has about 6 base items + 2 per tool
+      // Render with very small height (20)
+      const { lastFrame, unmount } = render(
+        <KeypressProvider>
+          <AgentConfigDialog
+            agentName="test-agent"
+            displayName="Test Agent"
+            definition={createMockAgentDefinition()}
+            settings={settings}
+            onClose={mockOnClose}
+            onSave={mockOnSave}
+            availableTerminalHeight={20}
+          />
+        </KeypressProvider>,
+      );
+      await waitFor(() =>
+        expect(lastFrame()).toContain('Configure: Test Agent'),
+      );
+
+      const frame = lastFrame();
+      // At height 20, it should be heavily truncated and show '▼'
+      expect(frame).toContain('▼');
+      unmount();
+    });
   });
 });
