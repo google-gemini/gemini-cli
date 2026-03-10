@@ -403,31 +403,10 @@ export class ToolExecutor {
           );
         }
       }
-    } else if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
-      const threshold = this.config.getTruncateToolOutputThreshold();
-
-      if (threshold > 0 && content.length > threshold) {
-        const originalContentLength = content.length;
-        const { outputFile: savedPath } = await saveTruncatedToolOutput(
-          content,
-          toolName,
-          callId,
-          this.config.storage.getProjectTempDir(),
-          this.config.getSessionId(),
-        );
-        outputFile = savedPath;
-        content = formatTruncatedToolOutput(content, outputFile, threshold);
-
-        logToolOutputTruncated(
-          this.config,
-          new ToolOutputTruncatedEvent(call.request.prompt_id, {
-            toolName,
-            originalContentLength,
-            truncatedContentLength: content.length,
-            threshold,
-          }),
-        );
-      }
+    } else {
+      const truncated = await this.truncateOutputIfNeeded(call, content);
+      content = truncated.truncatedContent;
+      outputFile = truncated.outputFile;
     }
 
     const response = convertToFunctionResponse(
