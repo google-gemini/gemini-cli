@@ -292,7 +292,12 @@ export class BrowserManager {
       browserConfig.customConfig.allowedDomains.length > 0
     ) {
       const exclusionRules = browserConfig.customConfig.allowedDomains
-        .map((domain) => `EXCLUDE ${domain}`)
+        .map((domain) => {
+          if (!/^(\*\.)?([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+$/.test(domain)) {
+            throw new Error(`Invalid domain in allowedDomains: ${domain}`);
+          }
+          return `EXCLUDE ${domain}`;
+        })
         .join(', ');
       mcpArgs.push(
         `--chromeArg="--host-rules=MAP * 127.0.0.1, ${exclusionRules}, EXCLUDE 127.0.0.1"`,

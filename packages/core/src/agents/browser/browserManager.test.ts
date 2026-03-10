@@ -254,6 +254,21 @@ describe('BrowserManager', () => {
       );
     });
 
+    it('should throw error when invalid domain is configured in allowedDomains', async () => {
+      const invalidConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['invalid domain!'],
+          },
+        },
+      });
+
+      const manager = new BrowserManager(invalidConfig);
+      await expect(manager.ensureConnection()).rejects.toThrow(
+        'Invalid domain in allowedDomains: invalid domain!',
+      );
+    });
+
     it('should pass headless flag when configured', async () => {
       const headlessConfig = makeFakeConfig({
         agents: {
