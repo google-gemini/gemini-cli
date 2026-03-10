@@ -396,6 +396,23 @@ describe('Task Event-Driven Scheduler', () => {
       undefined,
       true,
     );
+
+    // Clear the mock to track subsequent calls
+    yoloMessageBus.publish = vi.fn();
+
+    // 3. Verify that a delayed/spurious user confirmation is safely ignored
+    // because pendingCorrelationIds and pendingToolConfirmationDetails were cleaned up
+    const handled = await (
+      task as unknown as {
+        _handleToolConfirmationPart: (part: unknown) => Promise<boolean>;
+      }
+    )._handleToolConfirmationPart({
+      kind: 'data',
+      data: { callId: '1', outcome: 'cancel' },
+    });
+
+    expect(handled).toBe(false);
+    expect(yoloMessageBus.publish).not.toHaveBeenCalled();
   });
 
   it('should handle output updates via the message bus', async () => {
