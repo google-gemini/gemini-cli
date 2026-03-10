@@ -51,6 +51,24 @@ describe('<UserIdentity />', () => {
     unmount();
   });
 
+  it('should render the user email on the very first frame (regression test)', () => {
+    const mockConfig = makeFakeConfig();
+    vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
+      authType: AuthType.LOGIN_WITH_GOOGLE,
+      model: 'gemini-pro',
+    } as unknown as ContentGeneratorConfig);
+    vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue(undefined);
+
+    const { lastFrameRaw, unmount } = renderWithProviders(
+      <UserIdentity config={mockConfig} />,
+    );
+
+    // Assert immediately on the first available frame before any async ticks happen
+    const output = lastFrameRaw();
+    expect(output).toContain('test@example.com');
+    unmount();
+  });
+
   it('should render login message if email is missing', async () => {
     // Modify the mock for this specific test
     vi.mocked(UserAccountManager).mockImplementationOnce(
