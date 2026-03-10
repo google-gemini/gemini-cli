@@ -974,13 +974,32 @@ export class Config implements McpContext, AgentLoopContext {
     this.useAlternateBuffer = params.useAlternateBuffer ?? false;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
+
+    if (
+      os.platform() === 'win32' &&
+      (this.sandbox?.enabled || this.sandbox?.command === 'windows-native')
+    ) {
+      this._sandboxManager = new WindowsSandboxManager();
+    } else {
+      this._sandboxManager = new NoopSandboxManager();
+    }
+
+    if (this.sandbox?.enabled && this._sandboxManager) {
+      this.fileSystemService = new SandboxedFileSystemService(
+        this._sandboxManager,
+        this.cwd,
+      );
+    } else {
+      this.fileSystemService = new StandardFileSystemService();
+    }
+
     this.shellExecutionConfig = {
       terminalWidth: params.shellExecutionConfig?.terminalWidth ?? 80,
       terminalHeight: params.shellExecutionConfig?.terminalHeight ?? 24,
       showColor: params.shellExecutionConfig?.showColor ?? false,
       pager: params.shellExecutionConfig?.pager ?? 'cat',
       sanitizationConfig: this.sanitizationConfig,
-      sandboxManager: this.sandboxManager,
+      sandboxManager: this._sandboxManager,
       sandboxConfig: this.sandbox,
     };
     this.truncateToolOutputThreshold =
@@ -1097,25 +1116,6 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
     this._geminiClient = new GeminiClient(this);
-    if (
-      os.platform() === 'win32' &&
-      (this.sandbox?.enabled || this.sandbox?.command === 'windows-native')
-    ) {
-      this._sandboxManager = new WindowsSandboxManager();
-    } else {
-      this._sandboxManager = new NoopSandboxManager();
-    }
-
-    if (this.sandbox?.enabled && this._sandboxManager) {
-      this.fileSystemService = new SandboxedFileSystemService(
-        this._sandboxManager,
-        this.cwd,
-      );
-    } else {
-      this.fileSystemService = new StandardFileSystemService();
-    }
-
-    this.shellExecutionConfig.sandboxManager = this._sandboxManager;
     this.modelRouterService = new ModelRouterService(this);
 
     // HACK: The settings loading logic doesn't currently merge the default

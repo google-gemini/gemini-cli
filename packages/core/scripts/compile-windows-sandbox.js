@@ -17,18 +17,27 @@ const __dirname = path.dirname(__filename);
  * Compiles the GeminiSandbox C# helper on Windows.
  * This is used to provide native restricted token sandboxing.
  */
-function compileWindowsSandbox(): void {
+function compileWindowsSandbox() {
   if (os.platform() !== 'win32') {
     return;
   }
 
-  const helperPath = path.resolve(__dirname, '../src/services/scripts/GeminiSandbox.exe');
+  const srcHelperPath = path.resolve(__dirname, '../src/services/scripts/GeminiSandbox.exe');
+  const distHelperPath = path.resolve(__dirname, '../dist/src/services/scripts/GeminiSandbox.exe');
   const sourcePath = path.resolve(__dirname, '../src/services/scripts/GeminiSandbox.cs');
 
   if (!fs.existsSync(sourcePath)) {
     console.error(`Sandbox source not found at ${sourcePath}`);
     return;
   }
+
+  // Ensure directories exist
+  [srcHelperPath, distHelperPath].forEach(p => {
+    const dir = path.dirname(p);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  });
 
   // Find csc.exe (C# Compiler) which is built into Windows .NET Framework
   const systemRoot = process.env['SystemRoot'] || 'C:\\Windows';
@@ -45,14 +54,25 @@ function compileWindowsSandbox(): void {
   }
 
   console.log(`Compiling native Windows sandbox helper...`);
-  const result = spawnSync(csc, [`/out:${helperPath}`, '/optimize', sourcePath], {
+  // Compile to src
+  let result = spawnSync(csc, [`/out:${srcHelperPath}`, '/optimize', sourcePath], {
     stdio: 'inherit',
   });
 
-  if (result.status !== 0) {
-    console.error('Failed to compile Windows sandbox helper.');
+  if (result.status === 0) {
+    console.log('Successfully compiled GeminiSandbox.exe to src');
+    // Copy to dist if dist exists
+    const distDir = path.resolve(__dirname, '../dist');
+    if (fs.existsSync(distDir)) {
+       const distScriptsDir = path.dirname(distHelperPath);
+       if (!fs.existsSync(distScriptsDir)) {
+         fs.mkdirSync(distScriptsDir, { recursive: true });
+       }
+       fs.copyFileSync(srcHelperPath, distHelperPath);
+       console.log('Successfully copied GeminiSandbox.exe to dist');
+    }
   } else {
-    console.log('Successfully compiled GeminiSandbox.exe');
+    console.error('Failed to compile Windows sandbox helper.');
   }
 }
 

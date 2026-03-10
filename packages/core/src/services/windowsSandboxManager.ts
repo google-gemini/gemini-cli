@@ -7,7 +7,6 @@
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
   type SandboxManager,
@@ -83,6 +82,20 @@ export class WindowsSandboxManager implements SandboxManager {
     // 1. Handle filesystem permissions for Low Integrity
     // Grant "Low Mandatory Level" write access to the CWD.
     this.grantLowIntegrityAccess(req.cwd);
+
+    // Whitelist essential system paths for DLL loading and basic tool execution.
+    // This is required when using the Restricted Code SID (S-1-5-12).
+    const systemPaths = [
+      process.env['SystemRoot'] || 'C:\\Windows',
+      process.env['ProgramFiles'] || 'C:\\Program Files',
+      process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)',
+    ];
+
+    for (const sysPath of systemPaths) {
+      if (fs.existsSync(sysPath)) {
+        this.grantLowIntegrityAccess(sysPath);
+      }
+    }
 
     // Grant "Low Mandatory Level" read access to allowedPaths.
     if (req.config?.allowedPaths) {

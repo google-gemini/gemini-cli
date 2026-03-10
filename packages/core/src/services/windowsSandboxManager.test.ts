@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { WindowsSandboxManager } from './windowsSandboxManager.js';
-import { SandboxRequest } from './sandboxManager.js';
+import type { SandboxRequest } from './sandboxManager.js';
 import * as os from 'node:os';
 
 describe('WindowsSandboxManager', () => {

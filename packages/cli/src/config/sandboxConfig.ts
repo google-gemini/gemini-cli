@@ -43,8 +43,14 @@ function isSandboxCommand(
 function getSandboxCommand(
   sandbox?: boolean | string | null,
 ): SandboxConfig['command'] | '' {
-  // If the SANDBOX env var is set, we're already inside the sandbox.
-  if (process.env['SANDBOX']) {
+  // If the SANDBOX env var is set, we're already inside a container-based sandbox.
+  // For native sandboxing (windows-native, sandbox-exec), we still need the command
+  // to be active in the child process to restrict tool calls.
+  if (
+    process.env['SANDBOX'] &&
+    process.env['SANDBOX'] !== 'windows-native' &&
+    process.env['SANDBOX'] !== 'sandbox-exec'
+  ) {
     return '';
   }
 
@@ -143,10 +149,15 @@ export async function loadSandboxConfig(
   const allowedPaths =
     allowedPathsEnv ?? settings.tools?.sandboxAllowedPaths ?? [];
 
+  const enabled =
+    (sandboxOption !== undefined && sandboxOption !== false) ||
+    command === 'windows-native' ||
+    command === 'sandbox-exec';
+
   return command &&
     (image || command === 'sandbox-exec' || command === 'windows-native')
     ? {
-        enabled: true,
+        enabled,
         allowedPaths,
         networkAccess,
         command,

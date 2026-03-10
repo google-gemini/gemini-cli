@@ -10,7 +10,7 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "build": "node ../../scripts/build_package.js",
+    "build": "node scripts/compile-windows-sandbox.js && node ../../scripts/build_package.js",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
     "test": "vitest run",
