@@ -236,3 +236,62 @@ export function getCitations(resp: GenerateContentResponse): string[] {
       return citation.uri!;
     });
 }
+
+export function mergeResponseChunks(
+  chunks: GenerateContentResponse[],
+): GenerateContentResponse | undefined {
+  if (!chunks || chunks.length === 0) {
+    return undefined;
+  }
+
+  // Use the first chunk as the base
+  const result: GenerateContentResponse = {
+    ...chunks[0],
+    text: undefined,
+    data: undefined,
+    functionCalls: undefined,
+    executableCode: undefined,
+    codeExecutionResult: undefined,
+  };
+
+  let mergedText = '';
+   
+  const functionCalls: FunctionCall[] = [];
+
+  for (const chunk of chunks) {
+    const parts = chunk.candidates?.[0]?.content?.parts;
+    if (parts) {
+      for (const part of parts) {
+        if (part.text) {
+          mergedText += part.text;
+        } else if (part.functionCall) {
+          functionCalls.push(part.functionCall);
+        }
+      }
+    }
+  }
+
+  const mergedParts: Part[] = [];
+  if (mergedText) {
+    mergedParts.push({ text: mergedText });
+  }
+  for (const call of functionCalls) {
+    mergedParts.push({ functionCall: call });
+  }
+
+  if (result.candidates && result.candidates.length > 0) {
+    if (!result.candidates[0].content) {
+      result.candidates[0].content = { role: 'model', parts: [] };
+    }
+    result.candidates[0].content.parts = mergedParts;
+  } else {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    result.candidates = [
+      {
+        content: { role: 'model', parts: mergedParts },
+      },
+    ] as unknown as GenerateContentResponse['candidates'];
+  }
+
+  return result;
+}

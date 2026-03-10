@@ -17,6 +17,7 @@ import type { ContentGenerator } from './contentGenerator.js';
 import type { UserTierId, GeminiUserTier } from '../code_assist/types.js';
 import type { LlmRole } from '../telemetry/types.js';
 import { PromptCache } from '../cache/prompt-cache.js';
+import { mergeResponseChunks } from '../utils/generateContentResponseUtilities.js';
 
 export class CachingContentGenerator implements ContentGenerator {
   private readonly promptCache: PromptCache;
@@ -46,8 +47,14 @@ export class CachingContentGenerator implements ContentGenerator {
     role: LlmRole,
   ): Promise<GenerateContentResponse> {
     const cached = this.promptCache.get(request, request.model);
-    if (cached && !Array.isArray(cached)) {
-      return cached;
+    if (cached) {
+      if (!Array.isArray(cached)) {
+        return cached;
+      }
+      const merged = mergeResponseChunks(cached);
+      if (merged) {
+        return merged;
+      }
     }
 
     const response = await this.realGenerator.generateContent(
@@ -69,17 +76,17 @@ export class CachingContentGenerator implements ContentGenerator {
 
     if (cached && Array.isArray(cached)) {
       const cachedChunks: GenerateContentResponse[] = cached;
-      async function* streamCached() {
+      const streamCached = async function* () {
         for (const chunk of cachedChunks) {
           yield chunk;
         }
-      }
+      };
       return streamCached();
     } else if (cached && !Array.isArray(cached)) {
       const cachedSingle: GenerateContentResponse = cached;
-      async function* streamSingleCached() {
+      const streamSingleCached = async function* () {
         yield cachedSingle;
-      }
+      };
       return streamSingleCached();
     }
 
@@ -92,14 +99,14 @@ export class CachingContentGenerator implements ContentGenerator {
     const promptCache = this.promptCache;
     const model = request.model;
 
-    async function* stream() {
+    const stream = async function* () {
       const chunks: GenerateContentResponse[] = [];
       for await (const response of realResponses) {
         chunks.push(response);
         yield response;
       }
       promptCache.set(request, model, chunks);
-    }
+    };
 
     return stream();
   }
