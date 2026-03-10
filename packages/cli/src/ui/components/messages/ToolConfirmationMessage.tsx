@@ -32,11 +32,6 @@ import { useSettings } from '../../contexts/SettingsContext.js';
 import { useUIActions } from '../../contexts/UIActionsContext.js';
 import { Command } from '../../key/keyMatchers.js';
 import { formatCommand } from '../../key/keybindingUtils.js';
-import {
-  REDIRECTION_WARNING_NOTE_LABEL,
-  REDIRECTION_WARNING_NOTE_TEXT,
-  REDIRECTION_WARNING_TIP_LABEL,
-} from '../../textConstants.js';
 import { AskUserDialog } from '../AskUserDialog.js';
 import { ExitPlanModeDialog } from '../ExitPlanModeDialog.js';
 import { WarningMessage } from './WarningMessage.js';
@@ -57,6 +52,11 @@ export interface ToolConfirmationMessageProps {
   availableTerminalHeight?: number;
   terminalWidth: number;
 }
+
+const REDIRECTION_WARNING_NOTE_LABEL = 'Note: ';
+const REDIRECTION_WARNING_NOTE_TEXT =
+  'Command contains redirection which can be undesirable.';
+const REDIRECTION_WARNING_TIP_LABEL = 'Tip:  '; // Padded to align with "Note: "
 
 export const ToolConfirmationMessage: React.FC<
   ToolConfirmationMessageProps
@@ -480,7 +480,13 @@ export const ToolConfirmationMessage: React.FC<
             availableHeight={availableBodyContentHeight()}
           />
         );
-        return { question: '', bodyContent, options: [], securityWarnings: null };
+        return {
+          question: '',
+          bodyContent,
+          options: [],
+          securityWarnings: null,
+          initialIndex: 0,
+        };
       }
 
       if (confirmationDetails.type === 'edit') {
