@@ -169,7 +169,7 @@ You can share your skills in several ways depending on your target audience.
 Explore these resources to refine your skills and understand the framework
 better.
 
-- [Skill reference](../reference/skills.md): Deeply understand the skill format
-  and discovery tiers.
+- [Overview](./skills.md): Understand the discovery tiers and activation
+  lifecycle.
 - [Best practices](./skills-best-practices.md): Learn strategies for building
   effective skills.

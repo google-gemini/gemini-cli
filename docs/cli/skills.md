@@ -6,59 +6,70 @@ workflows, and task-specific resources. Based on the
 self-contained directory that packages instructions and assets into a
 discoverable capability.
 
-## Overview
-
 Unlike general context files ([`GEMINI.md`](../gemini-md.md)), which provide
 persistent workspace-wide background, Skills represent **on-demand expertise**.
 This lets Gemini maintain a vast library of specialized capabilities—such as
 security auditing, cloud deployments, or codebase migrations—without cluttering
 the model's immediate context window.
 
-Gemini autonomously decides when to employ a skill based on your request and the
-skill's description. When a relevant skill is identified, the model "pulls in"
-the full instructions and resources required to complete the task using the
-`activate_skill` tool.
+## How it works
 
-## Choose your path
+The lifecycle of an Agent Skill involves discovery, activation, and conditional
+resource access.
 
-Choose the guide that best fits your needs.
+1.  **Discovery**: At the start of a session, Gemini CLI scans the discovery
+    tiers and injects the name and description of all enabled skills into the
+    system prompt.
+2.  **Activation**: When Gemini identifies a task matching a skill's
+    description, it calls the `activate_skill` tool.
+3.  **Consent**: You will see a confirmation prompt in the UI detailing the
+    skill's name, purpose, and the directory path it will gain access to.
+4.  **Injection**: Upon your approval:
+    - The `SKILL.md` body and folder structure is added to the conversation
+      history.
+    - The skill's directory is added to the agent's allowed file paths, granting
+      it permission to read any bundled assets.
+5.  **Execution**: The model proceeds with the specialized expertise active. It
+    is instructed to prioritize the skill's procedural guidance within reason.
 
-### I want to use skills
+## Discovery tiers
 
-Learn how to discover, install, and manage skills to enhance your Gemini CLI
-experience.
+Gemini CLI discovers skills from three primary locations:
 
-- **[Manage skills](#managing-skills):** List and verify your installed skills.
-- **[Install skills](#from-the-terminal):** Add new capabilities from GitHub or
-  local paths.
+1.  **Workspace Skills**: Located in `.gemini/skills/` or the `.agents/skills/`
+    alias. Workspace skills are typically committed to version control and
+    shared with the team.
+2.  **User Skills**: Located in `~/.gemini/skills/` or the `~/.agents/skills/`
+    alias. These are personal skills available across all your workspaces.
+3.  **Extension Skills**: Skills bundled within installed
+    [extensions](../extensions/index.md).
 
-### I want to build skills
+### Precedence rules
 
-Learn how to create, test, and share your own skills with the community.
+If multiple skills share the same name, higher-precedence locations override
+lower ones: **Workspace > User > Extension**.
 
-- **[Build agent skills](./creating-skills.md):** Create your first skill from a
-  template.
-- **[Best practices](./skills-best-practices.md):** Learn how to build secure
-  and reliable skills.
-- **[Technical specifications](../reference/skills.md):** Deeply understand the
-  skill format and discovery tiers.
+Within the same tier (user or workspace), the `.agents/skills/` alias takes
+precedence over the `.gemini/skills/` directory. This generic alias provides an
+interactive path for managing agent-specific expertise that remains compatible
+across different AI agent tools.
 
-## Key Benefits
+## Key benefits
 
 Agent Skills provide several advantages for managing specialized knowledge and
 complex workflows.
 
-- **Shared Expertise:** Package complex workflows (like a specific team's PR
+- **Shared Expertise**: Package complex workflows (like a specific team's PR
   review process) into a folder that anyone can use.
-- **Repeatable Workflows:** Ensure complex multi-step tasks are performed
+- **Repeatable Workflows**: Ensure complex multi-step tasks are performed
   consistently by providing a procedural framework.
-- **Resource Bundling:** Include scripts, templates, or example data alongside
+- **Resource Bundling**: Include scripts, templates, or example data alongside
   instructions so the agent has everything it needs.
-- **Progressive Disclosure:** Only skill metadata (name and description) is
+- **Progressive Disclosure**: Only skill metadata (name and description) is
   loaded initially. Detailed instructions and resources are only disclosed when
   the model explicitly activates the skill, saving context tokens.
 
-## Standard Agent Skills
+## Standard skills
 
 Gemini CLI includes several high-value standard skills that showcase the power
 of the framework. These skills are often used for:
@@ -75,12 +86,12 @@ of the framework. These skills are often used for:
 To see all available skills in your current session, use the `/skills list`
 command.
 
-## Managing Skills
+## Managing skills
 
 You can manage Agent Skills through interactive session commands or directly
 from your terminal.
 
-### In an Interactive Session
+### In an interactive session
 
 Use the `/skills` slash command to view and manage available expertise:
 
@@ -91,7 +102,7 @@ Use the `/skills` slash command to view and manage available expertise:
 - `/skills enable <name> [--scope]`: Re-enables a disabled skill.
 - `/skills reload`: Refreshes the list of discovered skills from all tiers.
 
-### From the Terminal
+### From the terminal
 
 The `gemini skills` command provides management utilities:
 
@@ -126,8 +137,9 @@ For more details on CLI commands, see the
 Explore these resources to refine your skills and understand the framework
 better.
 
-- [Build agent skills](./creating-skills.md): Start developing your own skills.
-- [Skill reference](../reference/skills.md): Deeply understand the skill format
-  and discovery tiers.
+- [Get started with skills](./tutorials/skills-getting-started.md): Create your
+  first skill.
+- [Build agent skills](./creating-skills.md): Deepen your knowledge of skill
+  creation.
 - [Best practices](./skills-best-practices.md): Learn strategies for building
   effective skills.

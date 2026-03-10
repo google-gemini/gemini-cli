@@ -97,16 +97,12 @@
             "items": [
               { "label": "Overview", "slug": "docs/cli/skills" },
               {
-                "label": "Build agent skills",
+                "label": "Create skills",
                 "slug": "docs/cli/creating-skills"
               },
               {
                 "label": "Best practices",
                 "slug": "docs/cli/skills-best-practices"
-              },
-              {
-                "label": "Reference",
-                "slug": "docs/reference/skills"
               }
             ]
           },
