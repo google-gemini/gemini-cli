@@ -123,8 +123,8 @@ rm -f "$log_dir/npm-test.exit"
         done
         echo $exit_code > "$log_dir/npm-test.exit"
       else
-        echo "Could not extract specific failing files. Running full local test suite..." >> "$log_dir/npm-test.log"
-        npm run test:ci >> "$log_dir/npm-test.log" 2>&1; echo $? > "$log_dir/npm-test.exit"
+        echo "Could not extract specific failing files. Skipping full local test suite as it takes too long. Please check CI logs manually." >> "$log_dir/npm-test.log"
+        echo 1 > "$log_dir/npm-test.exit"
       fi
     fi
   else
