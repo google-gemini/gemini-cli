@@ -125,15 +125,16 @@ describe('KeychainTokenStorage', () => {
       await expect(storage.clearAll()).rejects.toThrow(
         /Failed to clear some credentials: system fail/,
       );
+    });
 
-      // Aggregating a 'not found' error (returns false)
-      vi.spyOn(KeychainService.prototype, 'deletePassword')
-        .mockResolvedValueOnce(true)
-        .mockResolvedValueOnce(false);
-
-      await expect(storage.clearAll()).rejects.toThrow(
-        /Failed to clear some credentials: No credentials found/,
+    it('should not throw when deleteCredentials called on missing entry', async () => {
+      vi.spyOn(KeychainService.prototype, 'deletePassword').mockResolvedValue(
+        false,
       );
+
+      await expect(
+        storage.deleteCredentials('nonexistent'),
+      ).resolves.not.toThrow();
     });
 
     it('should manage secrets with prefix independently', async () => {

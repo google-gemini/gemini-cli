@@ -142,7 +142,7 @@ export class FileTokenStorage extends BaseTokenStorage {
     const tokens = await this.loadTokens();
 
     if (!tokens.has(serverName)) {
-      throw new Error(`No credentials found for ${serverName}`);
+      return;
     }
 
     tokens.delete(serverName);
