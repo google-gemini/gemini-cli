@@ -569,6 +569,7 @@ export interface ConfigParameters {
   recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
+  disableAlwaysAllow?: boolean;
   rawOutput?: boolean;
   acceptRawOutputRisk?: boolean;
   modelConfigServiceConfig?: ModelConfigServiceConfig;
@@ -765,6 +766,7 @@ export class Config implements McpContext, AgentLoopContext {
   readonly fakeResponses?: string;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
+  private readonly disableAlwaysAllow: boolean;
   private readonly rawOutput: boolean;
   private readonly acceptRawOutputRisk: boolean;
   private pendingIncludeDirectories: string[];
@@ -996,6 +998,7 @@ export class Config implements McpContext, AgentLoopContext {
         ...params.policyEngineConfig,
         approvalMode:
           params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+        disableAlwaysAllow: this.disableAlwaysAllow,
       },
       checkerRunner,
     );
@@ -1027,6 +1030,7 @@ export class Config implements McpContext, AgentLoopContext {
       DEFAULT_MAX_ATTEMPTS,
     );
     this.disableYoloMode = params.disableYoloMode ?? false;
+    this.disableAlwaysAllow = params.disableAlwaysAllow ?? false;
     this.rawOutput = params.rawOutput ?? false;
     this.acceptRawOutputRisk = params.acceptRawOutputRisk ?? false;
 
@@ -2101,6 +2105,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   isYoloModeDisabled(): boolean {
     return this.disableYoloMode || !this.isTrustedFolder();
+  }
+
+  getDisableAlwaysAllow(): boolean {
+    return this.disableAlwaysAllow;
   }
 
   getRawOutput(): boolean {

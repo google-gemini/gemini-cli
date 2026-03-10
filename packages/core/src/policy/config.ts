@@ -16,6 +16,7 @@ import {
   type PolicyRule,
   type PolicySettings,
   type SafetyCheckerRule,
+  ALWAYS_ALLOW_PRIORITY_OFFSET,
 } from './types.js';
 import type { PolicyEngine } from './policy-engine.js';
 import { loadPoliciesFromToml, type PolicyFileError } from './toml-loader.js';
@@ -46,20 +47,8 @@ export const WORKSPACE_POLICY_TIER = 3;
 export const USER_POLICY_TIER = 4;
 export const ADMIN_POLICY_TIER = 5;
 
-/**
- * The fractional priority of "Always allow" rules (e.g., 950/1000).
- * Higher fraction within a tier wins.
- */
-export const ALWAYS_ALLOW_PRIORITY_FRACTION = 950;
-
-/**
- * The fractional priority offset for "Always allow" rules (e.g., 0.95).
- * This ensures consistency between in-memory rules and persisted rules.
- */
-export const ALWAYS_ALLOW_PRIORITY_OFFSET =
-  ALWAYS_ALLOW_PRIORITY_FRACTION / 1000;
-
 // Specific priority offsets and derived priorities for dynamic/settings rules.
+
 
 export const MCP_EXCLUDED_PRIORITY = USER_POLICY_TIER + 0.9;
 export const EXCLUDE_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.4;
@@ -481,6 +470,7 @@ export async function createPolicyEngineConfig(
     checkers,
     defaultDecision: PolicyDecision.ASK_USER,
     approvalMode,
+    disableAlwaysAllow: settings.disableAlwaysAllow,
   };
 }
 

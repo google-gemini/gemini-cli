@@ -62,6 +62,8 @@ export async function createPolicyEngineConfig(
     mcpServers: settings.mcpServers,
     policyPaths: settings.policyPaths,
     workspacePoliciesDir,
+    disableAlwaysAllow:
+      settings.security?.disableAlwaysAllow || settings.admin?.secureModeEnabled,
   };
 
   return createCorePolicyEngineConfig(policySettings, approvalMode);
