@@ -16,9 +16,9 @@ import {
 } from '@google/gemini-cli-core';
 import { cpLen, cpSlice, getCachedStringWidth } from '../utils/textUtils.js';
 import { type BackgroundShell } from '../hooks/shellCommandProcessor.js';
-import { Command, keyMatchers } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { formatCommand } from '../utils/keybindingUtils.js';
+import { formatCommand } from '../key/keybindingUtils.js';
 import {
   ScrollableList,
   type ScrollableListRef,
@@ -30,6 +30,7 @@ import {
   RadioButtonSelect,
   type RadioSelectItem,
 } from './shared/RadioButtonSelect.js';
+import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
 interface BackgroundShellDisplayProps {
   shells: Map<number, BackgroundShell>;
@@ -60,6 +61,7 @@ export const BackgroundShellDisplay = ({
   isFocused,
   isListOpenProp,
 }: BackgroundShellDisplayProps) => {
+  const keyMatchers = useKeyMatchers();
   const {
     dismissBackgroundShell,
     setActiveBackgroundShellPid,
@@ -427,7 +429,7 @@ export const BackgroundShellDisplay = ({
       height="100%"
       width="100%"
       borderStyle="single"
-      borderColor={isFocused ? theme.border.focused : undefined}
+      borderColor={isFocused ? theme.ui.focus : undefined}
     >
       <Box
         flexDirection="row"
@@ -438,7 +440,7 @@ export const BackgroundShellDisplay = ({
         borderRight={false}
         borderTop={false}
         paddingX={1}
-        borderColor={isFocused ? theme.border.focused : undefined}
+        borderColor={isFocused ? theme.ui.focus : undefined}
       >
         <Box flexDirection="row">
           {renderTabs()}

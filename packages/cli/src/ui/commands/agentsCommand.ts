@@ -322,7 +322,7 @@ const configCommand: SlashCommand = {
   completion: completeAllAgents,
 };
 
-const agentsRefreshCommand: SlashCommand = {
+const agentsReloadCommand: SlashCommand = {
   name: 'reload',
   altNames: ['refresh'],
   description: 'Reload the agent registry',
@@ -348,7 +348,7 @@ const agentsRefreshCommand: SlashCommand = {
     return {
       type: 'message',
       messageType: 'info',
-      content: 'Agents reloaded successfully.',
+      content: 'Agents reloaded successfully',
     };
   },
 };
@@ -359,7 +359,7 @@ export const agentsCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   subCommands: [
     agentsListCommand,
-    agentsRefreshCommand,
+    agentsReloadCommand,
     enableCommand,
     disableCommand,
     configCommand,

@@ -341,8 +341,8 @@ function getEnableDisableContext(
   if (
     name === '' ||
     !(
-      (parts.length === 2 && parts[1].startsWith('--scope=')) || // --scope=<scope>
-      (parts.length === 3 && parts[1] === '--scope') // --scope <scope>
+      (parts.length === 2 && parts[1].startsWith('--scope=')) ||
+      (parts.length === 3 && parts[1] === '--scope')
     )
   ) {
     context.ui.addItem({
@@ -352,7 +352,6 @@ function getEnableDisableContext(
     return null;
   }
   let scope: SettingScope;
-  // Transform `--scope=<scope>` to `--scope <scope>`.
   if (parts.length === 2) {
     parts.push(...parts[1].split('='));
     parts.splice(1, 1);
@@ -422,7 +421,6 @@ async function enableAction(context: CommandContext, args: string) {
       text: `Extension "${name}" enabled for the scope "${scope}"`,
     });
 
-    // Auto-enable any disabled MCP servers for this extension
     const extension = extensionManager
       .getExtensions()
       .find((e) => e.name === name);
@@ -474,15 +472,11 @@ async function installAction(context: CommandContext, args: string) {
     return;
   }
 
-  // Validate that the source is either a valid URL or a valid file path.
   let isValid = false;
   try {
-    // Check if it's a valid URL.
     new URL(source);
     isValid = true;
   } catch {
-    // If not a URL, check for characters that are disallowed in file paths
-    // and could be used for command injection.
     if (!/[;&|`'"]/.test(source)) {
       isValid = true;
     }
@@ -847,7 +841,6 @@ export function extensionsCommand(
       ...conditionalCommands,
     ],
     action: (context, args) =>
-      // Default to list if no subcommand is provided
       listExtensionsCommand.action!(context, args),
   };
 }

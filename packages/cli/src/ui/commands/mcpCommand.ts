@@ -149,7 +149,7 @@ const authCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'info',
-        content: `Successfully authenticated and refreshed tools for '${serverName}'.`,
+        content: `Successfully authenticated and reloaded tools for '${serverName}'`,
       };
     } catch (error) {
       return {
@@ -325,7 +325,7 @@ const schemaCommand: SlashCommand = {
   action: (context) => listAction(context, true, true),
 };
 
-const refreshCommand: SlashCommand = {
+const reloadCommand: SlashCommand = {
   name: 'reload',
   altNames: ['refresh'],
   description: 'Reloads MCP servers',
@@ -521,7 +521,7 @@ export const mcpCommand: SlashCommand = {
     descCommand,
     schemaCommand,
     authCommand,
-    refreshCommand,
+    reloadCommand,
     enableCommand,
     disableCommand,
   ],

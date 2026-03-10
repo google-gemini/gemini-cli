@@ -21,6 +21,10 @@ import {
   ConfigExtensionDialog,
   type ConfigExtensionDialogProps,
 } from '../components/ConfigExtensionDialog.js';
+import {
+  ExtensionRegistryView,
+  type ExtensionRegistryViewProps,
+} from '../components/views/ExtensionRegistryView.js';
 import { type CommandContext, type SlashCommand } from './types.js';
 
 import {
@@ -39,6 +43,8 @@ import {
 } from '../../config/extension-manager.js';
 import { SettingScope } from '../../config/settings.js';
 import { stat } from 'node:fs/promises';
+import { type RegistryExtension } from '../../config/extensionRegistryClient.js';
+import { waitFor } from '../../test-utils/async.js';
 
 vi.mock('../../config/extension-manager.js', async (importOriginal) => {
   const actual =
@@ -167,6 +173,7 @@ describe('extensionsCommand', () => {
       },
       ui: {
         dispatchExtensionStateUpdate: mockDispatchExtensionState,
+        removeComponent: vi.fn(),
       },
     });
   });
@@ -263,7 +270,7 @@ describe('extensionsCommand', () => {
 
   describe('update', () => {
     const updateAction = extensionsCommand().subCommands?.find(
-      (cmd) => cmd.name === 'update',
+      (cmd: SlashCommand) => cmd.name === 'update',
     )?.action;
 
     if (!updateAction) {
@@ -422,12 +429,67 @@ describe('extensionsCommand', () => {
 
   describe('explore', () => {
     const exploreAction = extensionsCommand().subCommands?.find(
-      (cmd) => cmd.name === 'explore',
+      (cmd: SlashCommand) => cmd.name === 'explore',
     )?.action;
 
     if (!exploreAction) {
       throw new Error('Explore action not found');
     }
+
+    it('should return ExtensionRegistryView custom dialog when experimental.extensionRegistry is true', async () => {
+      mockContext.services.settings.merged.experimental.extensionRegistry = true;
+
+      const result = await exploreAction(mockContext, '');
+
+      expect(result).toBeDefined();
+      if (result?.type !== 'custom_dialog') {
+        throw new Error('Expected custom_dialog');
+      }
+
+      const component =
+        result.component as ReactElement<ExtensionRegistryViewProps>;
+      expect(component.type).toBe(ExtensionRegistryView);
+      expect(component.props.extensionManager).toBe(mockExtensionLoader);
+    });
+
+    it('should handle onSelect and onClose in ExtensionRegistryView', async () => {
+      mockContext.services.settings.merged.experimental.extensionRegistry = true;
+
+      const result = await exploreAction(mockContext, '');
+      if (result?.type !== 'custom_dialog') {
+        throw new Error('Expected custom_dialog');
+      }
+
+      const component =
+        result.component as ReactElement<ExtensionRegistryViewProps>;
+
+      const extension = {
+        extensionName: 'test-ext',
+        url: 'https://github.com/test/ext.git',
+      } as RegistryExtension;
+
+      vi.mocked(inferInstallMetadata).mockResolvedValue({
+        source: extension.url,
+        type: 'git',
+      });
+      mockInstallExtension.mockResolvedValue({ name: extension.url });
+
+      // Call onSelect
+      component.props.onSelect?.(extension);
+
+      await waitFor(() => {
+        expect(inferInstallMetadata).toHaveBeenCalledWith(extension.url);
+        expect(mockInstallExtension).toHaveBeenCalledWith({
+          source: extension.url,
+          type: 'git',
+        });
+      });
+      expect(mockContext.ui.removeComponent).toHaveBeenCalledTimes(1);
+
+      // Call onClose
+      component.props.onClose?.();
+      expect(mockContext.ui.removeComponent).toHaveBeenCalledTimes(2);
+    });
 
     it("should add an info message and call 'open' in a non-sandbox environment", async () => {
       // Ensure no special environment variables that would affect behavior
@@ -496,7 +558,9 @@ describe('extensionsCommand', () => {
   describe('when enableExtensionReloading is true', () => {
     it('should include enable, disable, install, link, and uninstall subcommands', () => {
       const command = extensionsCommand(true);
-      const subCommandNames = command.subCommands?.map((cmd) => cmd.name);
+      const subCommandNames = command.subCommands?.map(
+        (cmd: SlashCommand) => cmd.name,
+      );
       expect(subCommandNames).toContain('enable');
       expect(subCommandNames).toContain('disable');
       expect(subCommandNames).toContain('install');
@@ -508,7 +572,9 @@ describe('extensionsCommand', () => {
   describe('when enableExtensionReloading is false', () => {
     it('should not include enable, disable, install, link, and uninstall subcommands', () => {
       const command = extensionsCommand(false);
-      const subCommandNames = command.subCommands?.map((cmd) => cmd.name);
+      const subCommandNames = command.subCommands?.map(
+        (cmd: SlashCommand) => cmd.name,
+      );
       expect(subCommandNames).not.toContain('enable');
       expect(subCommandNames).not.toContain('disable');
       expect(subCommandNames).not.toContain('install');
@@ -520,7 +586,9 @@ describe('extensionsCommand', () => {
   describe('when enableExtensionReloading is not provided', () => {
     it('should not include enable, disable, install, link, and uninstall subcommands by default', () => {
       const command = extensionsCommand();
-      const subCommandNames = command.subCommands?.map((cmd) => cmd.name);
+      const subCommandNames = command.subCommands?.map(
+        (cmd: SlashCommand) => cmd.name,
+      );
       expect(subCommandNames).not.toContain('enable');
       expect(subCommandNames).not.toContain('disable');
       expect(subCommandNames).not.toContain('install');
@@ -534,7 +602,7 @@ describe('extensionsCommand', () => {
 
     beforeEach(() => {
       installAction = extensionsCommand(true).subCommands?.find(
-        (cmd) => cmd.name === 'install',
+        (cmd: SlashCommand) => cmd.name === 'install',
       )?.action;
 
       expect(installAction).not.toBeNull();
@@ -611,7 +679,7 @@ describe('extensionsCommand', () => {
 
     beforeEach(() => {
       linkAction = extensionsCommand(true).subCommands?.find(
-        (cmd) => cmd.name === 'link',
+        (cmd: SlashCommand) => cmd.name === 'link',
       )?.action;
 
       expect(linkAction).not.toBeNull();
@@ -681,7 +749,7 @@ describe('extensionsCommand', () => {
 
     beforeEach(() => {
       uninstallAction = extensionsCommand(true).subCommands?.find(
-        (cmd) => cmd.name === 'uninstall',
+        (cmd: SlashCommand) => cmd.name === 'uninstall',
       )?.action;
 
       expect(uninstallAction).not.toBeNull();
@@ -693,7 +761,7 @@ describe('extensionsCommand', () => {
       await uninstallAction!(mockContext, '');
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.ERROR,
-        text: 'Usage: /extensions uninstall <extension-name>',
+        text: 'Usage: /extensions uninstall <extension-names...>|--all',
       });
       expect(mockUninstallExtension).not.toHaveBeenCalled();
     });
@@ -731,7 +799,7 @@ describe('extensionsCommand', () => {
 
     beforeEach(() => {
       enableAction = extensionsCommand(true).subCommands?.find(
-        (cmd) => cmd.name === 'enable',
+        (cmd: SlashCommand) => cmd.name === 'enable',
       )?.action;
 
       expect(enableAction).not.toBeNull();
@@ -783,7 +851,7 @@ describe('extensionsCommand', () => {
 
     beforeEach(() => {
       disableAction = extensionsCommand(true).subCommands?.find(
-        (cmd) => cmd.name === 'disable',
+        (cmd: SlashCommand) => cmd.name === 'disable',
       )?.action;
 
       expect(disableAction).not.toBeNull();
@@ -838,7 +906,7 @@ describe('extensionsCommand', () => {
 
     beforeEach(() => {
       reloadAction = extensionsCommand().subCommands?.find(
-        (c) => c.name === 'reload',
+        (c: SlashCommand) => c.name === 'reload',
       )?.action;
       expect(reloadAction).not.toBeNull();
 
@@ -868,7 +936,7 @@ describe('extensionsCommand', () => {
       });
     });
 
-    it('restarts all active extensions when --all is provided', async () => {
+    it('reloads all active extensions when --all is provided', async () => {
       const mockExtensions = [
         { name: 'ext1', isActive: true },
         { name: 'ext2', isActive: true },
@@ -890,7 +958,7 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: '2 extensions reloaded successfully.',
+          text: '2 extensions reloaded successfully',
         }),
       );
       expect(mockContext.ui.dispatchExtensionStateUpdate).toHaveBeenCalledWith({
@@ -924,7 +992,7 @@ describe('extensionsCommand', () => {
       );
     });
 
-    it('restarts only specified active extensions', async () => {
+    it('reloads only specified active extensions', async () => {
       const mockExtensions = [
         { name: 'ext1', isActive: false },
         { name: 'ext2', isActive: true },
@@ -968,7 +1036,7 @@ describe('extensionsCommand', () => {
       expect(mockRestartExtension).not.toHaveBeenCalled();
     });
 
-    it('handles errors during extension restart', async () => {
+    it('handles errors during extension reload', async () => {
       const mockExtensions = [
         { name: 'ext1', isActive: true },
       ] as GeminiCLIExtension[];
@@ -1004,7 +1072,7 @@ describe('extensionsCommand', () => {
       );
     });
 
-    it('does not restart any extensions if none are found', async () => {
+    it('does not reload any extensions if none are found', async () => {
       const mockExtensions = [
         { name: 'ext1', isActive: true },
       ] as GeminiCLIExtension[];
@@ -1051,7 +1119,7 @@ describe('extensionsCommand', () => {
 
     beforeEach(async () => {
       configAction = extensionsCommand(true).subCommands?.find(
-        (cmd) => cmd.name === 'config',
+        (cmd: SlashCommand) => cmd.name === 'config',
       )?.action;
 
       expect(configAction).not.toBeNull();
