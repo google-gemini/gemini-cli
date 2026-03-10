@@ -820,6 +820,17 @@ describe('Composer', () => {
   });
 
   describe('Shortcuts Hint', () => {
+    it('restores shortcuts hint after 200ms debounce when buffer is empty', async () => {
+      const { lastFrame } = await renderComposer(
+        createMockUIState({
+          buffer: { text: '' } as unknown as TextBuffer,
+          cleanUiDetailsVisible: false,
+        }),
+      );
+
+      expect(lastFrame({ allowEmpty: true })).toContain('ShortcutsHint');
+    });
+
     it('hides shortcuts hint when text is typed in buffer', async () => {
       const uiState = createMockUIState({
         buffer: { text: 'hello' } as unknown as TextBuffer,
