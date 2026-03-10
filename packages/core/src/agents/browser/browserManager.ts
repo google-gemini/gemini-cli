@@ -482,26 +482,33 @@ export class BrowserManager {
     if (!url) {
       return true;
     }
+    if (typeof url !== 'string') {
+      throw new Error('Invalid URL: URL must be a string.');
+    }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const parsedUrl = new URL(url as string);
-    const urlHostname = parsedUrl.hostname;
+    try {
+      const parsedUrl = new URL(url);
+      const urlHostname = parsedUrl.hostname;
 
-    for (const domainPattern of allowedDomains) {
-      if (domainPattern.startsWith('*.')) {
-        const baseDomain = domainPattern.substring(2);
-        if (
-          urlHostname === baseDomain ||
-          urlHostname.endsWith(`.${baseDomain}`)
-        ) {
-          return true;
-        }
-      } else {
-        if (urlHostname === domainPattern) {
-          return true;
+      for (const domainPattern of allowedDomains) {
+        if (domainPattern.startsWith('*.')) {
+          const baseDomain = domainPattern.substring(2);
+          if (
+            urlHostname === baseDomain ||
+            urlHostname.endsWith(`.${baseDomain}`)
+          ) {
+            return true;
+          }
+        } else {
+          if (urlHostname === domainPattern) {
+            return true;
+          }
         }
       }
+    } catch {
+      throw new Error('Invalid URL: Malformed URL string.');
     }
+
     // If none matched, then deny
     return false;
   }
