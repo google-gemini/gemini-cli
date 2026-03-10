@@ -129,6 +129,13 @@ describe('JsonFormatter', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
+      },
     };
     const formatted = formatter.format(undefined, response, stats);
     const expected = {
@@ -242,6 +249,13 @@ describe('JsonFormatter', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
+      },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
       },
     };
     const error: JsonError = {

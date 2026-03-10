@@ -62,6 +62,13 @@ describe('<ToolStatsDisplay />', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
+      },
     });
 
     expect(lastFrame()).toContain(
@@ -103,6 +110,13 @@ describe('<ToolStatsDisplay />', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
+      },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
       },
     });
 
@@ -157,6 +171,13 @@ describe('<ToolStatsDisplay />', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
+      },
     });
 
     const output = lastFrame();
@@ -199,6 +220,13 @@ describe('<ToolStatsDisplay />', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
+      },
     });
 
     expect(lastFrame()).toMatchSnapshot();
@@ -237,6 +265,13 @@ describe('<ToolStatsDisplay />', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
+      },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
       },
     });
 

@@ -68,6 +68,14 @@ export interface ModelMetrics {
   roles: Partial<Record<LlmRole, RoleMetrics>>;
 }
 
+export interface PromptMetrics {
+  count: number;
+  totalWallClockMs: number;
+  minMs: number;
+  maxMs: number;
+  lastMs: number;
+}
+
 export interface SessionMetrics {
   models: Record<string, ModelMetrics>;
   tools: {
@@ -87,6 +95,7 @@ export interface SessionMetrics {
     totalLinesAdded: number;
     totalLinesRemoved: number;
   };
+  prompts: PromptMetrics;
 }
 
 const createInitialRoleMetrics = (): RoleMetrics => ({
@@ -141,6 +150,13 @@ const createInitialMetrics = (): SessionMetrics => ({
     totalLinesAdded: 0,
     totalLinesRemoved: 0,
   },
+  prompts: {
+    count: 0,
+    totalWallClockMs: 0,
+    minMs: Infinity,
+    maxMs: 0,
+    lastMs: 0,
+  },
 });
 
 export class UiTelemetryService extends EventEmitter {
@@ -179,6 +195,19 @@ export class UiTelemetryService extends EventEmitter {
 
   setLastPromptTokenCount(lastPromptTokenCount: number): void {
     this.#lastPromptTokenCount = lastPromptTokenCount;
+    this.emit('update', {
+      metrics: this.#metrics,
+      lastPromptTokenCount: this.#lastPromptTokenCount,
+    });
+  }
+
+  recordPromptDuration(durationMs: number): void {
+    const p = this.#metrics.prompts;
+    p.count++;
+    p.totalWallClockMs += durationMs;
+    p.lastMs = durationMs;
+    if (durationMs < p.minMs) p.minMs = durationMs;
+    if (durationMs > p.maxMs) p.maxMs = durationMs;
     this.emit('update', {
       metrics: this.#metrics,
       lastPromptTokenCount: this.#lastPromptTokenCount,

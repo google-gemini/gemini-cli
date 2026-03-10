@@ -133,6 +133,13 @@ describe('SessionStatsContext', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
+      },
     };
 
     act(() => {
@@ -195,6 +202,13 @@ describe('SessionStatsContext', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
+      },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
       },
     };
 

@@ -101,6 +101,13 @@ describe('<ModelStatsDisplay />', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
+      },
     });
 
     expect(lastFrame()).toContain(
@@ -143,6 +150,13 @@ describe('<ModelStatsDisplay />', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
+      },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
       },
     });
 
@@ -201,6 +215,13 @@ describe('<ModelStatsDisplay />', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
+      },
     });
 
     const output = lastFrame();
@@ -258,6 +279,13 @@ describe('<ModelStatsDisplay />', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
+      },
     });
 
     const output = lastFrame();
@@ -305,6 +333,13 @@ describe('<ModelStatsDisplay />', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
+      },
     });
 
     expect(lastFrame()).toMatchSnapshot();
@@ -344,6 +379,13 @@ describe('<ModelStatsDisplay />', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
+      },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
       },
     });
 
@@ -401,6 +443,13 @@ describe('<ModelStatsDisplay />', () => {
         files: {
           totalLinesAdded: 0,
           totalLinesRemoved: 0,
+        },
+        prompts: {
+          count: 0,
+          totalWallClockMs: 0,
+          minMs: Infinity,
+          maxMs: 0,
+          lastMs: 0,
         },
       },
       80,
@@ -462,6 +511,13 @@ describe('<ModelStatsDisplay />', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
+      },
     });
 
     const output = lastFrame();
@@ -518,6 +574,13 @@ describe('<ModelStatsDisplay />', () => {
           files: {
             totalLinesAdded: 0,
             totalLinesRemoved: 0,
+          },
+          prompts: {
+            count: 0,
+            totalWallClockMs: 0,
+            minMs: Infinity,
+            maxMs: 0,
+            lastMs: 0,
           },
         },
         lastPromptTokenCount: 0,
@@ -598,6 +661,13 @@ describe('<ModelStatsDisplay />', () => {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
       },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
+      },
     });
 
     const output = lastFrame();
@@ -656,6 +726,13 @@ describe('<ModelStatsDisplay />', () => {
       files: {
         totalLinesAdded: 0,
         totalLinesRemoved: 0,
+      },
+      prompts: {
+        count: 0,
+        totalWallClockMs: 0,
+        minMs: Infinity,
+        maxMs: 0,
+        lastMs: 0,
       },
     });
 
