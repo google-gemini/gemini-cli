@@ -71,9 +71,9 @@ Slash commands provide meta-level control over the CLI itself.
         [Checkpointing documentation](../cli/checkpointing.md).
       - **Equivalent:** `/resume save <tag>`
   - **`share [filename]`**
-    - **Description** Writes the current conversation to a provided Markdown or
+    - **Description:** Writes the current conversation to a provided Markdown or
       JSON file. If no filename is provided, then the CLI will generate one.
-    - **Usage** `/chat share file.md` or `/chat share file.json`.
+    - **Usage:** `/chat share file.md` or `/chat share file.json`.
     - **Equivalent:** `/resume share [filename]`
 
 ### `/clear`

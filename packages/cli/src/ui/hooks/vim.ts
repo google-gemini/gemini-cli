@@ -9,7 +9,8 @@ import type { Key } from './useKeypress.js';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
 import { debugLogger } from '@google/gemini-cli-core';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
+import { useKeyMatchers } from './useKeyMatchers.js';
 
 export type VimMode = 'NORMAL' | 'INSERT';
 
@@ -152,6 +153,7 @@ const vimReducer = (state: VimState, action: VimAction): VimState => {
  * @returns Object with vim state and input handler
  */
 export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
+  const keyMatchers = useKeyMatchers();
   const { vimEnabled, vimMode, setVimMode } = useVimMode();
   const [state, dispatch] = useReducer(vimReducer, initialVimState);
 
@@ -394,7 +396,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       // In INSERT mode, let InputPrompt handle completion keys and special commands
       if (
         normalizedKey.name === 'tab' ||
-        (normalizedKey.name === 'return' && !normalizedKey.ctrl) ||
+        (normalizedKey.name === 'enter' && !normalizedKey.ctrl) ||
         normalizedKey.name === 'up' ||
         normalizedKey.name === 'down' ||
         (normalizedKey.ctrl && normalizedKey.name === 'r')
@@ -422,7 +424,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
       // Special handling for Enter key to allow command submission (lower priority than completion)
       if (
-        normalizedKey.name === 'return' &&
+        normalizedKey.name === 'enter' &&
         !normalizedKey.alt &&
         !normalizedKey.ctrl &&
         !normalizedKey.cmd
@@ -439,7 +441,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
 
       return buffer.handleInput(normalizedKey);
     },
-    [buffer, dispatch, updateMode, onSubmit, checkDoubleEscape],
+    [buffer, dispatch, updateMode, onSubmit, checkDoubleEscape, keyMatchers],
   );
 
   /**
@@ -1202,6 +1204,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
       executeCommand,
       updateMode,
       checkDoubleEscape,
+      keyMatchers,
     ],
   );
 
