@@ -27,7 +27,7 @@ export interface FormatForSpeechOptions {
 
 // ANSI escape sequences (CSI, OSC, etc.)
 // eslint-disable-next-line no-control-regex
-const ANSI_RE = /\x1b(?:\[[0-9;]*[mGKHF]|\][^\x07]*\x07|[()][AB012])/g;
+const ANSI_RE = /\x1b(?:\[[0-9;]*[mGKHF]|\][^\x07\x1b]*\x07|[()][AB012])/g;
 
 // Fenced code blocks  ```lang\n...\n```
 const CODE_FENCE_RE = /```[^\n]*\n([\s\S]*?)```/g;
@@ -60,11 +60,11 @@ const STACK_BLOCK_RE = /(?:^[ \t]+at [^\n]+(?:\n|$)){2,}/gm;
 // Absolute Unix paths optionally ending with :line or :line:col
 // Hyphen placed at start of char class to avoid useless-escape lint error
 const UNIX_PATH_RE =
-  /(?:^|(?<=\s|[(`"']))(\/(?:[-\w.@]+\/)*[-\w.@]+)(:\d+(?::\d+)?)?/g;
+  /(?:^|(?<=\s|[(`"']))(\/[-\w.@]+(?:\/[-\w.@]+)*)(:\d+(?::\d+)?)?/g;
 
 // Absolute Windows paths  C:\...  or  C:/...  (any drive letter)
 const WIN_PATH_RE =
-  /(?:^|(?<=\s|[(`"']))([A-Za-z]:[/\\](?:[-\w. ]+[/\\])*[-\w. ]+)(:\d+(?::\d+)?)?/g;
+  /(?:^|(?<=\s|[(`"']))([A-Za-z]:[/\\][-\w. ]+(?:[/\\][-\w. ]+)*)(:\d+(?::\d+)?)?/g;
 
 /**
  * Abbreviates an absolute path to at most `depth` trailing segments,
