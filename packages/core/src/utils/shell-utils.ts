@@ -586,11 +586,8 @@ export function getShellConfiguration(): ShellConfiguration {
       if (/[;&|<>%]/.test(comSpec)) {
         debugLogger.warn(`Unsafe ComSpec detected: ${comSpec}`);
       } else {
-        const executable = comSpec.toLowerCase();
-        if (
-          executable.endsWith('powershell.exe') ||
-          executable.endsWith('pwsh.exe')
-        ) {
+        const fileName = path.basename(comSpec).toLowerCase();
+        if (fileName === 'powershell.exe' || fileName === 'pwsh.exe') {
           try {
             // Security: fs.accessSync throws if file doesn't exist or isn't executable
             fs.accessSync(comSpec, fs.constants.X_OK);
