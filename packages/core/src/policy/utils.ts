@@ -57,7 +57,12 @@ export function buildArgsPatterns(
   argsPattern?: string,
   commandPrefix?: string | string[],
   commandRegex?: string,
+  skillName?: string,
 ): Array<string | undefined> {
+  if (skillName) {
+    return [`"name":"${escapeRegex(skillName)}"`];
+  }
+
   if (commandPrefix) {
     const prefixes = Array.isArray(commandPrefix)
       ? commandPrefix

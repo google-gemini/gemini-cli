@@ -489,7 +489,26 @@ export function createPolicyUpdater(
     async (message: UpdatePolicy) => {
       const toolName = message.toolName;
 
-      if (message.commandPrefix) {
+      if (message.skillName) {
+        // Convert skillName to argsPattern for in-memory rules
+        const patterns = buildArgsPatterns(
+          undefined,
+          undefined,
+          undefined,
+          message.skillName,
+        );
+        for (const pattern of patterns) {
+          if (pattern) {
+            policyEngine.addRule({
+              toolName,
+              decision: PolicyDecision.ALLOW,
+              priority: ALWAYS_ALLOW_PRIORITY,
+              argsPattern: new RegExp(pattern),
+              source: 'Dynamic (Confirmed)',
+            });
+          }
+        }
+      } else if (message.commandPrefix) {
         // Convert commandPrefix(es) to argsPatterns for in-memory rules
         const patterns = buildArgsPatterns(undefined, message.commandPrefix);
         for (const pattern of patterns) {
@@ -571,6 +590,19 @@ export function createPolicyUpdater(
               newRule.toolName = simpleToolName;
               newRule.decision = 'allow';
               newRule.priority = 200;
+            } else if (message.skillName) {
+              newRule.toolName = toolName;
+              newRule.decision = 'allow';
+              newRule.priority = 100;
+              const patterns = buildArgsPatterns(
+                undefined,
+                undefined,
+                undefined,
+                message.skillName,
+              );
+              if (patterns[0]) {
+                newRule.argsPattern = patterns[0];
+              }
             } else {
               newRule.toolName = toolName;
               newRule.decision = 'allow';

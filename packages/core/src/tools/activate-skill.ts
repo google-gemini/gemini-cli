@@ -15,6 +15,7 @@ import {
   type ToolCallConfirmationDetails,
   type ToolInvocation,
   type ToolConfirmationOutcome,
+  type PolicyUpdateOptions,
 } from './tools.js';
 import type { Config } from '../config/config.js';
 import { ACTIVATE_SKILL_TOOL_NAME } from './tool-names.js';
@@ -46,6 +47,12 @@ class ActivateSkillToolInvocation extends BaseToolInvocation<
     _toolDisplayName?: string,
   ) {
     super(params, messageBus, _toolName, _toolDisplayName);
+  }
+
+  protected override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    return { skillName: this.params.name };
   }
 
   getDescription(): string {
