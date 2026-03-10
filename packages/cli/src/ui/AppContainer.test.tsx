@@ -192,11 +192,18 @@ vi.mock('../utils/terminalNotifications.js', () => ({
 vi.mock('./hooks/useTerminalTheme.js', () => ({
   useTerminalTheme: vi.fn(),
 }));
+vi.mock('./hooks/useAlternateBuffer.js', () => ({
+  useAlternateBuffer: vi.fn().mockReturnValue(false),
+  useLegacyNonAlternateBufferMode: vi.fn().mockReturnValue(false),
+  isAlternateBufferEnabled: vi.fn().mockReturnValue(false),
+}));
+
 
 import { useHookDisplayState } from './hooks/useHookDisplayState.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
 import { useFocus } from './hooks/useFocus.js';
+import { TransientMessageType } from '../utils/events.js';
 
 // Mock external utilities
 vi.mock('../utils/events.js');
@@ -2140,19 +2147,19 @@ describe('AppContainer State Management', () => {
         vi.advanceTimersByTime(0);
       });
 
-      expect(capturedUIState.queueErrorMessage).toBeNull();
+      expect(capturedUIState.transientMessage).toBeNull();
 
       act(() => {
         capturedUIActions.setQueueErrorMessage('Test error');
       });
       rerender(getAppContainer());
-      expect(capturedUIState.queueErrorMessage).toBe('Test error');
+      await waitFor(() => expect(capturedUIState.transientMessage?.message).toBe('Test error'));
 
       act(() => {
         vi.advanceTimersByTime(3000);
       });
       rerender(getAppContainer());
-      expect(capturedUIState.queueErrorMessage).toBeNull();
+      expect(capturedUIState.transientMessage).toBeNull();
       unmount();
     });
 
@@ -2166,7 +2173,7 @@ describe('AppContainer State Management', () => {
         capturedUIActions.setQueueErrorMessage('First error');
       });
       rerender(getAppContainer());
-      expect(capturedUIState.queueErrorMessage).toBe('First error');
+      await waitFor(() => expect(capturedUIState.transientMessage?.message).toBe('First error'));
 
       act(() => {
         vi.advanceTimersByTime(1500);
@@ -2176,20 +2183,20 @@ describe('AppContainer State Management', () => {
         capturedUIActions.setQueueErrorMessage('Second error');
       });
       rerender(getAppContainer());
-      expect(capturedUIState.queueErrorMessage).toBe('Second error');
+      await waitFor(() => expect(capturedUIState.transientMessage?.message).toBe('Second error'));
 
       act(() => {
         vi.advanceTimersByTime(2000);
       });
       rerender(getAppContainer());
-      expect(capturedUIState.queueErrorMessage).toBe('Second error');
+      await waitFor(() => expect(capturedUIState.transientMessage?.message).toBe('Second error'));
 
       // 5. Advance time past the 3 second timeout from the second message
       act(() => {
         vi.advanceTimersByTime(1000);
       });
       rerender(getAppContainer());
-      expect(capturedUIState.queueErrorMessage).toBeNull();
+      expect(capturedUIState.transientMessage).toBeNull();
       unmount();
     });
   });
@@ -3389,21 +3396,21 @@ describe('AppContainer State Management', () => {
 
       await waitFor(() => {
         // Should show hint because we are in Standard Mode (default settings) and have overflow
-        expect(capturedUIState.showIsExpandableHint).toBe(true);
+        expect(capturedUIState.transientMessage?.type).toBe(TransientMessageType.Accent);
       });
 
       // Advance just before the timeout
       act(() => {
         vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS - 100);
       });
-      expect(capturedUIState.showIsExpandableHint).toBe(true);
+      expect(capturedUIState.transientMessage?.type).toBe(TransientMessageType.Accent);
 
       // Advance to hit the timeout mark
       act(() => {
         vi.advanceTimersByTime(100);
       });
       await waitFor(() => {
-        expect(capturedUIState.showIsExpandableHint).toBe(false);
+        expect(capturedUIState.transientMessage).toBeNull();
       });
 
       unmount!();
@@ -3423,14 +3430,14 @@ describe('AppContainer State Management', () => {
       });
 
       await waitFor(() => {
-        expect(capturedUIState.showIsExpandableHint).toBe(true);
+        expect(capturedUIState.transientMessage?.type).toBe(TransientMessageType.Accent);
       });
 
       // 2. Advance half the duration
       act(() => {
         vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2);
       });
-      expect(capturedUIState.showIsExpandableHint).toBe(true);
+      expect(capturedUIState.transientMessage?.type).toBe(TransientMessageType.Accent);
 
       // 3. Trigger second overflow (this should reset the timer)
       act(() => {
@@ -3444,7 +3451,7 @@ describe('AppContainer State Management', () => {
       });
 
       await waitFor(() => {
-        expect(capturedUIState.showIsExpandableHint).toBe(true);
+        expect(capturedUIState.transientMessage?.type).toBe(TransientMessageType.Accent);
       });
 
       // 4. Advance enough that the ORIGINAL timer would have expired
@@ -3453,14 +3460,14 @@ describe('AppContainer State Management', () => {
         vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2 + 100 - 1);
       });
       // The hint should STILL be visible because the timer reset at step 3
-      expect(capturedUIState.showIsExpandableHint).toBe(true);
+      expect(capturedUIState.transientMessage?.type).toBe(TransientMessageType.Accent);
 
       // 5. Advance to the end of the NEW timer
       act(() => {
         vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2 - 100);
       });
       await waitFor(() => {
-        expect(capturedUIState.showIsExpandableHint).toBe(false);
+        expect(capturedUIState.transientMessage).toBeNull();
       });
 
       unmount!();
@@ -3485,14 +3492,14 @@ describe('AppContainer State Management', () => {
       });
 
       await waitFor(() => {
-        expect(capturedUIState.showIsExpandableHint).toBe(true);
+        expect(capturedUIState.transientMessage?.type).toBe(TransientMessageType.Accent);
       });
 
       // Advance half the duration
       act(() => {
         vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2);
       });
-      expect(capturedUIState.showIsExpandableHint).toBe(true);
+      expect(capturedUIState.transientMessage?.type).toBe(TransientMessageType.Accent);
 
       // Simulate Ctrl+O
       act(() => {
@@ -3510,7 +3517,7 @@ describe('AppContainer State Management', () => {
       });
 
       // We expect it to still be true because Ctrl+O should have reset the timer
-      expect(capturedUIState.showIsExpandableHint).toBe(true);
+      expect(capturedUIState.transientMessage?.type).toBe(TransientMessageType.Accent);
 
       // Advance remaining time to reach the new timeout
       act(() => {
@@ -3518,7 +3525,7 @@ describe('AppContainer State Management', () => {
       });
 
       await waitFor(() => {
-        expect(capturedUIState.showIsExpandableHint).toBe(false);
+        expect(capturedUIState.transientMessage).toBeNull();
       });
 
       unmount!();
@@ -3543,14 +3550,14 @@ describe('AppContainer State Management', () => {
       });
 
       await waitFor(() => {
-        expect(capturedUIState.showIsExpandableHint).toBe(true);
+        expect(capturedUIState.transientMessage?.type).toBe(TransientMessageType.Accent);
       });
 
       // Advance half the duration
       act(() => {
         vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2);
       });
-      expect(capturedUIState.showIsExpandableHint).toBe(true);
+      expect(capturedUIState.transientMessage?.type).toBe(TransientMessageType.Accent);
 
       // First toggle 'on' (expanded)
       act(() => {
@@ -3564,7 +3571,7 @@ describe('AppContainer State Management', () => {
       act(() => {
         vi.advanceTimersByTime(1000);
       });
-      expect(capturedUIState.showIsExpandableHint).toBe(true);
+      expect(capturedUIState.transientMessage?.type).toBe(TransientMessageType.Accent);
 
       // Second toggle 'off' (collapsed)
       act(() => {
@@ -3578,7 +3585,7 @@ describe('AppContainer State Management', () => {
       act(() => {
         vi.advanceTimersByTime(1000);
       });
-      expect(capturedUIState.showIsExpandableHint).toBe(true);
+      expect(capturedUIState.transientMessage?.type).toBe(TransientMessageType.Accent);
 
       // Third toggle 'on' (expanded)
       act(() => {
@@ -3593,7 +3600,7 @@ describe('AppContainer State Management', () => {
       act(() => {
         vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS - 100);
       });
-      expect(capturedUIState.showIsExpandableHint).toBe(true);
+      expect(capturedUIState.transientMessage?.type).toBe(TransientMessageType.Accent);
 
       // Wait 0.1s more to hit exactly the timeout since the last toggle.
       // It should hide now.
@@ -3601,7 +3608,7 @@ describe('AppContainer State Management', () => {
         vi.advanceTimersByTime(100);
       });
       await waitFor(() => {
-        expect(capturedUIState.showIsExpandableHint).toBe(false);
+        expect(capturedUIState.transientMessage).toBeNull();
       });
 
       unmount!();
@@ -3635,9 +3642,9 @@ describe('AppContainer State Management', () => {
         capturedOverflowActions.addOverflowingId('test-id');
       });
 
-      // Should NOW show hint because we are in Alternate Buffer Mode
+      // Should NOT show hint because we are in Alternate Buffer Mode
       await waitFor(() => {
-        expect(capturedUIState.showIsExpandableHint).toBe(true);
+        expect(capturedUIState.transientMessage).toBeNull();
       });
 
       unmount!();

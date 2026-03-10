@@ -21,8 +21,8 @@ export const useAlternateBuffer = (): boolean => {
 
 export const useLegacyNonAlternateBufferMode = (
   rootUiRef: RefObject<DOMElement | null>,
+  isAlternateBuffer: boolean,
 ): boolean => {
-  const isAlternateBuffer = useAlternateBuffer();
   const { rows: terminalHeight } = useTerminalSize();
   const [isOverflowing, setIsOverflowing] = useState(false);
 

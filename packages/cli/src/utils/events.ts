@@ -9,11 +9,14 @@ import { EventEmitter } from 'node:events';
 export enum TransientMessageType {
   Warning = 'warning',
   Hint = 'hint',
+  Error = 'error',
+  Accent = 'accent',
 }
 
 export interface TransientMessagePayload {
   message: string;
   type: TransientMessageType;
+  durationMs?: number;
 }
 
 export enum AppEvent {

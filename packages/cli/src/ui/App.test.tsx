@@ -9,6 +9,7 @@ import type React from 'react';
 import { renderWithProviders } from '../test-utils/render.js';
 import { Text, useIsScreenReaderEnabled, type DOMElement } from 'ink';
 import { App } from './App.js';
+import { TransientMessageType } from '../utils/events.js';
 import { type UIState } from './contexts/UIStateContext.js';
 import { StreamingState } from './types.js';
 import { makeFakeConfig, CoreToolCallStatus } from '@google/gemini-cli-core';
@@ -170,16 +171,16 @@ describe('App', () => {
   });
 
   it.each([
-    { key: 'C', stateKey: 'ctrlCPressedOnce' },
-    { key: 'D', stateKey: 'ctrlDPressedOnce' },
+    { key: 'C' },
+    { key: 'D' },
   ])(
-    'should show Ctrl+$key exit prompt when dialogs are visible and $stateKey is true',
-    async ({ key, stateKey }) => {
+    'should show Ctrl+$key exit prompt when dialogs are visible and warning is present',
+    async ({ key }) => {
       const uiState = {
         ...mockUIState,
         dialogsVisible: true,
-        [stateKey]: true,
-      } as UIState;
+        transientMessage: { message: `Press Ctrl+${key} again to exit.`, type: TransientMessageType.Warning },
+      } as unknown as UIState;
 
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <App />,

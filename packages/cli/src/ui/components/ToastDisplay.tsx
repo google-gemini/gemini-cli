@@ -11,75 +11,45 @@ import { useUIState, type UIState } from '../contexts/UIStateContext.js';
 import { TransientMessageType } from '../../utils/events.js';
 
 export function shouldShowToast(uiState: UIState): boolean {
-  return (
-    uiState.ctrlCPressedOnce ||
-    Boolean(uiState.transientMessage) ||
-    uiState.ctrlDPressedOnce ||
-    (uiState.showEscapePrompt &&
-      (uiState.buffer.text.length > 0 || uiState.history.length > 0)) ||
-    Boolean(uiState.queueErrorMessage) ||
-    uiState.showIsExpandableHint
-  );
+  return Boolean(uiState.transientMessage);
 }
 
 export const ToastDisplay: React.FC = () => {
   const uiState = useUIState();
 
-  if (uiState.ctrlCPressedOnce) {
+  if (
+    uiState.transientMessage?.type === TransientMessageType.Warning &&
+    uiState.transientMessage.message
+  ) {
     return (
-      <Text color={theme.status.warning}>Press Ctrl+C again to exit.</Text>
+      <Text color={theme.status.warning}>{uiState.transientMessage.message}</Text>
     );
   }
 
   if (
-    uiState.transientMessage?.type === TransientMessageType.Warning &&
-    uiState.transientMessage.text
+    uiState.transientMessage?.type === TransientMessageType.Error &&
+    uiState.transientMessage.message
   ) {
     return (
-      <Text color={theme.status.warning}>{uiState.transientMessage.text}</Text>
-    );
-  }
-
-  if (uiState.ctrlDPressedOnce) {
-    return (
-      <Text color={theme.status.warning}>Press Ctrl+D again to exit.</Text>
-    );
-  }
-
-  if (uiState.showEscapePrompt) {
-    const isPromptEmpty = uiState.buffer.text.length === 0;
-    const hasHistory = uiState.history.length > 0;
-
-    if (isPromptEmpty && !hasHistory) {
-      return null;
-    }
-
-    return (
-      <Text color={theme.text.secondary}>
-        Press Esc again to {isPromptEmpty ? 'rewind' : 'clear prompt'}.
-      </Text>
+      <Text color={theme.status.error}>{uiState.transientMessage.message}</Text>
     );
   }
 
   if (
     uiState.transientMessage?.type === TransientMessageType.Hint &&
-    uiState.transientMessage.text
+    uiState.transientMessage.message
   ) {
     return (
-      <Text color={theme.text.secondary}>{uiState.transientMessage.text}</Text>
+      <Text color={theme.text.secondary}>{uiState.transientMessage.message}</Text>
     );
   }
 
-  if (uiState.queueErrorMessage) {
-    return <Text color={theme.status.error}>{uiState.queueErrorMessage}</Text>;
-  }
-
-  if (uiState.showIsExpandableHint) {
-    const action = uiState.constrainHeight ? 'show more' : 'collapse';
+  if (
+    uiState.transientMessage?.type === TransientMessageType.Accent &&
+    uiState.transientMessage.message
+  ) {
     return (
-      <Text color={theme.text.accent}>
-        Press Ctrl+O to {action} lines of the last response
-      </Text>
+      <Text color={theme.text.accent}>{uiState.transientMessage.message}</Text>
     );
   }
 

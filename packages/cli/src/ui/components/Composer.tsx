@@ -426,7 +426,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           shellModeActive={uiState.shellModeActive}
           setShellModeActive={uiActions.setShellModeActive}
           approvalMode={showApprovalModeIndicator}
-          onEscapePromptChange={uiActions.onEscapePromptChange}
           focus={isFocused}
           vimHandleInput={uiActions.vimHandleInput}
           isEmbeddedShellFocused={uiState.embeddedShellFocused}

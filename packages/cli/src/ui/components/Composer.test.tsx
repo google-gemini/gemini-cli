@@ -63,13 +63,7 @@ vi.mock('./StatusDisplay.js', () => ({
 
 vi.mock('./ToastDisplay.js', () => ({
   ToastDisplay: () => <Text>ToastDisplay</Text>,
-  shouldShowToast: (uiState: UIState) =>
-    uiState.ctrlCPressedOnce ||
-    Boolean(uiState.transientMessage) ||
-    uiState.ctrlDPressedOnce ||
-    (uiState.showEscapePrompt &&
-      (uiState.buffer.text.length > 0 || uiState.history.length > 0)) ||
-    Boolean(uiState.queueErrorMessage),
+  shouldShowToast: (uiState: UIState) => Boolean(uiState.transientMessage),
 }));
 
 vi.mock('./ContextSummaryDisplay.js', () => ({
@@ -175,9 +169,6 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     thought: '',
     currentLoadingPhrase: '',
     elapsedTime: 0,
-    ctrlCPressedOnce: false,
-    ctrlDPressedOnce: false,
-    showEscapePrompt: false,
     shortcutsHelpVisible: false,
     cleanUiDetailsVisible: true,
     ideContextState: null,
@@ -539,10 +530,7 @@ describe('Composer', () => {
   describe('Context and Status Display', () => {
     it('shows StatusDisplay and ApprovalModeIndicator in normal state', async () => {
       const uiState = createMockUIState({
-        ctrlCPressedOnce: false,
-        ctrlDPressedOnce: false,
-        showEscapePrompt: false,
-      });
+                  });
 
       const { lastFrame } = await renderComposer(uiState);
 
@@ -554,7 +542,7 @@ describe('Composer', () => {
 
     it('shows ToastDisplay and hides ApprovalModeIndicator when a toast is present', async () => {
       const uiState = createMockUIState({
-        ctrlCPressedOnce: true,
+        transientMessage: { message: 'test', type: TransientMessageType.Warning },
       });
 
       const { lastFrame } = await renderComposer(uiState);
@@ -567,10 +555,7 @@ describe('Composer', () => {
 
     it('shows ToastDisplay for other toast types', async () => {
       const uiState = createMockUIState({
-        transientMessage: {
-          text: 'Warning',
-          type: TransientMessageType.Warning,
-        },
+        transientMessage: { message: 'Warning', type: TransientMessageType.Warning },
       });
 
       const { lastFrame } = await renderComposer(uiState);
@@ -695,18 +680,7 @@ describe('Composer', () => {
       expect(output).not.toContain('ShortcutsHint');
     });
 
-    it('shows Esc rewind prompt in minimal mode without showing full UI', async () => {
-      const uiState = createMockUIState({
-        cleanUiDetailsVisible: false,
-        showEscapePrompt: true,
-        history: [{ id: 1, type: 'user', text: 'msg' }],
-      });
 
-      const { lastFrame } = await renderComposer(uiState);
-      const output = lastFrame();
-      expect(output).toContain('ToastDisplay');
-      expect(output).not.toContain('ContextSummaryDisplay');
-    });
 
     it('shows context usage bleed-through when over 60%', async () => {
       const model = 'gemini-2.5-pro';

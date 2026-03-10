@@ -5,6 +5,7 @@
  */
 
 import { createContext, useContext } from 'react';
+import { type TransientMessageType } from '../../utils/events.js';
 import type {
   HistoryItem,
   ThoughtSummary,
@@ -31,7 +32,6 @@ import type {
   FolderDiscoveryResults,
   PolicyUpdateConfirmationRequest,
 } from '@google/gemini-cli-core';
-import { type TransientMessageType } from '../../utils/events.js';
 import type { DOMElement } from 'ink';
 import type { SessionStatsState } from '../contexts/SessionContext.js';
 import type { ExtensionUpdateState } from '../state/extensions.js';
@@ -161,9 +161,6 @@ export interface UIState {
   filteredConsoleMessages: ConsoleMessageItem[];
   ideContextState: IdeContext | undefined;
   renderMarkdown: boolean;
-  ctrlCPressedOnce: boolean;
-  ctrlDPressedOnce: boolean;
-  showEscapePrompt: boolean;
   shortcutsHelpVisible: boolean;
   cleanUiDetailsVisible: boolean;
   elapsedTime: number;
@@ -171,7 +168,6 @@ export interface UIState {
   historyRemountKey: number;
   activeHooks: ActiveHook[];
   messageQueue: string[];
-  queueErrorMessage: string | null;
   showApprovalModeIndicator: ApprovalMode;
   allowPlanMode: boolean;
   // Quota-related state
@@ -220,11 +216,10 @@ export interface UIState {
   isBackgroundShellListOpen: boolean;
   adminSettingsChanged: boolean;
   newAgents: AgentDefinition[] | null;
-  showIsExpandableHint: boolean;
   hintMode: boolean;
   hintBuffer: string;
   transientMessage: {
-    text: string;
+    message: string;
     type: TransientMessageType;
   } | null;
 }

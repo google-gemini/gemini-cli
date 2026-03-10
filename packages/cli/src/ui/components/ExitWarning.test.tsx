@@ -8,6 +8,7 @@ import { render } from '../../test-utils/render.js';
 import { ExitWarning } from './ExitWarning.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useUIState, type UIState } from '../contexts/UIStateContext.js';
+import { TransientMessageType } from '../../utils/events.js';
 
 vi.mock('../contexts/UIStateContext.js');
 
@@ -21,8 +22,7 @@ describe('ExitWarning', () => {
   it('renders nothing by default', async () => {
     mockUseUIState.mockReturnValue({
       dialogsVisible: false,
-      ctrlCPressedOnce: false,
-      ctrlDPressedOnce: false,
+      transientMessage: null,
     } as unknown as UIState);
     const { lastFrame, waitUntilReady, unmount } = render(<ExitWarning />);
     await waitUntilReady();
@@ -30,35 +30,41 @@ describe('ExitWarning', () => {
     unmount();
   });
 
-  it('renders Ctrl+C warning when pressed once and dialogs visible', async () => {
+  it('renders warning when transient message is a warning and dialogs visible', async () => {
     mockUseUIState.mockReturnValue({
       dialogsVisible: true,
-      ctrlCPressedOnce: true,
-      ctrlDPressedOnce: false,
+      transientMessage: {
+        message: 'Test Warning',
+        type: TransientMessageType.Warning,
+      },
     } as unknown as UIState);
     const { lastFrame, waitUntilReady, unmount } = render(<ExitWarning />);
     await waitUntilReady();
-    expect(lastFrame()).toContain('Press Ctrl+C again to exit');
+    expect(lastFrame()).toContain('Test Warning');
     unmount();
   });
 
-  it('renders Ctrl+D warning when pressed once and dialogs visible', async () => {
+  it('renders nothing if transient message is not a warning', async () => {
     mockUseUIState.mockReturnValue({
       dialogsVisible: true,
-      ctrlCPressedOnce: false,
-      ctrlDPressedOnce: true,
+      transientMessage: {
+        message: 'Test Hint',
+        type: TransientMessageType.Hint,
+      },
     } as unknown as UIState);
     const { lastFrame, waitUntilReady, unmount } = render(<ExitWarning />);
     await waitUntilReady();
-    expect(lastFrame()).toContain('Press Ctrl+D again to exit');
+    expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
 
   it('renders nothing if dialogs are not visible', async () => {
     mockUseUIState.mockReturnValue({
       dialogsVisible: false,
-      ctrlCPressedOnce: true,
-      ctrlDPressedOnce: true,
+      transientMessage: {
+        message: 'Test Warning',
+        type: TransientMessageType.Warning,
+      },
     } as unknown as UIState);
     const { lastFrame, waitUntilReady, unmount } = render(<ExitWarning />);
     await waitUntilReady();

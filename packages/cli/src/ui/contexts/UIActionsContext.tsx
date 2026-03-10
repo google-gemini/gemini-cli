@@ -55,7 +55,6 @@ export interface UIActions {
   handleFolderTrustSelect: (choice: FolderTrustChoice) => void;
   setIsPolicyUpdateDialogOpen: (value: boolean) => void;
   setConstrainHeight: (value: boolean) => void;
-  onEscapePromptChange: (show: boolean) => void;
   refreshStatic: () => void;
   handleFinalSubmit: (value: string) => Promise<void>;
   handleClearScreen: () => void;

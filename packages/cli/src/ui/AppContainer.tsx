@@ -4,6 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { useLegacyNonAlternateBufferMode } from './hooks/useAlternateBuffer.js';
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import {
   useMemo,
   useState,
@@ -13,6 +20,7 @@ import {
   useLayoutEffect,
 } from 'react';
 import {
+  Box,
   type DOMElement,
   measureElement,
   useApp,
@@ -120,12 +128,18 @@ import { useFocus } from './hooks/useFocus.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { KeypressPriority } from './contexts/KeypressContext.js';
 import { keyMatchers, Command } from './keyMatchers.js';
+import { formatCommand } from './utils/keybindingUtils.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
 import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
 import { type IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
-import { appEvents, AppEvent, TransientMessageType } from '../utils/events.js';
+import {
+  appEvents,
+  AppEvent,
+  TransientMessageType,
+  type TransientMessagePayload,
+} from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
@@ -230,6 +244,89 @@ export const AppContainer = (props: AppContainerProps) => {
 
   useMemoryMonitor(historyManager);
   const isAlternateBuffer = config.getUseAlternateBuffer();
+
+  const rootUiRef = useRef<DOMElement>(null);
+  const isLegacyNonAlternateBufferMode =
+    useLegacyNonAlternateBufferMode(rootUiRef, isAlternateBuffer);
+
+  const [transientMessage, setTransientMessageInternal] = useTimedMessage<{
+    message: string;
+    type: TransientMessageType;
+  }>(WARNING_PROMPT_DURATION_MS, isLegacyNonAlternateBufferMode);
+
+  const currentlyShowingTypeRef = useRef<TransientMessageType | null>(null);
+
+  const [transientMessageQueue, setTransientMessageQueue] = useState<
+    TransientMessagePayload[]
+  >([]);
+
+  const showTransientMessage = useCallback(
+    (payload: TransientMessagePayload | null, durationMs?: number) => {
+      if (payload === null) {
+        setTransientMessageInternal(null);
+        setTransientMessageQueue([]);
+        currentlyShowingTypeRef.current = null;
+        return;
+      }
+
+      if (currentlyShowingTypeRef.current === payload.type) {
+        setTransientMessageInternal(
+          { message: payload.message, type: payload.type },
+          durationMs,
+        );
+        return;
+      }
+
+      setTransientMessageQueue((prev) => [...prev, { ...payload, durationMs }]);
+    },
+    [setTransientMessageInternal],
+  );
+
+  useEffect(() => {
+    if (isLegacyNonAlternateBufferMode) {
+      return;
+    }
+    if (transientMessageQueue.length > 0 && !transientMessage) {
+      const [next, ...rest] = transientMessageQueue;
+      currentlyShowingTypeRef.current = next.type;
+      setTransientMessageInternal(
+        { message: next.message, type: next.type },
+        next.durationMs,
+      );
+      setTransientMessageQueue(rest);
+    } else if (!transientMessage) {
+      currentlyShowingTypeRef.current = null;
+    }
+  }, [
+    transientMessageQueue,
+    transientMessage,
+    setTransientMessageInternal,
+    isLegacyNonAlternateBufferMode,
+  ]);
+
+  const handleSetConstrainHeight = useCallback(
+    (value: boolean) => {
+      setConstrainHeight(value);
+      showTransientMessage(
+        {
+          message: `Ctrl+O to ${!value ? 'show more' : 'collapse'} lines of the last response`,
+          type: TransientMessageType.Accent,
+        },
+        EXPAND_HINT_DURATION_MS,
+      );
+    },
+    [showTransientMessage],
+  );
+
+  const handleSetQueueErrorMessage = useCallback(
+    (message: string | null) => {
+      showTransientMessage(
+        message ? { message, type: TransientMessageType.Error } : null,
+        QUEUE_ERROR_DISPLAY_DURATION_MS,
+      );
+    },
+    [showTransientMessage],
+  );
   const [corgiMode, setCorgiMode] = useState(false);
   const [forceRerenderKey, setForceRerenderKey] = useState(0);
   const [debugMessage, setDebugMessage] = useState<string>('');
@@ -265,16 +362,9 @@ export const AppContainer = (props: AppContainerProps) => {
     () => isWorkspaceTrusted(settings.merged).isTrusted,
   );
 
-  const [queueErrorMessage, setQueueErrorMessage] = useTimedMessage<string>(
-    QUEUE_ERROR_DISPLAY_DURATION_MS,
-  );
 
   const [newAgents, setNewAgents] = useState<AgentDefinition[] | null>(null);
   const [constrainHeight, setConstrainHeight] = useState<boolean>(true);
-  const [expandHintTrigger, triggerExpandHint] = useTimedMessage<boolean>(
-    EXPAND_HINT_DURATION_MS,
-  );
-  const showIsExpandableHint = Boolean(expandHintTrigger);
   const overflowState = useOverflowState();
   const overflowingIdsSize = overflowState?.overflowingIds.size ?? 0;
   const hasOverflowState = overflowingIdsSize > 0 || !constrainHeight;
@@ -291,10 +381,22 @@ export const AppContainer = (props: AppContainerProps) => {
    * to avoid noise, but the user can still trigger it manually with Ctrl+O.
    */
   useEffect(() => {
-    if (hasOverflowState) {
-      triggerExpandHint(true);
+    if (hasOverflowState && !isAlternateBuffer) {
+      showTransientMessage(
+        {
+          message: `Ctrl+O to ${constrainHeight ? 'show more' : 'collapse'} lines of the last response`,
+          type: TransientMessageType.Accent,
+        },
+        EXPAND_HINT_DURATION_MS,
+      );
     }
-  }, [hasOverflowState, overflowingIdsSize, triggerExpandHint]);
+  }, [
+    hasOverflowState,
+    isAlternateBuffer,
+    constrainHeight,
+    showTransientMessage,
+    overflowingIdsSize,
+  ]);
 
   const [defaultBannerText, setDefaultBannerText] = useState('');
   const [warningBannerText, setWarningBannerText] = useState('');
@@ -415,7 +517,6 @@ export const AppContainer = (props: AppContainerProps) => {
   // Layout measurements
   const mainControlsRef = useRef<DOMElement>(null);
   // For performance profiling only
-  const rootUiRef = useRef<DOMElement>(null);
   const lastTitleRef = useRef<string | null>(null);
   const staticExtraHeight = 3;
 
@@ -1260,7 +1361,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     async (submittedValue: string) => {
       reset();
       // Explicitly hide the expansion hint and clear its x-second timer when a new turn begins.
-      triggerExpandHint(null);
+      showTransientMessage(null);
       if (!constrainHeight) {
         setConstrainHeight(true);
         if (!isAlternateBuffer) {
@@ -1322,24 +1423,24 @@ Logging in with Google... Restarting Gemini CLI to continue.
       submitQuery,
       isMcpReady,
       streamingState,
-      messageQueue.length,
       pendingSlashCommandHistoryItems,
       pendingGeminiHistoryItems,
       config,
       constrainHeight,
-      setConstrainHeight,
+      handleSetConstrainHeight,
       isAlternateBuffer,
+      isAgentConfigDialogOpen,
       refreshStatic,
       reset,
       handleHintSubmit,
-      triggerExpandHint,
+      showTransientMessage,
     ],
   );
 
   const handleClearScreen = useCallback(() => {
     reset();
     // Explicitly hide the expansion hint and clear its x-second timer when clearing the screen.
-    triggerExpandHint(null);
+    showTransientMessage(null);
     historyManager.clearItems();
     clearConsoleMessagesState();
     refreshStatic();
@@ -1348,7 +1449,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     clearConsoleMessagesState,
     refreshStatic,
     reset,
-    triggerExpandHint,
+    showTransientMessage,
   ]);
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
@@ -1471,39 +1572,39 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const [renderMarkdown, setRenderMarkdown] = useState<boolean>(true);
 
   const handleExitRepeat = useCallback(
-    (count: number) => {
+    (count: number, message: string) => {
       if (count > 2) {
         recordExitFail(config);
       }
       if (count > 1) {
         void handleSlashCommand('/quit', undefined, undefined, false);
+      } else if (count === 1) {
+        showTransientMessage({
+          message,
+          type: TransientMessageType.Warning,
+        });
       }
     },
-    [config, handleSlashCommand],
+    [config, handleSlashCommand, showTransientMessage],
   );
 
-  const { pressCount: ctrlCPressCount, handlePress: handleCtrlCPress } =
+  const { handlePress: handleCtrlCPress } =
     useRepeatedKeyPress({
       windowMs: WARNING_PROMPT_DURATION_MS,
-      onRepeat: handleExitRepeat,
+      onRepeat: (count) => handleExitRepeat(count, 'Press Ctrl+C again to exit.'),
     });
 
-  const { pressCount: ctrlDPressCount, handlePress: handleCtrlDPress } =
+  const { handlePress: handleCtrlDPress } =
     useRepeatedKeyPress({
       windowMs: WARNING_PROMPT_DURATION_MS,
-      onRepeat: handleExitRepeat,
+      onRepeat: (count) => handleExitRepeat(count, 'Press Ctrl+D again to exit.'),
     });
 
   const [ideContextState, setIdeContextState] = useState<
     IdeContext | undefined
   >();
-  const [showEscapePrompt, setShowEscapePrompt] = useState(false);
-  const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
+    const [showIdeRestartPrompt, setShowIdeRestartPrompt] = useState(false);
 
-  const [transientMessage, showTransientMessage] = useTimedMessage<{
-    text: string;
-    type: TransientMessageType;
-  }>(WARNING_PROMPT_DURATION_MS);
 
   const {
     isFolderTrustDialogOpen,
@@ -1532,20 +1633,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
       message: string;
       type: TransientMessageType;
     }) => {
-      showTransientMessage({ text: payload.message, type: payload.type });
+      showTransientMessage({ message: payload.message, type: payload.type }, payload.durationMs);
     };
 
     const handleSelectionWarning = () => {
-      showTransientMessage({
-        text: 'Press Ctrl-S to enter selection mode to copy text.',
-        type: TransientMessageType.Warning,
-      });
+      showTransientMessage({ message: 'Press Ctrl-S to enter selection mode to copy text.', type: TransientMessageType.Warning });
     };
     const handlePasteTimeout = () => {
-      showTransientMessage({
-        text: 'Paste Timed out. Possibly due to slow connection.',
-        type: TransientMessageType.Warning,
-      });
+      showTransientMessage({ message: 'Paste Timed out. Possibly due to slow connection.', type: TransientMessageType.Warning });
     };
 
     appEvents.on(AppEvent.TransientMessage, handleTransientMessage);
@@ -1564,10 +1659,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const handleWarning = useCallback(
     (message: string) => {
-      showTransientMessage({
-        text: message,
-        type: TransientMessageType.Warning,
-      });
+      showTransientMessage({ message, type: TransientMessageType.Warning });
     },
     [showTransientMessage],
   );
@@ -1620,9 +1712,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     };
   }, [config]);
 
-  const handleEscapePromptChange = useCallback((showPrompt: boolean) => {
-    setShowEscapePrompt(showPrompt);
-  }, []);
 
   const handleIdePromptComplete = useCallback(
     (result: IdeIntegrationNudgeResult) => {
@@ -1680,20 +1769,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
         keyMatchers[Command.TOGGLE_COPY_MODE](key) &&
         !isAlternateBuffer
       ) {
-        showTransientMessage({
-          text: 'Use Ctrl+O to expand and collapse blocks of content.',
-          type: TransientMessageType.Warning,
-        });
+        showTransientMessage({ message: 'Use Ctrl+O to expand and collapse blocks of content.', type: TransientMessageType.Warning });
         return true;
       }
 
       let enteringConstrainHeightMode = false;
       if (!constrainHeight) {
         enteringConstrainHeightMode = true;
-        setConstrainHeight(true);
         if (keyMatchers[Command.SHOW_MORE_LINES](key)) {
-          // If the user manually collapses the view, show the hint and reset the x-second timer.
-          triggerExpandHint(true);
+          handleSetConstrainHeight(true);
+        } else {
+          setConstrainHeight(true);
         }
         if (!isAlternateBuffer) {
           refreshStatic();
@@ -1723,7 +1809,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
       } else if (keyMatchers[Command.TOGGLE_MARKDOWN](key)) {
         setRenderMarkdown((prev) => {
           const newValue = !prev;
-          // Force re-render of static content
+          showTransientMessage(
+            {
+              message: newValue
+                ? 'rendered markdown mode'
+                : `raw markdown mode (${formatCommand(Command.TOGGLE_MARKDOWN)} to toggle)`,
+              type: TransientMessageType.Accent,
+            },
+            EXPAND_HINT_DURATION_MS,
+          );
           refreshStatic();
           return newValue;
         });
@@ -1740,9 +1834,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         keyMatchers[Command.SHOW_MORE_LINES](key) &&
         !enteringConstrainHeightMode
       ) {
-        setConstrainHeight(false);
-        // If the user manually expands the view, show the hint and reset the x-second timer.
-        triggerExpandHint(true);
+        handleSetConstrainHeight(false);
         if (!isAlternateBuffer) {
           refreshStatic();
         }
@@ -1760,10 +1852,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
             if (lastOutputTimeRef.current === capturedTime) {
               setEmbeddedShellFocused(false);
             } else {
-              showTransientMessage({
-                text: 'Use Shift+Tab to unfocus',
-                type: TransientMessageType.Warning,
-              });
+              showTransientMessage({ message: 'Use Shift+Tab to unfocus', type: TransientMessageType.Warning });
             }
           }, 150);
           return false;
@@ -1821,7 +1910,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     },
     [
       constrainHeight,
-      setConstrainHeight,
+      handleSetConstrainHeight,
       setShowErrorDetails,
       config,
       ideContextState,
@@ -1836,7 +1925,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       refreshStatic,
       setCopyModeEnabled,
       tabFocusTimeoutRef,
-      isAlternateBuffer,
       shortcutsHelpVisible,
       backgroundCurrentShell,
       toggleBackgroundShell,
@@ -1847,7 +1935,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       showTransientMessage,
       settings.merged.general.devtools,
       showErrorDetails,
-      triggerExpandHint,
+      showTransientMessage,
     ],
   );
 
@@ -2201,9 +2289,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       filteredConsoleMessages,
       ideContextState,
       renderMarkdown,
-      ctrlCPressedOnce: ctrlCPressCount >= 1,
-      ctrlDPressedOnce: ctrlDPressCount >= 1,
-      showEscapePrompt,
       shortcutsHelpVisible,
       cleanUiDetailsVisible,
       isFocused,
@@ -2212,7 +2297,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       historyRemountKey,
       activeHooks,
       messageQueue,
-      queueErrorMessage,
       showApprovalModeIndicator,
       allowPlanMode,
       currentModel,
@@ -2253,7 +2337,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       showDebugProfiler,
       customDialog,
       copyModeEnabled,
-      transientMessage,
       bannerData,
       bannerVisible,
       terminalBackgroundColor: config.getTerminalBackground(),
@@ -2264,7 +2347,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isBackgroundShellListOpen,
       adminSettingsChanged,
       newAgents,
-      showIsExpandableHint,
       hintMode:
         config.isModelSteeringEnabled() &&
         isToolExecuting([
@@ -2272,6 +2354,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
           ...pendingGeminiHistoryItems,
         ]),
       hintBuffer: '',
+      transientMessage: transientMessage
+        ? { message: transientMessage.message, type: transientMessage.type }
+        : null,
     }),
     [
       isThemeDialogOpen,
@@ -2291,7 +2376,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       isSettingsDialogOpen,
       isSessionBrowserOpen,
       isModelDialogOpen,
-      isAgentConfigDialogOpen,
       selectedAgentName,
       selectedAgentDisplayName,
       selectedAgentDefinition,
@@ -2329,9 +2413,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       filteredConsoleMessages,
       ideContextState,
       renderMarkdown,
-      ctrlCPressCount,
-      ctrlDPressCount,
-      showEscapePrompt,
       shortcutsHelpVisible,
       cleanUiDetailsVisible,
       isFocused,
@@ -2340,7 +2421,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       historyRemountKey,
       activeHooks,
       messageQueue,
-      queueErrorMessage,
       showApprovalModeIndicator,
       allowPlanMode,
       userTier,
@@ -2392,7 +2472,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       backgroundShells,
       adminSettingsChanged,
       newAgents,
-      showIsExpandableHint,
+      transientMessage,
     ],
   );
 
@@ -2423,8 +2503,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleIdePromptComplete,
       handleFolderTrustSelect,
       setIsPolicyUpdateDialogOpen,
-      setConstrainHeight,
-      onEscapePromptChange: handleEscapePromptChange,
+      handleSetConstrainHeight,
+      setConstrainHeight: handleSetConstrainHeight,
       refreshStatic,
       handleFinalSubmit,
       handleClearScreen,
@@ -2437,7 +2517,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       closeSessionBrowser,
       handleResumeSession,
       handleDeleteSession,
-      setQueueErrorMessage,
+      setQueueErrorMessage: handleSetQueueErrorMessage,
       popAllMessages,
       handleApiKeySubmit,
       handleApiKeyCancel,
@@ -2515,8 +2595,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       handleIdePromptComplete,
       handleFolderTrustSelect,
       setIsPolicyUpdateDialogOpen,
-      setConstrainHeight,
-      handleEscapePromptChange,
+      handleSetConstrainHeight,
       refreshStatic,
       handleFinalSubmit,
       handleClearScreen,
@@ -2528,7 +2607,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       closeSessionBrowser,
       handleResumeSession,
       handleDeleteSession,
-      setQueueErrorMessage,
+      handleSetQueueErrorMessage,
       popAllMessages,
       handleApiKeySubmit,
       handleApiKeyCancel,
@@ -2574,8 +2653,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
             }}
           >
             <ToolActionsProvider config={config} toolCalls={allToolCalls}>
-              <ShellFocusContext.Provider value={isFocused}>
-                <App key={`app-${forceRerenderKey}`} />
+              <ShellFocusContext.Provider value={embeddedShellFocused}>
+                <Box ref={rootUiRef} flexDirection="column">
+                  <App key={`app-${forceRerenderKey}`} />
+                </Box>
               </ShellFocusContext.Provider>
             </ToolActionsProvider>
           </AppContext.Provider>

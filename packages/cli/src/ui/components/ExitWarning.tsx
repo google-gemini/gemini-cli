@@ -8,22 +8,24 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { theme } from '../semantic-colors.js';
+import { TransientMessageType } from '../../utils/events.js';
 
 export const ExitWarning: React.FC = () => {
   const uiState = useUIState();
-  return (
-    <>
-      {uiState.dialogsVisible && uiState.ctrlCPressedOnce && (
-        <Box marginTop={1}>
-          <Text color={theme.status.warning}>Press Ctrl+C again to exit.</Text>
-        </Box>
-      )}
+  if (!uiState.dialogsVisible) {
+    return null;
+  }
 
-      {uiState.dialogsVisible && uiState.ctrlDPressedOnce && (
-        <Box marginTop={1}>
-          <Text color={theme.status.warning}>Press Ctrl+D again to exit.</Text>
-        </Box>
-      )}
-    </>
-  );
+  if (
+    uiState.transientMessage?.type === TransientMessageType.Warning &&
+    uiState.transientMessage.message
+  ) {
+    return (
+      <Box marginTop={1}>
+        <Text color={theme.status.warning}>{uiState.transientMessage.message}</Text>
+      </Box>
+    );
+  }
+
+  return null;
 };
