@@ -22,8 +22,8 @@ import { useConfig } from '../contexts/ConfigContext.js';
 import { AskUserDialog } from './AskUserDialog.js';
 import { openFileInEditor } from '../utils/editorUtils.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { Command } from '../keyMatchers.js';
-import { formatCommand } from '../utils/keybindingUtils.js';
+import { Command } from '../key/keyMatchers.js';
+import { formatCommand } from '../key/keybindingUtils.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
 export interface ExitPlanModeDialogProps {
