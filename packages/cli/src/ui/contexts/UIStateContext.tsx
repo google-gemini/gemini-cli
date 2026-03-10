@@ -223,6 +223,7 @@ export interface UIState {
   showIsExpandableHint: boolean;
   hintMode: boolean;
   hintBuffer: string;
+  a2aListenerPort: number | null;
   transientMessage: {
     text: string;
     type: TransientMessageType;

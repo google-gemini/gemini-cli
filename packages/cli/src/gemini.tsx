@@ -26,6 +26,7 @@ import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { runNonInteractive } from './nonInteractiveCli.js';
+import { startExternalListener } from './external-listener.js';
 import {
   cleanupCheckpoints,
   registerCleanup,
@@ -321,6 +322,26 @@ export async function startInteractiveUI(
     });
 
   registerCleanup(() => instance.unmount());
+
+  // Auto-start A2A HTTP listener in Forever Mode
+  if (config.getIsForeverMode()) {
+    const sisyphusMode = config.getSisyphusMode();
+    const a2aPort = sisyphusMode.a2aPort ?? 0;
+    try {
+      const listener = await startExternalListener({ port: a2aPort });
+      registerCleanup(listener.cleanup);
+      appEvents.emit(AppEvent.A2AListenerStarted, listener.port);
+      coreEvents.emitFeedback(
+        'info',
+        `A2A endpoint listening on port ${listener.port}`,
+      );
+    } catch (err) {
+      coreEvents.emitFeedback(
+        'warning',
+        `Failed to start A2A listener: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
 
   registerCleanup(setupTtyCheck());
 }

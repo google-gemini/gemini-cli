@@ -202,6 +202,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     activeHooks: [],
     isBackgroundShellVisible: false,
     embeddedShellFocused: false,
+    a2aListenerPort: null,
     quota: {
       userTier: undefined,
       stats: undefined,
