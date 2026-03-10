@@ -120,6 +120,9 @@ jobs:
             if (recentRuns.length > 0) {
               core.setOutput('dispatched_run_urls', recentRuns.map(r => r.html_url).join(','));
               core.setOutput('dispatched_run_ids', recentRuns.map(r => r.id).join(','));
+
+              const markdownLinks = recentRuns.map(r => `- [View dispatched workflow run](${r.html_url})`).join('\n');
+              core.setOutput('dispatched_run_links', markdownLinks);
             }
 
       - name: 'Comment on Failure'
@@ -138,16 +141,19 @@ jobs:
           token: '${{ secrets.GITHUB_TOKEN }}'
           issue-number: '${{ github.event.issue.number }}'
           body: |
-            ✅ **Patch workflow(s) dispatched successfully!**
+            🚀 **[Step 1/4] Patch workflow(s) waiting for approval!**
 
             **📋 Details:**
             - **Channels**: `${{ steps.dispatch_patch.outputs.dispatched_channels }}`
             - **Commit**: `${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}`
             - **Workflows Created**: ${{ steps.dispatch_patch.outputs.dispatched_run_count }}
 
+            **⏳ Status:** The patch creation workflow has been triggered and is waiting for deployment approval. Please visit the specific workflow links below and approve the runs.
+
             **🔗 Track Progress:**
-            - [View patch workflows](https://github.com/${{ github.repository }}/actions/workflows/release-patch-1-create-pr.yml)
-            - [This workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            ${{ steps.dispatch_patch.outputs.dispatched_run_links }}
+            - [View patch workflow history](https://github.com/${{ github.repository }}/actions/workflows/release-patch-1-create-pr.yml)
+            - [This trigger workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
       - name: 'Final Status Comment - Dispatch Success (No URL)'
         if: "always() && startsWith(github.event.comment.body, '/patch') && steps.dispatch_patch.outcome == 'success' && !steps.dispatch_patch.outputs.dispatched_run_urls"
@@ -156,16 +162,18 @@ jobs:
           token: '${{ secrets.GITHUB_TOKEN }}'
           issue-number: '${{ github.event.issue.number }}'
           body: |
-            ✅ **Patch workflow(s) dispatched successfully!**
+            🚀 **[Step 1/4] Patch workflow(s) waiting for approval!**
 
             **📋 Details:**
             - **Channels**: `${{ steps.dispatch_patch.outputs.dispatched_channels }}`
             - **Commit**: `${{ steps.pr_status.outputs.MERGE_COMMIT_SHA }}`
             - **Workflows Created**: ${{ steps.dispatch_patch.outputs.dispatched_run_count }}
 
+            **⏳ Status:** The patch creation workflow has been triggered and is waiting for deployment approval. Please visit the workflow history link below and approve the runs.
+
             **🔗 Track Progress:**
-            - [View patch workflows](https://github.com/${{ github.repository }}/actions/workflows/release-patch-1-create-pr.yml)
-            - [This workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            - [View patch workflow history](https://github.com/${{ github.repository }}/actions/workflows/release-patch-1-create-pr.yml)
+            - [This trigger workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
       - name: 'Final Status Comment - Failure'
         if: "always() && startsWith(github.event.comment.body, '/patch') && (steps.dispatch_patch.outcome == 'failure' || steps.dispatch_patch.outcome == 'cancelled')"
@@ -174,7 +182,7 @@ jobs:
           token: '${{ secrets.GITHUB_TOKEN }}'
           issue-number: '${{ github.event.issue.number }}'
           body: |
-            ❌ **Patch workflow dispatch failed!**
+            ❌ **[Step 1/4] Patch workflow dispatch failed!**
 
             There was an error dispatching the patch creation workflow.
 
