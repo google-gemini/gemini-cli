@@ -62,6 +62,8 @@ Operate as a **strategic orchestrator**. Your own context window is your most pr
 
 When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
 
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
+
 **High-Impact Delegation Candidates:**
 - **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
 - **High-Volume Output:** Commands or tools expected to return large amounts of data (e.g., verbose builds, exhaustive file searches).
@@ -103,7 +105,7 @@ The following tools are available in Plan Mode:
   <tool>\`exit_plan_mode\`</tool>
   <tool>\`write_file\`</tool>
   <tool>\`replace\`</tool>
-  <tool>\`read_data\` (readonly-server)</tool>
+  <tool>\`mcp_readonly-server_read_data\` (readonly-server)</tool>
 </available_tools>
 
 ## Rules
@@ -230,6 +232,8 @@ Operate as a **strategic orchestrator**. Your own context window is your most pr
 
 When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
 
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
+
 **High-Impact Delegation Candidates:**
 - **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
 - **High-Volume Output:** Commands or tools expected to return large amounts of data (e.g., verbose builds, exhaustive file searches).
@@ -271,7 +275,7 @@ The following tools are available in Plan Mode:
   <tool>\`exit_plan_mode\`</tool>
   <tool>\`write_file\`</tool>
   <tool>\`replace\`</tool>
-  <tool>\`read_data\` (readonly-server)</tool>
+  <tool>\`mcp_readonly-server_read_data\` (readonly-server)</tool>
 </available_tools>
 
 ## Rules
@@ -517,6 +521,8 @@ Operate as a **strategic orchestrator**. Your own context window is your most pr
 
 When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
 
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
+
 **High-Impact Delegation Candidates:**
 - **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
 - **High-Volume Output:** Commands or tools expected to return large amounts of data (e.g., verbose builds, exhaustive file searches).
@@ -558,7 +564,7 @@ The following tools are available in Plan Mode:
   <tool>\`exit_plan_mode\`</tool>
   <tool>\`write_file\`</tool>
   <tool>\`replace\`</tool>
-  <tool>\`read_data\` (readonly-server)</tool>
+  <tool>\`mcp_readonly-server_read_data\` (readonly-server)</tool>
 </available_tools>
 
 ## Rules
@@ -684,6 +690,8 @@ Sub-agents are specialized expert agents. Each sub-agent is available as a tool 
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
 
 When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
+
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
 
 **High-Impact Delegation Candidates:**
 - **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
@@ -1571,6 +1579,8 @@ Operate as a **strategic orchestrator**. Your own context window is your most pr
 
 When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
 
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
+
 **High-Impact Delegation Candidates:**
 - **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
 - **High-Volume Output:** Commands or tools expected to return large amounts of data (e.g., verbose builds, exhaustive file searches).
@@ -1734,6 +1744,8 @@ Operate as a **strategic orchestrator**. Your own context window is your most pr
 
 When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
 
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
+
 **High-Impact Delegation Candidates:**
 - **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
 - **High-Volume Output:** Commands or tools expected to return large amounts of data (e.g., verbose builds, exhaustive file searches).
@@ -1888,6 +1900,8 @@ Sub-agents are specialized expert agents. Each sub-agent is available as a tool 
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
 
 When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
+
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
 
 **High-Impact Delegation Candidates:**
 - **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
@@ -2044,6 +2058,8 @@ Operate as a **strategic orchestrator**. Your own context window is your most pr
 
 When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
 
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
+
 **High-Impact Delegation Candidates:**
 - **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
 - **High-Volume Output:** Commands or tools expected to return large amounts of data (e.g., verbose builds, exhaustive file searches).
@@ -2194,6 +2210,8 @@ Sub-agents are specialized expert agents. Each sub-agent is available as a tool 
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
 
 When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
+
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
 
 **High-Impact Delegation Candidates:**
 - **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
@@ -2346,6 +2364,8 @@ Operate as a **strategic orchestrator**. Your own context window is your most pr
 
 When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
 
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
+
 **High-Impact Delegation Candidates:**
 - **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
 - **High-Volume Output:** Commands or tools expected to return large amounts of data (e.g., verbose builds, exhaustive file searches).
@@ -2488,6 +2508,8 @@ Sub-agents are specialized expert agents. Each sub-agent is available as a tool 
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
 
 When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
+
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
 
 **High-Impact Delegation Candidates:**
 - **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
@@ -2639,6 +2661,8 @@ Operate as a **strategic orchestrator**. Your own context window is your most pr
 
 When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
 
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
+
 **High-Impact Delegation Candidates:**
 - **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
 - **High-Volume Output:** Commands or tools expected to return large amounts of data (e.g., verbose builds, exhaustive file searches).
@@ -2789,6 +2813,8 @@ Sub-agents are specialized expert agents. Each sub-agent is available as a tool 
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
 
 When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
+
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
 
 **High-Impact Delegation Candidates:**
 - **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
@@ -3193,6 +3219,8 @@ Operate as a **strategic orchestrator**. Your own context window is your most pr
 
 When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
 
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
+
 **High-Impact Delegation Candidates:**
 - **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
 - **High-Volume Output:** Commands or tools expected to return large amounts of data (e.g., verbose builds, exhaustive file searches).
@@ -3343,6 +3371,8 @@ Sub-agents are specialized expert agents. Each sub-agent is available as a tool 
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
 
 When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
+
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
 
 **High-Impact Delegation Candidates:**
 - **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
@@ -3607,6 +3637,8 @@ Operate as a **strategic orchestrator**. Your own context window is your most pr
 
 When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
 
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
+
 **High-Impact Delegation Candidates:**
 - **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
 - **High-Volume Output:** Commands or tools expected to return large amounts of data (e.g., verbose builds, exhaustive file searches).
@@ -3757,6 +3789,8 @@ Sub-agents are specialized expert agents. Each sub-agent is available as a tool 
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
 
 When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
+
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
 
 **High-Impact Delegation Candidates:**
 - **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
