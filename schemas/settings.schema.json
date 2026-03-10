@@ -1174,8 +1174,8 @@
             "allowedDomains": {
               "title": "Allowed Domains",
               "description": "A list of allowed domains for the browser agent (e.g., [\"github.com\", \"*.google.com\"]).",
-              "markdownDescription": "A list of allowed domains for the browser agent (e.g., [\"github.com\", \"*.google.com\"]).\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `[\n  \"github.com\",\n  \"*.google.com\"\n]`",
-              "default": ["github.com", "*.google.com"],
+              "markdownDescription": "A list of allowed domains for the browser agent (e.g., [\"github.com\", \"*.google.com\"]).\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `[\n  \"github.com\",\n  \"*.google.com\",\n  \"localhost\"\n]`",
+              "default": ["github.com", "*.google.com", "localhost"],
               "type": "array",
               "items": {
                 "type": "string"
