@@ -16,8 +16,12 @@ import {
 import { checkPolicy, updatePolicy, getPolicyDenialError } from './policy.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { MessageBusType } from '../confirmation-bus/types.js';
+import {
+  MessageBusType,
+  type SerializableConfirmationDetails,
+} from '../confirmation-bus/types.js';
 import { ApprovalMode, PolicyDecision } from '../policy/types.js';
+import { escapeRegex } from '../policy/utils.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
@@ -49,6 +53,9 @@ describe('policy.ts', () => {
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
       } as unknown as Mocked<Config>;
 
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
+
       const toolCall = {
         request: { name: 'test-tool', args: {} },
         tool: { name: 'test-tool' },
@@ -71,6 +78,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
 
       const mcpTool = Object.create(DiscoveredMCPTool.prototype);
       mcpTool.serverName = 'my-server';
@@ -99,6 +109,9 @@ describe('policy.ts', () => {
         isInteractive: vi.fn().mockReturnValue(false),
       } as unknown as Mocked<Config>;
 
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
+
       const toolCall = {
         request: { name: 'test-tool', args: {} },
         tool: { name: 'test-tool' },
@@ -117,6 +130,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
 
       const toolCall = {
         request: { name: 'test-tool', args: {} },
@@ -137,6 +153,9 @@ describe('policy.ts', () => {
         isInteractive: vi.fn().mockReturnValue(true),
       } as unknown as Mocked<Config>;
 
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
+
       const toolCall = {
         request: { name: 'test-tool', args: {} },
         tool: { name: 'test-tool' },
@@ -145,6 +164,43 @@ describe('policy.ts', () => {
       const result = await checkPolicy(toolCall, mockConfig);
       expect(result.decision).toBe(PolicyDecision.ASK_USER);
     });
+
+    it('should return ALLOW if decision is ASK_USER and request is client-initiated', async () => {
+      const mockPolicyEngine = {
+        check: vi.fn().mockResolvedValue({ decision: PolicyDecision.ASK_USER }),
+      } as unknown as Mocked<PolicyEngine>;
+
+      const mockConfig = {
+        getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+        isInteractive: vi.fn().mockReturnValue(true),
+      } as unknown as Mocked<Config>;
+
+      const toolCall = {
+        request: { name: 'test-tool', args: {}, isClientInitiated: true },
+        tool: { name: 'test-tool' },
+      } as ValidatingToolCall;
+
+      const result = await checkPolicy(toolCall, mockConfig);
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should still return DENY if request is client-initiated but policy says DENY', async () => {
+      const mockPolicyEngine = {
+        check: vi.fn().mockResolvedValue({ decision: PolicyDecision.DENY }),
+      } as unknown as Mocked<PolicyEngine>;
+
+      const mockConfig = {
+        getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+      } as unknown as Mocked<Config>;
+
+      const toolCall = {
+        request: { name: 'test-tool', args: {}, isClientInitiated: true },
+        tool: { name: 'test-tool' },
+      } as ValidatingToolCall;
+
+      const result = await checkPolicy(toolCall, mockConfig);
+      expect(result.decision).toBe(PolicyDecision.DENY);
+    });
   });
 
   describe('updatePolicy', () => {
@@ -152,6 +208,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -175,6 +234,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -198,8 +260,13 @@ describe('policy.ts', () => {
 
     it('should handle standard policy updates with persistence', async () => {
       const mockConfig = {
+        isTrustedFolder: vi.fn().mockReturnValue(false),
+        getWorkspacePoliciesDir: vi.fn().mockReturnValue(undefined),
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -225,6 +292,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -256,6 +326,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -290,6 +363,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -308,6 +384,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -325,6 +404,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -344,6 +426,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -378,6 +463,9 @@ describe('policy.ts', () => {
       const mockConfig = {
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -408,8 +496,13 @@ describe('policy.ts', () => {
 
     it('should handle MCP ProceedAlwaysAndSave (persist: true)', async () => {
       const mockConfig = {
+        isTrustedFolder: vi.fn().mockReturnValue(false),
+        getWorkspacePoliciesDir: vi.fn().mockReturnValue(undefined),
         setApprovalMode: vi.fn(),
       } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
@@ -439,6 +532,96 @@ describe('policy.ts', () => {
         }),
       );
     });
+
+    it('should determine persistScope: workspace in trusted folders', async () => {
+      const mockConfig = {
+        isTrustedFolder: vi.fn().mockReturnValue(true),
+        getWorkspacePoliciesDir: vi
+          .fn()
+          .mockReturnValue('/mock/project/policies'),
+        setApprovalMode: vi.fn(),
+      } as unknown as Mocked<Config>;
+      const mockMessageBus = {
+        publish: vi.fn(),
+      } as unknown as Mocked<MessageBus>;
+      const tool = { name: 'test-tool' } as AnyDeclarativeTool;
+
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.ProceedAlwaysAndSave,
+        undefined,
+        { config: mockConfig, messageBus: mockMessageBus },
+      );
+
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          persistScope: 'workspace',
+        }),
+      );
+    });
+
+    it('should determine persistScope: user in untrusted folders', async () => {
+      const mockConfig = {
+        isTrustedFolder: vi.fn().mockReturnValue(false),
+        getWorkspacePoliciesDir: vi
+          .fn()
+          .mockReturnValue('/mock/project/policies'),
+        setApprovalMode: vi.fn(),
+      } as unknown as Mocked<Config>;
+      const mockMessageBus = {
+        publish: vi.fn(),
+      } as unknown as Mocked<MessageBus>;
+      const tool = { name: 'test-tool' } as AnyDeclarativeTool;
+
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.ProceedAlwaysAndSave,
+        undefined,
+        { config: mockConfig, messageBus: mockMessageBus },
+      );
+
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          persistScope: 'user',
+        }),
+      );
+    });
+
+    it('should narrow edit tools with argsPattern', async () => {
+      const mockConfig = {
+        isTrustedFolder: vi.fn().mockReturnValue(false),
+        getWorkspacePoliciesDir: vi.fn().mockReturnValue(undefined),
+        getTargetDir: vi.fn().mockReturnValue('/mock/dir'),
+        setApprovalMode: vi.fn(),
+      } as unknown as Mocked<Config>;
+      const mockMessageBus = {
+        publish: vi.fn(),
+      } as unknown as Mocked<MessageBus>;
+      const tool = { name: 'write_file' } as AnyDeclarativeTool;
+      const details: SerializableConfirmationDetails = {
+        type: 'edit',
+        title: 'Edit',
+        filePath: 'src/foo.ts',
+        fileName: 'foo.ts',
+        fileDiff: '--- foo.ts\n+++ foo.ts\n@@ -1 +1 @@\n-old\n+new',
+        originalContent: 'old',
+        newContent: 'new',
+      };
+
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.ProceedAlwaysAndSave,
+        details,
+        { config: mockConfig, messageBus: mockMessageBus },
+      );
+
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'write_file',
+          argsPattern: escapeRegex('"file_path":"src/foo.ts"'),
+        }),
+      );
+    });
   });
 
   describe('getPolicyDenialError', () => {
@@ -446,6 +629,8 @@ describe('policy.ts', () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
       } as unknown as Config;
+
+      (mockConfig as unknown as { config: Config }).config = mockConfig;
 
       const { errorMessage, errorType } = getPolicyDenialError(mockConfig);
 
@@ -457,6 +642,8 @@ describe('policy.ts', () => {
       const mockConfig = {
         getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
       } as unknown as Config;
+
+      (mockConfig as unknown as { config: Config }).config = mockConfig;
       const rule = {
         decision: PolicyDecision.DENY,
         denyMessage: 'Custom Deny',
@@ -517,7 +704,8 @@ describe('Plan Mode Denial Consistency', () => {
 
     mockConfig = {
       getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
-      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      toolRegistry: mockToolRegistry,
+      getToolRegistry: () => mockToolRegistry,
       getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(false),
@@ -525,6 +713,7 @@ describe('Plan Mode Denial Consistency', () => {
       setApprovalMode: vi.fn(),
       getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Config>;
+    (mockConfig as unknown as { config: Config }).config = mockConfig as Config;
   });
 
   afterEach(() => {

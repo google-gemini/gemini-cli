@@ -64,6 +64,7 @@ export function createMockConfig(
     getEmbeddingModel: vi.fn().mockReturnValue('text-embedding-004'),
     getSessionId: vi.fn().mockReturnValue('test-session-id'),
     getUserTier: vi.fn(),
+    isEventDrivenSchedulerEnabled: vi.fn().mockReturnValue(false),
     getMessageBus: vi.fn(),
     getPolicyEngine: vi.fn(),
     getEnableExtensionReloading: vi.fn().mockReturnValue(false),
@@ -75,6 +76,14 @@ export function createMockConfig(
     validatePathAccess: vi.fn().mockReturnValue(undefined),
     ...overrides,
   } as unknown as Config;
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  (mockConfig as unknown as { config: Config; promptId: string }).config =
+    mockConfig;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  (mockConfig as unknown as { config: Config; promptId: string }).promptId =
+    'test-prompt-id';
+
   mockConfig.getMessageBus = vi.fn().mockReturnValue(createMockMessageBus());
   mockConfig.getHookSystem = vi
     .fn()
