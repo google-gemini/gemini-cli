@@ -10,9 +10,9 @@ import {
   expect,
   vi,
   beforeEach,
+  afterEach,
   type Mock,
   type MockInstance,
-  afterEach,
 } from 'vitest';
 import { handleFallback } from './handler.js';
 import type { Config } from '../config/config.js';
@@ -60,6 +60,19 @@ const MOCK_PRO_MODEL = DEFAULT_GEMINI_MODEL;
 const FALLBACK_MODEL = DEFAULT_GEMINI_FLASH_MODEL;
 const AUTH_OAUTH = AuthType.LOGIN_WITH_GOOGLE;
 const AUTH_API_KEY = AuthType.USE_GEMINI;
+
+type MockAvailabilityWithQuotaStatus = ModelAvailabilityService & {
+  getQuotaStatus?: (model: string) =>
+    | {
+        remainingAmount?: number;
+        remaining?: number;
+      }
+    | Promise<{
+        remainingAmount?: number;
+        remaining?: number;
+      }>
+    | undefined;
+};
 
 const createMockConfig = (overrides: Partial<Config> = {}): Config =>
   ({
@@ -207,8 +220,8 @@ describe('handleFallback', () => {
       }
     });
 
-    it('does not wrap around to upgrade candidates if the current model was selected at the end (e.g. by router)', async () => {
-      // Last-resort failure (Flash) in [Preview, Pro, Flash] checks Preview then Pro (all upstream).
+    it('wraps around to try earlier models when the failed model is last in the chain', async () => {
+      // Last-resort failure (Flash) in [Pro, Flash] checks Pro before ending.
       vi.mocked(policyConfig.getModel).mockReturnValue(
         DEFAULT_GEMINI_MODEL_AUTO,
       );
@@ -225,10 +238,12 @@ describe('handleFallback', () => {
         AUTH_OAUTH,
       );
 
-      expect(availability.selectFirstAvailable).not.toHaveBeenCalled();
+      expect(availability.selectFirstAvailable).toHaveBeenCalledWith([
+        DEFAULT_GEMINI_MODEL,
+      ]);
       expect(policyHandler).toHaveBeenCalledWith(
         DEFAULT_GEMINI_FLASH_MODEL,
-        DEFAULT_GEMINI_FLASH_MODEL,
+        DEFAULT_GEMINI_MODEL,
         undefined,
       );
     });
@@ -354,12 +369,13 @@ describe('handleFallback', () => {
 
     it('Call the handler with fallback model same as the failed model when the failed model is the last-resort policy', async () => {
       // Ensure short-circuit when wrapping to an unavailable upstream model.
-      availability.selectFirstAvailable = vi
-        .fn()
-        .mockReturnValue({ selectedModel: null, skipped: [] });
       vi.mocked(policyConfig.getModel).mockReturnValue(
         DEFAULT_GEMINI_MODEL_AUTO,
       );
+
+      availability.selectFirstAvailable = vi
+        .fn()
+        .mockReturnValue({ selectedModel: null, skipped: [] });
 
       const result = await handleFallback(
         policyConfig,
@@ -369,12 +385,8 @@ describe('handleFallback', () => {
 
       policyHandler.mockResolvedValue('retry_once');
 
-      expect(result).not.toBeNull();
-      expect(policyHandler).toHaveBeenCalledWith(
-        DEFAULT_GEMINI_FLASH_MODEL,
-        DEFAULT_GEMINI_FLASH_MODEL,
-        undefined,
-      );
+      expect(result).toBeNull();
+      expect(policyHandler).not.toHaveBeenCalled();
     });
 
     it('calls activateFallbackMode when handler returns "retry_always"', async () => {
@@ -421,6 +433,139 @@ describe('handleFallback', () => {
 
       expect(result).toBe(true);
       expect(policyConfig.activateFallbackMode).not.toHaveBeenCalled();
+    });
+
+    // --- New tests for quota filtering ---
+    it('should select a fallback model only if it has available quota', async () => {
+      const proPolicy = createDefaultPolicy(MOCK_PRO_MODEL);
+      // Mock dependencies
+      policyHandler.mockResolvedValue('retry_always');
+      const mockAvailabilityService = createAvailabilityServiceMock({
+        selectedModel: DEFAULT_GEMINI_FLASH_MODEL, // This might be selected if quota logic is applied correctly
+        skipped: [],
+      }) as unknown as MockAvailabilityWithQuotaStatus;
+      // Mock getQuotaStatus on the mock service
+      mockAvailabilityService.getQuotaStatus = vi
+        .fn()
+        .mockImplementation(async (modelName: string) => {
+          if (modelName === DEFAULT_GEMINI_FLASH_MODEL)
+            return { remaining: 100 };
+          if (modelName === PREVIEW_GEMINI_FLASH_MODEL) return { remaining: 0 };
+          return { remaining: 0 }; // Default to no quota
+        });
+      vi.mocked(policyConfig.getModelAvailabilityService).mockReturnValue(
+        mockAvailabilityService,
+      );
+
+      // Spy on policyHelpers to mock the context building and selection
+      const buildFallbackPolicyContextSpy = vi.spyOn(
+        policyHelpers,
+        'buildFallbackPolicyContext',
+      );
+      buildFallbackPolicyContextSpy.mockReturnValue({
+        failedPolicy: proPolicy,
+        candidates: [
+          {
+            ...createDefaultPolicy(DEFAULT_GEMINI_FLASH_MODEL),
+            isLastResort: false,
+          },
+          {
+            ...createDefaultPolicy(PREVIEW_GEMINI_FLASH_MODEL),
+            isLastResort: false,
+          },
+        ],
+      });
+
+      // Mock selectFirstAvailable to simulate its behavior after candidates are filtered
+      // In reality, our change modifies handleFallback *before* selectFirstAvailable is called
+      // So we need to mock the function that is called *within* handleFallback: 'availability.selectFirstAvailable'
+      vi.mocked(
+        mockAvailabilityService.selectFirstAvailable,
+      ).mockImplementation((modelNames) => {
+        // This mock should reflect that only models with quota are passed to it
+        if (
+          modelNames.includes(DEFAULT_GEMINI_FLASH_MODEL) &&
+          !modelNames.includes(PREVIEW_GEMINI_FLASH_MODEL)
+        ) {
+          return { selectedModel: DEFAULT_GEMINI_FLASH_MODEL, skipped: [] };
+        }
+        return { selectedModel: null, skipped: [] };
+      });
+
+      await handleFallback(policyConfig, MOCK_PRO_MODEL, AUTH_OAUTH);
+
+      // Expect the handler to be called with the model that has quota
+      expect(policyHandler).toHaveBeenCalledWith(
+        MOCK_PRO_MODEL,
+        DEFAULT_GEMINI_FLASH_MODEL, // The model with quota
+        undefined,
+      );
+      expect(policyConfig.activateFallbackMode).toHaveBeenCalledWith(
+        DEFAULT_GEMINI_FLASH_MODEL,
+      );
+      expect(buildFallbackPolicyContextSpy).toHaveBeenCalled(); // Ensure context was built
+
+      // Ensure the quota status was checked for both candidates
+      expect(mockAvailabilityService.getQuotaStatus).toHaveBeenCalledWith(
+        DEFAULT_GEMINI_FLASH_MODEL,
+      );
+      expect(mockAvailabilityService.getQuotaStatus).toHaveBeenCalledWith(
+        PREVIEW_GEMINI_FLASH_MODEL,
+      );
+    });
+
+    it('should return null if no fallback models have available quota', async () => {
+      const proPolicy = createDefaultPolicy(MOCK_PRO_MODEL);
+      // Both candidates have no quota
+      const noQuotaCandidate1 = {
+        ...createDefaultPolicy(DEFAULT_GEMINI_FLASH_MODEL),
+        isLastResort: false,
+      };
+      const noQuotaCandidate2 = {
+        ...createDefaultPolicy(PREVIEW_GEMINI_FLASH_MODEL),
+        isLastResort: false,
+      };
+
+      // Mock dependencies
+      policyHandler.mockResolvedValue('retry_always'); // Handler should not be called if no fallback is found
+      const mockAvailabilityService = createAvailabilityServiceMock({
+        selectedModel: null, // Ensure selectFirstAvailable won't find anything even if called
+        skipped: [],
+      }) as unknown as MockAvailabilityWithQuotaStatus;
+      mockAvailabilityService.selectFirstAvailable = vi.fn(); // Should not be called
+      mockAvailabilityService.getQuotaStatus = vi
+        .fn()
+        .mockResolvedValue({ remaining: 0 });
+      vi.mocked(policyConfig.getModelAvailabilityService).mockReturnValue(
+        mockAvailabilityService,
+      );
+
+      // Spy on policyHelpers
+      const buildFallbackPolicyContextSpy = vi.spyOn(
+        policyHelpers,
+        'buildFallbackPolicyContext',
+      );
+      buildFallbackPolicyContextSpy.mockReturnValue({
+        failedPolicy: proPolicy,
+        candidates: [noQuotaCandidate1, noQuotaCandidate2],
+      });
+
+      const result = await handleFallback(
+        policyConfig,
+        MOCK_PRO_MODEL,
+        AUTH_OAUTH,
+      );
+
+      expect(result).toBeNull(); // Expect null because no suitable fallback was found
+      expect(policyHandler).not.toHaveBeenCalled(); // Handler should not be called
+      expect(policyConfig.activateFallbackMode).not.toHaveBeenCalled();
+      expect(buildFallbackPolicyContextSpy).toHaveBeenCalled();
+      expect(mockAvailabilityService.getQuotaStatus).toHaveBeenCalledWith(
+        DEFAULT_GEMINI_FLASH_MODEL,
+      );
+      expect(mockAvailabilityService.getQuotaStatus).toHaveBeenCalledWith(
+        PREVIEW_GEMINI_FLASH_MODEL,
+      );
     });
   });
 });

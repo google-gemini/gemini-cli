@@ -14,6 +14,8 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { FallbackIntent, FallbackRecommendation } from './types.js';
 import { classifyFailureKind } from '../availability/errorClassification.js';
+import type { ModelPolicy } from '../availability/modelPolicy.js';
+import type { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import {
   buildFallbackPolicyContext,
   resolvePolicyChain,
@@ -22,6 +24,22 @@ import {
 } from '../availability/policyHelpers.js';
 
 export const UPGRADE_URL_PAGE = 'https://goo.gle/set-up-gemini-code-assist';
+
+type QuotaAwareModelAvailabilityService = ModelAvailabilityService & {
+  getQuotaStatus?: (model: string) =>
+    | {
+        remainingAmount?: number;
+        remaining?: number;
+      }
+    | undefined
+    | Promise<
+        | {
+            remainingAmount?: number;
+            remaining?: number;
+          }
+        | undefined
+      >;
+};
 
 export async function handleFallback(
   config: Config,
@@ -37,6 +55,7 @@ export async function handleFallback(
   const { failedPolicy, candidates } = buildFallbackPolicyContext(
     chain,
     failedModel,
+    true,
   );
 
   const failureKind = classifyFailureKind(error);
@@ -50,14 +69,29 @@ export async function handleFallback(
   if (!candidates.length) {
     fallbackModel = failedModel;
   } else {
-    const selection = availability.selectFirstAvailable(
-      candidates.map((policy) => policy.model),
+    const quotaAvailableCandidates = await getQuotaAvailableCandidates(
+      config,
+      availability,
+      candidates,
     );
 
-    const lastResortPolicy = candidates.find((policy) => policy.isLastResort);
+    // If no candidates have quota, we cannot select a fallback model based on quota.
+    // Return null to indicate failure to find a suitable fallback.
+    if (!quotaAvailableCandidates.length) {
+      debugLogger.warn('No fallback models with available quota found.');
+      return null;
+    }
+
+    const selection = availability.selectFirstAvailable(
+      quotaAvailableCandidates.map((policy) => policy.model),
+    );
+
+    const lastResortPolicy = quotaAvailableCandidates.find(
+      (policy) => policy.isLastResort,
+    );
     const selectedFallbackModel =
       selection.selectedModel ?? lastResortPolicy?.model;
-    const selectedPolicy = candidates.find(
+    const selectedPolicy = quotaAvailableCandidates.find(
       (policy) => policy.model === selectedFallbackModel,
     );
 
@@ -112,6 +146,51 @@ export async function handleFallback(
     debugLogger.error('Fallback handler failed:', handlerError);
     return null;
   }
+}
+
+async function getQuotaAvailableCandidates(
+  config: Config,
+  availability: QuotaAwareModelAvailabilityService,
+  candidates: ModelPolicy[],
+): Promise<ModelPolicy[]> {
+  const quotaPositiveCandidates: ModelPolicy[] = [];
+  const unknownQuotaCandidates: ModelPolicy[] = [];
+
+  for (const candidatePolicy of candidates) {
+    const quotaStatusFromAvailability = await availability.getQuotaStatus?.(
+      candidatePolicy.model,
+    );
+    const quotaStatus =
+      quotaStatusFromAvailability ??
+      config.getRemainingQuotaForModel?.(candidatePolicy.model);
+    const remaining = getRemainingFromQuotaStatus(quotaStatus);
+
+    if (remaining === undefined) {
+      unknownQuotaCandidates.push(candidatePolicy);
+      continue;
+    }
+
+    if (remaining > 0) {
+      quotaPositiveCandidates.push(candidatePolicy);
+    }
+  }
+
+  if (quotaPositiveCandidates.length > 0) {
+    return quotaPositiveCandidates;
+  }
+
+  return unknownQuotaCandidates;
+}
+
+function getRemainingFromQuotaStatus(
+  quotaStatus:
+    | {
+        remainingAmount?: number;
+        remaining?: number;
+      }
+    | undefined,
+): number | undefined {
+  return quotaStatus?.remainingAmount ?? quotaStatus?.remaining;
 }
 
 async function handleUpgrade() {
