@@ -57,11 +57,40 @@ export class SessionError extends Error {
   /**
    * Creates an error for when a session identifier is invalid.
    */
-  static invalidSessionIdentifier(identifier: string): SessionError {
-    return new SessionError(
-      'INVALID_SESSION_IDENTIFIER',
-      `Invalid session identifier "${identifier}".\n  Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.`,
-    );
+  static invalidSessionIdentifier(
+    identifier: string,
+    availableSessions?: SessionInfo[],
+  ): SessionError {
+    let message = `Invalid session identifier "${identifier}".`;
+
+    if (availableSessions && availableSessions.length > 0) {
+      // Limit to at most 10 sessions to avoid flooding the terminal
+      const sessionsToShow = availableSessions.slice(0, 10);
+      const hasMore = availableSessions.length > 10;
+
+      message += '\n\nAvailable sessions for this project:\n';
+      sessionsToShow.forEach((session) => {
+        const time = formatRelativeTime(session.lastUpdated);
+        const title =
+          session.displayName.length > 60
+            ? session.displayName.slice(0, 57) + '...'
+            : session.displayName;
+        message += `  ${session.index}. ${title} (${time})\n`;
+      });
+
+      if (hasMore) {
+        message += `\n  Run --list-sessions to see all ${availableSessions.length} sessions.\n`;
+      } else {
+        const indices = availableSessions.map((s) => s.index).join(', ');
+        message += `\nUse --resume ${indices}, or --resume latest.\n`;
+      }
+    } else {
+      // Fallback message when sessions list not available
+      message +=
+        '\n  Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.';
+    }
+
+    return new SessionError('INVALID_SESSION_IDENTIFIER', message);
   }
 }
 
@@ -447,7 +476,7 @@ export class SessionSelector {
       return sortedSessions[index - 1];
     }
 
-    throw SessionError.invalidSessionIdentifier(identifier);
+    throw SessionError.invalidSessionIdentifier(identifier, sessions);
   }
 
   /**

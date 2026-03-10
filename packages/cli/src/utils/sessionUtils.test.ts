@@ -341,6 +341,117 @@ describe('SessionSelector', () => {
     );
   });
 
+  it('should include available sessions in INVALID_SESSION_IDENTIFIER error', async () => {
+    // Create 3 test sessions with different timestamps
+    const sessionId1 = randomUUID();
+    const sessionId2 = randomUUID();
+    const sessionId3 = randomUUID();
+
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    // Session 1: 2 days ago
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    const session1 = {
+      sessionId: sessionId1,
+      projectHash: 'test-hash',
+      startTime: twoDaysAgo.toISOString(),
+      lastUpdated: twoDaysAgo.toISOString(),
+      messages: [
+        {
+          type: 'user',
+          content: 'Fix bug in auth',
+          id: 'msg1',
+          timestamp: twoDaysAgo.toISOString(),
+        },
+      ],
+    };
+
+    // Session 2: 5 hours ago
+    const fiveHoursAgo = new Date(Date.now() - 5 * 60 * 60 * 1000);
+    const session2 = {
+      sessionId: sessionId2,
+      projectHash: 'test-hash',
+      startTime: fiveHoursAgo.toISOString(),
+      lastUpdated: fiveHoursAgo.toISOString(),
+      messages: [
+        {
+          type: 'user',
+          content: 'Refactor database schema',
+          id: 'msg2',
+          timestamp: fiveHoursAgo.toISOString(),
+        },
+      ],
+    };
+
+    // Session 3: 2 minutes ago (very recent)
+    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+    const session3 = {
+      sessionId: sessionId3,
+      projectHash: 'test-hash',
+      startTime: twoMinutesAgo.toISOString(),
+      lastUpdated: twoMinutesAgo.toISOString(),
+      messages: [
+        {
+          type: 'user',
+          content: 'Update documentation',
+          id: 'msg3',
+          timestamp: twoMinutesAgo.toISOString(),
+        },
+      ],
+    };
+
+    // Write session files with proper timestamps in filenames
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}${twoDaysAgo.toISOString().slice(0, 10)}T${twoDaysAgo.toISOString().slice(11, 16).replace(':', '-')}-${sessionId1.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(session1, null, 2),
+    );
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}${fiveHoursAgo.toISOString().slice(0, 10)}T${fiveHoursAgo.toISOString().slice(11, 16).replace(':', '-')}-${sessionId2.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(session2, null, 2),
+    );
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}${twoMinutesAgo.toISOString().slice(0, 10)}T${twoMinutesAgo.toISOString().slice(11, 16).replace(':', '-')}-${sessionId3.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(session3, null, 2),
+    );
+
+    const sessionSelector = new SessionSelector(config);
+
+    // Test that error includes formatted sessions
+    await expect(sessionSelector.resolveSession('99')).rejects.toSatisfy(
+      (error) => {
+        expect(error).toBeInstanceOf(SessionError);
+        expect((error as SessionError).code).toBe('INVALID_SESSION_IDENTIFIER');
+        const errorMessage = (error as SessionError).message;
+
+        // Verify error message structure
+        expect(errorMessage).toContain('Invalid session identifier "99"');
+        expect(errorMessage).toContain('Available sessions for this project:');
+        expect(errorMessage).toContain('Fix bug in auth');
+        expect(errorMessage).toContain('Refactor database schema');
+        expect(errorMessage).toContain('Update documentation');
+
+        // Verify it includes the resume instructions
+        expect(errorMessage).toMatch(
+          /Use --resume 1, 2, 3, or --resume latest/,
+        );
+
+        return true;
+      },
+    );
+  });
+
   it('should throw SessionError with NO_SESSIONS_FOUND when resolving latest with no sessions', async () => {
     // Empty chats directory — no session files
     const chatsDir = path.join(tmpDir, 'chats');
