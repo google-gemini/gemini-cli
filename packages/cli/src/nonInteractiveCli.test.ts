@@ -54,6 +54,10 @@ const mockCoreEvents = vi.hoisted(() => ({
 }));
 
 const mockSchedulerSchedule = vi.hoisted(() => vi.fn());
+const mockSchedulerDispose = vi.hoisted(() => vi.fn());
+const mockConvertSessionToClientHistory = vi.hoisted(() =>
+  vi.fn((messages: unknown[]) => messages),
+);
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
@@ -71,6 +75,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     Scheduler: class {
       schedule = mockSchedulerSchedule;
       cancelAll = vi.fn();
+      dispose = mockSchedulerDispose;
     },
     isTelemetrySdkInitialized: vi.fn().mockReturnValue(true),
     ChatRecordingService: MockChatRecordingService,
@@ -78,6 +83,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       getMetrics: vi.fn(),
     },
     coreEvents: mockCoreEvents,
+    convertSessionToClientHistory: mockConvertSessionToClientHistory,
     createWorkingStdio: vi.fn(() => ({
       stdout: process.stdout,
       stderr: process.stderr,
@@ -132,6 +138,8 @@ describe('runNonInteractive', () => {
 
   beforeEach(async () => {
     mockSchedulerSchedule.mockReset();
+    mockSchedulerDispose.mockReset();
+    mockConvertSessionToClientHistory.mockClear();
 
     mockCommandServiceCreate.mockResolvedValue({
       getCommands: mockGetCommands,
@@ -264,6 +272,7 @@ describe('runNonInteractive', () => {
       'Test input',
     );
     expect(getWrittenOutput()).toBe('Hello World\n');
+    expect(mockSchedulerDispose).toHaveBeenCalledTimes(1);
     // Note: Telemetry shutdown is now handled in runExitCleanup() in cleanup.ts
     // so we no longer expect shutdownTelemetry to be called directly here
   });
@@ -908,6 +917,7 @@ describe('runNonInteractive', () => {
         2,
       ),
     );
+    expect(mockSchedulerDispose).toHaveBeenCalledTimes(1);
   });
 
   it('should handle FatalInputError with custom exit code in JSON format', async () => {
