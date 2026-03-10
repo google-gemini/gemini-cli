@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import readline from 'node:readline';
 import process from 'node:process';
 import { coreEvents } from './events.js';
@@ -51,6 +50,25 @@ describe('getConsentForOauth', () => {
         expect.objectContaining({
           prompt: expect.stringContaining(
             'Login required. Opening authentication page in your browser.',
+          ),
+        }),
+      );
+    });
+
+    it('should handle empty prompt correctly', async () => {
+      const mockEmitConsentRequest = vi.spyOn(coreEvents, 'emitConsentRequest');
+      vi.spyOn(coreEvents, 'listenerCount').mockReturnValue(1);
+
+      mockEmitConsentRequest.mockImplementation((payload) => {
+        payload.onConfirm(true);
+      });
+
+      await getConsentForOauth('');
+
+      expect(mockEmitConsentRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          prompt: expect.stringMatching(
+            /^Opening authentication page in your browser\./,
           ),
         }),
       );

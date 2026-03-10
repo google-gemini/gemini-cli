@@ -20,11 +20,15 @@ import { ToolErrorType } from '../tools/tool-error.js';
 import { ToolCallEvent } from '../telemetry/types.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { ToolModificationHandler } from '../scheduler/tool-modifier.js';
-import { getToolSuggestion } from '../utils/tool-utils.js';
+import {
+  getToolSuggestion,
+  isToolCallResponseInfo,
+} from '../utils/tool-utils.js';
 import type { ToolConfirmationRequest } from '../confirmation-bus/types.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
+  CoreToolCallStatus,
   type ToolCall,
   type ValidatingToolCall,
   type ScheduledToolCall,
@@ -42,10 +46,10 @@ import {
   type ToolCallRequestInfo,
   type ToolCallResponseInfo,
 } from '../scheduler/types.js';
-import { CoreToolCallStatus } from '../scheduler/types.js';
 import { ToolExecutor } from '../scheduler/tool-executor.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getPolicyDenialError } from '../scheduler/policy.js';
+import { GeminiCliOperation } from '../telemetry/constants.js';
 
 export type {
   ToolCall,
@@ -129,7 +133,7 @@ export class CoreToolScheduler {
     this.onAllToolCallsComplete = options.onAllToolCallsComplete;
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.getPreferredEditor = options.getPreferredEditor;
-    this.toolExecutor = new ToolExecutor(this.config);
+    this.toolExecutor = new ToolExecutor(this.config, this.config);
     this.toolModifier = new ToolModificationHandler();
 
     // Subscribe to message bus for ASK_USER policy decisions
@@ -224,32 +228,36 @@ export class CoreToolScheduler {
           const durationMs = existingStartTime
             ? Date.now() - existingStartTime
             : undefined;
-          return {
-            request: currentCall.request,
-            tool: toolInstance,
-            invocation,
-            status: CoreToolCallStatus.Success,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            response: auxiliaryData as ToolCallResponseInfo,
-            durationMs,
-            outcome,
-            approvalMode,
-          } as SuccessfulToolCall;
+          if (isToolCallResponseInfo(auxiliaryData)) {
+            return {
+              request: currentCall.request,
+              tool: toolInstance,
+              invocation,
+              status: CoreToolCallStatus.Success,
+              response: auxiliaryData,
+              durationMs,
+              outcome,
+              approvalMode,
+            } as SuccessfulToolCall;
+          }
+          throw new Error('Invalid response data for tool success');
         }
         case CoreToolCallStatus.Error: {
           const durationMs = existingStartTime
             ? Date.now() - existingStartTime
             : undefined;
-          return {
-            request: currentCall.request,
-            status: CoreToolCallStatus.Error,
-            tool: toolInstance,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            response: auxiliaryData as ToolCallResponseInfo,
-            durationMs,
-            outcome,
-            approvalMode,
-          } as ErroredToolCall;
+          if (isToolCallResponseInfo(auxiliaryData)) {
+            return {
+              request: currentCall.request,
+              status: CoreToolCallStatus.Error,
+              tool: toolInstance,
+              response: auxiliaryData,
+              durationMs,
+              outcome,
+              approvalMode,
+            } as ErroredToolCall;
+          }
+          throw new Error('Invalid response data for tool error');
         }
         case CoreToolCallStatus.AwaitingApproval:
           return {
@@ -278,6 +286,19 @@ export class CoreToolScheduler {
           const durationMs = existingStartTime
             ? Date.now() - existingStartTime
             : undefined;
+
+          if (isToolCallResponseInfo(auxiliaryData)) {
+            return {
+              request: currentCall.request,
+              tool: toolInstance,
+              invocation,
+              status: CoreToolCallStatus.Cancelled,
+              response: auxiliaryData,
+              durationMs,
+              outcome,
+              approvalMode,
+            } as CancelledToolCall;
+          }
 
           // Preserve diff for cancelled edit operations
           let resultDisplay: ToolResultDisplay | undefined = undefined;
@@ -424,7 +445,7 @@ export class CoreToolScheduler {
     signal: AbortSignal,
   ): Promise<void> {
     return runInDevTraceSpan(
-      { name: 'schedule' },
+      { operation: GeminiCliOperation.ScheduleToolCalls },
       async ({ metadata: spanMetadata }) => {
         spanMetadata.input = request;
         if (this.isRunning() || this.isScheduling) {
@@ -624,10 +645,11 @@ export class CoreToolScheduler {
           toolCall.tool instanceof DiscoveredMCPTool
             ? toolCall.tool.serverName
             : undefined;
+        const toolAnnotations = toolCall.tool.toolAnnotations;
 
         const { decision, rule } = await this.config
           .getPolicyEngine()
-          .check(toolCallForPolicy, serverName);
+          .check(toolCallForPolicy, serverName, toolAnnotations);
 
         if (decision === PolicyDecision.DENY) {
           const { errorMessage, errorType } = getPolicyDenialError(
