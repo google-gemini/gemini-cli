@@ -791,12 +791,10 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     ? Math.max(1, availableHeight - overhead)
     : undefined;
 
-  const minListHeight = 6; // Reserve ~6 lines for options list to avoid squishing
-
   const questionHeightLimit =
     listHeight && !isAlternateBuffer
       ? question.unconstrainedHeight
-        ? Math.max(1, listHeight - minListHeight)
+        ? Math.max(1, listHeight - selectionItems.length * 2)
         : Math.min(15, Math.max(1, listHeight - DIALOG_PADDING))
       : undefined;
 
