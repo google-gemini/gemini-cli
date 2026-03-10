@@ -5,7 +5,10 @@
  */
 
 import { describe, expect } from 'vitest';
-import { ApprovalMode } from '@google/gemini-cli-core';
+import {
+  TRACKER_CREATE_TASK_TOOL_NAME,
+  TRACKER_UPDATE_TASK_TOOL_NAME,
+} from '@google/gemini-cli-core';
 import { evalTest, assertModelHasOutput } from './test-helper.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -23,7 +26,6 @@ const FILES = {
 describe('tracker_mode', () => {
   evalTest('USUALLY_PASSES', {
     name: 'should manage tasks in the tracker when explicitly requested during a bug fix',
-    approvalMode: ApprovalMode.YOLO,
     params: {
       settings: { experimental: { taskTracker: true } },
     },
@@ -31,7 +33,9 @@ describe('tracker_mode', () => {
     prompt:
       'We have a bug in src/login.js: the password check is missing. First, create a task in the tracker to fix it. Then fix the bug, and mark the task as closed.',
     assert: async (rig, result) => {
-      const wasCreateCalled = await rig.waitForToolCall('tracker_create_task');
+      const wasCreateCalled = await rig.waitForToolCall(
+        TRACKER_CREATE_TASK_TOOL_NAME,
+      );
       expect(
         wasCreateCalled,
         'Expected tracker_create_task tool to be called',
@@ -39,22 +43,25 @@ describe('tracker_mode', () => {
 
       const toolLogs = rig.readToolLogs();
       const createCall = toolLogs.find(
-        (log) => log.toolRequest.name === 'tracker_create_task',
+        (log) => log.toolRequest.name === TRACKER_CREATE_TASK_TOOL_NAME,
       );
       expect(createCall).toBeDefined();
       const args = JSON.parse(createCall!.toolRequest.args);
       expect(
-        args.title?.toLowerCase() || args.description?.toLowerCase(),
+        (args.title?.toLowerCase() ?? '') +
+          (args.description?.toLowerCase() ?? ''),
       ).toContain('login');
 
-      const wasUpdateCalled = await rig.waitForToolCall('tracker_update_task');
+      const wasUpdateCalled = await rig.waitForToolCall(
+        TRACKER_UPDATE_TASK_TOOL_NAME,
+      );
       expect(
         wasUpdateCalled,
         'Expected tracker_update_task tool to be called',
       ).toBe(true);
 
       const updateCall = toolLogs.find(
-        (log) => log.toolRequest.name === 'tracker_update_task',
+        (log) => log.toolRequest.name === TRACKER_UPDATE_TASK_TOOL_NAME,
       );
       expect(updateCall).toBeDefined();
       const updateArgs = JSON.parse(updateCall!.toolRequest.args);
@@ -72,7 +79,6 @@ describe('tracker_mode', () => {
 
   evalTest('USUALLY_PASSES', {
     name: 'should implicitly create tasks when asked to build a feature plan',
-    approvalMode: ApprovalMode.YOLO,
     params: {
       settings: { experimental: { taskTracker: true } },
     },
@@ -81,7 +87,9 @@ describe('tracker_mode', () => {
       'I need to build a complex new feature for user authentication in our project. Create a detailed implementation plan and organize the work into bite-sized chunks. Do not actually implement the code yet, just plan it.',
     assert: async (rig, result) => {
       // The model should proactively use tracker_create_task to organize the work
-      const wasToolCalled = await rig.waitForToolCall('tracker_create_task');
+      const wasToolCalled = await rig.waitForToolCall(
+        TRACKER_CREATE_TASK_TOOL_NAME,
+      );
       expect(
         wasToolCalled,
         'Expected tracker_create_task to be called implicitly to organize plan',
@@ -89,7 +97,7 @@ describe('tracker_mode', () => {
 
       const toolLogs = rig.readToolLogs();
       const createCalls = toolLogs.filter(
-        (log) => log.toolRequest.name === 'tracker_create_task',
+        (log) => log.toolRequest.name === TRACKER_CREATE_TASK_TOOL_NAME,
       );
 
       // We expect it to create at least one task for authentication, likely more.
