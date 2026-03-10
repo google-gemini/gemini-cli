@@ -105,6 +105,8 @@ export async function loadConfig(
     checkpointing,
     interactive: true,
     enableInteractiveShell: true,
+    enableEventDrivenScheduler:
+      settings.experimental?.enableEventDrivenScheduler ?? true,
     ptyInfo: 'auto',
   };
 
