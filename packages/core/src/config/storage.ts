@@ -62,6 +62,10 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'mcp-oauth-tokens.json');
   }
 
+  static getA2AOAuthTokensPath(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'a2a-oauth-tokens.json');
+  }
+
   static getGlobalSettingsPath(): string {
     return path.join(Storage.getGlobalGeminiDir(), 'settings.json');
   }
