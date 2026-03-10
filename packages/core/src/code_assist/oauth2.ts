@@ -642,7 +642,7 @@ export function getAvailablePort(): Promise<number> {
   });
 }
 
-async function fetchCachedCredentials(): Promise<
+export async function fetchCachedCredentials(): Promise<
   Credentials | JWTInput | null
 > {
   const useEncryptedStorage = getUseEncryptedStorageFlag();

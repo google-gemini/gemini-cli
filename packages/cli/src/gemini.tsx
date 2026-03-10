@@ -72,7 +72,6 @@ import {
   getVersion,
   ValidationCancelledError,
   ValidationRequiredError,
-  type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -108,8 +107,9 @@ import { OverflowProvider } from './ui/contexts/OverflowContext.js';
 
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
-import { runDeferredCommand } from './deferred.js';
+import { runDeferredCommand, getDeferredCommand } from './deferred.js';
 import { SlashCommandConflictHandler } from './services/SlashCommandConflictHandler.js';
+import { fetchCachedCredentials } from '@google/gemini-cli-core';
 
 const SLOW_RENDER_MS = 200;
 
@@ -328,13 +328,6 @@ export async function startInteractiveUI(
 export async function main() {
   const cliStartupHandle = startupProfiler.start('cli_startup');
 
-  // Listen for admin controls from parent process (IPC) in non-sandbox mode. In
-  // sandbox mode, we re-fetch the admin controls from the server once we enter
-  // the sandbox.
-  // TODO: Cache settings in sandbox mode as well.
-  const adminControlsListner = setupAdminControlsListener();
-  registerCleanup(adminControlsListner.cleanup);
-
   const cleanupStdio = patchStdio();
   registerSyncCleanup(() => {
     // This is needed to ensure we don't lose any buffered output.
@@ -446,13 +439,50 @@ export async function main() {
   const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
     projectHooks: settings.workspace.settings.hooks,
   });
-  adminControlsListner.setConfig(partialConfig);
+
+  const isEnteringSandbox = !process.env['SANDBOX'] && !!argv.sandbox;
+
+  // We relaunch if we are not already in a sandbox and not already in a
+  // relaunched process. relaunchAppInChildProcess ensures we always have a
+  // child process that can be internally restarted.
+  const willRelaunch =
+    !process.env['SANDBOX'] && !process.env['GEMINI_CLI_NO_RELAUNCH'];
+
+  // Determine if we MUST authenticate in the parent process
+  const hasDeferredCommand = !!getDeferredCommand();
+  let needsInteractiveSandboxLogin = false;
+
+  if (isEnteringSandbox && !settings.merged.security.auth.useExternal) {
+    const authType =
+      settings.merged.security.auth.selectedType ||
+      (process.env['CLOUD_SHELL'] === 'true' ||
+      process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true'
+        ? AuthType.COMPUTE_ADC
+        : AuthType.LOGIN_WITH_GOOGLE);
+
+    if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+      const existingCredentials = await fetchCachedCredentials();
+      if (!existingCredentials) {
+        // Sandbox environment might block interactive login, so do it here
+        needsInteractiveSandboxLogin = true;
+      }
+    }
+  }
+
+  const mustAuthNow = hasDeferredCommand || needsInteractiveSandboxLogin;
 
   // Refresh auth to fetch remote admin settings from CCPA and before entering
   // the sandbox because the sandbox will interfere with the Oauth2 web
   // redirect.
+  //
+  // We skip this in the parent process if we are about to relaunch, as the
+  // child process will perform its own authentication and fetch admin settings
+  // itself.
   let initialAuthFailed = false;
-  if (!settings.merged.security.auth.useExternal) {
+  if (
+    !settings.merged.security.auth.useExternal &&
+    (!willRelaunch || mustAuthNow)
+  ) {
     try {
       if (
         partialConfig.isInteractive() &&
@@ -501,6 +531,7 @@ export async function main() {
   }
 
   // Run deferred command now that we have admin settings.
+  // Note: if auth was skipped, settings.merged.admin will use defaults.
   await runDeferredCommand(settings.merged);
 
   // hop into sandbox if we are outside and sandboxing is enabled
@@ -558,7 +589,7 @@ export async function main() {
     } else {
       // Relaunch app so we always have a child process that can be internally
       // restarted if needed.
-      await relaunchAppInChildProcess(memoryArgs, [], remoteAdminSettings);
+      await relaunchAppInChildProcess(memoryArgs, []);
     }
   }
 
@@ -576,8 +607,6 @@ export async function main() {
     // storage-related operations (like listing or resuming sessions) have
     // access to the project identifier.
     await config.storage.initialize();
-
-    adminControlsListner.setConfig(config);
 
     if (config.isInteractive() && settings.merged.general.devtools) {
       const { setupInitialActivityLogger } = await import(
@@ -881,38 +910,4 @@ export function initializeOutputListenersAndFlush() {
     }
   }
   coreEvents.drainBacklogs();
-}
-
-function setupAdminControlsListener() {
-  let pendingSettings: AdminControlsSettings | undefined;
-  let config: Config | undefined;
-
-  const messageHandler = (msg: unknown) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const message = msg as {
-      type?: string;
-      settings?: AdminControlsSettings;
-    };
-    if (message?.type === 'admin-settings' && message.settings) {
-      if (config) {
-        config.setRemoteAdminSettings(message.settings);
-      } else {
-        pendingSettings = message.settings;
-      }
-    }
-  };
-
-  process.on('message', messageHandler);
-
-  return {
-    setConfig: (newConfig: Config) => {
-      config = newConfig;
-      if (pendingSettings) {
-        config.setRemoteAdminSettings(pendingSettings);
-      }
-    },
-    cleanup: () => {
-      process.off('message', messageHandler);
-    },
-  };
 }

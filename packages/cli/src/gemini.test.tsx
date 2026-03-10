@@ -43,6 +43,7 @@ import {
   debugLogger,
   coreEvents,
   AuthType,
+  fetchCachedCredentials,
 } from '@google/gemini-cli-core';
 import { act } from 'react';
 import { type InitializationResult } from './core/initializer.js';
@@ -130,6 +131,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       off: vi.fn(),
       drainBacklogs: vi.fn(),
     },
+    fetchCachedCredentials: vi.fn().mockResolvedValue({}),
   };
 });
 
@@ -965,12 +967,47 @@ describe('gemini.tsx main function exit codes', () => {
     }
   });
 
-  it('should exit with 41 for auth failure during sandbox setup', async () => {
+  it('should skip refreshAuth in parent process when relaunch is expected', async () => {
     vi.stubEnv('SANDBOX', '');
+    const refreshAuthSpy = vi.fn();
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        refreshAuth: refreshAuthSpy,
+        getRemoteAdminSettings: vi.fn().mockReturnValue(undefined),
+        isInteractive: vi.fn().mockReturnValue(true),
+      }),
+    );
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: {
+          security: { auth: { selectedType: 'google', useExternal: false } },
+          advanced: { autoConfigureMemory: false },
+        },
+      }),
+    );
+    vi.mocked(parseArguments).mockResolvedValue({} as CliArgs);
+
+    // Initial process (no SANDBOX, no NO_RELAUNCH)
+    delete process.env['GEMINI_CLI_NO_RELAUNCH'];
+
+    try {
+      await main();
+    } catch (e) {
+      if (!(e instanceof MockProcessExitError)) throw e;
+    }
+
+    expect(refreshAuthSpy).not.toHaveBeenCalled();
+  });
+
+  it('should exit with 41 for auth failure during sandbox setup when auth IS required', async () => {
+    vi.stubEnv('SANDBOX', '');
+    // Force mustAuthNow = true by simulating sandbox entry without credentials
     vi.mocked(loadSandboxConfig).mockResolvedValue({
       command: 'docker',
       image: 'test-image',
     });
+    vi.mocked(fetchCachedCredentials).mockResolvedValue(null);
+
     vi.mocked(loadCliConfig).mockResolvedValue(
       createMockConfig({
         refreshAuth: vi.fn().mockRejectedValue(new Error('Auth failed')),
@@ -985,7 +1022,9 @@ describe('gemini.tsx main function exit codes', () => {
         },
       }),
     );
-    vi.mocked(parseArguments).mockResolvedValue({} as CliArgs);
+    vi.mocked(parseArguments).mockResolvedValue({
+      sandbox: true,
+    } as unknown as CliArgs);
 
     try {
       await main();

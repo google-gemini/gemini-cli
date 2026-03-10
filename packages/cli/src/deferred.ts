@@ -25,6 +25,10 @@ export function setDeferredCommand(command: DeferredCommand) {
   deferredCommand = command;
 }
 
+export function getDeferredCommand(): DeferredCommand | undefined {
+  return deferredCommand;
+}
+
 export async function runDeferredCommand(settings: MergedSettings) {
   if (!deferredCommand) {
     return;
