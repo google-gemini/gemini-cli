@@ -641,53 +641,27 @@ export class Task {
 
     // 4. Publish Status Updates to A2A event bus
     if (hasChanged) {
-      // Skip sending confirmation event if we are going to auto-approve it anyway
-      if (
-        tc.status === 'awaiting_approval' &&
-        tc.confirmationDetails &&
-        tc.correlationId &&
-        this.isYoloMatch
-      ) {
-        logger.info(
-          `[Task] Skipping ToolCallConfirmationEvent for ${callId} due to YOLO mode.`,
-        );
-      } else {
-        const coderAgentMessage: CoderAgentMessage =
-          tc.status === 'awaiting_approval'
-            ? { kind: CoderAgentEvent.ToolCallConfirmationEvent }
-            : { kind: CoderAgentEvent.ToolCallUpdateEvent };
+      const coderAgentMessage: CoderAgentMessage =
+        tc.status === 'awaiting_approval'
+          ? { kind: CoderAgentEvent.ToolCallConfirmationEvent }
+          : { kind: CoderAgentEvent.ToolCallUpdateEvent };
 
-        const message = this.toolStatusMessage(tc, this.id, this.contextId);
-        const statusUpdate = this._createStatusUpdateEvent(
-          this.taskState,
-          coderAgentMessage,
-          message,
-          false,
-        );
-        this.eventBus?.publish(statusUpdate);
-      }
-    }
-
-    // 5. Handle Auto-Execution (YOLO)
-    if (
-      tc.status === 'awaiting_approval' &&
-      tc.correlationId &&
-      this.isYoloMatch
-    ) {
-      logger.info(`[Task] Auto-approving tool call ${callId}`);
-      void this.config.getMessageBus().publish({
-        type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-        correlationId: tc.correlationId,
-        confirmed: true,
-        outcome: ToolConfirmationOutcome.ProceedOnce,
-      });
-      this.pendingToolConfirmationDetails.delete(callId);
-      this.pendingCorrelationIds.delete(callId);
-      this.toolsAlreadyConfirmed.add(callId);
+      const message = this.toolStatusMessage(tc, this.id, this.contextId);
+      const statusUpdate = this._createStatusUpdateEvent(
+        this.taskState,
+        coderAgentMessage,
+        message,
+        false,
+      );
+      this.eventBus?.publish(statusUpdate);
     }
   }
 
   private checkInputRequiredState(): void {
+    if (this.isYoloMatch) {
+      return;
+    }
+
     // 6. Handle Input Required State
     let isAwaitingApproval = false;
     let isExecuting = false;

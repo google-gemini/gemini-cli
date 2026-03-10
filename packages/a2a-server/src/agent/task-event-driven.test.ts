@@ -378,13 +378,10 @@ describe('Task Event-Driven Scheduler', () => {
     )?.[1];
     handler({ type: MessageBusType.TOOL_CALLS_UPDATE, toolCalls: [toolCall] });
 
-    // Should immediately auto-publish ProceedOnce without user intervention
-    expect(yoloMessageBus.publish).toHaveBeenCalledWith(
+    // Should NOT auto-publish ProceedOnce anymore, because PolicyEngine handles it directly
+    expect(yoloMessageBus.publish).not.toHaveBeenCalledWith(
       expect.objectContaining({
         type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-        correlationId: 'corr-1',
-        confirmed: true,
-        outcome: ToolConfirmationOutcome.ProceedOnce,
       }),
     );
 
@@ -396,23 +393,6 @@ describe('Task Event-Driven Scheduler', () => {
       undefined,
       true,
     );
-
-    // Clear the mock to track subsequent calls
-    yoloMessageBus.publish = vi.fn();
-
-    // 3. Verify that a delayed/spurious user confirmation is safely ignored
-    // because pendingCorrelationIds and pendingToolConfirmationDetails were cleaned up
-    const handled = await (
-      task as unknown as {
-        _handleToolConfirmationPart: (part: unknown) => Promise<boolean>;
-      }
-    )._handleToolConfirmationPart({
-      kind: 'data',
-      data: { callId: '1', outcome: 'cancel' },
-    });
-
-    expect(handled).toBe(false);
-    expect(yoloMessageBus.publish).not.toHaveBeenCalled();
   });
 
   it('should handle output updates via the message bus', async () => {

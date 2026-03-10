@@ -453,6 +453,15 @@ export class PolicyEngine {
 
     // Default if no rule matched
     if (decision === undefined) {
+      if (this.approvalMode === ApprovalMode.YOLO) {
+        debugLogger.debug(
+          `[PolicyEngine.check] NO MATCH in YOLO mode - using ALLOW`,
+        );
+        return {
+          decision: PolicyDecision.ALLOW,
+        };
+      }
+
       debugLogger.debug(
         `[PolicyEngine.check] NO MATCH - using default decision: ${this.defaultDecision}`,
       );
