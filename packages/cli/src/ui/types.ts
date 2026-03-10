@@ -483,6 +483,7 @@ export type SlashCommandProcessorResult =
       type: 'schedule_tool';
       toolName: string;
       toolArgs: Record<string, unknown>;
+      postSubmitPrompt?: PartListUnion;
     }
   | {
       type: 'handled'; // Indicates the command was processed and no further action is needed.

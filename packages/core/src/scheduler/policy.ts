@@ -69,6 +69,19 @@ export async function checkPolicy(
 
   const { decision } = result;
 
+  // If the tool call was initiated by the client (e.g. via a slash command),
+  // we treat it as implicitly confirmed by the user and bypass the
+  // confirmation prompt if the policy engine's decision is 'ASK_USER'.
+  if (
+    decision === PolicyDecision.ASK_USER &&
+    toolCall.request.isClientInitiated
+  ) {
+    return {
+      decision: PolicyDecision.ALLOW,
+      rule: result.rule,
+    };
+  }
+
   /*
    * Return the full check result including the rule that matched.
    * This is necessary to access metadata like custom deny messages.

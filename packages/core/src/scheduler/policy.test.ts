@@ -164,6 +164,43 @@ describe('policy.ts', () => {
       const result = await checkPolicy(toolCall, mockConfig);
       expect(result.decision).toBe(PolicyDecision.ASK_USER);
     });
+
+    it('should return ALLOW if decision is ASK_USER and request is client-initiated', async () => {
+      const mockPolicyEngine = {
+        check: vi.fn().mockResolvedValue({ decision: PolicyDecision.ASK_USER }),
+      } as unknown as Mocked<PolicyEngine>;
+
+      const mockConfig = {
+        getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+        isInteractive: vi.fn().mockReturnValue(true),
+      } as unknown as Mocked<Config>;
+
+      const toolCall = {
+        request: { name: 'test-tool', args: {}, isClientInitiated: true },
+        tool: { name: 'test-tool' },
+      } as ValidatingToolCall;
+
+      const result = await checkPolicy(toolCall, mockConfig);
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should still return DENY if request is client-initiated but policy says DENY', async () => {
+      const mockPolicyEngine = {
+        check: vi.fn().mockResolvedValue({ decision: PolicyDecision.DENY }),
+      } as unknown as Mocked<PolicyEngine>;
+
+      const mockConfig = {
+        getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+      } as unknown as Mocked<Config>;
+
+      const toolCall = {
+        request: { name: 'test-tool', args: {}, isClientInitiated: true },
+        tool: { name: 'test-tool' },
+      } as ValidatingToolCall;
+
+      const result = await checkPolicy(toolCall, mockConfig);
+      expect(result.decision).toBe(PolicyDecision.DENY);
+    });
   });
 
   describe('updatePolicy', () => {
