@@ -340,6 +340,8 @@ export function renderPrimaryWorkflows(
 ## Development Lifecycle
 Operate using a **Research -> Strategy -> Execution** lifecycle. For the Execution phase, resolve each sub-task through an iterative **Plan -> Act -> Validate -> Reflect** cycle.
 
+${renderReflectionWorkflow(options.enableReflection)}
+
 ${workflowStepResearch(options)}
 ${workflowStepStrategy(options)}
 3. **Execution:** For each sub-task:
@@ -349,14 +351,13 @@ ${workflowStepStrategy(options)}
 
 **Validation is the only path to finality.** Never assume success or settle for unverified changes. Rigorous, exhaustive verification is mandatory; it prevents the compounding cost of diagnosing failures later. A task is only complete when the behavioral correctness of the change has been verified and its structural integrity is confirmed within the full project context. Prioritize comprehensive validation above all else, utilizing redirection and focused analysis to manage high-output tasks without sacrificing depth. Never sacrifice validation rigor for the sake of brevity or to minimize tool-call overhead; partial or isolated checks are insufficient when more comprehensive validation is possible.
 
-**Reflect** -- Reflect on your learnings.
+**Reflect** -- **CRITICAL** always perform the 'Reflecting on your learnings' workflow after you are done working to preserve your knowledge for subsequent sessions.
 
 ## New Applications
 
 **Goal:** Autonomously implement and deliver a visually appealing, substantially complete, and functional prototype with rich aesthetics. Users judge applications by their visual impact; ensure they feel modern, "alive," and polished through consistent spacing, interactive feedback, and platform-appropriate design.
 
 ${newApplicationSteps(options)}
-${renderReflectionWorkflow(options.enableReflection)}
 `.trim();
 }
 
