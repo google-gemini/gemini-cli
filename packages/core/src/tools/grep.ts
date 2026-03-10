@@ -21,6 +21,8 @@ import {
   Kind,
   type ToolInvocation,
   type ToolResult,
+  type PolicyUpdateOptions,
+  type ToolConfirmationOutcome,
 } from './tools.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
@@ -29,6 +31,7 @@ import type { Config } from '../config/config.js';
 import type { FileExclusions } from '../utils/ignorePatterns.js';
 import { ToolErrorType } from './tool-error.js';
 import { GREP_TOOL_NAME } from './tool-names.js';
+import { buildPatternArgsPattern } from '../policy/utils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { GREP_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
@@ -283,6 +286,14 @@ class GrepToolInvocation extends BaseToolInvocation<
         },
       };
     }
+  }
+
+  override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    return {
+      argsPattern: buildPatternArgsPattern(this.params.pattern),
+    };
   }
 
   /**

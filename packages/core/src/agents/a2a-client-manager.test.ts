@@ -140,7 +140,7 @@ describe('A2AClientManager', () => {
       expect(createAuthenticatingFetchWithRetry).not.toHaveBeenCalled();
     });
 
-    it('should use provided custom authentication handler', async () => {
+    it('should use provided custom authentication handler for transports only', async () => {
       const customAuthHandler = {
         headers: vi.fn(),
         shouldRetryWithHeaders: vi.fn(),
@@ -155,6 +155,66 @@ describe('A2AClientManager', () => {
         expect.anything(),
         customAuthHandler,
       );
+
+      // Card resolver should NOT use the authenticated fetch by default.
+      const resolverInstance = vi.mocked(DefaultAgentCardResolver).mock
+        .instances[0];
+      expect(resolverInstance).toBeDefined();
+      const resolverOptions = vi.mocked(DefaultAgentCardResolver).mock
+        .calls[0][0];
+      expect(resolverOptions?.fetchImpl).not.toBe(authFetchMock);
+    });
+
+    it('should use unauthenticated fetch for card resolver and avoid authenticated fetch if success', async () => {
+      const customAuthHandler = {
+        headers: vi.fn(),
+        shouldRetryWithHeaders: vi.fn(),
+      };
+      await manager.loadAgent(
+        'AuthCardAgent',
+        'http://authcard.agent/card',
+        customAuthHandler as unknown as AuthenticationHandler,
+      );
+
+      const resolverOptions = vi.mocked(DefaultAgentCardResolver).mock
+        .calls[0][0];
+      const cardFetch = resolverOptions?.fetchImpl as typeof fetch;
+
+      expect(cardFetch).toBeDefined();
+
+      await cardFetch('http://test.url');
+
+      expect(fetch).toHaveBeenCalledWith('http://test.url', expect.anything());
+      expect(authFetchMock).not.toHaveBeenCalled();
+    });
+
+    it('should retry with authenticating fetch if agent card fetch returns 401', async () => {
+      const customAuthHandler = {
+        headers: vi.fn(),
+        shouldRetryWithHeaders: vi.fn(),
+      };
+
+      // Mock the initial unauthenticated fetch to fail with 401
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: async () => ({}),
+      } as Response);
+
+      await manager.loadAgent(
+        'AuthCardAgent401',
+        'http://authcard.agent/card',
+        customAuthHandler as unknown as AuthenticationHandler,
+      );
+
+      const resolverOptions = vi.mocked(DefaultAgentCardResolver).mock
+        .calls[0][0];
+      const cardFetch = resolverOptions?.fetchImpl as typeof fetch;
+
+      await cardFetch('http://test.url');
+
+      expect(fetch).toHaveBeenCalledWith('http://test.url', expect.anything());
+      expect(authFetchMock).toHaveBeenCalledWith('http://test.url', undefined);
     });
 
     it('should log a debug message upon loading an agent', async () => {
