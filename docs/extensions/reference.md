@@ -262,12 +262,14 @@ but lower priority than user or admin policies.
 
 ```toml
 [[rule]]
-toolName = "my_server__dangerous_tool"
+mcpName = "my_server"
+toolName = "dangerous_tool"
 decision = "ask_user"
 priority = 100
 
 [[safety_checker]]
-toolName = "my_server__write_data"
+mcpName = "my_server"
+toolName = "write_data"
 priority = 200
 [safety_checker.checker]
 type = "in-process"

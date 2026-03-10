@@ -457,6 +457,11 @@ export async function loadPoliciesFromToml(
                 const mcpName = rule.mcpName;
 
                 if (mcpName) {
+                  // TODO(mcp): Decouple mcpName rules from FQN string parsing
+                  // to support underscores in server aliases natively. Leaving
+                  // mcpName and toolName separate here and relying on metadata
+                  // during policy evaluation will avoid underscore splitting bugs.
+                  // See: https://github.com/google-gemini/gemini-cli/issues/21727
                   effectiveToolName = formatMcpToolName(
                     mcpName,
                     effectiveToolName,
