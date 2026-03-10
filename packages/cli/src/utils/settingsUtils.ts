@@ -284,7 +284,14 @@ export function getDisplayValue(
 
   let valueString = String(value);
 
-  if (definition?.type === 'enum' && definition.options) {
+  // Handle object types by stringifying them
+  if (
+    definition?.type === 'object' &&
+    value !== null &&
+    typeof value === 'object'
+  ) {
+    valueString = JSON.stringify(value);
+  } else if (definition?.type === 'enum' && definition.options) {
     const option = definition.options?.find((option) => option.value === value);
     valueString = option?.label ?? `${value}`;
   }

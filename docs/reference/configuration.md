@@ -1021,8 +1021,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`experimental.plan`** (boolean):
-  - **Description:** Enable planning features (Plan Mode and tools).
-  - **Default:** `false`
+  - **Description:** Enable Plan Mode.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.taskTracker`** (boolean):

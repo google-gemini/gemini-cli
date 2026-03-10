@@ -41,7 +41,7 @@ limit resets and Gemini 3 Pro can be used again.
 
 > **Note:** Looking to upgrade for higher limits? To compare subscription
 > options and find the right quota for your needs, see our
-> [Plans page](/plans/).
+> [Plans page](https://geminicli.com/plans/).
 
 Similarly, when you reach your daily usage limit for Gemini 2.5 Pro, you’ll see
 a message prompting fallback to Gemini 2.5 Flash.
