@@ -37,6 +37,12 @@ export interface Settings {
   showMemoryUsage?: boolean;
   checkpointing?: CheckpointingSettings;
   folderTrust?: boolean;
+  general?: {
+    previewFeatures?: boolean;
+  };
+  experimental?: {
+    enableEventDrivenScheduler?: boolean;
+  };
 
   // Git-aware file filtering settings
   fileFiltering?: {
