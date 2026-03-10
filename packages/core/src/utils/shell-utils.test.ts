@@ -102,7 +102,10 @@ beforeEach(() => {
   });
   mockExistsSync.mockReturnValue(false);
   mockRealpathSync.mockImplementation((p: string) => p);
-  mockAccessSync.mockReturnValue(undefined); // Success by default
+  mockAccessSync.mockImplementation((p: string) => {
+    if (mockExistsSync(p)) return;
+    throw new Error(`ENOENT: no such file or directory, access '${p}'`);
+  });
   resetShellConfiguration();
 });
 
@@ -430,10 +433,6 @@ describe('getShellConfiguration', () => {
       const expectedPath = path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
       
       mockExistsSync.mockImplementation((p: string) => p === expectedPath);
-      mockAccessSync.mockImplementation((p: string) => {
-        if (p === expectedPath) return; // success
-        throw new Error('ENOENT');
-      });
 
       const config = getShellConfiguration();
       expect(config.executable).toBe(expectedPath);
