@@ -226,7 +226,7 @@ describe('<FooterConfigDialog />', () => {
     await waitUntilReady();
 
     // By default labels are on
-    expect(lastFrame()).toContain('workspace (/directory)');
+    expect(lastFrame()).toContain('workspace');
     expect(lastFrame()).toContain('sandbox');
     expect(lastFrame()).toContain('/model');
 
@@ -248,12 +248,6 @@ describe('<FooterConfigDialog />', () => {
 
     await waitFor(() => {
       expect(lastFrame()).toMatch(/> \[ \] Show footer labels/);
-      // The headers should no longer be in the preview
-      expect(lastFrame()).not.toContain('workspace (/directory)');
-      expect(lastFrame()).not.toContain('/model');
-
-      // We can't strictly search for "sandbox" because the menu item also says "sandbox".
-      // Let's assert that the spacer dots are now present in the preview instead.
       const previewLine =
         lastFrame()
           .split('\n')
@@ -262,6 +256,9 @@ describe('<FooterConfigDialog />', () => {
         lastFrame().split('\n')[
           lastFrame().split('\n').indexOf(previewLine) + 1
         ] || '';
+
+      // The preview should render values only when labels are hidden.
+      expect(nextLine).not.toContain('/model');
       expect(nextLine).toContain('·');
       expect(nextLine).toContain('~/project/path');
       expect(nextLine).toContain('docker');

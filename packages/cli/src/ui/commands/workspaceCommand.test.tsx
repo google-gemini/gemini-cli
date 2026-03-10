@@ -6,7 +6,7 @@
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
-import { directoryCommand } from './directoryCommand.js';
+import { workspaceCommand } from './workspaceCommand.js';
 import {
   expandHomeDir,
   getDirectorySuggestions,
@@ -38,14 +38,14 @@ vi.mock('../utils/directoryUtils.js', async (importOriginal) => {
   };
 });
 
-describe('directoryCommand', () => {
+describe('workspaceCommand', () => {
   let mockContext: CommandContext;
   let mockConfig: Config;
   let mockWorkspaceContext: WorkspaceContext;
-  const addCommand = directoryCommand.subCommands?.find(
+  const addCommand = workspaceCommand.subCommands?.find(
     (c) => c.name === 'add',
   );
-  const showCommand = directoryCommand.subCommands?.find(
+  const showCommand = workspaceCommand.subCommands?.find(
     (c) => c.name === 'show',
   );
 
@@ -126,7 +126,7 @@ describe('directoryCommand', () => {
         type: 'message',
         messageType: 'error',
         content:
-          'The /directory add command is not supported in restrictive sandbox profiles. Please use --include-directories when starting the session instead.',
+          'The /workspace add command is not supported in restrictive sandbox profiles. Please use --include-directories when starting the session instead.',
       });
     });
 
@@ -343,7 +343,6 @@ describe('directoryCommand', () => {
 
     beforeEach(() => {
       vi.spyOn(trustedFolders, 'isFolderTrustEnabled').mockReturnValue(true);
-      // isWorkspaceTrusted is no longer checked, so we don't need to mock it returning true
       mockIsPathTrusted = vi.fn();
       const mockLoadedFolders = {
         isPathTrusted: mockIsPathTrusted,
@@ -375,7 +374,7 @@ describe('directoryCommand', () => {
 
     it('should return a custom dialog for an explicitly untrusted directory (upgrade flow)', async () => {
       if (!addCommand?.action) throw new Error('No action');
-      mockIsPathTrusted.mockReturnValue(false); // DO_NOT_TRUST
+      mockIsPathTrusted.mockReturnValue(false);
       const newPath = path.resolve('/home/user/untrusted-project');
 
       const result = await addCommand.action(mockContext, newPath);
@@ -384,7 +383,7 @@ describe('directoryCommand', () => {
         expect.objectContaining({
           type: 'custom_dialog',
           component: expect.objectContaining({
-            type: expect.any(Function), // React component for MultiFolderTrustDialog
+            type: expect.any(Function),
           }),
         }),
       );
@@ -407,7 +406,7 @@ describe('directoryCommand', () => {
         expect.objectContaining({
           type: 'custom_dialog',
           component: expect.objectContaining({
-            type: expect.any(Function), // React component for MultiFolderTrustDialog
+            type: expect.any(Function),
           }),
         }),
       );
@@ -421,7 +420,6 @@ describe('directoryCommand', () => {
 
     it('should prompt for directory even if workspace is untrusted', async () => {
       if (!addCommand?.action) throw new Error('No action');
-      // Even if workspace is untrusted, we should still check directory trust
       vi.spyOn(trustedFolders, 'isWorkspaceTrusted').mockReturnValue({
         isTrusted: false,
         source: 'file',

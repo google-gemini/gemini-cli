@@ -71,7 +71,7 @@ describe('mcp add command', () => {
     });
   });
 
-  it('should add a stdio server to project settings', async () => {
+  it('should add a stdio server to workspace settings', async () => {
     await parser.parseAsync(
       'add -e FOO=bar my-server /path/to/server arg1 arg2',
     );
@@ -121,7 +121,7 @@ describe('mcp add command', () => {
     });
   });
 
-  it('should add an http server to project settings', async () => {
+  it('should add an http server to workspace settings', async () => {
     await parser.parseAsync(
       'add --transport http -H "Authorization: Bearer your-token" http-server https://example.com/mcp',
     );
@@ -219,12 +219,12 @@ describe('mcp add command', () => {
       });
     };
 
-    describe('when in a project directory', () => {
+    describe('when in a workspace directory', () => {
       beforeEach(() => {
         setupMocks('/path/to/project', '/path/to/project');
       });
 
-      it('should use project scope by default', async () => {
+      it('should use workspace scope by default', async () => {
         await parser.parseAsync(`add ${serverName} ${command}`);
         expect(mockSetValue).toHaveBeenCalledWith(
           SettingScope.Workspace,
@@ -233,7 +233,7 @@ describe('mcp add command', () => {
         );
       });
 
-      it('should use project scope when --scope=project is used', async () => {
+      it('should support --scope=project as a compatibility alias', async () => {
         await parser.parseAsync(`add --scope project ${serverName} ${command}`);
         expect(mockSetValue).toHaveBeenCalledWith(
           SettingScope.Workspace,
@@ -252,12 +252,12 @@ describe('mcp add command', () => {
       });
     });
 
-    describe('when in a subdirectory of a project', () => {
+    describe('when in a subdirectory of a workspace', () => {
       beforeEach(() => {
         setupMocks('/path/to/project/subdir', '/path/to/project');
       });
 
-      it('should use project scope by default', async () => {
+      it('should use workspace scope by default', async () => {
         await parser.parseAsync(`add ${serverName} ${command}`);
         expect(mockSetValue).toHaveBeenCalledWith(
           SettingScope.Workspace,
@@ -290,7 +290,7 @@ describe('mcp add command', () => {
         expect(mockSetValue).not.toHaveBeenCalled();
       });
 
-      it('should show an error when --scope=project is used explicitly', async () => {
+      it('should show an error when --scope=project is used as a compatibility alias', async () => {
         const mockProcessExit = vi
           .spyOn(process, 'exit')
           .mockImplementation((() => {
@@ -319,12 +319,12 @@ describe('mcp add command', () => {
       });
     });
 
-    describe('when in a subdirectory of home (not a project)', () => {
+    describe('when in a subdirectory of home (not a workspace)', () => {
       beforeEach(() => {
         setupMocks('/home/user/some/dir', '/home/user/some/dir');
       });
 
-      it('should use project scope by default', async () => {
+      it('should use workspace scope by default', async () => {
         await parser.parseAsync(`add ${serverName} ${command}`);
         expect(mockSetValue).toHaveBeenCalledWith(
           SettingScope.Workspace,
@@ -347,12 +347,12 @@ describe('mcp add command', () => {
       });
     });
 
-    describe('when outside of home (not a project)', () => {
+    describe('when outside of home (not a workspace)', () => {
       beforeEach(() => {
         setupMocks('/tmp/foo', '/tmp/foo');
       });
 
-      it('should use project scope by default', async () => {
+      it('should use workspace scope by default', async () => {
         await parser.parseAsync(`add ${serverName} ${command}`);
         expect(mockSetValue).toHaveBeenCalledWith(
           SettingScope.Workspace,
@@ -386,7 +386,7 @@ describe('mcp add command', () => {
       });
     });
 
-    it('should update the existing server in the project scope', async () => {
+    it('should update the existing server in the workspace scope', async () => {
       await parser.parseAsync(
         `add ${serverName} ${updatedCommand} ${updatedArgs.join(' ')}`,
       );

@@ -1011,7 +1011,7 @@ gemini mcp add [options] <name> <commandOrUrl> [args...]
 
 **Options (flags):**
 
-- `-s, --scope`: Configuration scope (user or project). [default: "project"]
+- `-s, --scope`: Configuration scope (user or workspace). [default: "workspace"]
 - `-t, --transport`: Transport type (stdio, sse, http). [default: "stdio"]
 - `-e, --env`: Set environment variables (e.g. -e KEY=value).
 - `-H, --header`: Set HTTP headers for SSE and HTTP transports (e.g. -H
@@ -1122,7 +1122,7 @@ gemini mcp remove <name>
 
 **Options (flags):**
 
-- `-s, --scope`: Configuration scope (user or project). [default: "project"]
+- `-s, --scope`: Configuration scope (user or workspace). [default: "workspace"]
 
 **Example:**
 

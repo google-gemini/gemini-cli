@@ -588,11 +588,11 @@ const SETTINGS_SCHEMA = {
           },
           hideCWD: {
             type: 'boolean',
-            label: 'Hide CWD',
+            label: 'Hide Workspace Path',
             category: 'UI',
             requiresRestart: false,
             default: false,
-            description: 'Hide the current working directory in the footer.',
+            description: 'Hide the workspace path in the footer.',
             showInDialog: true,
           },
           hideSandboxStatus: {
