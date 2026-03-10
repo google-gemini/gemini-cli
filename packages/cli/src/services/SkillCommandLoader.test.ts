@@ -119,7 +119,7 @@ describe('SkillCommandLoader', () => {
     expect(commands[0].name).toBe('my-awesome-skill');
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const actionResult = await commands[0].action!({} as any, '');
+    const actionResult = (await commands[0].action!({} as any, '')) as any;
     expect(actionResult.toolArgs).toEqual({ name: 'my awesome skill' });
   });
 });
