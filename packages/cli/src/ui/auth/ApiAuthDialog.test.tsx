@@ -103,7 +103,7 @@ describe('ApiAuthDialog', () => {
 
   it.each([
     {
-      keyName: 'return',
+      keyName: 'enter',
       sequence: '\r',
       expectedCall: onSubmit,
       args: ['submitted-key'],

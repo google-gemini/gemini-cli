@@ -100,7 +100,7 @@ describe('KeypressContext', () => {
 
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
-          name: 'return',
+          name: 'enter',
           shift: false,
           ctrl: false,
           cmd: false,
@@ -115,7 +115,7 @@ describe('KeypressContext', () => {
 
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
-          name: 'return',
+          name: 'enter',
           shift: true,
           ctrl: false,
           cmd: false,
@@ -148,7 +148,7 @@ describe('KeypressContext', () => {
 
         expect(keyHandler).toHaveBeenCalledWith(
           expect.objectContaining({
-            name: 'return',
+            name: 'enter',
             ...expected,
           }),
         );
@@ -177,7 +177,7 @@ describe('KeypressContext', () => {
 
       expect(keyHandler).toHaveBeenCalledWith(
         expect.objectContaining({
-          name: 'return',
+          name: 'enter',
           shift: false,
           alt: true,
           ctrl: false,
@@ -216,7 +216,7 @@ describe('KeypressContext', () => {
 
       expect(keyHandler).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          name: 'return',
+          name: 'enter',
           sequence: '\r',
           insertable: true,
           shift: true,
@@ -238,7 +238,7 @@ describe('KeypressContext', () => {
 
       expect(keyHandler).toHaveBeenLastCalledWith(
         expect.objectContaining({
-          name: 'return',
+          name: 'enter',
           shift: false,
           alt: false,
           ctrl: false,
@@ -638,8 +638,8 @@ describe('KeypressContext', () => {
   describe('Parameterized functional keys', () => {
     it.each([
       // ModifyOtherKeys
-      { sequence: `\x1b[27;2;13~`, expected: { name: 'return', shift: true } },
-      { sequence: `\x1b[27;5;13~`, expected: { name: 'return', ctrl: true } },
+      { sequence: `\x1b[27;2;13~`, expected: { name: 'enter', shift: true } },
+      { sequence: `\x1b[27;5;13~`, expected: { name: 'enter', ctrl: true } },
       { sequence: `\x1b[27;5;9~`, expected: { name: 'tab', ctrl: true } },
       {
         sequence: `\x1b[27;6;9~`,
@@ -1124,7 +1124,7 @@ describe('KeypressContext', () => {
     expect(keyHandler).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
-        name: 'return',
+        name: 'enter',
       }),
     );
     expect(keyHandler).toHaveBeenNthCalledWith(

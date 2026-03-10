@@ -21,7 +21,7 @@ const SPECIAL_KEYS: Record<string, string> = {
   end: '\x1b[F',
   pageup: '\x1b[5~',
   pagedown: '\x1b[6~',
-  return: '\r',
+  enter: '\r',
 };
 
 /**

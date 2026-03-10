@@ -31,7 +31,7 @@ describe('keyMatchers', () => {
     // Basic bindings
     {
       command: Command.RETURN,
-      positive: [createKey('return')],
+      positive: [createKey('enter')],
       negative: [createKey('r')],
     },
     {
@@ -270,8 +270,8 @@ describe('keyMatchers', () => {
     // Auto-completion
     {
       command: Command.ACCEPT_SUGGESTION,
-      positive: [createKey('tab'), createKey('return')],
-      negative: [createKey('return', { ctrl: true }), createKey('space')],
+      positive: [createKey('tab'), createKey('enter')],
+      negative: [createKey('enter', { ctrl: true }), createKey('space')],
     },
     {
       command: Command.COMPLETION_UP,
@@ -287,21 +287,21 @@ describe('keyMatchers', () => {
     // Text input
     {
       command: Command.SUBMIT,
-      positive: [createKey('return')],
+      positive: [createKey('enter')],
       negative: [
-        createKey('return', { ctrl: true }),
-        createKey('return', { cmd: true }),
-        createKey('return', { alt: true }),
+        createKey('enter', { ctrl: true }),
+        createKey('enter', { cmd: true }),
+        createKey('enter', { alt: true }),
       ],
     },
     {
       command: Command.NEWLINE,
       positive: [
-        createKey('return', { ctrl: true }),
-        createKey('return', { cmd: true }),
-        createKey('return', { alt: true }),
+        createKey('enter', { ctrl: true }),
+        createKey('enter', { cmd: true }),
+        createKey('enter', { alt: true }),
       ],
-      negative: [createKey('return'), createKey('n')],
+      negative: [createKey('enter'), createKey('n')],
     },
 
     // External tools
@@ -382,14 +382,14 @@ describe('keyMatchers', () => {
     },
     {
       command: Command.SUBMIT_REVERSE_SEARCH,
-      positive: [createKey('return')],
-      negative: [createKey('return', { ctrl: true }), createKey('tab')],
+      positive: [createKey('enter')],
+      negative: [createKey('enter', { ctrl: true }), createKey('tab')],
     },
     {
       command: Command.ACCEPT_SUGGESTION_REVERSE_SEARCH,
       positive: [createKey('tab')],
       negative: [
-        createKey('return'),
+        createKey('enter'),
         createKey('space'),
         createKey('tab', { ctrl: true }),
       ],
