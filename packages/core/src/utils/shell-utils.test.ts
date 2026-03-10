@@ -430,6 +430,10 @@ describe('getShellConfiguration', () => {
       const expectedPath = path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
       
       mockExistsSync.mockImplementation((p: string) => p === expectedPath);
+      mockAccessSync.mockImplementation((p: string) => {
+        if (p === expectedPath) return; // success
+        throw new Error('ENOENT');
+      });
 
       const config = getShellConfiguration();
       expect(config.executable).toBe(expectedPath);

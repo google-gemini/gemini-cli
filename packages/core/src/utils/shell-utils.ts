@@ -630,16 +630,19 @@ export function getShellConfiguration(): ShellConfiguration {
     const fallbackPsPath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
     try {
       fs.accessSync(fallbackPsPath, fs.constants.X_OK);
+      cachedShellConfiguration = {
+        executable: fallbackPsPath,
+        argsPrefix: ['-NoProfile', '-Command'],
+        shell: 'powershell',
+      };
+      return cachedShellConfiguration;
     } catch {
-      debugLogger.warn('Could not find a valid PowerShell executable on Windows.');
+      debugLogger.error('Could not find a valid PowerShell executable on Windows.');
+      throw new Error(
+        'Could not find a valid PowerShell executable (pwsh.exe or powershell.exe) on Windows. ' +
+          'Please ensure PowerShell is installed and available in your PATH or SystemRoot.',
+      );
     }
-
-    cachedShellConfiguration = {
-      executable: fallbackPsPath,
-      argsPrefix: ['-NoProfile', '-Command'],
-      shell: 'powershell',
-    };
-    return cachedShellConfiguration;
   }
 
   // Unix-like systems (Linux, macOS)
