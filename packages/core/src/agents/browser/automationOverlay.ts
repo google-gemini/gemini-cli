@@ -34,11 +34,11 @@ function buildInjectionScript(): string {
   // Build the script as a plain string – no nested template literals.
   return [
     '() => {',
-    `  var id = '${OVERLAY_ELEMENT_ID}';`,
-    '  var existing = document.getElementById(id);',
+    `  const id = '${OVERLAY_ELEMENT_ID}';`,
+    '  const existing = document.getElementById(id);',
     '  if (existing) existing.remove();',
     '',
-    '  var overlay = document.createElement("div");',
+    '  const overlay = document.createElement("div");',
     '  overlay.id = id;',
     '  overlay.setAttribute("aria-hidden", "true");',
     '  overlay.setAttribute("role", "presentation");',
