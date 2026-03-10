@@ -134,6 +134,7 @@ vi.mock('../telemetry/uiTelemetry.js', () => ({
   uiTelemetryService: {
     setLastPromptTokenCount: vi.fn(),
     getLastPromptTokenCount: vi.fn(),
+    getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
   },
 }));
 vi.mock('../hooks/hookSystem.js');
@@ -395,6 +396,7 @@ describe('Gemini Client (client.ts)', () => {
         setHistory: vi.fn(),
         setTools: vi.fn(),
         getLastPromptTokenCount: vi.fn(),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
       } as unknown as GeminiChat;
     });
 
@@ -411,6 +413,7 @@ describe('Gemini Client (client.ts)', () => {
         getHistory: vi.fn((_curated?: boolean) => chatHistory),
         setHistory: vi.fn(),
         getLastPromptTokenCount: vi.fn().mockReturnValue(originalTokenCount),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
         getChatRecordingService: vi.fn().mockReturnValue({
           getConversation: vi.fn().mockReturnValue(null),
           getConversationFilePath: vi.fn().mockReturnValue(null),
@@ -443,6 +446,7 @@ describe('Gemini Client (client.ts)', () => {
         getHistory: vi.fn().mockReturnValue(newHistory),
         setHistory: vi.fn(),
         getLastPromptTokenCount: vi.fn().mockReturnValue(newTokenCount),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
       };
 
       client['startChat'] = vi
@@ -830,6 +834,7 @@ describe('Gemini Client (client.ts)', () => {
         setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
       } as unknown as GeminiChat;
       client['chat'] = mockChat;
 
@@ -894,6 +899,7 @@ ${JSON.stringify(
         setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -953,6 +959,7 @@ ${JSON.stringify(
         setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -1031,6 +1038,7 @@ ${JSON.stringify(
         setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -1149,6 +1157,7 @@ ${JSON.stringify(
         setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -1196,6 +1205,7 @@ ${JSON.stringify(
         setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -1245,6 +1255,7 @@ ${JSON.stringify(
         setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -1311,6 +1322,7 @@ ${JSON.stringify(
         setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -1369,6 +1381,7 @@ ${JSON.stringify(
         setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -1427,6 +1440,7 @@ ${JSON.stringify(
       const lastPromptTokenCount = 900;
       const mockChat: Partial<GeminiChat> = {
         getLastPromptTokenCount: vi.fn().mockReturnValue(lastPromptTokenCount),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
         setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
       };
@@ -1469,6 +1483,55 @@ ${JSON.stringify(
       expect(mockTurnRunFn).not.toHaveBeenCalled();
     });
 
+    it('should account for candidatesTokenCount when checking for overflow', async () => {
+      // Arrange
+      const MOCKED_TOKEN_LIMIT = 1000;
+      vi.mocked(tokenLimit).mockReturnValue(MOCKED_TOKEN_LIMIT);
+
+      const lastPromptTokenCount = 800;
+      const lastCandidatesTokenCount = 150; // total used = 950, remaining = 50
+      const mockChat: Partial<GeminiChat> = {
+        getLastPromptTokenCount: vi.fn().mockReturnValue(lastPromptTokenCount),
+        getLastCandidatesTokenCount: vi
+          .fn()
+          .mockReturnValue(lastCandidatesTokenCount),
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      // Request of ~51 tokens (204 chars / 4). Remaining = 1000 - 800 - 150 = 50 → overflow.
+      const longText = 'a'.repeat(204);
+      const request: Part[] = [{ text: longText }];
+      const estimatedRequestTokenCount = Math.floor(longText.length / 4);
+      const remainingTokenCount =
+        MOCKED_TOKEN_LIMIT - lastPromptTokenCount - lastCandidatesTokenCount;
+
+      vi.spyOn(client, 'tryCompressChat').mockResolvedValue({
+        originalTokenCount: lastPromptTokenCount,
+        newTokenCount: lastPromptTokenCount,
+        compressionStatus: CompressionStatus.NOOP,
+      });
+
+      // Act
+      const stream = client.sendMessageStream(
+        request,
+        new AbortController().signal,
+        'prompt-id-candidates-overflow',
+      );
+      const events = await fromAsync(stream);
+
+      // Assert
+      expect(events).toContainEqual({
+        type: GeminiEventType.ContextWindowWillOverflow,
+        value: {
+          estimatedRequestTokenCount,
+          remainingTokenCount,
+        },
+      });
+      expect(mockTurnRunFn).not.toHaveBeenCalled();
+    });
+
     it("should use the sticky model's token limit for the overflow check", async () => {
       // Arrange
       const STICKY_MODEL = 'gemini-1.5-flash';
@@ -1488,6 +1551,7 @@ ${JSON.stringify(
       const lastPromptTokenCount = 900;
       const mockChat: Partial<GeminiChat> = {
         getLastPromptTokenCount: vi.fn().mockReturnValue(lastPromptTokenCount),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
         setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
       };
@@ -1543,6 +1607,7 @@ ${JSON.stringify(
       // Use the real GeminiChat to manage state and token counts more realistically
       const mockChatCompressed = {
         getLastPromptTokenCount: vi.fn().mockReturnValue(400),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
         getHistory: vi
           .fn()
           .mockReturnValue([{ role: 'user', parts: [{ text: 'old' }] }]),
@@ -1556,6 +1621,7 @@ ${JSON.stringify(
 
       const mockChatInitial = {
         getLastPromptTokenCount: vi.fn().mockReturnValue(initialTokenCount),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
         getHistory: vi
           .fn()
           .mockReturnValue([{ role: 'user', parts: [{ text: 'old' }] }]),
@@ -1698,6 +1764,7 @@ ${JSON.stringify(
       const lastPromptTokenCount = 10000;
       const mockChat: Partial<GeminiChat> = {
         getLastPromptTokenCount: vi.fn().mockReturnValue(lastPromptTokenCount),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
         setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
       };
@@ -1775,6 +1842,7 @@ ${JSON.stringify(
           setTools: vi.fn(),
           getHistory: vi.fn().mockReturnValue([]),
           getLastPromptTokenCount: vi.fn(),
+          getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
         };
         client['chat'] = mockChat as GeminiChat;
       });
@@ -1984,6 +2052,7 @@ ${JSON.stringify(
         setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -2040,6 +2109,7 @@ ${JSON.stringify(
         setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -2082,6 +2152,7 @@ ${JSON.stringify(
         setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -2124,6 +2195,7 @@ ${JSON.stringify(
         setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -2174,6 +2246,7 @@ ${JSON.stringify(
               { role: 'user', parts: [{ text: 'previous message' }] },
             ]),
           getLastPromptTokenCount: vi.fn(),
+          getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
         };
         client['chat'] = mockChat as GeminiChat;
       });
@@ -2584,6 +2657,7 @@ ${JSON.stringify(
           setHistory: vi.fn(),
           setTools: vi.fn(),
           getLastPromptTokenCount: vi.fn(),
+          getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
         };
         client['chat'] = mockChat as GeminiChat;
 
@@ -2926,6 +3000,7 @@ ${JSON.stringify(
         setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -2964,6 +3039,7 @@ ${JSON.stringify(
         setTools: vi.fn(),
         getHistory: vi.fn().mockReturnValue([]),
         getLastPromptTokenCount: vi.fn(),
+        getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
       };
       client['chat'] = mockChat as GeminiChat;
 
@@ -2988,6 +3064,7 @@ ${JSON.stringify(
           setTools: vi.fn(),
           getHistory: vi.fn().mockReturnValue([]),
           getLastPromptTokenCount: vi.fn(),
+          getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
         };
         client['chat'] = mockChat as GeminiChat;
         vi.spyOn(client['loopDetector'], 'clearDetection');
@@ -3434,6 +3511,7 @@ ${JSON.stringify(
           setTools: vi.fn(),
           getHistory: vi.fn().mockReturnValue([]),
           getLastPromptTokenCount: vi.fn(),
+          getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
         };
         client['chat'] = mockChat as GeminiChat;
 
@@ -3469,6 +3547,7 @@ ${JSON.stringify(
           setTools: vi.fn(),
           getHistory: vi.fn().mockReturnValue([]),
           getLastPromptTokenCount: vi.fn(),
+          getLastCandidatesTokenCount: vi.fn().mockReturnValue(0),
         };
         client['chat'] = mockChat as GeminiChat;
 
