@@ -17,6 +17,7 @@ import {
   ToolErrorType,
   GeminiEventType,
   OutputFormat,
+  JsonStreamEventType,
   uiTelemetryService,
   FatalInputError,
   CoreEvent,
@@ -1002,7 +1003,10 @@ describe('runNonInteractive', () => {
       nonInteractiveCliCommands,
       'handleSlashCommand',
     );
-    handleSlashCommandSpy.mockResolvedValue([{ text: 'Slash command output' }]);
+    handleSlashCommandSpy.mockResolvedValue({
+      kind: 'submit_prompt',
+      content: [{ text: 'Slash command output' }],
+    });
 
     const events: ServerGeminiStreamEvent[] = [
       { type: GeminiEventType.Content, value: 'Response to slash command' },
@@ -1038,6 +1042,120 @@ describe('runNonInteractive', () => {
     );
     expect(getWrittenOutput()).toBe('Response to slash command\n');
     handleSlashCommandSpy.mockRestore();
+  });
+
+  it('should write slash command messages in text mode without invoking the model', async () => {
+    const mockCommand = {
+      name: 'testcommand',
+      description: 'a test command',
+      action: vi.fn().mockResolvedValue({
+        type: 'message',
+        messageType: 'info',
+        content: 'Slash command message',
+      }),
+    };
+    mockGetCommands.mockReturnValue([mockCommand]);
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: '/testcommand',
+      prompt_id: 'prompt-id-slash-message-text',
+    });
+
+    expect(mockGeminiClient.sendMessageStream).not.toHaveBeenCalled();
+    expect(getWrittenOutput()).toBe('[INFO] Slash command message\n');
+  });
+
+  it('should write slash command messages in JSON mode without invoking the model', async () => {
+    const mockCommand = {
+      name: 'testcommand',
+      description: 'a test command',
+      action: vi.fn().mockResolvedValue({
+        type: 'message',
+        messageType: 'info',
+        content: 'Slash command message',
+      }),
+    };
+    mockGetCommands.mockReturnValue([mockCommand]);
+    vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+      MOCK_SESSION_METRICS,
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: '/testcommand',
+      prompt_id: 'prompt-id-slash-message-json',
+    });
+
+    expect(mockGeminiClient.sendMessageStream).not.toHaveBeenCalled();
+    expect(getWrittenOutput()).toBe(
+      JSON.stringify(
+        {
+          session_id: 'test-session-id',
+          response: 'Slash command message',
+          stats: MOCK_SESSION_METRICS,
+        },
+        null,
+        2,
+      ),
+    );
+  });
+
+  it('should write slash command messages in stream-json mode without invoking the model', async () => {
+    const mockCommand = {
+      name: 'testcommand',
+      description: 'a test command',
+      action: vi.fn().mockResolvedValue({
+        type: 'message',
+        messageType: 'info',
+        content: 'Slash command message',
+      }),
+    };
+    mockGetCommands.mockReturnValue([mockCommand]);
+    vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
+      OutputFormat.STREAM_JSON,
+    );
+    vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+      MOCK_SESSION_METRICS,
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: '/testcommand',
+      prompt_id: 'prompt-id-slash-message-stream',
+    });
+
+    expect(mockGeminiClient.sendMessageStream).not.toHaveBeenCalled();
+
+    const lines = getWrittenOutput()
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+
+    expect(lines).toHaveLength(4);
+    expect(lines[0]).toMatchObject({
+      type: JsonStreamEventType.INIT,
+      session_id: 'test-session-id',
+      model: 'test-model',
+    });
+    expect(lines[1]).toMatchObject({
+      type: JsonStreamEventType.MESSAGE,
+      role: 'user',
+      content: '/testcommand',
+    });
+    expect(lines[2]).toMatchObject({
+      type: JsonStreamEventType.MESSAGE,
+      role: 'assistant',
+      content: 'Slash command message',
+    });
+    expect(lines[3]).toMatchObject({
+      type: JsonStreamEventType.RESULT,
+      status: 'success',
+    });
   });
 
   it('should handle cancellation (Ctrl+C)', async () => {

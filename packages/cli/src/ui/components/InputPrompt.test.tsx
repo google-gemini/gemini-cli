@@ -3344,28 +3344,28 @@ describe('InputPrompt', () => {
         name: 'first line, first char',
         relX: 0,
         relY: 0,
-        mouseCol: 5,
+        mouseCol: 4,
         mouseRow: 2,
       },
       {
         name: 'first line, middle char',
         relX: 6,
         relY: 0,
-        mouseCol: 11,
+        mouseCol: 10,
         mouseRow: 2,
       },
       {
         name: 'second line, first char',
         relX: 0,
         relY: 1,
-        mouseCol: 5,
+        mouseCol: 4,
         mouseRow: 3,
       },
       {
         name: 'second line, end char',
         relX: 5,
         relY: 1,
-        mouseCol: 10,
+        mouseCol: 9,
         mouseRow: 3,
       },
     ])(
@@ -3392,7 +3392,7 @@ describe('InputPrompt', () => {
         });
 
         // Simulate left mouse press at calculated coordinates.
-        // Without left border: inner box is at x=3, y=1 based on padding(1)+prompt(2) and border-top(1).
+        // Without left border: inner box is at x=2, y=1 based on padding(1)+prompt(1) and border-top(1).
         await act(async () => {
           stdin.write(`\x1b[<0;${mouseCol};${mouseRow}M`);
         });
@@ -3624,9 +3624,9 @@ describe('InputPrompt', () => {
         expect(stdout.lastFrame()).toContain('hello world');
       });
 
-      // With plain borders: 1(border) + 1(padding) + 3(prompt) = 5 offset (x=5, col=6)
+      // With plain borders: 1(border) + 1(padding) + 2(prompt) = 4 offset (x=4, col=5)
       await act(async () => {
-        stdin.write(`\x1b[<0;6;2M`); // Click at col 6, row 2
+        stdin.write(`\x1b[<0;5;2M`); // Click at col 5, row 2
       });
 
       await waitFor(() => {

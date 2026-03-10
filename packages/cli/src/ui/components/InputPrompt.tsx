@@ -77,7 +77,7 @@ import {
   onVoiceTranscript,
 } from '../contexts/VoiceContext.js';
 import Spinner from 'ink-spinner';
-import { shouldDismissShortcutsHelpOnHotkey, useIsHelpDismissKey } from '../utils/shortcutsHelp.js';
+import { useIsHelpDismissKey } from '../utils/shortcutsHelp.js';
 import { useRepeatedKeyPress } from '../hooks/useRepeatedKeyPress.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
@@ -1543,7 +1543,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   // (recording must always be visible regardless of approval mode)
   if (voiceState.isRecording) {
     statusColor = theme.status.error;
-    statusText = '🎤 Recording... (Space Space or Esc to stop)';
+    statusText = 'Recording... (Space Space or Esc to stop)';
   } else if (voiceState.isTranscribing) {
     statusColor = theme.status.warning;
     statusText = 'Transcribing...';
@@ -1638,16 +1638,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             ) : showYoloStyling ? (
               '* '
             ) : voiceState.isRecording ? (
-              '🎤'
+              '● '
             ) : voiceState.isTranscribing ? (
               <>
                 <Spinner type="dots" />{' '}
               </>
             ) : (
-              // Use two spaces for single-width icons to match double-width emoji
-              // and prevent layout shift when toggling voice.
               '> '
-            )}{' '}
+            )}
           </Text>
           <Box flexGrow={1} flexDirection="column" ref={innerBoxRef}>
             {buffer.text.length === 0 && effectivePlaceholder ? (

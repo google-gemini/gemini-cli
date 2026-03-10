@@ -146,6 +146,16 @@ export class LocalWhisperBackend implements VoiceBackend {
       if (!stats || stats.size === 0)
         throw new Error('No audio recorded (file is empty)');
 
+      const audioBuffer = await readFile(this.audioFile);
+      if (this.isSilentWav(audioBuffer)) {
+        void this.options.onStateChange({
+          isRecording: false,
+          isTranscribing: false,
+          error: null,
+        });
+        return;
+      }
+
       const transcript = await this.transcribe(this.audioFile);
       coreEvents.emitVoiceTranscript(transcript);
       void this.options.onStateChange({
@@ -219,5 +229,57 @@ export class LocalWhisperBackend implements VoiceBackend {
       this.tempDir = null;
       this.audioFile = null;
     }
+  }
+
+  private isSilentWav(wavBuffer: Buffer): boolean {
+    const threshold = this.options.silenceThreshold ?? 80;
+    if (threshold === 0) return false;
+
+    const pcmData = this.extractWavDataChunk(wavBuffer);
+    if (!pcmData || pcmData.length < 2) {
+      return false;
+    }
+
+    const samples = Math.floor(pcmData.length / 2);
+    if (samples === 0) return true;
+
+    let sumSquares = 0;
+    for (let i = 0; i < samples * 2; i += 2) {
+      const sample = pcmData.readInt16LE(i);
+      sumSquares += sample * sample;
+    }
+
+    const rms = Math.sqrt(sumSquares / samples);
+    return rms < threshold;
+  }
+
+  private extractWavDataChunk(wavBuffer: Buffer): Buffer | null {
+    if (
+      wavBuffer.length < 12 ||
+      wavBuffer.toString('ascii', 0, 4) !== 'RIFF' ||
+      wavBuffer.toString('ascii', 8, 12) !== 'WAVE'
+    ) {
+      return null;
+    }
+
+    let offset = 12;
+    while (offset + 8 <= wavBuffer.length) {
+      const chunkId = wavBuffer.toString('ascii', offset, offset + 4);
+      const chunkSize = wavBuffer.readUInt32LE(offset + 4);
+      const chunkStart = offset + 8;
+      const chunkEnd = chunkStart + chunkSize;
+
+      if (chunkEnd > wavBuffer.length) {
+        return null;
+      }
+
+      if (chunkId === 'data') {
+        return wavBuffer.subarray(chunkStart, chunkEnd);
+      }
+
+      offset = chunkEnd + (chunkSize % 2);
+    }
+
+    return null;
   }
 }

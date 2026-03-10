@@ -80,6 +80,52 @@ export async function runNonInteractive({
 
     const { stdout: workingStdout } = createWorkingStdio();
     const textOutput = new TextOutput(workingStdout);
+    const writeSlashCommandMessage = (
+      messageType: 'info' | 'error',
+      content: string,
+      streamFormatter: StreamJsonFormatter | null,
+    ) => {
+      const timestamp = new Date().toISOString();
+      if (streamFormatter) {
+        streamFormatter.emitEvent({
+          type: JsonStreamEventType.MESSAGE,
+          timestamp,
+          role: 'user',
+          content: input,
+        });
+        streamFormatter.emitEvent({
+          type: JsonStreamEventType.MESSAGE,
+          timestamp,
+          role: 'assistant',
+          content,
+        });
+        const metrics = uiTelemetryService.getMetrics();
+        const durationMs = Date.now() - startTime;
+        streamFormatter.emitEvent({
+          type: JsonStreamEventType.RESULT,
+          timestamp,
+          status: 'success',
+          stats: streamFormatter.convertToStreamStats(metrics, durationMs),
+        });
+        return;
+      }
+
+      if (config.getOutputFormat() === OutputFormat.JSON) {
+        const formatter = new JsonFormatter();
+        const stats = uiTelemetryService.getMetrics();
+        textOutput.write(
+          formatter.format(config.getSessionId(), content, stats),
+        );
+        return;
+      }
+
+      const output = `[${messageType.toUpperCase()}] ${content}\n`;
+      if (messageType === 'error') {
+        process.stderr.write(output);
+      } else {
+        textOutput.write(output);
+      }
+    };
 
     const handleUserFeedback = (payload: UserFeedbackPayload) => {
       const prefix = payload.severity.toUpperCase();
@@ -246,12 +292,17 @@ export async function runNonInteractive({
           config,
           settings,
         );
-        // If a slash command is found and returns a prompt, use it.
-        // Otherwise, if it was a slash command, we are done.
-        if (slashCommandResult) {
+        if (slashCommandResult.kind === 'submit_prompt') {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          query = slashCommandResult as Part[];
-        } else {
+          query = slashCommandResult.content as Part[];
+        } else if (slashCommandResult.kind === 'message') {
+          writeSlashCommandMessage(
+            slashCommandResult.messageType,
+            slashCommandResult.content,
+            streamFormatter,
+          );
+          return;
+        } else if (slashCommandResult.kind === 'handled') {
           return;
         }
       }
