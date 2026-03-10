@@ -1,4 +1,4 @@
-# Plan Mode (experimental)
+# Plan Mode
 
 Plan Mode is a read-only environment for architecting robust solutions before
 implementation. It allows you to:
@@ -8,65 +8,8 @@ implementation. It allows you to:
 - **Design:** Understand problems, evaluate trade-offs, and choose a solution.
 - **Plan:** Align on an execution strategy before any code is modified.
 
-> **Note:** This is a preview feature currently under active development. Your
-> feedback is invaluable as we refine this feature. If you have ideas,
-> suggestions, or encounter issues:
->
-> - [Open an issue](https://github.com/google-gemini/gemini-cli/issues) on
->   GitHub.
-> - Use the **/bug** command within Gemini CLI to file an issue.
-
-- [Enabling Plan Mode](#enabling-plan-mode)
-- [How to use Plan Mode](#how-to-use-plan-mode)
-  - [Entering Plan Mode](#entering-plan-mode)
-  - [Planning Workflow](#planning-workflow)
-  - [Exiting Plan Mode](#exiting-plan-mode)
-  - [Commands](#commands)
-- [Tool Restrictions](#tool-restrictions)
-  - [Customizing Planning with Skills](#customizing-planning-with-skills)
-  - [Customizing Policies](#customizing-policies)
-    - [Example: Allow git commands in Plan Mode](#example-allow-git-commands-in-plan-mode)
-    - [Example: Enable custom subagents in Plan Mode](#example-enable-custom-subagents-in-plan-mode)
-  - [Custom Plan Directory and Policies](#custom-plan-directory-and-policies)
-- [Automatic Model Routing](#automatic-model-routing)
-- [Cleanup](#cleanup)
-
-## Enabling Plan Mode
-
-To use Plan Mode, enable it via **/settings** (search for **Plan**) or add the
-following to your `settings.json`:
-
-```json
-{
-  "experimental": {
-    "plan": true
-  }
-}
-```
-
-## How to use Plan Mode
-
-### Entering Plan Mode
-
-You can configure Gemini CLI to start in Plan Mode by default or enter it
-manually during a session.
-
-- **Configuration:** Configure Gemini CLI to start directly in Plan Mode by
-  default:
-  1.  Type `/settings` in the CLI.
-  2.  Search for **Default Approval Mode**.
-  3.  Set the value to **Plan**.
-
-  Alternatively, use the `gemini --approval-mode=plan` CLI flag or manually
-  update:
-
-  ```json
-  {
-    "general": {
-      "defaultApprovalMode": "plan"
-    }
-  }
-  ```
+Plan Mode is enabled by default. You can manage this setting using the
+`/settings` command.
 
 - **Keyboard Shortcut:** Press `Shift+Tab` to cycle through approval modes
   (`Default` -> `Auto-Edit` -> `Plan`).

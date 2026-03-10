@@ -129,7 +129,7 @@ describe('BuiltinCommandLoader', () => {
     vi.clearAllMocks();
     mockConfig = {
       getFolderTrust: vi.fn().mockReturnValue(true),
-      isPlanEnabled: vi.fn().mockReturnValue(false),
+      isPlanEnabled: vi.fn().mockReturnValue(true),
       getEnableExtensionReloading: () => false,
       getEnableHooks: () => false,
       getEnableHooksUI: () => false,
@@ -287,7 +287,7 @@ describe('BuiltinCommandLoader profile', () => {
     vi.resetModules();
     mockConfig = {
       getFolderTrust: vi.fn().mockReturnValue(false),
-      isPlanEnabled: vi.fn().mockReturnValue(false),
+      isPlanEnabled: vi.fn().mockReturnValue(true),
       getCheckpointingEnabled: () => false,
       getEnableExtensionReloading: () => false,
       getEnableHooks: () => false,
