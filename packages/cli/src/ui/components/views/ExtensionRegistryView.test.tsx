@@ -206,4 +206,34 @@ describe('ExtensionRegistryView', () => {
       );
     });
   });
+
+  it('should call onSelect when extension is selected and Enter is pressed in details', async () => {
+    const { stdin, lastFrame } = renderView();
+
+    // Select the first extension in the list (Enter opens details)
+    await React.act(async () => {
+      stdin.write('\r');
+    });
+
+    // Verify we are in details view
+    await waitFor(() => {
+      expect(lastFrame()).toContain('author/ext1');
+      expect(lastFrame()).toContain('[Enter] Install');
+    });
+
+    // Ensure onSelect hasn't been called yet
+    expect(mockOnSelect).not.toHaveBeenCalled();
+
+    // Press Enter again in the details view to trigger install
+    await React.act(async () => {
+      stdin.write('\r');
+    });
+
+    await waitFor(() => {
+      expect(mockOnSelect).toHaveBeenCalledWith(
+        mockExtensions[0],
+        expect.any(Function),
+      );
+    });
+  });
 });
