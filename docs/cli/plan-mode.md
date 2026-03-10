@@ -1,72 +1,40 @@
-# Plan Mode (experimental)
+# Plan Mode
 
 Plan Mode is a read-only environment for architecting robust solutions before
-implementation. It allows you to:
+implementation. With Plan Mode, you can:
 
 - **Research:** Explore the project in a read-only state to prevent accidental
   changes.
 - **Design:** Understand problems, evaluate trade-offs, and choose a solution.
 - **Plan:** Align on an execution strategy before any code is modified.
 
-> **Note:** This is a preview feature currently under active development. Your
-> feedback is invaluable as we refine this feature. If you have ideas,
-> suggestions, or encounter issues:
->
-> - [Open an issue](https://github.com/google-gemini/gemini-cli/issues) on
->   GitHub.
-> - Use the **/bug** command within Gemini CLI to file an issue.
+Plan Mode is enabled by default. You can manage this setting using the
+`/settings` command.
 
-- [Enabling Plan Mode](#enabling-plan-mode)
-- [How to use Plan Mode](#how-to-use-plan-mode)
-  - [Entering Plan Mode](#entering-plan-mode)
-  - [Planning Workflow](#planning-workflow)
-  - [Exiting Plan Mode](#exiting-plan-mode)
-- [Tool Restrictions](#tool-restrictions)
-  - [Customizing Planning with Skills](#customizing-planning-with-skills)
-  - [Customizing Policies](#customizing-policies)
-    - [Example: Allow git commands in Plan Mode](#example-allow-git-commands-in-plan-mode)
-    - [Example: Enable research subagents in Plan Mode](#example-enable-research-subagents-in-plan-mode)
-  - [Custom Plan Directory and Policies](#custom-plan-directory-and-policies)
-- [Automatic Model Routing](#automatic-model-routing)
+## How to enter Plan Mode
 
-## Enabling Plan Mode
+Plan Mode integrates seamlessly into your workflow, letting you switch between
+planning and execution as needed.
 
-To use Plan Mode, enable it via **/settings** (search for **Plan**) or add the
-following to your `settings.json`:
+You can either configure Gemini CLI to start in Plan Mode by default or enter
+Plan Mode manually during a session.
 
-```json
-{
-  "experimental": {
-    "plan": true
-  }
-}
-```
+### Launch in Plan Mode
 
-## How to use Plan Mode
+To start Gemini CLI directly in Plan Mode by default:
 
-### Entering Plan Mode
+1.  Use the `/settings` command.
+2.  Set **Default Approval Mode** to `Plan`.
 
-You can configure Gemini CLI to start in Plan Mode by default or enter it
-manually during a session.
+To launch Gemini CLI in Plan Mode once:
 
-- **Configuration:** Configure Gemini CLI to start directly in Plan Mode by
-  default:
-  1.  Type `/settings` in the CLI.
-  2.  Search for **Default Approval Mode**.
-  3.  Set the value to **Plan**.
+1. Use `gemini --approval-mode=plan` when launching Gemini CLI.
 
-  Alternatively, use the `gemini --approval-mode=plan` CLI flag or manually
-  update:
+### Enter Plan Mode manually
 
-  ```json
-  {
-    "general": {
-      "defaultApprovalMode": "plan"
-    }
-  }
-  ```
+To start Plan Mode while using Gemini CLI:
 
-- **Keyboard Shortcut:** Press `Shift+Tab` to cycle through approval modes
+- **Keyboard shortcut:** Press `Shift+Tab` to cycle through approval modes
   (`Default` -> `Auto-Edit` -> `Plan`).
 
   > **Note:** Plan Mode is automatically removed from the rotation when Gemini
@@ -74,55 +42,58 @@ manually during a session.
 
 - **Command:** Type `/plan` in the input box.
 
-- **Natural Language:** Ask Gemini CLI to "start a plan for...". Gemini CLI then
-  calls the [`enter_plan_mode`] tool to switch modes.
-  > **Note:** This tool is not available when Gemini CLI is in [YOLO mode].
+- **Natural Language:** Ask Gemini CLI to "start a plan for...". Gemini CLI
+  calls the
+  [`enter_plan_mode`](../tools/planning.md#1-enter_plan_mode-enterplanmode) tool
+  to switch modes.
+  > **Note:** This tool is not available when Gemini CLI is in
+  > [YOLO mode](../reference/configuration.md#command-line-arguments).
 
-### Planning Workflow
+## How to use Plan Mode
 
-Plan Mode uses an adaptive planning workflow where the research depth, plan
-structure, and consultation level are proportional to the task's complexity:
+Plan Mode lets you collaborate with Gemini CLI to design a solution before
+Gemini CLI takes action.
 
-1.  **Explore & Analyze:** Analyze requirements and use read-only tools to map
-    affected modules and identify dependencies.
-2.  **Consult:** The depth of consultation is proportional to the task's
-    complexity:
-    - **Simple Tasks:** Proceed directly to drafting.
-    - **Standard Tasks:** Present a summary of viable approaches via
-      [`ask_user`] for selection.
-    - **Complex Tasks:** Present detailed trade-offs for at least two viable
-      approaches via [`ask_user`] and obtain approval before drafting.
-3.  **Draft:** Write a detailed implementation plan to the
-    [plans directory](#custom-plan-directory-and-policies). The plan's structure
-    adapts to the task:
-    - **Simple Tasks:** Focused on specific **Changes** and **Verification**
-      steps.
-    - **Standard Tasks:** Includes an **Objective**, **Key Files & Context**,
-      **Implementation Steps**, and **Verification & Testing**.
-    - **Complex Tasks:** Comprehensive plans including **Background &
-      Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives
-      Considered**, a phased **Implementation Plan**, **Verification**, and
-      **Migration & Rollback** strategies.
-4.  **Review & Approval:** Use the [`exit_plan_mode`] tool to present the plan
-    and formally request approval.
-    - **Approve:** Exit Plan Mode and start implementation.
-    - **Iterate:** Provide feedback to refine the plan.
-    - **Refine manually:** Press **Ctrl + X** to open the plan file in your
-      [preferred external editor]. This allows you to manually refine the plan
-      steps before approval. The CLI will automatically refresh and show the
-      updated plan after you save and close the editor.
+1.  **Provide a goal:** Start by describing what you want to achieve. Gemini CLI
+    will then enter Plan Mode (if it's not already) to research the task.
+2.  **Review research and provide input:** As Gemini CLI analyzes your codebase,
+    it may ask you questions or present different implementation options using
+    [`ask_user`](../tools/ask-user.md). Provide your preferences to help guide
+    the design.
+3.  **Review the plan:** Once Gemini CLI has a proposed strategy, it creates a
+    detailed implementation plan as a Markdown file in your plans directory. You
+    can open and read this file to understand the proposed changes.
+4.  **Approve or iterate:** Gemini CLI will present the finalized plan for your
+    approval.
+    - **Approve:** If you're satisfied with the plan, approve it to start the
+      implementation immediately: **Yes, automatically accept edits** or **Yes,
+      manually accept edits**.
+    - **Iterate:** If the plan needs adjustments, provide feedback. Gemini CLI
+      will refine the strategy and update the plan.
+    - **Cancel:** You can cancel your plan with `Esc`.
 
 For more complex or specialized planning tasks, you can
-[customize the planning workflow with skills](#customizing-planning-with-skills).
+[customize the planning workflow with skills](#custom-planning-with-skills).
 
-### Exiting Plan Mode
+## How to exit Plan Mode
 
-To exit Plan Mode, you can:
+You can exit Plan Mode at any time, whether you have finalized a plan or want to
+switch back to another mode.
 
-- **Keyboard Shortcut:** Press `Shift+Tab` to cycle to the desired mode.
+- **Approve a plan:** When Gemini CLI presents a finalized plan, approving it
+  automatically exits Plan Mode and starts the implementation.
+- **Keyboard shortcut:** Press `Shift+Tab` to cycle to the desired mode.
+- **Natural language:** Ask Gemini CLI to "exit plan mode" or "stop planning."
 
-- **Tool:** Gemini CLI calls the [`exit_plan_mode`] tool to present the
-  finalized plan for your approval.
+## Customization and best practices
+
+Plan Mode is secure by default, but you can adapt it to fit your specific
+workflows. You can customize how Gemini CLI plans by using skills, adjusting
+safety policies, or changing where plans are stored.
+
+## Commands
+
+- **`/plan copy`**: Copy the currently approved plan to your clipboard.
 
 ## Tool Restrictions
 
@@ -130,24 +101,33 @@ Plan Mode enforces strict safety policies to prevent accidental changes.
 
 These are the only allowed tools:
 
-- **FileSystem (Read):** [`read_file`], [`list_directory`], [`glob`]
-- **Search:** [`grep_search`], [`google_web_search`]
-- **Interaction:** [`ask_user`]
-- **MCP Tools (Read):** Read-only [MCP tools] (e.g., `github_read_issue`,
-  `postgres_read_schema`) are allowed.
-- **Planning (Write):** [`write_file`] and [`replace`] only allowed for `.md`
+- **FileSystem (Read):**
+  [`read_file`](../tools/file-system.md#2-read_file-readfile),
+  [`list_directory`](../tools/file-system.md#1-list_directory-readfolder),
+  [`glob`](../tools/file-system.md#4-glob-findfiles)
+- **Search:** [`grep_search`](../tools/file-system.md#5-grep_search-searchtext),
+  [`google_web_search`](../tools/web-search.md)
+- **Research Subagents:**
+  [`codebase_investigator`](../core/subagents.md#codebase-investigator),
+  [`cli_help`](../core/subagents.md#cli-help-agent)
+- **Interaction:** [`ask_user`](../tools/ask-user.md)
+- **MCP tools (Read):** Read-only [MCP tools](../tools/mcp-server.md) (for
+  example, `github_read_issue`, `postgres_read_schema`) are allowed.
+- **Planning (Write):**
+  [`write_file`](../tools/file-system.md#3-write_file-writefile) and
+  [`replace`](../tools/file-system.md#6-replace-edit) only allowed for `.md`
   files in the `~/.gemini/tmp/<project>/<session-id>/plans/` directory or your
   [custom plans directory](#custom-plan-directory-and-policies).
-- **Memory:** [`save_memory`]
-- **Skills:** [`activate_skill`] (allows loading specialized instructions and
-  resources in a read-only manner)
+- **Memory:** [`save_memory`](../tools/memory.md)
+- **Skills:** [`activate_skill`](../cli/skills.md) (allows loading specialized
+  instructions and resources in a read-only manner)
 
-### Customizing Planning with Skills
+### Custom planning with skills
 
-You can use [Agent Skills](./skills.md) to customize how Gemini CLI approaches
-planning for specific types of tasks. When a skill is activated during Plan
-Mode, its specialized instructions and procedural workflows will guide the
-research, design and planning phases.
+You can use [Agent Skills](../cli/skills.md) to customize how Gemini CLI
+approaches planning for specific types of tasks. When a skill is activated
+during Plan Mode, its specialized instructions and procedural workflows will
+guide the research, design, and planning phases.
 
 For example:
 
@@ -162,12 +142,34 @@ To use a skill in Plan Mode, you can explicitly ask Gemini CLI to "use the
 `<skill-name>` skill to plan..." or Gemini CLI may autonomously activate it
 based on the task description.
 
-### Customizing Policies
+### Custom policies
 
-Plan Mode's default tool restrictions are managed by the [policy engine] and
-defined in the built-in [`plan.toml`] file. The built-in policy (Tier 1)
-enforces the read-only state, but you can customize these rules by creating your
-own policies in your `~/.gemini/policies/` directory (Tier 2).
+Plan Mode's default tool restrictions are managed by the
+[policy engine](../reference/policy-engine.md) and defined in the built-in
+[`plan.toml`] file. The built-in policy (Tier 1) enforces the read-only state,
+but you can customize these rules by creating your own policies in your
+`~/.gemini/policies/` directory (Tier 2).
+
+#### Global vs. mode-specific rules
+
+As described in the
+[policy engine documentation](../reference/policy-engine.md#approval-modes), any
+rule that does not explicitly specify `modes` is considered "always active" and
+will apply to Plan Mode as well.
+
+If you want a rule to apply to other modes but _not_ to Plan Mode, you must
+explicitly specify the target modes. For example, to allow `npm test` in default
+and Auto-Edit modes but not in Plan Mode:
+
+```toml
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "npm test"
+decision = "allow"
+priority = 100
+# By omitting "plan", this rule will not be active in Plan Mode.
+modes = ["default", "autoEdit"]
+```
 
 #### Example: Automatically approve read-only MCP tools
 
@@ -186,10 +188,13 @@ priority = 100
 modes = ["plan"]
 ```
 
+For more information on how the policy engine works, see the
+[policy engine](../reference/policy-engine.md) docs.
+
 #### Example: Allow git commands in Plan Mode
 
-This rule allows you to check the repository status and see changes while in
-Plan Mode.
+This rule lets you check the repository status and see changes while in Plan
+Mode.
 
 `~/.gemini/policies/git-research.toml`
 
@@ -202,16 +207,20 @@ priority = 100
 modes = ["plan"]
 ```
 
-#### Example: Enable research subagents in Plan Mode
+#### Example: Enable custom subagents in Plan Mode
 
-You can enable experimental research [subagents] like `codebase_investigator` to
-help gather architecture details during the planning phase.
+Built-in research [subagents](../core/subagents.md) like
+[`codebase_investigator`](../core/subagents.md#codebase-investigator) and
+[`cli_help`](../core/subagents.md#cli-help-agent) are enabled by default in Plan
+Mode. You can enable additional
+[custom subagents](../core/subagents.md#creating-custom-subagents) by adding a
+rule to your policy.
 
 `~/.gemini/policies/research-subagents.toml`
 
 ```toml
 [[rule]]
-toolName = "codebase_investigator"
+toolName = "my_custom_subagent"
 decision = "allow"
 priority = 100
 modes = ["plan"]
@@ -220,10 +229,7 @@ modes = ["plan"]
 Tell Gemini CLI it can use these tools in your prompt, for example: _"You can
 check ongoing changes in git."_
 
-For more information on how the policy engine works, see the [policy engine]
-docs.
-
-### Custom Plan Directory and Policies
+### Custom plan directory and policies
 
 By default, planning artifacts are stored in a managed temporary directory
 outside your project: `~/.gemini/tmp/<project>/<session-id>/plans/`.
@@ -247,10 +253,11 @@ locations defined within a project's workspace cannot be used to escape and
 overwrite sensitive files elsewhere. Any user-configured directory must reside
 within the project boundary.
 
-Using a custom directory requires updating your [policy engine] configurations
-to allow `write_file` and `replace` in that specific location. For example, to
-allow writing to the `.gemini/plans` directory within your project, create a
-policy file at `~/.gemini/policies/plan-custom-directory.toml`:
+Using a custom directory requires updating your
+[policy engine](../reference/policy-engine.md) configurations to allow
+`write_file` and `replace` in that specific location. For example, to allow
+writing to the `.gemini/plans` directory within your project, create a policy
+file at `~/.gemini/policies/plan-custom-directory.toml`:
 
 ```toml
 [[rule]]
@@ -263,10 +270,69 @@ modes = ["plan"]
 argsPattern = "\"file_path\":\"[^\"]+[\\\\/]+\\.gemini[\\\\/]+plans[\\\\/]+[\\w-]+\\.md\""
 ```
 
+## Planning workflows
+
+Plan Mode provides building blocks for structured research and design. These are
+implemented as [extensions](../extensions/index.md) using core planning tools
+like [`enter_plan_mode`](../tools/planning.md#1-enter_plan_mode-enterplanmode),
+[`exit_plan_mode`](../tools/planning.md#2-exit_plan_mode-exitplanmode), and
+[`ask_user`](../tools/ask-user.md).
+
+### Built-in planning workflow
+
+The built-in planner uses an adaptive workflow to analyze your project, consult
+you on trade-offs via [`ask_user`](../tools/ask-user.md), and draft a plan for
+your approval.
+
+### Custom planning workflows
+
+You can install or create specialized planners to suit your workflow.
+
+#### Conductor
+
+[Conductor] is designed for spec-driven development. It organizes work into
+"tracks" and stores persistent artifacts in your project's `conductor/`
+directory:
+
+- **Automate transitions:** Switches to read-only mode via
+  [`enter_plan_mode`](../tools/planning.md#1-enter_plan_mode-enterplanmode).
+- **Streamline decisions:** Uses [`ask_user`](../tools/ask-user.md) for
+  architectural choices.
+- **Maintain project context:** Stores artifacts in the project directory using
+  [custom plan directory and policies](#custom-plan-directory-and-policies).
+- **Handoff execution:** Transitions to implementation via
+  [`exit_plan_mode`](../tools/planning.md#2-exit_plan_mode-exitplanmode).
+
+#### Build your own
+
+Since Plan Mode is built on modular building blocks, you can develop your own
+custom planning workflow as an [extensions](../extensions/index.md). By
+leveraging core tools and [custom policies](#custom-policies), you can define
+how Gemini CLI researches and stores plans for your specific domain.
+
+To build a custom planning workflow, you can use:
+
+- **Tool usage:** Use core tools like
+  [`enter_plan_mode`](../tools/planning.md#1-enter_plan_mode-enterplanmode),
+  [`ask_user`](../tools/ask-user.md), and
+  [`exit_plan_mode`](../tools/planning.md#2-exit_plan_mode-exitplanmode) to
+  manage the research and design process.
+- **Customization:** Set your own storage locations and policy rules using
+  [custom plan directories](#custom-plan-directory-and-policies) and
+  [custom policies](#custom-policies).
+
+> **Note:** Use [Conductor] as a reference when building your own custom
+> planning workflow.
+
+By using Plan Mode as its execution environment, your custom methodology can
+enforce read-only safety during the design phase while benefiting from
+high-reasoning model routing.
+
 ## Automatic Model Routing
 
-When using an [**auto model**], Gemini CLI automatically optimizes [**model
-routing**] based on the current phase of your task:
+When using an [auto model](../reference/configuration.md#model), Gemini CLI
+automatically optimizes [model routing](../cli/telemetry.md#model-routing) based
+on the current phase of your task:
 
 1.  **Planning Phase:** While in Plan Mode, the CLI routes requests to a
     high-reasoning **Pro** model to ensure robust architectural decisions and
@@ -289,24 +355,26 @@ performance. You can disable this automatic switching in your settings:
 }
 ```
 
-[`list_directory`]: /docs/tools/file-system.md#1-list_directory-readfolder
-[`read_file`]: /docs/tools/file-system.md#2-read_file-readfile
-[`grep_search`]: /docs/tools/file-system.md#5-grep_search-searchtext
-[`write_file`]: /docs/tools/file-system.md#3-write_file-writefile
-[`glob`]: /docs/tools/file-system.md#4-glob-findfiles
-[`google_web_search`]: /docs/tools/web-search.md
-[`replace`]: /docs/tools/file-system.md#6-replace-edit
-[MCP tools]: /docs/tools/mcp-server.md
-[`save_memory`]: /docs/tools/memory.md
-[`activate_skill`]: /docs/cli/skills.md
-[subagents]: /docs/core/subagents.md
-[policy engine]: /docs/reference/policy-engine.md
-[`enter_plan_mode`]: /docs/tools/planning.md#1-enter_plan_mode-enterplanmode
-[`exit_plan_mode`]: /docs/tools/planning.md#2-exit_plan_mode-exitplanmode
-[`ask_user`]: /docs/tools/ask-user.md
-[YOLO mode]: /docs/reference/configuration.md#command-line-arguments
+## Cleanup
+
+By default, Gemini CLI automatically cleans up old session data, including all
+associated plan files and task trackers.
+
+- **Default behavior:** Sessions (and their plans) are retained for **30 days**.
+- **Configuration:** You can customize this behavior via the `/settings` command
+  (search for **Session Retention**) or in your `settings.json` file. See
+  [session retention](../cli/session-management.md#session-retention) for more
+  details.
+
+Manual deletion also removes all associated artifacts:
+
+- **Command Line:** Use `gemini --delete-session <index|id>`.
+- **Session Browser:** Press `/resume`, navigate to a session, and press `x`.
+
+If you use a [custom plans directory](#custom-plan-directory-and-policies),
+those files are not automatically deleted and must be managed manually.
+
 [`plan.toml`]:
   https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/policy/policies/plan.toml
-[auto model]: /docs/reference/configuration.md#model-settings
-[model routing]: /docs/cli/telemetry.md#model-routing
-[preferred external editor]: /docs/reference/configuration.md#general
+[Conductor]: https://github.com/gemini-cli-extensions/conductor
+[open an issue]: https://github.com/google-gemini/gemini-cli/issues

@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
-import type { Mock } from 'vitest';
+import { describe, it, expect, vi, type Mock } from 'vitest';
 import type { CallableTool } from '@google/genai';
 import { CoreToolScheduler } from './coreToolScheduler.js';
 import {
@@ -290,6 +289,8 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
   } as unknown as Config;
 
   const finalConfig = { ...baseConfig, ...overrides } as Config;
+
+  (finalConfig as unknown as { config: Config }).config = finalConfig;
 
   // Patch the policy engine to use the final config if not overridden
   if (!overrides.getPolicyEngine) {
