@@ -57,13 +57,44 @@ export class SessionError extends Error {
   /**
    * Creates an error for when a session identifier is invalid.
    */
-  static invalidSessionIdentifier(identifier: string): SessionError {
+  static invalidSessionIdentifier(
+    identifier: string,
+    sessions: SessionInfo[] = [],
+  ): SessionError {
+    const sessionSummary = formatAvailableSessions(sessions);
     return new SessionError(
       'INVALID_SESSION_IDENTIFIER',
-      `Invalid session identifier "${identifier}".\n  Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.`,
+      sessionSummary
+        ? `Invalid session identifier "${identifier}".\n\nAvailable sessions for this project:\n${sessionSummary}\n\nUse --resume {number}, --resume {uuid}, or --resume latest.\nRun --list-sessions to see the full list.`
+        : `Invalid session identifier "${identifier}".\n  Use --list-sessions to see available sessions, then use --resume {number}, --resume {uuid}, or --resume latest.`,
     );
   }
 }
+
+const MAX_SESSIONS_IN_INVALID_RESUME_MESSAGE = 10;
+
+const formatAvailableSessions = (sessions: SessionInfo[]): string => {
+  if (sessions.length === 0) {
+    return '';
+  }
+
+  const visibleSessions = sessions.slice(
+    0,
+    MAX_SESSIONS_IN_INVALID_RESUME_MESSAGE,
+  );
+  const lines = visibleSessions.map(
+    (session) =>
+      `  ${session.index}. ${session.displayName} (${formatRelativeTime(session.lastUpdated)})`,
+  );
+
+  if (sessions.length > visibleSessions.length) {
+    lines.push(
+      `  ...and ${sessions.length - visibleSessions.length} more. Run --list-sessions to see the full list.`,
+    );
+  }
+
+  return lines.join('\n');
+};
 
 /**
  * Represents a text match found during search with surrounding context.
@@ -447,7 +478,7 @@ export class SessionSelector {
       return sortedSessions[index - 1];
     }
 
-    throw SessionError.invalidSessionIdentifier(identifier);
+    throw SessionError.invalidSessionIdentifier(identifier, sortedSessions);
   }
 
   /**

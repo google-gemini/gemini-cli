@@ -302,6 +302,7 @@ describe('SessionSelector', () => {
 
   it('should throw error for invalid session identifier', async () => {
     const sessionId1 = randomUUID();
+    const sessionId2 = randomUUID();
 
     // Create test session files
     const chatsDir = path.join(tmpDir, 'chats');
@@ -322,6 +323,22 @@ describe('SessionSelector', () => {
       ],
     };
 
+    const session2 = {
+      sessionId: sessionId2,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T11:00:00.000Z',
+      lastUpdated: '2024-01-01T11:45:00.000Z',
+      summary: 'Follow-up bugfix',
+      messages: [
+        {
+          type: 'user',
+          content: 'Test message 2',
+          id: 'msg2',
+          timestamp: '2024-01-01T11:00:00.000Z',
+        },
+      ],
+    };
+
     await fs.writeFile(
       path.join(
         chatsDir,
@@ -330,14 +347,86 @@ describe('SessionSelector', () => {
       JSON.stringify(session1, null, 2),
     );
 
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${sessionId2.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(session2, null, 2),
+    );
+
     const sessionSelector = new SessionSelector(config);
 
     await expect(
       sessionSelector.resolveSession('invalid-uuid'),
-    ).rejects.toThrow(SessionError);
+    ).rejects.toSatisfy((error) => {
+      expect(error).toBeInstanceOf(SessionError);
+      expect((error as SessionError).message).toContain(
+        'Invalid session identifier "invalid-uuid".',
+      );
+      expect((error as SessionError).message).toContain(
+        'Available sessions for this project:',
+      );
+      expect((error as SessionError).message).toContain('1. Test message 1');
+      expect((error as SessionError).message).toContain('2. Follow-up bugfix');
+      expect((error as SessionError).message).toContain(
+        'Use --resume {number}, --resume {uuid}, or --resume latest.',
+      );
+      return true;
+    });
 
     await expect(sessionSelector.resolveSession('999')).rejects.toThrow(
       SessionError,
+    );
+  });
+
+  it('should limit available sessions shown in invalid session identifier errors', async () => {
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    for (let index = 0; index < 12; index++) {
+      const sessionId = randomUUID();
+      const hour = String(index).padStart(2, '0');
+      await fs.writeFile(
+        path.join(
+          chatsDir,
+          `${SESSION_FILE_PREFIX}2024-01-01T${hour}-00-${sessionId.slice(0, 8)}.json`,
+        ),
+        JSON.stringify(
+          {
+            sessionId,
+            projectHash: 'test-hash',
+            startTime: `2024-01-01T${hour}:00:00.000Z`,
+            lastUpdated: `2024-01-01T${hour}:30:00.000Z`,
+            summary: `Session ${index + 1}`,
+            messages: [
+              {
+                type: 'user',
+                content: `Message ${index + 1}`,
+                id: `msg${index + 1}`,
+                timestamp: `2024-01-01T${hour}:00:00.000Z`,
+              },
+            ],
+          },
+          null,
+          2,
+        ),
+      );
+    }
+
+    const sessionSelector = new SessionSelector(config);
+
+    await expect(sessionSelector.resolveSession('999')).rejects.toSatisfy(
+      (error) => {
+        expect(error).toBeInstanceOf(SessionError);
+        expect((error as SessionError).message).toContain('1. Session 1');
+        expect((error as SessionError).message).toContain('10. Session 10');
+        expect((error as SessionError).message).not.toContain('11. Session 11');
+        expect((error as SessionError).message).toContain(
+          '...and 2 more. Run --list-sessions to see the full list.',
+        );
+        return true;
+      },
     );
   });
 
