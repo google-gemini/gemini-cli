@@ -160,7 +160,7 @@ async function restartAction(
   if (!extensionLoader) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: "Extensions are not yet loaded, can't restart yet",
+      text: "Extensions are not yet loaded, can't reload yet",
     });
     return;
   }
@@ -208,12 +208,12 @@ async function restartAction(
 
   const s = extensionsToRestart.length > 1 ? 's' : '';
 
-  const restartingMessage = {
+  const reloadingMessage = {
     type: MessageType.INFO,
     text: `Reloading ${extensionsToRestart.length} extension${s}...`,
     color: theme.text.primary,
   };
-  context.ui.addItem(restartingMessage);
+  context.ui.addItem(reloadingMessage);
 
   const results = await Promise.allSettled(
     extensionsToRestart.map(async (extension) => {
@@ -254,12 +254,12 @@ async function restartAction(
       .join('\n  ');
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: `Failed to restart some extensions:\n  ${errorMessages}`,
+      text: `Failed to reload some extensions:\n  ${errorMessages}`,
     });
   } else {
     const infoItem: HistoryItemInfo = {
       type: MessageType.INFO,
-      text: `${extensionsToRestart.length} extension${s} restarted successfully.`,
+      text: `${extensionsToRestart.length} extension${s} reloaded successfully.`,
       icon: emptyIcon,
       color: theme.text.primary,
     };

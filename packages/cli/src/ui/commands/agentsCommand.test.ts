@@ -122,7 +122,7 @@ describe('agentsCommand', () => {
     expect(result).toEqual({
       type: 'message',
       messageType: 'info',
-      content: 'Agents refreshed successfully.',
+      content: 'Agents reloaded successfully.',
     });
   });
 

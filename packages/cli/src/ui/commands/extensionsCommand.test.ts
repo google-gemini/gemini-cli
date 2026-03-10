@@ -890,7 +890,7 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.INFO,
-          text: '2 extensions restarted successfully.',
+          text: '2 extensions reloaded successfully.',
         }),
       );
       expect(mockContext.ui.dispatchExtensionStateUpdate).toHaveBeenCalledWith({
@@ -950,7 +950,7 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.ERROR,
-          text: "Extensions are not yet loaded, can't restart yet",
+          text: "Extensions are not yet loaded, can't reload yet",
         }),
       );
       expect(mockRestartExtension).not.toHaveBeenCalled();
@@ -981,7 +981,7 @@ describe('extensionsCommand', () => {
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.ERROR,
-          text: 'Failed to restart some extensions:\n  ext1: Failed to restart',
+          text: 'Failed to reload some extensions:\n  ext1: Failed to restart',
         }),
       );
     });

@@ -348,7 +348,7 @@ const agentsRefreshCommand: SlashCommand = {
     return {
       type: 'message',
       messageType: 'info',
-      content: 'Agents refreshed successfully.',
+      content: 'Agents reloaded successfully.',
     };
   },
 };
