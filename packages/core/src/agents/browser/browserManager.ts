@@ -113,12 +113,13 @@ export class BrowserManager {
       throw signal.reason ?? new Error('Operation cancelled');
     }
 
-    if (!this.checkNavigationRestrictions(toolName, args)) {
+    const errorMessage = this.checkNavigationRestrictions(toolName, args);
+    if (errorMessage) {
       return {
         content: [
           {
             type: 'text',
-            text: `Tool '${toolName}' is not permitted for the requested URL/domain based on your current browser settings.`,
+            text: errorMessage,
           },
         ],
         isError: true,
@@ -464,36 +465,38 @@ export class BrowserManager {
   }
 
   /**
-   * Check navigation restrictions based on tools and the args sending
-   * along with it.
+   * Check navigation restrictions based on tools and the args sent
+   * along with them.
+   *
+   * @returns error message if failed, undefined if passed.
    */
   private checkNavigationRestrictions(
     toolName: string,
     args: Record<string, unknown>,
-  ): boolean {
+  ): string | undefined {
     const pageNavigationTools = ['navigate_page', 'new_page'];
 
     if (!pageNavigationTools.includes(toolName)) {
-      return true;
+      return undefined;
     }
 
     const allowedDomains =
       this.config.getBrowserAgentConfig().customConfig.allowedDomains;
     if (!allowedDomains || allowedDomains.length === 0) {
-      return true;
+      return undefined;
     }
 
     const url = args['url'];
     if (!url) {
-      return true;
+      return undefined;
     }
     if (typeof url !== 'string') {
-      throw new Error('Invalid URL: URL must be a string.');
+      return `Invalid URL: URL must be a string.`;
     }
 
     try {
       const parsedUrl = new URL(url);
-      const urlHostname = parsedUrl.hostname;
+      const urlHostname = parsedUrl.hostname.replace(/\.$/, '');
 
       for (const domainPattern of allowedDomains) {
         if (domainPattern.startsWith('*.')) {
@@ -502,19 +505,19 @@ export class BrowserManager {
             urlHostname === baseDomain ||
             urlHostname.endsWith(`.${baseDomain}`)
           ) {
-            return true;
+            return undefined;
           }
         } else {
           if (urlHostname === domainPattern) {
-            return true;
+            return undefined;
           }
         }
       }
     } catch {
-      throw new Error('Invalid URL: Malformed URL string.');
+      return `Invalid URL: Malformed URL string.`;
     }
 
     // If none matched, then deny
-    return false;
+    return `Tool '${toolName}' is not permitted for the requested URL/domain based on your current browser settings.`;
   }
 }
