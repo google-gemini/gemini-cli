@@ -28,6 +28,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { safeJsonToMarkdown } from '../utils/markdownUtils.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
+import { A2AAgentError } from './a2a-errors.js';
 
 /**
  * Authentication handler implementation using Google Application Default Credentials (ADC).
@@ -228,7 +229,8 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       };
     } catch (error: unknown) {
       const partialOutput = reassembler.toString();
-      const errorMessage = `Error calling remote agent: ${error instanceof Error ? error.message : String(error)}`;
+      // Surface structured, user-friendly error messages.
+      const errorMessage = this.formatExecutionError(error);
       const fullDisplay = partialOutput
         ? `${partialOutput}\n\n${errorMessage}`
         : errorMessage;
@@ -244,5 +246,23 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         taskId: this.taskId,
       });
     }
+  }
+
+  /**
+   * Formats an execution error into a user-friendly message.
+   * Recognizes typed A2AAgentError subclasses and falls back to
+   * a generic message for unknown errors.
+   */
+  private formatExecutionError(error: unknown): string {
+    // All A2A-specific errors include a human-friendly `userMessage` on the
+    // A2AAgentError base class. Rely on that to avoid duplicating messages
+    // for specific subclasses, which improves maintainability.
+    if (error instanceof A2AAgentError) {
+      return error.userMessage;
+    }
+
+    return `Error calling remote agent: ${
+      error instanceof Error ? error.message : String(error)
+    }`;
   }
 }
