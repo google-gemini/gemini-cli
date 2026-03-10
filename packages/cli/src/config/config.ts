@@ -95,7 +95,7 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
-  profile: string | undefined;
+  profiles: string | undefined;
 }
 
 export async function parseArguments(
@@ -109,8 +109,8 @@ export async function parseArguments(
     .usage(
       'Usage: gemini [options] [command]\n\nGemini CLI - Defaults to interactive mode. Use -p/--prompt for non-interactive (headless) mode.',
     )
-    .option('profile', {
-      alias: ['profiles', 'P'],
+    .option('profiles', {
+      alias: ['profile', 'P'],
       type: 'string',
       nargs: 1,
       global: true,
@@ -435,7 +435,7 @@ export async function loadCliConfig(
   const loadedSettings = loadSettings(cwd);
   const profileManager = new ProfileManager(loadedSettings);
   const activeProfileName =
-    argv.profile || profileManager.getActiveProfileName();
+    argv.profiles || profileManager.getActiveProfileName();
   const profile = activeProfileName
     ? await profileManager.getProfile(activeProfileName)
     : null;
