@@ -20,3 +20,14 @@ exports[`McpProgressIndicator > renders progress with a message 1`] = `
 Downloading...
 "
 `;
+
+exports[`ToolInfo > honors truncateToolDescriptions=false 1`] = `
+"test-tool A very long description that might need to be truncated to fit on a single line for
+display purposes
+"
+`;
+
+exports[`ToolInfo > renders correctly 1`] = `
+"test-tool A very long description that might need to be truncated to fit on a single line for displ…
+"
+`;
