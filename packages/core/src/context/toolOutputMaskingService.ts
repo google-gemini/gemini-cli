@@ -48,6 +48,18 @@ export interface MaskingResult {
   tokensSaved: number;
 }
 
+interface HasOutputFile {
+  outputFile: string;
+}
+
+function hasOutputFile(obj: unknown): obj is HasOutputFile {
+  if (typeof obj !== 'object' || obj === null || !('outputFile' in obj)) {
+    return false;
+  }
+  const val = (obj as Record<string, unknown>)['outputFile'];
+  return typeof val === 'string';
+}
+
 /**
  * Service to manage context window efficiency by masking bulky tool outputs (Tool Output Masking).
  *
@@ -191,11 +203,8 @@ export class ToolOutputMaskingService {
       let fileSizeMB = '0.00';
       let totalLines = 0;
 
-      if (
-        typeof originalResponse['outputFile'] === 'string' &&
-        originalResponse['outputFile']
-      ) {
-        filePath = originalResponse['outputFile'];
+      if (hasOutputFile(originalResponse) && originalResponse.outputFile) {
+        filePath = originalResponse.outputFile;
         try {
           const stats = await fsPromises.stat(filePath);
           fileSizeMB = (stats.size / 1024 / 1024).toFixed(2);
