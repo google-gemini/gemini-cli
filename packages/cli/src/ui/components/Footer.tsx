@@ -106,6 +106,7 @@ export interface FooterRowItem {
   flexGrow?: number;
   flexShrink?: number;
   isFocused?: boolean;
+  alignItems?: 'flex-start' | 'center' | 'flex-end';
 }
 
 const COLUMN_GAP = 3;
@@ -117,10 +118,17 @@ export const FooterRow: React.FC<{
   const elements: React.ReactNode[] = [];
 
   items.forEach((item, idx) => {
-    if (idx > 0 && !showLabels) {
+    if (idx > 0) {
       elements.push(
-        <Box key={`sep-${item.key}`} height={1}>
-          <Text color={theme.ui.comment}> · </Text>
+        <Box
+          key={`sep-${item.key}`}
+          flexGrow={1}
+          flexShrink={1}
+          minWidth={showLabels ? COLUMN_GAP : 3}
+          justifyContent="center"
+          alignItems="center"
+        >
+          {!showLabels && <Text color={theme.ui.comment}> · </Text>}
         </Box>,
       );
     }
@@ -131,6 +139,7 @@ export const FooterRow: React.FC<{
         flexDirection="column"
         flexGrow={item.flexGrow ?? 0}
         flexShrink={item.flexShrink ?? 1}
+        alignItems={item.alignItems}
         backgroundColor={item.isFocused ? theme.background.focus : undefined}
       >
         {showLabels && (
@@ -148,12 +157,7 @@ export const FooterRow: React.FC<{
   });
 
   return (
-    <Box
-      flexDirection="row"
-      flexWrap="nowrap"
-      width="100%"
-      columnGap={showLabels ? COLUMN_GAP : 0}
-    >
+    <Box flexDirection="row" flexWrap="nowrap" width="100%">
       {elements}
     </Box>
   );
@@ -441,8 +445,9 @@ export const Footer: React.FC = () => {
     }
   }
 
-  const rowItems: FooterRowItem[] = columnsToRender.map((col) => {
+  const rowItems: FooterRowItem[] = columnsToRender.map((col, index) => {
     const isWorkspace = col.id === 'workspace';
+    const isLast = index === columnsToRender.length - 1;
 
     // Calculate exact space available for growth to prevent over-estimation truncation
     const otherItemsWidth = columnsToRender
@@ -464,8 +469,10 @@ export const Footer: React.FC = () => {
       key: col.id,
       header: col.header,
       element: col.element(estimatedWidth),
-      flexGrow: isWorkspace ? 1 : 0,
+      flexGrow: 0,
       flexShrink: isWorkspace ? 1 : 0,
+      alignItems:
+        isLast && !droppedAny && index > 0 ? 'flex-end' : 'flex-start',
     };
   });
 
@@ -476,6 +483,7 @@ export const Footer: React.FC = () => {
       element: <Text color={theme.ui.comment}>…</Text>,
       flexGrow: 0,
       flexShrink: 0,
+      alignItems: 'flex-end',
     });
   }
 

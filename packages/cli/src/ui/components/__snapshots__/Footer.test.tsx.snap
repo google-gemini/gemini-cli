@@ -1,26 +1,26 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`<Footer /> > displays "Limit reached" message when remaining is 0 1`] = `
-" workspace (/directory)                                                         sandbox      /model       /stats
- ~/project/foo/bar/and/some/more/directories/to/make/it/long                    no sandbox   gemini-pro   limit reached
+" workspace (/directory)                                              sandbox           /model                    /stats
+ ~/project/foo/bar/and/some/more/directories/to/make/it/long         no sandbox        gemini-pro         limit reached
 "
 `;
 
 exports[`<Footer /> > displays the usage indicator when usage is low 1`] = `
-" workspace (/directory)                                                                sandbox      /model       /stats
- ~/project/foo/bar/and/some/more/directories/to/make/it/long                           no sandbox   gemini-pro   85%
+" workspace (/directory)                                                sandbox              /model               /stats
+ ~/project/foo/bar/and/some/more/directories/to/make/it/long           no sandbox           gemini-pro              85%
 "
 `;
 
 exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders complete footer in narrow terminal (baseline narrow) > complete-footer-narrow 1`] = `
-" workspace (/directory)                      sandbox      /model       context
- ...me/more/directories/to/make/it/long      no sandbox   gemini-pro   14%
+" workspace (/directory)                    sandbox       /model        context
+ ...me/more/directories/to/make/it/long    no sandbox    gemini-pro        14%
 "
 `;
 
 exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders complete footer with all sections visible (baseline) > complete-footer-wide 1`] = `
-" workspace (/directory)                                                              sandbox      /model       context
- ~/project/foo/bar/and/some/more/directories/to/make/it/long                         no sandbox   gemini-pro   14% used
+" workspace (/directory)                                               sandbox              /model               context
+ ~/project/foo/bar/and/some/more/directories/to/make/it/long          no sandbox           gemini-pro          14% used
 "
 `;
 
@@ -33,13 +33,13 @@ exports[`<Footer /> > footer configuration filtering (golden snapshots) > render
 exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders footer with all optional sections hidden (minimal footer) > footer-minimal 1`] = `""`;
 
 exports[`<Footer /> > footer configuration filtering (golden snapshots) > renders footer with only model info hidden (partial filtering) > footer-no-model 1`] = `
-" workspace (/directory)                                                                                      sandbox
+" workspace (/directory)                                                                                         sandbox
  ~/project/foo/bar/and/some/more/directories/to/make/it/long                                                 no sandbox
 "
 `;
 
 exports[`<Footer /> > hides the usage indicator when usage is not near limit 1`] = `
-" workspace (/directory)                                                                sandbox      /model       /stats
- ~/project/foo/bar/and/some/more/directories/to/make/it/long                           no sandbox   gemini-pro   15%
+" workspace (/directory)                                                sandbox              /model               /stats
+ ~/project/foo/bar/and/some/more/directories/to/make/it/long           no sandbox           gemini-pro              15%
 "
 `;
