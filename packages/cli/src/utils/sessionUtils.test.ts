@@ -850,6 +850,28 @@ describe('SessionError.invalidSessionIdentifier', () => {
     expect(error.message).not.toContain(longName);
   });
 
+  it('truncates display names with multi-byte Unicode characters without splitting them', () => {
+    // Each emoji is 2 UTF-16 code units but 1 grapheme cluster.
+    // Naive .slice() would split at a surrogate pair boundary; cpSlice must not.
+    const emoji = '😀';
+    const longName = emoji.repeat(80); // 80 grapheme clusters, 160 UTF-16 code units
+    const sessions = [
+      {
+        id: 'uuid-1',
+        displayName: longName,
+        lastUpdated: '2024-01-01T10:00:00.000Z',
+        startTime: '2024-01-01T09:00:00.000Z',
+        index: 1,
+      },
+    ] as Array<import('./sessionUtils.js').SessionInfo>;
+
+    const error = SessionError.invalidSessionIdentifier('bad', sessions);
+    // Should end with exactly 57 emojis followed by '...'
+    expect(error.message).toContain(emoji.repeat(57) + '...');
+    // Must not contain the full un-truncated name
+    expect(error.message).not.toContain(longName);
+  });
+
   it('appends "Run --list-sessions for the full list." when more than 10 sessions exist', () => {
     const sessions = Array.from({ length: 11 }, (_, i) => ({
       id: `uuid-${i}`,

@@ -15,7 +15,11 @@ import {
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
-import { stripUnsafeCharacters } from '../ui/utils/textUtils.js';
+import {
+  cpLen,
+  cpSlice,
+  stripUnsafeCharacters,
+} from '../ui/utils/textUtils.js';
 import { MessageType, type HistoryItemWithoutId } from '../ui/types.js';
 
 /**
@@ -80,8 +84,8 @@ export class SessionError extends Error {
       const sessionLines = displaySessions
         .map((s, i) => {
           const title =
-            s.displayName.length > 60
-              ? s.displayName.slice(0, 57) + '...'
+            cpLen(s.displayName) > 60
+              ? cpSlice(s.displayName, 0, 57) + '...'
               : s.displayName;
           return `  ${i + 1}. ${title} (${formatRelativeTime(s.lastUpdated)})`;
         })
