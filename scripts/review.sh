@@ -70,8 +70,10 @@ echo "review: Changing directory to $WORKTREE_PATH"
 cd "$WORKTREE_PATH" || exit 1
 
 # 4. Checkout the PR
-echo "review: Checking out PR $pr..."
-gh pr checkout "$pr" -f -R "$REPO"
+echo "review: Cleaning worktree and checking out PR $pr..."
+git reset --hard
+git clean -fd
+gh pr checkout "$pr" --branch "review-$pr" -f -R "$REPO"
 
 # 5. Clean and Build
 echo "review: Clearing possibly stale node_modules..."
