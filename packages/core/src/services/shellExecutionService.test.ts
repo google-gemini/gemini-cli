@@ -1703,4 +1703,95 @@ describe('ShellExecutionService environment variables', () => {
     mockChildProcess.emit('close', 0, null);
     await new Promise(process.nextTick);
   });
+
+  it('should include headless git and gh environment variables in non-interactive mode and append git config safely', async () => {
+    vi.resetModules();
+    vi.stubEnv('GIT_CONFIG_COUNT', '2');
+    vi.stubEnv('GIT_CONFIG_KEY_0', 'core.editor');
+    vi.stubEnv('GIT_CONFIG_VALUE_0', 'vim');
+    vi.stubEnv('GIT_CONFIG_KEY_1', 'pull.rebase');
+    vi.stubEnv('GIT_CONFIG_VALUE_1', 'true');
+
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
+
+    mockGetPty.mockResolvedValue(null); // Force child_process fallback
+    await ShellExecutionService.execute(
+      'test-cp-headless-git',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      false, // non-interactive
+      shellExecutionConfig,
+    );
+
+    expect(mockCpSpawn).toHaveBeenCalled();
+    const cpEnv = mockCpSpawn.mock.calls[0][2].env;
+    expect(cpEnv).toHaveProperty('GIT_TERMINAL_PROMPT', '0');
+    expect(cpEnv).toHaveProperty('GIT_ASKPASS', '');
+    expect(cpEnv).toHaveProperty('SSH_ASKPASS', '');
+    expect(cpEnv).toHaveProperty('GH_PROMPT_DISABLED', '1');
+    expect(cpEnv).toHaveProperty('GCM_INTERACTIVE', 'never');
+    expect(cpEnv).toHaveProperty('DISPLAY', '');
+    expect(cpEnv).toHaveProperty('DBUS_SESSION_BUS_ADDRESS', '');
+
+    // Existing values should be preserved
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_0', 'core.editor');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_0', 'vim');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_1', 'pull.rebase');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_1', 'true');
+
+    // The new credential.helper override should be appended at index 2
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_COUNT', '3');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_KEY_2', 'credential.helper');
+    expect(cpEnv).toHaveProperty('GIT_CONFIG_VALUE_2', '');
+
+    // Ensure child_process exits
+    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
+    await new Promise(process.nextTick);
+
+    vi.unstubAllEnvs();
+  });
+
+  it('should NOT include headless git and gh environment variables in interactive fallback mode', async () => {
+    vi.resetModules();
+    vi.stubEnv('GIT_TERMINAL_PROMPT', undefined);
+    vi.stubEnv('GIT_ASKPASS', undefined);
+    vi.stubEnv('SSH_ASKPASS', undefined);
+    vi.stubEnv('GH_PROMPT_DISABLED', undefined);
+    vi.stubEnv('GCM_INTERACTIVE', undefined);
+    vi.stubEnv('GIT_CONFIG_COUNT', undefined);
+
+    const { ShellExecutionService } = await import(
+      './shellExecutionService.js'
+    );
+
+    mockGetPty.mockResolvedValue(null); // Force child_process fallback
+    await ShellExecutionService.execute(
+      'test-cp-interactive-fallback',
+      '/',
+      vi.fn(),
+      new AbortController().signal,
+      true, // isInteractive (shouldUseNodePty)
+      shellExecutionConfig,
+    );
+
+    expect(mockCpSpawn).toHaveBeenCalled();
+    const cpEnv = mockCpSpawn.mock.calls[0][2].env;
+    expect(cpEnv).not.toHaveProperty('GIT_TERMINAL_PROMPT');
+    expect(cpEnv).not.toHaveProperty('GIT_ASKPASS');
+    expect(cpEnv).not.toHaveProperty('SSH_ASKPASS');
+    expect(cpEnv).not.toHaveProperty('GH_PROMPT_DISABLED');
+    expect(cpEnv).not.toHaveProperty('GCM_INTERACTIVE');
+    expect(cpEnv).not.toHaveProperty('GIT_CONFIG_COUNT');
+
+    // Ensure child_process exits
+    mockChildProcess.emit('exit', 0, null);
+    mockChildProcess.emit('close', 0, null);
+    await new Promise(process.nextTick);
+
+    vi.unstubAllEnvs();
+  });
 });
