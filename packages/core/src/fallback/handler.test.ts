@@ -44,6 +44,7 @@ vi.mock('../telemetry/index.js', () => ({
 }));
 vi.mock('../utils/secure-browser-launcher.js', () => ({
   openBrowserSecurely: vi.fn(),
+  shouldLaunchBrowser: vi.fn().mockReturnValue(true),
 }));
 
 // Mock debugLogger to prevent console pollution and allow spying
