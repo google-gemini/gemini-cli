@@ -266,7 +266,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
         key: id,
         header: ALL_ITEMS.find((i) => i.id === id)?.header ?? id,
         element: mockData[id],
-        flexGrow: 1,
+        flexGrow: 0,
         isFocused: id === focusKey,
       }));
 
