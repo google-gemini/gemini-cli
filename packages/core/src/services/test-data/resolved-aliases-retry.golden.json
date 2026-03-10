@@ -9,9 +9,6 @@
     "generateContentConfig": {
       "temperature": 1,
       "topP": 0.95,
-      "thinkingConfig": {
-        "includeThoughts": true
-      },
       "topK": 64
     }
   },
@@ -19,22 +16,46 @@
     "generateContentConfig": {
       "temperature": 1,
       "topP": 0.95,
+      "topK": 64,
       "thinkingConfig": {
         "includeThoughts": true,
         "thinkingBudget": 8192
-      },
-      "topK": 64
+      }
     }
   },
   "chat-base-3": {
     "generateContentConfig": {
       "temperature": 1,
       "topP": 0.95,
+      "topK": 64,
       "thinkingConfig": {
         "includeThoughts": true,
         "thinkingLevel": "HIGH"
-      },
-      "topK": 64
+      }
+    }
+  },
+  "gemini-3.1-pro-preview": {
+    "model": "gemini-3.1-pro-preview",
+    "generateContentConfig": {
+      "temperature": 1,
+      "topP": 0.95,
+      "topK": 64,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingLevel": "HIGH"
+      }
+    }
+  },
+  "gemini-3.1-pro-preview-customtools": {
+    "model": "gemini-3.1-pro-preview-customtools",
+    "generateContentConfig": {
+      "temperature": 1,
+      "topP": 0.95,
+      "topK": 64,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingLevel": "HIGH"
+      }
     }
   },
   "gemini-3-pro-preview": {
@@ -42,11 +63,11 @@
     "generateContentConfig": {
       "temperature": 1,
       "topP": 0.95,
+      "topK": 64,
       "thinkingConfig": {
         "includeThoughts": true,
         "thinkingLevel": "HIGH"
-      },
-      "topK": 64
+      }
     }
   },
   "gemini-3-flash-preview": {
@@ -54,11 +75,23 @@
     "generateContentConfig": {
       "temperature": 1,
       "topP": 0.95,
+      "topK": 64,
       "thinkingConfig": {
         "includeThoughts": true,
         "thinkingLevel": "HIGH"
-      },
-      "topK": 64
+      }
+    }
+  },
+  "gemini-3.1-flash-lite-preview": {
+    "model": "gemini-3.1-flash-lite-preview",
+    "generateContentConfig": {
+      "temperature": 1,
+      "topP": 0.95,
+      "topK": 64,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingLevel": "HIGH"
+      }
     }
   },
   "gemini-2.5-pro": {
@@ -66,11 +99,11 @@
     "generateContentConfig": {
       "temperature": 1,
       "topP": 0.95,
+      "topK": 64,
       "thinkingConfig": {
         "includeThoughts": true,
         "thinkingBudget": 8192
-      },
-      "topK": 64
+      }
     }
   },
   "gemini-2.5-flash": {
@@ -78,11 +111,11 @@
     "generateContentConfig": {
       "temperature": 1,
       "topP": 0.95,
+      "topK": 64,
       "thinkingConfig": {
         "includeThoughts": true,
         "thinkingBudget": 8192
-      },
-      "topK": 64
+      }
     }
   },
   "gemini-2.5-flash-lite": {
@@ -90,11 +123,11 @@
     "generateContentConfig": {
       "temperature": 1,
       "topP": 0.95,
+      "topK": 64,
       "thinkingConfig": {
         "includeThoughts": true,
         "thinkingBudget": 8192
-      },
-      "topK": 64
+      }
     }
   },
   "gemini-2.5-flash-base": {
@@ -108,7 +141,11 @@
     "model": "gemini-3-flash-preview",
     "generateContentConfig": {
       "temperature": 0,
-      "topP": 1
+      "topP": 1,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingLevel": "HIGH"
+      }
     }
   },
   "classifier": {
@@ -175,6 +212,10 @@
     "generateContentConfig": {
       "temperature": 0,
       "topP": 1,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingLevel": "HIGH"
+      },
       "tools": [
         {
           "googleSearch": {}
@@ -187,6 +228,10 @@
     "generateContentConfig": {
       "temperature": 0,
       "topP": 1,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingLevel": "HIGH"
+      },
       "tools": [
         {
           "urlContext": {}
@@ -198,14 +243,22 @@
     "model": "gemini-3-flash-preview",
     "generateContentConfig": {
       "temperature": 0,
-      "topP": 1
+      "topP": 1,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingLevel": "HIGH"
+      }
     }
   },
   "loop-detection": {
     "model": "gemini-3-flash-preview",
     "generateContentConfig": {
       "temperature": 0,
-      "topP": 1
+      "topP": 1,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingLevel": "HIGH"
+      }
     }
   },
   "loop-detection-double-check": {
@@ -219,14 +272,22 @@
     "model": "gemini-3-flash-preview",
     "generateContentConfig": {
       "temperature": 0,
-      "topP": 1
+      "topP": 1,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingLevel": "HIGH"
+      }
     }
   },
   "next-speaker-checker": {
     "model": "gemini-3-flash-preview",
     "generateContentConfig": {
       "temperature": 0,
-      "topP": 1
+      "topP": 1,
+      "thinkingConfig": {
+        "includeThoughts": true,
+        "thinkingLevel": "HIGH"
+      }
     }
   },
   "chat-compression-3-pro": {

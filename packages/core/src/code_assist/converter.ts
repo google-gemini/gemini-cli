@@ -164,6 +164,7 @@ function toVertexGenerateContentRequest(
   req: GenerateContentParameters,
   sessionId?: string,
 ): VertexGenerateContentRequest {
+  const generationConfig = toVertexGenerationConfig(req.config);
   return {
     contents: toContents(req.contents),
     systemInstruction: maybeToContent(req.config?.systemInstruction),
@@ -172,7 +173,7 @@ function toVertexGenerateContentRequest(
     toolConfig: req.config?.toolConfig,
     labels: req.config?.labels,
     safetySettings: req.config?.safetySettings,
-    generationConfig: toVertexGenerationConfig(req.config),
+    generationConfig,
     session_id: sessionId,
   };
 }
@@ -247,8 +248,9 @@ function toPart(part: PartUnion): Part {
   // Handle thought parts for CountToken API compatibility
   // The CountToken API expects parts to have certain required "oneof" fields initialized,
   // but thought parts don't conform to this schema and cause API failures
-  if ('thought' in part && part.thought) {
-    const thoughtText = `[Thought: ${part.thought}]`;
+  const thoughtValue = (part as { thought?: unknown }).thought;
+  if ('thought' in part && thoughtValue) {
+    const thoughtText = `[Thought: ${String(thoughtValue)}]`;
 
     const newPart = { ...part };
     delete (newPart as Record<string, unknown>)['thought'];
@@ -287,6 +289,7 @@ function toVertexGenerationConfig(
   if (!config) {
     return undefined;
   }
+
   return {
     temperature: config.temperature,
     topP: config.topP,

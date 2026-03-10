@@ -91,52 +91,44 @@ vi.mock('../ui/commands/initCommand.js', () => ({
     action: vi.fn(),
   },
 }));
-vi.mock(
-  '@google/gemini-cli-core',
-  async (
-    importOriginal: () => Promise<typeof import('@google/gemini-cli-core')>,
-  ) => {
-    const actual = await importOriginal();
-    return {
-      ...actual,
-      ReadManyFilesTool: vi.fn().mockImplementation(() => ({
-        name: 'read_many_files',
-        kind: 'read',
-        build: vi.fn().mockReturnValue({
-          getDescription: () => 'Read files',
-          toolLocations: () => [],
-          execute: vi.fn().mockResolvedValue({
-            llmContent: ['--- file.txt ---\n\nFile content\n\n'],
-          }),
-        }),
-      })),
-      logToolCall: vi.fn(),
-      isWithinRoot: vi.fn().mockReturnValue(true),
-      LlmRole: {
-        MAIN: 'main',
-        SUBAGENT: 'subagent',
-        UTILITY_TOOL: 'utility_tool',
-        UTILITY_COMPRESSOR: 'utility_compressor',
-        UTILITY_SUMMARIZER: 'utility_summarizer',
-        UTILITY_ROUTER: 'utility_router',
-        UTILITY_LOOP_DETECTOR: 'utility_loop_detector',
-        UTILITY_NEXT_SPEAKER: 'utility_next_speaker',
-        UTILITY_EDIT_CORRECTOR: 'utility_edit_corrector',
-        UTILITY_AUTOCOMPLETE: 'utility_autocomplete',
-        UTILITY_FAST_ACK_HELPER: 'utility_fast_ack_helper',
-      },
-      CoreToolCallStatus: {
-        Validating: 'validating',
-        Scheduled: 'scheduled',
-        Error: 'error',
-        Success: 'success',
-        Executing: 'executing',
-        Cancelled: 'cancelled',
-        AwaitingApproval: 'awaiting_approval',
-      },
-    };
+const { actualCore } = await vi.hoisted(async () => {
+  const actual = await import('@google/gemini-cli-core');
+  return { actualCore: actual };
+});
+
+vi.mock('@google/gemini-cli-core', () => ({
+  ...actualCore,
+  ReadManyFilesTool: vi.fn().mockImplementation(() => ({
+    name: 'read_many_files',
+    kind: 'read',
+    build: vi.fn().mockReturnValue({
+      getDescription: () => 'Read files',
+      toolLocations: () => [],
+      execute: vi.fn().mockResolvedValue({
+        llmContent: ['--- file.txt ---\n\nFile content\n\n'],
+      }),
+    }),
+  })),
+  logToolCall: vi.fn(),
+  isWithinRoot: vi.fn().mockReturnValue(true),
+  // Ensure critical enums/objects are present if they were overridden
+  LlmRole: {
+    ...actualCore.LlmRole,
+    MAIN: 'main',
+    SUBAGENT: 'subagent',
+    UTILITY_TOOL: 'utility_tool',
   },
-);
+  CoreToolCallStatus: {
+    ...actualCore.CoreToolCallStatus,
+    Validating: 'validating',
+    Scheduled: 'scheduled',
+    Error: 'error',
+    Success: 'success',
+    Executing: 'executing',
+    Cancelled: 'cancelled',
+    AwaitingApproval: 'awaiting_approval',
+  },
+}));
 
 // Helper to create mock streams
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1587,5 +1579,44 @@ describe('Session', () => {
     });
 
     expect(handleCommandSpy).toHaveBeenCalledWith('/memory', expect.anything());
+  });
+
+  it('should extract and emit plan events from thought chunks', async () => {
+    const stream = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    thought: '- [TODO] First task\n- [x] Done task',
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    ]);
+    mockChat.sendMessageStream.mockResolvedValue(stream);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Hi' }],
+    });
+
+    expect(mockConnection.sessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          sessionUpdate: 'plan',
+          entries: [
+            { content: 'First task', status: 'pending', priority: 'medium' },
+            { content: 'Done task', status: 'completed', priority: 'medium' },
+          ],
+        }),
+      }),
+    );
   });
 });

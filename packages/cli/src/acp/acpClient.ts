@@ -49,6 +49,8 @@ import {
   getDisplayString,
 } from '@google/gemini-cli-core';
 import * as acp from '@agentclientprotocol/sdk';
+import { z } from 'zod';
+import { extractPlanEntries } from './planParser.js';
 import { AcpFileSystemService } from './fileSystemService.js';
 import { getAcpErrorMessage } from './acpErrors.js';
 import { Readable, Writable } from 'node:stream';
@@ -64,7 +66,6 @@ import {
 } from '../config/settings.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { z } from 'zod';
 
 import { randomUUID } from 'node:crypto';
 import { loadCliConfig, type CliArgs } from '../config/config.js';
@@ -716,13 +717,16 @@ export class Session {
           (await this.config.getGemini31Launched?.()) ?? false,
         );
         const responseStream = await chat.sendMessageStream(
-          { model },
+          { model, isChatModel: true },
           nextMessage?.parts ?? [],
           promptId,
           pendingSend.signal,
           LlmRole.MAIN,
         );
         nextMessage = null;
+
+        let currentThoughtTextBuffer = '';
+        let currentTurnPlanStr = '';
 
         for await (const resp of responseStream) {
           if (pendingSend.signal.aborted) {
@@ -736,13 +740,52 @@ export class Session {
           ) {
             const candidate = resp.value.candidates[0];
             for (const part of candidate.content?.parts ?? []) {
-              if (!part.text) {
+              const thoughtValue = (part as { thought?: unknown }).thought;
+              debugLogger.log(
+                `[ACP] Received part: thought=${
+                  thoughtValue ? typeof thoughtValue : 'undefined'
+                }, text=${part.text ? 'present' : 'empty'}`,
+              );
+              if (typeof thoughtValue === 'string') {
+                debugLogger.log(
+                  `[ACP] Thought content: ${thoughtValue.substring(0, 50)}...`,
+                );
+              }
+
+              if (part.thought) {
+                const thoughtSubText =
+                  typeof part.thought === 'string'
+                    ? part.thought
+                    : (part.text ?? '');
+                currentThoughtTextBuffer += thoughtSubText;
+                const entries = extractPlanEntries(currentThoughtTextBuffer);
+                if (entries) {
+                  const newPlanStr = JSON.stringify(entries);
+                  if (newPlanStr !== currentTurnPlanStr) {
+                    currentTurnPlanStr = newPlanStr;
+                    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+                    this.sendUpdate({
+                      sessionUpdate: 'plan',
+                      entries,
+                    });
+                  }
+                }
+              }
+
+              const textToStream =
+                typeof part.thought === 'string'
+                  ? part.thought
+                  : (part.text ?? '');
+
+              if (!textToStream) {
                 continue;
               }
 
               const content: acp.ContentBlock = {
                 type: 'text',
-                text: part.text,
+                text: part.thought
+                  ? textToStream.replace(/\\n/g, '\n')
+                  : textToStream,
               };
 
               // eslint-disable-next-line @typescript-eslint/no-floating-promises

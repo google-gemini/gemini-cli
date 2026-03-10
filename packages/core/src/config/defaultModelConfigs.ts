@@ -25,9 +25,6 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       extends: 'base',
       modelConfig: {
         generateContentConfig: {
-          thinkingConfig: {
-            includeThoughts: true,
-          },
           temperature: 1,
           topP: 0.95,
           topK: 64,
@@ -39,6 +36,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       modelConfig: {
         generateContentConfig: {
           thinkingConfig: {
+            includeThoughts: true,
             thinkingBudget: DEFAULT_THINKING_MODE,
           },
         },
@@ -49,6 +47,7 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       modelConfig: {
         generateContentConfig: {
           thinkingConfig: {
+            includeThoughts: true,
             thinkingLevel: ThinkingLevel.HIGH,
           },
         },
@@ -59,16 +58,64 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
     // ensure these model configs can be used interactively.
     // TODO(joshualitt): Introduce internal base configs for the various models,
     // note: we will have to think carefully about names.
+    'gemini-3.1-pro-preview': {
+      extends: 'chat-base-3',
+      modelConfig: {
+        model: 'gemini-3.1-pro-preview',
+        generateContentConfig: {
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingLevel: ThinkingLevel.HIGH,
+          },
+        },
+      },
+    },
+    'gemini-3.1-pro-preview-customtools': {
+      extends: 'chat-base-3',
+      modelConfig: {
+        model: 'gemini-3.1-pro-preview-customtools',
+        generateContentConfig: {
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingLevel: ThinkingLevel.HIGH,
+          },
+        },
+      },
+    },
     'gemini-3-pro-preview': {
       extends: 'chat-base-3',
       modelConfig: {
         model: 'gemini-3-pro-preview',
+        generateContentConfig: {
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingLevel: ThinkingLevel.HIGH,
+          },
+        },
       },
     },
     'gemini-3-flash-preview': {
       extends: 'chat-base-3',
       modelConfig: {
         model: 'gemini-3-flash-preview',
+        generateContentConfig: {
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingLevel: ThinkingLevel.HIGH,
+          },
+        },
+      },
+    },
+    'gemini-3.1-flash-lite-preview': {
+      extends: 'chat-base-3',
+      modelConfig: {
+        model: 'gemini-3.1-flash-lite-preview',
+        generateContentConfig: {
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingLevel: ThinkingLevel.HIGH,
+          },
+        },
       },
     },
     'gemini-2.5-pro': {
@@ -100,6 +147,12 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       extends: 'base',
       modelConfig: {
         model: 'gemini-3-flash-preview',
+        generateContentConfig: {
+          thinkingConfig: {
+            includeThoughts: true,
+            thinkingLevel: ThinkingLevel.HIGH,
+          },
+        },
       },
     },
     classifier: {

@@ -444,9 +444,6 @@ their corresponding top-level category object in your `settings.json` file.
         "extends": "base",
         "modelConfig": {
           "generateContentConfig": {
-            "thinkingConfig": {
-              "includeThoughts": true
-            },
             "temperature": 1,
             "topP": 0.95,
             "topK": 64
@@ -458,6 +455,7 @@ their corresponding top-level category object in your `settings.json` file.
         "modelConfig": {
           "generateContentConfig": {
             "thinkingConfig": {
+              "includeThoughts": true,
               "thinkingBudget": 8192
             }
           }
@@ -468,6 +466,31 @@ their corresponding top-level category object in your `settings.json` file.
         "modelConfig": {
           "generateContentConfig": {
             "thinkingConfig": {
+              "includeThoughts": true,
+              "thinkingLevel": "HIGH"
+            }
+          }
+        }
+      },
+      "gemini-3.1-pro-preview": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.1-pro-preview",
+          "generateContentConfig": {
+            "thinkingConfig": {
+              "includeThoughts": true,
+              "thinkingLevel": "HIGH"
+            }
+          }
+        }
+      },
+      "gemini-3.1-pro-preview-customtools": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.1-pro-preview-customtools",
+          "generateContentConfig": {
+            "thinkingConfig": {
+              "includeThoughts": true,
               "thinkingLevel": "HIGH"
             }
           }
@@ -476,13 +499,37 @@ their corresponding top-level category object in your `settings.json` file.
       "gemini-3-pro-preview": {
         "extends": "chat-base-3",
         "modelConfig": {
-          "model": "gemini-3-pro-preview"
+          "model": "gemini-3-pro-preview",
+          "generateContentConfig": {
+            "thinkingConfig": {
+              "includeThoughts": true,
+              "thinkingLevel": "HIGH"
+            }
+          }
         }
       },
       "gemini-3-flash-preview": {
         "extends": "chat-base-3",
         "modelConfig": {
-          "model": "gemini-3-flash-preview"
+          "model": "gemini-3-flash-preview",
+          "generateContentConfig": {
+            "thinkingConfig": {
+              "includeThoughts": true,
+              "thinkingLevel": "HIGH"
+            }
+          }
+        }
+      },
+      "gemini-3.1-flash-lite-preview": {
+        "extends": "chat-base-3",
+        "modelConfig": {
+          "model": "gemini-3.1-flash-lite-preview",
+          "generateContentConfig": {
+            "thinkingConfig": {
+              "includeThoughts": true,
+              "thinkingLevel": "HIGH"
+            }
+          }
         }
       },
       "gemini-2.5-pro": {
@@ -512,7 +559,13 @@ their corresponding top-level category object in your `settings.json` file.
       "gemini-3-flash-base": {
         "extends": "base",
         "modelConfig": {
-          "model": "gemini-3-flash-preview"
+          "model": "gemini-3-flash-preview",
+          "generateContentConfig": {
+            "thinkingConfig": {
+              "includeThoughts": true,
+              "thinkingLevel": "HIGH"
+            }
+          }
         }
       },
       "classifier": {

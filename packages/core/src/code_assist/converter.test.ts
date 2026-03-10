@@ -221,6 +221,15 @@ describe('converter', () => {
         frequencyPenalty: 0.8,
         seed: 9,
         responseMimeType: 'application/json',
+        responseSchema: undefined,
+        responseJsonSchema: undefined,
+        routingConfig: undefined,
+        modelSelectionConfig: undefined,
+        responseModalities: undefined,
+        mediaResolution: undefined,
+        speechConfig: undefined,
+        audioTimestamp: undefined,
+        thinkingConfig: undefined,
       });
     });
   });
