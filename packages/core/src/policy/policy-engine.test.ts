@@ -41,6 +41,11 @@ vi.mock('../utils/shell-utils.js', async (importOriginal) => {
         // Simple mock: true if '>' is present, unless it looks like "-> arrow"
         command.includes('>') && !command.includes('-> arrow'),
     ),
+    getCanonicalCommand: vi.fn().mockImplementation((command: string) => {
+      if (command === 'ls') return '/usr/bin/ls';
+      if (command === 'git status') return '/usr/bin/git status';
+      return command;
+    }),
   };
 });
 
@@ -1255,12 +1260,59 @@ describe('PolicyEngine', () => {
 
       engine = new PolicyEngine({ rules });
 
-      // "git status && ls" matches the catch-all ASK_USER rule initially.
       // But since both parts are explicitly ALLOWed, the result should be upgraded to ALLOW.
       const result = await engine.check(
         {
           name: 'run_shell_command',
           args: { command: 'git status && ls' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should match canonical command path if rule uses it', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          // Rule uses absolute path
+          argsPattern: /"command":"\/usr\/bin\/ls/,
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      // Call uses raw command "ls".
+      // Our mock getCanonicalCommand returns "/usr/bin/ls" for "ls".
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'ls' },
+        },
+        undefined,
+      );
+
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should match raw command if rule uses it (backward compatibility)', async () => {
+      const rules: PolicyRule[] = [
+        {
+          toolName: 'run_shell_command',
+          // Rule uses raw prefix
+          argsPattern: /"command":"ls/,
+          decision: PolicyDecision.ALLOW,
+        },
+      ];
+
+      engine = new PolicyEngine({ rules });
+
+      const result = await engine.check(
+        {
+          name: 'run_shell_command',
+          args: { command: 'ls' },
         },
         undefined,
       );

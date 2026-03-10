@@ -40,8 +40,23 @@ vi.mock('node:os', async (importOriginal) => {
 });
 vi.mock('crypto');
 vi.mock('../utils/summarizer.js');
+vi.mock('../utils/shell-utils.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../utils/shell-utils.js')>();
+  return {
+    ...actual,
+    initializeShellParsers: vi.fn().mockResolvedValue(undefined),
+    getCanonicalCommandRoots: vi.fn().mockImplementation((cmd) => {
+      if (cmd === 'ls') return ['/usr/bin/ls'];
+      return [cmd];
+    }),
+  };
+});
 
-import { initializeShellParsers } from '../utils/shell-utils.js';
+import {
+  initializeShellParsers,
+  getCanonicalCommandRoots,
+} from '../utils/shell-utils.js';
 import { ShellTool, OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
 import { debugLogger } from '../index.js';
 import { type Config } from '../config/config.js';
@@ -821,6 +836,20 @@ describe('ShellTool', () => {
       if (details && details.type === 'exec') {
         expect(details.rootCommand).toBe('ls, grep');
       }
+    });
+
+    it('should propose canonical paths for permanent policies', async () => {
+      const bus = createMockMessageBus();
+      const shellTool = new ShellTool(mockConfig, bus);
+      const command = 'ls';
+      const invocation = shellTool.build({ command });
+
+      // Mock getCanonicalCommandRoots is already set up to return ['/usr/bin/ls'] for 'ls'
+      // @ts-expect-error - getPolicyUpdateOptions is protected
+      const options = await invocation.getPolicyUpdateOptions(ToolConfirmationOutcome.ProceedAlwaysAndSave);
+
+      expect(options).toEqual({ commandPrefix: ['/usr/bin/ls'] });
+      expect(getCanonicalCommandRoots).toHaveBeenCalledWith('ls', tempRootDir);
     });
   });
 

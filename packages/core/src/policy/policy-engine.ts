@@ -5,6 +5,7 @@
  */
 
 import { type FunctionCall } from '@google/genai';
+import path from 'node:path';
 import {
   PolicyDecision,
   type PolicyEngineConfig,
@@ -23,6 +24,7 @@ import {
   initializeShellParsers,
   splitCommands,
   hasRedirection,
+  getCanonicalCommand,
 } from '../utils/shell-utils.js';
 import { getToolAliases } from '../tools/tool-names.js';
 import {
@@ -156,6 +158,7 @@ export class PolicyEngine {
   private readonly nonInteractive: boolean;
   private readonly checkerRunner?: CheckerRunner;
   private approvalMode: ApprovalMode;
+  private readonly targetDir?: string;
 
   constructor(config: PolicyEngineConfig = {}, checkerRunner?: CheckerRunner) {
     this.rules = (config.rules ?? []).sort(
@@ -171,6 +174,7 @@ export class PolicyEngine {
     this.nonInteractive = config.nonInteractive ?? false;
     this.checkerRunner = checkerRunner;
     this.approvalMode = config.approvalMode ?? ApprovalMode.DEFAULT;
+    this.targetDir = config.targetDir;
   }
 
   /**
@@ -380,18 +384,8 @@ export class PolicyEngine {
       }
     }
 
-    let stringifiedArgs: string | undefined;
-    // Compute stringified args once before the loop
-    if (
-      toolCall.args &&
-      (this.rules.some((rule) => rule.argsPattern) ||
-        this.checkers.some((checker) => checker.argsPattern))
-    ) {
-      stringifiedArgs = stableStringify(toolCall.args);
-    }
-
     debugLogger.debug(
-      `[PolicyEngine.check] toolCall.name: ${toolCall.name}, stringifiedArgs: ${stringifiedArgs}`,
+      `[PolicyEngine.check] toolCall.name: ${toolCall.name}`,
     );
 
     // Check for shell commands upfront to handle splitting
@@ -409,24 +403,64 @@ export class PolicyEngine {
       shellDirPath = args?.dir_path;
     }
 
+    // Resolve effective directory for shell tools to aid canonicalization.
+    let resolvedShellCwd: string | undefined;
+    if (isShellCommand) {
+      if (this.targetDir) {
+        resolvedShellCwd = shellDirPath
+          ? path.resolve(this.targetDir, shellDirPath)
+          : this.targetDir;
+      } else {
+        resolvedShellCwd = shellDirPath
+          ? path.resolve(process.cwd(), shellDirPath)
+          : process.cwd();
+      }
+    }
+
+    const canonicalCommand =
+      isShellCommand && command
+        ? await getCanonicalCommand(command, resolvedShellCwd)
+        : undefined;
+
+    // Prepare variations of the tool call to try against rules.
+    // For shell tools, we try both the raw command and its canonical path version.
+    const toolNamesToTry = toolCall.name ? getToolAliases(toolCall.name) : [];
+    const variations: Array<{ tc: FunctionCall; argsStr: string | undefined }> =
+      [];
+
+    const needsArgsString =
+      this.rules.some((rule) => rule.argsPattern) ||
+      this.checkers.some((checker) => checker.argsPattern);
+
+    for (const name of toolNamesToTry) {
+      const tc = { ...toolCall, name };
+      variations.push({
+        tc,
+        argsStr: needsArgsString ? stableStringify(tc.args) : undefined,
+      });
+
+      if (canonicalCommand && canonicalCommand !== command) {
+        const canonicalTc = {
+          ...tc,
+          args: { ...tc.args, command: canonicalCommand },
+        };
+        variations.push({
+          tc: canonicalTc,
+          argsStr: stableStringify(canonicalTc.args),
+        });
+      }
+    }
+
     // Find the first matching rule (already sorted by priority)
     let matchedRule: PolicyRule | undefined;
     let decision: PolicyDecision | undefined;
 
-    // We also want to check legacy aliases for the tool name.
-    const toolNamesToTry = toolCall.name ? getToolAliases(toolCall.name) : [];
-
-    const toolCallsToTry: FunctionCall[] = [];
-    for (const name of toolNamesToTry) {
-      toolCallsToTry.push({ ...toolCall, name });
-    }
-
     for (const rule of this.rules) {
-      const match = toolCallsToTry.some((tc) =>
+      const match = variations.find((v) =>
         ruleMatches(
           rule,
-          tc,
-          stringifiedArgs,
+          v.tc,
+          v.argsStr,
           serverName,
           this.approvalMode,
           toolAnnotations,
@@ -491,23 +525,25 @@ export class PolicyEngine {
     // Safety checks
     if (decision !== PolicyDecision.DENY && this.checkerRunner) {
       for (const checkerRule of this.checkers) {
-        if (
+        const match = variations.find((v) =>
           ruleMatches(
             checkerRule,
-            toolCall,
-            stringifiedArgs,
+            v.tc,
+            v.argsStr,
             serverName,
             this.approvalMode,
             toolAnnotations,
             subagent,
-          )
-        ) {
+          ),
+        );
+
+        if (match) {
           debugLogger.debug(
             `[PolicyEngine.check] Running safety checker: ${checkerRule.checker.name}`,
           );
           try {
             const result = await this.checkerRunner.runChecker(
-              toolCall,
+              match.tc,
               checkerRule.checker,
             );
             if (result.decision === SafetyCheckDecision.DENY) {

@@ -167,7 +167,13 @@ A rule matches a tool call if all of its conditions are met:
     - **Wildcards**: You can use wildcards like `*`, `server__*`, or
       `*__toolName` to match multiple tools. See [Tool Name](#tool-name) for
       details.
-2.  **Arguments pattern**: If `argsPattern` is specified, the tool's arguments
+2.  **Canonical Shell Commands**: For `run_shell_command`, the engine
+    automatically resolves commands to their canonical (absolute) paths (e.g.,
+    resolving `ls` to `/usr/bin/ls`) before matching. Rules are checked against
+    **both** the raw command and its canonical path. This provides enhanced
+    security by preventing path-based bypasses while maintaining backward
+    compatibility with rules that use raw command names.
+3.  **Arguments pattern**: If `argsPattern` is specified, the tool's arguments
     are converted to a stable JSON string, which is then tested against the
     provided regular expression. If the arguments don't match the pattern, the
     rule does not apply.

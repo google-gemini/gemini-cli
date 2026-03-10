@@ -565,4 +565,79 @@ describe('resolveExecutable', () => {
 
     expect(await resolveExecutable('unknown')).toBeUndefined();
   });
+
+  it('should resolve relative path with cwd', async () => {
+    const cwd = path.resolve('/my/project');
+    const relativeExe = './scripts/test.sh';
+    const absoluteExe = path.join(cwd, relativeExe);
+
+    mockAccess.mockImplementation(async (p: string) => {
+      if (p === absoluteExe) return undefined;
+      throw new Error('ENOENT');
+    });
+
+    expect(await resolveExecutable(relativeExe, cwd)).toBe(absoluteExe);
+  });
+});
+
+describe('getCanonicalCommand and getCanonicalCommandRoots', () => {
+  beforeEach(() => {
+    mockPlatform.mockReturnValue('linux');
+    mockAccess.mockReset();
+  });
+
+  it('should canonicalize simple command', async () => {
+    const usrBin = path.resolve('/usr/bin');
+    const gitPath = path.join(usrBin, 'git');
+    process.env['PATH'] = usrBin;
+
+    mockAccess.mockImplementation(async (p: string) => {
+      if (p === gitPath) return undefined;
+      throw new Error('ENOENT');
+    });
+
+    expect(await getCanonicalCommand('git status')).toBe(`${gitPath} status`);
+    expect(await getCanonicalCommandRoots('git status')).toEqual([gitPath]);
+  });
+
+  it('should canonicalize relative path command', async () => {
+    const cwd = path.resolve('/my/project');
+    const relativeExe = './bin/foo';
+    const absoluteExe = path.join(cwd, relativeExe);
+
+    mockAccess.mockImplementation(async (p: string) => {
+      if (p === absoluteExe) return undefined;
+      throw new Error('ENOENT');
+    });
+
+    expect(await getCanonicalCommand(relativeExe + ' --help', cwd)).toBe(
+      `${absoluteExe} --help`,
+    );
+    expect(await getCanonicalCommandRoots(relativeExe, cwd)).toEqual([
+      absoluteExe,
+    ]);
+  });
+
+  it('should return raw roots if resolution fails', async () => {
+    mockAccess.mockRejectedValue(new Error('ENOENT'));
+    expect(await getCanonicalCommandRoots('unknown --cmd')).toEqual(['unknown']);
+  });
+
+  it('should canonicalize roots in complex command', async () => {
+    const bin = path.resolve('/bin');
+    const catPath = path.join(bin, 'cat');
+    const grepPath = path.join(bin, 'grep');
+    process.env['PATH'] = bin;
+
+    mockAccess.mockImplementation(async (p: string) => {
+      if (p === catPath || p === grepPath) return undefined;
+      throw new Error('ENOENT');
+    });
+
+    // Note: getCanonicalCommandRoots returns all unique executables
+    const roots = await getCanonicalCommandRoots('cat file.txt | grep foo');
+    expect(roots).toContain(catPath);
+    expect(roots).toContain(grepPath);
+    expect(roots.length).toBe(2);
+  });
 });

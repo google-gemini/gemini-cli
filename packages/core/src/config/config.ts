@@ -991,6 +991,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.policyEngine = new PolicyEngine(
       {
         ...params.policyEngineConfig,
+        targetDir: this.targetDir,
         approvalMode:
           params.approvalMode ?? params.policyEngineConfig?.approvalMode,
       },
