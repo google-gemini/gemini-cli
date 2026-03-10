@@ -300,7 +300,7 @@ describe('SettingsDialog', () => {
       renderResult.unmount();
     });
 
-    it('should explain the scope marker in the help text', async () => {
+    it('should explain the scope marker in the title', async () => {
       const settings = createMockSettings();
       const onSelect = vi.fn();
 
