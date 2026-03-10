@@ -247,7 +247,6 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
             ],
             placeholder: 'Type your feedback...',
             multiSelect: false,
-            unconstrainedHeight: true,
           },
         ]}
         onSubmit={(answers) => {

@@ -1387,11 +1387,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   // Compute available terminal height based on controls measurement
   const availableTerminalHeight = Math.max(
     0,
-    terminalHeight -
-      controlsHeight -
-      staticExtraHeight -
-      2 -
-      backgroundShellHeight,
+    terminalHeight - controlsHeight - backgroundShellHeight - 1,
   );
 
   config.setShellExecutionConfig({
