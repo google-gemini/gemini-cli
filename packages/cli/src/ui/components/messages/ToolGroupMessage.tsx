@@ -141,11 +141,15 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   const contentWidth = terminalWidth - TOOL_MESSAGE_HORIZONTAL_MARGIN;
 
-  // If all tools are filtered out (e.g., in-progress AskUser tools, confirming tools),
-  // only render if we need to close a border from previous
-  // tool groups. borderBottomOverride=true means we must render the closing border;
-  // undefined or false means there's nothing to display.
-  if (visibleToolCalls.length === 0 && borderBottomOverride !== true) {
+  // If all tools are filtered out (e.g., in-progress AskUser tools, low-verbosity
+  // internal errors, plan-mode hidden write/edit), we should not emit standalone
+  // border fragments. The only case where an empty group should render is the
+  // explicit "closing slice" (tools: []) used to bridge static/pending sections.
+  const isExplicitClosingSlice = allToolCalls.length === 0;
+  if (
+    visibleToolCalls.length === 0 &&
+    (!isExplicitClosingSlice || borderBottomOverride !== true)
+  ) {
     return null;
   }
 
