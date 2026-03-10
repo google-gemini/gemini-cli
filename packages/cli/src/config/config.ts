@@ -147,6 +147,7 @@ export async function parseArguments(
           description: 'Run in sandbox?',
         })
         .option('profile', {
+          alias: ['profiles', 'P'],
           type: 'string',
           nargs: 1,
           description: 'The name of the profile to use for this session.',
