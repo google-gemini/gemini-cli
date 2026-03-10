@@ -749,7 +749,7 @@ their corresponding top-level category object in your `settings.json` file.
       },
       "auto": {
         "tier": "auto",
-        "isPreview": false,
+        "isPreview": true,
         "isAuto": true,
         "features": {
           "thinking": true,
