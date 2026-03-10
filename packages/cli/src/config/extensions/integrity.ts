@@ -18,6 +18,8 @@ import {
   type ExtensionInstallMetadata,
   KeychainService,
   isNodeError,
+  debugLogger,
+  getErrorMessage,
 } from '@google/gemini-cli-core';
 import {
   INTEGRITY_FILENAME,
@@ -104,40 +106,79 @@ export class ExtensionIntegrityManager {
     }
 
     try {
-      // Load and verify the centralized store first
       const store = await this.loadAndVerifyIntegrityStore();
+      const extensionRecord = store[extensionName];
 
-      if (!store[extensionName]) {
+      if (!extensionRecord) {
         return IntegrityDataStatus.MISSING;
       }
 
-      // Verify that the current metadata's hash matches the recorded hash
-      const integrity = store[extensionName];
       const actualHash = this.generateHash(metadata);
-      const expectedHash = integrity.hash;
 
-      if (!this.verifyConstantTime(actualHash, expectedHash)) {
+      if (
+        !this.validateMetadataHash(
+          extensionName,
+          actualHash,
+          extensionRecord.hash,
+        )
+      ) {
         return IntegrityDataStatus.INVALID;
       }
 
-      // Verify that the recorded signature matches the current hash
-      // This ensures that the recorded hash itself was not modified
-      // (even though the store signature also covers this).
-      const actualSignature = integrity.signature;
-      const expectedSignature = await this.generateSignature(actualHash);
+      if (
+        !(await this.validateMetadataSignature(
+          extensionName,
+          actualHash,
+          extensionRecord.signature,
+        ))
+      ) {
+        return IntegrityDataStatus.INVALID;
+      }
 
-      const isAuthentic = this.verifyConstantTime(
-        actualSignature,
-        expectedSignature,
+      return IntegrityDataStatus.VERIFIED;
+    } catch (e) {
+      debugLogger.warn(
+        `Error verifying integrity for "${extensionName}": ${getErrorMessage(e)}`,
       );
-
-      return isAuthentic
-        ? IntegrityDataStatus.VERIFIED
-        : IntegrityDataStatus.INVALID;
-    } catch (_) {
-      // If we cannot load or verify the store, we treat the extension as unverified.
       return IntegrityDataStatus.INVALID;
     }
+  }
+
+  /**
+   * Compares the actual hash of the metadata against the recorded value.
+   */
+  private validateMetadataHash(
+    extensionName: string,
+    actualHash: string,
+    expectedHash: string,
+  ): boolean {
+    if (!this.verifyConstantTime(actualHash, expectedHash)) {
+      debugLogger.warn(
+        `Integrity mismatch for "${extensionName}": Metadata hash does not match recorded value.`,
+      );
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Generates a signature for the actual hash and compares it against the
+   * recorded signature to ensure the record has not been tampered with.
+   */
+  private async validateMetadataSignature(
+    extensionName: string,
+    actualHash: string,
+    actualSignature: string,
+  ): Promise<boolean> {
+    const expectedSignature = await this.generateSignature(actualHash);
+
+    if (!this.verifyConstantTime(actualSignature, expectedSignature)) {
+      debugLogger.warn(
+        `Integrity mismatch for "${extensionName}": Metadata signature is invalid.`,
+      );
+      return false;
+    }
+    return true;
   }
 
   /**
