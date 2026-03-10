@@ -36,7 +36,7 @@ describe('generate-keybindings-doc', () => {
           },
           {
             description: 'Submit with Enter if no modifiers are held.',
-            bindings: [{ key: 'return', shift: false, ctrl: false }],
+            bindings: [{ key: 'enter', shift: false, ctrl: false }],
           },
         ],
       },

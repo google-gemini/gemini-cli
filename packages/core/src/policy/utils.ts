@@ -63,16 +63,22 @@ export function buildArgsPatterns(
       ? commandPrefix
       : [commandPrefix];
 
-    // Expand command prefixes to multiple patterns.
-    // We append [\\s"] to ensure we match whole words only (e.g., "git" but not
-    // "github"). Since we match against JSON stringified args, the value is
-    // always followed by a space or a closing quote.
     return prefixes.map((prefix) => {
-      const jsonPrefix = JSON.stringify(prefix).slice(1, -1);
+      // JSON.stringify safely encodes the prefix in quotes.
+      // We remove ONLY the trailing quote to match it as an open prefix string.
+      const encodedPrefix = JSON.stringify(prefix);
+      const openQuotePrefix = encodedPrefix.substring(
+        0,
+        encodedPrefix.length - 1,
+      );
+
+      // Escape the exact JSON literal segment we expect to see
+      const matchSegment = escapeRegex(`"command":${openQuotePrefix}`);
+
       // We allow [\s], ["], or the specific sequence [\"] (for escaped quotes
       // in JSON). We do NOT allow generic [\\], which would match "git\status"
       // -> "gitstatus".
-      return `"command":"${escapeRegex(jsonPrefix)}(?:[\\s"]|\\\\")`;
+      return `${matchSegment}(?:[\\s"]|\\\\")`;
     });
   }
 
@@ -81,4 +87,31 @@ export function buildArgsPatterns(
   }
 
   return [argsPattern];
+}
+
+/**
+ * Builds a regex pattern to match a specific file path in tool arguments.
+ * This is used to narrow tool approvals for edit tools to specific files.
+ *
+ * @param filePath The relative path to the file.
+ * @returns A regex string that matches "file_path":"<path>" in a JSON string.
+ */
+export function buildFilePathArgsPattern(filePath: string): string {
+  // JSON.stringify safely encodes the path (handling quotes, backslashes, etc)
+  // and wraps it in double quotes. We simply prepend the key name and escape
+  // the entire sequence for Regex matching without any slicing.
+  const encodedPath = JSON.stringify(filePath);
+  return escapeRegex(`"file_path":${encodedPath}`);
+}
+
+/**
+ * Builds a regex pattern to match a specific "pattern" in tool arguments.
+ * This is used to narrow tool approvals for search tools like glob/grep to specific patterns.
+ *
+ * @param pattern The pattern to match.
+ * @returns A regex string that matches "pattern":"<pattern>" in a JSON string.
+ */
+export function buildPatternArgsPattern(pattern: string): string {
+  const encodedPattern = JSON.stringify(pattern);
+  return escapeRegex(`"pattern":${encodedPattern}`);
 }

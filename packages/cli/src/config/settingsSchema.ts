@@ -1496,6 +1496,18 @@ const SETTINGS_SCHEMA = {
           'Enable the "Allow for all future sessions" option in tool confirmation dialogs.',
         showInDialog: true,
       },
+      autoAddToPolicyByDefault: {
+        type: 'boolean',
+        label: 'Auto-add to Policy by Default',
+        category: 'Security',
+        requiresRestart: false,
+        default: false,
+        description: oneLine`
+          When enabled, the "Allow for all future sessions" option becomes the
+          default choice for low-risk tools in trusted workspaces.
+        `,
+        showInDialog: true,
+      },
       blockGitExtensions: {
         type: 'boolean',
         label: 'Blocks extensions from Git',
@@ -1823,8 +1835,8 @@ const SETTINGS_SCHEMA = {
         label: 'Plan',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
-        description: 'Enable planning features (Plan Mode and tools).',
+        default: true,
+        description: 'Enable Plan Mode.',
         showInDialog: true,
       },
       taskTracker: {

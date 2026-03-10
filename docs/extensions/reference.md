@@ -123,6 +123,7 @@ The manifest file defines the extension's behavior and configuration.
   },
   "contextFileName": "GEMINI.md",
   "excludeTools": ["run_shell_command"],
+  "migratedTo": "https://github.com/new-owner/new-extension-repo",
   "plan": {
     "directory": ".gemini/plans"
   }
