@@ -24,6 +24,7 @@ import {
 } from '../utils/terminalSerializer.js';
 import { type EnvironmentSanitizationConfig } from './environmentSanitization.js';
 import { type SandboxManager } from './sandboxManager.js';
+import type { SandboxConfig } from '../config/config.js';
 import { killProcessGroup } from '../utils/process-utils.js';
 const { Terminal } = pkg;
 
@@ -101,6 +102,7 @@ export interface ShellExecutionConfig {
   defaultBg?: string;
   sanitizationConfig: EnvironmentSanitizationConfig;
   sandboxManager: SandboxManager;
+  sandboxConfig?: SandboxConfig;
   // Used for testing
   disableDynamicLineTrimming?: boolean;
   scrollback?: number;
@@ -308,6 +310,8 @@ export class ShellExecutionService {
       env,
       config: {
         sanitizationConfig: shellExecutionConfig.sanitizationConfig,
+        allowedPaths: shellExecutionConfig.sandboxConfig?.allowedPaths,
+        networkAccess: shellExecutionConfig.sandboxConfig?.networkAccess,
       },
     });
   }

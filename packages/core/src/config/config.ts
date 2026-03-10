@@ -6,6 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import { inspect } from 'node:util';
 import process from 'node:process';
 import { z } from 'zod';
@@ -45,6 +46,7 @@ import {
   NoopSandboxManager,
   type SandboxManager,
 } from '../services/sandboxManager.js';
+import { WindowsSandboxManager } from '../services/windowsSandboxManager.js';
 import {
   initializeTelemetry,
   DEFAULT_TELEMETRY_TARGET,
@@ -74,6 +76,7 @@ import {
   StandardFileSystemService,
   type FileSystemService,
 } from '../services/fileSystemService.js';
+import { SandboxedFileSystemService } from '../services/sandboxedFileSystemService.js';
 import {
   TrackerCreateTaskTool,
   TrackerUpdateTaskTool,
@@ -454,7 +457,7 @@ export interface SandboxConfig {
   enabled: boolean;
   allowedPaths: string[];
   networkAccess: boolean;
-  command?: 'docker' | 'podman' | 'sandbox-exec' | 'runsc' | 'lxc';
+  command?: 'docker' | 'podman' | 'sandbox-exec' | 'runsc' | 'lxc' | 'windows-native';
   image?: string;
 }
 
@@ -465,7 +468,7 @@ export const ConfigSchema = z.object({
       allowedPaths: z.array(z.string()).default([]),
       networkAccess: z.boolean().default(false),
       command: z
-        .enum(['docker', 'podman', 'sandbox-exec', 'runsc', 'lxc'])
+        .enum(['docker', 'podman', 'sandbox-exec', 'runsc', 'lxc', 'windows-native'])
         .optional(),
       image: z.string().optional(),
     })
@@ -835,7 +838,6 @@ export class Config implements McpContext, AgentLoopContext {
     this.approvedPlanPath = undefined;
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
-    this.fileSystemService = new StandardFileSystemService();
     this.sandbox = params.sandbox
       ? {
           enabled: params.sandbox.enabled ?? false,
@@ -979,6 +981,7 @@ export class Config implements McpContext, AgentLoopContext {
       pager: params.shellExecutionConfig?.pager ?? 'cat',
       sanitizationConfig: this.sanitizationConfig,
       sandboxManager: this.sandboxManager,
+      sandboxConfig: this.sandbox,
     };
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
@@ -1094,7 +1097,24 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
     this._geminiClient = new GeminiClient(this);
-    this._sandboxManager = new NoopSandboxManager();
+    if (
+      os.platform() === 'win32' &&
+      (this.sandbox?.enabled || this.sandbox?.command === 'windows-native')
+    ) {
+      this._sandboxManager = new WindowsSandboxManager();
+    } else {
+      this._sandboxManager = new NoopSandboxManager();
+    }
+
+    if (this.sandbox?.enabled && this._sandboxManager) {
+      this.fileSystemService = new SandboxedFileSystemService(
+        this._sandboxManager,
+        this.cwd,
+      );
+    } else {
+      this.fileSystemService = new StandardFileSystemService();
+    }
+
     this.shellExecutionConfig.sandboxManager = this._sandboxManager;
     this.modelRouterService = new ModelRouterService(this);
 

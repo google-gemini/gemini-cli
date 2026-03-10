@@ -29,6 +29,7 @@ const VALID_SANDBOX_COMMANDS: ReadonlyArray<SandboxConfig['command']> = [
   'sandbox-exec',
   'runsc',
   'lxc',
+  'windows-native',
 ];
 
 function isSandboxCommand(
@@ -95,6 +96,8 @@ function getSandboxCommand(
   // note: runsc is NOT auto-detected, it must be explicitly specified
   if (os.platform() === 'darwin' && commandExists.sync('sandbox-exec')) {
     return 'sandbox-exec';
+  } else if (os.platform() === 'win32') {
+    return 'windows-native';
   } else if (commandExists.sync('docker') && sandbox === true) {
     return 'docker';
   } else if (commandExists.sync('podman') && sandbox === true) {
@@ -128,7 +131,8 @@ export async function loadSandboxConfig(
     process.env['GEMINI_SANDBOX_IMAGE_DEFAULT'] ??
     packageJson?.config?.sandboxImageUri;
 
-  return command && image
+  return command &&
+    (image || command === 'sandbox-exec' || command === 'windows-native')
     ? { enabled: true, allowedPaths: [], networkAccess: false, command, image }
     : undefined;
 }
