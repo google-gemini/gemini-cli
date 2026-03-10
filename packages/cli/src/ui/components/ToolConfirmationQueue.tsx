@@ -55,24 +55,12 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
   // Safety check: ToolConfirmationMessage requires confirmationDetails
   if (!tool.confirmationDetails) return null;
 
-  const isExitPlanMode = tool.confirmationDetails.type === 'exit_plan_mode';
-
   // Render up to 100% of the available terminal height (minus 1 line for safety)
   // to maximize space for diffs and other content.
-  let maxHeight =
+  const maxHeight =
     uiAvailableHeight !== undefined
       ? Math.max(uiAvailableHeight - 1, 4)
       : Math.floor(terminalHeight * 0.5);
-
-  if (isExitPlanMode && uiAvailableHeight !== undefined) {
-    // For exit plan mode, we want to cover almost everything except 1 line of history.
-    // Based on the calculation of availableTerminalHeight in AppContainer.tsx:
-    // availableTerminalHeight = terminalHeight - controlsHeight - staticExtraHeight - 2 - backgroundShellHeight
-    // where staticExtraHeight = 3.
-    // So, terminalHeight - controlsHeight - backgroundShellHeight - 1 (the space we want to take)
-    // is equal to availableTerminalHeight + 3 + 2 - 1 = availableTerminalHeight + 4.
-    maxHeight = Math.max(uiAvailableHeight + 4, 4);
-  }
 
   const isRoutine =
     tool.confirmationDetails?.type === 'ask_user' ||
