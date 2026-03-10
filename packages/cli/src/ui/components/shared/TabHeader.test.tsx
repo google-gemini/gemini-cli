@@ -173,6 +173,28 @@ describe('TabHeader', () => {
       unmount();
     });
 
+    it('truncates long headers when not selected', async () => {
+      const longTabs: Tab[] = [
+        { key: '0', header: 'ThisIsAVeryLongHeaderThatShouldBeTruncated' },
+        { key: '1', header: 'AnotherVeryLongHeader' },
+      ];
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <TabHeader tabs={longTabs} currentIndex={0} />,
+      );
+      await waitUntilReady();
+      const frame = lastFrame();
+
+      // Current tab (index 0) should NOT be truncated
+      expect(frame).toContain('ThisIsAVeryLongHeaderThatShouldBeTruncated');
+
+      // Inactive tab (index 1) SHOULD be truncated to 16 chars (15 chars + …)
+      const expectedTruncated = 'AnotherVeryLong…';
+      expect(frame).toContain(expectedTruncated);
+      expect(frame).not.toContain('AnotherVeryLongHeader');
+
+      unmount();
+    });
+
     it('falls back to default when renderStatusIcon returns undefined', async () => {
       const renderStatusIcon = () => undefined;
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(

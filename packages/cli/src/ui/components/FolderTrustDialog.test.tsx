@@ -7,7 +7,7 @@
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { act } from 'react';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
 import { ExitCodes } from '@google/gemini-cli-core';
 import * as processUtils from '../../utils/processUtils.js';
@@ -246,7 +246,9 @@ describe('FolderTrustDialog', () => {
 
   it('should call relaunchApp when isRestarting is true', async () => {
     vi.useFakeTimers();
-    const relaunchApp = vi.spyOn(processUtils, 'relaunchApp');
+    const relaunchApp = vi
+      .spyOn(processUtils, 'relaunchApp')
+      .mockResolvedValue(undefined);
     const { waitUntilReady, unmount } = renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
     );
@@ -259,7 +261,9 @@ describe('FolderTrustDialog', () => {
 
   it('should not call relaunchApp if unmounted before timeout', async () => {
     vi.useFakeTimers();
-    const relaunchApp = vi.spyOn(processUtils, 'relaunchApp');
+    const relaunchApp = vi
+      .spyOn(processUtils, 'relaunchApp')
+      .mockResolvedValue(undefined);
     const { waitUntilReady, unmount } = renderWithProviders(
       <FolderTrustDialog onSelect={vi.fn()} isRestarting={true} />,
     );
