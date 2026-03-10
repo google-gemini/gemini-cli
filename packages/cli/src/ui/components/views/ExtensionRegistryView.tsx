@@ -255,9 +255,9 @@ export function ExtensionRegistryView({
         <ExtensionDetails
           extension={selectedExtension}
           onBack={handleBack}
-          onInstall={(requestConsentOverride) =>
-            handleInstall(selectedExtension, requestConsentOverride)
-          }
+          onInstall={async (requestConsentOverride) => {
+            await handleInstall(selectedExtension, requestConsentOverride);
+          }}
           isInstalled={installedExtensions.some(
             (e) => e.name === selectedExtension.extensionName,
           )}

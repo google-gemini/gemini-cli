@@ -108,12 +108,16 @@ describe('ExtensionDetails', () => {
   });
 
   it('should NOT call onInstall when Enter is pressed and already installed', async () => {
+    vi.useFakeTimers();
     const { stdin } = renderDetails(true);
     await React.act(async () => {
       stdin.write('\r'); // Enter
     });
-    // Wait a bit to ensure it's not called
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Advance timers to trigger the keypress flush
+    await React.act(async () => {
+      vi.runAllTimers();
+    });
     expect(mockOnInstall).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 });

@@ -5,6 +5,7 @@
  */
 
 import type React from 'react';
+import { useState } from 'react';
 import { Box, Text } from 'ink';
 import type { RegistryExtension } from '../../../config/extensionRegistryClient.js';
 import { useKeypress } from '../../hooks/useKeypress.js';
@@ -17,11 +18,9 @@ export interface ExtensionDetailsProps {
   onBack: () => void;
   onInstall: (
     requestConsentOverride: (consent: string) => Promise<boolean>,
-  ) => void;
+  ) => void | Promise<void>;
   isInstalled: boolean;
 }
-
-import { useState } from 'react';
 
 export function ExtensionDetails({
   extension,
@@ -59,7 +58,7 @@ export function ExtensionDetails({
       }
       if (keyMatchers[Command.RETURN](key) && !isInstalled && !isInstalling) {
         setIsInstalling(true);
-        onInstall(
+        void onInstall(
           (prompt: string) =>
             new Promise((resolve) => {
               setConsentRequest({ prompt, resolve });
