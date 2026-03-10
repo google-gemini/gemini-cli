@@ -7,8 +7,8 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { formatCommand } from '../utils/keybindingUtils.js';
-import { Command } from '../../config/keyBindings.js';
+import { formatCommand } from '../key/keybindingUtils.js';
+import { Command } from '../key/keyBindings.js';
 
 export const RawMarkdownIndicator: React.FC = () => {
   const modKey = formatCommand(Command.TOGGLE_MARKDOWN);

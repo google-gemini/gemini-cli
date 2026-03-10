@@ -12,7 +12,9 @@ import {
   type ToolInvocation,
   type ToolResult,
   type ToolConfirmationOutcome,
+  type PolicyUpdateOptions,
 } from './tools.js';
+import { buildPatternArgsPattern } from '../policy/utils.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -289,6 +291,22 @@ ${textContent}
     const displayPrompt =
       prompt.length > 100 ? prompt.substring(0, 97) + '...' : prompt;
     return `Processing URLs and instructions from prompt: "${displayPrompt}"`;
+  }
+
+  override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    if (this.params.url) {
+      return {
+        argsPattern: buildPatternArgsPattern(this.params.url),
+      };
+    }
+    if (this.params.prompt) {
+      return {
+        argsPattern: buildPatternArgsPattern(this.params.prompt),
+      };
+    }
+    return undefined;
   }
 
   protected override async getConfirmationDetails(

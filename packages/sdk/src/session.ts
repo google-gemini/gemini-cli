@@ -226,7 +226,7 @@ export class GeminiCliSession {
         break;
       }
 
-      const transcript: Content[] = client.getHistory();
+      const transcript: readonly Content[] = client.getHistory();
       const context: SessionContext = {
         sessionId,
         transcript,

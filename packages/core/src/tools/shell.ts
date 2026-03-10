@@ -90,7 +90,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
     return description;
   }
 
-  protected override getPolicyUpdateOptions(
+  override getPolicyUpdateOptions(
     outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
     if (

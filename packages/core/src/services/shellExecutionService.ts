@@ -662,6 +662,8 @@ export class ShellExecutionService {
       // This should not happen, but as a safeguard...
       throw new Error('PTY implementation not found');
     }
+    let spawnedPty: IPty | undefined;
+
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
@@ -695,6 +697,8 @@ export class ShellExecutionService {
         },
         handleFlowControl: true,
       });
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      spawnedPty = ptyProcess as IPty;
 
       const result = new Promise<ShellExecutionResult>((resolve) => {
         this.activeResolvers.set(ptyProcess.pid, resolve);
@@ -1006,6 +1010,15 @@ export class ShellExecutionService {
     } catch (e) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as Error;
+
+      if (spawnedPty) {
+        try {
+          (spawnedPty as IPty & { destroy?: () => void }).destroy?.();
+        } catch {
+          // Ignore errors during cleanup
+        }
+      }
+
       if (error.message.includes('posix_spawnp failed')) {
         onOutputEvent({
           type: 'data',
@@ -1134,6 +1147,11 @@ export class ShellExecutionService {
       this.activeChildProcesses.delete(pid);
     } else if (activePty) {
       killProcessGroup({ pid, pty: activePty.ptyProcess }).catch(() => {});
+      try {
+        (activePty.ptyProcess as IPty & { destroy?: () => void }).destroy?.();
+      } catch {
+        // Ignore errors during cleanup
+      }
       this.activePtys.delete(pid);
     }
 
