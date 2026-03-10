@@ -133,7 +133,7 @@ const authCommand: SlashCommand = {
       if (mcpClientManager) {
         context.ui.addItem({
           type: 'info',
-          text: `Restarting MCP server '${serverName}'...`,
+          text: `Reloading MCP server '${serverName}'...`,
         });
         await mcpClientManager.restartServer(serverName);
       }

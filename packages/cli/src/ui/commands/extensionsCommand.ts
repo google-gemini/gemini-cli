@@ -160,7 +160,7 @@ async function restartAction(
   if (!extensionLoader) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: "Extensions are not yet loaded, can't restart yet",
+      text: "Extensions are not yet loaded, can't reload yet",
     });
     return;
   }
@@ -259,7 +259,7 @@ async function restartAction(
   } else {
     const infoItem: HistoryItemInfo = {
       type: MessageType.INFO,
-      text: `${extensionsToRestart.length} extension${s} reloaded successfully`,
+      text: `${extensionsToRestart.length} extension${s} reloaded successfully.`,
       icon: emptyIcon,
       color: theme.text.primary,
     };
@@ -280,9 +280,7 @@ async function exploreAction(
         type: 'custom_dialog' as const,
         component: React.createElement(ExtensionRegistryView, {
           onSelect: (extension) => {
-            debugLogger.log(`Selected extension: ${extension.extensionName}`);
-            void installAction(context, extension.url);
-            context.ui.removeComponent();
+            debugLogger.debug(`Selected extension: ${extension.extensionName}`);
           },
           onClose: () => context.ui.removeComponent(),
           extensionManager,
@@ -343,8 +341,8 @@ function getEnableDisableContext(
   if (
     name === '' ||
     !(
-      (parts.length === 2 && parts[1].startsWith('--scope=')) || // --scope=<scope>
-      (parts.length === 3 && parts[1] === '--scope') // --scope <scope>
+      (parts.length === 2 && parts[1].startsWith('--scope=')) ||
+      (parts.length === 3 && parts[1] === '--scope')
     )
   ) {
     context.ui.addItem({
@@ -354,7 +352,6 @@ function getEnableDisableContext(
     return null;
   }
   let scope: SettingScope;
-  // Transform `--scope=<scope>` to `--scope <scope>`.
   if (parts.length === 2) {
     parts.push(...parts[1].split('='));
     parts.splice(1, 1);
@@ -424,7 +421,6 @@ async function enableAction(context: CommandContext, args: string) {
       text: `Extension "${name}" enabled for the scope "${scope}"`,
     });
 
-    // Auto-enable any disabled MCP servers for this extension
     const extension = extensionManager
       .getExtensions()
       .find((e) => e.name === name);
@@ -476,15 +472,11 @@ async function installAction(context: CommandContext, args: string) {
     return;
   }
 
-  // Validate that the source is either a valid URL or a valid file path.
   let isValid = false;
   try {
-    // Check if it's a valid URL.
     new URL(source);
     isValid = true;
   } catch {
-    // If not a URL, check for characters that are disallowed in file paths
-    // and could be used for command injection.
     if (!/[;&|`'"]/.test(source)) {
       isValid = true;
     }
@@ -594,53 +586,33 @@ async function uninstallAction(context: CommandContext, args: string) {
     return;
   }
 
-  const uninstallArgs = args.split(' ').filter((value) => value.length > 0);
-  const all = uninstallArgs.includes('--all');
-  const names = uninstallArgs.filter((a) => !a.startsWith('--'));
-
-  if (!all && names.length === 0) {
+  const name = args.trim();
+  if (!name) {
     context.ui.addItem({
       type: MessageType.ERROR,
-      text: `Usage: /extensions uninstall <extension-names...>|--all`,
+      text: `Usage: /extensions uninstall <extension-name>`,
     });
     return;
   }
 
-  let namesToUninstall: string[] = [];
-  if (all) {
-    namesToUninstall = extensionLoader.getExtensions().map((ext) => ext.name);
-  } else {
-    namesToUninstall = names;
-  }
+  context.ui.addItem({
+    type: MessageType.INFO,
+    text: `Uninstalling extension "${name}"...`,
+  });
 
-  if (namesToUninstall.length === 0) {
+  try {
+    await extensionLoader.uninstallExtension(name, false);
     context.ui.addItem({
       type: MessageType.INFO,
-      text: all ? 'No extensions installed.' : 'No extension name provided.',
+      text: `Extension "${name}" uninstalled successfully.`,
     });
-    return;
-  }
-
-  for (const extensionName of namesToUninstall) {
+  } catch (error) {
     context.ui.addItem({
-      type: MessageType.INFO,
-      text: `Uninstalling extension "${extensionName}"...`,
+      type: MessageType.ERROR,
+      text: `Failed to uninstall extension "${name}": ${getErrorMessage(
+        error,
+      )}`,
     });
-
-    try {
-      await extensionLoader.uninstallExtension(extensionName, false);
-      context.ui.addItem({
-        type: MessageType.INFO,
-        text: `Extension "${extensionName}" uninstalled successfully.`,
-      });
-    } catch (error) {
-      context.ui.addItem({
-        type: MessageType.ERROR,
-        text: `Failed to uninstall extension "${extensionName}": ${getErrorMessage(
-          error,
-        )}`,
-      });
-    }
   }
 }
 
@@ -729,8 +701,8 @@ export function completeExtensions(
   }
   if (
     context.invocation?.name === 'disable' ||
-    context.invocation?.name === 'restart' ||
-    context.invocation?.name === 'reload'
+    context.invocation?.name === 'reload' ||
+    context.invocation?.name === 'restart'
   ) {
     extensions = extensions.filter((ext) => ext.isActive);
   }
@@ -825,7 +797,7 @@ const exploreExtensionsCommand: SlashCommand = {
   action: exploreAction,
 };
 
-const reloadCommand: SlashCommand = {
+const restartCommand: SlashCommand = {
   name: 'reload',
   altNames: ['restart'],
   description: 'Reload all extensions',
@@ -865,11 +837,9 @@ export function extensionsCommand(
       listExtensionsCommand,
       updateExtensionsCommand,
       exploreExtensionsCommand,
-      reloadCommand,
+      restartCommand,
       ...conditionalCommands,
     ],
-    action: (context, args) =>
-      // Default to list if no subcommand is provided
-      listExtensionsCommand.action!(context, args),
+    action: (context, args) => listExtensionsCommand.action!(context, args),
   };
 }

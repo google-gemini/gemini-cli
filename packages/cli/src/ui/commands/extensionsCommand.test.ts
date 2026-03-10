@@ -270,7 +270,7 @@ describe('extensionsCommand', () => {
 
   describe('update', () => {
     const updateAction = extensionsCommand().subCommands?.find(
-      (cmd) => cmd.name === 'update',
+      (cmd: SlashCommand) => cmd.name === 'update',
     )?.action;
 
     if (!updateAction) {
@@ -429,7 +429,7 @@ describe('extensionsCommand', () => {
 
   describe('explore', () => {
     const exploreAction = extensionsCommand().subCommands?.find(
-      (cmd) => cmd.name === 'explore',
+      (cmd: SlashCommand) => cmd.name === 'explore',
     )?.action;
 
     if (!exploreAction) {
@@ -558,7 +558,9 @@ describe('extensionsCommand', () => {
   describe('when enableExtensionReloading is true', () => {
     it('should include enable, disable, install, link, and uninstall subcommands', () => {
       const command = extensionsCommand(true);
-      const subCommandNames = command.subCommands?.map((cmd) => cmd.name);
+      const subCommandNames = command.subCommands?.map(
+        (cmd: SlashCommand) => cmd.name,
+      );
       expect(subCommandNames).toContain('enable');
       expect(subCommandNames).toContain('disable');
       expect(subCommandNames).toContain('install');
@@ -570,7 +572,9 @@ describe('extensionsCommand', () => {
   describe('when enableExtensionReloading is false', () => {
     it('should not include enable, disable, install, link, and uninstall subcommands', () => {
       const command = extensionsCommand(false);
-      const subCommandNames = command.subCommands?.map((cmd) => cmd.name);
+      const subCommandNames = command.subCommands?.map(
+        (cmd: SlashCommand) => cmd.name,
+      );
       expect(subCommandNames).not.toContain('enable');
       expect(subCommandNames).not.toContain('disable');
       expect(subCommandNames).not.toContain('install');
@@ -582,7 +586,9 @@ describe('extensionsCommand', () => {
   describe('when enableExtensionReloading is not provided', () => {
     it('should not include enable, disable, install, link, and uninstall subcommands by default', () => {
       const command = extensionsCommand();
-      const subCommandNames = command.subCommands?.map((cmd) => cmd.name);
+      const subCommandNames = command.subCommands?.map(
+        (cmd: SlashCommand) => cmd.name,
+      );
       expect(subCommandNames).not.toContain('enable');
       expect(subCommandNames).not.toContain('disable');
       expect(subCommandNames).not.toContain('install');
@@ -596,7 +602,7 @@ describe('extensionsCommand', () => {
 
     beforeEach(() => {
       installAction = extensionsCommand(true).subCommands?.find(
-        (cmd) => cmd.name === 'install',
+        (cmd: SlashCommand) => cmd.name === 'install',
       )?.action;
 
       expect(installAction).not.toBeNull();
@@ -673,7 +679,7 @@ describe('extensionsCommand', () => {
 
     beforeEach(() => {
       linkAction = extensionsCommand(true).subCommands?.find(
-        (cmd) => cmd.name === 'link',
+        (cmd: SlashCommand) => cmd.name === 'link',
       )?.action;
 
       expect(linkAction).not.toBeNull();
@@ -743,7 +749,7 @@ describe('extensionsCommand', () => {
 
     beforeEach(() => {
       uninstallAction = extensionsCommand(true).subCommands?.find(
-        (cmd) => cmd.name === 'uninstall',
+        (cmd: SlashCommand) => cmd.name === 'uninstall',
       )?.action;
 
       expect(uninstallAction).not.toBeNull();
@@ -793,7 +799,7 @@ describe('extensionsCommand', () => {
 
     beforeEach(() => {
       enableAction = extensionsCommand(true).subCommands?.find(
-        (cmd) => cmd.name === 'enable',
+        (cmd: SlashCommand) => cmd.name === 'enable',
       )?.action;
 
       expect(enableAction).not.toBeNull();
@@ -845,7 +851,7 @@ describe('extensionsCommand', () => {
 
     beforeEach(() => {
       disableAction = extensionsCommand(true).subCommands?.find(
-        (cmd) => cmd.name === 'disable',
+        (cmd: SlashCommand) => cmd.name === 'disable',
       )?.action;
 
       expect(disableAction).not.toBeNull();
@@ -893,16 +899,16 @@ describe('extensionsCommand', () => {
   });
 
   describe('reload', () => {
-    let restartAction: SlashCommand['action'];
+    let reloadAction: SlashCommand['action'];
     let mockRestartExtension: MockedFunction<
       typeof ExtensionLoader.prototype.restartExtension
     >;
 
     beforeEach(() => {
-      restartAction = extensionsCommand().subCommands?.find(
-        (c) => c.name === 'reload',
+      reloadAction = extensionsCommand().subCommands?.find(
+        (c: SlashCommand) => c.name === 'reload',
       )?.action;
-      expect(restartAction).not.toBeNull();
+      expect(reloadAction).not.toBeNull();
 
       mockRestartExtension = vi.fn();
       mockContext.services.config!.getExtensionLoader = vi
@@ -922,7 +928,7 @@ describe('extensionsCommand', () => {
           restartExtension: mockRestartExtension,
         }));
 
-      await restartAction!(mockContext, '--all');
+      await reloadAction!(mockContext, '--all');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.INFO,
@@ -938,7 +944,7 @@ describe('extensionsCommand', () => {
       ] as GeminiCLIExtension[];
       mockGetExtensions.mockReturnValue(mockExtensions);
 
-      await restartAction!(mockContext, '--all');
+      await reloadAction!(mockContext, '--all');
 
       expect(mockRestartExtension).toHaveBeenCalledTimes(2);
       expect(mockRestartExtension).toHaveBeenCalledWith(mockExtensions[0]);
@@ -974,7 +980,7 @@ describe('extensionsCommand', () => {
       mockGetExtensions.mockReturnValue(mockExtensions);
       mockReloadSkills.mockRejectedValue(new Error('Failed to reload skills'));
 
-      await restartAction!(mockContext, '--all');
+      await reloadAction!(mockContext, '--all');
 
       expect(mockRestartExtension).toHaveBeenCalledWith(mockExtensions[0]);
       expect(mockReloadSkills).toHaveBeenCalled();
@@ -994,7 +1000,7 @@ describe('extensionsCommand', () => {
       ] as GeminiCLIExtension[];
       mockGetExtensions.mockReturnValue(mockExtensions);
 
-      await restartAction!(mockContext, 'ext1 ext3');
+      await reloadAction!(mockContext, 'ext1 ext3');
 
       expect(mockRestartExtension).toHaveBeenCalledTimes(1);
       expect(mockRestartExtension).toHaveBeenCalledWith(mockExtensions[2]);
@@ -1007,19 +1013,19 @@ describe('extensionsCommand', () => {
     it('shows an error if no extension loader is available', async () => {
       mockContext.services.config!.getExtensionLoader = vi.fn();
 
-      await restartAction!(mockContext, '--all');
+      await reloadAction!(mockContext, '--all');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageType.ERROR,
-          text: "Extensions are not yet loaded, can't restart yet",
+          text: "Extensions are not yet loaded, can't reload yet",
         }),
       );
       expect(mockRestartExtension).not.toHaveBeenCalled();
     });
 
     it('shows usage error for no arguments', async () => {
-      await restartAction!(mockContext, '');
+      await reloadAction!(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1037,7 +1043,7 @@ describe('extensionsCommand', () => {
       mockGetExtensions.mockReturnValue(mockExtensions);
       mockRestartExtension.mockRejectedValue(new Error('Failed to restart'));
 
-      await restartAction!(mockContext, '--all');
+      await reloadAction!(mockContext, '--all');
 
       expect(mockRestartExtension).toHaveBeenCalledWith(mockExtensions[0]);
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -1054,7 +1060,7 @@ describe('extensionsCommand', () => {
       ] as GeminiCLIExtension[];
       mockGetExtensions.mockReturnValue(mockExtensions);
 
-      await restartAction!(mockContext, 'ext1 ext2');
+      await reloadAction!(mockContext, 'ext1 ext2');
 
       expect(mockRestartExtension).toHaveBeenCalledTimes(1);
       expect(mockRestartExtension).toHaveBeenCalledWith(mockExtensions[0]);
@@ -1072,7 +1078,7 @@ describe('extensionsCommand', () => {
       ] as GeminiCLIExtension[];
       mockGetExtensions.mockReturnValue(mockExtensions);
 
-      await restartAction!(mockContext, 'ext2 ext3');
+      await reloadAction!(mockContext, 'ext2 ext3');
 
       expect(mockRestartExtension).not.toHaveBeenCalled();
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
@@ -1094,6 +1100,18 @@ describe('extensionsCommand', () => {
       const suggestions = completeExtensions(mockContext, 'ext');
       expect(suggestions).toEqual(['ext1']);
     });
+
+    it('should suggest only enabled extension names for the restart command alias', async () => {
+      mockContext.invocation!.name = 'restart';
+      const mockExtensions = [
+        { name: 'ext1', isActive: true },
+        { name: 'ext2', isActive: false },
+      ] as GeminiCLIExtension[];
+      mockGetExtensions.mockReturnValue(mockExtensions);
+
+      const suggestions = completeExtensions(mockContext, 'ext');
+      expect(suggestions).toEqual(['ext1']);
+    });
   });
 
   describe('config', () => {
@@ -1101,7 +1119,7 @@ describe('extensionsCommand', () => {
 
     beforeEach(async () => {
       configAction = extensionsCommand(true).subCommands?.find(
-        (cmd) => cmd.name === 'config',
+        (cmd: SlashCommand) => cmd.name === 'config',
       )?.action;
 
       expect(configAction).not.toBeNull();
