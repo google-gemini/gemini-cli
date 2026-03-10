@@ -29,7 +29,9 @@ npm install -g @google/gemini-cli@preview
 
 ## What's Changed
 
-- fix(patch): cherry-pick 5dd2dab to release/v0.33.0-preview.11-pr-21871 by @gemini-cli-robot in [#21876](https://github.com/google-gemini/gemini-cli/pull/21876)
+- fix(patch): cherry-pick 5dd2dab to release/v0.33.0-preview.11-pr-21871 by
+  @gemini-cli-robot in
+  [#21876](https://github.com/google-gemini/gemini-cli/pull/21876)
 - fix(patch): cherry-pick 7ec477d to release/v0.33.0-preview.3-pr-21305 to patch
   version v0.33.0-preview.3 and create version 0.33.0-preview.4 by
   @gemini-cli-robot in
