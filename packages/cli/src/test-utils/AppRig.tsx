@@ -30,6 +30,7 @@ import {
   IdeClient,
   debugLogger,
   CoreToolCallStatus,
+  ConsecaSafetyChecker,
 } from '@google/gemini-cli-core';
 import {
   type MockShellCommand,
@@ -47,6 +48,7 @@ import type {
   TrackedCompletedToolCall,
   TrackedToolCall,
 } from '../ui/hooks/useToolScheduler.js';
+import type { Content, GenerateContentParameters } from '@google/genai';
 
 // Global state observer for React-based signals
 const sessionStateMap = new Map<string, StreamingState>();
@@ -153,6 +155,7 @@ export class AppRig {
   private settings: LoadedSettings | undefined;
   private testDir: string;
   private sessionId: string;
+  private appRigId: string;
 
   private pendingConfirmations = new Map<string, PendingConfirmation>();
   private breakpointTools = new Set<string | undefined>();
@@ -168,6 +171,7 @@ export class AppRig {
     this.testDir = fs.mkdtempSync(
       path.join(os.tmpdir(), `gemini-app-rig-${uniqueId.slice(0, 8)}-`),
     );
+    this.appRigId = path.basename(this.testDir).toLowerCase();
     this.sessionId = `test-session-${uniqueId}`;
     activeRigs.set(this.sessionId, this);
   }
@@ -738,6 +742,10 @@ export class AppRig {
     // Forcefully clear IdeClient singleton promise
     // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
     (IdeClient as any).instancePromise = null;
+
+    // Reset Conseca singleton to avoid leaking config/state across tests
+    ConsecaSafetyChecker.resetInstance();
+
     vi.clearAllMocks();
 
     this.config = undefined;
@@ -753,5 +761,83 @@ export class AppRig {
         );
       }
     }
+  }
+
+  getSentRequests() {
+    if (!this.config) throw new Error('AppRig not initialized');
+    return this.config.getContentGenerator().getSentRequests?.() || [];
+  }
+
+  /**
+   * Helper to get the curated history (contents) sent in the most recent model request.
+   * This method scrubs unstable data like temp paths and IDs for deterministic goldens.
+   */
+  getLastSentRequestContents() {
+    const requests = this.getSentRequests();
+    if (requests.length === 0) return [];
+    const contents = requests[requests.length - 1].contents || [];
+    return this.scrubUnstableData(contents);
+  }
+
+  /**
+   * Gets the final curated history of the active chat session.
+   */
+  getCuratedHistory() {
+    if (!this.config) throw new Error('AppRig not initialized');
+    const history = this.config.getGeminiClient().getChat().getHistory(true);
+    return this.scrubUnstableData(history);
+  }
+
+  private scrubUnstableData<
+    T extends
+      | Content[]
+      | GenerateContentParameters['contents']
+      | readonly Content[],
+  >(contents: T): T {
+    // Deeply scrub unstable data
+    const scrubbedString = JSON.stringify(contents)
+      .replace(new RegExp(this.testDir, 'g'), '<TEST_DIR>')
+      .replace(new RegExp(this.appRigId, 'g'), '<APP_RIG_ID>')
+      .replace(new RegExp(this.sessionId, 'g'), '<SESSION_ID>')
+      .replace(
+        /([a-zA-Z0-9_]+)_([0-9]{13})_([0-9]+)\.txt/g,
+        '$1_<TIMESTAMP>_<INDEX>.txt',
+      )
+      .replace(/Process Group PGID: \d+/g, 'Process Group PGID: <PGID>');
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const scrubbed = JSON.parse(scrubbedString) as T;
+
+    if (Array.isArray(scrubbed) && scrubbed.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const firstItem = scrubbed[0] as Content;
+      if (firstItem.parts?.[0]?.text?.includes('<session_context>')) {
+        firstItem.parts[0].text = '<SESSION_CONTEXT>';
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      for (const content of scrubbed as Content[]) {
+        if (content.parts) {
+          for (const part of content.parts) {
+            if (part.functionCall) {
+              part.functionCall.id = '<CALL_ID>';
+            }
+            if (part.functionResponse) {
+              part.functionResponse.id = '<CALL_ID>';
+              if (
+                part.functionResponse.response !== null &&
+                typeof part.functionResponse.response === 'object' &&
+                'original_output_file' in part.functionResponse.response
+              ) {
+                part.functionResponse.response['original_output_file'] =
+                  '<TMP_FILE>';
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return scrubbed;
   }
 }

@@ -22,7 +22,6 @@ import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
-import { truncateString } from '../utils/textUtils.js';
 import { convert } from 'html-to-text';
 import {
   logWebFetchFallbackAttempt,
@@ -37,11 +36,10 @@ import { resolveToolDeclaration } from './definitions/resolver.js';
 import { LRUCache } from 'mnemonist';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
-const MAX_CONTENT_LENGTH = 100000;
+
 const MAX_EXPERIMENTAL_FETCH_SIZE = 10 * 1024 * 1024; // 10MB
 const USER_AGENT =
   'Mozilla/5.0 (compatible; Google-Gemini-CLI/1.0; +https://github.com/google-gemini/gemini-cli)';
-const TRUNCATION_WARNING = '\n\n... [Content truncated due to size limit] ...';
 
 // Rate limiting configuration
 const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
@@ -242,12 +240,6 @@ class WebFetchToolInvocation extends BaseToolInvocation<
         textContent = rawContent;
       }
 
-      textContent = truncateString(
-        textContent,
-        MAX_CONTENT_LENGTH,
-        TRUNCATION_WARNING,
-      );
-
       const geminiClient = this.config.getGeminiClient();
       const fallbackPrompt = `The user requested the following: "${this.params.prompt}".
 
@@ -441,7 +433,7 @@ ${textContent}
         });
         const errorContent = `Request failed with status ${status}
 Headers: ${JSON.stringify(headers, null, 2)}
-Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response truncated] ...')}`;
+Response: ${rawResponseText}`;
         return {
           llmContent: errorContent,
           returnDisplay: `Failed to fetch ${url} (Status: ${status})`,
@@ -454,11 +446,7 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
         lowContentType.includes('text/plain') ||
         lowContentType.includes('application/json')
       ) {
-        const text = truncateString(
-          bodyBuffer.toString('utf8'),
-          MAX_CONTENT_LENGTH,
-          TRUNCATION_WARNING,
-        );
+        const text = bodyBuffer.toString('utf8');
         return {
           llmContent: text,
           returnDisplay: `Fetched ${contentType} content from ${url}`,
@@ -467,16 +455,12 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
 
       if (lowContentType.includes('text/html')) {
         const html = bodyBuffer.toString('utf8');
-        const textContent = truncateString(
-          convert(html, {
-            wordwrap: false,
-            selectors: [
-              { selector: 'a', options: { ignoreHref: false, baseUrl: url } },
-            ],
-          }),
-          MAX_CONTENT_LENGTH,
-          TRUNCATION_WARNING,
-        );
+        const textContent = convert(html, {
+          wordwrap: false,
+          selectors: [
+            { selector: 'a', options: { ignoreHref: false, baseUrl: url } },
+          ],
+        });
         return {
           llmContent: textContent,
           returnDisplay: `Fetched and converted HTML content from ${url}`,
@@ -501,11 +485,7 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
       }
 
       // Fallback for unknown types - try as text
-      const text = truncateString(
-        bodyBuffer.toString('utf8'),
-        MAX_CONTENT_LENGTH,
-        TRUNCATION_WARNING,
-      );
+      const text = bodyBuffer.toString('utf8');
       return {
         llmContent: text,
         returnDisplay: `Fetched ${contentType || 'unknown'} content from ${url}`,

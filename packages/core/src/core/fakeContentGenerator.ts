@@ -42,11 +42,16 @@ export type FakeResponse =
 // CLI argument.
 export class FakeContentGenerator implements ContentGenerator {
   private callCounter = 0;
+  private sentRequests: GenerateContentParameters[] = [];
   userTier?: UserTierId;
   userTierName?: string;
   paidTier?: GeminiUserTier;
 
   constructor(private readonly responses: FakeResponse[]) {}
+
+  getSentRequests(): GenerateContentParameters[] {
+    return this.sentRequests;
+  }
 
   static async fromFile(filePath: string): Promise<FakeContentGenerator> {
     const fileContent = await promises.readFile(filePath, 'utf-8');
@@ -84,6 +89,7 @@ export class FakeContentGenerator implements ContentGenerator {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     role: LlmRole,
   ): Promise<GenerateContentResponse> {
+    this.sentRequests.push(request);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return Object.setPrototypeOf(
       this.getNextResponse('generateContent', request),
@@ -97,6 +103,7 @@ export class FakeContentGenerator implements ContentGenerator {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     role: LlmRole,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    this.sentRequests.push(request);
     const responses = this.getNextResponse('generateContentStream', request);
     async function* stream() {
       for (const response of responses) {

@@ -22,6 +22,7 @@ export * from './policy/integrity.js';
 export * from './billing/index.js';
 export * from './confirmation-bus/types.js';
 export * from './confirmation-bus/message-bus.js';
+export * from './safety/conseca/conseca.js';
 
 // Export Commands logic
 export * from './commands/extensions.js';

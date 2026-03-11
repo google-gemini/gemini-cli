@@ -168,6 +168,10 @@ export class LoggingContentGenerator implements ContentGenerator {
     return this.wrapped.paidTier;
   }
 
+  getSentRequests?(): GenerateContentParameters[] {
+    return this.wrapped.getSentRequests?.() || [];
+  }
+
   private logApiRequest(
     contents: Content[],
     model: string,

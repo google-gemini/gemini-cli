@@ -46,6 +46,8 @@ export interface ContentGenerator {
 
   embedContent(request: EmbedContentParameters): Promise<EmbedContentResponse>;
 
+  getSentRequests?(): GenerateContentParameters[];
+
   userTier?: UserTierId;
 
   userTierName?: string;

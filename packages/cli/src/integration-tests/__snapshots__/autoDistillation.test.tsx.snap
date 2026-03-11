@@ -1,0 +1,72 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Auto-distillation Integration > should truncate and summarize massive tool outputs, and we should golden the chat history 1`] = `
+[
+  {
+    "parts": [
+      {
+        "text": "<SESSION_CONTEXT>",
+      },
+    ],
+    "role": "user",
+  },
+  {
+    "parts": [
+      {
+        "text": "Fetch the massive file.",
+      },
+    ],
+    "role": "user",
+  },
+  {
+    "parts": [
+      {
+        "text": "I will now fetch the data.",
+      },
+      {
+        "functionCall": {
+          "args": {
+            "command": "cat large.txt",
+          },
+          "id": "<CALL_ID>",
+          "name": "run_shell_command",
+        },
+      },
+    ],
+    "role": "model",
+  },
+  {
+    "parts": [
+      {
+        "functionResponse": {
+          "id": "<CALL_ID>",
+          "name": "run_shell_command",
+          "response": {
+            "output": "Output too large. Showing first 10 and last 40 characters. For full output see: <TEST_DIR>/.gemini/tmp/<APP_RIG_ID>/tool-outputs/session-<SESSION_ID>/run_shell_command_<TIMESTAMP>_<INDEX>.txt
+Output: ca
+
+... [40 characters omitted] ...
+
+Exit Code: 1
+Process Group PGID: <PGID>
+
+--- Structural Map of Truncated Content ---
+- Line 1: Header
+- Lines 2-5000: User data
+- Line 5001: Footer",
+          },
+        },
+      },
+    ],
+    "role": "user",
+  },
+  {
+    "parts": [
+      {
+        "text": "I got the summarized output. Task complete.",
+      },
+    ],
+    "role": "model",
+  },
+]
+`;
