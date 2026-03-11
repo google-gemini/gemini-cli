@@ -71,9 +71,11 @@ gemini profiles disable
 
 ## Commands
 
-| Command                            | Description                                              |
-| :--------------------------------- | :------------------------------------------------------- |
-| `gemini profiles list`             | List all available profiles and see which one is active. |
-| `gemini profiles enable <name>`    | Set a profile as the persistent default.                 |
-| `gemini profiles disable`          | Clear the persistent default profile.                    |
-| `gemini profiles uninstall <name>` | Delete a profile from your local storage.                |
+| Command                            | Description                                                  |
+| :--------------------------------- | :----------------------------------------------------------- |
+| `gemini profiles list`             | List all available profiles and see which one is active.     |
+| `gemini profiles enable <name>`    | Set a profile as the persistent default.                     |
+| `gemini profiles disable`          | Clear the persistent default profile.                        |
+| `gemini profiles install <path>`   | Install a new profile from a local file (Markdown).          |
+| `gemini profiles link <path>`      | Create a symlink to an existing profile file on your system. |
+| `gemini profiles uninstall <name>` | Delete a profile from your local storage.                    |

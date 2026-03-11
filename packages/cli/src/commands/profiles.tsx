@@ -9,6 +9,8 @@ import { listCommand } from './profiles/list.js';
 import { enableCommand } from './profiles/enable.js';
 import { disableCommand } from './profiles/disable.js';
 import { uninstallCommand } from './profiles/uninstall.js';
+import { installCommand } from './profiles/install.js';
+import { linkCommand } from './profiles/link.js';
 import { initializeOutputListenersAndFlush } from '../gemini.js';
 
 export const profilesCommand: CommandModule = {
@@ -24,6 +26,8 @@ export const profilesCommand: CommandModule = {
       .command(enableCommand)
       .command(disableCommand)
       .command(uninstallCommand)
+      .command(installCommand)
+      .command(linkCommand)
       .demandCommand(1, 'You need at least one command before continuing.')
       .version(false),
   handler: () => {

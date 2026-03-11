@@ -184,3 +184,127 @@ name: Invalid Name
     );
   });
 });
+
+describe('ProfileManager Installation and Linking', () => {
+  let tempHomeDir: string;
+  let profilesDir: string;
+  let mockSettings: LoadedSettings;
+  let manager: ProfileManager;
+  let sourceDir: string;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    tempHomeDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-profile-test-home-'),
+    );
+    sourceDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'gemini-profile-test-source-'),
+    );
+    vi.stubEnv('GEMINI_CLI_HOME', tempHomeDir);
+
+    profilesDir = path.join(tempHomeDir, '.gemini', 'profiles');
+    fs.mkdirSync(profilesDir, { recursive: true });
+
+    mockSettings = {
+      merged: { general: { activeProfile: undefined } },
+      setValue: vi.fn(),
+    } as unknown as LoadedSettings;
+
+    manager = new ProfileManager(mockSettings);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    fs.rmSync(tempHomeDir, { recursive: true, force: true });
+    fs.rmSync(sourceDir, { recursive: true, force: true });
+  });
+
+  it('should install a profile by copying', async () => {
+    const sourcePath = path.join(sourceDir, 'new-profile.md');
+    const content = `---
+name: new-profile
+---
+Body`;
+    fs.writeFileSync(sourcePath, content);
+
+    const profile = await manager.installProfile(sourcePath);
+    expect(profile.name).toBe('new-profile');
+
+    const installedPath = path.join(profilesDir, 'new-profile.md');
+    expect(fs.existsSync(installedPath)).toBe(true);
+    expect(fs.readFileSync(installedPath, 'utf-8')).toBe(content);
+    expect(fs.lstatSync(installedPath).isSymbolicLink()).toBe(false);
+  });
+
+  it('should link a profile by creating a symlink', async () => {
+    const sourcePath = path.join(sourceDir, 'linked-profile.md');
+    const content = `---
+name: linked-profile
+---
+Body`;
+    fs.writeFileSync(sourcePath, content);
+
+    const profile = await manager.linkProfile(sourcePath);
+    expect(profile.name).toBe('linked-profile');
+
+    const linkedPath = path.join(profilesDir, 'linked-profile.md');
+    expect(fs.existsSync(linkedPath)).toBe(true);
+    expect(fs.lstatSync(linkedPath).isSymbolicLink()).toBe(true);
+    expect(fs.readlinkSync(linkedPath)).toBe(sourcePath);
+  });
+
+  it('should throw if installing when profile already exists', async () => {
+    const sourcePath = path.join(sourceDir, 'existing.md');
+    fs.writeFileSync(sourcePath, '---\nname: existing\n---');
+    fs.writeFileSync(path.join(profilesDir, 'existing.md'), 'orig');
+
+    await expect(manager.installProfile(sourcePath)).rejects.toThrow(
+      /Profile "existing" already exists/,
+    );
+  });
+
+  it('should throw if source file does not exist', async () => {
+    await expect(manager.installProfile('/non/existent')).rejects.toThrow(
+      /Source profile file not found/,
+    );
+  });
+
+  it('should throw if source file is invalid', async () => {
+    const sourcePath = path.join(sourceDir, 'invalid.md');
+    fs.writeFileSync(sourcePath, 'not a profile');
+
+    await expect(manager.installProfile(sourcePath)).rejects.toThrow(
+      /missing mandatory YAML frontmatter/,
+    );
+  });
+
+  it('should throw if linking when profile already exists', async () => {
+    const sourcePath = path.join(sourceDir, 'existing-link.md');
+    fs.writeFileSync(sourcePath, '---\nname: existing-link\n---');
+    fs.writeFileSync(path.join(profilesDir, 'existing-link.md'), 'orig');
+
+    await expect(manager.linkProfile(sourcePath)).rejects.toThrow(
+      /Profile "existing-link" already exists/,
+    );
+  });
+
+  it('should uninstall a linked profile (delete link but keep source)', async () => {
+    const sourcePath = path.join(sourceDir, 'linked.md');
+    fs.writeFileSync(sourcePath, '---\nname: linked\n---');
+    await manager.linkProfile(sourcePath);
+
+    const linkPath = path.join(profilesDir, 'linked.md');
+    expect(fs.existsSync(linkPath)).toBe(true);
+    expect(fs.lstatSync(linkPath).isSymbolicLink()).toBe(true);
+
+    await manager.uninstallProfile('linked');
+    expect(fs.existsSync(linkPath)).toBe(false);
+    expect(fs.existsSync(sourcePath)).toBe(true);
+  });
+
+  it('should throw if source file is missing during linking', async () => {
+    await expect(manager.linkProfile('/non/existent')).rejects.toThrow(
+      /Source profile file not found/,
+    );
+  });
+});

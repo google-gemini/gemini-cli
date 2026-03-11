@@ -205,4 +205,88 @@ export class ProfileManager {
       );
     }
   }
+
+  /**
+   * Installs a profile by copying it from a source path to the profiles directory.
+   * @param sourcePath Path to the profile file.
+   * @returns The installed Profile.
+   */
+  async installProfile(sourcePath: string): Promise<Profile> {
+    const absoluteSource = path.resolve(sourcePath);
+    if (!existsSync(absoluteSource)) {
+      throw new Error(`Source profile file not found at ${absoluteSource}`);
+    }
+
+    // Read and validate first
+    const content = await fs.readFile(absoluteSource, 'utf-8');
+    const match = content.match(FRONTMATTER_REGEX);
+    if (!match) {
+      throw new Error('Source file is missing mandatory YAML frontmatter.');
+    }
+
+    const frontmatterStr = match[1];
+    const rawFrontmatter = load(frontmatterStr);
+    const result = profileFrontmatterSchema.safeParse(rawFrontmatter);
+    if (!result.success) {
+      throw new Error(
+        `Invalid profile frontmatter at ${absoluteSource}: ${result.error.issues.map((i) => i.message).join(', ')}`,
+      );
+    }
+
+    const name = result.data.name;
+    const destPath = path.join(this.profilesDir, `${name}.md`);
+
+    if (existsSync(destPath)) {
+      throw new Error(
+        `Profile "${name}" already exists. Please uninstall it first or rename the source profile.`,
+      );
+    }
+
+    await this.ensureProfilesDir();
+    await fs.copyFile(absoluteSource, destPath);
+
+    return (await this.getProfile(name))!;
+  }
+
+  /**
+   * Links a profile by creating a symlink in the profiles directory.
+   * @param sourcePath Path to the profile file.
+   * @returns The linked Profile.
+   */
+  async linkProfile(sourcePath: string): Promise<Profile> {
+    const absoluteSource = path.resolve(sourcePath);
+    if (!existsSync(absoluteSource)) {
+      throw new Error(`Source profile file not found at ${absoluteSource}`);
+    }
+
+    // Read and validate first
+    const content = await fs.readFile(absoluteSource, 'utf-8');
+    const match = content.match(FRONTMATTER_REGEX);
+    if (!match) {
+      throw new Error('Source file is missing mandatory YAML frontmatter.');
+    }
+
+    const frontmatterStr = match[1];
+    const rawFrontmatter = load(frontmatterStr);
+    const result = profileFrontmatterSchema.safeParse(rawFrontmatter);
+    if (!result.success) {
+      throw new Error(
+        `Invalid profile frontmatter at ${absoluteSource}: ${result.error.issues.map((i) => i.message).join(', ')}`,
+      );
+    }
+
+    const name = result.data.name;
+    const destPath = path.join(this.profilesDir, `${name}.md`);
+
+    if (existsSync(destPath)) {
+      throw new Error(
+        `Profile "${name}" already exists. Please uninstall it first or rename the source profile.`,
+      );
+    }
+
+    await this.ensureProfilesDir();
+    await fs.symlink(absoluteSource, destPath);
+
+    return (await this.getProfile(name))!;
+  }
 }
