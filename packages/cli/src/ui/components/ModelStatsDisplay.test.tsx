@@ -410,6 +410,7 @@ describe('<ModelStatsDisplay />', () => {
     const output = lastFrame();
     expect(output).toContain('gemini-3-pro-');
     expect(output).toContain('gemini-3-flash-');
+    expect(output).toMatchSnapshot();
     unmount();
   });
 

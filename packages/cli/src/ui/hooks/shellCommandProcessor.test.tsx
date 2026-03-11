@@ -830,8 +830,8 @@ describe('useShellCommandProcessor', () => {
         result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
       });
 
-      act(() => {
-        result.current.dismissBackgroundShell(1001);
+      await act(async () => {
+        await result.current.dismissBackgroundShell(1001);
       });
 
       expect(mockShellKill).toHaveBeenCalledWith(1001);
@@ -936,8 +936,8 @@ describe('useShellCommandProcessor', () => {
       expect(shell?.exitCode).toBe(1);
 
       // Now dismiss it
-      act(() => {
-        result.current.dismissBackgroundShell(999);
+      await act(async () => {
+        await result.current.dismissBackgroundShell(999);
       });
       expect(result.current.backgroundShellCount).toBe(0);
     });

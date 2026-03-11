@@ -10,6 +10,8 @@ import { useUIActions } from '../contexts/UIActionsContext.js';
 import { theme } from '../semantic-colors.js';
 import {
   ShellExecutionService,
+  shortenPath,
+  tildeifyPath,
   type AnsiOutput,
   type AnsiLine,
   type AnsiToken,
@@ -43,8 +45,14 @@ interface BackgroundShellDisplayProps {
 
 const CONTENT_PADDING_X = 1;
 const BORDER_WIDTH = 2; // Left and Right border
-const HEADER_HEIGHT = 3; // 2 for border, 1 for header
+const MAIN_BORDER_HEIGHT = 2; // Top and Bottom border
+const HEADER_HEIGHT = 1;
+const FOOTER_HEIGHT = 1;
+const TOTAL_OVERHEAD_HEIGHT =
+  MAIN_BORDER_HEIGHT + HEADER_HEIGHT + FOOTER_HEIGHT;
+const PROCESS_LIST_HEADER_HEIGHT = 3; // 1 padding top, 1 text, 1 margin bottom
 const TAB_DISPLAY_HORIZONTAL_PADDING = 4;
+const LOG_PATH_OVERHEAD = 7; // "Log: " (5) + paddingX (2)
 
 const formatShellCommandForDisplay = (command: string, maxWidth: number) => {
   const commandFirstLine = command.split('\n')[0];
@@ -81,7 +89,7 @@ export const BackgroundShellDisplay = ({
     if (!activePid) return;
 
     const ptyWidth = Math.max(1, width - BORDER_WIDTH - CONTENT_PADDING_X * 2);
-    const ptyHeight = Math.max(1, height - HEADER_HEIGHT);
+    const ptyHeight = Math.max(1, height - TOTAL_OVERHEAD_HEIGHT);
     ShellExecutionService.resizePty(activePid, ptyWidth, ptyHeight);
   }, [activePid, width, height]);
 
@@ -150,7 +158,7 @@ export const BackgroundShellDisplay = ({
 
         if (keyMatchers[Command.KILL_BACKGROUND_SHELL](key)) {
           if (highlightedPid) {
-            dismissBackgroundShell(highlightedPid);
+            void dismissBackgroundShell(highlightedPid);
             // If we killed the active one, the list might update via props
           }
           return true;
@@ -171,7 +179,7 @@ export const BackgroundShellDisplay = ({
       }
 
       if (keyMatchers[Command.KILL_BACKGROUND_SHELL](key)) {
-        dismissBackgroundShell(activeShell.pid);
+        void dismissBackgroundShell(activeShell.pid);
         return true;
       }
 
@@ -336,7 +344,10 @@ export const BackgroundShellDisplay = ({
             }}
             onHighlight={(pid) => setHighlightedPid(pid)}
             isFocused={isFocused}
-            maxItemsToShow={Math.max(1, height - HEADER_HEIGHT - 3)} // Adjust for header
+            maxItemsToShow={Math.max(
+              1,
+              height - TOTAL_OVERHEAD_HEIGHT - PROCESS_LIST_HEADER_HEIGHT,
+            )}
             renderItem={(
               item,
               { isSelected: _isSelected, titleColor: _titleColor },
@@ -379,6 +390,23 @@ export const BackgroundShellDisplay = ({
             }}
           />
         </Box>
+      </Box>
+    );
+  };
+
+  const renderFooter = () => {
+    const pidToDisplay = isListOpenProp
+      ? (highlightedPid ?? activePid)
+      : activePid;
+    if (!pidToDisplay) return null;
+    const logPath = ShellExecutionService.getLogFilePath(pidToDisplay);
+    const displayPath = shortenPath(
+      tildeifyPath(logPath),
+      width - LOG_PATH_OVERHEAD,
+    );
+    return (
+      <Box paddingX={1}>
+        <Text color={theme.text.secondary}>Log: {displayPath}</Text>
       </Box>
     );
   };
@@ -454,6 +482,7 @@ export const BackgroundShellDisplay = ({
       <Box flexGrow={1} overflow="hidden" paddingX={CONTENT_PADDING_X}>
         {isListOpenProp ? renderProcessList() : renderOutput()}
       </Box>
+      {renderFooter()}
     </Box>
   );
 };
