@@ -7,14 +7,17 @@
 import { useEffect, useReducer, useRef } from 'react';
 import { setTimeout as setTimeoutPromise } from 'node:timers/promises';
 import * as path from 'node:path';
-import type { Config, FileSearch } from '@google/gemini-cli-core';
 import {
   FileSearchFactory,
   escapePath,
   FileDiscoveryService,
+  type Config,
+  type FileSearch,
 } from '@google/gemini-cli-core';
-import type { Suggestion } from '../components/SuggestionsDisplay.js';
-import { MAX_SUGGESTIONS_TO_SHOW } from '../components/SuggestionsDisplay.js';
+import {
+  MAX_SUGGESTIONS_TO_SHOW,
+  type Suggestion,
+} from '../components/SuggestionsDisplay.js';
 import { CommandKind } from '../commands/types.js';
 import { AsyncFzf } from 'fzf';
 

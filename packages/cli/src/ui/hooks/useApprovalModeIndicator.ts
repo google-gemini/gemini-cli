@@ -13,8 +13,7 @@ import {
 import { useKeypress } from './useKeypress.js';
 import { Command } from '../key/keyMatchers.js';
 import { useKeyMatchers } from './useKeyMatchers.js';
-import type { HistoryItemWithoutId } from '../types.js';
-import { MessageType } from '../types.js';
+import { MessageType, type HistoryItemWithoutId } from '../types.js';
 
 export interface UseApprovalModeIndicatorArgs {
   config: Config;

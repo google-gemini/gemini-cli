@@ -5,22 +5,29 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Mock, MockInstance } from 'vitest';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  type Mock,
+  type MockInstance,
+} from 'vitest';
 import { act } from 'react';
 import { renderHookWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useGeminiStream } from './useGeminiStream.js';
 import { useKeypress } from './useKeypress.js';
 import * as atCommandProcessor from './atCommandProcessor.js';
-import type {
-  TrackedToolCall,
-  TrackedCompletedToolCall,
-  TrackedExecutingToolCall,
-  TrackedCancelledToolCall,
-  TrackedWaitingToolCall,
+import {
+  useToolScheduler,
+  type TrackedToolCall,
+  type TrackedCompletedToolCall,
+  type TrackedExecutingToolCall,
+  type TrackedCancelledToolCall,
+  type TrackedWaitingToolCall,
 } from './useToolScheduler.js';
-import { useToolScheduler } from './useToolScheduler.js';
 import type {
   Config,
   EditorType,

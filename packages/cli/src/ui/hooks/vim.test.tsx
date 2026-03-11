@@ -17,15 +17,14 @@ import type React from 'react';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
-import { useVim } from './vim.js';
-import type { VimMode } from './vim.js';
+import { useVim, type VimMode } from './vim.js';
 import type { Key } from './useKeypress.js';
-import type {
-  TextBuffer,
-  TextBufferState,
-  TextBufferAction,
+import {
+  textBufferReducer,
+  type TextBuffer,
+  type TextBufferState,
+  type TextBufferAction,
 } from '../components/shared/text-buffer.js';
-import { textBufferReducer } from '../components/shared/text-buffer.js';
 
 // Mock the VimModeContext
 const mockVimContext = {
