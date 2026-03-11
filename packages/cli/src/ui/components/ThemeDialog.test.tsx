@@ -211,7 +211,7 @@ describe('Hint Visibility', () => {
       <ThemeDialog {...baseProps} settings={settings} />,
       {
         settings,
-        uiState: { terminalBackgroundColor: '#1E1E2E' },
+        uiState: { terminalBackgroundColor: '#000000' },
       },
     );
     await waitUntilReady();

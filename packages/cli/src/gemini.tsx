@@ -79,12 +79,12 @@ import {
   type InitializationResult,
 } from './core/initializer.js';
 import { validateAuthMethod } from './config/auth.js';
-import { runZedIntegration } from './zed-integration/zedIntegration.js';
+import { runAcpClient } from './acp/acpClient.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import { checkForUpdates } from './ui/utils/updateCheck.js';
 import { handleAutoUpdate } from './utils/handleAutoUpdate.js';
 import { appEvents, AppEvent } from './utils/events.js';
-import { SessionSelector } from './utils/sessionUtils.js';
+import { SessionError, SessionSelector } from './utils/sessionUtils.js';
 import { SettingsContext } from './ui/contexts/SettingsContext.js';
 import { MouseProvider } from './ui/contexts/MouseContext.js';
 import { StreamingState } from './ui/types.js';
@@ -92,6 +92,8 @@ import { computeTerminalTitle } from './utils/windowTitle.js';
 
 import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
+import { KeyMatchersProvider } from './ui/hooks/useKeyMatchers.js';
+import { loadKeyMatchers } from './ui/key/keyMatchers.js';
 import { KeypressProvider } from './ui/contexts/KeypressContext.js';
 import { useKittyKeyboardProtocol } from './ui/hooks/useKittyKeyboardProtocol.js';
 import {
@@ -109,6 +111,7 @@ import { OverflowProvider } from './ui/contexts/OverflowContext.js';
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
 import { runDeferredCommand } from './deferred.js';
+import { cleanupBackgroundLogs } from './utils/logCleanup.js';
 import { SlashCommandConflictHandler } from './services/SlashCommandConflictHandler.js';
 
 const SLOW_RENDER_MS = 200;
@@ -207,6 +210,11 @@ export async function startInteractiveUI(
     });
   }
 
+  const { matchers, errors } = await loadKeyMatchers();
+  errors.forEach((error) => {
+    coreEvents.emitFeedback('warning', error);
+  });
+
   const version = await getVersion();
   setWindowTitle(basename(workspaceRoot), settings);
 
@@ -229,35 +237,39 @@ export async function startInteractiveUI(
 
     return (
       <SettingsContext.Provider value={settings}>
-        <KeypressProvider
-          config={config}
-          debugKeystrokeLogging={settings.merged.general.debugKeystrokeLogging}
-        >
-          <MouseProvider
-            mouseEventsEnabled={mouseEventsEnabled}
+        <KeyMatchersProvider value={matchers}>
+          <KeypressProvider
+            config={config}
             debugKeystrokeLogging={
               settings.merged.general.debugKeystrokeLogging
             }
           >
-            <TerminalProvider>
-              <ScrollProvider>
-                <OverflowProvider>
-                  <SessionStatsProvider>
-                    <VimModeProvider>
-                      <AppContainer
-                        config={config}
-                        startupWarnings={startupWarnings}
-                        version={version}
-                        resumedSessionData={resumedSessionData}
-                        initializationResult={initializationResult}
-                      />
-                    </VimModeProvider>
-                  </SessionStatsProvider>
-                </OverflowProvider>
-              </ScrollProvider>
-            </TerminalProvider>
-          </MouseProvider>
-        </KeypressProvider>
+            <MouseProvider
+              mouseEventsEnabled={mouseEventsEnabled}
+              debugKeystrokeLogging={
+                settings.merged.general.debugKeystrokeLogging
+              }
+            >
+              <TerminalProvider>
+                <ScrollProvider>
+                  <OverflowProvider>
+                    <SessionStatsProvider>
+                      <VimModeProvider>
+                        <AppContainer
+                          config={config}
+                          startupWarnings={startupWarnings}
+                          version={version}
+                          resumedSessionData={resumedSessionData}
+                          initializationResult={initializationResult}
+                        />
+                      </VimModeProvider>
+                    </SessionStatsProvider>
+                  </OverflowProvider>
+                </ScrollProvider>
+              </TerminalProvider>
+            </MouseProvider>
+          </KeypressProvider>
+        </KeyMatchersProvider>
       </SettingsContext.Provider>
     );
   };
@@ -370,6 +382,7 @@ export async function main() {
   await Promise.all([
     cleanupCheckpoints(),
     cleanupToolOutputFiles(settings.merged),
+    cleanupBackgroundLogs(),
   ]);
 
   const parseArgsHandle = startupProfiler.start('parse_arguments');
@@ -672,8 +685,8 @@ export async function main() {
       await getOauthClient(settings.merged.security.auth.selectedType, config);
     }
 
-    if (config.getExperimentalZedIntegration()) {
-      return runZedIntegration(config, settings, argv);
+    if (config.getAcpMode()) {
+      return runAcpClient(config, settings, argv);
     }
 
     let input = config.getQuestion();
@@ -706,12 +719,24 @@ export async function main() {
         // Use the existing session ID to continue recording to the same session
         config.setSessionId(resumedSessionData.conversation.sessionId);
       } catch (error) {
-        coreEvents.emitFeedback(
-          'error',
-          `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        );
-        await runExitCleanup();
-        process.exit(ExitCodes.FATAL_INPUT_ERROR);
+        if (
+          error instanceof SessionError &&
+          error.code === 'NO_SESSIONS_FOUND'
+        ) {
+          // No sessions to resume — start a fresh session with a warning
+          startupWarnings.push({
+            id: 'resume-no-sessions',
+            message: error.message,
+            priority: WarningPriority.High,
+          });
+        } else {
+          coreEvents.emitFeedback(
+            'error',
+            `Error resuming session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          );
+          await runExitCleanup();
+          process.exit(ExitCodes.FATAL_INPUT_ERROR);
+        }
       }
     }
 

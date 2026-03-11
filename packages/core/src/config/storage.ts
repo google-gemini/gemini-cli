@@ -62,6 +62,10 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'mcp-oauth-tokens.json');
   }
 
+  static getA2AOAuthTokensPath(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'a2a-oauth-tokens.json');
+  }
+
   static getGlobalSettingsPath(): string {
     return path.join(Storage.getGlobalGeminiDir(), 'settings.json');
   }
@@ -92,6 +96,10 @@ export class Storage {
 
   static getUserPoliciesDir(): string {
     return path.join(Storage.getGlobalGeminiDir(), 'policies');
+  }
+
+  static getUserKeybindingsPath(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'keybindings.json');
   }
 
   static getUserAgentsDir(): string {
@@ -166,6 +174,13 @@ export class Storage {
 
   getWorkspacePoliciesDir(): string {
     return path.join(this.getGeminiDir(), 'policies');
+  }
+
+  getWorkspaceAutoSavedPolicyPath(): string {
+    return path.join(
+      this.getWorkspacePoliciesDir(),
+      AUTO_SAVED_POLICY_FILENAME,
+    );
   }
 
   getAutoSavedPolicyPath(): string {

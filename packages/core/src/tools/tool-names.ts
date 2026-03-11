@@ -154,6 +154,22 @@ export const LS_TOOL_NAME_LEGACY = 'list_directory'; // Just to be safe if anyth
 
 export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
 
+/**
+ * Tools that can access local files or remote resources and should be
+ * treated with extra caution when updating policies.
+ */
+export const SENSITIVE_TOOLS = new Set([
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
+  READ_MANY_FILES_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  LS_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  EDIT_TOOL_NAME,
+  SHELL_TOOL_NAME,
+]);
+
 export const TRACKER_CREATE_TASK_TOOL_NAME = 'tracker_create_task';
 export const TRACKER_UPDATE_TASK_TOOL_NAME = 'tracker_update_task';
 export const TRACKER_GET_TASK_TOOL_NAME = 'tracker_get_task';

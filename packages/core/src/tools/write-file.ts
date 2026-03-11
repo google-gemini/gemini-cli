@@ -24,7 +24,9 @@ import {
   type ToolLocation,
   type ToolResult,
   type ToolConfirmationOutcome,
+  type PolicyUpdateOptions,
 } from './tools.js';
+import { buildFilePathArgsPattern } from '../policy/utils.js';
 import { ToolErrorType } from './tool-error.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
@@ -162,6 +164,14 @@ class WriteFileToolInvocation extends BaseToolInvocation<
 
   override toolLocations(): ToolLocation[] {
     return [{ path: this.resolvedPath }];
+  }
+
+  override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    return {
+      argsPattern: buildFilePathArgsPattern(this.params.file_path),
+    };
   }
 
   override getDescription(): string {

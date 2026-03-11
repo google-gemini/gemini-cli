@@ -204,7 +204,8 @@ const SETTINGS_SCHEMA = {
         description: oneLine`
           The default approval mode for tool execution.
           'default' prompts for approval, 'auto_edit' auto-approves edit tools,
-          and 'plan' is read-only mode. 'yolo' is not supported yet.
+          and 'plan' is read-only mode. YOLO mode (auto-approve all actions) can
+          only be enabled via command line (--yolo or --approval-mode=yolo).
         `,
         showInDialog: true,
         options: [
@@ -306,10 +307,10 @@ const SETTINGS_SCHEMA = {
         label: 'Retry Fetch Errors',
         category: 'General',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Retry on "exception TypeError: fetch failed sending request" errors.',
-        showInDialog: false,
+        showInDialog: true,
       },
       maxAttempts: {
         type: 'number',
@@ -676,7 +677,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: true,
         description:
-          "Show the logged-in user's identity (e.g. email) in the UI.",
+          "Show the signed-in user's identity (e.g. email) in the UI.",
         showInDialog: true,
       },
       useAlternateBuffer: {
@@ -1169,7 +1170,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description: oneLine`
-          Controls how /memory refresh loads GEMINI.md files.
+          Controls how /memory reload loads GEMINI.md files.
           When true, include directories are scanned; when false, only the current directory is used.
         `,
         showInDialog: true,
@@ -1496,6 +1497,18 @@ const SETTINGS_SCHEMA = {
           'Enable the "Allow for all future sessions" option in tool confirmation dialogs.',
         showInDialog: true,
       },
+      autoAddToPolicyByDefault: {
+        type: 'boolean',
+        label: 'Auto-add to Policy by Default',
+        category: 'Security',
+        requiresRestart: false,
+        default: false,
+        description: oneLine`
+          When enabled, the "Allow for all future sessions" option becomes the
+          default choice for low-risk tools in trusted workspaces.
+        `,
+        showInDialog: true,
+      },
       blockGitExtensions: {
         type: 'boolean',
         label: 'Blocks extensions from Git',
@@ -1779,6 +1792,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable extension registry explore UI.',
         showInDialog: false,
       },
+      extensionRegistryURI: {
+        type: 'string',
+        label: 'Extension Registry URI',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 'https://geminicli.com/extensions.json',
+        description:
+          'The URI (web URL or local file path) of the extension registry.',
+        showInDialog: false,
+      },
       extensionReloading: {
         type: 'boolean',
         label: 'Extension Reloading',
@@ -1823,8 +1846,8 @@ const SETTINGS_SCHEMA = {
         label: 'Plan',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
-        description: 'Enable planning features (Plan Mode and tools).',
+        default: true,
+        description: 'Enable Plan Mode.',
         showInDialog: true,
       },
       taskTracker: {
@@ -1863,7 +1886,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: {},
         description: 'Enable Gemma model router (experimental).',
-        showInDialog: true,
+        showInDialog: false,
         properties: {
           enabled: {
             type: 'boolean',
@@ -1872,8 +1895,8 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: false,
             description:
-              'Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
-            showInDialog: true,
+              'Enable the Gemma Model Router (experimental). Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
+            showInDialog: false,
           },
           classifier: {
             type: 'object',

@@ -271,6 +271,7 @@ describe('useGeminiStream', () => {
     addHistory: vi.fn(),
     getSessionId: vi.fn(() => 'test-session-id'),
     setQuotaErrorOccurred: vi.fn(),
+    resetBillingTurnState: vi.fn(),
     getQuotaErrorOccurred: vi.fn(() => false),
     getModel: vi.fn(() => 'gemini-2.5-pro'),
     getContentGeneratorConfig: vi.fn(() => ({
@@ -2823,7 +2824,6 @@ describe('useGeminiStream', () => {
           type: 'thinking',
           thought: expect.objectContaining({ subject: 'Full thought' }),
         }),
-        expect.any(Number),
       );
     });
 
@@ -3508,6 +3508,116 @@ describe('useGeminiStream', () => {
       // Then verify loop detection confirmation request was set
       await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
+      });
+    });
+
+    describe('Race Condition Prevention', () => {
+      it('should reject concurrent submitQuery when already responding', async () => {
+        // Stream that stays open (simulates "still responding")
+        mockSendMessageStream.mockReturnValue(
+          (async function* () {
+            yield {
+              type: ServerGeminiEventType.Content,
+              value: 'First response',
+            };
+            // Keep the stream open
+            await new Promise(() => {});
+          })(),
+        );
+
+        const { result } = renderTestHook();
+
+        // Start first query without awaiting (fire-and-forget, like existing tests)
+        await act(async () => {
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          result.current.submitQuery('first query');
+        });
+
+        // Wait for the stream to start responding
+        await waitFor(() => {
+          expect(result.current.streamingState).toBe(StreamingState.Responding);
+        });
+
+        // Try a second query while first is still responding
+        await act(async () => {
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          result.current.submitQuery('second query');
+        });
+
+        // Should have only called sendMessageStream once (second was rejected)
+        expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
+      });
+
+      it('should allow continuation queries via loop detection retry', async () => {
+        const mockLoopDetectionService = {
+          disableForSession: vi.fn(),
+        };
+        const mockClient = {
+          ...new MockedGeminiClientClass(mockConfig),
+          getLoopDetectionService: () => mockLoopDetectionService,
+        };
+        mockConfig.getGeminiClient = vi.fn().mockReturnValue(mockClient);
+
+        // First call triggers loop detection
+        mockSendMessageStream.mockReturnValueOnce(
+          (async function* () {
+            yield {
+              type: ServerGeminiEventType.LoopDetected,
+            };
+          })(),
+        );
+
+        // Retry call succeeds
+        mockSendMessageStream.mockReturnValueOnce(
+          (async function* () {
+            yield {
+              type: ServerGeminiEventType.Content,
+              value: 'Retry success',
+            };
+            yield {
+              type: ServerGeminiEventType.Finished,
+              value: { reason: 'STOP' },
+            };
+          })(),
+        );
+
+        const { result } = renderTestHook();
+
+        await act(async () => {
+          await result.current.submitQuery('test query');
+        });
+
+        await waitFor(() => {
+          expect(
+            result.current.loopDetectionConfirmationRequest,
+          ).not.toBeNull();
+        });
+
+        // User selects "disable" which triggers a continuation query
+        await act(async () => {
+          result.current.loopDetectionConfirmationRequest?.onComplete({
+            userSelection: 'disable',
+          });
+        });
+
+        // Verify disableForSession was called
+        expect(
+          mockLoopDetectionService.disableForSession,
+        ).toHaveBeenCalledTimes(1);
+
+        // Continuation query should have gone through (2 total calls)
+        await waitFor(() => {
+          expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+          expect(mockSendMessageStream).toHaveBeenNthCalledWith(
+            2,
+            'test query',
+            expect.any(AbortSignal),
+            expect.any(String),
+            undefined,
+            false,
+            'test query',
+          );
+        });
       });
     });
   });

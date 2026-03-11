@@ -7,6 +7,7 @@
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
+import * as path from 'node:path';
 import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
@@ -33,6 +34,7 @@ import {
   getAdminErrorMessage,
   isHeadlessMode,
   Config,
+  resolveToRealPath,
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
   type HookDefinition,
@@ -76,7 +78,8 @@ export interface CliArgs {
   policy: string[] | undefined;
   allowedMcpServerNames: string[] | undefined;
   allowedTools: string[] | undefined;
-  experimentalAcp: boolean | undefined;
+  acp?: boolean;
+  experimentalAcp?: boolean;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
@@ -172,9 +175,14 @@ export async function parseArguments(
                 .filter(Boolean),
             ),
         })
-        .option('experimental-acp', {
+        .option('acp', {
           type: 'boolean',
           description: 'Starts the agent in ACP mode',
+        })
+        .option('experimental-acp', {
+          type: 'boolean',
+          description:
+            'Starts the agent in ACP mode (deprecated, use --acp instead)',
         })
         .option('allowed-mcp-server-names', {
           type: 'array',
@@ -482,6 +490,15 @@ export async function loadCliConfig(
 
   const experimentalJitContext = settings.experimental?.jitContext ?? false;
 
+  let extensionRegistryURI: string | undefined = trustedFolder
+    ? settings.experimental?.extensionRegistryURI
+    : undefined;
+  if (extensionRegistryURI && !extensionRegistryURI.startsWith('http')) {
+    extensionRegistryURI = resolveToRealPath(
+      path.resolve(cwd, resolvePath(extensionRegistryURI)),
+    );
+  }
+
   let memoryContent: string | HierarchicalMemory = '';
   let fileCount = 0;
   let filePaths: string[] = [];
@@ -493,7 +510,6 @@ export async function loadCliConfig(
       settings.context?.loadMemoryFromIncludeDirectories || false
         ? includeDirectories
         : [],
-      debugMode,
       fileService,
       extensionManager,
       trustedFolder,
@@ -597,6 +613,7 @@ export async function loadCliConfig(
   // -i/--prompt-interactive forces interactive mode with an initial prompt
   const interactive =
     !!argv.promptInteractive ||
+    !!argv.acp ||
     !!argv.experimentalAcp ||
     (!isHeadlessMode({ prompt: argv.prompt, query: argv.query }) &&
       !argv.isCommand);
@@ -688,6 +705,7 @@ export async function loadCliConfig(
   }
 
   return new Config({
+    acpMode: !!argv.acp || !!argv.experimentalAcp,
     sessionId,
     clientVersion: await getVersion(),
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
@@ -751,12 +769,13 @@ export async function loadCliConfig(
     bugCommand: settings.advanced?.bugCommand,
     model: resolvedModel,
     maxSessionTurns: settings.model?.maxSessionTurns,
-    experimentalZedIntegration: argv.experimentalAcp || false,
+
     listExtensions: argv.listExtensions || false,
     listSessions: argv.listSessions || false,
     deleteSession: argv.deleteSession,
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
+    extensionRegistryURI,
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
@@ -798,6 +817,7 @@ export async function loadCliConfig(
     fakeResponses: argv.fakeResponses,
     recordResponses: argv.recordResponses,
     retryFetchErrors: settings.general?.retryFetchErrors,
+    billing: settings.billing,
     maxAttempts: settings.general?.maxAttempts,
     ptyInfo: ptyInfo?.name,
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
