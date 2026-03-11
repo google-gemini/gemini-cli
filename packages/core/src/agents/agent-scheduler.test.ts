@@ -19,11 +19,12 @@ vi.mock('../scheduler/scheduler.js', () => ({
 }));
 
 describe('agent-scheduler', () => {
-  let mockConfig: Mocked<Config>;
   let mockToolRegistry: Mocked<ToolRegistry>;
+  let mockConfig: Mocked<Config>;
   let mockMessageBus: Mocked<MessageBus>;
 
   beforeEach(() => {
+    vi.mocked(Scheduler).mockClear();
     mockMessageBus = {} as Mocked<MessageBus>;
     mockToolRegistry = {
       getTool: vi.fn(),
@@ -33,9 +34,18 @@ describe('agent-scheduler', () => {
       getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
       toolRegistry: mockToolRegistry,
     } as unknown as Mocked<Config>;
+    (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+      mockMessageBus;
+    (mockConfig as unknown as { toolRegistry: ToolRegistry }).toolRegistry =
+      mockToolRegistry;
   });
 
   it('should create a scheduler with agent-specific config', async () => {
+    const mockConfig = {
+      getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
+      toolRegistry: mockToolRegistry,
+    } as unknown as Mocked<Config>;
+
     const requests: ToolCallRequestInfo[] = [
       {
         callId: 'call-1',
@@ -68,8 +78,46 @@ describe('agent-scheduler', () => {
       }),
     );
 
-    // Verify that the scheduler's config has the overridden tool registry
-    const schedulerConfig = vi.mocked(Scheduler).mock.calls[0][0].config;
+    // Verify that the scheduler's context has the overridden tool registry
+    const schedulerConfig = vi.mocked(Scheduler).mock.calls[0][0].context;
     expect(schedulerConfig.toolRegistry).toBe(mockToolRegistry);
+  });
+
+  it('should override toolRegistry getter from prototype chain', async () => {
+    const mainRegistry = { _id: 'main' } as unknown as Mocked<ToolRegistry>;
+    const agentRegistry = {
+      _id: 'agent',
+      getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
+    } as unknown as Mocked<ToolRegistry>;
+
+    const config = {
+      getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
+    } as unknown as Mocked<Config>;
+    Object.defineProperty(config, 'toolRegistry', {
+      get: () => mainRegistry,
+      configurable: true,
+    });
+
+    await scheduleAgentTools(
+      config as unknown as Config,
+      [
+        {
+          callId: 'c1',
+          name: 'new_page',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'p1',
+        },
+      ],
+      {
+        schedulerId: 'browser-1',
+        toolRegistry: agentRegistry as unknown as ToolRegistry,
+        signal: new AbortController().signal,
+      },
+    );
+
+    const schedulerConfig = vi.mocked(Scheduler).mock.calls[0][0].context;
+    expect(schedulerConfig.toolRegistry).toBe(agentRegistry);
+    expect(schedulerConfig.toolRegistry).not.toBe(mainRegistry);
   });
 });

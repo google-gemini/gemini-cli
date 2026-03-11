@@ -48,6 +48,8 @@ vi.mock('./a2a-client-manager.js', () => ({
 vi.mock('./auth-provider/factory.js', () => ({
   A2AAuthProviderFactory: {
     create: vi.fn(),
+    validateAuthConfig: vi.fn().mockReturnValue({ valid: true }),
+    describeRequiredAuth: vi.fn().mockReturnValue('API key required'),
   },
 }));
 
@@ -591,6 +593,7 @@ describe('AgentRegistry', () => {
       expect(A2AAuthProviderFactory.create).toHaveBeenCalledWith({
         authConfig: mockAuth,
         agentName: 'RemoteAgentWithAuth',
+        agentCardUrl: 'https://example.com/card',
       });
       expect(loadAgentSpy).toHaveBeenCalledWith(
         'RemoteAgentWithAuth',
@@ -664,6 +667,111 @@ describe('AgentRegistry', () => {
       );
     });
 
+    it('should emit error feedback with userMessage when A2AAgentError is thrown', async () => {
+      const { AgentConnectionError } = await import('./a2a-errors.js');
+      const feedbackSpy = vi
+        .spyOn(coreEvents, 'emitFeedback')
+        .mockImplementation(() => {});
+
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'FailAgent',
+        description: 'An agent that fails to load',
+        agentCardUrl: 'https://unreachable.example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+      };
+
+      const a2aError = new AgentConnectionError(
+        'FailAgent',
+        'https://unreachable.example.com/card',
+        new Error('ECONNREFUSED'),
+      );
+
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: vi.fn().mockRejectedValue(a2aError),
+      } as unknown as A2AClientManager);
+
+      await registry.testRegisterAgent(remoteAgent);
+
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'error',
+        `[FailAgent] ${a2aError.userMessage}`,
+      );
+      expect(registry.getDefinition('FailAgent')).toBeUndefined();
+    });
+
+    it('should emit generic error feedback for non-A2AAgentError failures', async () => {
+      const feedbackSpy = vi
+        .spyOn(coreEvents, 'emitFeedback')
+        .mockImplementation(() => {});
+
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'FailAgent',
+        description: 'An agent that fails',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+      };
+
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: vi.fn().mockRejectedValue(new Error('unexpected crash')),
+      } as unknown as A2AClientManager);
+
+      await registry.testRegisterAgent(remoteAgent);
+
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'error',
+        '[FailAgent] Failed to load remote agent: unexpected crash',
+      );
+      expect(registry.getDefinition('FailAgent')).toBeUndefined();
+    });
+
+    it('should emit warning feedback when auth config is missing for secured agent', async () => {
+      const feedbackSpy = vi
+        .spyOn(coreEvents, 'emitFeedback')
+        .mockImplementation(() => {});
+
+      vi.mocked(A2AAuthProviderFactory.validateAuthConfig).mockReturnValue({
+        valid: false,
+        diff: { requiredSchemes: ['api_key'], missingConfig: ['api_key'] },
+      });
+      vi.mocked(A2AAuthProviderFactory.describeRequiredAuth).mockReturnValue(
+        'apiKey (header: x-api-key)',
+      );
+
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'SecuredAgent',
+        description: 'A secured remote agent',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+        // No auth configured
+      };
+
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: vi.fn().mockResolvedValue({
+          name: 'SecuredAgent',
+          securitySchemes: {
+            api_key: {
+              type: 'apiKey',
+              in: 'header',
+              name: 'x-api-key',
+            },
+          },
+        }),
+      } as unknown as A2AClientManager);
+
+      await registry.testRegisterAgent(remoteAgent);
+
+      // Agent should still be registered (ADC fallback)
+      expect(registry.getDefinition('SecuredAgent')).toBeDefined();
+      // But a warning should have been emitted
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining('SecuredAgent'),
+      );
+    });
+
     it('should surface an error if remote agent registration fails', async () => {
       const remoteAgent: AgentDefinition = {
         kind: 'remote',
@@ -684,7 +792,7 @@ describe('AgentRegistry', () => {
 
       expect(feedbackSpy).toHaveBeenCalledWith(
         'error',
-        `Error loading A2A agent "FailingRemoteAgent": 401 Unauthorized`,
+        `[FailingRemoteAgent] Failed to load remote agent: 401 Unauthorized`,
       );
     });
 
