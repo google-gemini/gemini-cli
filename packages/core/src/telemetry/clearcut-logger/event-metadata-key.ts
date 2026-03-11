@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 176
+  // Next ID: 180
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -230,6 +230,18 @@ export enum EventMetadataKey {
 
   // Logs the repository name of the GitHub Action that triggered the session.
   GEMINI_CLI_GH_REPOSITORY_NAME_HASH = 132,
+
+  // Logs the event name of the GitHub Action that triggered the session.
+  GEMINI_CLI_GH_EVENT_NAME = 176,
+
+  // Logs the Pull Request number if the workflow is operating on a PR.
+  GEMINI_CLI_GH_PR_NUMBER = 177,
+
+  // Logs the Issue number if the workflow is operating on an Issue.
+  GEMINI_CLI_GH_ISSUE_NUMBER = 178,
+
+  // Logs a custom tracking string (e.g. a comma-separated list of issue IDs for scheduled batches).
+  GEMINI_CLI_GH_CUSTOM_TRACKING_ID = 179,
 
   // ==========================================================================
   // Loop Detected Event Keys
@@ -662,4 +674,17 @@ export enum EventMetadataKey {
 
   // Logs the error message for Conseca events.
   CONSECA_ERROR = 166,
+
+  // ==========================================================================
+  // Network Retry Event Keys
+  // ==========================================================================
+
+  // Logs the attempt number for a network retry.
+  GEMINI_CLI_NETWORK_RETRY_ATTEMPT_NUMBER = 180,
+
+  // Logs the delay in milliseconds for a network retry.
+  GEMINI_CLI_NETWORK_RETRY_DELAY_MS = 181,
+
+  // Logs the error type for a network retry.
+  GEMINI_CLI_NETWORK_RETRY_ERROR_TYPE = 182,
 }

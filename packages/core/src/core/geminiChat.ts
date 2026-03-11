@@ -19,7 +19,11 @@ import {
   type GenerateContentParameters,
 } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
-import { retryWithBackoff, isRetryableError } from '../utils/retry.js';
+import {
+  retryWithBackoff,
+  isRetryableError,
+  getRetryErrorType,
+} from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import type { Config } from '../config/config.js';
 import {
@@ -33,6 +37,7 @@ import type { CompletedToolCall } from './coreToolScheduler.js';
 import {
   logContentRetry,
   logContentRetryFailure,
+  logNetworkRetryAttempt,
 } from '../telemetry/loggers.js';
 import {
   ChatRecordingService,
@@ -41,6 +46,7 @@ import {
 import {
   ContentRetryEvent,
   ContentRetryFailureEvent,
+  NetworkRetryAttemptEvent,
   type LlmRole,
 } from '../telemetry/types.js';
 import { handleFallback } from '../fallback/handler.js';
@@ -344,8 +350,6 @@ export class GeminiChat {
       this: GeminiChat,
     ): AsyncGenerator<StreamEvent, void, void> {
       try {
-        let lastError: unknown = new Error('Request failed after all retries.');
-
         const maxAttempts = INVALID_CONTENT_RETRY_OPTIONS.maxAttempts;
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -374,15 +378,13 @@ export class GeminiChat {
               yield { type: StreamEventType.CHUNK, value: chunk };
             }
 
-            lastError = null;
-            break;
+            return;
           } catch (error) {
             if (error instanceof AgentExecutionStoppedError) {
               yield {
                 type: StreamEventType.AGENT_EXECUTION_STOPPED,
                 reason: error.reason,
               };
-              lastError = null; // Clear error as this is an expected stop
               return; // Stop the generator
             }
 
@@ -397,7 +399,6 @@ export class GeminiChat {
                   value: error.syntheticResponse,
                 };
               }
-              lastError = null; // Clear error as this is an expected stop
               return; // Stop the generator
             }
 
@@ -415,8 +416,11 @@ export class GeminiChat {
               }
               // Fall through to retry logic for retryable connection errors
             }
-            lastError = error;
+
             const isContentError = error instanceof InvalidStreamError;
+            const errorType = isContentError
+              ? error.type
+              : getRetryErrorType(error);
 
             if (
               (isContentError && isGemini2Model(model)) ||
@@ -425,17 +429,29 @@ export class GeminiChat {
               // Check if we have more attempts left.
               if (attempt < maxAttempts - 1) {
                 const delayMs = INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs;
-                const retryType = isContentError ? error.type : 'NETWORK_ERROR';
 
-                logContentRetry(
-                  this.config,
-                  new ContentRetryEvent(attempt, retryType, delayMs, model),
-                );
+                if (isContentError) {
+                  logContentRetry(
+                    this.config,
+                    new ContentRetryEvent(attempt, errorType, delayMs, model),
+                  );
+                } else {
+                  logNetworkRetryAttempt(
+                    this.config,
+                    new NetworkRetryAttemptEvent(
+                      attempt + 1,
+                      maxAttempts,
+                      errorType,
+                      delayMs * (attempt + 1),
+                      model,
+                    ),
+                  );
+                }
                 coreEvents.emitRetryAttempt({
                   attempt: attempt + 1,
                   maxAttempts,
                   delayMs: delayMs * (attempt + 1),
-                  error: error instanceof Error ? error.message : String(error),
+                  error: errorType,
                   model,
                 });
                 await new Promise((res) =>
@@ -444,21 +460,19 @@ export class GeminiChat {
                 continue;
               }
             }
-            break;
-          }
-        }
 
-        if (lastError) {
-          if (
-            lastError instanceof InvalidStreamError &&
-            isGemini2Model(model)
-          ) {
+            // If we've aborted, we throw without logging a failure.
+            if (signal.aborted) {
+              throw error;
+            }
+
             logContentRetryFailure(
               this.config,
-              new ContentRetryFailureEvent(maxAttempts, lastError.type, model),
+              new ContentRetryFailureEvent(attempt + 1, errorType, model),
             );
+
+            throw error;
           }
-          throw lastError;
         }
       } finally {
         streamDoneResolver!();
@@ -993,6 +1007,8 @@ export class GeminiChat {
         status: call.status,
         timestamp: new Date().toISOString(),
         resultDisplay,
+        description:
+          'invocation' in call ? call.invocation?.getDescription() : undefined,
       };
     });
 
