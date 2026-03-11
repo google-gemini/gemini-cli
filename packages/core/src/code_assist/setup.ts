@@ -20,12 +20,14 @@ import { ChangeAuthRequestedError } from '../utils/errors.js';
 import { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { createCache, type CacheService } from '../utils/cache.js';
+import {
+  getConfiguredProjectId,
+  getMissingProjectIdMessage,
+} from '../utils/projectIdValidator.js';
 
 export class ProjectIdRequiredError extends Error {
   constructor() {
-    super(
-      'This account requires setting the GOOGLE_CLOUD_PROJECT or GOOGLE_CLOUD_PROJECT_ID env var. See https://goo.gle/gemini-cli-auth-docs#workspace-gca',
-    );
+    super(getMissingProjectIdMessage());
   }
 }
 
@@ -106,10 +108,7 @@ export async function setupUser(
   validationHandler?: ValidationHandler,
   httpOptions: HttpOptions = {},
 ): Promise<UserData> {
-  const projectId =
-    process.env['GOOGLE_CLOUD_PROJECT'] ||
-    process.env['GOOGLE_CLOUD_PROJECT_ID'] ||
-    undefined;
+  const projectId = getConfiguredProjectId();
 
   const projectCache = userDataCache.getOrCreate(client, () =>
     createCache<string | undefined, Promise<UserData>>({
