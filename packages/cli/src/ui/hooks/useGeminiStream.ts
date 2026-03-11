@@ -217,6 +217,7 @@ export const useGeminiStream = (
     config.getApprovalMode(),
   );
   const [isResponding, setIsResponding] = useState<boolean>(false);
+  const isRespondingRef = useRef(isResponding);
   const [thought, thoughtRef, setThought] =
     useStateAndRef<ThoughtSummary | null>(null);
   const [pendingHistoryItem, pendingHistoryItemRef, setPendingHistoryItem] =
@@ -240,7 +241,14 @@ export const useGeminiStream = (
   }, [config, storage]);
 
   useEffect(() => {
+    isRespondingRef.current = isResponding;
+  }, [isResponding]);
+
+  useEffect(() => {
     const handleRetryAttempt = (payload: RetryAttemptPayload) => {
+      if (turnCancelledRef.current || !isRespondingRef.current) {
+        return;
+      }
       setRetryStatus(payload);
     };
     coreEvents.on(CoreEvent.RetryAttempt, handleRetryAttempt);
@@ -626,6 +634,7 @@ export const useGeminiStream = (
       return;
     }
     turnCancelledRef.current = true;
+    setRetryStatus(null);
 
     // A full cancellation means no tools have produced a final result yet.
     // This determines if we show a generic "Request cancelled" message.
