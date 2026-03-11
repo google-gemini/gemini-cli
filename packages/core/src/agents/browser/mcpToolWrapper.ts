@@ -30,23 +30,7 @@ import {
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import type { BrowserManager, McpToolCallResult } from './browserManager.js';
 import { debugLogger } from '../../utils/debugLogger.js';
-import { injectInputBlocker } from './inputBlocker.js';
-
-/**
- * Tools that change the page state and require re-injection of the input blocker.
- * After these tools complete, the DOM may have changed (navigation, click opening
- * a new page, etc.), so the overlay needs to be re-injected.
- */
-const TOOLS_REQUIRING_REINJECT = new Set([
-  'navigate_page',
-  'new_page',
-  'click',
-  'fill',
-  'fill_form',
-  'press_key',
-  'select_page',
-  'handle_dialog',
-]);
+import { injectInputBlocker, removeInputBlocker } from './inputBlocker.js';
 
 /**
  * Tool invocation that dispatches to BrowserManager's isolated MCP client.
@@ -98,13 +82,19 @@ class McpToolInvocation extends BaseToolInvocation<
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
     try {
-      const callToolPromise = this.browserManager.callTool(
+      // Remove input blocker before tool execution so it doesn't
+      // obscure elements or interfere with interactability checks.
+      // CDP commands bypass DOM event listeners, but chrome-devtools-mcp
+      // may check element visibility/interactability before dispatching.
+      if (this.shouldDisableInput) {
+        await removeInputBlocker(this.browserManager);
+      }
+
+      const result: McpToolCallResult = await this.browserManager.callTool(
         this.toolName,
         this.params,
         signal,
       );
-
-      const result: McpToolCallResult = await callToolPromise;
 
       // Extract text content from MCP response
       let textContent = '';
@@ -121,23 +111,19 @@ class McpToolInvocation extends BaseToolInvocation<
         textContent,
       );
 
+      // Re-inject input blocker after tool execution completes.
+      // Awaited (not fire-and-forget) to prevent race conditions
+      // with the agent's next tool call.
+      if (this.shouldDisableInput) {
+        await injectInputBlocker(this.browserManager);
+      }
+
       if (result.isError) {
         return {
           llmContent: `Error: ${processedContent}`,
           returnDisplay: `Error: ${processedContent}`,
           error: { message: textContent },
         };
-      }
-
-      // Re-inject the input blocker after state-changing tools.
-      // This ensures the overlay survives page navigations, clicks that
-      // trigger new page loads, form submissions, etc.
-      if (
-        this.shouldDisableInput &&
-        TOOLS_REQUIRING_REINJECT.has(this.toolName)
-      ) {
-        // Fire-and-forget: don't block the tool result on re-injection
-        void injectInputBlocker(this.browserManager);
       }
 
       return {
@@ -151,6 +137,11 @@ class McpToolInvocation extends BaseToolInvocation<
       // immediately instead of returning a result the LLM would retry.
       if (errorMsg.includes('Could not connect to Chrome')) {
         throw error;
+      }
+
+      // Re-inject on error path too so the blocker is always restored
+      if (this.shouldDisableInput) {
+        await injectInputBlocker(this.browserManager).catch(() => {});
       }
 
       debugLogger.error(`MCP tool ${this.toolName} failed: ${errorMsg}`);

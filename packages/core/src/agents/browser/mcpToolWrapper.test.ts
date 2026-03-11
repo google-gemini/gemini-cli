@@ -195,7 +195,7 @@ describe('mcpToolWrapper', () => {
   });
 
   describe('Input blocker re-injection', () => {
-    it('should re-inject input blocker after navigate_page when shouldDisableInput is true', async () => {
+    it('should remove and re-inject input blocker around navigate_page when shouldDisableInput is true', async () => {
       // Add navigate_page to discovered tools
       mockMcpTools.push({
         name: 'navigate_page',
@@ -217,9 +217,29 @@ describe('mcpToolWrapper', () => {
       const invocation = navigateTool.build({ url: 'https://example.com' });
       await invocation.execute(new AbortController().signal);
 
-      // callTool is called twice: once for navigate_page, once for evaluate_script (input blocker)
-      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(2);
-      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
+      // callTool is called 3 times: remove blocker, navigate_page, re-inject blocker
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(3);
+
+      // First call: remove blocker
+      expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
+        1,
+        'evaluate_script',
+        expect.objectContaining({
+          function: expect.stringContaining('__gemini_input_blocker'),
+        }),
+      );
+
+      // Second call: navigate_page
+      expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
+        2,
+        'navigate_page',
+        { url: 'https://example.com' },
+        expect.any(AbortSignal),
+      );
+
+      // Third call: re-inject blocker
+      expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
+        3,
         'evaluate_script',
         expect.objectContaining({
           function: expect.stringContaining('__gemini_input_blocker'),
@@ -227,7 +247,7 @@ describe('mcpToolWrapper', () => {
       );
     });
 
-    it('should NOT re-inject input blocker for take_snapshot', async () => {
+    it('should remove and re-inject input blocker around take_snapshot too', async () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
@@ -238,16 +258,17 @@ describe('mcpToolWrapper', () => {
       const invocation = snapshotTool.build({});
       await invocation.execute(new AbortController().signal);
 
-      // callTool should only be called once for take_snapshot itself
-      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(1);
-      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
+      // callTool is called 3 times: remove blocker, take_snapshot, re-inject blocker
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(3);
+      expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
+        2,
         'take_snapshot',
         {},
         expect.any(AbortSignal),
       );
     });
 
-    it('should NOT re-inject input blocker when shouldDisableInput is false', async () => {
+    it('should NOT remove/re-inject input blocker when shouldDisableInput is false', async () => {
       mockMcpTools.push({
         name: 'navigate_page',
         description: 'Navigate to URL',
@@ -272,7 +293,7 @@ describe('mcpToolWrapper', () => {
       expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(1);
     });
 
-    it('should re-inject input blocker after click when shouldDisableInput is true', async () => {
+    it('should remove and re-inject input blocker around click when shouldDisableInput is true', async () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
@@ -283,14 +304,38 @@ describe('mcpToolWrapper', () => {
       const invocation = clickTool.build({ uid: 'elem-42' });
       await invocation.execute(new AbortController().signal);
 
-      // callTool: click + evaluate_script for input blocker
-      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(2);
-      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
-        'evaluate_script',
-        expect.objectContaining({
-          function: expect.stringContaining('__gemini_input_blocker'),
-        }),
+      // callTool: remove blocker + click + re-inject blocker
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(3);
+
+      // Verify the actual click happened in the middle
+      expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
+        2,
+        'click',
+        { uid: 'elem-42' },
+        expect.any(AbortSignal),
       );
+    });
+
+    it('should re-inject input blocker even when tool execution fails', async () => {
+      vi.mocked(mockBrowserManager.callTool)
+        .mockResolvedValueOnce({ content: [] }) // remove blocker succeeds
+        .mockRejectedValueOnce(new Error('Click failed')) // tool fails
+        .mockResolvedValueOnce({ content: [] }); // re-inject succeeds
+
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        true, // shouldDisableInput
+      );
+
+      const clickTool = tools.find((t) => t.name === 'click')!;
+      const invocation = clickTool.build({ uid: 'bad-elem' });
+      const result = await invocation.execute(new AbortController().signal);
+
+      // Should return error, not throw
+      expect(result.error).toBeDefined();
+      // Should still try to re-inject
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(3);
     });
   });
 });
