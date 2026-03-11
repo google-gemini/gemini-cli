@@ -5,7 +5,6 @@
  */
 
 import * as grpc from '@grpc/grpc-js';
-import { z } from 'zod';
 import type {
   Message,
   Part,
@@ -20,32 +19,6 @@ import type {
 import type { SendMessageResult } from './a2a-client-manager.js';
 
 export const AUTH_REQUIRED_MSG = `[Authorization Required] The agent has indicated it requires authorization to proceed. Please follow the agent's instructions.`;
-
-const AgentInterfaceSchema = z
-  .object({
-    url: z.string().default(''),
-    transport: z.string().optional(),
-    protocolBinding: z.string().optional(),
-  })
-  .passthrough();
-
-const AgentCardSchema = z
-  .object({
-    name: z.string().default('unknown'),
-    description: z.string().default(''),
-    url: z.string().default(''),
-    version: z.string().default(''),
-    protocolVersion: z.string().default(''),
-    capabilities: z.record(z.unknown()).default({}),
-    skills: z.array(z.union([z.string(), z.record(z.unknown())])).default([]),
-    defaultInputModes: z.array(z.string()).default([]),
-    defaultOutputModes: z.array(z.string()).default([]),
-
-    additionalInterfaces: z.array(AgentInterfaceSchema).optional(),
-    supportedInterfaces: z.array(AgentInterfaceSchema).optional(),
-    preferredTransport: z.string().optional(),
-  })
-  .passthrough();
 
 /**
  * Reassembles incremental A2A streaming updates into a coherent result.
@@ -247,35 +220,80 @@ export function normalizeAgentCard(card: unknown): AgentCard {
     throw new Error('Agent card is missing.');
   }
 
-  // Use Zod to validate and parse the card, ensuring safe defaults and narrowing types.
-  const parsed = AgentCardSchema.parse(card);
-  // Narrowing to AgentCard interface after runtime validation.
+  // Narrowing to AgentCard interface.
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const result = parsed as unknown as AgentCard;
+  const result = card as unknown as AgentCard;
 
-  // Normalize interfaces and synchronize both interface fields.
-  const normalizedInterfaces = extractNormalizedInterfaces(parsed);
-  result.additionalInterfaces = normalizedInterfaces;
+  // 1. Normalize and Sync Interfaces
+  const interfaces = normalizeInterfaces(card);
+  result.additionalInterfaces = interfaces;
 
   // Sync supportedInterfaces for backward compatibility.
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const legacyResult = result as unknown as Record<string, AgentInterface[]>;
-  legacyResult['supportedInterfaces'] = normalizedInterfaces;
+  legacyResult['supportedInterfaces'] = interfaces;
 
-  // Fallback preferredTransport: If not specified, default to GRPC if available.
+  // 2. Fallback preferredTransport: If not specified, default to GRPC if available.
   if (
     !result.preferredTransport &&
-    normalizedInterfaces.some((i) => i.transport === 'GRPC')
+    interfaces.some((i) => i.transport === 'GRPC')
   ) {
     result.preferredTransport = 'GRPC';
   }
 
-  // Fallback: If top-level URL is missing, use the first interface's URL.
-  if (result.url === '' && normalizedInterfaces.length > 0) {
-    result.url = normalizedInterfaces[0].url;
+  // 3. Fallback: If top-level URL is missing, use the first interface's URL.
+  if ((!result.url || result.url === '') && interfaces.length > 0) {
+    result.url = interfaces[0].url;
   }
 
   return result;
+}
+
+/**
+ * Extracts and normalizes interfaces from the card, handling protocol version fallbacks.
+ */
+function normalizeInterfaces(card: Record<string, unknown>): AgentInterface[] {
+  const additional = card['additionalInterfaces'];
+  const supported = card['supportedInterfaces'];
+
+  let rawInterfaces: unknown[] = [];
+  if (Array.isArray(additional)) {
+    rawInterfaces = additional;
+  } else if (Array.isArray(supported)) {
+    rawInterfaces = supported;
+  }
+
+  return rawInterfaces.filter(isObject).map((i) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const intf = i as unknown as AgentInterface;
+    normalizeInterface(intf);
+    return intf;
+  });
+}
+
+/**
+ * Normalizes a single AgentInterface.
+ */
+function normalizeInterface(intf: AgentInterface): void {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  const raw = intf as unknown as Record<string, unknown>;
+
+  // Normalize 'transport' from 'protocolBinding' if missing.
+  const protocolBinding = raw['protocolBinding'];
+  if (!intf.transport && isString(protocolBinding)) {
+    intf.transport = protocolBinding;
+  }
+
+  // Robust URL: Ensure the URL has a scheme (except for gRPC).
+  if (
+    intf.url &&
+    !intf.url.includes('://') &&
+    !intf.url.startsWith('/') &&
+    intf.transport !== 'GRPC'
+  ) {
+    // Default to http:// for insecure REST/JSON-RPC if scheme is missing.
+    intf.url = `http://${intf.url}`;
+  }
 }
 
 /**
@@ -332,65 +350,6 @@ export function extractIdsFromResponse(result: SendMessageResult): {
   return { contextId, taskId, clearTaskId };
 }
 
-/**
- * Extracts and normalizes interfaces from the card, handling protocol version fallbacks.
- * Preserves all original fields to maintain SDK compatibility.
- */
-function extractNormalizedInterfaces(
-  card: Record<string, unknown>,
-): AgentInterface[] {
-  const rawInterfaces =
-    getArray(card, 'additionalInterfaces') ||
-    getArray(card, 'supportedInterfaces');
-
-  if (!rawInterfaces) {
-    return [];
-  }
-
-  const mapped: AgentInterface[] = [];
-  for (const i of rawInterfaces) {
-    if (isObject(i)) {
-      // Use schema to validate interface object.
-      const parsed = AgentInterfaceSchema.parse(i);
-      // Narrowing to AgentInterface after runtime validation.
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const normalized = parsed as unknown as AgentInterface & {
-        protocolBinding?: string;
-      };
-
-      // Normalize 'transport' from 'protocolBinding' if missing.
-      if (!normalized.transport && normalized.protocolBinding) {
-        normalized.transport = normalized.protocolBinding;
-      }
-
-      // Robust URL: Ensure the URL has a scheme (except for gRPC).
-      if (
-        normalized.url &&
-        !normalized.url.includes('://') &&
-        !normalized.url.startsWith('/') &&
-        normalized.transport !== 'GRPC'
-      ) {
-        // Default to http:// for insecure REST/JSON-RPC if scheme is missing.
-        normalized.url = `http://${normalized.url}`;
-      }
-
-      mapped.push(normalized as AgentInterface);
-    }
-  }
-  return mapped;
-}
-
-/**
- * Safely extracts an array property from an object.
- */
-function getArray(
-  obj: Record<string, unknown>,
-  key: string,
-): unknown[] | undefined {
-  const val = obj[key];
-  return Array.isArray(val) ? val : undefined;
-}
-
 // Type Guards
 
 function isTextPart(part: Part): part is TextPart {
@@ -415,6 +374,13 @@ export function isTerminalState(state: TaskState | undefined): boolean {
     state === 'canceled' ||
     state === 'rejected'
   );
+}
+
+/**
+ * Type guard to check if a value is a string.
+ */
+function isString(val: unknown): val is string {
+  return typeof val === 'string';
 }
 
 /**

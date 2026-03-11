@@ -286,9 +286,9 @@ describe('a2aUtils', () => {
       expect(normalized.name).toBe('my-agent');
       // @ts-expect-error - testing dynamic preservation
       expect(normalized.customField).toBe('keep-me');
-      expect(normalized.description).toBe('');
-      expect(normalized.skills).toEqual([]);
-      expect(normalized.defaultInputModes).toEqual([]);
+      expect(normalized.description).toBeUndefined();
+      expect(normalized.skills).toBeUndefined();
+      expect(normalized.defaultInputModes).toBeUndefined();
     });
 
     it('should normalize and synchronize interfaces while preserving other fields', () => {
