@@ -77,6 +77,9 @@ Gemini CLI takes action.
       CLI will refine the strategy and update the plan.
     - **Cancel:** You can cancel your plan with `Esc`.
 
+For more complex or specialized planning tasks, you can
+[customize the planning workflow with skills](#custom-planning-with-skills).
+
 ### Collaborative plan editing
 
 You can collaborate with Gemini CLI by making direct changes or leaving comments
@@ -95,9 +98,6 @@ describing complex changes in natural language.
 4.  **Review and refine:** Gemini CLI automatically detects the changes, reviews
     your comments, and adjusts the implementation strategy. It then presents the
     refined plan for your final approval.
-
-For more complex or specialized planning tasks, you can
-[customize the planning workflow with skills](#custom-planning-with-skills).
 
 ## How to exit Plan Mode
 
