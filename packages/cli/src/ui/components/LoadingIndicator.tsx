@@ -65,10 +65,10 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
     currentLoadingPhrase === INTERACTIVE_SHELL_WAITING_PHRASE
       ? currentLoadingPhrase
       : thought?.subject
-        ? (thoughtLabel ?? thought.subject)
+        ? `Gemini is thinking about ${thoughtLabel ?? thought.subject.trim()}`
         : currentLoadingPhrase ||
           (streamingState === StreamingState.Responding
-            ? 'Thinking...'
+            ? 'Gemini is thinking...'
             : undefined);
 
   const cancelAndTimerContent =
@@ -81,7 +81,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
     !forceRealStatusOnly &&
     showWit &&
     wittyPhrase &&
-    primaryText === 'Thinking...' ? (
+    (primaryText === 'Thinking...' || primaryText === 'Gemini is thinking...') ? (
       <Box marginLeft={1}>
         <Text color={theme.text.secondary} dimColor italic>
           {wittyPhrase}

@@ -76,7 +76,7 @@ export const DetailedMessagesDisplay: React.FC<
     >
       <Box marginBottom={1}>
         <Text bold color={theme.text.primary}>
-          Debug Console <Text color={theme.text.secondary}>(F12 to close)</Text>
+          Debug console <Text color={theme.text.secondary}>(F12 to close)</Text>
         </Text>
       </Box>
       <Box height={maxHeight} width={width - borderAndPadding}>

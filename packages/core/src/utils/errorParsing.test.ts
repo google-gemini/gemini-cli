@@ -11,8 +11,8 @@ import { AuthType } from '../core/contentGenerator.js';
 import type { StructuredError } from '../core/turn.js';
 
 describe('parseAndFormatApiError', () => {
-  const vertexMessage = 'request a quota increase through Vertex';
-  const geminiMessage = 'request a quota increase through AI Studio';
+  const vertexMessage = 'request a quota increase in Vertex';
+  const geminiMessage = 'request a quota increase in AI Studio';
 
   it('should format a valid API error JSON', () => {
     const errorMessage =
@@ -34,7 +34,7 @@ describe('parseAndFormatApiError', () => {
     );
     expect(result).toContain('[API Error: Rate limit exceeded');
     expect(result).toContain(
-      'Possible quota limitations in place or slow response times detected. Switching to the gemini-2.5-flash model',
+      'System busy or quota limit reached. Switching to gemini-2.5-flash for the rest of this session.',
     );
   });
 
