@@ -277,8 +277,14 @@ export async function uninstallSkill(
     // Fallback: Check if a directory with the given name exists.
     // This maintains backward compatibility for cases where the metadata might be missing or corrupted
     // but the directory name matches the user's request.
-    const skillPath = path.join(targetDir, name);
-    const exists = await fs.stat(skillPath).catch(() => null);
+    const skillPath = path.resolve(targetDir, name);
+
+    // Security check: ensure the resolved path is within the target directory to prevent path traversal
+    if (!skillPath.startsWith(path.resolve(targetDir))) {
+      return null;
+    }
+
+    const exists = await fs.lstat(skillPath).catch(() => null);
 
     if (!exists) {
       return null;
