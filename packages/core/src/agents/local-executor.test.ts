@@ -23,7 +23,7 @@ const {
   mockStopMcp,
 } = vi.hoisted(() => ({
   mockSendMessageStream: vi.fn().mockResolvedValue({
-    async *[Symbol.asyncIterator] () {
+    async *[Symbol.asyncIterator]() {
       yield {
         type: 'chunk',
         value: { candidates: [] },
@@ -38,11 +38,11 @@ const {
 }));
 
 vi.mock('../tools/mcp-client-manager.js', () => ({
-    McpClientManager: class {
-      maybeDiscoverMcpServer = mockMaybeDiscoverMcpServer;
-      stop = mockStopMcp;
-    },
-  }));
+  McpClientManager: class {
+    maybeDiscoverMcpServer = mockMaybeDiscoverMcpServer;
+    stop = mockStopMcp;
+  },
+}));
 
 import { debugLogger } from '../utils/debugLogger.js';
 import { LocalAgentExecutor, type ActivityCallback } from './local-executor.js';
@@ -2498,55 +2498,17 @@ describe('LocalAgentExecutor', () => {
         mcpServers,
       };
 
+      vi.spyOn(mockConfig, 'getMcpClientManager').mockReturnValue({
+        maybeDiscoverMcpServer: mockMaybeDiscoverMcpServer,
+      } as unknown as ReturnType<typeof mockConfig.getMcpClientManager>);
+
       await LocalAgentExecutor.create(definition, mockConfig);
 
-      expect(mockMaybeDiscoverMcpServer).toHaveBeenCalledWith(
-        'test-server',
+      const mcpManager = mockConfig.getMcpClientManager();
+      expect(mcpManager?.maybeDiscoverMcpServer).toHaveBeenCalledWith(
+        '__agent__TestAgent__test-server',
         mcpServers['test-server'],
       );
-    });
-
-    it('should stop McpClientManager when agent execution finishes', async () => {
-      const { MCPServerConfig } = await import('../config/config.js');
-      const mcpServers = {
-        'test-server': new MCPServerConfig('node', ['server.js']),
-      };
-
-      const definition = {
-        ...createTestDefinition(),
-        mcpServers,
-      };
-
-      const executor = await LocalAgentExecutor.create(definition, mockConfig);
-
-      mockSendMessageStream.mockResolvedValueOnce({
-        async *[Symbol.asyncIterator] () {
-          yield {
-            type: 'chunk',
-            value: {
-              candidates: [
-                {
-                  content: {
-                    parts: [
-                      {
-                        functionCall: {
-                          name: TASK_COMPLETE_TOOL_NAME,
-                          args: { result: 'Done' },
-                          id: 't1',
-                        },
-                      },
-                    ],
-                  },
-                },
-              ],
-            },
-          };
-        },
-      });
-
-      await executor.run({ goal: 'test' }, signal);
-
-      expect(mockStopMcp).toHaveBeenCalled();
     });
   });
 });

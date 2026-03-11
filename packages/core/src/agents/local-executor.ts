@@ -18,7 +18,7 @@ import {
 } from '@google/genai';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import { McpClientManager } from '../tools/mcp-client-manager.js';
+import type { McpClientManager } from '../tools/mcp-client-manager.js';
 import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import { type Message } from '../confirmation-bus/types.js';
@@ -95,7 +95,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private readonly agentId: string;
   private readonly toolRegistry: ToolRegistry;
   private readonly context: AgentLoopContext;
-  private readonly mcpClientManager?: McpClientManager;
   private readonly onActivity?: ActivityCallback;
   private readonly compressionService: ChatCompressionService;
   private readonly parentCallId?: string;
@@ -145,14 +144,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     );
     let mcpClientManager: McpClientManager | undefined;
     if (definition.mcpServers) {
-      mcpClientManager = new McpClientManager(
-        await getVersion(),
-        agentToolRegistry,
-        context.config,
-      );
-
-      for (const [name, config] of Object.entries(definition.mcpServers)) {
-        await mcpClientManager.maybeDiscoverMcpServer(name, config);
+      const globalMcpManager = context.config.getMcpClientManager();
+      if (globalMcpManager) {
+        for (const [name, config] of Object.entries(definition.mcpServers)) {
+          const prefixedName = `__agent__${definition.name}__${name}`;
+          await globalMcpManager.maybeDiscoverMcpServer(prefixedName, config);
+        }
       }
     }
 
@@ -205,9 +202,31 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     } else {
       // If no tools are explicitly configured, default to all available tools.
       for (const toolName of parentToolRegistry.getAllToolNames()) {
+        const tool = parentToolRegistry.getTool(toolName);
+        if (
+          tool instanceof DiscoveredMCPTool &&
+          tool.serverName.startsWith('__agent__')
+        ) {
+          if (!tool.serverName.startsWith(`__agent__${definition.name}__`)) {
+            continue; // Skip other agents' MCP tools
+          }
+        }
         registerToolByName(toolName);
       }
     }
+
+    // Always ensure this agent's own MCP servers are included, even if toolConfig is restricted
+    parentToolRegistry.getActiveTools().forEach((tool) => {
+      if (
+        tool instanceof DiscoveredMCPTool &&
+        tool.serverName.startsWith(`__agent__${definition.name}__`)
+      ) {
+        const qualifiedName = tool.asFullyQualifiedTool().name;
+        if (!agentToolRegistry.getTool(qualifiedName)) {
+          registerToolByName(qualifiedName);
+        }
+      }
+    });
 
     agentToolRegistry.sortTools();
 
@@ -242,7 +261,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     parentPromptId: string | undefined,
     parentCallId: string | undefined,
     onActivity?: ActivityCallback,
-    mcpClientManager?: McpClientManager,
   ) {
     this.definition = definition;
     this.context = context;
@@ -250,7 +268,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     this.onActivity = onActivity;
     this.compressionService = new ChatCompressionService();
     this.parentCallId = parentCallId;
-    this.mcpClientManager = mcpClientManager;
 
     const randomIdPart = Math.random().toString(36).slice(2, 8);
     // parentPromptId will be undefined if this agent is invoked directly
@@ -697,9 +714,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       throw error; // Re-throw other errors or external aborts.
     } finally {
       deadlineTimer.abort();
-      if (this.mcpClientManager) {
-        await this.mcpClientManager.stop();
-      }
       logAgentFinish(
         this.config,
         new AgentFinishEvent(
