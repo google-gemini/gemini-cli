@@ -2087,9 +2087,9 @@ export const EVENT_WEB_FETCH_FALLBACK_ATTEMPT =
 export class WebFetchFallbackAttemptEvent implements BaseTelemetryEvent {
   'event.name': 'web_fetch_fallback_attempt';
   'event.timestamp': string;
-  reason: 'private_ip' | 'primary_failed';
+  reason: 'private_ip' | 'primary_failed' | 'private_ip_skipped';
 
-  constructor(reason: 'private_ip' | 'primary_failed') {
+  constructor(reason: 'private_ip' | 'primary_failed' | 'private_ip_skipped') {
     this['event.name'] = 'web_fetch_fallback_attempt';
     this['event.timestamp'] = new Date().toISOString();
     this.reason = reason;

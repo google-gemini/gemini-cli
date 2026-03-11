@@ -146,7 +146,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`general.retryFetchErrors`** (boolean):
   - **Description:** Retry on "exception TypeError: fetch failed sending
     request" errors.
-  - **Default:** `true`
+  - **Default:** `false`
 
 - **`general.maxAttempts`** (number):
   - **Description:** Maximum number of attempts for requests to the main chat
