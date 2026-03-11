@@ -200,13 +200,14 @@ describe('EditorSettingsDialog', () => {
     } as unknown as LoadedSettings;
 
     const onSelect = vi.fn();
-    const { lastFrame } = renderWithProvider(
+    const { lastFrame, waitUntilReady } = renderWithProvider(
       <EditorSettingsDialog
         onSelect={onSelect}
         settings={settingsWithInvalidEditor}
         onExit={vi.fn()}
       />,
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toContain('Your preferred editor is: None');
 
