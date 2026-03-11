@@ -171,6 +171,7 @@ export class ChatRecordingService {
         this.cachedConversation = null;
       } else {
         // Create new session
+        this.sessionId = this.config.getSessionId();
         const chatsDir = path.join(
           this.config.storage.getProjectTempDir(),
           'chats',
