@@ -39,6 +39,52 @@ export interface ShellConfiguration {
   shell: ShellType;
 }
 
+/**
+ * User-configured shell settings.
+ */
+export interface CustomShellConfig {
+  executable: string;
+  args: string[];
+}
+
+let configuredShell: CustomShellConfig | null = null;
+
+/**
+ * Sets the shell to use for command execution, or null for platform defaults.
+ */
+export function setConfiguredShell(
+  config: CustomShellConfig | null | undefined,
+): void {
+  configuredShell = config ?? null;
+}
+
+/**
+ * Gets the configured shell, or null if using platform defaults.
+ */
+export function getConfiguredShell(): CustomShellConfig | null {
+  return configuredShell;
+}
+
+function inferShellType(executable: string): ShellType {
+  const lower = executable.toLowerCase();
+  const basename = lower.split(/[\\/]/).pop() ?? lower;
+
+  if (
+    basename.includes('powershell') ||
+    basename.includes('pwsh') ||
+    basename === 'powershell.exe' ||
+    basename === 'pwsh.exe'
+  ) {
+    return 'powershell';
+  }
+
+  if (basename.includes('cmd') || basename === 'cmd.exe') {
+    return 'cmd';
+  }
+
+  return 'bash';
+}
+
 export async function resolveExecutable(
   exe: string,
 ): Promise<string | undefined> {
@@ -535,14 +581,10 @@ export function parseCommandDetails(
 }
 
 /**
- * Determines the appropriate shell configuration for the current platform.
- *
- * This ensures we can execute command strings predictably and securely across platforms
- * using the `spawn(executable, [...argsPrefix, commandString], { shell: false })` pattern.
- *
- * @returns The ShellConfiguration for the current environment.
+ * This is used when no custom shell is configured.
+ * @returns The default shell configuration for the current platform.
  */
-export function getShellConfiguration(): ShellConfiguration {
+function getDefaultShellConfiguration(): ShellConfiguration {
   if (isWindows()) {
     const comSpec = process.env['ComSpec'];
     if (comSpec) {
@@ -569,6 +611,25 @@ export function getShellConfiguration(): ShellConfiguration {
 
   // Unix-like systems (Linux, macOS)
   return { executable: 'bash', argsPrefix: ['-c'], shell: 'bash' };
+}
+
+/**
+ * Determines the appropriate shell configuration for the current platform.
+ *
+ * This ensures we can execute command strings predictably and securely across platforms
+ * using the `spawn(executable, [...argsPrefix, commandString], { shell: false })` pattern.
+ *
+ * @returns The ShellConfiguration for the current environment.
+ */
+export function getShellConfiguration(): ShellConfiguration {
+  if (configuredShell) {
+    return {
+      executable: configuredShell.executable,
+      argsPrefix: configuredShell.args,
+      shell: inferShellType(configuredShell.executable),
+    };
+  }
+  return getDefaultShellConfiguration();
 }
 
 /**

@@ -14,6 +14,7 @@ import {
   isBinary,
   ShellExecutionService,
   CoreToolCallStatus,
+  getShellConfiguration,
 } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -283,8 +284,11 @@ export const useShellCommandProcessor = (
       let commandToExecute = rawQuery;
       let pwdFilePath: string | undefined;
 
-      // On non-windows, wrap the command to capture the final working directory.
-      if (!isWindows) {
+      // Wrap the command to capture the final working directory.
+      // This only works with bash-like shells; PowerShell uses different syntax.
+      const shellConfig = getShellConfiguration();
+      const isBashShell = shellConfig.shell === 'bash';
+      if (!isWindows && isBashShell) {
         let command = rawQuery.trim();
         const pwdFileName = `shell_pwd_${crypto.randomBytes(6).toString('hex')}.tmp`;
         pwdFilePath = path.join(os.tmpdir(), pwdFileName);

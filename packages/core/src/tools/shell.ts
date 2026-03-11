@@ -39,6 +39,7 @@ import {
   stripShellWrapper,
   parseCommandDetails,
   hasRedirection,
+  getShellConfiguration,
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -177,15 +178,19 @@ export class ShellToolInvocation extends BaseToolInvocation<
     const onAbort = () => combinedController.abort();
 
     try {
-      // pgrep is not available on Windows, so we can't get background PIDs
-      const commandToExecute = isWindows
-        ? strippedCommand
-        : (() => {
-            // wrap command to append subprocess pids (via pgrep) to temporary file
-            let command = strippedCommand.trim();
-            if (!command.endsWith('&')) command += ';';
-            return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
-          })();
+      // pgrep is not available on Windows and the bash-style command wrapping
+      // doesn't work with PowerShell. Only wrap commands when using bash.
+      const shellConfig = getShellConfiguration();
+      const isBashShell = shellConfig.shell === 'bash';
+      const commandToExecute =
+        isWindows || !isBashShell
+          ? strippedCommand
+          : (() => {
+              // wrap command to append subprocess pids (via pgrep) to temporary file
+              let command = strippedCommand.trim();
+              if (!command.endsWith('&')) command += ';';
+              return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
+            })();
 
       const cwd = this.params.dir_path
         ? path.resolve(this.config.getTargetDir(), this.params.dir_path)

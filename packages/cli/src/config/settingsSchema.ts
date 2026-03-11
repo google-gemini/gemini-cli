@@ -1270,6 +1270,32 @@ const SETTINGS_SCHEMA = {
         description: 'Settings for shell execution.',
         showInDialog: false,
         properties: {
+          executable: {
+            type: 'string',
+            label: 'Shell Executable',
+            category: 'Tools',
+            requiresRestart: true,
+            default: undefined as string | undefined,
+            description: oneLine`
+              The shell executable to use for running commands.
+              If not specified, defaults to bash on Unix-like systems and PowerShell on Windows.
+              Examples: "bash", "zsh", "pwsh", "/usr/bin/bash", "C:\\Program Files\\Git\\bin\\bash.exe".
+            `,
+            showInDialog: false,
+          },
+          args: {
+            type: 'array',
+            label: 'Shell Arguments',
+            category: 'Tools',
+            requiresRestart: true,
+            default: undefined as string[] | undefined,
+            description: oneLine`
+              Arguments passed to the shell executable before the command.
+              If not specified, defaults to ["-c"] for bash and ["-NoProfile", "-Command"] for PowerShell.
+            `,
+            showInDialog: false,
+            items: { type: 'string' },
+          },
           enableInteractiveShell: {
             type: 'boolean',
             label: 'Enable Interactive Shell',

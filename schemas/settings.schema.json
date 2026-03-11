@@ -1298,6 +1298,21 @@
           "default": {},
           "type": "object",
           "properties": {
+            "executable": {
+              "title": "Shell Executable",
+              "description": "The shell executable to use for running commands. If not specified, defaults to bash on Unix-like systems and PowerShell on Windows. Examples: \"bash\", \"zsh\", \"pwsh\", \"/usr/bin/bash\", \"C:\\Program Files\\Git\\bin\\bash.exe\".",
+              "markdownDescription": "The shell executable to use for running commands. If not specified, defaults to bash on Unix-like systems and PowerShell on Windows.\n\nExamples: `bash`, `zsh`, `pwsh`, `/usr/bin/bash`, `C:\\Program Files\\Git\\bin\\bash.exe`.\n\n- Category: `Tools`\n- Requires restart: `yes`",
+              "type": "string"
+            },
+            "args": {
+              "title": "Shell Arguments",
+              "description": "Arguments passed to the shell executable before the command. If not specified, defaults to [\"-c\"] for bash and [\"-NoProfile\", \"-Command\"] for PowerShell.",
+              "markdownDescription": "Arguments passed to the shell executable before the command. If not specified, defaults to `[\"-c\"]` for bash and `[\"-NoProfile\", \"-Command\"]` for PowerShell.\n\n- Category: `Tools`\n- Requires restart: `yes`",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "enableInteractiveShell": {
               "title": "Enable Interactive Shell",
               "description": "Use node-pty for an interactive shell experience. Fallback to child_process still applies.",
