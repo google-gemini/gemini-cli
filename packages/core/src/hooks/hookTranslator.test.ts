@@ -121,6 +121,77 @@ describe('HookTranslator', () => {
         },
       ]);
     });
+
+    it('should handle model-only override without messages', () => {
+      const partialRequest = { model: 'gemini-2.5-flash' } as LLMRequest;
+      const baseRequest = {
+        model: 'gemini-2.5-flash-lite',
+        contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+      } as unknown as GenerateContentParameters;
+
+      const result = translator.fromHookLLMRequest(partialRequest, baseRequest);
+
+      expect(result.model).toBe('gemini-2.5-flash');
+      expect(result.contents).toEqual(baseRequest.contents);
+    });
+
+    it('should handle config-only override without messages', () => {
+      const partialRequest = {
+        model: 'gemini-2.5-flash',
+        config: { temperature: 0.5 },
+      } as LLMRequest;
+      const baseRequest = {
+        model: 'gemini-2.5-flash-lite',
+        contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+        config: { temperature: 0.9, maxOutputTokens: 2000 },
+      } as unknown as GenerateContentParameters;
+
+      const result = translator.fromHookLLMRequest(partialRequest, baseRequest);
+
+      expect(result.model).toBe('gemini-2.5-flash');
+      expect(result.contents).toEqual(baseRequest.contents);
+      expect(result.config).toMatchObject({ temperature: 0.5 });
+    });
+
+    it('should fall back to baseRequest model when hookRequest has no model', () => {
+      const partialRequest = {} as LLMRequest;
+      const baseRequest = {
+        model: 'gemini-2.5-flash-lite',
+        contents: [{ role: 'user', parts: [{ text: 'hello' }] }],
+      } as unknown as GenerateContentParameters;
+
+      const result = translator.fromHookLLMRequest(partialRequest, baseRequest);
+
+      expect(result.model).toBe('gemini-2.5-flash-lite');
+      expect(result.contents).toEqual(baseRequest.contents);
+    });
+
+    it('should override messages when provided in hook request', () => {
+      const hookRequest: LLMRequest = {
+        model: 'gemini-2.5-flash',
+        messages: [{ role: 'user', content: 'modified prompt' }],
+      };
+      const baseRequest = {
+        model: 'gemini-2.5-flash-lite',
+        contents: [{ role: 'user', parts: [{ text: 'original' }] }],
+      } as unknown as GenerateContentParameters;
+
+      const result = translator.fromHookLLMRequest(hookRequest, baseRequest);
+
+      expect(result.model).toBe('gemini-2.5-flash');
+      expect(result.contents).toEqual([
+        { role: 'user', parts: [{ text: 'modified prompt' }] },
+      ]);
+    });
+
+    it('should handle partial override without baseRequest', () => {
+      const partialRequest = { model: 'gemini-2.5-flash' } as LLMRequest;
+
+      const result = translator.fromHookLLMRequest(partialRequest);
+
+      expect(result.model).toBe('gemini-2.5-flash');
+      expect(result.contents).toEqual([]);
+    });
   });
 
   describe('LLM Response Translation', () => {

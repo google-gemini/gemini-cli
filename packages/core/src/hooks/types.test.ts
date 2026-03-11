@@ -271,6 +271,25 @@ describe('Hook Output Classes', () => {
       const output = new BeforeModelHookOutput({});
       expect(output.applyLLMRequestModifications(target)).toBe(target);
     });
+
+    it('applyLLMRequestModifications should handle model-only override without messages', () => {
+      const target: GenerateContentParameters = {
+        model: 'gemini-pro',
+        contents: [{ parts: [{ text: 'original' }] }],
+      };
+      const modelOnlyRequest: Partial<LLMRequest> = {
+        model: 'gemini-2.5-flash',
+      };
+      const output = new BeforeModelHookOutput({
+        hookSpecificOutput: { llm_request: modelOnlyRequest },
+      });
+      const result = output.applyLLMRequestModifications(target);
+      expect(defaultHookTranslator.fromHookLLMRequest).toHaveBeenCalledWith(
+        modelOnlyRequest,
+        target,
+      );
+      expect(result).toBeDefined();
+    });
   });
 
   describe('BeforeToolSelectionHookOutput', () => {
