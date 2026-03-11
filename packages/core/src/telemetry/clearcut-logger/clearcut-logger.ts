@@ -27,6 +27,7 @@ import type {
   InvalidChunkEvent,
   ContentRetryEvent,
   ContentRetryFailureEvent,
+  RetryAttemptEvent,
   ExtensionInstallEvent,
   ToolOutputTruncatedEvent,
   ExtensionUninstallEvent,
@@ -94,6 +95,7 @@ export enum EventNames {
   INVALID_CHUNK = 'invalid_chunk',
   CONTENT_RETRY = 'content_retry',
   CONTENT_RETRY_FAILURE = 'content_retry_failure',
+  RETRY_ATTEMPT = 'retry_attempt',
   EXTENSION_ENABLE = 'extension_enable',
   EXTENSION_DISABLE = 'extension_disable',
   EXTENSION_INSTALL = 'extension_install',
@@ -1228,6 +1230,33 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.CONTENT_RETRY_FAILURE, data),
     );
+    this.flushIfNeeded();
+  }
+
+  logRetryAttemptEvent(event: RetryAttemptEvent): void {
+    // This event is generic for any retry attempt (Gemini, WebFetch, etc.)
+    const data: EventValue[] = [
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_CONTENT_RETRY_ATTEMPT_NUMBER,
+        value: String(event.attempt),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_CONTENT_RETRY_FAILURE_TOTAL_ATTEMPTS,
+        value: String(event.max_attempts),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_CONTENT_RETRY_DELAY_MS,
+        value: String(event.delay_ms),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_REQUEST_MODEL,
+        value: event.model,
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.RETRY_ATTEMPT, data));
     this.flushIfNeeded();
   }
 

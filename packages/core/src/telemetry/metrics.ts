@@ -848,6 +848,20 @@ export function recordInvalidChunk(config: Config): void {
   invalidChunkCounter.add(1, baseMetricDefinition.getCommonAttributes(config));
 }
 
+export function recordRetryAttemptMetrics(
+  config: Config,
+  attributes: {
+    model: string;
+    attempt: number;
+  },
+): void {
+  if (!contentRetryCounter || !isMetricsInitialized) return;
+  contentRetryCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  });
+}
+
 /**
  * Records a metric for when a retry is triggered due to a content error.
  */

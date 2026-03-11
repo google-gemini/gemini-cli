@@ -27,6 +27,8 @@ import { convert } from 'html-to-text';
 import {
   logWebFetchFallbackAttempt,
   WebFetchFallbackAttemptEvent,
+  logRetryAttempt,
+  RetryAttemptEvent,
 } from '../telemetry/index.js';
 import { LlmRole } from '../telemetry/llmRole.js';
 import { WEB_FETCH_TOOL_NAME } from './tool-names.js';
@@ -188,13 +190,28 @@ class WebFetchToolInvocation extends BaseToolInvocation<
   }
 
   private handleRetry(attempt: number, error: unknown, delayMs: number): void {
+    const maxAttempts = this.config.getMaxAttempts();
+    const modelName = 'Web Fetch';
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
     coreEvents.emitRetryAttempt({
       attempt,
-      maxAttempts: this.config.getMaxAttempts(),
+      maxAttempts,
       delayMs,
-      error: error instanceof Error ? error.message : String(error),
-      model: 'Web Fetch',
+      error: errorMessage,
+      model: modelName,
     });
+
+    logRetryAttempt(
+      this.config,
+      new RetryAttemptEvent(
+        attempt,
+        maxAttempts,
+        errorMessage,
+        delayMs,
+        modelName,
+      ),
+    );
   }
 
   private async executeFallback(signal: AbortSignal): Promise<ToolResult> {

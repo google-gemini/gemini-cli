@@ -45,6 +45,7 @@ import {
   logAgentStart,
   logAgentFinish,
   logWebFetchFallbackAttempt,
+  logRetryAttempt,
   logExtensionUpdateEvent,
   logHookCall,
 } from './loggers.js';
@@ -70,6 +71,7 @@ import {
   EVENT_AGENT_FINISH,
   EVENT_WEB_FETCH_FALLBACK_ATTEMPT,
   EVENT_INVALID_CHUNK,
+  EVENT_RETRY_ATTEMPT,
   ApiErrorEvent,
   ApiRequestEvent,
   ApiResponseEvent,
@@ -91,6 +93,7 @@ import {
   AgentStartEvent,
   AgentFinishEvent,
   WebFetchFallbackAttemptEvent,
+  RetryAttemptEvent,
   ExtensionUpdateEvent,
   EVENT_EXTENSION_UPDATE,
   HookCallEvent,
@@ -2425,6 +2428,56 @@ describe('loggers', () => {
         '/path/to/script.sh',
         150,
         true,
+      );
+    });
+  });
+
+  describe('logRetryAttempt', () => {
+    const mockConfig = makeFakeConfig();
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logRetryAttemptEvent');
+      vi.spyOn(metrics, 'recordRetryAttemptMetrics');
+    });
+
+    it('logs the retry attempt event to Clearcut and OTEL', () => {
+      const event = new RetryAttemptEvent(
+        2,
+        5,
+        'Overloaded',
+        1000,
+        'test-model',
+      );
+
+      logRetryAttempt(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logRetryAttemptEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Retry attempt 2/5 for test-model. Delay: 1000ms. Error: Overloaded',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
+          'event.name': EVENT_RETRY_ATTEMPT,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
+          attempt: 2,
+          max_attempts: 5,
+          error: 'Overloaded',
+          delay_ms: 1000,
+          model: 'test-model',
+        },
+      });
+
+      expect(metrics.recordRetryAttemptMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        {
+          model: 'test-model',
+          attempt: 2,
+        },
       );
     });
   });

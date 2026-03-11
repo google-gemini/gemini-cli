@@ -1341,6 +1341,51 @@ export class ContentRetryEvent implements BaseTelemetryEvent {
 
 export const EVENT_CONTENT_RETRY_FAILURE =
   'gemini_cli.chat.content_retry_failure';
+
+export const EVENT_RETRY_ATTEMPT = 'gemini_cli.retry_attempt';
+export class RetryAttemptEvent implements BaseTelemetryEvent {
+  'event.name': 'retry_attempt';
+  'event.timestamp': string;
+  attempt: number;
+  max_attempts: number;
+  error: string;
+  delay_ms: number;
+  model: string;
+
+  constructor(
+    attempt: number,
+    max_attempts: number,
+    error: string,
+    delay_ms: number,
+    model: string,
+  ) {
+    this['event.name'] = 'retry_attempt';
+    this['event.timestamp'] = new Date().toISOString();
+    this.attempt = attempt;
+    this.max_attempts = max_attempts;
+    this.error = error;
+    this.delay_ms = delay_ms;
+    this.model = model;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_RETRY_ATTEMPT,
+      'event.timestamp': this['event.timestamp'],
+      attempt: this.attempt,
+      max_attempts: this.max_attempts,
+      error: this.error,
+      delay_ms: this.delay_ms,
+      model: this.model,
+    };
+  }
+
+  toLogBody(): string {
+    return `Retry attempt ${this.attempt}/${this.max_attempts} for ${this.model}. Delay: ${this.delay_ms}ms. Error: ${this.error}`;
+  }
+}
+
 export class ContentRetryFailureEvent implements BaseTelemetryEvent {
   'event.name': 'content_retry_failure';
   'event.timestamp': string;
