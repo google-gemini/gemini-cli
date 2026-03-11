@@ -36,12 +36,14 @@ const HEURISTIC_GUI_COMMANDS = [
  * @param stdin The stdin stream from Ink/Node
  * @param setRawMode Function to toggle raw mode
  * @param preferredEditorType The user's preferred editor from config
+ * @param openInNewWindow Whether to open VS Code-family editors in a new window
  */
 export async function openFileInEditor(
   filePath: string,
   stdin: ReadStream | null | undefined,
   setRawMode: ((mode: boolean) => void) | undefined,
   preferredEditorType?: EditorType,
+  openInNewWindow?: boolean,
 ): Promise<void> {
   let command: string | undefined = undefined;
   const args = [filePath];
@@ -62,7 +64,11 @@ export async function openFileInEditor(
     if (isGuiEditor(preferredEditorType)) {
       args.unshift(getEditorWaitFlag(preferredEditorType));
     }
-    extraArgs.push(...getEditorExtraArgs(preferredEditorType));
+    extraArgs.push(
+      ...getEditorExtraArgs(preferredEditorType, {
+        newWindow: openInNewWindow,
+      }),
+    );
   }
 
   if (!command) {
@@ -79,7 +85,9 @@ export async function openFileInEditor(
         ) {
           args.unshift(getEditorWaitFlag(resolvedType));
         }
-        extraArgs.push(...getEditorExtraArgs(resolvedType));
+        extraArgs.push(
+          ...getEditorExtraArgs(resolvedType, { newWindow: openInNewWindow }),
+        );
       } else {
         // Heuristic fallback for commands not in the registry
         const lower = envCommand.toLowerCase();
