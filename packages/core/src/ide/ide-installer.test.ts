@@ -281,6 +281,29 @@ describe('AntigravityInstaller', () => {
     );
   });
 
+  it('ignores an unsafe alias and falls back to safe commands', async () => {
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'agy;malicious_command');
+    const { installer } = setup();
+    vi.mocked(child_process.execSync).mockImplementationOnce(() => 'agy');
+
+    const result = await installer.install();
+
+    expect(result.success).toBe(true);
+    expect(child_process.execSync).toHaveBeenCalledTimes(1);
+    expect(child_process.execSync).toHaveBeenCalledWith('command -v agy', {
+      stdio: 'ignore',
+    });
+    expect(child_process.spawnSync).toHaveBeenCalledWith(
+      'agy',
+      [
+        '--install-extension',
+        'google.gemini-cli-vscode-ide-companion',
+        '--force',
+      ],
+      { stdio: 'pipe', shell: false },
+    );
+  });
+
   it('falls back to antigravity when agy is unavailable on linux', async () => {
     vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', 'agy');
     const { installer } = setup();

@@ -253,12 +253,17 @@ class AntigravityInstaller implements IdeInstaller {
 
   async install(): Promise<InstallResult> {
     const envCommand = process.env['ANTIGRAVITY_CLI_ALIAS'];
+    const safeCommandPattern = /^[a-zA-Z0-9.\-_/\\]+$/;
+    const sanitizedEnvCommand =
+      envCommand && safeCommandPattern.test(envCommand)
+        ? envCommand
+        : undefined;
     const fallbackCommands =
       this.platform === 'win32'
         ? ['agy.cmd', 'antigravity.cmd']
         : ['agy', 'antigravity'];
     const commands = [
-      ...(envCommand ? [envCommand] : []),
+      ...(sanitizedEnvCommand ? [sanitizedEnvCommand] : []),
       ...fallbackCommands,
     ].filter(
       (command, index, allCommands) => allCommands.indexOf(command) === index,
