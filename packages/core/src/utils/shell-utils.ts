@@ -622,11 +622,18 @@ function getDefaultShellConfiguration(): ShellConfiguration {
  * @returns The ShellConfiguration for the current environment.
  */
 export function getShellConfiguration(): ShellConfiguration {
-  if (configuredShell) {
+  if (configuredShell?.executable) {
+    const shellType = inferShellType(configuredShell.executable);
+    const defaultArgs = () => {
+      if (shellType === 'powershell') {
+        return ['-NoProfile', '-Command'];
+      }
+      return ['-c'];
+    };
     return {
       executable: configuredShell.executable,
-      argsPrefix: configuredShell.args,
-      shell: inferShellType(configuredShell.executable),
+      argsPrefix: configuredShell.args ?? defaultArgs(),
+      shell: shellType,
     };
   }
   return getDefaultShellConfiguration();
