@@ -233,6 +233,7 @@ const NEW_WINDOW_EDITORS = new Set<EditorType>([
   'vscodium',
   'cursor',
   'windsurf',
+  'antigravity',
 ]);
 
 /**
