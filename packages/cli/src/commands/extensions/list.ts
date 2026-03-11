@@ -30,7 +30,7 @@ export async function handleList(
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const extensionManager = config.getExtensionLoader() as ExtensionManager;
-    const extensions = await extensionManager.loadExtensions();
+    const extensions = extensionManager.getExtensions();
     if (extensions.length === 0) {
       if (options?.outputFormat === 'json') {
         debugLogger.log('[]');
