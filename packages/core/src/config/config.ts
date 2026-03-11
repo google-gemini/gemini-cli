@@ -570,6 +570,7 @@ export interface ConfigParameters {
   recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
+  disablePromptCache?: boolean;
   rawOutput?: boolean;
   acceptRawOutputRisk?: boolean;
   modelConfigServiceConfig?: ModelConfigServiceConfig;
@@ -767,6 +768,7 @@ export class Config implements McpContext, AgentLoopContext {
   readonly fakeResponses?: string;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
+  private readonly disablePromptCache: boolean;
   private readonly rawOutput: boolean;
   private readonly acceptRawOutputRisk: boolean;
   private pendingIncludeDirectories: string[];
@@ -1030,6 +1032,7 @@ export class Config implements McpContext, AgentLoopContext {
       DEFAULT_MAX_ATTEMPTS,
     );
     this.disableYoloMode = params.disableYoloMode ?? false;
+    this.disablePromptCache = params.disablePromptCache ?? false;
     this.rawOutput = params.rawOutput ?? false;
     this.acceptRawOutputRisk = params.acceptRawOutputRisk ?? false;
 
@@ -1635,6 +1638,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getProjectRoot(): string {
     return this.targetDir;
+  }
+
+  getDisablePromptCache(): boolean {
+    return this.disablePromptCache;
   }
 
   getWorkspaceContext(): WorkspaceContext {
