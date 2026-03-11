@@ -22,6 +22,7 @@ import { promptIdContext } from '../../utils/promptIdContext.js';
 import type { Content } from '@google/genai';
 import type { ResolvedModelConfig } from '../../services/modelConfigService.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 import { AuthType } from '../../core/contentGenerator.js';
 
 vi.mock('../../core/baseLlmClient.js');
@@ -31,6 +32,7 @@ describe('NumericalClassifierStrategy', () => {
   let mockContext: RoutingContext;
   let mockConfig: Config;
   let mockBaseLlmClient: BaseLlmClient;
+  let mockLocalLiteRtLmClient: LocalLiteRtLmClient;
   let mockResolvedConfig: ResolvedModelConfig;
 
   beforeEach(() => {
@@ -56,6 +58,11 @@ describe('NumericalClassifierStrategy', () => {
       getNumericalRoutingEnabled: vi.fn().mockResolvedValue(true),
       getClassifierThreshold: vi.fn().mockResolvedValue(undefined),
       getGemini31Launched: vi.fn().mockResolvedValue(false),
+      getUseCustomToolModel: vi.fn().mockImplementation(async () => {
+        const launched = await mockConfig.getGemini31Launched();
+        const authType = mockConfig.getContentGeneratorConfig().authType;
+        return launched && authType === AuthType.USE_GEMINI;
+      }),
       getContentGeneratorConfig: vi.fn().mockReturnValue({
         authType: AuthType.LOGIN_WITH_GOOGLE,
       }),
@@ -63,6 +70,7 @@ describe('NumericalClassifierStrategy', () => {
     mockBaseLlmClient = {
       generateJson: vi.fn(),
     } as unknown as BaseLlmClient;
+    mockLocalLiteRtLmClient = {} as LocalLiteRtLmClient;
 
     vi.spyOn(promptIdContext, 'getStore').mockReturnValue('test-prompt-id');
   });
@@ -78,6 +86,7 @@ describe('NumericalClassifierStrategy', () => {
       mockContext,
       mockConfig,
       mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
     );
 
     expect(decision).toBeNull();
@@ -91,6 +100,7 @@ describe('NumericalClassifierStrategy', () => {
       mockContext,
       mockConfig,
       mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
     );
 
     expect(decision).toBeNull();
@@ -104,6 +114,7 @@ describe('NumericalClassifierStrategy', () => {
       mockContext,
       mockConfig,
       mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
     );
 
     expect(decision).toBeNull();
@@ -119,7 +130,12 @@ describe('NumericalClassifierStrategy', () => {
       mockApiResponse,
     );
 
-    await strategy.route(mockContext, mockConfig, mockBaseLlmClient);
+    await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
 
     const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
       .calls[0][0];
@@ -151,6 +167,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision).toEqual({
@@ -177,6 +194,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision).toEqual({
@@ -203,6 +221,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision).toEqual({
@@ -229,6 +248,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision).toEqual({
@@ -257,6 +277,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision).toEqual({
@@ -283,6 +304,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision).toEqual({
@@ -309,6 +331,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision).toEqual({
@@ -337,6 +360,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision).toEqual({
@@ -364,6 +388,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision).toEqual({
@@ -391,6 +416,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision).toEqual({
@@ -415,6 +441,7 @@ describe('NumericalClassifierStrategy', () => {
       mockContext,
       mockConfig,
       mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
     );
 
     expect(decision).toBeNull();
@@ -437,6 +464,7 @@ describe('NumericalClassifierStrategy', () => {
       mockContext,
       mockConfig,
       mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
     );
 
     expect(decision).toBeNull();
@@ -463,7 +491,12 @@ describe('NumericalClassifierStrategy', () => {
       mockApiResponse,
     );
 
-    await strategy.route(mockContext, mockConfig, mockBaseLlmClient);
+    await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
 
     const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
       .calls[0][0];
@@ -495,7 +528,12 @@ describe('NumericalClassifierStrategy', () => {
       mockApiResponse,
     );
 
-    await strategy.route(mockContext, mockConfig, mockBaseLlmClient);
+    await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
 
     const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
       .calls[0][0];
@@ -528,7 +566,12 @@ describe('NumericalClassifierStrategy', () => {
       mockApiResponse,
     );
 
-    await strategy.route(mockContext, mockConfig, mockBaseLlmClient);
+    await strategy.route(
+      mockContext,
+      mockConfig,
+      mockBaseLlmClient,
+      mockLocalLiteRtLmClient,
+    );
 
     const generateJsonCall = vi.mocked(mockBaseLlmClient.generateJson).mock
       .calls[0][0];
@@ -558,6 +601,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision?.model).toBe(PREVIEW_GEMINI_3_1_MODEL);
@@ -579,6 +623,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision?.model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
@@ -601,6 +646,7 @@ describe('NumericalClassifierStrategy', () => {
         mockContext,
         mockConfig,
         mockBaseLlmClient,
+        mockLocalLiteRtLmClient,
       );
 
       expect(decision?.model).toBe(PREVIEW_GEMINI_3_1_MODEL);

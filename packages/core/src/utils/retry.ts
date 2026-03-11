@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { GenerateContentResponse } from '@google/genai';
-import { ApiError } from '@google/genai';
+import { ApiError, type GenerateContentResponse } from '@google/genai';
 import {
   TerminalQuotaError,
   RetryableQuotaError,
@@ -101,6 +100,7 @@ function getNetworkErrorCode(error: unknown): string | undefined {
 }
 
 const FETCH_FAILED_MESSAGE = 'fetch failed';
+const INCOMPLETE_JSON_MESSAGE = 'incomplete json segment';
 
 /**
  * Default predicate function to determine if a retry should be attempted.
@@ -120,8 +120,12 @@ export function isRetryableError(
   }
 
   if (retryFetchErrors && error instanceof Error) {
-    // Check for generic fetch failed message (case-insensitive)
-    if (error.message.toLowerCase().includes(FETCH_FAILED_MESSAGE)) {
+    const lowerMessage = error.message.toLowerCase();
+    // Check for generic fetch failed message or incomplete JSON segment (common stream error)
+    if (
+      lowerMessage.includes(FETCH_FAILED_MESSAGE) ||
+      lowerMessage.includes(INCOMPLETE_JSON_MESSAGE)
+    ) {
       return true;
     }
   }
@@ -130,13 +134,17 @@ export function isRetryableError(
   if (error instanceof ApiError) {
     // Explicitly do not retry 400 (Bad Request)
     if (error.status === 400) return false;
-    return error.status === 429 || (error.status >= 500 && error.status < 600);
+    return (
+      error.status === 429 ||
+      error.status === 499 ||
+      (error.status >= 500 && error.status < 600)
+    );
   }
 
   // Check for status using helper (handles other error shapes)
   const status = getErrorStatus(error);
   if (status !== undefined) {
-    return status === 429 || (status >= 500 && status < 600);
+    return status === 429 || status === 499 || (status >= 500 && status < 600);
   }
 
   return false;

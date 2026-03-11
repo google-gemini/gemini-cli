@@ -372,7 +372,7 @@ To authenticate with a server using Service Account Impersonation, you must set
 the `authProviderType` to `service_account_impersonation` and provide the
 following properties:
 
-- **`targetAudience`** (string): The OAuth Client ID allowslisted on the
+- **`targetAudience`** (string): The OAuth Client ID allowlisted on the
   IAP-protected application you are trying to access.
 - **`targetServiceAccount`** (string): The email address of the Google Cloud
   Service Account to impersonate.
@@ -555,21 +555,34 @@ Upon successful connection:
    `excludeTools` configuration
 4. **Name sanitization:** Tool names are cleaned to meet Gemini API
    requirements:
-   - Invalid characters (non-alphanumeric, underscore, dot, hyphen) are replaced
-     with underscores
+   - Characters other than letters, numbers, underscore (`_`), hyphen (`-`), dot
+     (`.`), and colon (`:`) are replaced with underscores
    - Names longer than 63 characters are truncated with middle replacement
-     (`___`)
+     (`...`)
 
-### 3. Conflict resolution
+### 3. Tool naming and namespaces
 
-When multiple servers expose tools with the same name:
+To prevent collisions across multiple servers or conflicting built-in tools,
+every discovered MCP tool is assigned a strict namespace.
 
-1. **First registration wins:** The first server to register a tool name gets
-   the unprefixed name
-2. **Automatic prefixing:** Subsequent servers get prefixed names:
-   `serverName__toolName`
-3. **Registry tracking:** The tool registry maintains mappings between server
-   names and their tools
+1. **Automatic FQN:** All MCP tools are unconditionally assigned a fully
+   qualified name (FQN) using the format `mcp_{serverName}_{toolName}`.
+2. **Registry tracking:** The tool registry maintains metadata mappings between
+   these FQNs and their original server identities.
+3. **Overwrites:** If two servers share the exact same alias in your
+   configuration and provide tools with the exact same name, the last registered
+   tool overwrites the previous one.
+4. **Policies:** To configure permissions (like auto-approval or denial) for MCP
+   tools, see
+   [Special syntax for MCP tools](../reference/policy-engine.md#special-syntax-for-mcp-tools)
+   in the Policy Engine documentation.
+
+> **Warning:** Do not use underscores (`_`) in your MCP server names (e.g., use
+> `my-server` rather than `my_server`). The policy parser splits Fully Qualified
+> Names (`mcp_server_tool`) on the _first_ underscore following the `mcp_`
+> prefix. If your server name contains an underscore, the parser will
+> misinterpret the server identity, which can cause wildcard rules and security
+> policies to fail silently.
 
 ### 4. Schema processing
 
@@ -695,7 +708,7 @@ MCP Servers Status:
 
 🐳 dockerizedServer (CONNECTED)
   Command: docker run -i --rm -e API_KEY my-mcp-server:latest
-  Tools: docker__deploy, docker__status
+  Tools: mcp_dockerizedServer_docker_deploy, mcp_dockerizedServer_docker_status
 
 Discovery State: COMPLETED
 ```
@@ -1066,6 +1079,11 @@ command has no flags.
 gemini mcp list
 ```
 
+> **Note on Trust:** For security, `stdio` MCP servers (those using the
+> `command` property) are only tested and displayed as "Connected" if the
+> current folder is trusted. If the folder is untrusted, they will show as
+> "Disconnected". Use `gemini trust` to trust the current folder.
+
 **Example output:**
 
 ```sh
@@ -1073,6 +1091,23 @@ gemini mcp list
 ✓ http-server: https://api.example.com/mcp (http) - Connected
 ✗ sse-server: https://api.example.com/sse (sse) - Disconnected
 ```
+
+## Troubleshooting and Diagnostics
+
+To minimize noise during startup, MCP connection errors for background servers
+are "silent by default." If issues are detected during startup, a single
+informational hint will be shown: _"MCP issues detected. Run /mcp list for
+status."_
+
+Detailed, actionable diagnostics for a specific server are automatically
+re-enabled when:
+
+1.  You run an interactive command like `/mcp list`, `/mcp auth`, etc.
+2.  The model attempts to execute a tool from that server.
+3.  You invoke an MCP prompt from that server.
+
+You can also use `gemini mcp list` from your shell to see connection errors for
+all configured servers.
 
 ### Removing a server (`gemini mcp remove`)
 
