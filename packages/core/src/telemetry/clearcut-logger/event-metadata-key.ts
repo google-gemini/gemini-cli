@@ -674,4 +674,17 @@ export enum EventMetadataKey {
 
   // Logs the error message for Conseca events.
   CONSECA_ERROR = 166,
+
+  // ==========================================================================
+  // Network Retry Event Keys
+  // ==========================================================================
+
+  // Logs the attempt number for a network retry.
+  GEMINI_CLI_NETWORK_RETRY_ATTEMPT_NUMBER = 180,
+
+  // Logs the delay in milliseconds for a network retry.
+  GEMINI_CLI_NETWORK_RETRY_DELAY_MS = 181,
+
+  // Logs the error type for a network retry.
+  GEMINI_CLI_NETWORK_RETRY_ERROR_TYPE = 182,
 }
