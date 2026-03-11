@@ -39,6 +39,7 @@ import {
   stripShellWrapper,
   parseCommandDetails,
   hasRedirection,
+  normalizePowerShellCommand,
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -153,6 +154,25 @@ export class ShellToolInvocation extends BaseToolInvocation<
     setPidCallback?: (pid: number) => void,
   ): Promise<ToolResult> {
     const strippedCommand = stripShellWrapper(this.params.command);
+    const isWindows = os.platform() === 'win32';
+    const shellType = isWindows ? 'powershell' : 'bash';
+
+    // Validate command before normalization
+    if (!strippedCommand || typeof strippedCommand !== 'string') {
+      return {
+        llmContent: 'Invalid command provided.',
+        returnDisplay: 'Command validation failed.',
+        error: {
+          message: 'Command is empty or invalid',
+          type: ToolErrorType.SHELL_EXECUTE_ERROR,
+        },
+      };
+    }
+
+    const normalizedCommand = normalizePowerShellCommand(
+      strippedCommand,
+      shellType,
+    );
 
     if (signal.aborted) {
       return {
@@ -161,7 +181,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
       };
     }
 
-    const isWindows = os.platform() === 'win32';
     const tempFileName = `shell_pgrep_${crypto
       .randomBytes(6)
       .toString('hex')}.tmp`;
@@ -179,10 +198,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
     try {
       // pgrep is not available on Windows, so we can't get background PIDs
       const commandToExecute = isWindows
-        ? strippedCommand
+        ? normalizedCommand
         : (() => {
             // wrap command to append subprocess pids (via pgrep) to temporary file
-            let command = strippedCommand.trim();
+            let command = normalizedCommand.trim();
             if (!command.endsWith('&')) command += ';';
             return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
           })();
@@ -421,6 +440,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         : {};
       if (summarizeConfig && summarizeConfig[SHELL_TOOL_NAME]) {
         const summary = await summarizeToolOutput(
+          // Replace deprecated getGeminiClient() with new client API
           this.config,
           { model: 'summarizer-shell' },
           llmContent,

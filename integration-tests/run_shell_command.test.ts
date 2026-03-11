@@ -73,7 +73,7 @@ function getChainedEchoCommand(): { allowPattern: string; command: string } {
     case 'powershell':
       return {
         allowPattern: 'Write-Output',
-        command: `Write-Output "foo" && ${secondCommand}`,
+        command: `Write-Output "foo"; ${secondCommand}`,
       };
     case 'cmd':
       return {

@@ -579,6 +579,47 @@ describe('ShellTool', () => {
         await promise;
       });
     });
+
+    it('should normalize PowerShell commands by replacing && with ;', async () => {
+      mockPlatform.mockReturnValue('win32');
+      const invocation = shellTool.build({
+        command: 'Write-Output "hello" && Get-ChildItem',
+      });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution();
+
+      await promise;
+
+      // Verify that the command was normalized (replaced && with ;)
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        'Write-Output "hello"; Get-ChildItem',
+        tempRootDir,
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        { pager: 'cat', sanitizationConfig: {} },
+      );
+    });
+
+    it('should not normalize commands on non-Windows platforms', async () => {
+      mockPlatform.mockReturnValue('linux');
+      const command = 'echo "hello" && ls';
+      const invocation = shellTool.build({ command });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution();
+
+      await promise;
+
+      // Verify that the command was wrapped but not normalized (should still contain &&)
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        expect.stringContaining('echo "hello" && ls'),
+        tempRootDir,
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        { pager: 'cat', sanitizationConfig: {} },
+      );
+    });
   });
 
   describe('shouldConfirmExecute', () => {

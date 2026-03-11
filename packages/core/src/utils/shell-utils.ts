@@ -71,6 +71,11 @@ export async function resolveExecutable(
 let bashLanguage: Language | null = null;
 let treeSitterInitialization: Promise<void> | null = null;
 let treeSitterInitializationError: Error | null = null;
+let initializationLock = false;
+
+// Configurable timeout for shell parser initialization
+// This prevents indefinite waiting if initialization hangs
+const SHELL_PARSER_INITIALIZATION_TIMEOUT_MS = 5000; // 5 seconds
 
 class ShellParserInitializationError extends Error {
   constructor(cause: Error) {
@@ -126,16 +131,66 @@ async function loadBashLanguage(): Promise<void> {
 }
 
 export async function initializeShellParsers(): Promise<void> {
-  if (!treeSitterInitialization) {
-    treeSitterInitialization = loadBashLanguage().catch((error) => {
-      treeSitterInitialization = null;
+  // If already initialized successfully, return immediately
+  if (treeSitterInitialization && !treeSitterInitializationError) {
+    await treeSitterInitialization;
+    return;
+  }
+
+  // If there was a previous initialization error, throw it
+  if (treeSitterInitializationError) {
+    throw treeSitterInitializationError;
+  }
+
+  // Prevent race conditions with multiple concurrent initializations
+  if (initializationLock) {
+    // Wait for existing initialization to complete with timeout
+    const startTime = Date.now();
+
+    while (initializationLock) {
+      if (Date.now() - startTime > SHELL_PARSER_INITIALIZATION_TIMEOUT_MS) {
+        throw new Error(
+          `Shell parser initialization timed out after ${SHELL_PARSER_INITIALIZATION_TIMEOUT_MS}ms`,
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    // Check if initialization completed successfully while we were waiting
+    if (treeSitterInitialization && !treeSitterInitializationError) {
+      await treeSitterInitialization;
+      return;
+    }
+
+    // If there was an error during initialization, throw it
+    if (treeSitterInitializationError) {
+      throw treeSitterInitializationError;
+    }
+
+    return;
+  }
+
+  // Start initialization
+  initializationLock = true;
+  try {
+    treeSitterInitialization = loadBashLanguage().catch((error: unknown) => {
+      treeSitterInitializationError =
+        error instanceof Error ? error : new Error(String(error));
       // Log the error but don't throw, allowing the application to fall back to safe defaults (ASK_USER)
       // or regex checks where appropriate.
       debugLogger.debug('Failed to initialize shell parsers:', error);
+      throw treeSitterInitializationError; // Re-throw to ensure promise rejects properly
     });
+    await treeSitterInitialization;
+  } catch (error) {
+    // Reset initialization state on failure so it can be retried
+    treeSitterInitialization = null;
+    treeSitterInitializationError =
+      error instanceof Error ? error : new Error(String(error));
+    throw treeSitterInitializationError; // Propagate error to caller
+  } finally {
+    initializationLock = false;
   }
-
-  await treeSitterInitialization;
 }
 
 export interface ParsedCommandDetail {
@@ -230,9 +285,10 @@ function parseCommandTree(
 
   const deadline = performance.now() + timeoutMicros / 1000;
   let timedOut = false;
+  let tree: Tree | null = null;
 
   try {
-    const tree = parser.parse(command, null, {
+    tree = parser.parse(command, null, {
       progressCallback: () => {
         if (performance.now() > deadline) {
           timedOut = true;
@@ -244,13 +300,26 @@ function parseCommandTree(
 
     if (timedOut) {
       debugLogger.error('Bash command parsing timed out for command:', command);
-      // Returning a partial tree could be risky so we return null to be safe.
+      // Clean up tree if parsing timed out
+      if (tree) {
+        tree.delete();
+        tree = null;
+      }
       return null;
     }
 
     return tree;
-  } catch {
+  } catch (error) {
+    debugLogger.error('Error parsing command tree:', error);
+    // Clean up tree on error
+    if (tree) {
+      tree.delete();
+      tree = null;
+    }
     return null;
+  } finally {
+    // Always delete parser to prevent memory leaks
+    parser.delete();
   }
 }
 
@@ -396,40 +465,49 @@ function parseBashCommandDetails(command: string): CommandParseResult | null {
     return null;
   }
 
-  const details = collectCommandDetails(tree.rootNode, command);
+  try {
+    const details = collectCommandDetails(tree.rootNode, command);
 
-  const hasError =
-    tree.rootNode.hasError ||
-    details.length === 0 ||
-    hasPromptCommandTransform(tree.rootNode);
+    const hasError =
+      tree.rootNode.hasError ||
+      details.length === 0 ||
+      hasPromptCommandTransform(tree.rootNode);
 
-  if (hasError) {
-    let query = null;
-    try {
-      query = new Query(bashLanguage, '(ERROR) @error (MISSING) @missing');
-      const captures = query.captures(tree.rootNode);
-      const syntaxErrors = captures.map((capture) => {
-        const { node, name } = capture;
-        const type = name === 'missing' ? 'Missing' : 'Error';
-        return `${type} node: "${node.text}" at ${node.startPosition.row}:${node.startPosition.column}`;
-      });
+    if (hasError) {
+      let query: Query | null = null;
+      try {
+        query = new Query(bashLanguage, '(ERROR) @error (MISSING) @missing');
+        const captures = query.captures(tree.rootNode);
+        const syntaxErrors = captures.map((capture) => {
+          const { node, name } = capture;
+          const type = name === 'missing' ? 'Missing' : 'Error';
+          return `${type} node: "${node.text}" at ${node.startPosition.row}:${node.startPosition.column}`;
+        });
 
-      debugLogger.log(
-        'Bash command parsing error detected for command:',
-        command,
-        'Syntax Errors:',
-        syntaxErrors,
-      );
-    } catch (_e) {
-      // Ignore query errors
-    } finally {
-      query?.delete();
+        debugLogger.log(
+          'Bash command parsing error detected for command:',
+          command,
+          'Syntax Errors:',
+          syntaxErrors,
+        );
+      } catch (_e) {
+        // Ignore query errors
+      } finally {
+        // Always delete query to prevent memory leaks
+        if (query) {
+          query.delete();
+          query = null;
+        }
+      }
     }
+    return {
+      details: details.sort((a, b) => a.startIndex - b.startIndex),
+      hasError,
+    };
+  } finally {
+    // Always delete tree to prevent memory leaks
+    tree.delete();
   }
-  return {
-    details: details.sort((a, b) => a.startIndex - b.startIndex),
-    hasError,
-  };
 }
 
 function parsePowerShellCommandDetails(
@@ -637,23 +715,28 @@ export function hasRedirection(command: string): boolean {
     const tree = parseCommandTree(command);
     if (!tree) return fallbackCheck();
 
-    const stack: Node[] = [tree.rootNode];
-    while (stack.length > 0) {
-      const current = stack.pop()!;
-      if (
-        current.type === 'redirected_statement' ||
-        current.type === 'file_redirect' ||
-        current.type === 'heredoc_redirect' ||
-        current.type === 'herestring_redirect'
-      ) {
-        return true;
+    try {
+      const stack: Node[] = [tree.rootNode];
+      while (stack.length > 0) {
+        const current = stack.pop()!;
+        if (
+          current.type === 'redirected_statement' ||
+          current.type === 'file_redirect' ||
+          current.type === 'heredoc_redirect' ||
+          current.type === 'herestring_redirect'
+        ) {
+          return true;
+        }
+        for (let i = current.childCount - 1; i >= 0; i -= 1) {
+          const child = current.child(i);
+          if (child) stack.push(child);
+        }
       }
-      for (let i = current.childCount - 1; i >= 0; i -= 1) {
-        const child = current.child(i);
-        if (child) stack.push(child);
-      }
+      return false;
+    } finally {
+      // Always delete tree to prevent memory leaks
+      tree.delete();
     }
-    return false;
   }
 
   return fallbackCheck();
@@ -716,6 +799,67 @@ export function stripShellWrapper(command: string): string {
     return newCommand;
   }
   return command.trim();
+}
+
+/**
+ * Normalizes PowerShell commands by replacing && with ; for command chaining.
+ * PowerShell uses semicolon for sequential command execution, not &&.
+ *
+ * Limitations:
+ * - This is a simple regex replacement that doesn't parse strings
+ * - May incorrectly replace && inside quoted strings
+ * - This is acceptable as a best-effort fix since the AI model should not
+ *   be generating && for PowerShell anyway
+ *
+ * @param command The command string to normalize
+ * @param shellType The shell type to normalize for
+ * @returns The normalized command with proper PowerShell syntax
+ */
+export function normalizePowerShellCommand(
+  command: string,
+  shellType: ShellType,
+): string {
+  // Input validation with proper type guards
+  if (typeof command !== 'string') {
+    debugLogger.warn(
+      'Invalid command type passed to normalizePowerShellCommand:',
+      typeof command,
+    );
+    return '';
+  }
+
+  if (typeof shellType !== 'string') {
+    debugLogger.warn(
+      'Invalid shellType passed to normalizePowerShellCommand:',
+      typeof shellType,
+    );
+    return command;
+  }
+
+  // Early return for non-PowerShell shells or empty commands
+  if (!command || shellType !== 'powershell') {
+    return command;
+  }
+
+  // Prevent potential ReDoS attacks with command length limit
+  const MAX_COMMAND_LENGTH = 100000; // 100KB limit
+  if (command.length > MAX_COMMAND_LENGTH) {
+    debugLogger.warn(
+      `Command too long for normalization: ${command.length} characters`,
+    );
+    return command;
+  }
+
+  try {
+    // Replace && with ; for PowerShell command chaining
+    // Use a simple, efficient regex that avoids catastrophic backtracking
+    return command.replace(/\s*&&\s*/g, '; ');
+  } catch (error) {
+    // If regex replacement fails for any reason, return original command
+    // This ensures the function is robust and doesn't break command execution
+    debugLogger.warn('Failed to normalize PowerShell command:', error);
+    return command;
+  }
 }
 
 /**

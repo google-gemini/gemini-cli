@@ -33,6 +33,69 @@ Thumbs.db
 
 # Ignore built ts files
 dist
+# Ignore compiled TypeScript files in src directories
+packages/*/src/**/*.js
+packages/*/src/**/*.js.map
+packages/*/src/**/*.d.ts
+# Ignore compiled TypeScript artifacts in scripts (preserve source .js files)
+scripts/cleanup-branches.js
+scripts/cleanup-branches.js.map
+scripts/cleanup-branches.d.ts
+scripts/generate-keybindings-doc.js
+scripts/generate-keybindings-doc.js.map
+scripts/generate-keybindings-doc.d.ts
+scripts/generate-settings-doc.js
+scripts/generate-settings-doc.js.map
+scripts/generate-settings-doc.d.ts
+scripts/generate-settings-schema.js
+scripts/generate-settings-schema.js.map
+scripts/generate-settings-schema.d.ts
+scripts/tests/**/*.js
+scripts/tests/**/*.js.map
+scripts/tests/**/*.d.ts
+scripts/utils/**/*.js
+scripts/utils/**/*.js.map
+scripts/utils/**/*.d.ts
+# Ignore compiled TypeScript files in evals and integration-tests (all .js files here are compiled from .ts)
+evals/**/*.js
+evals/**/*.js.map
+evals/**/*.d.ts
+integration-tests/**/*.js
+integration-tests/**/*.js.map
+integration-tests/**/*.d.ts
+# Ignore compiled files in package root directories
+packages/*/index.js
+packages/*/index.js.map
+packages/*/index.d.ts
+packages/*/test-setup.js
+packages/*/test-setup.js.map
+packages/*/test-setup.d.ts
+packages/*/vitest.config.js
+packages/*/vitest.config.js.map
+packages/*/vitest.config.d.ts
+# Allow specific config files at package roots (but not vitest.config.js which is compiled)
+!packages/*/webpack.config.js
+!packages/*/rollup.config.js
+!packages/*/jest.config.js
+!packages/*/.eslintrc.js
+!packages/*/esbuild*.js
+# Ignore compiled files in client dist/build directories only
+packages/*/client/dist/
+packages/*/client/build/
+# Ignore compiled TypeScript files in client src (these are compiled from .ts)
+packages/*/client/src/**/*.js
+packages/*/client/src/**/*.js.map
+packages/*/client/src/**/*.d.ts
+# Ignore compiled TypeScript files in examples (keep source .js files in examples)
+packages/*/examples/**/*.js.map
+packages/*/examples/**/*.d.ts
+# Ignore specific compiled files in examples that have TypeScript sources
+packages/cli/examples/ask-user-dialog-demo.js
+packages/cli/examples/scrollable-list-demo.js
+packages/sdk/examples/session-context.js
+packages/sdk/examples/simple.js
+# Exception: allow source .js files in specific example directories
+!packages/cli/src/commands/extensions/examples/**/*.js
 
 # Docker folder to help skip auth refreshes
 .docker
