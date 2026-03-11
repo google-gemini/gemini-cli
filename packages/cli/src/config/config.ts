@@ -698,7 +698,7 @@ export async function loadCliConfig(
   let clientName: string | undefined = undefined;
   if (acpMode) {
     const ide = detectIdeFromEnv();
-    clientName = `acp-${ide.name}`;
+    clientName = `acp-${ide.name.replace(/[^a-zA-Z0-9]/g, '')}`;
   }
 
   return new Config({
