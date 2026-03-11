@@ -18,14 +18,14 @@ describe('getProgrammingLanguage', () => {
     {
       name: 'file_path is present',
       args: { file_path: 'src/test.ts' },
-      expected: 'TypeScript',
+      expected: 'typescript',
     },
     {
       name: 'absolute_path is present',
       args: { absolute_path: 'src/test.py' },
-      expected: 'Python',
+      expected: 'python',
     },
-    { name: 'path is present', args: { path: 'src/test.go' }, expected: 'Go' },
+    { name: 'path is present', args: { path: 'src/test.go' }, expected: 'go' },
     {
       name: 'no file path is present',
       args: {},
