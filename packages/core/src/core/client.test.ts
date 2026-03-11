@@ -23,6 +23,7 @@ import {
 } from './contentGenerator.js';
 import { GeminiChat } from './geminiChat.js';
 import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import {
   CompressionStatus,
   GeminiEventType,
@@ -234,6 +235,8 @@ describe('Gemini Client (client.ts)', () => {
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
       getGeminiClient: vi.fn(),
+      getRetryFetchErrors: vi.fn().mockReturnValue(true),
+      getMaxAttempts: vi.fn().mockReturnValue(3),
       getModelRouterService: vi
         .fn()
         .mockReturnValue(mockRouterService as unknown as ModelRouterService),
@@ -278,7 +281,16 @@ describe('Gemini Client (client.ts)', () => {
     } as unknown as Config;
     mockConfig.getHookSystem = vi.fn().mockReturnValue(mockHookSystem);
 
-    client = new GeminiClient(mockConfig);
+    (
+      mockConfig as unknown as { toolRegistry: typeof mockToolRegistry }
+    ).toolRegistry = mockToolRegistry;
+    (mockConfig as unknown as { messageBus: undefined }).messageBus = undefined;
+    (mockConfig as unknown as { config: Config; promptId: string }).config =
+      mockConfig;
+    (mockConfig as unknown as { config: Config; promptId: string }).promptId =
+      'test-prompt-id';
+
+    client = new GeminiClient(mockConfig as unknown as AgentLoopContext);
     await client.initialize();
     vi.mocked(mockConfig.getGeminiClient).mockReturnValue(client);
 
