@@ -110,10 +110,8 @@ export enum Command {
  * Data-driven key binding structure for user configuration
  */
 export class KeyBinding {
-  private static readonly VALID_KEYS = new Set([
-    ...'abcdefghijklmnopqrstuvwxyz0123456789', // Letters & Numbers
-    ..."`-=[]\\;',./", // Punctuation
-    ...Array.from({ length: 19 }, (_, i) => `f${i + 1}`), // Function Keys
+  private static readonly VALID_LONG_KEYS = new Set([
+    ...Array.from({ length: 35 }, (_, i) => `f${i + 1}`), // Function Keys
     ...Array.from({ length: 10 }, (_, i) => `numpad${i}`), // Numpad Numbers
     // Navigation & Actions
     'left',
@@ -130,6 +128,7 @@ export class KeyBinding {
     'space',
     'backspace',
     'delete',
+    'clear',
     'pausebreak',
     'capslock',
     'insert',
@@ -193,8 +192,11 @@ export class KeyBinding {
 
     const key = remains;
 
-    if (!KeyBinding.VALID_KEYS.has(key)) {
-      throw new Error(`Invalid keybinding key: "${key}" in "${pattern}"`);
+    if ([...key].length !== 1 && !KeyBinding.VALID_LONG_KEYS.has(key)) {
+      throw new Error(
+        `Invalid keybinding key: "${key}" in "${pattern}".` +
+          ` Must be a single character or one of: ${[...KeyBinding.VALID_LONG_KEYS].join(', ')}`,
+      );
     }
 
     this.key = key;

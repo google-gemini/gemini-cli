@@ -97,13 +97,6 @@ describe('KeyBinding', () => {
         'Invalid keybinding key: "ctlr+a" in "ctlr+a"',
       );
     });
-
-    it('should throw an error for literal "+" as key (must use "=")', () => {
-      // VS Code style peeling logic results in "+" as the remains
-      expect(() => new KeyBinding('alt++')).toThrow(
-        'Invalid keybinding key: "+" in "alt++"',
-      );
-    });
   });
 });
 

@@ -66,6 +66,14 @@ const KEY_INFO_MAP: Record<
   '[21~': { name: 'f10' },
   '[23~': { name: 'f11' },
   '[24~': { name: 'f12' },
+  '[25~': { name: 'f13' },
+  '[26~': { name: 'f14' },
+  '[28~': { name: 'f15' },
+  '[29~': { name: 'f16' },
+  '[31~': { name: 'f17' },
+  '[32~': { name: 'f18' },
+  '[33~': { name: 'f19' },
+  '[34~': { name: 'f20' },
   '[A': { name: 'up' },
   '[B': { name: 'down' },
   '[C': { name: 'right' },
@@ -91,12 +99,6 @@ const KEY_INFO_MAP: Record<
   OZ: { name: 'tab', shift: true }, // SS3 Shift+Tab variant for Windows terminals
   '[[5~': { name: 'pageup' },
   '[[6~': { name: 'pagedown' },
-  '[9u': { name: 'tab' },
-  '[13u': { name: 'enter' },
-  '[27u': { name: 'escape' },
-  '[32u': { name: 'space' },
-  '[127u': { name: 'backspace' },
-  '[57414u': { name: 'enter' }, // Numpad Enter
   '[a': { name: 'up', shift: true },
   '[b': { name: 'down', shift: true },
   '[c': { name: 'right', shift: true },
@@ -120,6 +122,46 @@ const KEY_INFO_MAP: Record<
   '[6^': { name: 'pagedown', ctrl: true },
   '[7^': { name: 'home', ctrl: true },
   '[8^': { name: 'end', ctrl: true },
+};
+
+// Kitty Keyboard Protocol (CSI u) code mappings
+const KITTY_CODE_MAP: Record<number, { name: string; sequence?: string }> = {
+  2: { name: 'insert' },
+  3: { name: 'delete' },
+  5: { name: 'pageup' },
+  6: { name: 'pagedown' },
+  9: { name: 'tab' },
+  13: { name: 'enter' },
+  14: { name: 'up' },
+  15: { name: 'down' },
+  16: { name: 'right' },
+  17: { name: 'left' },
+  27: { name: 'escape' },
+  32: { name: 'space', sequence: ' ' },
+  127: { name: 'backspace' },
+  57358: { name: 'capslock' },
+  57359: { name: 'scrolllock' },
+  57360: { name: 'numlock' },
+  57361: { name: 'printscreen' },
+  57362: { name: 'pausebreak' },
+  57409: { name: 'numpad_decimal', sequence: '.' },
+  57410: { name: 'numpad_divide', sequence: '/' },
+  57411: { name: 'numpad_multiply', sequence: '*' },
+  57412: { name: 'numpad_subtract', sequence: '-' },
+  57413: { name: 'numpad_add', sequence: '+' },
+  57414: { name: 'enter' },
+  57416: { name: 'numpad_separator', sequence: ',' },
+  // Function keys F13-F35, not standard, but supported by Kitty
+  ...Object.fromEntries(
+    Array.from({ length: 23 }, (_, i) => [302 + i, { name: `f${13 + i}` }]),
+  ),
+  // Numpad keys in Numeric Keypad Mode (CSI u codes 57399-57408)
+  ...Object.fromEntries(
+    Array.from({ length: 10 }, (_, i) => [
+      57399 + i,
+      { name: `numpad${i}`, sequence: String(i) },
+    ]),
+  ),
 };
 
 // Numpad keys in Application Keypad Mode (SS3 sequences)
@@ -565,17 +607,24 @@ function* emitKeys(
           }
         } else {
           name = 'undefined';
-          if (
-            (ctrl || cmd || alt) &&
-            (code.endsWith('u') || code.endsWith('~'))
-          ) {
+          if (code.endsWith('u') || code.endsWith('~')) {
             // CSI-u or tilde-coded functional keys: ESC [ <code> ; <mods> (u|~)
             const codeNumber = parseInt(code.slice(1, -1), 10);
-            if (
-              codeNumber >= 'a'.charCodeAt(0) &&
-              codeNumber <= 'z'.charCodeAt(0)
-            ) {
-              name = String.fromCharCode(codeNumber);
+            if (codeNumber >= 33 && codeNumber <= 126) {
+              const char = String.fromCharCode(codeNumber);
+              name = char.toLowerCase();
+              if (char >= 'A' && char <= 'Z') {
+                shift = true;
+              }
+            } else {
+              const mapped = KITTY_CODE_MAP[codeNumber];
+              if (mapped) {
+                name = mapped.name;
+                if (mapped.sequence && !ctrl && !cmd && !alt) {
+                  sequence = mapped.sequence;
+                  insertable = true;
+                }
+              }
             }
           }
         }
