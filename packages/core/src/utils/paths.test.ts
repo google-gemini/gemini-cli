@@ -568,6 +568,80 @@ describe('resolveToRealPath', () => {
       /Infinite recursion detected/,
     );
   });
+
+  it.skipIf(process.platform !== 'win32')(
+    'should handle Windows drive letter without trailing slash',
+    () => {
+      // On Windows, 'C:' refers to the current directory on drive C, not the root.
+      // fs.realpathSync('C:') throws EISDIR error on some systems.
+      // resolveToRealPath should convert 'C:' to 'C:\' and resolve it.
+      const driveLetter = 'C:';
+      const expectedPath = path.resolve('C:\\');
+
+      vi.spyOn(fs, 'realpathSync').mockImplementation((p) => {
+        const pStr = p.toString();
+        if (pStr === 'C:') {
+          const err = new Error(
+            'EISDIR: illegal operation on a directory',
+          ) as NodeJS.ErrnoException;
+          err.code = 'EISDIR';
+          throw err;
+        }
+        if (pStr === 'C:\\') {
+          return 'C:\\';
+        }
+        return pStr;
+      });
+
+      expect(resolveToRealPath(driveLetter)).toBe(expectedPath);
+    },
+  );
+
+  it.skipIf(process.platform !== 'win32')(
+    'should handle Windows drive letter when retry also fails',
+    () => {
+      // Test the fallback when both 'C:' and 'C:\' fail
+      const driveLetter = 'C:';
+
+      vi.spyOn(fs, 'realpathSync').mockImplementation((p) => {
+        const pStr = p.toString();
+        if (pStr === 'C:' || pStr === 'C:\\') {
+          const err = new Error(
+            'EISDIR: illegal operation on a directory',
+          ) as NodeJS.ErrnoException;
+          err.code = 'EISDIR';
+          throw err;
+        }
+        return pStr;
+      });
+
+      // Should return 'C:\' as fallback
+      expect(resolveToRealPath(driveLetter)).toBe('C:\\');
+    },
+  );
+
+  it.skipIf(process.platform !== 'win32')(
+    'should handle EISDIR for non-drive-letter paths',
+    () => {
+      // Test EISDIR for other paths (not bare drive letters)
+      const dirPath = path.resolve('C:\\some\\directory');
+
+      vi.spyOn(fs, 'realpathSync').mockImplementation((p) => {
+        const pStr = p.toString();
+        if (pStr === dirPath) {
+          const err = new Error(
+            'EISDIR: illegal operation on a directory',
+          ) as NodeJS.ErrnoException;
+          err.code = 'EISDIR';
+          throw err;
+        }
+        return pStr;
+      });
+
+      // Should return the path as-is for non-drive-letter EISDIR errors
+      expect(resolveToRealPath(dirPath)).toBe(dirPath);
+    },
+  );
 });
 
 describe('normalizePath', () => {
