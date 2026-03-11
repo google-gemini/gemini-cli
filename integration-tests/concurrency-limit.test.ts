@@ -36,13 +36,14 @@ describe('web-fetch rate limiting', () => {
 
     // We expect to find at least one tool call that failed with a rate limit error.
     const toolLogs = rig.readToolLogs();
-    const rateLimitedCalls = toolLogs.filter(
-      (log) =>
-        log.toolRequest.name === 'web_fetch' &&
-        (log.toolRequest as { error?: string }).error?.includes(
-          'Rate limit exceeded',
-        ),
-    );
+    const rateLimitedCalls = toolLogs.filter((log) => {
+      const req = log.toolRequest as { name: string; error?: unknown };
+      return (
+        req.name === 'web_fetch' &&
+        typeof req.error === 'string' &&
+        req.error.includes('Rate limit exceeded')
+      );
+    });
 
     expect(rateLimitedCalls.length).toBeGreaterThan(0);
     expect(result).toContain('Rate limit exceeded');
