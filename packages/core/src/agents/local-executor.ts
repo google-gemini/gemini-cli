@@ -18,7 +18,6 @@ import {
 } from '@google/genai';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import type { McpClientManager } from '../tools/mcp-client-manager.js';
 import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import { type Message } from '../confirmation-bus/types.js';
@@ -142,7 +141,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       context.config,
       subagentMessageBus,
     );
-    let mcpClientManager: McpClientManager | undefined;
     if (definition.mcpServers) {
       const globalMcpManager = context.config.getMcpClientManager();
       if (globalMcpManager) {
@@ -216,7 +214,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     }
 
     // Always ensure this agent's own MCP servers are included, even if toolConfig is restricted
-    parentToolRegistry.getActiveTools().forEach((tool) => {
+    parentToolRegistry.getAllTools().forEach((tool) => {
       if (
         tool instanceof DiscoveredMCPTool &&
         tool.serverName.startsWith(`__agent__${definition.name}__`)
@@ -244,7 +242,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       parentPromptId,
       parentCallId,
       onActivity,
-      mcpClientManager,
     );
   }
 
