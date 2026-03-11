@@ -246,6 +246,7 @@ export function runSensitiveKeywordLinter() {
   console.log('\nRunning sensitive keyword linter...');
   const SENSITIVE_PATTERN = /gemini-\d+(\.\d+)?/g;
   const ALLOWED_KEYWORDS = new Set([
+    'gemini-3.1',
     'gemini-3',
     'gemini-3.0',
     'gemini-2.5',
