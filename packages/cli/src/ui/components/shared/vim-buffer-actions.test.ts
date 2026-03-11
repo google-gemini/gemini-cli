@@ -2470,5 +2470,66 @@ describe('vim-buffer-actions', () => {
         expect(result.cursorRow).toBe(1);
       });
     });
+
+    describe('deletes populate the register', () => {
+      it('X populates register with deleted char before cursor', () => {
+        // cursor at col 2 ('l'); X deletes the char before = col 1 ('e')
+        const state = createTestState(['hello'], 0, 2);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_char_before' as const,
+          payload: { count: 1 },
+        });
+        expect(result.yankRegister).toEqual({ text: 'e', linewise: false });
+      });
+
+      it('dW populates register with deleted big-word', () => {
+        const state = createTestState(['hello world'], 0, 0);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_big_word_forward' as const,
+          payload: { count: 1 },
+        });
+        expect(result.yankRegister).toEqual({
+          text: 'hello ',
+          linewise: false,
+        });
+      });
+
+      it('de populates register with deleted word-end', () => {
+        const state = createTestState(['hello world'], 0, 0);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_word_end' as const,
+          payload: { count: 1 },
+        });
+        expect(result.yankRegister).toEqual({ text: 'hello', linewise: false });
+      });
+
+      it('dE populates register with deleted big-word-end', () => {
+        const state = createTestState(['hello world'], 0, 0);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_big_word_end' as const,
+          payload: { count: 1 },
+        });
+        expect(result.yankRegister).toEqual({ text: 'hello', linewise: false });
+      });
+
+      it('df populates register with text up to and including target char', () => {
+        const state = createTestState(['hello world'], 0, 0);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_to_char_forward' as const,
+          payload: { char: 'o', count: 1, till: false },
+        });
+        expect(result.yankRegister).toEqual({ text: 'hello', linewise: false });
+      });
+
+      it('dF populates register with text backward to and including target char', () => {
+        const state = createTestState(['hello world'], 0, 7);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_to_char_backward' as const,
+          payload: { char: 'o', count: 1, till: false },
+        });
+        // cursor at 7 ('o' in world), dFo finds 'o' at col 4, deletes [4, 8)
+        expect(result.yankRegister).toEqual({ text: 'o wo', linewise: false });
+      });
+    });
   });
 });
