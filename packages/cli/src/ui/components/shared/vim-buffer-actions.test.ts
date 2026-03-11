@@ -2586,6 +2586,22 @@ describe('vim-buffer-actions', () => {
         expect(result.lines).toEqual(['hello', 'foo', 'foo', 'world']);
         expect(result.cursorRow).toBe(1);
       });
+
+      it('should land cursor on last char when pasting multiline charwise text', () => {
+        // Simulates yanking across a line boundary and pasting charwise.
+        // Cursor must land on the last pasted char, not a large out-of-bounds column.
+        const state = {
+          ...createTestState(['ab', 'cd'], 0, 1),
+          yankRegister: { text: 'b\nc', linewise: false },
+        };
+        const result = handleVimAction(state, {
+          type: 'vim_paste_after' as const,
+          payload: { count: 1 },
+        });
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.cursorRow).toBe(1);
+        expect(result.cursorCol).toBe(0);
+      });
     });
 
     describe('vim_paste_before (P)', () => {

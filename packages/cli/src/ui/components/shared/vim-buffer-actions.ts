@@ -1781,12 +1781,15 @@ export function handleVimAction(
           insertCol,
           pasteText,
         );
-        // Cursor lands on last pasted char
-        const pasteCodePoints = toCodePoints(pasteText);
-        const newCol = insertCol + pasteCodePoints.length - 1;
+        // replaceRangeInternal leaves cursorCol one past the last inserted char;
+        // step back by 1 to land on the last pasted character.
+        const pasteLength = pasteText.length;
         return clampNormalCursor({
           ...newState,
-          cursorCol: Math.max(insertCol, newCol),
+          cursorCol: Math.max(
+            0,
+            newState.cursorCol - (pasteLength > 0 ? 1 : 0),
+          ),
           preferredCol: null,
         });
       }
@@ -1823,12 +1826,15 @@ export function handleVimAction(
           cursorCol,
           pasteText,
         );
-        // Cursor lands on last pasted char
-        const pasteCodePoints = toCodePoints(pasteText);
-        const newCol = cursorCol + pasteCodePoints.length - 1;
+        // replaceRangeInternal leaves cursorCol one past the last inserted char;
+        // step back by 1 to land on the last pasted character.
+        const pasteLength = pasteText.length;
         return clampNormalCursor({
           ...newState,
-          cursorCol: Math.max(cursorCol, newCol),
+          cursorCol: Math.max(
+            0,
+            newState.cursorCol - (pasteLength > 0 ? 1 : 0),
+          ),
           preferredCol: null,
         });
       }
