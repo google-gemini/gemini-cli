@@ -53,7 +53,7 @@ The model used by Gemini CLI is determined by the following order of precedence:
     model specified in the `model.name` property of your `settings.json` file
     will be used.
 4.  **Local model (experimental):** If the Gemma local model router is enabled
-    in your `settings.json` file, the CLI will use the local Gemma model to
-    route the request to an appropriate model.
+    in your `settings.json` file, the CLI will use the local Gemma model
+    (instead of Gemini models) to route the request to an appropriate model.
 5.  **Default model:** If none of the above are set, the default model will be
     used. The default model is `auto`

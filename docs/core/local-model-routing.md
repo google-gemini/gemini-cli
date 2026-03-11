@@ -28,8 +28,7 @@ for your system.
 
 1. Download
    [lit.windows_x86_64.exe](https://github.com/google-ai-edge/LiteRT-LM/releases/download/v0.9.0-alpha03/lit.windows_x86_64.exe).
-2. (Optional) Using GPU on Windows requires the DirectXShaderCompiler. Download
-   the
+2. Using GPU on Windows requires the DirectXShaderCompiler. Download the
    [dxc zip from the latest release](https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.8.2505.1/dxc_2025_07_14.zip).
    Unzip the archive and from the architecture-appropriate `bin\` directory, and
    copy the `dxil.dll` and `dxcompiler.dll` into the same location as you saved
@@ -93,7 +92,7 @@ You should see a short joke in the server output as an indicator of success.
 ```
 # Run this in PowerShell to send a request to the server
 
-$uri = "http://localhost:8000/v1beta/models/gemma3-1b-gpu-custom:generateContent"
+$uri = "http://localhost:9379/v1beta/models/gemma3-1b-gpu-custom:generateContent"
 $body = @{contents = @( @{
   role = "user"
   parts = @( @{ text = "Tell me a joke." } )
