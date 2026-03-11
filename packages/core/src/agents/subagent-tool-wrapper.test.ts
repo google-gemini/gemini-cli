@@ -56,6 +56,11 @@ describe('SubagentToolWrapper', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfig = makeFakeConfig();
+    // .config is already set correctly by the getter on the instance.
+    Object.defineProperty(mockConfig, 'promptId', {
+      get: () => 'test-prompt-id',
+      configurable: true,
+    });
     mockMessageBus = createMockMessageBus();
   });
 
@@ -70,7 +75,7 @@ describe('SubagentToolWrapper', () => {
       expect(wrapper.name).toBe(mockDefinition.name);
       expect(wrapper.displayName).toBe(mockDefinition.displayName);
       expect(wrapper.description).toBe(mockDefinition.description);
-      expect(wrapper.kind).toBe(Kind.Think);
+      expect(wrapper.kind).toBe(Kind.Agent);
       expect(wrapper.isOutputMarkdown).toBe(true);
       expect(wrapper.canUpdateOutput).toBe(true);
     });

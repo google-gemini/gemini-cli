@@ -19,6 +19,7 @@ import {
   type Question,
 } from '../confirmation-bus/types.js';
 import { type ApprovalMode } from '../policy/types.js';
+import type { SubagentProgress } from '../agents/types.js';
 
 /**
  * Represents a validated and ready-to-execute tool call.
@@ -64,15 +65,24 @@ export interface ToolInvocation<
    */
   execute(
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
   ): Promise<TResult>;
+
+  /**
+   * Returns tool-specific options for policy updates.
+   * This is used by the scheduler to narrow policy rules when a tool is approved.
+   */
+  getPolicyUpdateOptions?(
+    outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined;
 }
 
 /**
  * Options for policy updates that can be customized by tool invocations.
  */
 export interface PolicyUpdateOptions {
+  argsPattern?: string;
   commandPrefix?: string | string[];
   mcpName?: string;
 }
@@ -129,7 +139,7 @@ export abstract class BaseToolInvocation<
    * Subclasses can override this to provide additional options like
    * commandPrefix (for shell) or mcpName (for MCP tools).
    */
-  protected getPolicyUpdateOptions(
+  getPolicyUpdateOptions(
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
     return undefined;
@@ -276,7 +286,7 @@ export abstract class BaseToolInvocation<
 
   abstract execute(
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
   ): Promise<TResult>;
 }
@@ -422,7 +432,7 @@ export abstract class DeclarativeTool<
   async buildAndExecute(
     params: TParams,
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
   ): Promise<TResult> {
     const invocation = this.build(params);
@@ -688,7 +698,14 @@ export interface TodoList {
   todos: Todo[];
 }
 
-export type ToolResultDisplay = string | FileDiff | AnsiOutput | TodoList;
+export type ToolLiveOutput = string | AnsiOutput | SubagentProgress;
+
+export type ToolResultDisplay =
+  | string
+  | FileDiff
+  | AnsiOutput
+  | TodoList
+  | SubagentProgress;
 
 export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 
@@ -832,6 +849,7 @@ export enum Kind {
   Search = 'search',
   Execute = 'execute',
   Think = 'think',
+  Agent = 'agent',
   Fetch = 'fetch',
   Communicate = 'communicate',
   Plan = 'plan',
