@@ -70,6 +70,28 @@ terminal.
 Visual terminal output is easier to share and discuss than text-only
 explanations.
 
+## Related Issues / Prior Art
+
+This PoC is aligned with GSoC Idea 12 (Generative Architecture & UI
+Visualization) and builds on existing repository discussions. It also aims to
+address, and in several places surpass, the current issue surface for this
+topic through deterministic demo assets, reproducible flows, and integrated
+fallback behavior.
+
+1. 21230 - canonical visualize + `/visualize` discussion (ASCII-first diagrams,
+   dependency graphing, git graphing direction).
+2. PR 21231 - active implementation thread for ASCII-first visualize flow.
+3. 20393 - earlier Mermaid + terminal image protocol proposal, later closed as
+   duplicate of 21230.
+4. 15454 and 5316 - inline image support roadmap and long-running tracking
+   context in Gemini CLI.
+5. 6806 - Kitty image rendering bug / protocol reliability concerns.
+6. 16924 - `mmdc` allowlist friction, especially on Windows workflows.
+7. 17923, 16310, and 11084 - image/base64 token-counting pitfalls relevant to
+   rich media output.
+8. 11462, 9126, and 9176 - visual regression / screenshot testing direction for
+   terminal UI.
+
 ## Prerequisites
 
 1. Node.js 20+.
