@@ -63,17 +63,8 @@ function matchesWildcard(
     return toolName.startsWith(`${MCP_TOOL_PREFIX}${expectedServerName}_`);
   }
 
-  // Not a recognized wildcard pattern, fallback to regex match
-  try {
-    const regexStr =
-      '^' +
-      pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') +
-      '$';
-    const regex = new RegExp(regexStr);
-    return regex.test(toolName);
-  } catch (e) {
-    return toolName === pattern;
-  }
+  // Not a recognized wildcard pattern, fallback to exact match just in case
+  return toolName === pattern;
 }
 
 function ruleMatches(
