@@ -26,7 +26,10 @@ import {
   serializeTerminalToObject,
   type AnsiOutput,
 } from '../utils/terminalSerializer.js';
-import { sanitizeEnvironment, type EnvironmentSanitizationConfig } from './environmentSanitization.js';
+import {
+  sanitizeEnvironment,
+  type EnvironmentSanitizationConfig,
+} from './environmentSanitization.js';
 import { NoopSandboxManager } from './sandboxManager.js';
 import { killProcessGroup } from '../utils/process-utils.js';
 const { Terminal } = pkg;
