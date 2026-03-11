@@ -92,6 +92,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `[]`
   - **Requires restart:** Yes
 
+#### `adminPolicyPaths`
+
+- **`adminPolicyPaths`** (array):
+  - **Description:** Additional admin policy files or directories to load.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
 #### `general`
 
 - **`general.preferredEditor`** (string):
@@ -756,7 +763,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `tools`
 
-- **`tools.sandbox`** (boolean | string):
+- **`tools.sandbox`** (string):
   - **Description:** Sandbox execution environment. Set to a boolean to enable
     or disable the sandbox, provide a string path to a sandbox profile, or
     specify an explicit sandbox command (e.g., "docker", "podman", "lxc").
