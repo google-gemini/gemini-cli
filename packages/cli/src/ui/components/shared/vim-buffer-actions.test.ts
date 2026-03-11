@@ -572,6 +572,21 @@ describe('vim-buffer-actions', () => {
         const result = handleVimAction(state, action);
         expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('hel');
+        // Cursor clamps to last char of the shortened line (vim NORMAL mode
+        // cursor cannot rest past the final character).
+        expect(result.cursorCol).toBe(2);
+      });
+
+      it('should clamp cursor when deleting the last character on a line', () => {
+        const state = createTestState(['hello'], 0, 4);
+        const action = {
+          type: 'vim_delete_char' as const,
+          payload: { count: 1 },
+        };
+
+        const result = handleVimAction(state, action);
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe('hell');
         expect(result.cursorCol).toBe(3);
       });
 
@@ -626,7 +641,7 @@ describe('vim-buffer-actions', () => {
         const result = handleVimAction(state, action);
         expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('hello ');
-        expect(result.cursorCol).toBe(6);
+        expect(result.cursorCol).toBe(5);
       });
 
       it('should delete only the word characters if it is the last word followed by whitespace', () => {
@@ -665,6 +680,55 @@ describe('vim-buffer-actions', () => {
         const result = handleVimAction(state, action);
         expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('foo    ');
+      });
+
+      it('should clamp cursor when dW removes the last word leaving only a trailing space', () => {
+        // cursor on 'w' in 'hello world'; dW deletes 'world' → 'hello '
+        const state = createTestState(['hello world'], 0, 6);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_big_word_forward' as const,
+          payload: { count: 1 },
+        });
+        expect(result.lines[0]).toBe('hello ');
+        // col 6 is past the new line end (len 6, max valid = 5)
+        expect(result.cursorCol).toBe(5);
+      });
+    });
+
+    describe('vim_delete_word_end', () => {
+      it('should clamp cursor when de removes the last word on a line', () => {
+        // cursor on 'w' in 'hello world'; de deletes through 'd' → 'hello '
+        const state = createTestState(['hello world'], 0, 6);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_word_end' as const,
+          payload: { count: 1 },
+        });
+        expect(result.lines[0]).toBe('hello ');
+        expect(result.cursorCol).toBe(5);
+      });
+    });
+
+    describe('vim_delete_big_word_end', () => {
+      it('should delete from cursor to end of WORD (skipping punctuation)', () => {
+        // cursor on 'b' in 'foo bar.baz qux'; dE treats 'bar.baz' as one WORD
+        const state = createTestState(['foo bar.baz qux'], 0, 4);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_big_word_end' as const,
+          payload: { count: 1 },
+        });
+        expect(result.lines[0]).toBe('foo  qux');
+        expect(result.cursorCol).toBe(4);
+      });
+
+      it('should clamp cursor when dE removes the last WORD on a line', () => {
+        // cursor on 'w' in 'hello world'; dE deletes through 'd' → 'hello '
+        const state = createTestState(['hello world'], 0, 6);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_big_word_end' as const,
+          payload: { count: 1 },
+        });
+        expect(result.lines[0]).toBe('hello ');
+        expect(result.cursorCol).toBe(5);
       });
     });
 
@@ -751,7 +815,7 @@ describe('vim-buffer-actions', () => {
         const result = handleVimAction(state, action);
         expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('hello');
-        expect(result.cursorCol).toBe(5);
+        expect(result.cursorCol).toBe(4);
       });
 
       it('should do nothing at end of line', () => {
@@ -781,7 +845,7 @@ describe('vim-buffer-actions', () => {
         expect(result).toHaveOnlyValidCharacters();
         // 2D at position 5 on "line one" should delete "one" + entire "line two"
         expect(result.lines).toEqual(['line ', 'line three']);
-        expect(result.cursorCol).toBe(5);
+        expect(result.cursorCol).toBe(4);
       });
 
       it('should handle count exceeding available lines', () => {
@@ -2094,6 +2158,18 @@ describe('vim-buffer-actions', () => {
       });
       expect(result.undoStack.length).toBeGreaterThan(0);
     });
+
+    it('df: clamps cursor when deleting through the last char on the line', () => {
+      // cursor at 1 in 'hello'; dfo finds 'o' at col 4 and deletes [1,4] → 'h'
+      const state = createTestState(['hello'], 0, 1);
+      const result = handleVimAction(state, {
+        type: 'vim_delete_to_char_forward' as const,
+        payload: { char: 'o', count: 1, till: false },
+      });
+      expect(result.lines[0]).toBe('h');
+      // cursor was at col 1, new line has only col 0 valid
+      expect(result.cursorCol).toBe(0);
+    });
   });
 
   describe('vim_delete_to_char_backward (dF/dT)', () => {
@@ -2137,6 +2213,18 @@ describe('vim-buffer-actions', () => {
         payload: { char: 'o', count: 1, till: false },
       });
       expect(result.undoStack.length).toBeGreaterThan(0);
+    });
+
+    it('dF: clamps cursor when deletion removes chars up to end of line', () => {
+      // 'hello', cursor on last char 'o' (col 4), dFe finds 'e' at col 1
+      // deletes [1, 5) → 'h'; without clamp cursor would be at col 1 (past end)
+      const state = createTestState(['hello'], 0, 4);
+      const result = handleVimAction(state, {
+        type: 'vim_delete_to_char_backward' as const,
+        payload: { char: 'e', count: 1, till: false },
+      });
+      expect(result.lines[0]).toBe('h');
+      expect(result.cursorCol).toBe(0);
     });
   });
 });

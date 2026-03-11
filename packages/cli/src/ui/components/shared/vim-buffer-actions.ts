@@ -109,6 +109,20 @@ function findCharInLine(
   return found;
 }
 
+/**
+ * In NORMAL mode the cursor can never rest past the last character of a line.
+ * Call this after any delete action that stays in NORMAL mode to enforce that
+ * invariant. Change actions must NOT use this — they immediately enter INSERT
+ * mode where the cursor is allowed to sit at the end of the line.
+ */
+function clampNormalCursor(state: TextBufferState): TextBufferState {
+  const line = state.lines[state.cursorRow] || '';
+  const len = cpLen(line);
+  const maxCol = Math.max(0, len - 1);
+  if (state.cursorCol <= maxCol) return state;
+  return { ...state, cursorCol: maxCol };
+}
+
 export function handleVimAction(
   state: TextBufferState,
   action: VimAction,
@@ -143,7 +157,7 @@ export function handleVimAction(
 
       if (endRow !== cursorRow || endCol !== cursorCol) {
         const nextState = detachExpandedPaste(pushUndo(state));
-        return replaceRangeInternal(
+        const newState = replaceRangeInternal(
           nextState,
           cursorRow,
           cursorCol,
@@ -151,6 +165,9 @@ export function handleVimAction(
           endCol,
           '',
         );
+        return action.type === 'vim_delete_word_forward'
+          ? clampNormalCursor(newState)
+          : newState;
       }
       return state;
     }
@@ -185,7 +202,7 @@ export function handleVimAction(
 
       if (endRow !== cursorRow || endCol !== cursorCol) {
         const nextState = pushUndo(state);
-        return replaceRangeInternal(
+        const newState = replaceRangeInternal(
           nextState,
           cursorRow,
           cursorCol,
@@ -193,6 +210,9 @@ export function handleVimAction(
           endCol,
           '',
         );
+        return action.type === 'vim_delete_big_word_forward'
+          ? clampNormalCursor(newState)
+          : newState;
       }
       return state;
     }
@@ -298,7 +318,7 @@ export function handleVimAction(
 
       if (endRow !== cursorRow || endCol !== cursorCol) {
         const nextState = detachExpandedPaste(pushUndo(state));
-        return replaceRangeInternal(
+        const newState = replaceRangeInternal(
           nextState,
           cursorRow,
           cursorCol,
@@ -306,6 +326,9 @@ export function handleVimAction(
           endCol,
           '',
         );
+        return action.type === 'vim_delete_word_end'
+          ? clampNormalCursor(newState)
+          : newState;
       }
       return state;
     }
@@ -351,7 +374,7 @@ export function handleVimAction(
 
       if (endRow !== cursorRow || endCol !== cursorCol) {
         const nextState = pushUndo(state);
-        return replaceRangeInternal(
+        const newState = replaceRangeInternal(
           nextState,
           cursorRow,
           cursorCol,
@@ -359,6 +382,9 @@ export function handleVimAction(
           endCol,
           '',
         );
+        return action.type === 'vim_delete_big_word_end'
+          ? clampNormalCursor(newState)
+          : newState;
       }
       return state;
     }
@@ -432,12 +458,13 @@ export function handleVimAction(
       const { count } = action.payload;
       const currentLine = lines[cursorRow] || '';
       const totalLines = lines.length;
+      const isDelete = action.type === 'vim_delete_to_end_of_line';
 
       if (count === 1) {
         // Single line: delete from cursor to end of current line
         if (cursorCol < cpLen(currentLine)) {
           const nextState = detachExpandedPaste(pushUndo(state));
-          return replaceRangeInternal(
+          const newState = replaceRangeInternal(
             nextState,
             cursorRow,
             cursorCol,
@@ -445,6 +472,7 @@ export function handleVimAction(
             cpLen(currentLine),
             '',
           );
+          return isDelete ? clampNormalCursor(newState) : newState;
         }
         return state;
       } else {
@@ -457,7 +485,7 @@ export function handleVimAction(
           // No additional lines to delete, just delete to EOL
           if (cursorCol < cpLen(currentLine)) {
             const nextState = detachExpandedPaste(pushUndo(state));
-            return replaceRangeInternal(
+            const newState = replaceRangeInternal(
               nextState,
               cursorRow,
               cursorCol,
@@ -465,6 +493,7 @@ export function handleVimAction(
               cpLen(currentLine),
               '',
             );
+            return isDelete ? clampNormalCursor(newState) : newState;
           }
           return state;
         }
@@ -472,7 +501,7 @@ export function handleVimAction(
         // Delete from cursor position to end of endRow (including newlines)
         const nextState = detachExpandedPaste(pushUndo(state));
         const endLine = lines[endRow] || '';
-        return replaceRangeInternal(
+        const newState = replaceRangeInternal(
           nextState,
           cursorRow,
           cursorCol,
@@ -480,6 +509,7 @@ export function handleVimAction(
           cpLen(endLine),
           '',
         );
+        return isDelete ? clampNormalCursor(newState) : newState;
       }
     }
 
@@ -1035,7 +1065,7 @@ export function handleVimAction(
       if (cursorCol < lineLength) {
         const deleteCount = Math.min(count, lineLength - cursorCol);
         const nextState = detachExpandedPaste(pushUndo(state));
-        return replaceRangeInternal(
+        const newState = replaceRangeInternal(
           nextState,
           cursorRow,
           cursorCol,
@@ -1043,6 +1073,7 @@ export function handleVimAction(
           cursorCol + deleteCount,
           '',
         );
+        return clampNormalCursor(newState);
       }
       return state;
     }
@@ -1298,13 +1329,15 @@ export function handleVimAction(
       if (found === -1) return state;
       const endCol = till ? found : found + 1;
       const nextState = detachExpandedPaste(pushUndo(state));
-      return replaceRangeInternal(
-        nextState,
-        cursorRow,
-        cursorCol,
-        cursorRow,
-        endCol,
-        '',
+      return clampNormalCursor(
+        replaceRangeInternal(
+          nextState,
+          cursorRow,
+          cursorCol,
+          cursorRow,
+          endCol,
+          '',
+        ),
       );
     }
 
@@ -1331,7 +1364,11 @@ export function handleVimAction(
         endCol,
         '',
       );
-      return { ...resultState, cursorCol: startCol, preferredCol: null };
+      return clampNormalCursor({
+        ...resultState,
+        cursorCol: startCol,
+        preferredCol: null,
+      });
     }
 
     case 'vim_find_char_forward': {
