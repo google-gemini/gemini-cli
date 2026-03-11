@@ -429,7 +429,7 @@ export async function loadCliConfig(
   // Configure the shell based on user settings.
   // This allows users (especially on Windows) to override the default shell.
   const shellSettings = settings.tools?.shell;
-  if (shellSettings?.executable && shellSettings?.args) {
+  if (shellSettings?.executable) {
     setConfiguredShell({
       executable: shellSettings.executable,
       args: shellSettings.args,

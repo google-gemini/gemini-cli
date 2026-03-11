@@ -44,7 +44,7 @@ export interface ShellConfiguration {
  */
 export interface CustomShellConfig {
   executable: string;
-  args: string[];
+  args?: string[];
 }
 
 let configuredShell: CustomShellConfig | null = null;
