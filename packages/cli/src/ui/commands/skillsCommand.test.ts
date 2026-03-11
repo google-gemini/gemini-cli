@@ -23,6 +23,7 @@ vi.mock('../../utils/skillUtils.js', async (importOriginal) => {
   return {
     ...actual,
     linkSkill: vi.fn(),
+    syncSkills: vi.fn(),
   };
 });
 
@@ -36,7 +37,7 @@ vi.mock('../../config/extensions/consent.js', async (importOriginal) => {
   };
 });
 
-import { linkSkill } from '../../utils/skillUtils.js';
+import { linkSkill, syncSkills } from '../../utils/skillUtils.js';
 
 vi.mock('../../config/settings.js', async (importOriginal) => {
   const actual =
@@ -80,6 +81,7 @@ describe('skillsCommand', () => {
               ),
           }),
           getContentGenerator: vi.fn(),
+          reloadSkills: vi.fn().mockResolvedValue(undefined),
         } as unknown as Config,
         settings: {
           merged: createTestMergedSettings({ skills: { disabled: [] } }),
@@ -705,6 +707,83 @@ describe('skillsCommand', () => {
 
       const completions = await enableCmd.completion!(context, 'sk');
       expect(completions).toEqual(['skill2']);
+    });
+  });
+
+  describe('sync', () => {
+    it('should sync skills successfully and show details', async () => {
+      const syncCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'sync',
+      )!;
+      vi.mocked(syncSkills).mockResolvedValue({
+        synced: ['skill1', 'skill2'],
+        cleaned: ['old-link'],
+        conflicts: ['existing'],
+      });
+
+      await syncCmd.action!(context, '');
+
+      expect(syncSkills).toHaveBeenCalled();
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('Sync complete.'),
+        }),
+      );
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('Synced 2 skills (skill1, skill2)'),
+        }),
+      );
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('Cleaned up 1 stale link'),
+        }),
+      );
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining(
+            'Skipped 1 conflicting skill (existing)',
+          ),
+        }),
+      );
+      expect(context.services.config!.reloadSkills).toHaveBeenCalled();
+    });
+
+    it('should show info message if already in sync', async () => {
+      const syncCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'sync',
+      )!;
+      vi.mocked(syncSkills).mockResolvedValue({
+        synced: [],
+        cleaned: [],
+        conflicts: [],
+      });
+
+      await syncCmd.action!(context, '');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: 'Skills are already in sync. No changes needed.',
+        }),
+      );
+    });
+
+    it('should show error if sync fails', async () => {
+      const syncCmd = skillsCommand.subCommands!.find(
+        (s) => s.name === 'sync',
+      )!;
+      vi.mocked(syncSkills).mockRejectedValue(new Error('Sync failed'));
+
+      await syncCmd.action!(context, '');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.ERROR,
+          text: 'Failed to sync skills: Sync failed',
+        }),
+      );
     });
   });
 });

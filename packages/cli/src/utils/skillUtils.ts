@@ -12,6 +12,7 @@ import {
   type SkillDefinition,
 } from '@google/gemini-cli-core';
 import { cloneFromGit } from '../config/extensions/github.js';
+import { glob } from 'glob';
 import extract from 'extract-zip';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -279,4 +280,179 @@ export async function uninstallSkill(
 
   await fs.rm(skillPath, { recursive: true, force: true });
   return { location: skillPath };
+}
+
+/**
+ * Central logic for syncing skills from external tools (Claude, OpenCode).
+ */
+export async function syncSkills(onLog: (msg: string) => void): Promise<{
+  synced: string[];
+  cleaned: string[];
+  conflicts: string[];
+}> {
+  const home = os.homedir();
+
+  // 1. Identify all native skill names by scanning content in parallel
+  const nativePaths = [
+    Storage.getUserSkillsDir(), // User Tier Standard
+    path.join(home, '.agents', 'skills'), // User Tier Alias
+    path.join(Storage.getGlobalGeminiDir(), 'extensions'), // Extension Tier root
+  ];
+
+  const existingNativeSkillNames = new Set<string>();
+
+  const scanNativePath = async (p: string) => {
+    const stats = await fs.stat(p).catch(() => null);
+    if (!stats?.isDirectory()) return;
+
+    if (p === Storage.getUserSkillsDir()) {
+      const entries = await fs.readdir(p, { withFileTypes: true });
+      await Promise.all(
+        entries.map(async (entry) => {
+          if (entry.isDirectory() && !entry.isSymbolicLink()) {
+            const skills = await loadSkillsFromDir(path.join(p, entry.name));
+            for (const s of skills) existingNativeSkillNames.add(s.name);
+          }
+        }),
+      );
+    } else if (p.includes('extensions')) {
+      const matches = await glob(path.join(p, '**', 'skills'), {
+        nodir: false,
+      });
+      await Promise.all(
+        matches.map(async (match) => {
+          const skills = await loadSkillsFromDir(match);
+          for (const s of skills) existingNativeSkillNames.add(s.name);
+        }),
+      );
+    } else {
+      const skills = await loadSkillsFromDir(p);
+      for (const s of skills) existingNativeSkillNames.add(s.name);
+    }
+  };
+
+  await Promise.all(nativePaths.map(scanNativePath));
+
+  // 2. Define source paths for syncing
+  const sourcePaths = [
+    path.join(home, '.claude', 'skills'),
+    path.join(home, '.config', 'opencode', 'skills'),
+  ];
+
+  const targetDir = Storage.getUserSkillsDir();
+  await fs.mkdir(targetDir, { recursive: true });
+
+  const synced: string[] = [];
+  const cleaned: string[] = [];
+  const conflicts: string[] = [];
+
+  // 3. Cleanup pass: Standardize and deduplicate links in parallel
+  const targetEntries = await fs.readdir(targetDir, { withFileTypes: true });
+  const sourceToLinkMap = new Map<string, string>();
+
+  const resolveTarget = async (linkPath: string) => {
+    const raw = await fs.readlink(linkPath).catch(() => null);
+    if (!raw) return null;
+    return path
+      .resolve(
+        path.isAbsolute(raw) ? raw : path.join(path.dirname(linkPath), raw),
+      )
+      .replace(/\/+$/, '');
+  };
+
+  // First pass: Map sources to official names
+  await Promise.all(
+    targetEntries.map(async (entry) => {
+      if (!entry.isSymbolicLink()) return;
+      const entryPath = path.join(targetDir, entry.name);
+      const resolvedPath = await resolveTarget(entryPath);
+      if (!resolvedPath) return;
+
+      const linkedSkills = await loadSkillsFromDir(entryPath);
+      const actualSkillName = linkedSkills[0]?.name;
+      if (actualSkillName && entry.name === actualSkillName) {
+        sourceToLinkMap.set(resolvedPath, entry.name);
+      }
+    }),
+  );
+
+  // Second pass: Clean up
+  await Promise.all(
+    targetEntries.map(async (entry) => {
+      if (!entry.isSymbolicLink()) return;
+      const entryPath = path.join(targetDir, entry.name);
+      const targetExists = await fs.stat(entryPath).catch(() => null);
+
+      if (!targetExists) {
+        onLog(`Removing broken link: ${entry.name}`);
+        await fs.rm(entryPath);
+        cleaned.push(entry.name);
+        return;
+      }
+
+      const resolvedTargetPath = await resolveTarget(entryPath);
+      if (!resolvedTargetPath) return;
+
+      const linkedSkills = await loadSkillsFromDir(entryPath);
+      const linkedSkillName = linkedSkills[0]?.name || entry.name;
+
+      if (existingNativeSkillNames.has(linkedSkillName)) {
+        onLog(
+          `Removing conflicting link: ${entry.name} (conflicts with native ${linkedSkillName})`,
+        );
+        await fs.rm(entryPath);
+        cleaned.push(entry.name);
+      } else {
+        const officialLinkName = sourceToLinkMap.get(resolvedTargetPath);
+        if (officialLinkName && entry.name !== officialLinkName) {
+          onLog(
+            `Removing redundant link: ${entry.name} (official name is ${officialLinkName})`,
+          );
+          await fs.rm(entryPath);
+          cleaned.push(entry.name);
+        }
+      }
+    }),
+  );
+
+  // 4. Linking pass
+  for (const sourcePath of sourcePaths) {
+    const stats = await fs.stat(sourcePath).catch(() => null);
+    if (!stats?.isDirectory()) continue;
+
+    const externalSkills = await loadSkillsFromDir(sourcePath);
+    if (externalSkills.length === 0) continue;
+
+    onLog(`Syncing skills from ${sourcePath}...`);
+    for (const skill of externalSkills) {
+      const skillName = skill.name;
+      const skillSourceDir = path.dirname(skill.location);
+      const destPath = path.join(targetDir, skillName);
+
+      if (existingNativeSkillNames.has(skillName)) {
+        conflicts.push(skillName);
+        continue;
+      }
+
+      const destExists = await fs.lstat(destPath).catch(() => null);
+      if (destExists) {
+        if (destExists.isSymbolicLink()) {
+          const currentTarget = await resolveTarget(destPath);
+          if (currentTarget === skillSourceDir.replace(/\/+$/, '')) {
+            continue; // Already synced correctly
+          }
+          await fs.rm(destPath);
+        } else {
+          conflicts.push(skillName);
+          continue;
+        }
+      }
+
+      onLog(`Linking skill: ${skillName}`);
+      await fs.symlink(skillSourceDir, destPath, 'dir');
+      synced.push(skillName);
+    }
+  }
+
+  return { synced, cleaned, conflicts };
 }
