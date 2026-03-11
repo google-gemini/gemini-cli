@@ -41,6 +41,7 @@ import { READ_MANY_FILES_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 
 import { REFERENCE_CONTENT_END } from '../utils/constants.js';
+import { discoverJitContext, appendJitContext } from './jit-context.js';
 
 /**
  * Parameters for the ReadManyFilesTool.
@@ -411,6 +412,21 @@ ${finalExclusionPatternsForDescription
           reason: `Unexpected error: ${result.reason}`,
         });
       }
+    }
+
+    // Discover JIT subdirectory context for all unique directories of processed files
+    const uniqueDirs = new Set(
+      Array.from(filesToConsider).map((f) => path.dirname(f)),
+    );
+    const jitParts: string[] = [];
+    for (const dir of uniqueDirs) {
+      const jitContext = await discoverJitContext(this.config, dir);
+      if (jitContext) {
+        jitParts.push(jitContext);
+      }
+    }
+    if (jitParts.length > 0) {
+      contentParts.push(appendJitContext('', jitParts.join('\n')));
     }
 
     let displayMessage = `### ReadManyFiles Result (Target Dir: \`${this.config.getTargetDir()}\`)\n\n`;
