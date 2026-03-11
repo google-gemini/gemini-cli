@@ -1,5 +1,3 @@
-/* eslint-env node */
-
 /**
  * @license
  * Copyright 2025 Google LLC
@@ -71,6 +69,16 @@ function wildcardMatch(pattern, text) {
 
 async function getPermission(hostname) {
   const request = { hostname, timestamp: Date.now() };
+  try {
+    const stats = fs.lstatSync(REQUEST_PATH);
+    if (stats.isSymbolicLink()) {
+      fs.unlinkSync(REQUEST_PATH);
+    }
+  } catch (e) {
+    if (e.code !== 'ENOENT') {
+      throw e;
+    }
+  }
   fs.writeFileSync(REQUEST_PATH, JSON.stringify(request));
 
   // Wait for a response
@@ -104,7 +112,16 @@ const server = http.createServer((req, res) => {
 
 server.on('connect', async (req, clientSocket, head) => {
   // req.url will be in the format "hostname:port" for a CONNECT request.
-  const { port, hostname } = new URL(`http://${req.url}`);
+  let port, hostname;
+  try {
+    ({ port, hostname } = new URL(`http://${req.url}`));
+  } catch {
+    const message = `[HTTP] Invalid URL: ${req.url}`;
+    console.log(`[PROXY] ${message}`);
+    log(message);
+    clientSocket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+    return;
+  }
 
   const initialMessage = `[HTTP] Intercepted CONNECT request for: ${hostname}:${port}`;
   console.log(`[PROXY] ${initialMessage}`);

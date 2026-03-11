@@ -6,14 +6,17 @@
 
 import { useEffect, useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const REQUEST_PATH = path.resolve(process.cwd(), '.gemini', 'request.json');
 const RESPONSE_PATH = path.resolve(process.cwd(), '.gemini', 'response.json');
 
 interface RequestData {
   hostname: string;
+}
+interface SystemError extends Error {
+  code?: string;
 }
 
 export function ProxyPermissionDialog() {
@@ -38,6 +41,23 @@ export function ProxyPermissionDialog() {
   }, []);
 
   const handleResponse = (allow: boolean) => {
+    try {
+      const stats = fs.lstatSync(RESPONSE_PATH);
+      if (stats.isSymbolicLink()) {
+        // For security, if the response path is a symlink, just delete it.
+        fs.unlinkSync(RESPONSE_PATH);
+      }
+    } catch (e) {
+      // Check if it's an object with a 'code' property
+      if (e && typeof e === 'object' && 'code' in e) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const err = e as SystemError;
+        if (err.code !== 'ENOENT') throw err;
+      } else {
+        // If it's a weird error we didn't expect, throw it
+        throw e;
+      }
+    }
     fs.writeFileSync(RESPONSE_PATH, JSON.stringify({ ...request, allow }));
     fs.unlinkSync(REQUEST_PATH);
     setRequest(null);
@@ -46,15 +66,9 @@ export function ProxyPermissionDialog() {
   useInput((input, key) => {
     if (!request) return;
 
-    if (key.return) {
+    if (key.return || input.toLowerCase() === 'y') {
       handleResponse(true);
-    }
-
-    if (input === 'y' || input === 'Y') {
-      handleResponse(true);
-    }
-
-    if (input === 'n' || input === 'N') {
+    } else if (input.toLowerCase() === 'n') {
       handleResponse(false);
     }
   });
