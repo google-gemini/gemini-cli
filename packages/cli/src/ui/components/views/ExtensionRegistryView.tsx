@@ -8,7 +8,6 @@ import type React from 'react';
 import { useMemo, useCallback, useState } from 'react';
 import { Box, Text } from 'ink';
 import type { RegistryExtension } from '../../../config/extensionRegistryClient.js';
-
 import {
   SearchableList,
   type GenericListItem,

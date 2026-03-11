@@ -7,7 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderWithProviders } from '../../test-utils/render.js';
 import * as SessionContext from '../contexts/SessionContext.js';
-import type { SessionStatsState } from '../contexts/SessionContext.js';
+import { type SessionStatsState } from '../contexts/SessionContext.js';
 import { Banner } from './Banner.js';
 import { Footer } from './Footer.js';
 import { Header } from './Header.js';

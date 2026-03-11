@@ -8,10 +8,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
 import { render } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
-import type { Config } from '@google/gemini-cli-core';
-import { SessionBrowser } from './SessionBrowser.js';
-import type { SessionBrowserProps } from './SessionBrowser.js';
-import type { SessionInfo } from '../../utils/sessionUtils.js';
+import { type Config } from '@google/gemini-cli-core';
+import { SessionBrowser, type SessionBrowserProps } from './SessionBrowser.js';
+import { type SessionInfo } from '../../utils/sessionUtils.js';
 
 // Collect key handlers registered via useKeypress so tests can
 // simulate input without going through the full stdin pipeline.
