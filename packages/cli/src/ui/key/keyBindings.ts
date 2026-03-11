@@ -110,10 +110,8 @@ export enum Command {
  * Data-driven key binding structure for user configuration
  */
 export class KeyBinding {
-  private static readonly VALID_KEYS = new Set([
-    ...'abcdefghijklmnopqrstuvwxyz0123456789', // Letters & Numbers
-    ..."`-=[]\\;',./", // Punctuation
-    ...Array.from({ length: 19 }, (_, i) => `f${i + 1}`), // Function Keys
+  private static readonly VALID_LONG_KEYS = new Set([
+    ...Array.from({ length: 35 }, (_, i) => `f${i + 1}`), // Function Keys
     ...Array.from({ length: 10 }, (_, i) => `numpad${i}`), // Numpad Numbers
     // Navigation & Actions
     'left',
@@ -130,11 +128,13 @@ export class KeyBinding {
     'space',
     'backspace',
     'delete',
+    'clear',
     'pausebreak',
     'capslock',
     'insert',
     'numlock',
     'scrolllock',
+    'printscreen',
     'numpad_multiply',
     'numpad_add',
     'numpad_separator',
@@ -193,8 +193,11 @@ export class KeyBinding {
 
     const key = remains;
 
-    if (!KeyBinding.VALID_KEYS.has(key)) {
-      throw new Error(`Invalid keybinding key: "${key}" in "${pattern}"`);
+    if ([...key].length !== 1 && !KeyBinding.VALID_LONG_KEYS.has(key)) {
+      throw new Error(
+        `Invalid keybinding key: "${key}" in "${pattern}".` +
+          ` Must be a single character or one of: ${[...KeyBinding.VALID_LONG_KEYS].join(', ')}`,
+      );
     }
 
     this.key = key;
@@ -211,6 +214,16 @@ export class KeyBinding {
       !!key.alt === !!this.alt &&
       !!key.ctrl === !!this.ctrl &&
       !!key.cmd === !!this.cmd
+    );
+  }
+
+  equals(other: KeyBinding): boolean {
+    return (
+      this.key === other.key &&
+      this.shift === other.shift &&
+      this.alt === other.alt &&
+      this.ctrl === other.ctrl &&
+      this.cmd === other.cmd
     );
   }
 }
@@ -619,10 +632,32 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
 };
 
 const keybindingsSchema = z.array(
-  z.object({
-    command: z.nativeEnum(Command),
-    key: z.string(),
-  }),
+  z
+    .object({
+      command: z.string().transform((val, ctx) => {
+        const negate = val.startsWith('-');
+        const commandId = negate ? val.slice(1) : val;
+
+        const result = z.nativeEnum(Command).safeParse(commandId);
+        if (!result.success) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Invalid command: "${val}".`,
+          });
+          return z.NEVER;
+        }
+
+        return {
+          command: result.data,
+          negate,
+        };
+      }),
+      key: z.string(),
+    })
+    .transform((val) => ({
+      commandEntry: val.command,
+      key: val.key,
+    })),
 );
 
 /**
@@ -645,15 +680,29 @@ export async function loadCustomKeybindings(): Promise<{
 
     if (result.success) {
       config = new Map(defaultKeyBindingConfig);
-      for (const { command, key } of result.data) {
+      for (const { commandEntry, key } of result.data) {
+        const { command, negate } = commandEntry;
         const currentBindings = config.get(command) ?? [];
 
         try {
           const keyBinding = new KeyBinding(key);
-          // Add new binding (prepend so it's the primary one shown in UI)
-          config.set(command, [keyBinding, ...currentBindings]);
+
+          if (negate) {
+            const updatedBindings = currentBindings.filter(
+              (b) => !b.equals(keyBinding),
+            );
+            if (updatedBindings.length === currentBindings.length) {
+              throw new Error(`cannot remove "${key}" since it is not bound`);
+            }
+            config.set(command, updatedBindings);
+          } else {
+            // Add new binding (prepend so it's the primary one shown in UI)
+            config.set(command, [keyBinding, ...currentBindings]);
+          }
         } catch (e) {
-          errors.push(`Invalid keybinding for command "${command}": ${e}`);
+          errors.push(
+            `Invalid keybinding for command "${negate ? '-' : ''}${command}": ${e}`,
+          );
         }
       }
     } else {
