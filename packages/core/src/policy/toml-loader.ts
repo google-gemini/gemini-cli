@@ -47,8 +47,10 @@ const PolicyRuleSchema = z.object({
   // Priority must be in range [0, 999] to prevent tier overflow.
   // With tier transformation (tier + priority/1000), this ensures:
   // - Tier 1 (default): range [1.000, 1.999]
-  // - Tier 2 (user): range [2.000, 2.999]
-  // - Tier 3 (admin): range [3.000, 3.999]
+  // - Tier 2 (extension): range [2.000, 2.999]
+  // - Tier 3 (workspace): range [3.000, 3.999]
+  // - Tier 4 (user): range [4.000, 4.999]
+  // - Tier 5 (admin): range [5.000, 5.999]
   priority: z
     .number({
       required_error: 'priority is required',
@@ -297,7 +299,7 @@ function validateToolName(name: string, ruleIndex: number): string | null {
  * Formula: tier + priority/1000
  *
  * @param priority The priority value from the TOML file
- * @param tier The tier (1=default, 2=user, 3=admin)
+ * @param tier The tier (1=default, 2=extension, 3=workspace, 4=user, 5=admin)
  * @returns The transformed priority
  */
 function transformPriority(priority: number, tier: number): number {
@@ -314,7 +316,7 @@ function transformPriority(priority: number, tier: number): number {
  * 4. Collects detailed error information for any failures
  *
  * @param policyPaths Array of paths (directories or files) to scan for policy files
- * @param getPolicyTier Function to determine tier (1-4) for a path
+ * @param getPolicyTier Function to determine tier (1-5) for a path
  * @returns Object containing successfully parsed rules and any errors encountered
  */
 export async function loadPoliciesFromToml(
