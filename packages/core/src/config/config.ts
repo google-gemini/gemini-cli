@@ -779,7 +779,7 @@ export class Config implements McpContext, AgentLoopContext {
     | undefined;
   private disabledHooks: string[];
   private experiments: Experiments | undefined;
-  private experimentsPromise: Promise<void> | undefined;
+  private experimentsPromise: Promise<Experiments | undefined> | undefined;
   private hookSystem?: HookSystem;
   private readonly onModelChange: ((model: string) => void) | undefined;
   private readonly onReload:
@@ -1269,17 +1269,21 @@ export class Config implements McpContext, AgentLoopContext {
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
 
     const codeAssistServer = getCodeAssistServer(this);
-    if (codeAssistServer?.projectId) {
-      await this.refreshUserQuota();
-    }
+    const quotaPromise = codeAssistServer?.projectId
+      ? this.refreshUserQuota()
+      : Promise.resolve();
 
     this.experimentsPromise = getExperiments(codeAssistServer)
       .then((experiments) => {
         this.setExperiments(experiments);
+        return experiments;
       })
       .catch((e) => {
         debugLogger.error('Failed to fetch experiments', e);
+        return undefined;
       });
+
+    await quotaPromise;
 
     const authType = this.contentGeneratorConfig.authType;
     if (
@@ -1296,10 +1300,10 @@ export class Config implements McpContext, AgentLoopContext {
     }
 
     // Fetch admin controls
-    await this.ensureExperimentsLoaded();
+    const experiments = await this.experimentsPromise;
     const adminControlsEnabled =
-      this.experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
-        ?.boolValue ?? false;
+      experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]?.boolValue ??
+      false;
     const adminControls = await fetchAdminControls(
       codeAssistServer,
       this.getRemoteAdminSettings(),
@@ -2508,8 +2512,30 @@ export class Config implements McpContext, AgentLoopContext {
   async getNumericalRoutingEnabled(): Promise<boolean> {
     await this.ensureExperimentsLoaded();
 
-    return !!this.experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING]
-      ?.boolValue;
+    const flag =
+      this.experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING];
+    return flag?.boolValue ?? true;
+  }
+
+  /**
+   * Returns the resolved complexity threshold for routing.
+   * If a remote threshold is provided and within range (0-100), it is returned.
+   * Otherwise, the default threshold (90) is returned.
+   */
+  async getResolvedClassifierThreshold(): Promise<number> {
+    const remoteValue = await this.getClassifierThreshold();
+    const defaultValue = 90;
+
+    if (
+      remoteValue !== undefined &&
+      !isNaN(remoteValue) &&
+      remoteValue >= 0 &&
+      remoteValue <= 100
+    ) {
+      return remoteValue;
+    }
+
+    return defaultValue;
   }
 
   async getClassifierThreshold(): Promise<number | undefined> {
