@@ -446,20 +446,25 @@ export abstract class DeclarativeTool<
    * This allows the model to explicitly control parallel vs sequential execution.
    */
   private addWaitForPreviousParameter(schema: unknown): unknown {
-    if (!this.isSchemaObject(schema)) {
+    if (!this.isSchemaObject(schema) || schema['type'] !== 'object') {
       return schema;
     }
 
     const props = schema['properties'];
+    let propertiesObj: Record<string, unknown> = {};
 
-    if (schema['type'] !== 'object' || !this.isSchemaObject(props)) {
-      return schema;
+    if (props !== undefined) {
+      if (!this.isSchemaObject(props)) {
+        // properties exists but is not an object, so it's a malformed schema.
+        return schema;
+      }
+      propertiesObj = props;
     }
 
     return {
       ...schema,
       properties: {
-        ...props,
+        ...propertiesObj,
         wait_for_previous: {
           type: 'boolean',
           description:
