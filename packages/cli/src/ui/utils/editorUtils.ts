@@ -31,6 +31,7 @@ const HEURISTIC_GUI_COMMANDS = [
   'subl',
   'zed',
   'atom',
+  'agy',
 ] as const;
 
 /**
