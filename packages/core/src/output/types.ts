@@ -56,7 +56,7 @@ export interface MessageEvent extends BaseJsonStreamEvent {
 
 export interface ThinkingEvent extends BaseJsonStreamEvent {
   type: JsonStreamEventType.THINKING;
-  content: string;
+  description: string;
   subject?: string;
 }
 

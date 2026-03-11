@@ -316,14 +316,19 @@ export async function runNonInteractive({
 
           if (event.type === GeminiEventType.Thought) {
             if (streamFormatter) {
-              const text = event.value.subject
-                ? `**${event.value.subject}** ${event.value.description}`
-                : event.value.description;
+              const isRaw =
+                config.getRawOutput() || config.getAcceptRawOutputRisk();
+              const subject = isRaw
+                ? event.value.subject || undefined
+                : stripAnsi(event.value.subject) || undefined;
+              const description = isRaw
+                ? event.value.description
+                : stripAnsi(event.value.description);
               streamFormatter.emitEvent({
                 type: JsonStreamEventType.THINKING,
                 timestamp: new Date().toISOString(),
-                content: text,
-                subject: event.value.subject || undefined,
+                description,
+                subject,
               });
             }
           } else if (event.type === GeminiEventType.Content) {
