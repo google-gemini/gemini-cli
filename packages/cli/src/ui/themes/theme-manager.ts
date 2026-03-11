@@ -20,12 +20,15 @@ import { SolarizedLight } from './builtin/light/solarized-light.js';
 import { XCode } from './builtin/light/xcode-light.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { Theme, ThemeType, ColorsTheme ,
+import {
   createCustomTheme,
   validateCustomTheme,
   interpolateColor,
   getThemeTypeFromBackgroundColor,
   resolveColor,
+  type Theme,
+  type ThemeType,
+  type ColorsTheme,
   type CustomTheme,
 } from './theme.js';
 import type { SemanticColors } from './semantic-tokens.js';
