@@ -7,12 +7,16 @@
 import type { GeminiClient } from '../core/client.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
+import type { Config } from './config.js';
 
 /**
  * AgentLoopContext represents the execution-scoped view of the world for a single
  * agent turn or sub-agent loop.
  */
 export interface AgentLoopContext {
+  /** The global runtime configuration. */
+  readonly config: Config;
+
   /** The unique ID for the current user turn or agent thought loop. */
   readonly promptId: string;
 

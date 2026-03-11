@@ -1100,6 +1100,10 @@ export class Config implements McpContext, AgentLoopContext {
     );
   }
 
+  get config(): Config {
+    return this;
+  }
+
   isInitialized(): boolean {
     return this.initialized;
   }

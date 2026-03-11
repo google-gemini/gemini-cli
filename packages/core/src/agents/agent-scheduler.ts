@@ -65,7 +65,7 @@ export async function scheduleAgentTools(
   });
 
   const scheduler = new Scheduler({
-    config: agentConfig,
+    context: agentConfig,
     messageBus: toolRegistry.getMessageBus(),
     getPreferredEditor: getPreferredEditor ?? (() => undefined),
     schedulerId,

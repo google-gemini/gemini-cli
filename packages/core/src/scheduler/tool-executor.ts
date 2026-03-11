@@ -51,10 +51,11 @@ export interface ToolExecutionContext {
 }
 
 export class ToolExecutor {
-  constructor(
-    private readonly config: Config,
-    private readonly context: AgentLoopContext,
-  ) {}
+  constructor(private readonly context: AgentLoopContext) {}
+
+  private get config(): Config {
+    return this.context.config;
+  }
 
   async execute(context: ToolExecutionContext): Promise<CompletedToolCall> {
     const { call, signal, outputUpdateHandler, onUpdateToolCall } = context;

@@ -542,7 +542,7 @@ export class Task {
     const messageBus = this.config.getMessageBus();
     const scheduler = new Scheduler({
       schedulerId: this.id,
-      config: this.config,
+      context: this.config,
       messageBus,
       getPreferredEditor: () => DEFAULT_GUI_EDITOR,
     });

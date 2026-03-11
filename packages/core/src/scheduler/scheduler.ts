@@ -57,7 +57,7 @@ interface SchedulerQueueItem {
 }
 
 export interface SchedulerOptions {
-  config: Config;
+  context: AgentLoopContext;
   messageBus?: MessageBus;
   getPreferredEditor: () => EditorType | undefined;
   schedulerId: string;
@@ -110,8 +110,8 @@ export class Scheduler {
   private readonly requestQueue: SchedulerQueueItem[] = [];
 
   constructor(options: SchedulerOptions) {
-    this.config = options.config;
-    this.context = options.config;
+    this.context = options.context;
+    this.config = this.context.config;
     this.messageBus = options.messageBus ?? this.context.messageBus;
     this.getPreferredEditor = options.getPreferredEditor;
     this.schedulerId = options.schedulerId;
@@ -122,7 +122,7 @@ export class Scheduler {
       this.schedulerId,
       (call) => logToolCall(this.config, new ToolCallEvent(call)),
     );
-    this.executor = new ToolExecutor(this.config, this.context);
+    this.executor = new ToolExecutor(this.context);
     this.modifier = new ToolModificationHandler();
 
     this.setupMessageBusListener(this.messageBus);
@@ -605,11 +605,13 @@ export class Scheduler {
 
     // Handle Policy Updates
     if (decision === PolicyDecision.ASK_USER && outcome) {
-      await updatePolicy(toolCall.tool, outcome, lastDetails, {
-        config: this.config,
-        messageBus: this.messageBus,
-        toolInvocation: toolCall.invocation,
-      });
+      await updatePolicy(
+        toolCall.tool,
+        outcome,
+        lastDetails,
+        this.context,
+        toolCall.invocation,
+      );
     }
 
     // Handle cancellation (cascades to entire batch)

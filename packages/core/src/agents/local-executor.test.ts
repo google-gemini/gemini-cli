@@ -307,6 +307,11 @@ describe('LocalAgentExecutor', () => {
     vi.useFakeTimers();
 
     mockConfig = makeFakeConfig();
+    // .config is already set correctly by the getter on the instance.
+    Object.defineProperty(mockConfig, 'promptId', {
+      get: () => 'test-prompt-id',
+      configurable: true,
+    });
     parentToolRegistry = new ToolRegistry(
       mockConfig,
       mockConfig.getMessageBus(),
@@ -319,7 +324,9 @@ describe('LocalAgentExecutor', () => {
     );
     parentToolRegistry.registerTool(MOCK_TOOL_NOT_ALLOWED);
 
-    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(parentToolRegistry);
+    vi.spyOn(mockConfig, 'toolRegistry', 'get').mockReturnValue(
+      parentToolRegistry,
+    );
     vi.spyOn(mockConfig, 'getAgentRegistry').mockReturnValue({
       getAllAgentNames: () => [],
     } as unknown as AgentRegistry);
@@ -382,7 +389,10 @@ describe('LocalAgentExecutor', () => {
 
     it('should use parentPromptId from context to create agentId', async () => {
       const parentId = 'parent-id';
-      mockedPromptIdContext.getStore.mockReturnValue(parentId);
+      Object.defineProperty(mockConfig, 'promptId', {
+        get: () => parentId,
+        configurable: true,
+      });
 
       const definition = createTestDefinition();
       const executor = await LocalAgentExecutor.create(
@@ -2052,7 +2062,7 @@ describe('LocalAgentExecutor', () => {
         vi.spyOn(configWithHints, 'getAgentRegistry').mockReturnValue({
           getAllAgentNames: () => [],
         } as unknown as AgentRegistry);
-        vi.spyOn(configWithHints, 'getToolRegistry').mockReturnValue(
+        vi.spyOn(configWithHints, 'toolRegistry', 'get').mockReturnValue(
           parentToolRegistry,
         );
       });
