@@ -1,13 +1,43 @@
 [[rule]]
+toolName = "read_file"
+decision = "allow"
+priority = 100
+
+[[rule]]
+toolName = "write_file"
+decision = "allow"
+priority = 100
+
+[[rule]]
+toolName = "grep_search"
+decision = "allow"
+priority = 100
+
+[[rule]]
+toolName = "glob"
+decision = "allow"
+priority = 100
+
+[[rule]]
+toolName = "list_directory"
+decision = "allow"
+priority = 100
+
+[[rule]]
+toolName = "codebase_investigator"
+decision = "allow"
+priority = 100
+
+[[rule]]
 toolName = "run_shell_command"
 commandPrefix = [
   "ls",
   "find",
   "head",
   "cat",
+  "echo",
   "cd",
   "grep",
-  "npm",
   "npm run start",
   "npm install",
   "npm run",
@@ -20,14 +50,12 @@ commandPrefix = [
   "git branch",
   "git br",
   "git log",
-  "git add",
   "git show",
   "gh pr",
   "gh repo view",
   "gh run",
   "gh api",
-  "gh log",
-  "code"
+  "gh log"
 ]
 decision = "allow"
 priority = 100
