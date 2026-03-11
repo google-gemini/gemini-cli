@@ -130,10 +130,9 @@ available combinations.
 
 ## Customizing Keybindings
 
-You can add alternative keybindings for commands by creating or modifying the
+You can add alternative keybindings or remove default keybindings by creating a
 `keybindings.json` file in your home gemini directory (typically
-`~/.gemini/keybindings.json`). This allows you to bind commands to additional
-key combinations. Note that default keybindings cannot be removed.
+`~/.gemini/keybindings.json`).
 
 ### Configuration Format
 
@@ -144,28 +143,57 @@ a `key` combination.
 ```json
 [
   {
-    "command": "input.submit",
-    "key": "cmd+s"
+    "command": "edit.clear",
+    "key": "cmd+l"
   },
   {
-    "command": "edit.clear",
-    "key": "ctrl+l"
+    // prefix "-" to unbind a key
+    "command": "-app.toggleYolo",
+    "key": "ctrl+y"
+  },
+  {
+    "command": "input.submit",
+    "key": "ctrl+y"
+  },
+  {
+    // multiple modifiers
+    "command": "cursor.right",
+    "key": "shift+alt+a"
+  },
+  {
+    // Some mac keyboards send "Å" instead of "shift+option+a"
+    "command": "cursor.right",
+    "key": "Å"
+  },
+  {
+    // some base keys have special multi-char names
+    "command": "cursor.right",
+    "key": "shift+pageup"
   }
 ]
 ```
 
-### Keyboard Rules
-
+- **Unbinding** To remove an existing or default keybinding, prefix a minus sign
+  (`-`) to the `command` name.
+- **No Auto-unbinding** The same key can be bound to multiple commands in
+  different contexts at the same time. Therefore, creating a binding does not
+  automatically unbind the key from other commands.
 - **Explicit Modifiers**: Key matching is explicit. For example, a binding for
   `ctrl+f` will only trigger on exactly `ctrl+f`, not `ctrl+shift+f` or
-  `alt+ctrl+f`. You must specify the exact modifier keys (`ctrl`, `shift`,
-  `alt`/`opt`/`option`, `cmd`/`meta`).
+  `alt+ctrl+f`.
 - **Literal Characters**: Terminals often translate complex key combinations
-  (especially on macOS with the `Option` key) into special characters. To handle
-  this reliably across all operating systems and SSH sessions, you can bind
-  directly to the literal character produced. For example, instead of trying to
-  bind `shift+5`, bind directly to `%`.
-- **Special Keys**: Supported special keys include:
+  (especially on macOS with the `Option` key) into special characters, losing
+  modifier and keystroke information along the way. For example,`shift+5` might
+  be sent as `%`. In these cases, you must bind to the literal character `%` as
+  bindings to `shift+5` will never fire. To see precisely what is being sent,
+  enable `Debug Keystroke Logging` and hit f12 to open the debug log console.
+- **Key Modifiers**: The supported key modifiers are:
+  - `ctrl`
+  - `shift`,
+  - `alt` (synonyms: `opt`, `option`)
+  - `cmd` (synonym: `meta`)
+- **Base Key**: The base key can be any single unicode code point or any of the
+  following special keys:
   - **Navigation**: `up`, `down`, `left`, `right`, `home`, `end`, `pageup`,
     `pagedown`
   - **Actions**: `enter`, `escape`, `tab`, `space`, `backspace`, `delete`,
