@@ -229,6 +229,9 @@ a `key` combination.
   the numbered radio option and confirm when the full number is entered.
 - `Ctrl + O`: Expand or collapse paste placeholders (`[Pasted Text: X lines]`)
   inline when the cursor is over the placeholder.
+- `Ctrl + X` (while a plan is presented): Open the plan in an external editor to
+  [collaboratively edit or comment](../cli/plan-mode.md#collaborative-plan-editing)
+  on the implementation strategy.
 - `Double-click` on a paste placeholder (alternate buffer mode only): Expand to
   view full content inline. Double-click again to collapse.
 
