@@ -15,14 +15,16 @@ export function useTimedMessage<T>(durationMs: number) {
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const showMessage = useCallback(
-    (msg: T) => {
+    (msg: T | null) => {
       setMessage(msg);
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-      timeoutRef.current = setTimeout(() => {
-        setMessage(null);
-      }, durationMs);
+      if (msg !== null) {
+        timeoutRef.current = setTimeout(() => {
+          setMessage(null);
+        }, durationMs);
+      }
     },
     [durationMs],
   );

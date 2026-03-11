@@ -124,6 +124,15 @@ export async function maybePromptForSettings(
 
   const envContent = formatEnvContent(nonSensitiveSettings);
 
+  if (fsSync.existsSync(envFilePath)) {
+    const stat = fsSync.statSync(envFilePath);
+    if (stat.isDirectory()) {
+      throw new Error(
+        `Cannot write extension settings to ${envFilePath} because it is a directory.`,
+      );
+    }
+  }
+
   await fs.writeFile(envFilePath, envContent);
 }
 
@@ -156,6 +165,7 @@ export async function promptForSetting(
     name: 'value',
     message: `${setting.name}\n${setting.description}`,
   });
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   return response.value;
 }
 
@@ -172,8 +182,11 @@ export async function getScopedEnvContents(
   const envFilePath = getEnvFilePath(extensionName, scope, workspaceDir);
   let customEnv: Record<string, string> = {};
   if (fsSync.existsSync(envFilePath)) {
-    const envFile = fsSync.readFileSync(envFilePath, 'utf-8');
-    customEnv = dotenv.parse(envFile);
+    const stat = fsSync.statSync(envFilePath);
+    if (!stat.isDirectory()) {
+      const envFile = fsSync.readFileSync(envFilePath, 'utf-8');
+      customEnv = dotenv.parse(envFile);
+    }
   }
 
   if (extensionConfig.settings) {
@@ -259,6 +272,12 @@ export async function updateSetting(
   const envFilePath = getEnvFilePath(extensionName, scope, workspaceDir);
   let envContent = '';
   if (fsSync.existsSync(envFilePath)) {
+    const stat = fsSync.statSync(envFilePath);
+    if (stat.isDirectory()) {
+      throw new Error(
+        `Cannot write extension settings to ${envFilePath} because it is a directory.`,
+      );
+    }
     envContent = await fs.readFile(envFilePath, 'utf-8');
   }
 
@@ -323,7 +342,10 @@ async function clearSettings(
   keychain: KeychainTokenStorage,
 ) {
   if (fsSync.existsSync(envFilePath)) {
-    await fs.writeFile(envFilePath, '');
+    const stat = fsSync.statSync(envFilePath);
+    if (!stat.isDirectory()) {
+      await fs.writeFile(envFilePath, '');
+    }
   }
   if (!(await keychain.isAvailable())) {
     return;

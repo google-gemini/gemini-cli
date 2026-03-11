@@ -16,10 +16,14 @@ import type { UIState } from '../contexts/UIStateContext.js';
 vi.mock('../themes/theme-manager.js', () => ({
   themeManager: {
     getActiveTheme: vi.fn(),
+    setTerminalBackground: vi.fn(),
+    getAllThemes: vi.fn(() => []),
+    setActiveTheme: vi.fn(),
   },
+  DEFAULT_THEME: { name: 'Default' },
 }));
 
-vi.mock('../themes/holiday.js', () => ({
+vi.mock('../themes/builtin/dark/holiday-dark.js', () => ({
   Holiday: { name: 'Holiday' },
 }));
 

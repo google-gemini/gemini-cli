@@ -15,8 +15,11 @@ import {
   AgentLoadError,
 } from './agentLoader.js';
 import { GEMINI_MODEL_ALIAS_PRO } from '../config/models.js';
-import type { LocalAgentDefinition } from './types.js';
-import { DEFAULT_MAX_TIME_MINUTES, DEFAULT_MAX_TURNS } from './types.js';
+import {
+  DEFAULT_MAX_TIME_MINUTES,
+  DEFAULT_MAX_TURNS,
+  type LocalAgentDefinition,
+} from './types.js';
 
 describe('loader', () => {
   let tempDir: string;
@@ -361,6 +364,331 @@ Hidden`,
       const result = await loadAgentsFromDirectory(tempDir);
       expect(result.agents).toHaveLength(0);
       expect(result.errors).toHaveLength(1);
+    });
+  });
+
+  describe('remote agent auth configuration', () => {
+    it('should parse remote agent with apiKey auth', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: api-key-agent
+agent_card_url: https://example.com/card
+auth:
+  type: apiKey
+  key: $MY_API_KEY
+  name: X-Custom-Key
+---
+`);
+      const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        kind: 'remote',
+        name: 'api-key-agent',
+        auth: {
+          type: 'apiKey',
+          key: '$MY_API_KEY',
+          name: 'X-Custom-Key',
+        },
+      });
+    });
+
+    it('should parse remote agent with http Bearer auth', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: bearer-agent
+agent_card_url: https://example.com/card
+auth:
+  type: http
+  scheme: Bearer
+  token: $BEARER_TOKEN
+---
+`);
+      const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        kind: 'remote',
+        name: 'bearer-agent',
+        auth: {
+          type: 'http',
+          scheme: 'Bearer',
+          token: '$BEARER_TOKEN',
+        },
+      });
+    });
+
+    it('should parse remote agent with http Basic auth', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: basic-agent
+agent_card_url: https://example.com/card
+auth:
+  type: http
+  scheme: Basic
+  username: $AUTH_USER
+  password: $AUTH_PASS
+---
+`);
+      const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        kind: 'remote',
+        name: 'basic-agent',
+        auth: {
+          type: 'http',
+          scheme: 'Basic',
+          username: '$AUTH_USER',
+          password: '$AUTH_PASS',
+        },
+      });
+    });
+
+    it('should parse remote agent with Digest via raw value', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: digest-agent
+agent_card_url: https://example.com/card
+auth:
+  type: http
+  scheme: Digest
+  value: username="admin", response="abc123"
+---
+`);
+      const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        kind: 'remote',
+        name: 'digest-agent',
+        auth: {
+          type: 'http',
+          scheme: 'Digest',
+          value: 'username="admin", response="abc123"',
+        },
+      });
+    });
+
+    it('should parse remote agent with generic raw auth value', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: raw-agent
+agent_card_url: https://example.com/card
+auth:
+  type: http
+  scheme: CustomScheme
+  value: raw-token-value
+---
+`);
+      const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        kind: 'remote',
+        name: 'raw-agent',
+        auth: {
+          type: 'http',
+          scheme: 'CustomScheme',
+          value: 'raw-token-value',
+        },
+      });
+    });
+
+    it('should throw error for Bearer auth without token', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: invalid-bearer
+agent_card_url: https://example.com/card
+auth:
+  type: http
+  scheme: Bearer
+---
+`);
+      await expect(parseAgentMarkdown(filePath)).rejects.toThrow(
+        /Bearer scheme requires "token"/,
+      );
+    });
+
+    it('should throw error for Basic auth without credentials', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: invalid-basic
+agent_card_url: https://example.com/card
+auth:
+  type: http
+  scheme: Basic
+  username: user
+---
+`);
+      await expect(parseAgentMarkdown(filePath)).rejects.toThrow(
+        /Basic authentication requires "password"/,
+      );
+    });
+
+    it('should throw error for apiKey auth without key', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: invalid-apikey
+agent_card_url: https://example.com/card
+auth:
+  type: apiKey
+---
+`);
+      await expect(parseAgentMarkdown(filePath)).rejects.toThrow(
+        /auth\.key.*Required/,
+      );
+    });
+
+    it('should convert auth config in markdownToAgentDefinition', () => {
+      const markdown = {
+        kind: 'remote' as const,
+        name: 'auth-agent',
+        agent_card_url: 'https://example.com/card',
+        auth: {
+          type: 'apiKey' as const,
+          key: '$API_KEY',
+        },
+      };
+
+      const result = markdownToAgentDefinition(markdown);
+      expect(result).toMatchObject({
+        kind: 'remote',
+        name: 'auth-agent',
+        auth: {
+          type: 'apiKey',
+          key: '$API_KEY',
+        },
+      });
+    });
+
+    it('should parse remote agent with oauth2 auth', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: oauth2-agent
+agent_card_url: https://example.com/card
+auth:
+  type: oauth2
+  client_id: $MY_OAUTH_CLIENT_ID
+  scopes:
+    - read
+    - write
+---
+`);
+      const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        kind: 'remote',
+        name: 'oauth2-agent',
+        auth: {
+          type: 'oauth2',
+          client_id: '$MY_OAUTH_CLIENT_ID',
+          scopes: ['read', 'write'],
+        },
+      });
+    });
+
+    it('should parse remote agent with oauth2 auth including all fields', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: oauth2-full-agent
+agent_card_url: https://example.com/card
+auth:
+  type: oauth2
+  client_id: my-client-id
+  client_secret: my-client-secret
+  scopes:
+    - openid
+    - profile
+  authorization_url: https://auth.example.com/authorize
+  token_url: https://auth.example.com/token
+---
+`);
+      const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        kind: 'remote',
+        name: 'oauth2-full-agent',
+        auth: {
+          type: 'oauth2',
+          client_id: 'my-client-id',
+          client_secret: 'my-client-secret',
+          scopes: ['openid', 'profile'],
+          authorization_url: 'https://auth.example.com/authorize',
+          token_url: 'https://auth.example.com/token',
+        },
+      });
+    });
+
+    it('should parse remote agent with minimal oauth2 config (type only)', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: oauth2-minimal-agent
+agent_card_url: https://example.com/card
+auth:
+  type: oauth2
+---
+`);
+      const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        kind: 'remote',
+        name: 'oauth2-minimal-agent',
+        auth: {
+          type: 'oauth2',
+        },
+      });
+    });
+
+    it('should reject oauth2 auth with invalid authorization_url', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: invalid-oauth2-agent
+agent_card_url: https://example.com/card
+auth:
+  type: oauth2
+  client_id: my-client
+  authorization_url: not-a-valid-url
+---
+`);
+      await expect(parseAgentMarkdown(filePath)).rejects.toThrow(/Invalid url/);
+    });
+
+    it('should reject oauth2 auth with invalid token_url', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: invalid-oauth2-agent
+agent_card_url: https://example.com/card
+auth:
+  type: oauth2
+  client_id: my-client
+  token_url: not-a-valid-url
+---
+`);
+      await expect(parseAgentMarkdown(filePath)).rejects.toThrow(/Invalid url/);
+    });
+
+    it('should convert oauth2 auth config in markdownToAgentDefinition', () => {
+      const markdown = {
+        kind: 'remote' as const,
+        name: 'oauth2-convert-agent',
+        agent_card_url: 'https://example.com/card',
+        auth: {
+          type: 'oauth2' as const,
+          client_id: '$MY_CLIENT_ID',
+          scopes: ['read'],
+          authorization_url: 'https://auth.example.com/authorize',
+          token_url: 'https://auth.example.com/token',
+        },
+      };
+
+      const result = markdownToAgentDefinition(markdown);
+      expect(result).toMatchObject({
+        kind: 'remote',
+        name: 'oauth2-convert-agent',
+        auth: {
+          type: 'oauth2',
+          client_id: '$MY_CLIENT_ID',
+          scopes: ['read'],
+          authorization_url: 'https://auth.example.com/authorize',
+          token_url: 'https://auth.example.com/token',
+        },
+      });
     });
   });
 });

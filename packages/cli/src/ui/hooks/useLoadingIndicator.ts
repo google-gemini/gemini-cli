@@ -12,19 +12,26 @@ import {
   getDisplayString,
   type RetryAttemptPayload,
 } from '@google/gemini-cli-core';
+import type { LoadingPhrasesMode } from '../../config/settings.js';
+
+const LOW_VERBOSITY_RETRY_HINT_ATTEMPT_THRESHOLD = 2;
 
 export interface UseLoadingIndicatorProps {
   streamingState: StreamingState;
   shouldShowFocusHint: boolean;
   retryStatus: RetryAttemptPayload | null;
+  loadingPhrasesMode?: LoadingPhrasesMode;
   customWittyPhrases?: string[];
+  errorVerbosity: 'low' | 'full';
 }
 
 export const useLoadingIndicator = ({
   streamingState,
   shouldShowFocusHint,
   retryStatus,
+  loadingPhrasesMode,
   customWittyPhrases,
+  errorVerbosity,
 }: UseLoadingIndicatorProps) => {
   const [timerResetKey, setTimerResetKey] = useState(0);
   const isTimerActive = streamingState === StreamingState.Responding;
@@ -37,6 +44,7 @@ export const useLoadingIndicator = ({
     isPhraseCyclingActive,
     isWaiting,
     shouldShowFocusHint,
+    loadingPhrasesMode,
     customWittyPhrases,
   );
 
@@ -66,7 +74,11 @@ export const useLoadingIndicator = ({
   }, [streamingState, elapsedTimeFromTimer]);
 
   const retryPhrase = retryStatus
-    ? `Trying to reach ${getDisplayString(retryStatus.model)} (Attempt ${retryStatus.attempt + 1}/${retryStatus.maxAttempts})`
+    ? errorVerbosity === 'low'
+      ? retryStatus.attempt >= LOW_VERBOSITY_RETRY_HINT_ATTEMPT_THRESHOLD
+        ? "This is taking a bit longer, we're still on it."
+        : null
+      : `Trying to reach ${getDisplayString(retryStatus.model)} (Attempt ${retryStatus.attempt + 1}/${retryStatus.maxAttempts})`
     : null;
 
   return {

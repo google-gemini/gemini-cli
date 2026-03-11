@@ -13,15 +13,16 @@ import type {
   GenerateContentConfig,
 } from '@google/genai';
 import type { Config } from '../config/config.js';
-import type { ContentGenerator } from './contentGenerator.js';
-import type { AuthType } from './contentGenerator.js';
+import type { ContentGenerator, AuthType } from './contentGenerator.js';
 import { handleFallback } from '../fallback/handler.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { reportError } from '../utils/errorReporting.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { logMalformedJsonResponse } from '../telemetry/loggers.js';
-import { MalformedJsonResponseEvent } from '../telemetry/types.js';
+import { MalformedJsonResponseEvent, LlmRole } from '../telemetry/types.js';
 import { retryWithBackoff } from '../utils/retry.js';
+import { coreEvents } from '../utils/events.js';
+import { getDisplayString } from '../config/models.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import {
   applyModelSelection,
@@ -52,6 +53,10 @@ export interface GenerateJsonOptions {
    */
   promptId: string;
   /**
+   * The role of the LLM call.
+   */
+  role: LlmRole;
+  /**
    * The maximum number of attempts for the request.
    */
   maxAttempts?: number;
@@ -76,6 +81,10 @@ export interface GenerateContentOptions {
    * A unique ID for the prompt, used for logging/telemetry correlation.
    */
   promptId: string;
+  /**
+   * The role of the LLM call.
+   */
+  role: LlmRole;
   /**
    * The maximum number of attempts for the request.
    */
@@ -115,6 +124,7 @@ export class BaseLlmClient {
       systemInstruction,
       abortSignal,
       promptId,
+      role,
       maxAttempts,
     } = options;
 
@@ -150,9 +160,11 @@ export class BaseLlmClient {
       },
       shouldRetryOnContent,
       'generateJson',
+      role,
     );
 
     // If we are here, the content is valid (not empty and parsable).
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return JSON.parse(
       this.cleanJsonResponse(getResponseText(result)!.trim(), model),
     );
@@ -215,6 +227,7 @@ export class BaseLlmClient {
       systemInstruction,
       abortSignal,
       promptId,
+      role,
       maxAttempts,
     } = options;
 
@@ -234,6 +247,7 @@ export class BaseLlmClient {
       },
       shouldRetryOnContent,
       'generateContent',
+      role,
     );
   }
 
@@ -241,6 +255,7 @@ export class BaseLlmClient {
     options: _CommonGenerateOptions,
     shouldRetryOnContent: (response: GenerateContentResponse) => boolean,
     errorContext: 'generateJson' | 'generateContent',
+    role: LlmRole = LlmRole.UTILITY_TOOL,
   ): Promise<GenerateContentResponse> {
     const {
       modelConfigKey,
@@ -267,19 +282,22 @@ export class BaseLlmClient {
       () => currentModel,
     );
 
+    let initialActiveModel = this.config.getActiveModel();
+
     try {
       const apiCall = () => {
         // Ensure we use the current active model
         // in case a fallback occurred in a previous attempt.
         const activeModel = this.config.getActiveModel();
-        if (activeModel !== currentModel) {
-          currentModel = activeModel;
+        if (activeModel !== initialActiveModel) {
+          initialActiveModel = activeModel;
           // Re-resolve config if model changed during retry
-          const { generateContentConfig } =
+          const { model: resolvedModel, generateContentConfig } =
             this.config.modelConfigService.getResolvedConfig({
               ...modelConfigKey,
               model: activeModel,
             });
+          currentModel = resolvedModel;
           currentGenerateContentConfig = generateContentConfig;
         }
         const finalConfig: GenerateContentConfig = {
@@ -293,7 +311,11 @@ export class BaseLlmClient {
           config: finalConfig,
           contents,
         };
-        return this.contentGenerator.generateContent(requestParams, promptId);
+        return this.contentGenerator.generateContent(
+          requestParams,
+          promptId,
+          role,
+        );
       };
 
       return await retryWithBackoff(apiCall, {
@@ -307,6 +329,17 @@ export class BaseLlmClient {
           : undefined,
         authType:
           this.authType ?? this.config.getContentGeneratorConfig()?.authType,
+        retryFetchErrors: this.config.getRetryFetchErrors(),
+        onRetry: (attempt, error, delayMs) => {
+          coreEvents.emitRetryAttempt({
+            attempt,
+            maxAttempts:
+              availabilityMaxAttempts ?? maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+            delayMs,
+            error: error instanceof Error ? error.message : String(error),
+            model: getDisplayString(currentModel),
+          });
+        },
       });
     } catch (error) {
       if (abortSignal?.aborted) {

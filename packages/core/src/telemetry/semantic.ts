@@ -11,13 +11,13 @@
  * @see https://github.com/open-telemetry/semantic-conventions/blob/8b4f210f43136e57c1f6f47292eb6d38e3bf30bb/docs/gen-ai/gen-ai-events.md
  */
 
-import { FinishReason } from '@google/genai';
-import type {
-  Candidate,
-  Content,
-  ContentUnion,
-  Part,
-  PartUnion,
+import {
+  FinishReason,
+  type Candidate,
+  type Content,
+  type ContentUnion,
+  type Part,
+  type PartUnion,
 } from '@google/genai';
 import { truncateString } from '../utils/textUtils.js';
 
@@ -63,6 +63,7 @@ function getStringReferences(parts: AnyPart[]): StringReference[] {
         });
       }
     } else if (part instanceof GenericPart) {
+      // eslint-disable-next-line no-restricted-syntax
       if (part.type === 'executableCode' && typeof part['code'] === 'string') {
         refs.push({
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -73,6 +74,7 @@ function getStringReferences(parts: AnyPart[]): StringReference[] {
         });
       } else if (
         part.type === 'codeExecutionResult' &&
+        // eslint-disable-next-line no-restricted-syntax
         typeof part['output'] === 'string'
       ) {
         refs.push({
@@ -240,7 +242,7 @@ export function toChatMessage(content?: Content): ChatMessage {
   return message;
 }
 
-export function toOTelPart(part: Part): AnyPart {
+function toOTelPart(part: Part): AnyPart {
   if (part.thought) {
     if (part.text) {
       return new ReasoningPart(part.text);
@@ -287,7 +289,7 @@ export enum OTelRole {
   TOOL = 'tool',
 }
 
-export function toOTelRole(role?: string): OTelRole {
+function toOTelRole(role?: string): OTelRole {
   switch (role?.toLowerCase()) {
     case 'system':
       return OTelRole.SYSTEM;
@@ -322,7 +324,7 @@ export enum OTelFinishReason {
   ERROR = 'error',
 }
 
-export function toOTelFinishReason(finishReason?: string): OTelFinishReason {
+function toOTelFinishReason(finishReason?: string): OTelFinishReason {
   switch (finishReason) {
     // we have significantly more finish reasons than the spec
     case FinishReason.FINISH_REASON_UNSPECIFIED:
@@ -376,7 +378,7 @@ export interface ChatMessage {
   parts: AnyPart[];
 }
 
-export class TextPart {
+class TextPart {
   readonly type = 'text';
   content: string;
 
@@ -385,7 +387,7 @@ export class TextPart {
   }
 }
 
-export class ToolCallRequestPart {
+class ToolCallRequestPart {
   readonly type = 'tool_call';
   name?: string;
   id?: string;
@@ -398,7 +400,7 @@ export class ToolCallRequestPart {
   }
 }
 
-export class ToolCallResponsePart {
+class ToolCallResponsePart {
   readonly type = 'tool_call_response';
   response?: string;
   id?: string;
@@ -409,7 +411,7 @@ export class ToolCallResponsePart {
   }
 }
 
-export class ReasoningPart {
+class ReasoningPart {
   readonly type = 'reasoning';
   content: string;
 
@@ -418,7 +420,7 @@ export class ReasoningPart {
   }
 }
 
-export class GenericPart {
+class GenericPart {
   type: string;
   [key: string]: unknown;
 

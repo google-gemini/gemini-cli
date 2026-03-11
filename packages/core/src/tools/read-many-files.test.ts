@@ -4,8 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import type { Mock } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { mockControl } from '../__mocks__/fs/promises.js';
 import { ReadManyFilesTool } from './read-many-files.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
@@ -769,7 +776,7 @@ Content of file[1]
 
       // Mock to track concurrent vs sequential execution
       detectFileTypeSpy.mockImplementation(async (filePath: string) => {
-        const fileName = filePath.split('/').pop() || '';
+        const fileName = path.basename(filePath);
         executionOrder.push(`start:${fileName}`);
 
         // Add delay to make timing differences visible

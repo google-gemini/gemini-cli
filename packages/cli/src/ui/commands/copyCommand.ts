@@ -6,8 +6,11 @@
 
 import { debugLogger } from '@google/gemini-cli-core';
 import { copyToClipboard } from '../utils/commandUtils.js';
-import type { SlashCommand, SlashCommandActionReturn } from './types.js';
-import { CommandKind } from './types.js';
+import {
+  CommandKind,
+  type SlashCommand,
+  type SlashCommandActionReturn,
+} from './types.js';
 
 export const copyCommand: SlashCommand = {
   name: 'copy',
@@ -38,7 +41,8 @@ export const copyCommand: SlashCommand = {
 
     if (lastAiOutput) {
       try {
-        await copyToClipboard(lastAiOutput);
+        const settings = context.services.settings.merged;
+        await copyToClipboard(lastAiOutput, settings);
 
         return {
           type: 'message',

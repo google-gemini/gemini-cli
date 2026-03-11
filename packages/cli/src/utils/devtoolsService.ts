@@ -19,7 +19,6 @@ interface IDevTools {
   getPort(): number;
 }
 
-const DEVTOOLS_PKG = 'gemini-cli-devtools';
 const DEFAULT_DEVTOOLS_PORT = 25417;
 const DEFAULT_DEVTOOLS_HOST = '127.0.0.1';
 const MAX_PROMOTION_ATTEMPTS = 3;
@@ -62,7 +61,7 @@ async function startOrJoinDevTools(
   defaultHost: string,
   defaultPort: number,
 ): Promise<{ host: string; port: number }> {
-  const mod = await import(DEVTOOLS_PKG);
+  const mod = await import('@google/gemini-cli-devtools');
   const devtools: IDevTools = mod.DevTools.getInstance();
   const url = await devtools.start();
   const actualPort = devtools.getPort();
@@ -212,14 +211,24 @@ async function startDevToolsServerImpl(config: Config): Promise<string> {
 
 /**
  * Handles the F12 key toggle for the DevTools panel.
- * Starts the DevTools server, attempts to open the browser,
- * and always calls the toggle callback regardless of the outcome.
+ * Starts the DevTools server, attempts to open the browser.
+ * If the panel is already open, it closes it.
+ * If the panel is closed:
+ * - Attempts to open the browser.
+ * - If browser opening is successful, the panel remains closed.
+ * - If browser opening fails or is not possible, the panel is opened.
  */
 export async function toggleDevToolsPanel(
   config: Config,
+  isOpen: boolean,
   toggle: () => void,
   setOpen: () => void,
 ): Promise<void> {
+  if (isOpen) {
+    toggle();
+    return;
+  }
+
   try {
     const { openBrowserSecurely, shouldLaunchBrowser } = await import(
       '@google/gemini-cli-core'
@@ -228,11 +237,14 @@ export async function toggleDevToolsPanel(
     if (shouldLaunchBrowser()) {
       try {
         await openBrowserSecurely(url);
+        // Browser opened successfully, don't open drawer.
+        return;
       } catch (e) {
         debugLogger.warn('Failed to open browser securely:', e);
       }
     }
-    toggle();
+    // If we can't launch browser or it failed, open drawer.
+    setOpen();
   } catch (e) {
     setOpen();
     debugLogger.error('Failed to start DevTools server:', e);

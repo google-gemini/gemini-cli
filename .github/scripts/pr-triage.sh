@@ -22,7 +22,7 @@ get_issue_labels() {
     # Check cache
     case "${ISSUE_LABELS_CACHE_FLAT}" in
         *"|${ISSUE_NUM}:"*) 
-            local suffix="${ISSUE_LABELS_CACHE_FLAT#*|${ISSUE_NUM}:}"
+            local suffix="${ISSUE_LABELS_CACHE_FLAT#*|"${ISSUE_NUM}":}"
             echo "${suffix%%|*}"
             return
             ;; 

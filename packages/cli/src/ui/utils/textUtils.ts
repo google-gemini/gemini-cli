@@ -106,9 +106,13 @@ export function cpSlice(str: string, start: number, end?: number): string {
  * - VT control sequences (via Node.js util.stripVTControlCharacters)
  * - C0 control chars (0x00-0x1F) except TAB(0x09), LF(0x0A), CR(0x0D)
  * - C1 control chars (0x80-0x9F) that can cause display issues
+ * - BiDi control chars (U+200E, U+200F, U+202A-U+202E, U+2066-U+2069)
+ * - Zero-width chars (U+200B, U+FEFF)
  *
  * Characters preserved:
  * - All printable Unicode including emojis
+ * - ZWJ (U+200D) - needed for complex emoji sequences
+ * - ZWNJ (U+200C) - preserve zero-width non-joiner
  * - DEL (0x7F) - handled functionally by applyOperations, not a display issue
  * - CR/LF (0x0D/0x0A) - needed for line breaks
  * - TAB (0x09) - preserve tabs
@@ -120,8 +124,13 @@ export function stripUnsafeCharacters(str: string): string {
   // Use a regex to strip remaining unsafe control characters
   // C0: 0x00-0x1F except 0x09 (TAB), 0x0A (LF), 0x0D (CR)
   // C1: 0x80-0x9F
-  // eslint-disable-next-line no-control-regex
-  return strippedVT.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x80-\x9F]/g, '');
+  // BiDi: U+200E (LRM), U+200F (RLM), U+202A-U+202E, U+2066-U+2069
+  // Zero-width: U+200B (ZWSP), U+FEFF (BOM)
+  return strippedVT.replace(
+    // eslint-disable-next-line no-control-regex
+    /[\x00-\x08\x0B\x0C\x0E-\x1F\x80-\x9F\u200E\u200F\u202A-\u202E\u2066-\u2069\u200B\uFEFF]/g,
+    '',
+  );
 }
 
 /**
@@ -224,7 +233,9 @@ export function escapeAnsiCtrlCodes<T>(obj: T): T {
     let newArr: unknown[] | null = null;
 
     for (let i = 0; i < obj.length; i++) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const value = obj[i];
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const escapedValue = escapeAnsiCtrlCodes(value);
       if (escapedValue !== value) {
         if (newArr === null) {

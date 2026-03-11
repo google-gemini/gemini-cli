@@ -100,6 +100,7 @@ describe('SessionStatsContext', () => {
             thoughts: 20,
             tool: 10,
           },
+          roles: {},
         },
       },
       tools: {
@@ -180,6 +181,7 @@ describe('SessionStatsContext', () => {
             thoughts: 0,
             tool: 0,
           },
+          roles: {},
         },
       },
       tools: {
@@ -233,6 +235,34 @@ describe('SessionStatsContext', () => {
     });
 
     expect(renderCount).toBe(3);
+    unmount();
+  });
+
+  it('should update session ID and reset stats when the uiTelemetryService emits a clear event', () => {
+    const contextRef: MutableRefObject<
+      ReturnType<typeof useSessionStats> | undefined
+    > = { current: undefined };
+
+    const { unmount } = render(
+      <SessionStatsProvider>
+        <TestHarness contextRef={contextRef} />
+      </SessionStatsProvider>,
+    );
+
+    const initialStartTime = contextRef.current?.stats.sessionStartTime;
+    const newSessionId = 'new-session-id';
+
+    act(() => {
+      uiTelemetryService.emit('clear', newSessionId);
+    });
+
+    const stats = contextRef.current?.stats;
+    expect(stats?.sessionId).toBe(newSessionId);
+    expect(stats?.promptCount).toBe(0);
+    expect(stats?.sessionStartTime.getTime()).toBeGreaterThanOrEqual(
+      initialStartTime!.getTime(),
+    );
+
     unmount();
   });
 

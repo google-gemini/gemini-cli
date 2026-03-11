@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -11,15 +11,18 @@ import type { Config } from '@google/gemini-cli-core';
 
 describe('Tips', () => {
   it.each([
-    [0, '3. Create GEMINI.md files'],
-    [5, '3. /help for more information'],
-  ])('renders correct tips when file count is %i', (count, expectedText) => {
+    { fileCount: 0, description: 'renders all tips including GEMINI.md tip' },
+    { fileCount: 5, description: 'renders fewer tips when GEMINI.md exists' },
+  ])('$description', async ({ fileCount }) => {
     const config = {
-      getGeminiMdFileCount: vi.fn().mockReturnValue(count),
+      getGeminiMdFileCount: vi.fn().mockReturnValue(fileCount),
     } as unknown as Config;
 
-    const { lastFrame } = render(<Tips config={config} />);
-    const output = lastFrame();
-    expect(output).toContain(expectedText);
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <Tips config={config} />,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
   });
 });

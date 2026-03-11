@@ -115,6 +115,17 @@ export async function cleanupExpiredSessions(
           } catch {
             /* ignore if doesn't exist */
           }
+
+          // ALSO cleanup the session-specific directory (contains plans, tasks, etc.)
+          const sessionDir = path.join(
+            config.storage.getProjectTempDir(),
+            sessionId,
+          );
+          try {
+            await fs.rm(sessionDir, { recursive: true, force: true });
+          } catch {
+            /* ignore if doesn't exist */
+          }
         }
 
         if (config.getDebugMode()) {
@@ -174,7 +185,10 @@ export async function cleanupExpiredSessions(
 /**
  * Identifies sessions that should be deleted (corrupted or expired based on retention policy)
  */
-async function identifySessionsToDelete(
+/**
+ * Identifies sessions that should be deleted (corrupted or expired based on retention policy)
+ */
+export async function identifySessionsToDelete(
   allFiles: SessionFileEntry[],
   retentionConfig: SessionRetentionSettings,
 ): Promise<SessionFileEntry[]> {

@@ -5,11 +5,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { ContentGenerator } from './contentGenerator.js';
 import {
   createContentGenerator,
   AuthType,
   createContentGeneratorConfig,
+  type ContentGenerator,
 } from './contentGenerator.js';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { GoogleGenAI } from '@google/genai';
@@ -18,6 +18,7 @@ import { LoggingContentGenerator } from './loggingContentGenerator.js';
 import { loadApiKey } from './apiKeyCredentialStorage.js';
 import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
+import { resetVersionCache } from '../utils/version.js';
 
 vi.mock('../code_assist/codeAssist.js');
 vi.mock('@google/genai');
@@ -35,6 +36,7 @@ const mockConfig = {
 
 describe('createContentGenerator', () => {
   beforeEach(() => {
+    resetVersionCache();
     vi.clearAllMocks();
   });
 

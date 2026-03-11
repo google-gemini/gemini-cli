@@ -11,7 +11,8 @@ import {
   getAdminErrorMessage,
 } from '@google/gemini-cli-core';
 import { useKeypress } from './useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
+import { useKeyMatchers } from './useKeyMatchers.js';
 import type { HistoryItemWithoutId } from '../types.js';
 import { MessageType } from '../types.js';
 
@@ -20,6 +21,7 @@ export interface UseApprovalModeIndicatorArgs {
   addItem?: (item: HistoryItemWithoutId, timestamp: number) => void;
   onApprovalModeChange?: (mode: ApprovalMode) => void;
   isActive?: boolean;
+  allowPlanMode?: boolean;
 }
 
 export function useApprovalModeIndicator({
@@ -27,7 +29,9 @@ export function useApprovalModeIndicator({
   addItem,
   onApprovalModeChange,
   isActive = true,
+  allowPlanMode = false,
 }: UseApprovalModeIndicatorArgs): ApprovalMode {
+  const keyMatchers = useKeyMatchers();
   const currentConfigValue = config.getApprovalMode();
   const [showApprovalMode, setApprovalMode] = useState(currentConfigValue);
 
@@ -72,14 +76,14 @@ export function useApprovalModeIndicator({
         const currentMode = config.getApprovalMode();
         switch (currentMode) {
           case ApprovalMode.DEFAULT:
-            nextApprovalMode = config.isPlanEnabled()
-              ? ApprovalMode.PLAN
-              : ApprovalMode.AUTO_EDIT;
-            break;
-          case ApprovalMode.PLAN:
             nextApprovalMode = ApprovalMode.AUTO_EDIT;
             break;
           case ApprovalMode.AUTO_EDIT:
+            nextApprovalMode = allowPlanMode
+              ? ApprovalMode.PLAN
+              : ApprovalMode.DEFAULT;
+            break;
+          case ApprovalMode.PLAN:
             nextApprovalMode = ApprovalMode.DEFAULT;
             break;
           case ApprovalMode.YOLO:
