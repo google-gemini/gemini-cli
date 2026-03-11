@@ -6,6 +6,7 @@
 
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { SchemaValidator } from '../utils/schemaValidator.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -17,7 +18,12 @@ import {
   type ToolResult,
   type PolicyUpdateOptions,
 } from './tools.js';
-import type { CallableTool, FunctionCall, Part } from '@google/genai';
+import type {
+  CallableTool,
+  FunctionCall,
+  FunctionDeclaration,
+  Part,
+} from '@google/genai';
 import { ToolErrorType } from './tool-error.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { McpContext } from './mcp-client.js';
@@ -379,6 +385,22 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     return this._toolAnnotations;
   }
 
+  override getSchema(_modelId?: string): FunctionDeclaration {
+    if (
+      typeof this.parameterSchema === 'object' &&
+      this.parameterSchema !== null &&
+      '$schema' in this.parameterSchema
+    ) {
+      const { $schema: _, ...schemaWithout$schema } = this.parameterSchema;
+      return {
+        name: this.name,
+        description: this.description,
+        parametersJsonSchema: schemaWithout$schema,
+      };
+    }
+    return super.getSchema(_modelId);
+  }
+
   getFullyQualifiedPrefix(): string {
     return generateValidName(
       `${this.serverName}${MCP_QUALIFIED_NAME_SEPARATOR}`,
@@ -407,6 +429,14 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       this.extensionId,
       this._toolAnnotations,
     );
+  }
+
+  override validateToolParams(params: ToolParams): string | null {
+    const errors = SchemaValidator.validate(this.parameterSchema, params);
+    if (errors) {
+      return errors;
+    }
+    return this.validateToolParamValues(params);
   }
 
   protected createInvocation(
