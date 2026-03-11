@@ -29,7 +29,10 @@ function toPosixPath(p: string) {
   return p.split(path.sep).join(path.posix.sep);
 }
 
-export async function crawl(options: CrawlOptions): Promise<string[]> {
+export async function crawl(options: CrawlOptions): Promise<{
+  files: string[];
+  truncated: boolean;
+}> {
   if (options.cache) {
     const cacheKey = cache.getCacheKey(
       options.crawlDirectory,
@@ -39,6 +42,18 @@ export async function crawl(options: CrawlOptions): Promise<string[]> {
     const cachedResults = cache.read(cacheKey);
 
     if (cachedResults) {
+      // If the cache entry itself was truncated from a previous massive crawl, it stays truncated.
+      // Additionally, if the current request is for *fewer* files than the cache has, we slice it
+      // and forcefully mark it as truncated for the current caller.
+      if (
+        options.maxFiles !== undefined &&
+        cachedResults.files.length > options.maxFiles
+      ) {
+        return {
+          files: cachedResults.files.slice(0, options.maxFiles),
+          truncated: true,
+        };
+      }
       return cachedResults;
     }
   }
@@ -82,7 +97,7 @@ export async function crawl(options: CrawlOptions): Promise<string[]> {
     results = await api.crawl(options.crawlDirectory).withPromise();
   } catch (_e) {
     // The directory probably doesn't exist.
-    return [];
+    return { files: [], truncated: false };
   }
 
   const relativeToCrawlDir = path.posix.relative(posixCwd, posixCrawlDirectory);
@@ -91,14 +106,18 @@ export async function crawl(options: CrawlOptions): Promise<string[]> {
     path.posix.join(relativeToCrawlDir, p),
   );
 
-  if (options.cache && !truncated) {
+  if (options.cache) {
     const cacheKey = cache.getCacheKey(
       options.crawlDirectory,
       options.ignore.getFingerprint(),
       options.maxDepth,
     );
-    cache.write(cacheKey, relativeToCwdResults, options.cacheTtl * 1000);
+    cache.write(
+      cacheKey,
+      { files: relativeToCwdResults, truncated },
+      options.cacheTtl * 1000,
+    );
   }
 
-  return relativeToCwdResults;
+  return { files: relativeToCwdResults, truncated };
 }

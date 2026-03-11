@@ -36,7 +36,7 @@ describe('crawler', () => {
     });
     const ignore = loadIgnoreRules(service, []);
 
-    const results = await crawl({
+    const { files: results } = await crawl({
       crawlDirectory: tmpDir,
       cwd: tmpDir,
       ignore,
@@ -70,7 +70,7 @@ describe('crawler', () => {
     });
     const ignore = loadIgnoreRules(service, []);
 
-    const results = await crawl({
+    const { files: results } = await crawl({
       crawlDirectory: tmpDir,
       cwd: tmpDir,
       ignore,
@@ -101,7 +101,7 @@ describe('crawler', () => {
     });
     const ignore = loadIgnoreRules(service, ['logs']);
 
-    const results = await crawl({
+    const { files: results } = await crawl({
       crawlDirectory: tmpDir,
       cwd: tmpDir,
       ignore,
@@ -133,7 +133,7 @@ describe('crawler', () => {
     });
     const ignore = loadIgnoreRules(service, []);
 
-    const results = await crawl({
+    const { files: results } = await crawl({
       crawlDirectory: tmpDir,
       cwd: tmpDir,
       ignore,
@@ -168,7 +168,7 @@ describe('crawler', () => {
     });
     const ignore = loadIgnoreRules(service, []);
 
-    const results = await crawl({
+    const { files: results } = await crawl({
       crawlDirectory: tmpDir,
       cwd: tmpDir,
       ignore,
@@ -206,7 +206,7 @@ describe('crawler', () => {
     });
     const ignore = loadIgnoreRules(service, []);
 
-    const results = await crawl({
+    const { files: results } = await crawl({
       crawlDirectory: tmpDir,
       cwd: tmpDir,
       ignore,
@@ -240,7 +240,7 @@ describe('crawler', () => {
     });
     const ignore = loadIgnoreRules(service, []);
 
-    const results = await crawl({
+    const { files: results } = await crawl({
       crawlDirectory: tmpDir,
       cwd: tmpDir,
       ignore,
@@ -271,7 +271,7 @@ describe('crawler', () => {
     });
     const ignore = loadIgnoreRules(service, []);
 
-    const results = await crawl({
+    const { files: results } = await crawl({
       crawlDirectory: tmpDir,
       cwd: tmpDir,
       ignore,
@@ -296,7 +296,7 @@ describe('crawler', () => {
     });
     const ignore = loadIgnoreRules(service, []);
 
-    const results = await crawl({
+    const { files: results } = await crawl({
       crawlDirectory: tmpDir,
       cwd: tmpDir,
       ignore,
@@ -321,7 +321,7 @@ describe('crawler', () => {
     });
     const ignore = loadIgnoreRules(service, []);
 
-    const results = await crawl({
+    const { files: results } = await crawl({
       crawlDirectory: tmpDir,
       cwd: tmpDir,
       ignore,
@@ -401,7 +401,7 @@ describe('crawler', () => {
 
       // Initial crawl to populate the cache
       const ignore1 = getIgnore();
-      const results1 = await crawl(getOptions(ignore1));
+      const { files: results1 } = await crawl(getOptions(ignore1));
       expect(results1).toEqual(
         expect.arrayContaining(['.', '.gitignore', 'b.txt']),
       );
@@ -411,7 +411,7 @@ describe('crawler', () => {
 
       // Second crawl should miss the cache and trigger a recrawl
       const ignore2 = getIgnore();
-      const results2 = await crawl(getOptions(ignore2));
+      const { files: results2 } = await crawl(getOptions(ignore2));
       expect(results2).toEqual(
         expect.arrayContaining(['.', '.gitignore', 'a.txt']),
       );
@@ -505,7 +505,7 @@ describe('crawler', () => {
         respectGeminiIgnore: false,
       });
       const ignore = loadIgnoreRules(service, []);
-      const paths = await crawl({
+      const { files: paths } = await crawl({
         crawlDirectory: tmpDir,
         cwd: tmpDir,
         ignore,
@@ -581,7 +581,7 @@ describe('crawler', () => {
     });
     const ignore = loadIgnoreRules(service, []);
 
-    const paths = await crawl({
+    const { files: paths, truncated } = await crawl({
       crawlDirectory: tmpDir,
       cwd: tmpDir,
       ignore,
@@ -589,6 +589,8 @@ describe('crawler', () => {
       cacheTtl: 0,
       maxFiles: 2,
     });
+
+    expect(truncated).toBe(true);
 
     // fdir returns files and directories.
     // In our filter, we only increment fileCount for files.

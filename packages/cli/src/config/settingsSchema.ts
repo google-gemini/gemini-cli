@@ -18,6 +18,7 @@ import {
   type AuthType,
   type AgentOverride,
   type CustomTheme,
+  DEFAULT_FILE_FILTERING_OPTIONS,
 } from '@google/gemini-cli-core';
 import type { SessionRetentionSettings } from './settings.js';
 import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
@@ -1210,6 +1211,16 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: true,
             description: 'Respect .geminiignore files when searching.',
+            showInDialog: true,
+          },
+          maxFileCount: {
+            type: 'number',
+            label: 'Max File Count',
+            category: 'Context',
+            requiresRestart: true,
+            default: DEFAULT_FILE_FILTERING_OPTIONS.maxFileCount,
+            description:
+              'Maximum number of files to index for autocomplete and search.',
             showInDialog: true,
           },
           enableRecursiveFileSearch: {
