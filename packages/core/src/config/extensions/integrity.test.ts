@@ -37,6 +37,7 @@ vi.mock('node:fs', async (importOriginal) => {
       ...actual.promises,
       readFile: vi.fn(),
       writeFile: vi.fn(),
+      mkdir: vi.fn().mockResolvedValue(undefined),
     },
   };
 });
@@ -95,7 +96,7 @@ describe('ExtensionIntegrityManager', () => {
     });
   });
 
-  describe('storeExtensionIntegrity and verifyExtensionIntegrity', () => {
+  describe('store and verify', () => {
     const metadata: ExtensionInstallMetadata = {
       source: 'https://github.com/user/ext',
       type: 'git',
@@ -131,81 +132,66 @@ describe('ExtensionIntegrityManager', () => {
     });
 
     it('should store and verify integrity successfully', async () => {
-      await manager.storeExtensionIntegrity('ext-name', metadata);
-      const result = await manager.verifyExtensionIntegrity(
-        'ext-name',
-        metadata,
-      );
+      await manager.store('ext-name', metadata);
+      const result = await manager.verify('ext-name', metadata);
       expect(result).toBe(IntegrityDataStatus.VERIFIED);
     });
 
     it('should return MISSING if metadata record is missing from store', async () => {
-      const result = await manager.verifyExtensionIntegrity(
-        'unknown-ext',
-        metadata,
-      );
+      const result = await manager.verify('unknown-ext', metadata);
       expect(result).toBe(IntegrityDataStatus.MISSING);
     });
 
     it('should return INVALID if metadata content changes', async () => {
-      await manager.storeExtensionIntegrity('ext-name', metadata);
+      await manager.store('ext-name', metadata);
       const modifiedMetadata: ExtensionInstallMetadata = {
         ...metadata,
         source: 'https://github.com/attacker/ext',
       };
-      const result = await manager.verifyExtensionIntegrity(
-        'ext-name',
-        modifiedMetadata,
-      );
+      const result = await manager.verify('ext-name', modifiedMetadata);
       expect(result).toBe(IntegrityDataStatus.INVALID);
     });
 
     it('should return INVALID if store signature is modified', async () => {
-      await manager.storeExtensionIntegrity('ext-name', metadata);
+      await manager.store('ext-name', metadata);
 
       const data = JSON.parse(storedContent);
       data.signature = 'invalid-signature';
       storedContent = JSON.stringify(data);
 
-      const result = await manager.verifyExtensionIntegrity(
-        'ext-name',
-        metadata,
-      );
+      const result = await manager.verify('ext-name', metadata);
       expect(result).toBe(IntegrityDataStatus.INVALID);
     });
 
     it('should return INVALID if signature length mismatches (e.g. truncated data)', async () => {
-      await manager.storeExtensionIntegrity('ext-name', metadata);
+      await manager.store('ext-name', metadata);
 
       const data = JSON.parse(storedContent);
       data.signature = 'abc';
       storedContent = JSON.stringify(data);
 
-      const result = await manager.verifyExtensionIntegrity(
-        'ext-name',
-        metadata,
-      );
+      const result = await manager.verify('ext-name', metadata);
       expect(result).toBe(IntegrityDataStatus.INVALID);
     });
 
-    it('should throw error in storeExtensionIntegrity if existing store is modified', async () => {
-      await manager.storeExtensionIntegrity('ext-name', metadata);
+    it('should throw error in store if existing store is modified', async () => {
+      await manager.store('ext-name', metadata);
 
       const data = JSON.parse(storedContent);
       data.store['another-ext'] = { hash: 'fake', signature: 'fake' };
       storedContent = JSON.stringify(data);
 
-      await expect(
-        manager.storeExtensionIntegrity('other-ext', metadata),
-      ).rejects.toThrow('Extension integrity store cannot be verified');
+      await expect(manager.store('other-ext', metadata)).rejects.toThrow(
+        'Extension integrity store cannot be verified',
+      );
     });
 
-    it('should throw error in storeExtensionIntegrity if store file is corrupted', async () => {
+    it('should throw error in store if store file is corrupted', async () => {
       storedContent = 'not-json';
 
-      await expect(
-        manager.storeExtensionIntegrity('other-ext', metadata),
-      ).rejects.toThrow('Failed to parse extension integrity store');
+      await expect(manager.store('other-ext', metadata)).rejects.toThrow(
+        'Failed to parse extension integrity store',
+      );
     });
   });
 });

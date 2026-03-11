@@ -75,8 +75,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       setPassword = vi.fn().mockResolvedValue(undefined);
     },
     ExtensionIntegrityManager: class {
-      verifyExtensionIntegrity = vi.fn().mockResolvedValue('verified');
-      storeExtensionIntegrity = vi.fn().mockResolvedValue(undefined);
+      verify = vi.fn().mockResolvedValue('verified');
+      store = vi.fn().mockResolvedValue(undefined);
     },
     IntegrityDataStatus: {
       VERIFIED: 'verified',
@@ -291,10 +291,7 @@ describe('extensionUpdates', () => {
         version: '1.1.0',
       } as unknown as GeminiCLIExtension);
 
-      const storeSpy = vi.spyOn(
-        manager.integrityManager,
-        'storeExtensionIntegrity',
-      );
+      const storeSpy = vi.spyOn(manager, 'storeExtensionIntegrity');
 
       await manager.installOrUpdateExtension(installMetadata, previousConfig);
 

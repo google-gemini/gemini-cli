@@ -23,196 +23,35 @@ import { KeychainService } from '../../services/keychainService.js';
 import { isNodeError, getErrorMessage } from '../../utils/errors.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { homedir, GEMINI_DIR } from '../../utils/paths.js';
-import { z } from 'zod';
 import stableStringify from 'json-stable-stringify';
+import {
+  type IExtensionIntegrity,
+  IntegrityDataStatus,
+  type ExtensionIntegrityMap,
+  type IntegrityStore,
+  IntegrityStoreSchema,
+} from './integrityTypes.js';
 
-const ExtensionIntegrityDataSchema = z.object({
-  hash: z.string(),
-  signature: z.string(),
-});
-
-const ExtensionIntegrityMapSchema = z.record(
-  z.string(),
-  ExtensionIntegrityDataSchema,
-);
-
-const IntegrityStoreSchema = z.object({
-  store: ExtensionIntegrityMapSchema,
-  signature: z.string(),
-});
+export * from './integrityTypes.js';
 
 /**
- * The integrity data for a single extension.
+ * Manages the secret key used for signing integrity data.
+ * Attempts to use the OS keychain, falling back to a restricted local file.
+ * @internal
  */
-export type ExtensionIntegrityData = z.infer<
-  typeof ExtensionIntegrityDataSchema
->;
-
-/**
- * A map of extension names to their corresponding integrity data.
- */
-export type ExtensionIntegrityMap = z.infer<typeof ExtensionIntegrityMapSchema>;
-
-/**
- * The full structure of the integrity store as persisted on disk,
- * including the map of extension data and a master signature covering the map.
- */
-export type IntegrityStore = z.infer<typeof IntegrityStoreSchema>;
-
-export enum IntegrityDataStatus {
-  VERIFIED = 'verified',
-  MISSING = 'missing',
-  INVALID = 'invalid',
-}
-
-/**
- * Manages the integrity of installed extensions by cryptographically signing
- * their installation metadata.
- *
- * This prevents malicious processes or extensions from tampering with the
- * update source of other extensions. It uses an OS-level secure keychain
- * to protect the signing key, falling back to a local file with restricted
- * permissions if no keychain is available.
- */
-export class ExtensionIntegrityManager {
-  private readonly integrityStorePath: string;
+class IntegrityKeyManager {
   private readonly fallbackKeyPath: string;
   private readonly keychainService: KeychainService;
   private cachedSecretKey: string | null = null;
 
   constructor() {
     const configDir = path.join(homedir(), GEMINI_DIR);
-    this.integrityStorePath = path.join(configDir, INTEGRITY_FILENAME);
     this.fallbackKeyPath = path.join(configDir, INTEGRITY_KEY_FILENAME);
     this.keychainService = new KeychainService(KEYCHAIN_SERVICE_NAME);
   }
 
   /**
-   * Verifies that the current extension metadata matches the previously
-   * recorded integrity data in the store.
-   *
-   * @returns IntegrityDataStatus indicating the result of the verification.
-   */
-  async verifyExtensionIntegrity(
-    extensionName: string,
-    metadata: ExtensionInstallMetadata | undefined,
-  ): Promise<IntegrityDataStatus> {
-    if (!metadata) {
-      return IntegrityDataStatus.MISSING;
-    }
-
-    try {
-      const store = await this.loadAndVerifyIntegrityStore();
-      const extensionRecord = store[extensionName];
-
-      if (!extensionRecord) {
-        return IntegrityDataStatus.MISSING;
-      }
-
-      const actualHash = this.generateHash(metadata);
-
-      if (
-        !this.validateMetadataHash(
-          extensionName,
-          actualHash,
-          extensionRecord.hash,
-        )
-      ) {
-        return IntegrityDataStatus.INVALID;
-      }
-
-      if (
-        !(await this.validateMetadataSignature(
-          extensionName,
-          actualHash,
-          extensionRecord.signature,
-        ))
-      ) {
-        return IntegrityDataStatus.INVALID;
-      }
-
-      return IntegrityDataStatus.VERIFIED;
-    } catch (e) {
-      debugLogger.warn(
-        `Error verifying integrity for "${extensionName}": ${getErrorMessage(e)}`,
-      );
-      return IntegrityDataStatus.INVALID;
-    }
-  }
-
-  /**
-   * Compares the actual hash of the metadata against the recorded value.
-   */
-  private validateMetadataHash(
-    extensionName: string,
-    actualHash: string,
-    expectedHash: string,
-  ): boolean {
-    if (!this.verifyConstantTime(actualHash, expectedHash)) {
-      debugLogger.warn(
-        `Integrity mismatch for "${extensionName}": Metadata hash does not match recorded value.`,
-      );
-      return false;
-    }
-    return true;
-  }
-
-  /**
-   * Generates a signature for the actual hash and compares it against the
-   * recorded signature to ensure the record has not been tampered with.
-   */
-  private async validateMetadataSignature(
-    extensionName: string,
-    actualHash: string,
-    actualSignature: string,
-  ): Promise<boolean> {
-    const expectedSignature = await this.generateSignature(actualHash);
-
-    if (!this.verifyConstantTime(actualSignature, expectedSignature)) {
-      debugLogger.warn(
-        `Integrity mismatch for "${extensionName}": Metadata signature is invalid.`,
-      );
-      return false;
-    }
-    return true;
-  }
-
-  /**
-   * Calculates and persists the integrity data for an extension in the
-   * centralized integrity store.
-   */
-  async storeExtensionIntegrity(
-    extensionName: string,
-    metadata: ExtensionInstallMetadata,
-  ): Promise<void> {
-    // Generate integrity for the new metadata
-    const integrity = await this.generateExtensionIntegrity(metadata);
-
-    // Load and verify existing store
-    const store = await this.loadAndVerifyIntegrityStore();
-
-    // Update entry in the map
-    store[extensionName] = integrity;
-
-    // Save the entire store with a new signature
-    await this.writeIntegrityStore(store);
-  }
-
-  /**
-   * Generates integrity data (hash and signature) for specific extension metadata.
-   */
-  async generateExtensionIntegrity(
-    metadata: ExtensionInstallMetadata,
-  ): Promise<ExtensionIntegrityData> {
-    const hash = this.generateHash(metadata);
-    const signature = await this.generateSignature(hash);
-    return { hash, signature };
-  }
-
-  /**
-   * Retrieves the master secret key used for signing metadata.
-   * Generates a new random key if one does not already exist.
-   * Caches the key in memory after the first successful retrieval.
+   * Retrieves or generates the master secret key.
    */
   async getSecretKey(): Promise<string> {
     if (this.cachedSecretKey) {
@@ -228,53 +67,66 @@ export class ExtensionIntegrityManager {
     return this.cachedSecretKey;
   }
 
-  /**
-   * Retrieves the secret key from the OS keychain, generating and storing
-   * it if it does not already exist.
-   */
   private async getSecretKeyFromKeychain(): Promise<string> {
     let key = await this.keychainService.getPassword(SECRET_KEY_ACCOUNT);
     if (!key) {
+      // Generate a fresh 256-bit key if none exists.
       key = randomBytes(32).toString('hex');
       await this.keychainService.setPassword(SECRET_KEY_ACCOUNT, key);
     }
     return key;
   }
 
-  /**
-   * Retrieves the secret key from a restricted fallback file, generating
-   * and storing it if it does not already exist.
-   */
   private async getSecretKeyFromFile(): Promise<string> {
     try {
       const key = await fs.promises.readFile(this.fallbackKeyPath, 'utf-8');
       return key.trim();
     } catch (e) {
-      if (this.isNotFoundError(e)) {
+      if (isNodeError(e) && e.code === 'ENOENT') {
+        // Lazily create the config directory if it doesn't exist.
+        const configDir = path.dirname(this.fallbackKeyPath);
+        await fs.promises.mkdir(configDir, { recursive: true });
+
+        // Generate a fresh 256-bit key for the local fallback.
         const key = randomBytes(32).toString('hex');
+
+        // Store with restricted permissions (read/write for owner only).
         await fs.promises.writeFile(this.fallbackKeyPath, key, { mode: 0o600 });
         return key;
       }
       throw e;
     }
   }
+}
+
+/**
+ * Handles the persistence and signature verification of the integrity store.
+ * The entire store is signed to detect manual tampering of the JSON file.
+ * @internal
+ */
+class ExtensionIntegrityStore {
+  private readonly integrityStorePath: string;
+
+  constructor(private readonly keyManager: IntegrityKeyManager) {
+    const configDir = path.join(homedir(), GEMINI_DIR);
+    this.integrityStorePath = path.join(configDir, INTEGRITY_FILENAME);
+  }
 
   /**
-   * Loads the integrity store from disk and verifies its signature.
-   * @returns The verified integrity map, or an empty object if the store doesn't exist.
-   * @throws Error if the store signature is invalid or parsing fails.
+   * Loads the integrity map from disk, verifying the store-wide signature.
    */
-  private async loadAndVerifyIntegrityStore(): Promise<ExtensionIntegrityMap> {
+  async load(): Promise<ExtensionIntegrityMap> {
     let content: string;
     try {
       content = await fs.promises.readFile(this.integrityStorePath, 'utf-8');
     } catch (e) {
-      if (this.isNotFoundError(e)) {
+      if (isNodeError(e) && e.code === 'ENOENT') {
         return {};
       }
       throw e;
     }
 
+    // Parse and validate the store structure.
     let rawStore: IntegrityStore;
     try {
       rawStore = IntegrityStoreSchema.parse(JSON.parse(content));
@@ -286,10 +138,11 @@ export class ExtensionIntegrityManager {
 
     const { store, signature: actualSignature } = rawStore;
 
-    // Verify that the store has not been modified by checking its own signature
+    // Re-generate the expected signature for the store content.
     const storeContent = stableStringify(store) ?? '';
     const expectedSignature = await this.generateSignature(storeContent);
 
+    // Verify the store hasn't been tampered with.
     if (!this.verifyConstantTime(actualSignature, expectedSignature)) {
       throw new Error('Extension integrity store cannot be verified');
     }
@@ -298,11 +151,10 @@ export class ExtensionIntegrityManager {
   }
 
   /**
-   * Persists the integrity store to disk with a fresh signature.
+   * Persists the integrity map to disk with a fresh store-wide signature.
    */
-  private async writeIntegrityStore(
-    store: ExtensionIntegrityMap,
-  ): Promise<void> {
+  async save(store: ExtensionIntegrityMap): Promise<void> {
+    // Generate a signature for the entire map to prevent manual tampering.
     const storeContent = stableStringify(store) ?? '';
     const storeSignature = await this.generateSignature(storeContent);
 
@@ -311,6 +163,10 @@ export class ExtensionIntegrityManager {
       signature: storeSignature,
     };
 
+    // Ensure parent directory exists before writing.
+    const configDir = path.dirname(this.integrityStorePath);
+    await fs.promises.mkdir(configDir, { recursive: true });
+
     await fs.promises.writeFile(
       this.integrityStorePath,
       JSON.stringify(finalData, null, 2),
@@ -318,40 +174,126 @@ export class ExtensionIntegrityManager {
   }
 
   /**
-   * Generates a SHA-256 hash of the metadata using a stable string representation.
+   * Generates a deterministic SHA-256 hash of the metadata.
    */
-  private generateHash(metadata: ExtensionInstallMetadata): string {
+  generateHash(metadata: ExtensionInstallMetadata): string {
     const content = stableStringify(metadata) ?? '';
     return createHash('sha256').update(content).digest('hex');
   }
 
   /**
-   * Generates an HMAC-SHA256 signature for the given data using the secret key.
+   * Generates an HMAC-SHA256 signature using the master secret key.
    */
-  private async generateSignature(data: string): Promise<string> {
-    const secretKey = await this.getSecretKey();
+  async generateSignature(data: string): Promise<string> {
+    const secretKey = await this.keyManager.getSecretKey();
     return createHmac('sha256', secretKey).update(data).digest('hex');
   }
 
   /**
-   * Performs a constant-time comparison of two hex strings to prevent timing attacks.
-   * Safely handles inputs of different lengths by returning false early.
+   * Constant-time comparison to prevent timing attacks.
    */
-  private verifyConstantTime(actual: string, expected: string): boolean {
+  verifyConstantTime(actual: string, expected: string): boolean {
     const actualBuffer = Buffer.from(actual, 'hex');
     const expectedBuffer = Buffer.from(expected, 'hex');
 
+    // timingSafeEqual requires buffers of the same length.
     if (actualBuffer.length !== expectedBuffer.length) {
       return false;
     }
 
     return timingSafeEqual(actualBuffer, expectedBuffer);
   }
+}
+
+/**
+ * Implementation of IExtensionIntegrity that persists data to disk.
+ */
+export class ExtensionIntegrityManager implements IExtensionIntegrity {
+  private readonly keyManager: IntegrityKeyManager;
+  private readonly integrityStore: ExtensionIntegrityStore;
+
+  constructor() {
+    this.keyManager = new IntegrityKeyManager();
+    this.integrityStore = new ExtensionIntegrityStore(this.keyManager);
+  }
 
   /**
-   * Returns true if the error indicates that a file or directory was not found.
+   * Verifies the provided metadata against the recorded integrity data.
    */
-  private isNotFoundError(error: unknown): boolean {
-    return isNodeError(error) && error.code === 'ENOENT';
+  async verify(
+    extensionName: string,
+    metadata: ExtensionInstallMetadata | undefined,
+  ): Promise<IntegrityDataStatus> {
+    if (!metadata) {
+      return IntegrityDataStatus.MISSING;
+    }
+
+    try {
+      const storeMap = await this.integrityStore.load();
+      const extensionRecord = storeMap[extensionName];
+
+      if (!extensionRecord) {
+        return IntegrityDataStatus.MISSING;
+      }
+
+      // Verify the hash (metadata content) matches the recorded value.
+      const actualHash = this.integrityStore.generateHash(metadata);
+      const isHashValid = this.integrityStore.verifyConstantTime(
+        actualHash,
+        extensionRecord.hash,
+      );
+
+      if (!isHashValid) {
+        debugLogger.warn(
+          `Integrity mismatch for "${extensionName}": Hash mismatch.`,
+        );
+        return IntegrityDataStatus.INVALID;
+      }
+
+      // Verify the signature (authenticity) using the master secret key.
+      const actualSignature =
+        await this.integrityStore.generateSignature(actualHash);
+      const isSignatureValid = this.integrityStore.verifyConstantTime(
+        actualSignature,
+        extensionRecord.signature,
+      );
+
+      if (!isSignatureValid) {
+        debugLogger.warn(
+          `Integrity mismatch for "${extensionName}": Signature mismatch.`,
+        );
+        return IntegrityDataStatus.INVALID;
+      }
+
+      return IntegrityDataStatus.VERIFIED;
+    } catch (e) {
+      debugLogger.warn(
+        `Error verifying integrity for "${extensionName}": ${getErrorMessage(e)}`,
+      );
+      return IntegrityDataStatus.INVALID;
+    }
+  }
+
+  /**
+   * Records the integrity data for an extension.
+   */
+  async store(
+    extensionName: string,
+    metadata: ExtensionInstallMetadata,
+  ): Promise<void> {
+    const hash = this.integrityStore.generateHash(metadata);
+    const signature = await this.integrityStore.generateSignature(hash);
+
+    const storeMap = await this.integrityStore.load();
+    storeMap[extensionName] = { hash, signature };
+    await this.integrityStore.save(storeMap);
+  }
+
+  /**
+   * Retrieves or generates the master secret key.
+   * @internal visible for testing
+   */
+  async getSecretKey(): Promise<string> {
+    return this.keyManager.getSecretKey();
   }
 }

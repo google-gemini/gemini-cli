@@ -20,6 +20,7 @@ export * from './policy/toml-loader.js';
 export * from './policy/config.js';
 export * from './policy/integrity.js';
 export * from './config/extensions/integrity.js';
+export * from './config/extensions/integrityTypes.js';
 export * from './billing/index.js';
 export * from './confirmation-bus/types.js';
 export * from './confirmation-bus/message-bus.js';

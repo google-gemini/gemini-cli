@@ -25,7 +25,8 @@ function isGaxiosError(error: unknown): error is GaxiosError {
 export function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return (
     (error instanceof Error || (typeof error === 'object' && error !== null)) &&
-    'code' in error
+    'code' in error &&
+    'message' in error
   );
 }
 

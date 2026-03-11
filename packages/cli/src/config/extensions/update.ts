@@ -54,22 +54,19 @@ export async function updateExtension(
   }
 
   try {
-    if (extensionManager.integrityManager) {
-      const status =
-        await extensionManager.integrityManager.verifyExtensionIntegrity(
-          extension.name,
-          installMetadata,
-        );
+    const status = await extensionManager.verifyExtensionIntegrity(
+      extension.name,
+      installMetadata,
+    );
 
-      if (status === IntegrityDataStatus.MISSING) {
-        // Establish trust on first update if integrity data is missing.
-        await extensionManager.integrityManager.storeExtensionIntegrity(
-          extension.name,
-          installMetadata,
-        );
-      } else if (status === IntegrityDataStatus.INVALID) {
-        throw new Error('Extension integrity cannot be verified');
-      }
+    if (status === IntegrityDataStatus.MISSING) {
+      // Establish trust on first update if integrity data is missing.
+      await extensionManager.storeExtensionIntegrity(
+        extension.name,
+        installMetadata,
+      );
+    } else if (status === IntegrityDataStatus.INVALID) {
+      throw new Error('Extension integrity cannot be verified');
     }
   } catch (e) {
     dispatchExtensionStateUpdate({

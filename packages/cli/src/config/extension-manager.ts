@@ -42,6 +42,8 @@ import {
   loadAgentsFromDirectory,
   homedir,
   ExtensionIntegrityManager,
+  type IExtensionIntegrity,
+  type IntegrityDataStatus,
   type ExtensionEvents,
   type MCPServerConfig,
   type ExtensionInstallMetadata,
@@ -90,6 +92,7 @@ interface ExtensionManagerParams {
   workspaceDir: string;
   eventEmitter?: EventEmitter<ExtensionEvents>;
   clientVersion?: string;
+  integrityManager?: IExtensionIntegrity;
 }
 
 /**
@@ -99,7 +102,7 @@ interface ExtensionManagerParams {
  */
 export class ExtensionManager extends ExtensionLoader {
   private extensionEnablementManager: ExtensionEnablementManager;
-  integrityManager: ExtensionIntegrityManager;
+  private integrityManager: IExtensionIntegrity;
   private settings: MergedSettings;
   private requestConsent: (consent: string) => Promise<boolean>;
   private requestSetting:
@@ -129,11 +132,26 @@ export class ExtensionManager extends ExtensionLoader {
     });
     this.requestConsent = options.requestConsent;
     this.requestSetting = options.requestSetting ?? undefined;
-    this.integrityManager = new ExtensionIntegrityManager();
+    this.integrityManager =
+      options.integrityManager ?? new ExtensionIntegrityManager();
   }
 
   getEnablementManager(): ExtensionEnablementManager {
     return this.extensionEnablementManager;
+  }
+
+  async verifyExtensionIntegrity(
+    extensionName: string,
+    metadata: ExtensionInstallMetadata | undefined,
+  ): Promise<IntegrityDataStatus> {
+    return this.integrityManager.verify(extensionName, metadata);
+  }
+
+  async storeExtensionIntegrity(
+    extensionName: string,
+    metadata: ExtensionInstallMetadata,
+  ): Promise<void> {
+    return this.integrityManager.store(extensionName, metadata);
   }
 
   setRequestConsent(
@@ -421,7 +439,7 @@ Would you like to attempt to install via "git clone" instead?`,
         await fs.promises.writeFile(metadataPath, metadataString);
 
         // Establish trust at point of installation
-        await this.integrityManager.storeExtensionIntegrity(
+        await this.storeExtensionIntegrity(
           newExtensionConfig.name,
           installMetadata,
         );

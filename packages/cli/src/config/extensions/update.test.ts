@@ -76,12 +76,10 @@ describe('Extension Update Logic', () => {
         ...mockExtension,
         version: '1.1.0',
       }),
-      integrityManager: {
-        verifyExtensionIntegrity: vi
-          .fn()
-          .mockResolvedValue(IntegrityDataStatus.VERIFIED),
-        storeExtensionIntegrity: vi.fn().mockResolvedValue(undefined),
-      },
+      verifyExtensionIntegrity: vi
+        .fn()
+        .mockResolvedValue(IntegrityDataStatus.VERIFIED),
+      storeExtensionIntegrity: vi.fn().mockResolvedValue(undefined),
     } as unknown as ExtensionManager;
     mockDispatch = vi.fn();
 
@@ -315,7 +313,7 @@ describe('Extension Update Logic', () => {
     describe('Integrity Verification', () => {
       it('should fail update with security alert if integrity is invalid', async () => {
         vi.mocked(
-          mockExtensionManager.integrityManager.verifyExtensionIntegrity,
+          mockExtensionManager.verifyExtensionIntegrity,
         ).mockResolvedValue(IntegrityDataStatus.INVALID);
 
         await expect(
@@ -340,7 +338,7 @@ describe('Extension Update Logic', () => {
 
       it('should establish trust on first update if integrity data is missing', async () => {
         vi.mocked(
-          mockExtensionManager.integrityManager.verifyExtensionIntegrity,
+          mockExtensionManager.verifyExtensionIntegrity,
         ).mockResolvedValue(IntegrityDataStatus.MISSING);
 
         await updateExtension(
@@ -351,7 +349,7 @@ describe('Extension Update Logic', () => {
         );
 
         expect(
-          mockExtensionManager.integrityManager.storeExtensionIntegrity,
+          mockExtensionManager.storeExtensionIntegrity,
         ).toHaveBeenCalledWith(mockExtension.name, expect.any(Object));
 
         expect(mockDispatch).toHaveBeenCalledWith({
@@ -365,7 +363,7 @@ describe('Extension Update Logic', () => {
 
       it('should throw if integrity manager throws', async () => {
         vi.mocked(
-          mockExtensionManager.integrityManager.verifyExtensionIntegrity,
+          mockExtensionManager.verifyExtensionIntegrity,
         ).mockRejectedValue(new Error('Verification failed'));
 
         await expect(

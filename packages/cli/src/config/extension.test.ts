@@ -103,6 +103,10 @@ const mockLogExtensionInstallEvent = vi.hoisted(() => vi.fn());
 const mockLogExtensionUninstall = vi.hoisted(() => vi.fn());
 const mockLogExtensionUpdateEvent = vi.hoisted(() => vi.fn());
 const mockLogExtensionDisable = vi.hoisted(() => vi.fn());
+const mockIntegrityManager = vi.hoisted(() => ({
+  verify: vi.fn().mockResolvedValue('verified'),
+  store: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
@@ -118,6 +122,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     ExtensionInstallEvent: vi.fn(),
     ExtensionUninstallEvent: vi.fn(),
     ExtensionDisableEvent: vi.fn(),
+    ExtensionIntegrityManager: vi
+      .fn()
+      .mockImplementation(() => mockIntegrityManager),
     KeychainTokenStorage: vi.fn().mockImplementation(() => ({
       getSecret: vi.fn(),
       setSecret: vi.fn(),
@@ -214,6 +221,7 @@ describe('extension tests', () => {
       requestConsent: mockRequestConsent,
       requestSetting: mockPromptForSettings,
       settings,
+      integrityManager: mockIntegrityManager,
     });
     resetTrustedFoldersForTesting();
   });
@@ -774,6 +782,7 @@ name = "yolo-checker"
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
         settings: blockGitExtensionsSetting,
+        integrityManager: mockIntegrityManager,
       });
       const extensions = await extensionManager.loadExtensions();
       const extension = extensions.find((e) => e.name === 'my-ext');
@@ -807,6 +816,7 @@ name = "yolo-checker"
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
         settings: extensionAllowlistSetting,
+        integrityManager: mockIntegrityManager,
       });
       const extensions = await extensionManager.loadExtensions();
 
@@ -835,6 +845,7 @@ name = "yolo-checker"
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
         settings: extensionAllowlistSetting,
+        integrityManager: mockIntegrityManager,
       });
       const extensions = await extensionManager.loadExtensions();
       const extension = extensions.find((e) => e.name === 'my-ext');
@@ -862,6 +873,7 @@ name = "yolo-checker"
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
         settings: loadedSettings,
+        integrityManager: mockIntegrityManager,
       });
 
       const extensions = await extensionManager.loadExtensions();
@@ -885,6 +897,7 @@ name = "yolo-checker"
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
         settings: loadedSettings,
+        integrityManager: mockIntegrityManager,
       });
 
       const extensions = await extensionManager.loadExtensions();
@@ -909,6 +922,7 @@ name = "yolo-checker"
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
         settings: loadedSettings,
+        integrityManager: mockIntegrityManager,
       });
 
       const extensions = await extensionManager.loadExtensions();
@@ -1047,6 +1061,7 @@ name = "yolo-checker"
           requestConsent: mockRequestConsent,
           requestSetting: mockPromptForSettings,
           settings,
+          integrityManager: mockIntegrityManager,
         });
 
         const extensions = await extensionManager.loadExtensions();
@@ -1082,6 +1097,7 @@ name = "yolo-checker"
           requestConsent: mockRequestConsent,
           requestSetting: mockPromptForSettings,
           settings,
+          integrityManager: mockIntegrityManager,
         });
 
         const extensions = await extensionManager.loadExtensions();
@@ -1306,6 +1322,7 @@ name = "yolo-checker"
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
         settings: blockGitExtensionsSetting,
+        integrityManager: mockIntegrityManager,
       });
       await extensionManager.loadExtensions();
       await expect(
@@ -1330,6 +1347,7 @@ name = "yolo-checker"
         requestConsent: mockRequestConsent,
         requestSetting: mockPromptForSettings,
         settings: allowedExtensionsSetting,
+        integrityManager: mockIntegrityManager,
       });
       await extensionManager.loadExtensions();
       await expect(
@@ -1677,6 +1695,7 @@ ${INSTALL_WARNING_MESSAGE}`,
         requestConsent: mockRequestConsent,
         requestSetting: null,
         settings: loadSettings(tempWorkspaceDir).merged,
+        integrityManager: mockIntegrityManager,
       });
 
       await extensionManager.loadExtensions();

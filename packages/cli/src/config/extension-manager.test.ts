@@ -21,6 +21,10 @@ import { getRealPath } from '@google/gemini-cli-core';
 import type { MergedSettings } from './settings.js';
 
 const mockHomedir = vi.hoisted(() => vi.fn(() => '/tmp/mock-home'));
+const mockIntegrityManager = vi.hoisted(() => ({
+  verify: vi.fn().mockResolvedValue('verified'),
+  store: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('os', async (importOriginal) => {
   const mockedOs = await importOriginal<typeof os>();
@@ -36,6 +40,9 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     homedir: mockHomedir,
+    ExtensionIntegrityManager: vi
+      .fn()
+      .mockImplementation(() => mockIntegrityManager),
   };
 });
 
@@ -62,6 +69,7 @@ describe('ExtensionManager', () => {
       workspaceDir: tempWorkspaceDir,
       requestConsent: vi.fn().mockResolvedValue(true),
       requestSetting: null,
+      integrityManager: mockIntegrityManager,
     });
   });
 
@@ -224,6 +232,7 @@ describe('ExtensionManager', () => {
         } as unknown as MergedSettings,
         requestConsent: () => Promise.resolve(true),
         requestSetting: null,
+        integrityManager: mockIntegrityManager,
       });
 
       // Trust the workspace to allow installation
@@ -269,6 +278,7 @@ describe('ExtensionManager', () => {
         settings,
         requestConsent: () => Promise.resolve(true),
         requestSetting: null,
+        integrityManager: mockIntegrityManager,
       });
 
       const installMetadata = {
@@ -303,6 +313,7 @@ describe('ExtensionManager', () => {
         settings,
         requestConsent: () => Promise.resolve(true),
         requestSetting: null,
+        integrityManager: mockIntegrityManager,
       });
 
       const installMetadata = {
@@ -332,6 +343,7 @@ describe('ExtensionManager', () => {
         settings: settingsOnlySymlink,
         requestConsent: () => Promise.resolve(true),
         requestSetting: null,
+        integrityManager: mockIntegrityManager,
       });
 
       // This should FAIL because it checks the real path against the pattern
@@ -488,10 +500,7 @@ describe('ExtensionManager', () => {
 
   describe('extension integrity', () => {
     it('should store integrity data during installation', async () => {
-      const storeSpy = vi.spyOn(
-        extensionManager.integrityManager,
-        'storeExtensionIntegrity',
-      );
+      const storeSpy = vi.spyOn(extensionManager, 'storeExtensionIntegrity');
 
       const extDir = path.join(tempHomeDir, 'new-integrity-ext');
       fs.mkdirSync(extDir, { recursive: true });
