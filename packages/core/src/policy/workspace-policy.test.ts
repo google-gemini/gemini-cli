@@ -117,6 +117,8 @@ priority = 10
       return '';
     });
 
+    const mockRealpath = vi.fn(async (p) => p);
+
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
       default: {
@@ -124,10 +126,12 @@ priority = 10
         readdir: mockReaddir,
         readFile: mockReadFile,
         stat: mockStat,
+        realpath: mockRealpath,
       },
       readdir: mockReaddir,
       readFile: mockReadFile,
       stat: mockStat,
+      realpath: mockRealpath,
     }));
 
     const { createPolicyEngineConfig } = await import('./config.js');
@@ -197,6 +201,8 @@ decision="allow"
 priority=10`,
     );
 
+    const mockRealpath = vi.fn(async (p) => p);
+
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
       default: {
@@ -204,10 +210,12 @@ priority=10`,
         readdir: mockReaddir,
         readFile: mockReadFile,
         stat: mockStat,
+        realpath: mockRealpath,
       },
       readdir: mockReaddir,
       readFile: mockReadFile,
       stat: mockStat,
+      realpath: mockRealpath,
     }));
 
     const { createPolicyEngineConfig } = await import('./config.js');
@@ -262,6 +270,8 @@ decision="allow"
 priority=500`,
     );
 
+    const mockRealpath = vi.fn(async (p) => p);
+
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
       default: {
@@ -269,10 +279,12 @@ priority=500`,
         readdir: mockReaddir,
         readFile: mockReadFile,
         stat: mockStat,
+        realpath: mockRealpath,
       },
       readdir: mockReaddir,
       readFile: mockReadFile,
       stat: mockStat,
+      realpath: mockRealpath,
     }));
 
     const { createPolicyEngineConfig } = await import('./config.js');

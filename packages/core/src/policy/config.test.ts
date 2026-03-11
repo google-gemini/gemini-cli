@@ -115,8 +115,13 @@ describe('createPolicyEngineConfig', () => {
 
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readdir: mockReaddir },
+      default: {
+        ...actualFs,
+        readdir: mockReaddir,
+        realpath: vi.fn(async (p) => p),
+      },
       readdir: mockReaddir,
+      realpath: vi.fn(async (p) => p),
     }));
 
     // Mock Storage to avoid actual filesystem access for policy dirs during tests if needed,
@@ -486,10 +491,12 @@ describe('createPolicyEngineConfig', () => {
         readdir: mockReaddir,
         readFile: mockReadFile,
         stat: mockStat,
+        realpath: vi.fn(async (p) => p),
       },
       readdir: mockReaddir,
       readFile: mockReadFile,
       stat: mockStat,
+      realpath: vi.fn(async (p) => p),
     }));
     vi.resetModules();
     const { createPolicyEngineConfig: createConfig } = await import(
@@ -705,10 +712,12 @@ priority = 150
         readFile: mockReadFile,
         readdir: mockReaddir,
         stat: mockStat,
+        realpath: vi.fn(async (p) => p),
       },
       readFile: mockReadFile,
       readdir: mockReaddir,
       stat: mockStat,
+      realpath: vi.fn(async (p) => p),
     }));
 
     vi.resetModules();
@@ -834,10 +843,12 @@ required_context = ["environment"]
         readFile: mockReadFile,
         readdir: mockReaddir,
         stat: mockStat,
+        realpath: vi.fn(async (p) => p),
       },
       readFile: mockReadFile,
       readdir: mockReaddir,
       stat: mockStat,
+      realpath: vi.fn(async (p) => p),
     }));
 
     vi.resetModules();
@@ -956,10 +967,12 @@ name = "invalid-name"
         readFile: mockReadFile,
         readdir: mockReaddir,
         stat: mockStat,
+        realpath: vi.fn(async (p) => p),
       },
       readFile: mockReadFile,
       readdir: mockReaddir,
       stat: mockStat,
+      realpath: vi.fn(async (p) => p),
     }));
 
     vi.resetModules();
@@ -1021,8 +1034,13 @@ name = "invalid-name"
     );
     vi.doMock('node:fs/promises', () => ({
       ...actualFs,
-      default: { ...actualFs, readdir: mockReaddir },
+      default: {
+        ...actualFs,
+        readdir: mockReaddir,
+        realpath: vi.fn(async (p) => p),
+      },
       readdir: mockReaddir,
+      realpath: vi.fn(async (p) => p),
     }));
 
     const { createPolicyEngineConfig } = await import('./config.js');
@@ -1122,10 +1140,12 @@ modes = ["plan"]
         readFile: mockReadFile,
         readdir: mockReaddir,
         stat: mockStat,
+        realpath: vi.fn(async (p) => p),
       },
       readFile: mockReadFile,
       readdir: mockReaddir,
       stat: mockStat,
+      realpath: vi.fn(async (p) => p),
     }));
 
     vi.resetModules();

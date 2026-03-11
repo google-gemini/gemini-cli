@@ -43,7 +43,7 @@ export class PolicyIntegrityManager {
     policyDir: string,
   ): Promise<IntegrityResult> {
     const { hash: currentHash, fileCount } =
-      await PolicyIntegrityManager.calculateIntegrityHash(policyDir);
+      await PolicyIntegrityManager.calculateIntegrityHash(policyDir, scope);
     const storedData = await this.loadIntegrityData();
     const key = this.getIntegrityKey(scope, identifier);
     const storedHash = storedData[key];
@@ -86,9 +86,28 @@ export class PolicyIntegrityManager {
    */
   private static async calculateIntegrityHash(
     policyDir: string,
+    scope: string,
   ): Promise<{ hash: string; fileCount: number }> {
     try {
-      const files = await readPolicyFiles(policyDir);
+      // Map scope to tierName for readPolicyFiles
+      const tierName =
+        scope === 'user' || scope === 'admin' || scope === 'default'
+          ? scope
+          : 'workspace';
+
+      const { files, errors: readErrors } = await readPolicyFiles(
+        policyDir,
+        tierName,
+      );
+
+      if (readErrors.length > 0) {
+        const errorDetails = readErrors
+          .map((e) => `  - ${e.filePath}: ${e.details}`)
+          .join('\n');
+        debugLogger.error(
+          `[PolicyIntegrity] Unreadable policy files found in ${policyDir}, they will be excluded from the integrity hash:\n${errorDetails}`,
+        );
+      }
 
       // Sort files by path to ensure deterministic hashing
       files.sort((a, b) => a.path.localeCompare(b.path));
