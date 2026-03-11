@@ -205,11 +205,11 @@ export const useShellCommandProcessor = (
   }, [state.activeShellPtyId, activeToolPtyId, m]);
 
   const dismissBackgroundShell = useCallback(
-    (pid: number) => {
+    async (pid: number) => {
       const shell = state.backgroundShells.get(pid);
       if (shell) {
         if (shell.status === 'running') {
-          ShellExecutionService.kill(pid);
+          await ShellExecutionService.kill(pid);
         }
         dispatch({ type: 'DISMISS_SHELL', pid });
         m.backgroundedPids.delete(pid);

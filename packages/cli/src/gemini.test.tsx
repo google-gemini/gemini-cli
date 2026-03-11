@@ -21,15 +21,18 @@ import {
   startInteractiveUI,
   getNodeMemoryArgs,
 } from './gemini.js';
-import { loadCliConfig, parseArguments } from './config/config.js';
+import {
+  loadCliConfig,
+  parseArguments,
+  type CliArgs,
+} from './config/config.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { terminalCapabilityManager } from './ui/utils/terminalCapabilityManager.js';
 import { start_sandbox } from './utils/sandbox.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import os from 'node:os';
 import v8 from 'node:v8';
-import { type CliArgs } from './config/config.js';
-import { type LoadedSettings, loadSettings } from './config/settings.js';
+import { loadSettings, type LoadedSettings } from './config/settings.js';
 import {
   createMockConfig,
   createMockSettings,
@@ -481,6 +484,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       yolo: undefined,
       approvalMode: undefined,
       policy: undefined,
+      adminPolicy: undefined,
       allowedMcpServerNames: undefined,
       allowedTools: undefined,
       experimentalAcp: undefined,
