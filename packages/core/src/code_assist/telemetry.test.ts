@@ -375,7 +375,7 @@ describe('telemetry', () => {
 
       expect(mockServer.recordConversationInteraction).toHaveBeenCalledWith(
         expect.objectContaining({
-          language: 'TypeScript',
+          language: 'typescript',
         }),
       );
     });
@@ -408,7 +408,7 @@ describe('telemetry', () => {
 
       expect(mockServer.recordConversationInteraction).toHaveBeenCalledWith(
         expect.objectContaining({
-          language: 'Python',
+          language: 'python',
         }),
       );
     });
