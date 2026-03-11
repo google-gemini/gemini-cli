@@ -120,15 +120,12 @@ export class StandardSandboxManager implements SandboxManager {
           if (fs.existsSync(gitDotPath)) {
             const stat = fs.lstatSync(gitDotPath);
             if (stat.isFile()) {
-              // It's a worktree link (contains "gitdir: /path/to/repo/.git/worktrees/name")
               const content = fs.readFileSync(gitDotPath, 'utf8').trim();
               const match = content.match(/^gitdir:\s*(.+)$/);
               if (match?.[1]) {
                 const gitDir = path.resolve(options.cwd, match[1]);
                 allowedPaths.push(gitDir);
-                // Also allow the parent .git dir which often contains shared config/hooks
                 allowedPaths.push(path.dirname(gitDir));
-                // And the main repo root if possible
                 allowedPaths.push(path.dirname(path.dirname(gitDir)));
               }
             } else if (stat.isDirectory()) {
@@ -148,24 +145,18 @@ export class StandardSandboxManager implements SandboxManager {
           program: '/usr/bin/sandbox-exec',
           args: ['-f', profilePath, options.command, ...options.args],
           cleanup: () => {
-            // Temporarily disabled cleanup for debugging
-            console.error(`[DEBUG] Sandbox profile kept at: ${profilePath}`);
-            /*
             try {
               fs.rmSync(tempDir, { recursive: true, force: true });
             } catch (error) {
               debugLogger.error('macOS Sandbox cleanup failed:', error);
             }
-            */
           },
         };
       } catch (error) {
-        // Log failure but fallback to original command to ensure execution.
         debugLogger.error('macOS Sandbox setup failed:', error);
       }
     }
 
-    // TODO: Support bwrap (Linux) and Restricted Tokens (Windows).
     return {
       program: options.command,
       args: options.args,
@@ -238,6 +229,17 @@ export class StandardSandboxManager implements SandboxManager {
       '(allow file-read* file-write* (subpath "/tmp"))',
       '(allow file-read* file-write* (subpath "/var/tmp"))',
       '(allow file-read* file-write* (subpath "/private/var/folders"))',
+
+      // SECURITY: Protect sensitive configuration files from being modified by the AI.
+      // These rules override previous allows for the workspace.
+      `(deny file-write* (literal "${path.join(path.resolve(options.cwd), '.gitignore')}"))`,
+      `(deny file-write* (literal "${path.join(path.resolve(options.cwd), '.geminiignore')}"))`,
+      `(deny file-write* (literal "${path.join(path.resolve(options.cwd), '.env')}"))`,
+      
+      // OPTIONAL: If you want to hide these files completely (prevent reading), 
+      // uncomment the lines below. Note: this will break 'git status'.
+      // `(deny file-read* (literal "${path.join(path.resolve(options.cwd), '.gitignore')}"))`,
+      // `(deny file-read* (literal "${path.join(path.resolve(options.cwd), '.geminiignore')}"))`,
 
       // Metadata access
       '(allow file-read-metadata)',
