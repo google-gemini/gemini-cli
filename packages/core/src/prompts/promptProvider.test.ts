@@ -60,11 +60,32 @@ describe('PromptProvider', () => {
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       getApprovalMode: vi.fn(),
       isTrackerEnabled: vi.fn().mockReturnValue(false),
+      getModularSiEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Config;
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
+  });
+
+  it('should use modular snippets when getModularSiEnabled is true', () => {
+    vi.mocked(getAllGeminiMdFilenames).mockReturnValue([
+      DEFAULT_CONTEXT_FILENAME,
+    ]);
+    (
+      mockConfig.getModularSiEnabled as ReturnType<typeof vi.fn>
+    ).mockReturnValue(true);
+
+    const provider = new PromptProvider();
+    const prompt = provider.getCoreSystemPrompt(mockConfig);
+
+    // Modular SI preamble is general and doesn't mention SWE
+    expect(prompt).toContain(
+      'You are Gemini CLI, an interactive CLI agent. Your primary goal is to help users safely and effectively.',
+    );
+    expect(prompt).not.toContain('specializing in software engineering tasks');
+    // It should have the skill activation mandate
+    expect(prompt).toContain('Skill Discovery & Activation');
   });
 
   it('should handle multiple context filenames in the system prompt', () => {

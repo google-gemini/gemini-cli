@@ -1792,6 +1792,13 @@
             }
           },
           "additionalProperties": false
+        },
+        "modularSi": {
+          "title": "Modular System Instruction",
+          "description": "Enable the modular and streamlined system instruction (experimental).",
+          "markdownDescription": "Enable the modular and streamlined system instruction (experimental).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false

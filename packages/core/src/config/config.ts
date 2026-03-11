@@ -585,6 +585,7 @@ export interface ConfigParameters {
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
+  modularSi?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
   plan?: boolean;
@@ -802,6 +803,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly adminSkillsEnabled: boolean;
 
   private readonly experimentalJitContext: boolean;
+  private readonly modularSi: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
   private readonly trackerEnabled: boolean;
@@ -903,6 +905,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.experimentalJitContext = params.experimentalJitContext ?? false;
+    this.modularSi = params.modularSi ?? false;
     this.modelSteering = params.modelSteering ?? false;
     this.userHintService = new UserHintService(() =>
       this.isModelSteeringEnabled(),
@@ -1950,6 +1953,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   isJitContextEnabled(): boolean {
     return this.experimentalJitContext;
+  }
+
+  getModularSiEnabled(): boolean {
+    return this.modularSi;
   }
 
   isModelSteeringEnabled(): boolean {
