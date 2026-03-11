@@ -216,6 +216,16 @@ export class KeyBinding {
       !!key.cmd === !!this.cmd
     );
   }
+
+  equals(other: KeyBinding): boolean {
+    return (
+      this.key === other.key &&
+      this.shift === other.shift &&
+      this.alt === other.alt &&
+      this.ctrl === other.ctrl &&
+      this.cmd === other.cmd
+    );
+  }
 }
 
 /**
@@ -622,10 +632,32 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
 };
 
 const keybindingsSchema = z.array(
-  z.object({
-    command: z.nativeEnum(Command),
-    key: z.string(),
-  }),
+  z
+    .object({
+      command: z.string().transform((val, ctx) => {
+        const negate = val.startsWith('-');
+        const commandId = negate ? val.slice(1) : val;
+
+        const result = z.nativeEnum(Command).safeParse(commandId);
+        if (!result.success) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Invalid command: "${val}".`,
+          });
+          return z.NEVER;
+        }
+
+        return {
+          command: result.data,
+          negate,
+        };
+      }),
+      key: z.string(),
+    })
+    .transform((val) => ({
+      commandEntry: val.command,
+      key: val.key,
+    })),
 );
 
 /**
@@ -648,15 +680,29 @@ export async function loadCustomKeybindings(): Promise<{
 
     if (result.success) {
       config = new Map(defaultKeyBindingConfig);
-      for (const { command, key } of result.data) {
+      for (const { commandEntry, key } of result.data) {
+        const { command, negate } = commandEntry;
         const currentBindings = config.get(command) ?? [];
 
         try {
           const keyBinding = new KeyBinding(key);
-          // Add new binding (prepend so it's the primary one shown in UI)
-          config.set(command, [keyBinding, ...currentBindings]);
+
+          if (negate) {
+            const updatedBindings = currentBindings.filter(
+              (b) => !b.equals(keyBinding),
+            );
+            if (updatedBindings.length === currentBindings.length) {
+              throw new Error(`cannot remove "${key}" since it is not bound`);
+            }
+            config.set(command, updatedBindings);
+          } else {
+            // Add new binding (prepend so it's the primary one shown in UI)
+            config.set(command, [keyBinding, ...currentBindings]);
+          }
         } catch (e) {
-          errors.push(`Invalid keybinding for command "${command}": ${e}`);
+          errors.push(
+            `Invalid keybinding for command "${negate ? '-' : ''}${command}": ${e}`,
+          );
         }
       }
     } else {

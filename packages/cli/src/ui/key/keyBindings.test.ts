@@ -206,7 +206,7 @@ describe('loadCustomKeybindings', () => {
 
     expect(errors.length).toBeGreaterThan(0);
 
-    expect(errors[0]).toMatch(/error at 0.command: Invalid enum value/);
+    expect(errors[0]).toMatch(/error at 0.command: Invalid command: "unknown"/);
     // Should still have defaults
     expect(config.get(Command.RETURN)).toEqual([new KeyBinding('enter')]);
   });
@@ -226,5 +226,35 @@ describe('loadCustomKeybindings', () => {
       new KeyBinding('ctrl+y'),
       new KeyBinding('ctrl+c'),
     ]);
+  });
+
+  it('removes specific bindings when using the minus prefix', async () => {
+    const customJson = JSON.stringify([
+      { command: `-${Command.RETURN}`, key: 'enter' },
+      { command: Command.RETURN, key: 'ctrl+a' },
+    ]);
+    await fs.writeFile(tempFilePath, customJson, 'utf8');
+
+    const { config, errors } = await loadCustomKeybindings();
+
+    expect(errors).toHaveLength(0);
+    // 'enter' should be gone, only 'ctrl+a' should remain
+    expect(config.get(Command.RETURN)).toEqual([new KeyBinding('ctrl+a')]);
+  });
+
+  it('returns an error when attempting to negate a non-existent binding', async () => {
+    const customJson = JSON.stringify([
+      { command: `-${Command.RETURN}`, key: 'ctrl+z' },
+    ]);
+    await fs.writeFile(tempFilePath, customJson, 'utf8');
+
+    const { config, errors } = await loadCustomKeybindings();
+
+    expect(errors.length).toBe(1);
+    expect(errors[0]).toMatch(
+      /Invalid keybinding for command "-basic.confirm": Error: cannot remove "ctrl\+z" since it is not bound/,
+    );
+    // Defaults should still be present
+    expect(config.get(Command.RETURN)).toEqual([new KeyBinding('enter')]);
   });
 });
