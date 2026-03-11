@@ -112,6 +112,14 @@ vi.mock('@google/gemini-cli-core', async () => {
       }),
     },
     loadEnvironment: vi.fn(),
+    detectIdeFromEnv: vi.fn().mockImplementation(() => {
+      if (process.env['TERM_PROGRAM'] === 'Zed')
+        return actualServer.IDE_DEFINITIONS.zed;
+      if (process.env['XCODE_VERSION_ACTUAL'])
+        return actualServer.IDE_DEFINITIONS.xcode;
+      return actualServer.IDE_DEFINITIONS.vscode;
+    }),
+    IDE_DEFINITIONS: actualServer.IDE_DEFINITIONS,
     loadServerHierarchicalMemory: vi.fn(
       (
         cwd,
@@ -309,6 +317,20 @@ describe('parseArguments', () => {
         configurable: true,
         writable: true,
       });
+    });
+
+    it('should set clientName to acp-vscode when using --acp flag', async () => {
+      process.argv = ['node', 'script.js', '--acp'];
+      // Mock TERM_PROGRAM to ensure a known IDE is detected (default is vscode if nothing else matches)
+      vi.stubEnv('TERM_PROGRAM', 'vscode');
+
+      const args = await parseArguments(createTestMergedSettings());
+      const config = await loadCliConfig(
+        createTestMergedSettings(),
+        'test-session',
+        args,
+      );
+      expect(config.getClientName()).toBe('acp-vscode');
     });
 
     it.each([

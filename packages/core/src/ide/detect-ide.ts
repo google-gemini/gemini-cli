@@ -27,6 +27,8 @@ export const IDE_DEFINITIONS = {
   rustrover: { name: 'rustrover', displayName: 'RustRover' },
   datagrip: { name: 'datagrip', displayName: 'DataGrip' },
   phpstorm: { name: 'phpstorm', displayName: 'PhpStorm' },
+  zed: { name: 'zed', displayName: 'Zed' },
+  xcode: { name: 'xcode', displayName: 'XCode' },
 } as const;
 
 export interface IdeInfo {
@@ -74,6 +76,12 @@ export function detectIdeFromEnv(): IdeInfo {
   }
   if (process.env['TERM_PROGRAM'] === 'sublime') {
     return IDE_DEFINITIONS.sublimetext;
+  }
+  if (process.env['ZED_SESSION_ID'] || process.env['TERM_PROGRAM'] === 'Zed') {
+    return IDE_DEFINITIONS.zed;
+  }
+  if (process.env['XCODE_VERSION_ACTUAL']) {
+    return IDE_DEFINITIONS.xcode;
   }
   if (isJetBrains()) {
     return IDE_DEFINITIONS.jetbrains;

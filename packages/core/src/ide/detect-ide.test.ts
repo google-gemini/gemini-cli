@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { detectIde, IDE_DEFINITIONS } from './detect-ide.js';
+import { detectIde, IDE_DEFINITIONS, detectIdeFromEnv } from './detect-ide.js';
 
 beforeEach(() => {
   // Ensure Antigravity detection doesn't interfere with other tests
@@ -95,6 +95,21 @@ describe('detectIde', () => {
     vi.stubEnv('MONOSPACE_ENV', 'true');
     vi.stubEnv('CURSOR_TRACE_ID', '');
     expect(detectIde(ideProcessInfo)).toBe(IDE_DEFINITIONS.firebasestudio);
+  });
+
+  it('should detect Zed via ZED_SESSION_ID', () => {
+    vi.stubEnv('ZED_SESSION_ID', 'some-id');
+    expect(detectIdeFromEnv()).toBe(IDE_DEFINITIONS.zed);
+  });
+
+  it('should detect Zed via TERM_PROGRAM', () => {
+    vi.stubEnv('TERM_PROGRAM', 'Zed');
+    expect(detectIdeFromEnv()).toBe(IDE_DEFINITIONS.zed);
+  });
+
+  it('should detect XCode via XCODE_VERSION_ACTUAL', () => {
+    vi.stubEnv('XCODE_VERSION_ACTUAL', '1500');
+    expect(detectIdeFromEnv()).toBe(IDE_DEFINITIONS.xcode);
   });
 
   it('should detect VSCode when no other IDE is detected and command includes "code"', () => {
