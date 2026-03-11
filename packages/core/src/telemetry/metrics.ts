@@ -40,6 +40,7 @@ const INVALID_CHUNK_COUNT = 'gemini_cli.chat.invalid_chunk.count';
 const CONTENT_RETRY_COUNT = 'gemini_cli.chat.content_retry.count';
 const CONTENT_RETRY_FAILURE_COUNT =
   'gemini_cli.chat.content_retry_failure.count';
+const NETWORK_RETRY_COUNT = 'gemini_cli.network_retry.count';
 const MODEL_ROUTING_LATENCY = 'gemini_cli.model_routing.latency';
 const MODEL_ROUTING_FAILURE_COUNT = 'gemini_cli.model_routing.failure.count';
 const MODEL_SLASH_COMMAND_CALL_COUNT =
@@ -165,6 +166,16 @@ const COUNTER_DEFINITIONS = {
     valueType: ValueType.INT,
     assign: (c: Counter) => (contentRetryFailureCounter = c),
     attributes: {} as Record<string, never>,
+  },
+  [NETWORK_RETRY_COUNT]: {
+    description: 'Counts network retries.',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (networkRetryCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      model: string;
+      attempt: number;
+    },
   },
   [MODEL_ROUTING_FAILURE_COUNT]: {
     description: 'Counts model routing failures.',
@@ -610,6 +621,7 @@ let chatCompressionCounter: Counter | undefined;
 let invalidChunkCounter: Counter | undefined;
 let contentRetryCounter: Counter | undefined;
 let contentRetryFailureCounter: Counter | undefined;
+let networkRetryCounter: Counter | undefined;
 let modelRoutingLatencyHistogram: Histogram | undefined;
 let modelRoutingFailureCounter: Counter | undefined;
 let modelSlashCommandCallCounter: Counter | undefined;
@@ -846,6 +858,20 @@ export function recordSlowRender(config: Config, renderLatency: number): void {
 export function recordInvalidChunk(config: Config): void {
   if (!invalidChunkCounter || !isMetricsInitialized) return;
   invalidChunkCounter.add(1, baseMetricDefinition.getCommonAttributes(config));
+}
+
+export function recordRetryAttemptMetrics(
+  config: Config,
+  attributes: {
+    model: string;
+    attempt: number;
+  },
+): void {
+  if (!networkRetryCounter || !isMetricsInitialized) return;
+  networkRetryCounter.add(1, {
+    ...baseMetricDefinition.getCommonAttributes(config),
+    ...attributes,
+  });
 }
 
 /**

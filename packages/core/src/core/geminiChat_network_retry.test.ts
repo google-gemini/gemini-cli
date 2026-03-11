@@ -47,14 +47,20 @@ vi.mock('../utils/retry.js', async (importOriginal) => {
 });
 
 // Mock loggers
-const { mockLogContentRetry, mockLogContentRetryFailure } = vi.hoisted(() => ({
+const {
+  mockLogContentRetry,
+  mockLogContentRetryFailure,
+  mockLogNetworkRetryAttempt,
+} = vi.hoisted(() => ({
   mockLogContentRetry: vi.fn(),
   mockLogContentRetryFailure: vi.fn(),
+  mockLogNetworkRetryAttempt: vi.fn(),
 }));
 
 vi.mock('../telemetry/loggers.js', () => ({
   logContentRetry: mockLogContentRetry,
   logContentRetryFailure: mockLogContentRetryFailure,
+  logNetworkRetryAttempt: mockLogNetworkRetryAttempt,
 }));
 
 describe('GeminiChat Network Retries', () => {
@@ -185,10 +191,10 @@ describe('GeminiChat Network Retries', () => {
     expect(successChunk).toBeDefined();
 
     // Verify retry logging
-    expect(mockLogContentRetry).toHaveBeenCalledWith(
+    expect(mockLogNetworkRetryAttempt).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        error_type: 'NETWORK_ERROR',
+        error_type: 'SERVER_ERROR',
       }),
     );
   });
@@ -474,11 +480,11 @@ describe('GeminiChat Network Retries', () => {
     );
     expect(successChunk).toBeDefined();
 
-    // Verify retry logging was called with NETWORK_ERROR type
-    expect(mockLogContentRetry).toHaveBeenCalledWith(
+    // Verify retry logging was called with network error type
+    expect(mockLogNetworkRetryAttempt).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        error_type: 'NETWORK_ERROR',
+        error_type: 'ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC',
       }),
     );
   });
