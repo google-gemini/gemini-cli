@@ -330,6 +330,7 @@ export interface ConversationInteraction {
   removedLines?: string;
   language?: string;
   isAgentic?: boolean;
+  initiationMethod?: InitiationMethod;
 }
 
 export interface FetchAdminControlsRequest {
