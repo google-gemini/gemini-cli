@@ -101,6 +101,12 @@ describe('<Footer />', () => {
   beforeEach(() => {
     const root = path.parse(process.cwd()).root;
     vi.stubEnv('GEMINI_CLI_HOME', path.join(root, 'Users', 'test'));
+    vi.stubEnv('SANDBOX', '');
+    vi.stubEnv('SEATBELT_PROFILE', '');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('renders the component', async () => {
@@ -427,15 +433,6 @@ describe('<Footer />', () => {
   });
 
   describe('footer configuration filtering (golden snapshots)', () => {
-    beforeEach(() => {
-      vi.stubEnv('SANDBOX', '');
-      vi.stubEnv('SEATBELT_PROFILE', '');
-    });
-
-    afterEach(() => {
-      vi.unstubAllEnvs();
-    });
-
     it('renders complete footer with all sections visible (baseline)', async () => {
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <Footer />,
@@ -459,23 +456,21 @@ describe('<Footer />', () => {
     });
 
     it('renders footer with all optional sections hidden (minimal footer)', async () => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-        <Footer />,
-        {
-          width: 120,
-          uiState: { sessionStats: mockSessionStats },
-          settings: createMockSettings({
-            ui: {
-              footer: {
-                hideCWD: true,
-                hideSandboxStatus: true,
-                hideModelInfo: true,
-              },
+      const { lastFrame, unmount } = renderWithProviders(<Footer />, {
+        width: 120,
+        uiState: { sessionStats: mockSessionStats },
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              hideCWD: true,
+              hideSandboxStatus: true,
+              hideModelInfo: true,
             },
-          }),
-        },
-      );
-      await waitUntilReady();
+          },
+        }),
+      });
+      // Wait for Ink to render
+      await new Promise((resolve) => setTimeout(resolve, 50));
       expect(normalizeFrame(lastFrame({ allowEmpty: true }))).toMatchSnapshot(
         'footer-minimal',
       );
@@ -797,21 +792,19 @@ describe('<Footer />', () => {
     });
 
     it('handles empty items array', async () => {
-      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-        <Footer />,
-        {
-          width: 120,
-          uiState: { sessionStats: mockSessionStats },
-          settings: createMockSettings({
-            ui: {
-              footer: {
-                items: [],
-              },
+      const { lastFrame, unmount } = renderWithProviders(<Footer />, {
+        width: 120,
+        uiState: { sessionStats: mockSessionStats },
+        settings: createMockSettings({
+          ui: {
+            footer: {
+              items: [],
             },
-          }),
-        },
-      );
-      await waitUntilReady();
+          },
+        }),
+      });
+      // Wait for Ink to render
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       const output = lastFrame({ allowEmpty: true });
       expect(output).toBeDefined();
