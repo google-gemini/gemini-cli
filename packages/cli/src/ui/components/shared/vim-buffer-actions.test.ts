@@ -2602,6 +2602,22 @@ describe('vim-buffer-actions', () => {
         expect(result.cursorRow).toBe(1);
         expect(result.cursorCol).toBe(0);
       });
+
+      it('should land cursor correctly for count > 1 multiline charwise paste', () => {
+        const state = {
+          ...createTestState(['ab', 'cd'], 0, 0),
+          yankRegister: { text: 'x\ny', linewise: false },
+        };
+        const result = handleVimAction(state, {
+          type: 'vim_paste_after' as const,
+          payload: { count: 2 },
+        });
+        expect(result).toHaveOnlyValidCharacters();
+        // cursor should be on the last char of the last pasted copy, not off-screen
+        expect(result.cursorCol).toBeLessThanOrEqual(
+          result.lines[result.cursorRow].length - 1,
+        );
+      });
     });
 
     describe('vim_paste_before (P)', () => {
@@ -2617,6 +2633,21 @@ describe('vim-buffer-actions', () => {
         expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('abXYc');
         expect(result.cursorCol).toBe(3);
+      });
+
+      it('should land cursor on last char when pasting multiline charwise text', () => {
+        const state = {
+          ...createTestState(['ab', 'cd'], 0, 1),
+          yankRegister: { text: 'b\nc', linewise: false },
+        };
+        const result = handleVimAction(state, {
+          type: 'vim_paste_before' as const,
+          payload: { count: 1 },
+        });
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.cursorCol).toBeLessThanOrEqual(
+          result.lines[result.cursorRow].length - 1,
+        );
       });
 
       it('should paste linewise above current row', () => {
