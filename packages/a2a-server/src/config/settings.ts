@@ -40,9 +40,6 @@ export interface Settings {
   general?: {
     previewFeatures?: boolean;
   };
-  experimental?: {
-    enableEventDrivenScheduler?: boolean;
-  };
 
   // Git-aware file filtering settings
   fileFiltering?: {
