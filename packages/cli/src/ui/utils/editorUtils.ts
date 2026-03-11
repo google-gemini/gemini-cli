@@ -50,11 +50,13 @@ export async function openFileInEditor(
 
   if (preferredEditorType) {
     if (!isValidEditorType(preferredEditorType)) {
-      throw new Error(
+      coreEvents.emitFeedback(
+        'error',
         `Editor '${preferredEditorType}' is not a recognized editor identifier. ` +
           `Supported editors: ${ALL_EDITORS.join(', ')}. ` +
           `Use /editor to select one, or set the $VISUAL or $EDITOR environment variable.`,
       );
+      return;
     }
     command = getEditorCommand(preferredEditorType);
     if (isGuiEditor(preferredEditorType)) {
@@ -137,17 +139,23 @@ export async function openFileInEditor(
       );
       if (result.error) {
         const spawnErr = result.error as NodeJS.ErrnoException;
-        throw spawnErr.code === 'ENOENT'
-          ? new Error(
-              `Editor command '${executable}' was not found in PATH. Install it or use /editor to choose another editor.`,
-            )
-          : result.error;
+        coreEvents.emitFeedback(
+          'error',
+          spawnErr.code === 'ENOENT'
+            ? `Editor command '${executable}' was not found in PATH. Install it or use /editor to choose another editor.`
+            : (spawnErr.message ?? String(spawnErr)),
+        );
+        return;
       }
       if (typeof result.status === 'number' && result.status !== 0) {
-        throw new Error(`External editor exited with status ${result.status}`);
+        coreEvents.emitFeedback(
+          'error',
+          `External editor exited with status ${result.status}`,
+        );
+        return;
       }
     } else {
-      await new Promise<void>((resolve, reject) => {
+      await new Promise<void>((resolve) => {
         const child = spawn(
           executable,
           [...initialArgs, ...extraArgs, ...args],
@@ -159,20 +167,22 @@ export async function openFileInEditor(
 
         child.on('error', (err) => {
           const spawnErr = err as NodeJS.ErrnoException;
-          reject(
+          resolve();
+          coreEvents.emitFeedback(
+            'error',
             spawnErr.code === 'ENOENT'
-              ? new Error(
-                  `Editor command '${executable}' was not found in PATH. Install it or use /editor to choose another editor.`,
-                )
-              : err,
+              ? `Editor command '${executable}' was not found in PATH. Install it or use /editor to choose another editor.`
+              : (spawnErr.message ?? String(spawnErr)),
           );
         });
 
         child.on('close', (status) => {
+          resolve();
           if (typeof status === 'number' && status !== 0) {
-            reject(new Error(`External editor exited with status ${status}`));
-          } else {
-            resolve();
+            coreEvents.emitFeedback(
+              'error',
+              `External editor exited with status ${status}`,
+            );
           }
         });
       });
