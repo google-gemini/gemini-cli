@@ -11,8 +11,11 @@ import {
   showMemory,
 } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
-import type { SlashCommand, SlashCommandActionReturn } from './types.js';
-import { CommandKind } from './types.js';
+import {
+  CommandKind,
+  type SlashCommand,
+  type SlashCommandActionReturn,
+} from './types.js';
 
 export const memoryCommand: SlashCommand = {
   name: 'memory',

@@ -9,7 +9,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { ExtensionManager } from './extension-manager.js';
-import { createTestMergedSettings } from './settings.js';
+import { createTestMergedSettings, type MergedSettings } from './settings.js';
 import { createExtension } from '../test-utils/createExtension.js';
 import { EXTENSIONS_DIRECTORY_NAME } from './extensions/variables.js';
 import {
@@ -18,7 +18,6 @@ import {
   isWorkspaceTrusted,
 } from './trustedFolders.js';
 import { getRealPath } from '@google/gemini-cli-core';
-import type { MergedSettings } from './settings.js';
 
 const mockHomedir = vi.hoisted(() => vi.fn(() => '/tmp/mock-home'));
 

@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { SlashCommand } from '../ui/commands/types.js';
-import { CommandKind } from '../ui/commands/types.js';
+import { CommandKind, type SlashCommand } from '../ui/commands/types.js';
 import type { CommandConflict } from './types.js';
 
 /**

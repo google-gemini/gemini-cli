@@ -4,7 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  type MockInstance,
+} from 'vitest';
 import {
   runDeferredCommand,
   defer,
@@ -14,7 +21,6 @@ import {
 import { ExitCodes } from '@google/gemini-cli-core';
 import type { ArgumentsCamelCase, CommandModule } from 'yargs';
 import { createMockSettings } from './test-utils/settings.js';
-import type { MockInstance } from 'vitest';
 
 const { mockRunExitCleanup, mockCoreEvents } = vi.hoisted(() => ({
   mockRunExitCleanup: vi.fn(),
