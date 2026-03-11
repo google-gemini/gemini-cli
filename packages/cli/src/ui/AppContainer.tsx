@@ -1754,7 +1754,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
         if (!isAlternateBuffer) {
           refreshStatic();
         }
-        return true;
+        // Return false to allow other components (e.g. ToolConfirmationMessage) to also handle expansion.
+        return false;
       } else if (
         (keyMatchers[Command.FOCUS_SHELL_INPUT](key) ||
           keyMatchers[Command.UNFOCUS_BACKGROUND_SHELL_LIST](key)) &&

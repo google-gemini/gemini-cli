@@ -176,7 +176,8 @@ export const ToolConfirmationMessage: React.FC<
           callId,
           expanded: !isMcpToolDetailsExpanded,
         });
-        return true;
+        // Return false to let the global app container also expand its view.
+        return false;
       }
       if (keyMatchers[Command.ESCAPE](key)) {
         handleConfirm(ToolConfirmationOutcome.Cancel);

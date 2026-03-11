@@ -6,7 +6,7 @@
 
 import { render, renderWithProviders } from '../../../test-utils/render.js';
 import { OverflowProvider } from '../../contexts/OverflowContext.js';
-import { MaxSizedBox } from './MaxSizedBox.js';
+import { MaxSizedBox, ceilHeight } from './MaxSizedBox.js';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { Box, Text } from 'ink';
 import { act } from 'react';
@@ -315,5 +315,18 @@ describe('<MaxSizedBox />', () => {
     );
     expect(lastFrame()).toMatchSnapshot();
     unmount();
+  });
+
+  describe('ceilHeight', () => {
+    it('should round up fractional heights to next integer', () => {
+      expect(ceilHeight(2.1)).toBe(3);
+      expect(ceilHeight(2.9)).toBe(3);
+      expect(ceilHeight(2.0)).toBe(2);
+      expect(ceilHeight(0.1)).toBe(1);
+    });
+
+    it('should handle zero correctly', () => {
+      expect(ceilHeight(0)).toBe(0);
+    });
   });
 });
