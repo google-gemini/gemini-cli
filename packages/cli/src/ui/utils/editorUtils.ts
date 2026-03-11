@@ -20,6 +20,11 @@ import {
   resolveEditorTypeFromCommand,
 } from '@google/gemini-cli-core';
 
+/**
+ * Command name substrings used to guess whether an unknown $VISUAL/$EDITOR
+ * value is a GUI editor. This is a fallback for editors not in the registry;
+ * registered editors are detected via resolveEditorTypeFromCommand instead.
+ */
 const HEURISTIC_GUI_COMMANDS = [
   'code',
   'cursor',
