@@ -60,8 +60,8 @@ describe('A2AClientManager', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    A2AClientManager.resetInstanceForTesting();
     manager = A2AClientManager.getInstance();
-    manager.clearCache();
 
     // Re-create the instances as plain objects that can be spied on
     const factoryInstance = {

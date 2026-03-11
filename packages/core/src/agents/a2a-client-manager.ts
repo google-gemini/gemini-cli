@@ -73,9 +73,18 @@ export class A2AClientManager {
   }
 
   /**
+   * Resets the singleton instance. Only for testing purposes.
+   * @internal
+   */
+  static resetInstanceForTesting() {
+    // @ts-expect-error - Resetting singleton for testing
+    A2AClientManager.instance = undefined;
+  }
+
+  /**
    * Loads an agent by fetching its AgentCard and caches the client.
    * @param name The name to assign to the agent.
-   * @param agentCardUrl {string} The full URL to the agent's card.
+   * @param agentCardUrl The full URL to the agent's card.
    * @param authHandler Optional authentication handler to use for this agent.
    * @returns The loaded AgentCard.
    */
@@ -185,7 +194,7 @@ export class A2AClientManager {
     try {
       yield* client.sendMessageStream(messageParams, {
         signal: options?.signal,
-      }) as AsyncIterable<SendMessageResult>;
+      });
     } catch (error: unknown) {
       const prefix = `[A2AClientManager] sendMessageStream Error [${agentName}]`;
       if (error instanceof Error) {
