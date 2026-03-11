@@ -69,7 +69,7 @@ export const useSessionBrowser = (
           // Use the old session's ID to continue it.
           const existingSessionId = conversation.sessionId;
           config.setSessionId(existingSessionId);
-          uiTelemetryService.clear(existingSessionId);
+          uiTelemetryService.hydrate(conversation);
 
           const resumedSessionData = {
             conversation,

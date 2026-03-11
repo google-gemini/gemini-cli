@@ -15,6 +15,7 @@ import {
   type ApiErrorEvent,
   type ApiResponseEvent,
 } from './types.js';
+import { type ConversationRecord } from '../services/chatRecordingService.js';
 import type {
   CompletedToolCall,
   ErroredToolCall,
@@ -741,6 +742,75 @@ describe('UiTelemetryService', () => {
       const { metrics, lastPromptTokenCount } = updateSpy.mock.calls[0][0];
       expect(metrics.models).toEqual({});
       expect(lastPromptTokenCount).toBe(0);
+    });
+  });
+
+  describe('hydrate', () => {
+    it('should aggregate metrics from a ConversationRecord', () => {
+      const conversation = {
+        sessionId: 'resumed-session',
+        messages: [
+          {
+            type: 'user',
+            content: 'Hello',
+          },
+          {
+            type: 'gemini',
+            model: 'gemini-1.5-pro',
+            tokens: {
+              input: 10,
+              output: 20,
+              total: 30,
+              cached: 5,
+              thoughts: 2,
+              tool: 3,
+            },
+            toolCalls: [
+              { name: 'test_tool', status: 'success' },
+              { name: 'test_tool', status: 'error' },
+            ],
+          },
+          {
+            type: 'gemini',
+            model: 'gemini-1.5-pro',
+            tokens: {
+              input: 100,
+              output: 200,
+              total: 300,
+              cached: 50,
+              thoughts: 20,
+              tool: 30,
+            },
+          },
+        ],
+      } as unknown as ConversationRecord;
+
+      const clearSpy = vi.fn();
+      const updateSpy = vi.fn();
+      service.on('clear', clearSpy);
+      service.on('update', updateSpy);
+
+      service.hydrate(conversation);
+
+      expect(clearSpy).toHaveBeenCalledWith('resumed-session');
+      const metrics = service.getMetrics();
+      const modelMetrics = metrics.models['gemini-1.5-pro'];
+
+      expect(modelMetrics).toBeDefined();
+      expect(modelMetrics.tokens.prompt).toBe(110); // 10 + 100
+      expect(modelMetrics.tokens.candidates).toBe(220); // 20 + 200
+      expect(modelMetrics.tokens.cached).toBe(55); // 5 + 50
+      expect(modelMetrics.tokens.thoughts).toBe(22); // 2 + 20
+      expect(modelMetrics.tokens.tool).toBe(33); // 3 + 30
+      expect(modelMetrics.tokens.input).toBe(55); // 110 - 55
+
+      expect(metrics.tools.totalCalls).toBe(2);
+      expect(metrics.tools.totalSuccess).toBe(1);
+      expect(metrics.tools.totalFail).toBe(1);
+      expect(metrics.tools.byName['test_tool'].count).toBe(2);
+
+      expect(service.getLastPromptTokenCount()).toBe(300); // 100 (input) + 200 (output)
+      expect(updateSpy).toHaveBeenCalled();
     });
   });
 

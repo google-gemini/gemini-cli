@@ -44,6 +44,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     ...actual,
     uiTelemetryService: {
       clear: vi.fn(),
+      hydrate: vi.fn(),
     },
   };
 });
@@ -113,9 +114,7 @@ describe('useSessionBrowser', () => {
     expect(mockConfig.setSessionId).toHaveBeenCalledWith(
       'existing-session-456',
     );
-    expect(uiTelemetryService.clear).toHaveBeenCalledWith(
-      'existing-session-456',
-    );
+    expect(uiTelemetryService.hydrate).toHaveBeenCalledWith(mockConversation);
     expect(result.current.isSessionBrowserOpen).toBe(false);
     expect(mockOnLoadHistory).toHaveBeenCalled();
   });
