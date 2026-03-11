@@ -242,6 +242,25 @@ describe('useLoadingIndicator', () => {
   });
 
   it('should hide low-verbosity retry status for early retry attempts', async () => {
+  it('should not show retry status phrase when idle', () => {
+    const retryStatus = {
+      model: 'gemini-pro',
+      attempt: 2,
+      maxAttempts: 3,
+      delayMs: 1000,
+    };
+    const { result } = renderLoadingIndicatorHook(
+      StreamingState.Idle,
+      false,
+      retryStatus,
+      'all',
+      'full',
+    );
+
+    expect(result.current.currentLoadingPhrase).toBeUndefined();
+  });
+
+  it('should hide low-verbosity retry status for early retry attempts', () => {
     const retryStatus = {
       model: 'gemini-pro',
       attempt: 1,

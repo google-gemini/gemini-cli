@@ -232,6 +232,11 @@ export async function retryWithBackoff<T>(
 
   let attempt = 0;
   let currentDelay = initialDelayMs;
+  const throwIfAborted = () => {
+    if (signal?.aborted) {
+      throw createAbortError();
+    }
+  };
 
   while (attempt < maxAttempts) {
     if (signal?.aborted) {
@@ -249,6 +254,7 @@ export async function retryWithBackoff<T>(
         const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
         const delayWithJitter = Math.max(0, currentDelay + jitter);
         if (onRetry) {
+          throwIfAborted();
           onRetry(attempt, new Error('Invalid content'), delayWithJitter);
         }
         await delay(delayWithJitter, signal);
@@ -356,6 +362,7 @@ export async function retryWithBackoff<T>(
             `Attempt ${attempt} failed: ${classifiedError.message}. Retrying after ${Math.round(delayWithJitter)}ms...`,
           );
           if (onRetry) {
+            throwIfAborted();
             onRetry(attempt, error, delayWithJitter);
           }
           await delay(delayWithJitter, signal);
@@ -369,6 +376,7 @@ export async function retryWithBackoff<T>(
           const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
           const delayWithJitter = Math.max(0, currentDelay + jitter);
           if (onRetry) {
+            throwIfAborted();
             onRetry(attempt, error, delayWithJitter);
           }
           await delay(delayWithJitter, signal);
@@ -393,6 +401,7 @@ export async function retryWithBackoff<T>(
       const jitter = currentDelay * 0.3 * (Math.random() * 2 - 1);
       const delayWithJitter = Math.max(0, currentDelay + jitter);
       if (onRetry) {
+        throwIfAborted();
         onRetry(attempt, error, delayWithJitter);
       }
       await delay(delayWithJitter, signal);

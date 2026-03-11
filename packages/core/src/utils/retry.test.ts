@@ -634,6 +634,35 @@ describe('retryWithBackoff', () => {
     );
     expect(mockFn).toHaveBeenCalledTimes(1);
   });
+
+  it('should not emit onRetry when abort happens before retry callback', async () => {
+    const abortController = new AbortController();
+    const onRetry = vi.fn();
+    const error = new Error('Server error') as HttpError;
+    Object.defineProperty(error, 'status', {
+      configurable: true,
+      get: () => {
+        abortController.abort();
+        return 500;
+      },
+    });
+
+    const mockFn = vi.fn().mockRejectedValue(error);
+
+    const promise = retryWithBackoff(mockFn, {
+      maxAttempts: 3,
+      initialDelayMs: 100,
+      signal: abortController.signal,
+      onRetry,
+    });
+
+    await expect(promise).rejects.toThrow(
+      expect.objectContaining({ name: 'AbortError' }),
+    );
+    expect(onRetry).not.toHaveBeenCalled();
+    expect(mockFn).toHaveBeenCalledTimes(1);
+  });
+
   it('should trigger fallback for OAuth personal users on persistent 500 errors', async () => {
     const fallbackCallback = vi.fn().mockResolvedValue('gemini-2.5-flash');
 
