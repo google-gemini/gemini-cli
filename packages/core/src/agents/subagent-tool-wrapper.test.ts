@@ -56,6 +56,11 @@ describe('SubagentToolWrapper', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfig = makeFakeConfig();
+    // .config is already set correctly by the getter on the instance.
+    Object.defineProperty(mockConfig, 'promptId', {
+      get: () => 'test-prompt-id',
+      configurable: true,
+    });
     mockMessageBus = createMockMessageBus();
   });
 

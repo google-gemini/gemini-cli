@@ -637,6 +637,9 @@ describe('KeypressContext', () => {
 
   describe('Parameterized functional keys', () => {
     it.each([
+      // CSI-u numeric keys
+      { sequence: `\x1b[53;5u`, expected: { name: '5', ctrl: true } },
+      { sequence: `\x1b[51;2u`, expected: { name: '3', shift: true } },
       // ModifyOtherKeys
       { sequence: `\x1b[27;2;13~`, expected: { name: 'enter', shift: true } },
       { sequence: `\x1b[27;5;13~`, expected: { name: 'enter', ctrl: true } },
@@ -665,6 +668,14 @@ describe('KeypressContext', () => {
       { sequence: `\x1b[17~`, expected: { name: 'f6' } },
       { sequence: `\x1b[23~`, expected: { name: 'f11' } },
       { sequence: `\x1b[24~`, expected: { name: 'f12' } },
+      { sequence: `\x1b[25~`, expected: { name: 'f13' } },
+      { sequence: `\x1b[34~`, expected: { name: 'f20' } },
+      // Kitty Extended Function Keys (F13-F35)
+      { sequence: `\x1b[302u`, expected: { name: 'f13' } },
+      { sequence: `\x1b[324u`, expected: { name: 'f35' } },
+      // Modifier / Special Keys (Kitty Protocol)
+      { sequence: `\x1b[57358u`, expected: { name: 'capslock' } },
+      { sequence: `\x1b[57362u`, expected: { name: 'pausebreak' } },
       // Reverse tabs
       { sequence: `\x1b[Z`, expected: { name: 'tab', shift: true } },
       { sequence: `\x1b[1;2Z`, expected: { name: 'tab', shift: true } },
@@ -819,6 +830,20 @@ describe('KeypressContext', () => {
       {
         sequence: '\x1bOn',
         expected: { name: '.', sequence: '.', insertable: true },
+      },
+      // Kitty Numpad Support (CSI-u)
+      {
+        sequence: '\x1b[57404u',
+        expected: { name: 'numpad5', sequence: '5', insertable: true },
+      },
+      {
+        modifier: 'Ctrl',
+        sequence: '\x1b[57404;5u',
+        expected: { name: 'numpad5', ctrl: true, insertable: false },
+      },
+      {
+        sequence: '\x1b[57411u',
+        expected: { name: 'numpad_multiply', sequence: '*', insertable: true },
       },
     ])(
       'should recognize numpad sequence "$sequence" as $expected.name',
