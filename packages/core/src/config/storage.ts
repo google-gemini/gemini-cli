@@ -98,6 +98,10 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'policies');
   }
 
+  static getUserKeybindingsPath(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'keybindings.json');
+  }
+
   static getUserAgentsDir(): string {
     return path.join(Storage.getGlobalGeminiDir(), 'agents');
   }

@@ -4,28 +4,32 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
+import { Storage } from '@google/gemini-cli-core';
 import {
   defaultKeyMatchers,
   Command,
   createKeyMatchers,
+  loadKeyMatchers,
 } from './keyMatchers.js';
-import type { KeyBindingConfig } from './keyBindings.js';
-import { defaultKeyBindings, KeyBinding } from './keyBindings.js';
+import { defaultKeyBindingConfig, KeyBinding } from './keyBindings.js';
 import type { Key } from '../hooks/useKeypress.js';
 
-describe('keyMatchers', () => {
-  const createKey = (name: string, mods: Partial<Key> = {}): Key => ({
-    name,
-    shift: false,
-    alt: false,
-    ctrl: false,
-    cmd: false,
-    insertable: false,
-    sequence: name,
-    ...mods,
-  });
+const createKey = (name: string, mods: Partial<Key> = {}): Key => ({
+  name,
+  shift: false,
+  alt: false,
+  ctrl: false,
+  cmd: false,
+  insertable: false,
+  sequence: name,
+  ...mods,
+});
 
+describe('keyMatchers', () => {
   // Test data for each command with positive and negative test cases
   const testCases = [
     // Basic bindings
@@ -443,10 +447,11 @@ describe('keyMatchers', () => {
 
   describe('Custom key bindings', () => {
     it('should work with custom configuration', () => {
-      const customConfig: KeyBindingConfig = {
-        ...defaultKeyBindings,
-        [Command.HOME]: [new KeyBinding('ctrl+h'), new KeyBinding('0')],
-      };
+      const customConfig = new Map(defaultKeyBindingConfig);
+      customConfig.set(Command.HOME, [
+        new KeyBinding('ctrl+h'),
+        new KeyBinding('0'),
+      ]);
 
       const customMatchers = createKeyMatchers(customConfig);
 
@@ -460,10 +465,11 @@ describe('keyMatchers', () => {
     });
 
     it('should support multiple key bindings for same command', () => {
-      const config: KeyBindingConfig = {
-        ...defaultKeyBindings,
-        [Command.QUIT]: [new KeyBinding('ctrl+q'), new KeyBinding('alt+q')],
-      };
+      const config = new Map(defaultKeyBindingConfig);
+      config.set(Command.QUIT, [
+        new KeyBinding('ctrl+q'),
+        new KeyBinding('alt+q'),
+      ]);
 
       const matchers = createKeyMatchers(config);
       expect(matchers[Command.QUIT](createKey('q', { ctrl: true }))).toBe(true);
@@ -473,15 +479,54 @@ describe('keyMatchers', () => {
 
   describe('Edge Cases', () => {
     it('should handle empty binding arrays', () => {
-      const config: KeyBindingConfig = {
-        ...defaultKeyBindings,
-        [Command.HOME]: [],
-      };
+      const config = new Map(defaultKeyBindingConfig);
+      config.set(Command.HOME, []);
 
       const matchers = createKeyMatchers(config);
       expect(matchers[Command.HOME](createKey('a', { ctrl: true }))).toBe(
         false,
       );
     });
+  });
+});
+
+describe('loadKeyMatchers integration', () => {
+  let tempDir: string;
+  let tempFilePath: string;
+
+  beforeEach(async () => {
+    tempDir = await fs.mkdtemp(
+      path.join(os.tmpdir(), 'gemini-keymatchers-test-'),
+    );
+    tempFilePath = path.join(tempDir, 'keybindings.json');
+    vi.spyOn(Storage, 'getUserKeybindingsPath').mockReturnValue(tempFilePath);
+  });
+
+  afterEach(async () => {
+    await fs.rm(tempDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  it('loads matchers from a real file on disk', async () => {
+    const customJson = JSON.stringify([
+      { command: Command.QUIT, key: 'ctrl+y' },
+    ]);
+    await fs.writeFile(tempFilePath, customJson, 'utf8');
+
+    const { matchers, errors } = await loadKeyMatchers();
+
+    expect(errors).toHaveLength(0);
+    // User binding matches
+    expect(matchers[Command.QUIT](createKey('y', { ctrl: true }))).toBe(true);
+    // Default binding still matches as fallback
+    expect(matchers[Command.QUIT](createKey('c', { ctrl: true }))).toBe(true);
+  });
+
+  it('returns errors when the file on disk is invalid', async () => {
+    await fs.writeFile(tempFilePath, 'invalid json {', 'utf8');
+
+    const { errors } = await loadKeyMatchers();
+
+    expect(errors.length).toBeGreaterThan(0);
   });
 });
