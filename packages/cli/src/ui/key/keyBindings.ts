@@ -109,20 +109,10 @@ export enum Command {
  */
 export class KeyBinding {
   private static readonly VALID_KEYS = new Set([
-    // Letters & Numbers
-    ...'abcdefghijklmnopqrstuvwxyz0123456789',
-    // Punctuation
-    '`',
-    '-',
-    '=',
-    '[',
-    ']',
-    '\\',
-    ';',
-    "'",
-    ',',
-    '.',
-    '/',
+    ...'abcdefghijklmnopqrstuvwxyz0123456789', // Letters & Numbers
+    ..."`-=[]\\;',./", // Punctuation
+    ...Array.from({ length: 19 }, (_, i) => `f${i + 1}`), // Function Keys
+    ...Array.from({ length: 10 }, (_, i) => `numpad${i}`), // Numpad Numbers
     // Navigation & Actions
     'left',
     'up',
@@ -143,10 +133,6 @@ export class KeyBinding {
     'insert',
     'numlock',
     'scrolllock',
-    // Function Keys
-    ...Array.from({ length: 19 }, (_, i) => `f${i + 1}`),
-    // Numpad
-    ...Array.from({ length: 10 }, (_, i) => `numpad${i}`),
     'numpad_multiply',
     'numpad_add',
     'numpad_separator',

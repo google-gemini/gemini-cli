@@ -171,10 +171,10 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     return () => clearTimeout(timeout);
   }, [canShowShortcutsHint]);
 
+  const shouldReserveSpaceForShortcutsHint =
+    settings.merged.ui.showShortcutsHint && !hideShortcutsHintForSuggestions;
   const showShortcutsHint =
-    settings.merged.ui.showShortcutsHint &&
-    !hideShortcutsHintForSuggestions &&
-    showShortcutsHintDebounced;
+    shouldReserveSpaceForShortcutsHint && showShortcutsHintDebounced;
   const showMinimalModeBleedThrough =
     !hideUiDetailsForSuggestions && Boolean(minimalModeBleedThrough);
   const showMinimalInlineLoading = !showUiDetails && showLoadingIndicator;
@@ -187,7 +187,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     !showUiDetails &&
     (showMinimalInlineLoading ||
       showMinimalBleedThroughRow ||
-      showShortcutsHint);
+      shouldReserveSpaceForShortcutsHint);
 
   return (
     <Box
@@ -249,6 +249,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             marginTop={isNarrow ? 1 : 0}
             flexDirection="column"
             alignItems={isNarrow ? 'flex-start' : 'flex-end'}
+            minHeight={
+              showUiDetails && shouldReserveSpaceForShortcutsHint ? 1 : 0
+            }
           >
             {showUiDetails && showShortcutsHint && <ShortcutsHint />}
           </Box>
@@ -304,11 +307,13 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                 </Box>
               )}
             </Box>
-            {(showMinimalContextBleedThrough || showShortcutsHint) && (
+            {(showMinimalContextBleedThrough ||
+              shouldReserveSpaceForShortcutsHint) && (
               <Box
                 marginTop={isNarrow && showMinimalBleedThroughRow ? 1 : 0}
                 flexDirection={isNarrow ? 'column' : 'row'}
                 alignItems={isNarrow ? 'flex-start' : 'flex-end'}
+                minHeight={1}
               >
                 {showMinimalContextBleedThrough && (
                   <ContextUsageDisplay
@@ -317,18 +322,14 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                     terminalWidth={uiState.terminalWidth}
                   />
                 )}
-                {showShortcutsHint && (
-                  <Box
-                    marginLeft={
-                      showMinimalContextBleedThrough && !isNarrow ? 1 : 0
-                    }
-                    marginTop={
-                      showMinimalContextBleedThrough && isNarrow ? 1 : 0
-                    }
-                  >
-                    <ShortcutsHint />
-                  </Box>
-                )}
+                <Box
+                  marginLeft={
+                    showMinimalContextBleedThrough && !isNarrow ? 1 : 0
+                  }
+                  marginTop={showMinimalContextBleedThrough && isNarrow ? 1 : 0}
+                >
+                  {showShortcutsHint && <ShortcutsHint />}
+                </Box>
               </Box>
             )}
           </Box>
