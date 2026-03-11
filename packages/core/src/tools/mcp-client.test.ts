@@ -102,6 +102,7 @@ describe('mcp-client', () => {
   });
 
   afterEach(() => {
+    fs.rmSync(testWorkspace, { recursive: true, force: true });
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
