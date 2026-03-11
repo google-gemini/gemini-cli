@@ -146,7 +146,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`general.retryFetchErrors`** (boolean):
   - **Description:** Retry on "exception TypeError: fetch failed sending
     request" errors.
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`general.maxAttempts`** (number):
   - **Description:** Maximum number of attempts for requests to the main chat
@@ -1001,6 +1001,12 @@ their corresponding top-level category object in your `settings.json` file.
 - **`experimental.extensionRegistry`** (boolean):
   - **Description:** Enable extension registry explore UI.
   - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.extensionRegistryURI`** (string):
+  - **Description:** The URI (web URL or local file path) of the extension
+    registry.
+  - **Default:** `"https://geminicli.com/extensions.json"`
   - **Requires restart:** Yes
 
 - **`experimental.extensionReloading`** (boolean):
