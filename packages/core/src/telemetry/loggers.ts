@@ -32,6 +32,7 @@ import {
   type InvalidChunkEvent,
   type ContentRetryEvent,
   type ContentRetryFailureEvent,
+  type NetworkRetryAttemptEvent,
   type RipgrepFallbackEvent,
   type ToolOutputTruncatedEvent,
   type ModelRoutingEvent,
@@ -62,6 +63,7 @@ import {
   recordToolCallMetrics,
   recordChatCompressionMetrics,
   recordFileOperationMetric,
+  recordRetryAttemptMetrics,
   recordContentRetry,
   recordContentRetryFailure,
   recordModelRoutingMetrics,
@@ -482,6 +484,25 @@ export function logInvalidChunk(
     };
     logger.emit(logRecord);
     recordInvalidChunk(config);
+  });
+}
+
+export function logNetworkRetryAttempt(
+  config: Config,
+  event: NetworkRetryAttemptEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logNetworkRetryAttemptEvent(event);
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
+    recordRetryAttemptMetrics(config, {
+      model: event.model,
+      attempt: event.attempt,
+    });
   });
 }
 

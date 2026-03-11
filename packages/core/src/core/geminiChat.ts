@@ -19,7 +19,11 @@ import {
   type GenerateContentParameters,
 } from '@google/genai';
 import { toParts } from '../code_assist/converter.js';
-import { retryWithBackoff, isRetryableError } from '../utils/retry.js';
+import {
+  retryWithBackoff,
+  isRetryableError,
+  getRetryErrorType,
+} from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
 import type { Config } from '../config/config.js';
 import {
@@ -33,6 +37,7 @@ import type { CompletedToolCall } from './coreToolScheduler.js';
 import {
   logContentRetry,
   logContentRetryFailure,
+  logNetworkRetryAttempt,
 } from '../telemetry/loggers.js';
 import {
   ChatRecordingService,
@@ -41,6 +46,7 @@ import {
 import {
   ContentRetryEvent,
   ContentRetryFailureEvent,
+  NetworkRetryAttemptEvent,
   type LlmRole,
 } from '../telemetry/types.js';
 import { handleFallback } from '../fallback/handler.js';
@@ -412,7 +418,9 @@ export class GeminiChat {
             }
 
             const isContentError = error instanceof InvalidStreamError;
-            const errorType = isContentError ? error.type : 'NETWORK_ERROR';
+            const errorType = isContentError
+              ? error.type
+              : getRetryErrorType(error);
 
             if (
               (isContentError && isGemini2Model(model)) ||
@@ -422,15 +430,28 @@ export class GeminiChat {
               if (attempt < maxAttempts - 1) {
                 const delayMs = INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs;
 
-                logContentRetry(
-                  this.config,
-                  new ContentRetryEvent(attempt, errorType, delayMs, model),
-                );
+                if (isContentError) {
+                  logContentRetry(
+                    this.config,
+                    new ContentRetryEvent(attempt, errorType, delayMs, model),
+                  );
+                } else {
+                  logNetworkRetryAttempt(
+                    this.config,
+                    new NetworkRetryAttemptEvent(
+                      attempt + 1,
+                      maxAttempts,
+                      errorType,
+                      delayMs * (attempt + 1),
+                      model,
+                    ),
+                  );
+                }
                 coreEvents.emitRetryAttempt({
                   attempt: attempt + 1,
                   maxAttempts,
                   delayMs: delayMs * (attempt + 1),
-                  error: error instanceof Error ? error.message : String(error),
+                  error: errorType,
                   model,
                 });
                 await new Promise((res) =>

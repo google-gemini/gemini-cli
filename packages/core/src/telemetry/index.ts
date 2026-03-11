@@ -46,6 +46,7 @@ export {
   logExtensionUninstall,
   logExtensionUpdateEvent,
   logWebFetchFallbackAttempt,
+  logNetworkRetryAttempt,
   logRewind,
 } from './loggers.js';
 export {
@@ -66,6 +67,7 @@ export {
   ConversationFinishedEvent,
   ToolOutputTruncatedEvent,
   WebFetchFallbackAttemptEvent,
+  NetworkRetryAttemptEvent,
   ToolCallDecision,
   RewindEvent,
   ConsecaPolicyGenerationEvent,
@@ -111,6 +113,7 @@ export {
   recordApiErrorMetrics,
   recordFileOperationMetric,
   recordInvalidChunk,
+  recordRetryAttemptMetrics,
   recordContentRetry,
   recordContentRetryFailure,
   recordModelRoutingMetrics,
