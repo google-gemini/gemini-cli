@@ -12,6 +12,7 @@ import { GEMINI_DIR } from '../utils/paths.js';
 import { ApprovalMode } from '../policy/types.js';
 import * as snippets from './snippets.js';
 import * as legacySnippets from './snippets.legacy.js';
+import * as modularSnippets from './snippets.modular.js';
 import {
   resolvePathFromEnv,
   applySubstitutions,
@@ -67,7 +68,11 @@ export class PromptProvider {
       context.config,
     );
     const isModernModel = supportsModernFeatures(desiredModel);
-    const activeSnippets = isModernModel ? snippets : legacySnippets;
+    const activeSnippets = context.config.getModularSiEnabled()
+      ? modularSnippets
+      : isModernModel
+        ? snippets
+        : legacySnippets;
     const contextFilenames = getAllGeminiMdFilenames();
 
     // --- Context Gathering ---
@@ -249,7 +254,11 @@ export class PromptProvider {
       context.config,
     );
     const isModernModel = supportsModernFeatures(desiredModel);
-    const activeSnippets = isModernModel ? snippets : legacySnippets;
+    const activeSnippets = context.config.getModularSiEnabled()
+      ? modularSnippets
+      : isModernModel
+        ? snippets
+        : legacySnippets;
     return activeSnippets.getCompressionPrompt(
       context.config.getApprovedPlanPath(),
     );
