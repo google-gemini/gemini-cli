@@ -10,8 +10,7 @@ import {
   shouldLaunchBrowser,
   UPGRADE_URL_PAGE,
 } from '@google/gemini-cli-core';
-import type { SlashCommand } from './types.js';
-import { CommandKind } from './types.js';
+import { CommandKind, type SlashCommand } from './types.js';
 
 /**
  * Command to open the upgrade page for Gemini Code Assist.
