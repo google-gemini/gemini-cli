@@ -349,26 +349,32 @@ async function run() {
       }
 
       // Remove status/need-triage from maintainer-only issues since they
-      // don't need community triage (the label may already exist from the
-      // issue-opened labeler which runs before this script).
-      const hasNeedTriage = issueInfo.labels.some(
-        (l) => l === 'status/need-triage',
-      );
-      if (hasNeedTriage) {
-        if (isDryRun) {
-          console.log(
-            `[DRY RUN] Would remove status/need-triage from ${issueKey}`,
-          );
-        } else {
-          console.log(
-            `Removing status/need-triage from ${issueKey}...`,
-          );
+      // don't need community triage. We always attempt removal rather than
+      // checking the (potentially stale) label snapshot, because the
+      // issue-opened-labeler workflow runs concurrently and may add the
+      // label after our snapshot was taken.
+      if (isDryRun) {
+        console.log(
+          `[DRY RUN] Would remove status/need-triage from ${issueKey}`,
+        );
+      } else {
+        try {
           await octokit.rest.issues.removeLabel({
             owner: issueInfo.owner,
             repo: issueInfo.repo,
             issue_number: issueInfo.number,
             name: 'status/need-triage',
           });
+          console.log(`Removed status/need-triage from ${issueKey}`);
+        } catch (removeError) {
+          // 404 means the label wasn't present — that's fine.
+          if (removeError.status === 404) {
+            console.log(
+              `status/need-triage not present on ${issueKey}, skipping.`,
+            );
+          } else {
+            throw removeError;
+          }
         }
       }
     } catch (error) {
