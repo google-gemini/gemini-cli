@@ -284,6 +284,37 @@ describe('ToolRegistry', () => {
     });
   });
 
+  describe('subagent MCP tools filtering', () => {
+    it('should hide __agent__ prefixed tools when isMainRegistry is true', async () => {
+      const mainRegistry = new ToolRegistry(config, mockMessageBus, true);
+      const subagentRegistry = new ToolRegistry(config, mockMessageBus, false);
+
+      const mcpTool = createMCPTool(
+        '__agent__TestAgent__myServer',
+        'my-tool',
+        'description',
+      );
+      vi.spyOn(mcpTool, 'getSchema').mockReturnValue({
+        name: 'my_tool',
+        description: 'description',
+      } as unknown as FunctionDeclaration);
+
+      mainRegistry.registerTool(mcpTool);
+      subagentRegistry.registerTool(mcpTool);
+
+      const mainDeclarations =
+        mainRegistry.getFunctionDeclarations('test-model');
+      const subagentDeclarations =
+        subagentRegistry.getFunctionDeclarations('test-model');
+
+      expect(mainDeclarations.length).toBe(0);
+      expect(subagentDeclarations.length).toBe(1);
+      expect(subagentDeclarations[0].name).toBe(
+        'mcp___agent__TestAgent__myServer_my-tool',
+      );
+    });
+  });
+
   describe('excluded tools', () => {
     const simpleTool = new MockTool({
       name: 'tool-a',

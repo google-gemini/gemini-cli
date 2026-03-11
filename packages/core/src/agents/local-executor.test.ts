@@ -2510,5 +2510,49 @@ describe('LocalAgentExecutor', () => {
         mcpServers['test-server'],
       );
     });
+
+    it('should filter out other agents MCP tools when inheriting tools from parent registry', async () => {
+      const parentMcpTool1 = new DiscoveredMCPTool(
+        {} as unknown as CallableTool,
+        '__agent__OtherAgent__server1',
+        'tool1',
+        'desc1',
+        {},
+        mockConfig.getMessageBus(),
+      );
+      const parentMcpTool2 = new DiscoveredMCPTool(
+        {} as unknown as CallableTool,
+        '__agent__TestAgent__server2',
+        'tool2',
+        'desc2',
+        {},
+        mockConfig.getMessageBus(),
+      );
+
+      parentToolRegistry.registerTool(parentMcpTool1);
+      parentToolRegistry.registerTool(parentMcpTool2);
+
+      const definition = createTestDefinition();
+      definition.toolConfig = undefined; // trigger inheritance
+
+      vi.spyOn(mockConfig, 'getMcpClientManager').mockReturnValue({
+        maybeDiscoverMcpServer: vi.fn(),
+      } as unknown as ReturnType<typeof mockConfig.getMcpClientManager>);
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      const agentTools = (
+        executor as unknown as { toolRegistry: ToolRegistry }
+      ).toolRegistry.getAllToolNames();
+
+      expect(agentTools).toContain(parentMcpTool2.asFullyQualifiedTool().name);
+      expect(agentTools).not.toContain(
+        parentMcpTool1.asFullyQualifiedTool().name,
+      );
+    });
   });
 });
