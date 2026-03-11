@@ -594,7 +594,17 @@ export class ToolRegistry {
     for (const name of toolNames) {
       const tool = this.getTool(name);
       if (tool) {
-        declarations.push(tool.getSchema(modelId));
+        let schema = tool.getSchema(modelId);
+
+        // Ensure the schema name matches the qualified name for MCP tools
+        if (tool instanceof DiscoveredMCPTool) {
+          schema = {
+            ...schema,
+            name: tool.getFullyQualifiedName(),
+          };
+        }
+
+        declarations.push(schema);
       }
     }
     return declarations;
@@ -667,17 +677,6 @@ export class ToolRegistry {
         debugLogger.debug(
           `Resolved legacy tool name "${name}" to current name "${currentName}"`,
         );
-      }
-    }
-
-    if (!tool && name.includes('__')) {
-      for (const t of this.allKnownTools.values()) {
-        if (t instanceof DiscoveredMCPTool) {
-          if (t.getFullyQualifiedName() === name) {
-            tool = t;
-            break;
-          }
-        }
       }
     }
 
