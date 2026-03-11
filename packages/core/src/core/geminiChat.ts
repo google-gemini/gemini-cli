@@ -415,7 +415,7 @@ export class GeminiChat {
             const errorType = isContentError ? error.type : 'NETWORK_ERROR';
 
             if (
-              (isContentError && isGemini2Model(model)) ||
+              (isContentError && isGemini2Model(model, this.config)) ||
               (isRetryable && !signal.aborted)
             ) {
               // Check if we have more attempts left.
@@ -494,12 +494,24 @@ export class GeminiChat {
     const apiCall = async () => {
       const useGemini3_1 = (await this.config.getGemini31Launched?.()) ?? false;
       // Default to the last used model (which respects arguments/availability selection)
-      let modelToUse = resolveModel(lastModelToUse, useGemini3_1);
+      let modelToUse = resolveModel(
+        lastModelToUse,
+        useGemini3_1,
+        false,
+        this.config.getHasAccessToPreviewModel?.() ?? true,
+        this.config,
+      );
 
       // If the active model has changed (e.g. due to a fallback updating the config),
       // we switch to the new active model.
       if (this.config.getActiveModel() !== initialActiveModel) {
-        modelToUse = resolveModel(this.config.getActiveModel(), useGemini3_1);
+        modelToUse = resolveModel(
+          this.config.getActiveModel(),
+          useGemini3_1,
+          false,
+          this.config.getHasAccessToPreviewModel?.() ?? true,
+          this.config,
+        );
       }
 
       if (modelToUse !== lastModelToUse) {
@@ -521,7 +533,10 @@ export class GeminiChat {
         abortSignal,
       };
 
-      let contentsToUse: Content[] = supportsModernFeatures(modelToUse)
+      let contentsToUse: Content[] = supportsModernFeatures(
+        modelToUse,
+        this.config,
+      )
         ? [...contentsForPreviewModel]
         : [...requestContents];
 

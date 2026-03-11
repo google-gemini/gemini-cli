@@ -42,31 +42,78 @@ export function resolvePolicyChain(
   const modelFromConfig =
     preferredModel ?? config.getActiveModel?.() ?? config.getModel();
   const configuredModel = config.getModel();
-
-  let chain;
   const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
   const useCustomToolModel = config.getUseCustomToolModelSync?.() ?? false;
   const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? true;
-
+  const isAutoPreferred = preferredModel ? isAutoModel(preferredModel) : false;
+  const isAutoConfigured = isAutoModel(configuredModel);
   const resolvedModel = resolveModel(
     modelFromConfig,
     useGemini31,
     useCustomToolModel,
     hasAccessToPreview,
+    config,
   );
-  const isAutoPreferred = preferredModel ? isAutoModel(preferredModel) : false;
-  const isAutoConfigured = isAutoModel(configuredModel);
 
+  // --- DYNAMIC PATH ---
+  if (config.getExperimentalDynamicModelConfiguration?.() === true) {
+    let chain;
+
+    const context = {
+      useGemini3_1: useGemini31,
+      useCustomTools: useCustomToolModel,
+    };
+
+    if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
+      chain = config.modelConfigService.resolveChain('lite', context);
+    } else if (
+      isGemini3Model(resolvedModel, config) ||
+      isAutoModel(preferredModel ?? '', config) ||
+      isAutoModel(configuredModel, config)
+    ) {
+      // 1. Try to find a chain specifically for the current configured alias
+      const autoAlias = isAutoModel(configuredModel, config)
+        ? configuredModel
+        : undefined;
+      if (autoAlias && config.modelConfigService.getModelChain(autoAlias)) {
+        chain = config.modelConfigService.resolveChain(autoAlias, context);
+      }
+
+      // 2. Fallback to family-based auto-routing
+      if (!chain) {
+        if (hasAccessToPreview) {
+          const previewEnabled =
+            isGemini3Model(resolvedModel, config) ||
+            preferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
+            configuredModel === PREVIEW_GEMINI_MODEL_AUTO;
+          chain = previewEnabled
+            ? config.modelConfigService.resolveChain('preview', context)
+            : config.modelConfigService.resolveChain('default', context);
+        } else {
+          chain = config.modelConfigService.resolveChain('default', context);
+        }
+      }
+    }
+
+    if (!chain) {
+      // No matching modelChains found, default to single model chain
+      chain = createSingleModelChain(modelFromConfig);
+    }
+    return applyDynamicSlicing(chain, resolvedModel, wrapsAround);
+  }
+
+  // --- LEGACY PATH ---
+  let chain;
   if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
     chain = getFlashLitePolicyChain();
   } else if (
-    isGemini3Model(resolvedModel) ||
+    isGemini3Model(resolvedModel, config) ||
     isAutoPreferred ||
     isAutoConfigured
   ) {
     if (hasAccessToPreview) {
       const previewEnabled =
-        isGemini3Model(resolvedModel) ||
+        isGemini3Model(resolvedModel, config) ||
         preferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
         configuredModel === PREVIEW_GEMINI_MODEL_AUTO;
       chain = getModelPolicyChain({
@@ -89,6 +136,17 @@ export function resolvePolicyChain(
     chain = createSingleModelChain(modelFromConfig);
   }
 
+  return applyDynamicSlicing(chain, resolvedModel, wrapsAround);
+}
+
+/**
+ * Applies active-index slicing and wrap-around logic to a chain template.
+ */
+function applyDynamicSlicing(
+  chain: ModelPolicy[],
+  resolvedModel: string,
+  wrapsAround: boolean,
+): ModelPolicyChain {
   const activeIndex = chain.findIndex(
     (policy) => policy.model === resolvedModel,
   );
