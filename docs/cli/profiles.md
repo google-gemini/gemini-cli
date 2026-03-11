@@ -22,7 +22,7 @@ and the file body for system instructions.
 
 ```markdown
 ---
-name: Web Developer
+name: coder
 default_model: gemini-3.0-flash
 extensions:
   - github
@@ -35,11 +35,11 @@ Always prefer functional components and explain your reasoning.
 
 ### Configuration fields
 
-| Field           | Description                                                                                     |
-| :-------------- | :---------------------------------------------------------------------------------------------- |
-| `name`          | (Optional) A display name for the profile.                                                      |
-| `default_model` | (Optional) The model to use when this profile is active.                                        |
-| `extensions`    | (Optional) A list of allowed extension IDs. If specified, only these extensions will be loaded. |
+| Field           | Description                                                                                                                                |
+| :-------------- | :----------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`          | (Mandatory) A unique name for the profile. Must be a valid slug (a-z, 0-9, -, \_) and MUST match the filename without the `.md` extension. |
+| `default_model` | (Optional) The model to use when this profile is active.                                                                                   |
+| `extensions`    | (Optional) A list of allowed extension IDs. If specified, only these extensions will be loaded.                                            |
 
 The **body** of the Markdown file is injected into the system prompt, allowing
 you to define a specific persona or set of instructions that the AI will always
