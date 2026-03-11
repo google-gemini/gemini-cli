@@ -79,17 +79,17 @@ export type StreamEvent =
   | { type: StreamEventType.AGENT_EXECUTION_BLOCKED; reason: string };
 
 /**
- * Options for retrying due to invalid content from the model.
+ * Options for retrying mid-stream errors (e.g. invalid content or API disconnects).
  */
-interface ContentRetryOptions {
+interface MidStreamRetryOptions {
   /** Total number of attempts to make (1 initial + N retries). */
   maxAttempts: number;
   /** The base delay in milliseconds for linear backoff. */
   initialDelayMs: number;
 }
 
-const INVALID_CONTENT_RETRY_OPTIONS: ContentRetryOptions = {
-  maxAttempts: 2, // 1 initial call + 1 retry
+const MID_STREAM_RETRY_OPTIONS: MidStreamRetryOptions = {
+  maxAttempts: 4, // 1 initial call + 3 retries mid-stream
   initialDelayMs: 500,
 };
 
@@ -350,7 +350,7 @@ export class GeminiChat {
       this: GeminiChat,
     ): AsyncGenerator<StreamEvent, void, void> {
       try {
-        const maxAttempts = INVALID_CONTENT_RETRY_OPTIONS.maxAttempts;
+        const maxAttempts = this.config.getMaxAttempts();
 
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
           let isConnectionPhase = true;
@@ -402,20 +402,18 @@ export class GeminiChat {
               return; // Stop the generator
             }
 
+            if (isConnectionPhase) {
+              // Connection phase errors have already been retried by retryWithBackoff.
+              // If they bubble up here, they are exhausted or fatal.
+              throw error;
+            }
+
             // Check if the error is retryable (e.g., transient SSL errors
-            // like ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC)
+            // like ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC or ApiError)
             const isRetryable = isRetryableError(
               error,
               this.config.getRetryFetchErrors(),
             );
-
-            // For connection phase errors, only retryable errors should continue
-            if (isConnectionPhase) {
-              if (!isRetryable || signal.aborted) {
-                throw error;
-              }
-              // Fall through to retry logic for retryable connection errors
-            }
 
             const isContentError = error instanceof InvalidStreamError;
             const errorType = isContentError
@@ -426,9 +424,16 @@ export class GeminiChat {
               (isContentError && isGemini2Model(model)) ||
               (isRetryable && !signal.aborted)
             ) {
-              // Check if we have more attempts left.
-              if (attempt < maxAttempts - 1) {
-                const delayMs = INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs;
+              // The issue requests exactly 3 retries (4 attempts) for API errors during stream iteration.
+              // Regardless of the global maxAttempts (e.g. 10), we only want to retry these mid-stream API errors
+              // up to 3 times before finally throwing the error to the user.
+              const maxMidStreamAttempts = MID_STREAM_RETRY_OPTIONS.maxAttempts;
+
+              if (
+                attempt < maxAttempts - 1 &&
+                attempt < maxMidStreamAttempts - 1
+              ) {
+                const delayMs = MID_STREAM_RETRY_OPTIONS.initialDelayMs;
 
                 if (isContentError) {
                   logContentRetry(
@@ -449,7 +454,7 @@ export class GeminiChat {
                 }
                 coreEvents.emitRetryAttempt({
                   attempt: attempt + 1,
-                  maxAttempts,
+                  maxAttempts: Math.min(maxAttempts, maxMidStreamAttempts),
                   delayMs: delayMs * (attempt + 1),
                   error: errorType,
                   model,
