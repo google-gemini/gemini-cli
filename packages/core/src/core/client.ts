@@ -30,12 +30,6 @@ import { getCoreSystemPrompt } from './prompts.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
-import { coreEvents, CoreEvent } from '../utils/events.js';
-import {
-  getDisplayString,
-  resolveModel,
-  isGemini2Model,
-} from '../config/models.js';
 import {
   retryWithBackoff,
   type RetryAvailabilityContext,
@@ -76,7 +70,13 @@ import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
+import {
+  getDisplayString,
+  resolveModel,
+  isGemini2Model,
+} from '../config/models.js';
 import { partToString } from '../utils/partUtils.js';
+import { coreEvents, CoreEvent } from '../utils/events.js';
 
 const MAX_TURNS = 100;
 
@@ -907,6 +907,7 @@ export class GeminiClient {
 
     const boundedTurns = Math.min(turns, MAX_TURNS);
     let turn = new Turn(this.getChat(), prompt_id);
+    let continuationHandled = false;
 
     try {
       turn = yield* this.processTurn(
@@ -963,7 +964,15 @@ export class GeminiClient {
             await this.resetChat();
           }
           const continueRequest = [{ text: continueReason }];
-          yield* this.sendMessageStream(
+          // Reset hook state so the continuation fires BeforeAgent fresh
+          // and fireAfterAgentHookSafe sees activeCalls=1, not 2.
+          const contHookState = this.hookStateMap.get(prompt_id);
+          if (contHookState) {
+            contHookState.hasFiredBeforeAgent = false;
+            contHookState.activeCalls--;
+          }
+          continuationHandled = true;
+          turn = yield* this.sendMessageStream(
             continueRequest,
             signal,
             prompt_id,
@@ -981,16 +990,18 @@ export class GeminiClient {
       }
       throw error;
     } finally {
-      const hookState = this.hookStateMap.get(prompt_id);
-      if (hookState) {
-        hookState.activeCalls--;
-        const isPendingTools =
-          turn?.pendingToolCalls && turn.pendingToolCalls.length > 0;
-        const isAborted = signal?.aborted;
+      if (!continuationHandled) {
+        const hookState = this.hookStateMap.get(prompt_id);
+        if (hookState) {
+          hookState.activeCalls--;
+          const isPendingTools =
+            turn?.pendingToolCalls && turn.pendingToolCalls.length > 0;
+          const isAborted = signal?.aborted;
 
-        if (hookState.activeCalls <= 0) {
-          if (!isPendingTools || isAborted) {
-            this.hookStateMap.delete(prompt_id);
+          if (hookState.activeCalls <= 0) {
+            if (!isPendingTools || isAborted) {
+              this.hookStateMap.delete(prompt_id);
+            }
           }
         }
       }
