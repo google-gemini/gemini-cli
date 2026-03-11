@@ -1,0 +1,7 @@
+{
+  "name": "conductor",
+  "contextFileName": "GEMINI.md",
+  "plan": {
+    "directory": "conductor"
+  }
+}

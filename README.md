@@ -22,6 +22,8 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
   context window.
 - **🔧 Built-in tools**: Google Search grounding, file operations, shell
   commands, web fetching.
+- **📋 Context-Driven Development**: Built-in [Conductor] extension for
+  spec-driven project management.
 - **🔌 Extensible**: MCP (Model Context Protocol) support for custom
   integrations.
 - **💻 Terminal-first**: Designed for developers who live in the command line.
@@ -386,6 +388,8 @@ instructions.
 - **Security**: [Security Policy](SECURITY.md)
 
 ---
+
+[Conductor]: ./docs/cli/conductor.md
 
 <p align="center">
   Built with ❤️ by Google and the open source community

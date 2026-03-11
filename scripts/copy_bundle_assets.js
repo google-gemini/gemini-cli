@@ -73,6 +73,17 @@ if (existsSync(builtinSkillsSrc)) {
   console.log('Copied built-in skills to bundle/builtin/');
 }
 
+// 4.1 Copy Built-in Extensions (packages/core/src/extensions/builtin)
+const builtinExtensionsSrc = join(root, 'packages/core/src/extensions/builtin');
+const builtinExtensionsDest = join(bundleDir, 'extensions', 'builtin');
+if (existsSync(builtinExtensionsSrc)) {
+  cpSync(builtinExtensionsSrc, builtinExtensionsDest, {
+    recursive: true,
+    dereference: true,
+  });
+  console.log('Copied built-in extensions to bundle/extensions/builtin/');
+}
+
 // 5. Copy DevTools package so the external dynamic import resolves at runtime
 const devtoolsSrc = join(root, 'packages/devtools');
 const devtoolsDest = join(
