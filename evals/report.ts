@@ -94,8 +94,14 @@ export function buildReport(results: EvalResult[]): EvalReport {
       scorer,
       total: scores.length,
       passed: scores.filter((s) => s.pass).length,
-      passRate: scores.filter((s) => s.pass).length / scores.length,
-      meanScore: numeric.reduce((a, b) => a + b, 0) / numeric.length,
+      passRate:
+        scores.length > 0
+          ? scores.filter((s) => s.pass).length / scores.length
+          : 0,
+      meanScore:
+        numeric.length > 0
+          ? numeric.reduce((a, b) => a + b, 0) / numeric.length
+          : 0,
       p50Score: percentile(numeric, 50),
       p90Score: percentile(numeric, 90),
     });
