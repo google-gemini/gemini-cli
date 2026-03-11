@@ -384,7 +384,12 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
   try {
     return fs.realpathSync(p);
   } catch (e: unknown) {
-    if (e && typeof e === 'object' && 'code' in e && e.code === 'ENOENT') {
+    if (
+      e &&
+      typeof e === 'object' &&
+      'code' in e &&
+      (e.code === 'ENOENT' || e.code === 'EISDIR')
+    ) {
       try {
         const stat = fs.lstatSync(p);
         if (stat.isSymbolicLink()) {
@@ -400,7 +405,7 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
             lstatError &&
             typeof lstatError === 'object' &&
             'code' in lstatError &&
-            lstatError.code === 'ENOENT'
+            (lstatError.code === 'ENOENT' || lstatError.code === 'EISDIR')
           )
         ) {
           throw lstatError;

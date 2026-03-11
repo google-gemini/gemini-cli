@@ -528,6 +528,22 @@ describe('resolveToRealPath', () => {
     expect(resolveToRealPath(input)).toBe(expected);
   });
 
+  it('should return decoded path even if fs.realpathSync fails with EISDIR', () => {
+    vi.spyOn(fs, 'realpathSync').mockImplementationOnce(() => {
+      const err = new Error(
+        'Illegal operation on a directory',
+      ) as NodeJS.ErrnoException;
+      err.code = 'EISDIR';
+      throw err;
+    });
+
+    const p = path.resolve('path', 'to', 'New Project');
+    const input = pathToFileURL(p).toString();
+    const expected = p;
+
+    expect(resolveToRealPath(input)).toBe(expected);
+  });
+
   it('should recursively resolve symlinks for non-existent child paths', () => {
     const parentPath = path.resolve('/some/parent/path');
     const resolvedParentPath = path.resolve('/resolved/parent/path');
