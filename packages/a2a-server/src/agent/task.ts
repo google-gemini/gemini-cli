@@ -6,7 +6,6 @@
 
 import {
   Scheduler,
-  CoreToolScheduler,
   type GeminiClient,
   GeminiEventType,
   ToolConfirmationOutcome,
@@ -69,37 +68,10 @@ import type { PartUnion, Part as genAiPart } from '@google/genai';
 
 type UnionKeys<T> = T extends T ? keyof T : never;
 
-type ConfirmationType = ToolCallConfirmationDetails['type'];
-
-const VALID_CONFIRMATION_TYPES: readonly ConfirmationType[] = [
-  'edit',
-  'exec',
-  'mcp',
-  'info',
-  'ask_user',
-  'exit_plan_mode',
-] as const;
-
-function isToolCallConfirmationDetails(
-  value: unknown,
-): value is ToolCallConfirmationDetails {
-  if (
-    typeof value !== 'object' ||
-    value === null ||
-    !('onConfirm' in value) ||
-    typeof value.onConfirm !== 'function' ||
-    !('type' in value) ||
-    typeof value.type !== 'string'
-  ) {
-    return false;
-  }
-  return (VALID_CONFIRMATION_TYPES as readonly string[]).includes(value.type);
-}
-
 export class Task {
   id: string;
   contextId: string;
-  scheduler: Scheduler | CoreToolScheduler;
+  scheduler: Scheduler;
   config: Config;
   geminiClient: GeminiClient;
   pendingToolConfirmationDetails: Map<string, ToolCallConfirmationDetails>;
@@ -140,11 +112,7 @@ export class Task {
     this.contextId = contextId;
     this.config = config;
 
-    if (this.config.isEventDrivenSchedulerEnabled()) {
-      this.scheduler = this.setupEventDrivenScheduler();
-    } else {
-      this.scheduler = this.createLegacyScheduler();
-    }
+    this.scheduler = this.setupEventDrivenScheduler();
 
     this.geminiClient = this.config.getGeminiClient();
     this.pendingToolConfirmationDetails = new Map();
@@ -260,11 +228,7 @@ export class Task {
     this.pendingToolCalls.clear();
     this.pendingCorrelationIds.clear();
 
-    if (this.scheduler instanceof Scheduler) {
-      this.scheduler.cancelAll();
-    } else {
-      this.scheduler.cancelAll(new AbortController().signal);
-    }
+    this.scheduler.cancelAll();
     // Reset the promise for any future operations, ensuring it's in a clean state.
     this._resetToolCompletionPromise();
   }
@@ -409,133 +373,6 @@ export class Task {
     this.eventBus?.publish(artifactEvent);
   }
 
-  private async _schedulerAllToolCallsComplete(
-    completedToolCalls: CompletedToolCall[],
-  ): Promise<void> {
-    logger.info(
-      '[Task] All tool calls completed by scheduler (batch):',
-      completedToolCalls.map((tc) => tc.request.callId),
-    );
-    this.completedToolCalls.push(...completedToolCalls);
-    completedToolCalls.forEach((tc) => {
-      this._resolveToolCall(tc.request.callId);
-    });
-  }
-
-  private _schedulerToolCallsUpdate(toolCalls: ToolCall[]): void {
-    logger.info(
-      '[Task] Scheduler tool calls updated:',
-      toolCalls.map((tc) => `${tc.request.callId} (${tc.status})`),
-    );
-
-    // Update state and send continuous, non-final updates
-    toolCalls.forEach((tc) => {
-      const previousStatus = this.pendingToolCalls.get(tc.request.callId);
-      const hasChanged = previousStatus !== tc.status;
-
-      // Resolve tool call if it has reached a terminal state
-      if (['success', 'error', 'cancelled'].includes(tc.status)) {
-        this._resolveToolCall(tc.request.callId);
-      } else {
-        // This will update the map
-        this._registerToolCall(tc.request.callId, tc.status);
-      }
-
-      if (tc.status === 'awaiting_approval' && tc.confirmationDetails) {
-        const details = tc.confirmationDetails;
-        if (isToolCallConfirmationDetails(details)) {
-          this.pendingToolConfirmationDetails.set(tc.request.callId, details);
-        }
-      }
-
-      // Only send an update if the status has actually changed.
-      if (hasChanged) {
-        // Skip sending confirmation event if we are going to auto-approve it anyway
-        if (
-          tc.status === 'awaiting_approval' &&
-          tc.confirmationDetails &&
-          this.isYoloMatch
-        ) {
-          logger.info(
-            `[Task] Skipping ToolCallConfirmationEvent for ${tc.request.callId} due to YOLO mode.`,
-          );
-        } else {
-          const coderAgentMessage: CoderAgentMessage =
-            tc.status === 'awaiting_approval'
-              ? { kind: CoderAgentEvent.ToolCallConfirmationEvent }
-              : { kind: CoderAgentEvent.ToolCallUpdateEvent };
-          const message = this.toolStatusMessage(tc, this.id, this.contextId);
-
-          const event = this._createStatusUpdateEvent(
-            this.taskState,
-            coderAgentMessage,
-            message,
-            false, // Always false for these continuous updates
-          );
-          this.eventBus?.publish(event);
-        }
-      }
-    });
-
-    if (this.isYoloMatch) {
-      logger.info(
-        '[Task] ' +
-          (this.autoExecute ? '' : 'YOLO mode enabled. ') +
-          'Auto-approving all tool calls.',
-      );
-      toolCalls.forEach((tc: ToolCall) => {
-        if (tc.status === 'awaiting_approval' && tc.confirmationDetails) {
-          const details = tc.confirmationDetails;
-          if (isToolCallConfirmationDetails(details)) {
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            details.onConfirm(ToolConfirmationOutcome.ProceedOnce);
-            this.pendingToolConfirmationDetails.delete(tc.request.callId);
-          }
-        }
-      });
-      return;
-    }
-
-    const allPendingStatuses = Array.from(this.pendingToolCalls.values());
-    const isAwaitingApproval = allPendingStatuses.some(
-      (status) => status === 'awaiting_approval',
-    );
-    const isExecuting = allPendingStatuses.some(
-      (status) => status === 'executing',
-    );
-
-    // The turn is complete and requires user input if at least one tool
-    // is waiting for the user's decision, and no other tool is actively
-    // running in the background.
-    if (
-      isAwaitingApproval &&
-      !isExecuting &&
-      !this.skipFinalTrueAfterInlineEdit
-    ) {
-      this.skipFinalTrueAfterInlineEdit = false;
-
-      // We don't need to send another message, just a final status update.
-      this.setTaskStateAndPublishUpdate(
-        'input-required',
-        { kind: CoderAgentEvent.StateChangeEvent },
-        undefined,
-        undefined,
-        /*final*/ true,
-      );
-    }
-  }
-
-  private createLegacyScheduler(): CoreToolScheduler {
-    const scheduler = new CoreToolScheduler({
-      outputUpdateHandler: this._schedulerOutputUpdate.bind(this),
-      onAllToolCallsComplete: this._schedulerAllToolCallsComplete.bind(this),
-      onToolCallsUpdate: this._schedulerToolCallsUpdate.bind(this),
-      getPreferredEditor: () => DEFAULT_GUI_EDITOR,
-      config: this.config,
-    });
-    return scheduler;
-  }
-
   private messageBusListener?: (message: ToolCallsUpdateMessage) => void;
 
   private setupEventDrivenScheduler(): Scheduler {
@@ -564,9 +401,7 @@ export class Task {
       this.messageBusListener = undefined;
     }
 
-    if (this.scheduler instanceof Scheduler) {
-      this.scheduler.dispose();
-    }
+    this.scheduler.dispose();
   }
 
   private handleEventDrivenToolCallsUpdate(
