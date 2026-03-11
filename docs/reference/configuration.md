@@ -92,6 +92,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `[]`
   - **Requires restart:** Yes
 
+#### `adminPolicyPaths`
+
+- **`adminPolicyPaths`** (array):
+  - **Description:** Additional admin policy files or directories to load.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
 #### `general`
 
 - **`general.preferredEditor`** (string):
@@ -105,7 +112,8 @@ their corresponding top-level category object in your `settings.json` file.
 - **`general.defaultApprovalMode`** (enum):
   - **Description:** The default approval mode for tool execution. 'default'
     prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is
-    read-only mode. 'yolo' is not supported yet.
+    read-only mode. YOLO mode (auto-approve all actions) can only be enabled via
+    command line (--yolo or --approval-mode=yolo).
   - **Default:** `"default"`
   - **Values:** `"default"`, `"auto_edit"`, `"plan"`
 
@@ -146,7 +154,7 @@ their corresponding top-level category object in your `settings.json` file.
 - **`general.retryFetchErrors`** (boolean):
   - **Description:** Retry on "exception TypeError: fetch failed sending
     request" errors.
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`general.maxAttempts`** (number):
   - **Description:** Maximum number of attempts for requests to the main chat
