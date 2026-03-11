@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Box, Text, useStdin } from 'ink';
 import {
   ApprovalMode,
@@ -177,11 +177,16 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
   } | null>(null);
   const { settings, setSetting } = useSettingsStore();
 
+  const onApproveRef = useRef(onApprove);
+  useEffect(() => {
+    onApproveRef.current = onApprove;
+  }, [onApprove]);
+
   useEffect(() => {
     if (pendingApproval) {
-      onApprove(pendingApproval.mode, pendingApproval.clear);
+      onApproveRef.current(pendingApproval.mode, pendingApproval.clear);
     }
-  }, [pendingApproval, onApprove]);
+  }, [pendingApproval]);
 
   const handleOpenEditor = useCallback(async () => {
     try {

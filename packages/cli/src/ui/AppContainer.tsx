@@ -400,33 +400,6 @@ export const AppContainer = (props: AppContainerProps) => {
   );
 
   const [isConfigInitialized, setConfigInitialized] = useState(false);
-  const [planModeUIHistoryStartIndex, setPlanModeUIHistoryStartIndex] =
-    useState<number | null>(() =>
-      // Initialize if starting in PLAN mode (e.g. session resume)
-      config.getApprovalMode() === ApprovalMode.PLAN
-        ? config.getPlanModeHistoryStartIndex()
-        : null,
-    );
-
-  useEffect(() => {
-    const handleApprovalModeChanged = ({ mode }: { mode: ApprovalMode }) => {
-      if (mode === ApprovalMode.PLAN) {
-        // Only set the start index if we aren't already tracking one.
-        // This ensures that if we are already in PLAN mode and another
-        // event fires, we don't accidentally move the start index forward.
-        setPlanModeUIHistoryStartIndex((prev) =>
-          prev === null ? config.getPlanModeHistoryStartIndex() : prev,
-        );
-      } else {
-        // Reset the index when leaving PLAN mode
-        setPlanModeUIHistoryStartIndex(null);
-      }
-    };
-    coreEvents.on(CoreEvent.ApprovalModeChanged, handleApprovalModeChanged);
-    return () => {
-      coreEvents.off(CoreEvent.ApprovalModeChanged, handleApprovalModeChanged);
-    };
-  }, [config]);
 
   const logger = useLogger(config.storage);
   const { inputHistory, addInput, initializeFromLogger } =
@@ -1391,16 +1364,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
   ]);
 
   const handleClearPlanContext = useCallback(() => {
-    if (planModeUIHistoryStartIndex !== null) {
-      const newHistory = historyManager.history.slice(
-        0,
-        planModeUIHistoryStartIndex,
-      );
-      historyManager.loadHistory(newHistory);
-      setPlanModeUIHistoryStartIndex(null);
-      refreshStatic();
+    if (config.getApprovalMode() === ApprovalMode.PLAN) {
+      const startIndex = config.getPlanModeHistoryStartIndex();
+      if (historyManager.history.length > startIndex) {
+        const newHistory = historyManager.history.slice(0, startIndex);
+        historyManager.loadHistory(newHistory);
+        refreshStatic();
+      }
     }
-  }, [planModeUIHistoryStartIndex, historyManager, refreshStatic]);
+  }, [config, historyManager, refreshStatic]);
 
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
 
