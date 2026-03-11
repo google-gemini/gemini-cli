@@ -1,0 +1,55 @@
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = [
+  "ls",
+  "find",
+  "head",
+  "cat",
+  "cd",
+  "grep",
+  "npm",
+  "npm run start",
+  "npm install",
+  "npm run",
+  "npm test",
+  "npm ci",
+  "git diff",
+  "git rev-parse",
+  "git status",
+  "git st",
+  "git branch",
+  "git br",
+  "git log",
+  "git add",
+  "git show",
+  "gh pr",
+  "gh repo view",
+  "gh run",
+  "gh api",
+  "gh log",
+  "code"
+]
+decision = "allow"
+priority = 100
+
+[[rule]]
+toolName = "run_shell_command"
+decision = "allow"
+priority = 100
+commandPrefix = [
+  "tail",
+  "awk",
+  "xargs",
+  "wc",
+  "uniq",
+  "jq",
+  "rg",
+  "less",
+  "more",
+  "tree",
+  "file",
+  "which",
+  "pwd",
+  "node",
+  "npx"
+]

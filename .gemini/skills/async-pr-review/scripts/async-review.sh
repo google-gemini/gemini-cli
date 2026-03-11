@@ -76,10 +76,11 @@ rm -f "$log_dir/build-and-lint.exit"
 
 # Dynamically resolve gemini binary (fallback to your nightly path)
 GEMINI_CMD=$(which gemini || echo "$HOME/.gcli/nightly/node_modules/.bin/gemini")
+POLICY_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/policy.toml"
 
 echo "  ↳ [3/5] Starting Gemini code review..."
 rm -f "$log_dir/review.exit"
-{ "$GEMINI_CMD" --approval-mode=yolo /review-frontend "$pr_number" > "$log_dir/review.md" 2>&1; echo $? > "$log_dir/review.exit"; } &
+{ "$GEMINI_CMD" --policy "$POLICY_PATH" -p "/review-frontend $pr_number" > "$log_dir/review.md" 2>&1; echo $? > "$log_dir/review.exit"; } &
 
 echo "  ↳ [4/5] Starting automated tests (waiting for build and lint)..."
 rm -f "$log_dir/npm-test.exit"
@@ -144,7 +145,7 @@ rm -f "$log_dir/test-execution.exit"
 { 
   while [ ! -f "$log_dir/build-and-lint.exit" ]; do sleep 1; done
   if [ "$(cat "$log_dir/build-and-lint.exit")" == "0" ]; then
-    "$GEMINI_CMD" --approval-mode=yolo "Analyze the diff for PR $pr_number using 'gh pr diff $pr_number'. Instead of running the project's automated test suite (like 'npm test'), physically exercise the newly changed code in the terminal (e.g., by writing a temporary script to call the new functions, or testing the CLI command directly). Verify the feature's behavior works as expected. IMPORTANT: Do NOT modify any source code to fix errors. Just exercise the code and log the results, reporting any failures clearly. Do not ask for user confirmation." > "$log_dir/test-execution.log" 2>&1; echo $? > "$log_dir/test-execution.exit"
+    "$GEMINI_CMD" --policy "$POLICY_PATH" -p "Analyze the diff for PR $pr_number using 'gh pr diff $pr_number'. Instead of running the project's automated test suite (like 'npm test'), physically exercise the newly changed code in the terminal (e.g., by writing a temporary script to call the new functions, or testing the CLI command directly). Verify the feature's behavior works as expected. IMPORTANT: Do NOT modify any source code to fix errors. Just exercise the code and log the results, reporting any failures clearly. Do not ask for user confirmation." > "$log_dir/test-execution.log" 2>&1; echo $? > "$log_dir/test-execution.exit"
   else
     echo "Skipped due to build-and-lint failure" > "$log_dir/test-execution.log"
     echo 1 > "$log_dir/test-execution.exit"
@@ -227,7 +228,7 @@ done
 echo ""
 
 echo "⏳ Tasks complete! Synthesizing final assessment..."
-if ! "$GEMINI_CMD" --approval-mode=yolo -p "Read the review at $log_dir/review.md, the automated test logs at $log_dir/npm-test.log, and the manual test execution logs at $log_dir/test-execution.log. Summarize the results, state whether the build and tests passed based on $log_dir/build-and-lint.exit and $log_dir/npm-test.exit, and give a final recommendation for PR $pr_number." > "$log_dir/final-assessment.md" 2>&1; then
+if ! "$GEMINI_CMD" --policy "$POLICY_PATH" -p "Read the review at $log_dir/review.md, the automated test logs at $log_dir/npm-test.log, and the manual test execution logs at $log_dir/test-execution.log. Summarize the results, state whether the build and tests passed based on $log_dir/build-and-lint.exit and $log_dir/npm-test.exit, and give a final recommendation for PR $pr_number." > "$log_dir/final-assessment.md" 2>&1; then
   echo $? > "$log_dir/final-assessment.exit"
   echo "❌ Final assessment synthesis failed!"
   echo "Check $log_dir/final-assessment.md for details."
