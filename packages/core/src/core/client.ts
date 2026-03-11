@@ -1252,7 +1252,9 @@ export class GeminiClient {
    * A read output is stale when a subsequent write tool operated on the same
    * file path, making the prior file view outdated.
    */
-  private async tryElideStaleOutputs(history: Content[]): Promise<void> {
+  private async tryElideStaleOutputs(
+    history: readonly Content[],
+  ): Promise<void> {
     const result = await this.staleOutputElisionService.elide(
       history,
       this.config,
