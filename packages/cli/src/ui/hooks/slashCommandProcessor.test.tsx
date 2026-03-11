@@ -9,19 +9,18 @@ import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useSlashCommandProcessor } from './slashCommandProcessor.js';
-import type { SlashCommand } from '../commands/types.js';
-import { CommandKind } from '../commands/types.js';
+import { CommandKind, type SlashCommand } from '../commands/types.js';
 import type { LoadedSettings } from '../../config/settings.js';
 import { MessageType } from '../types.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
 import {
-  type GeminiClient,
   SlashCommandStatus,
   MCPDiscoveryState,
   makeFakeConfig,
   coreEvents,
+  type GeminiClient,
 } from '@google/gemini-cli-core';
 
 const {

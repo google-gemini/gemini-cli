@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type MutableRefObject, Component, type ReactNode } from 'react';
+import { type MutableRefObject, Component, type ReactNode, act } from 'react';
 import { render } from '../../test-utils/render.js';
-
-import { act } from 'react';
-import type { SessionMetrics } from './SessionContext.js';
-import { SessionStatsProvider, useSessionStats } from './SessionContext.js';
+import {
+  SessionStatsProvider,
+  useSessionStats,
+  type SessionMetrics,
+} from './SessionContext.js';
 import { describe, it, expect, vi } from 'vitest';
 import { uiTelemetryService } from '@google/gemini-cli-core';
 

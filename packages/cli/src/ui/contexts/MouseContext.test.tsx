@@ -5,10 +5,10 @@
  */
 
 import { renderHook } from '../../test-utils/render.js';
+import type React from 'react';
 import { act } from 'react';
 import { MouseProvider, useMouseContext, useMouse } from './MouseContext.js';
 import { vi, type Mock } from 'vitest';
-import type React from 'react';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'node:events';
 import { appEvents, AppEvent } from '../../utils/events.js';

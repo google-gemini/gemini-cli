@@ -24,10 +24,14 @@ import type { CommandContext } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
-import type { UseAtCompletionProps } from './useAtCompletion.js';
-import { useAtCompletion } from './useAtCompletion.js';
-import type { UseSlashCompletionProps } from './useSlashCompletion.js';
-import { useSlashCompletion } from './useSlashCompletion.js';
+import {
+  useAtCompletion,
+  type UseAtCompletionProps,
+} from './useAtCompletion.js';
+import {
+  useSlashCompletion,
+  type UseSlashCompletionProps,
+} from './useSlashCompletion.js';
 import { useShellCompletion } from './useShellCompletion.js';
 
 vi.mock('./useAtCompletion', () => ({
