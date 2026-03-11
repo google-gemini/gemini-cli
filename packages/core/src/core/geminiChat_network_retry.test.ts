@@ -292,6 +292,14 @@ describe('GeminiChat Network Retries', () => {
     (sslError as NodeJS.ErrnoException).code =
       'ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC';
 
+    // Instead of outer loop, connection retries are handled by retryWithBackoff.
+    // Simulate retryWithBackoff attempting it twice: first throws, second succeeds.
+    mockRetryWithBackoff.mockImplementation(
+      async (apiCall) =>
+        // Execute the apiCall to trigger mockContentGenerator
+        await apiCall(),
+    );
+
     vi.mocked(mockContentGenerator.generateContentStream)
       // First call: throw SSL error immediately (connection phase)
       .mockRejectedValueOnce(sslError)
@@ -309,6 +317,15 @@ describe('GeminiChat Network Retries', () => {
         })(),
       );
 
+    // Because retryWithBackoff is mocked and we just want to test GeminiChat's integration,
+    // we need to actually execute the real retryWithBackoff logic for this test to see it work.
+    // So let's restore the real retryWithBackoff for this test.
+    const { retryWithBackoff } =
+      await vi.importActual<typeof import('../utils/retry.js')>(
+        '../utils/retry.js',
+      );
+    mockRetryWithBackoff.mockImplementation(retryWithBackoff);
+
     const stream = await chat.sendMessageStream(
       { model: 'test-model' },
       'test message',
@@ -321,10 +338,6 @@ describe('GeminiChat Network Retries', () => {
     for await (const event of stream) {
       events.push(event);
     }
-
-    // Should have retried and succeeded
-    const retryEvent = events.find((e) => e.type === StreamEventType.RETRY);
-    expect(retryEvent).toBeDefined();
 
     const successChunk = events.find(
       (e) =>
@@ -341,6 +354,12 @@ describe('GeminiChat Network Retries', () => {
   it('should retry on ECONNRESET error during connection phase', async () => {
     const connectionError = new Error('read ECONNRESET');
     (connectionError as NodeJS.ErrnoException).code = 'ECONNRESET';
+
+    const { retryWithBackoff } =
+      await vi.importActual<typeof import('../utils/retry.js')>(
+        '../utils/retry.js',
+      );
+    mockRetryWithBackoff.mockImplementation(retryWithBackoff);
 
     vi.mocked(mockContentGenerator.generateContentStream)
       .mockRejectedValueOnce(connectionError)
@@ -372,9 +391,6 @@ describe('GeminiChat Network Retries', () => {
       events.push(event);
     }
 
-    const retryEvent = events.find((e) => e.type === StreamEventType.RETRY);
-    expect(retryEvent).toBeDefined();
-
     const successChunk = events.find(
       (e) =>
         e.type === StreamEventType.CHUNK &&
@@ -382,6 +398,7 @@ describe('GeminiChat Network Retries', () => {
           'Success after connection retry',
     );
     expect(successChunk).toBeDefined();
+    expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(2);
   });
 
   it('should NOT retry on non-retryable error during connection phase', async () => {
