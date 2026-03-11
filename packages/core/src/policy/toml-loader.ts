@@ -265,7 +265,41 @@ function validateShellCommandSyntax(
  */
 function validateToolName(name: string, ruleIndex: number): string | null {
   if (name.includes('__')) {
-    return `Rule #${ruleIndex + 1}: The "__" syntax for MCP tools is strictly deprecated. Please use the 'mcpName = "..."' property or the 'mcp_server_tool' format instead.`;
+    // Extract server and tool names from deprecated format for better guidance
+    const parts = name.split('__');
+    const hasValidParts = parts.length === 2 && parts[0] && parts[1];
+
+    // Sanitize the name to prevent injection of control characters or newlines
+    const sanitizedName = name.replace(/[\r\n\t]/g, ' ');
+
+    let exampleFix = '';
+    if (hasValidParts) {
+      // Sanitize server and tool names as well
+      const serverName = parts[0].replace(/[\r\n\t]/g, ' ');
+      const toolName = parts[1].replace(/[\r\n\t]/g, ' ');
+      exampleFix =
+        `  Example fix for "${sanitizedName}":\n` +
+        `    [[rule]]\n` +
+        `    mcpName = "${serverName}"\n` +
+        `    toolName = "${toolName}"\n` +
+        `    decision = "allow"\n` +
+        `    priority = 100`;
+    } else {
+      exampleFix =
+        `  Example:\n` +
+        `    [[rule]]\n` +
+        `    mcpName = "my_server"\n` +
+        `    toolName = "my_tool"\n` +
+        `    decision = "allow"\n` +
+        `    priority = 100`;
+    }
+
+    return (
+      `Rule #${ruleIndex + 1}: The "__" syntax for MCP tools is strictly deprecated.\n` +
+      `  Found: "${sanitizedName}"\n` +
+      `  Fix: Use the 'mcpName = "server_name"' property with 'toolName = "tool_name"' instead.\n` +
+      exampleFix
+    );
   }
 
   // A name that looks like an MCP tool (e.g., "re__ad") could be a typo of a

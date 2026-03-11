@@ -767,6 +767,47 @@ priority = 100
       expect(result.rules).toHaveLength(2);
     });
 
+    it('should warn for deprecated __ syntax with helpful migration example', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "github__list_issues"
+decision = "allow"
+priority = 100
+`);
+
+      const warnings = getWarnings(result);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0].errorType).toBe('tool_name_warning');
+      expect(warnings[0].severity).toBe('warning');
+      expect(warnings[0].details).toContain(
+        'The "__" syntax for MCP tools is strictly deprecated',
+      );
+      expect(warnings[0].details).toContain('github__list_issues');
+      // Should provide specific migration example
+      expect(warnings[0].details).toContain('mcpName = "github"');
+      expect(warnings[0].details).toContain('toolName = "list_issues"');
+      // Rules should still load despite warnings
+      expect(result.rules).toHaveLength(1);
+    });
+
+    it('should warn for deprecated __ syntax with generic example for invalid format', async () => {
+      const result = await runLoadPoliciesFromToml(`
+[[rule]]
+toolName = "invalid__"
+decision = "allow"
+priority = 100
+`);
+
+      const warnings = getWarnings(result);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0].details).toContain(
+        'The "__" syntax for MCP tools is strictly deprecated',
+      );
+      // Should provide generic example since format is invalid
+      expect(warnings[0].details).toContain('mcpName = "my_server"');
+      expect(warnings[0].details).toContain('toolName = "my_tool"');
+    });
+
     it('should not warn for catch-all rules (no toolName)', async () => {
       const result = await runLoadPoliciesFromToml(`
 [[rule]]
