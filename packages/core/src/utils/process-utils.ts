@@ -5,7 +5,8 @@
  */
 
 import os from 'node:os';
-import { spawn as cpSpawn } from 'node:child_process';
+
+import { spawnAsync } from './shell-utils.js';
 
 /** Default timeout for SIGKILL escalation on Unix systems. */
 export const SIGKILL_TIMEOUT_MS = 200;
@@ -44,8 +45,12 @@ export async function killProcessGroup(options: KillOptions): Promise<void> {
       } catch {
         // Ignore errors for dead processes
       }
-    } else {
-      cpSpawn('taskkill', ['/pid', pid.toString(), '/f', '/t']);
+    }
+    // Invoke taskkill to ensure the entire tree is terminated and any orphaned descendant processes are reaped.
+    try {
+      await spawnAsync('taskkill', ['/pid', pid.toString(), '/f', '/t']);
+    } catch (_e) {
+      // Ignore errors if the process tree is already dead
     }
     return;
   }
@@ -73,14 +78,24 @@ export async function killProcessGroup(options: KillOptions): Promise<void> {
       if (pty) {
         if (escalate) {
           try {
+            // Attempt the group kill BEFORE the pty session leader dies
+            process.kill(-pid, 'SIGTERM');
             pty.kill('SIGTERM');
             await new Promise((res) => setTimeout(res, SIGKILL_TIMEOUT_MS));
-            if (!isExited()) pty.kill('SIGKILL');
+            if (!isExited()) {
+              try {
+                process.kill(-pid, 'SIGKILL');
+              } catch {
+                // Ignore
+              }
+              pty.kill('SIGKILL');
+            }
           } catch {
             // Ignore
           }
         } else {
           try {
+            process.kill(-pid, 'SIGKILL'); // Group kill first
             pty.kill('SIGKILL');
           } catch {
             // Ignore

@@ -4,27 +4,37 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+  type MockInstance,
+} from 'vitest';
 import os from 'node:os';
-import { spawn as cpSpawn } from 'node:child_process';
 import { killProcessGroup, SIGKILL_TIMEOUT_MS } from './process-utils.js';
+import { spawnAsync } from './shell-utils.js';
 
 vi.mock('node:os');
-vi.mock('node:child_process');
+vi.mock('./shell-utils.js');
 
 describe('process-utils', () => {
-  const mockProcessKill = vi
-    .spyOn(process, 'kill')
-    .mockImplementation(() => true);
-  const mockSpawn = vi.mocked(cpSpawn);
+  let mockProcessKill: MockInstance;
+  let mockSpawnAsync: Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    mockProcessKill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    mockSpawnAsync = vi.mocked(spawnAsync);
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   describe('killProcessGroup', () => {
@@ -33,7 +43,7 @@ describe('process-utils', () => {
 
       await killProcessGroup({ pid: 1234 });
 
-      expect(mockSpawn).toHaveBeenCalledWith('taskkill', [
+      expect(mockSpawnAsync).toHaveBeenCalledWith('taskkill', [
         '/pid',
         '1234',
         '/f',
@@ -42,14 +52,20 @@ describe('process-utils', () => {
       expect(mockProcessKill).not.toHaveBeenCalled();
     });
 
-    it('should use pty.kill() on Windows if pty is provided', async () => {
+    it('should use pty.kill() on Windows if pty is provided and also taskkill for descendants', async () => {
       vi.mocked(os.platform).mockReturnValue('win32');
       const mockPty = { kill: vi.fn() };
 
       await killProcessGroup({ pid: 1234, pty: mockPty });
 
       expect(mockPty.kill).toHaveBeenCalled();
-      expect(mockSpawn).not.toHaveBeenCalled();
+      // taskkill is also called to reap orphaned descendant processes
+      expect(mockSpawnAsync).toHaveBeenCalledWith('taskkill', [
+        '/pid',
+        '1234',
+        '/f',
+        '/t',
+      ]);
     });
 
     it('should kill the process group on Unix with SIGKILL by default', async () => {
@@ -128,6 +144,24 @@ describe('process-utils', () => {
 
       await killProcessGroup({ pid: 1234, pty: mockPty });
 
+      expect(mockPty.kill).toHaveBeenCalledWith('SIGKILL');
+    });
+
+    it('should attempt process group kill on Unix after pty fallback to reap orphaned descendants', async () => {
+      vi.mocked(os.platform).mockReturnValue('linux');
+      // First call (group kill) throws to trigger PTY fallback
+      mockProcessKill.mockImplementationOnce(() => {
+        throw new Error('ESRCH');
+      });
+      // Second call (group kill retry after pty.kill) should succeed
+      mockProcessKill.mockImplementationOnce(() => true);
+      const mockPty = { kill: vi.fn() };
+
+      await killProcessGroup({ pid: 1234, pty: mockPty });
+
+      // Group kill should be called first to ensure it's hit before PTY leader dies
+      expect(mockProcessKill).toHaveBeenCalledWith(-1234, 'SIGKILL');
+      // Then PTY kill should be called
       expect(mockPty.kill).toHaveBeenCalledWith('SIGKILL');
     });
   });

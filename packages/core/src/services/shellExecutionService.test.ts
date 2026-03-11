@@ -1398,12 +1398,11 @@ describe('ShellExecutionService child_process fallback', () => {
               expectedSignal,
             );
           } else {
-            expect(mockCpSpawn).toHaveBeenCalledWith(expectedCommand, [
-              '/pid',
-              String(mockChildProcess.pid),
-              '/f',
-              '/t',
-            ]);
+            expect(mockCpSpawn).toHaveBeenCalledWith(
+              expectedCommand,
+              ['/pid', String(mockChildProcess.pid), '/f', '/t'],
+              undefined,
+            );
           }
         });
       },

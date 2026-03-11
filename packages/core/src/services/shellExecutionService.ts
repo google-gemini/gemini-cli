@@ -1181,10 +1181,12 @@ export class ShellExecutionService {
     await this.cleanupLogStream(pid);
 
     if (activeChild) {
-      killProcessGroup({ pid }).catch(() => {});
+      await killProcessGroup({ pid }).catch(() => {});
       this.activeChildProcesses.delete(pid);
     } else if (activePty) {
-      killProcessGroup({ pid, pty: activePty.ptyProcess }).catch(() => {});
+      await killProcessGroup({ pid, pty: activePty.ptyProcess }).catch(
+        () => {},
+      );
       try {
         (activePty.ptyProcess as IPty & { destroy?: () => void }).destroy?.();
       } catch {
