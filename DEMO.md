@@ -108,10 +108,25 @@ Run these in order after CLI startup:
 
 ## Known Limits
 
-1. Terminal image placement/scroll behavior can vary by terminal protocol
-implementation.
-2. Prompt-generated Mermaid may occasionally require syntax repair.
-3. ASCII fallback favors readability over pixel-level fidelity.
+1. Graphics sizing/dimensions are still terminal-dependent:
+image placement and viewport fit can vary across iTerm2/Kitty/Sixel-capable
+setups, especially with different font metrics, cell sizes, and window
+dimensions.
+2. Inline render consistency is not yet fully deterministic:
+the same artifact can look slightly different after terminal resize or when
+running in alternate buffer mode vs standard buffer mode.
+3. ASCII fallback consistency is still being improved:
+while the fallback remains functional, line wrapping/alignment and visual
+density can vary between terminals and width settings, and output is optimized
+for readability over visual fidelity.
+4. Prompt-generated Mermaid may occasionally require syntax repair or
+normalization for fully stable rendering.
+
+## Note
+
+This is not a perfect PoC yet. It is a hands-on integration prototype intended
+to prove feasibility and direction, and I look forward to contributing to this
+work officially and hardening it further.
 
 ## Useful Links
 
