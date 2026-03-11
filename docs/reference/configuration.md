@@ -762,6 +762,21 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`tools.shell.executable`** (string):
+  - **Description:** The shell executable to use for running commands. If not
+    specified, defaults to bash on Unix-like systems and PowerShell on Windows.
+    This allows Windows users in POSIX environments (GitBash, MSYS2) to use
+    bash.
+  - **Default:** `undefined` (uses platform default)
+  - **Requires restart:** Yes
+
+- **`tools.shell.args`** (array of strings):
+  - **Description:** Arguments passed to the shell executable before the
+    command. If not specified, defaults to `["-c"]` for bash and
+    `["-NoProfile", "-Command"]` for PowerShell.
+  - **Default:** `undefined` (uses shell-appropriate defaults)
+  - **Requires restart:** Yes
+
 - **`tools.shell.enableInteractiveShell`** (boolean):
   - **Description:** Use node-pty for an interactive shell experience. Fallback
     to child_process still applies.
