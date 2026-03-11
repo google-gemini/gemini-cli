@@ -38,8 +38,7 @@ export interface CommandContext {
   };
   // Core services and configuration
   services: {
-    // TODO(abhipatel12): Ensure that config is never null.
-    config: Config | null;
+    config: Config;
     settings: LoadedSettings;
     git: GitService | undefined;
     logger: Logger;

@@ -10,7 +10,7 @@ import * as path from 'node:path';
 import { initCommand } from './initCommand.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { CommandContext } from './types.js';
-import type { SubmitPromptActionReturn } from '@google/gemini-cli-core';
+import type { Config, SubmitPromptActionReturn } from '@google/gemini-cli-core';
 
 // Mock the 'fs' module
 vi.mock('fs', async (importOriginal) => {
@@ -94,7 +94,7 @@ describe('initCommand', () => {
     // Arrange: Create a context without config
     const noConfigContext = createMockCommandContext();
     if (noConfigContext.services) {
-      noConfigContext.services.config = null;
+      noConfigContext.services.config = {} as unknown as Config;
     }
 
     // Act: Run the command's action

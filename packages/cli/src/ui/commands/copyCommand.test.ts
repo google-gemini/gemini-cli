@@ -302,7 +302,7 @@ describe('copyCommand', () => {
     if (!copyCommand.action) throw new Error('Command has no action');
 
     const nullConfigContext = createMockCommandContext({
-      services: { config: null },
+      services: { config: {} as unknown as Config },
     });
 
     const result = await copyCommand.action(nullConfigContext, '');
