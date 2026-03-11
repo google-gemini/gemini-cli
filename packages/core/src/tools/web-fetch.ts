@@ -655,12 +655,12 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
           this.config,
           new WebFetchFallbackAttemptEvent('private_ip_skipped'),
         );
-        skipped.push(`[Private or Local Host] ${url}`);
+        skipped.push(`[Blocked Host] ${url}`);
         continue;
       }
       if (!checkRateLimit(url).allowed) {
         debugLogger.warn(`[WebFetchTool] Rate limit exceeded for host: ${url}`);
-        skipped.push(`[Rate Limit] ${url}`);
+        skipped.push(`[Rate limit exceeded] ${url}`);
         continue;
       }
       toFetch.push(url);

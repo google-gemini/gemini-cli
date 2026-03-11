@@ -423,7 +423,7 @@ describe('WebFetchTool', () => {
         '[Warning] The following URLs were skipped:',
       );
       expect(result.llmContent).toContain(
-        '[Rate Limit] https://ratelimit-multi.com/',
+        '[Rate limit exceeded] https://ratelimit-multi.com/',
       );
     });
 
@@ -456,11 +456,9 @@ describe('WebFetchTool', () => {
         '[Warning] The following URLs were skipped:',
       );
       expect(result.llmContent).toContain(
-        '[Private or Local Host] https://private.com/',
+        '[Blocked Host] https://private.com/',
       );
-      expect(result.llmContent).toContain(
-        '[Private or Local Host] http://localhost',
-      );
+      expect(result.llmContent).toContain('[Blocked Host] http://localhost');
     });
 
     it('should fallback to all public URLs if primary fails', async () => {
