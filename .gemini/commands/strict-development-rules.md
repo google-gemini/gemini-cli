@@ -134,6 +134,19 @@ Gemini CLI project.
 - **iTerm**: Be aware that `ITERM_SESSION_ID` may be present when users run
   VSCode from within iTerm, even if the terminal is not iTerm.
 
+## UI Text & Telemetry
+
+- **Precise Conciseness**: Keep status and error messages under 5 words whenever
+  possible to prevent "information snowblindness."
+- **Telemetry over Etiquette**: Favor status data and raw telemetry over polite
+  filler. Avoid "Please wait," "I'm sorry," or "We're still on it."
+- **Attribution**: Correctly attribute the source of a delay or error:
+    - Use **Gemini** for generative analysis or thinking latency.
+    - Use **System** or **API** for infrastructure, quota, or network issues.
+- **Tone**: Use a friendly, helpful, and humble tone. Use sentence-style
+  capitalization. Solitary sentences aren't punctuated. Speak to the user
+  ("you"). Avoid first-person pronouns ("I" or "we").
+
 ## Code Cleanup
 
 - **Refactoring**: Actively clean up code duplication, technical debt, and
