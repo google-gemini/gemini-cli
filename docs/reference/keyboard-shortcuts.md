@@ -8,125 +8,172 @@ available combinations.
 
 #### Basic Controls
 
-| Action                                                          | Keys                |
-| --------------------------------------------------------------- | ------------------- |
-| Confirm the current selection or choice.                        | `Enter`             |
-| Dismiss dialogs or cancel the current focus.                    | `Esc`<br />`Ctrl+[` |
-| Cancel the current request or quit the CLI when input is empty. | `Ctrl+C`            |
-| Exit the CLI when the input buffer is empty.                    | `Ctrl+D`            |
+| Command         | Action                                                          | Keys                |
+| --------------- | --------------------------------------------------------------- | ------------------- |
+| `basic.confirm` | Confirm the current selection or choice.                        | `Enter`             |
+| `basic.cancel`  | Dismiss dialogs or cancel the current focus.                    | `Esc`<br />`Ctrl+[` |
+| `basic.quit`    | Cancel the current request or quit the CLI when input is empty. | `Ctrl+C`            |
+| `basic.exit`    | Exit the CLI when the input buffer is empty.                    | `Ctrl+D`            |
 
 #### Cursor Movement
 
-| Action                                      | Keys                                       |
-| ------------------------------------------- | ------------------------------------------ |
-| Move the cursor to the start of the line.   | `Ctrl+A`<br />`Home`                       |
-| Move the cursor to the end of the line.     | `Ctrl+E`<br />`End`                        |
-| Move the cursor up one line.                | `Up`                                       |
-| Move the cursor down one line.              | `Down`                                     |
-| Move the cursor one character to the left.  | `Left`                                     |
-| Move the cursor one character to the right. | `Right`<br />`Ctrl+F`                      |
-| Move the cursor one word to the left.       | `Ctrl+Left`<br />`Alt+Left`<br />`Alt+B`   |
-| Move the cursor one word to the right.      | `Ctrl+Right`<br />`Alt+Right`<br />`Alt+F` |
+| Command            | Action                                      | Keys                                       |
+| ------------------ | ------------------------------------------- | ------------------------------------------ |
+| `cursor.home`      | Move the cursor to the start of the line.   | `Ctrl+A`<br />`Home`                       |
+| `cursor.end`       | Move the cursor to the end of the line.     | `Ctrl+E`<br />`End`                        |
+| `cursor.up`        | Move the cursor up one line.                | `Up`                                       |
+| `cursor.down`      | Move the cursor down one line.              | `Down`                                     |
+| `cursor.left`      | Move the cursor one character to the left.  | `Left`                                     |
+| `cursor.right`     | Move the cursor one character to the right. | `Right`<br />`Ctrl+F`                      |
+| `cursor.wordLeft`  | Move the cursor one word to the left.       | `Ctrl+Left`<br />`Alt+Left`<br />`Alt+B`   |
+| `cursor.wordRight` | Move the cursor one word to the right.      | `Ctrl+Right`<br />`Alt+Right`<br />`Alt+F` |
 
 #### Editing
 
-| Action                                           | Keys                                                     |
-| ------------------------------------------------ | -------------------------------------------------------- |
-| Delete from the cursor to the end of the line.   | `Ctrl+K`                                                 |
-| Delete from the cursor to the start of the line. | `Ctrl+U`                                                 |
-| Clear all text in the input field.               | `Ctrl+C`                                                 |
-| Delete the previous word.                        | `Ctrl+Backspace`<br />`Alt+Backspace`<br />`Ctrl+W`      |
-| Delete the next word.                            | `Ctrl+Delete`<br />`Alt+Delete`<br />`Alt+D`             |
-| Delete the character to the left.                | `Backspace`<br />`Ctrl+H`                                |
-| Delete the character to the right.               | `Delete`<br />`Ctrl+D`                                   |
-| Undo the most recent text edit.                  | `Cmd/Win+Z`<br />`Alt+Z`                                 |
-| Redo the most recent undone text edit.           | `Ctrl+Shift+Z`<br />`Shift+Cmd/Win+Z`<br />`Alt+Shift+Z` |
+| Command                | Action                                           | Keys                                                     |
+| ---------------------- | ------------------------------------------------ | -------------------------------------------------------- |
+| `edit.deleteRightAll`  | Delete from the cursor to the end of the line.   | `Ctrl+K`                                                 |
+| `edit.deleteLeftAll`   | Delete from the cursor to the start of the line. | `Ctrl+U`                                                 |
+| `edit.clear`           | Clear all text in the input field.               | `Ctrl+C`                                                 |
+| `edit.deleteWordLeft`  | Delete the previous word.                        | `Ctrl+Backspace`<br />`Alt+Backspace`<br />`Ctrl+W`      |
+| `edit.deleteWordRight` | Delete the next word.                            | `Ctrl+Delete`<br />`Alt+Delete`<br />`Alt+D`             |
+| `edit.deleteLeft`      | Delete the character to the left.                | `Backspace`<br />`Ctrl+H`                                |
+| `edit.deleteRight`     | Delete the character to the right.               | `Delete`<br />`Ctrl+D`                                   |
+| `edit.undo`            | Undo the most recent text edit.                  | `Cmd/Win+Z`<br />`Alt+Z`                                 |
+| `edit.redo`            | Redo the most recent undone text edit.           | `Ctrl+Shift+Z`<br />`Shift+Cmd/Win+Z`<br />`Alt+Shift+Z` |
 
 #### Scrolling
 
-| Action                   | Keys                          |
-| ------------------------ | ----------------------------- |
-| Scroll content up.       | `Shift+Up`                    |
-| Scroll content down.     | `Shift+Down`                  |
-| Scroll to the top.       | `Ctrl+Home`<br />`Shift+Home` |
-| Scroll to the bottom.    | `Ctrl+End`<br />`Shift+End`   |
-| Scroll up by one page.   | `Page Up`                     |
-| Scroll down by one page. | `Page Down`                   |
+| Command           | Action                   | Keys                          |
+| ----------------- | ------------------------ | ----------------------------- |
+| `scroll.up`       | Scroll content up.       | `Shift+Up`                    |
+| `scroll.down`     | Scroll content down.     | `Shift+Down`                  |
+| `scroll.home`     | Scroll to the top.       | `Ctrl+Home`<br />`Shift+Home` |
+| `scroll.end`      | Scroll to the bottom.    | `Ctrl+End`<br />`Shift+End`   |
+| `scroll.pageUp`   | Scroll up by one page.   | `Page Up`                     |
+| `scroll.pageDown` | Scroll down by one page. | `Page Down`                   |
 
 #### History & Search
 
-| Action                                       | Keys     |
-| -------------------------------------------- | -------- |
-| Show the previous entry in history.          | `Ctrl+P` |
-| Show the next entry in history.              | `Ctrl+N` |
-| Start reverse search through history.        | `Ctrl+R` |
-| Submit the selected reverse-search match.    | `Enter`  |
-| Accept a suggestion while reverse searching. | `Tab`    |
+| Command                 | Action                                       | Keys     |
+| ----------------------- | -------------------------------------------- | -------- |
+| `history.previous`      | Show the previous entry in history.          | `Ctrl+P` |
+| `history.next`          | Show the next entry in history.              | `Ctrl+N` |
+| `history.search.start`  | Start reverse search through history.        | `Ctrl+R` |
+| `history.search.submit` | Submit the selected reverse-search match.    | `Enter`  |
+| `history.search.accept` | Accept a suggestion while reverse searching. | `Tab`    |
 
 #### Navigation
 
-| Action                                             | Keys            |
-| -------------------------------------------------- | --------------- |
-| Move selection up in lists.                        | `Up`            |
-| Move selection down in lists.                      | `Down`          |
-| Move up within dialog options.                     | `Up`<br />`K`   |
-| Move down within dialog options.                   | `Down`<br />`J` |
-| Move to the next item or question in a dialog.     | `Tab`           |
-| Move to the previous item or question in a dialog. | `Shift+Tab`     |
+| Command               | Action                                             | Keys            |
+| --------------------- | -------------------------------------------------- | --------------- |
+| `nav.up`              | Move selection up in lists.                        | `Up`            |
+| `nav.down`            | Move selection down in lists.                      | `Down`          |
+| `nav.dialog.up`       | Move up within dialog options.                     | `Up`<br />`K`   |
+| `nav.dialog.down`     | Move down within dialog options.                   | `Down`<br />`J` |
+| `nav.dialog.next`     | Move to the next item or question in a dialog.     | `Tab`           |
+| `nav.dialog.previous` | Move to the previous item or question in a dialog. | `Shift+Tab`     |
 
 #### Suggestions & Completions
 
-| Action                                  | Keys                 |
-| --------------------------------------- | -------------------- |
-| Accept the inline suggestion.           | `Tab`<br />`Enter`   |
-| Move to the previous completion option. | `Up`<br />`Ctrl+P`   |
-| Move to the next completion option.     | `Down`<br />`Ctrl+N` |
-| Expand an inline suggestion.            | `Right`              |
-| Collapse an inline suggestion.          | `Left`               |
+| Command                 | Action                                  | Keys                 |
+| ----------------------- | --------------------------------------- | -------------------- |
+| `suggest.accept`        | Accept the inline suggestion.           | `Tab`<br />`Enter`   |
+| `suggest.focusPrevious` | Move to the previous completion option. | `Up`<br />`Ctrl+P`   |
+| `suggest.focusNext`     | Move to the next completion option.     | `Down`<br />`Ctrl+N` |
+| `suggest.expand`        | Expand an inline suggestion.            | `Right`              |
+| `suggest.collapse`      | Collapse an inline suggestion.          | `Left`               |
 
 #### Text Input
 
-| Action                                                     | Keys                                                                                |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Submit the current prompt.                                 | `Enter`                                                                             |
-| Insert a newline without submitting.                       | `Ctrl+Enter`<br />`Cmd/Win+Enter`<br />`Alt+Enter`<br />`Shift+Enter`<br />`Ctrl+J` |
-| Open the current prompt or the plan in an external editor. | `Ctrl+X`                                                                            |
-| Paste from the clipboard.                                  | `Ctrl+V`<br />`Cmd/Win+V`<br />`Alt+V`                                              |
+| Command                    | Action                                                     | Keys                                                                                |
+| -------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `input.submit`             | Submit the current prompt.                                 | `Enter`                                                                             |
+| `input.newline`            | Insert a newline without submitting.                       | `Ctrl+Enter`<br />`Cmd/Win+Enter`<br />`Alt+Enter`<br />`Shift+Enter`<br />`Ctrl+J` |
+| `input.openExternalEditor` | Open the current prompt or the plan in an external editor. | `Ctrl+X`                                                                            |
+| `input.paste`              | Paste from the clipboard.                                  | `Ctrl+V`<br />`Cmd/Win+V`<br />`Alt+V`                                              |
 
 #### App Controls
 
-| Action                                                                                                                                             | Keys               |
-| -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| Toggle detailed error information.                                                                                                                 | `F12`              |
-| Toggle the full TODO list.                                                                                                                         | `Ctrl+T`           |
-| Show IDE context details.                                                                                                                          | `Ctrl+G`           |
-| Toggle Markdown rendering.                                                                                                                         | `Alt+M`            |
-| Toggle copy mode when in alternate buffer mode.                                                                                                    | `Ctrl+S`           |
-| Toggle YOLO (auto-approval) mode for tool calls.                                                                                                   | `Ctrl+Y`           |
-| Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). Plan mode is skipped when the agent is busy. | `Shift+Tab`        |
-| Expand and collapse blocks of content when not in alternate buffer mode.                                                                           | `Ctrl+O`           |
-| Expand or collapse a paste placeholder when cursor is over placeholder.                                                                            | `Ctrl+O`           |
-| Move focus from Gemini to the active shell.                                                                                                        | `Tab`              |
-| Move focus from the shell back to Gemini.                                                                                                          | `Shift+Tab`        |
-| Clear the terminal screen and redraw the UI.                                                                                                       | `Ctrl+L`           |
-| Restart the application.                                                                                                                           | `R`<br />`Shift+R` |
-| Suspend the CLI and move it to the background.                                                                                                     | `Ctrl+Z`           |
-| Show warning when trying to move focus away from shell input.                                                                                      | `Tab`              |
+| Command                       | Action                                                                                                                                             | Keys               |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| `app.showErrorDetails`        | Toggle detailed error information.                                                                                                                 | `F12`              |
+| `app.showFullTodos`           | Toggle the full TODO list.                                                                                                                         | `Ctrl+T`           |
+| `app.showIdeContextDetail`    | Show IDE context details.                                                                                                                          | `Ctrl+G`           |
+| `app.toggleMarkdown`          | Toggle Markdown rendering.                                                                                                                         | `Alt+M`            |
+| `app.toggleCopyMode`          | Toggle copy mode when in alternate buffer mode.                                                                                                    | `Ctrl+S`           |
+| `app.toggleYolo`              | Toggle YOLO (auto-approval) mode for tool calls.                                                                                                   | `Ctrl+Y`           |
+| `app.cycleApprovalMode`       | Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). Plan mode is skipped when the agent is busy. | `Shift+Tab`        |
+| `app.showMoreLines`           | Expand and collapse blocks of content when not in alternate buffer mode.                                                                           | `Ctrl+O`           |
+| `app.expandPaste`             | Expand or collapse a paste placeholder when cursor is over placeholder.                                                                            | `Ctrl+O`           |
+| `app.focusShellInput`         | Move focus from Gemini to the active shell.                                                                                                        | `Tab`              |
+| `app.unfocusShellInput`       | Move focus from the shell back to Gemini.                                                                                                          | `Shift+Tab`        |
+| `app.clearScreen`             | Clear the terminal screen and redraw the UI.                                                                                                       | `Ctrl+L`           |
+| `app.restart`                 | Restart the application.                                                                                                                           | `R`<br />`Shift+R` |
+| `app.suspend`                 | Suspend the CLI and move it to the background.                                                                                                     | `Ctrl+Z`           |
+| `app.showShellUnfocusWarning` | Show warning when trying to move focus away from shell input.                                                                                      | `Tab`              |
 
 #### Background Shell Controls
 
-| Action                                                             | Keys        |
-| ------------------------------------------------------------------ | ----------- |
-| Dismiss background shell list.                                     | `Esc`       |
-| Confirm selection in background shell list.                        | `Enter`     |
-| Toggle current background shell visibility.                        | `Ctrl+B`    |
-| Toggle background shell list.                                      | `Ctrl+L`    |
-| Kill the active background shell.                                  | `Ctrl+K`    |
-| Move focus from background shell to Gemini.                        | `Shift+Tab` |
-| Move focus from background shell list to Gemini.                   | `Tab`       |
-| Show warning when trying to move focus away from background shell. | `Tab`       |
+| Command                     | Action                                                             | Keys        |
+| --------------------------- | ------------------------------------------------------------------ | ----------- |
+| `background.escape`         | Dismiss background shell list.                                     | `Esc`       |
+| `background.select`         | Confirm selection in background shell list.                        | `Enter`     |
+| `background.toggle`         | Toggle current background shell visibility.                        | `Ctrl+B`    |
+| `background.toggleList`     | Toggle background shell list.                                      | `Ctrl+L`    |
+| `background.kill`           | Kill the active background shell.                                  | `Ctrl+K`    |
+| `background.unfocus`        | Move focus from background shell to Gemini.                        | `Shift+Tab` |
+| `background.unfocusList`    | Move focus from background shell list to Gemini.                   | `Tab`       |
+| `background.unfocusWarning` | Show warning when trying to move focus away from background shell. | `Tab`       |
 
 <!-- KEYBINDINGS-AUTOGEN:END -->
+
+## Customizing Keybindings
+
+You can add alternative keybindings for commands by creating or modifying the
+`keybindings.json` file in your home gemini directory (typically
+`~/.gemini/keybindings.json`). This allows you to bind commands to additional
+key combinations. Note that default keybindings cannot be removed.
+
+### Configuration Format
+
+The configuration uses a JSON array of objects, similar to VS Code's keybinding
+schema. Each object must specify a `command` from the reference tables above and
+a `key` combination.
+
+```json
+[
+  {
+    "command": "input.submit",
+    "key": "cmd+s"
+  },
+  {
+    "command": "edit.clear",
+    "key": "ctrl+l"
+  }
+]
+```
+
+### Keyboard Rules
+
+- **Explicit Modifiers**: Key matching is explicit. For example, a binding for
+  `ctrl+f` will only trigger on exactly `ctrl+f`, not `ctrl+shift+f` or
+  `alt+ctrl+f`. You must specify the exact modifier keys (`ctrl`, `shift`,
+  `alt`/`opt`/`option`, `cmd`/`meta`).
+- **Literal Characters**: Terminals often translate complex key combinations
+  (especially on macOS with the `Option` key) into special characters. To handle
+  this reliably across all operating systems and SSH sessions, you can bind
+  directly to the literal character produced. For example, instead of trying to
+  bind `shift+5`, bind directly to `%`.
+- **Special Keys**: Supported special keys include:
+  - **Navigation**: `up`, `down`, `left`, `right`, `home`, `end`, `pageup`,
+    `pagedown`
+  - **Actions**: `enter`, `escape`, `tab`, `space`, `backspace`, `delete`,
+    `clear`, `insert`, `printscreen`
+  - **Toggles**: `capslock`, `numlock`, `scrolllock`, `pausebreak`
+  - **Function Keys**: `f1` through `f35`
+  - **Numpad**: `numpad0` through `numpad9`, `numpad_add`, `numpad_subtract`,
+    `numpad_multiply`, `numpad_divide`, `numpad_decimal`, `numpad_separator`
 
 ## Additional context-specific shortcuts
 

@@ -238,6 +238,34 @@ describe('SessionStatsContext', () => {
     unmount();
   });
 
+  it('should update session ID and reset stats when the uiTelemetryService emits a clear event', () => {
+    const contextRef: MutableRefObject<
+      ReturnType<typeof useSessionStats> | undefined
+    > = { current: undefined };
+
+    const { unmount } = render(
+      <SessionStatsProvider>
+        <TestHarness contextRef={contextRef} />
+      </SessionStatsProvider>,
+    );
+
+    const initialStartTime = contextRef.current?.stats.sessionStartTime;
+    const newSessionId = 'new-session-id';
+
+    act(() => {
+      uiTelemetryService.emit('clear', newSessionId);
+    });
+
+    const stats = contextRef.current?.stats;
+    expect(stats?.sessionId).toBe(newSessionId);
+    expect(stats?.promptCount).toBe(0);
+    expect(stats?.sessionStartTime.getTime()).toBeGreaterThanOrEqual(
+      initialStartTime!.getTime(),
+    );
+
+    unmount();
+  });
+
   it('should throw an error when useSessionStats is used outside of a provider', () => {
     const onError = vi.fn();
     // Suppress console.error from React for this test
