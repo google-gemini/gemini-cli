@@ -19,6 +19,8 @@ interface StartupPhase {
   cpuUsage?: NodeJS.CpuUsage;
   details?: Record<string, string | number | boolean>;
   ended: boolean;
+  relativeStart?: number;
+  durationMs?: number;
 }
 
 /**
@@ -66,12 +68,17 @@ export class StartupProfiler {
    * idempotent calls in environments where initialization might happen multiple
    * times.
    *
+   * @param phaseName The name of the phase.
+   * @param details Optional additional details.
+   * @param startAbsMs Optional absolute start time in milliseconds. If not provided, performance.now() is used.
+   *
    * Callers should handle the potential `undefined` return value, typically
    * by using optional chaining: `handle?.end()`.
    */
   start(
     phaseName: string,
     details?: Record<string, string | number | boolean>,
+    startAbsMs?: number,
   ): StartupPhaseHandle | undefined {
     const existingPhase = this.phases.get(phaseName);
 
@@ -83,14 +90,20 @@ export class StartupProfiler {
       return undefined;
     }
 
-    const startMarkName = this.getStartMarkName(phaseName);
-    performance.mark(startMarkName, { detail: details });
+    let relativeStart: number | undefined = undefined;
+    if (startAbsMs !== undefined) {
+      relativeStart = startAbsMs - performance.timeOrigin;
+    } else {
+      const startMarkName = this.getStartMarkName(phaseName);
+      performance.mark(startMarkName, { detail: details });
+    }
 
     const phase: StartupPhase = {
       name: phaseName,
       startCpuUsage: process.cpuUsage(),
       details,
       ended: false,
+      relativeStart,
     };
 
     this.phases.set(phaseName, phase);
@@ -101,6 +114,53 @@ export class StartupProfiler {
         this._end(phase, endDetails);
       },
     };
+  }
+
+  /**
+   * Ends a phase by its name.
+   */
+  endPhase(
+    phaseName: string,
+    details?: Record<string, string | number | boolean>,
+  ): void {
+    const phase = this.phases.get(phaseName);
+    if (!phase) {
+      debugLogger.warn(
+        `[STARTUP] Cannot end phase '${phaseName}': phase not found.`,
+      );
+      return;
+    }
+    this._end(phase, details);
+  }
+
+  /**
+   * Records a phase that has already completed.
+   */
+  recordPhase(
+    phaseName: string,
+    startAbsMs: number,
+    endAbsMs: number,
+    details?: Record<string, string | number | boolean>,
+  ): void {
+    const relativeStart = startAbsMs - performance.timeOrigin;
+    const relativeEnd = endAbsMs - performance.timeOrigin;
+    const durationMs = endAbsMs - startAbsMs;
+
+    // Node.js performance.measure throws if start or end are negative in the options object.
+    // We clamp to 0 for the local performance entry, but preserve the real duration in the phase.
+    performance.measure(phaseName, {
+      start: Math.max(0, relativeStart),
+      end: Math.max(0, relativeEnd),
+    });
+
+    this.phases.set(phaseName, {
+      name: phaseName,
+      startCpuUsage: { user: 0, system: 0 },
+      cpuUsage: { user: 0, system: 0 },
+      details,
+      ended: true,
+      durationMs,
+    });
   }
 
   /**
@@ -119,20 +179,30 @@ export class StartupProfiler {
       return;
     }
 
-    const startMarkName = this.getStartMarkName(phase.name);
     const endMarkName = this.getEndMarkName(phase.name);
-
-    // Check if start mark exists before measuring
-    if (performance.getEntriesByName(startMarkName).length === 0) {
-      debugLogger.warn(
-        `[STARTUP] Cannot measure phase '${phase.name}': start mark '${startMarkName}' not found (likely cleared by reset).`,
-      );
-      phase.ended = true;
-      return;
-    }
-
     performance.mark(endMarkName, { detail: details });
-    performance.measure(phase.name, startMarkName, endMarkName);
+
+    if (phase.relativeStart !== undefined) {
+      const now = performance.now();
+      phase.durationMs = now - phase.relativeStart;
+      // Clamp start to 0 for the performance measure to avoid ERR_PERFORMANCE_INVALID_TIMESTAMP,
+      // as relativeStart will be negative if it began before this process started.
+      performance.measure(phase.name, {
+        start: Math.max(0, phase.relativeStart),
+        end: now,
+      });
+    } else {
+      const startMarkName = this.getStartMarkName(phase.name);
+      // Check if start mark exists before measuring
+      if (performance.getEntriesByName(startMarkName).length === 0) {
+        debugLogger.warn(
+          `[STARTUP] Cannot measure phase '${phase.name}': start mark '${startMarkName}' not found (likely cleared by reset).`,
+        );
+        phase.ended = true;
+        return;
+      }
+      performance.measure(phase.name, startMarkName, endMarkName);
+    }
 
     phase.cpuUsage = process.cpuUsage(phase.startCpuUsage);
     phase.ended = true;
@@ -144,7 +214,7 @@ export class StartupProfiler {
   /**
    * Flushes buffered metrics to the telemetry system.
    */
-  flush(config: Config): void {
+  flush(config: Config, options: { skipWarnings?: boolean } = {}): void {
     debugLogger.debug(
       '[STARTUP] StartupProfiler.flush() called with',
       this.phases.size,
@@ -160,13 +230,16 @@ export class StartupProfiler {
 
     // Get all performance measures.
     const measures = performance.getEntriesByType('measure');
+    const flushedPhaseNames: string[] = [];
 
     for (const phase of this.phases.values()) {
-      // Warn about incomplete phases.
+      // Handle incomplete phases.
       if (!phase.ended) {
-        debugLogger.warn(
-          `[STARTUP] Phase '${phase.name}' was started but never ended. Skipping metrics.`,
-        );
+        if (!options.skipWarnings) {
+          debugLogger.warn(
+            `[STARTUP] Phase '${phase.name}' was started but never ended. Skipping metrics.`,
+          );
+        }
         continue;
       }
 
@@ -174,6 +247,13 @@ export class StartupProfiler {
       const measure = measures.find((m) => m.name === phase.name);
 
       if (measure && phase.cpuUsage) {
+        const durationMs = phase.durationMs ?? measure.duration;
+
+        // Skip metrics with non-positive duration.
+        if (durationMs <= 0) {
+          continue;
+        }
+
         const details = {
           ...commonDetails,
           cpu_usage_user: phase.cpuUsage.user,
@@ -185,12 +265,13 @@ export class StartupProfiler {
           '[STARTUP] Recording metric for phase:',
           phase.name,
           'duration:',
-          measure.duration,
+          durationMs,
         );
-        recordStartupPerformance(config, measure.duration, {
+        recordStartupPerformance(config, durationMs, {
           phase: phase.name,
           details,
         });
+        flushedPhaseNames.push(phase.name);
       } else {
         debugLogger.debug(
           '[STARTUP] Skipping phase without measure:',
@@ -205,9 +286,10 @@ export class StartupProfiler {
       if (!phase.ended) continue;
       const measure = measures.find((m) => m.name === phase.name);
       if (measure && phase.cpuUsage) {
+        const durationMs = phase.durationMs ?? measure.duration;
         startupPhases.push({
           name: phase.name,
-          duration_ms: measure.duration,
+          duration_ms: durationMs,
           cpu_usage_user_usec: phase.cpuUsage.user,
           cpu_usage_system_usec: phase.cpuUsage.system,
           start_time_usec: (performance.timeOrigin + measure.startTime) * 1000,
@@ -230,18 +312,18 @@ export class StartupProfiler {
       );
     }
 
-    // Clear performance marks and measures for all tracked phases.
-    for (const phaseName of this.phases.keys()) {
+    // Clear performance marks and measures for the successfully flushed phases.
+    for (const phaseName of flushedPhaseNames) {
       const startMarkName = this.getStartMarkName(phaseName);
       const endMarkName = this.getEndMarkName(phaseName);
 
       performance.clearMarks(startMarkName);
       performance.clearMarks(endMarkName);
       performance.clearMeasures(phaseName);
-    }
 
-    // Clear all phases.
-    this.phases.clear();
+      // Remove the successfully flushed phase from the tracking map.
+      this.phases.delete(phaseName);
+    }
   }
 }
 

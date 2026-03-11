@@ -431,7 +431,6 @@ export const AppContainer = (props: AppContainerProps) => {
         await config.initialize();
       }
       setConfigInitialized(true);
-      startupProfiler.flush(config);
 
       const sessionStartSource = resumedSessionData
         ? SessionStartSource.Resume
@@ -2571,6 +2570,23 @@ Logging in with Google... Restarting Gemini CLI to continue.
       getPreferredEditor,
     ],
   );
+
+  const hasFlushedStartupRef = useRef(false);
+  useEffect(() => {
+    if (
+      authState === AuthState.Authenticated &&
+      !hasFlushedStartupRef.current
+    ) {
+      startupProfiler.endPhase('child_process_to_typing_ready');
+      startupProfiler.endPhase('overall_startup');
+      startupProfiler.flush(config);
+      hasFlushedStartupRef.current = true;
+    }
+  }, [authState, config]);
+
+  useLayoutEffect(() => {
+    startupProfiler.endPhase('child_process_to_ui_visible');
+  }, []);
 
   if (authState === AuthState.AwaitingGoogleLoginRestart) {
     return (

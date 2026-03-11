@@ -107,6 +107,18 @@ describe('StartupProfiler', () => {
       const handle = profiler.start('test_phase');
       expect(handle).toBeUndefined();
     });
+
+    it('should support starting a phase at a specific absolute time', () => {
+      const startTimeMs = Date.now() - 1000;
+      profiler.start('custom_start_phase', {}, startTimeMs);
+
+      const phase = profiler['phases'].get('custom_start_phase');
+      expect(phase?.relativeStart).toBeDefined();
+      expect(phase?.relativeStart).toBeCloseTo(
+        startTimeMs - performance.timeOrigin,
+        0,
+      );
+    });
   });
 
   describe('end', () => {
@@ -119,6 +131,17 @@ describe('StartupProfiler', () => {
       const measure = measures.find((m) => m.name === 'test_phase');
       expect(measure).toBeDefined();
       expect(measure?.duration).toBeGreaterThan(0);
+    });
+
+    it('should handle ending a phase started at a specific absolute time', () => {
+      const startTimeMs = Date.now() - 1000;
+      const handle = profiler.start('custom_start_phase', {}, startTimeMs);
+      handle?.end();
+
+      const measures = performance.getEntriesByType('measure');
+      const measure = measures.find((m) => m.name === 'custom_start_phase');
+      expect(measure).toBeDefined();
+      expect(measure?.duration).toBeGreaterThanOrEqual(1000);
     });
 
     it('should merge details when ending a phase', () => {
@@ -138,6 +161,50 @@ describe('StartupProfiler', () => {
 
       const phase = profiler['phases'].get('test_phase');
       expect(phase?.details).toEqual({ key: 'updated' });
+    });
+  });
+
+  describe('endPhase', () => {
+    it('should end a phase by name', () => {
+      profiler.start('named_phase');
+      profiler.endPhase('named_phase', { end: 'detail' });
+
+      const phase = profiler['phases'].get('named_phase');
+      expect(phase?.ended).toBe(true);
+      expect(phase?.details).toEqual({ end: 'detail' });
+
+      const measures = performance.getEntriesByType('measure');
+      expect(measures.some((m) => m.name === 'named_phase')).toBe(true);
+    });
+
+    it('should warn and do nothing if phase does not exist', () => {
+      const warnSpy = vi.spyOn(debugLogger, 'warn');
+      profiler.endPhase('non_existent');
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "Cannot end phase 'non_existent': phase not found.",
+        ),
+      );
+    });
+  });
+
+  describe('recordPhase', () => {
+    it('should record a completed phase with start and end times', () => {
+      const startAbsMs = Date.now() - 2000;
+      const endAbsMs = Date.now() - 1000;
+
+      profiler.recordPhase('historical_phase', startAbsMs, endAbsMs, {
+        meta: 'data',
+      });
+
+      const phase = profiler['phases'].get('historical_phase');
+      expect(phase?.ended).toBe(true);
+      expect(phase?.details).toEqual({ meta: 'data' });
+
+      const measures = performance.getEntriesByType('measure');
+      const measure = measures.find((m) => m.name === 'historical_phase');
+      expect(measure).toBeDefined();
+      expect(measure?.duration).toBeCloseTo(1000, 0);
     });
   });
 
@@ -268,6 +335,13 @@ describe('StartupProfiler', () => {
 
       expect(logSpy).not.toHaveBeenCalled();
       expect(debugSpy).toHaveBeenCalled();
+    });
+
+    it('should suppress warnings for incomplete phases when skipWarnings is true', () => {
+      const warnSpy = vi.spyOn(debugLogger, 'warn');
+      profiler.start('incomplete_phase');
+      profiler.flush(mockConfig, { skipWarnings: true });
+      expect(warnSpy).not.toHaveBeenCalled();
     });
   });
 
