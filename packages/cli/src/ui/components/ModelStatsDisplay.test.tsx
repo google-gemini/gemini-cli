@@ -9,8 +9,8 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { ModelStatsDisplay } from './ModelStatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
 import * as SettingsContext from '../contexts/SettingsContext.js';
-import type { LoadedSettings } from '../../config/settings.js';
-import type { SessionMetrics } from '../contexts/SessionContext.js';
+import { type LoadedSettings } from '../../config/settings.js';
+import { type SessionMetrics } from '../contexts/SessionContext.js';
 import { ToolCallDecision, LlmRole } from '@google/gemini-cli-core';
 
 // Mock the context to provide controlled data for testing
