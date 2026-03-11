@@ -50,7 +50,7 @@ import {
   type GeminiUserTier,
   type UserFeedbackPayload,
   type AgentDefinition,
-  type ApprovalMode,
+  ApprovalMode,
   IdeClient,
   ideContextStore,
   getErrorMessage,
@@ -1363,6 +1363,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
     triggerExpandHint,
   ]);
 
+  const handleClearPlanContext = useCallback(() => {
+    if (config.getApprovalMode() === ApprovalMode.PLAN) {
+      const startIndex = config.getPlanModeHistoryStartIndex();
+      if (historyManager.history.length > startIndex) {
+        const newHistory = historyManager.history.slice(0, startIndex);
+        historyManager.loadHistory(newHistory);
+        refreshStatic();
+      }
+    }
+  }, [config, historyManager, refreshStatic]);
+
   const { handleInput: vimHandleInput } = useVim(buffer, handleFinalSubmit);
 
   /**
@@ -2447,6 +2458,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setConstrainHeight,
       onEscapePromptChange: handleEscapePromptChange,
       refreshStatic,
+      handleClearPlanContext,
       handleFinalSubmit,
       handleClearScreen,
       handleProQuotaChoice,
@@ -2539,6 +2551,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       setConstrainHeight,
       handleEscapePromptChange,
       refreshStatic,
+      handleClearPlanContext,
       handleFinalSubmit,
       handleClearScreen,
       handleProQuotaChoice,

@@ -174,6 +174,7 @@ export interface SummarizeToolOutputSettings {
 export interface PlanSettings {
   directory?: string;
   modelRouting?: boolean;
+  clearContextOnApproval?: boolean;
 }
 
 export interface TelemetrySettings {
@@ -806,6 +807,9 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly planEnabled: boolean;
   private readonly trackerEnabled: boolean;
   private readonly planModeRoutingEnabled: boolean;
+  private readonly clearContextOnPlanApproval?: boolean;
+  private clearContextOnPlanApprovalSessionOverride: boolean | undefined =
+    undefined;
   private readonly modelSteering: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
@@ -897,6 +901,8 @@ export class Config implements McpContext, AgentLoopContext {
     this.planEnabled = params.plan ?? true;
     this.trackerEnabled = params.tracker ?? false;
     this.planModeRoutingEnabled = params.planSettings?.modelRouting ?? true;
+    this.clearContextOnPlanApproval =
+      params.planSettings?.clearContextOnApproval;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];
@@ -2021,6 +2027,12 @@ export class Config implements McpContext, AgentLoopContext {
     this.geminiMdFilePaths = paths;
   }
 
+  private planModeHistoryStartIndex = 0;
+
+  getPlanModeHistoryStartIndex(): number {
+    return this.planModeHistoryStartIndex;
+  }
+
   getApprovalMode(): ApprovalMode {
     return this.policyEngine.getApprovalMode();
   }
@@ -2077,6 +2089,12 @@ export class Config implements McpContext, AgentLoopContext {
     }
 
     this.policyEngine.setApprovalMode(mode);
+
+    if (mode === ApprovalMode.PLAN && currentMode !== ApprovalMode.PLAN) {
+      this.planModeHistoryStartIndex = this.geminiClient?.isInitialized()
+        ? this.geminiClient.getHistory().length
+        : 0;
+    }
 
     const isPlanModeTransition =
       currentMode !== mode &&
@@ -2503,6 +2521,25 @@ export class Config implements McpContext, AgentLoopContext {
 
   async getPlanModeRoutingEnabled(): Promise<boolean> {
     return this.planModeRoutingEnabled;
+  }
+
+  getClearContextOnPlanApproval(): boolean | undefined {
+    return (
+      this.clearContextOnPlanApprovalSessionOverride ??
+      this.clearContextOnPlanApproval
+    );
+  }
+
+  getClearContextOnPlanApprovalSessionOverride(): boolean | undefined {
+    return this.clearContextOnPlanApprovalSessionOverride;
+  }
+
+  isClearContextOnPlanApprovalEnabled(): boolean {
+    return this.getClearContextOnPlanApproval() ?? false;
+  }
+
+  setClearContextOnPlanApprovalSessionOverride(value: boolean): void {
+    this.clearContextOnPlanApprovalSessionOverride = value;
   }
 
   async getNumericalRoutingEnabled(): Promise<boolean> {

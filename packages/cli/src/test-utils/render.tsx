@@ -608,6 +608,7 @@ const mockUIActions: UIActions = {
   setConstrainHeight: vi.fn(),
   onEscapePromptChange: vi.fn(),
   refreshStatic: vi.fn(),
+  handleClearPlanContext: vi.fn(),
   handleFinalSubmit: vi.fn(),
   handleClearScreen: vi.fn(),
   handleProQuotaChoice: vi.fn(),

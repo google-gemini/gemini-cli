@@ -144,6 +144,11 @@ their corresponding top-level category object in your `settings.json` file.
     implementation phase.
   - **Default:** `true`
 
+- **`general.plan.clearContextOnApproval`** (boolean):
+  - **Description:** Automatically clear conversation context after a plan is
+    approved and implementation begins.
+  - **Default:** `undefined`
+
 - **`general.retryFetchErrors`** (boolean):
   - **Description:** Retry on "exception TypeError: fetch failed sending
     request" errors.

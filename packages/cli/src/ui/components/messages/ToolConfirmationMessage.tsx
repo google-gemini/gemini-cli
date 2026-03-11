@@ -29,6 +29,7 @@ import {
 import { useKeypress } from '../../hooks/useKeypress.js';
 import { theme } from '../../semantic-colors.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
+import { useUIActions } from '../../contexts/UIActionsContext.js';
 import { Command } from '../../key/keyMatchers.js';
 import { formatCommand } from '../../key/keybindingUtils.js';
 import { AskUserDialog } from '../AskUserDialog.js';
@@ -70,6 +71,7 @@ export const ToolConfirmationMessage: React.FC<
 }) => {
   const keyMatchers = useKeyMatchers();
   const { confirm, isDiffingEnabled } = useToolActions();
+  const { handleClearPlanContext } = useUIActions();
   const [mcpDetailsExpansionState, setMcpDetailsExpansionState] = useState<{
     callId: string;
     expanded: boolean;
@@ -455,10 +457,14 @@ export const ToolConfirmationMessage: React.FC<
           <ExitPlanModeDialog
             planPath={confirmationDetails.planPath}
             getPreferredEditor={getPreferredEditor}
-            onApprove={(approvalMode) => {
+            onApprove={(approvalMode, clearConversation) => {
+              if (clearConversation) {
+                handleClearPlanContext();
+              }
               handleConfirm(ToolConfirmationOutcome.ProceedOnce, {
                 approved: true,
                 approvalMode,
+                clearConversation,
               });
             }}
             onFeedback={(feedback) => {
@@ -679,6 +685,7 @@ export const ToolConfirmationMessage: React.FC<
       mcpToolDetailsText,
       expandDetailsHintKey,
       getPreferredEditor,
+      handleClearPlanContext,
       isTrustedFolder,
       allowPermanentApproval,
       settings,

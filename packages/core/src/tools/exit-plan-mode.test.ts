@@ -9,6 +9,7 @@ import { ExitPlanModeTool, ExitPlanModeInvocation } from './exit-plan-mode.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import path from 'node:path';
 import type { Config } from '../config/config.js';
+import type { GeminiClient } from '../core/client.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolConfirmationOutcome } from './tools.js';
 import { ApprovalMode } from '../policy/types.js';
@@ -44,6 +45,8 @@ describe('ExitPlanModeTool', () => {
       getTargetDir: vi.fn().mockReturnValue(tempRootDir),
       setApprovalMode: vi.fn(),
       setApprovedPlanPath: vi.fn(),
+      getGeminiClient: vi.fn(),
+      getPlanModeHistoryStartIndex: vi.fn().mockReturnValue(0),
       storage: {
         getPlansDir: vi.fn().mockReturnValue(mockPlansDir),
       } as unknown as Config['storage'],
@@ -238,6 +241,49 @@ Read and follow the plan strictly during implementation.`,
         ApprovalMode.AUTO_EDIT,
       );
       expect(mockConfig.setApprovedPlanPath).toHaveBeenCalledWith(expectedPath);
+    });
+
+    it('should truncate history surgically when clearConversation is true', async () => {
+      const planRelativePath = createPlanFile('test.md', '# Content');
+      const invocation = tool.build({ plan_path: planRelativePath });
+
+      const mockSetHistory = vi.fn();
+      const mockHistory = [
+        { role: 'user', parts: [{ text: 'Pre-plan prompt' }] },
+        { role: 'model', parts: [{ text: 'Pre-plan response' }] },
+        { role: 'user', parts: [{ text: 'Enter plan mode' }] }, // Planning start turn (index 2)
+        { role: 'model', parts: [{ text: 'Draft 1' }] },
+        { role: 'user', parts: [{ text: 'No, change it' }] },
+        {
+          role: 'model',
+          parts: [{ functionCall: { name: 'exit_plan_mode', args: {} } }],
+        },
+      ];
+      vi.mocked(mockConfig.getGeminiClient!).mockReturnValue({
+        getHistory: vi.fn().mockReturnValue(mockHistory),
+        setHistory: mockSetHistory,
+      } as unknown as GeminiClient);
+      vi.mocked(mockConfig.getPlanModeHistoryStartIndex!).mockReturnValue(2);
+
+      const confirmDetails = await invocation.shouldConfirmExecute(
+        new AbortController().signal,
+      );
+      if (confirmDetails === false) return;
+
+      await confirmDetails.onConfirm(ToolConfirmationOutcome.ProceedOnce, {
+        approved: true,
+        approvalMode: ApprovalMode.AUTO_EDIT,
+        clearConversation: true,
+      });
+
+      await invocation.execute(new AbortController().signal);
+
+      expect(mockSetHistory).toHaveBeenCalledWith([
+        mockHistory[0], // pre-plan user
+        mockHistory[1], // pre-plan model
+        mockHistory[2], // first planning user message
+        mockHistory[5], // last model message (exit_plan_mode)
+      ]);
     });
 
     it('should return feedback message when plan is rejected with feedback', async () => {

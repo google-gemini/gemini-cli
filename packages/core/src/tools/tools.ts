@@ -766,6 +766,8 @@ export interface ToolExitPlanModeConfirmationPayload {
   approvalMode?: ApprovalMode;
   /** If rejected, the user's feedback */
   feedback?: string;
+  /** If the user wants to clear the conversation context upon approval */
+  clearConversation?: boolean;
 }
 
 export type ToolConfirmationPayload =

@@ -704,8 +704,9 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       },
     );
 
-    // Only add custom option for choice type, not yesno
-    if (question.type !== 'yesno') {
+    // Add custom option for choice type if allowed
+    const allowCustom = question.allowCustomOption ?? true;
+    if (question.type === 'choice' && allowCustom) {
       const otherItem: OptionItem = {
         key: 'other',
         label: customOptionText || '',
@@ -728,7 +729,13 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
     }
 
     return list;
-  }, [questionOptions, question.multiSelect, question.type, customOptionText]);
+  }, [
+    questionOptions,
+    question.allowCustomOption,
+    question.type,
+    question.multiSelect,
+    customOptionText,
+  ]);
 
   const handleHighlight = useCallback(
     (itemValue: OptionItem) => {
@@ -1050,11 +1057,16 @@ export const AskUserDialog: React.FC<AskUserDialogProps> = ({
     isActive: questions.length > 1 && !submitted,
   });
 
+  const onSubmitRef = useRef(onSubmit);
+  useEffect(() => {
+    onSubmitRef.current = onSubmit;
+  }, [onSubmit]);
+
   useEffect(() => {
     if (submitted) {
-      onSubmit(answers);
+      onSubmitRef.current(answers);
     }
-  }, [submitted, answers, onSubmit]);
+  }, [submitted, answers]);
 
   const handleAnswer = useCallback(
     (answer: string) => {

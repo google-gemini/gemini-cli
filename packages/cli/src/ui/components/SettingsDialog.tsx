@@ -275,7 +275,7 @@ export function SettingsDialog({
       let newValue: SettingsValue;
 
       if (definition?.type === 'boolean') {
-        if (typeof currentValue !== 'boolean') {
+        if (typeof currentValue !== 'boolean' && currentValue !== undefined) {
           return;
         }
         newValue = !currentValue;
