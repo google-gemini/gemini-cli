@@ -324,5 +324,5 @@ export function isValidModelOrAlias(model: string): boolean {
  * @returns Array of valid model names and aliases.
  */
 export function getValidModelsAndAliases(): string[] {
-  return [...VALID_ALIASES, ...VALID_GEMINI_MODELS].sort();
+  return [...new Set([...VALID_ALIASES, ...VALID_GEMINI_MODELS])].sort();
 }
