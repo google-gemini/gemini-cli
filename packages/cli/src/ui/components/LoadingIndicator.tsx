@@ -52,8 +52,8 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   const primaryText =
     currentLoadingPhrase === INTERACTIVE_SHELL_WAITING_PHRASE
       ? currentLoadingPhrase
-      : thought?.subject
-        ? `Gemini is thinking about ${thoughtLabel ?? thought.subject}`
+      : thought?.subject?.trim()
+        ? `Gemini is thinking about ${thoughtLabel ?? thought.subject.trim()}`
         : (currentLoadingPhrase ?? 'Gemini is thinking...');
   const hasThoughtIndicator =
     currentLoadingPhrase !== INTERACTIVE_SHELL_WAITING_PHRASE &&
