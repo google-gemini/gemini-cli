@@ -5,6 +5,7 @@
  */
 
 import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { SchedulerStateManager } from './state-manager.js';
 import { resolveConfirmation } from './confirmation.js';
@@ -56,8 +57,8 @@ interface SchedulerQueueItem {
 }
 
 export interface SchedulerOptions {
-  config: Config;
-  messageBus: MessageBus;
+  context: AgentLoopContext;
+  messageBus?: MessageBus;
   getPreferredEditor: () => EditorType | undefined;
   schedulerId: string;
   parentCallId?: string;
@@ -97,6 +98,7 @@ export class Scheduler {
   private readonly executor: ToolExecutor;
   private readonly modifier: ToolModificationHandler;
   private readonly config: Config;
+  private readonly context: AgentLoopContext;
   private readonly messageBus: MessageBus;
   private readonly getPreferredEditor: () => EditorType | undefined;
   private readonly schedulerId: string;
@@ -108,8 +110,9 @@ export class Scheduler {
   private readonly requestQueue: SchedulerQueueItem[] = [];
 
   constructor(options: SchedulerOptions) {
-    this.config = options.config;
-    this.messageBus = options.messageBus;
+    this.context = options.context;
+    this.config = this.context.config;
+    this.messageBus = options.messageBus ?? this.context.messageBus;
     this.getPreferredEditor = options.getPreferredEditor;
     this.schedulerId = options.schedulerId;
     this.parentCallId = options.parentCallId;
@@ -119,7 +122,7 @@ export class Scheduler {
       this.schedulerId,
       (call) => logToolCall(this.config, new ToolCallEvent(call)),
     );
-    this.executor = new ToolExecutor(this.config);
+    this.executor = new ToolExecutor(this.context);
     this.modifier = new ToolModificationHandler();
 
     this.setupMessageBusListener(this.messageBus);
@@ -294,7 +297,7 @@ export class Scheduler {
     const currentApprovalMode = this.config.getApprovalMode();
 
     try {
-      const toolRegistry = this.config.getToolRegistry();
+      const toolRegistry = this.context.toolRegistry;
       const newCalls: ToolCall[] = requests.map((request) => {
         const enrichedRequest: ToolCallRequestInfo = {
           ...request,
@@ -602,10 +605,13 @@ export class Scheduler {
 
     // Handle Policy Updates
     if (decision === PolicyDecision.ASK_USER && outcome) {
-      await updatePolicy(toolCall.tool, outcome, lastDetails, {
-        config: this.config,
-        messageBus: this.messageBus,
-      });
+      await updatePolicy(
+        toolCall.tool,
+        outcome,
+        lastDetails,
+        this.context,
+        toolCall.invocation,
+      );
     }
 
     // Handle cancellation (cascades to entire batch)
@@ -697,7 +703,7 @@ export class Scheduler {
       const originalRequestName =
         result.request.originalRequestName || result.request.name;
 
-      const newTool = this.config.getToolRegistry().getTool(tailRequest.name);
+      const newTool = this.context.toolRegistry.getTool(tailRequest.name);
 
       const newRequest: ToolCallRequestInfo = {
         callId: originalCallId,
@@ -713,7 +719,7 @@ export class Scheduler {
         // Enqueue an errored tool call
         const errorCall = this._createToolNotFoundErroredToolCall(
           newRequest,
-          this.config.getToolRegistry().getAllToolNames(),
+          this.context.toolRegistry.getAllToolNames(),
         );
         this.state.replaceActiveCallWithTailCall(callId, errorCall);
       } else {

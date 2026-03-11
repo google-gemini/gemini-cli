@@ -16,7 +16,8 @@ import {
   type ValidationIntent,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
+import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
 interface ValidationDialogProps {
   validationLink?: string;
@@ -32,6 +33,7 @@ export function ValidationDialog({
   learnMoreUrl,
   onChoice,
 }: ValidationDialogProps): React.JSX.Element {
+  const keyMatchers = useKeyMatchers();
   const [state, setState] = useState<DialogState>('choosing');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
@@ -134,7 +136,7 @@ export function ValidationDialog({
           <CliSpinner />
           <Text>
             {' '}
-            Waiting for verification... (Press ESC or CTRL+C to cancel)
+            Waiting for verification... (Press Esc or Ctrl+C to cancel)
           </Text>
         </Box>
         {errorMessage && (

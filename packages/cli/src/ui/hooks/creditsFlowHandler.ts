@@ -14,6 +14,7 @@ import {
   shouldShowOverageMenu,
   shouldShowEmptyWalletMenu,
   openBrowserSecurely,
+  shouldLaunchBrowser,
   logBillingEvent,
   OverageMenuShownEvent,
   OverageOptionSelectedEvent,
@@ -110,7 +111,6 @@ async function handleOverageMenu(
     isDialogPending,
     setOverageMenuRequest,
     setModelSwitchedFromQuotaError,
-    historyManager,
   } = args;
 
   logBillingEvent(
@@ -155,22 +155,28 @@ async function handleOverageMenu(
       setModelSwitchedFromQuotaError(false);
       config.setQuotaErrorOccurred(false);
       config.setOverageStrategy('always');
-      historyManager.addItem(
-        {
-          type: MessageType.INFO,
-          text: `Using AI Credits for this request.`,
-        },
-        Date.now(),
-      );
       return 'retry_with_credits';
 
     case 'use_fallback':
       return 'retry_always';
 
-    case 'manage':
+    case 'manage': {
       logCreditPurchaseClick(config, 'manage', usageLimitReachedModel);
-      await openG1Url('activity', G1_UTM_CAMPAIGNS.MANAGE_ACTIVITY);
+      const manageUrl = await openG1Url(
+        'activity',
+        G1_UTM_CAMPAIGNS.MANAGE_ACTIVITY,
+      );
+      if (manageUrl) {
+        args.historyManager.addItem(
+          {
+            type: MessageType.INFO,
+            text: `Please open this URL in a browser: ${manageUrl}`,
+          },
+          Date.now(),
+        );
+      }
       return 'stop';
+    }
 
     case 'stop':
     default:
@@ -213,13 +219,25 @@ async function handleEmptyWalletMenu(
       failedModel: usageLimitReachedModel,
       fallbackModel,
       resetTime,
-      onGetCredits: () => {
+      onGetCredits: async () => {
         logCreditPurchaseClick(
           config,
           'empty_wallet_menu',
           usageLimitReachedModel,
         );
-        void openG1Url('credits', G1_UTM_CAMPAIGNS.EMPTY_WALLET_ADD_CREDITS);
+        const creditsUrl = await openG1Url(
+          'credits',
+          G1_UTM_CAMPAIGNS.EMPTY_WALLET_ADD_CREDITS,
+        );
+        if (creditsUrl) {
+          args.historyManager.addItem(
+            {
+              type: MessageType.INFO,
+              text: `Please open this URL in a browser: ${creditsUrl}`,
+            },
+            Date.now(),
+          );
+        }
       },
       resolve,
     });
@@ -280,11 +298,16 @@ function logCreditPurchaseClick(
 async function openG1Url(
   path: 'activity' | 'credits',
   campaign: string,
-): Promise<void> {
+): Promise<string | undefined> {
   try {
     const userEmail = new UserAccountManager().getCachedGoogleAccount() ?? '';
-    await openBrowserSecurely(buildG1Url(path, userEmail, campaign));
+    const url = buildG1Url(path, userEmail, campaign);
+    if (!shouldLaunchBrowser()) {
+      return url;
+    }
+    await openBrowserSecurely(url);
   } catch {
     // Ignore browser open errors
   }
+  return undefined;
 }

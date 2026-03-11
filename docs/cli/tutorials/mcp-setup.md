@@ -89,7 +89,7 @@ don't need to learn special commands; just ask in natural language.
 The agent will:
 
 1.  Recognize the request matches a GitHub tool.
-2.  Call `github_list_pull_requests`.
+2.  Call `mcp_github_list_pull_requests`.
 3.  Present the data to you.
 
 ### Scenario: Creating an issue
@@ -101,8 +101,8 @@ The agent will:
 
 - **Server won't start?** Try running the docker command manually in your
   terminal to see if it prints an error (e.g., "image not found").
-- **Tools not found?** Run `/mcp refresh` to force the CLI to re-query the
-  server for its capabilities.
+- **Tools not found?** Run `/mcp reload` to force the CLI to re-query the server
+  for its capabilities.
 
 ## Next steps
 
