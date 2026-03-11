@@ -11,6 +11,7 @@ import { Box, Text, useStdout, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
 import { useInputHistory } from '../hooks/useInputHistory.js';
+import { escapeAtSymbols } from '../hooks/atCommandProcessor.js';
 import { HalfLinePaddedBox } from './shared/HalfLinePaddedBox.js';
 import {
   type TextBuffer,
@@ -497,7 +498,11 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         stdout.write('\x1b]52;c;?\x07');
       } else {
         const textToInsert = await clipboardy.read();
-        buffer.insert(textToInsert, { paste: true });
+        const escapedText = settings.ui?.escapePastedAtSymbols
+          ? escapeAtSymbols(textToInsert)
+          : textToInsert;
+        buffer.insert(escapedText, { paste: true });
+
         if (isLargePaste(textToInsert)) {
           appEvents.emit(AppEvent.TransientMessage, {
             message: `Press ${formatCommand(Command.EXPAND_PASTE)} to expand pasted text`,
@@ -732,8 +737,15 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
             pasteTimeoutRef.current = null;
           }, 40);
         }
-        // Ensure we never accidentally interpret paste as regular input.
-        buffer.handleInput(key);
+        if (settings.ui?.escapePastedAtSymbols) {
+          buffer.handleInput({
+            ...key,
+            sequence: escapeAtSymbols(key.sequence || ''),
+          });
+        } else {
+          buffer.handleInput(key);
+        }
+
         if (key.sequence && isLargePaste(key.sequence)) {
           appEvents.emit(AppEvent.TransientMessage, {
             message: `Press ${formatCommand(Command.EXPAND_PASTE)} to expand pasted text`,
@@ -1273,6 +1285,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       forceShowShellSuggestions,
       keyMatchers,
       isHelpDismissKey,
+      settings,
     ],
   );
 
