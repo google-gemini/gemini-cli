@@ -445,7 +445,6 @@ export async function createPolicyEngineConfig(
     const trackerToolNames = [
       'tracker_create_task',
       'tracker_update_task',
-      'tracker_delete_task',
       'tracker_get_task',
       'tracker_list_tasks',
       'tracker_add_dependency',
@@ -454,12 +453,6 @@ export async function createPolicyEngineConfig(
     for (const name of trackerToolNames) {
       rules.push({
         toolName: name,
-        decision: PolicyDecision.ALLOW,
-        priority: ALLOWED_TOOLS_FLAG_PRIORITY,
-        source: 'Settings (Tracker Enabled)',
-      });
-      rules.push({
-        toolName: `${MCP_TOOL_PREFIX}*_${name}`,
         decision: PolicyDecision.ALLOW,
         priority: ALLOWED_TOOLS_FLAG_PRIORITY,
         source: 'Settings (Tracker Enabled)',
