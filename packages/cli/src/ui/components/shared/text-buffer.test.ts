@@ -66,6 +66,7 @@ const initialState: TextBufferState = {
   visualLayout: defaultVisualLayout,
   pastedContent: {},
   expandedPaste: null,
+  yankRegister: null,
 };
 
 /**
