@@ -178,6 +178,7 @@ export class ExtensionManager extends ExtensionLoader {
   async installOrUpdateExtension(
     installMetadata: ExtensionInstallMetadata,
     previousExtensionConfig?: ExtensionConfig,
+    requestConsentOverride?: (consent: string) => Promise<boolean>,
   ): Promise<GeminiCLIExtension> {
     if ((this.settings.security?.allowedExtensions?.length ?? 0) > 0) {
       const extensionAllowed = this.settings.security?.allowedExtensions.some(
@@ -265,7 +266,7 @@ export class ExtensionManager extends ExtensionLoader {
             (result.failureReason === 'no release data' &&
               installMetadata.type === 'git') ||
             // Otherwise ask the user if they would like to try a git clone.
-            (await this.requestConsent(
+            (await (requestConsentOverride ?? this.requestConsent)(
               `Error downloading github release for ${installMetadata.source} with the following error: ${result.errorMessage}.
 
 Would you like to attempt to install via "git clone" instead?`,
@@ -339,7 +340,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
         await maybeRequestConsentOrFail(
           newExtensionConfig,
-          this.requestConsent,
+          requestConsentOverride ?? this.requestConsent,
           newHasHooks,
           previousExtensionConfig,
           previousHasHooks,

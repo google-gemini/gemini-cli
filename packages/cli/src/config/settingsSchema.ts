@@ -134,6 +134,18 @@ export interface SettingsSchema {
 export type MemoryImportFormat = 'tree' | 'flat';
 export type DnsResolutionOrder = 'ipv4first' | 'verbatim';
 
+const pathArraySetting = (label: string, description: string) => ({
+  type: 'array' as const,
+  label,
+  category: 'Advanced' as const,
+  requiresRestart: true as const,
+  default: [] as string[],
+  description,
+  showInDialog: false as const,
+  items: { type: 'string' as const },
+  mergeStrategy: MergeStrategy.UNION,
+});
+
 /**
  * The canonical schema for all settings.
  * The structure of this object defines the structure of the `Settings` type.
@@ -156,17 +168,15 @@ const SETTINGS_SCHEMA = {
     },
   },
 
-  policyPaths: {
-    type: 'array',
-    label: 'Policy Paths',
-    category: 'Advanced',
-    requiresRestart: true,
-    default: [] as string[],
-    description: 'Additional policy files or directories to load.',
-    showInDialog: false,
-    items: { type: 'string' },
-    mergeStrategy: MergeStrategy.UNION,
-  },
+  policyPaths: pathArraySetting(
+    'Policy Paths',
+    'Additional policy files or directories to load.',
+  ),
+
+  adminPolicyPaths: pathArraySetting(
+    'Admin Policy Paths',
+    'Additional admin policy files or directories to load.',
+  ),
 
   general: {
     type: 'object',
@@ -204,7 +214,8 @@ const SETTINGS_SCHEMA = {
         description: oneLine`
           The default approval mode for tool execution.
           'default' prompts for approval, 'auto_edit' auto-approves edit tools,
-          and 'plan' is read-only mode. 'yolo' is not supported yet.
+          and 'plan' is read-only mode. YOLO mode (auto-approve all actions) can
+          only be enabled via command line (--yolo or --approval-mode=yolo).
         `,
         showInDialog: true,
         options: [
@@ -306,10 +317,10 @@ const SETTINGS_SCHEMA = {
         label: 'Retry Fetch Errors',
         category: 'General',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Retry on "exception TypeError: fetch failed sending request" errors.',
-        showInDialog: false,
+        showInDialog: true,
       },
       maxAttempts: {
         type: 'number',
@@ -676,7 +687,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: true,
         description:
-          "Show the logged-in user's identity (e.g. email) in the UI.",
+          "Show the signed-in user's identity (e.g. email) in the UI.",
         showInDialog: true,
       },
       useAlternateBuffer: {
@@ -1791,6 +1802,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable extension registry explore UI.',
         showInDialog: false,
       },
+      extensionRegistryURI: {
+        type: 'string',
+        label: 'Extension Registry URI',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 'https://geminicli.com/extensions.json',
+        description:
+          'The URI (web URL or local file path) of the extension registry.',
+        showInDialog: false,
+      },
       extensionReloading: {
         type: 'boolean',
         label: 'Extension Reloading',
@@ -2666,7 +2687,9 @@ type InferSettings<T extends SettingsSchema> = {
         ? boolean
         : T[K]['default'] extends string
           ? string
-          : T[K]['default'];
+          : T[K]['default'] extends ReadonlyArray<infer U>
+            ? U[]
+            : T[K]['default'];
 };
 
 type InferMergedSettings<T extends SettingsSchema> = {
@@ -2680,7 +2703,9 @@ type InferMergedSettings<T extends SettingsSchema> = {
         ? boolean
         : T[K]['default'] extends string
           ? string
-          : T[K]['default'];
+          : T[K]['default'] extends ReadonlyArray<infer U>
+            ? U[]
+            : T[K]['default'];
 };
 
 export type Settings = InferSettings<SettingsSchemaType>;

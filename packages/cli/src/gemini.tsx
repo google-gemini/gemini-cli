@@ -16,12 +16,16 @@ import v8 from 'node:v8';
 import os from 'node:os';
 import dns from 'node:dns';
 import { start_sandbox } from './utils/sandbox.js';
-import type { DnsResolutionOrder, LoadedSettings } from './config/settings.js';
+import {
+  loadSettings,
+  SettingScope,
+  type DnsResolutionOrder,
+  type LoadedSettings,
+} from './config/settings.js';
 import {
   loadTrustedFolders,
   type TrustedFoldersError,
 } from './config/trustedFolders.js';
-import { loadSettings, SettingScope } from './config/settings.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
@@ -92,6 +96,8 @@ import { computeTerminalTitle } from './utils/windowTitle.js';
 
 import { SessionStatsProvider } from './ui/contexts/SessionContext.js';
 import { VimModeProvider } from './ui/contexts/VimModeContext.js';
+import { KeyMatchersProvider } from './ui/hooks/useKeyMatchers.js';
+import { loadKeyMatchers } from './ui/key/keyMatchers.js';
 import { KeypressProvider } from './ui/contexts/KeypressContext.js';
 import { useKittyKeyboardProtocol } from './ui/hooks/useKittyKeyboardProtocol.js';
 import {
@@ -109,6 +115,7 @@ import { OverflowProvider } from './ui/contexts/OverflowContext.js';
 import { setupTerminalAndTheme } from './utils/terminalTheme.js';
 import { profiler } from './ui/components/DebugProfiler.js';
 import { runDeferredCommand } from './deferred.js';
+import { cleanupBackgroundLogs } from './utils/logCleanup.js';
 import { SlashCommandConflictHandler } from './services/SlashCommandConflictHandler.js';
 
 const SLOW_RENDER_MS = 200;
@@ -207,6 +214,11 @@ export async function startInteractiveUI(
     });
   }
 
+  const { matchers, errors } = await loadKeyMatchers();
+  errors.forEach((error) => {
+    coreEvents.emitFeedback('warning', error);
+  });
+
   const version = await getVersion();
   setWindowTitle(basename(workspaceRoot), settings);
 
@@ -229,35 +241,39 @@ export async function startInteractiveUI(
 
     return (
       <SettingsContext.Provider value={settings}>
-        <KeypressProvider
-          config={config}
-          debugKeystrokeLogging={settings.merged.general.debugKeystrokeLogging}
-        >
-          <MouseProvider
-            mouseEventsEnabled={mouseEventsEnabled}
+        <KeyMatchersProvider value={matchers}>
+          <KeypressProvider
+            config={config}
             debugKeystrokeLogging={
               settings.merged.general.debugKeystrokeLogging
             }
           >
-            <TerminalProvider>
-              <ScrollProvider>
-                <OverflowProvider>
-                  <SessionStatsProvider>
-                    <VimModeProvider>
-                      <AppContainer
-                        config={config}
-                        startupWarnings={startupWarnings}
-                        version={version}
-                        resumedSessionData={resumedSessionData}
-                        initializationResult={initializationResult}
-                      />
-                    </VimModeProvider>
-                  </SessionStatsProvider>
-                </OverflowProvider>
-              </ScrollProvider>
-            </TerminalProvider>
-          </MouseProvider>
-        </KeypressProvider>
+            <MouseProvider
+              mouseEventsEnabled={mouseEventsEnabled}
+              debugKeystrokeLogging={
+                settings.merged.general.debugKeystrokeLogging
+              }
+            >
+              <TerminalProvider>
+                <ScrollProvider>
+                  <OverflowProvider>
+                    <SessionStatsProvider>
+                      <VimModeProvider>
+                        <AppContainer
+                          config={config}
+                          startupWarnings={startupWarnings}
+                          version={version}
+                          resumedSessionData={resumedSessionData}
+                          initializationResult={initializationResult}
+                        />
+                      </VimModeProvider>
+                    </SessionStatsProvider>
+                  </OverflowProvider>
+                </ScrollProvider>
+              </TerminalProvider>
+            </MouseProvider>
+          </KeypressProvider>
+        </KeyMatchersProvider>
       </SettingsContext.Provider>
     );
   };
@@ -370,6 +386,7 @@ export async function main() {
   await Promise.all([
     cleanupCheckpoints(),
     cleanupToolOutputFiles(settings.merged),
+    cleanupBackgroundLogs(),
   ]);
 
   const parseArgsHandle = startupProfiler.start('parse_arguments');
