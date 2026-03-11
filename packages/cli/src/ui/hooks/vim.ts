@@ -1345,12 +1345,12 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           }
 
           case 'Y': {
-            // Y yanks current line (same as yy)
+            // Y yanks from cursor to end of line (equivalent to y$)
             const repeatCount = getCurrentCount();
-            executeCommand(CMD_TYPES.YANK_LINE, repeatCount);
+            executeCommand(CMD_TYPES.YANK_TO_EOL, repeatCount);
             dispatch({
               type: 'SET_LAST_COMMAND',
-              command: { type: CMD_TYPES.YANK_LINE, count: repeatCount },
+              command: { type: CMD_TYPES.YANK_TO_EOL, count: repeatCount },
             });
             dispatch({ type: 'CLEAR_COUNT' });
             return true;

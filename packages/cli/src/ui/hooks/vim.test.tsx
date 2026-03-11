@@ -2425,13 +2425,13 @@ describe('useVim hook', () => {
       expect(mockBuffer.vimYankLine).toHaveBeenCalledWith(2);
     });
 
-    it('should handle Y (yank line, same as yy)', () => {
+    it('should handle Y (yank to end of line, equivalent to y$)', () => {
       const { result } = renderVimHook();
       exitInsertMode(result);
       act(() => {
         result.current.handleInput(createKey({ sequence: 'Y' }));
       });
-      expect(mockBuffer.vimYankLine).toHaveBeenCalledWith(1);
+      expect(mockBuffer.vimYankToEndOfLine).toHaveBeenCalledWith(1);
     });
 
     it('should handle yw (yank word forward)', () => {
