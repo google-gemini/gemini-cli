@@ -1044,9 +1044,10 @@ describe('useVim hook', () => {
         });
 
         // Should delete "world" (no trailing space at end), leaving "hello "
+        // Cursor clamps to last valid index in NORMAL mode (col 5 = trailing space)
         expect(result.lines).toEqual(['hello ']);
         expect(result.cursorRow).toBe(0);
-        expect(result.cursorCol).toBe(6);
+        expect(result.cursorCol).toBe(5);
       });
 
       it('should delete multiple words with count', () => {
@@ -1726,7 +1727,8 @@ describe('useVim hook', () => {
         count: 1,
         expectedLines: ['hello '],
         expectedCursorRow: 0,
-        expectedCursorCol: 6,
+        // Cursor clamps to last valid index in NORMAL mode (col 5 = trailing space)
+        expectedCursorCol: 5,
       },
       {
         command: 'D',
