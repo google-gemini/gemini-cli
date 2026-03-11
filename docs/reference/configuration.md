@@ -250,8 +250,18 @@ their corresponding top-level category object in your `settings.json` file.
     input.
   - **Default:** `false`
 
+- **`ui.footer.items`** (array):
+  - **Description:** List of item IDs to display in the footer. Rendered in
+    order
+  - **Default:** `undefined`
+
+- **`ui.footer.showLabels`** (boolean):
+  - **Description:** Display a second line above the footer items with
+    descriptive headers (e.g., /model).
+  - **Default:** `true`
+
 - **`ui.footer.hideCWD`** (boolean):
-  - **Description:** Hide the current working directory path in the footer.
+  - **Description:** Hide the current working directory in the footer.
   - **Default:** `false`
 
 - **`ui.footer.hideSandboxStatus`** (boolean):
@@ -287,7 +297,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`ui.showUserIdentity`** (boolean):
-  - **Description:** Show the logged-in user's identity (e.g. email) in the UI.
+  - **Description:** Show the signed-in user's identity (e.g. email) in the UI.
   - **Default:** `true`
 
 - **`ui.useAlternateBuffer`** (boolean):
@@ -709,7 +719,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `[]`
 
 - **`context.loadMemoryFromIncludeDirectories`** (boolean):
-  - **Description:** Controls how /memory refresh loads GEMINI.md files. When
+  - **Description:** Controls how /memory reload loads GEMINI.md files. When
     true, include directories are scanned; when false, only the current
     directory is used.
   - **Default:** `false`
@@ -747,7 +757,8 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`tools.sandbox`** (boolean | string):
   - **Description:** Sandbox execution environment. Set to a boolean to enable
-    or disable the sandbox, or provide a string path to a sandbox profile.
+    or disable the sandbox, provide a string path to a sandbox profile, or
+    specify an explicit sandbox command (e.g., "docker", "podman", "lxc").
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
@@ -859,6 +870,11 @@ their corresponding top-level category object in your `settings.json` file.
 - **`security.enablePermanentToolApproval`** (boolean):
   - **Description:** Enable the "Allow for all future sessions" option in tool
     confirmation dialogs.
+  - **Default:** `false`
+
+- **`security.autoAddToPolicyByDefault`** (boolean):
+  - **Description:** When enabled, the "Allow for all future sessions" option
+    becomes the default choice for low-risk tools in trusted workspaces.
   - **Default:** `false`
 
 - **`security.blockGitExtensions`** (boolean):
@@ -987,6 +1003,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.extensionRegistryURI`** (string):
+  - **Description:** The URI (web URL or local file path) of the extension
+    registry.
+  - **Default:** `"https://geminicli.com/extensions.json"`
+  - **Requires restart:** Yes
+
 - **`experimental.extensionReloading`** (boolean):
   - **Description:** Enables extension loading/unloading within the CLI session.
   - **Default:** `false`
@@ -1010,7 +1032,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`experimental.plan`** (boolean):
-  - **Description:** Enable planning features (Plan Mode and tools).
+  - **Description:** Enable Plan Mode.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`experimental.taskTracker`** (boolean):
+  - **Description:** Enable task tracker tools.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -1025,8 +1052,8 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`experimental.gemmaModelRouter.enabled`** (boolean):
-  - **Description:** Enable the Gemma Model Router. Requires a local endpoint
-    serving Gemma via the Gemini API using LiteRT-LM shim.
+  - **Description:** Enable the Gemma Model Router (experimental). Requires a
+    local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -1155,13 +1182,20 @@ their corresponding top-level category object in your `settings.json` file.
 
 Configures connections to one or more Model-Context Protocol (MCP) servers for
 discovering and using custom tools. Gemini CLI attempts to connect to each
-configured MCP server to discover available tools. If multiple MCP servers
-expose a tool with the same name, the tool names will be prefixed with the
-server alias you defined in the configuration (e.g.,
-`serverAlias__actualToolName`) to avoid conflicts. Note that the system might
-strip certain schema properties from MCP tool definitions for compatibility. At
-least one of `command`, `url`, or `httpUrl` must be provided. If multiple are
-specified, the order of precedence is `httpUrl`, then `url`, then `command`.
+configured MCP server to discover available tools. Every discovered tool is
+prepended with the `mcp_` prefix and its server alias to form a fully qualified
+name (FQN) (e.g., `mcp_serverAlias_actualToolName`) to avoid conflicts. Note
+that the system might strip certain schema properties from MCP tool definitions
+for compatibility. At least one of `command`, `url`, or `httpUrl` must be
+provided. If multiple are specified, the order of precedence is `httpUrl`, then
+`url`, then `command`.
+
+> **Warning:** Avoid using underscores (`_`) in your server aliases (e.g., use
+> `my-server` instead of `my_server`). The underlying policy engine parses Fully
+> Qualified Names (`mcp_server_tool`) using the first underscore after the
+> `mcp_` prefix. An underscore in your server alias will cause the parser to
+> misidentify the server name, which can cause security policies to fail
+> silently.
 
 - **`mcpServers.<SERVER_NAME>`** (object): The server parameters for the named
   server.
@@ -1689,7 +1723,7 @@ conventions and context.
     loaded, allowing you to verify the hierarchy and content being used by the
     AI.
   - See the [Commands documentation](./commands.md#memory) for full details on
-    the `/memory` command and its sub-commands (`show` and `refresh`).
+    the `/memory` command and its sub-commands (`show` and `reload`).
 
 By understanding and utilizing these configuration layers and the hierarchical
 nature of context files, you can effectively manage the AI's memory and tailor
