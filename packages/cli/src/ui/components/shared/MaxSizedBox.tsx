@@ -28,9 +28,6 @@ export interface MaxSizedBoxProps {
   additionalHiddenLinesCount?: number;
 }
 
-/** Ensures that fractional heights are correctly identified as overflowing. */
-export const ceilHeight = (height: number): number => Math.ceil(height);
-
 /**
  * A React component that constrains the size of its children and provides
  * content-aware truncation when the content exceeds the specified `maxHeight`.
@@ -58,8 +55,7 @@ export const MaxSizedBox: React.FC<MaxSizedBoxProps> = ({
         const observer = new ResizeObserver((entries) => {
           const entry = entries[0];
           if (entry) {
-            // Use ceilHeight to ensure that fractional heights (e.g. from zooming) that exceed the limit are correctly identified as overflowing.
-            setContentHeight(ceilHeight(entry.contentRect.height));
+            setContentHeight(entry.contentRect.height);
           }
         });
         observer.observe(node);
