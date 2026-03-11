@@ -439,10 +439,10 @@ export class GeminiChat {
                   logNetworkRetryAttempt(
                     this.config,
                     new NetworkRetryAttemptEvent(
-                      attempt,
+                      attempt + 1,
                       maxAttempts,
                       errorType,
-                      delayMs,
+                      delayMs * (attempt + 1),
                       model,
                     ),
                   );
