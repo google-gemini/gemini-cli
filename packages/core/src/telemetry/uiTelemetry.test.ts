@@ -698,6 +698,52 @@ describe('UiTelemetryService', () => {
     });
   });
 
+  describe('clear', () => {
+    it('should reset metrics and last prompt token count', () => {
+      // Set up initial state with some metrics
+      const event = {
+        'event.name': EVENT_API_RESPONSE,
+        model: 'gemini-2.5-pro',
+        duration_ms: 500,
+        usage: {
+          input_token_count: 100,
+          output_token_count: 200,
+          total_token_count: 300,
+          cached_content_token_count: 50,
+          thoughts_token_count: 20,
+          tool_token_count: 30,
+        },
+      } as ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE };
+
+      service.addEvent(event);
+      service.setLastPromptTokenCount(123);
+
+      expect(service.getMetrics().models['gemini-2.5-pro']).toBeDefined();
+      expect(service.getLastPromptTokenCount()).toBe(123);
+
+      service.clear();
+
+      expect(service.getMetrics().models).toEqual({});
+      expect(service.getLastPromptTokenCount()).toBe(0);
+    });
+
+    it('should emit clear and update events', () => {
+      const clearSpy = vi.fn();
+      const updateSpy = vi.fn();
+      service.on('clear', clearSpy);
+      service.on('update', updateSpy);
+
+      const newSessionId = 'new-session-id';
+      service.clear(newSessionId);
+
+      expect(clearSpy).toHaveBeenCalledWith(newSessionId);
+      expect(updateSpy).toHaveBeenCalledOnce();
+      const { metrics, lastPromptTokenCount } = updateSpy.mock.calls[0][0];
+      expect(metrics.models).toEqual({});
+      expect(lastPromptTokenCount).toBe(0);
+    });
+  });
+
   describe('Tool Call Event with Line Count Metadata', () => {
     it('should aggregate valid line count metadata', () => {
       const toolCall = createFakeCompletedToolCall('test_tool', true, 100);

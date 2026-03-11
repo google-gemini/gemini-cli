@@ -23,6 +23,7 @@ import {
 import {
   coreEvents,
   convertSessionToClientHistory,
+  uiTelemetryService,
 } from '@google/gemini-cli-core';
 
 // Mock modules
@@ -34,6 +35,16 @@ vi.mock('../../utils/sessionUtils.js', async (importOriginal) => {
   return {
     ...actual,
     getSessionFiles: vi.fn(),
+  };
+});
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    uiTelemetryService: {
+      clear: vi.fn(),
+    },
   };
 });
 
@@ -100,6 +111,9 @@ describe('useSessionBrowser', () => {
       'utf8',
     );
     expect(mockConfig.setSessionId).toHaveBeenCalledWith(
+      'existing-session-456',
+    );
+    expect(uiTelemetryService.clear).toHaveBeenCalledWith(
       'existing-session-456',
     );
     expect(result.current.isSessionBrowserOpen).toBe(false);
