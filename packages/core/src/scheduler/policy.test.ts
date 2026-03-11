@@ -15,6 +15,7 @@ import {
 } from 'vitest';
 import { checkPolicy, updatePolicy, getPolicyDenialError } from './policy.js';
 import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import {
   MessageBusType,
@@ -214,6 +215,8 @@ describe('policy.ts', () => {
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
+      (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+        mockMessageBus;
 
       const tool = { name: 'replace' } as AnyDeclarativeTool; // 'replace' is in EDIT_TOOL_NAMES
 
@@ -221,7 +224,7 @@ describe('policy.ts', () => {
         tool,
         ToolConfirmationOutcome.ProceedAlways,
         undefined,
-        { config: mockConfig, messageBus: mockMessageBus },
+        mockConfig,
       );
 
       expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
@@ -240,13 +243,15 @@ describe('policy.ts', () => {
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
+      (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+        mockMessageBus;
       const tool = { name: 'test-tool' } as AnyDeclarativeTool;
 
       await updatePolicy(
         tool,
         ToolConfirmationOutcome.ProceedAlways,
         undefined,
-        { config: mockConfig, messageBus: mockMessageBus },
+        mockConfig,
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -270,13 +275,15 @@ describe('policy.ts', () => {
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
+      (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+        mockMessageBus;
       const tool = { name: 'test-tool' } as AnyDeclarativeTool;
 
       await updatePolicy(
         tool,
         ToolConfirmationOutcome.ProceedAlwaysAndSave,
         undefined,
-        { config: mockConfig, messageBus: mockMessageBus },
+        mockConfig,
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -298,6 +305,8 @@ describe('policy.ts', () => {
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
+      (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+        mockMessageBus;
       const tool = { name: 'run_shell_command' } as AnyDeclarativeTool;
       const details: ToolExecuteConfirmationDetails = {
         type: 'exec',
@@ -308,10 +317,12 @@ describe('policy.ts', () => {
         onConfirm: vi.fn(),
       };
 
-      await updatePolicy(tool, ToolConfirmationOutcome.ProceedAlways, details, {
-        config: mockConfig,
-        messageBus: mockMessageBus,
-      });
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.ProceedAlways,
+        details,
+        mockConfig,
+      );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -332,6 +343,8 @@ describe('policy.ts', () => {
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
+      (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+        mockMessageBus;
       const tool = { name: 'mcp-tool' } as AnyDeclarativeTool;
       const details: ToolMcpConfirmationDetails = {
         type: 'mcp',
@@ -346,7 +359,7 @@ describe('policy.ts', () => {
         tool,
         ToolConfirmationOutcome.ProceedAlwaysServer,
         details,
-        { config: mockConfig, messageBus: mockMessageBus },
+        mockConfig,
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -369,12 +382,16 @@ describe('policy.ts', () => {
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
+      (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+        mockMessageBus;
       const tool = { name: 'test-tool' } as AnyDeclarativeTool;
 
-      await updatePolicy(tool, ToolConfirmationOutcome.ProceedOnce, undefined, {
-        config: mockConfig,
-        messageBus: mockMessageBus,
-      });
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.ProceedOnce,
+        undefined,
+        mockConfig,
+      );
 
       expect(mockMessageBus.publish).not.toHaveBeenCalled();
       expect(mockConfig.setApprovalMode).not.toHaveBeenCalled();
@@ -390,12 +407,16 @@ describe('policy.ts', () => {
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
+      (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+        mockMessageBus;
       const tool = { name: 'test-tool' } as AnyDeclarativeTool;
 
-      await updatePolicy(tool, ToolConfirmationOutcome.Cancel, undefined, {
-        config: mockConfig,
-        messageBus: mockMessageBus,
-      });
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.Cancel,
+        undefined,
+        mockConfig,
+      );
 
       expect(mockMessageBus.publish).not.toHaveBeenCalled();
     });
@@ -410,13 +431,15 @@ describe('policy.ts', () => {
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
+      (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+        mockMessageBus;
       const tool = { name: 'test-tool' } as AnyDeclarativeTool;
 
       await updatePolicy(
         tool,
         ToolConfirmationOutcome.ModifyWithEditor,
         undefined,
-        { config: mockConfig, messageBus: mockMessageBus },
+        mockConfig,
       );
 
       expect(mockMessageBus.publish).not.toHaveBeenCalled();
@@ -432,6 +455,8 @@ describe('policy.ts', () => {
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
+      (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+        mockMessageBus;
       const tool = { name: 'mcp-tool' } as AnyDeclarativeTool;
       const details: ToolMcpConfirmationDetails = {
         type: 'mcp',
@@ -446,7 +471,7 @@ describe('policy.ts', () => {
         tool,
         ToolConfirmationOutcome.ProceedAlwaysTool,
         details,
-        { config: mockConfig, messageBus: mockMessageBus },
+        mockConfig,
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -469,6 +494,8 @@ describe('policy.ts', () => {
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
+      (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+        mockMessageBus;
       const tool = { name: 'mcp-tool' } as AnyDeclarativeTool;
       const details: ToolMcpConfirmationDetails = {
         type: 'mcp',
@@ -479,10 +506,12 @@ describe('policy.ts', () => {
         onConfirm: vi.fn(),
       };
 
-      await updatePolicy(tool, ToolConfirmationOutcome.ProceedAlways, details, {
-        config: mockConfig,
-        messageBus: mockMessageBus,
-      });
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.ProceedAlways,
+        details,
+        mockConfig,
+      );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -506,6 +535,8 @@ describe('policy.ts', () => {
       const mockMessageBus = {
         publish: vi.fn(),
       } as unknown as Mocked<MessageBus>;
+      (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+        mockMessageBus;
       const tool = { name: 'mcp-tool' } as AnyDeclarativeTool;
       const details: ToolMcpConfirmationDetails = {
         type: 'mcp',
@@ -520,7 +551,7 @@ describe('policy.ts', () => {
         tool,
         ToolConfirmationOutcome.ProceedAlwaysAndSave,
         details,
-        { config: mockConfig, messageBus: mockMessageBus },
+        mockConfig,
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -550,7 +581,10 @@ describe('policy.ts', () => {
         tool,
         ToolConfirmationOutcome.ProceedAlwaysAndSave,
         undefined,
-        { config: mockConfig, messageBus: mockMessageBus },
+        {
+          config: mockConfig,
+          messageBus: mockMessageBus,
+        } as unknown as AgentLoopContext,
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -577,7 +611,10 @@ describe('policy.ts', () => {
         tool,
         ToolConfirmationOutcome.ProceedAlwaysAndSave,
         undefined,
-        { config: mockConfig, messageBus: mockMessageBus },
+        {
+          config: mockConfig,
+          messageBus: mockMessageBus,
+        } as unknown as AgentLoopContext,
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -612,7 +649,10 @@ describe('policy.ts', () => {
         tool,
         ToolConfirmationOutcome.ProceedAlwaysAndSave,
         details,
-        { config: mockConfig, messageBus: mockMessageBus },
+        {
+          config: mockConfig,
+          messageBus: mockMessageBus,
+        } as unknown as AgentLoopContext,
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -714,6 +754,8 @@ describe('Plan Mode Denial Consistency', () => {
       getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Config>;
     (mockConfig as unknown as { config: Config }).config = mockConfig as Config;
+    (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+      mockMessageBus;
   });
 
   afterEach(() => {
@@ -732,8 +774,7 @@ describe('Plan Mode Denial Consistency', () => {
 
       if (enableEventDrivenScheduler) {
         const scheduler = new Scheduler({
-          config: mockConfig,
-          messageBus: mockMessageBus,
+          context: mockConfig,
           getPreferredEditor: () => undefined,
           schedulerId: ROOT_SCHEDULER_ID,
         });

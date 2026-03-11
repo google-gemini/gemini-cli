@@ -6,7 +6,11 @@
 
 import type { Key } from '../hooks/useKeypress.js';
 import type { KeyBindingConfig } from './keyBindings.js';
-import { Command, defaultKeyBindings } from './keyBindings.js';
+import {
+  Command,
+  defaultKeyBindingConfig,
+  loadCustomKeybindings,
+} from './keyBindings.js';
 
 /**
  * Checks if a key matches any of the bindings for a command
@@ -14,9 +18,11 @@ import { Command, defaultKeyBindings } from './keyBindings.js';
 function matchCommand(
   command: Command,
   key: Key,
-  config: KeyBindingConfig = defaultKeyBindings,
+  config: KeyBindingConfig = defaultKeyBindingConfig,
 ): boolean {
-  return config[command].some((binding) => binding.matches(key));
+  const bindings = config.get(command);
+  if (!bindings) return false;
+  return bindings.some((binding) => binding.matches(key));
 }
 
 /**
@@ -35,7 +41,7 @@ export type KeyMatchers = {
  * Creates key matchers from a key binding configuration
  */
 export function createKeyMatchers(
-  config: KeyBindingConfig = defaultKeyBindings,
+  config: KeyBindingConfig = defaultKeyBindingConfig,
 ): KeyMatchers {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const matchers = {} as { [C in Command]: KeyMatcher };
@@ -50,8 +56,23 @@ export function createKeyMatchers(
 /**
  * Default key binding matchers using the default configuration
  */
-export const defaultKeyMatchers: KeyMatchers =
-  createKeyMatchers(defaultKeyBindings);
+export const defaultKeyMatchers: KeyMatchers = createKeyMatchers(
+  defaultKeyBindingConfig,
+);
 
 // Re-export Command for convenience
 export { Command };
+
+/**
+ * Loads and creates key matchers including user customizations.
+ */
+export async function loadKeyMatchers(): Promise<{
+  matchers: KeyMatchers;
+  errors: string[];
+}> {
+  const { config, errors } = await loadCustomKeybindings();
+  return {
+    matchers: createKeyMatchers(config),
+    errors,
+  };
+}
