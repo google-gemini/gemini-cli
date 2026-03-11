@@ -47,8 +47,8 @@
           "enum": [
             "vscode",
             "vscodium",
-            "cursor",
             "windsurf",
+            "cursor",
             "zed",
             "antigravity",
             "sublimetext",
@@ -58,8 +58,8 @@
             "vim",
             "neovim",
             "emacs",
-            "emacsclient",
             "hx",
+            "emacsclient",
             "micro"
           ]
         },
