@@ -15,7 +15,6 @@ import type { ConfirmingToolState } from '../hooks/useConfirmingTool.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { StickyHeader } from './StickyHeader.js';
-import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import type { SerializableConfirmationDetails } from '@google/gemini-cli-core';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 
@@ -55,7 +54,6 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
 }) => {
   const config = useConfig();
   const { getPreferredEditor } = useUIActions();
-  const isAlternateBuffer = useAlternateBuffer();
   const {
     mainAreaWidth,
     terminalHeight,
@@ -171,10 +169,5 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
     </>
   );
 
-  return isAlternateBuffer ? (
-    /* Shadow the global provider to maintain isolation in ASB mode. */
-    <OverflowProvider>{content}</OverflowProvider>
-  ) : (
-    content
-  );
+  return <OverflowProvider>{content}</OverflowProvider>;
 };
