@@ -11,6 +11,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import type { Config } from '../config/config.js';
 import { logStaleOutputElision } from '../telemetry/loggers.js';
 import { StaleOutputElisionEvent } from '../telemetry/types.js';
+import fs from 'node:fs';
 import {
   READ_FILE_TOOL_NAME,
   READ_MANY_FILES_TOOL_NAME,
@@ -352,8 +353,18 @@ export class StaleOutputElisionService {
    */
   private normalizePath(filePath: string): string {
     try {
-      return path.resolve(filePath);
+      const resolvedPath = path.resolve(filePath);
+      try {
+        // Use realpathSync to resolve symlinks for existing paths, ensuring
+        // that different path strings pointing to the same file are treated as equal.
+        return fs.realpathSync(resolvedPath);
+      } catch {
+        // If realpath fails (e.g., file doesn't exist, which is valid for
+        // a write operation), fall back to the resolved absolute path.
+        return resolvedPath;
+      }
     } catch {
+      // Fallback to the original path on any resolution error (e.g. null bytes in path).
       return filePath;
     }
   }
