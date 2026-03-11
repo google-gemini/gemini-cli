@@ -61,6 +61,7 @@ export interface SchedulerOptions {
   messageBus?: MessageBus;
   getPreferredEditor: () => EditorType | undefined;
   schedulerId: string;
+  subagent?: string;
   parentCallId?: string;
   onWaitingForConfirmation?: (waiting: boolean) => void;
 }
@@ -102,6 +103,7 @@ export class Scheduler {
   private readonly messageBus: MessageBus;
   private readonly getPreferredEditor: () => EditorType | undefined;
   private readonly schedulerId: string;
+  private readonly subagent?: string;
   private readonly parentCallId?: string;
   private readonly onWaitingForConfirmation?: (waiting: boolean) => void;
 
@@ -115,6 +117,7 @@ export class Scheduler {
     this.messageBus = options.messageBus ?? this.context.messageBus;
     this.getPreferredEditor = options.getPreferredEditor;
     this.schedulerId = options.schedulerId;
+    this.subagent = options.subagent;
     this.parentCallId = options.parentCallId;
     this.onWaitingForConfirmation = options.onWaitingForConfirmation;
     this.state = new SchedulerStateManager(
@@ -563,7 +566,11 @@ export class Scheduler {
     const callId = toolCall.request.callId;
 
     // Policy & Security
-    const { decision, rule } = await checkPolicy(toolCall, this.config);
+    const { decision, rule } = await checkPolicy(
+      toolCall,
+      this.config,
+      this.subagent,
+    );
 
     if (decision === PolicyDecision.DENY) {
       const { errorMessage, errorType } = getPolicyDenialError(

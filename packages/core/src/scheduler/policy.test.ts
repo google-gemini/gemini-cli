@@ -68,6 +68,7 @@ describe('policy.ts', () => {
         { name: 'test-tool', args: {} },
         undefined,
         undefined,
+        undefined,
       );
     });
 
@@ -97,6 +98,7 @@ describe('policy.ts', () => {
         { name: 'mcp-tool', args: {} },
         'my-server',
         { readOnlyHint: true },
+        undefined,
       );
     });
 
