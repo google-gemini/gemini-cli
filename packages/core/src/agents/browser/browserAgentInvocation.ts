@@ -16,6 +16,7 @@
 
 import { randomUUID } from 'node:crypto';
 import type { Config } from '../../config/config.js';
+import { type AgentLoopContext } from '../../config/agent-loop-context.js';
 import { LocalAgentExecutor } from '../local-executor.js';
 import { safeJsonToMarkdown } from '../../utils/markdownUtils.js';
 import {
@@ -180,7 +181,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: AgentInputs,
     messageBus: MessageBus,
     _toolName?: string,
@@ -193,6 +194,10 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
       _toolName ?? 'browser_agent',
       _toolDisplayName ?? 'Browser Agent',
     );
+  }
+
+  private get config(): Config {
+    return this.context.config;
   }
 
   /**
@@ -410,7 +415,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
       // Create and run executor with the configured definition
       const executor = await LocalAgentExecutor.create(
         definition,
-        this.config,
+        this.context,
         onActivity,
       );
 

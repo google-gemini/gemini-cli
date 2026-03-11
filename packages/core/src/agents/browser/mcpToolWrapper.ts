@@ -40,8 +40,8 @@ class McpToolInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
-    private readonly browserManager: BrowserManager,
-    private readonly toolName: string,
+    protected readonly browserManager: BrowserManager,
+    protected readonly toolName: string,
     params: Record<string, unknown>,
     messageBus: MessageBus,
     private readonly shouldDisableInput: boolean,
@@ -72,7 +72,7 @@ class McpToolInvocation extends BaseToolInvocation<
     };
   }
 
-  protected override getPolicyUpdateOptions(
+  override getPolicyUpdateOptions(
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
     return {
@@ -197,7 +197,7 @@ class TypeTextInvocation extends BaseToolInvocation<
     };
   }
 
-  protected override getPolicyUpdateOptions(
+  override getPolicyUpdateOptions(
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
     return {
@@ -300,7 +300,7 @@ class McpDeclarativeTool extends DeclarativeTool<
   ToolResult
 > {
   constructor(
-    private readonly browserManager: BrowserManager,
+    protected readonly browserManager: BrowserManager,
     name: string,
     description: string,
     parameterSchema: unknown,
