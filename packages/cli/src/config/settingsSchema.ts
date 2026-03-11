@@ -1209,7 +1209,7 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: DEFAULT_FILE_FILTERING_OPTIONS.maxFileCount,
             description:
-              'Maximum number of files to index for autocomplete and search. Defaults to 20,000.',
+              'Maximum number of files to index for autocomplete and search.',
             showInDialog: true,
           },
           enableRecursiveFileSearch: {
