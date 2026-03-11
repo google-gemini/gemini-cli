@@ -8,12 +8,12 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { readFile, writeFile } from 'node:fs/promises';
 
-import type { KeyBinding } from '../packages/cli/src/config/keyBindings.js';
+import type { KeyBinding } from '../packages/cli/src/ui/key/keyBindings.js';
 import {
   commandCategories,
   commandDescriptions,
-  defaultKeyBindings,
-} from '../packages/cli/src/config/keyBindings.js';
+  defaultKeyBindingConfig,
+} from '../packages/cli/src/ui/key/keyBindings.js';
 import {
   formatWithPrettier,
   injectBetweenMarkers,
@@ -24,7 +24,7 @@ const START_MARKER = '<!-- KEYBINDINGS-AUTOGEN:START -->';
 const END_MARKER = '<!-- KEYBINDINGS-AUTOGEN:END -->';
 const OUTPUT_RELATIVE_PATH = ['docs', 'reference', 'keyboard-shortcuts.md'];
 
-import { formatKeyBinding } from '../packages/cli/src/ui/utils/keybindingUtils.js';
+import { formatKeyBinding } from '../packages/cli/src/ui/key/keybindingUtils.js';
 
 export interface KeybindingDocCommand {
   description: string;
@@ -82,7 +82,7 @@ export function buildDefaultDocSections(): readonly KeybindingDocSection[] {
     title: category.title,
     commands: category.commands.map((command) => ({
       description: commandDescriptions[command],
-      bindings: defaultKeyBindings[command],
+      bindings: defaultKeyBindingConfig.get(command) ?? [],
     })),
   }));
 }
