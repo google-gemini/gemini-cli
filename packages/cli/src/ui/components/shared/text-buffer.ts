@@ -772,6 +772,7 @@ interface UseTextBufferProps {
   inputFilter?: (text: string) => string; // Optional filter for input text
   singleLine?: boolean;
   getPreferredEditor?: () => EditorType | undefined;
+  getOpenEditorInNewWindow?: () => boolean | undefined;
 }
 
 interface UndoHistoryEntry {
@@ -2840,6 +2841,7 @@ export function useTextBuffer({
   inputFilter,
   singleLine = false,
   getPreferredEditor,
+  getOpenEditorInNewWindow,
 }: UseTextBufferProps): TextBuffer {
   const keyMatchers = useKeyMatchers();
   const initialState = useMemo((): TextBufferState => {
@@ -3324,6 +3326,7 @@ export function useTextBuffer({
         stdin,
         setRawMode,
         getPreferredEditor?.(),
+        getOpenEditorInNewWindow?.(),
       );
 
       let newText = fs.readFileSync(filePath, 'utf8');
@@ -3354,7 +3357,14 @@ export function useTextBuffer({
         /* ignore */
       }
     }
-  }, [text, pastedContent, stdin, setRawMode, getPreferredEditor]);
+  }, [
+    text,
+    pastedContent,
+    stdin,
+    setRawMode,
+    getPreferredEditor,
+    getOpenEditorInNewWindow,
+  ]);
 
   const handleInput = useCallback(
     (key: Key): boolean => {

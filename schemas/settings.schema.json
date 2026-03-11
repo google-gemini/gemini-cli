@@ -73,6 +73,13 @@
             "micro"
           ]
         },
+        "openEditorInNewWindow": {
+          "title": "Open Editor in New Window",
+          "description": "Open VS Code-family editors in a new window when editing files.",
+          "markdownDescription": "Open VS Code-family editors in a new window when editing files.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "vimMode": {
           "title": "Vim Mode",
           "description": "Enable Vim keybindings",

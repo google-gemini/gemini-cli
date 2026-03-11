@@ -205,6 +205,16 @@ const SETTINGS_SCHEMA = {
         showInDialog: false,
         options: EDITOR_OPTIONS,
       },
+      openEditorInNewWindow: {
+        type: 'boolean',
+        label: 'Open Editor in New Window',
+        category: 'General',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Open VS Code-family editors in a new window when editing files.',
+        showInDialog: false,
+      },
       vimMode: {
         type: 'boolean',
         label: 'Vim Mode',
