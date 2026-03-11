@@ -223,18 +223,31 @@ export function getEditorWaitFlag(editor: EditorType): string {
  */
 const editorExtraArgs: Partial<Record<EditorType, string[]>> = {
   emacsclient: ['-nw'], // Force terminal (no-window) mode
-  vscode: ['--new-window'], // Force a new window to open the file directly
-  vscodium: ['--new-window'],
-  cursor: ['--new-window'],
-  windsurf: ['--new-window'],
 };
+
+/**
+ * VS Code-family editors that support the --new-window flag.
+ */
+const NEW_WINDOW_EDITORS = new Set<EditorType>([
+  'vscode',
+  'vscodium',
+  'cursor',
+  'windsurf',
+]);
 
 /**
  * Returns any extra arguments that must be passed to the editor executable
  * (in addition to the file path and any wait flag).
  */
-export function getEditorExtraArgs(editor: EditorType): string[] {
-  return editorExtraArgs[editor] ?? [];
+export function getEditorExtraArgs(
+  editor: EditorType,
+  options?: { newWindow?: boolean },
+): string[] {
+  const args = editorExtraArgs[editor] ? [...editorExtraArgs[editor]] : [];
+  if (options?.newWindow && NEW_WINDOW_EDITORS.has(editor)) {
+    args.push('--new-window');
+  }
+  return args;
 }
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {

@@ -926,7 +926,7 @@ describe('editor utils', () => {
       expect(getEditorExtraArgs('emacsclient')).toEqual(['-nw']);
     });
 
-    it('should return [--new-window] for VS Code-family editors', () => {
+    it('should return [] for VS Code-family editors by default', () => {
       const vscodeEditors: EditorType[] = [
         'vscode',
         'vscodium',
@@ -934,7 +934,33 @@ describe('editor utils', () => {
         'windsurf',
       ];
       for (const editor of vscodeEditors) {
-        expect(getEditorExtraArgs(editor)).toEqual(['--new-window']);
+        expect(getEditorExtraArgs(editor)).toEqual([]);
+      }
+    });
+
+    it('should return [--new-window] for VS Code-family editors when newWindow is true', () => {
+      const vscodeEditors: EditorType[] = [
+        'vscode',
+        'vscodium',
+        'cursor',
+        'windsurf',
+      ];
+      for (const editor of vscodeEditors) {
+        expect(getEditorExtraArgs(editor, { newWindow: true })).toEqual([
+          '--new-window',
+        ]);
+      }
+    });
+
+    it('should return [] for VS Code-family editors when newWindow is false', () => {
+      const vscodeEditors: EditorType[] = [
+        'vscode',
+        'vscodium',
+        'cursor',
+        'windsurf',
+      ];
+      for (const editor of vscodeEditors) {
+        expect(getEditorExtraArgs(editor, { newWindow: false })).toEqual([]);
       }
     });
 
