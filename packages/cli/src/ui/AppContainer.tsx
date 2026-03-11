@@ -568,11 +568,6 @@ export const AppContainer = (props: AppContainerProps) => {
     return isValidEditorType(val) ? val : undefined;
   }, [settings.merged.general.preferredEditor]);
 
-  const getOpenEditorInNewWindow = useCallback(
-    () => settings.merged.general.openEditorInNewWindow,
-    [settings.merged.general.openEditorInNewWindow],
-  );
-
   const buffer = useTextBuffer({
     initialText: '',
     viewport: { height: 10, width: inputWidth },
@@ -581,7 +576,6 @@ export const AppContainer = (props: AppContainerProps) => {
     escapePastedPaths: true,
     shellModeActive,
     getPreferredEditor,
-    getOpenEditorInNewWindow,
   });
   const bufferRef = useRef(buffer);
   useEffect(() => {
