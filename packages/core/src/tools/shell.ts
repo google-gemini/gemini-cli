@@ -111,7 +111,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    const command = stripShellWrapper(this.params.command);
+    const strippedCommand = stripShellWrapper(this.params.command);
+    const isWindows = os.platform() === 'win32';
+    const shellType = isWindows ? 'powershell' : 'bash';
+
+    // SECURITY: Apply the same normalization as in execute() to prevent command injection
+    // This ensures the user sees exactly what will be executed
+    const command = normalizePowerShellCommand(strippedCommand, shellType);
 
     const parsed = parseCommandDetails(command);
     let rootCommandDisplay = '';
@@ -169,10 +175,34 @@ export class ShellToolInvocation extends BaseToolInvocation<
       };
     }
 
+    // Additional validation for dangerous characters
+    if (strippedCommand.includes('\0')) {
+      return {
+        llmContent: 'Command contains invalid characters.',
+        returnDisplay: 'Command validation failed.',
+        error: {
+          message: 'Command contains null bytes',
+          type: ToolErrorType.SHELL_EXECUTE_ERROR,
+        },
+      };
+    }
+
     const normalizedCommand = normalizePowerShellCommand(
       strippedCommand,
       shellType,
     );
+
+    // Validate normalized command
+    if (!normalizedCommand || typeof normalizedCommand !== 'string') {
+      return {
+        llmContent: 'Command normalization failed.',
+        returnDisplay: 'Command normalization failed.',
+        error: {
+          message: 'Command normalization produced invalid result',
+          type: ToolErrorType.SHELL_EXECUTE_ERROR,
+        },
+      };
+    }
 
     if (signal.aborted) {
       return {

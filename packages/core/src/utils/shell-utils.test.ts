@@ -634,7 +634,17 @@ describe('normalizePowerShellCommand', () => {
     expect(normalizePowerShellCommand('test', null)).toBe('test');
   });
 
-  it('should handle very long commands by returning original', () => {
+  it('should handle null bytes in commands gracefully', () => {
+    const commandWithNullByte = 'echo "test\0malicious"';
+    const result = normalizePowerShellCommand(
+      commandWithNullByte,
+      'powershell',
+    );
+    // Should return original command without normalization due to null byte detection
+    expect(result).toBe(commandWithNullByte);
+  });
+
+  it('should handle extremely long commands by returning original', () => {
     const longCommand = 'echo "test"' + ' && echo "test"'.repeat(10000);
     const result = normalizePowerShellCommand(longCommand, 'powershell');
     // Should return original command if too long (over 100KB limit)

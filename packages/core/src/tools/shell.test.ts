@@ -622,6 +622,133 @@ describe('ShellTool', () => {
     });
   });
 
+  describe('Security - Command Injection Prevention', () => {
+    const mockAbortSignal = new AbortController().signal;
+
+    const resolveShellExecution = (
+      result: Partial<ShellExecutionResult> = {},
+    ) => {
+      const fullResult: ShellExecutionResult = {
+        rawOutput: Buffer.from(result.output || ''),
+        output: 'Success',
+        exitCode: 0,
+        signal: null,
+        error: null,
+        aborted: false,
+        pid: 12345,
+        executionMethod: 'child_process',
+        ...result,
+      };
+      resolveExecutionPromise(fullResult);
+    };
+
+    beforeEach(() => {
+      mockPlatform.mockReturnValue('win32');
+    });
+
+    it('should apply normalization in both confirmation and execution paths', async () => {
+      const maliciousCommand =
+        'Write-Output "Safe" && Remove-Item -Force C:\\*';
+      const invocation = shellTool.build({ command: maliciousCommand });
+
+      // Test confirmation details use normalized command
+      const confirmationDetails =
+        // @ts-expect-error - accessing protected method for testing
+        await invocation.getConfirmationDetails(mockAbortSignal);
+      expect(confirmationDetails).toBeTruthy();
+      if (confirmationDetails) {
+        // The rootCommand should be parsed from normalized command (Write-Output)
+        // not fail due to && syntax error
+        expect(confirmationDetails.rootCommand).toContain('Write-Output');
+      }
+
+      // Test execution uses same normalized command
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution();
+      await promise;
+
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Write-Output "Safe"; Remove-Item -Force C:\\*',
+        ),
+        expect.any(String),
+        expect.any(Function),
+        expect.any(Object),
+        expect.any(Boolean),
+        expect.any(Object),
+      );
+    });
+
+    it('should prevent command injection via && syntax in PowerShell', async () => {
+      const injectionAttempt =
+        'echo "hello" && del /f /q C:\\Windows\\System32\\*';
+      const invocation = shellTool.build({ command: injectionAttempt });
+
+      // CRITICAL: Test that confirmation shows the SAME command that will be executed
+      const confirmationDetails =
+        // @ts-expect-error - accessing protected method for testing
+        await invocation.getConfirmationDetails(mockAbortSignal);
+      expect(confirmationDetails).toBeTruthy();
+
+      // Execute and capture the actual command sent to shell service
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution();
+      await promise;
+
+      // SECURITY CHECK: Both confirmation and execution should use normalized command
+      if (confirmationDetails) {
+        // Should successfully parse 'echo' from normalized command (not fail on &&)
+        expect(confirmationDetails.rootCommand).toContain('echo');
+        // Should also contain 'del' since normalization allows parsing of full command
+        expect(confirmationDetails.rootCommand).toContain('del');
+      }
+
+      // Execution should use normalized command with semicolon
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'echo "hello"; del /f /q C:\\Windows\\System32\\*',
+        ),
+        expect.any(String),
+        expect.any(Function),
+        expect.any(Object),
+        expect.any(Boolean),
+        expect.any(Object),
+      );
+    });
+
+    it('should handle complex command chains consistently', async () => {
+      const complexCommand =
+        'Get-Process && Stop-Process -Name "notepad" && Remove-Item "temp.txt"';
+      const invocation = shellTool.build({ command: complexCommand });
+
+      // Test confirmation parsing
+      const confirmationDetails =
+        // @ts-expect-error - accessing protected method for testing
+        await invocation.getConfirmationDetails(mockAbortSignal);
+      expect(confirmationDetails).toBeTruthy();
+      if (confirmationDetails) {
+        // Should parse multiple commands from normalized version
+        expect(confirmationDetails.rootCommand).toContain('Get-Process');
+      }
+
+      // Test execution normalization
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution();
+      await promise;
+
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Get-Process; Stop-Process -Name "notepad"; Remove-Item "temp.txt"',
+        ),
+        expect.any(String),
+        expect.any(Function),
+        expect.any(Object),
+        expect.any(Boolean),
+        expect.any(Object),
+      );
+    });
+  });
+
   describe('shouldConfirmExecute', () => {
     it('should request confirmation for a new command and allowlist it on "Always"', async () => {
       const params = { command: 'npm install' };

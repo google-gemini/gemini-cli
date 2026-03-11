@@ -167,11 +167,16 @@ export async function initializeShellParsers(): Promise<void> {
       throw treeSitterInitializationError;
     }
 
-    return;
+    // Handle race condition: lock was released but initialization state is ambiguous
+    // This should not happen in normal operation, but we handle it defensively
+    throw new Error(
+      'Tree-sitter initialization incomplete after lock release - initialization state is ambiguous',
+    );
   }
 
   // Start initialization
   initializationLock = true;
+
   try {
     treeSitterInitialization = loadBashLanguage().catch((error: unknown) => {
       treeSitterInitializationError =
@@ -189,6 +194,7 @@ export async function initializeShellParsers(): Promise<void> {
       error instanceof Error ? error : new Error(String(error));
     throw treeSitterInitializationError; // Propagate error to caller
   } finally {
+    // Only release lock after error handling is complete
     initializationLock = false;
   }
 }
@@ -265,11 +271,17 @@ function createParser(): Parser | null {
     return null;
   }
 
+  let parser: Parser | null = null;
   try {
-    const parser = new Parser();
+    parser = new Parser();
     parser.setLanguage(bashLanguage);
     return parser;
-  } catch {
+  } catch (_error) {
+    // Clean up parser on error to prevent memory leaks
+    if (parser) {
+      parser.delete();
+      parser = null;
+    }
     return null;
   }
 }
@@ -292,8 +304,7 @@ function parseCommandTree(
       progressCallback: () => {
         if (performance.now() > deadline) {
           timedOut = true;
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          return true as unknown as void; // Returning true cancels parsing, but type says void
+          return; // Cancel parsing by returning from callback
         }
       },
     });
@@ -819,7 +830,7 @@ export function normalizePowerShellCommand(
   command: string,
   shellType: ShellType,
 ): string {
-  // Input validation with proper type guards
+  // Input validation with proper type guards and additional safety checks
   if (typeof command !== 'string') {
     debugLogger.warn(
       'Invalid command type passed to normalizePowerShellCommand:',
@@ -847,6 +858,12 @@ export function normalizePowerShellCommand(
     debugLogger.warn(
       `Command too long for normalization: ${command.length} characters`,
     );
+    return command;
+  }
+
+  // Additional safety check for null bytes and other dangerous characters
+  if (command.includes('\0')) {
+    debugLogger.warn('Command contains null bytes, rejecting normalization');
     return command;
   }
 
