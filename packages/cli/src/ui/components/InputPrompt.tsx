@@ -5,8 +5,14 @@
  */
 
 import type React from 'react';
+import {
+  useCallback,
+  useEffect,
+  useState,
+  useRef,
+  useMemo,
+} from 'react';
 import clipboardy from 'clipboardy';
-import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { Box, Text, useStdout, type DOMElement } from 'ink';
 import { SuggestionsDisplay, MAX_WIDTH } from './SuggestionsDisplay.js';
 import { theme } from '../semantic-colors.js';
@@ -34,13 +40,16 @@ import {
   useCommandCompletion,
   CompletionMode,
 } from '../hooks/useCommandCompletion.js';
-import type { Key } from '../hooks/useKeypress.js';
-import { useKeypress } from '../hooks/useKeypress.js';
+import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { Command } from '../key/keyMatchers.js';
 import { formatCommand } from '../key/keybindingUtils.js';
 import type { CommandContext, SlashCommand } from '../commands/types.js';
-import type { Config } from '@google/gemini-cli-core';
-import { ApprovalMode, coreEvents, debugLogger } from '@google/gemini-cli-core';
+import {
+  ApprovalMode,
+  coreEvents,
+  debugLogger,
+  type Config,
+} from '@google/gemini-cli-core';
 import {
   parseInputForHighlighting,
   parseSegmentsFromTokens,
