@@ -16,6 +16,7 @@ import type {
 import {
   coreEvents,
   convertSessionToClientHistory,
+  uiTelemetryService,
 } from '@google/gemini-cli-core';
 import type { SessionInfo } from '../../utils/sessionUtils.js';
 import { convertSessionToHistoryFormats } from '../../utils/sessionUtils.js';
@@ -68,6 +69,7 @@ export const useSessionBrowser = (
           // Use the old session's ID to continue it.
           const existingSessionId = conversation.sessionId;
           config.setSessionId(existingSessionId);
+          uiTelemetryService.hydrate(conversation);
 
           const resumedSessionData = {
             conversation,
