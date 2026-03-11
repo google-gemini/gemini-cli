@@ -204,7 +204,8 @@ const SETTINGS_SCHEMA = {
         description: oneLine`
           The default approval mode for tool execution.
           'default' prompts for approval, 'auto_edit' auto-approves edit tools,
-          and 'plan' is read-only mode. 'yolo' is not supported yet.
+          and 'plan' is read-only mode. YOLO mode (auto-approve all actions) can
+          only be enabled via command line (--yolo or --approval-mode=yolo).
         `,
         showInDialog: true,
         options: [
