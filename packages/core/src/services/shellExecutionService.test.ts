@@ -341,6 +341,37 @@ describe('ShellExecutionService', () => {
       );
     });
 
+    it('should truncate raw output to avoid OOM for massive streams', async () => {
+      const { MAX_RAW_OUTPUT_BUFFER_SIZE } = await import(
+        './shellExecutionService.js'
+      );
+      // Produce an output that is larger than the maximum buffer size
+      const targetSize = MAX_RAW_OUTPUT_BUFFER_SIZE + 5 * 1024 * 1024; // 5MB over the limit
+
+      const { result } = await simulateExecution(
+        'massive-output-command',
+        (pty) => {
+          // Send 1MB chunks
+          const chunk = 'a'.repeat(1024 * 1024);
+          let bytesSent = 0;
+          while (bytesSent < targetSize) {
+            pty.onData.mock.calls[0][0](chunk);
+            bytesSent += chunk.length;
+          }
+          pty.onExit.mock.calls[0][0]({ exitCode: 0, signal: null });
+        },
+        { ...shellExecutionConfig, maxSerializedLines: 100 },
+      );
+
+      expect(result.exitCode).toBe(0);
+
+      // rawOutput should be capped at MAX_RAW_OUTPUT_BUFFER_SIZE
+      expect(result.rawOutput.length).toBeLessThanOrEqual(
+        MAX_RAW_OUTPUT_BUFFER_SIZE,
+      );
+      expect(result.rawOutput.length).toBeGreaterThan(0);
+    });
+
     it('should not wrap long lines in the final output', async () => {
       // Set a small width to force wrapping
       const narrowConfig = { ...shellExecutionConfig, terminalWidth: 10 };
