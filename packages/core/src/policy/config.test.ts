@@ -19,6 +19,7 @@ import { isDirectorySecure } from '../utils/security.js';
 import {
   createPolicyEngineConfig,
   clearEmittedPolicyWarnings,
+  getPolicyDirectories,
 } from './config.js';
 import { Storage } from '../config/storage.js';
 import * as tomlLoader from './toml-loader.js';
@@ -744,5 +745,54 @@ modes = ["plan"]
     expect(feedbackSpy.mock.calls.length).toBe(count);
 
     feedbackSpy.mockRestore();
+  });
+});
+
+describe('getPolicyDirectories', () => {
+  const USER_POLICIES_DIR = '/mock/user/policies';
+  const SYSTEM_POLICIES_DIR = '/mock/system/policies';
+
+  beforeEach(() => {
+    vi.spyOn(Storage, 'getUserPoliciesDir').mockReturnValue(USER_POLICIES_DIR);
+    vi.spyOn(Storage, 'getSystemPoliciesDir').mockReturnValue(
+      SYSTEM_POLICIES_DIR,
+    );
+  });
+
+  it('should include default user policies directory when policyPaths is undefined', () => {
+    const dirs = getPolicyDirectories();
+    expect(dirs).toContain(USER_POLICIES_DIR);
+  });
+
+  it('should include default user policies directory when policyPaths is an empty array', () => {
+    // This is the specific case that regressed
+    const dirs = getPolicyDirectories(undefined, []);
+    expect(dirs).toContain(USER_POLICIES_DIR);
+  });
+
+  it('should replace default user policies directory when policyPaths has entries', () => {
+    const customPath = '/custom/policies';
+    const dirs = getPolicyDirectories(undefined, [customPath]);
+    expect(dirs).toContain(customPath);
+    expect(dirs).not.toContain(USER_POLICIES_DIR);
+  });
+
+  it('should include all tiers in correct order', () => {
+    const defaultDir = '/default/policies';
+    const workspaceDir = '/workspace/policies';
+    const adminPath = '/admin/extra/policies';
+    const userPath = '/user/custom/policies';
+
+    const dirs = getPolicyDirectories(defaultDir, [userPath], workspaceDir, [
+      adminPath,
+    ]);
+
+    // Order should be Admin -> User -> Workspace -> Default
+    // getPolicyDirectories returns them in that order (which is then reversed by the loader)
+    expect(dirs[0]).toBe(SYSTEM_POLICIES_DIR);
+    expect(dirs[1]).toBe(adminPath);
+    expect(dirs[2]).toBe(userPath);
+    expect(dirs[3]).toBe(workspaceDir);
+    expect(dirs[4]).toBe(defaultDir);
   });
 });

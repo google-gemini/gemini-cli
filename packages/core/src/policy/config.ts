@@ -124,7 +124,9 @@ export function getPolicyDirectories(
     ...(adminPolicyPaths ?? []),
 
     // User tier (second highest priority)
-    ...(policyPaths ?? [Storage.getUserPoliciesDir()]),
+    ...(policyPaths && policyPaths.length > 0
+      ? policyPaths
+      : [Storage.getUserPoliciesDir()]),
 
     // Workspace Tier (third highest)
     workspacePoliciesDir,
