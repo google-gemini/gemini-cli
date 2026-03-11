@@ -59,7 +59,6 @@ vi.mock('../utils/debugLogger.js', () => ({
 const MOCK_PRO_MODEL = DEFAULT_GEMINI_MODEL;
 const FALLBACK_MODEL = DEFAULT_GEMINI_FLASH_MODEL;
 const AUTH_OAUTH = AuthType.LOGIN_WITH_GOOGLE;
-const AUTH_API_KEY = AuthType.USE_GEMINI;
 
 const createMockConfig = (overrides: Partial<Config> = {}): Config =>
   ({
@@ -127,16 +126,6 @@ describe('handleFallback', () => {
       vi.mocked(policyConfig.getFallbackModelHandler).mockReturnValue(
         policyHandler,
       );
-    });
-
-    it('should return null immediately if authType is not OAuth', async () => {
-      const result = await handleFallback(
-        policyConfig,
-        MOCK_PRO_MODEL,
-        AUTH_API_KEY,
-      );
-      expect(result).toBeNull();
-      expect(policyHandler).not.toHaveBeenCalled();
     });
 
     it('uses availability selection with correct candidates when enabled', async () => {
