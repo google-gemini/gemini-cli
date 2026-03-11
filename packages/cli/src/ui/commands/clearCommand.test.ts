@@ -17,6 +17,7 @@ vi.mock('@google/gemini-cli-core', async () => {
     ...actual,
     uiTelemetryService: {
       setLastPromptTokenCount: vi.fn(),
+      clear: vi.fn(),
     },
   };
 });
@@ -74,17 +75,16 @@ describe('clearCommand', () => {
 
     expect(mockResetChat).toHaveBeenCalledTimes(1);
     expect(mockHintClear).toHaveBeenCalledTimes(1);
-    expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledWith(0);
-    expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledTimes(1);
+    expect(uiTelemetryService.clear).toHaveBeenCalled();
+    expect(uiTelemetryService.clear).toHaveBeenCalledTimes(1);
     expect(mockContext.ui.clear).toHaveBeenCalledTimes(1);
 
     // Check the order of operations.
     const setDebugMessageOrder = (mockContext.ui.setDebugMessage as Mock).mock
       .invocationCallOrder[0];
     const resetChatOrder = mockResetChat.mock.invocationCallOrder[0];
-    const resetTelemetryOrder = (
-      uiTelemetryService.setLastPromptTokenCount as Mock
-    ).mock.invocationCallOrder[0];
+    const resetTelemetryOrder = (uiTelemetryService.clear as Mock).mock
+      .invocationCallOrder[0];
     const clearOrder = (mockContext.ui.clear as Mock).mock
       .invocationCallOrder[0];
 
@@ -110,8 +110,8 @@ describe('clearCommand', () => {
       'Clearing terminal.',
     );
     expect(mockResetChat).not.toHaveBeenCalled();
-    expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledWith(0);
-    expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledTimes(1);
+    expect(uiTelemetryService.clear).toHaveBeenCalled();
+    expect(uiTelemetryService.clear).toHaveBeenCalledTimes(1);
     expect(nullConfigContext.ui.clear).toHaveBeenCalledTimes(1);
   });
 });
