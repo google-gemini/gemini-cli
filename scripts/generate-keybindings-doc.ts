@@ -12,7 +12,7 @@ import type { KeyBinding } from '../packages/cli/src/ui/key/keyBindings.js';
 import {
   commandCategories,
   commandDescriptions,
-  defaultKeyBindings,
+  defaultKeyBindingConfig,
 } from '../packages/cli/src/ui/key/keyBindings.js';
 import {
   formatWithPrettier,
@@ -82,7 +82,7 @@ export function buildDefaultDocSections(): readonly KeybindingDocSection[] {
     title: category.title,
     commands: category.commands.map((command) => ({
       description: commandDescriptions[command],
-      bindings: defaultKeyBindings[command],
+      bindings: defaultKeyBindingConfig.get(command) ?? [],
     })),
   }));
 }
