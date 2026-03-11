@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { Box, Text } from 'ink';
 import type { RegistryExtension } from '../../../config/extensionRegistryClient.js';
 
@@ -23,9 +23,13 @@ import type { ExtensionManager } from '../../../config/extension-manager.js';
 import { useRegistrySearch } from '../../hooks/useRegistrySearch.js';
 
 import { useUIState } from '../../contexts/UIStateContext.js';
+import { ExtensionDetails } from './ExtensionDetails.js';
 
 export interface ExtensionRegistryViewProps {
-  onSelect?: (extension: RegistryExtension) => void;
+  onSelect?: (
+    extension: RegistryExtension,
+    requestConsentOverride?: (consent: string) => Promise<boolean>,
+  ) => void | Promise<void>;
   onClose?: () => void;
   extensionManager: ExtensionManager;
 }
@@ -45,6 +49,8 @@ export function ExtensionRegistryView({
     config.getExtensionRegistryURI(),
   );
   const { terminalHeight, staticExtraHeight } = useUIState();
+  const [selectedExtension, setSelectedExtension] =
+    useState<RegistryExtension | null>(null);
 
   const { extensionsUpdateState } = useExtensionUpdates(
     extensionManager,
@@ -52,7 +58,9 @@ export function ExtensionRegistryView({
     config.getEnableExtensionReloading(),
   );
 
-  const installedExtensions = extensionManager.getExtensions();
+  const [installedExtensions, setInstalledExtensions] = useState(() =>
+    extensionManager.getExtensions(),
+  );
 
   const items: ExtensionItem[] = useMemo(
     () =>
@@ -65,11 +73,28 @@ export function ExtensionRegistryView({
     [extensions],
   );
 
-  const handleSelect = useCallback(
-    (item: ExtensionItem) => {
-      onSelect?.(item.extension);
+  const handleSelect = useCallback((item: ExtensionItem) => {
+    setSelectedExtension(item.extension);
+  }, []);
+
+  const handleBack = useCallback(() => {
+    setSelectedExtension(null);
+  }, []);
+
+  const handleInstall = useCallback(
+    async (
+      extension: RegistryExtension,
+      requestConsentOverride?: (consent: string) => Promise<boolean>,
+    ) => {
+      await onSelect?.(extension, requestConsentOverride);
+
+      // Refresh installed extensions list
+      setInstalledExtensions(extensionManager.getExtensions());
+
+      // Go back to the search page (list view)
+      setSelectedExtension(null);
     },
-    [onSelect],
+    [onSelect, extensionManager],
   );
 
   const renderItem = useCallback(
@@ -206,19 +231,41 @@ export function ExtensionRegistryView({
   }
 
   return (
-    <SearchableList<ExtensionItem>
-      title="Extensions"
-      items={items}
-      onSelect={handleSelect}
-      onClose={onClose || (() => {})}
-      searchPlaceholder="Search extension gallery"
-      renderItem={renderItem}
-      header={header}
-      footer={footer}
-      maxItemsToShow={maxItemsToShow}
-      useSearch={useRegistrySearch}
-      onSearch={search}
-      resetSelectionOnItemsChange={true}
-    />
+    <>
+      <Box
+        display={selectedExtension ? 'none' : 'flex'}
+        flexDirection="column"
+        width="100%"
+        height="100%"
+      >
+        <SearchableList<ExtensionItem>
+          title="Extensions"
+          items={items}
+          onSelect={handleSelect}
+          onClose={onClose || (() => {})}
+          searchPlaceholder="Search extension gallery"
+          renderItem={renderItem}
+          header={header}
+          footer={footer}
+          maxItemsToShow={maxItemsToShow}
+          useSearch={useRegistrySearch}
+          onSearch={search}
+          resetSelectionOnItemsChange={true}
+          isFocused={!selectedExtension}
+        />
+      </Box>
+      {selectedExtension && (
+        <ExtensionDetails
+          extension={selectedExtension}
+          onBack={handleBack}
+          onInstall={async (requestConsentOverride) => {
+            await handleInstall(selectedExtension, requestConsentOverride);
+          }}
+          isInstalled={installedExtensions.some(
+            (e) => e.name === selectedExtension.extensionName,
+          )}
+        />
+      )}
+    </>
   );
 }

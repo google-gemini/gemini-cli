@@ -28,8 +28,8 @@ exports[`SettingsDialog > Initial Rendering > should render settings list with v
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
 │                                                                                                  │
-│    Clear Context on Plan Approval                                                     undefined  │
-│    Automatically clear conversation context after a plan is approved and implement…              │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
@@ -74,8 +74,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'accessibility settings
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
 │                                                                                                  │
-│    Clear Context on Plan Approval                                                     undefined  │
-│    Automatically clear conversation context after a plan is approved and implement…              │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
@@ -120,8 +120,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'all boolean settings d
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
 │                                                                                                  │
-│    Clear Context on Plan Approval                                                     undefined  │
-│    Automatically clear conversation context after a plan is approved and implement…              │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
@@ -166,8 +166,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'default state' correct
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
 │                                                                                                  │
-│    Clear Context on Plan Approval                                                     undefined  │
-│    Automatically clear conversation context after a plan is approved and implement…              │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
@@ -212,8 +212,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'file filtering setting
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
 │                                                                                                  │
-│    Clear Context on Plan Approval                                                     undefined  │
-│    Automatically clear conversation context after a plan is approved and implement…              │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
@@ -258,8 +258,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'focused on scope selec
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
 │                                                                                                  │
-│    Clear Context on Plan Approval                                                     undefined  │
-│    Automatically clear conversation context after a plan is approved and implement…              │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
@@ -304,8 +304,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'mixed boolean and numb
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
 │                                                                                                  │
-│    Clear Context on Plan Approval                                                     undefined  │
-│    Automatically clear conversation context after a plan is approved and implement…              │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
@@ -350,8 +350,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'tools and security set
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
 │                                                                                                  │
-│    Clear Context on Plan Approval                                                     undefined  │
-│    Automatically clear conversation context after a plan is approved and implement…              │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │
@@ -396,8 +396,8 @@ exports[`SettingsDialog > Snapshot Tests > should render 'various boolean settin
 │    Plan Model Routing                                                                      true  │
 │    Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pr…         │
 │                                                                                                  │
-│    Clear Context on Plan Approval                                                     undefined  │
-│    Automatically clear conversation context after a plan is approved and implement…              │
+│    Retry Fetch Errors                                                                      true  │
+│    Retry on "exception TypeError: fetch failed sending request" errors.                          │
 │                                                                                                  │
 │    Max Chat Model Attempts                                                                   10  │
 │    Maximum number of attempts for requests to the main chat model. Cannot exceed 10.             │

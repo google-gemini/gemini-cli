@@ -500,9 +500,11 @@ export const AppContainer = (props: AppContainerProps) => {
       disableMouseEvents();
 
       // Kill all background shells
-      for (const pid of backgroundShellsRef.current.keys()) {
-        ShellExecutionService.kill(pid);
-      }
+      await Promise.all(
+        Array.from(backgroundShellsRef.current.keys()).map((pid) =>
+          ShellExecutionService.kill(pid),
+        ),
+      );
 
       const ideClient = await IdeClient.getInstance();
       await ideClient.disconnect();
@@ -1247,8 +1249,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return;
       }
 
+      // If cancelling (shouldRestorePrompt=false), never modify the buffer
+      // User is in control - preserve whatever text they typed, pasted, or restored
+      if (!shouldRestorePrompt) {
+        return;
+      }
+
+      // Restore the last message when shouldRestorePrompt=true
       const lastUserMessage = inputHistory.at(-1);
-      let textToSet = shouldRestorePrompt ? lastUserMessage || '' : '';
+      let textToSet = lastUserMessage || '';
 
       const queuedText = getQueuedMessagesText();
       if (queuedText) {
@@ -1256,7 +1265,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         clearQueue();
       }
 
-      if (textToSet || !shouldRestorePrompt) {
+      if (textToSet) {
         buffer.setText(textToSet);
       }
     },
@@ -1894,7 +1903,18 @@ Logging in with Google... Restarting Gemini CLI to continue.
   useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
 
   useKeypress(
-    () => {
+    (key: Key) => {
+      if (
+        keyMatchers[Command.SCROLL_UP](key) ||
+        keyMatchers[Command.SCROLL_DOWN](key) ||
+        keyMatchers[Command.PAGE_UP](key) ||
+        keyMatchers[Command.PAGE_DOWN](key) ||
+        keyMatchers[Command.SCROLL_HOME](key) ||
+        keyMatchers[Command.SCROLL_END](key)
+      ) {
+        return false;
+      }
+
       setCopyModeEnabled(false);
       enableMouseEvents();
       return true;
