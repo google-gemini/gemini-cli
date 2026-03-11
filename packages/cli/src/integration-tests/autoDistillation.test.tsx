@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { AppRig } from '../test-utils/AppRig.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { FakeContentGenerator } from '@google/gemini-cli-core';
 import { PolicyDecision } from '@google/gemini-cli-core';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -27,8 +28,9 @@ describe('Auto-distillation Integration', () => {
       __dirname,
       '../test-utils/fixtures/auto-distillation.responses',
     );
+    const contentGenerator = await FakeContentGenerator.fromFile(fakeResponsesPath);
     rig = new AppRig({
-      fakeResponsesPath,
+      contentGenerator,
     });
 
     await rig.initialize();

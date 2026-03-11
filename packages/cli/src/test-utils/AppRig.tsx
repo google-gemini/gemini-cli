@@ -31,6 +31,7 @@ import {
   debugLogger,
   CoreToolCallStatus,
   ConsecaSafetyChecker,
+  type ContentGenerator,
 } from '@google/gemini-cli-core';
 import {
   type MockShellCommand,
@@ -54,32 +55,38 @@ import type { Content, GenerateContentParameters } from '@google/genai';
 const sessionStateMap = new Map<string, StreamingState>();
 const activeRigs = new Map<string, AppRig>();
 
-// Mock StreamingContext to report state changes back to the observer
-vi.mock('../ui/contexts/StreamingContext.js', async (importOriginal) => {
+// Mock useGeminiStream to report state changes back to the observer
+vi.mock('../ui/hooks/useGeminiStream.js', async (importOriginal) => {
   const original =
-    await importOriginal<typeof import('../ui/contexts/StreamingContext.js')>();
-  const { useConfig } = await import('../ui/contexts/ConfigContext.js');
+    await importOriginal<typeof import('../ui/hooks/useGeminiStream.js')>();
   const React = await import('react');
 
   return {
     ...original,
-    useStreamingContext: () => {
-      const state = original.useStreamingContext();
-      const config = useConfig();
-      const sessionId = config.getSessionId();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    useGeminiStream: (...args: any[]) => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+      const result = (original.useGeminiStream as any)(...args);
+      const config = args[3]; // config is the 4th argument
+      const sessionId = config?.getSessionId?.();
 
       React.useEffect(() => {
-        sessionStateMap.set(sessionId, state);
-        // If we see activity, we are no longer "awaiting" the start of a response
-        if (state !== StreamingState.Idle) {
-          const rig = activeRigs.get(sessionId);
-          if (rig) {
-            rig.awaitingResponse = false;
+        if (sessionId) {
+          debugLogger.log(
+            `[AppRig React Hook] State updating to: ${result.streamingState}`,
+          );
+          sessionStateMap.set(sessionId, result.streamingState);
+          // If we see activity, we are no longer "awaiting" the start of a response
+          if (result.streamingState !== StreamingState.Idle) {
+            const rig = activeRigs.get(sessionId);
+            if (rig) {
+              rig.awaitingResponse = false;
+            }
           }
         }
-      }, [sessionId, state]);
+      }, [sessionId, result.streamingState]);
 
-      return state;
+      return result;
     },
   };
 });
@@ -137,10 +144,10 @@ vi.mock('../ui/components/GeminiRespondingSpinner.js', async () => {
 });
 
 export interface AppRigOptions {
-  fakeResponsesPath?: string;
   terminalWidth?: number;
   terminalHeight?: number;
   configOverrides?: Partial<ConfigParameters>;
+  contentGenerator?: ContentGenerator;
 }
 
 export interface PendingConfirmation {
@@ -160,11 +167,13 @@ export class AppRig {
   private pendingConfirmations = new Map<string, PendingConfirmation>();
   private breakpointTools = new Set<string | undefined>();
   private lastAwaitedConfirmation: PendingConfirmation | undefined;
+  private lastIsBusyLog = 0;
 
   /**
    * True if a message was just sent but React hasn't yet reported a non-idle state.
    */
   awaitingResponse = false;
+  activeStreamCount = 0;
 
   constructor(private options: AppRigOptions = {}) {
     const uniqueId = randomUUID();
@@ -194,7 +203,7 @@ export class AppRig {
       cwd: this.testDir,
       debugMode: false,
       model: 'test-model',
-      fakeResponses: this.options.fakeResponsesPath,
+      contentGenerator: this.options.contentGenerator,
       interactive: true,
       approvalMode,
       policyEngineConfig,
@@ -205,8 +214,38 @@ export class AppRig {
     };
     this.config = makeFakeConfig(configParams);
 
-    if (this.options.fakeResponsesPath) {
-      this.stubRefreshAuth();
+    // Track active streams directly from the client to prevent false idleness during synchronous mock yields
+    const client = this.config.getGeminiClient();
+    const originalStream = client.sendMessageStream.bind(client);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-type-assertion
+    client.sendMessageStream = async function* (this: AppRig, ...args: any[]): AsyncGenerator<any, any, any> {
+      this.awaitingResponse = false;
+      this.activeStreamCount++;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
+        yield* (originalStream as any)(...args);
+      } finally {
+        this.activeStreamCount = Math.max(0, this.activeStreamCount - 1);
+      }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }.bind(this) as any;
+
+    if (this.config.fakeResponses || this.options.contentGenerator) {
+      if (!this.options.contentGenerator && !this.config.fakeResponses) {
+        this.stubRefreshAuth();
+      }
+      if (!process.env['GEMINI_API_KEY']) {
+        vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+      }
+      MockShellExecutionService.setPassthrough(false);
+    } else {
+      if (!process.env['GEMINI_API_KEY']) {
+        throw new Error(
+          'GEMINI_API_KEY must be set in the environment for live model tests.',
+        );
+      }
+      // For live tests, we allow falling through to the real shell service if no mock matches
+      MockShellExecutionService.setPassthrough(true);
     }
 
     this.setupMessageBusListeners();
@@ -222,18 +261,6 @@ export class AppRig {
   private setupEnvironment() {
     // Stub environment variables to avoid interference from developer's machine
     vi.stubEnv('GEMINI_CLI_HOME', this.testDir);
-    if (this.options.fakeResponsesPath) {
-      vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
-      MockShellExecutionService.setPassthrough(false);
-    } else {
-      if (!process.env['GEMINI_API_KEY']) {
-        throw new Error(
-          'GEMINI_API_KEY must be set in the environment for live model tests.',
-        );
-      }
-      // For live tests, we allow falling through to the real shell service if no mock matches
-      MockShellExecutionService.setPassthrough(true);
-    }
     vi.stubEnv('GEMINI_DEFAULT_AUTH_TYPE', AuthType.USE_GEMINI);
   }
 
@@ -348,18 +375,28 @@ export class AppRig {
    * Returns true if the agent is currently busy (responding or executing tools).
    */
   isBusy(): boolean {
-    if (this.awaitingResponse) {
+    const reactState = sessionStateMap.get(this.sessionId);
+    
+    if (reactState && reactState !== StreamingState.Idle) {
+       this.awaitingResponse = false;
+    }
+
+    if (!this.lastIsBusyLog || Date.now() - this.lastIsBusyLog > 1000) {
+      debugLogger.log(`[AppRig] isBusy check: awaitingResponse=${this.awaitingResponse}, activeStreams=${this.activeStreamCount}, reactState=${reactState}`);
+      this.lastIsBusyLog = Date.now();
+    }
+
+    if (this.awaitingResponse || this.activeStreamCount > 0) {
       return true;
     }
 
-    const reactState = sessionStateMap.get(this.sessionId);
     // If we have a React-based state, use it as the definitive signal.
     // 'responding' and 'waiting-for-confirmation' both count as busy for the overall task.
     if (reactState !== undefined) {
       return reactState !== StreamingState.Idle;
     }
 
-    // Fallback to tool tracking if React hasn't reported yet
+    // Fallback to tool tracking
     const isAnyToolActive = this.toolCalls.some((tc) => {
       if (
         tc.status === CoreToolCallStatus.Executing ||
@@ -535,6 +572,7 @@ export class AppRig {
     | { type: 'confirmation'; confirmation: PendingConfirmation }
     | { type: 'idle' }
   > {
+    debugLogger.log(`[AppRig] waitForNextEvent started`);
     let confirmation: PendingConfirmation | undefined;
     let isIdle = false;
 
@@ -554,6 +592,7 @@ export class AppRig {
       },
     );
 
+    debugLogger.log(`[AppRig] waitForNextEvent finished: confirmation=${!!confirmation}, isIdle=${isIdle}`);
     if (confirmation) {
       this.lastAwaitedConfirmation = confirmation;
       return { type: 'confirmation', confirmation };
@@ -630,8 +669,11 @@ export class AppRig {
     onConfirmation?: (confirmation: PendingConfirmation) => void | boolean,
     timeout = 60000,
   ) {
+    debugLogger.log(`[AppRig] drainBreakpointsUntilIdle started`);
     while (true) {
+      debugLogger.log(`[AppRig] drainBreakpointsUntilIdle: waiting for next event`);
       const event = await this.waitForNextEvent(timeout);
+      debugLogger.log(`[AppRig] drainBreakpointsUntilIdle: got event type ${event.type}`);
       if (event.type === 'idle') {
         break;
       }
@@ -640,9 +682,30 @@ export class AppRig {
       const handled = onConfirmation?.(confirmation);
 
       if (!handled) {
+        debugLogger.log(`[AppRig] drainBreakpointsUntilIdle: resolving tool ${confirmation.toolName}`);
         await this.resolveTool(confirmation);
       }
     }
+    debugLogger.log(`[AppRig] drainBreakpointsUntilIdle finished`);
+  }
+
+  /**
+   * Acts as an automated user ('Mock User') to prime the system with a specific
+   * history state before handing off control to a live trial or eval.
+   *
+   * @param prompts An array of user messages to send sequentially.
+   * @param timeout Optional timeout per interaction.
+   */
+  async driveMockUser(prompts: string[], timeout = 60000) {
+    debugLogger.log(`[AppRig] driveMockUser started with ${prompts.length} prompts`);
+    for (let i = 0; i < prompts.length; i++) {
+      const prompt = prompts[i];
+      debugLogger.log(`[AppRig] driveMockUser: sending prompt ${i + 1}: ${prompt}`);
+      await this.sendMessage(prompt);
+      debugLogger.log(`[AppRig] driveMockUser: draining breakpoints after prompt ${i + 1}`);
+      await this.drainBreakpointsUntilIdle(undefined, timeout);
+    }
+    debugLogger.log(`[AppRig] driveMockUser finished`);
   }
 
   getConfig(): Config {

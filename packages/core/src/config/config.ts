@@ -495,6 +495,7 @@ export interface ConfigParameters {
   mcpEnablementCallbacks?: McpEnablementCallbacks;
   userMemory?: string | HierarchicalMemory;
   geminiMdFileCount?: number;
+  contentGenerator?: ContentGenerator;
   geminiMdFilePaths?: string[];
   approvalMode?: ApprovalMode;
   showMemoryUsage?: boolean;
@@ -566,7 +567,7 @@ export interface ConfigParameters {
   maxAttempts?: number;
   enableShellOutputEfficiency?: boolean;
   shellToolInactivityTimeout?: number;
-  fakeResponses?: string;
+  fakeResponses?: string | any[];
   recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
@@ -625,6 +626,7 @@ export class Config implements McpContext, AgentLoopContext {
   private trackerService?: TrackerService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
+  private _initialContentGenerator?: ContentGenerator;
   readonly modelConfigService: ModelConfigService;
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
@@ -764,7 +766,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly maxAttempts: number;
   private readonly enableShellOutputEfficiency: boolean;
   private readonly shellToolInactivityTimeout: number;
-  readonly fakeResponses?: string;
+  readonly fakeResponses?: string | any[];
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
   private readonly rawOutput: boolean;
@@ -829,6 +831,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.pendingIncludeDirectories = params.includeDirectories ?? [];
     this.debugMode = params.debugMode;
     this.question = params.question;
+    this._initialContentGenerator = params.contentGenerator;
 
     this.coreTools = params.coreTools;
     this.allowedTools = params.allowedTools;
@@ -1253,11 +1256,17 @@ export class Config implements McpContext, AgentLoopContext {
       baseUrl,
       customHeaders,
     );
-    this.contentGenerator = await createContentGenerator(
-      newContentGeneratorConfig,
-      this,
-      this.getSessionId(),
-    );
+    if (this._initialContentGenerator) {
+      this.contentGenerator = this._initialContentGenerator;
+      // We only use it once, on first initialization. Future refreshes will create real ones
+      // unless we want it to persist forever, but usually AppRig manages this.
+    } else {
+      this.contentGenerator = await createContentGenerator(
+        newContentGeneratorConfig,
+        this,
+        this.getSessionId(),
+      );
+    }
     // Only assign to instance properties after successful initialization
     this.contentGeneratorConfig = newContentGeneratorConfig;
 

@@ -776,9 +776,47 @@ export const renderWithProviders = (
             <VimModeProvider>
               <ShellFocusContext.Provider value={shellFocus}>
                 <SessionStatsProvider>
-                  <StreamingContext.Provider
-                    value={finalUiState.streamingState}
-                  >
+                  {providedUiState?.streamingState !== undefined ? (
+                    <StreamingContext.Provider
+                      value={finalUiState.streamingState}
+                    >
+                      <UIActionsContext.Provider value={finalUIActions}>
+                        <OverflowProvider>
+                          <ToolActionsProvider
+                            config={finalConfig}
+                            toolCalls={allToolCalls}
+                          >
+                            <AskUserActionsProvider
+                              request={null}
+                              onSubmit={vi.fn()}
+                              onCancel={vi.fn()}
+                            >
+                              <KeypressProvider>
+                                <MouseProvider
+                                  mouseEventsEnabled={mouseEventsEnabled}
+                                >
+                                  <TerminalProvider>
+                                    <ScrollProvider>
+                                      <ContextCapture>
+                                        <Box
+                                          width={terminalWidth}
+                                          flexShrink={0}
+                                          flexGrow={0}
+                                          flexDirection="column"
+                                        >
+                                          {component}
+                                        </Box>
+                                      </ContextCapture>
+                                    </ScrollProvider>
+                                  </TerminalProvider>
+                                </MouseProvider>
+                              </KeypressProvider>
+                            </AskUserActionsProvider>
+                          </ToolActionsProvider>
+                        </OverflowProvider>
+                      </UIActionsContext.Provider>
+                    </StreamingContext.Provider>
+                  ) : (
                     <UIActionsContext.Provider value={finalUIActions}>
                       <OverflowProvider>
                         <ToolActionsProvider
@@ -814,7 +852,7 @@ export const renderWithProviders = (
                         </ToolActionsProvider>
                       </OverflowProvider>
                     </UIActionsContext.Provider>
-                  </StreamingContext.Provider>
+                  )}
                 </SessionStatsProvider>
               </ShellFocusContext.Provider>
             </VimModeProvider>
