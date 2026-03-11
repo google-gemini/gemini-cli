@@ -31,6 +31,7 @@ import {
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
 import { killProcessGroup } from '../utils/process-utils.js';
+import path from 'node:path';
 const { Terminal } = pkg;
 
 const MAX_CHILD_PROCESS_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
@@ -403,7 +404,14 @@ export class ShellExecutionService {
       const isWindows = os.platform() === 'win32';
       const { executable, argsPrefix, shell } = getShellConfiguration();
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-      const spawnArgs = [...argsPrefix, guardedCommand];
+      const finalCommand =
+        ShellExecutionService.applyWindowsPowerShellEncodingFix(
+          guardedCommand,
+          executable,
+          isWindows,
+        );
+
+      const spawnArgs = [...argsPrefix, finalCommand];
 
       // Specifically allow GIT_CONFIG_* variables to pass through sanitization
       // in non-interactive mode so we can safely append our overrides.
@@ -715,7 +723,14 @@ export class ShellExecutionService {
       }
 
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-      const args = [...argsPrefix, guardedCommand];
+      const isWindows = process.platform === 'win32';
+      const finalCommand =
+        ShellExecutionService.applyWindowsPowerShellEncodingFix(
+          guardedCommand,
+          executable,
+          isWindows,
+        );
+      const args = [...argsPrefix, finalCommand];
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const ptyProcess = ptyInfo.module.spawn(executable, args, {
@@ -1080,6 +1095,25 @@ export class ShellExecutionService {
         };
       }
     }
+  }
+
+  private static applyWindowsPowerShellEncodingFix(
+    command: string,
+    executable: string,
+    isWindows: boolean,
+  ): string {
+    // Force PowerShell on Windows to use UTF-8 encoding.
+    // Without this, multibyte characters (e.g., Japanese, Chinese) appear garbled.
+    const exeName = path.basename(executable).toLowerCase();
+    const isPowerShell =
+      isWindows &&
+      (exeName.startsWith('powershell') || exeName.startsWith('pwsh'));
+
+    if (isPowerShell) {
+      return `$OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ${command}`;
+    }
+
+    return command;
   }
 
   /**
