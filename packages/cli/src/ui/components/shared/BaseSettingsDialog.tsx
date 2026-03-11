@@ -355,7 +355,7 @@ export function BaseSettingsDialog({
 
       // Not in edit mode - handle navigation and actions
       if (effectiveFocusSection === 'settings') {
-        // Up Down navigation with wrap-around
+        // Up/Down navigation with wrap-around
         if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
           moveUp();
           return true;
