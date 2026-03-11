@@ -288,7 +288,7 @@ describe('useAuth', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.authError).toContain('Failed to login');
+        expect(result.current.authError).toContain('Failed to sign in');
         expect(result.current.authState).toBe(AuthState.Updating);
       });
     });

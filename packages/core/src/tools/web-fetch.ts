@@ -12,7 +12,9 @@ import {
   type ToolInvocation,
   type ToolResult,
   type ToolConfirmationOutcome,
+  type PolicyUpdateOptions,
 } from './tools.js';
+import { buildPatternArgsPattern } from '../policy/utils.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -29,6 +31,7 @@ import {
 import { LlmRole } from '../telemetry/llmRole.js';
 import { WEB_FETCH_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { coreEvents } from '../utils/events.js';
 import { retryWithBackoff } from '../utils/retry.js';
 import { WEB_FETCH_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
@@ -184,6 +187,16 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     super(params, messageBus, _toolName, _toolDisplayName);
   }
 
+  private handleRetry(attempt: number, error: unknown, delayMs: number): void {
+    coreEvents.emitRetryAttempt({
+      attempt,
+      maxAttempts: this.config.getMaxAttempts(),
+      delayMs,
+      error: error instanceof Error ? error.message : String(error),
+      model: 'Web Fetch',
+    });
+  }
+
   private async executeFallback(signal: AbortSignal): Promise<ToolResult> {
     const { validUrls: urls } = parsePrompt(this.params.prompt!);
     // For now, we only support one URL for fallback
@@ -212,6 +225,8 @@ class WebFetchToolInvocation extends BaseToolInvocation<
         },
         {
           retryFetchErrors: this.config.getRetryFetchErrors(),
+          onRetry: (attempt, error, delayMs) =>
+            this.handleRetry(attempt, error, delayMs),
         },
       );
 
@@ -289,6 +304,22 @@ ${textContent}
     const displayPrompt =
       prompt.length > 100 ? prompt.substring(0, 97) + '...' : prompt;
     return `Processing URLs and instructions from prompt: "${displayPrompt}"`;
+  }
+
+  override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    if (this.params.url) {
+      return {
+        argsPattern: buildPatternArgsPattern(this.params.url),
+      };
+    }
+    if (this.params.prompt) {
+      return {
+        argsPattern: buildPatternArgsPattern(this.params.prompt),
+      };
+    }
+    return undefined;
   }
 
   protected override async getConfirmationDetails(
@@ -405,6 +436,8 @@ ${textContent}
         },
         {
           retryFetchErrors: this.config.getRetryFetchErrors(),
+          onRetry: (attempt, error, delayMs) =>
+            this.handleRetry(attempt, error, delayMs),
         },
       );
 

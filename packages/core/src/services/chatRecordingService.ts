@@ -171,6 +171,7 @@ export class ChatRecordingService {
         this.cachedConversation = null;
       } else {
         // Create new session
+        this.sessionId = this.config.getSessionId();
         const chatsDir = path.join(
           this.config.storage.getProjectTempDir(),
           'chats',
@@ -664,7 +665,7 @@ export class ChatRecordingService {
    * Updates the conversation history based on the provided API Content array.
    * This is used to persist changes made to the history (like masking) back to disk.
    */
-  updateMessagesFromHistory(history: Content[]): void {
+  updateMessagesFromHistory(history: readonly Content[]): void {
     if (!this.conversationFile) return;
 
     try {

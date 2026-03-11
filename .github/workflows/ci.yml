@@ -169,7 +169,7 @@ jobs:
             npm run test:ci --workspace @google/gemini-cli
           else
             # Explicitly list non-cli packages to ensure they are sharded correctly
-            npm run test:ci --workspace @google/gemini-cli-core --workspace @google/gemini-cli-a2a-server --workspace gemini-cli-vscode-ide-companion --workspace @google/gemini-cli-test-utils --if-present
+            npm run test:ci --workspace @google/gemini-cli-core --workspace @google/gemini-cli-a2a-server --workspace gemini-cli-vscode-ide-companion --workspace @google/gemini-cli-test-utils --if-present -- --coverage.enabled=false
             npm run test:scripts
           fi
 

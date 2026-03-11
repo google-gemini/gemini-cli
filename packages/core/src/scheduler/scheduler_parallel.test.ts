@@ -211,12 +211,14 @@ describe('Scheduler Parallel Execution', () => {
 
     mockConfig = {
       getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
-      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      toolRegistry: mockToolRegistry,
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(true),
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
     } as unknown as Mocked<Config>;
+
+    (mockConfig as unknown as { config: Config }).config = mockConfig as Config;
 
     mockMessageBus = {
       publish: vi.fn(),
@@ -306,7 +308,7 @@ describe('Scheduler Parallel Execution', () => {
     );
 
     scheduler = new Scheduler({
-      config: mockConfig,
+      context: mockConfig,
       messageBus: mockMessageBus,
       getPreferredEditor,
       schedulerId: 'root',
