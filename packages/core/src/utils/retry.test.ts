@@ -350,6 +350,25 @@ describe('retryWithBackoff', () => {
       expect(mockFn).toHaveBeenCalledTimes(2);
     });
 
+    it("should retry on 'Incomplete JSON segment' when retryFetchErrors is true", async () => {
+      const mockFn = vi.fn();
+      mockFn.mockRejectedValueOnce(
+        new Error('Incomplete JSON segment at the end'),
+      );
+      mockFn.mockResolvedValueOnce('success');
+
+      const promise = retryWithBackoff(mockFn, {
+        retryFetchErrors: true,
+        initialDelayMs: 10,
+      });
+
+      await vi.runAllTimersAsync();
+
+      const result = await promise;
+      expect(result).toBe('success');
+      expect(mockFn).toHaveBeenCalledTimes(2);
+    });
+
     it('should retry on common network error codes (ECONNRESET)', async () => {
       const mockFn = vi.fn();
       const error = new Error('read ECONNRESET');

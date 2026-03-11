@@ -106,8 +106,6 @@ export async function loadConfig(
     trustedFolder: true,
     extensionLoader,
     checkpointing,
-    enableEventDrivenScheduler:
-      settings.experimental?.enableEventDrivenScheduler ?? true,
     interactive: !isHeadlessMode(),
     enableInteractiveShell: !isHeadlessMode(),
     ptyInfo: 'auto',
