@@ -1703,6 +1703,25 @@ export type TextBufferAction =
   | { type: 'vim_change_to_first_nonwhitespace' }
   | { type: 'vim_delete_to_first_line'; payload: { count: number } }
   | { type: 'vim_delete_to_last_line'; payload: { count: number } }
+  | { type: 'vim_delete_char_before'; payload: { count: number } }
+  | { type: 'vim_toggle_case'; payload: { count: number } }
+  | { type: 'vim_replace_char'; payload: { char: string; count: number } }
+  | {
+      type: 'vim_find_char_forward';
+      payload: { char: string; count: number; till: boolean };
+    }
+  | {
+      type: 'vim_find_char_backward';
+      payload: { char: string; count: number; till: boolean };
+    }
+  | {
+      type: 'vim_delete_to_char_forward';
+      payload: { char: string; count: number; till: boolean };
+    }
+  | {
+      type: 'vim_delete_to_char_backward';
+      payload: { char: string; count: number; till: boolean };
+    }
   | {
       type: 'toggle_paste_expansion';
       payload: { id: string; row: number; col: number };
@@ -2484,6 +2503,13 @@ function textBufferReducerLogic(
     case 'vim_change_to_first_nonwhitespace':
     case 'vim_delete_to_first_line':
     case 'vim_delete_to_last_line':
+    case 'vim_delete_char_before':
+    case 'vim_toggle_case':
+    case 'vim_replace_char':
+    case 'vim_find_char_forward':
+    case 'vim_find_char_backward':
+    case 'vim_delete_to_char_forward':
+    case 'vim_delete_to_char_backward':
       return handleVimAction(state, action as VimAction);
 
     case 'toggle_paste_expansion': {
@@ -3043,6 +3069,58 @@ export function useTextBuffer({
     dispatch({ type: 'vim_delete_char', payload: { count } });
   }, []);
 
+  const vimDeleteCharBefore = useCallback((count: number): void => {
+    dispatch({ type: 'vim_delete_char_before', payload: { count } });
+  }, []);
+
+  const vimToggleCase = useCallback((count: number): void => {
+    dispatch({ type: 'vim_toggle_case', payload: { count } });
+  }, []);
+
+  const vimReplaceChar = useCallback((char: string, count: number): void => {
+    dispatch({ type: 'vim_replace_char', payload: { char, count } });
+  }, []);
+
+  const vimFindCharForward = useCallback(
+    (char: string, count: number, till: boolean): void => {
+      dispatch({
+        type: 'vim_find_char_forward',
+        payload: { char, count, till },
+      });
+    },
+    [],
+  );
+
+  const vimFindCharBackward = useCallback(
+    (char: string, count: number, till: boolean): void => {
+      dispatch({
+        type: 'vim_find_char_backward',
+        payload: { char, count, till },
+      });
+    },
+    [],
+  );
+
+  const vimDeleteToCharForward = useCallback(
+    (char: string, count: number, till: boolean): void => {
+      dispatch({
+        type: 'vim_delete_to_char_forward',
+        payload: { char, count, till },
+      });
+    },
+    [],
+  );
+
+  const vimDeleteToCharBackward = useCallback(
+    (char: string, count: number, till: boolean): void => {
+      dispatch({
+        type: 'vim_delete_to_char_backward',
+        payload: { char, count, till },
+      });
+    },
+    [],
+  );
+
   const vimInsertAtCursor = useCallback((): void => {
     dispatch({ type: 'vim_insert_at_cursor' });
   }, []);
@@ -3542,6 +3620,13 @@ export function useTextBuffer({
       vimMoveBigWordBackward,
       vimMoveBigWordEnd,
       vimDeleteChar,
+      vimDeleteCharBefore,
+      vimToggleCase,
+      vimReplaceChar,
+      vimFindCharForward,
+      vimFindCharBackward,
+      vimDeleteToCharForward,
+      vimDeleteToCharBackward,
       vimInsertAtCursor,
       vimAppendAtCursor,
       vimOpenLineBelow,
@@ -3630,6 +3715,13 @@ export function useTextBuffer({
       vimMoveBigWordBackward,
       vimMoveBigWordEnd,
       vimDeleteChar,
+      vimDeleteCharBefore,
+      vimToggleCase,
+      vimReplaceChar,
+      vimFindCharForward,
+      vimFindCharBackward,
+      vimDeleteToCharForward,
+      vimDeleteToCharBackward,
       vimInsertAtCursor,
       vimAppendAtCursor,
       vimOpenLineBelow,
@@ -3937,6 +4029,20 @@ export interface TextBuffer {
    * Delete N characters at cursor (vim 'x' command)
    */
   vimDeleteChar: (count: number) => void;
+  /** Delete N characters before cursor (vim 'X') */
+  vimDeleteCharBefore: (count: number) => void;
+  /** Toggle case of N characters at cursor (vim '~') */
+  vimToggleCase: (count: number) => void;
+  /** Replace N characters at cursor with char, stay in NORMAL mode (vim 'r') */
+  vimReplaceChar: (char: string, count: number) => void;
+  /** Move to Nth occurrence of char forward on line; till=true stops before it (vim 'f'/'t') */
+  vimFindCharForward: (char: string, count: number, till: boolean) => void;
+  /** Move to Nth occurrence of char backward on line; till=true stops after it (vim 'F'/'T') */
+  vimFindCharBackward: (char: string, count: number, till: boolean) => void;
+  /** Delete from cursor to Nth occurrence of char forward; till=true excludes the char (vim 'df'/'dt') */
+  vimDeleteToCharForward: (char: string, count: number, till: boolean) => void;
+  /** Delete from Nth occurrence of char backward to cursor; till=true excludes the char (vim 'dF'/'dT') */
+  vimDeleteToCharBackward: (char: string, count: number, till: boolean) => void;
   /**
    * Enter insert mode at cursor (vim 'i' command)
    */
