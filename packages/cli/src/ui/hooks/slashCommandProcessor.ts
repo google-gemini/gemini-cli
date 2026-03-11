@@ -52,6 +52,7 @@ import { CommandService } from '../../services/CommandService.js';
 import { BuiltinCommandLoader } from '../../services/BuiltinCommandLoader.js';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import { McpPromptLoader } from '../../services/McpPromptLoader.js';
+import { SkillCommandLoader } from '../../services/SkillCommandLoader.js';
 import { parseSlashCommand } from '../../utils/commands.js';
 import {
   type ExtensionUpdateAction,
@@ -324,6 +325,7 @@ export const useSlashCommandProcessor = (
     (async () => {
       const commandService = await CommandService.create(
         [
+          new SkillCommandLoader(config),
           new McpPromptLoader(config),
           new BuiltinCommandLoader(config),
           new FileCommandLoader(config),
@@ -362,6 +364,36 @@ export const useSlashCommandProcessor = (
         return false;
       }
 
+      const {
+        commandToExecute,
+        args,
+        canonicalPath: resolvedCommandPath,
+      } = parseSlashCommand(trimmed, commands);
+
+      // If the input doesn't match any known command, check if MCP servers
+      // are still loading (the command might come from an MCP server).
+      // Otherwise, treat it as regular text input (e.g. file paths like
+      // /home/user/file.txt) and let it be sent to the model.
+      if (!commandToExecute) {
+        const isMcpLoading =
+          config?.getMcpClientManager()?.getDiscoveryState() ===
+          MCPDiscoveryState.IN_PROGRESS;
+        if (isMcpLoading) {
+          setIsProcessing(true);
+          if (addToHistory) {
+            addItem({ type: MessageType.USER, text: trimmed }, Date.now());
+          }
+          addMessage({
+            type: MessageType.ERROR,
+            content: `Unknown command: ${trimmed}. Command might have been from an MCP server but MCP servers are not done loading.`,
+            timestamp: new Date(),
+          });
+          setIsProcessing(false);
+          return { type: 'handled' };
+        }
+        return false;
+      }
+
       setIsProcessing(true);
 
       if (addToHistory) {
@@ -373,11 +405,6 @@ export const useSlashCommandProcessor = (
       }
 
       let hasError = false;
-      const {
-        commandToExecute,
-        args,
-        canonicalPath: resolvedCommandPath,
-      } = parseSlashCommand(trimmed, commands);
 
       const subcommand =
         resolvedCommandPath.length > 1
@@ -420,6 +447,7 @@ export const useSlashCommandProcessor = (
                     type: 'schedule_tool',
                     toolName: result.toolName,
                     toolArgs: result.toolArgs,
+                    postSubmitPrompt: result.postSubmitPrompt,
                   };
                 case 'message':
                   addItem(
@@ -477,7 +505,9 @@ export const useSlashCommandProcessor = (
                       const props = result.props as Record<string, unknown>;
                       if (
                         !props ||
+                        // eslint-disable-next-line no-restricted-syntax
                         typeof props['name'] !== 'string' ||
+                        // eslint-disable-next-line no-restricted-syntax
                         typeof props['displayName'] !== 'string' ||
                         !props['definition']
                       ) {
@@ -556,6 +586,7 @@ export const useSlashCommandProcessor = (
                       name: 'Expansion',
                       description: 'Command expansion needs shell access',
                       status: CoreToolCallStatus.AwaitingApproval,
+                      isClientInitiated: true,
                       resultDisplay: undefined,
                       confirmationDetails,
                     };
@@ -653,19 +684,6 @@ export const useSlashCommandProcessor = (
             return { type: 'handled' };
           }
         }
-
-        const isMcpLoading =
-          config?.getMcpClientManager()?.getDiscoveryState() ===
-          MCPDiscoveryState.IN_PROGRESS;
-        const errorMessage = isMcpLoading
-          ? `Unknown command: ${trimmed}. Command might have been from an MCP server but MCP servers are not done loading.`
-          : `Unknown command: ${trimmed}`;
-
-        addMessage({
-          type: MessageType.ERROR,
-          content: errorMessage,
-          timestamp: new Date(),
-        });
 
         return { type: 'handled' };
       } catch (e: unknown) {

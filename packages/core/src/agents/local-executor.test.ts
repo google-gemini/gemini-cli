@@ -17,10 +17,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { LocalAgentExecutor, type ActivityCallback } from './local-executor.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import {
-  DiscoveredMCPTool,
-  MCP_QUALIFIED_NAME_SEPARATOR,
-} from '../tools/mcp-tool.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { LSTool } from '../tools/ls.js';
 import { LS_TOOL_NAME, READ_FILE_TOOL_NAME } from '../tools/tool-names.js';
 import {
@@ -41,25 +38,26 @@ import type { Config } from '../config/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { z } from 'zod';
+import { getErrorMessage } from '../utils/errors.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
 import {
   logAgentStart,
   logAgentFinish,
   logRecoveryAttempt,
 } from '../telemetry/loggers.js';
-import { LlmRole } from '../telemetry/types.js';
 import {
+  LlmRole,
   AgentStartEvent,
   AgentFinishEvent,
   RecoveryAttemptEvent,
 } from '../telemetry/types.js';
-import type {
-  AgentInputs,
-  LocalAgentDefinition,
-  SubagentActivityEvent,
-  OutputConfig,
+import {
+  AgentTerminateMode,
+  type AgentInputs,
+  type LocalAgentDefinition,
+  type SubagentActivityEvent,
+  type OutputConfig,
 } from './types.js';
-import { AgentTerminateMode } from './types.js';
 import type { AnyDeclarativeTool, AnyToolInvocation } from '../tools/tools.js';
 import type { ToolCallRequestInfo } from '../scheduler/types.js';
 import { CompressionStatus } from '../core/turn.js';
@@ -68,8 +66,7 @@ import type {
   ModelConfigKey,
   ResolvedModelConfig,
 } from '../services/modelConfigService.js';
-import type { AgentRegistry } from './registry.js';
-import { getModelConfigAlias } from './registry.js';
+import { getModelConfigAlias, type AgentRegistry } from './registry.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
 
 const {
@@ -310,6 +307,11 @@ describe('LocalAgentExecutor', () => {
     vi.useFakeTimers();
 
     mockConfig = makeFakeConfig();
+    // .config is already set correctly by the getter on the instance.
+    Object.defineProperty(mockConfig, 'promptId', {
+      get: () => 'test-prompt-id',
+      configurable: true,
+    });
     parentToolRegistry = new ToolRegistry(
       mockConfig,
       mockConfig.getMessageBus(),
@@ -322,7 +324,9 @@ describe('LocalAgentExecutor', () => {
     );
     parentToolRegistry.registerTool(MOCK_TOOL_NOT_ALLOWED);
 
-    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(parentToolRegistry);
+    vi.spyOn(mockConfig, 'toolRegistry', 'get').mockReturnValue(
+      parentToolRegistry,
+    );
     vi.spyOn(mockConfig, 'getAgentRegistry').mockReturnValue({
       getAllAgentNames: () => [],
     } as unknown as AgentRegistry);
@@ -385,7 +389,10 @@ describe('LocalAgentExecutor', () => {
 
     it('should use parentPromptId from context to create agentId', async () => {
       const parentId = 'parent-id';
-      mockedPromptIdContext.getStore.mockReturnValue(parentId);
+      Object.defineProperty(mockConfig, 'promptId', {
+        get: () => parentId,
+        configurable: true,
+      });
 
       const definition = createTestDefinition();
       const executor = await LocalAgentExecutor.create(
@@ -500,10 +507,10 @@ describe('LocalAgentExecutor', () => {
       expect(agentRegistry.getTool(subAgentName)).toBeUndefined();
     });
 
-    it('should enforce qualified names for MCP tools in agent definitions', async () => {
+    it('should automatically qualify MCP tools in agent definitions', async () => {
       const serverName = 'mcp-server';
       const toolName = 'mcp-tool';
-      const qualifiedName = `${serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${toolName}`;
+      const qualifiedName = `mcp_${serverName}_${toolName}`;
 
       const mockMcpTool = {
         tool: vi.fn(),
@@ -529,7 +536,7 @@ describe('LocalAgentExecutor', () => {
           return undefined;
         });
 
-      // 1. Qualified name works and registers the tool (using short name per status quo)
+      // 1. Qualified name works and registers the tool (using qualified name)
       const definition = createTestDefinition([qualifiedName]);
       const executor = await LocalAgentExecutor.create(
         definition,
@@ -538,14 +545,18 @@ describe('LocalAgentExecutor', () => {
       );
 
       const agentRegistry = executor['toolRegistry'];
-      // Registry shortening logic means it's registered as 'mcp-tool' internally
-      expect(agentRegistry.getTool(toolName)).toBeDefined();
+      // It should be registered as the qualified name
+      expect(agentRegistry.getTool(qualifiedName)).toBeDefined();
 
-      // 2. Unqualified name for MCP tool THROWS
-      const badDefinition = createTestDefinition([toolName]);
-      await expect(
-        LocalAgentExecutor.create(badDefinition, mockConfig, onActivity),
-      ).rejects.toThrow(/must be requested with its server prefix/);
+      // 2. Unqualified name for MCP tool now also works (and gets upgraded to qualified)
+      const definition2 = createTestDefinition([toolName]);
+      const executor2 = await LocalAgentExecutor.create(
+        definition2,
+        mockConfig,
+        onActivity,
+      );
+      const agentRegistry2 = executor2['toolRegistry'];
+      expect(agentRegistry2.getTool(qualifiedName)).toBeDefined();
 
       getToolSpy.mockRestore();
     });
@@ -710,25 +721,28 @@ describe('LocalAgentExecutor', () => {
         expect.arrayContaining([
           expect.objectContaining({
             type: 'THOUGHT_CHUNK',
-            data: { text: 'T1: Listing' },
+            data: expect.objectContaining({ text: 'T1: Listing' }),
           }),
           expect.objectContaining({
             type: 'TOOL_CALL_END',
-            data: { name: LS_TOOL_NAME, output: 'file1.txt' },
+            data: expect.objectContaining({
+              name: LS_TOOL_NAME,
+              output: 'file1.txt',
+            }),
           }),
           expect.objectContaining({
             type: 'TOOL_CALL_START',
-            data: {
+            data: expect.objectContaining({
               name: TASK_COMPLETE_TOOL_NAME,
               args: { finalResult: 'Found file1.txt' },
-            },
+            }),
           }),
           expect.objectContaining({
             type: 'TOOL_CALL_END',
-            data: {
+            data: expect.objectContaining({
               name: TASK_COMPLETE_TOOL_NAME,
               output: expect.stringContaining('Output submitted'),
-            },
+            }),
           }),
         ]),
       );
@@ -923,11 +937,11 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'ERROR',
-          data: {
+          data: expect.objectContaining({
             context: 'tool_call',
             name: TASK_COMPLETE_TOOL_NAME,
             error: expectedError,
-          },
+          }),
         }),
       );
 
@@ -1209,11 +1223,11 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'ERROR',
-          data: {
+          data: expect.objectContaining({
             context: 'tool_call',
             name: TASK_COMPLETE_TOOL_NAME,
             error: expect.stringContaining('Output validation failed'),
-          },
+          }),
         }),
       );
 
@@ -1250,7 +1264,7 @@ describe('LocalAgentExecutor', () => {
       );
 
       await expect(executor.run({ goal: 'test' }, signal)).rejects.toThrow(
-        `Failed to create chat object: ${initError}`,
+        `Failed to create chat object: ${getErrorMessage(initError)}`,
       );
 
       // Ensure the error was reported via the activity callback
@@ -1258,7 +1272,7 @@ describe('LocalAgentExecutor', () => {
         expect.objectContaining({
           type: 'ERROR',
           data: expect.objectContaining({
-            error: `Error: Failed to create chat object: ${initError}`,
+            error: `Error: Failed to create chat object: ${getErrorMessage(initError)}`,
           }),
         }),
       );
@@ -1334,11 +1348,11 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'ERROR',
-          data: {
+          data: expect.objectContaining({
             context: 'tool_call',
             name: LS_TOOL_NAME,
             error: toolErrorMessage,
-          },
+          }),
         }),
       );
 
@@ -1695,15 +1709,17 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'THOUGHT_CHUNK',
-          data: {
+          data: expect.objectContaining({
             text: 'Execution limit reached (MAX_TURNS). Attempting one final recovery turn with a grace period.',
-          },
+          }),
         }),
       );
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'THOUGHT_CHUNK',
-          data: { text: 'Graceful recovery succeeded.' },
+          data: expect.objectContaining({
+            text: 'Graceful recovery succeeded.',
+          }),
         }),
       );
     });
@@ -1780,9 +1796,9 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'THOUGHT_CHUNK',
-          data: {
+          data: expect.objectContaining({
             text: 'Execution limit reached (ERROR_NO_COMPLETE_TASK_CALL). Attempting one final recovery turn with a grace period.',
-          },
+          }),
         }),
       );
     });
@@ -1878,9 +1894,9 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'THOUGHT_CHUNK',
-          data: {
+          data: expect.objectContaining({
             text: 'Execution limit reached (TIMEOUT). Attempting one final recovery turn with a grace period.',
-          },
+          }),
         }),
       );
     });
@@ -2036,6 +2052,215 @@ describe('LocalAgentExecutor', () => {
       expect(recoveryEvent).toBeInstanceOf(RecoveryAttemptEvent);
       expect(recoveryEvent.success).toBe(true);
       expect(recoveryEvent.reason).toBe(AgentTerminateMode.MAX_TURNS);
+    });
+
+    describe('Model Steering', () => {
+      let configWithHints: Config;
+
+      beforeEach(() => {
+        configWithHints = makeFakeConfig({ modelSteering: true });
+        vi.spyOn(configWithHints, 'getAgentRegistry').mockReturnValue({
+          getAllAgentNames: () => [],
+        } as unknown as AgentRegistry);
+        vi.spyOn(configWithHints, 'toolRegistry', 'get').mockReturnValue(
+          parentToolRegistry,
+        );
+      });
+
+      it('should inject user hints into the next turn after they are added', async () => {
+        const definition = createTestDefinition();
+
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          configWithHints,
+        );
+
+        // Turn 1: Model calls LS
+        mockModelResponse(
+          [{ name: LS_TOOL_NAME, args: { path: '.' }, id: 'call1' }],
+          'T1: Listing',
+        );
+
+        // We use a manual promise to ensure the hint is added WHILE Turn 1 is "running"
+        let resolveToolCall: (value: unknown) => void;
+        const toolCallPromise = new Promise((resolve) => {
+          resolveToolCall = resolve;
+        });
+        mockScheduleAgentTools.mockReturnValueOnce(toolCallPromise);
+
+        // Turn 2: Model calls complete_task
+        mockModelResponse(
+          [
+            {
+              name: TASK_COMPLETE_TOOL_NAME,
+              args: { finalResult: 'Done' },
+              id: 'call2',
+            },
+          ],
+          'T2: Done',
+        );
+
+        const runPromise = executor.run({ goal: 'Hint test' }, signal);
+
+        // Give the loop a chance to start and register the listener
+        await vi.advanceTimersByTimeAsync(1);
+
+        configWithHints.userHintService.addUserHint('Initial Hint');
+
+        // Resolve the tool call to complete Turn 1
+        resolveToolCall!([
+          {
+            status: 'success',
+            request: {
+              callId: 'call1',
+              name: LS_TOOL_NAME,
+              args: { path: '.' },
+              isClientInitiated: false,
+              prompt_id: 'p1',
+            },
+            tool: {} as AnyDeclarativeTool,
+            invocation: {} as AnyToolInvocation,
+            response: {
+              callId: 'call1',
+              resultDisplay: 'file1.txt',
+              responseParts: [
+                {
+                  functionResponse: {
+                    name: LS_TOOL_NAME,
+                    response: { result: 'file1.txt' },
+                    id: 'call1',
+                  },
+                },
+              ],
+            },
+          },
+        ]);
+
+        await runPromise;
+
+        // The first call to sendMessageStream should NOT contain the hint (it was added after start)
+        // The SECOND call to sendMessageStream SHOULD contain the hint
+        expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+        const secondTurnMessageParts = mockSendMessageStream.mock.calls[1][1];
+        expect(secondTurnMessageParts).toContainEqual(
+          expect.objectContaining({
+            text: expect.stringContaining('Initial Hint'),
+          }),
+        );
+      });
+
+      it('should NOT inject legacy hints added before executor was created', async () => {
+        const definition = createTestDefinition();
+        configWithHints.userHintService.addUserHint('Legacy Hint');
+
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          configWithHints,
+        );
+
+        mockModelResponse([
+          {
+            name: TASK_COMPLETE_TOOL_NAME,
+            args: { finalResult: 'Done' },
+            id: 'call1',
+          },
+        ]);
+
+        await executor.run({ goal: 'Isolation test' }, signal);
+
+        // The first call to sendMessageStream should NOT contain the legacy hint
+        expect(mockSendMessageStream).toHaveBeenCalled();
+        const firstTurnMessageParts = mockSendMessageStream.mock.calls[0][1];
+        // We expect only the goal, no hints injected at turn start
+        for (const part of firstTurnMessageParts) {
+          if (part.text) {
+            expect(part.text).not.toContain('Legacy Hint');
+          }
+        }
+      });
+
+      it('should inject mid-execution hints into subsequent turns', async () => {
+        const definition = createTestDefinition();
+        const executor = await LocalAgentExecutor.create(
+          definition,
+          configWithHints,
+        );
+
+        // Turn 1: Model calls LS
+        mockModelResponse(
+          [{ name: LS_TOOL_NAME, args: { path: '.' }, id: 'call1' }],
+          'T1: Listing',
+        );
+
+        // We use a manual promise to ensure the hint is added WHILE Turn 1 is "running"
+        let resolveToolCall: (value: unknown) => void;
+        const toolCallPromise = new Promise((resolve) => {
+          resolveToolCall = resolve;
+        });
+        mockScheduleAgentTools.mockReturnValueOnce(toolCallPromise);
+
+        // Turn 2: Model calls complete_task
+        mockModelResponse(
+          [
+            {
+              name: TASK_COMPLETE_TOOL_NAME,
+              args: { finalResult: 'Done' },
+              id: 'call2',
+            },
+          ],
+          'T2: Done',
+        );
+
+        // Start execution
+        const runPromise = executor.run({ goal: 'Mid-turn hint test' }, signal);
+
+        // Small delay to ensure the run loop has reached the await and registered listener
+        await vi.advanceTimersByTimeAsync(1);
+
+        // Add the hint while the tool call is pending
+        configWithHints.userHintService.addUserHint('Corrective Hint');
+
+        // Now resolve the tool call to complete Turn 1
+        resolveToolCall!([
+          {
+            status: 'success',
+            request: {
+              callId: 'call1',
+              name: LS_TOOL_NAME,
+              args: { path: '.' },
+              isClientInitiated: false,
+              prompt_id: 'p1',
+            },
+            tool: {} as AnyDeclarativeTool,
+            invocation: {} as AnyToolInvocation,
+            response: {
+              callId: 'call1',
+              resultDisplay: 'file1.txt',
+              responseParts: [
+                {
+                  functionResponse: {
+                    name: LS_TOOL_NAME,
+                    response: { result: 'file1.txt' },
+                    id: 'call1',
+                  },
+                },
+              ],
+            },
+          },
+        ]);
+
+        await runPromise;
+
+        expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+
+        // The second turn (turn 1) should contain the corrective hint.
+        const secondTurnMessageParts = mockSendMessageStream.mock.calls[1][1];
+        expect(secondTurnMessageParts).toContainEqual(
+          expect.objectContaining({
+            text: expect.stringContaining('Corrective Hint'),
+          }),
+        );
+      });
     });
   });
   describe('Chat Compression', () => {

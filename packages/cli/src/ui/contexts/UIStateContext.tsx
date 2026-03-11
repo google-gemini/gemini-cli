@@ -24,9 +24,12 @@ import type {
   ApprovalMode,
   UserTierId,
   IdeInfo,
+  AuthType,
   FallbackIntent,
   ValidationIntent,
   AgentDefinition,
+  FolderDiscoveryResults,
+  PolicyUpdateConfirmationRequest,
 } from '@google/gemini-cli-core';
 import { type TransientMessageType } from '../../utils/events.js';
 import type { DOMElement } from 'ink';
@@ -40,6 +43,7 @@ export interface ProQuotaDialogRequest {
   message: string;
   isTerminalQuotaError: boolean;
   isModelNotFoundError?: boolean;
+  authType?: AuthType;
   resolve: (intent: FallbackIntent) => void;
 }
 
@@ -48,6 +52,34 @@ export interface ValidationDialogRequest {
   validationDescription?: string;
   learnMoreUrl?: string;
   resolve: (intent: ValidationIntent) => void;
+}
+
+/** Intent for overage menu dialog */
+export type OverageMenuIntent =
+  | 'use_credits'
+  | 'use_fallback'
+  | 'manage'
+  | 'stop';
+
+export interface OverageMenuDialogRequest {
+  failedModel: string;
+  fallbackModel?: string;
+  resetTime?: string;
+  creditBalance: number;
+  userEmail?: string;
+  resolve: (intent: OverageMenuIntent) => void;
+}
+
+/** Intent for empty wallet dialog */
+export type EmptyWalletIntent = 'get_credits' | 'use_fallback' | 'stop';
+
+export interface EmptyWalletDialogRequest {
+  failedModel: string;
+  fallbackModel?: string;
+  resetTime?: string;
+  userEmail?: string;
+  onGetCredits: () => void;
+  resolve: (intent: EmptyWalletIntent) => void;
 }
 
 import { type UseHistoryManagerReturn } from '../hooks/useHistoryManager.js';
@@ -60,18 +92,26 @@ export interface QuotaState {
   stats: QuotaStats | undefined;
   proQuotaRequest: ProQuotaDialogRequest | null;
   validationRequest: ValidationDialogRequest | null;
+  // G1 AI Credits overage flow
+  overageMenuRequest: OverageMenuDialogRequest | null;
+  emptyWalletRequest: EmptyWalletDialogRequest | null;
+}
+
+export interface AccountSuspensionInfo {
+  message: string;
+  appealUrl?: string;
+  appealLinkText?: string;
 }
 
 export interface UIState {
   history: HistoryItem[];
   historyManager: UseHistoryManagerReturn;
   isThemeDialogOpen: boolean;
-  shouldShowRetentionWarning: boolean;
-  sessionsToDeleteCount: number;
   themeError: string | null;
   isAuthenticating: boolean;
   isConfigInitialized: boolean;
   authError: string | null;
+  accountSuspensionInfo: AccountSuspensionInfo | null;
   isAuthDialogOpen: boolean;
   isAwaitingApiKeyInput: boolean;
   apiKeyDefaultValue?: string;
@@ -112,6 +152,9 @@ export interface UIState {
   isResuming: boolean;
   shouldShowIdePrompt: boolean;
   isFolderTrustDialogOpen: boolean;
+  folderDiscoveryResults: FolderDiscoveryResults | null;
+  isPolicyUpdateDialogOpen: boolean;
+  policyUpdateConfirmationRequest: PolicyUpdateConfirmationRequest | undefined;
   isTrustedFolder: boolean | undefined;
   constrainHeight: boolean;
   showErrorDetails: boolean;
@@ -177,6 +220,9 @@ export interface UIState {
   isBackgroundShellListOpen: boolean;
   adminSettingsChanged: boolean;
   newAgents: AgentDefinition[] | null;
+  showIsExpandableHint: boolean;
+  hintMode: boolean;
+  hintBuffer: string;
   transientMessage: {
     text: string;
     type: TransientMessageType;

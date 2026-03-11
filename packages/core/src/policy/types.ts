@@ -78,6 +78,7 @@ export interface ExternalCheckerConfig {
 
 export enum InProcessCheckerType {
   ALLOWED_PATH = 'allowed-path',
+  CONSECA = 'conseca',
 }
 
 /**
@@ -110,10 +111,29 @@ export interface PolicyRule {
   toolName?: string;
 
   /**
+   * The name of the subagent this rule applies to.
+   * If undefined, the rule applies regardless of whether it's the main agent or a subagent.
+   */
+  subagent?: string;
+
+  /**
+   * Identifies the MCP server this rule applies to.
+   * Enables precise rule matching against `serverName` metadata instead
+   * of parsing composite string names.
+   */
+  mcpName?: string;
+
+  /**
    * Pattern to match against tool arguments.
    * Can be used for more fine-grained control.
    */
   argsPattern?: RegExp;
+
+  /**
+   * Metadata annotations provided by the tool (e.g. readOnlyHint).
+   * All keys and values in this record must match the tool's annotations.
+   */
+  toolAnnotations?: Record<string, unknown>;
 
   /**
    * The decision to make when this rule matches.
@@ -160,10 +180,21 @@ export interface SafetyCheckerRule {
   toolName?: string;
 
   /**
+   * Identifies the MCP server this rule applies to.
+   */
+  mcpName?: string;
+
+  /**
    * Pattern to match against tool arguments.
    * Can be used for more fine-grained control.
    */
   argsPattern?: RegExp;
+
+  /**
+   * Metadata annotations provided by the tool (e.g. readOnlyHint).
+   * All keys and values in this record must match the tool's annotations.
+   */
+  toolAnnotations?: Record<string, unknown>;
 
   /**
    * Priority of this checker. Higher numbers run first.
@@ -182,6 +213,12 @@ export interface SafetyCheckerRule {
    * If undefined or empty, it applies to all modes.
    */
   modes?: ApprovalMode[];
+
+  /**
+   * Source of the rule.
+   * e.g. "my-policies.toml", "Workspace: project.toml", etc.
+   */
+  source?: string;
 }
 
 export interface HookExecutionContext {
@@ -272,7 +309,9 @@ export interface PolicySettings {
     allowed?: string[];
   };
   mcpServers?: Record<string, { trust?: boolean }>;
+  // User provided policies that will replace the USER level policies in ~/.gemini/policies
   policyPaths?: string[];
+  workspacePoliciesDir?: string;
 }
 
 export interface CheckResult {

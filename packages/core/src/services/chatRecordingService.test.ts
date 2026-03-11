@@ -8,14 +8,14 @@ import { expect, it, describe, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import type {
-  ConversationRecord,
-  ToolCallRecord,
-  MessageRecord,
+import {
+  ChatRecordingService,
+  type ConversationRecord,
+  type ToolCallRecord,
+  type MessageRecord,
 } from './chatRecordingService.js';
 import { CoreToolCallStatus } from '../scheduler/types.js';
 import type { Content, Part } from '@google/genai';
-import { ChatRecordingService } from './chatRecordingService.js';
 import type { Config } from '../config/config.js';
 import { getProjectHash } from '../utils/paths.js';
 
@@ -84,6 +84,21 @@ describe('ChatRecordingService', () => {
       const files = fs.readdirSync(chatsDir);
       expect(files.length).toBeGreaterThan(0);
       expect(files[0]).toMatch(/^session-.*-test-ses\.json$/);
+    });
+
+    it('should include the conversation kind when specified', () => {
+      chatRecordingService.initialize(undefined, 'subagent');
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'ping',
+        model: 'm',
+      });
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const conversation = JSON.parse(
+        fs.readFileSync(sessionFile, 'utf8'),
+      ) as ConversationRecord;
+      expect(conversation.kind).toBe('subagent');
     });
 
     it('should resume from an existing session if provided', () => {
@@ -230,6 +245,97 @@ describe('ChatRecordingService', () => {
         tool: 0,
       });
     });
+
+    it('should not write to disk when queuing tokens (no last gemini message)', () => {
+      const writeFileSyncSpy = vi.spyOn(fs, 'writeFileSync');
+
+      // Clear spy call count after initialize writes the initial file
+      writeFileSyncSpy.mockClear();
+
+      // No gemini message recorded yet, so tokens should only be queued
+      chatRecordingService.recordMessageTokens({
+        promptTokenCount: 5,
+        candidatesTokenCount: 10,
+        totalTokenCount: 15,
+        cachedContentTokenCount: 0,
+      });
+
+      // writeFileSync should NOT have been called since we only queued
+      expect(writeFileSyncSpy).not.toHaveBeenCalled();
+
+      // @ts-expect-error private property
+      expect(chatRecordingService.queuedTokens).toEqual({
+        input: 5,
+        output: 10,
+        total: 15,
+        cached: 0,
+        thoughts: 0,
+        tool: 0,
+      });
+
+      writeFileSyncSpy.mockRestore();
+    });
+
+    it('should not write to disk when queuing tokens (last message already has tokens)', () => {
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'Response',
+        model: 'gemini-pro',
+      });
+
+      // First recordMessageTokens updates the message and writes to disk
+      chatRecordingService.recordMessageTokens({
+        promptTokenCount: 1,
+        candidatesTokenCount: 1,
+        totalTokenCount: 2,
+        cachedContentTokenCount: 0,
+      });
+
+      const writeFileSyncSpy = vi.spyOn(fs, 'writeFileSync');
+      writeFileSyncSpy.mockClear();
+
+      // Second call should only queue, NOT write to disk
+      chatRecordingService.recordMessageTokens({
+        promptTokenCount: 2,
+        candidatesTokenCount: 2,
+        totalTokenCount: 4,
+        cachedContentTokenCount: 0,
+      });
+
+      expect(writeFileSyncSpy).not.toHaveBeenCalled();
+      writeFileSyncSpy.mockRestore();
+    });
+
+    it('should use in-memory cache and not re-read from disk on subsequent operations', () => {
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'Response',
+        model: 'gemini-pro',
+      });
+
+      const readFileSyncSpy = vi.spyOn(fs, 'readFileSync');
+      readFileSyncSpy.mockClear();
+
+      // These operations should all use the in-memory cache
+      chatRecordingService.recordMessageTokens({
+        promptTokenCount: 1,
+        candidatesTokenCount: 1,
+        totalTokenCount: 2,
+        cachedContentTokenCount: 0,
+      });
+
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'Another response',
+        model: 'gemini-pro',
+      });
+
+      chatRecordingService.saveSummary('Test summary');
+
+      // readFileSync should NOT have been called since we use the in-memory cache
+      expect(readFileSyncSpy).not.toHaveBeenCalled();
+      readFileSyncSpy.mockRestore();
+    });
   });
 
   describe('recordToolCalls', () => {
@@ -294,23 +400,33 @@ describe('ChatRecordingService', () => {
   });
 
   describe('deleteSession', () => {
-    it('should delete the session file and tool outputs if they exist', () => {
+    it('should delete the session file, tool outputs, session directory, and logs if they exist', () => {
+      const sessionId = 'test-session-id';
       const chatsDir = path.join(testTempDir, 'chats');
+      const logsDir = path.join(testTempDir, 'logs');
+      const toolOutputsDir = path.join(testTempDir, 'tool-outputs');
+      const sessionDir = path.join(testTempDir, sessionId);
+
       fs.mkdirSync(chatsDir, { recursive: true });
-      const sessionFile = path.join(chatsDir, 'test-session-id.json');
+      fs.mkdirSync(logsDir, { recursive: true });
+      fs.mkdirSync(toolOutputsDir, { recursive: true });
+      fs.mkdirSync(sessionDir, { recursive: true });
+
+      const sessionFile = path.join(chatsDir, `${sessionId}.json`);
       fs.writeFileSync(sessionFile, '{}');
 
-      const toolOutputDir = path.join(
-        testTempDir,
-        'tool-outputs',
-        'session-test-session-id',
-      );
+      const logFile = path.join(logsDir, `session-${sessionId}.jsonl`);
+      fs.writeFileSync(logFile, '{}');
+
+      const toolOutputDir = path.join(toolOutputsDir, `session-${sessionId}`);
       fs.mkdirSync(toolOutputDir, { recursive: true });
 
-      chatRecordingService.deleteSession('test-session-id');
+      chatRecordingService.deleteSession(sessionId);
 
       expect(fs.existsSync(sessionFile)).toBe(false);
+      expect(fs.existsSync(logFile)).toBe(false);
       expect(fs.existsSync(toolOutputDir)).toBe(false);
+      expect(fs.existsSync(sessionDir)).toBe(false);
     });
 
     it('should not throw if session file does not exist', () => {
@@ -743,6 +859,71 @@ describe('ChatRecordingService', () => {
       expect(result).toHaveLength(2);
       expect(result[0].text).toBe('Prefix metadata or text');
       expect(result[1].functionResponse!.id).toBe(callId);
+    });
+
+    it('should not write to disk when no tool calls match', () => {
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: 'Response with no tool calls',
+        model: 'gemini-pro',
+      });
+
+      const writeFileSyncSpy = vi.spyOn(fs, 'writeFileSync');
+      writeFileSyncSpy.mockClear();
+
+      // History with a tool call ID that doesn't exist in the conversation
+      const history: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name: 'read_file',
+                id: 'nonexistent-call-id',
+                response: { output: 'some content' },
+              },
+            },
+          ],
+        },
+      ];
+
+      chatRecordingService.updateMessagesFromHistory(history);
+
+      // No tool calls matched, so writeFileSync should NOT have been called
+      expect(writeFileSyncSpy).not.toHaveBeenCalled();
+      writeFileSyncSpy.mockRestore();
+    });
+  });
+
+  describe('ENOENT (missing directory) handling', () => {
+    it('should ensure directory exists before writing conversation file', () => {
+      chatRecordingService.initialize();
+
+      const mkdirSyncSpy = vi.spyOn(fs, 'mkdirSync');
+      const writeFileSyncSpy = vi.spyOn(fs, 'writeFileSync');
+
+      chatRecordingService.recordMessage({
+        type: 'user',
+        content: 'Hello after dir cleanup',
+        model: 'gemini-pro',
+      });
+
+      // mkdirSync should be called with the parent directory and recursive option
+      const conversationFile = chatRecordingService.getConversationFilePath()!;
+      expect(mkdirSyncSpy).toHaveBeenCalledWith(
+        path.dirname(conversationFile),
+        { recursive: true },
+      );
+
+      // mkdirSync should be called before writeFileSync
+      const mkdirCallOrder = mkdirSyncSpy.mock.invocationCallOrder;
+      const writeCallOrder = writeFileSyncSpy.mock.invocationCallOrder;
+      const lastMkdir = mkdirCallOrder[mkdirCallOrder.length - 1];
+      const lastWrite = writeCallOrder[writeCallOrder.length - 1];
+      expect(lastMkdir).toBeLessThan(lastWrite);
+
+      mkdirSyncSpy.mockRestore();
+      writeFileSyncSpy.mockRestore();
     });
   });
 });

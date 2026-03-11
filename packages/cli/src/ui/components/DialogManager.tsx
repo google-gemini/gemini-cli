@@ -13,13 +13,15 @@ import { ThemeDialog } from './ThemeDialog.js';
 import { SettingsDialog } from './SettingsDialog.js';
 import { AuthInProgress } from '../auth/AuthInProgress.js';
 import { AuthDialog } from '../auth/AuthDialog.js';
+import { BannedAccountDialog } from '../auth/BannedAccountDialog.js';
 import { ApiAuthDialog } from '../auth/ApiAuthDialog.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { PrivacyNotice } from '../privacy/PrivacyNotice.js';
 import { ProQuotaDialog } from './ProQuotaDialog.js';
 import { ValidationDialog } from './ValidationDialog.js';
-import { runExitCleanup } from '../../utils/cleanup.js';
-import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
+import { OverageMenuDialog } from './OverageMenuDialog.js';
+import { EmptyWalletDialog } from './EmptyWalletDialog.js';
+import { relaunchApp } from '../../utils/processUtils.js';
 import { SessionBrowser } from './SessionBrowser.js';
 import { PermissionsModifyTrustDialog } from './PermissionsModifyTrustDialog.js';
 import { ModelDialog } from './ModelDialog.js';
@@ -34,9 +36,7 @@ import { AdminSettingsChangedDialog } from './AdminSettingsChangedDialog.js';
 import { IdeTrustChangeDialog } from './IdeTrustChangeDialog.js';
 import { NewAgentsNotification } from './NewAgentsNotification.js';
 import { AgentConfigDialog } from './AgentConfigDialog.js';
-import { SessionRetentionWarningDialog } from './SessionRetentionWarningDialog.js';
-import { useCallback } from 'react';
-import { SettingScope } from '../../config/settings.js';
+import { PolicyUpdateDialog } from './PolicyUpdateDialog.js';
 
 interface DialogManagerProps {
   addItem: UseHistoryManagerReturn['addItem'];
@@ -58,55 +58,7 @@ export const DialogManager = ({
     terminalHeight,
     staticExtraHeight,
     terminalWidth: uiTerminalWidth,
-    shouldShowRetentionWarning,
-    sessionsToDeleteCount,
   } = uiState;
-
-  const handleKeep120Days = useCallback(() => {
-    settings.setValue(
-      SettingScope.User,
-      'general.sessionRetention.warningAcknowledged',
-      true,
-    );
-    settings.setValue(
-      SettingScope.User,
-      'general.sessionRetention.enabled',
-      true,
-    );
-    settings.setValue(
-      SettingScope.User,
-      'general.sessionRetention.maxAge',
-      '120d',
-    );
-  }, [settings]);
-
-  const handleKeep30Days = useCallback(() => {
-    settings.setValue(
-      SettingScope.User,
-      'general.sessionRetention.warningAcknowledged',
-      true,
-    );
-    settings.setValue(
-      SettingScope.User,
-      'general.sessionRetention.enabled',
-      true,
-    );
-    settings.setValue(
-      SettingScope.User,
-      'general.sessionRetention.maxAge',
-      '30d',
-    );
-  }, [settings]);
-
-  if (shouldShowRetentionWarning && sessionsToDeleteCount !== undefined) {
-    return (
-      <SessionRetentionWarningDialog
-        onKeep120Days={handleKeep120Days}
-        onKeep30Days={handleKeep30Days}
-        sessionsToDeleteCount={sessionsToDeleteCount ?? 0}
-      />
-    );
-  }
 
   if (uiState.adminSettingsChanged) {
     return <AdminSettingsChangedDialog />;
@@ -134,6 +86,7 @@ export const DialogManager = ({
         isModelNotFoundError={
           !!uiState.quota.proQuotaRequest.isModelNotFoundError
         }
+        authType={uiState.quota.proQuotaRequest.authType}
         onChoice={uiActions.handleProQuotaChoice}
       />
     );
@@ -150,6 +103,28 @@ export const DialogManager = ({
       />
     );
   }
+  if (uiState.quota.overageMenuRequest) {
+    return (
+      <OverageMenuDialog
+        failedModel={uiState.quota.overageMenuRequest.failedModel}
+        fallbackModel={uiState.quota.overageMenuRequest.fallbackModel}
+        resetTime={uiState.quota.overageMenuRequest.resetTime}
+        creditBalance={uiState.quota.overageMenuRequest.creditBalance}
+        onChoice={uiActions.handleOverageMenuChoice}
+      />
+    );
+  }
+  if (uiState.quota.emptyWalletRequest) {
+    return (
+      <EmptyWalletDialog
+        failedModel={uiState.quota.emptyWalletRequest.failedModel}
+        fallbackModel={uiState.quota.emptyWalletRequest.fallbackModel}
+        resetTime={uiState.quota.emptyWalletRequest.resetTime}
+        onGetCredits={uiState.quota.emptyWalletRequest.onGetCredits}
+        onChoice={uiActions.handleEmptyWalletChoice}
+      />
+    );
+  }
   if (uiState.shouldShowIdePrompt) {
     return (
       <IdeIntegrationNudge
@@ -163,6 +138,16 @@ export const DialogManager = ({
       <FolderTrustDialog
         onSelect={uiActions.handleFolderTrustSelect}
         isRestarting={uiState.isRestarting}
+        discoveryResults={uiState.folderDiscoveryResults}
+      />
+    );
+  }
+  if (uiState.isPolicyUpdateDialogOpen) {
+    return (
+      <PolicyUpdateDialog
+        config={config}
+        request={uiState.policyUpdateConfirmationRequest!}
+        onClose={() => uiActions.setIsPolicyUpdateDialogOpen(false)}
       />
     );
   }
@@ -244,14 +229,9 @@ export const DialogManager = ({
     return (
       <Box flexDirection="column">
         <SettingsDialog
-          settings={settings}
           onSelect={() => uiActions.closeSettingsDialog()}
-          onRestartRequest={async () => {
-            await runExitCleanup();
-            process.exit(RELAUNCH_EXIT_CODE);
-          }}
+          onRestartRequest={relaunchApp}
           availableTerminalHeight={terminalHeight - staticExtraHeight}
-          config={config}
         />
       </Box>
     );
@@ -272,6 +252,7 @@ export const DialogManager = ({
           displayName={uiState.selectedAgentDisplayName}
           definition={uiState.selectedAgentDefinition}
           settings={settings}
+          availableTerminalHeight={terminalHeight - staticExtraHeight}
           onClose={uiActions.closeAgentConfigDialog}
           onSave={async () => {
             // Reload agent registry to pick up changes
@@ -279,6 +260,21 @@ export const DialogManager = ({
             if (agentRegistry) {
               await agentRegistry.reload();
             }
+          }}
+        />
+      </Box>
+    );
+  }
+  if (uiState.accountSuspensionInfo) {
+    return (
+      <Box flexDirection="column">
+        <BannedAccountDialog
+          accountSuspensionInfo={uiState.accountSuspensionInfo}
+          onExit={() => {
+            process.exit(1);
+          }}
+          onChangeAuth={() => {
+            uiActions.clearAccountSuspension();
           }}
         />
       </Box>
@@ -306,6 +302,7 @@ export const DialogManager = ({
       </Box>
     );
   }
+
   if (uiState.isAuthDialogOpen) {
     return (
       <Box flexDirection="column">

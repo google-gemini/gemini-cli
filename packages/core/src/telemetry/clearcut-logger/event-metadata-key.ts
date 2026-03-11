@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 159
+  // Next ID: 180
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -53,6 +53,22 @@ export enum EventMetadataKey {
 
   // Logs the output format of the session.
   GEMINI_CLI_START_SESSION_OUTPUT_FORMAT = 94,
+
+  // ==========================================================================
+  // Startup Stats Event Keys
+  // ==========================================================================
+
+  // Logs the array of startup phases.
+  GEMINI_CLI_STARTUP_PHASES = 172,
+
+  // Logs the OS platform for startup stats.
+  GEMINI_CLI_STARTUP_OS_PLATFORM = 173,
+
+  // Logs the OS release for startup stats.
+  GEMINI_CLI_STARTUP_OS_RELEASE = 174,
+
+  // Logs whether the CLI is running in docker for startup stats.
+  GEMINI_CLI_STARTUP_IS_DOCKER = 175,
 
   // ==========================================================================
   // User Prompt Event Keys
@@ -137,6 +153,21 @@ export enum EventMetadataKey {
   // Logs the tool use token count of the API call.
   GEMINI_CLI_API_RESPONSE_TOOL_TOKEN_COUNT = 29,
 
+  // Logs the token count for system instructions.
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_SYSTEM_INSTRUCTIONS = 167,
+
+  // Logs the token count for tool definitions.
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_TOOL_DEFINITIONS = 168,
+
+  // Logs the token count for conversation history.
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_HISTORY = 169,
+
+  // Logs the token count for tool calls (JSON map of tool name to tokens).
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_TOOL_CALLS = 170,
+
+  // Logs the token count from MCP servers (tool definitions + tool inputs/outputs).
+  GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_MCP_SERVERS = 171,
+
   // ==========================================================================
   // GenAI API Error Event Keys
   // ===========================================================================
@@ -199,6 +230,18 @@ export enum EventMetadataKey {
 
   // Logs the repository name of the GitHub Action that triggered the session.
   GEMINI_CLI_GH_REPOSITORY_NAME_HASH = 132,
+
+  // Logs the event name of the GitHub Action that triggered the session.
+  GEMINI_CLI_GH_EVENT_NAME = 176,
+
+  // Logs the Pull Request number if the workflow is operating on a PR.
+  GEMINI_CLI_GH_PR_NUMBER = 177,
+
+  // Logs the Issue number if the workflow is operating on an Issue.
+  GEMINI_CLI_GH_ISSUE_NUMBER = 178,
+
+  // Logs a custom tracking string (e.g. a comma-separated list of issue IDs for scheduled batches).
+  GEMINI_CLI_GH_CUSTOM_TRACKING_ID = 179,
 
   // ==========================================================================
   // Loop Detected Event Keys
@@ -605,4 +648,30 @@ export enum EventMetadataKey {
 
   // Logs whether the token storage type was forced by an environment variable.
   GEMINI_CLI_TOKEN_STORAGE_FORCED = 158,
+  // Conseca Event Keys
+  // ==========================================================================
+
+  // Logs the policy generation event.
+  CONSECA_POLICY_GENERATION = 159,
+
+  // Logs the verdict event.
+  CONSECA_VERDICT = 160,
+
+  // Logs the generated policy content.
+  CONSECA_GENERATED_POLICY = 161,
+
+  // Logs the verdict result (e.g. ALLOW/BLOCK).
+  CONSECA_VERDICT_RESULT = 162,
+
+  // Logs the verdict rationale.
+  CONSECA_VERDICT_RATIONALE = 163,
+
+  // Logs the trusted content used.
+  CONSECA_TRUSTED_CONTENT = 164,
+
+  // Logs the user prompt for Conseca events.
+  CONSECA_USER_PROMPT = 165,
+
+  // Logs the error message for Conseca events.
+  CONSECA_ERROR = 166,
 }

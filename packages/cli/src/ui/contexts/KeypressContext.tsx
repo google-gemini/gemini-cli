@@ -92,11 +92,11 @@ const KEY_INFO_MAP: Record<
   '[[5~': { name: 'pageup' },
   '[[6~': { name: 'pagedown' },
   '[9u': { name: 'tab' },
-  '[13u': { name: 'return' },
+  '[13u': { name: 'enter' },
   '[27u': { name: 'escape' },
   '[32u': { name: 'space' },
   '[127u': { name: 'backspace' },
-  '[57414u': { name: 'return' }, // Numpad Enter
+  '[57414u': { name: 'enter' }, // Numpad Enter
   '[a': { name: 'up', shift: true },
   '[b': { name: 'down', shift: true },
   '[c': { name: 'right', shift: true },
@@ -122,6 +122,25 @@ const KEY_INFO_MAP: Record<
   '[8^': { name: 'end', ctrl: true },
 };
 
+// Numpad keys in Application Keypad Mode (SS3 sequences)
+const NUMPAD_MAP: Record<string, string> = {
+  Oj: '*',
+  Ok: '+',
+  Om: '-',
+  Oo: '/',
+  Op: '0',
+  Oq: '1',
+  Or: '2',
+  Os: '3',
+  Ot: '4',
+  Ou: '5',
+  Ov: '6',
+  Ow: '7',
+  Ox: '8',
+  Oy: '9',
+  On: '.',
+};
+
 const kUTF16SurrogateThreshold = 0x10000; // 2 ** 16
 function charLengthAt(str: string, i: number): number {
   if (str.length <= i) {
@@ -141,6 +160,7 @@ const MAC_ALT_KEY_CHARACTER_MAP: Record<string, string> = {
   '\u00B5': 'm', // "µ" toggle markup view
   '\u03A9': 'z', // "Ω" Option+z
   '\u00B8': 'Z', // "¸" Option+Shift+z
+  '\u2202': 'd', // "∂" delete word forward
 };
 
 function nonKeyboardEventFilter(
@@ -158,8 +178,7 @@ function nonKeyboardEventFilter(
 }
 
 /**
- * Converts return keys pressed quickly after other keys into plain
- * insertable return characters.
+ * Converts return keys pressed quickly after insertable keys into a shift+return
  *
  * This is to accommodate older terminals that paste text without bracketing.
  */
@@ -167,10 +186,10 @@ function bufferFastReturn(keypressHandler: KeypressHandler): KeypressHandler {
   let lastKeyTime = 0;
   return (key: Key) => {
     const now = Date.now();
-    if (key.name === 'return' && now - lastKeyTime <= FAST_RETURN_TIMEOUT) {
+    if (key.name === 'enter' && now - lastKeyTime <= FAST_RETURN_TIMEOUT) {
       keypressHandler({
         ...key,
-        name: 'return',
+        name: 'enter',
         shift: true, // to make it a newline, not a submission
         alt: false,
         ctrl: false,
@@ -181,7 +200,7 @@ function bufferFastReturn(keypressHandler: KeypressHandler): KeypressHandler {
     } else {
       keypressHandler(key);
     }
-    lastKeyTime = now;
+    lastKeyTime = key.insertable ? now : 0;
   };
 }
 
@@ -213,7 +232,7 @@ function bufferBackslashEnter(
 
       if (nextKey === null) {
         keypressHandler(key);
-      } else if (nextKey.name === 'return') {
+      } else if (nextKey.name === 'enter') {
         keypressHandler({
           ...nextKey,
           shift: true,
@@ -537,28 +556,37 @@ function* emitKeys(
           insertable = true;
         }
       } else {
-        name = 'undefined';
-        if (
-          (ctrl || cmd || alt) &&
-          (code.endsWith('u') || code.endsWith('~'))
-        ) {
-          // CSI-u or tilde-coded functional keys: ESC [ <code> ; <mods> (u|~)
-          const codeNumber = parseInt(code.slice(1, -1), 10);
+        const numpadChar = NUMPAD_MAP[code];
+        if (numpadChar) {
+          name = numpadChar;
+          if (!ctrl && !cmd && !alt) {
+            sequence = numpadChar;
+            insertable = true;
+          }
+        } else {
+          name = 'undefined';
           if (
-            codeNumber >= 'a'.charCodeAt(0) &&
-            codeNumber <= 'z'.charCodeAt(0)
+            (ctrl || cmd || alt) &&
+            (code.endsWith('u') || code.endsWith('~'))
           ) {
-            name = String.fromCharCode(codeNumber);
+            // CSI-u or tilde-coded functional keys: ESC [ <code> ; <mods> (u|~)
+            const codeNumber = parseInt(code.slice(1, -1), 10);
+            if (
+              codeNumber >= 'a'.charCodeAt(0) &&
+              codeNumber <= 'z'.charCodeAt(0)
+            ) {
+              name = String.fromCharCode(codeNumber);
+            }
           }
         }
       }
     } else if (ch === '\r') {
       // carriage return
-      name = 'return';
+      name = 'enter';
       alt = escaped;
     } else if (escaped && ch === '\n') {
       // Alt+Enter (linefeed), should be consistent with carriage return
-      name = 'return';
+      name = 'enter';
       alt = escaped;
     } else if (ch === '\t') {
       // tab
@@ -601,7 +629,7 @@ function* emitKeys(
     } else if (sequence === `${ESC}${ESC}`) {
       // Double escape
       name = 'escape';
-      alt = true;
+      alt = false;
 
       // Emit first escape key here, then continue processing
       keypressHandler({
@@ -616,7 +644,7 @@ function* emitKeys(
     } else if (escaped) {
       // Escape sequence timeout
       name = ch.length ? undefined : 'escape';
-      alt = true;
+      alt = ch.length > 0;
     } else {
       // Any other character is considered printable.
       insertable = true;
@@ -757,6 +785,8 @@ export function KeypressProvider({
   );
 
   useEffect(() => {
+    terminalCapabilityManager.enableSupportedModes();
+
     const wasRaw = stdin.isRaw;
     if (wasRaw === false) {
       setRawMode(true);

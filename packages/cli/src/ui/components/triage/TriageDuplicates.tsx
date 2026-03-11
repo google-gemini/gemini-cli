@@ -10,7 +10,8 @@ import Spinner from 'ink-spinner';
 import type { Config } from '@google/gemini-cli-core';
 import { debugLogger, spawnAsync, LlmRole } from '@google/gemini-cli-core';
 import { useKeypress } from '../../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../key/keyMatchers.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 interface Issue {
   number: number;
@@ -106,6 +107,7 @@ export const TriageDuplicates = ({
   onExit: () => void;
   initialLimit?: number;
 }) => {
+  const keyMatchers = useKeyMatchers();
   const [state, setState] = useState<TriageState>({
     status: 'loading',
     issues: [],
@@ -451,6 +453,7 @@ Return a JSON object with:
         '--limit',
         String(limit),
       ]);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const issues: Issue[] = JSON.parse(stdout);
       if (issues.length === 0) {
         setState((s) => ({

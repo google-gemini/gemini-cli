@@ -4,17 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { ShortcutsHelp } from './ShortcutsHelp.js';
 
 describe('ShortcutsHelp', () => {
   const originalPlatform = process.platform;
 
+  beforeEach(() => vi.stubEnv('FORCE_GENERIC_KEYBINDING_HINTS', ''));
+
   afterEach(() => {
     Object.defineProperty(process, 'platform', {
       value: originalPlatform,
     });
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -34,22 +37,28 @@ describe('ShortcutsHelp', () => {
     ),
   )(
     'renders correctly in $name mode on $platform.name',
-    ({ width, platform }) => {
+    async ({ width, platform }) => {
       Object.defineProperty(process, 'platform', {
         value: platform.value,
       });
 
-      const { lastFrame } = renderWithProviders(<ShortcutsHelp />, {
-        width,
-      });
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <ShortcutsHelp />,
+        {
+          width,
+        },
+      );
+      await waitUntilReady();
       expect(lastFrame()).toContain('shell mode');
       expect(lastFrame()).toMatchSnapshot();
+      unmount();
     },
   );
 
-  it('always shows Tab Tab focus UI shortcut', () => {
+  it('always shows Tab focus UI shortcut', async () => {
     const rendered = renderWithProviders(<ShortcutsHelp />);
-    expect(rendered.lastFrame()).toContain('Tab Tab');
+    await rendered.waitUntilReady();
+    expect(rendered.lastFrame()).toContain('Tab focus UI');
     rendered.unmount();
   });
 });

@@ -20,7 +20,7 @@ The most powerful tools for enterprise administration are the system-wide
 settings files. These files allow you to define a baseline configuration
 (`system-defaults.json`) and a set of overrides (`settings.json`) that apply to
 all users on a machine. For a complete overview of configuration options, see
-the [Configuration documentation](../get-started/configuration.md).
+the [Configuration documentation](../reference/configuration.md).
 
 Settings are merged from four files. The precedence order for single-value
 settings (like `theme`) is:
@@ -203,6 +203,15 @@ with the actual Gemini CLI process, which inherits the environment variable.
 This makes it significantly more difficult for a user to bypass the enforced
 settings.
 
+**PowerShell Profile (Windows alternative):**
+
+On Windows, administrators can achieve similar results by adding the environment
+variable to the system-wide or user-specific PowerShell profile:
+
+```powershell
+Add-Content -Path $PROFILE -Value '$env:GEMINI_CLI_SYSTEM_SETTINGS_PATH="C:\ProgramData\gemini-cli\settings.json"'
+```
+
 ## User isolation in shared environments
 
 In shared compute environments (like ML experiment runners or shared build
@@ -214,9 +223,19 @@ use the `GEMINI_CLI_HOME` environment variable to point to a unique directory
 for a specific user or job. The CLI will create a `.gemini` folder inside the
 specified path.
 
+**macOS/Linux**
+
 ```bash
 # Isolate state for a specific job
 export GEMINI_CLI_HOME="/tmp/gemini-job-123"
+gemini
+```
+
+**Windows (PowerShell)**
+
+```powershell
+# Isolate state for a specific job
+$env:GEMINI_CLI_HOME="C:\temp\gemini-job-123"
 gemini
 ```
 
@@ -224,8 +243,8 @@ gemini
 
 You can significantly enhance security by controlling which tools the Gemini
 model can use. This is achieved through the `tools.core` setting and the
-[Policy Engine](../core/policy-engine.md). For a list of available tools, see
-the [Tools documentation](../tools/index.md).
+[Policy Engine](../reference/policy-engine.md). For a list of available tools,
+see the [Tools reference](../reference/tools.md).
 
 ### Allowlisting with `coreTools`
 
@@ -245,8 +264,8 @@ on the approved list.
 
 ### Blocklisting with `excludeTools` (Deprecated)
 
-> **Deprecated:** Use the [Policy Engine](../core/policy-engine.md) for more
-> robust control.
+> **Deprecated:** Use the [Policy Engine](../reference/policy-engine.md) for
+> more robust control.
 
 Alternatively, you can add specific tools that are considered dangerous in your
 environment to a blocklist.
@@ -289,7 +308,7 @@ unintended tool execution.
 ## Managing custom tools (MCP servers)
 
 If your organization uses custom tools via
-[Model-Context Protocol (MCP) servers](../core/tools-api.md), it is crucial to
+[Model-Context Protocol (MCP) servers](../tools/mcp-server.md), it is crucial to
 understand how server configurations are managed to apply security policies
 effectively.
 

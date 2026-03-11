@@ -4,21 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ToolCall,
-  Status,
-  WaitingToolCall,
-  CompletedToolCall,
-  SuccessfulToolCall,
-  ErroredToolCall,
-  CancelledToolCall,
-  ScheduledToolCall,
-  ValidatingToolCall,
-  ExecutingToolCall,
-  ToolCallResponseInfo,
+import {
+  CoreToolCallStatus,
+  ROOT_SCHEDULER_ID,
+  type ToolCall,
+  type Status,
+  type WaitingToolCall,
+  type CompletedToolCall,
+  type SuccessfulToolCall,
+  type ErroredToolCall,
+  type CancelledToolCall,
+  type ScheduledToolCall,
+  type ValidatingToolCall,
+  type ExecutingToolCall,
+  type ToolCallResponseInfo,
 } from './types.js';
-import { CoreToolCallStatus } from './types.js';
-import { ROOT_SCHEDULER_ID } from './types.js';
 import type {
   ToolConfirmationOutcome,
   ToolResultDisplay,
@@ -31,6 +31,7 @@ import {
   MessageBusType,
   type SerializableConfirmationDetails,
 } from '../confirmation-bus/types.js';
+import { isToolCallResponseInfo } from '../utils/tool-utils.js';
 
 /**
  * Handler for terminal tool calls.
@@ -78,8 +79,16 @@ export class SchedulerStateManager {
     return next;
   }
 
+  peekQueue(): ToolCall | undefined {
+    return this.queue[0];
+  }
+
   get isActive(): boolean {
     return this.activeCalls.size > 0;
+  }
+
+  get allActiveCalls(): ToolCall[] {
+    return Array.from(this.activeCalls.values());
   }
 
   get activeCallCount(): number {
@@ -120,7 +129,7 @@ export class SchedulerStateManager {
   updateStatus(
     callId: string,
     status: CoreToolCallStatus.Cancelled,
-    data: string,
+    data: string | ToolCallResponseInfo,
   ): void;
   updateStatus(
     callId: string,
@@ -178,6 +187,19 @@ export class SchedulerStateManager {
 
     this.activeCalls.set(callId, this.patchCall(call, { outcome }));
     this.emitUpdate();
+  }
+
+  /**
+   * Replaces the currently active call with a new call, placing the new call
+   * at the front of the queue to be processed immediately in the next tick.
+   * Used for Tail Calls to chain execution without finalizing the original call.
+   */
+  replaceActiveCallWithTailCall(callId: string, nextCall: ToolCall): void {
+    if (this.activeCalls.has(callId)) {
+      this.activeCalls.delete(callId);
+      this.queue.unshift(nextCall);
+      this.emitUpdate();
+    }
   }
 
   cancelAllQueued(reason: string): void {
@@ -244,7 +266,7 @@ export class SchedulerStateManager {
   ): ToolCall {
     switch (newStatus) {
       case CoreToolCallStatus.Success: {
-        if (!this.isToolCallResponseInfo(auxiliaryData)) {
+        if (!isToolCallResponseInfo(auxiliaryData)) {
           throw new Error(
             `Invalid data for 'success' transition (callId: ${call.request.callId})`,
           );
@@ -252,7 +274,7 @@ export class SchedulerStateManager {
         return this.toSuccess(call, auxiliaryData);
       }
       case CoreToolCallStatus.Error: {
-        if (!this.isToolCallResponseInfo(auxiliaryData)) {
+        if (!isToolCallResponseInfo(auxiliaryData)) {
           throw new Error(
             `Invalid data for 'error' transition (callId: ${call.request.callId})`,
           );
@@ -270,9 +292,12 @@ export class SchedulerStateManager {
       case CoreToolCallStatus.Scheduled:
         return this.toScheduled(call);
       case CoreToolCallStatus.Cancelled: {
-        if (typeof auxiliaryData !== 'string') {
+        if (
+          typeof auxiliaryData !== 'string' &&
+          !isToolCallResponseInfo(auxiliaryData)
+        ) {
           throw new Error(
-            `Invalid reason (string) for 'cancelled' transition (callId: ${call.request.callId})`,
+            `Invalid reason (string) or response for 'cancelled' transition (callId: ${call.request.callId})`,
           );
         }
         return this.toCancelled(call, auxiliaryData);
@@ -295,15 +320,6 @@ export class SchedulerStateManager {
         return exhaustiveCheck;
       }
     }
-  }
-
-  private isToolCallResponseInfo(data: unknown): data is ToolCallResponseInfo {
-    return (
-      typeof data === 'object' &&
-      data !== null &&
-      'callId' in data &&
-      'responseParts' in data
-    );
   }
 
   private isExecutingToolCallPatch(
@@ -431,7 +447,10 @@ export class SchedulerStateManager {
     };
   }
 
-  private toCancelled(call: ToolCall, reason: string): CancelledToolCall {
+  private toCancelled(
+    call: ToolCall,
+    reason: string | ToolCallResponseInfo,
+  ): CancelledToolCall {
     this.validateHasToolAndInvocation(call, CoreToolCallStatus.Cancelled);
     const startTime = 'startTime' in call ? call.startTime : undefined;
 
@@ -458,6 +477,31 @@ export class SchedulerStateManager {
       }
     }
 
+    // Capture any existing live output so it isn't lost when forcing cancellation.
+    let existingOutput: ToolResultDisplay | undefined = undefined;
+    if (call.status === CoreToolCallStatus.Executing && call.liveOutput) {
+      existingOutput = call.liveOutput;
+    }
+
+    if (isToolCallResponseInfo(reason)) {
+      const finalResponse = { ...reason };
+      if (!finalResponse.resultDisplay) {
+        finalResponse.resultDisplay = resultDisplay ?? existingOutput;
+      }
+
+      return {
+        request: call.request,
+        tool: call.tool,
+        invocation: call.invocation,
+        status: CoreToolCallStatus.Cancelled,
+        response: finalResponse,
+        durationMs: startTime ? Date.now() - startTime : undefined,
+        outcome: call.outcome,
+        schedulerId: call.schedulerId,
+        approvalMode: call.approvalMode,
+      };
+    }
+
     const errorMessage = `[Operation Cancelled] Reason: ${reason}`;
     return {
       request: call.request,
@@ -475,7 +519,7 @@ export class SchedulerStateManager {
             },
           },
         ],
-        resultDisplay,
+        resultDisplay: resultDisplay ?? existingOutput,
         error: undefined,
         errorType: undefined,
         contentLength: errorMessage.length,
@@ -517,6 +561,17 @@ export class SchedulerStateManager {
       execData?.liveOutput ??
       ('liveOutput' in call ? call.liveOutput : undefined);
     const pid = execData?.pid ?? ('pid' in call ? call.pid : undefined);
+    const progressMessage =
+      execData?.progressMessage ??
+      ('progressMessage' in call ? call.progressMessage : undefined);
+    const progressPercent =
+      execData?.progressPercent ??
+      ('progressPercent' in call ? call.progressPercent : undefined);
+    const progress =
+      execData?.progress ?? ('progress' in call ? call.progress : undefined);
+    const progressTotal =
+      execData?.progressTotal ??
+      ('progressTotal' in call ? call.progressTotal : undefined);
 
     return {
       request: call.request,
@@ -527,6 +582,10 @@ export class SchedulerStateManager {
       invocation: call.invocation,
       liveOutput,
       pid,
+      progressMessage,
+      progressPercent,
+      progress,
+      progressTotal,
       schedulerId: call.schedulerId,
       approvalMode: call.approvalMode,
     };

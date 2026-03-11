@@ -5,8 +5,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Content, GenerateContentResponse } from '@google/genai';
-import { ApiError, ThinkingLevel } from '@google/genai';
+import {
+  ApiError,
+  ThinkingLevel,
+  type Content,
+  type GenerateContentResponse,
+} from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import {
   GeminiChat,
@@ -153,6 +157,7 @@ describe('GeminiChat', () => {
       }),
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getRetryFetchErrors: vi.fn().mockReturnValue(false),
+      getMaxAttempts: vi.fn().mockReturnValue(10),
       getUserTier: vi.fn().mockReturnValue(undefined),
       modelConfigService: {
         getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => {
@@ -1031,6 +1036,59 @@ describe('GeminiChat', () => {
         LlmRole.MAIN,
       );
     });
+
+    it('should flush transcript before tool dispatch for pure tool call with no text or thoughts', async () => {
+      const pureToolCallStream = (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                role: 'model',
+                parts: [
+                  {
+                    functionCall: {
+                      name: 'read_file',
+                      args: { path: 'test.py' },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        } as unknown as GenerateContentResponse;
+      })();
+
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        pureToolCallStream,
+      );
+
+      const { default: fs } = await import('node:fs');
+      const writeFileSync = vi.mocked(fs.writeFileSync);
+      const writeCountBefore = writeFileSync.mock.calls.length;
+
+      const stream = await chat.sendMessageStream(
+        { model: 'test-model' },
+        'analyze test.py',
+        'prompt-id-pure-tool-flush',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+      for await (const _ of stream) {
+        // consume
+      }
+
+      const newWrites = writeFileSync.mock.calls.slice(writeCountBefore);
+      expect(newWrites.length).toBeGreaterThan(0);
+
+      const lastWriteData = JSON.parse(
+        newWrites[newWrites.length - 1][1] as string,
+      ) as { messages: Array<{ type: string }> };
+
+      const geminiMessages = lastWriteData.messages.filter(
+        (m) => m.type === 'gemini',
+      );
+      expect(geminiMessages.length).toBeGreaterThan(0);
+    });
   });
 
   describe('addHistory', () => {
@@ -1096,6 +1154,7 @@ describe('GeminiChat', () => {
         1,
       );
       expect(mockLogContentRetry).not.toHaveBeenCalled();
+      expect(mockLogContentRetryFailure).toHaveBeenCalledTimes(1);
     });
 
     it('should yield a RETRY event when an invalid stream is encountered', async () => {

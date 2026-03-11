@@ -7,7 +7,11 @@
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { ToolGroupMessage } from './ToolGroupMessage.js';
-import type { IndividualToolCallDisplay } from '../../types.js';
+import type {
+  HistoryItem,
+  HistoryItemWithoutId,
+  IndividualToolCallDisplay,
+} from '../../types.js';
 import { Scrollable } from '../shared/Scrollable.js';
 import {
   makeFakeConfig,
@@ -20,6 +24,7 @@ import {
   GLOB_DISPLAY_NAME,
 } from '@google/gemini-cli-core';
 import os from 'node:os';
+import { createMockSettings } from '../../../test-utils/settings.js';
 
 describe('<ToolGroupMessage />', () => {
   afterEach(() => {
@@ -40,9 +45,16 @@ describe('<ToolGroupMessage />', () => {
   });
 
   const baseProps = {
-    groupId: 1,
     terminalWidth: 80,
   };
+
+  const createItem = (
+    tools: IndividualToolCallDisplay[],
+  ): HistoryItem | HistoryItemWithoutId => ({
+    id: 1,
+    type: 'tool_group',
+    tools,
+  });
 
   const baseMockConfig = makeFakeConfig({
     model: 'gemini-pro',
@@ -52,24 +64,42 @@ describe('<ToolGroupMessage />', () => {
     ideMode: false,
     enableInteractiveShell: true,
   });
+  const fullVerbositySettings = createMockSettings({
+    merged: {
+      ui: { errorVerbosity: 'full' },
+    },
+  });
+  const lowVerbositySettings = createMockSettings({
+    merged: {
+      ui: { errorVerbosity: 'low' },
+    },
+  });
 
   describe('Golden Snapshots', () => {
-    it('renders single successful tool call', () => {
+    it('renders single successful tool call', async () => {
       const toolCalls = [createToolCall()];
-      const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+      const item = createItem(toolCalls);
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
 
-    it('hides confirming tools (standard behavior)', () => {
+    it('hides confirming tools (standard behavior)', async () => {
       const toolCalls = [
         createToolCall({
           callId: 'confirm-tool',
@@ -81,18 +111,20 @@ describe('<ToolGroupMessage />', () => {
           },
         }),
       ];
+      const item = createItem(toolCalls);
 
-      const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-        { config: baseMockConfig },
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+        { config: baseMockConfig, settings: fullVerbositySettings },
       );
 
       // Should render nothing because all tools in the group are confirming
-      expect(lastFrame()).toBe('');
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toBe('');
       unmount();
     });
 
-    it('renders multiple tool calls with different statuses (only visible ones)', () => {
+    it('renders multiple tool calls with different statuses (only visible ones)', async () => {
       const toolCalls = [
         createToolCall({
           callId: 'tool-1',
@@ -113,17 +145,25 @@ describe('<ToolGroupMessage />', () => {
           status: CoreToolCallStatus.Error,
         }),
       ];
+      const item = createItem(toolCalls);
 
-      const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
       // pending-tool should be hidden
+      await waitUntilReady();
       const output = lastFrame();
       expect(output).toContain('successful-tool');
       expect(output).not.toContain('pending-tool');
@@ -132,7 +172,77 @@ describe('<ToolGroupMessage />', () => {
       unmount();
     });
 
-    it('renders mixed tool calls including shell command', () => {
+    it('hides errored tool calls in low error verbosity mode', async () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'tool-1',
+          name: 'successful-tool',
+          status: CoreToolCallStatus.Success,
+        }),
+        createToolCall({
+          callId: 'tool-2',
+          name: 'error-tool',
+          status: CoreToolCallStatus.Error,
+          resultDisplay: 'Tool failed',
+        }),
+      ];
+      const item = createItem(toolCalls);
+
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+        {
+          config: baseMockConfig,
+          uiState: {
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
+          },
+        },
+      );
+      await waitUntilReady();
+      const output = lastFrame();
+      expect(output).toContain('successful-tool');
+      expect(output).not.toContain('error-tool');
+      unmount();
+    });
+
+    it('keeps client-initiated errored tool calls visible in low error verbosity mode', async () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'tool-1',
+          name: 'client-error-tool',
+          status: CoreToolCallStatus.Error,
+          isClientInitiated: true,
+          resultDisplay: 'Client tool failed',
+        }),
+      ];
+      const item = createItem(toolCalls);
+
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+        {
+          config: baseMockConfig,
+          uiState: {
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
+          },
+        },
+      );
+
+      await waitUntilReady();
+      const output = lastFrame();
+      expect(output).toContain('client-error-tool');
+      unmount();
+    });
+
+    it('renders mixed tool calls including shell command', async () => {
       const toolCalls = [
         createToolCall({
           callId: 'tool-1',
@@ -153,17 +263,25 @@ describe('<ToolGroupMessage />', () => {
           status: CoreToolCallStatus.Scheduled,
         }),
       ];
+      const item = createItem(toolCalls);
 
-      const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
       // write_file (Pending) should be hidden
+      await waitUntilReady();
       const output = lastFrame();
       expect(output).toContain('read_file');
       expect(output).toContain('run_shell_command');
@@ -172,7 +290,7 @@ describe('<ToolGroupMessage />', () => {
       unmount();
     });
 
-    it('renders with limited terminal height', () => {
+    it('renders with limited terminal height', async () => {
       const toolCalls = [
         createToolCall({
           callId: 'tool-1',
@@ -188,24 +306,33 @@ describe('<ToolGroupMessage />', () => {
           resultDisplay: 'More output here',
         }),
       ];
-      const { lastFrame, unmount } = renderWithProviders(
+      const item = createItem(toolCalls);
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
+          item={item}
           toolCalls={toolCalls}
           availableTerminalHeight={10}
         />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
 
-    it('renders with narrow terminal width', () => {
+    it('renders with narrow terminal width', async () => {
       const toolCalls = [
         createToolCall({
           name: 'very-long-tool-name-that-might-wrap',
@@ -213,38 +340,56 @@ describe('<ToolGroupMessage />', () => {
             'This is a very long description that might cause wrapping issues',
         }),
       ];
-      const { lastFrame, unmount } = renderWithProviders(
+      const item = createItem(toolCalls);
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
+          item={item}
           toolCalls={toolCalls}
           terminalWidth={40}
         />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
 
-    it('renders empty tool calls array', () => {
-      const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={[]} />,
+    it('renders empty tool calls array', async () => {
+      const toolCalls: IndividualToolCallDisplay[] = [];
+      const item = createItem(toolCalls);
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: [] }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: [],
+              },
+            ],
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
 
-    it('renders header when scrolled', () => {
+    it('renders header when scrolled', async () => {
       const toolCalls = [
         createToolCall({
           callId: '1',
@@ -260,22 +405,30 @@ describe('<ToolGroupMessage />', () => {
           resultDisplay: 'line1\nline2',
         }),
       ];
-      const { lastFrame, unmount } = renderWithProviders(
+      const item = createItem(toolCalls);
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <Scrollable height={10} hasFocus={true} scrollToBottom={true}>
-          <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />
+          <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />
         </Scrollable>,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
 
-    it('renders tool call with outputFile', () => {
+    it('renders tool call with outputFile', async () => {
       const toolCalls = [
         createToolCall({
           callId: 'tool-output-file',
@@ -285,20 +438,28 @@ describe('<ToolGroupMessage />', () => {
           outputFile: '/path/to/output.txt',
         }),
       ];
-      const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+      const item = createItem(toolCalls);
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
 
-    it('renders two tool groups where only the last line of the previous group is visible', () => {
+    it('renders two tool groups where only the last line of the previous group is visible', async () => {
       const toolCalls1 = [
         createToolCall({
           callId: '1',
@@ -307,6 +468,7 @@ describe('<ToolGroupMessage />', () => {
           resultDisplay: 'line1\nline2\nline3\nline4\nline5',
         }),
       ];
+      const item1 = createItem(toolCalls1);
       const toolCalls2 = [
         createToolCall({
           callId: '2',
@@ -315,49 +477,74 @@ describe('<ToolGroupMessage />', () => {
           resultDisplay: 'line1',
         }),
       ];
+      const item2 = createItem(toolCalls2);
 
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <Scrollable height={6} hasFocus={true} scrollToBottom={true}>
-          <ToolGroupMessage {...baseProps} toolCalls={toolCalls1} />
-          <ToolGroupMessage {...baseProps} toolCalls={toolCalls2} />
+          <ToolGroupMessage
+            {...baseProps}
+            item={item1}
+            toolCalls={toolCalls1}
+          />
+          <ToolGroupMessage
+            {...baseProps}
+            item={item2}
+            toolCalls={toolCalls2}
+          />
         </Scrollable>,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
             pendingHistoryItems: [
-              { type: 'tool_group', tools: toolCalls1 },
-              { type: 'tool_group', tools: toolCalls2 },
+              {
+                type: 'tool_group',
+                tools: toolCalls1,
+              },
+              {
+                type: 'tool_group',
+                tools: toolCalls2,
+              },
             ],
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
   });
 
   describe('Border Color Logic', () => {
-    it('uses yellow border for shell commands even when successful', () => {
+    it('uses yellow border for shell commands even when successful', async () => {
       const toolCalls = [
         createToolCall({
           name: 'run_shell_command',
           status: CoreToolCallStatus.Success,
         }),
       ];
-      const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+      const item = createItem(toolCalls);
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
 
-    it('uses gray border when all tools are successful and no shell commands', () => {
+    it('uses gray border when all tools are successful and no shell commands', async () => {
       const toolCalls = [
         createToolCall({ status: CoreToolCallStatus.Success }),
         createToolCall({
@@ -366,22 +553,30 @@ describe('<ToolGroupMessage />', () => {
           status: CoreToolCallStatus.Success,
         }),
       ];
-      const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
+      const item = createItem(toolCalls);
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
   });
 
   describe('Height Calculation', () => {
-    it('calculates available height correctly with multiple tools with results', () => {
+    it('calculates available height correctly with multiple tools with results', async () => {
       const toolCalls = [
         createToolCall({
           callId: 'tool-1',
@@ -396,20 +591,29 @@ describe('<ToolGroupMessage />', () => {
           resultDisplay: '', // No result
         }),
       ];
-      const { lastFrame, unmount } = renderWithProviders(
+      const item = createItem(toolCalls);
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
+          item={item}
           toolCalls={toolCalls}
           availableTerminalHeight={20}
         />,
         {
           config: baseMockConfig,
+          settings: fullVerbositySettings,
           uiState: {
-            pendingHistoryItems: [{ type: 'tool_group', tools: toolCalls }],
+            pendingHistoryItems: [
+              {
+                type: 'tool_group',
+                tools: toolCalls,
+              },
+            ],
           },
         },
       );
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
   });
@@ -444,7 +648,7 @@ describe('<ToolGroupMessage />', () => {
       },
     ])(
       'filtering logic for status=$status and hasResult=$resultDisplay',
-      ({ status, resultDisplay, shouldHide }) => {
+      async ({ status, resultDisplay, shouldHide }) => {
         const toolCalls = [
           createToolCall({
             callId: `ask-user-${status}`,
@@ -453,14 +657,16 @@ describe('<ToolGroupMessage />', () => {
             resultDisplay,
           }),
         ];
+        const item = createItem(toolCalls);
 
-        const { lastFrame, unmount } = renderWithProviders(
-          <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-          { config: baseMockConfig },
+        const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+          <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+          { config: baseMockConfig, settings: fullVerbositySettings },
         );
+        await waitUntilReady();
 
         if (shouldHide) {
-          expect(lastFrame()).toBe('');
+          expect(lastFrame({ allowEmpty: true })).toBe('');
         } else {
           expect(lastFrame()).toMatchSnapshot();
         }
@@ -468,7 +674,7 @@ describe('<ToolGroupMessage />', () => {
       },
     );
 
-    it('shows other tools when ask_user is filtered out', () => {
+    it('shows other tools when ask_user is filtered out', async () => {
       const toolCalls = [
         createToolCall({
           callId: 'other-tool',
@@ -481,17 +687,19 @@ describe('<ToolGroupMessage />', () => {
           status: CoreToolCallStatus.Scheduled,
         }),
       ];
+      const item = createItem(toolCalls);
 
-      const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-        { config: baseMockConfig },
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+        { config: baseMockConfig, settings: fullVerbositySettings },
       );
 
-      expect(lastFrame()).toMatchSnapshot();
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toMatchSnapshot();
       unmount();
     });
 
-    it('renders nothing when only tool is in-progress AskUser with borderBottom=false', () => {
+    it('renders nothing when only tool is in-progress AskUser with borderBottom=false', async () => {
       // AskUser tools in progress are rendered by AskUserDialog, not ToolGroupMessage.
       // When AskUser is the only tool and borderBottom=false (no border to close),
       // the component should render nothing.
@@ -502,17 +710,259 @@ describe('<ToolGroupMessage />', () => {
           status: CoreToolCallStatus.Executing,
         }),
       ];
+      const item = createItem(toolCalls);
 
-      const { lastFrame, unmount } = renderWithProviders(
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
         <ToolGroupMessage
           {...baseProps}
+          item={item}
           toolCalls={toolCalls}
           borderBottom={false}
         />,
-        { config: baseMockConfig },
+        { config: baseMockConfig, settings: fullVerbositySettings },
       );
       // AskUser tools in progress are rendered by AskUserDialog, so we expect nothing.
-      expect(lastFrame()).toBe('');
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toBe('');
+      unmount();
+    });
+
+    it('does not render a bottom-border fragment when all tools are filtered out', async () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'hidden-error-tool',
+          name: 'error-tool',
+          status: CoreToolCallStatus.Error,
+          resultDisplay: 'Hidden in low verbosity',
+          isClientInitiated: false,
+        }),
+      ];
+      const item = createItem(toolCalls);
+
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage
+          {...baseProps}
+          item={item}
+          toolCalls={toolCalls}
+          borderTop={false}
+          borderBottom={true}
+        />,
+        {
+          config: baseMockConfig,
+          settings: lowVerbositySettings,
+        },
+      );
+
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toBe('');
+      unmount();
+    });
+
+    it('still renders explicit closing slices for split static/pending groups', async () => {
+      const toolCalls: IndividualToolCallDisplay[] = [];
+      const item = createItem(toolCalls);
+
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage
+          {...baseProps}
+          item={item}
+          toolCalls={toolCalls}
+          borderTop={false}
+          borderBottom={true}
+        />,
+        {
+          config: baseMockConfig,
+          settings: fullVerbositySettings,
+        },
+      );
+
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).not.toBe('');
+      unmount();
+    });
+
+    it('does not render a border fragment when plan-mode tools are filtered out', async () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'plan-write',
+          name: WRITE_FILE_DISPLAY_NAME,
+          approvalMode: ApprovalMode.PLAN,
+          status: CoreToolCallStatus.Success,
+          resultDisplay: 'Plan file written',
+        }),
+      ];
+      const item = createItem(toolCalls);
+
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage
+          {...baseProps}
+          item={item}
+          toolCalls={toolCalls}
+          borderTop={false}
+          borderBottom={true}
+        />,
+        {
+          config: baseMockConfig,
+          settings: fullVerbositySettings,
+        },
+      );
+
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toBe('');
+      unmount();
+    });
+
+    it('does not render a border fragment when only confirming tools are present', async () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'confirm-only',
+          status: CoreToolCallStatus.AwaitingApproval,
+          confirmationDetails: {
+            type: 'info',
+            title: 'Confirm',
+            prompt: 'Proceed?',
+          },
+        }),
+      ];
+      const item = createItem(toolCalls);
+
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage
+          {...baseProps}
+          item={item}
+          toolCalls={toolCalls}
+          borderTop={false}
+          borderBottom={true}
+        />,
+        {
+          config: baseMockConfig,
+          settings: fullVerbositySettings,
+        },
+      );
+
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toBe('');
+      unmount();
+    });
+
+    it('does not leave a border stub when transitioning from visible to fully filtered tools', async () => {
+      const visibleTools = [
+        createToolCall({
+          callId: 'visible-success',
+          name: 'visible-tool',
+          status: CoreToolCallStatus.Success,
+          resultDisplay: 'visible output',
+        }),
+      ];
+      const hiddenTools = [
+        createToolCall({
+          callId: 'hidden-error',
+          name: 'hidden-error-tool',
+          status: CoreToolCallStatus.Error,
+          resultDisplay: 'hidden output',
+          isClientInitiated: false,
+        }),
+      ];
+
+      const initialItem = createItem(visibleTools);
+      const hiddenItem = createItem(hiddenTools);
+
+      const firstRender = renderWithProviders(
+        <ToolGroupMessage
+          {...baseProps}
+          item={initialItem}
+          toolCalls={visibleTools}
+          borderTop={false}
+          borderBottom={true}
+        />,
+        {
+          config: baseMockConfig,
+          settings: lowVerbositySettings,
+        },
+      );
+      await firstRender.waitUntilReady();
+      expect(firstRender.lastFrame()).toContain('visible-tool');
+      firstRender.unmount();
+
+      const secondRender = renderWithProviders(
+        <ToolGroupMessage
+          {...baseProps}
+          item={hiddenItem}
+          toolCalls={hiddenTools}
+          borderTop={false}
+          borderBottom={true}
+        />,
+        {
+          config: baseMockConfig,
+          settings: lowVerbositySettings,
+        },
+      );
+      await secondRender.waitUntilReady();
+      expect(secondRender.lastFrame({ allowEmpty: true })).toBe('');
+      secondRender.unmount();
+    });
+
+    it('keeps visible tools rendered with many filtered tools (stress case)', async () => {
+      const visibleTool = createToolCall({
+        callId: 'visible-tool',
+        name: 'visible-tool',
+        status: CoreToolCallStatus.Success,
+        resultDisplay: 'visible output',
+      });
+      const hiddenTools = Array.from({ length: 50 }, (_, index) =>
+        createToolCall({
+          callId: `hidden-${index}`,
+          name: `hidden-error-${index}`,
+          status: CoreToolCallStatus.Error,
+          resultDisplay: `hidden output ${index}`,
+          isClientInitiated: false,
+        }),
+      );
+      const toolCalls = [visibleTool, ...hiddenTools];
+      const item = createItem(toolCalls);
+
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage
+          {...baseProps}
+          item={item}
+          toolCalls={toolCalls}
+          borderTop={false}
+          borderBottom={true}
+        />,
+        {
+          config: baseMockConfig,
+          settings: lowVerbositySettings,
+        },
+      );
+
+      await waitUntilReady();
+      const output = lastFrame();
+      expect(output).toContain('visible-tool');
+      expect(output).not.toContain('hidden-error-0');
+      expect(output).not.toContain('hidden-error-49');
+      unmount();
+    });
+
+    it('renders explicit closing slice even at very narrow terminal width', async () => {
+      const toolCalls: IndividualToolCallDisplay[] = [];
+      const item = createItem(toolCalls);
+
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage
+          item={item}
+          toolCalls={toolCalls}
+          terminalWidth={8}
+          borderTop={false}
+          borderBottom={true}
+        />,
+        {
+          config: baseMockConfig,
+          settings: fullVerbositySettings,
+        },
+      );
+
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).not.toBe('');
       unmount();
     });
   });
@@ -532,26 +982,32 @@ describe('<ToolGroupMessage />', () => {
       },
       { name: READ_FILE_DISPLAY_NAME, mode: ApprovalMode.PLAN, visible: true },
       { name: GLOB_DISPLAY_NAME, mode: ApprovalMode.PLAN, visible: true },
-    ])('filtering logic for $name in $mode mode', ({ name, mode, visible }) => {
-      const toolCalls = [
-        createToolCall({
-          callId: 'test-call',
-          name,
-          approvalMode: mode,
-        }),
-      ];
+    ])(
+      'filtering logic for $name in $mode mode',
+      async ({ name, mode, visible }) => {
+        const toolCalls = [
+          createToolCall({
+            callId: 'test-call',
+            name,
+            approvalMode: mode,
+          }),
+        ];
+        const item = createItem(toolCalls);
 
-      const { lastFrame, unmount } = renderWithProviders(
-        <ToolGroupMessage {...baseProps} toolCalls={toolCalls} />,
-        { config: baseMockConfig },
-      );
+        const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+          <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+          { config: baseMockConfig, settings: fullVerbositySettings },
+        );
 
-      if (visible) {
-        expect(lastFrame()).toContain(name);
-      } else {
-        expect(lastFrame()).toBe('');
-      }
-      unmount();
-    });
+        await waitUntilReady();
+
+        if (visible) {
+          expect(lastFrame()).toContain(name);
+        } else {
+          expect(lastFrame({ allowEmpty: true })).toBe('');
+        }
+        unmount();
+      },
+    );
   });
 });

@@ -12,22 +12,23 @@ import { isHeadlessMode } from './headless.js';
 
 /**
  * Requests consent from the user for OAuth login.
- * Handles both TTY and non-TTY environments.
+ * Handles both interactive and non-interactive (headless) modes.
  */
 export async function getConsentForOauth(prompt: string): Promise<boolean> {
-  const finalPrompt = prompt + ' Opening authentication page in your browser. ';
+  const finalPrompt =
+    (prompt ? prompt + ' ' : '') +
+    'Opening authentication page in your browser. ';
 
-  if (coreEvents.listenerCount(CoreEvent.ConsentRequest) === 0) {
-    if (isHeadlessMode()) {
-      throw new FatalAuthenticationError(
-        'Interactive consent could not be obtained.\n' +
-          'Please run Gemini CLI in an interactive terminal to authenticate, or use NO_BROWSER=true for manual authentication.',
-      );
-    }
+  if (isHeadlessMode()) {
     return getOauthConsentNonInteractive(finalPrompt);
+  } else if (coreEvents.listenerCount(CoreEvent.ConsentRequest) > 0) {
+    return getOauthConsentInteractive(finalPrompt);
   }
-
-  return getOauthConsentInteractive(finalPrompt);
+  throw new FatalAuthenticationError(
+    'Authentication consent could not be obtained.\n' +
+      'Please run Gemini CLI in an interactive terminal to authenticate, ' +
+      'or use NO_BROWSER=true for manual authentication.',
+  );
 }
 
 async function getOauthConsentNonInteractive(prompt: string) {

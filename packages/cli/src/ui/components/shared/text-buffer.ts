@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import pathMod from 'node:path';
@@ -13,12 +12,9 @@ import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
 import { LRUCache } from 'mnemonist';
 import {
   coreEvents,
-  CoreEvent,
   debugLogger,
   unescapePath,
   type EditorType,
-  getEditorCommand,
-  isGuiEditor,
 } from '@google/gemini-cli-core';
 import {
   toCodePoints,
@@ -29,10 +25,12 @@ import {
 } from '../../utils/textUtils.js';
 import { parsePastedPaths } from '../../utils/clipboardUtils.js';
 import type { Key } from '../../contexts/KeypressContext.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../key/keyMatchers.js';
 import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../../constants.js';
+import { openFileInEditor } from '../../utils/editorUtils.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 export const LARGE_PASTE_LINE_THRESHOLD = 5;
 export const LARGE_PASTE_CHAR_THRESHOLD = 500;
@@ -40,6 +38,17 @@ export const LARGE_PASTE_CHAR_THRESHOLD = 500;
 // Regex to match paste placeholders like [Pasted Text: 6 lines] or [Pasted Text: 501 chars #2]
 export const PASTED_TEXT_PLACEHOLDER_REGEX =
   /\[Pasted Text: \d+ (?:lines|chars)(?: #\d+)?\]/g;
+
+// Replace paste placeholder strings with their actual pasted content.
+export function expandPastePlaceholders(
+  text: string,
+  pastedContent: Record<string, string>,
+): string {
+  return text.replace(
+    PASTED_TEXT_PLACEHOLDER_REGEX,
+    (match) => pastedContent[match] || match,
+  );
+}
 
 export type Direction =
   | 'left'
@@ -1694,6 +1703,25 @@ export type TextBufferAction =
   | { type: 'vim_change_to_first_nonwhitespace' }
   | { type: 'vim_delete_to_first_line'; payload: { count: number } }
   | { type: 'vim_delete_to_last_line'; payload: { count: number } }
+  | { type: 'vim_delete_char_before'; payload: { count: number } }
+  | { type: 'vim_toggle_case'; payload: { count: number } }
+  | { type: 'vim_replace_char'; payload: { char: string; count: number } }
+  | {
+      type: 'vim_find_char_forward';
+      payload: { char: string; count: number; till: boolean };
+    }
+  | {
+      type: 'vim_find_char_backward';
+      payload: { char: string; count: number; till: boolean };
+    }
+  | {
+      type: 'vim_delete_to_char_forward';
+      payload: { char: string; count: number; till: boolean };
+    }
+  | {
+      type: 'vim_delete_to_char_backward';
+      payload: { char: string; count: number; till: boolean };
+    }
   | {
       type: 'toggle_paste_expansion';
       payload: { id: string; row: number; col: number };
@@ -2475,6 +2503,13 @@ function textBufferReducerLogic(
     case 'vim_change_to_first_nonwhitespace':
     case 'vim_delete_to_first_line':
     case 'vim_delete_to_last_line':
+    case 'vim_delete_char_before':
+    case 'vim_toggle_case':
+    case 'vim_replace_char':
+    case 'vim_find_char_forward':
+    case 'vim_find_char_backward':
+    case 'vim_delete_to_char_forward':
+    case 'vim_delete_to_char_backward':
       return handleVimAction(state, action as VimAction);
 
     case 'toggle_paste_expansion': {
@@ -2700,6 +2735,7 @@ export function useTextBuffer({
   singleLine = false,
   getPreferredEditor,
 }: UseTextBufferProps): TextBuffer {
+  const keyMatchers = useKeyMatchers();
   const initialState = useMemo((): TextBufferState => {
     const lines = initialText.split('\n');
     const [initialCursorRow, initialCursorCol] = calculateInitialCursorPosition(
@@ -3033,6 +3069,58 @@ export function useTextBuffer({
     dispatch({ type: 'vim_delete_char', payload: { count } });
   }, []);
 
+  const vimDeleteCharBefore = useCallback((count: number): void => {
+    dispatch({ type: 'vim_delete_char_before', payload: { count } });
+  }, []);
+
+  const vimToggleCase = useCallback((count: number): void => {
+    dispatch({ type: 'vim_toggle_case', payload: { count } });
+  }, []);
+
+  const vimReplaceChar = useCallback((char: string, count: number): void => {
+    dispatch({ type: 'vim_replace_char', payload: { char, count } });
+  }, []);
+
+  const vimFindCharForward = useCallback(
+    (char: string, count: number, till: boolean): void => {
+      dispatch({
+        type: 'vim_find_char_forward',
+        payload: { char, count, till },
+      });
+    },
+    [],
+  );
+
+  const vimFindCharBackward = useCallback(
+    (char: string, count: number, till: boolean): void => {
+      dispatch({
+        type: 'vim_find_char_backward',
+        payload: { char, count, till },
+      });
+    },
+    [],
+  );
+
+  const vimDeleteToCharForward = useCallback(
+    (char: string, count: number, till: boolean): void => {
+      dispatch({
+        type: 'vim_delete_to_char_forward',
+        payload: { char, count, till },
+      });
+    },
+    [],
+  );
+
+  const vimDeleteToCharBackward = useCallback(
+    (char: string, count: number, till: boolean): void => {
+      dispatch({
+        type: 'vim_delete_to_char_backward',
+        payload: { char, count, till },
+      });
+    },
+    [],
+  );
+
   const vimInsertAtCursor = useCallback((): void => {
     dispatch({ type: 'vim_insert_at_cursor' });
   }, []);
@@ -3089,42 +3177,18 @@ export function useTextBuffer({
     const tmpDir = fs.mkdtempSync(pathMod.join(os.tmpdir(), 'gemini-edit-'));
     const filePath = pathMod.join(tmpDir, 'buffer.txt');
     // Expand paste placeholders so user sees full content in editor
-    const expandedText = text.replace(
-      PASTED_TEXT_PLACEHOLDER_REGEX,
-      (match) => pastedContent[match] || match,
-    );
+    const expandedText = expandPastePlaceholders(text, pastedContent);
     fs.writeFileSync(filePath, expandedText, 'utf8');
-
-    let command: string | undefined = undefined;
-    const args = [filePath];
-
-    const preferredEditorType = getPreferredEditor?.();
-    if (!command && preferredEditorType) {
-      command = getEditorCommand(preferredEditorType);
-      if (isGuiEditor(preferredEditorType)) {
-        args.unshift('--wait');
-      }
-    }
-
-    if (!command) {
-      command =
-        process.env['VISUAL'] ??
-        process.env['EDITOR'] ??
-        (process.platform === 'win32' ? 'notepad' : 'vi');
-    }
 
     dispatch({ type: 'create_undo_snapshot' });
 
-    const wasRaw = stdin?.isRaw ?? false;
     try {
-      setRawMode?.(false);
-      const { status, error } = spawnSync(command, args, {
-        stdio: 'inherit',
-        shell: process.platform === 'win32',
-      });
-      if (error) throw error;
-      if (typeof status === 'number' && status !== 0)
-        throw new Error(`External editor exited with status ${status}`);
+      await openFileInEditor(
+        filePath,
+        stdin,
+        setRawMode,
+        getPreferredEditor?.(),
+      );
 
       let newText = fs.readFileSync(filePath, 'utf8');
       newText = newText.replace(/\r\n?/g, '\n');
@@ -3147,8 +3211,6 @@ export function useTextBuffer({
         err,
       );
     } finally {
-      coreEvents.emit(CoreEvent.ExternalEditorClosed);
-      if (wasRaw) setRawMode?.(true);
       try {
         fs.unlinkSync(filePath);
       } catch {
@@ -3288,6 +3350,7 @@ export function useTextBuffer({
       text,
       visualCursor,
       visualLines,
+      keyMatchers,
     ],
   );
 
@@ -3557,6 +3620,13 @@ export function useTextBuffer({
       vimMoveBigWordBackward,
       vimMoveBigWordEnd,
       vimDeleteChar,
+      vimDeleteCharBefore,
+      vimToggleCase,
+      vimReplaceChar,
+      vimFindCharForward,
+      vimFindCharBackward,
+      vimDeleteToCharForward,
+      vimDeleteToCharBackward,
       vimInsertAtCursor,
       vimAppendAtCursor,
       vimOpenLineBelow,
@@ -3645,6 +3715,13 @@ export function useTextBuffer({
       vimMoveBigWordBackward,
       vimMoveBigWordEnd,
       vimDeleteChar,
+      vimDeleteCharBefore,
+      vimToggleCase,
+      vimReplaceChar,
+      vimFindCharForward,
+      vimFindCharBackward,
+      vimDeleteToCharForward,
+      vimDeleteToCharBackward,
       vimInsertAtCursor,
       vimAppendAtCursor,
       vimOpenLineBelow,
@@ -3952,6 +4029,20 @@ export interface TextBuffer {
    * Delete N characters at cursor (vim 'x' command)
    */
   vimDeleteChar: (count: number) => void;
+  /** Delete N characters before cursor (vim 'X') */
+  vimDeleteCharBefore: (count: number) => void;
+  /** Toggle case of N characters at cursor (vim '~') */
+  vimToggleCase: (count: number) => void;
+  /** Replace N characters at cursor with char, stay in NORMAL mode (vim 'r') */
+  vimReplaceChar: (char: string, count: number) => void;
+  /** Move to Nth occurrence of char forward on line; till=true stops before it (vim 'f'/'t') */
+  vimFindCharForward: (char: string, count: number, till: boolean) => void;
+  /** Move to Nth occurrence of char backward on line; till=true stops after it (vim 'F'/'T') */
+  vimFindCharBackward: (char: string, count: number, till: boolean) => void;
+  /** Delete from cursor to Nth occurrence of char forward; till=true excludes the char (vim 'df'/'dt') */
+  vimDeleteToCharForward: (char: string, count: number, till: boolean) => void;
+  /** Delete from Nth occurrence of char backward to cursor; till=true excludes the char (vim 'dF'/'dT') */
+  vimDeleteToCharBackward: (char: string, count: number, till: boolean) => void;
   /**
    * Enter insert mode at cursor (vim 'i' command)
    */

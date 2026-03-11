@@ -18,7 +18,93 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
-## Announcements: v0.28.0 - 2026-02-03
+## Announcements: v0.32.0 - 2026-03-03
+
+- **Generalist Agent:** The generalist agent is now enabled to improve task
+  delegation and routing
+  ([#19665](https://github.com/google-gemini/gemini-cli/pull/19665) by
+  @joshualitt).
+- **Model Steering in Workspace:** Added support for model steering directly in
+  the workspace
+  ([#20343](https://github.com/google-gemini/gemini-cli/pull/20343) by
+  @joshualitt).
+- **Plan Mode Enhancements:** Users can now open and modify plans in an external
+  editor, and the planning workflow has been adapted to handle complex tasks
+  more effectively with multi-select options
+  ([#20348](https://github.com/google-gemini/gemini-cli/pull/20348) by @Adib234,
+  [#20465](https://github.com/google-gemini/gemini-cli/pull/20465) by @jerop).
+- **Interactive Shell Autocompletion:** Introduced interactive shell
+  autocompletion for a more seamless experience
+  ([#20082](https://github.com/google-gemini/gemini-cli/pull/20082) by
+  @mrpmohiburrahman).
+- **Parallel Extension Loading:** Extensions are now loaded in parallel to
+  improve startup times
+  ([#20229](https://github.com/google-gemini/gemini-cli/pull/20229) by
+  @scidomino).
+
+## Announcements: v0.31.0 - 2026-02-27
+
+- **Gemini 3.1 Pro Preview:** Gemini CLI now supports the new Gemini 3.1 Pro
+  Preview model
+  ([#19676](https://github.com/google-gemini/gemini-cli/pull/19676) by
+  @sehoon38).
+- **Experimental Browser Agent:** We've introduced a new experimental browser
+  agent to interact with web pages
+  ([#19284](https://github.com/google-gemini/gemini-cli/pull/19284) by
+  @gsquared94).
+- **Policy Engine Updates:** The policy engine now supports project-level
+  policies, MCP server wildcards, and tool annotation matching
+  ([#18682](https://github.com/google-gemini/gemini-cli/pull/18682) by
+  @Abhijit-2592,
+  [#20024](https://github.com/google-gemini/gemini-cli/pull/20024) by @jerop).
+- **Web Fetch Improvements:** We've implemented an experimental direct web fetch
+  feature and added rate limiting to mitigate DDoS risks
+  ([#19557](https://github.com/google-gemini/gemini-cli/pull/19557) by @mbleigh,
+  [#19567](https://github.com/google-gemini/gemini-cli/pull/19567) by
+  @mattKorwel).
+
+## Announcements: v0.30.0 - 2026-02-25
+
+- **SDK & Custom Skills:** Introduced the initial SDK package, enabling dynamic
+  system instructions, `SessionContext` for SDK tool calls, and support for
+  custom skills
+  ([#18861](https://github.com/google-gemini/gemini-cli/pull/18861) by
+  @mbleigh).
+- **Policy Engine Enhancements:** Added a new `--policy` flag for user-defined
+  policies, introduced strict seatbelt profiles, and deprecated
+  `--allowed-tools` in favor of the policy engine
+  ([#18500](https://github.com/google-gemini/gemini-cli/pull/18500) by
+  @allenhutchison).
+- **UI & Themes:** Added a generic searchable list for settings and extensions,
+  new Solarized themes, text wrapping for markdown tables, and a clean UI toggle
+  prototype ([#19064](https://github.com/google-gemini/gemini-cli/pull/19064) by
+  @rmedranollamas).
+- **Vim & Terminal Interaction:** Improved Vim support to feel more complete and
+  added support for Ctrl-Z terminal suspension
+  ([#18755](https://github.com/google-gemini/gemini-cli/pull/18755) by
+  @ppgranger, [#18931](https://github.com/google-gemini/gemini-cli/pull/18931)
+  by @scidomino).
+
+## Announcements: v0.29.0 - 2026-02-17
+
+- **Plan Mode:** A new comprehensive planning capability with `/plan`,
+  `enter_plan_mode` tool, and dedicated documentation
+  ([#17698](https://github.com/google-gemini/gemini-cli/pull/17698) by @Adib234,
+  [#18324](https://github.com/google-gemini/gemini-cli/pull/18324) by @jerop).
+- **Gemini 3 Default:** We've removed the preview flag and enabled Gemini 3 by
+  default for all users
+  ([#18414](https://github.com/google-gemini/gemini-cli/pull/18414) by
+  @sehoon38).
+- **Extension Exploration:** New UI and settings to explore and manage
+  extensions more easily
+  ([#18686](https://github.com/google-gemini/gemini-cli/pull/18686) by
+  @sripasg).
+- **Admin Control:** Administrators can now allowlist specific MCP server
+  configurations
+  ([#18311](https://github.com/google-gemini/gemini-cli/pull/18311) by
+  @skeshive).
+
+## Announcements: v0.28.0 - 2026-02-10
 
 - **Slash Command:** We've added a new `/prompt-suggest` slash command to help
   you generate prompt suggestions
@@ -276,7 +362,8 @@ on GitHub.
 - **Experimental permission improvements:** We are now experimenting with a new
   policy engine in Gemini CLI. This allows users and administrators to create
   fine-grained policy for tool calls. Currently behind a flag. See
-  [policy engine documentation](../core/policy-engine.md) for more information.
+  [policy engine documentation](../reference/policy-engine.md) for more
+  information.
   - Blog:
     [https://allen.hutchison.org/2025/11/26/the-guardrails-of-autonomy/](https://allen.hutchison.org/2025/11/26/the-guardrails-of-autonomy/)
 - **Gemini 3 support for paid:** Gemini 3 support has been rolled out to all API
@@ -401,8 +488,9 @@ on GitHub.
   page in their default browser directly from the CLI using the `/extension`
   explore command. ([pr](https://github.com/google-gemini/gemini-cli/pull/11846)
   by [@JayadityaGit](https://github.com/JayadityaGit)).
-- **Configurable compression:** Users can modify the compression threshold in
-  `/settings`. The default has been made more proactive
+- **Configurable compression:** Users can modify the context compression
+  threshold in `/settings` (decimal with percentage display). The default has
+  been made more proactive
   ([pr](https://github.com/google-gemini/gemini-cli/pull/12317) by
   [@scidomino](https://github.com/scidomino)).
 - **API key authentication:** Users can now securely enter and store their

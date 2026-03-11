@@ -319,13 +319,15 @@ export function getProjectHash(projectRoot: string): string {
 }
 
 /**
- * Normalizes a path for reliable comparison.
+ * Normalizes a path for reliable comparison across platforms.
  * - Resolves to an absolute path.
+ * - Converts all path separators to forward slashes.
  * - On Windows, converts to lowercase for case-insensitivity.
  */
 export function normalizePath(p: string): string {
   const resolved = path.resolve(p);
-  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+  const normalized = resolved.replace(/\\/g, '/');
+  return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
 }
 
 /**
@@ -357,8 +359,8 @@ export function isSubpath(parentPath: string, childPath: string): boolean {
  * @param pathStr The path string to resolve.
  * @returns The resolved real path.
  */
-export function resolveToRealPath(path: string): string {
-  let resolvedPath = path;
+export function resolveToRealPath(pathStr: string): string {
+  let resolvedPath = pathStr;
 
   try {
     if (resolvedPath.startsWith('file://')) {
@@ -370,11 +372,44 @@ export function resolveToRealPath(path: string): string {
     // Ignore error (e.g. malformed URI), keep path from previous step
   }
 
+  return robustRealpath(path.resolve(resolvedPath));
+}
+
+function robustRealpath(p: string, visited = new Set<string>()): string {
+  const key = process.platform === 'win32' ? p.toLowerCase() : p;
+  if (visited.has(key)) {
+    throw new Error(`Infinite recursion detected in robustRealpath: ${p}`);
+  }
+  visited.add(key);
   try {
-    return fs.realpathSync(resolvedPath);
-  } catch (_e) {
-    // If realpathSync fails, it might be because the path doesn't exist.
-    // In that case, we can fall back to the path processed.
-    return resolvedPath;
+    return fs.realpathSync(p);
+  } catch (e: unknown) {
+    if (e && typeof e === 'object' && 'code' in e && e.code === 'ENOENT') {
+      try {
+        const stat = fs.lstatSync(p);
+        if (stat.isSymbolicLink()) {
+          const target = fs.readlinkSync(p);
+          const resolvedTarget = path.resolve(path.dirname(p), target);
+          return robustRealpath(resolvedTarget, visited);
+        }
+      } catch (lstatError: unknown) {
+        // Not a symlink, or lstat failed. Re-throw if it's not an expected
+        // ENOENT (e.g., a permissions error), otherwise resolve parent.
+        if (
+          !(
+            lstatError &&
+            typeof lstatError === 'object' &&
+            'code' in lstatError &&
+            lstatError.code === 'ENOENT'
+          )
+        ) {
+          throw lstatError;
+        }
+      }
+      const parent = path.dirname(p);
+      if (parent === p) return p;
+      return path.join(robustRealpath(parent, visited), path.basename(p));
+    }
+    throw e;
   }
 }

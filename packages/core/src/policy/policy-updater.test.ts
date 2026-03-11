@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
-import { createPolicyUpdater } from './config.js';
+import { createPolicyUpdater, ALWAYS_ALLOW_PRIORITY } from './config.js';
 import { PolicyEngine } from './policy-engine.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import { MessageBusType } from '../confirmation-bus/types.js';
@@ -19,6 +19,7 @@ import {
   type PolicyUpdateOptions,
 } from '../tools/tools.js';
 import * as shellUtils from '../utils/shell-utils.js';
+import { escapeRegex } from './utils.js';
 
 vi.mock('node:fs/promises');
 vi.mock('../config/storage.js');
@@ -41,6 +42,7 @@ interface TestableShellToolInvocation {
 describe('createPolicyUpdater', () => {
   let policyEngine: PolicyEngine;
   let messageBus: MessageBus;
+  let mockStorage: Storage;
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -48,8 +50,9 @@ describe('createPolicyUpdater', () => {
     vi.spyOn(policyEngine, 'addRule');
 
     messageBus = new MessageBus(policyEngine);
-    vi.spyOn(Storage, 'getUserPoliciesDir').mockReturnValue(
-      '/mock/user/policies',
+    mockStorage = new Storage('/mock/project');
+    vi.spyOn(mockStorage, 'getAutoSavedPolicyPath').mockReturnValue(
+      '/mock/user/.gemini/policies/auto-saved.toml',
     );
   });
 
@@ -58,7 +61,7 @@ describe('createPolicyUpdater', () => {
   });
 
   it('should add multiple rules when commandPrefix is an array', async () => {
-    createPolicyUpdater(policyEngine, messageBus);
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
     await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
@@ -72,20 +75,26 @@ describe('createPolicyUpdater', () => {
       1,
       expect.objectContaining({
         toolName: 'run_shell_command',
-        argsPattern: new RegExp('"command":"echo(?:[\\s"]|\\\\")'),
+        priority: ALWAYS_ALLOW_PRIORITY,
+        argsPattern: new RegExp(
+          escapeRegex('"command":"echo') + '(?:[\\s"]|\\\\")',
+        ),
       }),
     );
     expect(policyEngine.addRule).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         toolName: 'run_shell_command',
-        argsPattern: new RegExp('"command":"ls(?:[\\s"]|\\\\")'),
+        priority: ALWAYS_ALLOW_PRIORITY,
+        argsPattern: new RegExp(
+          escapeRegex('"command":"ls') + '(?:[\\s"]|\\\\")',
+        ),
       }),
     );
   });
 
   it('should add a single rule when commandPrefix is a string', async () => {
-    createPolicyUpdater(policyEngine, messageBus);
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
     await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,
@@ -98,13 +107,16 @@ describe('createPolicyUpdater', () => {
     expect(policyEngine.addRule).toHaveBeenCalledWith(
       expect.objectContaining({
         toolName: 'run_shell_command',
-        argsPattern: new RegExp('"command":"git(?:[\\s"]|\\\\")'),
+        priority: ALWAYS_ALLOW_PRIORITY,
+        argsPattern: new RegExp(
+          escapeRegex('"command":"git') + '(?:[\\s"]|\\\\")',
+        ),
       }),
     );
   });
 
   it('should persist multiple rules correctly to TOML', async () => {
-    createPolicyUpdater(policyEngine, messageBus);
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
     vi.mocked(fs.readFile).mockRejectedValue({ code: 'ENOENT' });
     vi.mocked(fs.mkdir).mockResolvedValue(undefined);
 
@@ -139,7 +151,7 @@ describe('createPolicyUpdater', () => {
   });
 
   it('should reject unsafe regex patterns', async () => {
-    createPolicyUpdater(policyEngine, messageBus);
+    createPolicyUpdater(policyEngine, messageBus, mockStorage);
 
     await messageBus.publish({
       type: MessageBusType.UPDATE_POLICY,

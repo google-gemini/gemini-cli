@@ -23,10 +23,15 @@ import {
  */
 export function mapToDisplay(
   toolOrTools: ToolCall[] | ToolCall,
-  options: { borderTop?: boolean; borderBottom?: boolean } = {},
+  options: {
+    borderTop?: boolean;
+    borderBottom?: boolean;
+    borderColor?: string;
+    borderDimColor?: boolean;
+  } = {},
 ): HistoryItemToolGroup {
   const toolCalls = Array.isArray(toolOrTools) ? toolOrTools : [toolOrTools];
-  const { borderTop, borderBottom } = options;
+  const { borderTop, borderBottom, borderColor, borderDimColor } = options;
 
   const toolDisplays = toolCalls.map((call): IndividualToolCallDisplay => {
     let description: string;
@@ -43,6 +48,7 @@ export function mapToDisplay(
 
     const baseDisplayProperties = {
       callId: call.request.callId,
+      parentCallId: call.request.parentCallId,
       name: displayName,
       description,
       renderOutputAsMarkdown,
@@ -54,6 +60,9 @@ export function mapToDisplay(
     let outputFile: string | undefined = undefined;
     let ptyId: number | undefined = undefined;
     let correlationId: string | undefined = undefined;
+    let progressMessage: string | undefined = undefined;
+    let progress: number | undefined = undefined;
+    let progressTotal: number | undefined = undefined;
 
     switch (call.status) {
       case CoreToolCallStatus.Success:
@@ -72,6 +81,9 @@ export function mapToDisplay(
       case CoreToolCallStatus.Executing:
         resultDisplay = call.liveOutput;
         ptyId = call.pid;
+        progressMessage = call.progressMessage;
+        progress = call.progress;
+        progressTotal = call.progressTotal;
         break;
       case CoreToolCallStatus.Scheduled:
       case CoreToolCallStatus.Validating:
@@ -90,12 +102,18 @@ export function mapToDisplay(
     return {
       ...baseDisplayProperties,
       status: call.status,
+      isClientInitiated: !!call.request.isClientInitiated,
+      kind: call.tool?.kind,
       resultDisplay,
       confirmationDetails,
       outputFile,
       ptyId,
       correlationId,
+      progressMessage,
+      progress,
+      progressTotal,
       approvalMode: call.approvalMode,
+      originalRequestName: call.request.originalRequestName,
     };
   });
 
@@ -104,5 +122,7 @@ export function mapToDisplay(
     tools: toolDisplays,
     borderTop,
     borderBottom,
+    borderColor,
+    borderDimColor,
   };
 }

@@ -49,6 +49,7 @@ import type {
   ToolOutputMaskingEvent,
   KeychainAvailabilityEvent,
   TokenStorageInitializationEvent,
+  StartupStatsEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -115,6 +116,9 @@ export enum EventNames {
   TOOL_OUTPUT_MASKING = 'tool_output_masking',
   KEYCHAIN_AVAILABILITY = 'keychain_availability',
   TOKEN_STORAGE_INITIALIZATION = 'token_storage_initialization',
+  CONSECA_POLICY_GENERATION = 'conseca_policy_generation',
+  CONSECA_VERDICT = 'conseca_verdict',
+  STARTUP_STATS = 'startup_stats',
 }
 
 export interface LogResponse {
@@ -184,6 +188,34 @@ function determineGHWorkflowName(): string | undefined {
  */
 function determineGHRepositoryName(): string | undefined {
   return process.env['GITHUB_REPOSITORY'];
+}
+
+/**
+ * Determines the GitHub event name if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHEventName(): string | undefined {
+  return process.env['GITHUB_EVENT_NAME'];
+}
+
+/**
+ * Determines the GitHub Pull Request number if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHPRNumber(): string | undefined {
+  return process.env['GH_PR_NUMBER'];
+}
+
+/**
+ * Determines the GitHub Issue number if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHIssueNumber(): string | undefined {
+  return process.env['GH_ISSUE_NUMBER'];
+}
+
+/**
+ * Determines the GitHub custom tracking ID if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHCustomTrackingId(): string | undefined {
+  return process.env['GH_CUSTOM_TRACKING_ID'];
 }
 
 /**
@@ -368,6 +400,10 @@ export class ClearcutLogger {
     const email = this.userAccountManager.getCachedGoogleAccount();
     const surface = determineSurface();
     const ghWorkflowName = determineGHWorkflowName();
+    const ghEventName = determineGHEventName();
+    const ghPRNumber = determineGHPRNumber();
+    const ghIssueNumber = determineGHIssueNumber();
+    const ghCustomTrackingId = determineGHCustomTrackingId();
     const baseMetadata: EventValue[] = [
       ...data,
       {
@@ -399,6 +435,34 @@ export class ClearcutLogger {
       baseMetadata.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
         value: this.hashedGHRepositoryName,
+      });
+    }
+
+    if (ghEventName) {
+      baseMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_EVENT_NAME,
+        value: ghEventName,
+      });
+    }
+
+    if (ghPRNumber) {
+      baseMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_PR_NUMBER,
+        value: ghPRNumber,
+      });
+    }
+
+    if (ghIssueNumber) {
+      baseMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_ISSUE_NUMBER,
+        value: ghIssueNumber,
+      });
+    }
+
+    if (ghCustomTrackingId) {
+      baseMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_CUSTOM_TRACKING_ID,
+        value: ghCustomTrackingId,
       });
     }
 
@@ -470,6 +534,7 @@ export class ClearcutLogger {
     let result: LogResponse = {};
 
     try {
+      // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
       const response = await fetch(CLEARCUT_URL, {
         method: 'POST',
         body: safeJsonStringify(request),
@@ -615,14 +680,17 @@ export class ClearcutLogger {
 
     // Add hardware information only to the start session event
     const cpus = os.cpus();
-    data.push(
-      {
+    if (cpus && cpus.length > 0) {
+      data.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_INFO,
         value: cpus[0].model,
-      },
+      });
+    }
+
+    data.push(
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_CPU_CORES,
-        value: cpus.length.toString(),
+        value: os.availableParallelism().toString(),
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_RAM_TOTAL_GB,
@@ -713,6 +781,7 @@ export class ClearcutLogger {
         event.function_name === ASK_USER_TOOL_NAME &&
         event.metadata['ask_user']
       ) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const askUser = event.metadata['ask_user'];
         const askUserMapping: { [key: string]: EventMetadataKey } = {
           question_types: EventMetadataKey.GEMINI_CLI_ASK_USER_QUESTION_TYPES,
@@ -839,6 +908,40 @@ export class ClearcutLogger {
         gemini_cli_key:
           EventMetadataKey.GEMINI_CLI_API_RESPONSE_TOOL_TOKEN_COUNT,
         value: JSON.stringify(event.usage.tool_token_count),
+      },
+      // Context breakdown fields are only populated on turn-ending responses
+      // (when the user gets back control), not during intermediate tool-use
+      // loops. Values still grow across turns as conversation history
+      // accumulates, so downstream consumers should use the last event per
+      // session (MAX) rather than summing across events.
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_SYSTEM_INSTRUCTIONS,
+        value: JSON.stringify(
+          event.usage.context_breakdown?.system_instructions ?? 0,
+        ),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_TOOL_DEFINITIONS,
+        value: JSON.stringify(
+          event.usage.context_breakdown?.tool_definitions ?? 0,
+        ),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_HISTORY,
+        value: JSON.stringify(event.usage.context_breakdown?.history ?? 0),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_TOOL_CALLS,
+        value: JSON.stringify(event.usage.context_breakdown?.tool_calls ?? {}),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_API_RESPONSE_CONTEXT_BREAKDOWN_MCP_SERVERS,
+        value: JSON.stringify(event.usage.context_breakdown?.mcp_servers ?? 0),
       },
     ];
 
@@ -1648,6 +1751,30 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.TOKEN_STORAGE_INITIALIZATION, data),
     );
+    this.flushIfNeeded();
+  }
+
+  logStartupStatsEvent(event: StartupStatsEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_STARTUP_PHASES,
+        value: JSON.stringify(event.phases),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_STARTUP_OS_PLATFORM,
+        value: event.os_platform,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_STARTUP_OS_RELEASE,
+        value: event.os_release,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_STARTUP_IS_DOCKER,
+        value: JSON.stringify(event.is_docker),
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.STARTUP_STATS, data));
     this.flushIfNeeded();
   }
 
