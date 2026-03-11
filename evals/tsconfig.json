@@ -5,6 +5,6 @@
     "allowJs": true,
     "noUnusedLocals": false
   },
-  "include": ["**/*.ts", "../integration-tests/test-helper.ts"],
+  "include": ["**/*.ts"],
   "references": [{ "path": "../packages/core" }, { "path": "../packages/cli" }]
 }
