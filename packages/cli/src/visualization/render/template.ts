@@ -1,0 +1,151 @@
+import type { Theme } from '../types.js';
+
+// ---------------------------------------------------------------------------
+// Mermaid HTML shell
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate the minimal HTML page that Puppeteer will render.
+ * We use the official Mermaid CDN, set the theme, and inject the diagram source.
+ */
+export function buildMermaidHtml(
+  spec: string,
+  theme: Theme,
+  widthPx: number,
+): string {
+  const mermaidTheme =
+    theme === 'dark' ? 'dark' : theme === 'neutral' ? 'neutral' : 'default';
+
+  return /* html */ `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: ${theme === 'dark' ? '#1e1e2e' : '#ffffff'};
+      margin: 0;
+      padding: 0;
+      overflow: visible;
+    }
+    #container {
+      padding: 12px;
+      display: inline-block;
+      overflow: visible;
+    }
+    .mermaid {
+      display: inline-block;
+      font-size: 16px;
+    }
+    .mermaid svg {
+      max-width: none !important;
+      height: auto !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div class="mermaid">
+${spec}
+    </div>
+  </div>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    
+    window.__mermaidDone = false;
+    window.__mermaidError = '';
+
+    const formatMermaidError = (err) => {
+      if (err && typeof err === 'object') {
+        if (typeof err.str === 'string' && err.str.trim().length > 0) {
+          return err.str.trim();
+        }
+        if (typeof err.message === 'string' && err.message.trim().length > 0) {
+          return err.message.trim();
+        }
+        try {
+          const json = JSON.stringify(err);
+          if (json && json !== '{}') {
+            return json;
+          }
+        } catch {}
+      }
+      return String(err);
+    };
+    
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: '${mermaidTheme}',
+      securityLevel: 'loose',
+      themeVariables: {
+        fontSize: '16px',
+      },
+    });
+
+    const init = async () => {
+      try {
+        const node = document.querySelector('.mermaid');
+        const source = node instanceof HTMLElement ? node.textContent ?? '' : '';
+        if (!source.trim()) {
+          throw new Error('Empty Mermaid diagram source.');
+        }
+
+        await mermaid.parse(source);
+        await mermaid.run();
+      } catch (e) {
+        const message = formatMermaidError(e);
+        window.__mermaidError = message;
+        console.error('Mermaid render failed', message);
+      } finally {
+        window.__mermaidDone = true;
+      }
+    };
+    
+    init();
+  </script>
+</body>
+</html>`;
+}
+
+/**
+ * Generate a generic HTML preview shell.
+ * Useful for rendering React components (as HTML/CSS) or plain HTML/Tailwind snippets.
+ */
+export function buildHtmlPreview(
+  content: string,
+  theme: Theme,
+  widthPx: number,
+): string {
+  return /* html */ `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: ${theme === 'dark' ? '#1e1e2e' : '#ffffff'};
+      color: ${theme === 'dark' ? '#ffffff' : '#000000'};
+      margin: 0;
+      padding: 0;
+      overflow: visible;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    }
+    #container {
+      padding: 40px;
+      display: inline-block;
+      width: ${widthPx}px;
+      overflow: visible;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    ${content}
+  </div>
+  <script>
+    window.__previewDone = true;
+  </script>
+</body>
+</html>`;
+}
