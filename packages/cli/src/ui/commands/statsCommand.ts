@@ -84,6 +84,7 @@ export const statsCommand: SlashCommand = {
   description: 'Check session stats. Usage: /stats [session|model|tools]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  isSafeConcurrent: true,
   action: async (context: CommandContext) => {
     await defaultSessionView(context);
   },

@@ -12,6 +12,7 @@ export const vimCommand: SlashCommand = {
   description: 'Toggle vim mode on/off',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  isSafeConcurrent: true,
   action: async (context, _args) => {
     const newVimState = await context.ui.toggleVimEnabled();
 
