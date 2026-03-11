@@ -101,24 +101,9 @@ describe('mcp-client', () => {
     workspaceContext = new WorkspaceContext(testWorkspace);
   });
 
-  afterEach(async () => {
-    // Clean up test workspace BEFORE restoring mocks
-    try {
-      if (testWorkspace && fs.existsSync(testWorkspace)) {
-        // On Windows, wait for file handles to close
-        if (process.platform === 'win32') {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-        fs.rmSync(testWorkspace, { recursive: true, force: true });
-      }
-    } catch {
-      // ignore
-    }
-
-    // Clear object references to prevent memory leaks
+  afterEach(() => {
+    fs.rmSync(testWorkspace, { recursive: true, force: true });
     workspaceContext = null as unknown as WorkspaceContext;
-
-    // Restore mocks after cleanup
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
@@ -2357,24 +2342,9 @@ describe('connectToMcpServer with OAuth', () => {
     vi.mocked(MCPOAuthProvider).mockReturnValue(mockAuthProvider);
   });
 
-  afterEach(async () => {
-    // Clean up test workspace BEFORE clearing mocks
-    try {
-      if (testWorkspace && fs.existsSync(testWorkspace)) {
-        // On Windows, wait for file handles to close
-        if (process.platform === 'win32') {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-        fs.rmSync(testWorkspace, { recursive: true, force: true });
-      }
-    } catch {
-      // ignore
-    }
-
-    // Clear object references to prevent memory leaks
+  afterEach(() => {
+    fs.rmSync(testWorkspace, { recursive: true, force: true });
     workspaceContext = null as unknown as WorkspaceContext;
-
-    // Clear mocks after cleanup
     vi.clearAllMocks();
   });
 
@@ -2581,24 +2551,9 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  afterEach(async () => {
-    // Clean up test workspace BEFORE clearing mocks
-    try {
-      if (testWorkspace && fs.existsSync(testWorkspace)) {
-        // On Windows, wait for file handles to close
-        if (process.platform === 'win32') {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-        fs.rmSync(testWorkspace, { recursive: true, force: true });
-      }
-    } catch {
-      // ignore
-    }
-
-    // Clear object references to prevent memory leaks
+  afterEach(() => {
+    fs.rmSync(testWorkspace, { recursive: true, force: true });
     workspaceContext = null as unknown as WorkspaceContext;
-
-    // Clear mocks after cleanup
     vi.clearAllMocks();
   });
 
@@ -2761,24 +2716,9 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
     });
   });
 
-  afterEach(async () => {
-    // Clean up test workspace BEFORE clearing mocks
-    try {
-      if (testWorkspace && fs.existsSync(testWorkspace)) {
-        // On Windows, wait for file handles to close
-        if (process.platform === 'win32') {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-        fs.rmSync(testWorkspace, { recursive: true, force: true });
-      }
-    } catch {
-      // ignore
-    }
-
-    // Clear object references to prevent memory leaks
+  afterEach(() => {
+    fs.rmSync(testWorkspace, { recursive: true, force: true });
     workspaceContext = null as unknown as WorkspaceContext;
-
-    // Clear mocks after cleanup
     vi.clearAllMocks();
     vi.unstubAllGlobals();
   });

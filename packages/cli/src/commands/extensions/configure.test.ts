@@ -94,20 +94,8 @@ describe('extensions configure command', () => {
     );
   });
 
-  afterEach(async () => {
-    // Clean up temporary workspace directory
-    try {
-      if (tempWorkspaceDir && fs.existsSync(tempWorkspaceDir)) {
-        // On Windows, wait for file handles to close
-        if (process.platform === 'win32') {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-        fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
-      }
-    } catch {
-      // ignore
-    }
-
+  afterEach(() => {
+    fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
     vi.restoreAllMocks();
   });
 

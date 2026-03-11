@@ -87,33 +87,9 @@ describe('ExtensionManager Settings Scope', () => {
     );
   });
 
-  afterEach(async () => {
-    // Clean up tempWorkspace and currentTempHome — they are sibling directories under os.tmpdir()
-    // Both are created independently in beforeEach, so cleanup order doesn't matter
-    try {
-      if (tempWorkspace && fs.existsSync(tempWorkspace)) {
-        // On Windows, wait for file handles to close
-        if (process.platform === 'win32') {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-        fs.rmSync(tempWorkspace, { recursive: true, force: true });
-      }
-    } catch {
-      // ignore
-    }
-
-    try {
-      if (currentTempHome && fs.existsSync(currentTempHome)) {
-        // On Windows, wait for file handles to close
-        if (process.platform === 'win32') {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-        fs.rmSync(currentTempHome, { recursive: true, force: true });
-      }
-    } catch {
-      // ignore
-    }
-
+  afterEach(() => {
+    fs.rmSync(currentTempHome, { recursive: true, force: true });
+    fs.rmSync(tempWorkspace, { recursive: true, force: true });
     vi.clearAllMocks();
   });
 
