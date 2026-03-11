@@ -674,4 +674,14 @@ export enum EventMetadataKey {
 
   // Logs the error message for Conseca events.
   CONSECA_ERROR = 166,
+
+  // ==========================================================================
+  // Stale Output Elision Event Keys
+  // ==========================================================================
+
+  // Logs the number of tool outputs elided in this operation.
+  GEMINI_CLI_STALE_OUTPUT_ELISION_COUNT = 172,
+
+  // Logs the tokens saved by stale output elision.
+  GEMINI_CLI_STALE_OUTPUT_ELISION_TOKENS_SAVED = 173,
 }

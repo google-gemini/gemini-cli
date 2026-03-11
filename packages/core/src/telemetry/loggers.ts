@@ -56,6 +56,7 @@ import {
   type ToolOutputMaskingEvent,
   type KeychainAvailabilityEvent,
   type TokenStorageInitializationEvent,
+  type StaleOutputElisionEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -182,6 +183,21 @@ export function logToolOutputMasking(
   event: ToolOutputMaskingEvent,
 ): void {
   ClearcutLogger.getInstance(config)?.logToolOutputMaskingEvent(event);
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
+  });
+}
+
+export function logStaleOutputElision(
+  config: Config,
+  event: StaleOutputElisionEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logStaleOutputElisionEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {

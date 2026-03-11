@@ -59,6 +59,23 @@ const AGENT_RECOVERY_ATTEMPT_COUNT = 'gemini_cli.agent.recovery_attempt.count';
 const AGENT_RECOVERY_ATTEMPT_DURATION =
   'gemini_cli.agent.recovery_attempt.duration';
 
+// Browser Agent Metrics
+const BROWSER_AGENT_CONNECTION_DURATION =
+  'gemini_cli.browser_agent.connection.duration';
+const BROWSER_AGENT_CONNECTION_FAILURE_COUNT =
+  'gemini_cli.browser_agent.connection.failure.count';
+const BROWSER_AGENT_TOOLS_DISCOVERED =
+  'gemini_cli.browser_agent.tools.discovered';
+const BROWSER_AGENT_TOOLS_MISSING_SEMANTIC =
+  'gemini_cli.browser_agent.tools.missing_semantic';
+const BROWSER_AGENT_VISION_STATUS = 'gemini_cli.browser_agent.vision.status';
+const BROWSER_AGENT_TASK_OUTCOME = 'gemini_cli.browser_agent.task.outcome';
+const BROWSER_AGENT_TASK_DURATION = 'gemini_cli.browser_agent.task.duration';
+const BROWSER_AGENT_CLEANUP_DURATION =
+  'gemini_cli.browser_agent.cleanup.duration';
+const BROWSER_AGENT_CLEANUP_FAILURE_COUNT =
+  'gemini_cli.browser_agent.cleanup.failure.count';
+
 // OpenTelemetry GenAI Semantic Convention Metrics
 const GEN_AI_CLIENT_TOKEN_USAGE = 'gen_ai.client.token.usage';
 const GEN_AI_CLIENT_OPERATION_DURATION = 'gen_ai.client.operation.duration';
@@ -288,6 +305,66 @@ const COUNTER_DEFINITIONS = {
       model: string;
     },
   },
+  [BROWSER_AGENT_CONNECTION_FAILURE_COUNT]: {
+    description: 'Browser agent MCP connection failure count',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (browserAgentConnectionFailureCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      session_mode: string;
+      headless: boolean;
+      error_type: string;
+    },
+  },
+  [BROWSER_AGENT_TOOLS_DISCOVERED]: {
+    description: 'Browser agent tools discovered from chrome-devtools-mcp',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (browserAgentToolsDiscoveredCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      session_mode: string;
+    },
+  },
+  [BROWSER_AGENT_TOOLS_MISSING_SEMANTIC]: {
+    description: 'Browser agent required semantic tools missing',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (browserAgentToolsMissingSemanticCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      tool_name: string;
+    },
+  },
+  [BROWSER_AGENT_VISION_STATUS]: {
+    description: 'Browser agent vision enabled/disabled status',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (browserAgentVisionStatusCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      enabled: boolean;
+      disabled_reason: string;
+    },
+  },
+  [BROWSER_AGENT_TASK_OUTCOME]: {
+    description: 'Browser agent task outcome',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (browserAgentTaskOutcomeCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      success: boolean;
+      session_mode: string;
+      vision_enabled: boolean;
+      headless: boolean;
+    },
+  },
+  [BROWSER_AGENT_CLEANUP_FAILURE_COUNT]: {
+    description: 'Browser agent cleanup failure count',
+    valueType: ValueType.INT,
+    assign: (c: Counter) => (browserAgentCleanupFailureCounter = c),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      session_mode: string;
+    },
+  },
 } as const;
 
 const HISTOGRAM_DEFINITIONS = {
@@ -401,6 +478,39 @@ const HISTOGRAM_DEFINITIONS = {
       hook_event_name: string;
       hook_name: string;
       success: boolean;
+    },
+  },
+  [BROWSER_AGENT_CONNECTION_DURATION]: {
+    description: 'Browser agent MCP connection duration in ms',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (browserAgentConnectionDurationHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      session_mode: string;
+      headless: boolean;
+      success: boolean;
+    },
+  },
+  [BROWSER_AGENT_TASK_DURATION]: {
+    description: 'Browser agent full invocation duration in ms',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (browserAgentTaskDurationHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      success: boolean;
+      session_mode: string;
+    },
+  },
+  [BROWSER_AGENT_CLEANUP_DURATION]: {
+    description: 'Browser agent cleanup duration in ms',
+    unit: 'ms',
+    valueType: ValueType.INT,
+    assign: (h: Histogram) => (browserAgentCleanupDurationHistogram = h),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    attributes: {} as {
+      session_mode: string;
     },
   },
 } as const;
@@ -618,6 +728,17 @@ let agentDurationHistogram: Histogram | undefined;
 let agentTurnsHistogram: Histogram | undefined;
 let agentRecoveryAttemptCounter: Counter | undefined;
 let agentRecoveryAttemptDurationHistogram: Histogram | undefined;
+
+// Browser Agent Metrics
+let browserAgentConnectionDurationHistogram: Histogram | undefined;
+let browserAgentConnectionFailureCounter: Counter | undefined;
+let browserAgentToolsDiscoveredCounter: Counter | undefined;
+let browserAgentToolsMissingSemanticCounter: Counter | undefined;
+let browserAgentVisionStatusCounter: Counter | undefined;
+let browserAgentTaskOutcomeCounter: Counter | undefined;
+let browserAgentTaskDurationHistogram: Histogram | undefined;
+let browserAgentCleanupDurationHistogram: Histogram | undefined;
+let browserAgentCleanupFailureCounter: Counter | undefined;
 let flickerFrameCounter: Counter | undefined;
 let exitFailCounter: Counter | undefined;
 let planExecutionCounter: Counter | undefined;
@@ -1392,4 +1513,134 @@ export function recordCreditPurchaseClick(
     ...baseMetricDefinition.getCommonAttributes(config),
     ...attributes,
   });
+}
+
+export function recordBrowserAgentConnectionMetrics(
+  config: Config,
+  event: {
+    durationMs: number;
+    sessionMode: string;
+    headless: boolean;
+    success: boolean;
+    errorType?: string; // 'profile_locked' | 'timeout' | 'connection_refused' | 'unknown'
+  },
+): void {
+  if (!isMetricsInitialized) return;
+  const common = baseMetricDefinition.getCommonAttributes(config);
+  if (browserAgentConnectionDurationHistogram) {
+    browserAgentConnectionDurationHistogram.record(event.durationMs, {
+      ...common,
+      session_mode: event.sessionMode,
+      headless: event.headless,
+      success: event.success,
+    });
+  }
+  if (
+    !event.success &&
+    event.errorType &&
+    browserAgentConnectionFailureCounter
+  ) {
+    browserAgentConnectionFailureCounter.add(1, {
+      ...common,
+      session_mode: event.sessionMode,
+      headless: event.headless,
+      error_type: event.errorType,
+    });
+  }
+}
+
+export function recordBrowserAgentToolDiscoveryMetrics(
+  config: Config,
+  event: {
+    toolCount: number;
+    sessionMode: string;
+    missingSemanticTools: string[]; // each tool name emitted separately
+  },
+): void {
+  if (!isMetricsInitialized) return;
+  const common = baseMetricDefinition.getCommonAttributes(config);
+  if (browserAgentToolsDiscoveredCounter) {
+    browserAgentToolsDiscoveredCounter.add(event.toolCount, {
+      ...common,
+      session_mode: event.sessionMode,
+    });
+  }
+  if (browserAgentToolsMissingSemanticCounter) {
+    for (const toolName of event.missingSemanticTools) {
+      browserAgentToolsMissingSemanticCounter.add(1, {
+        ...common,
+        tool_name: toolName,
+      });
+    }
+  }
+}
+
+export function recordBrowserAgentVisionStatus(
+  config: Config,
+  event: {
+    enabled: boolean;
+    disabledReason?: string; // 'no_visual_model' | 'missing_visual_tools' | 'blocked_auth_type'
+  },
+): void {
+  if (!browserAgentVisionStatusCounter || !isMetricsInitialized) return;
+  const common = baseMetricDefinition.getCommonAttributes(config);
+  browserAgentVisionStatusCounter.add(1, {
+    ...common,
+    enabled: event.enabled,
+    disabled_reason: event.disabledReason ?? '',
+  });
+}
+
+export function recordBrowserAgentTaskMetrics(
+  config: Config,
+  event: {
+    success: boolean;
+    sessionMode: string;
+    visionEnabled: boolean;
+    headless: boolean;
+    durationMs: number;
+  },
+): void {
+  if (!isMetricsInitialized) return;
+  const common = baseMetricDefinition.getCommonAttributes(config);
+  if (browserAgentTaskOutcomeCounter) {
+    browserAgentTaskOutcomeCounter.add(1, {
+      ...common,
+      success: event.success,
+      session_mode: event.sessionMode,
+      vision_enabled: event.visionEnabled,
+      headless: event.headless,
+    });
+  }
+  if (browserAgentTaskDurationHistogram) {
+    browserAgentTaskDurationHistogram.record(event.durationMs, {
+      ...common,
+      success: event.success,
+      session_mode: event.sessionMode,
+    });
+  }
+}
+
+export function recordBrowserAgentCleanupMetrics(
+  config: Config,
+  event: {
+    durationMs: number;
+    sessionMode: string;
+    success: boolean;
+  },
+): void {
+  if (!isMetricsInitialized) return;
+  const common = baseMetricDefinition.getCommonAttributes(config);
+  if (browserAgentCleanupDurationHistogram) {
+    browserAgentCleanupDurationHistogram.record(event.durationMs, {
+      ...common,
+      session_mode: event.sessionMode,
+    });
+  }
+  if (!event.success && browserAgentCleanupFailureCounter) {
+    browserAgentCleanupFailureCounter.add(1, {
+      ...common,
+      session_mode: event.sessionMode,
+    });
+  }
 }
