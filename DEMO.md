@@ -5,6 +5,23 @@ CLI codebase (not a standalone app).
 
 Branch: `feature/termviz-integration`
 
+## Demo Video and Screenshots
+
+- Demo video:
+  [Google Drive video link](https://docs.google.com/videos/d/1jXJkx9n7V8yOyfcV54AHZuWUJIG9NEY2DxYkFKk3dSI/edit?scene=id.p#scene=id.p)
+- Raw video URL file: [`demos/video_demo_link.txt`](./demos/video_demo_link.txt)
+
+### Screenshot Walkthrough
+
+| Step | Screenshot |
+| --- | --- |
+| 1. Visualize Mermaid from file | ![Visualize Mermaid from file](./demos/Screenshots/1_Visualize_mmd.png) |
+| 2. ASCII fallback in basic terminal | ![ASCII fallback output](./demos/Screenshots/2_ascii.png) |
+| 3. Prompt-based visualize flow | ![Prompt-based visualize flow](./demos/Screenshots/3_visualize_core.png) |
+| 4. Git graph rendering | ![Graph git rendering](./demos/Screenshots/4_graph_git.png) |
+| 5. Explain with visualization | ![Explain visualize output](./demos/Screenshots/5_explain_visualize.png) |
+| 6. Preview command visualization | ![Preview visualization output](./demos/Screenshots/6_preview_visualize.png) |
+
 ## Demo Option A: Clone This Branch Directly
 
 ```bash
