@@ -18,6 +18,7 @@ import {
   type AuthType,
   type AgentOverride,
   type CustomTheme,
+  type SandboxConfig,
 } from '@google/gemini-cli-core';
 import type { SessionRetentionSettings } from './settings.js';
 import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
@@ -134,6 +135,18 @@ export interface SettingsSchema {
 export type MemoryImportFormat = 'tree' | 'flat';
 export type DnsResolutionOrder = 'ipv4first' | 'verbatim';
 
+const pathArraySetting = (label: string, description: string) => ({
+  type: 'array' as const,
+  label,
+  category: 'Advanced' as const,
+  requiresRestart: true as const,
+  default: [] as string[],
+  description,
+  showInDialog: false as const,
+  items: { type: 'string' as const },
+  mergeStrategy: MergeStrategy.UNION,
+});
+
 /**
  * The canonical schema for all settings.
  * The structure of this object defines the structure of the `Settings` type.
@@ -156,17 +169,15 @@ const SETTINGS_SCHEMA = {
     },
   },
 
-  policyPaths: {
-    type: 'array',
-    label: 'Policy Paths',
-    category: 'Advanced',
-    requiresRestart: true,
-    default: [] as string[],
-    description: 'Additional policy files or directories to load.',
-    showInDialog: false,
-    items: { type: 'string' },
-    mergeStrategy: MergeStrategy.UNION,
-  },
+  policyPaths: pathArraySetting(
+    'Policy Paths',
+    'Additional policy files or directories to load.',
+  ),
+
+  adminPolicyPaths: pathArraySetting(
+    'Admin Policy Paths',
+    'Additional admin policy files or directories to load.',
+  ),
 
   general: {
     type: 'object',
@@ -204,7 +215,8 @@ const SETTINGS_SCHEMA = {
         description: oneLine`
           The default approval mode for tool execution.
           'default' prompts for approval, 'auto_edit' auto-approves edit tools,
-          and 'plan' is read-only mode. 'yolo' is not supported yet.
+          and 'plan' is read-only mode. YOLO mode (auto-approve all actions) can
+          only be enabled via command line (--yolo or --approval-mode=yolo).
         `,
         showInDialog: true,
         options: [
@@ -306,10 +318,10 @@ const SETTINGS_SCHEMA = {
         label: 'Retry Fetch Errors',
         category: 'General',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Retry on "exception TypeError: fetch failed sending request" errors.',
-        showInDialog: false,
+        showInDialog: true,
       },
       maxAttempts: {
         type: 'number',
@@ -676,7 +688,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: true,
         description:
-          "Show the logged-in user's identity (e.g. email) in the UI.",
+          "Show the signed-in user's identity (e.g. email) in the UI.",
         showInDialog: true,
       },
       useAlternateBuffer: {
@@ -1252,8 +1264,8 @@ const SETTINGS_SCHEMA = {
         label: 'Sandbox',
         category: 'Tools',
         requiresRestart: true,
-        default: undefined as boolean | string | undefined,
-        ref: 'BooleanOrString',
+        default: undefined as boolean | string | SandboxConfig | undefined,
+        ref: 'BooleanOrStringOrObject',
         description: oneLine`
           Sandbox execution environment.
           Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile,
@@ -1494,6 +1506,18 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Enable the "Allow for all future sessions" option in tool confirmation dialogs.',
+        showInDialog: true,
+      },
+      autoAddToPolicyByDefault: {
+        type: 'boolean',
+        label: 'Auto-add to Policy by Default',
+        category: 'Security',
+        requiresRestart: false,
+        default: false,
+        description: oneLine`
+          When enabled, the "Allow for all future sessions" option becomes the
+          default choice for low-risk tools in trusted workspaces.
+        `,
         showInDialog: true,
       },
       blockGitExtensions: {
@@ -1777,6 +1801,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Enable extension registry explore UI.',
+        showInDialog: false,
+      },
+      extensionRegistryURI: {
+        type: 'string',
+        label: 'Extension Registry URI',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 'https://geminicli.com/extensions.json',
+        description:
+          'The URI (web URL or local file path) of the extension registry.',
         showInDialog: false,
       },
       extensionReloading: {
@@ -2585,9 +2619,44 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
     description: 'Accepts either a single string or an array of strings.',
     anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
   },
-  BooleanOrString: {
-    description: 'Accepts either a boolean flag or a string command name.',
-    anyOf: [{ type: 'boolean' }, { type: 'string' }],
+  BooleanOrStringOrObject: {
+    description:
+      'Accepts either a boolean flag, a string command name, or a configuration object.',
+    anyOf: [
+      { type: 'boolean' },
+      { type: 'string' },
+      {
+        type: 'object',
+        description: 'Sandbox configuration object.',
+        additionalProperties: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            description: 'Enables or disables the sandbox.',
+          },
+          command: {
+            type: 'string',
+            description:
+              'The sandbox command to use (docker, podman, sandbox-exec, runsc, lxc).',
+            enum: ['docker', 'podman', 'sandbox-exec', 'runsc', 'lxc'],
+          },
+          image: {
+            type: 'string',
+            description: 'The sandbox image to use.',
+          },
+          allowedPaths: {
+            type: 'array',
+            description:
+              'A list of absolute host paths that should be accessible within the sandbox.',
+            items: { type: 'string' },
+          },
+          networkAccess: {
+            type: 'boolean',
+            description: 'Whether the sandbox should have internet access.',
+          },
+        },
+      },
+    ],
   },
   HookDefinitionArray: {
     type: 'array',
@@ -2654,7 +2723,9 @@ type InferSettings<T extends SettingsSchema> = {
         ? boolean
         : T[K]['default'] extends string
           ? string
-          : T[K]['default'];
+          : T[K]['default'] extends ReadonlyArray<infer U>
+            ? U[]
+            : T[K]['default'];
 };
 
 type InferMergedSettings<T extends SettingsSchema> = {
@@ -2668,7 +2739,9 @@ type InferMergedSettings<T extends SettingsSchema> = {
         ? boolean
         : T[K]['default'] extends string
           ? string
-          : T[K]['default'];
+          : T[K]['default'] extends ReadonlyArray<infer U>
+            ? U[]
+            : T[K]['default'];
 };
 
 export type Settings = InferSettings<SettingsSchemaType>;
