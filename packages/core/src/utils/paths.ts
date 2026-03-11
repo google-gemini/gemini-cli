@@ -384,6 +384,31 @@ function robustRealpath(p: string, visited = new Set<string>()): string {
   try {
     return fs.realpathSync(p);
   } catch (e: unknown) {
+    // Handle EISDIR error on Windows for drive letters without trailing slash (e.g., 'C:')
+    // On some Windows systems/Node versions, fs.realpathSync('C:') throws EISDIR because
+    // 'C:' refers to the current directory on drive C, not the root directory.
+    if (
+      e &&
+      typeof e === 'object' &&
+      'code' in e &&
+      e.code === 'EISDIR' &&
+      process.platform === 'win32'
+    ) {
+      // Check if this is a bare drive letter (e.g., 'C:')
+      if (/^[a-zA-Z]:$/.test(p)) {
+        // Convert to root directory path (e.g., 'C:\') and retry
+        try {
+          return robustRealpath(p + path.sep, visited);
+        } catch (_retryError) {
+          // If the retry also fails, return the resolved path as-is
+          // This handles cases where the drive might not be accessible
+          return p + path.sep;
+        }
+      }
+      // For other EISDIR cases (e.g., trying to realpath a directory),
+      // return the path as-is since it's already resolved
+      return p;
+    }
     if (e && typeof e === 'object' && 'code' in e && e.code === 'ENOENT') {
       try {
         const stat = fs.lstatSync(p);

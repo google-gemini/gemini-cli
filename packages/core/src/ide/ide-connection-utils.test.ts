@@ -513,6 +513,48 @@ describe('ide-connection-utils', () => {
         expect(result.isValid).toBe(true);
       },
     );
+
+    it.skipIf(process.platform !== 'win32')(
+      'should handle Windows drive letter without trailing slash gracefully',
+      () => {
+        // Test that validateWorkspacePath handles 'C:' in workspace path
+        const workspacePath = 'C:';
+        const cwd = 'C:\\Users\\test';
+
+        const result = validateWorkspacePath(workspacePath, cwd);
+
+        // Should either succeed or fail gracefully, not crash
+        expect(result).toHaveProperty('isValid');
+      },
+    );
+
+    it('should handle resolveToRealPath errors gracefully', async () => {
+      const workspacePath = '/test/workspace';
+      const cwd = '/test/workspace/sub-dir';
+
+      // Dynamically import and mock the paths module
+      const pathsModule = await import('../utils/paths.js');
+      const originalResolveToRealPath = pathsModule.resolveToRealPath;
+
+      // Mock resolveToRealPath to throw an error for specific path
+      vi.spyOn(pathsModule, 'resolveToRealPath').mockImplementation(
+        (p: string) => {
+          if (p === '/test/workspace') {
+            throw new Error('Mock error');
+          }
+          // For other paths, call the original implementation
+          return originalResolveToRealPath(p);
+        },
+      );
+
+      try {
+        // Should handle the error and skip the problematic path
+        const result = validateWorkspacePath(workspacePath, cwd);
+        expect(result).toHaveProperty('isValid');
+      } finally {
+        vi.restoreAllMocks();
+      }
+    });
   });
 
   describe('validateWorkspacePath (sanitization)', () => {

@@ -53,9 +53,27 @@ export function validateWorkspacePath(
 
   const ideWorkspacePaths = ideWorkspacePath
     .split(path.delimiter)
-    .map((p) => resolveToRealPath(p))
+    .map((p) => {
+      try {
+        return resolveToRealPath(p);
+      } catch (error) {
+        // If resolveToRealPath fails for a path, log and skip it
+        logger.debug(`Failed to resolve workspace path "${p}":`, error);
+        return '';
+      }
+    })
     .filter((e) => !!e);
-  const realCwd = resolveToRealPath(cwd);
+
+  let realCwd: string;
+  try {
+    realCwd = resolveToRealPath(cwd);
+  } catch (_error) {
+    return {
+      isValid: false,
+      error: `Failed to resolve current working directory: ${cwd}`,
+    };
+  }
+
   const isWithinWorkspace = ideWorkspacePaths.some((workspacePath) =>
     isSubpath(workspacePath, realCwd),
   );
