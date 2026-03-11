@@ -204,7 +204,8 @@ const SETTINGS_SCHEMA = {
         description: oneLine`
           The default approval mode for tool execution.
           'default' prompts for approval, 'auto_edit' auto-approves edit tools,
-          and 'plan' is read-only mode. 'yolo' is not supported yet.
+          and 'plan' is read-only mode. YOLO mode (auto-approve all actions) can
+          only be enabled via command line (--yolo or --approval-mode=yolo).
         `,
         showInDialog: true,
         options: [
@@ -306,10 +307,10 @@ const SETTINGS_SCHEMA = {
         label: 'Retry Fetch Errors',
         category: 'General',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Retry on "exception TypeError: fetch failed sending request" errors.',
-        showInDialog: false,
+        showInDialog: true,
       },
       maxAttempts: {
         type: 'number',
@@ -676,7 +677,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: true,
         description:
-          "Show the logged-in user's identity (e.g. email) in the UI.",
+          "Show the signed-in user's identity (e.g. email) in the UI.",
         showInDialog: true,
       },
       useAlternateBuffer: {
@@ -1789,6 +1790,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Enable extension registry explore UI.',
+        showInDialog: false,
+      },
+      extensionRegistryURI: {
+        type: 'string',
+        label: 'Extension Registry URI',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 'https://geminicli.com/extensions.json',
+        description:
+          'The URI (web URL or local file path) of the extension registry.',
         showInDialog: false,
       },
       extensionReloading: {
