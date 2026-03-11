@@ -24,6 +24,13 @@ import { assumeExhaustive } from '@google/gemini-cli-core';
 
 export type VimAction = Extract<
   TextBufferAction,
+  | { type: 'vim_delete_char_before' }
+  | { type: 'vim_toggle_case' }
+  | { type: 'vim_replace_char' }
+  | { type: 'vim_find_char_forward' }
+  | { type: 'vim_find_char_backward' }
+  | { type: 'vim_delete_to_char_forward' }
+  | { type: 'vim_delete_to_char_backward' }
   | { type: 'vim_delete_word_forward' }
   | { type: 'vim_delete_word_backward' }
   | { type: 'vim_delete_word_end' }
@@ -72,6 +79,35 @@ export type VimAction = Extract<
   | { type: 'vim_move_to_line' }
   | { type: 'vim_escape_insert_mode' }
 >;
+
+/**
+ * Find the Nth occurrence of `char` in `codePoints`, starting at `start` and
+ * stepping by `direction` (+1 forward, -1 backward). Returns the index or -1.
+ */
+function findCharInLine(
+  codePoints: string[],
+  char: string,
+  count: number,
+  start: number,
+  direction: 1 | -1,
+): number {
+  let found = -1;
+  let hits = 0;
+  for (
+    let i = start;
+    direction === 1 ? i < codePoints.length : i >= 0;
+    i += direction
+  ) {
+    if (codePoints[i] === char) {
+      hits++;
+      if (hits >= count) {
+        found = i;
+        break;
+      }
+    }
+  }
+  return found;
+}
 
 export function handleVimAction(
   state: TextBufferState,
@@ -1181,6 +1217,151 @@ export function handleVimAction(
         cursorCol: newCol,
         preferredCol: null,
       };
+    }
+
+    case 'vim_delete_char_before': {
+      const { count } = action.payload;
+      if (cursorCol > 0) {
+        const deleteStart = Math.max(0, cursorCol - count);
+        const nextState = detachExpandedPaste(pushUndo(state));
+        return replaceRangeInternal(
+          nextState,
+          cursorRow,
+          deleteStart,
+          cursorRow,
+          cursorCol,
+          '',
+        );
+      }
+      return state;
+    }
+
+    case 'vim_toggle_case': {
+      const { count } = action.payload;
+      const currentLine = lines[cursorRow] || '';
+      const lineLen = cpLen(currentLine);
+      if (cursorCol >= lineLen) return state;
+      const end = Math.min(cursorCol + count, lineLen);
+      const codePoints = toCodePoints(currentLine);
+      for (let i = cursorCol; i < end; i++) {
+        const ch = codePoints[i];
+        const upper = ch.toUpperCase();
+        const lower = ch.toLowerCase();
+        codePoints[i] = ch === upper ? lower : upper;
+      }
+      const newLine = codePoints.join('');
+      const nextState = detachExpandedPaste(pushUndo(state));
+      const newLines = [...nextState.lines];
+      newLines[cursorRow] = newLine;
+      const newCol = Math.min(end, lineLen > 0 ? lineLen - 1 : 0);
+      return {
+        ...nextState,
+        lines: newLines,
+        cursorCol: newCol,
+        preferredCol: null,
+      };
+    }
+
+    case 'vim_replace_char': {
+      const { char, count } = action.payload;
+      const currentLine = lines[cursorRow] || '';
+      const lineLen = cpLen(currentLine);
+      if (cursorCol >= lineLen) return state;
+      const replaceCount = Math.min(count, lineLen - cursorCol);
+      const replacement = char.repeat(replaceCount);
+      const nextState = detachExpandedPaste(pushUndo(state));
+      const resultState = replaceRangeInternal(
+        nextState,
+        cursorRow,
+        cursorCol,
+        cursorRow,
+        cursorCol + replaceCount,
+        replacement,
+      );
+      return {
+        ...resultState,
+        cursorCol: cursorCol + replaceCount - 1,
+        preferredCol: null,
+      };
+    }
+
+    case 'vim_delete_to_char_forward': {
+      const { char, count, till } = action.payload;
+      const lineCodePoints = toCodePoints(lines[cursorRow] || '');
+      const found = findCharInLine(
+        lineCodePoints,
+        char,
+        count,
+        cursorCol + 1,
+        1,
+      );
+      if (found === -1) return state;
+      const endCol = till ? found : found + 1;
+      const nextState = detachExpandedPaste(pushUndo(state));
+      return replaceRangeInternal(
+        nextState,
+        cursorRow,
+        cursorCol,
+        cursorRow,
+        endCol,
+        '',
+      );
+    }
+
+    case 'vim_delete_to_char_backward': {
+      const { char, count, till } = action.payload;
+      const lineCodePoints = toCodePoints(lines[cursorRow] || '');
+      const found = findCharInLine(
+        lineCodePoints,
+        char,
+        count,
+        cursorCol - 1,
+        -1,
+      );
+      if (found === -1) return state;
+      const startCol = till ? found + 1 : found;
+      const endCol = cursorCol + 1; // inclusive: cursor char is part of the deletion
+      if (startCol >= endCol) return state;
+      const nextState = detachExpandedPaste(pushUndo(state));
+      const resultState = replaceRangeInternal(
+        nextState,
+        cursorRow,
+        startCol,
+        cursorRow,
+        endCol,
+        '',
+      );
+      return { ...resultState, cursorCol: startCol, preferredCol: null };
+    }
+
+    case 'vim_find_char_forward': {
+      const { char, count, till } = action.payload;
+      const lineCodePoints = toCodePoints(lines[cursorRow] || '');
+      const found = findCharInLine(
+        lineCodePoints,
+        char,
+        count,
+        cursorCol + 1,
+        1,
+      );
+      if (found === -1) return state;
+      const newCol = till ? Math.max(cursorCol, found - 1) : found;
+      return { ...state, cursorCol: newCol, preferredCol: null };
+    }
+
+    case 'vim_find_char_backward': {
+      const { char, count, till } = action.payload;
+      const lineCodePoints = toCodePoints(lines[cursorRow] || '');
+      const found = findCharInLine(
+        lineCodePoints,
+        char,
+        count,
+        cursorCol - 1,
+        -1,
+      );
+      if (found === -1) return state;
+      const newCol = till ? Math.min(cursorCol, found + 1) : found;
+      return { ...state, cursorCol: newCol, preferredCol: null };
     }
 
     default: {
