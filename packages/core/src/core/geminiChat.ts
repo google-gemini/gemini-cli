@@ -73,17 +73,17 @@ export type StreamEvent =
   | { type: StreamEventType.AGENT_EXECUTION_BLOCKED; reason: string };
 
 /**
- * Options for retrying due to invalid content from the model.
+ * Options for retrying mid-stream errors (e.g. invalid content or API disconnects).
  */
-interface ContentRetryOptions {
+interface MidStreamRetryOptions {
   /** Total number of attempts to make (1 initial + N retries). */
   maxAttempts: number;
   /** The base delay in milliseconds for linear backoff. */
   initialDelayMs: number;
 }
 
-const INVALID_CONTENT_RETRY_OPTIONS: ContentRetryOptions = {
-  maxAttempts: 2, // 1 initial call + 1 retry
+const MID_STREAM_RETRY_OPTIONS: MidStreamRetryOptions = {
+  maxAttempts: 4, // 1 initial call + 3 retries mid-stream
   initialDelayMs: 500,
 };
 
@@ -419,13 +419,13 @@ export class GeminiChat {
               // The issue requests exactly 3 retries (4 attempts) for API errors during stream iteration.
               // Regardless of the global maxAttempts (e.g. 10), we only want to retry these mid-stream API errors
               // up to 3 times before finally throwing the error to the user.
-              const maxMidStreamAttempts = 4;
+              const maxMidStreamAttempts = MID_STREAM_RETRY_OPTIONS.maxAttempts;
 
               if (
                 attempt < maxAttempts - 1 &&
                 attempt < maxMidStreamAttempts - 1
               ) {
-                const delayMs = INVALID_CONTENT_RETRY_OPTIONS.initialDelayMs;
+                const delayMs = MID_STREAM_RETRY_OPTIONS.initialDelayMs;
 
                 logContentRetry(
                   this.config,
