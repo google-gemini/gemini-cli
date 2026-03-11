@@ -1558,7 +1558,10 @@ for that specific session.
   - **Values:**
     - `text`: (Default) The standard human-readable output.
     - `json`: A machine-readable JSON output.
-    - `stream-json`: A streaming JSON output that emits real-time events.
+    - `stream-json`: A streaming JSON output that emits real-time JSONL events.
+      Event types include: `init`, `message`, `thinking`, `tool_use`,
+      `tool_result`, `error`, and `result`. The `thinking` event exposes model
+      reasoning from thinking-capable models (for example, Gemini 2.5 Pro).
   - **Note:** For structured output and scripting, use the
     `--output-format json` or `--output-format stream-json` flag.
 - **`--sandbox`** (**`-s`**):

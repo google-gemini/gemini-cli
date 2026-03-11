@@ -314,7 +314,19 @@ export async function runNonInteractive({
             handleCancellationError(config);
           }
 
-          if (event.type === GeminiEventType.Content) {
+          if (event.type === GeminiEventType.Thought) {
+            if (streamFormatter) {
+              const text = event.value.subject
+                ? `**${event.value.subject}** ${event.value.description}`
+                : event.value.description;
+              streamFormatter.emitEvent({
+                type: JsonStreamEventType.THINKING,
+                timestamp: new Date().toISOString(),
+                content: text,
+                subject: event.value.subject || undefined,
+              });
+            }
+          } else if (event.type === GeminiEventType.Content) {
             const isRaw =
               config.getRawOutput() || config.getAcceptRawOutputRisk();
             const output = isRaw ? event.value : stripAnsi(event.value);
