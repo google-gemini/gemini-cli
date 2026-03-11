@@ -184,6 +184,11 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `ui`
 
+- **`ui.scrollableInputPrompt`** (boolean):
+  - **Description:** Whether to display the input prompt with a scrollbar when
+    it contains many lines.
+  - **Default:** `true`
+
 - **`ui.theme`** (string):
   - **Description:** The color theme for the UI. See the CLI themes guide for
     available options.

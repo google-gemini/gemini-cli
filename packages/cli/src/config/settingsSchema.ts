@@ -415,6 +415,15 @@ const SETTINGS_SCHEMA = {
     description: 'User interface settings.',
     showInDialog: false,
     properties: {
+      scrollableInputPrompt: {
+        type: 'boolean',
+        label: 'Scrollable Input Prompt',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description: 'Whether to show a scrollbar in the input prompt.',
+        showInDialog: true,
+      },
       theme: {
         type: 'string',
         label: 'Theme',
