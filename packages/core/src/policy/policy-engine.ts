@@ -190,6 +190,13 @@ export class PolicyEngine {
     return this.approvalMode;
   }
 
+  private isAlwaysAllowRule(rule: PolicyRule): boolean {
+    return (
+      rule.priority !== undefined &&
+      Math.round((rule.priority % 1) * 1000) === ALWAYS_ALLOW_PRIORITY_FRACTION
+    );
+  }
+
   private shouldDowngradeForRedirection(
     command: string,
     allowRedirection?: boolean,
@@ -425,12 +432,7 @@ export class PolicyEngine {
     }
 
     for (const rule of this.rules) {
-      if (
-        this.disableAlwaysAllow &&
-        rule.priority !== undefined &&
-        Math.round((rule.priority % 1) * 1000) ===
-          ALWAYS_ALLOW_PRIORITY_FRACTION
-      ) {
+      if (this.disableAlwaysAllow && this.isAlwaysAllowRule(rule)) {
         continue;
       }
 
@@ -696,12 +698,7 @@ export class PolicyEngine {
 
       // Evaluate rules in priority order (they are already sorted in constructor)
       for (const rule of this.rules) {
-        if (
-          this.disableAlwaysAllow &&
-          rule.priority !== undefined &&
-          Math.round((rule.priority % 1) * 1000) ===
-            ALWAYS_ALLOW_PRIORITY_FRACTION
-        ) {
+        if (this.disableAlwaysAllow && this.isAlwaysAllowRule(rule)) {
           continue;
         }
 

@@ -996,6 +996,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.policyUpdateConfirmationRequest =
       params.policyUpdateConfirmationRequest;
 
+    this.disableAlwaysAllow = params.disableAlwaysAllow ?? false;
     this.policyEngine = new PolicyEngine(
       {
         ...params.policyEngineConfig,
@@ -1033,7 +1034,6 @@ export class Config implements McpContext, AgentLoopContext {
       DEFAULT_MAX_ATTEMPTS,
     );
     this.disableYoloMode = params.disableYoloMode ?? false;
-    this.disableAlwaysAllow = params.disableAlwaysAllow ?? false;
     this.rawOutput = params.rawOutput ?? false;
     this.acceptRawOutputRisk = params.acceptRawOutputRisk ?? false;
 

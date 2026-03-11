@@ -3246,7 +3246,10 @@ describe('PolicyEngine', () => {
         defaultDecision: PolicyDecision.ASK_USER,
       });
 
-      const result = await engine.check({ name: 'test-tool', args: {} });
+      const result = await engine.check(
+        { name: 'test-tool', args: {} },
+        undefined,
+      );
       expect(result.decision).toBe(PolicyDecision.ASK_USER);
     });
 
@@ -3264,7 +3267,10 @@ describe('PolicyEngine', () => {
         defaultDecision: PolicyDecision.ASK_USER,
       });
 
-      const result = await engine.check({ name: 'test-tool', args: {} });
+      const result = await engine.check(
+        { name: 'test-tool', args: {} },
+        undefined,
+      );
       expect(result.decision).toBe(PolicyDecision.ALLOW);
     });
 
@@ -3282,7 +3288,10 @@ describe('PolicyEngine', () => {
         defaultDecision: PolicyDecision.ASK_USER,
       });
 
-      const result = await engine.check({ name: 'test-tool', args: {} });
+      const result = await engine.check(
+        { name: 'test-tool', args: {} },
+        undefined,
+      );
       expect(result.decision).toBe(PolicyDecision.ALLOW);
     });
   });
@@ -3303,7 +3312,10 @@ describe('PolicyEngine', () => {
         defaultDecision: PolicyDecision.DENY,
       });
 
-      const excluded = engine.getExcludedTools(undefined, new Set(['test-tool']));
+      const excluded = engine.getExcludedTools(
+        undefined,
+        new Set(['test-tool']),
+      );
       expect(excluded.has('test-tool')).toBe(true);
     });
 
@@ -3320,7 +3332,10 @@ describe('PolicyEngine', () => {
         defaultDecision: PolicyDecision.DENY,
       });
 
-      const excluded = engine.getExcludedTools(undefined, new Set(['test-tool']));
+      const excluded = engine.getExcludedTools(
+        undefined,
+        new Set(['test-tool']),
+      );
       expect(excluded.has('test-tool')).toBe(false);
     });
   });

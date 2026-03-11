@@ -63,7 +63,8 @@ export async function createPolicyEngineConfig(
     policyPaths: settings.policyPaths,
     workspacePoliciesDir,
     disableAlwaysAllow:
-      settings.security?.disableAlwaysAllow || settings.admin?.secureModeEnabled,
+      settings.security?.disableAlwaysAllow ||
+      settings.admin?.secureModeEnabled,
   };
 
   return createCorePolicyEngineConfig(policySettings, approvalMode);
