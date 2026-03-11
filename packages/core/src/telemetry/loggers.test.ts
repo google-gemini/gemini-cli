@@ -1117,6 +1117,10 @@ describe('loggers', () => {
       getUserMemory: () => 'user-memory',
     } as unknown as Config;
 
+    (cfg2 as unknown as { config: Config; promptId: string }).config = cfg2;
+    (cfg2 as unknown as { config: Config; promptId: string }).promptId =
+      'test-prompt-id';
+
     const mockGeminiClient = new GeminiClient(cfg2);
     const mockConfig = {
       getSessionId: () => 'test-session-id',

@@ -20,6 +20,7 @@ vi.mock('../scheduler/scheduler.js', () => ({
 
 describe('agent-scheduler', () => {
   let mockToolRegistry: Mocked<ToolRegistry>;
+  let mockConfig: Mocked<Config>;
   let mockMessageBus: Mocked<MessageBus>;
 
   beforeEach(() => {
@@ -29,6 +30,14 @@ describe('agent-scheduler', () => {
       getTool: vi.fn(),
       getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
     } as unknown as Mocked<ToolRegistry>;
+    mockConfig = {
+      getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
+      toolRegistry: mockToolRegistry,
+    } as unknown as Mocked<Config>;
+    (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+      mockMessageBus;
+    (mockConfig as unknown as { toolRegistry: ToolRegistry }).toolRegistry =
+      mockToolRegistry;
   });
 
   it('should create a scheduler with agent-specific config', async () => {
@@ -69,7 +78,8 @@ describe('agent-scheduler', () => {
       }),
     );
 
-    const schedulerConfig = vi.mocked(Scheduler).mock.calls[0][0].config;
+    // Verify that the scheduler's context has the overridden tool registry
+    const schedulerConfig = vi.mocked(Scheduler).mock.calls[0][0].context;
     expect(schedulerConfig.toolRegistry).toBe(mockToolRegistry);
   });
 
@@ -106,9 +116,8 @@ describe('agent-scheduler', () => {
       },
     );
 
-    const schedulerConfig = vi.mocked(Scheduler).mock.calls[0][0].config;
+    const schedulerConfig = vi.mocked(Scheduler).mock.calls[0][0].context;
     expect(schedulerConfig.toolRegistry).toBe(agentRegistry);
     expect(schedulerConfig.toolRegistry).not.toBe(mainRegistry);
-    expect(schedulerConfig.getToolRegistry()).toBe(agentRegistry);
   });
 });

@@ -39,6 +39,12 @@ describe('WebSearchTool', () => {
         })),
       },
     } as unknown as Config;
+    (
+      mockConfigInstance as unknown as { config: Config; promptId: string }
+    ).config = mockConfigInstance;
+    (
+      mockConfigInstance as unknown as { config: Config; promptId: string }
+    ).promptId = 'test-prompt-id';
     mockGeminiClient = new GeminiClient(mockConfigInstance);
     tool = new WebSearchTool(mockConfigInstance, createMockMessageBus());
   });

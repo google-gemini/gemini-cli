@@ -77,6 +77,11 @@ describe('SubAgentInvocation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfig = makeFakeConfig();
+    // .config is already set correctly by the getter on the instance.
+    Object.defineProperty(mockConfig, 'promptId', {
+      get: () => 'test-prompt-id',
+      configurable: true,
+    });
     mockMessageBus = createMockMessageBus();
     mockInnerInvocation = {
       shouldConfirmExecute: vi.fn(),
@@ -339,6 +344,11 @@ describe('SubagentTool Read-Only logic', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfig = makeFakeConfig();
+    // .config is already set correctly by the getter on the instance.
+    Object.defineProperty(mockConfig, 'promptId', {
+      get: () => 'test-prompt-id',
+      configurable: true,
+    });
     mockMessageBus = createMockMessageBus();
   });
 
@@ -359,7 +369,7 @@ describe('SubagentTool Read-Only logic', () => {
     const registry = {
       getTool: (name: string) => (name === 'read' ? readOnlyTool : undefined),
     };
-    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(
+    vi.spyOn(mockConfig, 'toolRegistry', 'get').mockReturnValue(
       registry as unknown as ToolRegistry,
     );
 
@@ -387,7 +397,7 @@ describe('SubagentTool Read-Only logic', () => {
         return undefined;
       },
     };
-    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(
+    vi.spyOn(mockConfig, 'toolRegistry', 'get').mockReturnValue(
       registry as unknown as ToolRegistry,
     );
 
@@ -401,7 +411,7 @@ describe('SubagentTool Read-Only logic', () => {
 
   it('should be true for local agent with no tools', () => {
     const registry = { getTool: () => undefined };
-    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(
+    vi.spyOn(mockConfig, 'toolRegistry', 'get').mockReturnValue(
       registry as unknown as ToolRegistry,
     );
 
