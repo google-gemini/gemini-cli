@@ -28,6 +28,7 @@ import { makeRelative } from '../utils/paths.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { EDIT_TOOL_NAMES } from '../tools/tool-names.js';
 import type { ValidatingToolCall } from './types.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 /**
  * Helper to format the policy denial error.
@@ -69,6 +70,19 @@ export async function checkPolicy(
 
   const { decision } = result;
 
+  // If the tool call was initiated by the client (e.g. via a slash command),
+  // we treat it as implicitly confirmed by the user and bypass the
+  // confirmation prompt if the policy engine's decision is 'ASK_USER'.
+  if (
+    decision === PolicyDecision.ASK_USER &&
+    toolCall.request.isClientInitiated
+  ) {
+    return {
+      decision: PolicyDecision.ALLOW,
+      rule: result.rule,
+    };
+  }
+
   /*
    * Return the full check result including the rule that matched.
    * This is necessary to access metadata like custom deny messages.
@@ -97,12 +111,10 @@ export async function updatePolicy(
   tool: AnyDeclarativeTool,
   outcome: ToolConfirmationOutcome,
   confirmationDetails: SerializableConfirmationDetails | undefined,
-  deps: {
-    config: Config;
-    messageBus: MessageBus;
-    toolInvocation?: AnyToolInvocation;
-  },
+  context: AgentLoopContext,
+  toolInvocation?: AnyToolInvocation,
 ): Promise<void> {
+  const deps = { ...context, toolInvocation };
   // Mode Transitions (AUTO_EDIT)
   if (isAutoEditTransition(tool, outcome)) {
     deps.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
