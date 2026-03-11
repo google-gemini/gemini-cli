@@ -825,6 +825,8 @@ export class ShellExecutionService {
 
               const finalBuffer = Buffer.concat(outputChunks);
 
+              headlessTerminal.dispose();
+
               resolve({
                 rawOutput: finalBuffer,
                 output: getFullBufferText(headlessTerminal),
@@ -1008,6 +1010,7 @@ export class ShellExecutionService {
       this.activeChildProcesses.delete(pid);
     } else if (activePty) {
       killProcessGroup({ pid, pty: activePty.ptyProcess }).catch(() => {});
+      activePty.headlessTerminal.dispose();
       this.activePtys.delete(pid);
     }
 

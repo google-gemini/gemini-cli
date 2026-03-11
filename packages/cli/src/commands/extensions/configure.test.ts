@@ -94,7 +94,17 @@ describe('extensions configure command', () => {
     );
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    try {
+      if (tempWorkspaceDir && fs.existsSync(tempWorkspaceDir)) {
+        if (process.platform === 'win32') {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
+      }
+    } catch {
+      // ignore
+    }
     vi.restoreAllMocks();
   });
 
