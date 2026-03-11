@@ -31,6 +31,7 @@ import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../../constants.js';
 import { openFileInEditor } from '../../utils/editorUtils.js';
+import { useSettings } from '../../contexts/SettingsContext.js';
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 export const LARGE_PASTE_LINE_THRESHOLD = 5;
@@ -772,7 +773,6 @@ interface UseTextBufferProps {
   inputFilter?: (text: string) => string; // Optional filter for input text
   singleLine?: boolean;
   getPreferredEditor?: () => EditorType | undefined;
-  getOpenEditorInNewWindow?: () => boolean | undefined;
 }
 
 interface UndoHistoryEntry {
@@ -2841,8 +2841,8 @@ export function useTextBuffer({
   inputFilter,
   singleLine = false,
   getPreferredEditor,
-  getOpenEditorInNewWindow,
 }: UseTextBufferProps): TextBuffer {
+  const settings = useSettings();
   const keyMatchers = useKeyMatchers();
   const initialState = useMemo((): TextBufferState => {
     const lines = initialText.split('\n');
@@ -3326,7 +3326,7 @@ export function useTextBuffer({
         stdin,
         setRawMode,
         getPreferredEditor?.(),
-        getOpenEditorInNewWindow?.(),
+        settings.merged.general.openEditorInNewWindow,
       );
 
       let newText = fs.readFileSync(filePath, 'utf8');
@@ -3363,7 +3363,7 @@ export function useTextBuffer({
     stdin,
     setRawMode,
     getPreferredEditor,
-    getOpenEditorInNewWindow,
+    settings.merged.general.openEditorInNewWindow,
   ]);
 
   const handleInput = useCallback(
