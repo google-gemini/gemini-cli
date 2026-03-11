@@ -41,7 +41,16 @@ async function listTools(
   context.ui.addItem(toolsListItem);
 }
 
-const toolsDescSubCommand: SlashCommand = {
+const listSubCommand: SlashCommand = {
+  name: 'list',
+  description: 'List available Gemini CLI tools.',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: async (context: CommandContext): Promise<void> =>
+    listTools(context, false),
+};
+
+const descSubCommand: SlashCommand = {
   name: 'desc',
   altNames: ['descriptions'],
   description: 'List available Gemini CLI tools with descriptions.',
@@ -57,11 +66,11 @@ export const toolsCommand: SlashCommand = {
     'List available Gemini CLI tools. Use /tools desc to include descriptions.',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
-  subCommands: [toolsDescSubCommand],
+  subCommands: [listSubCommand, descSubCommand],
   action: async (context: CommandContext, args?: string): Promise<void> => {
     const subCommand = args?.trim();
 
-    // Keep backward compatibility for typed arguments while exposing desc in TUI via subcommands.
+    // Keep backward compatibility for typed arguments while exposing subcommands in TUI.
     const useShowDescriptions =
       subCommand === 'desc' || subCommand === 'descriptions';
 
