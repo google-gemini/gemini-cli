@@ -1342,9 +1342,9 @@ export class ContentRetryEvent implements BaseTelemetryEvent {
 export const EVENT_CONTENT_RETRY_FAILURE =
   'gemini_cli.chat.content_retry_failure';
 
-export const EVENT_RETRY_ATTEMPT = 'gemini_cli.retry_attempt';
-export class RetryAttemptEvent implements BaseTelemetryEvent {
-  'event.name': 'retry_attempt';
+export const EVENT_NETWORK_RETRY_ATTEMPT = 'gemini_cli.network_retry_attempt';
+export class NetworkRetryAttemptEvent implements BaseTelemetryEvent {
+  'event.name': 'network_retry_attempt';
   'event.timestamp': string;
   attempt: number;
   max_attempts: number;
@@ -1359,7 +1359,7 @@ export class RetryAttemptEvent implements BaseTelemetryEvent {
     delay_ms: number,
     model: string,
   ) {
-    this['event.name'] = 'retry_attempt';
+    this['event.name'] = 'network_retry_attempt';
     this['event.timestamp'] = new Date().toISOString();
     this.attempt = attempt;
     this.max_attempts = max_attempts;
@@ -1371,7 +1371,7 @@ export class RetryAttemptEvent implements BaseTelemetryEvent {
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
       ...getCommonAttributes(config),
-      'event.name': EVENT_RETRY_ATTEMPT,
+      'event.name': EVENT_NETWORK_RETRY_ATTEMPT,
       'event.timestamp': this['event.timestamp'],
       attempt: this.attempt,
       max_attempts: this.max_attempts,
@@ -1382,7 +1382,7 @@ export class RetryAttemptEvent implements BaseTelemetryEvent {
   }
 
   toLogBody(): string {
-    return `Retry attempt ${this.attempt}/${this.max_attempts} for ${this.model}. Delay: ${this.delay_ms}ms. Error type: ${this.error_type}`;
+    return `Network retry attempt ${this.attempt}/${this.max_attempts} for ${this.model}. Delay: ${this.delay_ms}ms. Error type: ${this.error_type}`;
   }
 }
 

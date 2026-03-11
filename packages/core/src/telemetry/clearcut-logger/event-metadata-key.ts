@@ -685,6 +685,6 @@ export enum EventMetadataKey {
   // Logs the delay in milliseconds for a network retry.
   GEMINI_CLI_NETWORK_RETRY_DELAY_MS = 181,
 
-  // Logs the error message for a network retry.
-  GEMINI_CLI_NETWORK_RETRY_ERROR_MESSAGE = 182,
+  // Logs the error type for a network retry.
+  GEMINI_CLI_NETWORK_RETRY_ERROR_TYPE = 182,
 }

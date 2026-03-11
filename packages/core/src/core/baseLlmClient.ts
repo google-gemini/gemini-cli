@@ -20,12 +20,12 @@ import { reportError } from '../utils/errorReporting.js';
 import { getErrorMessage } from '../utils/errors.js';
 import {
   logMalformedJsonResponse,
-  logRetryAttempt,
+  logNetworkRetryAttempt,
 } from '../telemetry/loggers.js';
 import {
   MalformedJsonResponseEvent,
   LlmRole,
-  RetryAttemptEvent,
+  NetworkRetryAttemptEvent,
 } from '../telemetry/types.js';
 import { retryWithBackoff, getRetryErrorType } from '../utils/retry.js';
 import { coreEvents } from '../utils/events.js';
@@ -351,9 +351,9 @@ export class BaseLlmClient {
             model: modelName,
           });
 
-          logRetryAttempt(
+          logNetworkRetryAttempt(
             this.config,
-            new RetryAttemptEvent(
+            new NetworkRetryAttemptEvent(
               attempt,
               actualMaxAttempts,
               errorType,

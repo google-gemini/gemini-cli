@@ -27,7 +27,7 @@ import type {
   InvalidChunkEvent,
   ContentRetryEvent,
   ContentRetryFailureEvent,
-  RetryAttemptEvent,
+  NetworkRetryAttemptEvent,
   ExtensionInstallEvent,
   ToolOutputTruncatedEvent,
   ExtensionUninstallEvent,
@@ -1233,7 +1233,7 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
-  logRetryAttemptEvent(event: RetryAttemptEvent): void {
+  logNetworkRetryAttemptEvent(event: NetworkRetryAttemptEvent): void {
     // This event is generic for any retry attempt (Gemini, WebFetch, etc.)
     const data: EventValue[] = [
       {
@@ -1246,7 +1246,7 @@ export class ClearcutLogger {
         value: String(event.delay_ms),
       },
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_NETWORK_RETRY_ERROR_MESSAGE,
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_NETWORK_RETRY_ERROR_TYPE,
         value: event.error_type,
       },
       {

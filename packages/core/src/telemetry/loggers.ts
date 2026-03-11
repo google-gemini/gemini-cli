@@ -32,7 +32,7 @@ import {
   type InvalidChunkEvent,
   type ContentRetryEvent,
   type ContentRetryFailureEvent,
-  type RetryAttemptEvent,
+  type NetworkRetryAttemptEvent,
   type RipgrepFallbackEvent,
   type ToolOutputTruncatedEvent,
   type ModelRoutingEvent,
@@ -487,11 +487,11 @@ export function logInvalidChunk(
   });
 }
 
-export function logRetryAttempt(
+export function logNetworkRetryAttempt(
   config: Config,
-  event: RetryAttemptEvent,
+  event: NetworkRetryAttemptEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logRetryAttemptEvent(event);
+  ClearcutLogger.getInstance(config)?.logNetworkRetryAttemptEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {
