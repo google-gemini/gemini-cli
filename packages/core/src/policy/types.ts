@@ -312,6 +312,7 @@ export interface PolicySettings {
   // User provided policies that will replace the USER level policies in ~/.gemini/policies
   policyPaths?: string[];
   workspacePoliciesDir?: string;
+  trackerEnabled?: boolean;
 }
 
 export interface CheckResult {

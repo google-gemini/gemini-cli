@@ -23,11 +23,32 @@ import {
   TRACKER_UPDATE_TASK_TOOL_NAME,
   TRACKER_VISUALIZE_TOOL_NAME,
 } from './tool-names.js';
-import type { ToolResult } from './tools.js';
+import type { ToolResult, TodoList } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import type { TrackerTask, TaskType } from '../services/trackerTypes.js';
 import { TaskStatus } from '../services/trackerTypes.js';
+
+async function buildTodosReturnDisplay(
+  service: ReturnType<Config['getTrackerService']>,
+): Promise<TodoList> {
+  const tasks = await service.listTasks();
+  return {
+    todos: tasks.map((t) => {
+      let status: 'pending' | 'in_progress' | 'completed' | 'cancelled' =
+        'pending';
+      if (t.status === TaskStatus.IN_PROGRESS) {
+        status = 'in_progress';
+      } else if (t.status === TaskStatus.CLOSED) {
+        status = 'completed';
+      }
+      return {
+        description: `[${t.id}] ${t.title}`,
+        status,
+      };
+    }),
+  };
+}
 
 // --- tracker_create_task ---
 
@@ -71,7 +92,7 @@ class TrackerCreateTaskInvocation extends BaseToolInvocation<
       });
       return {
         llmContent: `Created task ${task.id}: ${task.title}`,
-        returnDisplay: `Created task ${task.id}.`,
+        returnDisplay: await buildTodosReturnDisplay(this.service),
       };
     } catch (error) {
       const errorMessage =
@@ -155,7 +176,7 @@ class TrackerUpdateTaskInvocation extends BaseToolInvocation<
       const task = await this.service.updateTask(id, updates);
       return {
         llmContent: `Updated task ${task.id}. Status: ${task.status}`,
-        returnDisplay: `Updated task ${task.id}.`,
+        returnDisplay: await buildTodosReturnDisplay(this.service),
       };
     } catch (error) {
       const errorMessage =
@@ -239,7 +260,7 @@ class TrackerGetTaskInvocation extends BaseToolInvocation<
     }
     return {
       llmContent: JSON.stringify(task, null, 2),
-      returnDisplay: `Retrieved task ${task.id}.`,
+      returnDisplay: await buildTodosReturnDisplay(this.service),
     };
   }
 }
@@ -327,7 +348,7 @@ class TrackerListTasksInvocation extends BaseToolInvocation<
       .join('\n');
     return {
       llmContent: content,
-      returnDisplay: `Listed ${tasks.length} tasks.`,
+      returnDisplay: await buildTodosReturnDisplay(this.service),
     };
   }
 }
@@ -427,7 +448,7 @@ class TrackerAddDependencyInvocation extends BaseToolInvocation<
       await this.service.updateTask(task.id, { dependencies: newDeps });
       return {
         llmContent: `Linked ${task.id} -> ${dep.id}.`,
-        returnDisplay: 'Dependency added.',
+        returnDisplay: await buildTodosReturnDisplay(this.service),
       };
     } catch (error) {
       const errorMessage =
@@ -566,7 +587,7 @@ class TrackerVisualizeInvocation extends BaseToolInvocation<
 
     return {
       llmContent: output,
-      returnDisplay: output,
+      returnDisplay: await buildTodosReturnDisplay(this.service),
     };
   }
 }

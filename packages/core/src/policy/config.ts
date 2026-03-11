@@ -439,6 +439,34 @@ export async function createPolicyEngineConfig(
     }
   }
 
+  // Auto-allow tracker tools if the tracker feature is enabled
+  // Priority: ALLOWED_TOOLS_FLAG_PRIORITY (user tier)
+  if (settings.trackerEnabled) {
+    const trackerToolNames = [
+      'tracker_create_task',
+      'tracker_update_task',
+      'tracker_delete_task',
+      'tracker_get_task',
+      'tracker_list_tasks',
+      'tracker_add_dependency',
+      'tracker_visualize',
+    ];
+    for (const name of trackerToolNames) {
+      rules.push({
+        toolName: name,
+        decision: PolicyDecision.ALLOW,
+        priority: ALLOWED_TOOLS_FLAG_PRIORITY,
+        source: 'Settings (Tracker Enabled)',
+      });
+      rules.push({
+        toolName: `${MCP_TOOL_PREFIX}*_${name}`,
+        decision: PolicyDecision.ALLOW,
+        priority: ALLOWED_TOOLS_FLAG_PRIORITY,
+        source: 'Settings (Tracker Enabled)',
+      });
+    }
+  }
+
   // MCP servers that are trusted in the settings.
   // Priority: TRUSTED_MCP_SERVER_PRIORITY (user tier - persistent trusted servers)
   if (settings.mcpServers) {
