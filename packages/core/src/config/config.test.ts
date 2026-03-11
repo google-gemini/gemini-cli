@@ -19,6 +19,7 @@ import {
   type ConfigParameters,
   type SandboxConfig,
 } from './config.js';
+import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
 import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -247,10 +248,10 @@ vi.mock('../code_assist/experiments/experiments.js');
 
 describe('Server Config (config.ts)', () => {
   const MODEL = DEFAULT_GEMINI_MODEL;
-  const SANDBOX: SandboxConfig = {
+  const SANDBOX: SandboxConfig = createMockSandboxConfig({
     command: 'docker',
     image: 'gemini-cli-sandbox',
-  };
+  });
   const TARGET_DIR = '/path/to/target';
   const DEBUG_MODE = false;
   const QUESTION = 'test question';
@@ -1566,14 +1567,62 @@ describe('Server Config (config.ts)', () => {
       expect(browserConfig.customConfig.sessionMode).toBe('persistent');
     });
   });
+
+  describe('Sandbox Configuration', () => {
+    it('should default sandbox settings when not provided', () => {
+      const config = new Config({
+        ...baseParams,
+        sandbox: undefined,
+      });
+
+      expect(config.getSandboxEnabled()).toBe(false);
+      expect(config.getSandboxAllowedPaths()).toEqual([]);
+      expect(config.getSandboxNetworkAccess()).toBe(false);
+    });
+
+    it('should store provided sandbox settings', () => {
+      const sandbox: SandboxConfig = {
+        enabled: true,
+        allowedPaths: ['/tmp/foo', '/var/bar'],
+        networkAccess: true,
+        command: 'docker',
+        image: 'my-image',
+      };
+      const config = new Config({
+        ...baseParams,
+        sandbox,
+      });
+
+      expect(config.getSandboxEnabled()).toBe(true);
+      expect(config.getSandboxAllowedPaths()).toEqual(['/tmp/foo', '/var/bar']);
+      expect(config.getSandboxNetworkAccess()).toBe(true);
+      expect(config.getSandbox()?.command).toBe('docker');
+      expect(config.getSandbox()?.image).toBe('my-image');
+    });
+
+    it('should partially override default sandbox settings', () => {
+      const config = new Config({
+        ...baseParams,
+        sandbox: {
+          enabled: true,
+          allowedPaths: ['/only/this'],
+          networkAccess: false,
+        } as SandboxConfig,
+      });
+
+      expect(config.getSandboxEnabled()).toBe(true);
+      expect(config.getSandboxAllowedPaths()).toEqual(['/only/this']);
+      expect(config.getSandboxNetworkAccess()).toBe(false);
+    });
+  });
 });
 
 describe('GemmaModelRouterSettings', () => {
   const MODEL = DEFAULT_GEMINI_MODEL;
-  const SANDBOX: SandboxConfig = {
+  const SANDBOX: SandboxConfig = createMockSandboxConfig({
     command: 'docker',
     image: 'gemini-cli-sandbox',
-  };
+  });
   const TARGET_DIR = '/path/to/target';
   const DEBUG_MODE = false;
   const QUESTION = 'test question';
@@ -1950,10 +1999,10 @@ describe('isYoloModeDisabled', () => {
 
 describe('BaseLlmClient Lifecycle', () => {
   const MODEL = 'gemini-pro';
-  const SANDBOX: SandboxConfig = {
+  const SANDBOX: SandboxConfig = createMockSandboxConfig({
     command: 'docker',
     image: 'gemini-cli-sandbox',
-  };
+  });
   const TARGET_DIR = '/path/to/target';
   const DEBUG_MODE = false;
   const QUESTION = 'test question';
@@ -2005,10 +2054,10 @@ describe('BaseLlmClient Lifecycle', () => {
 
 describe('Generation Config Merging (HACK)', () => {
   const MODEL = 'gemini-pro';
-  const SANDBOX: SandboxConfig = {
+  const SANDBOX: SandboxConfig = createMockSandboxConfig({
     command: 'docker',
     image: 'gemini-cli-sandbox',
-  };
+  });
   const TARGET_DIR = '/path/to/target';
   const DEBUG_MODE = false;
   const QUESTION = 'test question';
@@ -2311,10 +2360,10 @@ describe('Config getHooks', () => {
 
 describe('LocalLiteRtLmClient Lifecycle', () => {
   const MODEL = 'gemini-pro';
-  const SANDBOX: SandboxConfig = {
+  const SANDBOX: SandboxConfig = createMockSandboxConfig({
     command: 'docker',
     image: 'gemini-cli-sandbox',
-  };
+  });
   const TARGET_DIR = '/path/to/target';
   const DEBUG_MODE = false;
   const QUESTION = 'test question';
@@ -2629,6 +2678,9 @@ describe('Config Quota & Preview Model Access', () => {
     usageStatisticsEnabled: false,
     embeddingModel: 'gemini-embedding',
     sandbox: {
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
       command: 'docker',
       image: 'gemini-cli-sandbox',
     },
@@ -3262,5 +3314,41 @@ describe('Model Persistence Bug Fix (#19864)', () => {
     // Verify onModelChange was called to persist the model
     expect(onModelChange).toHaveBeenCalledWith(PREVIEW_GEMINI_3_1_MODEL);
     expect(config.getModel()).toBe(PREVIEW_GEMINI_3_1_MODEL);
+  });
+});
+
+describe('ConfigSchema validation', () => {
+  it('should validate a valid sandbox config', async () => {
+    const validConfig = {
+      sandbox: {
+        enabled: true,
+        allowedPaths: ['/tmp'],
+        networkAccess: false,
+        command: 'docker',
+        image: 'node:20',
+      },
+    };
+
+    const { ConfigSchema } = await import('./config.js');
+    const result = ConfigSchema.safeParse(validConfig);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sandbox?.enabled).toBe(true);
+    }
+  });
+
+  it('should apply defaults in ConfigSchema', async () => {
+    const minimalConfig = {
+      sandbox: {},
+    };
+
+    const { ConfigSchema } = await import('./config.js');
+    const result = ConfigSchema.safeParse(minimalConfig);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sandbox?.enabled).toBe(false);
+      expect(result.data.sandbox?.allowedPaths).toEqual([]);
+      expect(result.data.sandbox?.networkAccess).toBe(false);
+    }
   });
 });

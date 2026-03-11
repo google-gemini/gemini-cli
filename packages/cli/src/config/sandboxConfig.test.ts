@@ -90,7 +90,13 @@ describe('loadSandboxConfig', () => {
       process.env['GEMINI_SANDBOX'] = 'docker';
       mockedCommandExistsSync.mockReturnValue(true);
       const config = await loadSandboxConfig({}, {});
-      expect(config).toEqual({ command: 'docker', image: 'default/image' });
+      expect(config).toEqual({
+        enabled: true,
+        allowedPaths: [],
+        networkAccess: false,
+        command: 'docker',
+        image: 'default/image',
+      });
       expect(mockedCommandExistsSync).toHaveBeenCalledWith('docker');
     });
 
@@ -113,7 +119,13 @@ describe('loadSandboxConfig', () => {
       process.env['GEMINI_SANDBOX'] = 'lxc';
       mockedCommandExistsSync.mockReturnValue(true);
       const config = await loadSandboxConfig({}, {});
-      expect(config).toEqual({ command: 'lxc', image: 'default/image' });
+      expect(config).toEqual({
+        enabled: true,
+        allowedPaths: [],
+        networkAccess: false,
+        command: 'lxc',
+        image: 'default/image',
+      });
       expect(mockedCommandExistsSync).toHaveBeenCalledWith('lxc');
     });
 
@@ -134,6 +146,9 @@ describe('loadSandboxConfig', () => {
       );
       const config = await loadSandboxConfig({}, { sandbox: true });
       expect(config).toEqual({
+        enabled: true,
+        allowedPaths: [],
+        networkAccess: false,
         command: 'sandbox-exec',
         image: 'default/image',
       });
@@ -144,6 +159,9 @@ describe('loadSandboxConfig', () => {
       mockedCommandExistsSync.mockReturnValue(true); // all commands exist
       const config = await loadSandboxConfig({}, { sandbox: true });
       expect(config).toEqual({
+        enabled: true,
+        allowedPaths: [],
+        networkAccess: false,
         command: 'sandbox-exec',
         image: 'default/image',
       });
@@ -153,14 +171,26 @@ describe('loadSandboxConfig', () => {
       mockedOsPlatform.mockReturnValue('linux');
       mockedCommandExistsSync.mockImplementation((cmd) => cmd === 'docker');
       const config = await loadSandboxConfig({ tools: { sandbox: true } }, {});
-      expect(config).toEqual({ command: 'docker', image: 'default/image' });
+      expect(config).toEqual({
+        enabled: true,
+        allowedPaths: [],
+        networkAccess: false,
+        command: 'docker',
+        image: 'default/image',
+      });
     });
 
     it('should use podman if available and docker is not', async () => {
       mockedOsPlatform.mockReturnValue('linux');
       mockedCommandExistsSync.mockImplementation((cmd) => cmd === 'podman');
       const config = await loadSandboxConfig({}, { sandbox: true });
-      expect(config).toEqual({ command: 'podman', image: 'default/image' });
+      expect(config).toEqual({
+        enabled: true,
+        allowedPaths: [],
+        networkAccess: false,
+        command: 'podman',
+        image: 'default/image',
+      });
     });
 
     it('should throw if sandbox: true but no command is found', async () => {
@@ -177,7 +207,13 @@ describe('loadSandboxConfig', () => {
     it('should use the specified command if it exists', async () => {
       mockedCommandExistsSync.mockReturnValue(true);
       const config = await loadSandboxConfig({}, { sandbox: 'podman' });
-      expect(config).toEqual({ command: 'podman', image: 'default/image' });
+      expect(config).toEqual({
+        enabled: true,
+        allowedPaths: [],
+        networkAccess: false,
+        command: 'podman',
+        image: 'default/image',
+      });
       expect(mockedCommandExistsSync).toHaveBeenCalledWith('podman');
     });
 
@@ -205,14 +241,26 @@ describe('loadSandboxConfig', () => {
       process.env['GEMINI_SANDBOX'] = 'docker';
       mockedCommandExistsSync.mockReturnValue(true);
       const config = await loadSandboxConfig({}, {});
-      expect(config).toEqual({ command: 'docker', image: 'env/image' });
+      expect(config).toEqual({
+        enabled: true,
+        allowedPaths: [],
+        networkAccess: false,
+        command: 'docker',
+        image: 'env/image',
+      });
     });
 
     it('should use image from package.json if env var is not set', async () => {
       process.env['GEMINI_SANDBOX'] = 'docker';
       mockedCommandExistsSync.mockReturnValue(true);
       const config = await loadSandboxConfig({}, {});
-      expect(config).toEqual({ command: 'docker', image: 'default/image' });
+      expect(config).toEqual({
+        enabled: true,
+        allowedPaths: [],
+        networkAccess: false,
+        command: 'docker',
+        image: 'default/image',
+      });
     });
 
     it('should return undefined if command is found but no image is configured', async () => {
@@ -234,18 +282,113 @@ describe('loadSandboxConfig', () => {
       'should enable sandbox for value: %s',
       async (value) => {
         const config = await loadSandboxConfig({}, { sandbox: value });
-        expect(config).toEqual({ command: 'docker', image: 'default/image' });
+        expect(config).toEqual({
+          enabled: true,
+          allowedPaths: [],
+          networkAccess: false,
+          command: 'docker',
+          image: 'default/image',
+        });
       },
     );
 
     it.each([false, 'false', '0', undefined, null, ''])(
       'should disable sandbox for value: %s',
       async (value) => {
-        // \`null\` is not a valid type for the arg, but good to test falsiness
+        // `null` is not a valid type for the arg, but good to test falsiness
         const config = await loadSandboxConfig({}, { sandbox: value });
         expect(config).toBeUndefined();
       },
     );
+  });
+
+  describe('with SandboxConfig object in settings', () => {
+    beforeEach(() => {
+      mockedOsPlatform.mockReturnValue('linux');
+      mockedCommandExistsSync.mockImplementation((cmd) => cmd === 'docker');
+    });
+
+    it('should support object structure with enabled: true', async () => {
+      const config = await loadSandboxConfig(
+        {
+          tools: {
+            sandbox: {
+              enabled: true,
+              allowedPaths: ['/tmp'],
+              networkAccess: true,
+            },
+          },
+        },
+        {},
+      );
+      expect(config).toEqual({
+        enabled: true,
+        allowedPaths: ['/tmp'],
+        networkAccess: true,
+        command: 'docker',
+        image: 'default/image',
+      });
+    });
+
+    it('should support object structure with explicit command', async () => {
+      mockedCommandExistsSync.mockImplementation((cmd) => cmd === 'podman');
+      const config = await loadSandboxConfig(
+        {
+          tools: {
+            sandbox: {
+              enabled: true,
+              command: 'podman',
+            },
+          },
+        },
+        {},
+      );
+      expect(config?.command).toBe('podman');
+    });
+
+    it('should support object structure with custom image', async () => {
+      const config = await loadSandboxConfig(
+        {
+          tools: {
+            sandbox: {
+              enabled: true,
+              image: 'custom/image',
+            },
+          },
+        },
+        {},
+      );
+      expect(config?.image).toBe('custom/image');
+    });
+
+    it('should return undefined if enabled is false in object', async () => {
+      const config = await loadSandboxConfig(
+        {
+          tools: {
+            sandbox: {
+              enabled: false,
+            },
+          },
+        },
+        {},
+      );
+      expect(config).toBeUndefined();
+    });
+
+    it('should prioritize CLI flag over settings object', async () => {
+      const config = await loadSandboxConfig(
+        {
+          tools: {
+            sandbox: {
+              enabled: true,
+              allowedPaths: ['/settings-path'],
+            },
+          },
+        },
+        { sandbox: false },
+      );
+      expect(config).toBeUndefined();
+    });
   });
 
   describe('with sandbox: runsc (gVisor)', () => {
@@ -257,7 +400,13 @@ describe('loadSandboxConfig', () => {
     it('should use runsc via CLI argument on Linux', async () => {
       const config = await loadSandboxConfig({}, { sandbox: 'runsc' });
 
-      expect(config).toEqual({ command: 'runsc', image: 'default/image' });
+      expect(config).toEqual({
+        enabled: true,
+        allowedPaths: [],
+        networkAccess: false,
+        command: 'runsc',
+        image: 'default/image',
+      });
       expect(mockedCommandExistsSync).toHaveBeenCalledWith('runsc');
       expect(mockedCommandExistsSync).toHaveBeenCalledWith('docker');
     });
@@ -266,7 +415,13 @@ describe('loadSandboxConfig', () => {
       process.env['GEMINI_SANDBOX'] = 'runsc';
       const config = await loadSandboxConfig({}, {});
 
-      expect(config).toEqual({ command: 'runsc', image: 'default/image' });
+      expect(config).toEqual({
+        enabled: true,
+        allowedPaths: [],
+        networkAccess: false,
+        command: 'runsc',
+        image: 'default/image',
+      });
       expect(mockedCommandExistsSync).toHaveBeenCalledWith('runsc');
       expect(mockedCommandExistsSync).toHaveBeenCalledWith('docker');
     });
@@ -277,7 +432,13 @@ describe('loadSandboxConfig', () => {
         {},
       );
 
-      expect(config).toEqual({ command: 'runsc', image: 'default/image' });
+      expect(config).toEqual({
+        enabled: true,
+        allowedPaths: [],
+        networkAccess: false,
+        command: 'runsc',
+        image: 'default/image',
+      });
       expect(mockedCommandExistsSync).toHaveBeenCalledWith('runsc');
       expect(mockedCommandExistsSync).toHaveBeenCalledWith('docker');
     });
@@ -289,7 +450,13 @@ describe('loadSandboxConfig', () => {
         { sandbox: 'podman' },
       );
 
-      expect(config).toEqual({ command: 'runsc', image: 'default/image' });
+      expect(config).toEqual({
+        enabled: true,
+        allowedPaths: [],
+        networkAccess: false,
+        command: 'runsc',
+        image: 'default/image',
+      });
     });
 
     it('should reject runsc on macOS (Linux-only)', async () => {
