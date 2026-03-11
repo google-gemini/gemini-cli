@@ -130,10 +130,10 @@ available combinations.
 
 ## Customizing Keybindings
 
-You can customize your keybindings by creating or modifying the
+You can add alternative keybindings for commands by creating or modifying the
 `keybindings.json` file in your home gemini directory (typically
-`~/.gemini/keybindings.json`). The CLI allows you to bind specific commands to
-custom key combinations.
+`~/.gemini/keybindings.json`). This allows you to bind commands to additional
+key combinations. Note that default keybindings cannot be removed.
 
 ### Configuration Format
 
@@ -145,7 +145,7 @@ a `key` combination.
 [
   {
     "command": "input.submit",
-    "key": "ctrl+enter"
+    "key": "cmd+s"
   },
   {
     "command": "edit.clear",
