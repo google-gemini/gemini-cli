@@ -2832,7 +2832,11 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
-    const registry = new ToolRegistry(this, this.messageBus, true);
+    const registry = new ToolRegistry(
+      this,
+      this.messageBus,
+      /* isMainRegistry= */ true,
+    );
 
     // helper to create & register core tools that are enabled
     const maybeRegister = (

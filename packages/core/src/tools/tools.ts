@@ -381,6 +381,8 @@ export abstract class DeclarativeTool<
   ) {}
 
   clone(messageBus?: MessageBus): this {
+    // Note: we cannot use structuredClone() here because it does not preserve
+    // prototype chains or handle non-serializable properties (like functions).
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const cloned = Object.assign(
       Object.create(Object.getPrototypeOf(this)),
