@@ -137,6 +137,7 @@ export class KeyBinding {
     'insert',
     'numlock',
     'scrolllock',
+    'printscreen',
     'numpad_multiply',
     'numpad_add',
     'numpad_separator',

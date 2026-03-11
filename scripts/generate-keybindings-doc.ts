@@ -30,6 +30,7 @@ const OUTPUT_RELATIVE_PATH = ['docs', 'reference', 'keyboard-shortcuts.md'];
 import { formatKeyBinding } from '../packages/cli/src/ui/key/keybindingUtils.js';
 
 export interface KeybindingDocCommand {
+  command: string;
   description: string;
   bindings: readonly KeyBinding[];
 }
@@ -89,6 +90,7 @@ export function buildDefaultDocSections(): readonly KeybindingDocSection[] {
       commands: category.commands
         .filter((command) => !commandsExcludedFromAutogen.has(command))
         .map((command) => ({
+          command,
           description: commandDescriptions[command],
           bindings: defaultKeyBindingConfig.get(command) ?? [],
         })),
@@ -103,14 +105,14 @@ export function renderDocumentation(
     const rows = section.commands.map((command) => {
       const formattedBindings = formatBindings(command.bindings);
       const keysCell = formattedBindings.join('<br />');
-      return `| ${command.description} | ${keysCell} |`;
+      return `| \`${command.command}\` | ${command.description} | ${keysCell} |`;
     });
 
     return [
       `#### ${section.title}`,
       '',
-      '| Action | Keys |',
-      '| --- | --- |',
+      '| Command | Action | Keys |',
+      '| --- | --- | --- |',
       ...rows,
     ].join('\n');
   });
