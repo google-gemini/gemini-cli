@@ -77,6 +77,7 @@ const createMockTextBufferState = (
     },
     pastedContent: {},
     expandedPaste: null,
+    yankRegister: null,
     ...partial,
   };
 };
@@ -206,6 +207,14 @@ describe('useVim hook', () => {
           cursorState.pos = [row, col - 1];
         }
       }),
+      vimYankLine: vi.fn(),
+      vimYankWordForward: vi.fn(),
+      vimYankBigWordForward: vi.fn(),
+      vimYankWordEnd: vi.fn(),
+      vimYankBigWordEnd: vi.fn(),
+      vimYankToEndOfLine: vi.fn(),
+      vimPasteAfter: vi.fn(),
+      vimPasteBefore: vi.fn(),
       // Additional properties for transformations
       transformedToLogicalMaps: lines.map(() => []),
       visualToTransformedMap: [],
@@ -2385,6 +2394,207 @@ describe('useVim hook', () => {
         2,
         false,
       );
+    });
+  });
+
+  describe('Yank and paste (y/p/P)', () => {
+    it('should handle yy (yank line)', () => {
+      const { result } = renderVimHook();
+      exitInsertMode(result);
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'y' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'y' }));
+      });
+      expect(mockBuffer.vimYankLine).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle 2yy (yank 2 lines)', () => {
+      const { result } = renderVimHook();
+      exitInsertMode(result);
+      act(() => {
+        result.current.handleInput(createKey({ sequence: '2' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'y' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'y' }));
+      });
+      expect(mockBuffer.vimYankLine).toHaveBeenCalledWith(2);
+    });
+
+    it('should handle Y (yank to end of line, equivalent to y$)', () => {
+      const { result } = renderVimHook();
+      exitInsertMode(result);
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'Y' }));
+      });
+      expect(mockBuffer.vimYankToEndOfLine).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle yw (yank word forward)', () => {
+      const { result } = renderVimHook();
+      exitInsertMode(result);
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'y' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'w' }));
+      });
+      expect(mockBuffer.vimYankWordForward).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle yW (yank big word forward)', () => {
+      const { result } = renderVimHook();
+      exitInsertMode(result);
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'y' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'W' }));
+      });
+      expect(mockBuffer.vimYankBigWordForward).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle ye (yank to end of word)', () => {
+      const { result } = renderVimHook();
+      exitInsertMode(result);
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'y' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'e' }));
+      });
+      expect(mockBuffer.vimYankWordEnd).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle yE (yank to end of big word)', () => {
+      const { result } = renderVimHook();
+      exitInsertMode(result);
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'y' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'E' }));
+      });
+      expect(mockBuffer.vimYankBigWordEnd).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle y$ (yank to end of line)', () => {
+      const { result } = renderVimHook();
+      exitInsertMode(result);
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'y' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: '$' }));
+      });
+      expect(mockBuffer.vimYankToEndOfLine).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle p (paste after)', () => {
+      const { result } = renderVimHook();
+      exitInsertMode(result);
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'p' }));
+      });
+      expect(mockBuffer.vimPasteAfter).toHaveBeenCalledWith(1);
+    });
+
+    it('should handle 2p (paste after, count 2)', () => {
+      const { result } = renderVimHook();
+      exitInsertMode(result);
+      act(() => {
+        result.current.handleInput(createKey({ sequence: '2' }));
+      });
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'p' }));
+      });
+      expect(mockBuffer.vimPasteAfter).toHaveBeenCalledWith(2);
+    });
+
+    it('should handle P (paste before)', () => {
+      const { result } = renderVimHook();
+      exitInsertMode(result);
+      act(() => {
+        result.current.handleInput(createKey({ sequence: 'P' }));
+      });
+      expect(mockBuffer.vimPasteBefore).toHaveBeenCalledWith(1);
+    });
+
+    // Integration tests using actual textBufferReducer to verify full state changes
+    it('should duplicate a line below with yy then p', () => {
+      const initialState = createMockTextBufferState({
+        lines: ['hello', 'world'],
+        cursorRow: 0,
+        cursorCol: 0,
+      });
+      // Simulate yy action
+      let state = textBufferReducer(initialState, {
+        type: 'vim_yank_line',
+        payload: { count: 1 },
+      });
+      expect(state.yankRegister).toEqual({ text: 'hello', linewise: true });
+      expect(state.lines).toEqual(['hello', 'world']); // unchanged
+
+      // Simulate p action
+      state = textBufferReducer(state, {
+        type: 'vim_paste_after',
+        payload: { count: 1 },
+      });
+      expect(state.lines).toEqual(['hello', 'hello', 'world']);
+      expect(state.cursorRow).toBe(1);
+      expect(state.cursorCol).toBe(0);
+    });
+
+    it('should paste a yanked word after cursor with yw then p', () => {
+      const initialState = createMockTextBufferState({
+        lines: ['hello world'],
+        cursorRow: 0,
+        cursorCol: 0,
+      });
+      // Simulate yw action
+      let state = textBufferReducer(initialState, {
+        type: 'vim_yank_word_forward',
+        payload: { count: 1 },
+      });
+      expect(state.yankRegister).toEqual({ text: 'hello ', linewise: false });
+      expect(state.lines).toEqual(['hello world']); // unchanged
+
+      // Move cursor to col 6 (start of 'world') and paste
+      state = { ...state, cursorCol: 6 };
+      state = textBufferReducer(state, {
+        type: 'vim_paste_after',
+        payload: { count: 1 },
+      });
+      // 'hello world' with paste after col 6 (between 'w' and 'o')
+      // insert 'hello ' at col 7, result: 'hello whello orld'
+      expect(state.lines[0]).toContain('hello ');
+    });
+
+    it('should move a word forward with dw then p', () => {
+      const initialState = createMockTextBufferState({
+        lines: ['hello world'],
+        cursorRow: 0,
+        cursorCol: 0,
+      });
+      // Simulate dw (delete word, populates register)
+      let state = textBufferReducer(initialState, {
+        type: 'vim_delete_word_forward',
+        payload: { count: 1 },
+      });
+      expect(state.yankRegister).toEqual({ text: 'hello ', linewise: false });
+      expect(state.lines[0]).toBe('world');
+
+      // Paste at end of 'world' (after last char)
+      state = { ...state, cursorCol: 4 };
+      state = textBufferReducer(state, {
+        type: 'vim_paste_after',
+        payload: { count: 1 },
+      });
+      expect(state.lines[0]).toContain('hello');
     });
   });
 });
