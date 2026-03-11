@@ -469,6 +469,15 @@ export const ConfigSchema = z.object({
         .optional(),
       image: z.string().optional(),
     })
+    .superRefine((data, ctx) => {
+      if (data.enabled && !data.command) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Sandbox command is required when sandbox is enabled',
+          path: ['command'],
+        });
+      }
+    })
     .optional(),
 });
 
@@ -839,19 +848,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.fileSystemService = new StandardFileSystemService();
-    this.sandbox = params.sandbox
-      ? {
-          enabled: params.sandbox.enabled ?? false,
-          allowedPaths: params.sandbox.allowedPaths ?? [],
-          networkAccess: params.sandbox.networkAccess ?? false,
-          command: params.sandbox.command,
-          image: params.sandbox.image,
-        }
-      : {
-          enabled: false,
-          allowedPaths: [],
-          networkAccess: false,
-        };
+    this.sandbox = params.sandbox;
     this.targetDir = path.resolve(params.targetDir);
     this.folderTrust = params.folderTrust ?? false;
     this.workspaceContext = new WorkspaceContext(this.targetDir, []);

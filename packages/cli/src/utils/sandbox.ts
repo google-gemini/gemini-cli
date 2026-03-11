@@ -7,9 +7,9 @@
 import {
   exec,
   execFile,
-  execFileSync,
   execSync,
   spawn,
+  spawnSync,
   type ChildProcess,
 } from 'node:child_process';
 import path from 'node:path';
@@ -876,10 +876,10 @@ async function start_lxc_sandbox(
   const removeDevices = () => {
     for (const deviceName of devicesToRemove) {
       try {
-        execFileSync(
+        spawnSync(
           'lxc',
           ['config', 'device', 'remove', containerName, deviceName],
-          { timeout: 2000 },
+          { timeout: 1000, killSignal: 'SIGKILL', stdio: 'ignore' },
         );
       } catch {
         // Best-effort cleanup; ignore errors on exit.
