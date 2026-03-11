@@ -65,32 +65,11 @@ describe('ExtensionManager', () => {
     });
   });
 
-  afterEach(async () => {
-    // CRITICAL: Clean up child directory (tempWorkspaceDir) BEFORE parent (tempHomeDir)
-    // tempWorkspaceDir is created INSIDE tempHomeDir, so delete it first
+  afterEach(() => {
     try {
-      if (tempWorkspaceDir && fs.existsSync(tempWorkspaceDir)) {
-        // On Windows, wait for file handles to close
-        if (process.platform === 'win32') {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-        fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
-      }
-    } catch {
-      // ignore
-    }
-
-    // Now clean up parent directory (which contains tempWorkspaceDir)
-    try {
-      if (tempHomeDir && fs.existsSync(tempHomeDir)) {
-        // On Windows, wait for file handles to close
-        if (process.platform === 'win32') {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-        fs.rmSync(tempHomeDir, { recursive: true, force: true });
-      }
-    } catch {
-      // ignore
+      fs.rmSync(tempHomeDir, { recursive: true, force: true });
+    } catch (_e) {
+      // Ignore
     }
   });
 
