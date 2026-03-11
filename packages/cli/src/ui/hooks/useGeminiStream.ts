@@ -1082,9 +1082,6 @@ export const useGeminiStream = (
           'Response stopped due to prohibited image content.',
         [FinishReason.NO_IMAGE]:
           'Response stopped because no image was generated.',
-        [FinishReason.IMAGE_RECITATION]:
-          'Response stopped due to image recitation policy.',
-        [FinishReason.IMAGE_OTHER]: 'Response stopped for other image reasons.',
       };
 
       const message = finishReasonMessages[finishReason];

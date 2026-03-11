@@ -13,8 +13,6 @@ import {
   AUTH_REQUIRED_MSG,
   normalizeAgentCard,
   getGrpcCredentials,
-  pinUrlToIp,
-  splitAgentCardUrl,
 } from './a2aUtils.js';
 import type { SendMessageResult } from './a2a-client-manager.js';
 import type {
@@ -26,12 +24,6 @@ import type {
   TaskStatusUpdateEvent,
   TaskArtifactUpdateEvent,
 } from '@a2a-js/sdk';
-import * as dnsPromises from 'node:dns/promises';
-import type { LookupAddress } from 'node:dns';
-
-vi.mock('node:dns/promises', () => ({
-  lookup: vi.fn(),
-}));
 
 describe('a2aUtils', () => {
   beforeEach(() => {
@@ -51,77 +43,6 @@ describe('a2aUtils', () => {
     it('should return insecure credentials for http', () => {
       const credentials = getGrpcCredentials('http://test.agent');
       expect(credentials).toBeDefined();
-    });
-  });
-
-  describe('pinUrlToIp', () => {
-    it('should resolve and pin hostname to IP', async () => {
-      vi.mocked(
-        dnsPromises.lookup as unknown as (
-          hostname: string,
-          options: { all: true },
-        ) => Promise<LookupAddress[]>,
-      ).mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
-
-      const { pinnedUrl, hostname } = await pinUrlToIp(
-        'http://example.com:9000',
-        'test-agent',
-      );
-      expect(hostname).toBe('example.com');
-      expect(pinnedUrl).toBe('http://93.184.216.34:9000/');
-    });
-
-    it('should handle raw host:port strings (standard for gRPC)', async () => {
-      vi.mocked(
-        dnsPromises.lookup as unknown as (
-          hostname: string,
-          options: { all: true },
-        ) => Promise<LookupAddress[]>,
-      ).mockResolvedValue([{ address: '93.184.216.34', family: 4 }]);
-
-      const { pinnedUrl, hostname } = await pinUrlToIp(
-        'example.com:9000',
-        'test-agent',
-      );
-      expect(hostname).toBe('example.com');
-      expect(pinnedUrl).toBe('93.184.216.34:9000');
-    });
-
-    it('should throw error if resolution fails (fail closed)', async () => {
-      vi.mocked(dnsPromises.lookup).mockRejectedValue(new Error('DNS Error'));
-
-      await expect(
-        pinUrlToIp('http://unreachable.com', 'test-agent'),
-      ).rejects.toThrow("Failed to resolve host for agent 'test-agent'");
-    });
-
-    it('should throw error if resolved to private IP', async () => {
-      vi.mocked(
-        dnsPromises.lookup as unknown as (
-          hostname: string,
-          options: { all: true },
-        ) => Promise<LookupAddress[]>,
-      ).mockResolvedValue([{ address: '10.0.0.1', family: 4 }]);
-
-      await expect(
-        pinUrlToIp('http://malicious.com', 'test-agent'),
-      ).rejects.toThrow('resolves to private IP range');
-    });
-
-    it('should allow localhost/127.0.0.1/::1 exceptions', async () => {
-      vi.mocked(
-        dnsPromises.lookup as unknown as (
-          hostname: string,
-          options: { all: true },
-        ) => Promise<LookupAddress[]>,
-      ).mockResolvedValue([{ address: '127.0.0.1', family: 4 }]);
-
-      const { pinnedUrl, hostname } = await pinUrlToIp(
-        'http://localhost:9000',
-        'test-agent',
-      );
-      expect(hostname).toBe('localhost');
-      expect(pinnedUrl).toBe('http://127.0.0.1:9000/');
     });
   });
 
@@ -447,49 +368,6 @@ describe('a2aUtils', () => {
       };
       const normalized = normalizeAgentCard(raw);
       expect(normalized.additionalInterfaces?.[0].transport).toBe('GRPC');
-    });
-  });
-
-  describe('splitAgentCardUrl', () => {
-    const standard = '.well-known/agent-card.json';
-
-    it('should return baseUrl as-is if it does not end with standard path', () => {
-      const url = 'http://localhost:9001/custom/path';
-      expect(splitAgentCardUrl(url)).toEqual({ baseUrl: url });
-    });
-
-    it('should split correctly if URL ends with standard path', () => {
-      const url = `http://localhost:9001/${standard}`;
-      expect(splitAgentCardUrl(url)).toEqual({
-        baseUrl: 'http://localhost:9001/',
-        path: undefined,
-      });
-    });
-
-    it('should handle trailing slash in baseUrl when splitting', () => {
-      const url = `http://example.com/api/${standard}`;
-      expect(splitAgentCardUrl(url)).toEqual({
-        baseUrl: 'http://example.com/api/',
-        path: undefined,
-      });
-    });
-
-    it('should ignore hashes and query params when splitting', () => {
-      const url = `http://localhost:9001/${standard}?foo=bar#baz`;
-      expect(splitAgentCardUrl(url)).toEqual({
-        baseUrl: 'http://localhost:9001/',
-        path: undefined,
-      });
-    });
-
-    it('should return original URL if parsing fails', () => {
-      const url = 'not-a-url';
-      expect(splitAgentCardUrl(url)).toEqual({ baseUrl: url });
-    });
-
-    it('should handle standard path appearing earlier in the path', () => {
-      const url = `http://localhost:9001/${standard}/something-else`;
-      expect(splitAgentCardUrl(url)).toEqual({ baseUrl: url });
     });
   });
 

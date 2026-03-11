@@ -24,19 +24,7 @@ import {
 import { GrpcTransportFactory } from '@a2a-js/sdk/client/grpc';
 import { v4 as uuidv4 } from 'uuid';
 import { Agent as UndiciAgent } from 'undici';
-import {
-  getGrpcChannelOptions,
-  getGrpcCredentials,
-  normalizeAgentCard,
-  pinUrlToIp,
-  splitAgentCardUrl,
-} from './a2aUtils.js';
-import {
-  isPrivateIpAsync,
-  safeLookup,
-  isLoopbackHost,
-  safeFetch,
-} from '../utils/fetch.js';
+import { getGrpcCredentials, normalizeAgentCard } from './a2aUtils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { classifyAgentError } from './a2a-errors.js';
 
@@ -50,29 +38,16 @@ export type SendMessageResult =
   | TaskStatusUpdateEvent
   | TaskArtifactUpdateEvent;
 
-/**
- * Internal interface representing properties we inject into the SDK
- * to enable DNS rebinding protection for gRPC connections.
- * TODO: Replace with official SDK pinning API once available.
- */
-interface InternalGrpcExtensions {
-  target: string;
-  grpcChannelOptions: Record<string, unknown>;
-}
-
 // Remote agents can take 10+ minutes (e.g. Deep Research).
 // Use a dedicated dispatcher so the global 5-min timeout isn't affected.
 const A2A_TIMEOUT = 1800000; // 30 minutes
 const a2aDispatcher = new UndiciAgent({
   headersTimeout: A2A_TIMEOUT,
   bodyTimeout: A2A_TIMEOUT,
-  connect: {
-    // SSRF protection at the connection level (mitigates DNS rebinding)
-    lookup: safeLookup,
-  },
 });
 const a2aFetch: typeof fetch = (input, init) =>
-  safeFetch(input, { ...init, dispatcher: a2aDispatcher });
+  // @ts-expect-error The `dispatcher` property is a Node.js extension to fetch not present in standard types.
+  fetch(input, { ...init, dispatcher: a2aDispatcher });
 
 /**
  * Orchestrates communication with remote A2A agents.
@@ -139,30 +114,6 @@ export class A2AClientManager {
     const resolver = new DefaultAgentCardResolver({ fetchImpl: cardFetch });
     const agentCard = await this.resolveAgentCard(name, agentCardUrl, resolver);
 
-    // Pin URL to IP to prevent DNS rebinding for gRPC (connection-level SSRF protection)
-    const grpcInterface = agentCard.additionalInterfaces?.find(
-      (i) => i.transport === 'GRPC',
-    );
-    const urlToPin = grpcInterface?.url ?? agentCard.url;
-    const { pinnedUrl, hostname } = await pinUrlToIp(urlToPin, name);
-
-    // Prepare base gRPC options
-    const baseGrpcOptions: ConstructorParameters<
-      typeof GrpcTransportFactory
-    >[0] = {
-      grpcChannelCredentials: getGrpcCredentials(urlToPin),
-    };
-
-    // We inject additional properties into the transport options to force
-    // the use of a pinned IP address and matching SSL authority. This is
-    // required for robust DNS Rebinding protection.
-    const transportOptions = {
-      ...baseGrpcOptions,
-      target: pinnedUrl,
-      grpcChannelOptions: getGrpcChannelOptions(hostname),
-    } as ConstructorParameters<typeof GrpcTransportFactory>[0] &
-      InternalGrpcExtensions;
-
     // Configure standard SDK client for tool registration and discovery
     const clientOptions = ClientFactoryOptions.createFrom(
       ClientFactoryOptions.default,
@@ -170,11 +121,9 @@ export class A2AClientManager {
         transports: [
           new RestTransportFactory({ fetchImpl: authFetch }),
           new JsonRpcTransportFactory({ fetchImpl: authFetch }),
-          new GrpcTransportFactory(
-            transportOptions as ConstructorParameters<
-              typeof GrpcTransportFactory
-            >[0],
-          ),
+          new GrpcTransportFactory({
+            grpcChannelCredentials: getGrpcCredentials(agentCard.url),
+          }),
         ],
         cardResolver: resolver,
       },
@@ -182,8 +131,7 @@ export class A2AClientManager {
 
     try {
       const factory = new ClientFactory(clientOptions);
-      const client = await factory.createFromUrl(agentCardUrl, '');
-      const agentCard = await client.getAgentCard();
+      const client = await factory.createFromAgentCard(agentCard);
 
       this.clients.set(name, client);
       this.agentCards.set(name, agentCard);
@@ -307,65 +255,13 @@ export class A2AClientManager {
     }
   }
 
-  /**
-   * Resolves and normalizes an agent card from a given URL.
-   * Handles splitting the URL if it already contains the standard .well-known path.
-   * Also performs basic SSRF validation to prevent internal IP access.
-   */
   private async resolveAgentCard(
     agentName: string,
     url: string,
     resolver: DefaultAgentCardResolver,
   ): Promise<AgentCard> {
-    // Validate URL to prevent SSRF (with DNS resolution)
-    if (await isPrivateIpAsync(url)) {
-      // Local/private IPs are allowed ONLY for localhost for testing.
-      const parsed = new URL(url);
-      if (!isLoopbackHost(parsed.hostname)) {
-        throw new Error(
-          `Refusing to load agent '${agentName}' from private IP range: ${url}. Remote agents must use public URLs.`,
-        );
-      }
-    }
-
-    const { baseUrl, path } = splitAgentCardUrl(url);
-    const rawCard = await resolver.resolve(baseUrl, path);
+    const rawCard = await resolver.resolve(url);
     const agentCard = normalizeAgentCard(rawCard);
-
-    // Deep validation of all transport URLs within the card to prevent SSRF
-    await this.validateAgentCardUrls(agentName, agentCard);
-
     return agentCard;
-  }
-
-  /**
-   * Validates all URLs (top-level and interfaces) within an AgentCard for SSRF.
-   */
-  private async validateAgentCardUrls(
-    agentName: string,
-    card: AgentCard,
-  ): Promise<void> {
-    const urlsToValidate = [card.url];
-    if (card.additionalInterfaces) {
-      for (const intf of card.additionalInterfaces) {
-        if (intf.url) urlsToValidate.push(intf.url);
-      }
-    }
-
-    for (const url of urlsToValidate) {
-      if (!url) continue;
-
-      // Ensure URL has a scheme for the parser (gRPC often provides raw IP:port)
-      const validationUrl = url.includes('://') ? url : `http://${url}`;
-
-      if (await isPrivateIpAsync(validationUrl)) {
-        const parsed = new URL(validationUrl);
-        if (!isLoopbackHost(parsed.hostname)) {
-          throw new Error(
-            `Refusing to load agent '${agentName}': contains transport URL pointing to private IP range: ${url}.`,
-          );
-        }
-      }
-    }
   }
 }
