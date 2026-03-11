@@ -199,7 +199,7 @@ export async function startInteractiveUI(
     isAlternateBufferEnabled(config),
     config.getScreenReader(),
   );
-  const mouseEventsEnabled = !config.getScreenReader();
+  const mouseEventsEnabled = useAlternateBuffer;
   if (mouseEventsEnabled) {
     enableMouseEvents();
     registerCleanup(() => {

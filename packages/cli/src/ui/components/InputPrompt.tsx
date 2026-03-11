@@ -263,6 +263,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const wheelTimerRef = useRef<NodeJS.Timeout | null>(null);
   const innerBoxRef = useRef<DOMElement>(null);
   const hasUserNavigatedSuggestions = useRef(false);
+  const scrollBy = buffer.scrollBy;
 
   const pumpWheelQueue = useCallback(() => {
     if (pendingWheelStepsRef.current === 0) {
@@ -272,10 +273,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
     const direction: 1 | -1 = pendingWheelStepsRef.current > 0 ? 1 : -1;
     pendingWheelStepsRef.current -= direction;
-    buffer.scrollBy(direction);
+    scrollBy(direction);
 
     wheelTimerRef.current = setTimeout(pumpWheelQueue, WHEEL_TICK_MS);
-  }, [buffer]);
+  }, [scrollBy]);
 
   const enqueueWheelSteps = useCallback(
     (direction: 1 | -1) => {
