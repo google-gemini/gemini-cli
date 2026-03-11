@@ -12,6 +12,8 @@ import type {
   ConversationRecord,
   MessageRecord,
 } from '@google/gemini-cli-core';
+import type { FileChangeStats } from '../utils/rewindFileOps.js';
+import * as rewindFileOps from '../utils/rewindFileOps.js';
 
 // Mock the dependency
 vi.mock('../utils/rewindFileOps.js', () => ({
