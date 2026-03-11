@@ -149,6 +149,7 @@
             "label": "Project context (GEMINI.md)",
             "slug": "docs/cli/gemini-md"
           },
+          { "label": "Profiles", "slug": "docs/cli/profiles" },
           { "label": "Settings", "slug": "docs/cli/settings" },
           {
             "label": "System prompt override",
