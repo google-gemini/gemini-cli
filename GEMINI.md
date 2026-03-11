@@ -51,9 +51,10 @@ powerful tool for developers.
   its long runtime, only run this at the very end of a code implementation task.
   If it fails, use faster, targeted commands (e.g., `npm run test`,
   `npm run lint`, or workspace-specific tests) to iterate on fixes before
-  re-running `preflight`. For simple, non-code changes like documentation or
-  prompting updates, skip `preflight` at the end of the task and wait for PR
-  validation.)
+  re-running `preflight`. When specifically fixing build errors, CI failures, or
+  addressing PR review feedback, exhaustive validation is mandatory to prevent
+  regressions. For simple, non-code changes like documentation or prompting
+  updates, skip `preflight` at the end of the task and wait for PR validation.)
 - **Individual Checks:** `npm run lint` / `npm run format` / `npm run typecheck`
 
 ## Development Conventions
