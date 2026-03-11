@@ -97,10 +97,10 @@ export function buildArgsPatterns(
  * @returns A regex string that matches "file_path":"<path>" in a JSON string.
  */
 export function buildFilePathArgsPattern(filePath: string): string {
-  // JSON.stringify safely encodes the path (handling quotes, backslashes, etc)
-  // and wraps it in double quotes. We simply prepend the key name and escape
-  // the entire sequence for Regex matching without any slicing.
   const encodedPath = JSON.stringify(filePath);
+  // We must wrap the JSON string in escapeRegex to ensure regex control characters
+  // (like '.' in file extensions) are treated as literals, preventing overly broad
+  // matches (e.g. 'foo.ts' matching 'fooXts').
   return escapeRegex(`"file_path":${encodedPath}`);
 }
 
@@ -113,5 +113,6 @@ export function buildFilePathArgsPattern(filePath: string): string {
  */
 export function buildPatternArgsPattern(pattern: string): string {
   const encodedPattern = JSON.stringify(pattern);
+  // We use escapeRegex to ensure regex control characters are treated as literals.
   return escapeRegex(`"pattern":${encodedPattern}`);
 }
