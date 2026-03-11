@@ -23,7 +23,7 @@ and the file body for system instructions.
 ```markdown
 ---
 name: Web Developer
-default_model: gemini-2.0-flash
+default_model: gemini-3.0-flash
 extensions:
   - github
   - web-search
