@@ -11,6 +11,7 @@ import { useVimMode } from '../contexts/VimModeContext.js';
 import { debugLogger } from '@google/gemini-cli-core';
 import { Command } from '../key/keyMatchers.js';
 import { useKeyMatchers } from './useKeyMatchers.js';
+import { toCodePoints } from '../utils/textUtils.js';
 
 export type VimMode = 'NORMAL' | 'INSERT';
 
@@ -671,7 +672,7 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
           const { op, operator, count: findCount } = state.pendingFindOp;
           dispatch({ type: 'SET_PENDING_FIND_OP', pendingFindOp: undefined });
           dispatch({ type: 'CLEAR_COUNT' });
-          if (targetChar && targetChar.length === 1) {
+          if (targetChar && toCodePoints(targetChar).length === 1) {
             if (op === 'r') {
               buffer.vimReplaceChar(targetChar, findCount);
               dispatch({
