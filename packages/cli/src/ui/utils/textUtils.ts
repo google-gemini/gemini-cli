@@ -126,9 +126,10 @@ export function stripUnsafeCharacters(str: string): string {
   // C1: 0x80-0x9F
   // BiDi: U+200E (LRM), U+200F (RLM), U+202A-U+202E, U+2066-U+2069
   // Zero-width: U+200B (ZWSP), U+FEFF (BOM)
+  // U+0602: ARABIC FOOTNOTE MARKER (can crash string-width)
   return strippedVT.replace(
     // eslint-disable-next-line no-control-regex
-    /[\x00-\x08\x0B\x0C\x0E-\x1F\x80-\x9F\u200E\u200F\u202A-\u202E\u2066-\u2069\u200B\uFEFF]/g,
+    /[\x00-\x08\x0B\x0C\x0E-\x1F\x80-\x9F\u200E\u200F\u202A-\u202E\u2066-\u2069\u200B\uFEFF\u0602]/g,
     '',
   );
 }
@@ -187,7 +188,7 @@ export const getCachedStringWidth = (str: string): number => {
   } catch {
     // Fallback for characters that cause string-width to crash (e.g. U+0602)
     // See: https://github.com/google-gemini/gemini-cli/issues/16418
-    width = toCodePoints(stripAnsi(str)).length;
+    width = toCodePoints(stripUnsafeCharacters(str)).length;
   }
 
   stringWidthCache.set(str, width);
