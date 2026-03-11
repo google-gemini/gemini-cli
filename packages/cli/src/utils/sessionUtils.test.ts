@@ -341,6 +341,29 @@ describe('SessionSelector', () => {
     );
   });
 
+  it('should throw SessionError with NO_SESSIONS_FOUND when resolving latest with no sessions', async () => {
+    // Empty chats directory — no session files
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const emptyConfig = {
+      storage: {
+        getProjectTempDir: () => tmpDir,
+      },
+      getSessionId: () => 'current-session-id',
+    } as Partial<Config> as Config;
+
+    const sessionSelector = new SessionSelector(emptyConfig);
+
+    await expect(sessionSelector.resolveSession('latest')).rejects.toSatisfy(
+      (error) => {
+        expect(error).toBeInstanceOf(SessionError);
+        expect((error as SessionError).code).toBe('NO_SESSIONS_FOUND');
+        return true;
+      },
+    );
+  });
+
   it('should not list sessions with only system messages', async () => {
     const sessionIdWithUser = randomUUID();
     const sessionIdSystemOnly = randomUUID();
@@ -445,8 +468,75 @@ describe('SessionSelector', () => {
     const sessionSelector = new SessionSelector(config);
     const sessions = await sessionSelector.listSessions();
 
+    // Should list the session with gemini message
     expect(sessions.length).toBe(1);
     expect(sessions[0].id).toBe(sessionIdGeminiOnly);
+  });
+
+  it('should not list sessions marked as subagent', async () => {
+    const mainSessionId = randomUUID();
+    const subagentSessionId = randomUUID();
+
+    // Create test session files
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    // Main session - should be listed
+    const mainSession = {
+      sessionId: mainSessionId,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:30:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Hello world',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+      kind: 'main',
+    };
+
+    // Subagent session - should NOT be listed
+    const subagentSession = {
+      sessionId: subagentSessionId,
+      projectHash: 'test-hash',
+      startTime: '2024-01-01T11:00:00.000Z',
+      lastUpdated: '2024-01-01T11:30:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Internal subagent task',
+          id: 'msg1',
+          timestamp: '2024-01-01T11:00:00.000Z',
+        },
+      ],
+      kind: 'subagent',
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${mainSessionId.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(mainSession, null, 2),
+    );
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T11-00-${subagentSessionId.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(subagentSession, null, 2),
+    );
+
+    const sessionSelector = new SessionSelector(config);
+    const sessions = await sessionSelector.listSessions();
+
+    // Should only list the main session
+    expect(sessions.length).toBe(1);
+    expect(sessions[0].id).toBe(mainSessionId);
   });
 });
 

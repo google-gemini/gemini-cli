@@ -13,14 +13,24 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
+import * as fs from 'node:fs/promises';
 import {
   ExtensionRegistryClient,
   type RegistryExtension,
 } from './extensionRegistryClient.js';
-import { fetchWithTimeout } from '@google/gemini-cli-core';
+import { fetchWithTimeout, resolveToRealPath } from '@google/gemini-cli-core';
 
-vi.mock('@google/gemini-cli-core', () => ({
-  fetchWithTimeout: vi.fn(),
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    fetchWithTimeout: vi.fn(),
+  };
+});
+
+vi.mock('node:fs/promises', () => ({
+  readFile: vi.fn(),
 }));
 
 const mockExtensions: RegistryExtension[] = [
@@ -222,6 +232,89 @@ describe('ExtensionRegistryClient', () => {
 
     await expect(client.getExtensions()).rejects.toThrow(
       'Failed to fetch extensions: Not Found',
+    );
+  });
+
+  it('should not return irrelevant results', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => [
+        ...mockExtensions,
+        {
+          id: 'dataplex',
+          extensionName: 'dataplex',
+          extensionDescription: 'Connect to Dataplex Universal Catalog...',
+          fullName: 'google-cloud/dataplex',
+          rank: 6,
+          stars: 6,
+          url: '',
+          repoDescription: '',
+          lastUpdated: '',
+          extensionVersion: '1.0.0',
+          avatarUrl: '',
+          hasMCP: false,
+          hasContext: false,
+          isGoogleOwned: true,
+          licenseKey: '',
+          hasHooks: false,
+          hasCustomCommands: false,
+          hasSkills: false,
+        },
+        {
+          id: 'conductor',
+          extensionName: 'conductor',
+          extensionDescription: 'A conductor extension that actually matches.',
+          fullName: 'someone/conductor',
+          rank: 100,
+          stars: 100,
+          url: '',
+          repoDescription: '',
+          lastUpdated: '',
+          extensionVersion: '1.0.0',
+          avatarUrl: '',
+          hasMCP: false,
+          hasContext: false,
+          isGoogleOwned: false,
+          licenseKey: '',
+          hasHooks: false,
+          hasCustomCommands: false,
+          hasSkills: false,
+        },
+      ],
+    });
+
+    const results = await client.searchExtensions('conductor');
+    const ids = results.map((r) => r.id);
+
+    expect(ids).not.toContain('dataplex');
+    expect(ids).toContain('conductor');
+  });
+
+  it('should fetch extensions from a local file path', async () => {
+    const filePath = '/path/to/extensions.json';
+    const clientWithFile = new ExtensionRegistryClient(filePath);
+    const mockReadFile = vi.mocked(fs.readFile);
+    mockReadFile.mockResolvedValue(JSON.stringify(mockExtensions));
+
+    const result = await clientWithFile.getExtensions();
+    expect(result.extensions).toHaveLength(3);
+    expect(mockReadFile).toHaveBeenCalledWith(
+      resolveToRealPath(filePath),
+      'utf-8',
+    );
+  });
+
+  it('should fetch extensions from a file:// URL', async () => {
+    const fileUrl = 'file:///path/to/extensions.json';
+    const clientWithFileUrl = new ExtensionRegistryClient(fileUrl);
+    const mockReadFile = vi.mocked(fs.readFile);
+    mockReadFile.mockResolvedValue(JSON.stringify(mockExtensions));
+
+    const result = await clientWithFileUrl.getExtensions();
+    expect(result.extensions).toHaveLength(3);
+    expect(mockReadFile).toHaveBeenCalledWith(
+      resolveToRealPath(fileUrl),
+      'utf-8',
     );
   });
 });

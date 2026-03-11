@@ -6,13 +6,13 @@
 
 import { expect } from 'vitest';
 import { execSync, spawn, type ChildProcess } from 'node:child_process';
-import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import fs, { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { DEFAULT_GEMINI_MODEL, GEMINI_DIR } from '@google/gemini-cli-core';
-import fs from 'node:fs';
+export { GEMINI_DIR };
 import * as pty from '@lydell/node-pty';
 import stripAnsi from 'strip-ansi';
 import * as os from 'node:os';
@@ -208,6 +208,7 @@ export interface ParsedLog {
     stdout?: string;
     stderr?: string;
     error?: string;
+    error_type?: string;
     prompt_id?: string;
   };
   scopeMetrics?: {
@@ -497,13 +498,19 @@ export class TestRig {
     command: string;
     initialArgs: string[];
   } {
+    const binaryPath = env['INTEGRATION_TEST_GEMINI_BINARY_PATH'];
     const isNpmReleaseTest =
       env['INTEGRATION_TEST_USE_INSTALLED_GEMINI'] === 'true';
     const geminiCommand = os.platform() === 'win32' ? 'gemini.cmd' : 'gemini';
-    const command = isNpmReleaseTest ? geminiCommand : 'node';
-    const initialArgs = isNpmReleaseTest
-      ? extraInitialArgs
-      : [BUNDLE_PATH, ...extraInitialArgs];
+    let command = 'node';
+    let initialArgs = [BUNDLE_PATH, ...extraInitialArgs];
+    if (binaryPath) {
+      command = binaryPath;
+      initialArgs = extraInitialArgs;
+    } else if (isNpmReleaseTest) {
+      command = geminiCommand;
+      initialArgs = extraInitialArgs;
+    }
     if (this.fakeResponsesPath) {
       if (process.env['REGENERATE_MODEL_GOLDENS'] === 'true') {
         initialArgs.push('--record-responses', this.fakeResponsesPath);
@@ -1255,6 +1262,8 @@ export class TestRig {
         success: boolean;
         duration_ms: number;
         prompt_id?: string;
+        error?: string;
+        error_type?: string;
       };
     }[] = [];
 
@@ -1272,6 +1281,8 @@ export class TestRig {
             success: logData.attributes.success ?? false,
             duration_ms: logData.attributes.duration_ms ?? 0,
             prompt_id: logData.attributes.prompt_id,
+            error: logData.attributes.error,
+            error_type: logData.attributes.error_type,
           },
         });
       }

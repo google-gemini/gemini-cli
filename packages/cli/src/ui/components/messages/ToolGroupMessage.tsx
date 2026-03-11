@@ -18,10 +18,13 @@ import { ShellToolMessage } from './ShellToolMessage.js';
 import { theme } from '../../semantic-colors.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
 import { isShellTool } from './ToolShared.js';
-import { shouldHideToolCall } from '@google/gemini-cli-core';
-import { ShowMoreLines } from '../ShowMoreLines.js';
+import {
+  shouldHideToolCall,
+  CoreToolCallStatus,
+} from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { getToolGroupBorderAppearance } from '../../utils/borderStyles.js';
+import { useSettings } from '../../contexts/SettingsContext.js';
 
 interface ToolGroupMessageProps {
   item: HistoryItem | HistoryItemWithoutId;
@@ -31,6 +34,7 @@ interface ToolGroupMessageProps {
   onShellInputSubmit?: (input: string) => void;
   borderTop?: boolean;
   borderBottom?: boolean;
+  isExpandable?: boolean;
 }
 
 // Main component renders the border and maps the tools using ToolMessage
@@ -43,25 +47,36 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   terminalWidth,
   borderTop: borderTopOverride,
   borderBottom: borderBottomOverride,
+  isExpandable,
 }) => {
+  const settings = useSettings();
+  const isLowErrorVerbosity = settings.merged.ui?.errorVerbosity !== 'full';
+
   // Filter out tool calls that should be hidden (e.g. in-progress Ask User, or Plan Mode operations).
   const toolCalls = useMemo(
     () =>
-      allToolCalls.filter(
-        (t) =>
-          !shouldHideToolCall({
-            displayName: t.name,
-            status: t.status,
-            approvalMode: t.approvalMode,
-            hasResultDisplay: !!t.resultDisplay,
-          }),
-      ),
-    [allToolCalls],
+      allToolCalls.filter((t) => {
+        if (
+          isLowErrorVerbosity &&
+          t.status === CoreToolCallStatus.Error &&
+          !t.isClientInitiated
+        ) {
+          return false;
+        }
+
+        return !shouldHideToolCall({
+          displayName: t.name,
+          status: t.status,
+          approvalMode: t.approvalMode,
+          hasResultDisplay: !!t.resultDisplay,
+          parentCallId: t.parentCallId,
+        });
+      }),
+    [allToolCalls, isLowErrorVerbosity],
   );
 
   const config = useConfig();
   const {
-    constrainHeight,
     activePtyId,
     embeddedShellFocused,
     backgroundShells,
@@ -106,14 +121,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   const staticHeight = /* border */ 2;
 
-  // If all tools are filtered out (e.g., in-progress AskUser tools, confirming tools),
-  // only render if we need to close a border from previous
-  // tool groups. borderBottomOverride=true means we must render the closing border;
-  // undefined or false means there's nothing to display.
-  if (visibleToolCalls.length === 0 && borderBottomOverride !== true) {
-    return null;
-  }
-
   let countToolCallsWithResults = 0;
   for (const tool of visibleToolCalls) {
     if (tool.resultDisplay !== undefined && tool.resultDisplay !== '') {
@@ -134,21 +141,29 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   const contentWidth = terminalWidth - TOOL_MESSAGE_HORIZONTAL_MARGIN;
 
-  return (
-    // This box doesn't have a border even though it conceptually does because
-    // we need to allow the sticky headers to render the borders themselves so
-    // that the top border can be sticky.
+  // If all tools are filtered out (e.g., in-progress AskUser tools, low-verbosity
+  // internal errors, plan-mode hidden write/edit), we should not emit standalone
+  // border fragments. The only case where an empty group should render is the
+  // explicit "closing slice" (tools: []) used to bridge static/pending sections.
+  const isExplicitClosingSlice = allToolCalls.length === 0;
+  if (
+    visibleToolCalls.length === 0 &&
+    (!isExplicitClosingSlice || borderBottomOverride !== true)
+  ) {
+    return null;
+  }
+
+  const content = (
     <Box
       flexDirection="column"
       /*
-        This width constraint is highly important and protects us from an Ink rendering bug.
-        Since the ToolGroup can typically change rendering states frequently, it can cause
-        Ink to render the border of the box incorrectly and span multiple lines and even
-        cause tearing.
-      */
+      This width constraint is highly important and protects us from an Ink rendering bug.
+      Since the ToolGroup can typically change rendering states frequently, it can cause
+      Ink to render the border of the box incorrectly and span multiple lines and even
+      cause tearing.
+    */
       width={terminalWidth}
       paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
-      marginBottom={borderBottomOverride === false ? 0 : 1}
     >
       {visibleToolCalls.map((tool, index) => {
         const isFirst = index === 0;
@@ -165,6 +180,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               : isFirst,
           borderColor,
           borderDimColor,
+          isExpandable,
         };
 
         return (
@@ -179,34 +195,34 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             ) : (
               <ToolMessage {...commonProps} />
             )}
-            <Box
-              borderLeft={true}
-              borderRight={true}
-              borderTop={false}
-              borderBottom={false}
-              borderColor={borderColor}
-              borderDimColor={borderDimColor}
-              flexDirection="column"
-              borderStyle="round"
-              paddingLeft={1}
-              paddingRight={1}
-            >
-              {tool.outputFile && (
+            {tool.outputFile && (
+              <Box
+                borderLeft={true}
+                borderRight={true}
+                borderTop={false}
+                borderBottom={false}
+                borderColor={borderColor}
+                borderDimColor={borderDimColor}
+                flexDirection="column"
+                borderStyle="round"
+                paddingLeft={1}
+                paddingRight={1}
+              >
                 <Box>
                   <Text color={theme.text.primary}>
                     Output too long and was saved to: {tool.outputFile}
                   </Text>
                 </Box>
-              )}
-            </Box>
+              </Box>
+            )}
           </Box>
         );
       })}
       {
         /*
-              We have to keep the bottom border separate so it doesn't get
-              drawn over by the sticky header directly inside it.
-             */
+            We have to keep the bottom border separate so it doesn't get
+            drawn over by the sticky header directly inside it.
+           */
         (visibleToolCalls.length > 0 || borderBottomOverride !== undefined) && (
           <Box
             height={0}
@@ -221,9 +237,8 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           />
         )
       }
-      {(borderBottomOverride ?? true) && visibleToolCalls.length > 0 && (
-        <ShowMoreLines constrainHeight={constrainHeight} />
-      )}
     </Box>
   );
+
+  return content;
 };

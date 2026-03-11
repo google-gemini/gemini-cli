@@ -38,9 +38,11 @@ async function checkForUpdates(
   isManagedExtensionSurface: boolean,
 ) {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const currentVersion = context.extension.packageJSON.version;
 
     // Fetch extension details from the VSCode Marketplace.
+    // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
     const response = await fetch(
       'https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery',
       {
@@ -75,9 +77,12 @@ async function checkForUpdates(
       return;
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const data = await response.json();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const extension = data?.results?.[0]?.extensions?.[0];
     // The versions are sorted by date, so the first one is the latest.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const latestVersion = extension?.versions?.[0]?.version;
 
     if (

@@ -21,15 +21,18 @@ import {
   startInteractiveUI,
   getNodeMemoryArgs,
 } from './gemini.js';
-import { loadCliConfig, parseArguments } from './config/config.js';
+import {
+  loadCliConfig,
+  parseArguments,
+  type CliArgs,
+} from './config/config.js';
 import { loadSandboxConfig } from './config/sandboxConfig.js';
 import { terminalCapabilityManager } from './ui/utils/terminalCapabilityManager.js';
 import { start_sandbox } from './utils/sandbox.js';
 import { validateNonInteractiveAuth } from './validateNonInterActiveAuth.js';
 import os from 'node:os';
 import v8 from 'node:v8';
-import { type CliArgs } from './config/config.js';
-import { type LoadedSettings, loadSettings } from './config/settings.js';
+import { loadSettings, type LoadedSettings } from './config/settings.js';
 import {
   createMockConfig,
   createMockSettings,
@@ -38,6 +41,8 @@ import { appEvents, AppEvent } from './utils/events.js';
 import {
   type Config,
   type ResumedSessionData,
+  type StartupWarning,
+  WarningPriority,
   debugLogger,
   coreEvents,
   AuthType,
@@ -479,6 +484,7 @@ describe('gemini.tsx main function kitty protocol', () => {
       yolo: undefined,
       approvalMode: undefined,
       policy: undefined,
+      adminPolicy: undefined,
       allowedMcpServerNames: undefined,
       allowedTools: undefined,
       experimentalAcp: undefined,
@@ -745,6 +751,60 @@ describe('gemini.tsx main function kitty protocol', () => {
     emitFeedbackSpy.mockRestore();
   });
 
+  it('should start normally with a warning when no sessions found for resume', async () => {
+    const { SessionSelector, SessionError } = await import(
+      './utils/sessionUtils.js'
+    );
+    vi.mocked(SessionSelector).mockImplementation(
+      () =>
+        ({
+          resolveSession: vi
+            .fn()
+            .mockRejectedValue(SessionError.noSessionsFound()),
+        }) as unknown as InstanceType<typeof SessionSelector>,
+    );
+
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+    const emitFeedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: { advanced: {}, security: { auth: {} }, ui: { theme: 'test' } },
+        workspace: { settings: {} },
+        setValue: vi.fn(),
+        forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      }),
+    );
+
+    vi.mocked(parseArguments).mockResolvedValue({
+      promptInteractive: false,
+      resume: 'latest',
+    } as unknown as CliArgs);
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => true,
+        getQuestion: () => '',
+        getSandbox: () => undefined,
+      }),
+    );
+
+    await main();
+
+    // Should NOT have crashed
+    expect(processExitSpy).not.toHaveBeenCalled();
+    // Should NOT have emitted a feedback error
+    expect(emitFeedbackSpy).not.toHaveBeenCalledWith(
+      'error',
+      expect.stringContaining('Error resuming session'),
+    );
+    processExitSpy.mockRestore();
+    emitFeedbackSpy.mockRestore();
+  });
+
   it.skip('should log error when cleanupExpiredSessions fails', async () => {
     const { cleanupExpiredSessions } = await import(
       './utils/sessionCleanup.js'
@@ -957,13 +1017,18 @@ describe('gemini.tsx main function exit codes', () => {
       resume: 'invalid-session',
     } as unknown as CliArgs);
 
-    vi.mock('./utils/sessionUtils.js', () => ({
-      SessionSelector: vi.fn().mockImplementation(() => ({
-        resolveSession: vi
-          .fn()
-          .mockRejectedValue(new Error('Session not found')),
-      })),
-    }));
+    vi.mock('./utils/sessionUtils.js', async (importOriginal) => {
+      const original =
+        await importOriginal<typeof import('./utils/sessionUtils.js')>();
+      return {
+        ...original,
+        SessionSelector: vi.fn().mockImplementation(() => ({
+          resolveSession: vi
+            .fn()
+            .mockRejectedValue(new Error('Session not found')),
+        })),
+      };
+    });
 
     process.env['GEMINI_API_KEY'] = 'test-key';
     try {
@@ -1180,6 +1245,7 @@ describe('startInteractiveUI', () => {
     getProjectRoot: () => '/root',
     getScreenReader: () => false,
     getDebugMode: () => false,
+    getUseAlternateBuffer: () => true,
   });
   const mockSettings = {
     merged: {
@@ -1193,10 +1259,13 @@ describe('startInteractiveUI', () => {
       },
     },
   } as LoadedSettings;
-  const mockStartupWarnings = ['warning1'];
+  const mockStartupWarnings: StartupWarning[] = [
+    { id: 'w1', message: 'warning1', priority: WarningPriority.High },
+  ];
   const mockWorkspaceRoot = '/root';
   const mockInitializationResult = {
     authError: null,
+    accountSuspensionInfo: null,
     themeError: null,
     shouldOpenAuthDialog: false,
     geminiMdFileCount: 0,
@@ -1212,6 +1281,8 @@ describe('startInteractiveUI', () => {
     runExitCleanup: vi.fn(),
     registerSyncCleanup: vi.fn(),
     registerTelemetryConfig: vi.fn(),
+    setupSignalHandlers: vi.fn(),
+    setupTtyCheck: vi.fn(() => vi.fn()),
   }));
 
   beforeEach(() => {
@@ -1226,7 +1297,7 @@ describe('startInteractiveUI', () => {
   async function startTestInteractiveUI(
     config: Config,
     settings: LoadedSettings,
-    startupWarnings: string[],
+    startupWarnings: StartupWarning[],
     workspaceRoot: string,
     resumedSessionData: ResumedSessionData | undefined,
     initializationResult: InitializationResult,
@@ -1318,7 +1389,8 @@ describe('startInteractiveUI', () => {
 
     // Verify all startup tasks were called
     expect(getVersion).toHaveBeenCalledTimes(1);
-    expect(registerCleanup).toHaveBeenCalledTimes(4);
+    // 5 cleanups: mouseEvents, consolePatcher, lineWrapping, instance.unmount, and TTY check
+    expect(registerCleanup).toHaveBeenCalledTimes(5);
 
     // Verify cleanup handler is registered with unmount function
     const cleanupFn = vi.mocked(registerCleanup).mock.calls[0][0];

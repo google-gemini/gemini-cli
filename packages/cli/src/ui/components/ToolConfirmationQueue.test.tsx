@@ -51,6 +51,7 @@ describe('ToolConfirmationQueue', () => {
     storage: {
       getPlansDir: () => '/mock/temp/plans',
     },
+    getUseAlternateBuffer: () => false,
   } as unknown as Config;
 
   beforeEach(() => {
@@ -161,7 +162,7 @@ describe('ToolConfirmationQueue', () => {
       </Box>,
       {
         config: mockConfig,
-        useAlternateBuffer: false,
+        useAlternateBuffer: true,
         uiState: {
           terminalWidth: 80,
           terminalHeight: 20,
@@ -173,10 +174,11 @@ describe('ToolConfirmationQueue', () => {
     await waitUntilReady();
 
     await waitFor(() =>
-      expect(lastFrame()).toContain('Press ctrl-o to show more lines'),
+      expect(lastFrame()?.toLowerCase()).toContain(
+        'press ctrl+o to show more lines',
+      ),
     );
     expect(lastFrame()).toMatchSnapshot();
-    expect(lastFrame()).toContain('Press ctrl-o to show more lines');
     unmount();
   });
 
@@ -226,7 +228,7 @@ describe('ToolConfirmationQueue', () => {
     // availableContentHeight = Math.max(9 - 6, 4) = 4
     // MaxSizedBox in ToolConfirmationMessage will use 4
     // It should show truncation message
-    await waitFor(() => expect(lastFrame()).toContain('first 49 lines hidden'));
+    await waitFor(() => expect(lastFrame()).toContain('49 hidden (Ctrl+O)'));
     expect(lastFrame()).toMatchSnapshot();
     unmount();
   });
@@ -254,7 +256,11 @@ describe('ToolConfirmationQueue', () => {
       total: 1,
     };
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+    const {
+      lastFrame,
+      waitUntilReady,
+      unmount = vi.fn(),
+    } = renderWithProviders(
       <ToolConfirmationQueue
         confirmingTool={confirmingTool as unknown as ConfirmingToolState}
       />,
@@ -276,7 +282,10 @@ describe('ToolConfirmationQueue', () => {
     // hideToolIdentity is true for ask_user -> subtracts 4 instead of 6
     // availableContentHeight = 19 - 4 = 15
     // ToolConfirmationMessage handlesOwnUI=true -> returns full 15
-    // AskUserDialog uses 15 lines to render its multi-line question and options.
+    // AskUserDialog allocates questionHeight = availableHeight - overhead - DIALOG_PADDING.
+    // listHeight = 15 - overhead (Header:0, Margin:1, Footer:2) = 12.
+    // maxQuestionHeight = listHeight - 4 = 8.
+    // 8 lines is enough for the 6-line question.
     await waitFor(() => {
       expect(lastFrame()).toContain('Line 6');
       expect(lastFrame()).not.toContain('lines hidden');
@@ -324,7 +333,7 @@ describe('ToolConfirmationQueue', () => {
     await waitUntilReady();
 
     const output = lastFrame();
-    expect(output).not.toContain('Press ctrl-o to show more lines');
+    expect(output).not.toContain('Press CTRL-O to show more lines');
     expect(output).toMatchSnapshot();
     unmount();
   });

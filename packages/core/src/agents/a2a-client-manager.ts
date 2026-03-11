@@ -4,7 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { AgentCard, Message, MessageSendParams, Task } from '@a2a-js/sdk';
+import type {
+  AgentCard,
+  Message,
+  MessageSendParams,
+  Task,
+  TaskStatusUpdateEvent,
+  TaskArtifactUpdateEvent,
+} from '@a2a-js/sdk';
 import {
   type Client,
   ClientFactory,
@@ -16,9 +23,30 @@ import {
   createAuthenticatingFetchWithRetry,
 } from '@a2a-js/sdk/client';
 import { v4 as uuidv4 } from 'uuid';
+import { Agent as UndiciAgent } from 'undici';
 import { debugLogger } from '../utils/debugLogger.js';
+import { safeLookup } from '../utils/fetch.js';
+import { classifyAgentError } from './a2a-errors.js';
 
-export type SendMessageResult = Message | Task;
+// Remote agents can take 10+ minutes (e.g. Deep Research).
+// Use a dedicated dispatcher so the global 5-min timeout isn't affected.
+const A2A_TIMEOUT = 1800000; // 30 minutes
+const a2aDispatcher = new UndiciAgent({
+  headersTimeout: A2A_TIMEOUT,
+  bodyTimeout: A2A_TIMEOUT,
+  connect: {
+    lookup: safeLookup, // SSRF protection at connection level
+  },
+});
+const a2aFetch: typeof fetch = (input, init) =>
+  // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
+  fetch(input, { ...init, dispatcher: a2aDispatcher } as RequestInit);
+
+export type SendMessageResult =
+  | Message
+  | Task
+  | TaskStatusUpdateEvent
+  | TaskArtifactUpdateEvent;
 
 /**
  * Manages A2A clients and caches loaded agent information.
@@ -68,36 +96,58 @@ export class A2AClientManager {
       throw new Error(`Agent with name '${name}' is already loaded.`);
     }
 
-    let fetchImpl: typeof fetch = fetch;
+    // Authenticated fetch for API calls (transports).
+    let authFetch: typeof fetch = a2aFetch;
     if (authHandler) {
-      fetchImpl = createAuthenticatingFetchWithRetry(fetch, authHandler);
+      authFetch = createAuthenticatingFetchWithRetry(a2aFetch, authHandler);
     }
 
-    const resolver = new DefaultAgentCardResolver({ fetchImpl });
+    // Use unauthenticated fetch for the agent card unless explicitly required.
+    // Some servers reject unexpected auth headers on the card endpoint (e.g. 400).
+    const cardFetch = async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ): Promise<Response> => {
+      // Try without auth first
+      const response = await a2aFetch(input, init);
+
+      // Retry with auth if we hit a 401/403
+      if ((response.status === 401 || response.status === 403) && authFetch) {
+        return authFetch(input, init);
+      }
+
+      return response;
+    };
+
+    const resolver = new DefaultAgentCardResolver({ fetchImpl: cardFetch });
 
     const options = ClientFactoryOptions.createFrom(
       ClientFactoryOptions.default,
       {
         transports: [
-          new RestTransportFactory({ fetchImpl }),
-          new JsonRpcTransportFactory({ fetchImpl }),
+          new RestTransportFactory({ fetchImpl: authFetch }),
+          new JsonRpcTransportFactory({ fetchImpl: authFetch }),
         ],
         cardResolver: resolver,
       },
     );
 
-    const factory = new ClientFactory(options);
-    const client = await factory.createFromUrl(agentCardUrl, '');
-    const agentCard = await client.getAgentCard();
+    try {
+      const factory = new ClientFactory(options);
+      const client = await factory.createFromUrl(agentCardUrl, '');
+      const agentCard = await client.getAgentCard();
 
-    this.clients.set(name, client);
-    this.agentCards.set(name, agentCard);
+      this.clients.set(name, client);
+      this.agentCards.set(name, agentCard);
 
-    debugLogger.debug(
-      `[A2AClientManager] Loaded agent '${name}' from ${agentCardUrl}`,
-    );
+      debugLogger.debug(
+        `[A2AClientManager] Loaded agent '${name}' from ${agentCardUrl}`,
+      );
 
-    return agentCard;
+      return agentCard;
+    } catch (error: unknown) {
+      throw classifyAgentError(name, agentCardUrl, error);
+    }
   }
 
   /**
@@ -110,18 +160,18 @@ export class A2AClientManager {
   }
 
   /**
-   * Sends a message to a loaded agent.
+   * Sends a message to a loaded agent and returns a stream of responses.
    * @param agentName The name of the agent to send the message to.
    * @param message The message content.
    * @param options Optional context and task IDs to maintain conversation state.
-   * @returns The response from the agent (Message or Task).
+   * @returns An async iterable of responses from the agent (Message or Task).
    * @throws Error if the agent returns an error response.
    */
-  async sendMessage(
+  async *sendMessageStream(
     agentName: string,
     message: string,
-    options?: { contextId?: string; taskId?: string },
-  ): Promise<SendMessageResult> {
+    options?: { contextId?: string; taskId?: string; signal?: AbortSignal },
+  ): AsyncIterable<SendMessageResult> {
     const client = this.clients.get(agentName);
     if (!client) {
       throw new Error(`Agent '${agentName}' not found.`);
@@ -136,22 +186,11 @@ export class A2AClientManager {
         contextId: options?.contextId,
         taskId: options?.taskId,
       },
-      configuration: {
-        blocking: true,
-      },
     };
 
-    try {
-      return await client.sendMessage(messageParams);
-    } catch (error: unknown) {
-      const prefix = `A2AClient SendMessage Error [${agentName}]`;
-      if (error instanceof Error) {
-        throw new Error(`${prefix}: ${error.message}`, { cause: error });
-      }
-      throw new Error(
-        `${prefix}: Unexpected error during sendMessage: ${String(error)}`,
-      );
-    }
+    yield* client.sendMessageStream(messageParams, {
+      signal: options?.signal,
+    });
   }
 
   /**

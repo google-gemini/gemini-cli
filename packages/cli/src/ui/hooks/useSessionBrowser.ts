@@ -13,7 +13,11 @@ import type {
   ConversationRecord,
   ResumedSessionData,
 } from '@google/gemini-cli-core';
-import { coreEvents } from '@google/gemini-cli-core';
+import {
+  coreEvents,
+  convertSessionToClientHistory,
+  uiTelemetryService,
+} from '@google/gemini-cli-core';
 import type { SessionInfo } from '../../utils/sessionUtils.js';
 import { convertSessionToHistoryFormats } from '../../utils/sessionUtils.js';
 import type { Part } from '@google/genai';
@@ -57,6 +61,7 @@ export const useSessionBrowser = (
           const originalFilePath = path.join(chatsDir, fileName);
 
           // Load up the conversation.
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const conversation: ConversationRecord = JSON.parse(
             await fs.readFile(originalFilePath, 'utf8'),
           );
@@ -64,6 +69,7 @@ export const useSessionBrowser = (
           // Use the old session's ID to continue it.
           const existingSessionId = conversation.sessionId;
           config.setSessionId(existingSessionId);
+          uiTelemetryService.hydrate(conversation);
 
           const resumedSessionData = {
             conversation,
@@ -77,7 +83,7 @@ export const useSessionBrowser = (
           );
           await onLoadHistory(
             historyData.uiHistory,
-            historyData.clientHistory,
+            convertSessionToClientHistory(conversation.messages),
             resumedSessionData,
           );
         } catch (error) {

@@ -26,6 +26,7 @@ interface McpStatusProps {
   serverStatus: (serverName: string) => MCPServerStatus;
   authStatus: HistoryItemMcpStatus['authStatus'];
   enablementState: HistoryItemMcpStatus['enablementState'];
+  errors: Record<string, string>;
   discoveryInProgress: boolean;
   connectingServers: string[];
   showDescriptions: boolean;
@@ -41,12 +42,18 @@ export const McpStatus: React.FC<McpStatusProps> = ({
   serverStatus,
   authStatus,
   enablementState,
+  errors,
   discoveryInProgress,
   connectingServers,
   showDescriptions,
   showSchema,
 }) => {
-  const serverNames = Object.keys(servers);
+  const serverNames = Object.keys(servers).filter(
+    (serverName) =>
+      !blockedServers.some(
+        (blockedServer) => blockedServer.name === serverName,
+      ),
+  );
 
   if (serverNames.length === 0 && blockedServers.length === 0) {
     return (
@@ -80,7 +87,6 @@ export const McpStatus: React.FC<McpStatusProps> = ({
 
       <Text bold>Configured MCP servers:</Text>
       <Box height={1} />
-
       {serverNames.map((serverName) => {
         const server = servers[serverName];
         const serverTools = tools.filter(
@@ -193,6 +199,14 @@ export const McpStatus: React.FC<McpStatusProps> = ({
             )}
             {status === MCPServerStatus.DISCONNECTED && toolCount > 0 && (
               <Text> ({toolCount} tools cached)</Text>
+            )}
+
+            {errors[serverName] && (
+              <Box marginLeft={2}>
+                <Text color={theme.status.error}>
+                  Error: {errors[serverName]}
+                </Text>
+              </Box>
             )}
 
             {showDescriptions && server?.description && (

@@ -25,7 +25,7 @@ jobs:
     if: |-
       github.repository == 'google-gemini/gemini-cli' &&
       github.event_name == 'issue_comment' &&
-      contains(github.event.comment.body, '/assign')
+      (contains(github.event.comment.body, '/assign') || contains(github.event.comment.body, '/unassign'))
     runs-on: 'ubuntu-latest'
     steps:
       - name: 'Generate GitHub App Token'
@@ -38,6 +38,7 @@ jobs:
           permission-issues: 'write'
 
       - name: 'Assign issue to user'
+        if: "contains(github.event.comment.body, '/assign')"
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
         with:
           github-token: '${{ steps.generate_token.outputs.token }}'
@@ -47,6 +48,24 @@ jobs:
             const owner = context.repo.owner;
             const repo = context.repo.repo;
             const MAX_ISSUES_ASSIGNED = 3;
+
+            const issue = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+            });
+
+            const hasHelpWantedLabel = issue.data.labels.some(label => label.name === 'help wanted');
+
+            if (!hasHelpWantedLabel) {
+              await github.rest.issues.createComment({
+                owner: owner,
+                repo: repo,
+                issue_number: issueNumber,
+                body: `👋 @${commenter}, thanks for your interest in this issue! We're reserving self-assignment for issues that have been marked with the \`help wanted\` label. Feel free to check out our list of [issues that need attention](https://github.com/google-gemini/gemini-cli/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22).`
+              });
+              return;
+            }
 
             // Search for open issues already assigned to the commenter in this repo
             const { data: assignedIssues } = await github.rest.search.issuesAndPullRequests({
@@ -63,13 +82,6 @@ jobs:
               });
               return; // exit
             }
-
-            // Check if the issue is already assigned
-            const issue = await github.rest.issues.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issueNumber,
-            });
 
             if (issue.data.assignees.length > 0) {
               // Comment that it's already assigned
@@ -97,3 +109,42 @@ jobs:
               issue_number: issueNumber,
               body: `👋 @${commenter}, you've been assigned to this issue! Thank you for taking the time to contribute. Make sure to check out our [contributing guidelines](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md).`
             });
+
+      - name: 'Unassign issue from user'
+        if: "contains(github.event.comment.body, '/unassign')"
+        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
+        with:
+          github-token: '${{ steps.generate_token.outputs.token }}'
+          script: |
+            const issueNumber = context.issue.number;
+            const commenter = context.actor;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const commentBody = context.payload.comment.body.trim();
+
+            if (commentBody !== '/unassign') {
+              return;
+            }
+
+            const issue = await github.rest.issues.get({
+              owner: owner,
+              repo: repo,
+              issue_number: issueNumber,
+            });
+
+            const isAssigned = issue.data.assignees.some(assignee => assignee.login === commenter);
+
+            if (isAssigned) {
+              await github.rest.issues.removeAssignees({
+                owner: owner,
+                repo: repo,
+                issue_number: issueNumber,
+                assignees: [commenter]
+              });
+              await github.rest.issues.createComment({
+                owner: owner,
+                repo: repo,
+                issue_number: issueNumber,
+                body: `👋 @${commenter}, you have been unassigned from this issue.`
+              });
+            }

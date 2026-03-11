@@ -5,8 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { GenerateContentResponse } from '@google/genai';
-import { ApiError } from '@google/genai';
+import { ApiError, type GenerateContentResponse } from '@google/genai';
 import type { ContentGenerator } from '../core/contentGenerator.js';
 import { GeminiChat, StreamEventType, type StreamEvent } from './geminiChat.js';
 import type { Config } from '../config/config.js';
@@ -48,14 +47,20 @@ vi.mock('../utils/retry.js', async (importOriginal) => {
 });
 
 // Mock loggers
-const { mockLogContentRetry, mockLogContentRetryFailure } = vi.hoisted(() => ({
+const {
+  mockLogContentRetry,
+  mockLogContentRetryFailure,
+  mockLogNetworkRetryAttempt,
+} = vi.hoisted(() => ({
   mockLogContentRetry: vi.fn(),
   mockLogContentRetryFailure: vi.fn(),
+  mockLogNetworkRetryAttempt: vi.fn(),
 }));
 
 vi.mock('../telemetry/loggers.js', () => ({
   logContentRetry: mockLogContentRetry,
   logContentRetryFailure: mockLogContentRetryFailure,
+  logNetworkRetryAttempt: mockLogNetworkRetryAttempt,
 }));
 
 describe('GeminiChat Network Retries', () => {
@@ -94,6 +99,7 @@ describe('GeminiChat Network Retries', () => {
       getToolRegistry: vi.fn().mockReturnValue({ getTool: vi.fn() }),
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getRetryFetchErrors: vi.fn().mockReturnValue(false), // Default false
+      getMaxAttempts: vi.fn().mockReturnValue(10),
       modelConfigService: {
         getResolvedConfig: vi.fn().mockImplementation((modelConfigKey) => ({
           model: modelConfigKey.model,
@@ -185,10 +191,10 @@ describe('GeminiChat Network Retries', () => {
     expect(successChunk).toBeDefined();
 
     // Verify retry logging
-    expect(mockLogContentRetry).toHaveBeenCalledWith(
+    expect(mockLogNetworkRetryAttempt).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        error_type: 'NETWORK_ERROR',
+        error_type: 'SERVER_ERROR',
       }),
     );
   });
@@ -401,6 +407,7 @@ describe('GeminiChat Network Retries', () => {
 
     // Should only be called once (no retry)
     expect(mockContentGenerator.generateContentStream).toHaveBeenCalledTimes(1);
+    expect(mockLogContentRetryFailure).not.toHaveBeenCalled();
   });
 
   it('should retry on SSL error during stream iteration (mid-stream failure)', async () => {
@@ -473,11 +480,11 @@ describe('GeminiChat Network Retries', () => {
     );
     expect(successChunk).toBeDefined();
 
-    // Verify retry logging was called with NETWORK_ERROR type
-    expect(mockLogContentRetry).toHaveBeenCalledWith(
+    // Verify retry logging was called with network error type
+    expect(mockLogNetworkRetryAttempt).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        error_type: 'NETWORK_ERROR',
+        error_type: 'ERR_SSL_SSLV3_ALERT_BAD_RECORD_MAC',
       }),
     );
   });

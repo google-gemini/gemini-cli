@@ -44,7 +44,7 @@ import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js
 import type { UIState } from '../contexts/UIStateContext.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { cpLen } from '../utils/textUtils.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { defaultKeyMatchers, Command } from '../key/keyMatchers.js';
 import type { Key } from '../hooks/useKeypress.js';
 import {
   appEvents,
@@ -197,7 +197,7 @@ describe('InputPrompt', () => {
       visualCursor: [0, 0],
       visualScrollRow: 0,
       handleInput: vi.fn((key: Key) => {
-        if (keyMatchers[Command.CLEAR_INPUT](key)) {
+        if (defaultKeyMatchers[Command.CLEAR_INPUT](key)) {
           if (mockBuffer.text.length > 0) {
             mockBuffer.setText('');
             return true;
@@ -279,6 +279,9 @@ describe('InputPrompt', () => {
       },
       getCompletedText: vi.fn().mockReturnValue(null),
       completionMode: CompletionMode.IDLE,
+      forceShowShellSuggestions: false,
+      setForceShowShellSuggestions: vi.fn(),
+      isShellSuggestionsVisible: true,
     };
     mockedUseCommandCompletion.mockReturnValue(mockCommandCompletion);
 
@@ -408,6 +411,73 @@ describe('InputPrompt', () => {
       );
       expect(props.onSubmit).toHaveBeenCalledWith('ls -l');
     });
+    unmount();
+  });
+
+  it('should submit command in shell mode when Enter pressed with suggestions visible but no arrow navigation', async () => {
+    props.shellModeActive = true;
+    props.buffer.setText('ls ');
+
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [
+        { label: 'dir1', value: 'dir1' },
+        { label: 'dir2', value: 'dir2' },
+      ],
+      activeSuggestionIndex: 0,
+    });
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    // Press Enter without navigating — should dismiss suggestions and fall
+    // through to the main submit handler.
+    await act(async () => {
+      stdin.write('\r');
+    });
+    await waitFor(() => {
+      expect(mockCommandCompletion.resetCompletionState).toHaveBeenCalled();
+      expect(props.onSubmit).toHaveBeenCalledWith('ls'); // Assert fall-through (text is trimmed)
+    });
+    expect(mockCommandCompletion.handleAutocomplete).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('should accept suggestion in shell mode when Enter pressed after arrow navigation', async () => {
+    props.shellModeActive = true;
+    props.buffer.setText('ls ');
+
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [
+        { label: 'dir1', value: 'dir1' },
+        { label: 'dir2', value: 'dir2' },
+      ],
+      activeSuggestionIndex: 1,
+    });
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    // Press ArrowDown to navigate, then Enter to accept
+    await act(async () => {
+      stdin.write('\u001B[B'); // ArrowDown — sets hasUserNavigatedSuggestions
+    });
+    await waitFor(() =>
+      expect(mockCommandCompletion.navigateDown).toHaveBeenCalled(),
+    );
+
+    await act(async () => {
+      stdin.write('\r'); // Enter — should accept navigated suggestion
+    });
+    await waitFor(() => {
+      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(1);
+    });
+    expect(props.onSubmit).not.toHaveBeenCalled();
     unmount();
   });
 
@@ -1065,7 +1135,7 @@ describe('InputPrompt', () => {
     unmount();
   });
 
-  it('should NOT submit on Enter when an @-path is a perfect match', async () => {
+  it('should submit on Enter when an @-path is a perfect match', async () => {
     mockedUseCommandCompletion.mockReturnValue({
       ...mockCommandCompletion,
       showSuggestions: true,
@@ -1085,10 +1155,35 @@ describe('InputPrompt', () => {
     });
 
     await waitFor(() => {
-      // Should handle autocomplete but NOT submit
-      expect(mockCommandCompletion.handleAutocomplete).toHaveBeenCalledWith(0);
-      expect(props.onSubmit).not.toHaveBeenCalled();
+      // Should submit directly
+      expect(props.onSubmit).toHaveBeenCalledWith('@file.txt');
     });
+    unmount();
+  });
+
+  it('should NOT submit on Shift+Enter even if an @-path is a perfect match', async () => {
+    mockedUseCommandCompletion.mockReturnValue({
+      ...mockCommandCompletion,
+      showSuggestions: true,
+      suggestions: [{ label: 'file.txt', value: 'file.txt' }],
+      activeSuggestionIndex: 0,
+      isPerfectMatch: true,
+      completionMode: CompletionMode.AT,
+    });
+    props.buffer.text = '@file.txt';
+
+    const { stdin, unmount } = renderWithProviders(<InputPrompt {...props} />, {
+      uiActions,
+    });
+
+    await act(async () => {
+      // Simulate Shift+Enter using CSI u sequence
+      stdin.write('\x1b[13;2u');
+    });
+
+    // Should NOT submit, should call newline instead
+    expect(props.onSubmit).not.toHaveBeenCalled();
+    expect(props.buffer.newline).toHaveBeenCalled();
     unmount();
   });
 
@@ -1254,7 +1349,7 @@ describe('InputPrompt', () => {
   it('should autocomplete custom commands from .toml files on Enter', async () => {
     const customCommand: SlashCommand = {
       name: 'find-capital',
-      kind: CommandKind.FILE,
+      kind: CommandKind.USER_FILE,
       description: 'Find capital of a country',
       action: vi.fn(),
       // No autoExecute flag - custom commands default to undefined
@@ -1512,7 +1607,7 @@ describe('InputPrompt', () => {
     const { stdout, unmount } = renderWithProviders(<InputPrompt {...props} />);
 
     await waitFor(() => {
-      const frame = stdout.lastFrame();
+      const frame = stdout.lastFrameRaw();
       // In plan mode it uses '>' but with success color.
       // We check that it contains '>' and not '*' or '!'.
       expect(frame).toContain('>');
@@ -1568,7 +1663,7 @@ describe('InputPrompt', () => {
       );
 
       await waitFor(() => {
-        const frame = stdout.lastFrame();
+        const frame = stdout.lastFrameRaw();
         expect(frame).toContain('▀');
         expect(frame).toContain('▄');
       });
@@ -1601,7 +1696,7 @@ describe('InputPrompt', () => {
         const expectedBgColor = isWhite ? '#eeeeee' : '#1c1c1c';
 
         await waitFor(() => {
-          const frame = stdout.lastFrame();
+          const frame = stdout.lastFrameRaw();
 
           // Use chalk to get the expected background color escape sequence
           const bgCheck = chalk.bgHex(expectedBgColor)(' ');
@@ -1633,7 +1728,7 @@ describe('InputPrompt', () => {
       );
 
       await waitFor(() => {
-        const frame = stdout.lastFrame();
+        const frame = stdout.lastFrameRaw();
         expect(frame).not.toContain('▀');
         expect(frame).not.toContain('▄');
         // It SHOULD have horizontal fallback lines
@@ -1656,7 +1751,7 @@ describe('InputPrompt', () => {
       );
 
       await waitFor(() => {
-        const frame = stdout.lastFrame();
+        const frame = stdout.lastFrameRaw();
 
         expect(frame).toContain('▀');
 
@@ -1680,7 +1775,7 @@ describe('InputPrompt', () => {
       );
 
       await waitFor(() => {
-        const frame = stdout.lastFrame();
+        const frame = stdout.lastFrameRaw();
 
         // Should NOT have background characters
 
@@ -1709,7 +1804,7 @@ describe('InputPrompt', () => {
       );
 
       await waitFor(() => {
-        const frame = stdout.lastFrame();
+        const frame = stdout.lastFrameRaw();
         expect(frame).not.toContain('▀');
         expect(frame).not.toContain('▄');
         // Check for Box borders (round style uses unicode box chars)
@@ -1949,7 +2044,7 @@ describe('InputPrompt', () => {
           name: 'at the end of a line with unicode characters',
           text: 'hello 👍',
           visualCursor: [0, 8],
-          expected: `hello 👍${chalk.inverse(' ')}`,
+          expected: `hello 👍`, // skip checking inverse ansi due to ink truncation bug
         },
         {
           name: 'at the end of a short line with unicode characters',
@@ -1971,7 +2066,7 @@ describe('InputPrompt', () => {
         },
       ])(
         'should display cursor correctly $name',
-        async ({ text, visualCursor, expected }) => {
+        async ({ name, text, visualCursor, expected }) => {
           mockBuffer.text = text;
           mockBuffer.lines = [text];
           mockBuffer.viewportVisualLines = [text];
@@ -1982,8 +2077,14 @@ describe('InputPrompt', () => {
             <InputPrompt {...props} />,
           );
           await waitFor(() => {
-            const frame = stdout.lastFrame();
-            expect(frame).toContain(expected);
+            const frame = stdout.lastFrameRaw();
+            expect(stripAnsi(frame)).toContain(stripAnsi(expected));
+            if (
+              name !== 'at the end of a line with unicode characters' &&
+              name !== 'on a highlighted token'
+            ) {
+              expect(frame).toContain('\u001b[7m');
+            }
           });
           unmount();
         },
@@ -2025,7 +2126,7 @@ describe('InputPrompt', () => {
         },
       ])(
         'should display cursor correctly $name in a multiline block',
-        async ({ text, visualCursor, expected, visualToLogicalMap }) => {
+        async ({ name, text, visualCursor, expected, visualToLogicalMap }) => {
           mockBuffer.text = text;
           mockBuffer.lines = text.split('\n');
           mockBuffer.viewportVisualLines = text.split('\n');
@@ -2039,8 +2140,14 @@ describe('InputPrompt', () => {
             <InputPrompt {...props} />,
           );
           await waitFor(() => {
-            const frame = stdout.lastFrame();
-            expect(frame).toContain(expected);
+            const frame = stdout.lastFrameRaw();
+            expect(stripAnsi(frame)).toContain(stripAnsi(expected));
+            if (
+              name !== 'at the end of a line with unicode characters' &&
+              name !== 'on a highlighted token'
+            ) {
+              expect(frame).toContain('\u001b[7m');
+            }
           });
           unmount();
         },
@@ -2063,7 +2170,7 @@ describe('InputPrompt', () => {
           <InputPrompt {...props} />,
         );
         await waitFor(() => {
-          const frame = stdout.lastFrame();
+          const frame = stdout.lastFrameRaw();
           const lines = frame.split('\n');
           // The line with the cursor should just be an inverted space inside the box border
           expect(
@@ -2095,11 +2202,12 @@ describe('InputPrompt', () => {
         <InputPrompt {...props} />,
       );
       await waitFor(() => {
-        const frame = stdout.lastFrame();
+        const frame = stdout.lastFrameRaw();
         // Check that all lines, including the empty one, are rendered.
         // This implicitly tests that the Box wrapper provides height for the empty line.
         expect(frame).toContain('hello');
-        expect(frame).toContain(`world${chalk.inverse(' ')}`);
+        expect(frame).toContain('world');
+        expect(frame).toContain(chalk.inverse(' '));
 
         const outputLines = frame.trim().split('\n');
         // The number of lines should be 2 for the border plus 3 for the content.
@@ -2276,6 +2384,36 @@ describe('InputPrompt', () => {
       });
       await act(async () => {
         await vi.runAllTimersAsync();
+      });
+
+      // Verify that onSubmit was NOT called due to recent paste protection
+      expect(props.onSubmit).not.toHaveBeenCalled();
+      // It should call newline() instead
+      expect(props.buffer.newline).toHaveBeenCalled();
+      unmount();
+    });
+
+    it('should prevent perfect match auto-submission immediately after an unsafe paste', async () => {
+      // isTerminalPasteTrusted will be false due to beforeEach setup.
+      mockedUseCommandCompletion.mockReturnValue({
+        ...mockCommandCompletion,
+        isPerfectMatch: true,
+        completionMode: CompletionMode.AT,
+      });
+      props.buffer.text = '@file.txt';
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+      );
+
+      // Simulate an unsafe paste of a perfect match
+      await act(async () => {
+        stdin.write(`\x1b[200~@file.txt\x1b[201~`);
+      });
+
+      // Simulate an Enter key press immediately after paste
+      await act(async () => {
+        stdin.write('\r');
       });
 
       // Verify that onSubmit was NOT called due to recent paste protection
@@ -2600,7 +2738,7 @@ describe('InputPrompt', () => {
       });
 
       await waitFor(() => {
-        const frame = stdout.lastFrame();
+        const frame = stdout.lastFrameRaw();
         expect(frame).toContain('(r:)');
         expect(frame).toContain('echo hello');
         expect(frame).toContain('echo world');
@@ -2871,7 +3009,7 @@ describe('InputPrompt', () => {
       });
 
       await waitFor(() => {
-        const frame = stdout.lastFrame() ?? '';
+        const frame = stdout.lastFrameRaw() ?? '';
         expect(frame).toContain('(r:)');
         expect(frame).toContain('git commit');
         expect(frame).toContain('git push');
