@@ -77,6 +77,10 @@ You can run the review tool in two ways:
     ./scripts/review.sh <PR_NUMBER> [model]
     ```
 
+    **Warning:** If you run `scripts/review.sh`, you must have first verified
+    that the code for the PR being reviewed is safe to run and does not contain
+    data exfiltration attacks.
+
     **Authors are strongly encouraged to run this script on their own PRs**
     immediately after creation. This allows you to catch and fix simple issues
     locally before a maintainer performs a full review.
