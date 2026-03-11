@@ -6,8 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { main } from './gemini.js';
-import { debugLogger } from '@google/gemini-cli-core';
-import { type Config } from '@google/gemini-cli-core';
+import { debugLogger, type Config } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =

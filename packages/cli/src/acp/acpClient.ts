@@ -57,15 +57,17 @@ function hasMeta(obj: unknown): obj is { _meta?: Record<string, unknown> } {
   return typeof obj === 'object' && obj !== null && '_meta' in obj;
 }
 import type { Content, Part, FunctionCall } from '@google/genai';
-import type { LoadedSettings } from '../config/settings.js';
-import { SettingScope, loadSettings } from '../config/settings.js';
+import {
+  SettingScope,
+  loadSettings,
+  type LoadedSettings,
+} from '../config/settings.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
 
 import { randomUUID } from 'node:crypto';
-import type { CliArgs } from '../config/config.js';
-import { loadCliConfig } from '../config/config.js';
+import { loadCliConfig, type CliArgs } from '../config/config.js';
 import { runExitCleanup } from '../utils/cleanup.js';
 import { SessionSelector } from '../utils/sessionUtils.js';
 

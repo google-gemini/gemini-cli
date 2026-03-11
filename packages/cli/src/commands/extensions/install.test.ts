@@ -17,8 +17,10 @@ import {
 import { handleInstall, installCommand } from './install.js';
 import yargs from 'yargs';
 import * as core from '@google/gemini-cli-core';
-import type { inferInstallMetadata } from '../../config/extension-manager.js';
-import { ExtensionManager } from '../../config/extension-manager.js';
+import {
+  ExtensionManager,
+  type inferInstallMetadata,
+} from '../../config/extension-manager.js';
 import type {
   promptForConsentNonInteractive,
   requestConsentNonInteractive,

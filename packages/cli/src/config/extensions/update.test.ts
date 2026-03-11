@@ -15,11 +15,10 @@ import {
   type ExtensionUpdateStatus,
 } from '../../ui/state/extensions.js';
 import { ExtensionStorage } from './storage.js';
-import { copyExtension } from '../extension-manager.js';
+import { copyExtension, type ExtensionManager } from '../extension-manager.js';
 import { checkForExtensionUpdate } from './github.js';
 import { loadInstallMetadata } from '../extension.js';
 import * as fs from 'node:fs';
-import type { ExtensionManager } from '../extension-manager.js';
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
 
 // Mock dependencies

@@ -4,14 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from '@google/gemini-cli-core';
-import { getErrorMessage, getMCPServerPrompts } from '@google/gemini-cli-core';
-import type {
-  CommandContext,
-  SlashCommand,
-  SlashCommandActionReturn,
+import {
+  getErrorMessage,
+  getMCPServerPrompts,
+  type Config,
+} from '@google/gemini-cli-core';
+import {
+  CommandKind,
+  type CommandContext,
+  type SlashCommand,
+  type SlashCommandActionReturn,
 } from '../ui/commands/types.js';
-import { CommandKind } from '../ui/commands/types.js';
 import type { ICommandLoader } from './types.js';
 import type { PromptArgument } from '@modelcontextprotocol/sdk/types.js';
 

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { listExtensions } from '@google/gemini-cli-core';
+import { listExtensions, type Config } from '@google/gemini-cli-core';
 import { SettingScope } from '../../config/settings.js';
 import {
   ExtensionManager,
@@ -18,7 +18,6 @@ import type {
   CommandContext,
   CommandExecutionResponse,
 } from './types.js';
-import type { Config } from '@google/gemini-cli-core';
 
 export class ExtensionsCommand implements Command {
   readonly name = 'extensions';
