@@ -1155,25 +1155,22 @@ name = "yolo-checker"
       fs.rmSync(targetExtDir, { recursive: true, force: true });
     });
 
-    it('should throw an error if the extension already exists', async () => {
+    it('should be idempotent and not throw an error if the extension already exists', async () => {
       const sourceExtDir = createExtension({
         extensionsDir: tempHomeDir,
         name: 'my-local-extension',
         version: '1.0.0',
       });
       await extensionManager.loadExtensions();
-      await extensionManager.installOrUpdateExtension({
+      const first = await extensionManager.installOrUpdateExtension({
         source: sourceExtDir,
         type: 'local',
       });
-      await expect(
-        extensionManager.installOrUpdateExtension({
-          source: sourceExtDir,
-          type: 'local',
-        }),
-      ).rejects.toThrow(
-        'Extension "my-local-extension" is already installed. Please uninstall it first.',
-      );
+      const second = await extensionManager.installOrUpdateExtension({
+        source: sourceExtDir,
+        type: 'local',
+      });
+      expect(first).toBe(second);
     });
 
     it('should throw an error and cleanup if gemini-extension.json is missing', async () => {
