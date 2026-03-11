@@ -269,14 +269,32 @@ export async function uninstallSkill(
       ? storage.getProjectSkillsDir()
       : Storage.getUserSkillsDir();
 
-  const skillPath = path.join(targetDir, name);
+  // Load all skills in the target directory to find the one with the matching name
+  const discoveredSkills = await loadSkillsFromDir(targetDir);
+  const skillToUninstall = discoveredSkills.find((s) => s.name === name);
 
-  const exists = await fs.stat(skillPath).catch(() => null);
+  if (!skillToUninstall) {
+    // Fallback: Check if a directory with the given name exists.
+    // This maintains backward compatibility for cases where the metadata might be missing or corrupted
+    // but the directory name matches the user's request.
+    const skillPath = path.resolve(targetDir, name);
 
-  if (!exists) {
-    return null;
+    // Security check: ensure the resolved path is within the target directory to prevent path traversal
+    if (!skillPath.startsWith(path.resolve(targetDir))) {
+      return null;
+    }
+
+    const exists = await fs.lstat(skillPath).catch(() => null);
+
+    if (!exists) {
+      return null;
+    }
+
+    await fs.rm(skillPath, { recursive: true, force: true });
+    return { location: skillPath };
   }
 
-  await fs.rm(skillPath, { recursive: true, force: true });
-  return { location: skillPath };
+  const skillDir = path.dirname(skillToUninstall.location);
+  await fs.rm(skillDir, { recursive: true, force: true });
+  return { location: skillDir };
 }

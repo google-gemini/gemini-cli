@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { installSkill, linkSkill } from './skillUtils.js';
+import { installSkill, linkSkill, uninstallSkill } from './skillUtils.js';
 
 describe('skillUtils', () => {
   let tempDir: string;
@@ -17,11 +17,13 @@ describe('skillUtils', () => {
   beforeEach(async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'skill-utils-test-'));
     vi.spyOn(process, 'cwd').mockReturnValue(tempDir);
+    vi.stubEnv('GEMINI_CLI_HOME', tempDir);
   });
 
   afterEach(async () => {
     await fs.rm(tempDir, { recursive: true, force: true });
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   const itif = (condition: boolean) => (condition ? it : it.skip);
@@ -211,5 +213,75 @@ describe('skillUtils', () => {
     const installedPath = path.join(tempDir, '.gemini/skills', 'test-skill');
     const installedExists = await fs.stat(installedPath).catch(() => null);
     expect(installedExists).toBeNull();
+  });
+
+  describe('uninstallSkill', () => {
+    it('should successfully uninstall an existing skill', async () => {
+      const skillsDir = path.join(tempDir, '.gemini/skills');
+      const skillDir = path.join(skillsDir, 'test-skill');
+      await fs.mkdir(skillDir, { recursive: true });
+      await fs.writeFile(
+        path.join(skillDir, 'SKILL.md'),
+        '---\nname: test-skill\ndescription: test\n---\nbody',
+      );
+
+      const result = await uninstallSkill('test-skill', 'user');
+      expect(result?.location).toContain('test-skill');
+
+      const exists = await fs.stat(skillDir).catch(() => null);
+      expect(exists).toBeNull();
+    });
+
+    it('should return null for non-existent skill', async () => {
+      const result = await uninstallSkill('non-existent', 'user');
+      expect(result).toBeNull();
+    });
+
+    itif(process.platform !== 'win32')(
+      'should successfully uninstall a skill even if its name was updated after linking',
+      async () => {
+        // 1. Create source skill
+        const sourceDir = path.join(tempDir, 'source-skill');
+        await fs.mkdir(sourceDir, { recursive: true });
+        const skillMdPath = path.join(sourceDir, 'SKILL.md');
+        await fs.writeFile(
+          skillMdPath,
+          '---\nname: original-name\ndescription: test\n---\nbody',
+        );
+
+        // 2. Link it
+        const skillsDir = path.join(tempDir, '.gemini/skills');
+        await fs.mkdir(skillsDir, { recursive: true });
+        const destPath = path.join(skillsDir, 'original-name');
+        await fs.symlink(sourceDir, destPath, 'dir');
+
+        // 3. Update name in source
+        await fs.writeFile(
+          skillMdPath,
+          '---\nname: updated-name\ndescription: test\n---\nbody',
+        );
+
+        // 4. Uninstall by NEW name (this is the bug fix)
+        const result = await uninstallSkill('updated-name', 'user');
+        expect(result).not.toBeNull();
+        expect(result?.location).toBe(destPath);
+
+        const exists = await fs.lstat(destPath).catch(() => null);
+        expect(exists).toBeNull();
+      },
+    );
+
+    it('should successfully uninstall a skill by directory name if metadata is missing (fallback)', async () => {
+      const skillsDir = path.join(tempDir, '.gemini/skills');
+      const skillDir = path.join(skillsDir, 'test-skill-dir');
+      await fs.mkdir(skillDir, { recursive: true });
+      // No SKILL.md here
+
+      const result = await uninstallSkill('test-skill-dir', 'user');
+      expect(result?.location).toBe(skillDir);
+
+      const exists = await fs.stat(skillDir).catch(() => null);
+      expect(exists).toBeNull();
+    });
   });
 });
