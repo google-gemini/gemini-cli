@@ -7,128 +7,15 @@
  */
 
 import { execSync } from 'node:child_process';
-import {
-  mkdirSync,
-  rmSync,
-  readFileSync,
-  existsSync,
-  lstatSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
-const ACTIONLINT_VERSION = '1.7.7';
-const SHELLCHECK_VERSION = '0.11.0';
-const YAMLLINT_VERSION = '1.35.1';
-
-const TEMP_DIR =
-  process.env.GEMINI_LINT_TEMP_DIR || join(tmpdir(), 'gemini-cli-linters');
-
-function getPlatformArch() {
-  const platform = process.platform;
-  const arch = process.arch;
-  if (platform === 'linux' && arch === 'x64') {
-    return {
-      actionlint: 'linux_amd64',
-      shellcheck: 'linux.x86_64',
-    };
-  }
-  if (platform === 'darwin' && arch === 'x64') {
-    return {
-      actionlint: 'darwin_amd64',
-      shellcheck: 'darwin.x86_64',
-    };
-  }
-  if (platform === 'darwin' && arch === 'arm64') {
-    return {
-      actionlint: 'darwin_arm64',
-      shellcheck: 'darwin.aarch64',
-    };
-  }
-  if (platform === 'win32' && arch === 'x64') {
-    return {
-      actionlint: 'windows_amd64',
-      // shellcheck is not used for Windows since it uses the .zip release
-      // which has a consistent name across architectures
-    };
-  }
-  throw new Error(`Unsupported platform/architecture: ${platform}/${arch}`);
-}
-
-const platformArch = getPlatformArch();
-
-const PYTHON_VENV_PATH = join(TEMP_DIR, 'python_venv');
-
-const pythonVenvPythonPath = join(
-  PYTHON_VENV_PATH,
-  process.platform === 'win32' ? 'Scripts' : 'bin',
-  process.platform === 'win32' ? 'python.exe' : 'python',
-);
 
 const isWindows = process.platform === 'win32';
 
-const actionlintCheck = isWindows
-  ? `where actionlint 2>nul`
-  : 'command -v actionlint';
-
-const actionlintInstaller = isWindows
-  ? `powershell -Command "` +
-    `New-Item -ItemType Directory -Force -Path '${TEMP_DIR}/actionlint' | Out-Null; ` +
-    `Invoke-WebRequest -Uri 'https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_${platformArch.actionlint}.zip' -OutFile '${TEMP_DIR}/.actionlint.zip'; ` +
-    `Add-Type -AssemblyName System.IO.Compression.FileSystem; ` +
-    `[System.IO.Compression.ZipFile]::ExtractToDirectory('${TEMP_DIR}/.actionlint.zip', '${TEMP_DIR}/actionlint')"`
-  : `
-      mkdir -p "${TEMP_DIR}/actionlint"
-      curl -sSLo "${TEMP_DIR}/.actionlint.tgz" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_${platformArch.actionlint}.tar.gz"
-      tar -xzf "${TEMP_DIR}/.actionlint.tgz" -C "${TEMP_DIR}/actionlint"
-    `;
-
-const shellcheckCheck = isWindows
-  ? `where shellcheck 2>nul`
-  : 'command -v shellcheck';
-
-const shellcheckInstaller = isWindows
-  ? `powershell -Command "` +
-    `Invoke-WebRequest -Uri 'https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.zip' -OutFile '${TEMP_DIR}/.shellcheck.zip'; ` +
-    `Add-Type -AssemblyName System.IO.Compression.FileSystem; ` +
-    `[System.IO.Compression.ZipFile]::ExtractToDirectory('${TEMP_DIR}/.shellcheck.zip', '${TEMP_DIR}/shellcheck')"`
-  : `
-      mkdir -p "${TEMP_DIR}/shellcheck"
-      curl -sSLo "${TEMP_DIR}/.shellcheck.txz" "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.${platformArch.shellcheck}.tar.xz"
-      tar -xf "${TEMP_DIR}/.shellcheck.txz" -C "${TEMP_DIR}/shellcheck" --strip-components=1
-    `;
-
-const yamllintCheck = isWindows
-  ? `if exist "${PYTHON_VENV_PATH}\\Scripts\\yamllint.exe" (exit 0) else (exit 1)`
-  : `test -x "${PYTHON_VENV_PATH}/bin/yamllint"`;
-
-const yamllintInstaller = isWindows
-  ? `python -m venv "${PYTHON_VENV_PATH}" && ` +
-    `"${pythonVenvPythonPath}" -m pip install --upgrade pip && ` +
-    `"${pythonVenvPythonPath}" -m pip install "yamllint==${YAMLLINT_VERSION}" --index-url https://pypi.org/simple`
-  : `
-    python3 -m venv "${PYTHON_VENV_PATH}" && \
-    "${pythonVenvPythonPath}" -m pip install --upgrade pip && \
-    "${pythonVenvPythonPath}" -m pip install "yamllint==${YAMLLINT_VERSION}" --index-url https://pypi.org/simple
-  `;
-
-/**
- * @typedef {{
- *   check: string;
- *   installer: string;
- *   run: string;
- * }}
- */
-
-/**
- * @type {{[linterName: string]: Linter}}
- */
 const LINTERS = {
   actionlint: {
-    check: actionlintCheck,
-    installer: actionlintInstaller,
+    check: isWindows ? 'where npx node-actionlint 2>nul' : 'command -v npx node-actionlint',
+    installer: 'npm install --save-dev @tktco/node-actionlint',
     run: `
-      actionlint \
+      npx node-actionlint \
         -color \
         -ignore 'SC2002:' \
         -ignore 'SC2016:' \
@@ -137,12 +24,12 @@ const LINTERS = {
     `,
   },
   shellcheck: {
-    check: shellcheckCheck,
-    installer: shellcheckInstaller,
+    check: isWindows ? 'where npx shellcheck 2>nul' : 'command -v npx shellcheck',
+    installer: 'npm install --save-dev shellcheck',
     run: `
       git ls-files | grep -E '^([^.]+|.*\\.(sh|zsh|bash))' | xargs file --mime-type \
         | grep "text/x-shellscript" | awk '{ print substr($1, 1, length($1)-1) }' \
-        | xargs shellcheck \
+        | xargs npx shellcheck \
           --check-sourced \
           --enable=all \
           --exclude=SC2002,SC2129,SC2310 \
@@ -152,30 +39,17 @@ const LINTERS = {
     `,
   },
   yamllint: {
-    check: yamllintCheck,
-    installer: yamllintInstaller,
-    run: "git ls-files | grep -E '\\.(yaml|yml)' | xargs yamllint --format github",
+    check: isWindows ? 'where npx yaml-lint 2>nul' : 'command -v npx yaml-lint',
+    installer: 'npm install --save-dev yaml-lint',
+    run: isWindows
+      ? `powershell -Command "Get-ChildItem -Recurse -Include *.yaml,*.yml | ForEach-Object { npx yaml-lint $_.FullName }"`
+      : "git ls-files | grep -E '\\.(yaml|yml)' | xargs npx yaml-lint",
   },
 };
 
 function runCommand(command, stdio = 'inherit') {
   try {
-    const env = { ...process.env };
-    const nodeBin = join(process.cwd(), 'node_modules', '.bin');
-    const sep = isWindows ? ';' : ':';
-    const pythonBin = isWindows
-      ? join(PYTHON_VENV_PATH, 'Scripts')
-      : join(PYTHON_VENV_PATH, 'bin');
-    // Windows sometimes uses 'Path' instead of 'PATH'
-    const pathKey = 'Path' in env ? 'Path' : 'PATH';
-    env[pathKey] = [
-      nodeBin,
-      join(TEMP_DIR, 'actionlint'),
-      join(TEMP_DIR, 'shellcheck'),
-      pythonBin,
-      env[pathKey],
-    ].join(sep);
-    execSync(command, { stdio, env, shell: true });
+    execSync(command, { stdio, env: process.env, shell: true });
     return true;
   } catch (_e) {
     return false;
@@ -184,11 +58,7 @@ function runCommand(command, stdio = 'inherit') {
 
 export function setupLinters() {
   console.log('Setting up linters...');
-  if (!process.env.GEMINI_LINT_TEMP_DIR) {
-    rmSync(TEMP_DIR, { recursive: true, force: true });
-  }
-  mkdirSync(TEMP_DIR, { recursive: true });
-
+  
   for (const linter in LINTERS) {
     const { check, installer } = LINTERS[linter];
     if (!runCommand(check, 'ignore')) {
