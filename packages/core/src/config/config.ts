@@ -1416,6 +1416,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.discoveryMaxDirs;
   }
 
+  getClientVersion(): string {
+    return this.clientVersion;
+  }
+
   getContentGeneratorConfig(): ContentGeneratorConfig {
     return this.contentGeneratorConfig;
   }

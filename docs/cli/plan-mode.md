@@ -272,27 +272,24 @@ argsPattern = "\"file_path\":\"[^\"]+[\\\\/]+\\.gemini[\\\\/]+plans[\\\\/]+[\\w-
 
 ## Planning workflows
 
-Plan Mode provides building blocks for structured research and design. These are
-implemented as [extensions](../extensions/index.md) using core planning tools
-like [`enter_plan_mode`](../tools/planning.md#1-enter_plan_mode-enterplanmode),
-[`exit_plan_mode`](../tools/planning.md#2-exit_plan_mode-exitplanmode), and
-[`ask_user`](../tools/ask-user.md).
+Plan Mode provides building blocks for structured research and design. Gemini
+CLI includes two built-in planning workflows to suit different project needs.
 
-### Built-in planning workflow
+### Standard
 
-The built-in planner uses an adaptive workflow to analyze your project, consult
+The standard planner uses an adaptive workflow to analyze your project, consult
 you on trade-offs via [`ask_user`](../tools/ask-user.md), and draft a plan for
-your approval.
+your approval. It is ideal for quick exploration and ad-hoc tasks.
 
-### Custom planning workflows
+### Conductor
 
-You can install or create specialized planners to suit your workflow.
+[Conductor] is a built-in methodology for spec-driven development, designed for
+managing large features and complex tasks through persistent artifacts. It
+organizes work into tracks and stores them in your project's `conductor/`
+directory.
 
-#### Conductor
-
-[Conductor] is designed for spec-driven development. It organizes work into
-"tracks" and stores persistent artifacts in your project's `conductor/`
-directory:
+Conductor leverages Plan Mode internally to ensure architectural safety during
+the design phase. To get started with Conductor, run `/conductor:setup`.
 
 - **Automate transitions:** Switches to read-only mode via
   [`enter_plan_mode`](../tools/planning.md#1-enter_plan_mode-enterplanmode).
@@ -303,10 +300,19 @@ directory:
 - **Handoff execution:** Transitions to implementation via
   [`exit_plan_mode`](../tools/planning.md#2-exit_plan_mode-exitplanmode).
 
-#### Build your own
+### Comparison of planning workflows
+
+| Feature         | Standard                           | Conductor                                         |
+| :-------------- | :--------------------------------- | :------------------------------------------------ |
+| **Persistence** | Ephemeral, session-based           | Persistent, stored in your repository             |
+| **Workflow**    | Lightweight research & design      | Structured Spec -> Plan -> Implement lifecycle    |
+| **Artifacts**   | `.md` files in a temp directory    | `spec.md`, `plan.md`, `tracks.md` in `conductor/` |
+| **Best For**    | Quick exploration and ad-hoc tasks | Major features, bug fixes, and long-running tasks |
+
+### Build your own
 
 Since Plan Mode is built on modular building blocks, you can develop your own
-custom planning workflow as an [extensions](../extensions/index.md). By
+custom planning workflow as an [extension](../extensions/index.md). By
 leveraging core tools and [custom policies](#custom-policies), you can define
 how Gemini CLI researches and stores plans for your specific domain.
 
@@ -376,5 +382,5 @@ those files are not automatically deleted and must be managed manually.
 
 [`plan.toml`]:
   https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/policy/policies/plan.toml
-[Conductor]: https://github.com/gemini-cli-extensions/conductor
+[Conductor]: ./conductor.md
 [open an issue]: https://github.com/google-gemini/gemini-cli/issues

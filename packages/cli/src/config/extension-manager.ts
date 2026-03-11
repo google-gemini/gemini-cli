@@ -7,6 +7,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { stat } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import chalk from 'chalk';
 import { ExtensionEnablementManager } from './extensions/extensionEnablement.js';
 import { type MergedSettings, SettingScope } from './settings.js';
@@ -433,8 +434,8 @@ Would you like to attempt to install via "git clone" instead?`,
               newExtensionConfig.name,
               hashValue(newExtensionConfig.name),
               getExtensionId(newExtensionConfig, installMetadata),
-              newExtensionConfig.version,
-              previousExtensionConfig.version,
+              newExtensionConfig.version ?? 'unknown',
+              previousExtensionConfig.version ?? 'unknown',
               installMetadata.type,
               CoreToolCallStatus.Success,
             ),
@@ -458,7 +459,7 @@ Would you like to attempt to install via "git clone" instead?`,
               newExtensionConfig.name,
               hashValue(newExtensionConfig.name),
               getExtensionId(newExtensionConfig, installMetadata),
-              newExtensionConfig.version,
+              newExtensionConfig.version ?? 'unknown',
               installMetadata.type,
               CoreToolCallStatus.Success,
             ),
@@ -495,8 +496,8 @@ Would you like to attempt to install via "git clone" instead?`,
             config?.name ?? '',
             hashValue(config?.name ?? ''),
             extensionId ?? '',
-            newExtensionConfig?.version ?? '',
-            previousExtensionConfig.version,
+            newExtensionConfig?.version ?? 'unknown',
+            previousExtensionConfig.version ?? 'unknown',
             installMetadata.type,
             CoreToolCallStatus.Error,
           ),
@@ -508,7 +509,7 @@ Would you like to attempt to install via "git clone" instead?`,
             newExtensionConfig?.name ?? '',
             hashValue(newExtensionConfig?.name ?? ''),
             extensionId ?? '',
-            newExtensionConfig?.version ?? '',
+            newExtensionConfig?.version ?? 'unknown',
             installMetadata.type,
             CoreToolCallStatus.Error,
           ),
@@ -611,6 +612,68 @@ Would you like to attempt to install via "git clone" instead?`,
           (ext): ext is GeminiCLIExtension => ext !== null,
         );
 
+        let builtinExtensionsDir = path.join(
+          path.dirname(fileURLToPath(import.meta.url)),
+          'extensions',
+          'builtin',
+        );
+        if (!fs.existsSync(builtinExtensionsDir)) {
+          builtinExtensionsDir = path.join(
+            path.dirname(fileURLToPath(import.meta.url)),
+            '..',
+            '..',
+            '..',
+            '..',
+            'core',
+            'src',
+            'extensions',
+            'builtin',
+          );
+        }
+
+        if (!process.env['VITEST'] && fs.existsSync(builtinExtensionsDir)) {
+          const builtinSubdirs =
+            await fs.promises.readdir(builtinExtensionsDir);
+          const builtinPromises = builtinSubdirs.map((subdir) => {
+            const extensionDir = path.join(builtinExtensionsDir, subdir);
+            return this._buildExtension(extensionDir, true);
+          });
+          const builtinResolved = await Promise.all(builtinPromises);
+
+          for (const builtinExt of builtinResolved) {
+            if (builtinExt) {
+              const existingIdx = builtExtensions.findIndex(
+                (e) => e.name === builtinExt.name,
+              );
+              if (existingIdx !== -1) {
+                // If the user has a manually installed version of the builtin extension, we migrate them.
+                const manualExt = builtExtensions[existingIdx];
+                const storage = new ExtensionStorage(
+                  manualExt.installMetadata?.type === 'link'
+                    ? manualExt.name
+                    : path.basename(manualExt.path),
+                );
+                try {
+                  await fs.promises.rm(storage.getExtensionDir(), {
+                    recursive: true,
+                    force: true,
+                  });
+                  debugLogger.debug(
+                    `Migrated to built-in extension: ${builtinExt.name}. Removed manual installation.`,
+                  );
+                } catch (e) {
+                  debugLogger.warn(
+                    `Failed to clean up manual installation of ${builtinExt.name}: ${getErrorMessage(e)}`,
+                  );
+                }
+                builtExtensions[existingIdx] = builtinExt;
+              } else {
+                builtExtensions.push(builtinExt);
+              }
+            }
+          }
+        }
+
         const seenNames = new Set<string>();
         for (const ext of builtExtensions) {
           if (seenNames.has(ext.name)) {
@@ -673,6 +736,7 @@ Would you like to attempt to install via "git clone" instead?`,
    */
   private async _buildExtension(
     extensionDir: string,
+    isBuiltin = false,
   ): Promise<GeminiCLIExtension | null> {
     try {
       const stats = await fs.promises.stat(extensionDir);
@@ -928,7 +992,9 @@ Would you like to attempt to install via "git clone" instead?`,
 
       return {
         name: config.name,
-        version: config.version,
+        version:
+          config.version ??
+          (isBuiltin ? this.telemetryConfig.getClientVersion() : 'unknown'),
         path: effectiveExtensionPath,
         contextFiles,
         installMetadata,
@@ -990,9 +1056,9 @@ Would you like to attempt to install via "git clone" instead?`,
       const configContent = await fs.promises.readFile(configFilePath, 'utf-8');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const rawConfig = JSON.parse(configContent) as ExtensionConfig;
-      if (!rawConfig.name || !rawConfig.version) {
+      if (!rawConfig.name) {
         throw new Error(
-          `Invalid configuration in ${configFilePath}: missing ${!rawConfig.name ? '"name"' : '"version"'}`,
+          `Invalid configuration in ${configFilePath}: missing "name"`,
         );
       }
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

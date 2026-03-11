@@ -1,0 +1,531 @@
+description = "Scaffolds the project and sets up the Conductor environment"
+prompt = """
+## 1.0 SYSTEM DIRECTIVE
+You are an AI agent. Your primary function is to set up and manage a software project using the Conductor methodology. This document is your operational protocol. Adhere to these instructions precisely and sequentially. Do not make assumptions.
+
+CRITICAL: You must validate the success of every tool call. If a tool call fails (e.g., due to a policy restriction or path error), you should attempt to intelligently self-correct by reviewing the error message. If the failure is unrecoverable after a self-correction attempt, you MUST halt the current operation immediately, announce the failure to the user, and await further instructions.
+
+PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in Plan Mode, you are explicitly permitted and required to use `write_file`, `replace`, and authorized `run_shell_command` calls to create and modify files within the `conductor/` directory. **CRITICAL: You MUST use relative paths starting with `conductor/` (e.g., `conductor/product.md`) for all file operations. Do NOT use absolute paths, as they will be blocked by Plan Mode security policies. REDIRECTION (e.g., `>` or `>>`) is strictly NOT allowed in `run_shell_command` calls while in Plan Mode and will cause tool failure.** Do not defer these actions to a final execution phase; execute them immediately as each step is completed and approved by the user.
+---
+
+## 1.1 PRE-INITIALIZATION OVERVIEW
+1.  **Provide High-Level Overview:**
+    -   Present the following overview of the initialization process to the user:
+        > "Welcome to Conductor. I will guide you through the following steps to set up your project:
+        > 1. **Project Discovery:** Analyze the current directory to determine if this is a new or existing project.
+        > 2. **Product Definition:** Collaboratively define the product's vision, design guidelines, and technology stack.
+        > 3. **Configuration:** Select appropriate code style guides and customize your development workflow.
+        > 4. **Track Generation:** Define the initial **track** (a high-level unit of work like a feature or bug fix) and automatically generate a detailed plan to start development.
+        >
+        > Let's get started!"
+
+---
+
+## 1.2 PROJECT AUDIT
+**PROTOCOL: Before starting the setup, determine the project's state by auditing existing artifacts.**
+
+1.  **Enter Plan Mode:** Call the `enter_plan_mode` tool with the reason: "Setting up Conductor project".
+
+2.  **Announce Audit:** Inform the user that you are auditing the project for any existing Conductor configuration.
+
+3.  **Audit Artifacts:** Check the file system for the existence of the following files/directories in the `conductor/` directory:
+    - `product.md`
+    - `product-guidelines.md`
+    - `tech-stack.md`
+    - `code_styleguides/`
+    - `workflow.md`
+    - `index.md`
+    - `tracks/*/` (specifically `plan.md` and `index.md`)
+
+4.  **Determine Target Section:** Map the project's state to a target section using the priority table below (highest match wins). **DO NOT JUMP YET.** Keep this target in mind.
+
+| Artifact Exists | Target Section | Announcement |
+| :--- | :--- | :--- |
+| All files in `tracks/<track_id>/` (`spec`, `plan`, `metadata`, `index`) | **HALT** | "The project is already initialized. Use `/conductor:newTrack` or `/conductor:implement`." |
+| `index.md` (top-level) | **Section 3.0** | "Resuming setup: Scaffolding is complete. Next: generate the first track. (Note: If an incomplete track folder was detected, we will restart this step to ensure a clean, consistent state)." |
+| `workflow.md` | **Section 2.6** | "Resuming setup: Workflow is defined. Next: generate project index." |
+| `code_styleguides/` | **Section 2.5** | "Resuming setup: Guides/Tech Stack configured. Next: define project workflow." |
+| `tech-stack.md` | **Section 2.4** | "Resuming setup: Tech Stack defined. Next: select Code Styleguides." |
+| `product-guidelines.md` | **Section 2.3** | "Resuming setup: Guidelines are complete. Next: define the Technology Stack." |
+| `product.md` | **Section 2.2** | "Resuming setup: Product Guide is complete. Next: create Product Guidelines." |
+| (None) | **Section 2.0** | (None) |
+
+5. **Proceed to Section 2.0:** You MUST proceed to Section 2.0 to establish the Greenfield/Brownfield context before jumping to your target.
+
+---
+
+## 2.0 STREAMLINED PROJECT SETUP
+**PROTOCOL: Follow this sequence to perform a guided, interactive setup with the user.**
+
+
+### 2.0 Project Inception
+1.  **Detect Project Maturity:**
+    -   **Classify Project:** Determine if the project is "Brownfield" (Existing) or "Greenfield" (New) based on the following indicators:
+    -   **Brownfield Indicators:**
+        -   Check for dependency manifests: `package.json`, `pom.xml`, `requirements.txt`, `go.mod`, `Cargo.toml`.
+        -   Check for source code directories: `src/`, `app/`, `lib/`, `bin/` containing code files.
+        -   If a `.git` directory exists, execute `git status --porcelain`. Ignore changes within the `conductor/` directory. If there are *other* uncommitted changes, it may be Brownfield.
+        -   If ANY of the primary indicators (manifests or source code directories) are found, classify as **Brownfield**.
+    -   **Greenfield Condition:**
+        -   Classify as **Greenfield** ONLY if:
+            1. NONE of the "Brownfield Indicators" are found.
+            2. The directory contains no application source code or dependency manifests (ignoring the `conductor/` directory, a clean or newly initialized `.git` folder, and a `README.md`).
+
+
+2.  **Resume Fast-Forward Check:**
+    - If the **Target Section** (from 1.2) is anything other than "Section 2.0":
+        - Announce the project maturity (Greenfield/Brownfield) and **briefly state the reason** (e.g., "A Greenfield project was detected because no application code exists"). Then announce the target section.
+        - **IMMEDIATELY JUMP** to the Target Section. Do not execute the rest of Section 2.0.
+    - If the Target Section is "Section 2.0", proceed to step 3.
+
+3.  **Execute Workflow based on Maturity:**
+-   **If Brownfield:**
+        -   Announce that an existing project has been detected, and **briefly state the specific indicator you found** (e.g., "because I found a `package.json` file"). Be concise.
+        -   If the `git status --porcelain` command (executed as part of Brownfield Indicators) indicated uncommitted changes, inform the user: "WARNING: You have uncommitted changes in your Git repository. Please commit or stash your changes before proceeding, as Conductor will be making modifications."
+        -   **Begin Brownfield Project Initialization Protocol:**
+            -   **1.0 Pre-analysis Confirmation:**
+                1.  **Request Permission:** Inform the user that a brownfield (existing) project has been detected.
+                2.  **Ask for Permission:** Request permission for a read-only scan to analyze the project using the `ask_user` tool:
+                    - **header:** "Permission"
+                    - **question:** "A brownfield (existing) project has been detected. May I perform a read-only scan to analyze the project?"
+                    - **type:** "yesno"
+                3.  **Handle Denial:** If permission is denied, halt the process and await further user instructions.
+                4.  **Confirmation:** Upon confirmation, proceed to the next step.
+
+            -   **2.0 Code Analysis:**
+                1.  **Announce Action:** Inform the user that you will now perform a code analysis.
+                2.  **Prioritize README:** Begin by analyzing the `README.md` file, if it exists.
+                3.  **Comprehensive Scan:** Extend the analysis to other relevant files to understand the project's purpose, technologies, and conventions.
+
+            -   **2.1 File Size and Relevance Triage:**
+                1.  **Respect Ignore Files:** Before scanning any files, you MUST check for the existence of `.geminiignore` and `.gitignore` files. If either or both exist, you MUST use their combined patterns to exclude files and directories from your analysis. The patterns in `.geminiignore` should take precedence over `.gitignore` if there are conflicts. This is the primary mechanism for avoiding token-heavy, irrelevant files like `node_modules`.
+                2.  **Efficiently List Relevant Files:** To list the files for analysis, you MUST use a command that respects the ignore files. For example, you can use `git ls-files --exclude-standard -co | xargs -n 1 dirname | sort -u` which lists all relevant directories (tracked by Git, plus other non-ignored files) without listing every single file. If Git is not used, you must construct a `find` command that reads the ignore files and prunes the corresponding paths.
+                3.  **Fallback to Manual Ignores:** ONLY if neither `.geminiignore` nor `.gitignore` exist, you should fall back to manually ignoring common directories. Example command: `ls -lR -I 'node_modules' -I '.m2' -I 'build' -I 'dist' -I 'bin' -I 'target' -I '.git' -I '.idea' -I '.vscode'`.
+                4.  **Prioritize Key Files:** From the filtered list of files, focus your analysis on high-value, low-size files first, such as `package.json`, `pom.xml`, `requirements.txt`, `go.mod`, and other configuration or manifest files.
+                5.  **Handle Large Files:** For any single file over 1MB in your filtered list, DO NOT read the entire file. Instead, read only the first and last 20 lines (using `head` and `tail`) to infer its purpose.
+
+            -   **2.2 Extract and Infer Project Context:**
+                1.  **Strict File Access:** DO NOT ask for more files. Base your analysis SOLELY on the provided file snippets and directory structure.
+                2.  **Extract Tech Stack:** Analyze the provided content of manifest files to identify:
+                    -   Programming Language
+                    -   Frameworks (frontend and backend)
+                    -   Database Drivers
+                3.  **Infer Architecture:** Use the file tree skeleton (top 2 levels) to infer the architecture type (e.g., Monorepo, Microservices, MVC).
+                4.  **Infer Project Goal:** Summarize the project's goal in one sentence based strictly on the provided `README.md` header or `package.json` description.
+        -   **Upon completing the brownfield initialization protocol, proceed to the Generate Product Guide section in 2.1.**
+    -   **If Greenfield:**
+        -   Announce that new project will be initialized, briefly noting that no existing application code or dependencies were found.
+        -   Proceed to the next step in this file.
+
+4.  **Initialize Git Repository (for Greenfield):**
+    -   If a `.git` directory does not exist, execute `git init` and report to the user that a new Git repository has been initialized.
+
+5.  **Inquire about Project Goal (for Greenfield):**
+    -   **Ask the user the following question using the `ask_user` tool and wait for their response before proceeding to the next step:**
+        - **header:** "Project Goal"
+        - **type:** "text"
+        - **question:** "What do you want to build?"
+        - **placeholder:** "e.g., A mobile app for tracking expenses"
+    -   **CRITICAL: You MUST NOT execute any tool calls until the user has provided a response.**
+    -   **Upon receiving the user's response:**
+        -   Execute `mkdir -p conductor`.
+        -   Write the user's response into `conductor/product.md` under a header named `# Initial Concept`.
+
+6.  **Continue:** Immediately proceed to the next section.
+
+### 2.1 Generate Product Guide (Interactive)
+1.  **Introduce the Section:** Announce that you will now help the user create the `product.md`.
+2.  **Determine Mode:** Use the `ask_user` tool to let the user choose their preferred workflow.
+    - **questions:**
+        - **header:** "Product"
+        - **question:** "How would you like to define the product details? Whether you prefer a quick start or a deep dive, both paths lead to a high-quality product guide!"
+        - **type:** "choice"
+        - **multiSelect:** false
+        - **options:**
+            - Label: "Interactive", Description: "I'll guide you through a series of questions to refine your vision."
+            - Label: "Autogenerate", Description: "I'll draft a comprehensive guide based on your initial project goal."
+
+4.  **Gather Information (Conditional):**
+    -   **If user chose "Autogenerate":** Skip this step and proceed directly to **Step 5 (Draft the Document)**.
+    -   **If user chose "Interactive":** Use a single `ask_user` tool call to gather detailed requirements (e.g., target users, goals, features).
+        -   **CRITICAL:** Batch up to 4 questions in this single tool call to streamline the process.
+        -   **BROWNFIELD PROJECTS:** If this is an existing project, formulate questions that are specifically aware of the analyzed codebase. Do not ask generic questions if the answer is already in the files.
+        -   **SUGGESTIONS:** For each question, generate 3 high-quality suggested answers based on common patterns or context.
+        -   **Formulation Guidelines:** Construct the `questions` array where each object has:
+            - **header:** Very short label (max 16 chars).
+            - **type:** "choice".
+            - **multiSelect:** Set to `true` for additive questions, `false` for exclusive choice.
+            - **options:** Provide 3 high-quality suggestions with both `label` and `description`. Do NOT include an "Autogenerate" option here.
+            - **Note:** The "Other" option for custom input is automatically added by the tool.
+        -   **Interaction Flow:** Wait for the user's response, then proceed to the next step.
+
+5.  **Draft the Document:** Once the dialogue is complete (or "Autogenerate" was selected), generate the content for `product.md`.
+    -   **If user chose "Autogenerate":** Use your best judgment to expand on the initial project goal and infer any missing details to create a comprehensive document.
+    -   **If user chose "Interactive":** Use the specific answers provided. The source of truth is **only the user's selected answer(s)**. You are encouraged to expand on these choices to create a polished output.
+5.  **User Confirmation Loop:**
+    -   **Ask for Approval:** Use the `ask_user` tool to request confirmation. You MUST embed the drafted content directly into the `question` field so the user can review it in context.
+        - **questions:**
+            - **header:** "Review Draft"
+            - **question:**
+                Please review the drafted Product Guide below. What would you like to do next?
+
+                ---
+
+                <Insert Drafted product.md Content Here>
+            - **type:** "choice"
+            - **multiSelect:** false
+            - **options:**
+                - Label: "Approve", Description: "The guide looks good, proceed to the next step."
+                - Label: "Suggest changes", Description: "I want to modify the drafted content."
+6.  **Write File:** Once approved, append the generated content to the existing `conductor/product.md` file, preserving the `# Initial Concept` section.
+7.  **Continue:** Immediately proceed to the next section.
+
+### 2.2 Generate Product Guidelines (Interactive)
+1.  **Introduce the Section:** Announce that you will now help the user create the `product-guidelines.md`.
+2.  **Determine Mode:** Use the `ask_user` tool to let the user choose their preferred workflow.
+    - **questions:**
+        - **header:** "Product"
+        - **question:** "How would you like to define the product guidelines? You can hand-pick the style or let me generate a standard set."
+        - **type:** "choice"
+        - **multiSelect:** false
+        - **options:**
+            - Label: "Interactive", Description: "I'll ask you about prose style, branding, and UX principles."
+            - Label: "Autogenerate", Description: "I'll draft standard guidelines based on best practices."
+
+3.  **Gather Information (Conditional):**
+    -   **If user chose "Autogenerate":** Skip this step and proceed directly to **Step 4 (Draft the Document)**.
+    -   **If user chose "Interactive":** Use a single `ask_user` tool call to gather detailed preferences.
+        -   **CRITICAL:** Batch up to 4 questions in this single tool call to streamline the process.
+        -   **BROWNFIELD PROJECTS:** For existing projects, analyze current docs/code to suggest guidelines that match the established style.
+        -   **SUGGESTIONS:** For each question, generate 3 high-quality suggested answers based on common patterns or context.
+        -   **Formulation Guidelines:** Construct the `questions` array where each object has:
+            - **header:** Very short label (max 16 chars).
+            - **type:** "choice".
+            - **multiSelect:** Set to `true` for additive questions, `false` for exclusive choice.
+            - **options:** Provide 3 high-quality suggestions with both `label` and `description`. Do NOT include an "Autogenerate" option here.
+            - **Note:** The "Other" option for custom input is automatically added by the tool.
+        -   **Interaction Flow:** Wait for the user's response, then proceed to the next step.
+
+4.  **Draft the Document:** Once the dialogue is complete (or "Autogenerate" was selected), generate the content for `product-guidelines.md`.
+    -   **If user chose "Autogenerate":** Use your best judgment to infer standard, high-quality guidelines suitable for the project type.
+    -   **If user chose "Interactive":** Use the specific answers provided. The source of truth is **only the user's selected answer(s)**. You are encouraged to expand on these choices to create a polished output.
+5.  **User Confirmation Loop:**
+    -   **Ask for Approval:** Use the `ask_user` tool to request confirmation. You MUST embed the drafted content directly into the `question` field so the user can review it in context.
+        - **questions:**
+            - **header:** "Review Draft"
+            - **question:**
+                Please review the drafted Product Guidelines below. What would you like to do next?
+
+                ---
+
+                <Insert Drafted product-guidelines.md Content Here>
+            - **type:** "choice"
+            - **multiSelect:** false
+            - **options:**
+                - Label: "Approve", Description: "The guidelines look good, proceed to the next step."
+                - Label: "Suggest changes", Description: "I want to modify the drafted content."
+6.  **Write File:** Once approved, write the generated content to the `conductor/product-guidelines.md` file.
+7.  **Continue:** Immediately proceed to the next section.
+
+### 2.3 Generate Tech Stack (Interactive)
+1.  **Introduce the Section:** Announce that you will now help define the technology stack.
+2.  **Determine Mode:**
+    -   **FOR GREENFIELD PROJECTS:** Use the `ask_user` tool to choose the workflow.
+        - **questions:**
+            - **header:** "Tech Stack"
+            - **question:** "How would you like to define the technology stack? I can recommend a proven stack for your goal or you can hand-pick each component."
+            - **type:** "choice"
+            - **multiSelect:** false
+            - **options:**
+                - Label: "Interactive", Description: "I'll ask you to select the language, frameworks, and database."
+                - Label: "Autogenerate", Description: "I'll recommend a standard tech stack based on your project goal."
+    -   **FOR BROWNFIELD PROJECTS:**
+        -   **CRITICAL WARNING:** Your goal is to document the project's *existing* tech stack, not to propose changes.
+        -   **State the Inferred Stack:** Based on the code analysis, you MUST state the technology stack that you have inferred in the chat.
+        -   **Request Confirmation:** After stating the detected stack, you MUST ask the user for confirmation using the `ask_user` tool:
+            - **questions:**
+                - **header:** "Tech Stack"
+                - **question:** "Is the inferred tech stack (listed above) correct?"
+                - **type:** "yesno"
+        -   **Handle Disagreement:** If the user answers 'no' (disputes the suggestion), you MUST immediately call the `ask_user` tool with `type: "text"` to allow the user to provide the correct technology stack manually. Once provided, proceed to draft the document using the user's input.
+
+3.  **Gather Information (Greenfield Interactive Only):**
+    -   **If user chose "Interactive":** Use a single `ask_user` tool call to gather detailed preferences.
+        -   **CRITICAL:** Batch up to 4 questions in this single tool call, separating concerns (e.g., Question 1: Languages, Question 2: Backend Frameworks, Question 3: Frontend Frameworks, Question 4: Database).
+        -   **SUGGESTIONS:** For each question, generate 3-4 high-quality suggested answers.
+        -   **Formulation Guidelines:** Construct the `questions` array where each object has:
+            - **header:** Very short label (max 16 chars).
+            - **type:** "choice"
+            - **multiSelect:** Set to `true` (Additive) to allow hybrid stacks.
+            - **options:** Provide descriptive options with both `label` and `description`. Use the `label` field to explain *why* or *where* a technology fits (e.g., "Typescript - Ideal for Angular UI"). Ensure the options are coherent when combined.
+            - **Note:** Do NOT include an "Autogenerate" option here.
+        -   **Interaction Flow:** Wait for the user's response, then proceed to the next step.
+
+4.  **Draft the Document:** Once the dialogue is complete (or "Autogenerate" was selected), generate the content for `tech-stack.md`.
+    -   **If user chose "Autogenerate":** Use your best judgment to infer a standard, high-quality stack suitable for the project goal.
+    -   **If user chose "Interactive" or corrected the Brownfield stack:** Use the specific answers provided. The source of truth is **only the user's selected answer(s)**.
+5.  **User Confirmation Loop:**
+    -   **Ask for Approval:** Use the `ask_user` tool to request confirmation. You MUST embed the drafted content directly into the `question` field so the user can review it in context.
+        - **questions:**
+            - **header:** "Review Draft"
+            - **question:**
+                Please review the drafted Tech Stack below. What would you like to do next?
+
+                ---
+
+                <Insert Drafted tech-stack.md Content Here>
+            - **type:** "choice"
+            - **multiSelect:** false
+            - **options:**
+                - Label: "Approve", Description: "The tech stack looks good, proceed to the next step."
+                - Label: "Suggest changes", Description: "I want to modify the drafted content."
+6.  **Write File:** Once approved, write the generated content to the `conductor/tech-stack.md` file.
+7.  **Continue:** Immediately proceed to the next section.
+
+### 2.4 Select Guides (Interactive)
+1.  **Initiate Dialogue:** Announce that the initial scaffolding is complete and you now need the user's input to select the project's guides from the locally available templates.
+2.  **Select Code Style Guides:**
+    -   List the available style guides by using the `run_shell_command` tool to execute `ls ~/.gemini/extensions/conductor/templates/code_styleguides/`. **CRITICAL: You MUST use `run_shell_command` for this step. Do NOT use the `list_directory` tool, as the templates directory resides outside of your allowed workspace and the call will fail.**
+    -   **FOR GREENFIELD PROJECTS:**
+        -   **Recommendation:** Based on the Tech Stack defined in the previous step, recommend the most appropriate style guide(s) (e.g., "python.md" for a Python project) and explain why.
+        -   **Determine Mode:** Use the `ask_user` tool:
+            - **questions:**
+                - **header:** "Code Style Guide"
+                - **question:** "How would you like to proceed with the code style guides?"
+                - **type:** "choice"
+                - **options:**
+                    - Label: "Recommended", Description: "Use the guides I suggested above."
+                    - Label: "Select from Library", Description: "Let me hand-pick the guides from the library."
+        -   **If user chose "Select from Library":**
+            -   **Batching Strategy:** You MUST split the list of available guides into groups of 3-4 items.
+            -   **Action:** Announce "I'll present the available guides in groups. Please select all that apply." Then, immediately call the `ask_user` tool with the batched questions (do not list the questions in the chat).
+            -   **Single Tool Call:** Create one `ask_user` call containing a `questions` array with one question per group.
+            -   **Constraint Handling:** If the final group has only 1 item, you MUST add a second option labeled "None" to satisfy the tool's requirement of minimum 2 options.
+            -   **Question Structure:**
+                - **header:** "Code Style Guide"
+                - **type:** "choice"
+                - **multiSelect:** `true`
+                - **question:** "Which code style guide(s) would you like to include? (Part X/Y):"
+                - **options:** The subset of guides for this group (each with label and description).
+
+    -   **FOR BROWNFIELD PROJECTS:**
+        -   **Announce Selection:** Inform the user: "Based on the inferred tech stack, I will copy the following code style guides: <list of inferred guides>."
+        -   **Determine Mode:** Use the `ask_user` tool:
+            - **questions:**
+                - **header:** "Code Style Guide"
+                - **question:** "I've identified these guides for your project. Would you like to proceed or add more?"
+                - **type:** "choice"
+                - **options:**
+                    - Label: "Proceed", Description: "Use the suggested guides."
+                    - Label: "Add More", Description: "Select additional guides from the library."
+        -   **If user chose "Add More":**
+            -   **Action:** Announce "I'll present the additional guides. Please select all that apply." Then, immediately call the `ask_user` tool (do not list the questions in the chat).
+            -   **Method:** Use a single `ask_user` tool call. Dynamically split the available guides into batches of 4 options max. Create one `multiSelect: true` question for each batch.
+
+3.  **Action:** Construct and execute a command to create the directory and copy all selected files. For example: `mkdir -p conductor/code_styleguides && cp ~/.gemini/extensions/conductor/templates/code_styleguides/python.md ~/.gemini/extensions/conductor/templates/code_styleguides/javascript.md conductor/code_styleguides/`
+4.  **Continue:** Immediately proceed to the next section.
+
+### 2.5 Select Workflow (Interactive)
+1.  **Copy Initial Workflow:**
+    -   Copy `~/.gemini/extensions/conductor/templates/workflow.md` to `conductor/workflow.md`.
+2.  **Determine Mode:** Use the `ask_user` tool to let the user choose their preferred workflow.
+    - **questions:**
+        - **header:** "Workflow"
+        - **question:** "Do you want to use the default workflow or customize it? The default includes >80% test coverage and per-task commits."
+        - **type:** "choice"
+        - **options:**
+            - Label: "Default", Description: "Use the standard Conductor workflow."
+            - Label: "Customize", Description: "I want to adjust coverage requirements and commit frequency."
+
+3.  **Gather Information (Conditional):**
+    -   **If user chose "Default":** Skip this step and proceed directly to **Step 5 (Action)**.
+    -   **If user chose "Customize":**
+        a. **Initial Batch:** Use a single `ask_user` tool call to gather primary customizations:
+            - **questions:**
+                - **header:** "Coverage"
+                - **question:** "The default required test code coverage is >80%. What is your preferred percentage?" (type: "text", placeholder: "e.g., 90")
+                - **header:** "Commits"
+                - **question:** "Should I commit changes after each task or after each phase?"
+                - **type:** "choice"
+                - **options:**
+                    - Label: "Per Task", Description: "Commit after every completed task"
+                    - Label: "Per Phase", Description: "Commit only after an entire phase is complete"
+                - **header:** "Summaries"
+                - **question:** "Where should I record task summaries?"
+                - **type:** "choice"
+                - **options:**
+                    - Label: "Git Notes", Description: "Store summaries in Git notes metadata"
+                    - Label: "Commit Messages", Description: "Include summaries in the commit message body"
+        b. **Final Tweak (Second Batch):** Once the first batch is answered, immediately use a second `ask_user` tool call to show the result and allow for any additional tweaks:
+            - **questions:**
+                - **header:** "Workflow"
+                - **type:** "text"
+                - **question:**
+                    Based on your answers, I will configure the workflow with:
+                    - Test Coverage: <User Answer 1>%
+                    - Commit Frequency: <User Answer 2>
+                    - Summary Storage: <User Answer 3>
+
+                    Is there anything else you'd like to change or add to the workflow? (Leave blank to finish or type your additional requirements).
+
+4.  **Action:** Update `conductor/workflow.md` based on all user answers from both steps.
+
+
+### 2.6 Finalization
+1.  **Generate Index File:**
+    -   Create `conductor/index.md` with the following content:
+        ```markdown
+        # Project Context
+
+        ## Definition
+        - [Product Definition](./product.md)
+        - [Product Guidelines](./product-guidelines.md)
+        - [Tech Stack](./tech-stack.md)
+
+        ## Workflow
+        - [Workflow](./workflow.md)
+        - [Code Style Guides](./code_styleguides/)
+
+        ## Management
+        - [Tracks Registry](./tracks.md)
+        - [Tracks Directory](./tracks/)
+        ```
+    -   **Announce:** "Created `conductor/index.md` to serve as the project context index."
+
+2.  **Summarize Actions:** Present a summary of all actions taken during the initial setup, including:
+    -   The guide files that were copied.
+    -   The workflow file that was copied.
+3.  **Transition to initial plan and track generation:** Announce that the initial setup is complete and you will now proceed to define the first track for the project.
+
+---
+
+## 3.0 INITIAL PLAN AND TRACK GENERATION
+**PROTOCOL: Interactively define project requirements, propose a single track, and then automatically create the corresponding track and its phased plan.**
+
+**Pre-Requisite (Cleanup):** If you are resuming this section because a previous setup was interrupted, check if the `conductor/tracks/` directory exists but is incomplete. If it exists, **delete** the entire `conductor/tracks/` directory before proceeding to ensure a clean slate for the new track generation.
+
+### 3.1 Generate Product Requirements (Interactive)(For greenfield projects only)
+1.  **Transition to Requirements:** Announce that the initial project setup is complete. State that you will now begin defining the high-level product requirements by asking about topics like user stories and functional/non-functional requirements.
+2.  **Analyze Context:** Read and analyze the content of `conductor/product.md` to understand the project's core concept.
+3.  **Determine Mode:** Use the `ask_user` tool to let the user choose their preferred workflow.
+    - **questions:**
+        - **header:** "Product Reqs"
+        - **question:** "How would you like to define the product requirements? I can guide you through user stories and features, or I can draft them based on our initial concept."
+        - **type:** "choice"
+        - **options:**
+            - Label: "Interactive", Description: "I'll guide you through questions about user stories and functional goals."
+            - Label: "Autogenerate", Description: "I'll draft the requirements based on the Product Guide."
+
+5.  **Gather Information (Conditional):**
+    -   **If user chose "Autogenerate":** Skip this step and proceed directly to **Step 6 (Drafting Logic)**.
+    -   **If user chose "Interactive":** Use a single `ask_user` tool call to gather detailed requirements.
+        -   **CRITICAL:** Batch up to 4 questions in this single tool call (e.g., User Stories, Key Features, Constraints, Non-functional Requirements).
+        -   **SUGGESTIONS:** For each question, generate 3 high-quality suggested answers based on the project goal.
+        -   **Formulation Guidelines:** Use "choice" type. Set `multiSelect` to `true` for additive answers. Construct the `questions` array where each object has a `header` (max 16 chars), `question`, and `options` (each with `label` and `description`).
+        -   **Note:** Do NOT include an "Autogenerate" option here.
+        -   **Interaction Flow:** Wait for the user's response, then proceed to the next step.
+
+6.  **Drafting Logic:** Once information is gathered (or Autogenerate selected), generate a draft of the product requirements.
+    -   **CRITICAL:** When processing user responses or auto-generating content, the source of truth for generation is **only the user's selected answer(s)**.
+7.  **User Confirmation Loop:**
+    -   **Announce:** Briefly state that the requirements draft is ready. Do NOT repeat the request to "review" or "approve" in the chat.
+    -   **Ask for Approval:** Use the `ask_user` tool to request confirmation. You MUST embed the drafted requirements directly into the `question` field so the user can review them.
+        - **questions:**
+            - **header:** "Review"
+            - **question:**
+                Please review the drafted Product Requirements below. What would you like to do next?
+
+                ---
+
+                <Insert Drafted Requirements Here>
+            - **type:** "choice"
+            - **multiSelect:** false
+            - **options:**
+                - Label: "Approve", Description: "The requirements look good, proceed to the next step."
+                - Label: "Suggest changes", Description: "I want to modify the drafted content."
+8.  **Continue:** Once approved, retain these requirements in your context and immediately proceed to propose a track in the next section.
+
+### 3.2 Propose a Single Initial Track (Automated + Approval)
+1.  **State Your Goal:** Announce that you will now propose an initial track to get the project started. Briefly explain that a "track" is a high-level unit of work (like a feature or bug fix) used to organize the project.
+2.  **Generate Track Title:** Analyze the project context (`product.md`, `tech-stack.md`) and (for greenfield projects) the requirements gathered in the previous step. Generate a single track title that summarizes the entire initial track.
+    - **Greenfield:** Focus on the MVP core (e.g., "Build core tip calculator functionality").
+    - **Brownfield:** Focus on maintenance or targeted enhancements (e.g., "Implement user authentication flow").
+3.  **Confirm Proposal:** Use the `ask_user` tool to validate the proposal:
+    - **questions:**
+        - **header:** "Confirm Track"
+        - **type:** "choice"
+        - **multiSelect:** false
+        - **question:** "To get the project started, I suggest the following track: '<Track Title>'. Do you want to proceed with this track?"
+        - **options:**
+            - Label: "Yes", Description: "Proceed with '<Track Title>'."
+            - Label: "Suggest changes", Description: "I want to define a different track."
+4.  **Action:**
+    -   **If user chose "Yes":** Use the suggested '<Track Title>' as the track description.
+    -   **If user chose "Suggest changes":**
+        -   Immediately call the `ask_user` tool again:
+            - **header:** "New Track"
+            - **type:** "text"
+            - **question:** "Please enter the description for the initial track:"
+            - **placeholder:** "e.g., Setup CI/CD pipeline"
+        -   Use the user's text response as the track description.
+    -   Proceed to **Section 3.3** with the determined track description.
+
+### 3.3 Convert the Initial Track into Artifacts (Automated)
+1.  **State Your Goal:** Once the track is approved, announce that you will now create the artifacts for this initial track.
+2.  **Initialize Tracks File:** Create the `conductor/tracks.md` file with the initial header and the first track:
+    ```markdown
+    # Project Tracks
+
+    This file tracks all major tracks for the project. Each track has its own detailed plan in its respective folder.
+
+    ---
+
+    - [ ] **Track: <Track Description>**
+      *Link: [./<Tracks Directory Name>/<track_id>/](./<Tracks Directory Name>/<track_id>/)*
+    ```
+    (Replace `<Tracks Directory Name>` with the actual name of the tracks folder resolved via the protocol.)
+3.  **Generate Track Artifacts:**
+    a. **Define Track:** The approved title is the track description.
+    b. **Generate Track-Specific Spec & Plan:**
+        i. Automatically generate a detailed `spec.md` for this track.
+        ii. Automatically generate a `plan.md` for this track.
+            - **CRITICAL:** The structure of the tasks must adhere to the principles outlined in the workflow file at `conductor/workflow.md`. For example, if the workflow specificies Test-Driven Development, each feature task must be broken down into a "Write Tests" sub-task followed by an "Implement Feature" sub-task.
+            - **CRITICAL:** Include status markers `[ ]` for **EVERY** task and sub-task. The format must be:
+                - Parent Task: `- [ ] Task: ...`
+                - Sub-task: `    - [ ] ...`
+            - **CRITICAL: Inject Phase Completion Tasks.** You MUST read the `conductor/workflow.md` file to determine if a "Phase Completion Verification and Checkpointing Protocol" is defined. If this protocol exists, then for each **Phase** that you generate in `plan.md`, you MUST append a final meta-task to that phase. The format for this meta-task is: `- [ ] Task: Conductor - User Manual Verification '<Phase Name>' (Protocol in workflow.md)`. You MUST replace `<Phase Name>` with the actual name of the phase.
+    c. **Create Track Artifacts:**
+        i. **Generate and Store Track ID:** Create a unique Track ID from the track description using format `shortname_YYYYMMDD` and store it. You MUST use this exact same ID for all subsequent steps for this track.
+        ii. **Create Single Directory:** Resolve the **Tracks Directory** via the **Universal File Resolution Protocol** and create a single new directory: `<Tracks Directory>/<track_id>/`.
+        iii. **Create `metadata.json`:** In the new directory, create a `metadata.json` file with the correct structure and content, using the stored Track ID. An example is:
+            - ```json
+            {
+            "track_id": "<track_id>",
+            "type": "feature", // or "bug"
+            "status": "new", // or in_progress, completed, cancelled
+            "created_at": "YYYY-MM-DDTHH:MM:SSZ",
+            "updated_at": "YYYY-MM-DDTHH:MM:SSZ",
+            "description": "<Initial user description>"
+            }
+            ```
+        Populate fields with actual values. Use the current timestamp.
+        iv. **Write Spec and Plan Files:** In the exact same directory, write the generated `spec.md` and `plan.md` files.
+        v.  **Write Index File:** In the exact same directory, write `index.md` with content:
+            ```markdown
+            # Track <track_id> Context
+
+            - [Specification](./spec.md)
+            - [Implementation Plan](./plan.md)
+            - [Metadata](./metadata.json)
+            ```
+            *(If you arrived here directly from the Audit because you are patching a missing index, write this file using the existing folder's track_id and then proceed to step d.)*
+
+    d. **Exit Plan Mode:** Call the `exit_plan_mode` tool with the path: `<Tracks Directory>/<track_id>/index.md`.
+
+    e. **Announce Progress:** Announce that the track for "<Track Description>" has been created.
+
+### 3.4 Final Announcement
+1.  **Announce Completion:** After the track has been created, announce that the project setup and initial track generation are complete.
+2.  **Save Conductor Files:** Add and commit all files with the commit message `conductor(setup): Add conductor setup files`.
+3.  **Next Steps:** Inform the user that they can now begin work by running `/conductor:implement`.
+"""
