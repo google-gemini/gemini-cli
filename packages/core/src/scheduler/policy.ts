@@ -26,7 +26,7 @@ import {
 import { buildFilePathArgsPattern } from '../policy/utils.js';
 import { makeRelative } from '../utils/paths.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import { EDIT_TOOL_NAMES } from '../tools/tool-names.js';
+import { EDIT_TOOL_NAMES, WEB_FETCH_TOOL_NAME } from '../tools/tool-names.js';
 import type { ValidatingToolCall } from './types.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
@@ -115,6 +115,7 @@ export async function updatePolicy(
   toolInvocation?: AnyToolInvocation,
 ): Promise<void> {
   const deps = { ...context, toolInvocation };
+
   // Mode Transitions (AUTO_EDIT)
   if (isAutoEditTransition(tool, outcome)) {
     deps.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
@@ -172,7 +173,7 @@ function isAutoEditTransition(
   // tools.
   return (
     outcome === ToolConfirmationOutcome.ProceedAlways &&
-    EDIT_TOOL_NAMES.has(tool.name)
+    (EDIT_TOOL_NAMES.has(tool.name) || tool.name === WEB_FETCH_TOOL_NAME)
   );
 }
 

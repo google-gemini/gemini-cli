@@ -90,6 +90,24 @@ export function buildArgsPatterns(
 }
 
 /**
+ * Builds a regex pattern to match a specific parameter and value in tool arguments.
+ * This is used to narrow tool approvals to specific parameters.
+ *
+ * @param paramName The name of the parameter.
+ * @param value The value to match.
+ * @returns A regex string that matches "<paramName>":<value> in a JSON string.
+ */
+export function buildParamArgsPattern(
+  paramName: string,
+  value: unknown,
+): string {
+  const encodedValue = JSON.stringify(value);
+  // We must wrap the JSON string in escapeRegex to ensure regex control characters
+  // are treated as literals, preventing overly broad matches.
+  return escapeRegex(`"${paramName}":${encodedValue}`);
+}
+
+/**
  * Builds a regex pattern to match a specific file path in tool arguments.
  * This is used to narrow tool approvals for edit tools to specific files.
  *
@@ -97,11 +115,18 @@ export function buildArgsPatterns(
  * @returns A regex string that matches "file_path":"<path>" in a JSON string.
  */
 export function buildFilePathArgsPattern(filePath: string): string {
-  const encodedPath = JSON.stringify(filePath);
-  // We must wrap the JSON string in escapeRegex to ensure regex control characters
-  // (like '.' in file extensions) are treated as literals, preventing overly broad
-  // matches (e.g. 'foo.ts' matching 'fooXts').
-  return escapeRegex(`"file_path":${encodedPath}`);
+  return buildParamArgsPattern('file_path', filePath);
+}
+
+/**
+ * Builds a regex pattern to match a specific directory path in tool arguments.
+ * This is used to narrow tool approvals for list_directory tool.
+ *
+ * @param dirPath The path to the directory.
+ * @returns A regex string that matches "dir_path":"<path>" in a JSON string.
+ */
+export function buildDirPathArgsPattern(dirPath: string): string {
+  return buildParamArgsPattern('dir_path', dirPath);
 }
 
 /**
@@ -112,7 +137,5 @@ export function buildFilePathArgsPattern(filePath: string): string {
  * @returns A regex string that matches "pattern":"<pattern>" in a JSON string.
  */
 export function buildPatternArgsPattern(pattern: string): string {
-  const encodedPattern = JSON.stringify(pattern);
-  // We use escapeRegex to ensure regex control characters are treated as literals.
-  return escapeRegex(`"pattern":${encodedPattern}`);
+  return buildParamArgsPattern('pattern', pattern);
 }
