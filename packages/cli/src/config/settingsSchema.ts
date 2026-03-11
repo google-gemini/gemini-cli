@@ -12,6 +12,7 @@
 import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
+  EDITOR_OPTIONS,
   AuthProviderType,
   type MCPServerConfig,
   type RequiredMcpServerConfig,
@@ -202,24 +203,7 @@ const SETTINGS_SCHEMA = {
           or leave unset to use $VISUAL/$EDITOR.
         `,
         showInDialog: false,
-        options: [
-          { value: 'vscode', label: 'VS Code' },
-          { value: 'vscodium', label: 'VSCodium' },
-          { value: 'cursor', label: 'Cursor' },
-          { value: 'windsurf', label: 'Windsurf' },
-          { value: 'zed', label: 'Zed' },
-          { value: 'antigravity', label: 'Antigravity' },
-          { value: 'sublimetext', label: 'Sublime Text' },
-          { value: 'lapce', label: 'Lapce' },
-          { value: 'nova', label: 'Nova (macOS)' },
-          { value: 'bbedit', label: 'BBEdit (macOS)' },
-          { value: 'vim', label: 'Vim' },
-          { value: 'neovim', label: 'Neovim' },
-          { value: 'emacs', label: 'Emacs' },
-          { value: 'emacsclient', label: 'Emacs Client' },
-          { value: 'hx', label: 'Helix' },
-          { value: 'micro', label: 'Micro' },
-        ],
+        options: EDITOR_OPTIONS,
       },
       vimMode: {
         type: 'boolean',

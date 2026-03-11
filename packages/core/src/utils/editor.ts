@@ -80,6 +80,11 @@ export function getEditorDisplayName(editor: EditorType): string {
   return EDITOR_DISPLAY_NAMES[editor] || editor;
 }
 
+export const EDITOR_OPTIONS: ReadonlyArray<{
+  value: EditorType;
+  label: string;
+}> = EDITORS.map((e) => ({ value: e, label: EDITOR_DISPLAY_NAMES[e] }));
+
 export function isValidEditorType(editor: string): editor is EditorType {
   return EDITORS_SET.has(editor);
 }
