@@ -20,6 +20,14 @@ import {
   resolveEditorTypeFromCommand,
 } from '@google/gemini-cli-core';
 
+const HEURISTIC_GUI_COMMANDS = [
+  'code',
+  'cursor',
+  'subl',
+  'zed',
+  'atom',
+] as const;
+
 /**
  * Opens a file in an external editor and waits for it to close.
  * Handles raw mode switching to ensure the editor can interact with the terminal.
@@ -73,9 +81,7 @@ export async function openFileInEditor(
       } else {
         // Heuristic fallback for commands not in the registry
         const lower = envCommand.toLowerCase();
-        const isGui = ['code', 'cursor', 'subl', 'zed', 'atom'].some((g) =>
-          lower.includes(g),
-        );
+        const isGui = HEURISTIC_GUI_COMMANDS.some((g) => lower.includes(g));
         if (isGui && !lower.includes('--wait') && !lower.includes('-w')) {
           args.unshift(lower.includes('subl') ? '-w' : '--wait');
         }
