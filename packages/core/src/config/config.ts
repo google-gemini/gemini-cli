@@ -2096,8 +2096,6 @@ export class Config implements McpContext, AgentLoopContext {
         : 0;
     }
 
-    coreEvents.emitApprovalModeChanged(mode);
-
     const isPlanModeTransition =
       currentMode !== mode &&
       (currentMode === ApprovalMode.PLAN || mode === ApprovalMode.PLAN);
