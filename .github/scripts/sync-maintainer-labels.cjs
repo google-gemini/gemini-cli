@@ -347,6 +347,30 @@ async function run() {
           });
         }
       }
+
+      // Remove status/need-triage from maintainer-only issues since they
+      // don't need community triage (the label may already exist from the
+      // issue-opened labeler which runs before this script).
+      const hasNeedTriage = issueInfo.labels.some(
+        (l) => l === 'status/need-triage',
+      );
+      if (hasNeedTriage) {
+        if (isDryRun) {
+          console.log(
+            `[DRY RUN] Would remove status/need-triage from ${issueKey}`,
+          );
+        } else {
+          console.log(
+            `Removing status/need-triage from ${issueKey}...`,
+          );
+          await octokit.rest.issues.removeLabel({
+            owner: issueInfo.owner,
+            repo: issueInfo.repo,
+            issue_number: issueInfo.number,
+            name: 'status/need-triage',
+          });
+        }
+      }
     } catch (error) {
       console.error(`Error processing label for ${issueKey}: ${error.message}`);
     }
