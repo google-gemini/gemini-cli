@@ -492,6 +492,43 @@ describe('Server Config (config.ts)', () => {
         expect(await config.getUserCaching()).toBeUndefined();
       });
     });
+
+    describe('getNumericalRoutingEnabled', () => {
+      it('should return true by default if there are no experiments', async () => {
+        const config = new Config(baseParams);
+        expect(await config.getNumericalRoutingEnabled()).toBe(true);
+      });
+
+      it('should return true if the remote flag is set to true', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.ENABLE_NUMERICAL_ROUTING]: {
+                boolValue: true,
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getNumericalRoutingEnabled()).toBe(true);
+      });
+
+      it('should return false if the remote flag is explicitly set to false', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.ENABLE_NUMERICAL_ROUTING]: {
+                boolValue: false,
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getNumericalRoutingEnabled()).toBe(false);
+      });
+    });
   });
 
   describe('refreshAuth', () => {

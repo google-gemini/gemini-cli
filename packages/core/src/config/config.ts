@@ -2508,8 +2508,12 @@ export class Config implements McpContext, AgentLoopContext {
   async getNumericalRoutingEnabled(): Promise<boolean> {
     await this.ensureExperimentsLoaded();
 
-    return !!this.experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING]
-      ?.boolValue;
+    const flag =
+      this.experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING];
+    if (flag?.boolValue !== undefined) {
+      return flag.boolValue;
+    }
+    return true;
   }
 
   async getClassifierThreshold(): Promise<number | undefined> {

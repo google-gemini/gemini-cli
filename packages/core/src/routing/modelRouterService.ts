@@ -14,7 +14,10 @@ import type {
 } from './routingStrategy.js';
 import { DefaultStrategy } from './strategies/defaultStrategy.js';
 import { ClassifierStrategy } from './strategies/classifierStrategy.js';
-import { NumericalClassifierStrategy } from './strategies/numericalClassifierStrategy.js';
+import {
+  NumericalClassifierStrategy,
+  DEFAULT_CLASSIFIER_THRESHOLD,
+} from './strategies/numericalClassifierStrategy.js';
 import { CompositeStrategy } from './strategies/compositeStrategy.js';
 import { FallbackStrategy } from './strategies/fallbackStrategy.js';
 import { OverrideStrategy } from './strategies/overrideStrategy.js';
@@ -80,8 +83,9 @@ export class ModelRouterService {
       this.config.getNumericalRoutingEnabled(),
       this.config.getClassifierThreshold(),
     ]);
-    const classifierThreshold =
-      thresholdValue !== undefined ? String(thresholdValue) : undefined;
+    const classifierThreshold = String(
+      thresholdValue ?? DEFAULT_CLASSIFIER_THRESHOLD,
+    );
 
     let failed = false;
     let error_message: string | undefined;
