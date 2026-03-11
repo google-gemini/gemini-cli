@@ -59,11 +59,17 @@ class IntegrityKeyManager {
     }
 
     if (await this.keychainService.isAvailable()) {
-      this.cachedSecretKey = await this.getSecretKeyFromKeychain();
-    } else {
-      this.cachedSecretKey = await this.getSecretKeyFromFile();
+      try {
+        this.cachedSecretKey = await this.getSecretKeyFromKeychain();
+        return this.cachedSecretKey;
+      } catch (e) {
+        debugLogger.warn(
+          `Keychain access failed, falling back to file-based key: ${getErrorMessage(e)}`,
+        );
+      }
     }
 
+    this.cachedSecretKey = await this.getSecretKeyFromFile();
     return this.cachedSecretKey;
   }
 
@@ -126,13 +132,15 @@ class ExtensionIntegrityStore {
       throw e;
     }
 
+    const resetInstruction = `Please delete ${this.integrityStorePath} to reset it.`;
+
     // Parse and validate the store structure.
     let rawStore: IntegrityStore;
     try {
       rawStore = IntegrityStoreSchema.parse(JSON.parse(content));
-    } catch (e) {
+    } catch (_) {
       throw new Error(
-        `Failed to parse extension integrity store: ${e instanceof Error ? e.message : 'Unknown error'}`,
+        `Failed to parse extension integrity store. ${resetInstruction}}`,
       );
     }
 
@@ -144,7 +152,9 @@ class ExtensionIntegrityStore {
 
     // Verify the store hasn't been tampered with.
     if (!this.verifyConstantTime(actualSignature, expectedSignature)) {
-      throw new Error('Extension integrity store cannot be verified');
+      throw new Error(
+        `Extension integrity store cannot be verified. ${resetInstruction}`,
+      );
     }
 
     return store;
@@ -167,10 +177,13 @@ class ExtensionIntegrityStore {
     const configDir = path.dirname(this.integrityStorePath);
     await fs.promises.mkdir(configDir, { recursive: true });
 
-    await fs.promises.writeFile(
-      this.integrityStorePath,
-      JSON.stringify(finalData, null, 2),
-    );
+    // Use a 'write-then-rename' pattern for an atomic update.
+    // Restrict file permissions to owner only (0o600).
+    const tmpPath = `${this.integrityStorePath}.tmp`;
+    await fs.promises.writeFile(tmpPath, JSON.stringify(finalData, null, 2), {
+      mode: 0o600,
+    });
+    await fs.promises.rename(tmpPath, this.integrityStorePath);
   }
 
   /**
@@ -211,6 +224,7 @@ class ExtensionIntegrityStore {
 export class ExtensionIntegrityManager implements IExtensionIntegrity {
   private readonly keyManager: IntegrityKeyManager;
   private readonly integrityStore: ExtensionIntegrityStore;
+  private writeLock: Promise<void> = Promise.resolve();
 
   constructor() {
     this.keyManager = new IntegrityKeyManager();
@@ -276,17 +290,28 @@ export class ExtensionIntegrityManager implements IExtensionIntegrity {
 
   /**
    * Records the integrity data for an extension.
+   * Uses a promise chain to serialize concurrent store operations.
    */
   async store(
     extensionName: string,
     metadata: ExtensionInstallMetadata,
   ): Promise<void> {
-    const hash = this.integrityStore.generateHash(metadata);
-    const signature = await this.integrityStore.generateSignature(hash);
+    const operation = (async () => {
+      await this.writeLock;
 
-    const storeMap = await this.integrityStore.load();
-    storeMap[extensionName] = { hash, signature };
-    await this.integrityStore.save(storeMap);
+      // Generate integrity data for the new metadata.
+      const hash = this.integrityStore.generateHash(metadata);
+      const signature = await this.integrityStore.generateSignature(hash);
+
+      // Update the store map and persist to disk.
+      const storeMap = await this.integrityStore.load();
+      storeMap[extensionName] = { hash, signature };
+      await this.integrityStore.save(storeMap);
+    })();
+
+    // Update the lock to point to the latest operation, ensuring they are serialized.
+    this.writeLock = operation.catch(() => {});
+    return operation;
   }
 
   /**

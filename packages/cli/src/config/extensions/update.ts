@@ -59,13 +59,7 @@ export async function updateExtension(
       installMetadata,
     );
 
-    if (status === IntegrityDataStatus.MISSING) {
-      // Establish trust on first update if integrity data is missing.
-      await extensionManager.storeExtensionIntegrity(
-        extension.name,
-        installMetadata,
-      );
-    } else if (status === IntegrityDataStatus.INVALID) {
+    if (status === IntegrityDataStatus.INVALID) {
       throw new Error('Extension integrity cannot be verified');
     }
   } catch (e) {

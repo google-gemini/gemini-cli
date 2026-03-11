@@ -347,9 +347,11 @@ describe('Extension Update Logic', () => {
           mockDispatch,
         );
 
+        // Verify updateExtension delegates to installOrUpdateExtension,
+        // which is responsible for establishing trust internally.
         expect(
-          mockExtensionManager.storeExtensionIntegrity,
-        ).toHaveBeenCalledWith(mockExtension.name, expect.any(Object));
+          mockExtensionManager.installOrUpdateExtension,
+        ).toHaveBeenCalled();
 
         expect(mockDispatch).toHaveBeenCalledWith({
           type: 'SET_STATE',

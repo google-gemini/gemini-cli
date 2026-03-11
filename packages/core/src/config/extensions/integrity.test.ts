@@ -38,6 +38,7 @@ vi.mock('node:fs', async (importOriginal) => {
       readFile: vi.fn(),
       writeFile: vi.fn(),
       mkdir: vi.fn().mockResolvedValue(undefined),
+      rename: vi.fn().mockResolvedValue(undefined),
     },
   };
 });
@@ -108,7 +109,9 @@ describe('ExtensionIntegrityManager', () => {
       storedContent = '';
 
       const isIntegrityStore = (p: unknown) =>
-        typeof p === 'string' && p.endsWith('extension_integrity.json');
+        typeof p === 'string' &&
+        (p.endsWith('extension_integrity.json') ||
+          p.endsWith('extension_integrity.json.tmp'));
 
       vi.mocked(fs.promises.writeFile).mockImplementation(
         async (p, content) => {
@@ -129,12 +132,15 @@ describe('ExtensionIntegrityManager', () => {
         }
         return '';
       });
+
+      vi.mocked(fs.promises.rename).mockResolvedValue(undefined);
     });
 
     it('should store and verify integrity successfully', async () => {
       await manager.store('ext-name', metadata);
       const result = await manager.verify('ext-name', metadata);
       expect(result).toBe(IntegrityDataStatus.VERIFIED);
+      expect(fs.promises.rename).toHaveBeenCalled();
     });
 
     it('should return MISSING if metadata record is missing from store', async () => {

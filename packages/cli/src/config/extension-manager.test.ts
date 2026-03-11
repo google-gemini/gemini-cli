@@ -17,7 +17,7 @@ import {
   loadTrustedFolders,
   isWorkspaceTrusted,
 } from './trustedFolders.js';
-import { getRealPath } from '@google/gemini-cli-core';
+import { getRealPath, IntegrityDataStatus } from '@google/gemini-cli-core';
 
 const mockHomedir = vi.hoisted(() => vi.fn(() => '/tmp/mock-home'));
 const mockIntegrityManager = vi.hoisted(() => ({
@@ -517,6 +517,57 @@ describe('ExtensionManager', () => {
       await extensionManager.installOrUpdateExtension(installMetadata);
 
       expect(storeSpy).toHaveBeenCalledWith('integrity-ext', installMetadata);
+    });
+
+    it('should store integrity data during first update', async () => {
+      const storeSpy = vi.spyOn(extensionManager, 'storeExtensionIntegrity');
+      const verifySpy = vi.spyOn(extensionManager, 'verifyExtensionIntegrity');
+
+      // Setup existing extension
+      const extName = 'update-integrity-ext';
+      const extDir = path.join(userExtensionsDir, extName);
+      fs.mkdirSync(extDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(extDir, 'gemini-extension.json'),
+        JSON.stringify({ name: extName, version: '1.0.0' }),
+      );
+      fs.writeFileSync(
+        path.join(extDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: extDir }),
+      );
+
+      await extensionManager.loadExtensions();
+
+      // Ensure no integrity data exists for this extension
+      verifySpy.mockResolvedValueOnce(IntegrityDataStatus.MISSING);
+
+      const initialStatus = await extensionManager.verifyExtensionIntegrity(
+        extName,
+        { type: 'local', source: extDir },
+      );
+      expect(initialStatus).toBe('missing');
+
+      // Create new version of the extension
+      const newSourceDir = fs.mkdtempSync(
+        path.join(tempHomeDir, 'new-source-'),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'gemini-extension.json'),
+        JSON.stringify({ name: extName, version: '1.1.0' }),
+      );
+
+      const installMetadata = {
+        source: newSourceDir,
+        type: 'local' as const,
+      };
+
+      // Perform update and verify integrity was stored
+      await extensionManager.installOrUpdateExtension(installMetadata, {
+        name: extName,
+        version: '1.0.0',
+      });
+
+      expect(storeSpy).toHaveBeenCalledWith(extName, installMetadata);
     });
   });
 });
