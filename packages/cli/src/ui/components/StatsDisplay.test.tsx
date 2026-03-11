@@ -8,7 +8,7 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { describe, it, expect, vi } from 'vitest';
 import { StatsDisplay } from './StatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
-import type { SessionMetrics } from '../contexts/SessionContext.js';
+import { type SessionMetrics } from '../contexts/SessionContext.js';
 import {
   ToolCallDecision,
   type RetrieveUserQuotaResponse,

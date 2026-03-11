@@ -6,13 +6,11 @@
 
 import type React from 'react';
 import { useCallback } from 'react';
-import type { Key } from '../../hooks/useKeypress.js';
 import { Text, Box } from 'ink';
-import { useKeypress } from '../../hooks/useKeypress.js';
+import { useKeypress, type Key } from '../../hooks/useKeypress.js';
 import chalk from 'chalk';
 import { theme } from '../../semantic-colors.js';
-import type { TextBuffer } from './text-buffer.js';
-import { expandPastePlaceholders } from './text-buffer.js';
+import { expandPastePlaceholders, type TextBuffer } from './text-buffer.js';
 import { cpSlice, cpIndexToOffset } from '../../utils/textUtils.js';
 import { Command } from '../../key/keyMatchers.js';
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';

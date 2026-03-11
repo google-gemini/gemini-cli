@@ -7,8 +7,7 @@
 import { render } from '../../test-utils/render.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SettingScope } from '../../config/settings.js';
-import type { LoadedSettings } from '../../config/settings.js';
+import { SettingScope, type LoadedSettings } from '../../config/settings.js';
 import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { act } from 'react';
 import { waitFor } from '../../test-utils/async.js';

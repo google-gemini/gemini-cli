@@ -8,11 +8,9 @@ import { render } from '../../../test-utils/render.js';
 import { describe, it, expect } from 'vitest';
 import { Box } from 'ink';
 import { TodoTray } from './Todo.js';
-import type { Todo } from '@google/gemini-cli-core';
-import type { UIState } from '../../contexts/UIStateContext.js';
-import { UIStateContext } from '../../contexts/UIStateContext.js';
-import type { HistoryItem } from '../../types.js';
-import { CoreToolCallStatus } from '@google/gemini-cli-core';
+import { CoreToolCallStatus, type Todo } from '@google/gemini-cli-core';
+import { UIStateContext, type UIState } from '../../contexts/UIStateContext.js';
+import { type HistoryItem } from '../../types.js';
 
 const createTodoHistoryItem = (todos: Todo[]): HistoryItem =>
   ({
