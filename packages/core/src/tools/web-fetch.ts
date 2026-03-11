@@ -49,6 +49,14 @@ const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 10;
 const hostRequestHistory = new LRUCache<string, number[]>(1000);
 
+/**
+ * Resets the per-host rate limit history. Used exclusively for test isolation.
+ * @internal
+ */
+export function resetRateLimitsForTesting(): void {
+  hostRequestHistory.clear();
+}
+
 function checkRateLimit(url: string): {
   allowed: boolean;
   waitTimeMs?: number;
@@ -421,6 +429,40 @@ ${textContent}
     // Convert GitHub blob URL to raw URL
     url = convertGithubUrlToRaw(url);
 
+    // Enforce rate limiting (consistent with the non-experimental path)
+    const rateLimitResult = checkRateLimit(url);
+    if (!rateLimitResult.allowed) {
+      const waitTimeSecs = Math.ceil((rateLimitResult.waitTimeMs || 0) / 1000);
+      const errorMessage = `Rate limit exceeded for host. Please wait ${waitTimeSecs} seconds before trying again.`;
+      debugLogger.warn(`[WebFetchTool] Rate limit exceeded for ${url}`);
+      return {
+        llmContent: `Error: ${errorMessage}`,
+        returnDisplay: `Error: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.WEB_FETCH_PROCESSING_ERROR,
+        },
+      };
+    }
+
+    // Prevent SSRF by blocking private/internal IPs (consistent with the
+    // non-experimental path which falls back; here we return an error since
+    // there is no fallback mechanism in experimental mode).
+    if (isPrivateIp(url)) {
+      const errorMessage = `Fetching from private IP addresses is not allowed in direct fetch mode: ${url}`;
+      debugLogger.warn(
+        `[WebFetchTool] Private IP blocked in experimental mode: ${url}`,
+      );
+      return {
+        llmContent: `Error: ${errorMessage}`,
+        returnDisplay: `Error: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.POLICY_VIOLATION,
+        },
+      };
+    }
+
     try {
       const response = await retryWithBackoff(
         async () => {
@@ -735,7 +777,10 @@ export class WebFetchTool extends BaseDeclarativeTool<
         return "The 'url' parameter is required.";
       }
       try {
-        new URL(params.url);
+        const parsedUrl = new URL(params.url);
+        if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+          return `Unsupported protocol in URL: "${params.url}". Only http and https are supported.`;
+        }
       } catch {
         return `Invalid URL: "${params.url}"`;
       }
