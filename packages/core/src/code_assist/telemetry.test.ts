@@ -339,6 +339,7 @@ describe('telemetry', () => {
           acceptedLines: '8',
           removedLines: '3',
           isAgentic: true,
+          initiationMethod: InitiationMethod.COMMAND,
         }),
       );
     });
@@ -375,7 +376,7 @@ describe('telemetry', () => {
 
       expect(mockServer.recordConversationInteraction).toHaveBeenCalledWith(
         expect.objectContaining({
-          language: 'TypeScript',
+          language: 'typescript',
         }),
       );
     });
@@ -408,7 +409,7 @@ describe('telemetry', () => {
 
       expect(mockServer.recordConversationInteraction).toHaveBeenCalledWith(
         expect.objectContaining({
-          language: 'Python',
+          language: 'python',
         }),
       );
     });
