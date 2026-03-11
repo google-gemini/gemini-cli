@@ -99,7 +99,7 @@ export class LikertJudgeScorer implements Scorer {
       this.rubric,
       '</criteria>',
       '<response>',
-      response,
+      this.sanitizeResponse(response),
       '</response>',
       '',
       'Grade the reasoning quality of the response against the criteria above.',
@@ -109,6 +109,15 @@ export class LikertJudgeScorer implements Scorer {
       'Reply ONLY with valid XML (no other text):',
       '<score>N</score><reason>one sentence explaining the grade</reason>',
     ].join('\n');
+  }
+
+  /**
+   * Strips closing XML tags from untrusted agent output to prevent prompt
+   * injection — an agent must not be able to break out of the `<response>`
+   * block and inject a fake `<score>` into the judge prompt.
+   */
+  private sanitizeResponse(text: string): string {
+    return text.replace(/<\/(response|criteria|score|reason)>/gi, '');
   }
 
   private parseResponse(raw: string): ScorerResult {

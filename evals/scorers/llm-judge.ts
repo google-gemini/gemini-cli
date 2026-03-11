@@ -77,13 +77,22 @@ export class LlmJudgeScorer implements Scorer {
       this.rubric,
       '</criteria>',
       '<response>',
-      response,
+      this.sanitizeResponse(response),
       '</response>',
       '',
       'Grade the response against the criteria above.',
       'Reply ONLY with valid XML in this exact format (no other text):',
       '<verdict>PASS</verdict><score>0.95</score><reason>one sentence</reason>',
     ].join('\n');
+  }
+
+  /**
+   * Strips closing XML tags from untrusted agent output to prevent prompt
+   * injection — an agent must not be able to break out of the `<response>`
+   * block and inject a fake `<verdict>` into the judge prompt.
+   */
+  private sanitizeResponse(text: string): string {
+    return text.replace(/<\/(response|criteria|verdict|score|reason)>/gi, '');
   }
 
   private parseJudgeResponse(raw: string): ScorerResult {

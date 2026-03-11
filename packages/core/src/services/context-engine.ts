@@ -13,6 +13,7 @@ import type {
 } from '../rag/embeddingStrategy.js';
 import type { VectorStore } from '../rag/vectorStore.js';
 import { glob } from 'glob';
+import { debugLogger } from '../utils/debugLogger.js';
 
 /**
  * A single chunk of text retrieved from the workspace index.
@@ -95,8 +96,12 @@ export class ContextEngine {
               vector,
             });
           }
-        } catch {
-          // Skip unreadable files (binary, permissions, etc.)
+        } catch (err) {
+          // Skip unreadable files (binary, permissions, etc.) but log for debugging.
+          debugLogger.warn(
+            `ContextEngine: skipping file during indexing: ${filePath}`,
+            err,
+          );
         }
       }
     }
@@ -124,11 +129,21 @@ export class ContextEngine {
    * injection via the `BeforeModel` hook. Tagged with `<rag_context>`
    * for visibility in session recordings and debug logs.
    */
+  /**
+   * Sanitizes untrusted text by removing any occurrence of the closing tag
+   * `</rag_context>` that could allow a malicious file to break out of the
+   * context block and inject instructions into the LLM prompt.
+   */
+  private sanitizeForPrompt(text: string): string {
+    // Strip the closing tag (case-insensitive) to prevent prompt injection.
+    return text.replace(/<\/rag_context>/gi, '');
+  }
+
   formatAsContent(chunks: ContentChunk[]): Content {
     const body = chunks
       .map(
         (c, i) =>
-          `[${i + 1}] Source: ${c.source} (score: ${c.score.toFixed(3)})\n${c.text}`,
+          `[${i + 1}] Source: ${c.source} (score: ${c.score.toFixed(3)})\n${this.sanitizeForPrompt(c.text)}`,
       )
       .join('\n\n---\n\n');
 
