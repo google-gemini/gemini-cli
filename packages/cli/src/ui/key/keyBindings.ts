@@ -73,16 +73,6 @@ export enum Command {
   OPEN_EXTERNAL_EDITOR = 'input.openExternalEditor',
   PASTE_CLIPBOARD = 'input.paste',
 
-  BACKGROUND_SHELL_ESCAPE = 'backgroundShellEscape',
-  BACKGROUND_SHELL_SELECT = 'backgroundShellSelect',
-  TOGGLE_BACKGROUND_SHELL = 'toggleBackgroundShell',
-  TOGGLE_BACKGROUND_SHELL_LIST = 'toggleBackgroundShellList',
-  KILL_BACKGROUND_SHELL = 'backgroundShell.kill',
-  UNFOCUS_BACKGROUND_SHELL = 'backgroundShell.unfocus',
-  UNFOCUS_BACKGROUND_SHELL_LIST = 'backgroundShell.listUnfocus',
-  SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING = 'backgroundShell.unfocusWarning',
-  SHOW_SHELL_INPUT_UNFOCUS_WARNING = 'shellInput.unfocusWarning',
-
   // App Controls
   SHOW_ERROR_DETAILS = 'app.showErrorDetails',
   SHOW_FULL_TODOS = 'app.showFullTodos',
@@ -98,6 +88,17 @@ export enum Command {
   CLEAR_SCREEN = 'app.clearScreen',
   RESTART_APP = 'app.restart',
   SUSPEND_APP = 'app.suspend',
+  SHOW_SHELL_INPUT_UNFOCUS_WARNING = 'app.showShellUnfocusWarning',
+
+  // Background Shell Controls
+  BACKGROUND_SHELL_ESCAPE = 'background.escape',
+  BACKGROUND_SHELL_SELECT = 'background.select',
+  TOGGLE_BACKGROUND_SHELL = 'background.toggle',
+  TOGGLE_BACKGROUND_SHELL_LIST = 'background.toggleList',
+  KILL_BACKGROUND_SHELL = 'background.kill',
+  UNFOCUS_BACKGROUND_SHELL = 'background.unfocus',
+  UNFOCUS_BACKGROUND_SHELL_LIST = 'background.unfocusList',
+  SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING = 'background.unfocusWarning',
 
   // Voice Input
   VOICE_INPUT = 'input.voice',
@@ -357,15 +358,6 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.TOGGLE_COPY_MODE]: [new KeyBinding('ctrl+s')],
   [Command.TOGGLE_YOLO]: [new KeyBinding('ctrl+y')],
   [Command.CYCLE_APPROVAL_MODE]: [new KeyBinding('shift+tab')],
-  [Command.TOGGLE_BACKGROUND_SHELL]: [new KeyBinding('ctrl+b')],
-  [Command.TOGGLE_BACKGROUND_SHELL_LIST]: [new KeyBinding('ctrl+l')],
-  [Command.KILL_BACKGROUND_SHELL]: [new KeyBinding('ctrl+k')],
-  [Command.UNFOCUS_BACKGROUND_SHELL]: [new KeyBinding('shift+tab')],
-  [Command.UNFOCUS_BACKGROUND_SHELL_LIST]: [new KeyBinding('tab')],
-  [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]: [new KeyBinding('tab')],
-  [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]: [new KeyBinding('tab')],
-  [Command.BACKGROUND_SHELL_SELECT]: [new KeyBinding('enter')],
-  [Command.BACKGROUND_SHELL_ESCAPE]: [new KeyBinding('escape')],
   [Command.SHOW_MORE_LINES]: [new KeyBinding('ctrl+o')],
   [Command.EXPAND_PASTE]: [new KeyBinding('ctrl+o')],
   [Command.FOCUS_SHELL_INPUT]: [new KeyBinding('tab')],
@@ -373,6 +365,17 @@ export const defaultKeyBindings: KeyBindingConfig = {
   [Command.CLEAR_SCREEN]: [new KeyBinding('ctrl+l')],
   [Command.RESTART_APP]: [new KeyBinding('r'), new KeyBinding('shift+r')],
   [Command.SUSPEND_APP]: [new KeyBinding('ctrl+z')],
+  [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]: [new KeyBinding('tab')],
+
+  // Background Shell Controls
+  [Command.BACKGROUND_SHELL_ESCAPE]: [new KeyBinding('escape')],
+  [Command.BACKGROUND_SHELL_SELECT]: [new KeyBinding('enter')],
+  [Command.TOGGLE_BACKGROUND_SHELL]: [new KeyBinding('ctrl+b')],
+  [Command.TOGGLE_BACKGROUND_SHELL_LIST]: [new KeyBinding('ctrl+l')],
+  [Command.KILL_BACKGROUND_SHELL]: [new KeyBinding('ctrl+k')],
+  [Command.UNFOCUS_BACKGROUND_SHELL]: [new KeyBinding('shift+tab')],
+  [Command.UNFOCUS_BACKGROUND_SHELL_LIST]: [new KeyBinding('tab')],
+  [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]: [new KeyBinding('tab')],
 
   // Voice Input — triggered by double-space on empty input (see InputPrompt.tsx)
   [Command.VOICE_INPUT]: [],
@@ -470,10 +473,6 @@ export const commandCategories: readonly CommandCategory[] = [
     ],
   },
   {
-    title: 'Voice Input',
-    commands: [Command.VOICE_INPUT],
-  },
-  {
     title: 'App Controls',
     commands: [
       Command.SHOW_ERROR_DETAILS,
@@ -485,21 +484,30 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.CYCLE_APPROVAL_MODE,
       Command.SHOW_MORE_LINES,
       Command.EXPAND_PASTE,
-      Command.TOGGLE_BACKGROUND_SHELL,
-      Command.TOGGLE_BACKGROUND_SHELL_LIST,
-      Command.KILL_BACKGROUND_SHELL,
-      Command.BACKGROUND_SHELL_SELECT,
-      Command.BACKGROUND_SHELL_ESCAPE,
-      Command.UNFOCUS_BACKGROUND_SHELL,
-      Command.UNFOCUS_BACKGROUND_SHELL_LIST,
-      Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING,
-      Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING,
       Command.FOCUS_SHELL_INPUT,
       Command.UNFOCUS_SHELL_INPUT,
       Command.CLEAR_SCREEN,
       Command.RESTART_APP,
       Command.SUSPEND_APP,
+      Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING,
     ],
+  },
+  {
+    title: 'Background Shell Controls',
+    commands: [
+      Command.BACKGROUND_SHELL_ESCAPE,
+      Command.BACKGROUND_SHELL_SELECT,
+      Command.TOGGLE_BACKGROUND_SHELL,
+      Command.TOGGLE_BACKGROUND_SHELL_LIST,
+      Command.KILL_BACKGROUND_SHELL,
+      Command.UNFOCUS_BACKGROUND_SHELL,
+      Command.UNFOCUS_BACKGROUND_SHELL_LIST,
+      Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING,
+    ],
+  },
+  {
+    title: 'Voice Input',
+    commands: [Command.VOICE_INPUT],
   },
 ];
 
@@ -586,9 +594,18 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
     'Expand and collapse blocks of content when not in alternate buffer mode.',
   [Command.EXPAND_PASTE]:
     'Expand or collapse a paste placeholder when cursor is over placeholder.',
+  [Command.FOCUS_SHELL_INPUT]: 'Move focus from Gemini to the active shell.',
+  [Command.UNFOCUS_SHELL_INPUT]: 'Move focus from the shell back to Gemini.',
+  [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
+  [Command.RESTART_APP]: 'Restart the application.',
+  [Command.SUSPEND_APP]: 'Suspend the CLI and move it to the background.',
+  [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]:
+    'Show warning when trying to move focus away from shell input.',
+
+  // Background Shell Controls
+  [Command.BACKGROUND_SHELL_ESCAPE]: 'Dismiss background shell list.',
   [Command.BACKGROUND_SHELL_SELECT]:
     'Confirm selection in background shell list.',
-  [Command.BACKGROUND_SHELL_ESCAPE]: 'Dismiss background shell list.',
   [Command.TOGGLE_BACKGROUND_SHELL]:
     'Toggle current background shell visibility.',
   [Command.TOGGLE_BACKGROUND_SHELL_LIST]: 'Toggle background shell list.',
@@ -599,13 +616,6 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
     'Move focus from background shell list to Gemini.',
   [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]:
     'Show warning when trying to move focus away from background shell.',
-  [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]:
-    'Show warning when trying to move focus away from shell input.',
-  [Command.FOCUS_SHELL_INPUT]: 'Move focus from Gemini to the active shell.',
-  [Command.UNFOCUS_SHELL_INPUT]: 'Move focus from the shell back to Gemini.',
-  [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
-  [Command.RESTART_APP]: 'Restart the application.',
-  [Command.SUSPEND_APP]: 'Suspend the CLI and move it to the background.',
 
   // Voice Input
   [Command.VOICE_INPUT]:
