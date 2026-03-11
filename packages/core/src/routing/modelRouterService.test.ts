@@ -55,6 +55,9 @@ describe('ModelRouterService', () => {
       mockLocalLiteRtLmClient,
     );
     vi.spyOn(mockConfig, 'getNumericalRoutingEnabled').mockResolvedValue(true);
+    vi.spyOn(mockConfig, 'getResolvedClassifierThreshold').mockResolvedValue(
+      90,
+    );
     vi.spyOn(mockConfig, 'getClassifierThreshold').mockResolvedValue(undefined);
     vi.spyOn(mockConfig, 'getGemmaModelRouterSettings').mockReturnValue({
       enabled: false,

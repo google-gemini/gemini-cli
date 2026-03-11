@@ -2513,6 +2513,27 @@ export class Config implements McpContext, AgentLoopContext {
     return flag?.boolValue ?? true;
   }
 
+  /**
+   * Returns the resolved complexity threshold for routing.
+   * If a remote threshold is provided and within range (0-100), it is returned.
+   * Otherwise, the default threshold (90) is returned.
+   */
+  async getResolvedClassifierThreshold(): Promise<number> {
+    const remoteValue = await this.getClassifierThreshold();
+    const defaultValue = 90;
+
+    if (
+      remoteValue !== undefined &&
+      !isNaN(remoteValue) &&
+      remoteValue >= 0 &&
+      remoteValue <= 100
+    ) {
+      return remoteValue;
+    }
+
+    return defaultValue;
+  }
+
   async getClassifierThreshold(): Promise<number | undefined> {
     await this.ensureExperimentsLoaded();
 

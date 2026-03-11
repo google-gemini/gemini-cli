@@ -25,12 +25,6 @@ const HISTORY_TURNS_FOR_CONTEXT = 8;
 const FLASH_MODEL = 'flash';
 const PRO_MODEL = 'pro';
 
-/**
- * The default complexity threshold for routing.
- * If the score is greater than or equal to this threshold, the Pro model is used.
- */
-export const DEFAULT_CLASSIFIER_THRESHOLD = 90;
-
 const RESPONSE_SCHEMA = {
   type: Type.OBJECT,
   properties: {
@@ -188,21 +182,13 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
     groupLabel: string;
     modelAlias: typeof FLASH_MODEL | typeof PRO_MODEL;
   }> {
-    let threshold: number;
-    let groupLabel: string;
-
+    const threshold = await config.getResolvedClassifierThreshold();
     const remoteThresholdValue = await config.getClassifierThreshold();
 
-    if (
-      remoteThresholdValue !== undefined &&
-      !isNaN(remoteThresholdValue) &&
-      remoteThresholdValue >= 0 &&
-      remoteThresholdValue <= 100
-    ) {
-      threshold = remoteThresholdValue;
+    let groupLabel: string;
+    if (threshold === remoteThresholdValue) {
       groupLabel = 'Remote';
     } else {
-      threshold = DEFAULT_CLASSIFIER_THRESHOLD;
       groupLabel = 'Default';
     }
 

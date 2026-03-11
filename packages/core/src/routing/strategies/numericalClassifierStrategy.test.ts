@@ -56,6 +56,7 @@ describe('NumericalClassifierStrategy', () => {
       getModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL_AUTO),
       getSessionId: vi.fn().mockReturnValue('control-group-id'), // Default to Control Group (Hash 71 >= 50)
       getNumericalRoutingEnabled: vi.fn().mockResolvedValue(true),
+      getResolvedClassifierThreshold: vi.fn().mockResolvedValue(90),
       getClassifierThreshold: vi.fn().mockResolvedValue(undefined),
       getGemini31Launched: vi.fn().mockResolvedValue(false),
       getUseCustomToolModel: vi.fn().mockImplementation(async () => {
@@ -209,6 +210,9 @@ describe('NumericalClassifierStrategy', () => {
   describe('Remote Threshold Logic', () => {
     it('should use the remote CLASSIFIER_THRESHOLD if provided (int value)', async () => {
       vi.mocked(mockConfig.getClassifierThreshold).mockResolvedValue(70);
+      vi.mocked(mockConfig.getResolvedClassifierThreshold).mockResolvedValue(
+        70,
+      );
       const mockApiResponse = {
         complexity_reasoning: 'Test task',
         complexity_score: 60,
@@ -236,6 +240,9 @@ describe('NumericalClassifierStrategy', () => {
 
     it('should use the remote CLASSIFIER_THRESHOLD if provided (float value)', async () => {
       vi.mocked(mockConfig.getClassifierThreshold).mockResolvedValue(45.5);
+      vi.mocked(mockConfig.getResolvedClassifierThreshold).mockResolvedValue(
+        45.5,
+      );
       const mockApiResponse = {
         complexity_reasoning: 'Test task',
         complexity_score: 40,
@@ -263,6 +270,9 @@ describe('NumericalClassifierStrategy', () => {
 
     it('should use PRO model if score >= remote CLASSIFIER_THRESHOLD', async () => {
       vi.mocked(mockConfig.getClassifierThreshold).mockResolvedValue(30);
+      vi.mocked(mockConfig.getResolvedClassifierThreshold).mockResolvedValue(
+        30,
+      );
       const mockApiResponse = {
         complexity_reasoning: 'Test task',
         complexity_score: 35,
