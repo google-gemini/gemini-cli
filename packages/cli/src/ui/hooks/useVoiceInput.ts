@@ -79,6 +79,11 @@ export function useVoiceInput(voiceConfig?: VoiceInputConfig) {
 
   const backendRef = useRef<VoiceBackend | null>(null);
   const isTogglingRef = useRef(false);
+  const stateRef = useRef(state);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   // Initialize (or re-initialize) the backend when config changes
   useEffect(() => {
@@ -97,17 +102,21 @@ export function useVoiceInput(voiceConfig?: VoiceInputConfig) {
       silenceThreshold: voiceConfig?.silenceThreshold,
     };
 
+    let activeBackend: VoiceBackend | null = null;
     if (voiceConfig?.provider === 'whisper') {
-      backendRef.current = new LocalWhisperBackend(options, {
+      activeBackend = new LocalWhisperBackend(options, {
         whisperPath: voiceConfig.whisperPath,
       });
     } else if (voiceConfig?.config) {
-      backendRef.current = new GeminiRestBackend(options, voiceConfig.config);
+      activeBackend = new GeminiRestBackend(options, voiceConfig.config);
     }
+    backendRef.current = activeBackend;
 
     return () => {
-      void backendRef.current?.cleanup();
-      backendRef.current = null;
+      void activeBackend?.cleanup();
+      if (backendRef.current === activeBackend) {
+        backendRef.current = null;
+      }
     };
   }, [
     voiceConfig?.provider,
@@ -142,7 +151,7 @@ export function useVoiceInput(voiceConfig?: VoiceInputConfig) {
     if (isTogglingRef.current) return;
     isTogglingRef.current = true;
     try {
-      if (state.isRecording) {
+      if (stateRef.current.isRecording) {
         await stopRecording();
       } else {
         await startRecording();
@@ -152,7 +161,7 @@ export function useVoiceInput(voiceConfig?: VoiceInputConfig) {
     } finally {
       isTogglingRef.current = false;
     }
-  }, [state.isRecording, startRecording, stopRecording]);
+  }, [startRecording, stopRecording]);
 
   const isEnabled = !!(
     voiceConfig?.config || voiceConfig?.provider === 'whisper'

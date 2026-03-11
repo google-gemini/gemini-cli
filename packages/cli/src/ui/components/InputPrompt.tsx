@@ -360,17 +360,17 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     toggleRecording,
     cancelRecording,
   } = useVoiceContext();
+  const insertText = buffer.insert;
 
   // Handle voice transcript via event listener (not context) to avoid re-renders
   useEffect(() => {
     const handleTranscript = (transcript: string) => {
       // Insert transcribed text at cursor position with trailing space for next input
-      buffer.insert(transcript + ' ');
+      insertText(transcript + ' ');
     };
 
-    const unsubscribe = onVoiceTranscript(handleTranscript);
-    return unsubscribe;
-  }, [buffer]);
+    return onVoiceTranscript(handleTranscript);
+  }, [insertText]);
 
   const handleSubmitAndClear = useCallback(
     (submittedValue: string) => {

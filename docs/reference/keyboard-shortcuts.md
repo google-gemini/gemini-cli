@@ -93,12 +93,6 @@ available combinations.
 | Open the current prompt or the plan in an external editor. | `Ctrl+X`                                                                            |
 | Paste from the clipboard.                                  | `Ctrl+V`<br />`Cmd/Win+V`<br />`Alt+V`                                              |
 
-#### Voice Input
-
-| Action                                                    | Keys          |
-| --------------------------------------------------------- | ------------- |
-| Toggle voice input recording (press space twice rapidly). | `Space Space` |
-
 #### App Controls
 
 | Action                                                                                                                                             | Keys               |

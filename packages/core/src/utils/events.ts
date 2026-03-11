@@ -186,20 +186,20 @@ export enum CoreEvent {
   ConsentRequest = 'consent-request',
   McpProgress = 'mcp-progress',
   AgentsDiscovered = 'agents-discovered',
-RequestEditorSelection = 'request-editor-selection',
-EditorSelected = 'editor-selected',
-SlashCommandConflicts = 'slash-command-conflicts',
-QuotaChanged = 'quota-changed',
-TelemetryKeychainAvailability = 'telemetry-keychain-availability',
-TelemetryTokenStorageType = 'telemetry-token-storage-type',
-VoiceTranscript = 'voice-transcript',
+  RequestEditorSelection = 'request-editor-selection',
+  EditorSelected = 'editor-selected',
+  SlashCommandConflicts = 'slash-command-conflicts',
+  QuotaChanged = 'quota-changed',
+  TelemetryKeychainAvailability = 'telemetry-keychain-availability',
+  TelemetryTokenStorageType = 'telemetry-token-storage-type',
+  VoiceTranscript = 'voice-transcript',
 }
 
 /**
-* Payload for the 'editor-selected' event.
-*/
+ * Payload for the 'editor-selected' event.
+ */
 export interface EditorSelectedPayload {
-editor?: EditorType;
+  editor?: EditorType;
 }
 export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.UserFeedback]: [UserFeedbackPayload];

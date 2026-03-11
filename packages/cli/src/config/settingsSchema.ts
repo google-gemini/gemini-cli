@@ -817,7 +817,7 @@ const SETTINGS_SCHEMA = {
         label: 'Transcription Backend',
         category: 'General',
         requiresRestart: false,
-        default: undefined as string | undefined,
+        default: 'gemini',
         description:
           'Transcription backend: "gemini" (default, zero-install) or "whisper" (local).',
         showInDialog: true,
