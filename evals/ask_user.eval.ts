@@ -5,19 +5,16 @@
  */
 
 import { describe, expect } from 'vitest';
-import { evalTest } from './test-helper.js';
+import { appEvalTest } from './app-test-helper.js';
 
 describe('ask_user', () => {
-  evalTest('USUALLY_PASSES', {
+  appEvalTest('USUALLY_PASSES', {
     name: 'Agent uses AskUser tool to present multiple choice options',
-    approvalMode: 'default',
-    interactive: true,
-    params: {
-      settings: {
-        general: {
-          enableAutoUpdate: false,
-          enableAutoUpdateNotification: false,
-        },
+    configOverrides: {
+      general: {
+        approvalMode: 'default',
+        enableAutoUpdate: false,
+        enableAutoUpdateNotification: false,
       },
     },
     files: {
@@ -30,35 +27,28 @@ priority = 100
 `,
     },
     prompt: `Use the ask_user tool to ask me what my favorite color is. Provide 3 options: red, green, or blue.`,
+    setup: async (rig) => {
+      rig.setBreakpoint(['ask_user']);
+    },
     assert: async (rig) => {
-      await rig.waitForTelemetryReady();
-      const homeDir = rig.homeDir;
-      const telemetryPath = require('path').join(homeDir, 'telemetry.log');
-      const fs = require('fs');
-      if (fs.existsSync(telemetryPath)) {
-        console.log(`\n--- TELEMETRY LOG CONTENT (${telemetryPath}) ---`);
-        console.log(fs.readFileSync(telemetryPath, 'utf-8'));
-      }
-
-      const toolLogs = rig.readToolLogs();
-      console.log('Parsed Tool Logs:', JSON.stringify(toolLogs, null, 2));
-      const wasToolCalled = toolLogs.some(
-        (log) => log.toolRequest.name === 'ask_user',
+      const confirmation = await rig.waitForPendingConfirmation(
+        'ask_user',
+        60000,
       );
-      expect(wasToolCalled, 'Expected ask_user tool to be called').toBe(true);
+      expect(
+        confirmation,
+        'Expected a pending confirmation for ask_user tool',
+      ).toBeDefined();
     },
   });
 
-  evalTest('USUALLY_PASSES', {
+  appEvalTest('USUALLY_PASSES', {
     name: 'Agent uses AskUser tool to clarify ambiguous requirements',
-    approvalMode: 'default',
-    interactive: true,
-    params: {
-      settings: {
-        general: {
-          enableAutoUpdate: false,
-          enableAutoUpdateNotification: false,
-        },
+    configOverrides: {
+      general: {
+        approvalMode: 'default',
+        enableAutoUpdate: false,
+        enableAutoUpdateNotification: false,
       },
     },
     files: {
@@ -72,35 +62,28 @@ priority = 100
 `,
     },
     prompt: `I want to build a new feature in this app. Ask me questions to clarify the requirements before proceeding.`,
+    setup: async (rig) => {
+      rig.setBreakpoint(['ask_user']);
+    },
     assert: async (rig) => {
-      await rig.waitForTelemetryReady();
-      const homeDir = rig.homeDir;
-      const telemetryPath = require('path').join(homeDir, 'telemetry.log');
-      const fs = require('fs');
-      if (fs.existsSync(telemetryPath)) {
-        console.log(`\n--- TELEMETRY LOG CONTENT (${telemetryPath}) ---`);
-        console.log(fs.readFileSync(telemetryPath, 'utf-8'));
-      }
-
-      const toolLogs = rig.readToolLogs();
-      console.log('Parsed Tool Logs:', JSON.stringify(toolLogs, null, 2));
-      const wasToolCalled = toolLogs.some(
-        (log) => log.toolRequest.name === 'ask_user',
+      const confirmation = await rig.waitForPendingConfirmation(
+        'ask_user',
+        60000,
       );
-      expect(wasToolCalled, 'Expected ask_user tool to be called').toBe(true);
+      expect(
+        confirmation,
+        'Expected a pending confirmation for ask_user tool',
+      ).toBeDefined();
     },
   });
 
-  evalTest('USUALLY_PASSES', {
+  appEvalTest('USUALLY_PASSES', {
     name: 'Agent uses AskUser tool before performing significant ambiguous rework',
-    approvalMode: 'default',
-    interactive: true,
-    params: {
-      settings: {
-        general: {
-          enableAutoUpdate: false,
-          enableAutoUpdateNotification: false,
-        },
+    configOverrides: {
+      general: {
+        approvalMode: 'default',
+        enableAutoUpdate: false,
+        enableAutoUpdateNotification: false,
       },
     },
     files: {
@@ -123,53 +106,43 @@ decision = "allow"
 priority = 100
 `,
     },
-    prompt: `Refactor the entire core package to be better.`,
+    prompt: `I want to completely rewrite the core package to support the upcoming V2 architecture, but I haven't decided what that looks like yet. We need to figure out the requirements first. Can you ask me some questions to help nail down the design?`,
+    setup: async (rig) => {
+      rig.setBreakpoint(['enter_plan_mode', 'ask_user']);
+    },
     assert: async (rig) => {
-      await rig.waitForTelemetryReady();
-      const homeDir = rig.homeDir;
-      const telemetryPath = require('path').join(homeDir, 'telemetry.log');
-      const fs = require('fs');
-      if (fs.existsSync(telemetryPath)) {
-        console.log(`\n--- TELEMETRY LOG CONTENT (${telemetryPath}) ---`);
-        console.log(fs.readFileSync(telemetryPath, 'utf-8'));
+      // It might call enter_plan_mode first.
+      let confirmation = await rig.waitForPendingConfirmation(
+        ['enter_plan_mode', 'ask_user'],
+        60000,
+      );
+      expect(confirmation, 'Expected a tool call confirmation').toBeDefined();
+
+      if (confirmation!.name === 'enter_plan_mode') {
+        rig.acceptConfirmation('enter_plan_mode');
+        confirmation = await rig.waitForPendingConfirmation('ask_user', 60000);
       }
 
-      const toolLogs = rig.readToolLogs();
-      console.log('Parsed Tool Logs:', JSON.stringify(toolLogs, null, 2));
-
-      const wasPlanModeCalled = toolLogs.some(
-        (log) => log.toolRequest.name === 'enter_plan_mode',
-      );
-      expect(wasPlanModeCalled, 'Expected enter_plan_mode to be called').toBe(
-        true,
-      );
-
-      const wasAskUserCalled = toolLogs.some(
-        (log) => log.toolRequest.name === 'ask_user',
-      );
       expect(
-        wasAskUserCalled,
-        'Expected ask_user tool to be called to clarify the significant rework',
-      ).toBe(true);
+        confirmation?.toolName,
+        'Expected ask_user to be called to clarify the significant rework',
+      ).toBe('ask_user');
     },
   });
 
   // --- Regression Tests for Recent Fixes ---
 
-  // Regression test for issue #20177: Ensure the agent does not use `ask_user` to
+  // Regression test for issue #20177: Ensure the agent does not use \`ask_user\` to
   // confirm shell commands. Fixed via prompt refinements and tool definition
   // updates to clarify that shell command confirmation is handled by the UI.
   // See fix: https://github.com/google-gemini/gemini-cli/pull/20504
-  evalTest('USUALLY_PASSES', {
+  appEvalTest('USUALLY_PASSES', {
     name: 'Agent does NOT use AskUser to confirm shell commands',
-    approvalMode: 'default',
-    interactive: true,
-    params: {
-      settings: {
-        general: {
-          enableAutoUpdate: false,
-          enableAutoUpdateNotification: false,
-        },
+    configOverrides: {
+      general: {
+        approvalMode: 'default',
+        enableAutoUpdate: false,
+        enableAutoUpdateNotification: false,
       },
     },
     files: {
@@ -185,25 +158,24 @@ priority = 100
 `,
     },
     prompt: `Run 'npm run build' in the current directory.`,
+    setup: async (rig) => {
+      rig.setBreakpoint(['run_shell_command', 'ask_user']);
+    },
     assert: async (rig) => {
-      await rig.waitForTelemetryReady();
-
-      const toolLogs = rig.readToolLogs();
-      const wasShellCalled = toolLogs.some(
-        (log) => log.toolRequest.name === 'run_shell_command',
-      );
-      const wasAskUserCalled = toolLogs.some(
-        (log) => log.toolRequest.name === 'ask_user',
+      const confirmation = await rig.waitForPendingConfirmation(
+        ['run_shell_command', 'ask_user'],
+        60000,
       );
 
       expect(
-        wasShellCalled,
-        'Expected run_shell_command tool to be called',
-      ).toBe(true);
+        confirmation,
+        'Expected a pending confirmation for a tool',
+      ).toBeDefined();
+
       expect(
-        wasAskUserCalled,
+        confirmation?.toolName,
         'ask_user should not be called to confirm shell commands',
-      ).toBe(false);
+      ).toBe('run_shell_command');
     },
   });
 });
