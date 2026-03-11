@@ -9,7 +9,7 @@ import {
   type Command,
   type KeyBinding,
   type KeyBindingConfig,
-  defaultKeyBindings,
+  defaultKeyBindingConfig,
 } from './keyBindings.js';
 
 /**
@@ -97,10 +97,10 @@ export function formatKeyBinding(
  */
 export function formatCommand(
   command: Command,
-  config: KeyBindingConfig = defaultKeyBindings,
+  config: KeyBindingConfig = defaultKeyBindingConfig,
   platform?: string,
 ): string {
-  const bindings = config[command];
+  const bindings = config.get(command);
   if (!bindings || bindings.length === 0) {
     return '';
   }
