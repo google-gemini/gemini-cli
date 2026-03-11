@@ -13,6 +13,37 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
+
+const {
+  mockSendMessageStream,
+  mockScheduleAgentTools,
+  mockSetSystemInstruction,
+  mockCompress,
+  mockMaybeDiscoverMcpServer,
+  mockStopMcp,
+} = vi.hoisted(() => ({
+  mockSendMessageStream: vi.fn().mockResolvedValue({
+    async *[Symbol.asyncIterator] () {
+      yield {
+        type: 'chunk',
+        value: { candidates: [] },
+      };
+    },
+  }),
+  mockScheduleAgentTools: vi.fn(),
+  mockSetSystemInstruction: vi.fn(),
+  mockCompress: vi.fn(),
+  mockMaybeDiscoverMcpServer: vi.fn().mockResolvedValue(undefined),
+  mockStopMcp: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../tools/mcp-client-manager.js', () => ({
+    McpClientManager: class {
+      maybeDiscoverMcpServer = mockMaybeDiscoverMcpServer;
+      stop = mockStopMcp;
+    },
+  }));
+
 import { debugLogger } from '../utils/debugLogger.js';
 import { LocalAgentExecutor, type ActivityCallback } from './local-executor.js';
 import { makeFakeConfig } from '../test-utils/config.js';
@@ -68,18 +99,6 @@ import type {
 } from '../services/modelConfigService.js';
 import { getModelConfigAlias, type AgentRegistry } from './registry.js';
 import type { ModelRouterService } from '../routing/modelRouterService.js';
-
-const {
-  mockSendMessageStream,
-  mockScheduleAgentTools,
-  mockSetSystemInstruction,
-  mockCompress,
-} = vi.hoisted(() => ({
-  mockSendMessageStream: vi.fn(),
-  mockScheduleAgentTools: vi.fn(),
-  mockSetSystemInstruction: vi.fn(),
-  mockCompress: vi.fn(),
-}));
 
 let mockChatHistory: Content[] = [];
 const mockSetHistory = vi.fn((newHistory: Content[]) => {
@@ -2464,6 +2483,70 @@ describe('LocalAgentExecutor', () => {
 
       expect(mockSetHistory).toHaveBeenCalledTimes(1);
       expect(mockSetHistory).toHaveBeenCalledWith(compressedHistory);
+    });
+  });
+
+  describe('MCP Isolation', () => {
+    it('should initialize McpClientManager when mcpServers are defined', async () => {
+      const { MCPServerConfig } = await import('../config/config.js');
+      const mcpServers = {
+        'test-server': new MCPServerConfig('node', ['server.js']),
+      };
+
+      const definition = {
+        ...createTestDefinition(),
+        mcpServers,
+      };
+
+      await LocalAgentExecutor.create(definition, mockConfig);
+
+      expect(mockMaybeDiscoverMcpServer).toHaveBeenCalledWith(
+        'test-server',
+        mcpServers['test-server'],
+      );
+    });
+
+    it('should stop McpClientManager when agent execution finishes', async () => {
+      const { MCPServerConfig } = await import('../config/config.js');
+      const mcpServers = {
+        'test-server': new MCPServerConfig('node', ['server.js']),
+      };
+
+      const definition = {
+        ...createTestDefinition(),
+        mcpServers,
+      };
+
+      const executor = await LocalAgentExecutor.create(definition, mockConfig);
+
+      mockSendMessageStream.mockResolvedValueOnce({
+        async *[Symbol.asyncIterator] () {
+          yield {
+            type: 'chunk',
+            value: {
+              candidates: [
+                {
+                  content: {
+                    parts: [
+                      {
+                        functionCall: {
+                          name: TASK_COMPLETE_TOOL_NAME,
+                          args: { result: 'Done' },
+                          id: 't1',
+                        },
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          };
+        },
+      });
+
+      await executor.run({ goal: 'test' }, signal);
+
+      expect(mockStopMcp).toHaveBeenCalled();
     });
   });
 });

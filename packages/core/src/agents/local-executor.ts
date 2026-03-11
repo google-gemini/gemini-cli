@@ -18,6 +18,7 @@ import {
 } from '@google/genai';
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import { McpClientManager } from '../tools/mcp-client-manager.js';
 import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import { type Message } from '../confirmation-bus/types.js';
@@ -94,6 +95,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private readonly agentId: string;
   private readonly toolRegistry: ToolRegistry;
   private readonly context: AgentLoopContext;
+  private readonly mcpClientManager?: McpClientManager;
   private readonly onActivity?: ActivityCallback;
   private readonly compressionService: ChatCompressionService;
   private readonly parentCallId?: string;
@@ -141,6 +143,19 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       context.config,
       subagentMessageBus,
     );
+    let mcpClientManager: McpClientManager | undefined;
+    if (definition.mcpServers) {
+      mcpClientManager = new McpClientManager(
+        await getVersion(),
+        agentToolRegistry,
+        context.config,
+      );
+
+      for (const [name, config] of Object.entries(definition.mcpServers)) {
+        await mcpClientManager.maybeDiscoverMcpServer(name, config);
+      }
+    }
+
     const parentToolRegistry = context.toolRegistry;
     const allAgentNames = new Set(
       context.config.getAgentRegistry().getAllAgentNames(),
@@ -210,6 +225,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       parentPromptId,
       parentCallId,
       onActivity,
+      mcpClientManager,
     );
   }
 
@@ -226,6 +242,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     parentPromptId: string | undefined,
     parentCallId: string | undefined,
     onActivity?: ActivityCallback,
+    mcpClientManager?: McpClientManager,
   ) {
     this.definition = definition;
     this.context = context;
@@ -233,6 +250,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     this.onActivity = onActivity;
     this.compressionService = new ChatCompressionService();
     this.parentCallId = parentCallId;
+    this.mcpClientManager = mcpClientManager;
 
     const randomIdPart = Math.random().toString(36).slice(2, 8);
     // parentPromptId will be undefined if this agent is invoked directly
@@ -679,6 +697,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       throw error; // Re-throw other errors or external aborts.
     } finally {
       deadlineTimer.abort();
+      if (this.mcpClientManager) {
+        await this.mcpClientManager.stop();
+      }
       logAgentFinish(
         this.config,
         new AgentFinishEvent(
