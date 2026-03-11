@@ -72,7 +72,9 @@ primary conditions are the tool's name and its arguments.
 
 #### Tool Name
 
-The `toolName` in the rule must match the name of the tool being called.
+The `toolName` in the rule must match the name of the tool being called. For a
+complete list of built-in tool names, see the
+[Tools reference](./tools.md#available-tools).
 
 - **Wildcards**: You can use wildcards to match multiple tools.
   - `*`: Matches **any tool** (built-in or MCP).
@@ -84,7 +86,9 @@ The `toolName` in the rule must match the name of the tool being called.
 
 If `argsPattern` is specified, the tool's arguments are converted to a stable
 JSON string, which is then tested against the provided regular expression. If
-the arguments don't match the pattern, the rule does not apply.
+the arguments don't match the pattern, the rule does not apply. To understand
+which argument keys are available for a tool, see the **Parameters** in the
+[Tools reference](./tools.md#available-tools).
 
 ### Decisions
 
@@ -207,6 +211,9 @@ admin directories. If checks fail, system policies are **ignored**.
 
 Here is a breakdown of the fields available in a TOML policy rule:
 
+For valid built-in `toolName` values and their argument structures (used by
+`argsPattern`), see the [Tools reference](./tools.md#available-tools).
+
 ```toml
 [[rule]]
 # A unique name for the tool, or an array of names.
@@ -269,6 +276,9 @@ priority = 10
 
 To simplify writing policies for `run_shell_command`, you can use
 `commandPrefix` or `commandRegex` instead of the more complex `argsPattern`.
+These are policy-rule shorthands, not arguments of the `run_shell_command` tool
+itself. For the tool's invocation arguments, see [Shell tool](../tools/shell.md)
+and [Tools reference](./tools.md#available-tools).
 
 - `commandPrefix`: Matches if the `command` argument starts with the given
   string.
