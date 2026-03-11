@@ -361,6 +361,10 @@ export interface GeminiCLIExtension {
      */
     directory?: string;
   };
+  /**
+   * Used to migrate an extension to a new repository source.
+   */
+  migratedTo?: string;
 }
 
 export interface ExtensionInstallMetadata {
@@ -546,9 +550,11 @@ export interface ConfigParameters {
   skipNextSpeakerCheck?: boolean;
   shellExecutionConfig?: ShellExecutionConfig;
   extensionManagement?: boolean;
+  extensionRegistryURI?: string;
   truncateToolOutputThreshold?: number;
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
+  workspacePoliciesDir?: string;
   policyEngineConfig?: PolicyEngineConfig;
   directWebFetch?: boolean;
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
@@ -733,6 +739,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly useAlternateBuffer: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
+  private readonly extensionRegistryURI: string | undefined;
   private readonly truncateToolOutputThreshold: number;
   private compressionTruncationCounter = 0;
   private initialized = false;
@@ -742,6 +749,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
   private readonly useWriteTodos: boolean;
+  private readonly workspacePoliciesDir: string | undefined;
   private readonly _messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private policyUpdateConfirmationRequest:
@@ -952,6 +960,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.useWriteTodos = isPreviewModel(this.model)
       ? false
       : (params.useWriteTodos ?? true);
+    this.workspacePoliciesDir = params.workspacePoliciesDir;
     this.enableHooksUI = params.enableHooksUI ?? true;
     this.enableHooks = params.enableHooks ?? true;
     this.disabledHooks = params.disabledHooks ?? [];
@@ -962,6 +971,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.shellToolInactivityTimeout =
       (params.shellToolInactivityTimeout ?? 300) * 1000; // 5 minutes
     this.extensionManagement = params.extensionManagement ?? true;
+    this.extensionRegistryURI = params.extensionRegistryURI;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
     this.storage = new Storage(this.targetDir, this._sessionId);
     this.storage.setCustomPlansDir(params.planSettings?.directory);
@@ -1014,7 +1024,7 @@ export class Config implements McpContext, AgentLoopContext {
           params.gemmaModelRouter?.classifier?.model ?? 'gemma3-1b-gpu-custom',
       },
     };
-    this.retryFetchErrors = params.retryFetchErrors ?? false;
+    this.retryFetchErrors = params.retryFetchErrors ?? true;
     this.maxAttempts = Math.min(
       params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
       DEFAULT_MAX_ATTEMPTS,
@@ -1088,6 +1098,10 @@ export class Config implements McpContext, AgentLoopContext {
     this.modelConfigService = new ModelConfigService(
       modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
     );
+  }
+
+  get config(): Config {
+    return this;
   }
 
   isInitialized(): boolean {
@@ -1183,7 +1197,7 @@ export class Config implements McpContext, AgentLoopContext {
         if (this.getSkillManager().getSkills().length > 0) {
           this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
           this.getToolRegistry().registerTool(
-            new ActivateSkillTool(this, this._messageBus),
+            new ActivateSkillTool(this, this.messageBus),
           );
         }
       }
@@ -1833,6 +1847,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.extensionsEnabled;
   }
 
+  getExtensionRegistryURI(): string | undefined {
+    return this.extensionRegistryURI;
+  }
+
   getMcpClientManager(): McpClientManager | undefined {
     return this.mcpClientManager;
   }
@@ -1993,6 +2011,10 @@ export class Config implements McpContext, AgentLoopContext {
       return Array.from(this.contextManager.getLoadedPaths());
     }
     return this.geminiMdFilePaths;
+  }
+
+  getWorkspacePoliciesDir(): string | undefined {
+    return this.workspacePoliciesDir;
   }
 
   setGeminiMdFilePaths(paths: string[]): void {
@@ -2526,6 +2548,26 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
+   * Returns whether the custom tool model should be used.
+   */
+  async getUseCustomToolModel(): Promise<boolean> {
+    const useGemini3_1 = await this.getGemini31Launched();
+    const authType = this.contentGeneratorConfig?.authType;
+    return useGemini3_1 && authType === AuthType.USE_GEMINI;
+  }
+
+  /**
+   * Returns whether the custom tool model should be used.
+   *
+   * Note: This method should only be called after startup, once experiments have been loaded.
+   */
+  getUseCustomToolModelSync(): boolean {
+    const useGemini3_1 = this.getGemini31LaunchedSync();
+    const authType = this.contentGeneratorConfig?.authType;
+    return useGemini3_1 && authType === AuthType.USE_GEMINI;
+  }
+
+  /**
    * Returns whether Gemini 3.1 has been launched.
    *
    * Note: This method should only be called after startup, once experiments have been loaded.
@@ -2597,7 +2639,7 @@ export class Config implements McpContext, AgentLoopContext {
       if (this.getSkillManager().getSkills().length > 0) {
         this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
         this.getToolRegistry().registerTool(
-          new ActivateSkillTool(this, this._messageBus),
+          new ActivateSkillTool(this, this.messageBus),
         );
       } else {
         this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
@@ -2781,7 +2823,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
-    const registry = new ToolRegistry(this, this._messageBus);
+    const registry = new ToolRegistry(this, this.messageBus);
 
     // helper to create & register core tools that are enabled
     const maybeRegister = (
@@ -2811,10 +2853,10 @@ export class Config implements McpContext, AgentLoopContext {
     };
 
     maybeRegister(LSTool, () =>
-      registry.registerTool(new LSTool(this, this._messageBus)),
+      registry.registerTool(new LSTool(this, this.messageBus)),
     );
     maybeRegister(ReadFileTool, () =>
-      registry.registerTool(new ReadFileTool(this, this._messageBus)),
+      registry.registerTool(new ReadFileTool(this, this.messageBus)),
     );
 
     if (this.getUseRipgrep()) {
@@ -2827,85 +2869,81 @@ export class Config implements McpContext, AgentLoopContext {
       }
       if (useRipgrep) {
         maybeRegister(RipGrepTool, () =>
-          registry.registerTool(new RipGrepTool(this, this._messageBus)),
+          registry.registerTool(new RipGrepTool(this, this.messageBus)),
         );
       } else {
         logRipgrepFallback(this, new RipgrepFallbackEvent(errorString));
         maybeRegister(GrepTool, () =>
-          registry.registerTool(new GrepTool(this, this._messageBus)),
+          registry.registerTool(new GrepTool(this, this.messageBus)),
         );
       }
     } else {
       maybeRegister(GrepTool, () =>
-        registry.registerTool(new GrepTool(this, this._messageBus)),
+        registry.registerTool(new GrepTool(this, this.messageBus)),
       );
     }
 
     maybeRegister(GlobTool, () =>
-      registry.registerTool(new GlobTool(this, this._messageBus)),
+      registry.registerTool(new GlobTool(this, this.messageBus)),
     );
     maybeRegister(ActivateSkillTool, () =>
-      registry.registerTool(new ActivateSkillTool(this, this._messageBus)),
+      registry.registerTool(new ActivateSkillTool(this, this.messageBus)),
     );
     maybeRegister(EditTool, () =>
-      registry.registerTool(new EditTool(this, this._messageBus)),
+      registry.registerTool(new EditTool(this, this.messageBus)),
     );
     maybeRegister(WriteFileTool, () =>
-      registry.registerTool(new WriteFileTool(this, this._messageBus)),
+      registry.registerTool(new WriteFileTool(this, this.messageBus)),
     );
     maybeRegister(WebFetchTool, () =>
-      registry.registerTool(new WebFetchTool(this, this._messageBus)),
+      registry.registerTool(new WebFetchTool(this, this.messageBus)),
     );
     maybeRegister(ShellTool, () =>
-      registry.registerTool(new ShellTool(this, this._messageBus)),
+      registry.registerTool(new ShellTool(this, this.messageBus)),
     );
     maybeRegister(MemoryTool, () =>
-      registry.registerTool(new MemoryTool(this._messageBus)),
+      registry.registerTool(new MemoryTool(this.messageBus)),
     );
     maybeRegister(WebSearchTool, () =>
-      registry.registerTool(new WebSearchTool(this, this._messageBus)),
+      registry.registerTool(new WebSearchTool(this, this.messageBus)),
     );
     maybeRegister(AskUserTool, () =>
-      registry.registerTool(new AskUserTool(this._messageBus)),
+      registry.registerTool(new AskUserTool(this.messageBus)),
     );
     if (this.getUseWriteTodos()) {
       maybeRegister(WriteTodosTool, () =>
-        registry.registerTool(new WriteTodosTool(this._messageBus)),
+        registry.registerTool(new WriteTodosTool(this.messageBus)),
       );
     }
     if (this.isPlanEnabled()) {
       maybeRegister(ExitPlanModeTool, () =>
-        registry.registerTool(new ExitPlanModeTool(this, this._messageBus)),
+        registry.registerTool(new ExitPlanModeTool(this, this.messageBus)),
       );
       maybeRegister(EnterPlanModeTool, () =>
-        registry.registerTool(new EnterPlanModeTool(this, this._messageBus)),
+        registry.registerTool(new EnterPlanModeTool(this, this.messageBus)),
       );
     }
 
     if (this.isTrackerEnabled()) {
       maybeRegister(TrackerCreateTaskTool, () =>
-        registry.registerTool(
-          new TrackerCreateTaskTool(this, this._messageBus),
-        ),
+        registry.registerTool(new TrackerCreateTaskTool(this, this.messageBus)),
       );
       maybeRegister(TrackerUpdateTaskTool, () =>
-        registry.registerTool(
-          new TrackerUpdateTaskTool(this, this._messageBus),
-        ),
+        registry.registerTool(new TrackerUpdateTaskTool(this, this.messageBus)),
       );
       maybeRegister(TrackerGetTaskTool, () =>
-        registry.registerTool(new TrackerGetTaskTool(this, this._messageBus)),
+        registry.registerTool(new TrackerGetTaskTool(this, this.messageBus)),
       );
       maybeRegister(TrackerListTasksTool, () =>
-        registry.registerTool(new TrackerListTasksTool(this, this._messageBus)),
+        registry.registerTool(new TrackerListTasksTool(this, this.messageBus)),
       );
       maybeRegister(TrackerAddDependencyTool, () =>
         registry.registerTool(
-          new TrackerAddDependencyTool(this, this._messageBus),
+          new TrackerAddDependencyTool(this, this.messageBus),
         ),
       );
       maybeRegister(TrackerVisualizeTool, () =>
-        registry.registerTool(new TrackerVisualizeTool(this, this._messageBus)),
+        registry.registerTool(new TrackerVisualizeTool(this, this.messageBus)),
       );
     }
 

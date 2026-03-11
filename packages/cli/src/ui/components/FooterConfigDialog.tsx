@@ -11,7 +11,7 @@ import { theme } from '../semantic-colors.js';
 import { useSettingsStore } from '../contexts/SettingsContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
-import { Command } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
 import { FooterRow, type FooterRowItem } from './Footer.js';
 import { ALL_ITEMS, resolveFooterState } from '../../config/footerItems.js';
 import { SettingScope } from '../../config/settings.js';
@@ -266,7 +266,7 @@ export const FooterConfigDialog: React.FC<FooterConfigDialogProps> = ({
         key: id,
         header: ALL_ITEMS.find((i) => i.id === id)?.header ?? id,
         element: mockData[id],
-        flexGrow: 1,
+        flexGrow: 0,
         isFocused: id === focusKey,
       }));
 

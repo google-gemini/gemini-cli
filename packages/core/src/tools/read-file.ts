@@ -14,8 +14,11 @@ import {
   type ToolInvocation,
   type ToolLocation,
   type ToolResult,
+  type PolicyUpdateOptions,
+  type ToolConfirmationOutcome,
 } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
+import { buildFilePathArgsPattern } from '../policy/utils.js';
 
 import type { PartUnion } from '@google/genai';
 import {
@@ -86,6 +89,14 @@ class ReadFileToolInvocation extends BaseToolInvocation<
         line: this.params.start_line,
       },
     ];
+  }
+
+  override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    return {
+      argsPattern: buildFilePathArgsPattern(this.params.file_path),
+    };
   }
 
   async execute(): Promise<ToolResult> {
