@@ -448,8 +448,8 @@ export enum AuthProviderType {
 
 export interface SandboxConfig {
   enabled: boolean;
-  allowedPaths: string[];
-  networkAccess: boolean;
+  allowedPaths?: string[];
+  networkAccess?: boolean;
   command?: 'docker' | 'podman' | 'sandbox-exec' | 'runsc' | 'lxc';
   image?: string;
 }
