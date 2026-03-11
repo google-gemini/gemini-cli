@@ -33,7 +33,6 @@ import {
 } from '../types.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import {
-import {
   createBrowserAgentDefinition,
   cleanupBrowserAgent,
 } from './browserAgentFactory.js';

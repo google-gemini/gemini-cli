@@ -119,8 +119,7 @@ export async function createBrowserAgentDefinition(
     );
   }
 
-  const browserConfig = config.getBrowserAgentConfig();
-  const sessionMode = browserConfig.customConfig.sessionMode ?? 'isolated';
+  const sessionMode = browserConfig?.customConfig?.sessionMode ?? 'isolated';
 
   // Record tool discovery metrics
   recordBrowserAgentToolDiscoveryMetrics(config, {

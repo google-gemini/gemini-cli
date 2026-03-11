@@ -1635,6 +1635,36 @@ export class ToolOutputMaskingEvent implements BaseTelemetryEvent {
   }
 }
 
+export const EVENT_STALE_OUTPUT_ELISION = 'gemini_cli.stale_output_elision';
+
+export class StaleOutputElisionEvent implements BaseTelemetryEvent {
+  'event.name': 'stale_output_elision';
+  'event.timestamp': string;
+  elision_count: number;
+  tokens_saved: number;
+
+  constructor(details: { elision_count: number; tokens_saved: number }) {
+    this['event.name'] = 'stale_output_elision';
+    this['event.timestamp'] = new Date().toISOString();
+    this.elision_count = details.elision_count;
+    this.tokens_saved = details.tokens_saved;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_STALE_OUTPUT_ELISION,
+      'event.timestamp': this['event.timestamp'],
+      elision_count: this.elision_count,
+      tokens_saved: this.tokens_saved,
+    };
+  }
+
+  toLogBody(): string {
+    return `Stale output elision (Elided ${this.elision_count} stale tool output(s). Saved ${this.tokens_saved} tokens)`;
+  }
+}
+
 export const EVENT_EXTENSION_UNINSTALL = 'gemini_cli.extension_uninstall';
 export class ExtensionUninstallEvent implements BaseTelemetryEvent {
   'event.name': 'extension_uninstall';
@@ -1862,6 +1892,7 @@ export type TelemetryEvent =
   | StartupStatsEvent
   | WebFetchFallbackAttemptEvent
   | ToolOutputMaskingEvent
+  | StaleOutputElisionEvent
   | EditStrategyEvent
   | PlanExecutionEvent
   | RewindEvent
