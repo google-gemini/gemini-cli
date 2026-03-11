@@ -71,6 +71,7 @@ import type { RoutingContext } from '../routing/routingStrategy.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import { ToolOutputMaskingService } from '../services/toolOutputMaskingService.js';
+import { StaleOutputElisionService } from '../services/staleOutputElisionService.js';
 import { calculateRequestTokenCount } from '../utils/tokenCalculation.js';
 import {
   applyModelSelection,
@@ -99,6 +100,7 @@ export class GeminiClient {
   private readonly loopDetector: LoopDetectionService;
   private readonly compressionService: ChatCompressionService;
   private readonly toolOutputMaskingService: ToolOutputMaskingService;
+  private readonly staleOutputElisionService: StaleOutputElisionService;
   private lastPromptId: string;
   private currentSequenceModel: string | null = null;
   private lastSentIdeContext: IdeContext | undefined;
@@ -114,6 +116,7 @@ export class GeminiClient {
     this.loopDetector = new LoopDetectionService(this.config);
     this.compressionService = new ChatCompressionService();
     this.toolOutputMaskingService = new ToolOutputMaskingService();
+    this.staleOutputElisionService = new StaleOutputElisionService();
     this.lastPromptId = this.config.getSessionId();
 
     coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
@@ -605,6 +608,7 @@ export class GeminiClient {
     const remainingTokenCount =
       tokenLimit(modelForLimitCheck) - this.getChat().getLastPromptTokenCount();
 
+    await this.tryElideStaleOutputs(this.getHistory());
     await this.tryMaskToolOutputs(this.getHistory());
 
     // Estimate tokens. For text-only requests, we estimate based on character length.
@@ -1205,6 +1209,7 @@ export class GeminiClient {
   }
 
   /**
+  /**
    * Handles loop recovery by providing feedback to the model and initiating a new turn.
    */
   private _recoverFromLoop(
@@ -1240,5 +1245,20 @@ export class GeminiClient {
       isInvalidStreamRetry,
       displayContent,
     );
+  }
+
+  /**
+   * Elides stale tool read outputs from history.
+   * A read output is stale when a subsequent write tool operated on the same
+   * file path, making the prior file view outdated.
+   */
+  private async tryElideStaleOutputs(history: Content[]): Promise<void> {
+    const result = await this.staleOutputElisionService.elide(
+      history,
+      this.config,
+    );
+    if (result.elisionCount > 0) {
+      this.getChat().setHistory(result.newHistory);
+    }
   }
 }

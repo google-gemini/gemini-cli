@@ -47,6 +47,7 @@ import type {
   ApprovalModeDurationEvent,
   PlanExecutionEvent,
   ToolOutputMaskingEvent,
+  StaleOutputElisionEvent,
   KeychainAvailabilityEvent,
   TokenStorageInitializationEvent,
   StartupStatsEvent,
@@ -119,6 +120,7 @@ export enum EventNames {
   CONSECA_POLICY_GENERATION = 'conseca_policy_generation',
   CONSECA_VERDICT = 'conseca_verdict',
   STARTUP_STATS = 'startup_stats',
+  STALE_OUTPUT_ELISION = 'stale_output_elision',
 }
 
 export interface LogResponse {
@@ -1382,6 +1384,25 @@ export class ClearcutLogger {
 
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.TOOL_OUTPUT_MASKING, data),
+    );
+    this.flushIfNeeded();
+  }
+
+  logStaleOutputElisionEvent(event: StaleOutputElisionEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_STALE_OUTPUT_ELISION_COUNT,
+        value: event.elision_count.toString(),
+      },
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_STALE_OUTPUT_ELISION_TOKENS_SAVED,
+        value: event.tokens_saved.toString(),
+      },
+    ];
+
+    this.enqueueLogEvent(
+      this.createLogEvent(EventNames.STALE_OUTPUT_ELISION, data),
     );
     this.flushIfNeeded();
   }
