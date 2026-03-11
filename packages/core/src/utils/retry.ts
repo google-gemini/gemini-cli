@@ -100,6 +100,7 @@ function getNetworkErrorCode(error: unknown): string | undefined {
 }
 
 const FETCH_FAILED_MESSAGE = 'fetch failed';
+const INCOMPLETE_JSON_MESSAGE = 'incomplete json segment';
 
 /**
  * Default predicate function to determine if a retry should be attempted.
@@ -119,8 +120,12 @@ export function isRetryableError(
   }
 
   if (retryFetchErrors && error instanceof Error) {
-    // Check for generic fetch failed message (case-insensitive)
-    if (error.message.toLowerCase().includes(FETCH_FAILED_MESSAGE)) {
+    const lowerMessage = error.message.toLowerCase();
+    // Check for generic fetch failed message or incomplete JSON segment (common stream error)
+    if (
+      lowerMessage.includes(FETCH_FAILED_MESSAGE) ||
+      lowerMessage.includes(INCOMPLETE_JSON_MESSAGE)
+    ) {
       return true;
     }
   }

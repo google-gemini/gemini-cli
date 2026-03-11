@@ -21,6 +21,8 @@ import { getErrorMessage } from '../utils/errors.js';
 import { logMalformedJsonResponse } from '../telemetry/loggers.js';
 import { MalformedJsonResponseEvent, LlmRole } from '../telemetry/types.js';
 import { retryWithBackoff } from '../utils/retry.js';
+import { coreEvents } from '../utils/events.js';
+import { getDisplayString } from '../config/models.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 import {
   applyModelSelection,
@@ -327,6 +329,17 @@ export class BaseLlmClient {
           : undefined,
         authType:
           this.authType ?? this.config.getContentGeneratorConfig()?.authType,
+        retryFetchErrors: this.config.getRetryFetchErrors(),
+        onRetry: (attempt, error, delayMs) => {
+          coreEvents.emitRetryAttempt({
+            attempt,
+            maxAttempts:
+              availabilityMaxAttempts ?? maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
+            delayMs,
+            error: error instanceof Error ? error.message : String(error),
+            model: getDisplayString(currentModel),
+          });
+        },
       });
     } catch (error) {
       if (abortSignal?.aborted) {
