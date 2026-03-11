@@ -21,10 +21,11 @@ import { EventEmitter } from 'node:events';
 import open from 'open';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
+import { logGoogleAuthStart, logGoogleAuthEnd } from '../telemetry/loggers.js';
 import {
-  recordGoogleAuthStart,
-  recordGoogleAuthEnd,
-} from '../telemetry/metrics.js';
+  GoogleAuthStartEvent,
+  GoogleAuthEndEvent,
+} from '../telemetry/types.js';
 import type { Config } from '../config/config.js';
 import {
   getErrorMessage,
@@ -117,9 +118,9 @@ async function initOauthClient(
   authType: AuthType,
   config: Config,
 ): Promise<AuthClient> {
-  const recordGoogleAuthEndIfApplicable = () => {
+  const logGoogleAuthEndIfApplicable = () => {
     if (authType === AuthType.LOGIN_WITH_GOOGLE) {
-      recordGoogleAuthEnd(config);
+      logGoogleAuthEnd(config, new GoogleAuthEndEvent());
     }
   };
 
@@ -154,7 +155,7 @@ async function initOauthClient(
   });
 
   if (authType === AuthType.LOGIN_WITH_GOOGLE) {
-    recordGoogleAuthStart(config);
+    logGoogleAuthStart(config, new GoogleAuthStartEvent());
   }
 
   const useEncryptedStorage = getUseEncryptedStorageFlag();
@@ -203,7 +204,7 @@ async function initOauthClient(
         debugLogger.log('Loaded cached credentials.');
         await triggerPostAuthCallbacks(credentials as Credentials);
 
-        recordGoogleAuthEndIfApplicable();
+        logGoogleAuthEndIfApplicable();
         return client;
       }
     } catch (error) {
@@ -295,7 +296,7 @@ async function initOauthClient(
     }
 
     await triggerPostAuthCallbacks(client.credentials);
-    recordGoogleAuthEndIfApplicable();
+    logGoogleAuthEndIfApplicable();
   } else {
     // In ACP mode, we skip the interactive consent and directly open the browser
     if (!config.getAcpMode()) {
@@ -402,7 +403,7 @@ async function initOauthClient(
     });
 
     await triggerPostAuthCallbacks(client.credentials);
-    recordGoogleAuthEndIfApplicable();
+    logGoogleAuthEndIfApplicable();
   }
 
   return client;

@@ -1397,6 +1397,7 @@ export function recordTokenStorageInitialization(
   tokenStorageTypeCounter.add(1, {
     ...baseMetricDefinition.getCommonAttributes(config),
     forced: event.forced,
+    type: event.type,
   });
 }
 
