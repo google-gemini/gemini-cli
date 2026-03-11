@@ -1330,7 +1330,12 @@ export function useVim(buffer: TextBuffer, onSubmit?: (value: string) => void) {
             // Unknown command, clear count and pending states
             dispatch({ type: 'CLEAR_PENDING_STATES' });
 
-            // Not handled by vim so allow other handlers to process it.
+            // Ignore any insertable key in Normal Mode
+            if (normalizedKey.insertable) {
+              return true;
+            }
+
+            // Not handled by vim so allow other handlers to process it
             return false;
           }
         }
