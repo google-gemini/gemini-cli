@@ -382,7 +382,7 @@ describe('ChatRecordingService', () => {
         id: 'tool-1',
         name: 'testTool',
         args: {},
-        status: 'success',
+        status: CoreToolCallStatus.Success,
         timestamp: new Date().toISOString(),
         description: dynamicDescription,
       };
