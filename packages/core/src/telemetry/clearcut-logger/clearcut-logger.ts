@@ -1238,17 +1238,16 @@ export class ClearcutLogger {
     const data: EventValue[] = [
       {
         gemini_cli_key:
-          EventMetadataKey.GEMINI_CLI_CONTENT_RETRY_ATTEMPT_NUMBER,
+          EventMetadataKey.GEMINI_CLI_NETWORK_RETRY_ATTEMPT_NUMBER,
         value: String(event.attempt),
       },
       {
-        gemini_cli_key:
-          EventMetadataKey.GEMINI_CLI_CONTENT_RETRY_FAILURE_TOTAL_ATTEMPTS,
-        value: String(event.max_attempts),
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_NETWORK_RETRY_DELAY_MS,
+        value: String(event.delay_ms),
       },
       {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_CONTENT_RETRY_DELAY_MS,
-        value: String(event.delay_ms),
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_NETWORK_RETRY_ERROR_MESSAGE,
+        value: event.error,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_REQUEST_MODEL,
