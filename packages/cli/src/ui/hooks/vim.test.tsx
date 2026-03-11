@@ -2398,7 +2398,7 @@ describe('useVim hook', () => {
   });
 
   describe('Yank and paste (y/p/P)', () => {
-    it('yy calls vimYankLine(1)', () => {
+    it('should handle yy (yank line)', () => {
       const { result } = renderVimHook();
       exitInsertMode(result);
       act(() => {
@@ -2410,7 +2410,7 @@ describe('useVim hook', () => {
       expect(mockBuffer.vimYankLine).toHaveBeenCalledWith(1);
     });
 
-    it('2yy calls vimYankLine(2)', () => {
+    it('should handle 2yy (yank 2 lines)', () => {
       const { result } = renderVimHook();
       exitInsertMode(result);
       act(() => {
@@ -2425,7 +2425,7 @@ describe('useVim hook', () => {
       expect(mockBuffer.vimYankLine).toHaveBeenCalledWith(2);
     });
 
-    it('Y calls vimYankLine(1)', () => {
+    it('should handle Y (yank line, same as yy)', () => {
       const { result } = renderVimHook();
       exitInsertMode(result);
       act(() => {
@@ -2434,7 +2434,7 @@ describe('useVim hook', () => {
       expect(mockBuffer.vimYankLine).toHaveBeenCalledWith(1);
     });
 
-    it('yw calls vimYankWordForward(1)', () => {
+    it('should handle yw (yank word forward)', () => {
       const { result } = renderVimHook();
       exitInsertMode(result);
       act(() => {
@@ -2446,7 +2446,7 @@ describe('useVim hook', () => {
       expect(mockBuffer.vimYankWordForward).toHaveBeenCalledWith(1);
     });
 
-    it('yW calls vimYankBigWordForward(1)', () => {
+    it('should handle yW (yank big word forward)', () => {
       const { result } = renderVimHook();
       exitInsertMode(result);
       act(() => {
@@ -2458,7 +2458,7 @@ describe('useVim hook', () => {
       expect(mockBuffer.vimYankBigWordForward).toHaveBeenCalledWith(1);
     });
 
-    it('ye calls vimYankWordEnd(1)', () => {
+    it('should handle ye (yank to end of word)', () => {
       const { result } = renderVimHook();
       exitInsertMode(result);
       act(() => {
@@ -2470,7 +2470,7 @@ describe('useVim hook', () => {
       expect(mockBuffer.vimYankWordEnd).toHaveBeenCalledWith(1);
     });
 
-    it('yE calls vimYankBigWordEnd(1)', () => {
+    it('should handle yE (yank to end of big word)', () => {
       const { result } = renderVimHook();
       exitInsertMode(result);
       act(() => {
@@ -2482,7 +2482,7 @@ describe('useVim hook', () => {
       expect(mockBuffer.vimYankBigWordEnd).toHaveBeenCalledWith(1);
     });
 
-    it('y$ calls vimYankToEndOfLine(1)', () => {
+    it('should handle y$ (yank to end of line)', () => {
       const { result } = renderVimHook();
       exitInsertMode(result);
       act(() => {
@@ -2494,7 +2494,7 @@ describe('useVim hook', () => {
       expect(mockBuffer.vimYankToEndOfLine).toHaveBeenCalledWith(1);
     });
 
-    it('p calls vimPasteAfter(1)', () => {
+    it('should handle p (paste after)', () => {
       const { result } = renderVimHook();
       exitInsertMode(result);
       act(() => {
@@ -2503,7 +2503,7 @@ describe('useVim hook', () => {
       expect(mockBuffer.vimPasteAfter).toHaveBeenCalledWith(1);
     });
 
-    it('2p calls vimPasteAfter(2)', () => {
+    it('should handle 2p (paste after, count 2)', () => {
       const { result } = renderVimHook();
       exitInsertMode(result);
       act(() => {
@@ -2515,7 +2515,7 @@ describe('useVim hook', () => {
       expect(mockBuffer.vimPasteAfter).toHaveBeenCalledWith(2);
     });
 
-    it('P calls vimPasteBefore(1)', () => {
+    it('should handle P (paste before)', () => {
       const { result } = renderVimHook();
       exitInsertMode(result);
       act(() => {
@@ -2524,8 +2524,8 @@ describe('useVim hook', () => {
       expect(mockBuffer.vimPasteBefore).toHaveBeenCalledWith(1);
     });
 
-    // Integration tests using actual textBufferReducer to verify state changes
-    it('yy then p: duplicates line below (end-to-end)', () => {
+    // Integration tests using actual textBufferReducer to verify full state changes
+    it('should duplicate a line below with yy then p', () => {
       const initialState = createMockTextBufferState({
         lines: ['hello', 'world'],
         cursorRow: 0,
@@ -2549,7 +2549,7 @@ describe('useVim hook', () => {
       expect(state.cursorCol).toBe(0);
     });
 
-    it('yw then p: pastes word after cursor (end-to-end)', () => {
+    it('should paste a yanked word after cursor with yw then p', () => {
       const initialState = createMockTextBufferState({
         lines: ['hello world'],
         cursorRow: 0,
@@ -2574,7 +2574,7 @@ describe('useVim hook', () => {
       expect(state.lines[0]).toContain('hello ');
     });
 
-    it('dw then p: moves word forward (end-to-end)', () => {
+    it('should move a word forward with dw then p', () => {
       const initialState = createMockTextBufferState({
         lines: ['hello world'],
         cursorRow: 0,
