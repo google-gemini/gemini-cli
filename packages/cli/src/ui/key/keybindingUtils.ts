@@ -9,14 +9,14 @@ import {
   type Command,
   type KeyBinding,
   type KeyBindingConfig,
-  defaultKeyBindings,
-} from '../../config/keyBindings.js';
+  defaultKeyBindingConfig,
+} from './keyBindings.js';
 
 /**
  * Maps internal key names to user-friendly display names.
  */
 const KEY_NAME_MAP: Record<string, string> = {
-  return: 'Enter',
+  enter: 'Enter',
   escape: 'Esc',
   backspace: 'Backspace',
   delete: 'Delete',
@@ -30,7 +30,6 @@ const KEY_NAME_MAP: Record<string, string> = {
   end: 'End',
   tab: 'Tab',
   space: 'Space',
-  'double escape': 'Double Esc',
 };
 
 interface ModifierMap {
@@ -98,10 +97,10 @@ export function formatKeyBinding(
  */
 export function formatCommand(
   command: Command,
-  config: KeyBindingConfig = defaultKeyBindings,
+  config: KeyBindingConfig = defaultKeyBindingConfig,
   platform?: string,
 ): string {
-  const bindings = config[command];
+  const bindings = config.get(command);
   if (!bindings || bindings.length === 0) {
     return '';
   }

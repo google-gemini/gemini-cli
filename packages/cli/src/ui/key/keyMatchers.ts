@@ -4,26 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Key } from './hooks/useKeypress.js';
-import type { KeyBinding, KeyBindingConfig } from '../config/keyBindings.js';
-import { Command, defaultKeyBindings } from '../config/keyBindings.js';
-
-/**
- * Matches a KeyBinding against an actual Key press
- * Pure data-driven matching logic
- */
-function matchKeyBinding(keyBinding: KeyBinding, key: Key): boolean {
-  // Check modifiers:
-  // true = modifier must be pressed
-  // false or undefined = modifier must NOT be pressed
-  return (
-    keyBinding.key === key.name &&
-    !!key.shift === !!keyBinding.shift &&
-    !!key.alt === !!keyBinding.alt &&
-    !!key.ctrl === !!keyBinding.ctrl &&
-    !!key.cmd === !!keyBinding.cmd
-  );
-}
+import type { Key } from '../hooks/useKeypress.js';
+import type { KeyBindingConfig } from './keyBindings.js';
+import {
+  Command,
+  defaultKeyBindingConfig,
+  loadCustomKeybindings,
+} from './keyBindings.js';
 
 /**
  * Checks if a key matches any of the bindings for a command
@@ -31,10 +18,11 @@ function matchKeyBinding(keyBinding: KeyBinding, key: Key): boolean {
 function matchCommand(
   command: Command,
   key: Key,
-  config: KeyBindingConfig = defaultKeyBindings,
+  config: KeyBindingConfig = defaultKeyBindingConfig,
 ): boolean {
-  const bindings = config[command];
-  return bindings.some((binding) => matchKeyBinding(binding, key));
+  const bindings = config.get(command);
+  if (!bindings) return false;
+  return bindings.some((binding) => binding.matches(key));
 }
 
 /**
@@ -53,7 +41,7 @@ export type KeyMatchers = {
  * Creates key matchers from a key binding configuration
  */
 export function createKeyMatchers(
-  config: KeyBindingConfig = defaultKeyBindings,
+  config: KeyBindingConfig = defaultKeyBindingConfig,
 ): KeyMatchers {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const matchers = {} as { [C in Command]: KeyMatcher };
@@ -68,7 +56,23 @@ export function createKeyMatchers(
 /**
  * Default key binding matchers using the default configuration
  */
-export const keyMatchers: KeyMatchers = createKeyMatchers(defaultKeyBindings);
+export const defaultKeyMatchers: KeyMatchers = createKeyMatchers(
+  defaultKeyBindingConfig,
+);
 
 // Re-export Command for convenience
 export { Command };
+
+/**
+ * Loads and creates key matchers including user customizations.
+ */
+export async function loadKeyMatchers(): Promise<{
+  matchers: KeyMatchers;
+  errors: string[];
+}> {
+  const { config, errors } = await loadCustomKeybindings();
+  return {
+    matchers: createKeyMatchers(config),
+    errors,
+  };
+}

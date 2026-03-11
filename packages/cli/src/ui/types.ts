@@ -15,6 +15,7 @@ import {
   type SkillDefinition,
   type AgentDefinition,
   type ApprovalMode,
+  type Kind,
   CoreToolCallStatus,
   checkExhaustive,
 } from '@google/gemini-cli-core';
@@ -105,6 +106,7 @@ export interface IndividualToolCallDisplay {
   status: CoreToolCallStatus;
   // True when the tool was initiated directly by the user (slash/@/shell flows).
   isClientInitiated?: boolean;
+  kind?: Kind;
   confirmationDetails: SerializableConfirmationDetails | undefined;
   renderOutputAsMarkdown?: boolean;
   ptyId?: number;
@@ -481,6 +483,7 @@ export type SlashCommandProcessorResult =
       type: 'schedule_tool';
       toolName: string;
       toolArgs: Record<string, unknown>;
+      postSubmitPrompt?: PartListUnion;
     }
   | {
       type: 'handled'; // Indicates the command was processed and no further action is needed.
