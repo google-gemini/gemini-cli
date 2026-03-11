@@ -31,7 +31,6 @@ export function createMockConfig(
   const tmpDir = tmpdir();
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const mockConfig = {
-     
     get toolRegistry(): ToolRegistry {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return (this as unknown as Config).getToolRegistry();
