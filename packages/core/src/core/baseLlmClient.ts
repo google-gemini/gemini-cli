@@ -27,7 +27,7 @@ import {
   LlmRole,
   RetryAttemptEvent,
 } from '../telemetry/types.js';
-import { retryWithBackoff } from '../utils/retry.js';
+import { retryWithBackoff, getRetryErrorType } from '../utils/retry.js';
 import { coreEvents } from '../utils/events.js';
 import { getDisplayString } from '../config/models.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
@@ -341,14 +341,13 @@ export class BaseLlmClient {
           const actualMaxAttempts =
             availabilityMaxAttempts ?? maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
           const modelName = getDisplayString(currentModel);
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
+          const errorType = getRetryErrorType(error);
 
           coreEvents.emitRetryAttempt({
             attempt,
             maxAttempts: actualMaxAttempts,
             delayMs,
-            error: errorMessage,
+            error: errorType,
             model: modelName,
           });
 
@@ -357,7 +356,7 @@ export class BaseLlmClient {
             new RetryAttemptEvent(
               attempt,
               actualMaxAttempts,
-              errorMessage,
+              errorType,
               delayMs,
               modelName,
             ),

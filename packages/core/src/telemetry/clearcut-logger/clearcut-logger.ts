@@ -1247,7 +1247,7 @@ export class ClearcutLogger {
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_NETWORK_RETRY_ERROR_MESSAGE,
-        value: event.error,
+        value: event.error_type,
       },
       {
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_REQUEST_MODEL,

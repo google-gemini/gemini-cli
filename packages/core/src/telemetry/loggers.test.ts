@@ -2456,7 +2456,7 @@ describe('loggers', () => {
       ).toHaveBeenCalledWith(event);
 
       expect(mockLogger.emit).toHaveBeenCalledWith({
-        body: 'Retry attempt 2/5 for test-model. Delay: 1000ms. Error: Overloaded',
+        body: 'Retry attempt 2/5 for test-model. Delay: 1000ms. Error type: Overloaded',
         attributes: {
           'session.id': 'test-session-id',
           'user.email': 'test-user@example.com',
@@ -2466,7 +2466,7 @@ describe('loggers', () => {
           interactive: false,
           attempt: 2,
           max_attempts: 5,
-          error: 'Overloaded',
+          error_type: 'Overloaded',
           delay_ms: 1000,
           model: 'test-model',
         },

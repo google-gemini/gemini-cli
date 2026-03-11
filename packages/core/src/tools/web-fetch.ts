@@ -34,7 +34,7 @@ import { LlmRole } from '../telemetry/llmRole.js';
 import { WEB_FETCH_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
-import { retryWithBackoff } from '../utils/retry.js';
+import { retryWithBackoff, getRetryErrorType } from '../utils/retry.js';
 import { WEB_FETCH_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { LRUCache } from 'mnemonist';
@@ -192,13 +192,13 @@ class WebFetchToolInvocation extends BaseToolInvocation<
   private handleRetry(attempt: number, error: unknown, delayMs: number): void {
     const maxAttempts = this.config.getMaxAttempts();
     const modelName = 'Web Fetch';
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorType = getRetryErrorType(error);
 
     coreEvents.emitRetryAttempt({
       attempt,
       maxAttempts,
       delayMs,
-      error: errorMessage,
+      error: errorType,
       model: modelName,
     });
 
@@ -207,7 +207,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       new RetryAttemptEvent(
         attempt,
         maxAttempts,
-        errorMessage,
+        errorType,
         delayMs,
         modelName,
       ),

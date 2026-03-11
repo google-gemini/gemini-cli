@@ -1348,14 +1348,14 @@ export class RetryAttemptEvent implements BaseTelemetryEvent {
   'event.timestamp': string;
   attempt: number;
   max_attempts: number;
-  error: string;
+  error_type: string;
   delay_ms: number;
   model: string;
 
   constructor(
     attempt: number,
     max_attempts: number,
-    error: string,
+    error_type: string,
     delay_ms: number,
     model: string,
   ) {
@@ -1363,7 +1363,7 @@ export class RetryAttemptEvent implements BaseTelemetryEvent {
     this['event.timestamp'] = new Date().toISOString();
     this.attempt = attempt;
     this.max_attempts = max_attempts;
-    this.error = error;
+    this.error_type = error_type;
     this.delay_ms = delay_ms;
     this.model = model;
   }
@@ -1375,14 +1375,14 @@ export class RetryAttemptEvent implements BaseTelemetryEvent {
       'event.timestamp': this['event.timestamp'],
       attempt: this.attempt,
       max_attempts: this.max_attempts,
-      error: this.error,
+      error_type: this.error_type,
       delay_ms: this.delay_ms,
       model: this.model,
     };
   }
 
   toLogBody(): string {
-    return `Retry attempt ${this.attempt}/${this.max_attempts} for ${this.model}. Delay: ${this.delay_ms}ms. Error: ${this.error}`;
+    return `Retry attempt ${this.attempt}/${this.max_attempts} for ${this.model}. Delay: ${this.delay_ms}ms. Error type: ${this.error_type}`;
   }
 }
 
