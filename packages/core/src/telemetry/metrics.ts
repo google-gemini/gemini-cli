@@ -1398,6 +1398,7 @@ export function recordTokenStorageInitialization(
     ...baseMetricDefinition.getCommonAttributes(config),
     type: event.type,
     forced: event.forced,
+    type: event.type,
   });
 }
 

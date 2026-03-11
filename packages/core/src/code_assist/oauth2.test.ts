@@ -26,10 +26,7 @@ import {
   clearOauthClientCache,
   authEvents,
 } from './oauth2.js';
-import {
-  recordGoogleAuthStart,
-  recordGoogleAuthEnd,
-} from '../telemetry/metrics.js';
+import { logGoogleAuthStart, logGoogleAuthEnd } from '../telemetry/loggers.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -109,9 +106,9 @@ vi.mock('../mcp/token-storage/hybrid-token-storage.js', () => ({
   })),
 }));
 
-vi.mock('../telemetry/metrics.js', () => ({
-  recordGoogleAuthStart: vi.fn(),
-  recordGoogleAuthEnd: vi.fn(),
+vi.mock('../telemetry/loggers.js', () => ({
+  logGoogleAuthStart: vi.fn(),
+  logGoogleAuthEnd: vi.fn(),
 }));
 
 const mockConfig = {
@@ -1415,8 +1412,14 @@ describe('oauth2', () => {
 
         await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
 
-        expect(recordGoogleAuthStart).toHaveBeenCalledWith(mockConfig);
-        expect(recordGoogleAuthEnd).toHaveBeenCalledWith(mockConfig);
+        expect(logGoogleAuthStart).toHaveBeenCalledWith(
+          mockConfig,
+          expect.any(Object),
+        );
+        expect(logGoogleAuthEnd).toHaveBeenCalledWith(
+          mockConfig,
+          expect.any(Object),
+        );
       });
 
       it('should NOT record google auth events for non-LOGIN_WITH_GOOGLE auth types', async () => {
