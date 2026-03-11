@@ -1364,7 +1364,11 @@ export function handleVimAction(
         endCol,
         '',
       );
-      return { ...resultState, cursorCol: startCol, preferredCol: null };
+      return clampNormalCursor({
+        ...resultState,
+        cursorCol: startCol,
+        preferredCol: null,
+      });
     }
 
     case 'vim_find_char_forward': {

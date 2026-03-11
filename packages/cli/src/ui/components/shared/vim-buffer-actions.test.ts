@@ -641,7 +641,7 @@ describe('vim-buffer-actions', () => {
         const result = handleVimAction(state, action);
         expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('hello ');
-        expect(result.cursorCol).toBe(6);
+        expect(result.cursorCol).toBe(5);
       });
 
       it('should delete only the word characters if it is the last word followed by whitespace', () => {
@@ -815,7 +815,7 @@ describe('vim-buffer-actions', () => {
         const result = handleVimAction(state, action);
         expect(result).toHaveOnlyValidCharacters();
         expect(result.lines[0]).toBe('hello');
-        expect(result.cursorCol).toBe(5);
+        expect(result.cursorCol).toBe(4);
       });
 
       it('should do nothing at end of line', () => {
@@ -845,7 +845,7 @@ describe('vim-buffer-actions', () => {
         expect(result).toHaveOnlyValidCharacters();
         // 2D at position 5 on "line one" should delete "one" + entire "line two"
         expect(result.lines).toEqual(['line ', 'line three']);
-        expect(result.cursorCol).toBe(5);
+        expect(result.cursorCol).toBe(4);
       });
 
       it('should handle count exceeding available lines', () => {
@@ -2213,6 +2213,18 @@ describe('vim-buffer-actions', () => {
         payload: { char: 'o', count: 1, till: false },
       });
       expect(result.undoStack.length).toBeGreaterThan(0);
+    });
+
+    it('dF: clamps cursor when deletion removes chars up to end of line', () => {
+      // 'hello', cursor on last char 'o' (col 4), dFe finds 'e' at col 1
+      // deletes [1, 5) → 'h'; without clamp cursor would be at col 1 (past end)
+      const state = createTestState(['hello'], 0, 4);
+      const result = handleVimAction(state, {
+        type: 'vim_delete_to_char_backward' as const,
+        payload: { char: 'e', count: 1, till: false },
+      });
+      expect(result.lines[0]).toBe('h');
+      expect(result.cursorCol).toBe(0);
     });
   });
 });
