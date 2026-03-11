@@ -12,6 +12,7 @@ import type {
   Config,
 } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { act } from 'react';
 import { createMockSettings } from '../../../test-utils/settings.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
 
@@ -642,6 +643,57 @@ describe('ToolConfirmationMessage', () => {
     expect(output).toContain('MCP Tool Details:');
     expect(output).toContain('(press Ctrl+O to expand MCP tool details)');
     expect(output).not.toContain('Invocation Arguments:');
+    unmount();
+  });
+
+  it('should toggle MCP tool details expansion when Ctrl+O is pressed', async () => {
+    const confirmationDetails: ToolCallConfirmationDetails = {
+      type: 'mcp',
+      title: 'Confirm MCP Tool',
+      serverName: 'test-server',
+      toolName: 'test-tool',
+      toolDisplayName: 'Test Tool',
+      toolArgs: { arg: 'val' },
+      toolDescription: 'Test tool description',
+      onConfirm: vi.fn(),
+    };
+
+    const { lastFrame, waitUntilReady, stdin, unmount } = renderWithProviders(
+      <ToolConfirmationMessage
+        callId="test-call-id"
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        getPreferredEditor={vi.fn()}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
+    );
+    await waitUntilReady();
+
+    // Initially collapsed
+    expect(lastFrame()).toContain('(press Ctrl+O to expand MCP tool details)');
+    expect(lastFrame()).not.toContain('Invocation Arguments:');
+
+    // Press Ctrl+O (\x0f)
+    await act(async () => {
+      stdin.write('\x0f');
+    });
+    await waitUntilReady();
+
+    // Now expanded
+    expect(lastFrame()).toContain(
+      '(press Ctrl+O to collapse MCP tool details)',
+    );
+    expect(lastFrame()).toContain('Invocation Arguments:');
+
+    // Press Ctrl+O again
+    await act(async () => {
+      stdin.write('\x0f');
+    });
+    await waitUntilReady();
+
+    // Collapsed again
+    expect(lastFrame()).toContain('(press Ctrl+O to expand MCP tool details)');
     unmount();
   });
 });

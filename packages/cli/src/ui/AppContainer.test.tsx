@@ -3893,4 +3893,42 @@ describe('AppContainer State Management', () => {
       unmount!();
     });
   });
+
+  describe('Keyboard Shortcuts', () => {
+    it('should toggle constrainHeight when Ctrl+O is pressed', async () => {
+      let renderResult: {
+        stdin: { write: (data: string) => boolean };
+        waitUntilReady: () => Promise<void>;
+        unmount: () => void;
+      };
+      await act(async () => {
+        renderResult = renderAppContainer() as unknown as typeof renderResult;
+      });
+      const { stdin, waitUntilReady, unmount } = renderResult!;
+      await waitUntilReady();
+
+      // Initially constrained
+      expect(capturedUIState.constrainHeight).toBe(true);
+
+      // Press Ctrl+O (\x0f)
+      await act(async () => {
+        stdin.write('\x0f');
+      });
+      await waitUntilReady();
+
+      // Now unconstrained
+      expect(capturedUIState.constrainHeight).toBe(false);
+
+      // Press Ctrl+O again
+      await act(async () => {
+        stdin.write('\x0f');
+      });
+      await waitUntilReady();
+
+      // Constrained again
+      expect(capturedUIState.constrainHeight).toBe(true);
+
+      unmount();
+    });
+  });
 });
