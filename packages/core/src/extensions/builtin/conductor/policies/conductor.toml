@@ -1,0 +1,15 @@
+# Allow writing conductor files in plan mode
+[[rule]]
+toolName = ["write_file", "replace"]
+priority = 100 # prioritize over other extension policies
+decision = "ask_user"
+modes = ["plan"]
+argsPattern = '"(?:file_path|path)":"conductor/[^"]*"'
+
+# Allow tools used by conductor to set up conductor dir
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = ["git status", "git diff", "ls", "mkdir", "cp", "git init", "git add", "git commit"]
+decision = "ask_user"
+priority = 100 # prioritize over other extension policies
+modes = ["plan"]

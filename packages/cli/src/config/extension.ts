@@ -23,7 +23,7 @@ import type { ExtensionSetting } from './extensions/extensionSettings.js';
  */
 export interface ExtensionConfig {
   name: string;
-  version: string;
+  version?: string;
   mcpServers?: Record<string, MCPServerConfig>;
   contextFileName?: string | string[];
   excludeTools?: string[];
