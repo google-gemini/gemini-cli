@@ -75,8 +75,9 @@ async function buildTodosReturnDisplay(
 
     const children = childrenMap.get(task.id) ?? [];
     for (const child of children) {
-      addTask(child, depth + 1, new Set(visited));
+      addTask(child, depth + 1, visited);
     }
+    visited.delete(task.id);
   };
 
   for (const root of roots) {
@@ -607,8 +608,9 @@ class TrackerVisualizeInvocation extends BaseToolInvocation<
       }
       const children = childrenMap.get(task.id) ?? [];
       for (const child of children) {
-        renderTask(child, depth + 1, new Set(visited));
+        renderTask(child, depth + 1, visited);
       }
+      visited.delete(task.id);
     };
 
     for (const root of roots) {
