@@ -12,12 +12,13 @@ function askUserEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
   return appEvalTest(policy, {
     ...evalCase,
     configOverrides: {
+      ...evalCase.configOverrides,
       general: {
+        ...evalCase.configOverrides?.general,
         approvalMode: 'default',
         enableAutoUpdate: false,
         enableAutoUpdateNotification: false,
       },
-      ...evalCase.configOverrides,
     },
     files: {
       '.gemini/state.json': JSON.stringify({ terminalSetupPromptShown: true }),
