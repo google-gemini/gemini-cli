@@ -212,9 +212,9 @@ toolset or force specific tool modes.
   - `hookSpecificOutput.toolConfig.mode`: (`"AUTO" | "ANY" | "NONE"`)
     - `"NONE"`: Disables all tools (Wins over other hooks).
     - `"ANY"`: Forces at least one tool call.
-  - `hookSpecificOutput.toolConfig.allowedFunctionNames`: (`string[]`) Whitelist
+  - `hookSpecificOutput.toolConfig.allowedFunctionNames`: (`string[]`) Allowlist
     of tool names.
-- **Union Strategy**: Multiple hooks' whitelists are **combined**.
+- **Union Strategy**: Multiple hooks' allowlists are **combined**.
 - **Limitations**: Does **not** support `decision`, `continue`, or
   `systemMessage`.
 

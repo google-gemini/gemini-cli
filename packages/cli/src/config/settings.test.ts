@@ -1993,20 +1993,20 @@ describe('Settings Loading and Merging', () => {
       expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
     });
 
-    it('loads whitelisted env files from untrusted spaces if sandboxing is enabled', () => {
+    it('loads allowed env files from untrusted spaces if sandboxing is enabled', () => {
       setup({ isFolderTrustEnabled: true, isWorkspaceTrustedValue: false });
       const settings = createTestMergedSettings({
         tools: { sandbox: true },
       });
       loadEnvironment(settings, MOCK_WORKSPACE_DIR, isWorkspaceTrusted);
 
-      // GEMINI_API_KEY is in the whitelist, so it should be loaded.
+      // GEMINI_API_KEY is in the allowlist, so it should be loaded.
       expect(process.env['GEMINI_API_KEY']).toEqual('test-key');
-      // TESTTEST is NOT in the whitelist, so it should be blocked.
+      // TESTTEST is NOT in the allowlist, so it should be blocked.
       expect(process.env['TESTTEST']).not.toEqual('1234');
     });
 
-    it('loads whitelisted env files from untrusted spaces if sandboxing is enabled via CLI flag', () => {
+    it('loads allowed env files from untrusted spaces if sandboxing is enabled via CLI flag', () => {
       const originalArgv = [...process.argv];
       process.argv.push('-s');
       try {
@@ -2961,7 +2961,7 @@ describe('Settings Loading and Merging', () => {
     });
 
     describe('env var sanitization', () => {
-      it('should strictly enforce whitelist in untrusted/sandboxed mode', () => {
+      it('should strictly enforce allowlist in untrusted/sandboxed mode', () => {
         process.argv = ['node', 'gemini', '-s', 'prompt'];
         vi.mocked(isWorkspaceTrusted).mockReturnValue({
           isTrusted: false,
@@ -2986,7 +2986,7 @@ GOOGLE_API_KEY=another-secret
         expect(process.env['MALICIOUS_VAR']).toBeUndefined();
       });
 
-      it('should sanitize shell injection characters in whitelisted env vars in untrusted mode', () => {
+      it('should sanitize shell injection characters in allowed env vars in untrusted mode', () => {
         process.argv = ['node', 'gemini', '--sandbox', 'prompt'];
         vi.mocked(isWorkspaceTrusted).mockReturnValue({
           isTrusted: false,
@@ -3010,7 +3010,7 @@ GOOGLE_API_KEY=another-secret
         expect(process.env['GEMINI_API_KEY']).toBe('key-whoami-id-');
       });
 
-      it('should allow . and / in whitelisted env vars but sanitize other characters in untrusted mode', () => {
+      it('should allow . and / in allowed env vars but sanitize other characters in untrusted mode', () => {
         process.argv = ['node', 'gemini', '--sandbox', 'prompt'];
         vi.mocked(isWorkspaceTrusted).mockReturnValue({
           isTrusted: false,
