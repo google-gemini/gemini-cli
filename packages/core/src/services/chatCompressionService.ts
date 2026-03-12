@@ -360,14 +360,13 @@ export class ChatCompressionService {
           role: 'user',
           parts: [
             {
-              text: `${anchorInstruction}\n\nFirst, reason in your scratchpad. Then, generate the updated <state_snapshot>.`,
+              text: `${anchorInstruction}\\n\\nFirst, reason in your scratchpad. Then, generate the updated <state_snapshot>.`,
             },
           ],
         },
       ],
       systemInstruction: { text: getCompressionPrompt(config) },
       promptId,
-      // TODO(joshualitt): wire up a sensible abort signal,
       abortSignal: abortSignal ?? new AbortController().signal,
       role: LlmRole.UTILITY_COMPRESSOR,
     });
