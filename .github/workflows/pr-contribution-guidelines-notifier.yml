@@ -1,17 +1,19 @@
 name: '🏷️ PR Contribution Guidelines Notifier'
 
 on:
-  pull_request:
+  pull_request_target:
     types:
       - 'opened'
+      - 'reopened'
 
 jobs:
-  notify-process-change:
+  enforce-contribution-guidelines:
     runs-on: 'ubuntu-latest'
     if: |-
       github.repository == 'google-gemini/gemini-cli' || github.repository == 'google-gemini/maintainers-gemini-cli'
     permissions:
       pull-requests: 'write'
+      issues: 'read'
     steps:
       - name: 'Generate GitHub App Token'
         id: 'generate_token'
@@ -24,7 +26,7 @@ jobs:
           app-id: '${{ secrets.APP_ID }}'
           private-key: '${{ secrets.PRIVATE_KEY }}'
 
-      - name: 'Check membership and post comment'
+      - name: 'Enforce contribution guidelines'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea'
         with:
           github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
@@ -91,13 +93,32 @@ jobs:
               return;
             }
 
-            // 2. Check if the PR is already associated with an issue
+            // Helper: post a comment and close the PR
+            const closeWithComment = async (body) => {
+              await github.rest.issues.createComment({
+                owner: org,
+                repo: repo,
+                issue_number: pr_number,
+                body: body
+              });
+              await github.rest.pulls.update({
+                owner: org,
+                repo: repo,
+                pull_number: pr_number,
+                state: 'closed'
+              });
+            };
+
+            // 2. Check if the PR is linked to an existing issue
             const query = `
               query($owner:String!, $repo:String!, $number:Int!) {
                 repository(owner:$owner, name:$repo) {
                   pullRequest(number:$number) {
                     closingIssuesReferences(first: 1) {
                       totalCount
+                      nodes {
+                        number
+                      }
                     }
                   }
                 }
@@ -105,29 +126,45 @@ jobs:
             `;
             const variables = { owner: org, repo: repo, number: pr_number };
             const result = await github.graphql(query, variables);
-            const issueCount = result.repository.pullRequest.closingIssuesReferences.totalCount;
+            const refs = result.repository.pullRequest.closingIssuesReferences;
 
-            if (issueCount > 0) {
-              core.info(`PR #${pr_number} is already associated with an issue. No notification needed.`);
+            if (refs.totalCount === 0) {
+              core.info(`PR #${pr_number} has no linked issue. Closing.`);
+              await closeWithComment(
+                `Hi @${username}, this PR has been closed because it is not linked to an existing issue.\n\n` +
+                `Please follow these steps:\n` +
+                `1. Open an issue describing the change you want to make.\n` +
+                `2. Comment \`/assign\` on the issue to get assigned (only issues labelled \`help wanted\` are open for assignment).\n` +
+                `3. Open a new PR with \`Fixes #<issue_number>\` in the body.\n\n` +
+                `See our [contributing guidelines](https://github.com/google-gemini/gemini-cli/blob/main/CONTRIBUTING.md) for details.`
+              );
               return;
             }
 
-            // 3. Post the notification comment
-            core.info(`${username} is not a maintainer and PR #${pr_number} has no linked issue. Posting notification.`);
+            // 3. Check if the PR author is assigned to the linked issue
+            const linkedIssueNumber = refs.nodes[0].number;
+            core.info(`PR #${pr_number} is linked to issue #${linkedIssueNumber}. Checking assignment.`);
 
-            const comment = `
-            Hi @${username}, thank you so much for your contribution to Gemini CLI! We really appreciate the time and effort you've put into this.
-
-            We're making some updates to our contribution process to improve how we track and review changes. Please take a moment to review our recent discussion post: [Improving Our Contribution Process & Introducing New Guidelines](https://github.com/google-gemini/gemini-cli/discussions/16706).
-
-            Key Update: Starting **January 26, 2026**, the Gemini CLI project will require all pull requests to be associated with an existing issue. Any pull requests not linked to an issue by that date will be automatically closed.
-
-            Thank you for your understanding and for being a part of our community!
-            `.trim().replace(/^[ ]+/gm, '');
-
-            await github.rest.issues.createComment({
+            const { data: linkedIssue } = await github.rest.issues.get({
               owner: org,
               repo: repo,
-              issue_number: pr_number,
-              body: comment
+              issue_number: linkedIssueNumber
             });
+
+            const isAssigned = linkedIssue.assignees.some(
+              a => a.login.toLowerCase() === username.toLowerCase()
+            );
+
+            if (!isAssigned) {
+              core.info(`@${username} is not assigned to issue #${linkedIssueNumber}. Closing PR #${pr_number}.`);
+              await closeWithComment(
+                `Hi @${username}, this PR has been closed because you are not assigned to issue #${linkedIssueNumber}.\n\n` +
+                `To get assigned, comment \`/assign\` on [issue #${linkedIssueNumber}](https://github.com/${org}/${repo}/issues/${linkedIssueNumber}). ` +
+                `Once assigned, you can re-open this PR.\n\n` +
+                `Note: self-assignment is only available on issues labelled \`help wanted\`.`
+              );
+              return;
+            }
+
+            // 4. All checks passed
+            core.info(`@${username} is assigned to issue #${linkedIssueNumber}. PR #${pr_number} is compliant.`);
