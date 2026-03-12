@@ -188,10 +188,11 @@ const LINTERS = {
   shellcheck: {
     check: shellcheckCheck,
     installer: shellcheckInstaller,
-    // If Linux/Mac, keep the original "smart" command. If Windows, use JS-filtered version.
+    // If Linux/Mac, keep the original "smart" command (sed masks the exit code).
+    // If Windows, use JS-filtered version with || exit 0 to match Linux's behavior.
     run: !isWindows
       ? `git ls-files | grep -E '^([^.]+|.*\\.(sh|zsh|bash))' | xargs file --mime-type | grep "text/x-shellscript" | awk '{ print substr($1, 1, length($1)-1) }' | xargs shellcheck --check-sourced --enable=all --exclude=SC2002,SC2129,SC2310 --severity=style --format=gcc --color=never | sed -e 's/note:/warning:/g' -e 's/style:/warning:/g'`
-      : `shellcheck --check-sourced --enable=all --exclude=SC2002,SC2129,SC2310 --severity=style --format=gcc --color=never ${getShellFiles()}`,
+      : `shellcheck --check-sourced --enable=all --exclude=SC2002,SC2129,SC2310 --severity=style --format=gcc --color=never ${getShellFiles()} || exit 0`,
   },
   yamllint: {
     check: yamllintCheck,
