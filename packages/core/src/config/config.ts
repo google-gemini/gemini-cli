@@ -581,6 +581,7 @@ export interface ConfigParameters {
   extensionManagement?: boolean;
   extensionRegistryURI?: string;
   truncateToolOutputThreshold?: number;
+  textFileReadSizeThreshold?: number;
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
   workspacePoliciesDir?: string;
@@ -771,6 +772,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly extensionManagement: boolean = true;
   private readonly extensionRegistryURI: string | undefined;
   private readonly truncateToolOutputThreshold: number;
+  private readonly textFileReadSizeThreshold: number | undefined;
   private compressionTruncationCounter = 0;
   private initialized = false;
   private initPromise: Promise<void> | undefined;
@@ -987,6 +989,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
+    this.textFileReadSizeThreshold = params.textFileReadSizeThreshold;
     this.useWriteTodos = isPreviewModel(this.model)
       ? false
       : (params.useWriteTodos ?? true);
@@ -2809,6 +2812,10 @@ export class Config implements McpContext, AgentLoopContext {
         (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
       this.truncateToolOutputThreshold,
     );
+  }
+
+  getTextFileReadSizeThreshold(): number | undefined {
+    return this.textFileReadSizeThreshold;
   }
 
   getNextCompressionTruncationId(): number {

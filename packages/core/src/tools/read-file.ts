@@ -121,6 +121,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
       this.config.getFileSystemService(),
       this.params.start_line,
       this.params.end_line,
+      this.config.getTextFileReadSizeThreshold(),
     );
 
     if (result.error) {
@@ -135,7 +136,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     }
 
     let llmContent: PartUnion;
-    if (result.isTruncated) {
+    if (result.isPartialRead) {
       const [start, end] = result.linesShown!;
       const total = result.originalLineCount!;
 

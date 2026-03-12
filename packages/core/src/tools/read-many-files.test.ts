@@ -31,6 +31,7 @@ import {
 import * as glob from 'glob';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
+import { DEFAULT_TEXT_FILE_READ_THRESHOLD_BYTES } from '../utils/constants.js';
 
 vi.mock('glob', { spy: true });
 
@@ -100,6 +101,7 @@ describe('ReadManyFilesTool', () => {
         getReadManyFilesExcludes: () => DEFAULT_FILE_EXCLUDES,
       }),
       isInteractive: () => false,
+      getTextFileReadSizeThreshold: () => undefined,
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
       },
@@ -537,6 +539,7 @@ describe('ReadManyFilesTool', () => {
           getReadManyFilesExcludes: () => [],
         }),
         isInteractive: () => false,
+        getTextFileReadSizeThreshold: () => undefined,
         storage: {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
         },
@@ -592,9 +595,9 @@ describe('ReadManyFilesTool', () => {
       fs.rmSync(tempDir2, { recursive: true, force: true });
     });
 
-    it('should add a warning for truncated files', async () => {
+    it('should read large files without truncation warning', async () => {
       createFile('file1.txt', 'Content1');
-      // Create a file that will be "truncated" by making it long
+      // Create a file with many lines — no longer truncated
       const longContent = Array.from({ length: 2500 }, (_, i) => `L${i}`).join(
         '\n',
       );
@@ -606,19 +609,19 @@ describe('ReadManyFilesTool', () => {
       const content = result.llmContent as string[];
 
       const normalFileContent = content.find((c) => c.includes('file1.txt'));
-      const truncatedFileContent = content.find((c) =>
+      const largeFileContent = content.find((c) =>
         c.includes('large-file.txt'),
       );
 
       expect(normalFileContent).not.toContain(
         '[WARNING: This file was truncated.',
       );
-      expect(truncatedFileContent).toContain(
-        "[WARNING: This file was truncated. To view the full content, use the 'read_file' tool on this specific file.]",
+      expect(largeFileContent).not.toContain(
+        '[WARNING: This file was truncated.',
       );
-      // Check that the actual content is still there but truncated
-      expect(truncatedFileContent).toContain('L200');
-      expect(truncatedFileContent).not.toContain('L2400');
+      // All content should be present
+      expect(largeFileContent).toContain('L200');
+      expect(largeFileContent).toContain('L2400');
     });
 
     it('should read files with special characters like [] and () in the path', async () => {
@@ -658,6 +661,37 @@ Content of file[1]
       expect(result.returnDisplay).toContain(
         'Successfully read and concatenated content from **1 file(s)**',
       );
+    });
+
+    it('should skip files exceeding the text file read threshold', async () => {
+      createFile('small.txt', 'Small content');
+      const largeContent = 'x'.repeat(
+        DEFAULT_TEXT_FILE_READ_THRESHOLD_BYTES + 1,
+      );
+      createFile('large.txt', largeContent);
+
+      const params = { include: ['*.txt'] };
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+      const content = result.llmContent as string[];
+
+      // Small file should be included
+      const smallFileContent = content.find((c) => c.includes('small.txt'));
+      expect(smallFileContent).toBeDefined();
+      expect(smallFileContent).toContain('Small content');
+
+      // Large file should be skipped (not in successful content)
+      const largeFileContent = content.find(
+        (c) => c.includes('large.txt') && c.includes('x'.repeat(100)),
+      );
+      expect(largeFileContent).toBeUndefined();
+
+      // Guidance block should be present in llmContent
+      const guidanceBlock = content.find((c) =>
+        c.includes('FILES EXCEEDING READ THRESHOLD'),
+      );
+      expect(guidanceBlock).toBeDefined();
+      expect(guidanceBlock).toContain('large.txt');
     });
   });
 
