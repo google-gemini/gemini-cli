@@ -11,6 +11,7 @@ import type { ShellExecutionConfig } from '../services/shellExecutionService.js'
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { isRecord } from '../utils/markdownUtils.js';
 import { randomUUID } from 'node:crypto';
 import {
   MessageBusType,
@@ -395,6 +396,15 @@ export interface ToolBuilder<
 }
 
 /**
+ * Represents the expected JSON Schema structure for tool parameters.
+ */
+export interface ToolParameterSchema {
+  type: string;
+  properties?: unknown;
+  [key: string]: unknown;
+}
+
+/**
  * New base class for tools that separates validation from execution.
  * New tools should extend this class.
  */
@@ -435,10 +445,10 @@ export abstract class DeclarativeTool<
   }
 
   /**
-   * Type guard to check if an unknown value is a plain object record.
+   * Type guard to check if an unknown value represents a ToolParameterSchema object.
    */
-  private isSchemaObject(obj: unknown): obj is Record<string, unknown> {
-    return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
+  private isParameterSchema(obj: unknown): obj is ToolParameterSchema {
+    return isRecord(obj) && 'type' in obj;
   }
 
   /**
@@ -446,15 +456,15 @@ export abstract class DeclarativeTool<
    * This allows the model to explicitly control parallel vs sequential execution.
    */
   private addWaitForPreviousParameter(schema: unknown): unknown {
-    if (!this.isSchemaObject(schema) || schema['type'] !== 'object') {
+    if (!this.isParameterSchema(schema) || schema.type !== 'object') {
       return schema;
     }
 
-    const props = schema['properties'];
+    const props = schema.properties;
     let propertiesObj: Record<string, unknown> = {};
 
     if (props !== undefined) {
-      if (!this.isSchemaObject(props)) {
+      if (!isRecord(props)) {
         // properties exists but is not an object, so it's a malformed schema.
         return schema;
       }
