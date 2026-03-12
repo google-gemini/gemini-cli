@@ -314,13 +314,14 @@ describe('SettingsDialog', () => {
       );
       await waitUntilReady();
 
-      // Wait for the dialog to render
+      // Wait for the dialog to render. Height math reserves space for title/search/scope/help
+      // so the list does not overflow (avoids terminal glitches on scroll); output may be < 25 lines.
       await waitFor(() => {
         const output = lastFrame();
         expect(output).toBeDefined();
         const lines = output.trim().split('\n');
 
-        expect(lines.length).toBeGreaterThanOrEqual(24);
+        expect(lines.length).toBeGreaterThanOrEqual(20);
         expect(lines.length).toBeLessThanOrEqual(25);
       });
       unmount();

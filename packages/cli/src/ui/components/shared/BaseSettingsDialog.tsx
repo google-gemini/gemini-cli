@@ -150,11 +150,12 @@ export function BaseSettingsDialog({
       };
     }
 
-    // Layout constants based on BaseSettingsDialog structure:
+    // Layout constants based on BaseSettingsDialog structure (must match JSX
+    // below so the list height does not overflow and cause terminal glitches on scroll):
     const DIALOG_PADDING = 4;
     const SETTINGS_TITLE_HEIGHT = 1;
-    // Account for the unconditional spacer below search/title section
-    const SEARCH_SECTION_HEIGHT = searchEnabled ? 5 : 1;
+    // When search enabled: marginTop (1) + search Box border+content (2+3) + spacer (1) = 7; else spacer only = 1
+    const SEARCH_SECTION_HEIGHT = searchEnabled ? 7 : 1;
     const SCROLL_ARROWS_HEIGHT = 2;
     const ITEMS_SPACING_AFTER = 1;
     const SCOPE_SECTION_HEIGHT = 5;
