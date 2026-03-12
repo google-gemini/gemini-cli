@@ -502,6 +502,7 @@ export interface PolicyUpdateConfirmationRequest {
 
 export interface ConfigParameters {
   sessionId: string;
+  clientName?: string;
   clientVersion?: string;
   embeddingModel?: string;
   sandbox?: SandboxConfig;
@@ -646,6 +647,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly acknowledgedAgentsService: AcknowledgedAgentsService;
   private skillManager!: SkillManager;
   private _sessionId: string;
+  private readonly clientName: string | undefined;
   private clientVersion: string;
   private fileSystemService: FileSystemService;
   private trackerService?: TrackerService;
@@ -843,6 +845,7 @@ export class Config implements McpContext, AgentLoopContext {
 
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
+    this.clientName = params.clientName;
     this.clientVersion = params.clientVersion ?? 'unknown';
     this.approvedPlanPath = undefined;
     this.embeddingModel =
@@ -1406,6 +1409,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getSessionId(): string {
     return this.promptId;
+  }
+
+  getClientName(): string | undefined {
+    return this.clientName;
   }
 
   setSessionId(sessionId: string): void {
