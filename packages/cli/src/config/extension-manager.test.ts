@@ -42,18 +42,21 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
 const testTheme: CustomTheme = {
   type: 'custom',
   name: 'MyTheme',
-  Background: '#000000',
-  Foreground: '#ffffff',
-  LightBlue: '#89BDCD',
-  AccentBlue: '#3B82F6',
-  AccentPurple: '#8B5CF6',
-  AccentCyan: '#06B6D4',
-  AccentGreen: '#3CA84B',
-  AccentYellow: 'yellow',
-  AccentRed: 'red',
-  DiffAdded: 'green',
-  DiffRemoved: 'red',
-  Gray: 'gray',
+  background: {
+    primary: '#282828',
+    diff: { added: '#2b3312', removed: '#341212' },
+  },
+  text: {
+    primary: '#ebdbb2',
+    secondary: '#a89984',
+    link: '#83a598',
+    accent: '#d3869b',
+  },
+  status: {
+    success: '#b8bb26',
+    warning: '#fabd2f',
+    error: '#fb4934',
+  },
 };
 
 describe('ExtensionManager', () => {

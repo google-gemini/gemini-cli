@@ -624,9 +624,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
         this.loadedExtensions = builtExtensions;
 
-        // Register extension themes early so they're available before
-        // config.initialize() calls startExtension(). Themes are purely
-        // declarative data and don't depend on MCP server initialization.
+        // Register extension themes early so they're available at startup.
         for (const ext of this.loadedExtensions) {
           if (ext.isActive && ext.themes) {
             themeManager.registerExtensionThemes(ext.name, ext.themes);
@@ -674,12 +672,6 @@ Would you like to attempt to install via "git clone" instead?`,
     }
 
     this.loadedExtensions = [...this.loadedExtensions, extension];
-
-    // Register themes early for dynamically loaded extensions too
-    if (extension.isActive && extension.themes) {
-      themeManager.registerExtensionThemes(extension.name, extension.themes);
-    }
-
     await this.maybeStartExtension(extension);
     return extension;
   }
