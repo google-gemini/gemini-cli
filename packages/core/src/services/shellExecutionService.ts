@@ -290,32 +290,32 @@ export class ShellExecutionService {
   }
 
   private static appendAndTruncateBuffers(
-    context: { chunks: Buffer[]; totalRawBytes: number },
+    state: { outputChunks: Buffer[]; totalRawBytes: number },
     newChunk: Buffer,
     maxSize: number,
   ): void {
-    context.chunks.push(newChunk);
-    context.totalRawBytes += newChunk.length;
+    state.outputChunks.push(newChunk);
+    state.totalRawBytes += newChunk.length;
 
     // Fast path: truncate the entire chunk if it alone is bigger than maxSize
     if (newChunk.length >= maxSize) {
       const kept = newChunk.subarray(newChunk.length - maxSize);
-      context.chunks.splice(0, context.chunks.length, kept);
-      context.totalRawBytes = kept.length;
+      state.outputChunks.splice(0, state.outputChunks.length, kept);
+      state.totalRawBytes = kept.length;
       return;
     }
 
-    while (context.totalRawBytes > maxSize && context.chunks.length > 1) {
-      const oldestChunk = context.chunks[0];
-      if (context.totalRawBytes - oldestChunk.length >= maxSize) {
+    while (state.totalRawBytes > maxSize && state.outputChunks.length > 1) {
+      const oldestChunk = state.outputChunks[0];
+      if (state.totalRawBytes - oldestChunk.length >= maxSize) {
         // We can safely remove the whole oldest chunk
-        context.totalRawBytes -= oldestChunk.length;
-        context.chunks.shift();
+        state.totalRawBytes -= oldestChunk.length;
+        state.outputChunks.shift();
       } else {
         // We only need to remove a portion of the oldest chunk
-        const excess = context.totalRawBytes - maxSize;
-        context.chunks[0] = oldestChunk.subarray(excess);
-        context.totalRawBytes -= excess;
+        const excess = state.totalRawBytes - maxSize;
+        state.outputChunks[0] = oldestChunk.subarray(excess);
+        state.totalRawBytes -= excess;
         break;
       }
     }
@@ -398,20 +398,7 @@ export class ShellExecutionService {
           }
 
           this.appendAndTruncateBuffers(
-            {
-              get chunks() {
-                return state.outputChunks;
-              },
-              set chunks(v) {
-                state.outputChunks = v;
-              },
-              get totalRawBytes() {
-                return state.totalRawBytes;
-              },
-              set totalRawBytes(v) {
-                state.totalRawBytes = v;
-              },
-            },
+            state,
             data,
             MAX_RAW_OUTPUT_BUFFER_SIZE,
           );
@@ -652,16 +639,17 @@ export class ShellExecutionService {
         headlessTerminal.scrollToTop();
 
         const outputChunks: Buffer[] = [];
-        let totalRawBytes = 0;
 
-        this.activePtys.set(ptyProcess.pid, {
+        const activePty: ActivePty = {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           ptyProcess,
           headlessTerminal,
           maxSerializedLines: shellExecutionConfig.maxSerializedLines,
           outputChunks,
-          totalRawBytes,
-        });
+          totalRawBytes: 0,
+        };
+
+        this.activePtys.set(ptyProcess.pid, activePty);
 
         let processingChain = Promise.resolve();
         let decoder: TextDecoder | null = null;
@@ -797,27 +785,7 @@ export class ShellExecutionService {
                 }
 
                 ShellExecutionService.appendAndTruncateBuffers(
-                  {
-                    get chunks() {
-                      return outputChunks;
-                    },
-                    set chunks(v) {
-                      // appendAndTruncateBuffers only modifies array or uses splice.
-                      // If it re-assigned, we'd need a more complex closure.
-                    },
-                    get totalRawBytes() {
-                      return totalRawBytes;
-                    },
-                    set totalRawBytes(v) {
-                      totalRawBytes = v;
-                      const active = ShellExecutionService.activePtys.get(
-                        ptyProcess.pid,
-                      );
-                      if (active) {
-                        active.totalRawBytes = v;
-                      }
-                    },
-                  },
+                  activePty,
                   data,
                   MAX_RAW_OUTPUT_BUFFER_SIZE,
                 );
@@ -847,13 +815,9 @@ export class ShellExecutionService {
                     resolve();
                   });
                 } else {
-                  const totalBytes = outputChunks.reduce(
-                    (sum, chunk) => sum + chunk.length,
-                    0,
-                  );
                   const event: ShellOutputEvent = {
                     type: 'binary_progress',
-                    bytesReceived: totalBytes,
+                    bytesReceived: activePty.totalRawBytes,
                   };
                   onOutputEvent(event);
                   ShellExecutionService.emitEvent(ptyProcess.pid, event);
