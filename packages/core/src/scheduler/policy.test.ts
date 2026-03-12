@@ -777,7 +777,11 @@ describe('Plan Mode Denial Consistency', () => {
 
       if (enableEventDrivenScheduler) {
         const scheduler = new Scheduler({
-          context: mockConfig,
+          context: {
+            config: mockConfig,
+            messageBus: mockMessageBus,
+            toolRegistry: mockToolRegistry,
+          } as unknown as AgentLoopContext,
           getPreferredEditor: () => undefined,
           schedulerId: ROOT_SCHEDULER_ID,
         });
@@ -793,7 +797,11 @@ describe('Plan Mode Denial Consistency', () => {
       } else {
         let capturedCalls: CompletedToolCall[] = [];
         const scheduler = new CoreToolScheduler({
-          config: mockConfig,
+          context: {
+            config: mockConfig,
+            messageBus: mockMessageBus,
+            toolRegistry: mockToolRegistry,
+          } as unknown as AgentLoopContext,
           getPreferredEditor: () => undefined,
           onAllToolCallsComplete: async (calls) => {
             capturedCalls = calls;
