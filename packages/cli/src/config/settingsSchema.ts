@@ -1842,6 +1842,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Just-In-Time (JIT) context loading.',
         showInDialog: false,
       },
+      reflection: {
+        type: 'boolean',
+        label: 'Continuous Learning (Reflection)',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable the agent to periodically reflect on the session and propose new skills or memories.',
+        showInDialog: true,
+      },
       useOSC52Paste: {
         type: 'boolean',
         label: 'Use OSC 52 Paste',

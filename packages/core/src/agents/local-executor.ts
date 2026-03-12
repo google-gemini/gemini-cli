@@ -916,10 +916,6 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     taskCompleted: boolean;
     aborted: boolean;
   }> {
-    const allowedToolNames = new Set(this.toolRegistry.getAllToolNames());
-    // Always allow the completion tool
-    allowedToolNames.add(TASK_COMPLETE_TOOL_NAME);
-
     let submittedOutput: string | null = null;
     let taskCompleted = false;
     let aborted = false;
@@ -1093,7 +1089,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
 
       // Handle standard tools
-      if (!allowedToolNames.has(toolName)) {
+      if (!this.toolRegistry.getTool(toolName)) {
         const error = createUnauthorizedToolError(toolName);
         debugLogger.warn(`[LocalAgentExecutor] Blocked call: ${error}`);
 
@@ -1137,6 +1133,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           toolRegistry: this.toolRegistry,
           signal,
           onWaitingForConfirmation,
+          allowedTools: this.definition.toolConfig?.allowedTools,
         },
       );
 

@@ -274,6 +274,7 @@ describe('AgentRegistry', () => {
             codebase_investigator: { enabled: false },
             cli_help: { enabled: false },
             generalist: { enabled: false },
+            reflect_agent: { enabled: false },
           },
         },
       });

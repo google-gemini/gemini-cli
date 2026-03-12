@@ -264,6 +264,8 @@ Skip this step only if the skill being developed already exists, and iteration o
 
 When creating a new skill from scratch, always run the `init_skill.cjs` script. The script conveniently generates a new template skill directory that automatically includes everything a skill requires, making the skill creation process much more efficient and reliable.
 
+**Note for In-Repo Skills:** If you are creating a skill specifically for the current repository, you should initialize it in the `.gemini/skills` directory of the repository (e.g., `--path .gemini/skills`). This allows Gemini CLI to automatically discover and use the skill without it needing to be packaged and installed globally or at the workspace level.
+
 **Note:** Use the absolute path to the script as provided in the `available_resources` section.
 
 Usage:
@@ -323,11 +325,15 @@ Do not include any other fields in YAML frontmatter.
 
 Write instructions for using the skill and its bundled resources.
 
-### Step 5: Packaging a Skill
+### Step 5: Packaging a Skill (Optional for In-Repo Skills)
 
-Once development of the skill is complete, it must be packaged into a distributable .skill file that gets shared with the user. The packaging process automatically validates the skill first (checking YAML and ensuring no TODOs remain) to ensure it meets all requirements:
+Once development of the skill is complete, it can be packaged into a distributable .skill file that gets shared with the user.
 
-**Note:** Use the absolute path to the script as provided in the `available_resources` section.
+**Note for In-Repo Skills:** If you are creating a skill specifically for the current repository and it is located in the \`.gemini/skills/\` directory, you DO NOT need to package or install it. Gemini CLI automatically loads skills from this directory. You can skip to Step 7.
+
+If you do need to package the skill for distribution:
+
+**Note:** Use the absolute path to the script as provided in the \`available_resources\` section.
 
 ```bash
 node <path-to-skill-creator>/scripts/package_skill.cjs <path/to/skill-folder>
@@ -347,15 +353,15 @@ The packaging script will:
    - Description completeness and quality
    - File organization and resource references
 
-2. **Package** the skill if validation passes, creating a .skill file named after the skill (e.g., `my-skill.skill`) that includes all files and maintains the proper directory structure for distribution. The .skill file is a zip file with a .skill extension.
+2. **Package** the skill if validation passes, creating a .skill file named after the skill (e.g., \`my-skill.skill\`) that includes all files and maintains the proper directory structure for distribution. The .skill file is a zip file with a .skill extension.
 
 If validation fails, the script will report the errors and exit without creating a package. Fix any validation errors and run the packaging command again.
 
 ### Step 6: Installing and Reloading a Skill
 
-Once the skill is packaged into a `.skill` file, offer to install it for the user. Ask whether they would like to install it locally in the current folder (workspace scope) or at the user level (user scope).
+If you packaged the skill into a \`.skill\` file, offer to install it for the user. Ask whether they would like to install it locally in the current folder (workspace scope) or at the user level (user scope).
 
-If the user agrees to an installation, perform it immediately using the `run_shell_command` tool:
+If the user agrees to an installation, perform it immediately using the \`run_shell_command\` tool:
 
 - **Locally (workspace scope)**:
   ```bash
@@ -366,9 +372,11 @@ If the user agrees to an installation, perform it immediately using the `run_she
   gemini skills install <path/to/skill-name.skill> --scope user
   ```
 
-**Important:** After the installation is complete, notify the user that they MUST manually execute the `/skills reload` command in their interactive Gemini CLI session to enable the new skill. They can then verify the installation by running `/skills list`.
+**Important:** After the installation is complete, notify the user that they MUST manually execute the \`/skills reload\` command in their interactive Gemini CLI session to enable the new skill. They can then verify the installation by running \`/skills list\`.
 
-Note: You (the agent) cannot execute the `/skills reload` command yourself; it must be done by the user in an interactive instance of Gemini CLI. Do not attempt to run it on their behalf.
+For in-repo skills created in \`.gemini/skills/\`, notify the user that they must execute \`/skills reload\` to enable the new skill.
+
+Note: You (the agent) cannot execute the \`/skills reload\` command yourself; it must be done by the user in an interactive instance of Gemini CLI. Do not attempt to run it on their behalf.
 
 ### Step 7: Iterate
 
