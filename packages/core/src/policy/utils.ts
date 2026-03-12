@@ -34,7 +34,9 @@ export function isSafeRegExp(pattern: string): boolean {
   // where the group itself contains a quantifier.
   // This matches a '(' followed by some content including a quantifier, then ')',
   // followed by another quantifier.
-  const nestedQuantifierPattern = /\([^)]*[*+?{].*\)[*+?{]/;
+  // Note: '?' as an outer quantifier is excluded because it only allows 0 or 1
+  // match of the group, which cannot cause exponential backtracking.
+  const nestedQuantifierPattern = /\([^)]*[*+?{].*\)[*+{]/;
   if (nestedQuantifierPattern.test(pattern)) {
     return false;
   }
