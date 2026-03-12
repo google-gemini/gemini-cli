@@ -174,11 +174,6 @@ class ThemeManager {
       return;
     }
 
-    debugLogger.log(
-      `Registering extension themes for "${extensionName}":`,
-      customThemes,
-    );
-
     for (const customThemeConfig of customThemes) {
       const namespacedName = `${customThemeConfig.name} (${extensionName})`;
 
@@ -238,6 +233,17 @@ class ThemeManager {
       this.extensionThemes.delete(namespacedName);
       debugLogger.log(`Unregistered theme: ${namespacedName}`);
     }
+  }
+
+  /**
+   * Checks if themes for a given extension are already registered.
+   * @param extensionName The name of the extension.
+   * @returns True if any themes from the extension are registered.
+   */
+  hasExtensionThemes(extensionName: string): boolean {
+    return Array.from(this.extensionThemes.keys()).some((name) =>
+      name.endsWith(`(${extensionName})`),
+    );
   }
 
   /**

@@ -17,7 +17,13 @@ import {
   type Schema,
 } from '@google/genai';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import { type AnyDeclarativeTool } from '../tools/tools.js';
+import {
+  DiscoveredMCPTool,
+  isMcpToolName,
+  parseMcpToolName,
+  MCP_TOOL_PREFIX,
+} from '../tools/mcp-tool.js';
 import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import { type Message } from '../confirmation-bus/types.js';
@@ -146,28 +152,55 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       context.config.getAgentRegistry().getAllAgentNames(),
     );
 
-    const registerToolByName = (toolName: string) => {
+    const registerToolInstance = (tool: AnyDeclarativeTool) => {
       // Check if the tool is a subagent to prevent recursion.
       // We do not allow agents to call other agents.
-      if (allAgentNames.has(toolName)) {
+      if (allAgentNames.has(tool.name)) {
         debugLogger.warn(
-          `[LocalAgentExecutor] Skipping subagent tool '${toolName}' for agent '${definition.name}' to prevent recursion.`,
+          `[LocalAgentExecutor] Skipping subagent tool '${tool.name}' for agent '${definition.name}' to prevent recursion.`,
         );
         return;
+      }
+
+      agentToolRegistry.registerTool(tool);
+    };
+
+    const registerToolByName = (toolName: string) => {
+      // Handle global wildcard
+      if (toolName === '*') {
+        for (const tool of parentToolRegistry.getAllTools()) {
+          registerToolInstance(tool);
+        }
+        return;
+      }
+
+      // Handle MCP wildcards
+      if (isMcpToolName(toolName)) {
+        if (toolName === `${MCP_TOOL_PREFIX}*`) {
+          for (const tool of parentToolRegistry.getAllTools()) {
+            if (tool instanceof DiscoveredMCPTool) {
+              registerToolInstance(tool);
+            }
+          }
+          return;
+        }
+
+        const parsed = parseMcpToolName(toolName);
+        if (parsed.serverName && parsed.toolName === '*') {
+          for (const tool of parentToolRegistry.getToolsByServer(
+            parsed.serverName,
+          )) {
+            registerToolInstance(tool);
+          }
+          return;
+        }
       }
 
       // If the tool is referenced by name, retrieve it from the parent
       // registry and register it with the agent's isolated registry.
       const tool = parentToolRegistry.getTool(toolName);
       if (tool) {
-        if (tool instanceof DiscoveredMCPTool) {
-          // Subagents MUST use fully qualified names for MCP tools to ensure
-          // unambiguous tool calls and to comply with policy requirements.
-          // We automatically "upgrade" any MCP tool to its qualified version.
-          agentToolRegistry.registerTool(tool.asFullyQualifiedTool());
-        } else {
-          agentToolRegistry.registerTool(tool);
-        }
+        registerToolInstance(tool);
       }
     };
 
@@ -1175,10 +1208,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     const { toolConfig, outputConfig } = this.definition;
 
     if (toolConfig) {
-      const toolNamesToLoad: string[] = [];
       for (const toolRef of toolConfig.tools) {
         if (typeof toolRef === 'string') {
-          toolNamesToLoad.push(toolRef);
+          // The names were already expanded and loaded into the registry during creation.
         } else if (typeof toolRef === 'object' && 'schema' in toolRef) {
           // Tool instance with an explicit schema property.
           toolsList.push(toolRef.schema);
@@ -1187,10 +1219,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           toolsList.push(toolRef);
         }
       }
-      // Add schemas from tools that were registered by name.
-      toolsList.push(
-        ...this.toolRegistry.getFunctionDeclarationsFiltered(toolNamesToLoad),
-      );
+      // Add schemas from tools that were explicitly registered by name or wildcard.
+      toolsList.push(...this.toolRegistry.getFunctionDeclarations());
     }
 
     // Always inject complete_task.
