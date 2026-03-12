@@ -276,9 +276,9 @@ describe('ScrollProvider', () => {
     // Advance timers to trigger the batched update
     await vi.runAllTimersAsync();
 
-    // Should have called scrollBy once with accumulated delta (3)
+    // Should have called scrollBy once with accumulated delta (9)
     expect(scrollBy).toHaveBeenCalledTimes(1);
-    expect(scrollBy).toHaveBeenCalledWith(3);
+    expect(scrollBy).toHaveBeenCalledWith(9);
   });
 
   it('handles mixed direction scroll events in batch', async () => {
@@ -299,7 +299,7 @@ describe('ScrollProvider', () => {
       </ScrollProvider>,
     );
 
-    // Simulate mixed scroll events: down (1), down (1), up (-1)
+    // Simulate mixed scroll events: down (3), down (3), up (-3)
     for (const callback of mockUseMouseCallbacks) {
       callback({
         name: 'scroll-down',
@@ -335,7 +335,7 @@ describe('ScrollProvider', () => {
     await vi.runAllTimersAsync();
 
     expect(scrollBy).toHaveBeenCalledTimes(1);
-    expect(scrollBy).toHaveBeenCalledWith(1); // 1 + 1 - 1 = 1
+    expect(scrollBy).toHaveBeenCalledWith(3); // 3 + 3 - 3 = 3
   });
 
   it('respects scroll limits during batching', async () => {
@@ -390,13 +390,9 @@ describe('ScrollProvider', () => {
 
     await vi.runAllTimersAsync();
 
-    // Should have accumulated only 1, because subsequent scrolls would be blocked
-    // Actually, the logic in ScrollProvider uses effectiveScrollTop to check bounds.
-    // scrollTop=89, max=90.
-    // 1st scroll: pending=1, effective=90. Allowed.
-    // 2nd scroll: pending=1, effective=90. canScrollDown checks effective < 90. 90 < 90 is false. Blocked.
+    // Should have accumulated only 3, because subsequent scrolls would be blocked
     expect(scrollBy).toHaveBeenCalledTimes(1);
-    expect(scrollBy).toHaveBeenCalledWith(1);
+    expect(scrollBy).toHaveBeenCalledWith(3);
   });
 
   it('calls scrollTo when dragging scrollbar thumb if available', async () => {
