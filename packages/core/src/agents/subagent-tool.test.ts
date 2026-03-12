@@ -189,6 +189,7 @@ describe('SubAgentInvocation', () => {
     expect(mockInnerInvocation.execute).toHaveBeenCalledWith(
       abortSignal,
       updateOutput,
+      undefined,
     );
 
     expect(runInDevTraceSpan).toHaveBeenCalledWith(
