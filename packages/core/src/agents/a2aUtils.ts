@@ -212,88 +212,43 @@ function extractPartText(part: Part): string {
 }
 
 /**
- * Normalizes an agent card by ensuring it has the required properties
- * and resolving any inconsistencies between protocol versions.
+ * Normalizes proto field name aliases that the SDK doesn't handle yet.
+ * The A2A proto spec uses `supported_interfaces` and `protocol_binding`,
+ * while the SDK expects `additionalInterfaces` and `transport`.
+ * TODO: Remove once @a2a-js/sdk handles these aliases natively.
  */
 export function normalizeAgentCard(card: unknown): AgentCard {
   if (!isObject(card)) {
     throw new Error('Agent card is missing.');
   }
 
-  // Narrowing to AgentCard interface.
+  // Shallow-copy to avoid mutating the SDK's cached object.
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const result = card as unknown as AgentCard;
+  const result = { ...card } as unknown as AgentCard;
 
-  // 1. Normalize and Sync Interfaces
-  const interfaces = normalizeInterfaces(card);
-  result.additionalInterfaces = interfaces;
-
-  // Sync supportedInterfaces for backward compatibility.
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const legacyResult = result as unknown as Record<string, AgentInterface[]>;
-  legacyResult['supportedInterfaces'] = interfaces;
-
-  // 2. Fallback preferredTransport: If not specified, default to GRPC if available.
-  if (
-    !result.preferredTransport &&
-    interfaces.some((i) => i.transport === 'GRPC')
-  ) {
-    result.preferredTransport = 'GRPC';
+  // Map supportedInterfaces → additionalInterfaces if needed
+  if (!result.additionalInterfaces) {
+    const raw = card;
+    if (Array.isArray(raw['supportedInterfaces'])) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      result.additionalInterfaces = raw[
+        'supportedInterfaces'
+      ] as AgentInterface[];
+    }
   }
 
-  // 3. Fallback: If top-level URL is missing, use the first interface's URL.
-  if ((!result.url || result.url === '') && interfaces.length > 0) {
-    result.url = interfaces[0].url;
+  // Map protocolBinding → transport on each interface
+  for (const intf of result.additionalInterfaces ?? []) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const raw = intf as unknown as Record<string, unknown>;
+    const binding = raw['protocolBinding'];
+     
+    if (!intf.transport && typeof binding === 'string') {
+      intf.transport = binding;
+    }
   }
 
   return result;
-}
-
-/**
- * Extracts and normalizes interfaces from the card, handling protocol version fallbacks.
- */
-function normalizeInterfaces(card: Record<string, unknown>): AgentInterface[] {
-  const additional = card['additionalInterfaces'];
-  const supported = card['supportedInterfaces'];
-
-  let rawInterfaces: unknown[] = [];
-  if (Array.isArray(additional)) {
-    rawInterfaces = additional;
-  } else if (Array.isArray(supported)) {
-    rawInterfaces = supported;
-  }
-
-  return rawInterfaces.filter(isObject).map((i) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const intf = i as unknown as AgentInterface;
-    normalizeInterface(intf);
-    return intf;
-  });
-}
-
-/**
- * Normalizes a single AgentInterface.
- */
-function normalizeInterface(intf: AgentInterface): void {
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const raw = intf as unknown as Record<string, unknown>;
-
-  // Normalize 'transport' from 'protocolBinding' if missing.
-  const protocolBinding = raw['protocolBinding'];
-  if (!intf.transport && isString(protocolBinding)) {
-    intf.transport = protocolBinding;
-  }
-
-  // Robust URL: Ensure the URL has a scheme (except for gRPC).
-  if (
-    intf.url &&
-    !intf.url.includes('://') &&
-    !intf.url.startsWith('/') &&
-    intf.transport !== 'GRPC'
-  ) {
-    // Default to http:// for insecure REST/JSON-RPC if scheme is missing.
-    intf.url = `http://${intf.url}`;
-  }
 }
 
 /**
@@ -374,13 +329,6 @@ export function isTerminalState(state: TaskState | undefined): boolean {
     state === 'canceled' ||
     state === 'rejected'
   );
-}
-
-/**
- * Type guard to check if a value is a string.
- */
-function isString(val: unknown): val is string {
-  return typeof val === 'string';
 }
 
 /**

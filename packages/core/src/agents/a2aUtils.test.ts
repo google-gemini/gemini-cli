@@ -291,7 +291,7 @@ describe('a2aUtils', () => {
       expect(normalized.defaultInputModes).toBeUndefined();
     });
 
-    it('should normalize and synchronize interfaces while preserving other fields', () => {
+    it('should map supportedInterfaces to additionalInterfaces with protocolBinding → transport', () => {
       const raw = {
         name: 'test',
         supportedInterfaces: [
@@ -305,13 +305,7 @@ describe('a2aUtils', () => {
 
       const normalized = normalizeAgentCard(raw);
 
-      // Should exist in both fields
       expect(normalized.additionalInterfaces).toHaveLength(1);
-      expect(
-        (normalized as unknown as Record<string, unknown>)[
-          'supportedInterfaces'
-        ],
-      ).toHaveLength(1);
 
       const intf = normalized.additionalInterfaces?.[0] as unknown as Record<
         string,
@@ -320,43 +314,18 @@ describe('a2aUtils', () => {
 
       expect(intf['transport']).toBe('GRPC');
       expect(intf['url']).toBe('grpc://test');
-
-      // Should fallback top-level url
-      expect(normalized.url).toBe('grpc://test');
     });
 
-    it('should preserve existing top-level url if present', () => {
+    it('should not overwrite additionalInterfaces if already present', () => {
       const raw = {
         name: 'test',
-        url: 'http://existing',
+        additionalInterfaces: [{ url: 'http://grpc', transport: 'GRPC' }],
         supportedInterfaces: [{ url: 'http://other', transport: 'REST' }],
       };
 
       const normalized = normalizeAgentCard(raw);
-      expect(normalized.url).toBe('http://existing');
-    });
-
-    it('should NOT prepend http:// scheme to raw IP:port strings for gRPC interfaces', () => {
-      const raw = {
-        name: 'raw-ip-grpc',
-        supportedInterfaces: [{ url: '127.0.0.1:9000', transport: 'GRPC' }],
-      };
-
-      const normalized = normalizeAgentCard(raw);
-      expect(normalized.additionalInterfaces?.[0].url).toBe('127.0.0.1:9000');
-      expect(normalized.url).toBe('127.0.0.1:9000');
-    });
-
-    it('should prepend http:// scheme to raw IP:port strings for REST interfaces', () => {
-      const raw = {
-        name: 'raw-ip-rest',
-        supportedInterfaces: [{ url: '127.0.0.1:8080', transport: 'REST' }],
-      };
-
-      const normalized = normalizeAgentCard(raw);
-      expect(normalized.additionalInterfaces?.[0].url).toBe(
-        'http://127.0.0.1:8080',
-      );
+      expect(normalized.additionalInterfaces).toHaveLength(1);
+      expect(normalized.additionalInterfaces?.[0].url).toBe('http://grpc');
     });
 
     it('should NOT override existing transport if protocolBinding is also present', () => {
@@ -368,6 +337,21 @@ describe('a2aUtils', () => {
       };
       const normalized = normalizeAgentCard(raw);
       expect(normalized.additionalInterfaces?.[0].transport).toBe('GRPC');
+    });
+
+    it('should not mutate the original card object', () => {
+      const raw = {
+        name: 'test',
+        supportedInterfaces: [{ url: 'grpc://test', protocolBinding: 'GRPC' }],
+      };
+
+      const normalized = normalizeAgentCard(raw);
+      expect(normalized).not.toBe(raw);
+      expect(normalized.additionalInterfaces).toBeDefined();
+      // Original should not have additionalInterfaces added
+      expect(
+        (raw as Record<string, unknown>)['additionalInterfaces'],
+      ).toBeUndefined();
     });
   });
 

@@ -121,9 +121,16 @@ export class A2AClientManager {
     };
 
     const resolver = new DefaultAgentCardResolver({ fetchImpl: cardFetch });
-    const agentCard = await this.resolveAgentCard(name, agentCardUrl, resolver);
+    const rawCard = await resolver.resolve(agentCardUrl, '');
+    // TODO: Remove normalizeAgentCard once @a2a-js/sdk handles
+    // proto field name aliases (supportedInterfaces → additionalInterfaces,
+    // protocolBinding → transport).
+    const agentCard = normalizeAgentCard(rawCard);
 
-    // Configure standard SDK client for tool registration and discovery
+    const grpcUrl =
+      agentCard.additionalInterfaces?.find((i) => i.transport === 'GRPC')
+        ?.url ?? agentCard.url;
+
     const clientOptions = ClientFactoryOptions.createFrom(
       ClientFactoryOptions.default,
       {
@@ -131,7 +138,7 @@ export class A2AClientManager {
           new RestTransportFactory({ fetchImpl: authFetch }),
           new JsonRpcTransportFactory({ fetchImpl: authFetch }),
           new GrpcTransportFactory({
-            grpcChannelCredentials: getGrpcCredentials(agentCard.url),
+            grpcChannelCredentials: getGrpcCredentials(grpcUrl),
           }),
         ],
         cardResolver: resolver,
@@ -262,15 +269,5 @@ export class A2AClientManager {
       }
       throw new Error(`${prefix}: Unexpected error: ${String(error)}`);
     }
-  }
-
-  private async resolveAgentCard(
-    agentName: string,
-    url: string,
-    resolver: DefaultAgentCardResolver,
-  ): Promise<AgentCard> {
-    const rawCard = await resolver.resolve(url);
-    const agentCard = normalizeAgentCard(rawCard);
-    return agentCard;
   }
 }
