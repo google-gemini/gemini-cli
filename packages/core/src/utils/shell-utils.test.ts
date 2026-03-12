@@ -22,6 +22,7 @@ import {
   stripShellWrapper,
   hasRedirection,
   resolveExecutable,
+  resetShellConfiguration,
 } from './shell-utils.js';
 import path from 'node:path';
 
@@ -37,17 +38,26 @@ vi.mock('os', () => ({
 }));
 
 const mockAccess = vi.hoisted(() => vi.fn());
+const mockAccessSync = vi.hoisted(() => vi.fn());
+const mockExistsSync = vi.hoisted(() => vi.fn());
+const mockRealpathSync = vi.hoisted(() => vi.fn());
 vi.mock('node:fs', () => ({
   default: {
     promises: {
       access: mockAccess,
     },
     constants: { X_OK: 1 },
+    existsSync: mockExistsSync,
+    realpathSync: mockRealpathSync,
+    accessSync: mockAccessSync,
   },
   promises: {
     access: mockAccess,
   },
   constants: { X_OK: 1 },
+  existsSync: mockExistsSync,
+  realpathSync: mockRealpathSync,
+  accessSync: mockAccessSync,
 }));
 
 const mockSpawnSync = vi.hoisted(() => vi.fn());
@@ -90,10 +100,18 @@ beforeEach(() => {
     status: 0,
     error: undefined,
   });
+  mockExistsSync.mockReturnValue(false);
+  mockRealpathSync.mockImplementation((p: string) => p);
+  mockAccessSync.mockImplementation((p: string) => {
+    if (mockExistsSync(p)) return;
+    throw new Error(`ENOENT: no such file or directory, access '${p}'`);
+  });
+  resetShellConfiguration();
 });
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllEnvs();
 });
 
 const mockPowerShellResult = (
@@ -270,21 +288,10 @@ describe('hasRedirection', () => {
 });
 
 describeWindowsOnly('PowerShell integration', () => {
-  const originalComSpec = process.env['ComSpec'];
-
   beforeEach(() => {
     mockPlatform.mockReturnValue('win32');
-    const systemRoot = process.env['SystemRoot'] || 'C:\\\\Windows';
-    process.env['ComSpec'] =
-      `${systemRoot}\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe`;
-  });
-
-  afterEach(() => {
-    if (originalComSpec === undefined) {
-      delete process.env['ComSpec'];
-    } else {
-      process.env['ComSpec'] = originalComSpec;
-    }
+    const systemRoot = 'C:\\\\Windows';
+    vi.stubEnv('ComSpec', `${systemRoot}\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe`);
   });
 
   it('should return command roots using PowerShell AST output', () => {
@@ -398,12 +405,6 @@ describe('escapeShellArg', () => {
 });
 
 describe('getShellConfiguration', () => {
-  const originalEnv = { ...process.env };
-
-  afterEach(() => {
-    process.env = originalEnv;
-  });
-
   it('should return bash configuration on Linux', () => {
     mockPlatform.mockReturnValue('linux');
     const config = getShellConfiguration();
@@ -425,27 +426,77 @@ describe('getShellConfiguration', () => {
       mockPlatform.mockReturnValue('win32');
     });
 
-    it('should return PowerShell configuration by default', () => {
-      delete process.env['ComSpec'];
+    it('should return PowerShell configuration by default (powershell.exe) with absolute path', () => {
+      vi.stubEnv('ComSpec', '');
+      const systemRoot = 'C:\\Windows';
+      vi.stubEnv('SystemRoot', systemRoot);
+      const expectedPath = path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+      
+      mockExistsSync.mockImplementation((p: string) => p === expectedPath);
+
       const config = getShellConfiguration();
-      expect(config.executable).toBe('powershell.exe');
+      expect(config.executable).toBe(expectedPath);
       expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
       expect(config.shell).toBe('powershell');
     });
 
-    it('should ignore ComSpec when pointing to cmd.exe', () => {
+    it('should prefer pwsh.exe if available in PATH with absolute directory', () => {
+      vi.stubEnv('ComSpec', '');
+      const pwshDir = path.resolve('C:\\Program Files\\PowerShell\\7');
+      const pwshPath = path.join(pwshDir, 'pwsh.exe');
+      vi.stubEnv('PATH', pwshDir);
+
+      mockExistsSync.mockImplementation((p: string) => p === pwshPath);
+
+      const config = getShellConfiguration();
+      expect(config.executable).toBe(pwshPath);
+      expect(config.shell).toBe('powershell');
+    });
+
+    it('should ignore relative paths in PATH for security', () => {
+      vi.stubEnv('ComSpec', '');
+      vi.stubEnv('PATH', `relative_path${path.delimiter}C:\\Windows`);
+      mockExistsSync.mockReturnValue(false);
+
+      const config = getShellConfiguration();
+      // Should fall back to absolute powershell.exe, not search in 'relative_path'
+      expect(config.executable).toContain('powershell.exe');
+      expect(config.executable).toContain('C:');
+    });
+
+    it('should ignore ComSpec when pointing to cmd.exe and prefer pwsh.exe in PATH', () => {
       const cmdPath = 'C:\\WINDOWS\\system32\\cmd.exe';
-      process.env['ComSpec'] = cmdPath;
+      vi.stubEnv('ComSpec', cmdPath);
+      const pwshPath = path.join('C:\\pwsh', 'pwsh.exe');
+      vi.stubEnv('PATH', 'C:\\pwsh');
+
+      mockExistsSync.mockImplementation((p: string) => p === pwshPath);
+
       const config = getShellConfiguration();
-      expect(config.executable).toBe('powershell.exe');
-      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.executable).toBe(pwshPath);
       expect(config.shell).toBe('powershell');
     });
 
-    it('should return PowerShell configuration if ComSpec points to powershell.exe', () => {
+    it('should prefer pwsh.exe in PATH even if ComSpec points to powershell.exe', () => {
+      const psPath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+      const pwshPath = path.resolve('C:\\pwsh', 'pwsh.exe');
+      vi.stubEnv('ComSpec', psPath);
+      vi.stubEnv('PATH', 'C:\\pwsh');
+
+      mockExistsSync.mockImplementation((p: string) => p === pwshPath);
+
+      const config = getShellConfiguration();
+      expect(config.executable).toBe(pwshPath);
+      expect(config.shell).toBe('powershell');
+    });
+
+    it('should return PowerShell configuration if ComSpec points to powershell.exe and pwsh.exe is NOT in PATH', () => {
       const psPath =
         'C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
-      process.env['ComSpec'] = psPath;
+      vi.stubEnv('ComSpec', psPath);
+      vi.stubEnv('PATH', ''); // Ensure pwsh is not found
+      mockExistsSync.mockReturnValue(false);
+
       const config = getShellConfiguration();
       expect(config.executable).toBe(psPath);
       expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
@@ -454,7 +505,7 @@ describe('getShellConfiguration', () => {
 
     it('should return PowerShell configuration if ComSpec points to pwsh.exe', () => {
       const pwshPath = 'C:\\Program Files\\PowerShell\\7\\pwsh.exe';
-      process.env['ComSpec'] = pwshPath;
+      vi.stubEnv('ComSpec', pwshPath);
       const config = getShellConfiguration();
       expect(config.executable).toBe(pwshPath);
       expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
@@ -462,7 +513,7 @@ describe('getShellConfiguration', () => {
     });
 
     it('should be case-insensitive when checking ComSpec', () => {
-      process.env['ComSpec'] = 'C:\\Path\\To\\POWERSHELL.EXE';
+      vi.stubEnv('ComSpec', 'C:\\Path\\To\\POWERSHELL.EXE');
       const config = getShellConfiguration();
       expect(config.executable).toBe('C:\\Path\\To\\POWERSHELL.EXE');
       expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
@@ -474,7 +525,7 @@ describe('getShellConfiguration', () => {
 describe('hasRedirection (PowerShell via mock)', () => {
   beforeEach(() => {
     mockPlatform.mockReturnValue('win32');
-    process.env['ComSpec'] = 'powershell.exe';
+    vi.stubEnv('ComSpec', 'powershell.exe');
   });
 
   it('should return true when PowerShell parser detects redirection', () => {
@@ -506,15 +557,8 @@ describe('hasRedirection (PowerShell via mock)', () => {
 });
 
 describe('resolveExecutable', () => {
-  const originalEnv = process.env;
-
   beforeEach(() => {
-    process.env = { ...originalEnv };
     mockAccess.mockReset();
-  });
-
-  afterEach(() => {
-    process.env = originalEnv;
   });
 
   it('should return the absolute path if it exists and is executable', async () => {
@@ -533,7 +577,7 @@ describe('resolveExecutable', () => {
   it('should resolve executable in PATH', async () => {
     const binDir = path.resolve('/bin');
     const usrBinDir = path.resolve('/usr/bin');
-    process.env['PATH'] = `${binDir}${path.delimiter}${usrBinDir}`;
+    vi.stubEnv('PATH', `${binDir}${path.delimiter}${usrBinDir}`);
     mockPlatform.mockReturnValue('linux');
 
     const targetPath = path.join(usrBinDir, 'ls');
@@ -547,7 +591,7 @@ describe('resolveExecutable', () => {
 
   it('should try extensions on Windows', async () => {
     const sys32 = path.resolve('C:\\Windows\\System32');
-    process.env['PATH'] = sys32;
+    vi.stubEnv('PATH', sys32);
     mockPlatform.mockReturnValue('win32');
     mockAccess.mockImplementation(async (p: string) => {
       // Use includes because on Windows path separators might differ
@@ -559,7 +603,7 @@ describe('resolveExecutable', () => {
   });
 
   it('should return undefined if not found in PATH', async () => {
-    process.env['PATH'] = path.resolve('/bin');
+    vi.stubEnv('PATH', path.resolve('/bin'));
     mockPlatform.mockReturnValue('linux');
     mockAccess.mockRejectedValue(new Error('ENOENT'));
 

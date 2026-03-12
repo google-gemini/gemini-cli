@@ -513,7 +513,8 @@ function parsePowerShellCommandDetails(
       hasError: details.length === 0,
       hasRedirection: parsed.hasRedirection,
     };
-  } catch {
+  } catch (e) {
+    debugLogger.debug('PowerShell command parsing error:', e);
     return null;
   }
 }
@@ -534,6 +535,8 @@ export function parseCommandDetails(
   return null;
 }
 
+let cachedShellConfiguration: ShellConfiguration | null = null;
+
 /**
  * Determines the appropriate shell configuration for the current platform.
  *
@@ -543,32 +546,117 @@ export function parseCommandDetails(
  * @returns The ShellConfiguration for the current environment.
  */
 export function getShellConfiguration(): ShellConfiguration {
+  if (cachedShellConfiguration) {
+    return cachedShellConfiguration;
+  }
+
   if (isWindows()) {
-    const comSpec = process.env['ComSpec'];
-    if (comSpec) {
-      const executable = comSpec.toLowerCase();
-      if (
-        executable.endsWith('powershell.exe') ||
-        executable.endsWith('pwsh.exe')
-      ) {
-        return {
-          executable: comSpec,
-          argsPrefix: ['-NoProfile', '-Command'],
-          shell: 'powershell',
-        };
+    // Prefer pwsh.exe (PowerShell 7+) if available in PATH
+    const pathDelimiter = os.platform() === 'win32' ? ';' : path.delimiter;
+    const paths = (process.env['PATH'] || '').split(pathDelimiter);
+    for (const p of paths) {
+      if (!p) continue;
+      // Security: ignore relative paths in PATH
+      if (!path.isAbsolute(p)) {
+        debugLogger.debug(`Ignoring relative path in PATH: ${p}`);
+        continue;
+      }
+      const fullPath = path.resolve(p, 'pwsh.exe');
+      try {
+        if (path.isAbsolute(fullPath)) {
+          // Security: fs.accessSync throws if file doesn't exist or isn't executable
+          fs.accessSync(fullPath, fs.constants.X_OK);
+          const canonicalPath = fs.realpathSync(fullPath);
+          cachedShellConfiguration = {
+            executable: canonicalPath,
+            argsPrefix: ['-NoProfile', '-Command'],
+            shell: 'powershell',
+          };
+          return cachedShellConfiguration;
+        }
+      } catch (e) {
+        debugLogger.debug(`Error checking for pwsh.exe in ${p}:`, e);
+        continue;
       }
     }
 
-    // Default to PowerShell for all other Windows configurations.
-    return {
-      executable: 'powershell.exe',
-      argsPrefix: ['-NoProfile', '-Command'],
-      shell: 'powershell',
-    };
+    const comSpec = process.env['ComSpec'];
+    if (comSpec && path.isAbsolute(comSpec)) {
+      // Basic security check: ensure no redirection or command chaining characters in ComSpec
+      if (/[;&|<>%]/.test(comSpec)) {
+        debugLogger.warn(`Unsafe ComSpec detected: ${comSpec}`);
+      } else {
+        const fileName = path.basename(comSpec).toLowerCase();
+        if (fileName === 'powershell.exe' || fileName === 'pwsh.exe') {
+          try {
+            // Security: fs.accessSync throws if file doesn't exist or isn't executable
+            fs.accessSync(comSpec, fs.constants.X_OK);
+            const canonicalPath = fs.realpathSync(comSpec);
+            cachedShellConfiguration = {
+              executable: canonicalPath,
+              argsPrefix: ['-NoProfile', '-Command'],
+              shell: 'powershell',
+            };
+            return cachedShellConfiguration;
+          } catch (e) {
+            debugLogger.debug(`Error resolving canonical path or checking execution permission for ComSpec: ${comSpec}`, e);
+          }
+        }
+      }
+    }
+
+    // Default to Windows PowerShell (powershell.exe) with absolute path
+    const systemRoot = process.env['SystemRoot'];
+    if (systemRoot && path.isAbsolute(systemRoot)) {
+      const defaultPsPath = path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+      try {
+        // Security: use accessSync(X_OK) for consistency with other checks
+        fs.accessSync(defaultPsPath, fs.constants.X_OK);
+        cachedShellConfiguration = {
+          executable: defaultPsPath,
+          argsPrefix: ['-NoProfile', '-Command'],
+          shell: 'powershell',
+        };
+        return cachedShellConfiguration;
+      } catch (e) {
+        debugLogger.debug(`Error checking for default powershell.exe in ${defaultPsPath}:`, e);
+      }
+    }
+
+    // Last resort fallback, strictly absolute to well-known system location
+    const fallbackPsPath = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+    try {
+      fs.accessSync(fallbackPsPath, fs.constants.X_OK);
+      cachedShellConfiguration = {
+        executable: fallbackPsPath,
+        argsPrefix: ['-NoProfile', '-Command'],
+        shell: 'powershell',
+      };
+      return cachedShellConfiguration;
+    } catch {
+      debugLogger.error('Could not find a valid PowerShell executable on Windows.');
+      throw new Error(
+        'Could not find a valid PowerShell executable (pwsh.exe or powershell.exe) on Windows. ' +
+          'Please ensure PowerShell is installed and available in your PATH or SystemRoot.',
+      );
+    }
   }
 
   // Unix-like systems (Linux, macOS)
-  return { executable: 'bash', argsPrefix: ['-c'], shell: 'bash' };
+  cachedShellConfiguration = {
+    executable: 'bash',
+    argsPrefix: ['-c'],
+    shell: 'bash',
+  };
+  return cachedShellConfiguration;
+}
+
+/**
+ * Resets the cached shell configuration.
+ * Used for testing purposes when environment variables change.
+ */
+export function resetShellConfiguration(): void {
+  cachedShellConfiguration = null;
 }
 
 /**
