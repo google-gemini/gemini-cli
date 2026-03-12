@@ -18,6 +18,8 @@ import {
   type AuthenticationHandler,
   type Client,
 } from '@a2a-js/sdk/client';
+import type { Config } from '../config/config.js';
+import { Agent as UndiciAgent, ProxyAgent } from 'undici';
 import { debugLogger } from '../utils/debugLogger.js';
 
 vi.mock('../utils/debugLogger.js', () => ({
@@ -115,6 +117,51 @@ describe('A2AClientManager', () => {
     const instance1 = A2AClientManager.getInstance();
     const instance2 = A2AClientManager.getInstance();
     expect(instance1).toBe(instance2);
+  });
+
+  describe('getInstance / dispatcher initialization', () => {
+    it('should use UndiciAgent when no proxy is configured', async () => {
+      await manager.loadAgent('TestAgent', 'http://test.agent/card');
+
+      const resolverOptions = vi.mocked(DefaultAgentCardResolver).mock
+        .calls[0][0];
+      const cardFetch = resolverOptions?.fetchImpl as typeof fetch;
+      await cardFetch('http://test.agent/card');
+
+      const fetchCall = vi
+        .mocked(fetch)
+        .mock.calls.find((call) => call[0] === 'http://test.agent/card');
+      expect(fetchCall).toBeDefined();
+      expect(
+        (fetchCall![1] as { dispatcher?: unknown })?.dispatcher,
+      ).toBeInstanceOf(UndiciAgent);
+      expect(
+        (fetchCall![1] as { dispatcher?: unknown })?.dispatcher,
+      ).not.toBeInstanceOf(ProxyAgent);
+    });
+
+    it('should use ProxyAgent when a proxy is configured via Config', async () => {
+      A2AClientManager.resetInstanceForTesting();
+      const mockConfig = {
+        getProxy: () => 'http://my-proxy:8080',
+      } as Config;
+
+      manager = A2AClientManager.getInstance(mockConfig);
+      await manager.loadAgent('TestProxyAgent', 'http://test.proxy.agent/card');
+
+      const resolverOptions = vi.mocked(DefaultAgentCardResolver).mock
+        .calls[0][0];
+      const cardFetch = resolverOptions?.fetchImpl as typeof fetch;
+      await cardFetch('http://test.proxy.agent/card');
+
+      const fetchCall = vi
+        .mocked(fetch)
+        .mock.calls.find((call) => call[0] === 'http://test.proxy.agent/card');
+      expect(fetchCall).toBeDefined();
+      expect(
+        (fetchCall![1] as { dispatcher?: unknown })?.dispatcher,
+      ).toBeInstanceOf(ProxyAgent);
+    });
   });
 
   describe('loadAgent', () => {
