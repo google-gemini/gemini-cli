@@ -26,7 +26,7 @@ import {
 import { buildFilePathArgsPattern } from '../policy/utils.js';
 import { makeRelative } from '../utils/paths.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
-import { EDIT_TOOL_NAMES, WEB_FETCH_TOOL_NAME } from '../tools/tool-names.js';
+import { EDIT_TOOL_NAMES } from '../tools/tool-names.js';
 import type { ValidatingToolCall } from './types.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
@@ -52,6 +52,7 @@ export function getPolicyDenialError(
 export async function checkPolicy(
   toolCall: ValidatingToolCall,
   config: Config,
+  subagent?: string,
 ): Promise<CheckResult> {
   const serverName =
     toolCall.tool instanceof DiscoveredMCPTool
@@ -66,6 +67,7 @@ export async function checkPolicy(
       { name: toolCall.request.name, args: toolCall.request.args },
       serverName,
       toolAnnotations,
+      subagent,
     );
 
   const { decision } = result;
@@ -173,7 +175,7 @@ function isAutoEditTransition(
   // tools.
   return (
     outcome === ToolConfirmationOutcome.ProceedAlways &&
-    (EDIT_TOOL_NAMES.has(tool.name) || tool.name === WEB_FETCH_TOOL_NAME)
+    EDIT_TOOL_NAMES.has(tool.name)
   );
 }
 
