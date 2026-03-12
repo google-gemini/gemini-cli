@@ -68,7 +68,9 @@ describe('AcknowledgedAgentsService', () => {
 
     await service.acknowledge('/project', 'AgentA', 'hash1');
 
-    expect(service.isAcknowledgedSync('/project', 'AgentA', 'hash1')).toBe(true);
+    expect(service.isAcknowledgedSync('/project', 'AgentA', 'hash1')).toBe(
+      true,
+    );
     expect(service.isAcknowledgedSync('/project', 'AgentA', 'hash2')).toBe(
       false,
     );
