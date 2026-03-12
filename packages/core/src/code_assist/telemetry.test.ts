@@ -339,6 +339,7 @@ describe('telemetry', () => {
           acceptedLines: '8',
           removedLines: '3',
           isAgentic: true,
+          initiationMethod: InitiationMethod.COMMAND,
         }),
       );
     });
