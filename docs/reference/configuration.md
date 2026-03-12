@@ -729,6 +729,10 @@ input.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`agents.browser.disableUserInput`** (boolean):
+  - **Description:** Disable user input on browser window during automation.
+  - **Default:** `true`
+
 #### `context`
 
 - **`context.fileName`** (string | string[]):
@@ -1412,6 +1416,13 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Useful for shared compute environments or keeping CLI state isolated.
   - Example: `export GEMINI_CLI_HOME="/path/to/user/config"` (Windows
     PowerShell: `$env:GEMINI_CLI_HOME="C:\path\to\user\config"`)
+- **`GEMINI_CLI_SURFACE`**:
+  - Specifies a custom label to include in the `User-Agent` header for API
+    traffic reporting.
+  - This is useful for tracking specific internal tools or distribution
+    channels.
+  - Example: `export GEMINI_CLI_SURFACE="my-custom-tool"` (Windows PowerShell:
+    `$env:GEMINI_CLI_SURFACE="my-custom-tool"`)
 - **`GOOGLE_API_KEY`**:
   - Your Google Cloud API key.
   - Required for using Vertex AI in express mode.
