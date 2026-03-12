@@ -155,6 +155,45 @@ describe('DiscoveredMCPTool', () => {
     });
   });
 
+  describe('getSchema', () => {
+    it('should strip $schema from parametersJsonSchema for API compatibility', () => {
+      const schemaWithDraft2020 = {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: 'object' as const,
+        properties: { param: { type: 'string' } },
+        required: ['param'],
+      };
+      const bus = createMockMessageBus();
+      const toolWith$schema = new DiscoveredMCPTool(
+        mockCallableToolInstance,
+        serverName,
+        serverToolName,
+        baseDescription,
+        schemaWithDraft2020,
+        bus,
+      );
+      const schema = toolWith$schema.getSchema();
+      expect(schema.parametersJsonSchema).toEqual({
+        type: 'object',
+        properties: { param: { type: 'string' } },
+        required: ['param'],
+      });
+      expect(
+        (schema.parametersJsonSchema as Record<string, unknown>)?.['$schema'],
+      ).toBeUndefined();
+      expect(
+        (toolWith$schema.parameterSchema as Record<string, unknown>)?.[
+          '$schema'
+        ],
+      ).toBe('https://json-schema.org/draft/2020-12/schema');
+    });
+
+    it('should not modify schema without $schema property', () => {
+      const schema = tool.getSchema();
+      expect(schema.parametersJsonSchema).toEqual(inputSchema);
+    });
+  });
+
   describe('execute', () => {
     it('should call mcpTool.callTool with correct parameters and format display output', async () => {
       const params = { param: 'testValue' };
