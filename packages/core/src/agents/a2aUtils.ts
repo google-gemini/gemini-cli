@@ -242,7 +242,7 @@ export function normalizeAgentCard(card: unknown): AgentCard {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const raw = intf as unknown as Record<string, unknown>;
     const binding = raw['protocolBinding'];
-     
+
     if (!intf.transport && typeof binding === 'string') {
       intf.transport = binding;
     }
