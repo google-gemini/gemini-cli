@@ -702,7 +702,7 @@ describe('CodeAssistServer', () => {
     expect(response).toEqual(mockResponse);
   });
 
-  it('should call getCodeAssistGlobalUserSetting endpoint', async () => {
+  it('should call getCodeAssistGlobalUserSetting endpoint with projectId as query param', async () => {
     const { server } = createTestServer();
     const mockResponse: CodeAssistGlobalUserSettingResponse = {
       freeTierDataCollectionOptin: true,
@@ -715,8 +715,54 @@ describe('CodeAssistServer', () => {
 
     expect(requestGetSpy).toHaveBeenCalledWith(
       'getCodeAssistGlobalUserSetting',
+      undefined,
+      { cloudaicompanionProject: 'test-project' },
     );
     expect(response).toEqual(mockResponse);
+  });
+
+  it('should call getCodeAssistGlobalUserSetting without params when projectId is absent', async () => {
+    const mockRequest = vi.fn();
+    const client = { request: mockRequest } as unknown as OAuth2Client;
+    const serverWithoutProject = new CodeAssistServer(
+      client,
+      undefined,
+      {},
+      'test-session',
+      UserTierId.FREE,
+    );
+    const mockResponse: CodeAssistGlobalUserSettingResponse = {
+      freeTierDataCollectionOptin: false,
+    };
+    const requestGetSpy = vi
+      .spyOn(serverWithoutProject, 'requestGet')
+      .mockResolvedValue(mockResponse);
+
+    const response =
+      await serverWithoutProject.getCodeAssistGlobalUserSetting();
+
+    expect(requestGetSpy).toHaveBeenCalledWith(
+      'getCodeAssistGlobalUserSetting',
+      undefined,
+      undefined,
+    );
+    expect(response).toEqual(mockResponse);
+  });
+
+  it('should pass query params through requestGet to the underlying HTTP request', async () => {
+    const { server, mockRequest } = createTestServer();
+    mockRequest.mockResolvedValue({ data: {} });
+
+    await server.requestGet('someMethod', undefined, {
+      cloudaicompanionProject: 'my-project',
+    });
+
+    expect(mockRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'GET',
+        params: { cloudaicompanionProject: 'my-project' },
+      }),
+    );
   });
 
   it('should call setCodeAssistGlobalUserSetting endpoint', async () => {

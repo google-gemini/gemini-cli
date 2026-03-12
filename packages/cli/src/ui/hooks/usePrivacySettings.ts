@@ -106,10 +106,10 @@ async function getRemoteDataCollectionOptIn(
     const resp = await server.getCodeAssistGlobalUserSetting();
     if (resp.freeTierDataCollectionOptin === undefined) {
       debugLogger.warn(
-        'Warning: Code Assist API did not return freeTierDataCollectionOptin. Defaulting to true.',
+        'Warning: Code Assist API did not return freeTierDataCollectionOptin. Defaulting to false.',
       );
     }
-    return resp.freeTierDataCollectionOptin ?? true;
+    return resp.freeTierDataCollectionOptin ?? false;
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'response' in error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -119,6 +119,7 @@ async function getRemoteDataCollectionOptIn(
         };
       };
       if (gaxiosError.response?.status === 404) {
+        // New user with no saved preference — default to opted in.
         return true;
       }
     }
