@@ -593,6 +593,7 @@ describe('AgentRegistry', () => {
       expect(A2AAuthProviderFactory.create).toHaveBeenCalledWith({
         authConfig: mockAuth,
         agentName: 'RemoteAgentWithAuth',
+        targetUrl: 'https://example.com/card',
         agentCardUrl: 'https://example.com/card',
       });
       expect(loadAgentSpy).toHaveBeenCalledWith(
