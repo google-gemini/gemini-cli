@@ -19,6 +19,7 @@ import {
   cleanupTerminalOnExit,
   terminalCapabilityManager,
 } from '../utils/terminalCapabilityManager.js';
+import { isAndroid } from '../../utils/platform.js';
 import { WARNING_PROMPT_DURATION_MS } from '../constants.js';
 import { formatCommand } from '../key/keybindingUtils.js';
 import { Command } from '../key/keyBindings.js';
@@ -26,16 +27,12 @@ import { Command } from '../key/keyBindings.js';
 interface UseSuspendProps {
   handleWarning: (message: string) => void;
   setRawMode: (mode: boolean) => void;
-  refreshStatic: () => void;
-  setForceRerenderKey: (updater: (prev: number) => number) => void;
   shouldUseAlternateScreen: boolean;
 }
 
 export function useSuspend({
   handleWarning,
   setRawMode,
-  refreshStatic,
-  setForceRerenderKey,
   shouldUseAlternateScreen,
 }: UseSuspendProps) {
   const [ctrlZPressCount, setCtrlZPressCount] = useState(0);
@@ -108,16 +105,9 @@ export function useSuspend({
             enableMouseEvents();
           }
 
-          // Force Ink to do a complete repaint by:
-          // 1. Emitting a resize event (tricks Ink into full redraw)
-          // 2. Remounting components via state changes
+          // Force Ink to do a complete repaint by emitting a resize event.
+          // We avoid remounting the entire App component to preserve local state.
           process.stdout.emit('resize');
-
-          // Give a tick for resize to process, then trigger remount
-          setImmediate(() => {
-            refreshStatic();
-            setForceRerenderKey((prev) => prev + 1);
-          });
         } finally {
           if (onResumeHandlerRef.current === onResume) {
             onResumeHandlerRef.current = null;
@@ -146,8 +136,6 @@ export function useSuspend({
     ctrlZPressCount,
     handleWarning,
     setRawMode,
-    refreshStatic,
-    setForceRerenderKey,
     shouldUseAlternateScreen,
   ]);
 

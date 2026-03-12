@@ -5,6 +5,8 @@
  */
 
 import { spawn } from 'node:child_process';
+import os from 'node:os';
+import { isAndroid } from './platform.js';
 import { RELAUNCH_EXIT_CODE } from './processUtils.js';
 import {
   writeToStderr,
@@ -16,7 +18,7 @@ export async function relaunchOnExitCode(runner: () => Promise<number>) {
     try {
       const exitCode = await runner();
 
-      if (exitCode !== RELAUNCH_EXIT_CODE) {
+      if (isAndroid || exitCode !== RELAUNCH_EXIT_CODE) {
         process.exit(exitCode);
       }
     } catch (error) {
