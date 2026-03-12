@@ -9,6 +9,8 @@ import {
   type ToolConfirmationOutcome,
   type ToolResult,
   type ToolCallConfirmationDetails,
+  type BackgroundExecutionData,
+  type ExecuteOptions,
 } from '../tools/tools.js';
 import {
   DEFAULT_QUERY_STRING,
@@ -28,6 +30,7 @@ import { safeJsonToMarkdown } from '../utils/markdownUtils.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import { A2AAgentError } from './a2a-errors.js';
+import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
 
 /**
  * A tool invocation that proxies to a remote A2A agent.
@@ -116,13 +119,122 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
   }
 
   async execute(
-    _signal: AbortSignal,
+    signal: AbortSignal,
     updateOutput?: (output: string | AnsiOutput) => void,
+    options?: ExecuteOptions,
   ): Promise<ToolResult> {
-    // 1. Ensure the agent is loaded (cached by manager)
-    // We assume the user has provided an access token via some mechanism (TODO),
-    // or we rely on ADC.
+    const { setExecutionIdCallback } = options ?? {};
+    // Create an AbortController for lifecycle kill support.
+    // Parent abort and lifecycle kill both funnel through this controller.
+    const executionAbortController = new AbortController();
+    if (signal.aborted) {
+      executionAbortController.abort();
+    } else {
+      signal.addEventListener('abort', () => executionAbortController.abort(), {
+        once: true,
+      });
+    }
+
+    // Register with lifecycle service as a virtual execution so this
+    // invocation can be backgrounded, subscribed to, and killed.
+    const agentLabel = this.definition.displayName ?? this.definition.name;
+    const handle = ExecutionLifecycleService.createExecution(
+      '',
+      () => executionAbortController.abort(),
+      'remote_agent',
+      (output, error) => {
+        const header = error
+          ? `[Remote agent '${agentLabel}' completed with error: ${error.message}]`
+          : `[Remote agent '${agentLabel}' completed successfully]`;
+        return output ? `${header}\nOutput:\n${output}` : header;
+      },
+      agentLabel,
+    );
+    // createExecution always produces a valid numeric ID
+    const executionId = handle.pid!;
+
+    if (setExecutionIdCallback) {
+      setExecutionIdCallback(executionId);
+    }
+
+    // Guard: stop calling updateOutput after backgrounding since the
+    // tool call has already returned from the scheduler's perspective.
+    let backgrounded = false;
+
+    // Fire-and-forget: stream processing runs concurrently and settles the
+    // lifecycle execution on completion or error.
+    const streamingPromise = this.processStream(
+      executionId,
+      executionAbortController.signal,
+      (output) => {
+        if (!backgrounded && updateOutput) {
+          updateOutput(output);
+        }
+      },
+    );
+    // Errors are handled internally via completeExecution; prevent
+    // unhandled-rejection noise.
+    streamingPromise.catch(() => {});
+
+    // Resolves when either: (a) processStream completes/errors, or
+    // (b) the execution is backgrounded externally.
+    const result = await handle.result;
+
+    if (result.backgrounded) {
+      backgrounded = true;
+      const data: BackgroundExecutionData = {
+        pid: executionId,
+        command: `Remote agent: ${agentLabel}`,
+        initialOutput: result.output,
+      };
+      return {
+        llmContent: [
+          {
+            text: `Remote agent '${agentLabel}' moved to background (ID: ${executionId}). Use subscribe to view output.`,
+          },
+        ],
+        returnDisplay: `Remote agent moved to background (ID: ${executionId}).`,
+        data,
+      };
+    }
+
+    // Error path — the lifecycle result carries the original Error instance.
+    if (result.error) {
+      const errorMessage = this.formatExecutionError(result.error);
+      const fullDisplay = result.output
+        ? `${result.output}\n\n${errorMessage}`
+        : errorMessage;
+      return {
+        llmContent: [{ text: fullDisplay }],
+        returnDisplay: fullDisplay,
+        error: { message: errorMessage },
+      };
+    }
+
+    // Normal completion.
+    const finalOutput = result.output;
+    debugLogger.debug(
+      `[RemoteAgent] Final output from ${this.definition.name}: ${finalOutput.substring(0, 200)}`,
+    );
+    return {
+      llmContent: [{ text: finalOutput }],
+      returnDisplay: safeJsonToMarkdown(finalOutput),
+    };
+  }
+
+  /**
+   * Runs the A2A stream, feeding output deltas into the lifecycle service.
+   * On completion (or error) it settles the lifecycle execution so
+   * {@link execute}'s `handle.result` resolves.
+   */
+  private async processStream(
+    executionId: number,
+    signal: AbortSignal,
+    updateOutput?: (output: string | AnsiOutput) => void,
+  ): Promise<void> {
     const reassembler = new A2AResultReassembler();
+    let previousOutputLength = 0;
+
     try {
       const priorState = RemoteAgentInvocation.sessionState.get(
         this.definition.name,
@@ -150,21 +262,30 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         {
           contextId: this.contextId,
           taskId: this.taskId,
-          signal: _signal,
+          signal,
         },
       );
 
       let finalResponse: SendMessageResult | undefined;
 
       for await (const chunk of stream) {
-        if (_signal.aborted) {
+        if (signal.aborted) {
           throw new Error('Operation aborted');
         }
         finalResponse = chunk;
         reassembler.update(chunk);
 
+        // Compute delta so lifecycle subscribers see incremental chunks.
+        const currentOutput = reassembler.toString();
+        const delta = currentOutput.substring(previousOutputLength);
+        previousOutputLength = currentOutput.length;
+
+        if (delta) {
+          ExecutionLifecycleService.appendOutput(executionId, delta);
+        }
+
         if (updateOutput) {
-          updateOutput(reassembler.toString());
+          updateOutput(currentOutput);
         }
 
         const {
@@ -184,33 +305,22 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         throw new Error('No response from remote agent.');
       }
 
-      const finalOutput = reassembler.toString();
-
       debugLogger.debug(
         `[RemoteAgent] Final response from ${this.definition.name}:\n${JSON.stringify(finalResponse, null, 2)}`,
       );
 
-      return {
-        llmContent: [{ text: finalOutput }],
-        returnDisplay: safeJsonToMarkdown(finalOutput),
-      };
+      ExecutionLifecycleService.completeExecution(executionId);
     } catch (error: unknown) {
-      const partialOutput = reassembler.toString();
-      // Surface structured, user-friendly error messages.
-      const errorMessage = this.formatExecutionError(error);
-      const fullDisplay = partialOutput
-        ? `${partialOutput}\n\n${errorMessage}`
-        : errorMessage;
-      return {
-        llmContent: [{ text: fullDisplay }],
-        returnDisplay: fullDisplay,
-        error: { message: errorMessage },
-      };
+      ExecutionLifecycleService.completeExecution(executionId, {
+        error: error instanceof Error ? error : new Error(String(error)),
+      });
     } finally {
-      // Persist state even on partial failures or aborts to maintain conversational continuity.
+      // Persist conversational state. On abort/kill the task was interrupted
+      // so clear taskId (next invocation starts a fresh task), but keep
+      // contextId to maintain the conversation with the remote agent.
       RemoteAgentInvocation.sessionState.set(this.definition.name, {
         contextId: this.contextId,
-        taskId: this.taskId,
+        taskId: signal.aborted ? undefined : this.taskId,
       });
     }
   }
