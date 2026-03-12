@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, beforeEach, afterEach } from 'vitest';
+import { vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { format } from 'node:util';
 import { coreEvents } from '@google/gemini-cli-core';
 import { themeManager } from './src/ui/themes/theme-manager.js';
+import { setupServer } from 'msw/node';
 
 // Unset CI environment variable so that ink renders dynamically as it does in a real terminal
 if (process.env.CI !== undefined) {
@@ -31,6 +32,13 @@ process.env.FORCE_COLOR = '3';
 process.env.FORCE_GENERIC_KEYBINDING_HINTS = 'true';
 
 import './src/test-utils/customMatchers.js';
+
+// Global MSW server instance available to all tests in the CLI package.
+export const server = setupServer();
+
+beforeAll(() => {
+  server.listen({ onUnhandledRequest: 'error' });
+});
 
 let consoleErrorSpy: vi.SpyInstance;
 let actWarnings: Array<{ message: string; stack: string }> = [];
@@ -80,10 +88,16 @@ afterEach(() => {
 
   vi.unstubAllEnvs();
 
+  server.resetHandlers();
+
   if (actWarnings.length > 0) {
     const messages = actWarnings
       .map(({ message, stack }) => `${message}\n${stack}`)
       .join('\n\n');
     throw new Error(`Failing test due to "act(...)" warnings:\n${messages}`);
   }
+});
+
+afterAll(() => {
+  server.close();
 });
