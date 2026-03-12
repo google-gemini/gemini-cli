@@ -18,6 +18,7 @@ import {
   Kind,
   type ToolInvocation,
   type ToolResult,
+  type BackgroundExecutionData,
   type ToolCallConfirmationDetails,
   type ToolExecuteConfirmationDetails,
   type PolicyUpdateOptions,
@@ -150,7 +151,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
-    setPidCallback?: (pid: number) => void,
+    setExecutionIdCallback?: (executionId: number) => void,
   ): Promise<ToolResult> {
     const strippedCommand = stripShellWrapper(this.params.command);
 
@@ -281,8 +282,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
         );
 
       if (pid) {
-        if (setPidCallback) {
-          setPidCallback(pid);
+        if (setExecutionIdCallback) {
+          setExecutionIdCallback(pid);
         }
 
         // If the model requested to run in the background, do so after a short delay.
@@ -324,7 +325,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         }
       }
 
-      let data: Record<string, unknown> | undefined;
+      let data: BackgroundExecutionData | undefined;
 
       let llmContent = '';
       let timeoutMessage = '';

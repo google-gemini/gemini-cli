@@ -15,7 +15,6 @@ import type {
 import { ToolErrorType } from '../tools/tool-error.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ShellExecutionConfig } from '../index.js';
-import { ShellToolInvocation } from '../tools/shell.js';
 import { DiscoveredMCPToolInvocation } from '../tools/mcp-tool.js';
 
 /**
@@ -26,7 +25,7 @@ import { DiscoveredMCPToolInvocation } from '../tools/mcp-tool.js';
  * @returns MCP context if this is an MCP tool, undefined otherwise
  */
 function extractMcpContext(
-  invocation: ShellToolInvocation | AnyToolInvocation,
+  invocation: AnyToolInvocation,
   config: Config,
 ): McpToolContext | undefined {
   if (!(invocation instanceof DiscoveredMCPToolInvocation)) {
@@ -63,18 +62,18 @@ function extractMcpContext(
  * @param signal Abort signal for cancellation
  * @param liveOutputCallback Optional callback for live output updates
  * @param shellExecutionConfig Optional shell execution config
- * @param setPidCallback Optional callback to set the PID for shell invocations
+ * @param setExecutionIdCallback Optional callback to set an execution ID for backgroundable invocations
  * @param config Config to look up MCP server details for hook context
  * @returns The tool result
  */
 export async function executeToolWithHooks(
-  invocation: ShellToolInvocation | AnyToolInvocation,
+  invocation: AnyToolInvocation,
   toolName: string,
   signal: AbortSignal,
   tool: AnyDeclarativeTool,
   liveOutputCallback?: (outputChunk: ToolLiveOutput) => void,
   shellExecutionConfig?: ShellExecutionConfig,
-  setPidCallback?: (pid: number) => void,
+  setExecutionIdCallback?: (executionId: number) => void,
   config?: Config,
   originalRequestName?: string,
 ): Promise<ToolResult> {
@@ -154,22 +153,14 @@ export async function executeToolWithHooks(
     }
   }
 
-  // Execute the actual tool
-  let toolResult: ToolResult;
-  if (setPidCallback && invocation instanceof ShellToolInvocation) {
-    toolResult = await invocation.execute(
-      signal,
-      liveOutputCallback,
-      shellExecutionConfig,
-      setPidCallback,
-    );
-  } else {
-    toolResult = await invocation.execute(
-      signal,
-      liveOutputCallback,
-      shellExecutionConfig,
-    );
-  }
+  // Execute the actual tool. Tools that support backgrounding can optionally
+  // surface an execution ID via the callback.
+  const toolResult: ToolResult = await invocation.execute(
+    signal,
+    liveOutputCallback,
+    shellExecutionConfig,
+    setExecutionIdCallback,
+  );
 
   // Append notification if parameters were modified
   if (inputWasModified) {

@@ -550,7 +550,7 @@ describe('ToolExecutor', () => {
     expect(result.status).toBe(CoreToolCallStatus.Success);
   });
 
-  it('should report PID updates for shell tools', async () => {
+  it('should report execution ID updates for backgroundable tools', async () => {
     // 1. Setup ShellToolInvocation
     const messageBus = createMockMessageBus();
     const shellInvocation = new ShellToolInvocation(
@@ -561,7 +561,7 @@ describe('ToolExecutor', () => {
     // We need a dummy tool that matches the invocation just for structure
     const mockTool = new MockTool({ name: SHELL_TOOL_NAME });
 
-    // 2. Mock executeToolWithHooks to trigger the PID callback
+    // 2. Mock executeToolWithHooks to trigger the execution ID callback
     const testPid = 12345;
     vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockImplementation(
       async (
@@ -571,13 +571,13 @@ describe('ToolExecutor', () => {
         _tool,
         _liveCb,
         _shellCfg,
-        setPidCallback,
+        setExecutionIdCallback,
         _config,
         _originalRequestName,
       ) => {
-        // Simulate the shell tool reporting a PID
-        if (setPidCallback) {
-          setPidCallback(testPid);
+        // Simulate the tool reporting an execution ID
+        if (setExecutionIdCallback) {
+          setExecutionIdCallback(testPid);
         }
         return { llmContent: 'done', returnDisplay: 'done' };
       },
@@ -606,11 +606,64 @@ describe('ToolExecutor', () => {
       onUpdateToolCall,
     });
 
-    // 4. Verify PID was reported
+    // 4. Verify execution ID was reported
     expect(onUpdateToolCall).toHaveBeenCalledWith(
       expect.objectContaining({
         status: CoreToolCallStatus.Executing,
         pid: testPid,
+      }),
+    );
+  });
+
+  it('should report execution ID updates for non-shell backgroundable tools', async () => {
+    const mockTool = new MockTool({
+      name: 'remote_agent_call',
+      description: 'Remote agent call',
+    });
+    const invocation = mockTool.build({});
+
+    const testExecutionId = 67890;
+    vi.mocked(coreToolHookTriggers.executeToolWithHooks).mockImplementation(
+      async (
+        _inv,
+        _name,
+        _sig,
+        _tool,
+        _liveCb,
+        _shellCfg,
+        setExecutionIdCallback,
+      ) => {
+        setExecutionIdCallback?.(testExecutionId);
+        return { llmContent: 'done', returnDisplay: 'done' };
+      },
+    );
+
+    const scheduledCall: ScheduledToolCall = {
+      status: CoreToolCallStatus.Scheduled,
+      request: {
+        callId: 'call-remote-pid',
+        name: 'remote_agent_call',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-remote-pid',
+      },
+      tool: mockTool,
+      invocation: invocation as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+    };
+
+    const onUpdateToolCall = vi.fn();
+
+    await executor.execute({
+      call: scheduledCall,
+      signal: new AbortController().signal,
+      onUpdateToolCall,
+    });
+
+    expect(onUpdateToolCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: CoreToolCallStatus.Executing,
+        pid: testExecutionId,
       }),
     );
   });
