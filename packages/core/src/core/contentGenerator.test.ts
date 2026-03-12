@@ -495,6 +495,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -525,6 +526,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -556,6 +558,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -585,6 +588,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     vi.stubEnv('GOOGLE_GEMINI_BASE_URL', 'http://evil-proxy.example.com');
