@@ -2,10 +2,10 @@
 
 exports[`App > Snapshots > renders default layout correctly 1`] = `
 "
-  ▝▜▄    Gemini CLI v1.2.3
+  ▝▜▄     Gemini CLI v1.2.3
     ▝▜▄
-    ▗▟▀
-  ▗▟▀  
+   ▗▟▀ 
+  ▝▀    
 
 
 Tips for getting started:
@@ -47,10 +47,10 @@ exports[`App > Snapshots > renders screen reader layout correctly 1`] = `
 "Notifications
 Footer
 
-  ▝▜▄    Gemini CLI v1.2.3
+  ▝▜▄     Gemini CLI v1.2.3
     ▝▜▄
-    ▗▟▀
-  ▗▟▀  
+   ▗▟▀ 
+  ▝▀    
 
 
 Tips for getting started:
@@ -64,10 +64,10 @@ Composer
 
 exports[`App > Snapshots > renders with dialogs visible 1`] = `
 "
-  ▝▜▄    Gemini CLI v1.2.3
+  ▝▜▄     Gemini CLI v1.2.3
     ▝▜▄
-    ▗▟▀
-  ▗▟▀  
+   ▗▟▀ 
+  ▝▀    
 
 
 
@@ -107,10 +107,10 @@ DialogManager
 
 exports[`App > should render ToolConfirmationQueue along with Composer when tool is confirming and experiment is on 1`] = `
 "
-  ▝▜▄    Gemini CLI v1.2.3
+  ▝▜▄     Gemini CLI v1.2.3
     ▝▜▄
-    ▗▟▀
-  ▗▟▀  
+   ▗▟▀ 
+  ▝▀    
 
 
 Tips for getting started:
