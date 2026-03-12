@@ -22,6 +22,7 @@ import {
   isEditorAvailable,
   isEditorAvailableAsync,
   resolveEditorAsync,
+  resolveCustomEditorCommand,
   type EditorType,
 } from './editor.js';
 import { coreEvents, CoreEvent } from './events.js';
@@ -775,6 +776,162 @@ describe('editor utils', () => {
       const result = await resolvePromise;
       expect(result).toBe('vim');
       expect(emitSpy).toHaveBeenCalledWith(CoreEvent.RequestEditorSelection);
+    });
+  });
+
+  describe('resolveCustomEditorCommand', () => {
+    it('should return $VISUAL when set', () => {
+      vi.stubEnv('VISUAL', '/usr/local/bin/code');
+      vi.stubEnv('EDITOR', 'vim');
+      expect(resolveCustomEditorCommand()).toBe('/usr/local/bin/code');
+    });
+
+    it('should return $EDITOR when $VISUAL is not set', () => {
+      vi.stubEnv('VISUAL', '');
+      vi.stubEnv('EDITOR', 'vim');
+      expect(resolveCustomEditorCommand()).toBe('vim');
+    });
+
+    it('should return undefined when neither variable is set', () => {
+      vi.stubEnv('VISUAL', '');
+      vi.stubEnv('EDITOR', '');
+      expect(resolveCustomEditorCommand()).toBeUndefined();
+    });
+
+    it('should trim whitespace from $VISUAL', () => {
+      vi.stubEnv('VISUAL', '  /usr/local/bin/code  ');
+      expect(resolveCustomEditorCommand()).toBe('/usr/local/bin/code');
+    });
+
+    it('should trim whitespace from $EDITOR', () => {
+      vi.stubEnv('VISUAL', '');
+      vi.stubEnv('EDITOR', '  vim  ');
+      expect(resolveCustomEditorCommand()).toBe('vim');
+    });
+  });
+
+  describe('custom editor type', () => {
+    describe('hasValidEditorCommand', () => {
+      it('should return true when $VISUAL points to an installed command', () => {
+        vi.stubEnv('VISUAL', '/usr/local/bin/code');
+        (execSync as Mock).mockReturnValue(Buffer.from('/usr/local/bin/code'));
+        expect(hasValidEditorCommand('custom')).toBe(true);
+      });
+
+      it('should return false when no env vars are set', () => {
+        vi.stubEnv('VISUAL', '');
+        vi.stubEnv('EDITOR', '');
+        expect(hasValidEditorCommand('custom')).toBe(false);
+      });
+
+      it('should return false when $EDITOR command is not installed', () => {
+        vi.stubEnv('VISUAL', '');
+        vi.stubEnv('EDITOR', 'my-editor');
+        (execSync as Mock).mockImplementation(() => {
+          throw new Error();
+        });
+        expect(hasValidEditorCommand('custom')).toBe(false);
+      });
+    });
+
+    describe('hasValidEditorCommandAsync', () => {
+      it('should return true when $VISUAL points to an installed command', async () => {
+        vi.stubEnv('VISUAL', '/usr/local/bin/code');
+        mockExecAsync((cmd) => cmd.includes('/usr/local/bin/code'));
+        expect(await hasValidEditorCommandAsync('custom')).toBe(true);
+      });
+
+      it('should return false when no env vars are set', async () => {
+        vi.stubEnv('VISUAL', '');
+        vi.stubEnv('EDITOR', '');
+        expect(await hasValidEditorCommandAsync('custom')).toBe(false);
+      });
+    });
+
+    describe('getDiffCommand', () => {
+      it('should reuse vscode diff args when $VISUAL is code', () => {
+        vi.stubEnv('VISUAL', '/usr/local/bin/code');
+        const result = getDiffCommand('old.txt', 'new.txt', 'custom');
+        expect(result).toEqual({
+          command: '/usr/local/bin/code',
+          args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+        });
+      });
+
+      it('should reuse vim diff args when $EDITOR is vim', () => {
+        vi.stubEnv('VISUAL', '');
+        vi.stubEnv('EDITOR', '/usr/bin/vim');
+        const result = getDiffCommand('old.txt', 'new.txt', 'custom');
+        expect(result).not.toBeNull();
+        expect(result!.command).toBe('/usr/bin/vim');
+        expect(result!.args[0]).toBe('-d');
+      });
+
+      it('should reuse zed diff args when $VISUAL is zeditor', () => {
+        vi.stubEnv('VISUAL', '/usr/local/bin/zeditor');
+        const result = getDiffCommand('old.txt', 'new.txt', 'custom');
+        expect(result).toEqual({
+          command: '/usr/local/bin/zeditor',
+          args: ['--wait', '--diff', 'old.txt', 'new.txt'],
+        });
+      });
+
+      it('should open only the new file for an unrecognized editor', () => {
+        vi.stubEnv('VISUAL', '/usr/local/bin/my-editor');
+        const result = getDiffCommand('old.txt', 'new.txt', 'custom');
+        expect(result).toEqual({
+          command: '/usr/local/bin/my-editor',
+          args: ['new.txt'],
+        });
+      });
+
+      it('should return null when no env var is set', () => {
+        vi.stubEnv('VISUAL', '');
+        vi.stubEnv('EDITOR', '');
+        const result = getDiffCommand('old.txt', 'new.txt', 'custom');
+        expect(result).toBeNull();
+      });
+    });
+
+    describe('allowEditorTypeInSandbox', () => {
+      it('should block custom editor in sandbox when it maps to a GUI editor', () => {
+        vi.stubEnv('VISUAL', '/usr/local/bin/code');
+        vi.stubEnv('SANDBOX', 'sandbox');
+        expect(allowEditorTypeInSandbox('custom')).toBe(false);
+      });
+
+      it('should allow custom editor in sandbox when it maps to a terminal editor', () => {
+        vi.stubEnv('VISUAL', '/usr/bin/vim');
+        vi.stubEnv('SANDBOX', 'sandbox');
+        expect(allowEditorTypeInSandbox('custom')).toBe(true);
+      });
+
+      it('should allow custom editor in sandbox when it is unrecognized', () => {
+        vi.stubEnv('VISUAL', '/usr/local/bin/my-editor');
+        vi.stubEnv('SANDBOX', 'sandbox');
+        expect(allowEditorTypeInSandbox('custom')).toBe(true);
+      });
+
+      it('should allow custom editor outside sandbox regardless of type', () => {
+        vi.stubEnv('VISUAL', '/usr/local/bin/code');
+        vi.stubEnv('SANDBOX', '');
+        expect(allowEditorTypeInSandbox('custom')).toBe(true);
+      });
+    });
+
+    describe('isEditorAvailable', () => {
+      it('should return true when $VISUAL is set and command exists', () => {
+        vi.stubEnv('VISUAL', '/usr/local/bin/code');
+        vi.stubEnv('SANDBOX', '');
+        (execSync as Mock).mockReturnValue(Buffer.from('/usr/local/bin/code'));
+        expect(isEditorAvailable('custom')).toBe(true);
+      });
+
+      it('should return false when no env var is set', () => {
+        vi.stubEnv('VISUAL', '');
+        vi.stubEnv('EDITOR', '');
+        expect(isEditorAvailable('custom')).toBe(false);
+      });
     });
   });
 });

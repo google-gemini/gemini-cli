@@ -19,7 +19,8 @@ const GUI_EDITORS = [
   'antigravity',
 ] as const;
 const TERMINAL_EDITORS = ['vim', 'neovim', 'emacs', 'hx'] as const;
-const EDITORS = [...GUI_EDITORS, ...TERMINAL_EDITORS] as const;
+const BUILTIN_EDITORS = [...GUI_EDITORS, ...TERMINAL_EDITORS] as const;
+const EDITORS = [...BUILTIN_EDITORS, 'custom'] as const;
 
 const GUI_EDITORS_SET = new Set<string>(GUI_EDITORS);
 const TERMINAL_EDITORS_SET = new Set<string>(TERMINAL_EDITORS);
@@ -32,6 +33,7 @@ export const DEFAULT_GUI_EDITOR: GuiEditorType = 'vscode';
 
 export type GuiEditorType = (typeof GUI_EDITORS)[number];
 export type TerminalEditorType = (typeof TERMINAL_EDITORS)[number];
+export type BuiltinEditorType = (typeof BUILTIN_EDITORS)[number];
 export type EditorType = (typeof EDITORS)[number];
 
 export function isGuiEditor(editor: EditorType): editor is GuiEditorType {
@@ -55,6 +57,7 @@ export const EDITOR_DISPLAY_NAMES: Record<EditorType, string> = {
   emacs: 'Emacs',
   antigravity: 'Antigravity',
   hx: 'Helix',
+  custom: 'Custom ($VISUAL / $EDITOR)',
 };
 
 export function getEditorDisplayName(editor: EditorType): string {
@@ -71,6 +74,58 @@ function isValidEditorType(editor: string): editor is EditorType {
  */
 function escapeELispString(str: string): string {
   return `"${str.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+/**
+ * Maps the basename of a command to a known built-in editor type so that
+ * custom editor commands (from $VISUAL / $EDITOR) can reuse the diff
+ * arguments and execution strategy of a recognized editor.
+ */
+const COMMAND_TO_EDITOR: Record<string, BuiltinEditorType> = {
+  code: 'vscode',
+  codium: 'vscodium',
+  'code.cmd': 'vscode',
+  'codium.cmd': 'vscodium',
+  windsurf: 'windsurf',
+  cursor: 'cursor',
+  vim: 'vim',
+  vi: 'vim',
+  nvim: 'neovim',
+  emacs: 'emacs',
+  'emacs.exe': 'emacs',
+  nano: 'vim', // nano lacks diff mode; fall back to opening new file
+  hx: 'hx',
+  zed: 'zed',
+  zeditor: 'zed',
+  agy: 'antigravity',
+  antigravity: 'antigravity',
+};
+
+/**
+ * Resolves the editor command from the $VISUAL and $EDITOR environment
+ * variables, following the POSIX convention of preferring $VISUAL.
+ * Returns undefined when neither variable is set to a non-empty value.
+ */
+export function resolveCustomEditorCommand(): string | undefined {
+  const visual = process.env['VISUAL']?.trim();
+  if (visual) {
+    return visual;
+  }
+  const editor = process.env['EDITOR']?.trim();
+  if (editor) {
+    return editor;
+  }
+  return undefined;
+}
+
+/**
+ * Given a command string (potentially a full path), extracts the basename
+ * and returns the matching built-in editor type, or undefined if no match.
+ */
+function detectEditorFlavor(command: string): BuiltinEditorType | undefined {
+  const parts = command.split(/[\\/]/);
+  const basename = parts[parts.length - 1];
+  return COMMAND_TO_EDITOR[basename];
 }
 
 interface DiffCommand {
@@ -109,7 +164,7 @@ async function commandExistsAsync(cmd: string): Promise<boolean> {
  * Each editor can have multiple possible command names, listed in order of preference.
  */
 const editorCommands: Record<
-  EditorType,
+  BuiltinEditorType,
   { win32: string[]; default: string[] }
 > = {
   vscode: { win32: ['code.cmd'], default: ['code'] },
@@ -128,6 +183,10 @@ const editorCommands: Record<
 };
 
 function getEditorCommands(editor: EditorType): string[] {
+  if (editor === 'custom') {
+    const cmd = resolveCustomEditorCommand();
+    return cmd ? [cmd] : [];
+  }
   const commandConfig = editorCommands[editor];
   return process.platform === 'win32'
     ? commandConfig.win32
@@ -135,12 +194,20 @@ function getEditorCommands(editor: EditorType): string[] {
 }
 
 export function hasValidEditorCommand(editor: EditorType): boolean {
+  if (editor === 'custom') {
+    const cmd = resolveCustomEditorCommand();
+    return !!cmd && commandExists(cmd);
+  }
   return getEditorCommands(editor).some((cmd) => commandExists(cmd));
 }
 
 export async function hasValidEditorCommandAsync(
   editor: EditorType,
 ): Promise<boolean> {
+  if (editor === 'custom') {
+    const cmd = resolveCustomEditorCommand();
+    return !!cmd && commandExistsAsync(cmd);
+  }
   return Promise.any(
     getEditorCommands(editor).map((cmd) =>
       commandExistsAsync(cmd).then((exists) => exists || Promise.reject()),
@@ -149,6 +216,9 @@ export async function hasValidEditorCommandAsync(
 }
 
 export function getEditorCommand(editor: EditorType): string {
+  if (editor === 'custom') {
+    return resolveCustomEditorCommand() || '';
+  }
   const commands = getEditorCommands(editor);
   return (
     commands.slice(0, -1).find((cmd) => commandExists(cmd)) ||
@@ -158,6 +228,18 @@ export function getEditorCommand(editor: EditorType): string {
 
 export function allowEditorTypeInSandbox(editor: EditorType): boolean {
   const notUsingSandbox = !process.env['SANDBOX'];
+  if (editor === 'custom') {
+    // For custom editors, check what the resolved command maps to.
+    // If it maps to a GUI editor, block in sandbox; otherwise allow.
+    const cmd = resolveCustomEditorCommand();
+    if (cmd) {
+      const flavor = detectEditorFlavor(cmd);
+      if (flavor && isGuiEditor(flavor)) {
+        return notUsingSandbox;
+      }
+    }
+    return true;
+  }
   if (isGuiEditor(editor)) {
     return notUsingSandbox;
   }
@@ -227,6 +309,26 @@ export function getDiffCommand(
   if (!isValidEditorType(editor)) {
     return null;
   }
+
+  // For custom editors, resolve the command from env vars and delegate
+  // to the matching built-in editor's diff args when possible.
+  if (editor === 'custom') {
+    const command = resolveCustomEditorCommand();
+    if (!command) {
+      return null;
+    }
+    const flavor = detectEditorFlavor(command);
+    if (flavor) {
+      // Reuse the built-in editor's diff arguments with the custom command
+      const builtinDiff = getDiffCommand(oldPath, newPath, flavor);
+      if (builtinDiff) {
+        return { command, args: builtinDiff.args };
+      }
+    }
+    // Unknown editor: just open the new file for editing
+    return { command, args: [newPath] };
+  }
+
   const command = getEditorCommand(editor);
 
   switch (editor) {
