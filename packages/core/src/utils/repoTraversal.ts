@@ -36,18 +36,21 @@ export async function buildRepoTree(
 
   const rootAbsPath = path.resolve(projectRoot, subPath);
 
+  const normalizePath = (p: string) => p.replace(/\\/g, '/');
+
   async function traverse(currentPath: string): Promise<RepoTreeNode | null> {
     const relPath = path.relative(projectRoot, currentPath);
+    const normalizedRelPath = normalizePath(relPath);
 
     // Check if the file is ignored directly.
-    // To correctly evaluate directory exclusions (like \`**/node_modules/**\`),
+    // To correctly evaluate directory exclusions (like `**/node_modules/**`),
     // we also check a dummy file path inside the directory.
-    const isIgnoredDirectly = parser.isIgnored(relPath);
+    const isIgnoredDirectly = parser.isIgnored(normalizedRelPath);
     const isDirectoryIgnored = parser.isIgnored(
-      path.posix.join(relPath.replace(/\\/g, '/'), '.gemini-dummy'),
+      path.posix.join(normalizedRelPath, '.gemini-dummy'),
     );
 
-    if (relPath !== '' && (isIgnoredDirectly || isDirectoryIgnored)) {
+    if (normalizedRelPath !== '' && (isIgnoredDirectly || isDirectoryIgnored)) {
       return null;
     }
 
