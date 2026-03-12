@@ -11,11 +11,14 @@ import {
   Kind,
   type ToolInvocation,
   type ToolResult,
+  type PolicyUpdateOptions,
+  type ToolConfirmationOutcome,
 } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 import { glob, escape } from 'glob';
+import { buildParamArgsPattern } from '../policy/utils.js';
 import {
   detectFileType,
   processSingleFileContent,
@@ -153,6 +156,14 @@ ${finalExclusionPatternsForDescription
       '{filePath}',
       'path/to/file.ext',
     )}".`;
+  }
+
+  override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    return {
+      argsPattern: buildParamArgsPattern('include', this.params.include),
+    };
   }
 
   async execute(signal: AbortSignal): Promise<ToolResult> {

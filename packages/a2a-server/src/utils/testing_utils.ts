@@ -20,6 +20,7 @@ import {
   tmpdir,
   type Config,
   type Storage,
+  type ToolRegistry,
 } from '@google/gemini-cli-core';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
 import { expect, vi } from 'vitest';
@@ -30,6 +31,10 @@ export function createMockConfig(
   const tmpDir = tmpdir();
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const mockConfig = {
+    get toolRegistry(): ToolRegistry {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return (this as unknown as Config).getToolRegistry();
+    },
     getToolRegistry: vi.fn().mockReturnValue({
       getTool: vi.fn(),
       getAllToolNames: vi.fn().mockReturnValue([]),
@@ -75,6 +80,14 @@ export function createMockConfig(
     validatePathAccess: vi.fn().mockReturnValue(undefined),
     ...overrides,
   } as unknown as Config;
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  (mockConfig as unknown as { config: Config; promptId: string }).config =
+    mockConfig;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  (mockConfig as unknown as { config: Config; promptId: string }).promptId =
+    'test-prompt-id';
+
   mockConfig.getMessageBus = vi.fn().mockReturnValue(createMockMessageBus());
   mockConfig.getHookSystem = vi
     .fn()

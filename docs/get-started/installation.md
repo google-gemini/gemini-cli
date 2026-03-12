@@ -70,7 +70,7 @@ gemini
 ```
 
 For a list of options and additional commands, see the
-[CLI cheatsheet](/docs/cli/cli-reference.md).
+[CLI cheatsheet](../cli/cli-reference.md).
 
 You can also run Gemini CLI using one of the following advanced methods:
 

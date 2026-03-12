@@ -204,6 +204,7 @@ function createConversationInteraction(
     removedLines,
     language,
     isAgentic: true,
+    initiationMethod: InitiationMethod.COMMAND,
   };
 }
 

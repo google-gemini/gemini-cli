@@ -76,9 +76,13 @@ The `toolName` in the rule must match the name of the tool being called.
 
 - **Wildcards**: You can use wildcards to match multiple tools.
   - `*`: Matches **any tool** (built-in or MCP).
-  - `server__*`: Matches any tool from a specific MCP server.
-  - `*__toolName`: Matches a specific tool name across **all** MCP servers.
-  - `*__*`: Matches **any tool from any MCP server**.
+  - `mcp_server_*`: Matches any tool from a specific MCP server.
+  - `mcp_*_toolName`: Matches a specific tool name across **all** MCP servers.
+  - `mcp_*`: Matches **any tool from any MCP server**.
+
+> **Recommendation:** While FQN wildcards are supported, the recommended
+> approach for MCP tools is to use the `mcpName` field in your TOML rules. See
+> [Special syntax for MCP tools](#special-syntax-for-mcp-tools).
 
 #### Arguments pattern
 
@@ -91,9 +95,16 @@ the arguments don't match the pattern, the rule does not apply.
 There are three possible decisions a rule can enforce:
 
 - `allow`: The tool call is executed automatically without user interaction.
-- `deny`: The tool call is blocked and is not executed.
+- `deny`: The tool call is blocked and is not executed. For global rules (those
+  without an `argsPattern`), tools that are denied are **completely excluded
+  from the model's memory**. This means the model will not even see the tool as
+  an option, which is more secure and saves context window space.
 - `ask_user`: The user is prompted to approve or deny the tool call. (In
   non-interactive mode, this is treated as `deny`.)
+
+> **Note:** The `deny` decision is the recommended way to exclude tools. The
+> legacy `tools.exclude` setting in `settings.json` is deprecated in favor of
+> policy rules with a `deny` decision.
 
 ### Priority system and tiers
 
@@ -143,8 +154,8 @@ always active.
   confirmation.
 - `autoEdit`: Optimized for automated code editing; some write tools may be
   auto-approved.
-- `plan`: A strict, read-only mode for research and design. See [Customizing
-  Plan Mode Policies].
+- `plan`: A strict, read-only mode for research and design. See
+  [Customizing Plan Mode Policies](../cli/plan-mode.md#customizing-policies).
 - `yolo`: A mode where all tools are auto-approved (use with extreme caution).
 
 ## Rule matching
@@ -157,8 +168,8 @@ A rule matches a tool call if all of its conditions are met:
 
 1.  **Tool name**: The `toolName` in the rule must match the name of the tool
     being called.
-    - **Wildcards**: You can use wildcards like `*`, `server__*`, or
-      `*__toolName` to match multiple tools. See [Tool Name](#tool-name) for
+    - **Wildcards**: You can use wildcards like `*`, `mcp_server_*`, or
+      `mcp_*_toolName` to match multiple tools. See [Tool Name](#tool-name) for
       details.
 2.  **Arguments pattern**: If `argsPattern` is specified, the tool's arguments
     are converted to a stable JSON string, which is then tested against the
@@ -180,9 +191,13 @@ User, and (if configured) Admin directories.
 
 #### System-wide policies (Admin)
 
-Administrators can enforce system-wide policies (Tier 3) that override all user
-and default settings. These policies must be placed in specific, secure
-directories:
+Administrators can enforce system-wide policies (Tier 4) that override all user
+and default settings. These policies can be loaded from standard system
+locations or supplemental paths.
+
+##### Standard Locations
+
+These are the default paths the CLI searches for admin policies:
 
 | OS          | Policy Directory Path                             |
 | :---------- | :------------------------------------------------ |
@@ -190,10 +205,25 @@ directories:
 | **macOS**   | `/Library/Application Support/GeminiCli/policies` |
 | **Windows** | `C:\ProgramData\gemini-cli\policies`              |
 
-**Security Requirements:**
+##### Supplemental Admin Policies
 
-To prevent privilege escalation, the CLI enforces strict security checks on
-admin directories. If checks fail, system policies are **ignored**.
+Administrators can also specify supplemental policy paths using:
+
+- The `--admin-policy` command-line flag.
+- The `adminPolicyPaths` setting in a system settings file.
+
+These supplemental policies are assigned the same **Admin** tier (Base 4) as
+policies in standard locations.
+
+**Security Guard**: Supplemental admin policies are **ignored** if any `.toml`
+policy files are found in the standard system location. This prevents flag-based
+overrides when a central system policy has already been established.
+
+#### Security Requirements
+
+To prevent privilege escalation, the CLI enforces strict security checks on the
+**standard system policy directory**. If checks fail, the policies in that
+directory are **ignored**.
 
 - **Linux / macOS:** Must be owned by `root` (UID 0) and NOT writable by group
   or others (e.g., `chmod 755`).
@@ -202,6 +232,11 @@ admin directories. If checks fail, system policies are **ignored**.
   see a security warning, use the folder properties to remove write permissions
   for non-admin groups. You may need to "Disable inheritance" in Advanced
   Security Settings._
+
+**Note:** Supplemental admin policies (provided via `--admin-policy` or
+`adminPolicyPaths` settings) are **NOT** subject to these strict ownership
+checks, as they are explicitly provided by the user or administrator in their
+current execution context.
 
 ### TOML rule schema
 
@@ -212,8 +247,12 @@ Here is a breakdown of the fields available in a TOML policy rule:
 # A unique name for the tool, or an array of names.
 toolName = "run_shell_command"
 
+# (Optional) The name of a subagent. If provided, the rule only applies to tool calls
+# made by this specific subagent.
+subagent = "generalist"
+
 # (Optional) The name of an MCP server. Can be combined with toolName
-# to form a composite name like "mcpName__toolName".
+# to form a composite FQN internally like "mcp_mcpName_toolName".
 mcpName = "my-custom-server"
 
 # (Optional) Metadata hints provided by the tool. A rule matches if all
@@ -290,7 +329,16 @@ priority = 100
 ### Special syntax for MCP tools
 
 You can create rules that target tools from Model Context Protocol (MCP) servers
-using the `mcpName` field or composite wildcard patterns.
+using the `mcpName` field. **This is the recommended approach** for defining MCP
+policies, as it is much more robust than manually writing Fully Qualified Names
+(FQNs) or string wildcards.
+
+> **Warning:** Do not use underscores (`_`) in your MCP server names (e.g., use
+> `my-server` rather than `my_server`). The policy parser splits Fully Qualified
+> Names (`mcp_server_tool`) on the _first_ underscore following the `mcp_`
+> prefix. If your server name contains an underscore, the parser will
+> misinterpret the server identity, which can cause wildcard rules and security
+> policies to fail silently.
 
 **1. Targeting a specific tool on a server**
 
@@ -360,5 +408,3 @@ out-of-the-box experience.
 - In **`yolo`** mode, a high-priority rule allows all tools.
 - In **`autoEdit`** mode, rules allow certain write operations to happen without
   prompting.
-
-[Customizing Plan Mode Policies]: /docs/cli/plan-mode.md#customizing-policies

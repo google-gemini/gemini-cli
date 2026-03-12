@@ -55,6 +55,24 @@ export async function updateExtension(
     });
     throw new Error(`Extension is linked so does not need to be updated`);
   }
+
+  if (extension.migratedTo) {
+    const migratedState = await checkForExtensionUpdate(
+      {
+        ...extension,
+        installMetadata: { ...installMetadata, source: extension.migratedTo },
+        migratedTo: undefined,
+      },
+      extensionManager,
+    );
+    if (
+      migratedState === ExtensionUpdateState.UPDATE_AVAILABLE ||
+      migratedState === ExtensionUpdateState.UP_TO_DATE
+    ) {
+      installMetadata.source = extension.migratedTo;
+    }
+  }
+
   const originalVersion = extension.version;
 
   const tempDir = await ExtensionStorage.createTmpDir();
