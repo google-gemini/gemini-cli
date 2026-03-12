@@ -37,6 +37,10 @@ describe('repoMapCommand', () => {
     });
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('should return RepoMap UI component on success', async () => {
     const result = await repoMapCommand.action!(context, '');
 
