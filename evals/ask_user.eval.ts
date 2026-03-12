@@ -19,12 +19,6 @@ describe('ask_user', () => {
     },
     files: {
       '.gemini/state.json': JSON.stringify({ terminalSetupPromptShown: true }),
-      '.gemini/policies/allow_ask_user.toml': `
-[[rule]]
-toolName = "ask_user"
-decision = "allow"
-priority = 100
-`,
     },
     prompt: `Use the ask_user tool to ask me what my favorite color is. Provide 3 options: red, green, or blue.`,
     setup: async (rig) => {
@@ -54,12 +48,6 @@ priority = 100
     files: {
       '.gemini/state.json': JSON.stringify({ terminalSetupPromptShown: true }),
       'package.json': JSON.stringify({ name: 'my-app', version: '1.0.0' }),
-      '.gemini/policies/allow_ask_user.toml': `
-[[rule]]
-toolName = "ask_user"
-decision = "allow"
-priority = 100
-`,
     },
     prompt: `I want to build a new feature in this app. Ask me questions to clarify the requirements before proceeding.`,
     setup: async (rig) => {
@@ -94,17 +82,6 @@ priority = 100
         name: '@google/gemini-cli-core',
       }),
       'README.md': '# Gemini CLI',
-      '.gemini/policies/allow_ask_user.toml': `
-[[rule]]
-toolName = "ask_user"
-decision = "allow"
-priority = 100
-
-[[rule]]
-toolName = "enter_plan_mode"
-decision = "allow"
-priority = 100
-`,
     },
     prompt: `I want to completely rewrite the core package to support the upcoming V2 architecture, but I haven't decided what that looks like yet. We need to figure out the requirements first. Can you ask me some questions to help nail down the design?`,
     setup: async (rig) => {
@@ -150,12 +127,6 @@ priority = 100
       'package.json': JSON.stringify({
         scripts: { build: 'echo building' },
       }),
-      '.gemini/policies/allow_ask_user.toml': `
-[[rule]]
-toolName = "ask_user"
-decision = "allow"
-priority = 100
-`,
     },
     prompt: `Run 'npm run build' in the current directory.`,
     setup: async (rig) => {

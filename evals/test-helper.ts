@@ -9,7 +9,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execSync } from 'node:child_process';
-import { TestRig } from '@google/gemini-cli-test-utils';
+import { TestRig, poll } from '@google/gemini-cli-test-utils';
+import stripAnsi from 'strip-ansi';
 import {
   createUnauthorizedToolError,
   parseAgentMarkdown,
@@ -142,9 +143,10 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         await run.sendKeys(evalCase.prompt);
         await run.type('\r');
 
-        // Let it process for a bit, then pull whatever output we have
-        await new Promise((resolve) =>
-          setTimeout(resolve, evalCase.timeout ?? 30000),
+        // Let it process until it shows the prompt again
+        await poll(
+          () => stripAnsi(run.output).trimEnd().endsWith('>'),
+          evalCase.timeout ?? 30000,
         );
         result = run.output;
       } else {
