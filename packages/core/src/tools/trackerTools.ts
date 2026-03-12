@@ -33,21 +33,62 @@ async function buildTodosReturnDisplay(
   service: ReturnType<Config['getTrackerService']>,
 ): Promise<TodoList> {
   const tasks = await service.listTasks();
-  return {
-    todos: tasks.map((t) => {
-      let status: 'pending' | 'in_progress' | 'completed' | 'cancelled' =
-        'pending';
-      if (t.status === TaskStatus.IN_PROGRESS) {
-        status = 'in_progress';
-      } else if (t.status === TaskStatus.CLOSED) {
-        status = 'completed';
+  const childrenMap = new Map<string, TrackerTask[]>();
+  const roots: TrackerTask[] = [];
+
+  for (const task of tasks) {
+    if (task.parentId) {
+      if (!childrenMap.has(task.parentId)) {
+        childrenMap.set(task.parentId, []);
       }
-      return {
-        description: `[${t.id}] ${t.title}`,
-        status,
-      };
-    }),
+      childrenMap.get(task.parentId)!.push(task);
+    } else {
+      roots.push(task);
+    }
+  }
+
+  const todos: TodoList['todos'] = [];
+
+  const addTask = (task: TrackerTask, depth: number, visited: Set<string>) => {
+    if (visited.has(task.id)) {
+      todos.push({
+        description: `${'  '.repeat(depth)}[CYCLE DETECTED: ${task.id}]`,
+        status: 'cancelled',
+      });
+      return;
+    }
+    visited.add(task.id);
+
+    let status: 'pending' | 'in_progress' | 'completed' | 'cancelled' =
+      'pending';
+    if (task.status === TaskStatus.IN_PROGRESS) {
+      status = 'in_progress';
+    } else if (task.status === TaskStatus.CLOSED) {
+      status = 'completed';
+    }
+
+    const typeLabels: Record<TaskType, string> = {
+      epic: '[EPIC]',
+      task: '[TASK]',
+      bug: '[BUG]',
+    };
+
+    const indent = '  '.repeat(depth);
+    const description = `${indent}[${task.id}] ${typeLabels[task.type]} ${task.title}`;
+
+    todos.push({ description, status });
+
+    const children = childrenMap.get(task.id) ?? [];
+    for (const child of children) {
+      addTask(child, depth + 1, new Set(visited));
+    }
   };
+
+  for (const root of roots) {
+    addTask(root, 0, new Set());
+  }
+
+  return { todos };
 }
 
 // --- tracker_create_task ---
