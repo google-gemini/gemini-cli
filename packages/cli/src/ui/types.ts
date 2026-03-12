@@ -13,6 +13,7 @@ import {
   type ToolResultDisplay,
   type RetrieveUserQuotaResponse,
   type SkillDefinition,
+  type ProfileDefinition,
   type AgentDefinition,
   type ApprovalMode,
   type Kind,
@@ -22,7 +23,7 @@ import {
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
 
-export type { ThoughtSummary, SkillDefinition };
+export type { ThoughtSummary, SkillDefinition, ProfileDefinition };
 
 export enum AuthState {
   // Attempting to authenticate or re-authenticate
@@ -290,6 +291,13 @@ export type HistoryItemSkillsList = HistoryItemBase & {
   showDescriptions: boolean;
 };
 
+export type HistoryItemProfilesList = HistoryItemBase & {
+  type: 'profiles_list';
+  profiles: ProfileDefinition[];
+  activeProfileName?: string;
+  showDescriptions: boolean;
+};
+
 export type AgentDefinitionJson = Pick<
   AgentDefinition,
   'name' | 'displayName' | 'description' | 'kind'
@@ -376,6 +384,7 @@ export type HistoryItemWithoutId =
   | HistoryItemExtensionsList
   | HistoryItemToolsList
   | HistoryItemSkillsList
+  | HistoryItemProfilesList
   | HistoryItemAgentsList
   | HistoryItemMcpStatus
   | HistoryItemChatList
@@ -401,6 +410,7 @@ export enum MessageType {
   EXTENSIONS_LIST = 'extensions_list',
   TOOLS_LIST = 'tools_list',
   SKILLS_LIST = 'skills_list',
+  PROFILES_LIST = 'profiles_list',
   AGENTS_LIST = 'agents_list',
   MCP_STATUS = 'mcp_status',
   CHAT_LIST = 'chat_list',

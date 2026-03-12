@@ -5,9 +5,8 @@
  */
 
 import { type CommandModule } from 'yargs';
-import { loadSettings } from '../../config/settings.js';
-import { ProfileManager } from '../../config/profile-manager.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import { loadSettings, SettingScope } from '../../config/settings.js';
+import { Storage, ProfileManager, debugLogger } from '@google/gemini-cli-core';
 import { exitCli } from '../utils.js';
 
 /**
@@ -25,9 +24,15 @@ export const enableCommand: CommandModule = {
     const name = String(argv['name']);
     try {
       const settings = loadSettings();
-      const manager = new ProfileManager(settings);
+      const profilesDir = Storage.getProfilesDir();
+      const manager = new ProfileManager(profilesDir);
+      await manager.load();
 
-      await manager.enableProfile(name);
+      if (!manager.getProfile(name)) {
+        throw new Error(`Profile "${name}" not found.`);
+      }
+
+      settings.setValue(SettingScope.User, 'general.activeProfile', name);
       debugLogger.log(`Profile "${name}" successfully enabled.`);
       // eslint-disable-next-line no-console
       console.log(`Profile "${name}" successfully enabled.`);

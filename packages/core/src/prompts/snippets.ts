@@ -46,6 +46,7 @@ export interface SystemPromptOptions {
   planningWorkflow?: PlanningWorkflowOptions;
   taskTracker?: boolean;
   operationalGuidelines?: OperationalGuidelinesOptions;
+  profileContext?: string;
   sandbox?: SandboxMode;
   interactiveYoloMode?: boolean;
   gitRepo?: GitRepoOptions;
@@ -112,6 +113,8 @@ export function getCoreSystemPrompt(options: SystemPromptOptions): string {
   return `
 ${renderPreamble(options.preamble)}
 
+${renderProfileContext(options.profileContext)}
+
 ${renderCoreMandates(options.coreMandates)}
 
 ${renderSubAgents(options.subAgents)}
@@ -154,6 +157,14 @@ ${renderUserMemory(userMemory, contextFilenames)}
 }
 
 // --- Subsection Renderers ---
+
+export function renderProfileContext(profileContext?: string): string {
+  if (!profileContext) return '';
+  return `
+# Profile Persona
+${profileContext}
+`.trim();
+}
 
 export function renderPreamble(options?: PreambleOptions): string {
   if (!options) return '';

@@ -143,6 +143,7 @@ import { SubagentTool } from '../agents/subagent-tool.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
+import { ProfileManager } from '../profiles/profileManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
@@ -583,6 +584,9 @@ export interface ConfigParameters {
   skillsSupport?: boolean;
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
+  profilesEnabled?: boolean;
+  activeProfile?: string;
+  profilesDir?: string;
   experimentalJitContext?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
@@ -618,6 +622,7 @@ export class Config implements McpContext, AgentLoopContext {
   private agentRegistry!: AgentRegistry;
   private readonly acknowledgedAgentsService: AcknowledgedAgentsService;
   private skillManager!: SkillManager;
+  private profileManager!: ProfileManager;
   private _sessionId: string;
   private clientVersion: string;
   private fileSystemService: FileSystemService;
@@ -686,7 +691,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly deleteSession: string | undefined;
   private readonly listExtensions: boolean;
   private readonly _extensionLoader: ExtensionLoader;
-  private readonly _enabledExtensions: string[];
+  private _enabledExtensions: string[];
   private readonly enableExtensionReloading: boolean;
   fallbackModelHandler?: FallbackModelHandler;
   validationHandler?: ValidationHandler;
@@ -1009,6 +1014,12 @@ export class Config implements McpContext, AgentLoopContext {
     this._messageBus = new MessageBus(this.policyEngine, this.debugMode);
     this.acknowledgedAgentsService = new AcknowledgedAgentsService();
     this.skillManager = new SkillManager();
+    this.profileManager = new ProfileManager(
+      params.profilesDir ?? path.join(this.targetDir, 'profiles'),
+    );
+    if (params.activeProfile) {
+      this.profileManager.setActiveProfile(params.activeProfile);
+    }
     this.outputSettings = {
       format: params.output?.format ?? OutputFormat.TEXT,
     };
@@ -1649,6 +1660,30 @@ export class Config implements McpContext, AgentLoopContext {
 
   getSkillManager(): SkillManager {
     return this.skillManager;
+  }
+
+  getProfileManager(): ProfileManager {
+    return this.profileManager;
+  }
+
+  async applyProfile(name: string): Promise<void> {
+    const profile = this.profileManager.getProfile(name);
+    if (!profile) {
+      throw new Error(`Profile "${name}" not found.`);
+    }
+
+    this.profileManager.setActiveProfile(name);
+
+    if (profile.default_model) {
+      this.model = profile.default_model;
+    }
+
+    if (profile.extensions) {
+      this._enabledExtensions = profile.extensions;
+    }
+
+    // Emit event or perform other side effects if necessary
+    debugLogger.log(`Applied profile: ${name}`);
   }
 
   getResourceRegistry(): ResourceRegistry {

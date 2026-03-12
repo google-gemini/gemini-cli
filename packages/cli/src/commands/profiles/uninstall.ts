@@ -5,9 +5,7 @@
  */
 
 import { type CommandModule } from 'yargs';
-import { loadSettings } from '../../config/settings.js';
-import { ProfileManager } from '../../config/profile-manager.js';
-import { debugLogger } from '@google/gemini-cli-core';
+import { Storage, ProfileManager, debugLogger } from '@google/gemini-cli-core';
 import { exitCli } from '../utils.js';
 
 /**
@@ -24,8 +22,8 @@ export const uninstallCommand: CommandModule = {
   handler: async (argv) => {
     const name = String(argv['name']);
     try {
-      const settings = loadSettings();
-      const manager = new ProfileManager(settings);
+      const manager = new ProfileManager(Storage.getProfilesDir());
+      await manager.load();
 
       await manager.uninstallProfile(name);
       debugLogger.log(`Profile "${name}" successfully uninstalled.`);

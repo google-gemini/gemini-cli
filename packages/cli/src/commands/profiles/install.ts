@@ -6,10 +6,8 @@
 
 import type { CommandModule } from 'yargs';
 import chalk from 'chalk';
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger, Storage, ProfileManager } from '@google/gemini-cli-core';
 import { getErrorMessage } from '../../utils/errors.js';
-import { ProfileManager } from '../../config/profile-manager.js';
-import { loadSettings } from '../../config/settings.js';
 import { exitCli } from '../utils.js';
 
 interface InstallArgs {
@@ -18,9 +16,8 @@ interface InstallArgs {
 
 export async function handleInstall(args: InstallArgs) {
   try {
-    const settings = loadSettings();
-    const profileManager = new ProfileManager(settings);
-    const profile = await profileManager.installProfile(args.path);
+    const manager = new ProfileManager(Storage.getProfilesDir());
+    const profile = await manager.installProfile(args.path);
     debugLogger.log(
       chalk.green(`Profile "${profile.name}" installed successfully.`),
     );

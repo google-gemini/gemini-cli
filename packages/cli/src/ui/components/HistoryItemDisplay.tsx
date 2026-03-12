@@ -35,6 +35,7 @@ import { ChatList } from './views/ChatList.js';
 import { ModelMessage } from './messages/ModelMessage.js';
 import { ThinkingMessage } from './messages/ThinkingMessage.js';
 import { HintMessage } from './messages/HintMessage.js';
+import { ProfilesList } from './views/ProfilesList.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 
@@ -232,6 +233,13 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       )}
       {itemForDisplay.type === 'chat_list' && (
         <ChatList chats={itemForDisplay.chats} />
+      )}
+      {itemForDisplay.type === 'profiles_list' && (
+        <ProfilesList
+          profiles={itemForDisplay.profiles}
+          activeProfileName={itemForDisplay.activeProfileName}
+          showDescriptions={itemForDisplay.showDescriptions}
+        />
       )}
     </Box>
   );

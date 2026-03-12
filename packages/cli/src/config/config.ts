@@ -39,6 +39,8 @@ import {
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
+  Storage as CoreStorage,
+  ProfileManager as CoreProfileManager,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -62,7 +64,7 @@ import type { ExtensionEvents } from '@google/gemini-cli-core/src/utils/extensio
 import { requestConsentNonInteractive } from './extensions/consent.js';
 import { promptForSetting } from './extensions/extensionSettings.js';
 import type { EventEmitter } from 'node:stream';
-import { ProfileManager } from './profile-manager.js';
+// Removed legacy profile manager import
 import { runExitCleanup } from '../utils/cleanup.js';
 
 export interface CliArgs {
@@ -436,12 +438,15 @@ export async function loadCliConfig(
   const { cwd = process.cwd(), projectHooks } = options;
   const debugMode = isDebugMode(argv);
 
-  const loadedSettings = loadSettings(cwd);
-  const profileManager = new ProfileManager(loadedSettings);
+  const profilesDir = CoreStorage.getProfilesDir();
+  const coreProfileManager = new CoreProfileManager(profilesDir);
+  await coreProfileManager.load();
   const activeProfileName =
-    argv.profiles || profileManager.getActiveProfileName();
+    argv.profiles ||
+    settings.general?.activeProfile ||
+    coreProfileManager.getActiveProfileName();
   const profile = activeProfileName
-    ? await profileManager.getProfile(activeProfileName)
+    ? coreProfileManager.getProfile(activeProfileName)
     : null;
 
   if (argv.sandbox) {
@@ -493,7 +498,7 @@ export async function loadCliConfig(
 
   let enabledExtensionOverrides = argv.extensions;
   if (enabledExtensionOverrides === undefined && profile) {
-    const profileExtensions = profile.frontmatter.extensions;
+    const profileExtensions = profile.extensions;
     if (profileExtensions !== undefined) {
       enabledExtensionOverrides =
         profileExtensions.length > 0 ? profileExtensions : ['none'];
@@ -541,8 +546,8 @@ export async function loadCliConfig(
     filePaths = result.filePaths;
   }
 
-  if (profile?.context) {
-    const profileContext = `Profile Context (${profile.name}):\n${profile.context}`;
+  if (profile?.body) {
+    const profileContext = `Profile Context (${profile.name}):\n${profile.body}`;
     if (typeof memoryContent === 'string') {
       memoryContent = profileContext + '\n\n' + memoryContent;
     } else {
@@ -696,7 +701,7 @@ export async function loadCliConfig(
   const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
   const specifiedModel =
     argv.model ||
-    profile?.frontmatter.default_model ||
+    profile?.default_model ||
     process.env['GEMINI_MODEL'] ||
     settings.model?.name;
 
@@ -768,6 +773,8 @@ export async function loadCliConfig(
     extensionsEnabled,
     agents: settings.agents,
     adminSkillsEnabled,
+    profilesDir,
+    activeProfile: activeProfileName || undefined,
     allowedMcpServers: mcpEnabled
       ? (argv.allowedMcpServerNames ?? settings.mcp?.allowed)
       : undefined,
@@ -865,7 +872,7 @@ export async function loadCliConfig(
     hooks: settings.hooks || {},
     disabledHooks: settings.hooksConfig?.disabled || [],
     projectHooks: projectHooks || {},
-    onModelChange: (model: string) => saveModelChange(loadedSettings, model),
+    onModelChange: (model: string) => saveModelChange(loadSettings(cwd), model),
     onReload: async () => {
       const refreshedSettings = loadSettings(cwd);
       return {

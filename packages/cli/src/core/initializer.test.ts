@@ -44,10 +44,14 @@ describe('initializer', () => {
     getToolRegistry: ReturnType<typeof vi.fn>;
     getIdeMode: ReturnType<typeof vi.fn>;
     getGeminiMdFileCount: ReturnType<typeof vi.fn>;
+    getProfileManager: ReturnType<typeof vi.fn>;
   };
   let mockSettings: LoadedSettings;
   let mockIdeClient: {
     connect: ReturnType<typeof vi.fn>;
+  };
+  let mockProfileManager: {
+    load: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -56,7 +60,12 @@ describe('initializer', () => {
       getToolRegistry: vi.fn(),
       getIdeMode: vi.fn().mockReturnValue(false),
       getGeminiMdFileCount: vi.fn().mockReturnValue(5),
+      getProfileManager: vi.fn(),
     };
+    mockProfileManager = {
+      load: vi.fn().mockResolvedValue(undefined),
+    };
+    mockConfig.getProfileManager.mockReturnValue(mockProfileManager);
     mockSettings = {
       merged: {
         security: {

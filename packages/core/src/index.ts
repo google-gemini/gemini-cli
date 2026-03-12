@@ -28,6 +28,7 @@ export * from './commands/extensions.js';
 export * from './commands/restore.js';
 export * from './commands/init.js';
 export * from './commands/memory.js';
+export * from './commands/profiles.js';
 export * from './commands/types.js';
 
 // Export Core Logic
@@ -130,6 +131,8 @@ export * from './services/keychainService.js';
 export * from './services/keychainTypes.js';
 export * from './skills/skillManager.js';
 export * from './skills/skillLoader.js';
+export * from './profiles/profileLoader.js';
+export * from './profiles/profileManager.js';
 
 // Export IDE specific logic
 export * from './ide/ide-client.js';

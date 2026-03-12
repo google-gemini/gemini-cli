@@ -60,6 +60,11 @@ export async function initializeApp(
     logIdeConnection(config, new IdeConnectionEvent(IdeConnectionType.START));
   }
 
+  // Load profiles
+  const profilesHandle = startupProfiler.start('load_profiles');
+  await config.getProfileManager().load();
+  profilesHandle?.end();
+
   return {
     authError,
     accountSuspensionInfo,

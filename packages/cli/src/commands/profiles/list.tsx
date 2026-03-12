@@ -6,8 +6,8 @@
 
 import type { CommandModule } from 'yargs';
 import { render, Box, Text } from 'ink';
+import { Storage, ProfileManager } from '@google/gemini-cli-core';
 import { loadSettings } from '../../config/settings.js';
-import { ProfileManager } from '../../config/profile-manager.js';
 import { exitCli } from '../utils.js';
 
 /**
@@ -67,9 +67,11 @@ export const listCommand: CommandModule = {
   handler: async () => {
     try {
       const settings = loadSettings();
-      const manager = new ProfileManager(settings);
-      const profiles = await manager.listProfiles();
-      const activeProfile = manager.getActiveProfileName();
+      const profilesDir = Storage.getProfilesDir();
+      const manager = new ProfileManager(profilesDir);
+      await manager.load();
+      const profiles = manager.getProfileNames();
+      const activeProfile = settings.merged.general?.activeProfile;
 
       const { waitUntilExit } = render(
         <ProfileListView profiles={profiles} activeProfile={activeProfile} />,

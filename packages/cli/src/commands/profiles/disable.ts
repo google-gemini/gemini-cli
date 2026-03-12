@@ -5,8 +5,7 @@
  */
 
 import { type CommandModule } from 'yargs';
-import { loadSettings } from '../../config/settings.js';
-import { ProfileManager } from '../../config/profile-manager.js';
+import { loadSettings, SettingScope } from '../../config/settings.js';
 import { debugLogger } from '@google/gemini-cli-core';
 import { exitCli } from '../utils.js';
 
@@ -19,9 +18,7 @@ export const disableCommand: CommandModule = {
   handler: async () => {
     try {
       const settings = loadSettings();
-      const manager = new ProfileManager(settings);
-
-      manager.disableProfile();
+      settings.setValue(SettingScope.User, 'general.activeProfile', undefined);
       debugLogger.log('Profile disabled. Reverting to default behavior.');
       // eslint-disable-next-line no-console
       console.log('Profile disabled. Reverting to default behavior.');

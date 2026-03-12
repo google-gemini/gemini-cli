@@ -117,6 +117,7 @@ export class PromptProvider {
         preamble: this.withSection('preamble', () => ({
           interactive: interactiveMode,
         })),
+        profileContext: config.getProfileManager().getActiveProfile()?.body,
         coreMandates: this.withSection('coreMandates', () => ({
           interactive: interactiveMode,
           hasSkills: skills.length > 0,

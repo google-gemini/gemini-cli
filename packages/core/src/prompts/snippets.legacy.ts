@@ -34,6 +34,7 @@ export interface SystemPromptOptions {
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
   interactiveYoloMode?: boolean;
+  profileContext?: string;
   gitRepo?: GitRepoOptions;
   finalReminder?: FinalReminderOptions;
 }
@@ -101,6 +102,8 @@ export function getCoreSystemPrompt(options: SystemPromptOptions): string {
   return `
 ${renderPreamble(options.preamble)}
 
+${renderProfileContext(options.profileContext)}
+
 ${renderCoreMandates(options.coreMandates)}
 
 ${renderSubAgents(options.subAgents)}
@@ -141,6 +144,14 @@ ${renderUserMemory(userMemory)}
 }
 
 // --- Subsection Renderers ---
+
+export function renderProfileContext(profileContext?: string): string {
+  if (!profileContext) return '';
+  return `
+# Profile Persona
+${profileContext}
+`.trim();
+}
 
 export function renderPreamble(options?: PreambleOptions): string {
   if (!options) return '';
