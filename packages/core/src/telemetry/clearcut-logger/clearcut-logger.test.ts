@@ -51,6 +51,12 @@ import { InstallationManager } from '../../utils/installationManager.js';
 
 import si, { type Systeminformation } from 'systeminformation';
 import * as os from 'node:os';
+import {
+  CreditsUsedEvent,
+  OverageOptionSelectedEvent,
+  EmptyWalletMenuShownEvent,
+  CreditPurchaseClickEvent,
+} from '../billingEvents.js';
 
 interface CustomMatchers<R = unknown> {
   toHaveMetadataValue: ([key, value]: [EventMetadataKey, string]) => R;
@@ -195,6 +201,9 @@ describe('ClearcutLogger', () => {
     vi.stubEnv('MONOSPACE_ENV', '');
     vi.stubEnv('REPLIT_USER', '');
     vi.stubEnv('__COG_BASHRC_SOURCED', '');
+    vi.stubEnv('GH_PR_NUMBER', '');
+    vi.stubEnv('GH_ISSUE_NUMBER', '');
+    vi.stubEnv('GH_CUSTOM_TRACKING_ID', '');
   });
 
   function setup({
@@ -593,6 +602,110 @@ describe('ClearcutLogger', () => {
           item.gemini_cli_key === EventMetadataKey.GEMINI_CLI_GH_WORKFLOW_NAME,
       );
       expect(hasWorkflowName).toBe(false);
+    });
+  });
+
+  describe('GITHUB_EVENT_NAME metadata', () => {
+    it('includes event name when GITHUB_EVENT_NAME is set', () => {
+      const { logger } = setup({});
+      vi.stubEnv('GITHUB_EVENT_NAME', 'issues');
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_EVENT_NAME,
+        value: 'issues',
+      });
+    });
+
+    it('does not include event name when GITHUB_EVENT_NAME is not set', () => {
+      const { logger } = setup({});
+      vi.stubEnv('GITHUB_EVENT_NAME', undefined);
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const hasEventName = event?.event_metadata[0].some(
+        (item) =>
+          item.gemini_cli_key === EventMetadataKey.GEMINI_CLI_GH_EVENT_NAME,
+      );
+      expect(hasEventName).toBe(false);
+    });
+  });
+
+  describe('GH_PR_NUMBER metadata', () => {
+    it('includes PR number when GH_PR_NUMBER is set', () => {
+      vi.stubEnv('GH_PR_NUMBER', '123');
+      const { logger } = setup({});
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_PR_NUMBER,
+        value: '123',
+      });
+    });
+
+    it('does not include PR number when GH_PR_NUMBER is not set', () => {
+      vi.stubEnv('GH_PR_NUMBER', undefined);
+      const { logger } = setup({});
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const hasPRNumber = event?.event_metadata[0].some(
+        (item) =>
+          item.gemini_cli_key === EventMetadataKey.GEMINI_CLI_GH_PR_NUMBER,
+      );
+      expect(hasPRNumber).toBe(false);
+    });
+  });
+
+  describe('GH_ISSUE_NUMBER metadata', () => {
+    it('includes issue number when GH_ISSUE_NUMBER is set', () => {
+      vi.stubEnv('GH_ISSUE_NUMBER', '456');
+      const { logger } = setup({});
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_ISSUE_NUMBER,
+        value: '456',
+      });
+    });
+
+    it('does not include issue number when GH_ISSUE_NUMBER is not set', () => {
+      vi.stubEnv('GH_ISSUE_NUMBER', undefined);
+      const { logger } = setup({});
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const hasIssueNumber = event?.event_metadata[0].some(
+        (item) =>
+          item.gemini_cli_key === EventMetadataKey.GEMINI_CLI_GH_ISSUE_NUMBER,
+      );
+      expect(hasIssueNumber).toBe(false);
+    });
+  });
+
+  describe('GH_CUSTOM_TRACKING_ID metadata', () => {
+    it('includes custom tracking ID when GH_CUSTOM_TRACKING_ID is set', () => {
+      vi.stubEnv('GH_CUSTOM_TRACKING_ID', 'abc-789');
+      const { logger } = setup({});
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+
+      expect(event?.event_metadata[0]).toContainEqual({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_CUSTOM_TRACKING_ID,
+        value: 'abc-789',
+      });
+    });
+
+    it('does not include custom tracking ID when GH_CUSTOM_TRACKING_ID is not set', () => {
+      vi.stubEnv('GH_CUSTOM_TRACKING_ID', undefined);
+      const { logger } = setup({});
+
+      const event = logger?.createLogEvent(EventNames.API_ERROR, []);
+      const hasTrackingId = event?.event_metadata[0].some(
+        (item) =>
+          item.gemini_cli_key ===
+          EventMetadataKey.GEMINI_CLI_GH_CUSTOM_TRACKING_ID,
+      );
+      expect(hasTrackingId).toBe(false);
     });
   });
 
@@ -1441,6 +1554,101 @@ describe('ClearcutLogger', () => {
       expect(events[0]).toHaveMetadataValue([
         EventMetadataKey.GEMINI_CLI_HOOK_EXIT_CODE,
         '0',
+      ]);
+    });
+  });
+
+  describe('logCreditsUsedEvent', () => {
+    it('logs an event with model, consumed, and remaining credits', () => {
+      const { logger } = setup();
+      const event = new CreditsUsedEvent('gemini-3-pro-preview', 10, 490);
+
+      logger?.logCreditsUsedEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.CREDITS_USED);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BILLING_MODEL,
+        '"gemini-3-pro-preview"',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BILLING_CREDITS_CONSUMED,
+        '10',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BILLING_CREDITS_REMAINING,
+        '490',
+      ]);
+    });
+  });
+
+  describe('logOverageOptionSelectedEvent', () => {
+    it('logs an event with model, selected option, and credit balance', () => {
+      const { logger } = setup();
+      const event = new OverageOptionSelectedEvent(
+        'gemini-3-pro-preview',
+        'use_credits',
+        350,
+      );
+
+      logger?.logOverageOptionSelectedEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.OVERAGE_OPTION_SELECTED);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BILLING_MODEL,
+        '"gemini-3-pro-preview"',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BILLING_SELECTED_OPTION,
+        '"use_credits"',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BILLING_CREDIT_BALANCE,
+        '350',
+      ]);
+    });
+  });
+
+  describe('logEmptyWalletMenuShownEvent', () => {
+    it('logs an event with the model', () => {
+      const { logger } = setup();
+      const event = new EmptyWalletMenuShownEvent('gemini-3-pro-preview');
+
+      logger?.logEmptyWalletMenuShownEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.EMPTY_WALLET_MENU_SHOWN);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BILLING_MODEL,
+        '"gemini-3-pro-preview"',
+      ]);
+    });
+  });
+
+  describe('logCreditPurchaseClickEvent', () => {
+    it('logs an event with model and source', () => {
+      const { logger } = setup();
+      const event = new CreditPurchaseClickEvent(
+        'empty_wallet_menu',
+        'gemini-3-pro-preview',
+      );
+
+      logger?.logCreditPurchaseClickEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.CREDIT_PURCHASE_CLICK);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BILLING_MODEL,
+        '"gemini-3-pro-preview"',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BILLING_PURCHASE_SOURCE,
+        '"empty_wallet_menu"',
       ]);
     });
   });
