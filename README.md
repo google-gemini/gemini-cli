@@ -388,6 +388,38 @@ instructions.
 
 ---
 
+## 🇨🇳 中文说明
+
+Gemini CLI 是一个开源 AI Agent，可以将 Gemini 的强大功能直接带入您的终端。它提供了轻量级访问 Gemini 的方式，为您提供从提示到模型的最直接路径。
+
+### 主要特性
+
+- **🎯 免费额度**: 个人 Google 账户每分钟 60 次请求，每天 1,000 次请求
+- **🧠 强大的 Gemini 3 模型**: 访问改进的推理能力和 100 万 token 上下文窗口
+- **🔧 内置工具**: Google Search 接地、文件操作、shell 命令、网页抓取
+- **🔌 可扩展**: 支持 MCP (Model Context Protocol) 进行自定义集成
+- **💻 终端优先**: 为命令行生活的开发者设计
+- **🛡️ 开源**: Apache 2.0 许可
+
+### 快速安装
+
+```bash
+# 使用 npx（无需安装）
+npx @google/gemini-cli
+
+# 全局安装
+npm install -g @google/gemini-cli
+
+# 使用 Homebrew 安装 (macOS/Linux)
+brew install gemini-cli
+```
+
+### 文档
+
+了解更多，请访问 [官方文档](https://geminicli.com/docs/)。
+
+---
+
 <p align="center">
   Built with ❤️ by Google and the open source community
 </p>
