@@ -14,7 +14,7 @@ import {
   type ToolConfirmationOutcome,
   type PolicyUpdateOptions,
 } from './tools.js';
-import { buildPatternArgsPattern } from '../policy/utils.js';
+import { buildParamArgsPattern } from '../policy/utils.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -27,12 +27,14 @@ import { convert } from 'html-to-text';
 import {
   logWebFetchFallbackAttempt,
   WebFetchFallbackAttemptEvent,
+  logNetworkRetryAttempt,
+  NetworkRetryAttemptEvent,
 } from '../telemetry/index.js';
 import { LlmRole } from '../telemetry/llmRole.js';
 import { WEB_FETCH_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
-import { retryWithBackoff } from '../utils/retry.js';
+import { retryWithBackoff, getRetryErrorType } from '../utils/retry.js';
 import { WEB_FETCH_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { LRUCache } from 'mnemonist';
@@ -188,13 +190,28 @@ class WebFetchToolInvocation extends BaseToolInvocation<
   }
 
   private handleRetry(attempt: number, error: unknown, delayMs: number): void {
+    const maxAttempts = this.config.getMaxAttempts();
+    const modelName = 'Web Fetch';
+    const errorType = getRetryErrorType(error);
+
     coreEvents.emitRetryAttempt({
       attempt,
-      maxAttempts: this.config.getMaxAttempts(),
+      maxAttempts,
       delayMs,
-      error: error instanceof Error ? error.message : String(error),
-      model: 'Web Fetch',
+      error: errorType,
+      model: modelName,
     });
+
+    logNetworkRetryAttempt(
+      this.config,
+      new NetworkRetryAttemptEvent(
+        attempt,
+        maxAttempts,
+        errorType,
+        delayMs,
+        modelName,
+      ),
+    );
   }
 
   private async executeFallback(signal: AbortSignal): Promise<ToolResult> {
@@ -311,12 +328,11 @@ ${textContent}
   ): PolicyUpdateOptions | undefined {
     if (this.params.url) {
       return {
-        argsPattern: buildPatternArgsPattern(this.params.url),
+        argsPattern: buildParamArgsPattern('url', this.params.url),
       };
-    }
-    if (this.params.prompt) {
+    } else if (this.params.prompt) {
       return {
-        argsPattern: buildPatternArgsPattern(this.params.prompt),
+        argsPattern: buildParamArgsPattern('prompt', this.params.prompt),
       };
     }
     return undefined;

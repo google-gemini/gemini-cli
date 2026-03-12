@@ -45,6 +45,7 @@ Environment variables can override these settings.
 | `logPrompts`   | `GEMINI_TELEMETRY_LOG_PROMPTS`   | Include prompts in telemetry logs                   | `true`/`false`    | `true`                  |
 | `useCollector` | `GEMINI_TELEMETRY_USE_COLLECTOR` | Use external OTLP collector (advanced)              | `true`/`false`    | `false`                 |
 | `useCliAuth`   | `GEMINI_TELEMETRY_USE_CLI_AUTH`  | Use CLI credentials for telemetry (GCP target only) | `true`/`false`    | `false`                 |
+| -              | `GEMINI_CLI_SURFACE`             | Optional custom label for traffic reporting         | string            | -                       |
 
 **Note on boolean environment variables:** For boolean settings like `enabled`,
 setting the environment variable to `true` or `1` enables the feature.
@@ -215,6 +216,50 @@ recommend using file-based output for local development.
 
 For advanced local telemetry setups (such as Jaeger or Genkit), see the
 [Local development guide](../local-development.md#viewing-traces).
+
+## Client identification
+
+Gemini CLI includes identifiers in its `User-Agent` header to help you
+differentiate and report on API traffic from different environments (for
+example, identifying calls from Gemini Code Assist versus a standard terminal).
+
+### Automatic identification
+
+Most integrated environments are identified automatically without additional
+configuration. The identifier is included as a prefix to the `User-Agent` and as
+a "surface" tag in the parenthetical metadata.
+
+| Environment                         | User-Agent Prefix            | Surface Tag |
+| :---------------------------------- | :--------------------------- | :---------- |
+| **Gemini Code Assist (Agent Mode)** | `GeminiCLI-a2a-server`       | `vscode`    |
+| **Zed (via ACP)**                   | `GeminiCLI-acp-zed`          | `zed`       |
+| **XCode (via ACP)**                 | `GeminiCLI-acp-xcode`        | `xcode`     |
+| **IntelliJ IDEA (via ACP)**         | `GeminiCLI-acp-intellijidea` | `jetbrains` |
+| **Standard Terminal**               | `GeminiCLI`                  | `terminal`  |
+
+**Example User-Agent:**
+`GeminiCLI-a2a-server/0.34.0/gemini-pro (linux; x64; vscode)`
+
+### Custom identification
+
+You can provide a custom identifier for your own scripts or automation by
+setting the `GEMINI_CLI_SURFACE` environment variable. This is useful for
+tracking specific internal tools or distribution channels in your GCP logs.
+
+**macOS/Linux**
+
+```bash
+export GEMINI_CLI_SURFACE="my-custom-tool"
+```
+
+**Windows (PowerShell)**
+
+```powershell
+$env:GEMINI_CLI_SURFACE="my-custom-tool"
+```
+
+When set, the value appears at the end of the `User-Agent` parenthetical:
+`GeminiCLI/0.34.0/gemini-pro (linux; x64; my-custom-tool)`
 
 ## Logs, metrics, and traces
 
