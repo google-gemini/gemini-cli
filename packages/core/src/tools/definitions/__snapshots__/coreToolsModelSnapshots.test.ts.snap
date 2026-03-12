@@ -656,7 +656,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: write_file 1`] = `
 {
-  "description": "Writes content to a specified file in the local filesystem.
+  "description": "Writes content to a specified file in the local filesystem. PREFERRED over shell-based alternatives (heredocs, cat, echo, tee, or scripts) for creating or overwriting files.
 
       The user has the ability to modify \`content\`. If modified, this will be stated in the response.",
   "name": "write_file",
@@ -1412,7 +1412,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: write_file 1`] = `
 {
-  "description": "Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use 'replace' for targeted edits to large files.",
+  "description": "Writes the complete content to a file, automatically creating missing parent directories. Overwrites existing files. PREFERRED over shell-based alternatives (heredocs, cat, echo, tee, or scripts) for creating or overwriting files. The user has the ability to modify 'content' before it is saved. Best for new or small files; use 'replace' for targeted edits to large files.",
   "name": "write_file",
   "parametersJsonSchema": {
     "properties": {
