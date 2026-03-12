@@ -191,7 +191,7 @@ export class ExtensionManager extends ExtensionLoader {
       );
     }
 
-    const isUpdate = !!previousExtensionConfig;
+    let isUpdate = !!previousExtensionConfig;
     let newExtensionConfig: ExtensionConfig | null = null;
     let localSourcePath: string | undefined;
     let extension: GeminiCLIExtension | null;
@@ -280,6 +280,20 @@ Would you like to attempt to install via "git clone" instead?`,
         const previous = this.getExtensions().find(
           (installed) => installed.name === previousName,
         );
+        const isSameLinkRelink =
+          !isUpdate &&
+          installMetadata.type === 'link' &&
+          previous?.installMetadata?.type === 'link' &&
+          getRealPath(previous.installMetadata.source) ===
+            getRealPath(installMetadata.source);
+
+        if (isSameLinkRelink) {
+          isUpdate = true;
+          previousExtensionConfig = await this.loadExtensionConfig(
+            previous.path,
+          );
+        }
+
         const nameConflict = this.getExtensions().find(
           (installed) =>
             installed.name === newExtensionName &&
@@ -435,7 +449,7 @@ Would you like to attempt to install via "git clone" instead?`,
               hashValue(newExtensionConfig.name),
               getExtensionId(newExtensionConfig, installMetadata),
               newExtensionConfig.version,
-              previousExtensionConfig.version,
+              previousExtensionConfig!.version,
               installMetadata.type,
               CoreToolCallStatus.Success,
             ),
@@ -497,7 +511,7 @@ Would you like to attempt to install via "git clone" instead?`,
             hashValue(config?.name ?? ''),
             extensionId ?? '',
             newExtensionConfig?.version ?? '',
-            previousExtensionConfig.version,
+            previousExtensionConfig!.version,
             installMetadata.type,
             CoreToolCallStatus.Error,
           ),
