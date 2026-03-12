@@ -296,6 +296,81 @@ describe('ExecutionLifecycleService', () => {
     }).toThrow('Execution 4324 is already attached.');
   });
 
+  describe('Background Start Listeners', () => {
+    it('fires onBackground when an execution is backgrounded', async () => {
+      const listener = vi.fn();
+      ExecutionLifecycleService.onBackground(listener);
+
+      const handle = ExecutionLifecycleService.createExecution(
+        '',
+        undefined,
+        'remote_agent',
+        undefined,
+        'My Remote Agent',
+      );
+      const executionId = handle.pid!;
+
+      ExecutionLifecycleService.appendOutput(executionId, 'some output');
+      ExecutionLifecycleService.background(executionId);
+      await handle.result;
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      const info = listener.mock.calls[0][0];
+      expect(info.executionId).toBe(executionId);
+      expect(info.executionMethod).toBe('remote_agent');
+      expect(info.label).toBe('My Remote Agent');
+      expect(info.output).toBe('some output');
+
+      ExecutionLifecycleService.offBackground(listener);
+    });
+
+    it('uses fallback label when none is provided', async () => {
+      const listener = vi.fn();
+      ExecutionLifecycleService.onBackground(listener);
+
+      const handle = ExecutionLifecycleService.createExecution(
+        '',
+        undefined,
+        'none',
+      );
+      const executionId = handle.pid!;
+
+      ExecutionLifecycleService.background(executionId);
+      await handle.result;
+
+      const info = listener.mock.calls[0][0];
+      expect(info.label).toContain('none');
+      expect(info.label).toContain(String(executionId));
+
+      ExecutionLifecycleService.offBackground(listener);
+    });
+
+    it('does not fire onBackground for non-backgrounded completions', async () => {
+      const listener = vi.fn();
+      ExecutionLifecycleService.onBackground(listener);
+
+      const handle = ExecutionLifecycleService.createExecution();
+      ExecutionLifecycleService.completeExecution(handle.pid!);
+      await handle.result;
+
+      expect(listener).not.toHaveBeenCalled();
+
+      ExecutionLifecycleService.offBackground(listener);
+    });
+
+    it('offBackground removes the listener', async () => {
+      const listener = vi.fn();
+      ExecutionLifecycleService.onBackground(listener);
+      ExecutionLifecycleService.offBackground(listener);
+
+      const handle = ExecutionLifecycleService.createExecution();
+      ExecutionLifecycleService.background(handle.pid!);
+      await handle.result;
+
+      expect(listener).not.toHaveBeenCalled();
+    });
+  });
+
   describe('Background Completion Listeners', () => {
     it('fires onBackgroundComplete with formatInjection text when backgrounded execution settles', async () => {
       const listener = vi.fn();

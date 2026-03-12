@@ -13,6 +13,7 @@ import type { AnsiOutput, Config, GeminiClient } from '@google/gemini-cli-core';
 import {
   isBinary,
   ShellExecutionService,
+  ExecutionLifecycleService,
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
@@ -144,7 +145,7 @@ export const useShellCommandProcessor = (
 
   useEffect(
     () => () => {
-      // Unsubscribe from all background shell events on unmount
+      // Unsubscribe from all background task events on unmount
       for (const unsubscribe of m.subscriptions.values()) {
         unsubscribe();
       }
@@ -176,7 +177,7 @@ export const useShellCommandProcessor = (
       addItemToHistory(
         {
           type: 'info',
-          text: 'No background shells are currently active.',
+          text: 'No background tasks are currently active.',
         },
         Date.now(),
       );
@@ -191,12 +192,19 @@ export const useShellCommandProcessor = (
     dispatch,
   ]);
 
-  const backgroundCurrentShell = useCallback(() => {
+  const backgroundCurrentExecution = useCallback(() => {
     const pidToBackground =
       state.activeShellPtyId ?? activeBackgroundExecutionId;
     if (pidToBackground) {
-      ShellExecutionService.background(pidToBackground);
+      // Use ShellExecutionService for shell PTYs (handles log files, etc.),
+      // fall back to ExecutionLifecycleService for non-shell executions
+      // (e.g. remote agents, MCP tools, local agents).
       m.backgroundedPids.add(pidToBackground);
+      if (state.activeShellPtyId) {
+        ShellExecutionService.background(pidToBackground);
+      } else {
+        ExecutionLifecycleService.background(pidToBackground);
+      }
       // Ensure backgrounding is silent and doesn't trigger restoration
       m.wasVisibleBeforeForeground = false;
       if (m.restoreTimeout) {
@@ -206,12 +214,14 @@ export const useShellCommandProcessor = (
     }
   }, [state.activeShellPtyId, activeBackgroundExecutionId, m]);
 
-  const dismissBackgroundShell = useCallback(
+  const dismissBackgroundTask = useCallback(
     async (pid: number) => {
       const shell = state.backgroundShells.get(pid);
       if (shell) {
         if (shell.status === 'running') {
-          await ShellExecutionService.kill(pid);
+          // ExecutionLifecycleService.kill handles both shell and non-shell
+          // executions. For shells, ShellExecutionService.kill delegates to it.
+          ExecutionLifecycleService.kill(pid);
         }
         dispatch({ type: 'DISMISS_SHELL', pid });
         m.backgroundedPids.delete(pid);
@@ -227,37 +237,55 @@ export const useShellCommandProcessor = (
     [state.backgroundShells, dispatch, m],
   );
 
-  const registerBackgroundShell = useCallback(
+  const registerBackgroundTask = useCallback(
     (pid: number, command: string, initialOutput: string | AnsiOutput) => {
       dispatch({ type: 'REGISTER_SHELL', pid, command, initialOutput });
 
-      // Subscribe to process exit directly
-      const exitUnsubscribe = ShellExecutionService.onExit(pid, (code) => {
+      // Subscribe to exit via ExecutionLifecycleService (works for all execution types)
+      const exitUnsubscribe = ExecutionLifecycleService.onExit(pid, (code) => {
         dispatch({
           type: 'UPDATE_SHELL',
           pid,
           update: { status: 'exited', exitCode: code },
         });
+        // Auto-dismiss completed tasks from the background panel.
+        dispatch({ type: 'DISMISS_SHELL', pid });
+        const unsub = m.subscriptions.get(pid);
+        if (unsub) {
+          unsub();
+          m.subscriptions.delete(pid);
+        }
         m.backgroundedPids.delete(pid);
       });
 
-      // Subscribe to future updates (data only)
-      const dataUnsubscribe = ShellExecutionService.subscribe(pid, (event) => {
-        if (event.type === 'data') {
-          dispatch({ type: 'APPEND_SHELL_OUTPUT', pid, chunk: event.chunk });
-        } else if (event.type === 'binary_detected') {
-          dispatch({ type: 'UPDATE_SHELL', pid, update: { isBinary: true } });
-        } else if (event.type === 'binary_progress') {
-          dispatch({
-            type: 'UPDATE_SHELL',
-            pid,
-            update: {
-              isBinary: true,
-              binaryBytesReceived: event.bytesReceived,
-            },
-          });
-        }
-      });
+      // Subscribe to output via ExecutionLifecycleService (works for all execution types)
+      const dataUnsubscribe = ExecutionLifecycleService.subscribe(
+        pid,
+        (event) => {
+          if (event.type === 'data') {
+            dispatch({
+              type: 'APPEND_SHELL_OUTPUT',
+              pid,
+              chunk: event.chunk,
+            });
+          } else if (event.type === 'binary_detected') {
+            dispatch({
+              type: 'UPDATE_SHELL',
+              pid,
+              update: { isBinary: true },
+            });
+          } else if (event.type === 'binary_progress') {
+            dispatch({
+              type: 'UPDATE_SHELL',
+              pid,
+              update: {
+                isBinary: true,
+                binaryBytesReceived: event.bytesReceived,
+              },
+            });
+          }
+        },
+      );
 
       m.subscriptions.set(pid, () => {
         exitUnsubscribe();
@@ -266,6 +294,28 @@ export const useShellCommandProcessor = (
     },
     [dispatch, m],
   );
+
+  // Auto-register any execution that gets backgrounded, regardless of type.
+  // This is the agnostic hook: any tool that calls
+  // ExecutionLifecycleService.createExecution() or attachExecution()
+  // automatically gets Ctrl+B support — no UI changes needed per tool.
+  useEffect(() => {
+    const listener = (info: {
+      executionId: number;
+      label: string;
+      output: string;
+    }) => {
+      // Skip if already registered (e.g. shells register via their own flow)
+      if (m.backgroundedPids.has(info.executionId)) {
+        return;
+      }
+      registerBackgroundTask(info.executionId, info.label, info.output);
+    };
+    ExecutionLifecycleService.onBackground(listener);
+    return () => {
+      ExecutionLifecycleService.offBackground(listener);
+    };
+  }, [registerBackgroundTask, m]);
 
   const handleShellCommand = useCallback(
     (rawQuery: PartListUnion, abortSignal: AbortSignal): boolean => {
@@ -439,7 +489,7 @@ export const useShellCommandProcessor = (
           setPendingHistoryItem(null);
 
           if (result.backgrounded && result.pid) {
-            registerBackgroundShell(result.pid, rawQuery, cumulativeStdout);
+            registerBackgroundTask(result.pid, rawQuery, cumulativeStdout);
             dispatch({ type: 'SET_ACTIVE_PTY', pid: null });
           }
 
@@ -531,7 +581,7 @@ export const useShellCommandProcessor = (
       setShellInputFocused,
       terminalHeight,
       terminalWidth,
-      registerBackgroundShell,
+      registerBackgroundTask,
       m,
       dispatch,
     ],
@@ -548,9 +598,9 @@ export const useShellCommandProcessor = (
     backgroundShellCount,
     isBackgroundShellVisible: state.isBackgroundShellVisible,
     toggleBackgroundShell,
-    backgroundCurrentShell,
-    registerBackgroundShell,
-    dismissBackgroundShell,
+    backgroundCurrentShell: backgroundCurrentExecution,
+    registerBackgroundShell: registerBackgroundTask,
+    dismissBackgroundShell: dismissBackgroundTask,
     backgroundShells: state.backgroundShells,
   };
 };

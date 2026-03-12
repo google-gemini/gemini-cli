@@ -34,6 +34,23 @@ const mockShellOnExit = vi.hoisted(() =>
     ) => () => void
   >(() => vi.fn()),
 );
+const mockLifecycleSubscribe = vi.hoisted(() =>
+  vi.fn<
+    (pid: number, listener: (event: ShellOutputEvent) => void) => () => void
+  >(() => vi.fn()),
+);
+const mockLifecycleOnExit = vi.hoisted(() =>
+  vi.fn<
+    (
+      pid: number,
+      callback: (exitCode: number, signal?: number) => void,
+    ) => () => void
+  >(() => vi.fn()),
+);
+const mockLifecycleKill = vi.hoisted(() => vi.fn());
+const mockLifecycleBackground = vi.hoisted(() => vi.fn());
+const mockLifecycleOnBackground = vi.hoisted(() => vi.fn());
+const mockLifecycleOffBackground = vi.hoisted(() => vi.fn());
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -46,6 +63,14 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       background: mockShellBackground,
       subscribe: mockShellSubscribe,
       onExit: mockShellOnExit,
+    },
+    ExecutionLifecycleService: {
+      subscribe: mockLifecycleSubscribe,
+      onExit: mockLifecycleOnExit,
+      kill: mockLifecycleKill,
+      background: mockLifecycleBackground,
+      onBackground: mockLifecycleOnBackground,
+      offBackground: mockLifecycleOffBackground,
     },
     isBinary: mockIsBinary,
   };
@@ -777,8 +802,11 @@ describe('useShellCommandProcessor', () => {
           output: 'initial',
         }),
       );
-      expect(mockShellOnExit).toHaveBeenCalledWith(1001, expect.any(Function));
-      expect(mockShellSubscribe).toHaveBeenCalledWith(
+      expect(mockLifecycleOnExit).toHaveBeenCalledWith(
+        1001,
+        expect.any(Function),
+      );
+      expect(mockLifecycleSubscribe).toHaveBeenCalledWith(
         1001,
         expect.any(Function),
       );
@@ -816,7 +844,7 @@ describe('useShellCommandProcessor', () => {
       expect(addItemToHistoryMock).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'info',
-          text: 'No background shells are currently active.',
+          text: 'No background tasks are currently active.',
         }),
         expect.any(Number),
       );
@@ -834,7 +862,7 @@ describe('useShellCommandProcessor', () => {
         await result.current.dismissBackgroundShell(1001);
       });
 
-      expect(mockShellKill).toHaveBeenCalledWith(1001);
+      expect(mockLifecycleKill).toHaveBeenCalledWith(1001);
       expect(result.current.backgroundShellCount).toBe(0);
       expect(result.current.backgroundShells.has(1001)).toBe(false);
     });
@@ -884,7 +912,7 @@ describe('useShellCommandProcessor', () => {
       expect(result.current.activeShellPtyId).toBeNull();
     });
 
-    it('should persist background shell on successful exit and mark as exited', async () => {
+    it('should auto-dismiss background task on successful exit', async () => {
       const { result } = renderProcessorHook();
 
       act(() => {
@@ -892,7 +920,7 @@ describe('useShellCommandProcessor', () => {
       });
 
       // Find the exit callback registered
-      const exitCallback = mockShellOnExit.mock.calls.find(
+      const exitCallback = mockLifecycleOnExit.mock.calls.find(
         (call) => call[0] === 888,
       )?.[1];
       expect(exitCallback).toBeDefined();
@@ -903,22 +931,19 @@ describe('useShellCommandProcessor', () => {
         });
       }
 
-      // Should NOT be removed, but updated
-      expect(result.current.backgroundShellCount).toBe(0); // Badge count is 0
-      expect(result.current.backgroundShells.has(888)).toBe(true); // Map has it
-      const shell = result.current.backgroundShells.get(888);
-      expect(shell?.status).toBe('exited');
-      expect(shell?.exitCode).toBe(0);
+      // Should be auto-dismissed from the panel
+      expect(result.current.backgroundShellCount).toBe(0);
+      expect(result.current.backgroundShells.has(888)).toBe(false);
     });
 
-    it('should persist background shell on failed exit', async () => {
+    it('should auto-dismiss background task on failed exit', async () => {
       const { result } = renderProcessorHook();
 
       act(() => {
         result.current.registerBackgroundShell(999, 'fail-exit', '');
       });
 
-      const exitCallback = mockShellOnExit.mock.calls.find(
+      const exitCallback = mockLifecycleOnExit.mock.calls.find(
         (call) => call[0] === 999,
       )?.[1];
       expect(exitCallback).toBeDefined();
@@ -929,17 +954,9 @@ describe('useShellCommandProcessor', () => {
         });
       }
 
-      // Should NOT be removed, but updated
-      expect(result.current.backgroundShellCount).toBe(0); // Badge count is 0
-      const shell = result.current.backgroundShells.get(999);
-      expect(shell?.status).toBe('exited');
-      expect(shell?.exitCode).toBe(1);
-
-      // Now dismiss it
-      await act(async () => {
-        await result.current.dismissBackgroundShell(999);
-      });
+      // Should be auto-dismissed from the panel
       expect(result.current.backgroundShellCount).toBe(0);
+      expect(result.current.backgroundShells.has(999)).toBe(false);
     });
 
     it('should NOT trigger re-render on background shell output when visible', async () => {
@@ -956,7 +973,7 @@ describe('useShellCommandProcessor', () => {
 
       const initialRenderCount = getRenderCount();
 
-      const subscribeCallback = mockShellSubscribe.mock.calls.find(
+      const subscribeCallback = mockLifecycleSubscribe.mock.calls.find(
         (call) => call[0] === 1001,
       )?.[1];
       expect(subscribeCallback).toBeDefined();
@@ -982,7 +999,7 @@ describe('useShellCommandProcessor', () => {
       // Ensure background shells are hidden (default)
       const initialRenderCount = getRenderCount();
 
-      const subscribeCallback = mockShellSubscribe.mock.calls.find(
+      const subscribeCallback = mockLifecycleSubscribe.mock.calls.find(
         (call) => call[0] === 1001,
       )?.[1];
       expect(subscribeCallback).toBeDefined();
@@ -1012,7 +1029,7 @@ describe('useShellCommandProcessor', () => {
 
       const initialRenderCount = getRenderCount();
 
-      const subscribeCallback = mockShellSubscribe.mock.calls.find(
+      const subscribeCallback = mockLifecycleSubscribe.mock.calls.find(
         (call) => call[0] === 1001,
       )?.[1];
       expect(subscribeCallback).toBeDefined();
