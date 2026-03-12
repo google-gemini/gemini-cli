@@ -57,10 +57,11 @@ interface SchedulerQueueItem {
 }
 
 export interface SchedulerOptions {
-  config: Config;
+  context: AgentLoopContext;
   messageBus?: MessageBus;
   getPreferredEditor: () => EditorType | undefined;
   schedulerId: string;
+  subagent?: string;
   parentCallId?: string;
   onWaitingForConfirmation?: (waiting: boolean) => void;
 }
@@ -102,6 +103,7 @@ export class Scheduler {
   private readonly messageBus: MessageBus;
   private readonly getPreferredEditor: () => EditorType | undefined;
   private readonly schedulerId: string;
+  private readonly subagent?: string;
   private readonly parentCallId?: string;
   private readonly onWaitingForConfirmation?: (waiting: boolean) => void;
 
@@ -110,11 +112,12 @@ export class Scheduler {
   private readonly requestQueue: SchedulerQueueItem[] = [];
 
   constructor(options: SchedulerOptions) {
-    this.config = options.config;
-    this.context = options.config;
+    this.context = options.context;
+    this.config = this.context.config;
     this.messageBus = options.messageBus ?? this.context.messageBus;
     this.getPreferredEditor = options.getPreferredEditor;
     this.schedulerId = options.schedulerId;
+    this.subagent = options.subagent;
     this.parentCallId = options.parentCallId;
     this.onWaitingForConfirmation = options.onWaitingForConfirmation;
     this.state = new SchedulerStateManager(
@@ -122,7 +125,7 @@ export class Scheduler {
       this.schedulerId,
       (call) => logToolCall(this.config, new ToolCallEvent(call)),
     );
-    this.executor = new ToolExecutor(this.config, this.context);
+    this.executor = new ToolExecutor(this.context);
     this.modifier = new ToolModificationHandler();
 
     this.setupMessageBusListener(this.messageBus);
@@ -563,7 +566,11 @@ export class Scheduler {
     const callId = toolCall.request.callId;
 
     // Policy & Security
-    const { decision, rule } = await checkPolicy(toolCall, this.config);
+    const { decision, rule } = await checkPolicy(
+      toolCall,
+      this.config,
+      this.subagent,
+    );
 
     if (decision === PolicyDecision.DENY) {
       const { errorMessage, errorType } = getPolicyDenialError(
@@ -605,10 +612,13 @@ export class Scheduler {
 
     // Handle Policy Updates
     if (decision === PolicyDecision.ASK_USER && outcome) {
-      await updatePolicy(toolCall.tool, outcome, lastDetails, {
-        config: this.config,
-        messageBus: this.messageBus,
-      });
+      await updatePolicy(
+        toolCall.tool,
+        outcome,
+        lastDetails,
+        this.context,
+        toolCall.invocation,
+      );
     }
 
     // Handle cancellation (cascades to entire batch)

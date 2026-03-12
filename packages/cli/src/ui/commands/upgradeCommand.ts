@@ -7,10 +7,10 @@
 import {
   AuthType,
   openBrowserSecurely,
+  shouldLaunchBrowser,
   UPGRADE_URL_PAGE,
 } from '@google/gemini-cli-core';
-import type { SlashCommand } from './types.js';
-import { CommandKind } from './types.js';
+import { CommandKind, type SlashCommand } from './types.js';
 
 /**
  * Command to open the upgrade page for Gemini Code Assist.
@@ -32,6 +32,14 @@ export const upgradeCommand: SlashCommand = {
         messageType: 'error',
         content:
           'The /upgrade command is only available when logged in with Google.',
+      };
+    }
+
+    if (!shouldLaunchBrowser()) {
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: `Please open this URL in a browser: ${UPGRADE_URL_PAGE}`,
       };
     }
 

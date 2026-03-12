@@ -183,6 +183,11 @@ describe('Scheduler (Orchestrator)', () => {
       subscribe: vi.fn(),
     } as unknown as Mocked<MessageBus>;
 
+    (mockConfig as unknown as { toolRegistry: ToolRegistry }).toolRegistry =
+      mockToolRegistry;
+    (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+      mockMessageBus;
+
     getPreferredEditor = vi.fn().mockReturnValue('vim');
 
     // --- Setup Sub-component Mocks ---
@@ -306,7 +311,7 @@ describe('Scheduler (Orchestrator)', () => {
 
     // Initialize Scheduler
     scheduler = new Scheduler({
-      config: mockConfig,
+      context: mockConfig,
       messageBus: mockMessageBus,
       getPreferredEditor,
       schedulerId: 'root',
@@ -360,6 +365,32 @@ describe('Scheduler (Orchestrator)', () => {
             }),
           }),
         ]),
+      );
+    });
+
+    it('should propagate subagent name to checkPolicy', async () => {
+      const { checkPolicy } = await import('./policy.js');
+      const scheduler = new Scheduler({
+        context: mockConfig,
+        schedulerId: 'sub-scheduler',
+        subagent: 'my-agent',
+        getPreferredEditor: () => undefined,
+      });
+
+      const request: ToolCallRequestInfo = {
+        callId: 'call-1',
+        name: 'test-tool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      };
+
+      await scheduler.schedule([request], new AbortController().signal);
+
+      expect(checkPolicy).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        'my-agent',
       );
     });
 
@@ -802,7 +833,7 @@ describe('Scheduler (Orchestrator)', () => {
         signal,
         expect.objectContaining({
           config: mockConfig,
-          messageBus: mockMessageBus,
+          messageBus: expect.anything(),
           state: mockStateManager,
           schedulerId: ROOT_SCHEDULER_ID,
         }),
@@ -812,10 +843,8 @@ describe('Scheduler (Orchestrator)', () => {
         mockTool,
         resolution.outcome,
         resolution.lastDetails,
-        expect.objectContaining({
-          config: mockConfig,
-          messageBus: mockMessageBus,
-        }),
+        mockConfig,
+        expect.anything(),
       );
 
       expect(mockExecutor.execute).toHaveBeenCalled();
@@ -1158,7 +1187,7 @@ describe('Scheduler (Orchestrator)', () => {
       const schedulerId = 'custom-scheduler';
       const parentCallId = 'parent-call';
       const customScheduler = new Scheduler({
-        config: mockConfig,
+        context: mockConfig,
         messageBus: mockMessageBus,
         getPreferredEditor,
         schedulerId,
@@ -1203,7 +1232,7 @@ describe('Scheduler (Orchestrator)', () => {
       const offSpy = vi.spyOn(coreEvents, 'off');
 
       const s = new Scheduler({
-        config: mockConfig,
+        context: mockConfig,
         messageBus: mockMessageBus,
         getPreferredEditor,
         schedulerId: 'cleanup-test',
@@ -1329,6 +1358,11 @@ describe('Scheduler MCP Progress', () => {
       subscribe: vi.fn(),
     } as unknown as Mocked<MessageBus>;
 
+    (mockConfig as unknown as { toolRegistry: ToolRegistry }).toolRegistry =
+      mockToolRegistry;
+    (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
+      mockMessageBus;
+
     getPreferredEditor = vi.fn().mockReturnValue('vim');
 
     vi.mocked(SchedulerStateManager).mockImplementation(
@@ -1337,7 +1371,7 @@ describe('Scheduler MCP Progress', () => {
     );
 
     scheduler = new Scheduler({
-      config: mockConfig,
+      context: mockConfig,
       messageBus: mockMessageBus,
       getPreferredEditor,
       schedulerId: 'progress-test',
