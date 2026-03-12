@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BrowserManager } from './browserManager.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import type { Config } from '../../config/config.js';
+import { injectAutomationOverlay } from './automationOverlay.js';
 
 // Mock the MCP SDK
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
@@ -42,6 +43,10 @@ vi.mock('../../utils/debugLogger.js', () => ({
   },
 }));
 
+vi.mock('./automationOverlay.js', () => ({
+  injectAutomationOverlay: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
@@ -50,6 +55,7 @@ describe('BrowserManager', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(injectAutomationOverlay).mockClear();
 
     // Setup mock config
     mockConfig = makeFakeConfig({
@@ -147,7 +153,7 @@ describe('BrowserManager', () => {
       // Verify StdioClientTransport was created with correct args
       expect(StdioClientTransport).toHaveBeenCalledWith(
         expect.objectContaining({
-          command: 'npx',
+          command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
           args: expect.arrayContaining([
             '-y',
             expect.stringMatching(/chrome-devtools-mcp@/),
@@ -185,7 +191,7 @@ describe('BrowserManager', () => {
 
       expect(StdioClientTransport).toHaveBeenCalledWith(
         expect.objectContaining({
-          command: 'npx',
+          command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
           args: expect.arrayContaining(['--headless']),
         }),
       );
@@ -210,7 +216,7 @@ describe('BrowserManager', () => {
 
       expect(StdioClientTransport).toHaveBeenCalledWith(
         expect.objectContaining({
-          command: 'npx',
+          command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
           args: expect.arrayContaining(['--userDataDir', '/path/to/profile']),
         }),
       );
@@ -409,6 +415,83 @@ describe('BrowserManager', () => {
       await manager.close();
 
       expect(client.close).toHaveBeenCalled();
+    });
+  });
+
+  describe('overlay re-injection in callTool', () => {
+    it('should re-inject overlay after click in non-headless mode', async () => {
+      const manager = new BrowserManager(mockConfig);
+      await manager.callTool('click', { uid: '1_2' });
+
+      expect(injectAutomationOverlay).toHaveBeenCalledWith(manager, undefined);
+    });
+
+    it('should re-inject overlay after navigate_page in non-headless mode', async () => {
+      const manager = new BrowserManager(mockConfig);
+      await manager.callTool('navigate_page', { url: 'https://example.com' });
+
+      expect(injectAutomationOverlay).toHaveBeenCalledWith(manager, undefined);
+    });
+
+    it('should re-inject overlay after click_at, new_page, press_key, handle_dialog', async () => {
+      const manager = new BrowserManager(mockConfig);
+      for (const tool of [
+        'click_at',
+        'new_page',
+        'press_key',
+        'handle_dialog',
+      ]) {
+        vi.mocked(injectAutomationOverlay).mockClear();
+        await manager.callTool(tool, {});
+        expect(injectAutomationOverlay).toHaveBeenCalledTimes(1);
+      }
+    });
+
+    it('should NOT re-inject overlay after read-only tools', async () => {
+      const manager = new BrowserManager(mockConfig);
+      for (const tool of [
+        'take_snapshot',
+        'take_screenshot',
+        'get_console_message',
+        'fill',
+      ]) {
+        vi.mocked(injectAutomationOverlay).mockClear();
+        await manager.callTool(tool, {});
+        expect(injectAutomationOverlay).not.toHaveBeenCalled();
+      }
+    });
+
+    it('should NOT re-inject overlay when headless is true', async () => {
+      const headlessConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { headless: true },
+        },
+      });
+      const manager = new BrowserManager(headlessConfig);
+      await manager.callTool('click', { uid: '1_2' });
+
+      expect(injectAutomationOverlay).not.toHaveBeenCalled();
+    });
+
+    it('should NOT re-inject overlay when tool returns an error result', async () => {
+      vi.mocked(Client).mockImplementation(
+        () =>
+          ({
+            connect: vi.fn().mockResolvedValue(undefined),
+            close: vi.fn().mockResolvedValue(undefined),
+            listTools: vi.fn().mockResolvedValue({ tools: [] }),
+            callTool: vi.fn().mockResolvedValue({
+              content: [{ type: 'text', text: 'Element not found' }],
+              isError: true,
+            }),
+          }) as unknown as InstanceType<typeof Client>,
+      );
+
+      const manager = new BrowserManager(mockConfig);
+      await manager.callTool('click', { uid: 'bad' });
+
+      expect(injectAutomationOverlay).not.toHaveBeenCalled();
     });
   });
 });

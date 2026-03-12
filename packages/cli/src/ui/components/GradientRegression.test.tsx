@@ -7,7 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderWithProviders } from '../../test-utils/render.js';
 import * as SessionContext from '../contexts/SessionContext.js';
-import type { SessionStatsState } from '../contexts/SessionContext.js';
+import { type SessionStatsState } from '../contexts/SessionContext.js';
 import { Banner } from './Banner.js';
 import { Footer } from './Footer.js';
 import { Header } from './Header.js';
@@ -22,8 +22,13 @@ vi.mock('../semantic-colors.js', async (importOriginal) => {
     ...original,
     theme: {
       ...original.theme,
+      background: {
+        ...original.theme.background,
+        focus: '#004000',
+      },
       ui: {
         ...original.theme.ui,
+        focus: '#00ff00',
         gradient: [], // Empty array to potentially trigger the crash
       },
     },
