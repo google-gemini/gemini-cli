@@ -43,7 +43,7 @@ describe('GoogleCredentialsAuthProvider', () => {
       },
     });
 
-    (GoogleAuth as Mock).mockImplementation(() => ({
+    (GoogleAuth as unknown as Mock).mockImplementation(() => ({
       getClient: mockGetClient,
       getIdTokenClient: mockGetIdTokenClient,
     }));
