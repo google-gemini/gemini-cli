@@ -132,7 +132,7 @@ export function AuthDialog({
           config.isBrowserLaunchSuppressed()
         ) {
           setExiting(true);
-          setTimeout(relaunchApp, 100);
+          setTimeout(() => relaunchApp(config.getSessionId()), 100);
           return;
         }
 

@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { TrustLevel } from '../../config/trustedFolders.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { usePermissionsModifyTrust } from '../hooks/usePermissionsModifyTrust.js';
+import { useConfig } from '../contexts/ConfigContext.js';
 import { theme } from '../semantic-colors.js';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { relaunchApp } from '../../utils/processUtils.js';
@@ -33,6 +34,7 @@ export function PermissionsModifyTrustDialog({
   const currentDirectory = targetDirectory ?? process.cwd();
   const dirName = path.basename(currentDirectory);
   const parentFolder = path.basename(path.dirname(currentDirectory));
+  const config = useConfig();
 
   const TRUST_LEVEL_ITEMS = [
     {
@@ -72,7 +74,7 @@ export function PermissionsModifyTrustDialog({
         void (async () => {
           const success = await commitTrustLevelChange();
           if (success) {
-            void relaunchApp();
+            void relaunchApp(config.getSessionId());
           } else {
             onExit();
           }

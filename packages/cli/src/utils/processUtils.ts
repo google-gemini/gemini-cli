@@ -22,10 +22,23 @@ export function _resetRelaunchStateForTesting(): void {
   isRelaunching = false;
 }
 
-export async function relaunchApp(): Promise<void> {
+export async function relaunchApp(sessionId?: string): Promise<void> {
   if (isRelaunching) return;
   isRelaunching = true;
   await waitForUpdateCompletion();
   await runExitCleanup();
+
+  if (process.send && sessionId) {
+    await new Promise<void>((resolve) => {
+      process.send!(
+        {
+          type: 'relaunch-session',
+          sessionId,
+        },
+        () => resolve(),
+      );
+    });
+  }
+
   process.exit(RELAUNCH_EXIT_CODE);
 }

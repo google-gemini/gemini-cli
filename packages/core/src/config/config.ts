@@ -659,7 +659,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly targetDir: string;
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
-  private readonly question: string | undefined;
+  private question: string | undefined;
   readonly enableConseca: boolean;
 
   private readonly coreTools: string[] | undefined;
@@ -1715,6 +1715,10 @@ export class Config implements McpContext, AgentLoopContext {
   }
   getQuestion(): string | undefined {
     return this.question;
+  }
+
+  clearQuestion(): void {
+    this.question = undefined;
   }
 
   getHasAccessToPreviewModel(): boolean {

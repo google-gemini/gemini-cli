@@ -85,6 +85,7 @@ describe('AuthDialog', () => {
     props = {
       config: {
         isBrowserLaunchSuppressed: vi.fn().mockReturnValue(false),
+        getSessionId: vi.fn().mockReturnValue('test-session-id'),
       } as unknown as Config,
       settings: {
         merged: {
@@ -357,6 +358,13 @@ describe('AuthDialog', () => {
         .spyOn(process, 'exit')
         .mockImplementation(() => undefined as never);
       const logSpy = vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
+      const originalSend = process.send;
+      process.send = vi.fn(
+        (_msg: unknown, callback?: (err: Error | null) => void) => {
+          if (callback) callback(null);
+          return true;
+        },
+      );
       vi.mocked(props.config.isBrowserLaunchSuppressed).mockReturnValue(true);
       mockedValidateAuthMethod.mockReturnValue(null);
 
@@ -376,6 +384,7 @@ describe('AuthDialog', () => {
 
       exitSpy.mockRestore();
       logSpy.mockRestore();
+      process.send = originalSend;
       vi.useRealTimers();
       unmount();
     });

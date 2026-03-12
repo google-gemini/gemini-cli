@@ -41,6 +41,7 @@ export async function relaunchAppInChildProcess(
   }
 
   let latestAdminSettings = remoteAdminSettings;
+  let resumeSessionId: string | undefined = undefined;
 
   const runner = () => {
     // process.argv is [node, script, ...args]
@@ -55,7 +56,11 @@ export async function relaunchAppInChildProcess(
       ...additionalScriptArgs,
       ...scriptArgs,
     ];
-    const newEnv = { ...process.env, GEMINI_CLI_NO_RELAUNCH: 'true' };
+    const newEnv: Record<string, string | undefined> = {
+      ...process.env,
+      GEMINI_CLI_NO_RELAUNCH: 'true',
+      GEMINI_RESUME_SESSION_ID: resumeSessionId,
+    };
 
     // The parent process should not be reading from stdin while the child is running.
     process.stdin.pause();
@@ -69,11 +74,16 @@ export async function relaunchAppInChildProcess(
       child.send({ type: 'admin-settings', settings: latestAdminSettings });
     }
 
-    child.on('message', (msg: { type?: string; settings?: unknown }) => {
-      if (msg.type === 'admin-settings-update' && msg.settings) {
-        latestAdminSettings = msg.settings as AdminControlsSettings;
-      }
-    });
+    child.on(
+      'message',
+      (msg: { type?: string; settings?: unknown; sessionId?: string }) => {
+        if (msg.type === 'admin-settings-update' && msg.settings) {
+          latestAdminSettings = msg.settings as AdminControlsSettings;
+        } else if (msg.type === 'relaunch-session' && msg.sessionId) {
+          resumeSessionId = msg.sessionId;
+        }
+      },
+    );
 
     return new Promise<number>((resolve, reject) => {
       child.on('error', reject);

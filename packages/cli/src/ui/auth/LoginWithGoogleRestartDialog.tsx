@@ -35,7 +35,7 @@ export const LoginWithGoogleRestartDialog = ({
               });
             }
           }
-          await relaunchApp();
+          await relaunchApp(config.getSessionId());
         }, 100);
         return true;
       }

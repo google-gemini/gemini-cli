@@ -710,12 +710,19 @@ export async function main() {
       })),
     ];
 
-    // Handle --resume flag
+    // Handle session resume — either from explicit --resume flag or from
+    // auto-restart via GEMINI_RESUME_SESSION_ID env var.
+    const resumeArg = argv.resume ?? process.env['GEMINI_RESUME_SESSION_ID'];
+    const isAutoRestart =
+      !argv.resume && !!process.env['GEMINI_RESUME_SESSION_ID'];
+    // Clean up the env var so it doesn't leak to further restarts
+    delete process.env['GEMINI_RESUME_SESSION_ID'];
+
     let resumedSessionData: ResumedSessionData | undefined = undefined;
-    if (argv.resume) {
+    if (resumeArg) {
       const sessionSelector = new SessionSelector(config);
       try {
-        const result = await sessionSelector.resolveSession(argv.resume);
+        const result = await sessionSelector.resolveSession(resumeArg);
         resumedSessionData = {
           conversation: result.sessionData,
           filePath: result.sessionPath,
@@ -723,14 +730,18 @@ export async function main() {
         // Use the existing session ID to continue recording to the same session
         config.setSessionId(resumedSessionData.conversation.sessionId);
       } catch (error) {
-        if (
+        if (error instanceof SessionError && isAutoRestart) {
+          // Auto-restart tried to resume a session that doesn't exist on
+          // disk yet (e.g. empty session with no messages). Silently start
+          // a new session.
+        } else if (
           error instanceof SessionError &&
           error.code === 'NO_SESSIONS_FOUND'
         ) {
           // No sessions to resume — start a fresh session with a warning
           startupWarnings.push({
-            id: 'resume-no-sessions',
-            message: error.message,
+            id: 'resume-failure',
+            message: `${error.message} Started a new session.`,
             priority: WarningPriority.High,
           });
         } else {
@@ -742,6 +753,14 @@ export async function main() {
           process.exit(ExitCodes.FATAL_INPUT_ERROR);
         }
       }
+    }
+
+    // When this is an auto-restart (not explicit --resume), clear the
+    // original --prompt so it doesn't get submitted again — the resumed
+    // session already contains it.
+    if (isAutoRestart && resumedSessionData) {
+      config.clearQuestion();
+      input = undefined;
     }
 
     cliStartupHandle?.end();
@@ -799,7 +818,7 @@ export async function main() {
       await config.getHookSystem()?.fireSessionEndEvent(SessionEndReason.Exit);
     });
 
-    if (!input) {
+    if (!input && !resumedSessionData) {
       debugLogger.error(
         `No input provided via stdin. Input can be provided by piping data into gemini or using the --prompt option.`,
       );
@@ -808,15 +827,17 @@ export async function main() {
     }
 
     const prompt_id = Math.random().toString(16).slice(2);
-    logUserPrompt(
-      config,
-      new UserPromptEvent(
-        input.length,
-        prompt_id,
-        config.getContentGeneratorConfig()?.authType,
-        input,
-      ),
-    );
+    if (input) {
+      logUserPrompt(
+        config,
+        new UserPromptEvent(
+          input.length,
+          prompt_id,
+          config.getContentGeneratorConfig()?.authType,
+          input,
+        ),
+      );
+    }
 
     const authType = await validateNonInteractiveAuth(
       settings.merged.security.auth.selectedType,

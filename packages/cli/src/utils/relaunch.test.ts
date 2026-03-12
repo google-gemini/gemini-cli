@@ -314,6 +314,51 @@ describe('relaunchAppInChildProcess', () => {
       // Should default to exit code 1
       expect(processExitSpy).toHaveBeenCalledWith(1);
     });
+
+    it('should set GEMINI_RESUME_SESSION_ID env var on the next spawn if relaunch-session message is received', async () => {
+      process.argv = ['/usr/bin/node', '/app/cli.js', '--some-flag'];
+
+      let spawnCount = 0;
+      mockedSpawn.mockImplementation(() => {
+        spawnCount++;
+        const mockChild = createMockChildProcess(0, false);
+
+        if (spawnCount === 1) {
+          // First run: send the resume session ID, then exit with RELAUNCH_EXIT_CODE
+          setImmediate(() => {
+            mockChild.emit('message', {
+              type: 'relaunch-session',
+              sessionId: 'test-session-123',
+            });
+            mockChild.emit('close', RELAUNCH_EXIT_CODE);
+          });
+        } else if (spawnCount === 2) {
+          // Second run: exit normally
+          setImmediate(() => {
+            mockChild.emit('close', 0);
+          });
+        }
+
+        return mockChild;
+      });
+
+      const promise = relaunchAppInChildProcess([], []);
+      await expect(promise).rejects.toThrow('PROCESS_EXIT_CALLED');
+
+      expect(mockedSpawn).toHaveBeenCalledTimes(2);
+
+      // First spawn should not have the env var set
+      const firstEnv = mockedSpawn.mock.calls[0][2]?.env;
+      expect(firstEnv?.['GEMINI_RESUME_SESSION_ID']).toBeUndefined();
+
+      // Second spawn should have GEMINI_RESUME_SESSION_ID set
+      const secondEnv = mockedSpawn.mock.calls[1][2]?.env;
+      expect(secondEnv?.['GEMINI_RESUME_SESSION_ID']).toBe('test-session-123');
+
+      // Args should not contain --resume
+      const secondArgs = mockedSpawn.mock.calls[1][1];
+      expect(secondArgs).not.toContain('--resume');
+    });
   });
 });
 
