@@ -5,21 +5,30 @@
  */
 
 import { describe, expect } from 'vitest';
-import { appEvalTest } from './app-test-helper.js';
+import { appEvalTest, AppEvalCase } from './app-test-helper.js';
+import { EvalPolicy } from './test-helper.js';
 
-describe('ask_user', () => {
-  appEvalTest('USUALLY_PASSES', {
-    name: 'Agent uses AskUser tool to present multiple choice options',
+function askUserEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
+  return appEvalTest(policy, {
+    ...evalCase,
     configOverrides: {
       general: {
         approvalMode: 'default',
         enableAutoUpdate: false,
         enableAutoUpdateNotification: false,
       },
+      ...evalCase.configOverrides,
     },
     files: {
       '.gemini/state.json': JSON.stringify({ terminalSetupPromptShown: true }),
+      ...evalCase.files,
     },
+  });
+}
+
+describe('ask_user', () => {
+  askUserEvalTest('USUALLY_PASSES', {
+    name: 'Agent uses AskUser tool to present multiple choice options',
     prompt: `Use the ask_user tool to ask me what my favorite color is. Provide 3 options: red, green, or blue.`,
     setup: async (rig) => {
       rig.setBreakpoint(['ask_user']);
@@ -36,17 +45,9 @@ describe('ask_user', () => {
     },
   });
 
-  appEvalTest('USUALLY_PASSES', {
+  askUserEvalTest('USUALLY_PASSES', {
     name: 'Agent uses AskUser tool to clarify ambiguous requirements',
-    configOverrides: {
-      general: {
-        approvalMode: 'default',
-        enableAutoUpdate: false,
-        enableAutoUpdateNotification: false,
-      },
-    },
     files: {
-      '.gemini/state.json': JSON.stringify({ terminalSetupPromptShown: true }),
       'package.json': JSON.stringify({ name: 'my-app', version: '1.0.0' }),
     },
     prompt: `I want to build a new feature in this app. Ask me questions to clarify the requirements before proceeding.`,
@@ -65,17 +66,9 @@ describe('ask_user', () => {
     },
   });
 
-  appEvalTest('USUALLY_PASSES', {
+  askUserEvalTest('USUALLY_PASSES', {
     name: 'Agent uses AskUser tool before performing significant ambiguous rework',
-    configOverrides: {
-      general: {
-        approvalMode: 'default',
-        enableAutoUpdate: false,
-        enableAutoUpdateNotification: false,
-      },
-    },
     files: {
-      '.gemini/state.json': JSON.stringify({ terminalSetupPromptShown: true }),
       'packages/core/src/index.ts': '// index\nexport const version = "1.0.0";',
       'packages/core/src/util.ts': '// util\nexport function help() {}',
       'packages/core/package.json': JSON.stringify({
@@ -113,17 +106,9 @@ describe('ask_user', () => {
   // confirm shell commands. Fixed via prompt refinements and tool definition
   // updates to clarify that shell command confirmation is handled by the UI.
   // See fix: https://github.com/google-gemini/gemini-cli/pull/20504
-  appEvalTest('USUALLY_PASSES', {
+  askUserEvalTest('USUALLY_PASSES', {
     name: 'Agent does NOT use AskUser to confirm shell commands',
-    configOverrides: {
-      general: {
-        approvalMode: 'default',
-        enableAutoUpdate: false,
-        enableAutoUpdateNotification: false,
-      },
-    },
     files: {
-      '.gemini/state.json': JSON.stringify({ terminalSetupPromptShown: true }),
       'package.json': JSON.stringify({
         scripts: { build: 'echo building' },
       }),
