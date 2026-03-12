@@ -33,6 +33,7 @@ import {
   type PartListUnion,
   type Tool,
   type CallableTool,
+  type FunctionDeclaration,
 } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
@@ -559,6 +560,34 @@ describe('LocalAgentExecutor', () => {
       expect(agentRegistry2.getTool(qualifiedName)).toBeDefined();
 
       getToolSpy.mockRestore();
+    });
+
+    it('should not duplicate schemas when instantiated tools are provided in toolConfig', async () => {
+      // Create an instantiated mock tool
+      const instantiatedTool = new MockTool({ name: 'instantiated_tool' });
+
+      // Create an agent definition containing the instantiated tool
+      const definition = createTestDefinition([instantiatedTool]);
+
+      // Create the executor
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Extract the prepared tools list using the private method
+      const toolsList = (
+        executor as unknown as { prepareToolsList: () => FunctionDeclaration[] }
+      ).prepareToolsList();
+
+      // Filter for the specific tool schema
+      const foundSchemas = (
+        toolsList as unknown as FunctionDeclaration[]
+      ).filter((t: FunctionDeclaration) => t.name === 'instantiated_tool');
+
+      // Assert that there is exactly ONE schema for this tool
+      expect(foundSchemas).toHaveLength(1);
     });
   });
 

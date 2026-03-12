@@ -1209,17 +1209,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     if (toolConfig) {
       for (const toolRef of toolConfig.tools) {
-        if (typeof toolRef === 'string') {
-          // The names were already expanded and loaded into the registry during creation.
-        } else if (typeof toolRef === 'object' && 'schema' in toolRef) {
-          // Tool instance with an explicit schema property.
-          toolsList.push(toolRef.schema);
-        } else {
+        if (typeof toolRef === 'object' && !('schema' in toolRef)) {
           // Raw `FunctionDeclaration` object.
           toolsList.push(toolRef);
         }
       }
-      // Add schemas from tools that were explicitly registered by name or wildcard.
+      // Add schemas from tools that were explicitly registered by name, wildcard, or instance.
       toolsList.push(...this.toolRegistry.getFunctionDeclarations());
     }
 
