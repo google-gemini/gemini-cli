@@ -162,14 +162,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         return;
       }
 
-      if (tool instanceof DiscoveredMCPTool) {
-        // Subagents MUST use fully qualified names for MCP tools to ensure
-        // unambiguous tool calls and to comply with policy requirements.
-        // We automatically "upgrade" any MCP tool to its qualified version.
-        agentToolRegistry.registerTool(tool.asFullyQualifiedTool());
-      } else {
-        agentToolRegistry.registerTool(tool);
-      }
+      agentToolRegistry.registerTool(tool);
     };
 
     const registerToolByName = (toolName: string) => {

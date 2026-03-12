@@ -391,25 +391,6 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       `${this.serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${this.serverToolName}`,
     );
   }
-
-  asFullyQualifiedTool(): DiscoveredMCPTool {
-    return new DiscoveredMCPTool(
-      this.mcpTool,
-      this.serverName,
-      this.serverToolName,
-      this.description,
-      this.parameterSchema,
-      this.messageBus,
-      this.trust,
-      this.isReadOnly,
-      this.getFullyQualifiedName(),
-      this.cliConfig,
-      this.extensionName,
-      this.extensionId,
-      this._toolAnnotations,
-    );
-  }
-
   protected createInvocation(
     params: ToolParams,
     messageBus: MessageBus,

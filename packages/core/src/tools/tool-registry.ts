@@ -222,14 +222,10 @@ export class ToolRegistry {
    */
   registerTool(tool: AnyDeclarativeTool): void {
     if (this.allKnownTools.has(tool.name)) {
-      if (tool instanceof DiscoveredMCPTool) {
-        tool = tool.asFullyQualifiedTool();
-      } else {
-        // Decide on behavior: throw error, log warning, or allow overwrite
-        debugLogger.warn(
-          `Tool with name "${tool.name}" is already registered. Overwriting.`,
-        );
-      }
+      // Decide on behavior: throw error, log warning, or allow overwrite
+      debugLogger.warn(
+        `Tool with name "${tool.name}" is already registered. Overwriting.`,
+      );
     }
     this.allKnownTools.set(tool.name, tool);
   }
