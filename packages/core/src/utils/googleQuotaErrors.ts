@@ -4,14 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ErrorInfo,
-  GoogleApiError,
-  Help,
-  QuotaFailure,
-  RetryInfo,
+import {
+  parseGoogleApiError,
+  type ErrorInfo,
+  type GoogleApiError,
+  type Help,
+  type QuotaFailure,
+  type RetryInfo,
 } from './googleErrors.js';
-import { parseGoogleApiError } from './googleErrors.js';
 import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 
 /**
@@ -19,17 +19,24 @@ import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
  */
 export class TerminalQuotaError extends Error {
   retryDelayMs?: number;
+  reason?: string;
 
   constructor(
     message: string,
     override readonly cause: GoogleApiError,
     retryDelaySeconds?: number,
+    reason?: string,
   ) {
     super(message);
     this.name = 'TerminalQuotaError';
     this.retryDelayMs = retryDelaySeconds
       ? retryDelaySeconds * 1000
       : undefined;
+    this.reason = reason;
+  }
+
+  get isInsufficientCredits(): boolean {
+    return this.reason === 'INSUFFICIENT_G1_CREDITS_BALANCE';
   }
 }
 
@@ -94,6 +101,13 @@ function parseDurationInSeconds(duration: string): number | null {
 }
 
 /**
+ * Maximum retry delay (in seconds) before a retryable error is treated as terminal.
+ * If the server suggests waiting longer than this, the user is effectively locked out,
+ * so we trigger the fallback/credits flow instead of silently waiting.
+ */
+const MAX_RETRYABLE_DELAY_SECONDS = 300; // 5 minutes
+
+/**
  * Valid Cloud Code API domains for VALIDATION_REQUIRED errors.
  */
 const CLOUDCODE_DOMAINS = [
@@ -101,6 +115,16 @@ const CLOUDCODE_DOMAINS = [
   'staging-cloudcode-pa.googleapis.com',
   'autopush-cloudcode-pa.googleapis.com',
 ];
+
+/**
+ * Checks if the given domain belongs to a Cloud Code API endpoint.
+ * Sanitizes stray characters that SSE stream parsing can inject into the
+ * domain string before comparing.
+ */
+function isCloudCodeDomain(domain: string): boolean {
+  const sanitized = domain.replace(/[^a-zA-Z0-9.-]/g, '');
+  return CLOUDCODE_DOMAINS.includes(sanitized);
+}
 
 /**
  * Checks if a 403 error requires user validation and extracts validation details.
@@ -121,7 +145,8 @@ function classifyValidationRequiredError(
   }
 
   if (
-    !CLOUDCODE_DOMAINS.includes(errorInfo.domain) ||
+    !errorInfo.domain ||
+    !isCloudCodeDomain(errorInfo.domain) ||
     errorInfo.reason !== 'VALIDATION_REQUIRED'
   ) {
     return null;
@@ -230,15 +255,15 @@ export function classifyGoogleError(error: unknown): unknown {
     if (match?.[1]) {
       const retryDelaySeconds = parseDurationInSeconds(match[1]);
       if (retryDelaySeconds !== null) {
-        return new RetryableQuotaError(
-          errorMessage,
-          googleApiError ?? {
-            code: status ?? 429,
-            message: errorMessage,
-            details: [],
-          },
-          retryDelaySeconds,
-        );
+        const cause = googleApiError ?? {
+          code: status ?? 429,
+          message: errorMessage,
+          details: [],
+        };
+        if (retryDelaySeconds > MAX_RETRYABLE_DELAY_SECONDS) {
+          return new TerminalQuotaError(errorMessage, cause, retryDelaySeconds);
+        }
+        return new RetryableQuotaError(errorMessage, cause, retryDelaySeconds);
       }
     } else if (status === 429 || status === 499) {
       // Fallback: If it is a 429 or 499 but doesn't have a specific "retry in" message,
@@ -293,19 +318,33 @@ export function classifyGoogleError(error: unknown): unknown {
   }
 
   if (errorInfo) {
+    // INSUFFICIENT_G1_CREDITS_BALANCE is always terminal, regardless of domain
+    if (errorInfo.reason === 'INSUFFICIENT_G1_CREDITS_BALANCE') {
+      return new TerminalQuotaError(
+        `${googleApiError.message}`,
+        googleApiError,
+        delaySeconds,
+        errorInfo.reason,
+      );
+    }
+
     // New Cloud Code API quota handling
     if (errorInfo.domain) {
-      const validDomains = [
-        'cloudcode-pa.googleapis.com',
-        'staging-cloudcode-pa.googleapis.com',
-        'autopush-cloudcode-pa.googleapis.com',
-      ];
-      if (validDomains.includes(errorInfo.domain)) {
+      if (isCloudCodeDomain(errorInfo.domain)) {
         if (errorInfo.reason === 'RATE_LIMIT_EXCEEDED') {
+          const effectiveDelay = delaySeconds ?? 10;
+          if (effectiveDelay > MAX_RETRYABLE_DELAY_SECONDS) {
+            return new TerminalQuotaError(
+              `${googleApiError.message}`,
+              googleApiError,
+              effectiveDelay,
+              errorInfo.reason,
+            );
+          }
           return new RetryableQuotaError(
             `${googleApiError.message}`,
             googleApiError,
-            delaySeconds ?? 10,
+            effectiveDelay,
           );
         }
         if (errorInfo.reason === 'QUOTA_EXHAUSTED') {
@@ -313,6 +352,7 @@ export function classifyGoogleError(error: unknown): unknown {
             `${googleApiError.message}`,
             googleApiError,
             delaySeconds,
+            errorInfo.reason,
           );
         }
       }
@@ -321,6 +361,13 @@ export function classifyGoogleError(error: unknown): unknown {
 
   // 2. Check for delays in RetryInfo
   if (retryInfo?.retryDelay && delaySeconds) {
+    if (delaySeconds > MAX_RETRYABLE_DELAY_SECONDS) {
+      return new TerminalQuotaError(
+        `${googleApiError.message}\nSuggested retry after ${retryInfo.retryDelay}.`,
+        googleApiError,
+        delaySeconds,
+      );
+    }
     return new RetryableQuotaError(
       `${googleApiError.message}\nSuggested retry after ${retryInfo.retryDelay}.`,
       googleApiError,

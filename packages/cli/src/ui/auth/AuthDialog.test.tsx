@@ -209,7 +209,7 @@ describe('AuthDialog', () => {
       {
         setup: () => {},
         expected: AuthType.LOGIN_WITH_GOOGLE,
-        desc: 'defaults to Login with Google',
+        desc: 'defaults to Sign in with Google',
       },
     ])('selects initial auth type $desc', async ({ setup, expected }) => {
       setup();
@@ -351,7 +351,7 @@ describe('AuthDialog', () => {
       unmount();
     });
 
-    it('restarts for Login with Google when browser is suppressed', async () => {
+    it('restarts for Sign in with Google when browser is suppressed', async () => {
       vi.useFakeTimers();
       const logSpy = vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
       vi.mocked(props.config.isBrowserLaunchSuppressed).mockReturnValue(true);

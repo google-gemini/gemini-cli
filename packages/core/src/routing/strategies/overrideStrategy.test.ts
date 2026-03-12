@@ -10,18 +10,25 @@ import type { RoutingContext } from '../routingStrategy.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { Config } from '../../config/config.js';
 import { DEFAULT_GEMINI_MODEL_AUTO } from '../../config/models.js';
+import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 
 describe('OverrideStrategy', () => {
   const strategy = new OverrideStrategy();
   const mockContext = {} as RoutingContext;
   const mockClient = {} as BaseLlmClient;
+  const mockLocalLiteRtLmClient = {} as LocalLiteRtLmClient;
 
   it('should return null when the override model is auto', async () => {
     const mockConfig = {
       getModel: () => DEFAULT_GEMINI_MODEL_AUTO,
     } as Config;
 
-    const decision = await strategy.route(mockContext, mockConfig, mockClient);
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockClient,
+      mockLocalLiteRtLmClient,
+    );
     expect(decision).toBeNull();
   });
 
@@ -31,7 +38,12 @@ describe('OverrideStrategy', () => {
       getModel: () => overrideModel,
     } as Config;
 
-    const decision = await strategy.route(mockContext, mockConfig, mockClient);
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockClient,
+      mockLocalLiteRtLmClient,
+    );
 
     expect(decision).not.toBeNull();
     expect(decision?.model).toBe(overrideModel);
@@ -48,7 +60,12 @@ describe('OverrideStrategy', () => {
       getModel: () => overrideModel,
     } as Config;
 
-    const decision = await strategy.route(mockContext, mockConfig, mockClient);
+    const decision = await strategy.route(
+      mockContext,
+      mockConfig,
+      mockClient,
+      mockLocalLiteRtLmClient,
+    );
 
     expect(decision).not.toBeNull();
     expect(decision?.model).toBe(overrideModel);
@@ -68,6 +85,7 @@ describe('OverrideStrategy', () => {
       contextWithRequestedModel,
       mockConfig,
       mockClient,
+      mockLocalLiteRtLmClient,
     );
 
     expect(decision).not.toBeNull();

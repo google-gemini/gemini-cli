@@ -240,6 +240,37 @@ describe('ToolConfirmationMessage', () => {
     unmount();
   });
 
+  it('should render multiline shell scripts with correct newlines and syntax highlighting (SVG snapshot)', async () => {
+    const confirmationDetails: SerializableConfirmationDetails = {
+      type: 'exec',
+      title: 'Confirm Multiline Script',
+      command: 'echo "hello"\nfor i in 1 2 3; do\n  echo $i\ndone',
+      rootCommand: 'echo',
+      rootCommands: ['echo'],
+    };
+
+    const result = renderWithProviders(
+      <ToolConfirmationMessage
+        callId="test-call-id"
+        confirmationDetails={confirmationDetails}
+        config={mockConfig}
+        getPreferredEditor={vi.fn()}
+        availableTerminalHeight={30}
+        terminalWidth={80}
+      />,
+    );
+    await result.waitUntilReady();
+
+    const output = result.lastFrame();
+    expect(output).toContain('echo "hello"');
+    expect(output).toContain('for i in 1 2 3; do');
+    expect(output).toContain('echo $i');
+    expect(output).toContain('done');
+
+    await expect(result).toMatchSvgSnapshot();
+    result.unmount();
+  });
+
   describe('with folder trust', () => {
     const editConfirmationDetails: SerializableConfirmationDetails = {
       type: 'edit',
@@ -380,7 +411,7 @@ describe('ToolConfirmationMessage', () => {
       unmount();
     });
 
-    it('should show "Allow for all future sessions" when setting is true', async () => {
+    it('should show "Allow for all future sessions" when trusted', async () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
@@ -403,7 +434,10 @@ describe('ToolConfirmationMessage', () => {
       );
       await waitUntilReady();
 
-      expect(lastFrame()).toContain('Allow for all future sessions');
+      const output = lastFrame();
+      expect(output).toContain('future sessions');
+      // Verify it is the default selection (matching the indicator in the snapshot)
+      expect(output).toMatchSnapshot();
       unmount();
     });
   });

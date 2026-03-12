@@ -134,21 +134,21 @@ describe('classifyGoogleError', () => {
     expect((result as TerminalQuotaError).cause).toBe(apiError);
   });
 
-  it('should return RetryableQuotaError for long retry delays', () => {
+  it('should return TerminalQuotaError for retry delays over 5 minutes', () => {
     const apiError: GoogleApiError = {
       code: 429,
       message: 'Too many requests',
       details: [
         {
           '@type': 'type.googleapis.com/google.rpc.RetryInfo',
-          retryDelay: '301s', // Any delay is now retryable
+          retryDelay: '301s', // Over 5 min threshold => terminal
         },
       ],
     };
     vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
     const result = classifyGoogleError(new Error());
-    expect(result).toBeInstanceOf(RetryableQuotaError);
-    expect((result as RetryableQuotaError).retryDelayMs).toBe(301000);
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+    expect((result as TerminalQuotaError).retryDelayMs).toBe(301000);
   });
 
   it('should return RetryableQuotaError for short retry delays', () => {
@@ -285,6 +285,34 @@ describe('classifyGoogleError', () => {
     );
   });
 
+  it('should return TerminalQuotaError for Cloud Code RATE_LIMIT_EXCEEDED with retry delay over 5 minutes', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message:
+        'You have exhausted your capacity on this model. Your quota will reset after 10m.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'RATE_LIMIT_EXCEEDED',
+          domain: 'cloudcode-pa.googleapis.com',
+          metadata: {
+            uiMessage: 'true',
+            model: 'gemini-2.5-pro',
+          },
+        },
+        {
+          '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+          retryDelay: '600s',
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+    expect((result as TerminalQuotaError).retryDelayMs).toBe(600000);
+    expect((result as TerminalQuotaError).reason).toBe('RATE_LIMIT_EXCEEDED');
+  });
+
   it('should return TerminalQuotaError for Cloud Code QUOTA_EXHAUSTED', () => {
     const apiError: GoogleApiError = {
       code: 429,
@@ -311,6 +339,26 @@ describe('classifyGoogleError', () => {
     vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
     const result = classifyGoogleError(new Error());
     expect(result).toBeInstanceOf(TerminalQuotaError);
+  });
+
+  it('should return TerminalQuotaError for INSUFFICIENT_G1_CREDITS_BALANCE without domain', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message: 'Resource has been exhausted (e.g. check quota).',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'INSUFFICIENT_G1_CREDITS_BALANCE',
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+    expect((result as TerminalQuotaError).isInsufficientCredits).toBe(true);
+    expect((result as TerminalQuotaError).reason).toBe(
+      'INSUFFICIENT_G1_CREDITS_BALANCE',
+    );
   });
 
   it('should prioritize daily limit over retry info', () => {
@@ -405,6 +453,40 @@ describe('classifyGoogleError', () => {
         details: [],
       });
     }
+  });
+
+  it('should return TerminalQuotaError when fallback "Please retry in" delay exceeds 5 minutes', () => {
+    const errorWithEmptyDetails = {
+      error: {
+        code: 429,
+        message: 'Resource exhausted. Please retry in 400s',
+        details: [],
+      },
+    };
+
+    const result = classifyGoogleError(errorWithEmptyDetails);
+
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+    if (result instanceof TerminalQuotaError) {
+      expect(result.retryDelayMs).toBe(400000);
+    }
+  });
+
+  it('should return RetryableQuotaError when retry delay is exactly 5 minutes', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      message: 'Too many requests',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+          retryDelay: '300s',
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(RetryableQuotaError);
+    expect((result as RetryableQuotaError).retryDelayMs).toBe(300000);
   });
 
   it('should return RetryableQuotaError without delay time for generic 429 without specific message', () => {
@@ -648,5 +730,54 @@ describe('classifyGoogleError', () => {
     const result = classifyGoogleError(originalError);
     expect(result).toBe(originalError);
     expect(result).not.toBeInstanceOf(ValidationRequiredError);
+  });
+
+  it('should return TerminalQuotaError for Cloud Code QUOTA_EXHAUSTED with SSE-corrupted domain', () => {
+    // SSE serialization can inject a trailing comma into the domain string.
+    // This test verifies that the domain sanitization handles this case.
+    const apiError: GoogleApiError = {
+      code: 429,
+      message:
+        'You have exhausted your capacity on this model. Your quota will reset after 19h14m47s.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'QUOTA_EXHAUSTED',
+          domain: 'cloudcode-pa.googleapis.com,',
+          metadata: {
+            uiMessage: 'true',
+            model: 'gemini-3-flash-preview',
+          },
+        },
+        {
+          '@type': 'type.googleapis.com/google.rpc.RetryInfo',
+          retryDelay: '68940s',
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+  });
+
+  it('should return ValidationRequiredError with SSE-corrupted domain', () => {
+    const apiError: GoogleApiError = {
+      code: 403,
+      message: 'Forbidden.',
+      details: [
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason: 'VALIDATION_REQUIRED',
+          domain: 'cloudcode-pa.googleapis.com,',
+          metadata: {
+            validationUrl: 'https://example.com/validate',
+            validationDescription: 'Please validate',
+          },
+        },
+      ],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const result = classifyGoogleError(new Error());
+    expect(result).toBeInstanceOf(ValidationRequiredError);
   });
 });

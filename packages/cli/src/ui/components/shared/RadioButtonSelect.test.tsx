@@ -6,9 +6,8 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders } from '../../../test-utils/render.js';
-import type { Text } from 'ink';
-import { Box } from 'ink';
 import type React from 'react';
+import { Box, type Text } from 'ink';
 import {
   RadioButtonSelect,
   type RadioSelectItem,
@@ -27,6 +26,8 @@ vi.mock('./BaseSelectionList.js', () => ({
 vi.mock('../../semantic-colors.js', () => ({
   theme: {
     text: { secondary: 'COLOR_SECONDARY' },
+    ui: { focus: 'COLOR_FOCUS' },
+    background: { focus: 'COLOR_FOCUS_BG' },
   },
 }));
 

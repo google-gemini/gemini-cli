@@ -22,6 +22,7 @@ on:
 
 jobs:
   generate-release-notes:
+    if: "github.repository == 'google-gemini/gemini-cli'"
     runs-on: 'ubuntu-latest'
     permissions:
       contents: 'write'
@@ -94,6 +95,8 @@ jobs:
             This PR contains the auto-generated changelog for the ${{ steps.release_info.outputs.VERSION }} release.
 
             Please review and merge.
+
+            Related to #18505
           branch: 'changelog-${{ steps.release_info.outputs.VERSION }}'
           base: 'main'
           team-reviewers: 'gemini-cli-docs, gemini-cli-maintainers'
