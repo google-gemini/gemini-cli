@@ -337,7 +337,8 @@ export class Task {
     } else if (isSubagentProgress(outputChunk)) {
       outputAsText = JSON.stringify(outputChunk);
     } else if (Array.isArray(outputChunk)) {
-      const ansiOutput: AnsiOutput = outputChunk;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const ansiOutput = outputChunk as AnsiOutput;
       outputAsText = ansiOutput
         .map((line: AnsiLine) =>
           line.map((token: AnsiToken) => token.text).join(''),
