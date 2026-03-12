@@ -87,7 +87,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
       if (text.length > MAXIMUM_RESULT_DISPLAY_CHARACTERS) {
         text = '...' + text.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
       }
-      if (maxLines) {
+      if (maxLines !== undefined) {
         const hasTrailingNewline = text.endsWith('\n');
         const contentText = hasTrailingNewline ? text.slice(0, -1) : text;
         const lines = contentText.split('\n');
@@ -103,7 +103,11 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
       return { truncatedResultDisplay: text, hiddenLinesCount: hiddenLines };
     }
 
-    if (Array.isArray(resultDisplay) && !isAlternateBuffer && maxLines) {
+    if (
+      Array.isArray(resultDisplay) &&
+      !isAlternateBuffer &&
+      maxLines !== undefined
+    ) {
       if (resultDisplay.length > maxLines) {
         // We will have a label from MaxSizedBox. Reserve space for it.
         const targetLines = Math.max(1, maxLines - 1);
