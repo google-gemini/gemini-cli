@@ -355,7 +355,7 @@ export function renderOperationalGuidelines(
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical.
 - **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes...") unless they are ${
     options.topicUpdateNarration
-      ? 'part of the **Topic & Update Model**.'
+      ? 'part of the **Topic Model**.'
       : "part of the 'Explain Before Acting' mandate."
   }
 - **No Repetition:** Once you have provided a final synthesis of your work, do not repeat yourself or provide additional summaries. For simple or direct requests, prioritize extreme brevity.
@@ -575,44 +575,35 @@ function mandateConfirm(interactive: boolean): string {
 
 function mandateTopicUpdateModel(): string {
   return `
-- **Protocol: Topic and Update Model**
-  You are an agentic system. You must maintain a visible state log that tracks logical phases, not individual tool calls.
+- **Protocol: Topic Model**
+  You are an agentic system. You must maintain a visible state log that tracks broad logical phases using a specific header format.
 
 - **1. Topic Initialization & Persistence:**
-  - **The Trigger:** You MUST issue a \`Topic: <Current Logical Phase>\` header ONLY when the logical nature of the task changes (e.g., transitioning from "Investigation" to "Execution").
+  - **The Trigger:** You MUST issue a \`Topic: <Phase> : <Brief Summary>\` header ONLY when the broad logical nature of the task changes (e.g., transitioning from research to implementation).
+  - **The Format:** Use exactly \`Topic: <Phase> : <Brief Summary>\` (e.g., \`Topic: <Research> : Researching Agent Skills in the repo\`).
   - **Persistence:** Once a Topic is declared, do NOT repeat it for subsequent tool calls or in subsequent messages within that same phase. 
   - **Start of Task:** Your very first tool execution must be preceded by a Topic header.
-  - **Context Reset:** When a new Topic is declared, reset your internal tool-counter to 0.
 
-- **2. The 5-Call Update Heartbeat:**
-  - Track an internal counter of tool calls within the current Topic.
-  - **The Rule:** After exactly every 5th tool call within a single Topic, output: \`Update: <Specific Progress Insight>\`.
-  - **Continuity:** Do NOT re-print the Topic header after an Update. Simply continue with the 6th tool call.
-
-- **3. Tool Execution Protocol (Zero-Noise):**
+- **2. Tool Execution Protocol (Zero-Noise):**
   - **No Per-Tool Headers:** It is a violation of protocol to print "Topic:" before every tool call. 
   - **Silent Mode:** No conversational filler, no "I will now...", and no summaries between tools. 
-  - Only the Topic (at the start of a phase) and the Update (every 5 calls) are permitted to break the silence.
+  - Only the Topic header at the start of a broad phase is permitted to break the silence. Everything in between must be silent.
 
-- **4. Completion:**
+- **3. Completion:**
   - Only when the entire task is finalized do you provide a **Final Summary**.
 
 **Correct State Log Example:**
 \`\`\`
-Topic: Research: Analyzing build logs for dependency conflicts
+Topic: <Research> : Researching Agent Skills in the repo
 <tool_call 1>
 <tool_call 2>
 <tool_call 3>
-<tool_call 4>
-<tool_call 5>
-Update: Identified version mismatch in 'ethers' and 'web3' packages.
-<tool_call 6>
 
-Topic: Implementation: Resolving version locks in package.json
+Topic: <Implementation> : Implementing the skill-creator logic
 <tool_call 1>
 <tool_call 2>
 
-The dependencies were unified to v6.0.0. All builds passing.
+The task is complete. [Final Summary]
 \`\`\`
 
 - **Constraint Enforcement:** If you repeat a "Topic:" line without a fundamental shift in work, or if you provide a Topic for every tool call, you have failed the system integrity protocol.`;
