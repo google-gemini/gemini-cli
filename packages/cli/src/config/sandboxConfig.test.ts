@@ -61,6 +61,7 @@ describe('loadSandboxConfig', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     process.env = originalEnv;
   });
 
@@ -83,6 +84,15 @@ describe('loadSandboxConfig', () => {
     process.env['SANDBOX'] = '1';
     const config = await loadSandboxConfig({}, { sandbox: true });
     expect(config).toBeUndefined();
+  });
+
+  it("should not treat SANDBOX='0' as already inside sandbox", async () => {
+    vi.stubEnv('SANDBOX', '0');
+    vi.stubEnv('GEMINI_SANDBOX', 'docker');
+    mockedCommandExistsSync.mockImplementation((cmd) => cmd === 'docker');
+
+    const config = await loadSandboxConfig({}, {});
+    expect(config).toEqual({ command: 'docker', image: 'default/image' });
   });
 
   describe('with GEMINI_SANDBOX environment variable', () => {
