@@ -50,13 +50,62 @@ for your system.
 2. Ensure the binary is executable: `chmod a+x lit.macos_arm64`
 3. (Optional) Test starting the runtime: `./lit.macos_arm64 serve --verbose`
 
+> **Note**: MacOS can be configured to only allows binaries from "App Store &
+> Known Developers". If you encounter an error message when attempting to run
+> the binary, you will need to allow the application. One option is to visit
+> `System Settings -> Privacy & Security`, scroll to `Security`, and click
+> `"Allow Anyway"` for `"lit.macos_arm64"`. Another option is to run
+> `xattr -d com.apple.quarantine lit.macos_arm64` from the commandline.
+
 ### Download the Gemma Model
 
 Before using Gemma, you will need to download the model (and agree to the Terms
-of Service). This can be done via the LiteRT-LM runtime via:
+of Service).
+
+This can be done via the LiteRT-LM runtime.
+
+#### Windows
+
+```bash
+$ .\lit.windows_x86_64.exe pull gemma3-1b-gpu-custom
+
+[Legal] The model you are about to download is governed by
+the Gemma Terms of Use and Prohibited Use Policy. Please review these terms and ensure you agree before continuing.
+
+Full Terms: https://ai.google.dev/gemma/terms
+Prohibited Use Policy: https://ai.google.dev/gemma/prohibited_use_policy
+
+Do you accept these terms? (Y/N): Y
+
+Terms accepted.
+Downloading model 'gemma3-1b-gpu-custom' ...
+Downloading... 968.6 MB
+Download complete.
+```
+
+#### Linux
 
 ```bash
 $ ./lit.linux_x86_64 pull gemma3-1b-gpu-custom
+
+[Legal] The model you are about to download is governed by
+the Gemma Terms of Use and Prohibited Use Policy. Please review these terms and ensure you agree before continuing.
+
+Full Terms: https://ai.google.dev/gemma/terms
+Prohibited Use Policy: https://ai.google.dev/gemma/prohibited_use_policy
+
+Do you accept these terms? (Y/N): Y
+
+Terms accepted.
+Downloading model 'gemma3-1b-gpu-custom' ...
+Downloading... 968.6 MB
+Download complete.
+```
+
+#### MacOS
+
+```bash
+$ ./lit.lit.macos_arm64 pull gemma3-1b-gpu-custom
 
 [Legal] The model you are about to download is governed by
 the Gemma Terms of Use and Prohibited Use Policy. Please review these terms and ensure you agree before continuing.
