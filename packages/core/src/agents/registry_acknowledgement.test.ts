@@ -12,6 +12,7 @@ import { coreEvents } from '../utils/events.js';
 import * as tomlLoader from './agentLoader.js';
 import { type Config } from '../config/config.js';
 import { AcknowledgedAgentsService } from './acknowledgedAgents.js';
+import { PolicyDecision } from '../policy/types.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -103,13 +104,22 @@ describe('AgentRegistry Acknowledgement', () => {
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
-  it('should not register unacknowledged project agents and emit event', async () => {
+  it('should register unacknowledged project agents and emit event', async () => {
     const emitSpy = vi.spyOn(coreEvents, 'emitAgentsDiscovered');
 
     await registry.initialize();
 
-    expect(registry.getDefinition('ProjectAgent')).toBeUndefined();
+    // Now unacknowledged agents ARE registered (but with ASK_USER policy)
+    expect(registry.getDefinition('ProjectAgent')).toBeDefined();
     expect(emitSpy).toHaveBeenCalledWith([MOCK_AGENT_WITH_HASH]);
+
+    // Verify policy
+    const policyEngine = config.getPolicyEngine();
+    expect(
+      await policyEngine?.check({ name: 'ProjectAgent', args: {} }, undefined),
+    ).toMatchObject({
+      decision: PolicyDecision.ASK_USER,
+    });
   });
 
   it('should register acknowledged project agents', async () => {
@@ -134,6 +144,14 @@ describe('AgentRegistry Acknowledgement', () => {
 
     expect(registry.getDefinition('ProjectAgent')).toBeDefined();
     expect(emitSpy).not.toHaveBeenCalled();
+
+    // Verify policy is ALLOW for acknowledged agent
+    const policyEngine = config.getPolicyEngine();
+    expect(
+      await policyEngine?.check({ name: 'ProjectAgent', args: {} }, undefined),
+    ).toMatchObject({
+      decision: PolicyDecision.ALLOW,
+    });
   });
 
   it('should register agents without hash (legacy/safe?)', async () => {

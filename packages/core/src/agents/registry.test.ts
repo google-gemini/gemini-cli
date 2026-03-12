@@ -29,7 +29,7 @@ import { SimpleExtensionLoader } from '../utils/extensionLoader.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import { ThinkingLevel } from '@google/genai';
 import type { AcknowledgedAgentsService } from './acknowledgedAgents.js';
-import { PolicyDecision } from '../policy/types.js';
+import { PolicyDecision, ApprovalMode } from '../policy/types.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { A2AAuthProvider } from './auth-provider/types.js';
 
@@ -1168,6 +1168,37 @@ describe('AgentRegistry', () => {
         expect.objectContaining({
           toolName: 'OverwrittenAgent',
           decision: PolicyDecision.ASK_USER,
+        }),
+      );
+    });
+
+    it('should register remote agents with ALLOW decision in YOLO mode', async () => {
+      const remoteAgent: AgentDefinition = {
+        kind: 'remote',
+        name: 'YoloAgent',
+        description: 'A remote agent in YOLO mode',
+        agentCardUrl: 'https://example.com/card',
+        inputConfig: { inputSchema: { type: 'object' } },
+      };
+
+      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
+        loadAgent: vi.fn().mockResolvedValue({ name: 'YoloAgent' }),
+      } as unknown as A2AClientManager);
+
+      const policyEngine = mockConfig.getPolicyEngine();
+      vi.spyOn(mockConfig, 'getApprovalMode').mockReturnValue(
+        ApprovalMode.YOLO,
+      );
+      const addRuleSpy = vi.spyOn(policyEngine, 'addRule');
+
+      await registry.testRegisterAgent(remoteAgent);
+
+      // In YOLO mode, even remote agents should be registered with ALLOW.
+      expect(addRuleSpy).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          toolName: 'YoloAgent',
+          decision: PolicyDecision.ALLOW,
+          source: 'AgentRegistry (Dynamic)',
         }),
       );
     });

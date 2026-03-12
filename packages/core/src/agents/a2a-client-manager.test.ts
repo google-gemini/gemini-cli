@@ -186,6 +186,7 @@ describe('A2AClientManager', () => {
     });
 
     it('should configure ClientFactory with REST, JSON-RPC, and gRPC transports', async () => {
+<<<<<<< HEAD
       await manager.loadAgent('TestAgent', 'http://test.agent/card');
       expect(ClientFactoryOptions.createFrom).toHaveBeenCalled();
     });
@@ -195,6 +196,23 @@ describe('A2AClientManager', () => {
       await expect(
         manager.loadAgent('TestAgent', 'http://test.agent/card'),
       ).rejects.toThrow("Agent with name 'TestAgent' is already loaded.");
+=======
+      await manager.loadAgent('TestAgent', 'http://test.agent/card');
+      expect(ClientFactoryOptions.createFrom).toHaveBeenCalled();
+    });
+
+    it('should return the cached card if an agent with the same name is already loaded (idempotent)', async () => {
+      const card1 = await manager.loadAgent(
+        'TestAgent',
+        'http://test.agent/card',
+      );
+      const card2 = await manager.loadAgent(
+        'TestAgent',
+        'http://test.agent/card',
+      );
+      expect(card1).toBe(card2);
+      expect(vi.mocked(DefaultAgentCardResolver)).toHaveBeenCalledTimes(1);
+>>>>>>> 7af0b4745
     });
 
     it('should use native fetch by default', async () => {

@@ -66,6 +66,18 @@ export class AcknowledgedAgentsService {
     hash: string,
   ): Promise<boolean> {
     await this.load();
+    return this.isAcknowledgedSync(projectPath, agentName, hash);
+  }
+
+  /**
+   * Synchronous check for acknowledgment.
+   * Note: Assumes load() has already been called and awaited (e.g. during registry init).
+   */
+  isAcknowledgedSync(
+    projectPath: string,
+    agentName: string,
+    hash: string,
+  ): boolean {
     const projectAgents = this.acknowledgedAgents[projectPath];
     if (!projectAgents) return false;
     return projectAgents[agentName] === hash;
