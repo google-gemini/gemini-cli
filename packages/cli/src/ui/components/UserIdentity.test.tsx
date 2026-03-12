@@ -182,4 +182,23 @@ describe('<UserIdentity />', () => {
     expect(output).toContain('/upgrade');
     unmount();
   });
+
+  it('should not render /upgrade indicator for ultra tiers', async () => {
+    const mockConfig = makeFakeConfig();
+    vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
+      authType: AuthType.LOGIN_WITH_GOOGLE,
+      model: 'gemini-pro',
+    } as unknown as ContentGeneratorConfig);
+    vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue('Advanced Ultra');
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <UserIdentity config={mockConfig} />,
+    );
+    await waitUntilReady();
+
+    const output = lastFrame();
+    expect(output).toContain('Plan: Advanced Ultra');
+    expect(output).not.toContain('/upgrade');
+    unmount();
+  });
 });
