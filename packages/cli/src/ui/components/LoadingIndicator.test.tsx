@@ -50,7 +50,7 @@ const renderWithContext = async (
 
 describe('<LoadingIndicator />', () => {
   const defaultProps = {
-    currentLoadingPhrase: 'Thinking...',
+    currentLoadingPhrase: 'Gemini is thinking...',
     elapsedTime: 5,
   };
 
@@ -71,7 +71,7 @@ describe('<LoadingIndicator />', () => {
     await waitUntilReady();
     const output = lastFrame();
     expect(output).toContain('MockRespondingSpinner');
-    expect(output).toContain('Thinking...');
+    expect(output).toContain('Gemini is thinking...');
     expect(output).toContain('(esc to cancel, 5s)');
   });
 
@@ -108,7 +108,7 @@ describe('<LoadingIndicator />', () => {
 
   it('should display the elapsedTime correctly when Responding', async () => {
     const props = {
-      currentLoadingPhrase: 'Thinking...',
+      currentLoadingPhrase: 'Gemini is thinking...',
       elapsedTime: 60,
     };
     const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
@@ -122,7 +122,7 @@ describe('<LoadingIndicator />', () => {
 
   it('should display the elapsedTime correctly in human-readable format', async () => {
     const props = {
-      currentLoadingPhrase: 'Thinking...',
+      currentLoadingPhrase: 'Gemini is thinking...',
       elapsedTime: 125,
     };
     const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
@@ -229,7 +229,7 @@ describe('<LoadingIndicator />', () => {
   it('should display fallback phrase if thought is empty', async () => {
     const props = {
       thought: null,
-      currentLoadingPhrase: 'Thinking...',
+      currentLoadingPhrase: 'Gemini is thinking...',
       elapsedTime: 5,
     };
     const { lastFrame, unmount, waitUntilReady } = await renderWithContext(
@@ -238,7 +238,7 @@ describe('<LoadingIndicator />', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('Thinking...');
+    expect(output).toContain('Gemini is thinking...');
     unmount();
   });
 
@@ -258,15 +258,15 @@ describe('<LoadingIndicator />', () => {
     const output = lastFrame();
     expect(output).toBeDefined();
     if (output) {
-      // Should NOT contain "Thinking... " prefix because the subject already starts with "Thinking"
-      expect(output).not.toContain('Thinking... Thinking');
-      expect(output).toContain('Thinking about something...');
+      expect(output).toContain(
+        'Gemini is thinking about Thinking about something...',
+      );
       expect(output).not.toContain('and other stuff.');
     }
     unmount();
   });
 
-  it('should NOT prepend "Thinking... " even if the subject does not start with "Thinking"', async () => {
+  it('should use "Gemini is thinking about" if a subject is provided', async () => {
     const props = {
       thought: {
         subject: 'Planning the response...',
@@ -280,12 +280,13 @@ describe('<LoadingIndicator />', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('Planning the response...');
-    expect(output).not.toContain('Thinking... ');
+    expect(output).toContain(
+      'Gemini is thinking about Planning the response...',
+    );
     unmount();
   });
 
-  it('should prioritize thought.subject over currentLoadingPhrase', async () => {
+  it('should prioritize thought.subject over currentLoadingPhrase using the new Gemini pattern', async () => {
     const props = {
       thought: {
         subject: 'This should be displayed',
@@ -300,7 +301,9 @@ describe('<LoadingIndicator />', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('This should be displayed');
+    expect(output).toContain(
+      'Gemini is thinking about This should be displayed',
+    );
     expect(output).not.toContain('This should not be displayed');
     unmount();
   });
@@ -348,7 +351,7 @@ describe('<LoadingIndicator />', () => {
       const output = lastFrame();
       // Check for single line output
       expect(output?.trim().includes('\n')).toBe(false);
-      expect(output).toContain('Thinking...');
+      expect(output).toContain('Gemini is thinking...');
       expect(output).toContain('(esc to cancel, 5s)');
       expect(output).toContain('Right');
       unmount();
@@ -372,7 +375,7 @@ describe('<LoadingIndicator />', () => {
       // 3. Right Content
       expect(lines).toHaveLength(3);
       if (lines) {
-        expect(lines[0]).toContain('Thinking...');
+        expect(lines[0]).toContain('Gemini is thinking...');
         expect(lines[0]).not.toContain('(esc to cancel, 5s)');
         expect(lines[1]).toContain('(esc to cancel, 5s)');
         expect(lines[2]).toContain('Right');
@@ -408,7 +411,7 @@ describe('<LoadingIndicator />', () => {
           elapsedTime={5}
           wittyPhrase="I am witty"
           showWit={true}
-          currentLoadingPhrase="Thinking..."
+          currentLoadingPhrase="Gemini is thinking..."
         />,
         StreamingState.Responding,
         120,
@@ -416,7 +419,7 @@ describe('<LoadingIndicator />', () => {
       await waitUntilReady();
       const output = lastFrame();
       // Sequence should be: Primary Text -> Cancel/Timer -> Witty Phrase
-      expect(output).toContain('Thinking... (esc to cancel, 5s) I am witty');
+      expect(output).toContain('Gemini is thinking... (esc to cancel, 5s) I am witty');
       unmount();
     });
 
@@ -426,7 +429,7 @@ describe('<LoadingIndicator />', () => {
           elapsedTime={5}
           wittyPhrase="I am witty"
           showWit={true}
-          currentLoadingPhrase="Thinking..."
+          currentLoadingPhrase="Gemini is thinking..."
         />,
         StreamingState.Responding,
         79,
@@ -440,7 +443,7 @@ describe('<LoadingIndicator />', () => {
       // 3. Witty Phrase
       expect(lines).toHaveLength(3);
       if (lines) {
-        expect(lines[0]).toContain('Thinking...');
+        expect(lines[0]).toContain('Gemini is thinking...');
         expect(lines[1]).toContain('(esc to cancel, 5s)');
         expect(lines[2]).toContain('I am witty');
       }
