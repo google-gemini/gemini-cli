@@ -9,8 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execSync } from 'node:child_process';
-import { TestRig, poll } from '@google/gemini-cli-test-utils';
-import stripAnsi from 'strip-ansi';
+import { TestRig } from '@google/gemini-cli-test-utils';
 import {
   createUnauthorizedToolError,
   parseAgentMarkdown,
@@ -101,24 +100,6 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
             JSON.stringify(acknowledgedAgents, null, 2),
           );
         }
-
-        // Bypassing terminal keybindings setup prompt for interactive tests
-        const homeDir = rig.homeDir;
-        if (!homeDir) {
-          throw new Error('TestRig homeDir is not initialized');
-        }
-        const stateFilePath = path.join(homeDir, '.gemini', 'state.json');
-        let stateData: { terminalSetupPromptShown?: boolean } = {};
-        if (fs.existsSync(stateFilePath)) {
-          try {
-            stateData = JSON.parse(fs.readFileSync(stateFilePath, 'utf-8'));
-          } catch (e) {
-            console.warn(`Failed to parse state.json:`, e);
-          }
-        }
-        stateData.terminalSetupPromptShown = true;
-        fs.mkdirSync(path.dirname(stateFilePath), { recursive: true });
-        fs.writeFileSync(stateFilePath, JSON.stringify(stateData, null, 2));
 
         const execOptions = { cwd: rig.testDir!, stdio: 'inherit' as const };
         execSync('git init', execOptions);

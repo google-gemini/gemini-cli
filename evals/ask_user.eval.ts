@@ -21,7 +21,6 @@ function askUserEvalTest(policy: EvalPolicy, evalCase: AppEvalCase) {
       },
     },
     files: {
-      '.gemini/state.json': JSON.stringify({ terminalSetupPromptShown: true }),
       ...evalCase.files,
     },
   });
@@ -35,10 +34,7 @@ describe('ask_user', () => {
       rig.setBreakpoint(['ask_user']);
     },
     assert: async (rig) => {
-      const confirmation = await rig.waitForPendingConfirmation(
-        'ask_user',
-        60000,
-      );
+      const confirmation = await rig.waitForPendingConfirmation('ask_user');
       expect(
         confirmation,
         'Expected a pending confirmation for ask_user tool',
@@ -56,10 +52,7 @@ describe('ask_user', () => {
       rig.setBreakpoint(['ask_user']);
     },
     assert: async (rig) => {
-      const confirmation = await rig.waitForPendingConfirmation(
-        'ask_user',
-        60000,
-      );
+      const confirmation = await rig.waitForPendingConfirmation('ask_user');
       expect(
         confirmation,
         'Expected a pending confirmation for ask_user tool',
@@ -83,15 +76,15 @@ describe('ask_user', () => {
     },
     assert: async (rig) => {
       // It might call enter_plan_mode first.
-      let confirmation = await rig.waitForPendingConfirmation(
-        ['enter_plan_mode', 'ask_user'],
-        60000,
-      );
+      let confirmation = await rig.waitForPendingConfirmation([
+        'enter_plan_mode',
+        'ask_user',
+      ]);
       expect(confirmation, 'Expected a tool call confirmation').toBeDefined();
 
-      if (confirmation!.name === 'enter_plan_mode') {
+      if (confirmation?.name === 'enter_plan_mode') {
         rig.acceptConfirmation('enter_plan_mode');
-        confirmation = await rig.waitForPendingConfirmation('ask_user', 60000);
+        confirmation = await rig.waitForPendingConfirmation('ask_user');
       }
 
       expect(
@@ -119,10 +112,10 @@ describe('ask_user', () => {
       rig.setBreakpoint(['run_shell_command', 'ask_user']);
     },
     assert: async (rig) => {
-      const confirmation = await rig.waitForPendingConfirmation(
-        ['run_shell_command', 'ask_user'],
-        60000,
-      );
+      const confirmation = await rig.waitForPendingConfirmation([
+        'run_shell_command',
+        'ask_user',
+      ]);
 
       expect(
         confirmation,
