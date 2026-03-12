@@ -423,7 +423,6 @@ try {
     blobPath,
     '--sentinel-fuse',
     sentinelFuse,
-    '--overwrite',
   ];
 
   if (platform === 'darwin') {
