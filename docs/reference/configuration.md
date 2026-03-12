@@ -92,6 +92,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `[]`
   - **Requires restart:** Yes
 
+#### `adminPolicyPaths`
+
+- **`adminPolicyPaths`** (array):
+  - **Description:** Additional admin policy files or directories to load.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
 #### `general`
 
 - **`general.preferredEditor`** (string):
@@ -105,7 +112,8 @@ their corresponding top-level category object in your `settings.json` file.
 - **`general.defaultApprovalMode`** (enum):
   - **Description:** The default approval mode for tool execution. 'default'
     prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is
-    read-only mode. 'yolo' is not supported yet.
+    read-only mode. YOLO mode (auto-approve all actions) can only be enabled via
+    command line (--yolo or --approval-mode=yolo).
   - **Default:** `"default"`
   - **Values:** `"default"`, `"auto_edit"`, `"plan"`
 
@@ -755,7 +763,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `tools`
 
-- **`tools.sandbox`** (boolean | string):
+- **`tools.sandbox`** (string):
   - **Description:** Sandbox execution environment. Set to a boolean to enable
     or disable the sandbox, provide a string path to a sandbox profile, or
     specify an explicit sandbox command (e.g., "docker", "podman", "lxc").
@@ -1376,6 +1384,13 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Useful for shared compute environments or keeping CLI state isolated.
   - Example: `export GEMINI_CLI_HOME="/path/to/user/config"` (Windows
     PowerShell: `$env:GEMINI_CLI_HOME="C:\path\to\user\config"`)
+- **`GEMINI_CLI_SURFACE`**:
+  - Specifies a custom label to include in the `User-Agent` header for API
+    traffic reporting.
+  - This is useful for tracking specific internal tools or distribution
+    channels.
+  - Example: `export GEMINI_CLI_SURFACE="my-custom-tool"` (Windows PowerShell:
+    `$env:GEMINI_CLI_SURFACE="my-custom-tool"`)
 - **`GOOGLE_API_KEY`**:
   - Your Google Cloud API key.
   - Required for using Vertex AI in express mode.
