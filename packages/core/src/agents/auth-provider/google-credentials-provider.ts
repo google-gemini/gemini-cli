@@ -12,12 +12,7 @@ import { debugLogger } from '../../utils/debugLogger.js';
 import { OAuthUtils, FIVE_MIN_BUFFER_MS } from '../../mcp/oauth-utils.js';
 
 const CLOUD_RUN_HOST_REGEX = /^(.*\.)?run\.app$/;
-const CLOUD_LUCI_HOST_REGEX = /^(.*\.)?luci\.app$/;
-const ALLOWED_HOSTS = [
-  /^.+\.googleapis\.com$/,
-  CLOUD_LUCI_HOST_REGEX,
-  CLOUD_RUN_HOST_REGEX,
-];
+const ALLOWED_HOSTS = [/^.+\.googleapis\.com$/, CLOUD_RUN_HOST_REGEX];
 
 /**
  * Authentication provider for Google ADC (Application Default Credentials).
@@ -47,9 +42,8 @@ export class GoogleCredentialsAuthProvider extends BaseA2AAuthProvider {
 
     const hostname = new URL(targetUrl).hostname;
     const isRunAppHost = CLOUD_RUN_HOST_REGEX.test(hostname);
-    const isLuciAppHost = CLOUD_LUCI_HOST_REGEX.test(hostname);
 
-    if (isRunAppHost || isLuciAppHost) {
+    if (isRunAppHost) {
       this.useIdToken = true;
     }
     this.audience = hostname;

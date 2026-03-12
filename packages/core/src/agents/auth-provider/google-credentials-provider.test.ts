@@ -82,16 +82,6 @@ describe('GoogleCredentialsAuthProvider', () => {
           ),
       ).not.toThrow();
     });
-
-    it('initializes seamlessly with .luci.app', () => {
-      expect(
-        () =>
-          new GoogleCredentialsAuthProvider(
-            mockConfig,
-            'https://my-service.luci.app',
-          ),
-      ).not.toThrow();
-    });
   });
 
   describe('Token Fetching', () => {
