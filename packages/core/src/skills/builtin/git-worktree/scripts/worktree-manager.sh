@@ -10,6 +10,10 @@ BRANCH=$3
 BASE_DIR=$(pwd)
 PARENT_DIR=$(dirname "$BASE_DIR")
 
+slugify() {
+    echo "$1" | iconv -t ascii//TRANSLIT | tr -cd "[:alnum:] " | tr "[:upper:]" "[:lower:]" | tr " " "-" | sed "s/--/-/g" | cut -c 1-50
+}
+
 case $ACTION in
     "add")
         if [ -z "$NAME" ] || [ -z "$BRANCH" ]; then
@@ -18,6 +22,24 @@ case $ACTION in
         fi
         git worktree add "$PARENT_DIR/$NAME" "$BRANCH"
         echo "Success: Added worktree at $PARENT_DIR/$NAME tracking branch $BRANCH"
+        ;;
+    "pr")
+        if [ -z "$NAME" ]; then
+            echo "Error: Usage: worktree-manager.sh pr <pr-number>"
+            exit 1
+        fi
+        PR_NUMBER=$NAME
+        echo "Fetching PR details for #$PR_NUMBER..."
+        PR_DATA=$(gh pr view "$PR_NUMBER" --json title,headRefName)
+        PR_TITLE=$(echo "$PR_DATA" | jq -r .title)
+        PR_BRANCH=$(echo "$PR_DATA" | jq -r .headRefName)
+        
+        SLUG=$(slugify "$PR_TITLE")
+        DIR_NAME="pr-$PR_NUMBER-$SLUG"
+        
+        echo "Creating semantic worktree: $DIR_NAME"
+        git worktree add "$PARENT_DIR/$DIR_NAME" "$PR_BRANCH"
+        echo "Success: Added PR worktree at $PARENT_DIR/$DIR_NAME"
         ;;
     "list")
         git worktree list
