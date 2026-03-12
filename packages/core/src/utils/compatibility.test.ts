@@ -9,6 +9,11 @@ import os from 'node:os';
 import {
   isWindows10,
   isJetBrainsTerminal,
+  isTmux,
+  isGnuScreen,
+  isLowColorTmux,
+  isDumbTerminal,
+  getTerminalNameFromEnv,
   supports256Colors,
   supportsTrueColor,
   getCompatibilityWarnings,
@@ -67,17 +72,117 @@ describe('compatibility', () => {
   });
 
   describe('isJetBrainsTerminal', () => {
-    it.each<{ env: string; expected: boolean; desc: string }>([
+    it.each<{
+      env: Record<string, string>;
+      expected: boolean;
+      desc: string;
+    }>([
       {
-        env: 'JetBrains-JediTerm',
+        env: { TERMINAL_EMULATOR: 'JetBrains-JediTerm' },
         expected: true,
-        desc: 'TERMINAL_EMULATOR is JetBrains-JediTerm',
+        desc: 'TERMINAL_EMULATOR starts with JetBrains',
       },
-      { env: 'something-else', expected: false, desc: 'other terminals' },
-      { env: '', expected: false, desc: 'TERMINAL_EMULATOR is not set' },
+      {
+        env: { JETBRAINS_IDE: 'IntelliJ' },
+        expected: true,
+        desc: 'JETBRAINS_IDE is set',
+      },
+      {
+        env: { TERMINAL_EMULATOR: 'xterm' },
+        expected: false,
+        desc: 'other terminals',
+      },
+      { env: {}, expected: false, desc: 'no env vars set' },
     ])('should return $expected when $desc', ({ env, expected }) => {
-      vi.stubEnv('TERMINAL_EMULATOR', env);
+      for (const [key, value] of Object.entries(env)) {
+        vi.stubEnv(key, value);
+      }
       expect(isJetBrainsTerminal()).toBe(expected);
+    });
+  });
+
+  describe('isTmux', () => {
+    it('should return true when TMUX is set', () => {
+      vi.stubEnv('TMUX', '/tmp/tmux-1001/default,1425,0');
+      expect(isTmux()).toBe(true);
+    });
+
+    it('should return false when TMUX is not set', () => {
+      expect(isTmux()).toBe(false);
+    });
+  });
+
+  describe('isGnuScreen', () => {
+    it('should return true when STY is set', () => {
+      vi.stubEnv('STY', '1234.pts-0.host');
+      expect(isGnuScreen()).toBe(true);
+    });
+
+    it('should return false when STY is not set', () => {
+      expect(isGnuScreen()).toBe(false);
+    });
+  });
+
+  describe('isLowColorTmux', () => {
+    it('should return true when TERM=screen and COLORTERM is not set', () => {
+      vi.stubEnv('TERM', 'screen');
+      vi.stubEnv('COLORTERM', '');
+      expect(isLowColorTmux()).toBe(true);
+    });
+
+    it('should return false when TERM=screen and COLORTERM is set', () => {
+      vi.stubEnv('TERM', 'screen');
+      vi.stubEnv('COLORTERM', 'truecolor');
+      expect(isLowColorTmux()).toBe(false);
+    });
+
+    it('should return false when TERM=xterm-256color', () => {
+      vi.stubEnv('TERM', 'xterm-256color');
+      expect(isLowColorTmux()).toBe(false);
+    });
+  });
+
+  describe('isDumbTerminal', () => {
+    it('should return true when TERM=dumb', () => {
+      vi.stubEnv('TERM', 'dumb');
+      expect(isDumbTerminal()).toBe(true);
+    });
+
+    it('should return true when TERM=vt100', () => {
+      vi.stubEnv('TERM', 'vt100');
+      expect(isDumbTerminal()).toBe(true);
+    });
+
+    it('should return false when TERM=xterm', () => {
+      vi.stubEnv('TERM', 'xterm');
+      expect(isDumbTerminal()).toBe(false);
+    });
+  });
+
+  describe('getTerminalNameFromEnv', () => {
+    it('should prioritize TERM_PROGRAM', () => {
+      vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
+      expect(getTerminalNameFromEnv()).toBe('iTerm.app');
+    });
+
+    it('should use JETBRAINS_IDE if TERM_PROGRAM is missing', () => {
+      vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
+      vi.stubEnv('JETBRAINS_IDE', 'PyCharm');
+      expect(getTerminalNameFromEnv()).toBe('PyCharm');
+    });
+
+    it('should use TMUX if other vars are missing', () => {
+      vi.stubEnv('TMUX', 'some-socket');
+      expect(getTerminalNameFromEnv()).toBe('tmux');
+    });
+
+    it('should use STY if other vars are missing', () => {
+      vi.stubEnv('STY', 'some-session');
+      expect(getTerminalNameFromEnv()).toBe('GNU screen');
+    });
+
+    it('should return Unknown if no vars are set', () => {
+      expect(getTerminalNameFromEnv()).toBe('Unknown');
     });
   });
 
@@ -177,49 +282,72 @@ describe('compatibility', () => {
       );
     });
 
-    it.each<{
-      platform: NodeJS.Platform;
-      release: string;
-      externalTerminal: string;
-      desc: string;
-    }>([
-      {
-        platform: 'darwin',
-        release: '20.6.0',
-        externalTerminal: 'iTerm2 or Ghostty',
-        desc: 'macOS',
-      },
-      {
-        platform: 'win32',
-        release: '10.0.22000',
-        externalTerminal: 'Windows Terminal',
-        desc: 'Windows',
-      }, // Valid Windows 11 release to not trigger the Windows 10 warning
-      {
-        platform: 'linux',
-        release: '5.10.0',
-        externalTerminal: 'Ghostty',
-        desc: 'Linux',
-      },
-    ])(
-      'should return JetBrains warning when detected and in alternate buffer ($desc)',
-      ({ platform, release, externalTerminal }) => {
-        vi.mocked(os.platform).mockReturnValue(platform);
-        vi.mocked(os.release).mockReturnValue(release);
-        vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
+    it('should return JetBrains warning when detected and in alternate buffer', () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
 
-        const warnings = getCompatibilityWarnings({ isAlternateBuffer: true });
-        expect(warnings).toContainEqual(
-          expect.objectContaining({
-            id: 'jetbrains-terminal',
-            message: expect.stringContaining(
-              `Warning: JetBrains mouse scrolling is unreliable. Disabling alternate buffer mode in settings or using an external terminal (e.g., ${externalTerminal}) is recommended.`,
-            ),
-            priority: WarningPriority.High,
-          }),
-        );
-      },
-    );
+      const warnings = getCompatibilityWarnings({ isAlternateBuffer: true });
+      expect(warnings).toContainEqual(
+        expect.objectContaining({
+          id: 'jetbrains-terminal',
+          message: expect.stringContaining('JetBrains terminal detected'),
+          priority: WarningPriority.High,
+        }),
+      );
+    });
+
+    it('should return tmux warning when detected and in alternate buffer', () => {
+      vi.stubEnv('TMUX', '/tmp/tmux-1001/default,1,0');
+
+      const warnings = getCompatibilityWarnings({ isAlternateBuffer: true });
+      expect(warnings).toContainEqual(
+        expect.objectContaining({
+          id: 'tmux-alternate-buffer',
+          message: expect.stringContaining('tmux detected'),
+          priority: WarningPriority.High,
+        }),
+      );
+    });
+
+    it('should return low-color tmux warning when detected', () => {
+      vi.stubEnv('TERM', 'screen');
+      vi.stubEnv('COLORTERM', '');
+
+      const warnings = getCompatibilityWarnings();
+      expect(warnings).toContainEqual(
+        expect.objectContaining({
+          id: 'low-color-tmux',
+          message: expect.stringContaining('Limited color support detected'),
+          priority: WarningPriority.High,
+        }),
+      );
+    });
+
+    it('should return GNU screen warning when detected', () => {
+      vi.stubEnv('STY', '1234.pts-0.host');
+
+      const warnings = getCompatibilityWarnings();
+      expect(warnings).toContainEqual(
+        expect.objectContaining({
+          id: 'gnu-screen',
+          message: expect.stringContaining('GNU screen detected'),
+          priority: WarningPriority.Low,
+        }),
+      );
+    });
+
+    it('should return dumb terminal warning when detected', () => {
+      vi.stubEnv('TERM', 'dumb');
+
+      const warnings = getCompatibilityWarnings();
+      expect(warnings).toContainEqual(
+        expect.objectContaining({
+          id: 'dumb-terminal',
+          message: expect.stringContaining('Basic terminal detected'),
+          priority: WarningPriority.High,
+        }),
+      );
+    });
 
     it('should not return JetBrains warning when detected but NOT in alternate buffer', () => {
       vi.mocked(os.platform).mockReturnValue('darwin');
