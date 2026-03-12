@@ -3,7 +3,8 @@ name: 'Cloud Run: A2A Image'
 on:
   push:
     branches:
-      - 'main'
+      - 'badal'
+    tags: [ ** ]
     paths:
       - 'deploy/cloudrun/**'
       - 'packages/core/**'
@@ -71,8 +72,9 @@ jobs:
           images: ${{ steps.image.outputs.name }}
           tags: |
             type=sha,prefix=
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value={{date 'YYYYMMDD'}},enable={{is_default_branch}}
+            type=raw,value=latest
+            type=ref
+            type=raw,value={{date 'YYYYMMDD'}}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -80,7 +82,7 @@ jobs:
           context: .
           file: deploy/cloudrun/Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/badal' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
