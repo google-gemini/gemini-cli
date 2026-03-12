@@ -316,6 +316,8 @@ export interface BrowserAgentCustomConfig {
   profilePath?: string;
   /** Model override for the visual agent. */
   visualModel?: string;
+  /** Disable user input on the browser window during automation. Default: true in non-headless mode */
+  disableUserInput?: boolean;
 }
 
 /**
@@ -502,6 +504,7 @@ export interface PolicyUpdateConfirmationRequest {
 
 export interface ConfigParameters {
   sessionId: string;
+  clientName?: string;
   clientVersion?: string;
   embeddingModel?: string;
   sandbox?: SandboxConfig;
@@ -646,6 +649,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly acknowledgedAgentsService: AcknowledgedAgentsService;
   private skillManager!: SkillManager;
   private _sessionId: string;
+  private readonly clientName: string | undefined;
   private clientVersion: string;
   private fileSystemService: FileSystemService;
   private trackerService?: TrackerService;
@@ -843,6 +847,7 @@ export class Config implements McpContext, AgentLoopContext {
 
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
+    this.clientName = params.clientName;
     this.clientVersion = params.clientVersion ?? 'unknown';
     this.approvedPlanPath = undefined;
     this.embeddingModel =
@@ -1406,6 +1411,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getSessionId(): string {
     return this.promptId;
+  }
+
+  getClientName(): string | undefined {
+    return this.clientName;
   }
 
   setSessionId(sessionId: string): void {
@@ -2881,8 +2890,21 @@ export class Config implements McpContext, AgentLoopContext {
         headless: customConfig.headless ?? false,
         profilePath: customConfig.profilePath,
         visualModel: customConfig.visualModel,
+        disableUserInput: customConfig.disableUserInput,
       },
     };
+  }
+
+  /**
+   * Determines if user input should be disabled during browser automation.
+   * Based on the `disableUserInput` setting and `headless` mode.
+   */
+  shouldDisableBrowserUserInput(): boolean {
+    const browserConfig = this.getBrowserAgentConfig();
+    return (
+      browserConfig.customConfig?.disableUserInput !== false &&
+      !browserConfig.customConfig?.headless
+    );
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
