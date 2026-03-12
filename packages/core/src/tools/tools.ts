@@ -11,6 +11,7 @@ import type { ShellExecutionConfig } from '../services/shellExecutionService.js'
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { isRecord } from '../utils/markdownUtils.js';
 import { randomUUID } from 'node:crypto';
 import {
   MessageBusType,
@@ -395,6 +396,15 @@ export interface ToolBuilder<
 }
 
 /**
+ * Represents the expected JSON Schema structure for tool parameters.
+ */
+export interface ToolParameterSchema {
+  type: string;
+  properties?: unknown;
+  [key: string]: unknown;
+}
+
+/**
  * New base class for tools that separates validation from execution.
  * New tools should extend this class.
  */
@@ -428,7 +438,49 @@ export abstract class DeclarativeTool<
     return {
       name: this.name,
       description: this.description,
-      parametersJsonSchema: this.parameterSchema,
+      parametersJsonSchema: this.addWaitForPreviousParameter(
+        this.parameterSchema,
+      ),
+    };
+  }
+
+  /**
+   * Type guard to check if an unknown value represents a ToolParameterSchema object.
+   */
+  private isParameterSchema(obj: unknown): obj is ToolParameterSchema {
+    return isRecord(obj) && 'type' in obj;
+  }
+
+  /**
+   * Adds the `wait_for_previous` parameter to the tool's schema.
+   * This allows the model to explicitly control parallel vs sequential execution.
+   */
+  private addWaitForPreviousParameter(schema: unknown): unknown {
+    if (!this.isParameterSchema(schema) || schema.type !== 'object') {
+      return schema;
+    }
+
+    const props = schema.properties;
+    let propertiesObj: Record<string, unknown> = {};
+
+    if (props !== undefined) {
+      if (!isRecord(props)) {
+        // properties exists but is not an object, so it's a malformed schema.
+        return schema;
+      }
+      propertiesObj = props;
+    }
+
+    return {
+      ...schema,
+      properties: {
+        ...propertiesObj,
+        wait_for_previous: {
+          type: 'boolean',
+          description:
+            'Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.',
+        },
+      },
     };
   }
 
