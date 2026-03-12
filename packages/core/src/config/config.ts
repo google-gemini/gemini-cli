@@ -1155,10 +1155,9 @@ export class Config implements McpContext, AgentLoopContext {
   private async _initialize(): Promise<void> {
     await this.storage.initialize();
 
-    // Add pending directories to workspace context
-    for (const dir of this.pendingIncludeDirectories) {
-      this.workspaceContext.addDirectory(dir);
-    }
+    // Add pending include directories to workspace context.
+    // Missing/unreadable paths are skipped by WorkspaceContext with warnings.
+    this.workspaceContext.addDirectories(this.pendingIncludeDirectories);
 
     // Add plans directory to workspace context for plan file storage
     if (this.planEnabled) {
