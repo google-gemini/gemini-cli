@@ -21,6 +21,8 @@ export interface CreateAuthProviderOptions {
   agentCard?: AgentCard;
   /** Required by some providers (like google-credentials) to determine token audience. */
   targetUrl?: string;
+  /** URL to fetch the agent card from, used for OAuth2 URL discovery. */
+  agentCardUrl?: string;
 }
 
 /**
@@ -65,9 +67,20 @@ export class A2AAuthProviderFactory {
         return provider;
       }
 
-      case 'oauth2':
-        // TODO: Implement
-        throw new Error('oauth2 auth provider not yet implemented');
+      case 'oauth2': {
+        // Dynamic import to avoid pulling MCPOAuthTokenStorage into the
+        // factory's static module graph, which causes initialization
+        // conflicts with code_assist/oauth-credential-storage.ts.
+        const { OAuth2AuthProvider } = await import('./oauth2-provider.js');
+        const provider = new OAuth2AuthProvider(
+          authConfig,
+          options.agentName ?? 'unknown',
+          agentCard,
+          options.agentCardUrl,
+        );
+        await provider.initialize();
+        return provider;
+      }
 
       case 'openIdConnect':
         // TODO: Implement

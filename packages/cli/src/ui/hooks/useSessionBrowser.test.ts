@@ -23,6 +23,7 @@ import {
 import {
   coreEvents,
   convertSessionToClientHistory,
+  uiTelemetryService,
 } from '@google/gemini-cli-core';
 
 // Mock modules
@@ -34,6 +35,17 @@ vi.mock('../../utils/sessionUtils.js', async (importOriginal) => {
   return {
     ...actual,
     getSessionFiles: vi.fn(),
+  };
+});
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    uiTelemetryService: {
+      clear: vi.fn(),
+      hydrate: vi.fn(),
+    },
   };
 });
 
@@ -102,6 +114,7 @@ describe('useSessionBrowser', () => {
     expect(mockConfig.setSessionId).toHaveBeenCalledWith(
       'existing-session-456',
     );
+    expect(uiTelemetryService.hydrate).toHaveBeenCalledWith(mockConversation);
     expect(result.current.isSessionBrowserOpen).toBe(false);
     expect(mockOnLoadHistory).toHaveBeenCalled();
   });
@@ -187,6 +200,37 @@ describe('convertSessionToHistoryFormats', () => {
     expect(clientHistory[1]).toEqual({
       role: 'model',
       parts: [{ text: 'Hi there' }],
+    });
+  });
+
+  it('should convert thinking tokens (thoughts) to thinking history items', () => {
+    const messages: MessageRecord[] = [
+      {
+        type: 'gemini',
+        content: 'Hi there',
+        thoughts: [
+          {
+            subject: 'Thinking...',
+            description: 'I should say hello.',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      } as MessageRecord,
+    ];
+
+    const result = convertSessionToHistoryFormats(messages);
+
+    expect(result.uiHistory).toHaveLength(2);
+    expect(result.uiHistory[0]).toMatchObject({
+      type: 'thinking',
+      thought: {
+        subject: 'Thinking...',
+        description: 'I should say hello.',
+      },
+    });
+    expect(result.uiHistory[1]).toMatchObject({
+      type: 'gemini',
+      text: 'Hi there',
     });
   });
 

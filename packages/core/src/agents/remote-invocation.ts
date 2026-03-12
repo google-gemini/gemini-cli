@@ -4,26 +4,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  ToolConfirmationOutcome,
-  ToolResult,
-  ToolCallConfirmationDetails,
+import {
+  BaseToolInvocation,
+  type ToolConfirmationOutcome,
+  type ToolResult,
+  type ToolCallConfirmationDetails,
 } from '../tools/tools.js';
-import { BaseToolInvocation } from '../tools/tools.js';
-import { DEFAULT_QUERY_STRING } from './types.js';
-import type {
-  RemoteAgentInputs,
-  RemoteAgentDefinition,
-  AgentInputs,
+import {
+  DEFAULT_QUERY_STRING,
+  type RemoteAgentInputs,
+  type RemoteAgentDefinition,
+  type AgentInputs,
 } from './types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { A2AClientManager } from './a2a-client-manager.js';
+import {
+  A2AClientManager,
+  type SendMessageResult,
+} from './a2a-client-manager.js';
 import { extractIdsFromResponse, A2AResultReassembler } from './a2aUtils.js';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { debugLogger } from '../utils/debugLogger.js';
+import { safeJsonToMarkdown } from '../utils/markdownUtils.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
-import type { SendMessageResult } from './a2a-client-manager.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
+import { A2AAgentError } from './a2a-errors.js';
 
 /**
  * A tool invocation that proxies to a remote A2A agent.
@@ -84,6 +88,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         authConfig: this.definition.auth,
         agentName: this.definition.name,
         targetUrl: this.definition.agentCardUrl,
+        agentCardUrl: this.definition.agentCardUrl,
       });
       if (!provider) {
         throw new Error(
@@ -187,11 +192,12 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
 
       return {
         llmContent: [{ text: finalOutput }],
-        returnDisplay: finalOutput,
+        returnDisplay: safeJsonToMarkdown(finalOutput),
       };
     } catch (error: unknown) {
       const partialOutput = reassembler.toString();
-      const errorMessage = `Error calling remote agent: ${error instanceof Error ? error.message : String(error)}`;
+      // Surface structured, user-friendly error messages.
+      const errorMessage = this.formatExecutionError(error);
       const fullDisplay = partialOutput
         ? `${partialOutput}\n\n${errorMessage}`
         : errorMessage;
@@ -207,5 +213,23 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         taskId: this.taskId,
       });
     }
+  }
+
+  /**
+   * Formats an execution error into a user-friendly message.
+   * Recognizes typed A2AAgentError subclasses and falls back to
+   * a generic message for unknown errors.
+   */
+  private formatExecutionError(error: unknown): string {
+    // All A2A-specific errors include a human-friendly `userMessage` on the
+    // A2AAgentError base class. Rely on that to avoid duplicating messages
+    // for specific subclasses, which improves maintainability.
+    if (error instanceof A2AAgentError) {
+      return error.userMessage;
+    }
+
+    return `Error calling remote agent: ${
+      error instanceof Error ? error.message : String(error)
+    }`;
   }
 }

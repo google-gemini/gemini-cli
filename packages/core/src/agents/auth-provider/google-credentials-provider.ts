@@ -122,8 +122,12 @@ export class GoogleCredentialsAuthProvider extends BaseA2AAuthProvider {
       const token = await client.getAccessToken();
 
       if (token.token) {
-        // We do not cache the access token ourselves since GoogleAuth Client does it under the hood.
-        // Or if we wanted to, we could, but let's rely on getAccessToken()'s cache for now.
+        this.cachedToken = token.token;
+        // Use expiry_date from the underlying credentials if available.
+        const creds = client.credentials;
+        if (creds.expiry_date) {
+          this.tokenExpiryTime = creds.expiry_date;
+        }
         return { Authorization: `Bearer ${token.token}` };
       }
       throw new Error('Failed to retrieve ADC access token.');

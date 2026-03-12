@@ -4,16 +4,31 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { Mock } from 'vitest';
-import type { ConfigParameters, SandboxConfig } from './config.js';
-import { Config, DEFAULT_FILE_FILTERING_OPTIONS } from './config.js';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
+import {
+  Config,
+  DEFAULT_FILE_FILTERING_OPTIONS,
+  type ConfigParameters,
+  type SandboxConfig,
+} from './config.js';
+import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
 import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { ApprovalMode } from '../policy/types.js';
-import type { HookDefinition } from '../hooks/types.js';
-import { HookType, HookEventName } from '../hooks/types.js';
+import {
+  HookType,
+  HookEventName,
+  type HookDefinition,
+} from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -23,14 +38,12 @@ import {
   DEFAULT_OTLP_ENDPOINT,
   uiTelemetryService,
 } from '../telemetry/index.js';
-import type {
-  ContentGeneratorConfig,
-  ContentGenerator,
-} from '../core/contentGenerator.js';
 import {
   AuthType,
   createContentGenerator,
   createContentGeneratorConfig,
+  type ContentGeneratorConfig,
+  type ContentGenerator,
 } from '../core/contentGenerator.js';
 import { GeminiClient } from '../core/client.js';
 import { GitService } from '../services/gitService.js';
@@ -235,10 +248,10 @@ vi.mock('../code_assist/experiments/experiments.js');
 
 describe('Server Config (config.ts)', () => {
   const MODEL = DEFAULT_GEMINI_MODEL;
-  const SANDBOX: SandboxConfig = {
+  const SANDBOX: SandboxConfig = createMockSandboxConfig({
     command: 'docker',
     image: 'gemini-cli-sandbox',
-  };
+  });
   const TARGET_DIR = '/path/to/target';
   const DEBUG_MODE = false;
   const QUESTION = 'test question';
@@ -480,6 +493,95 @@ describe('Server Config (config.ts)', () => {
         expect(await config.getUserCaching()).toBeUndefined();
       });
     });
+
+    describe('getNumericalRoutingEnabled', () => {
+      it('should return true by default if there are no experiments', async () => {
+        const config = new Config(baseParams);
+        expect(await config.getNumericalRoutingEnabled()).toBe(true);
+      });
+
+      it('should return true if the remote flag is set to true', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.ENABLE_NUMERICAL_ROUTING]: {
+                boolValue: true,
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getNumericalRoutingEnabled()).toBe(true);
+      });
+
+      it('should return false if the remote flag is explicitly set to false', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.ENABLE_NUMERICAL_ROUTING]: {
+                boolValue: false,
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getNumericalRoutingEnabled()).toBe(false);
+      });
+    });
+
+    describe('getResolvedClassifierThreshold', () => {
+      it('should return 90 by default if there are no experiments', async () => {
+        const config = new Config(baseParams);
+        expect(await config.getResolvedClassifierThreshold()).toBe(90);
+      });
+
+      it('should return the remote flag value if it is within range (0-100)', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.CLASSIFIER_THRESHOLD]: {
+                intValue: '75',
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getResolvedClassifierThreshold()).toBe(75);
+      });
+
+      it('should return 90 if the remote flag is out of range (less than 0)', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.CLASSIFIER_THRESHOLD]: {
+                intValue: '-10',
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getResolvedClassifierThreshold()).toBe(90);
+      });
+
+      it('should return 90 if the remote flag is out of range (greater than 100)', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.CLASSIFIER_THRESHOLD]: {
+                intValue: '110',
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getResolvedClassifierThreshold()).toBe(90);
+      });
+    });
   });
 
   describe('refreshAuth', () => {
@@ -499,6 +601,8 @@ describe('Server Config (config.ts)', () => {
       expect(createContentGeneratorConfig).toHaveBeenCalledWith(
         config,
         authType,
+        undefined,
+        undefined,
         undefined,
       );
       // Verify that contentGeneratorConfig is updated
@@ -1463,14 +1567,62 @@ describe('Server Config (config.ts)', () => {
       expect(browserConfig.customConfig.sessionMode).toBe('persistent');
     });
   });
+
+  describe('Sandbox Configuration', () => {
+    it('should default sandbox settings when not provided', () => {
+      const config = new Config({
+        ...baseParams,
+        sandbox: undefined,
+      });
+
+      expect(config.getSandboxEnabled()).toBe(false);
+      expect(config.getSandboxAllowedPaths()).toEqual([]);
+      expect(config.getSandboxNetworkAccess()).toBe(false);
+    });
+
+    it('should store provided sandbox settings', () => {
+      const sandbox: SandboxConfig = {
+        enabled: true,
+        allowedPaths: ['/tmp/foo', '/var/bar'],
+        networkAccess: true,
+        command: 'docker',
+        image: 'my-image',
+      };
+      const config = new Config({
+        ...baseParams,
+        sandbox,
+      });
+
+      expect(config.getSandboxEnabled()).toBe(true);
+      expect(config.getSandboxAllowedPaths()).toEqual(['/tmp/foo', '/var/bar']);
+      expect(config.getSandboxNetworkAccess()).toBe(true);
+      expect(config.getSandbox()?.command).toBe('docker');
+      expect(config.getSandbox()?.image).toBe('my-image');
+    });
+
+    it('should partially override default sandbox settings', () => {
+      const config = new Config({
+        ...baseParams,
+        sandbox: {
+          enabled: true,
+          allowedPaths: ['/only/this'],
+          networkAccess: false,
+        } as SandboxConfig,
+      });
+
+      expect(config.getSandboxEnabled()).toBe(true);
+      expect(config.getSandboxAllowedPaths()).toEqual(['/only/this']);
+      expect(config.getSandboxNetworkAccess()).toBe(false);
+    });
+  });
 });
 
 describe('GemmaModelRouterSettings', () => {
   const MODEL = DEFAULT_GEMINI_MODEL;
-  const SANDBOX: SandboxConfig = {
+  const SANDBOX: SandboxConfig = createMockSandboxConfig({
     command: 'docker',
     image: 'gemini-cli-sandbox',
-  };
+  });
   const TARGET_DIR = '/path/to/target';
   const DEBUG_MODE = false;
   const QUESTION = 'test question';
@@ -1847,10 +1999,10 @@ describe('isYoloModeDisabled', () => {
 
 describe('BaseLlmClient Lifecycle', () => {
   const MODEL = 'gemini-pro';
-  const SANDBOX: SandboxConfig = {
+  const SANDBOX: SandboxConfig = createMockSandboxConfig({
     command: 'docker',
     image: 'gemini-cli-sandbox',
-  };
+  });
   const TARGET_DIR = '/path/to/target';
   const DEBUG_MODE = false;
   const QUESTION = 'test question';
@@ -1902,10 +2054,10 @@ describe('BaseLlmClient Lifecycle', () => {
 
 describe('Generation Config Merging (HACK)', () => {
   const MODEL = 'gemini-pro';
-  const SANDBOX: SandboxConfig = {
+  const SANDBOX: SandboxConfig = createMockSandboxConfig({
     command: 'docker',
     image: 'gemini-cli-sandbox',
-  };
+  });
   const TARGET_DIR = '/path/to/target';
   const DEBUG_MODE = false;
   const QUESTION = 'test question';
@@ -2186,15 +2338,32 @@ describe('Config getHooks', () => {
 
       expect(onModelChange).not.toHaveBeenCalled();
     });
+
+    it('should call onModelChange when persisting a model that was previously temporary', () => {
+      const onModelChange = vi.fn();
+      const config = new Config({
+        ...baseParams,
+        model: 'some-other-model',
+        onModelChange,
+      });
+
+      // Temporary selection
+      config.setModel(DEFAULT_GEMINI_MODEL, true);
+      expect(onModelChange).not.toHaveBeenCalled();
+
+      // Persist selection of the same model
+      config.setModel(DEFAULT_GEMINI_MODEL, false);
+      expect(onModelChange).toHaveBeenCalledWith(DEFAULT_GEMINI_MODEL);
+    });
   });
 });
 
 describe('LocalLiteRtLmClient Lifecycle', () => {
   const MODEL = 'gemini-pro';
-  const SANDBOX: SandboxConfig = {
+  const SANDBOX: SandboxConfig = createMockSandboxConfig({
     command: 'docker',
     image: 'gemini-cli-sandbox',
-  };
+  });
   const TARGET_DIR = '/path/to/target';
   const DEBUG_MODE = false;
   const QUESTION = 'test question';
@@ -2395,6 +2564,65 @@ describe('Availability Service Integration', () => {
     config.resetTurn();
     expect(spy).toHaveBeenCalled();
   });
+
+  it('resetTurn does NOT reset billing state', () => {
+    const config = new Config({
+      ...baseParams,
+      billing: { overageStrategy: 'ask' },
+    });
+
+    // Simulate accepting credits mid-turn
+    config.setOverageStrategy('always');
+    config.setCreditsNotificationShown(true);
+
+    // resetTurn should leave billing state intact
+    config.resetTurn();
+    expect(config.getBillingSettings().overageStrategy).toBe('always');
+    expect(config.getCreditsNotificationShown()).toBe(true);
+  });
+
+  it('resetBillingTurnState resets overageStrategy to configured value', () => {
+    const config = new Config({
+      ...baseParams,
+      billing: { overageStrategy: 'ask' },
+    });
+
+    config.setOverageStrategy('always');
+    expect(config.getBillingSettings().overageStrategy).toBe('always');
+
+    config.resetBillingTurnState('ask');
+    expect(config.getBillingSettings().overageStrategy).toBe('ask');
+  });
+
+  it('resetBillingTurnState preserves overageStrategy when configured as always', () => {
+    const config = new Config({
+      ...baseParams,
+      billing: { overageStrategy: 'always' },
+    });
+
+    config.resetBillingTurnState('always');
+    expect(config.getBillingSettings().overageStrategy).toBe('always');
+  });
+
+  it('resetBillingTurnState defaults to ask when no strategy provided', () => {
+    const config = new Config({
+      ...baseParams,
+      billing: { overageStrategy: 'always' },
+    });
+
+    config.resetBillingTurnState();
+    expect(config.getBillingSettings().overageStrategy).toBe('ask');
+  });
+
+  it('resetBillingTurnState resets creditsNotificationShown', () => {
+    const config = new Config(baseParams);
+
+    config.setCreditsNotificationShown(true);
+    expect(config.getCreditsNotificationShown()).toBe(true);
+
+    config.resetBillingTurnState();
+    expect(config.getCreditsNotificationShown()).toBe(false);
+  });
 });
 
 describe('Hooks configuration', () => {
@@ -2450,6 +2678,9 @@ describe('Config Quota & Preview Model Access', () => {
     usageStatisticsEnabled: false,
     embeddingModel: 'gemini-embedding',
     sandbox: {
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
       command: 'docker',
       image: 'gemini-cli-sandbox',
     },
@@ -2698,9 +2929,9 @@ describe('Config Quota & Preview Model Access', () => {
   });
 
   describe('isPlanEnabled', () => {
-    it('should return false by default', () => {
+    it('should return true by default', () => {
       const config = new Config(baseParams);
-      expect(config.isPlanEnabled()).toBe(false);
+      expect(config.isPlanEnabled()).toBe(true);
     });
 
     it('should return true when plan is enabled', () => {
@@ -3083,5 +3314,41 @@ describe('Model Persistence Bug Fix (#19864)', () => {
     // Verify onModelChange was called to persist the model
     expect(onModelChange).toHaveBeenCalledWith(PREVIEW_GEMINI_3_1_MODEL);
     expect(config.getModel()).toBe(PREVIEW_GEMINI_3_1_MODEL);
+  });
+});
+
+describe('ConfigSchema validation', () => {
+  it('should validate a valid sandbox config', async () => {
+    const validConfig = {
+      sandbox: {
+        enabled: true,
+        allowedPaths: ['/tmp'],
+        networkAccess: false,
+        command: 'docker',
+        image: 'node:20',
+      },
+    };
+
+    const { ConfigSchema } = await import('./config.js');
+    const result = ConfigSchema.safeParse(validConfig);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sandbox?.enabled).toBe(true);
+    }
+  });
+
+  it('should apply defaults in ConfigSchema', async () => {
+    const minimalConfig = {
+      sandbox: {},
+    };
+
+    const { ConfigSchema } = await import('./config.js');
+    const result = ConfigSchema.safeParse(minimalConfig);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sandbox?.enabled).toBe(false);
+      expect(result.data.sandbox?.allowedPaths).toEqual([]);
+      expect(result.data.sandbox?.networkAccess).toBe(false);
+    }
   });
 });

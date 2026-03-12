@@ -12,8 +12,8 @@ import { OAuthUtils } from '../../mcp/oauth-utils.js';
 
 // Mock the external dependencies
 vi.mock('google-auth-library', () => ({
-    GoogleAuth: vi.fn(),
-  }));
+  GoogleAuth: vi.fn(),
+}));
 
 describe('GoogleCredentialsAuthProvider', () => {
   const mockConfig: GoogleCredentialsAuthConfig = {
@@ -33,6 +33,7 @@ describe('GoogleCredentialsAuthProvider', () => {
       .mockResolvedValue({ token: 'mock-access-token' });
     mockGetClient = vi.fn().mockResolvedValue({
       getAccessToken: mockGetAccessToken,
+      credentials: { expiry_date: Date.now() + 3600 * 1000 },
     });
 
     mockFetchIdToken = vi.fn().mockResolvedValue('mock-id-token');
@@ -125,14 +126,46 @@ describe('GoogleCredentialsAuthProvider', () => {
       expect(mockGetClient).not.toHaveBeenCalled();
     });
 
-    it('re-fetches token on auth failure (shouldRetryWithHeaders)', async () => {
-      vi.spyOn(OAuthUtils, 'parseTokenExpiry').mockReturnValue(
-        Date.now() + 1000000,
-      );
+    it('returns cached access token on subsequent calls', async () => {
       const provider = new GoogleCredentialsAuthProvider(
         mockConfig,
         'https://language.googleapis.com',
       );
+
+      await provider.headers();
+      await provider.headers();
+
+      // Should only call getClient/getAccessToken once due to caching
+      expect(mockGetClient).toHaveBeenCalledTimes(1);
+      expect(mockGetAccessToken).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns cached id token on subsequent calls', async () => {
+      vi.spyOn(OAuthUtils, 'parseTokenExpiry').mockReturnValue(
+        Date.now() + 1000000,
+      );
+
+      const provider = new GoogleCredentialsAuthProvider(
+        mockConfig,
+        'https://my-service.run.app',
+      );
+
+      await provider.headers();
+      await provider.headers();
+
+      expect(mockGetIdTokenClient).toHaveBeenCalledTimes(1);
+      expect(mockFetchIdToken).toHaveBeenCalledTimes(1);
+    });
+
+    it('re-fetches access token on 401 (shouldRetryWithHeaders)', async () => {
+      const provider = new GoogleCredentialsAuthProvider(
+        mockConfig,
+        'https://language.googleapis.com',
+      );
+
+      // Prime the cache
+      await provider.headers();
+      expect(mockGetAccessToken).toHaveBeenCalledTimes(1);
 
       const req = {} as RequestInit;
       const res = { status: 401 } as Response;
@@ -142,7 +175,41 @@ describe('GoogleCredentialsAuthProvider', () => {
       expect(retryHeaders).toEqual({
         Authorization: 'Bearer mock-access-token',
       });
-      expect(mockGetAccessToken).toHaveBeenCalledTimes(1); // the retry fetched it
+      // Cache was cleared, so getAccessToken was called again
+      expect(mockGetAccessToken).toHaveBeenCalledTimes(2);
+    });
+
+    it('re-fetches token on 403', async () => {
+      const provider = new GoogleCredentialsAuthProvider(
+        mockConfig,
+        'https://language.googleapis.com',
+      );
+
+      const req = {} as RequestInit;
+      const res = { status: 403 } as Response;
+
+      const retryHeaders = await provider.shouldRetryWithHeaders(req, res);
+
+      expect(retryHeaders).toEqual({
+        Authorization: 'Bearer mock-access-token',
+      });
+    });
+
+    it('stops retrying after MAX_AUTH_RETRIES', async () => {
+      const provider = new GoogleCredentialsAuthProvider(
+        mockConfig,
+        'https://language.googleapis.com',
+      );
+
+      const req = {} as RequestInit;
+      const res = { status: 401 } as Response;
+
+      // First two retries should succeed (MAX_AUTH_RETRIES = 2)
+      expect(await provider.shouldRetryWithHeaders(req, res)).toBeDefined();
+      expect(await provider.shouldRetryWithHeaders(req, res)).toBeDefined();
+
+      // Third should return undefined (exhausted)
+      expect(await provider.shouldRetryWithHeaders(req, res)).toBeUndefined();
     });
   });
 });
