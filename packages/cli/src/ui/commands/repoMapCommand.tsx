@@ -4,56 +4,64 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  type CommandContext,
-  type SlashCommand,
-  CommandKind,
-} from './types.js';
+import { repoMapCommand } from './repoMapCommand.js';
+import type { CommandContext } from './types.js';
+import type { Config } from '@google/gemini-cli-core';
+import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { MessageType } from '../types.js';
-import { buildRepoTree } from '@google/gemini-cli-core';
-import { InteractiveRepoMap } from '../components/InteractiveRepoMap.js';
 
-export const repoMapCommand: SlashCommand = {
-  name: 'repo-map',
-  description: 'Visualizes the repository tree structure.',
-  kind: CommandKind.BUILT_IN,
-  suggestionGroup: 'Project',
-  action: async (context: CommandContext) => {
-    const projectRoot = context.services.config?.getProjectRoot();
-    if (!projectRoot) {
-      context.ui.addItem({
-        type: MessageType.ERROR,
-        text: 'Error: Outside of a project workspace. Cannot build repository tree.',
-      });
-      return;
-    }
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    buildRepoTree: vi.fn().mockResolvedValue({
+      name: 'mock-repo',
+      isDirectory: true,
+      children: [],
+    }),
+  };
+});
 
-    context.ui.setPendingItem({
-      type: MessageType.INFO,
-      text: 'Generating repository map...',
+describe('repoMapCommand', () => {
+  let context: CommandContext;
+
+  beforeEach(() => {
+    context = createMockCommandContext({
+      services: {
+        config: {
+          getProjectRoot: vi.fn().mockReturnValue('/home/user/project'),
+        } as unknown as Config,
+      },
     });
+  });
 
-    try {
-      const tree = await buildRepoTree({ projectRoot });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-      context.ui.setPendingItem(null);
+  it('should return RepoMap UI component on success', async () => {
+    const result = await repoMapCommand.action!(context, '');
 
-      return {
-        type: 'custom_dialog',
-        component: (
-          <InteractiveRepoMap
-            tree={tree}
-            onClose={() => context.ui.removeComponent()}
-          />
-        ),
-      };
-    } catch (e: unknown) {
-      context.ui.setPendingItem(null);
-      context.ui.addItem({
+    expect(context.ui.setPendingItem).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'Generating repository map...' }),
+    );
+    expect(result).toMatchObject({
+      type: 'custom_dialog',
+    });
+  });
+
+  it('should handle error if outside workspace', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (context.services.config!.getProjectRoot as any).mockReturnValue(undefined);
+    await repoMapCommand.action!(context, '');
+
+    expect(context.ui.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
         type: MessageType.ERROR,
-        text: `Error generating repository map: ${e instanceof Error ? e.message : String(e)}`,
-      });
-      return;
-    }
-  },
-};
+        text: expect.stringContaining('Outside of a project workspace'),
+      }),
+    );
+  });
+});
