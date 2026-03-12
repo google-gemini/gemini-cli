@@ -4,12 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/**
- * @license
- * Copyright 2026 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import { readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { ShellCompletionProvider, CompletionResult } from './types.js';

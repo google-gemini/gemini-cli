@@ -4,12 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/**
- * @license
- * Copyright 2026 Google LLC
- * SPDX-License-Identifier: Apache-2.0
- */
-
 import { readdir, stat } from 'node:fs/promises';
 import { join, extname, basename } from 'node:path';
 import type { FileNode } from '../ui/RepoVisualizer.js';
