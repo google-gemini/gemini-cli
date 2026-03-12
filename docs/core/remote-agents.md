@@ -80,6 +80,8 @@ Add an `auth` block to your agent's frontmatter to configure credentials.
 
 ### Supported auth types
 
+Gemini CLI supports the following authentication types:
+
 | Type                 | Description                                                                                    |
 | :------------------- | :--------------------------------------------------------------------------------------------- |
 | `apiKey`             | Send a static API key as an HTTP header.                                                       |
@@ -103,7 +105,7 @@ For `apiKey` and `http` auth types, secret values (`key`, `token`, `username`,
 > directly in agent files, especially for project-level agents checked into
 > version control.
 
-### API Key (`apiKey`)
+### API key (`apiKey`)
 
 Sends an API key as an HTTP header on every request.
 
@@ -131,6 +133,8 @@ authentication schemes.
 
 #### Bearer token
 
+Use the following fields to configure a Bearer token:
+
 | Field    | Type   | Required | Description                                |
 | :------- | :----- | :------- | :----------------------------------------- |
 | `type`   | string | Yes      | Must be `http`.                            |
@@ -145,6 +149,8 @@ auth:
 ```
 
 #### Basic authentication
+
+Use the following fields to configure Basic authentication:
 
 | Field      | Type   | Required | Description                            |
 | :--------- | :----- | :------- | :------------------------------------- |
@@ -163,13 +169,13 @@ auth:
 
 #### Raw scheme
 
-For any other IANA-registered scheme (e.g., Digest, HOBA), provide the raw
-authorization value.
+For any other IANA-registered scheme (for example, Digest, HOBA), provide the
+raw authorization value.
 
 | Field    | Type   | Required | Description                                                                   |
 | :------- | :----- | :------- | :---------------------------------------------------------------------------- |
 | `type`   | string | Yes      | Must be `http`.                                                               |
-| `scheme` | string | Yes      | The scheme name (e.g., `Digest`).                                             |
+| `scheme` | string | Yes      | The scheme name (for example, `Digest`).                                      |
 | `value`  | string | Yes      | Raw value sent as `Authorization: <scheme> <value>`. Supports dynamic values. |
 
 ```yaml
@@ -243,6 +249,9 @@ hosted on a different domain, use one of the other auth types (`apiKey`, `http`,
 or `oauth2`).
 
 #### Examples
+
+The following examples demonstrate how to configure Google Application Default
+Credentials.
 
 **Cloud Run agent:**
 
@@ -325,9 +334,9 @@ is re-executed on retry to fetch a fresh key.
 
 When connecting to a remote agent, Gemini CLI first fetches the agent card
 **without** authentication. If the card endpoint returns a `401` or `403`, it
-retries the fetch **with** the configured auth headers. This allows agents to
-have publicly accessible cards while protecting their task endpoints, or to
-protect both behind auth.
+retries the fetch **with** the configured auth headers. This lets agents have
+publicly accessible cards while protecting their task endpoints, or to protect
+both behind auth.
 
 ## Managing Subagents
 
