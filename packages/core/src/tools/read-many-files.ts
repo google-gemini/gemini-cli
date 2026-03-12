@@ -18,7 +18,7 @@ import { getErrorMessage } from '../utils/errors.js';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 import { glob, escape } from 'glob';
-import { buildPatternArgsPattern } from '../policy/utils.js';
+import { buildParamArgsPattern } from '../policy/utils.js';
 import {
   detectFileType,
   processSingleFileContent,
@@ -161,10 +161,8 @@ ${finalExclusionPatternsForDescription
   override getPolicyUpdateOptions(
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
-    // We join the include patterns to match the JSON stringified arguments.
-    // buildPatternArgsPattern handles JSON stringification.
     return {
-      argsPattern: buildPatternArgsPattern(JSON.stringify(this.params.include)),
+      argsPattern: buildParamArgsPattern('include', this.params.include),
     };
   }
 

@@ -14,7 +14,7 @@ import {
   type ToolConfirmationOutcome,
   type PolicyUpdateOptions,
 } from './tools.js';
-import { buildPatternArgsPattern } from '../policy/utils.js';
+import { buildParamArgsPattern } from '../policy/utils.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -328,12 +328,11 @@ ${textContent}
   ): PolicyUpdateOptions | undefined {
     if (this.params.url) {
       return {
-        argsPattern: buildPatternArgsPattern(this.params.url),
+        argsPattern: buildParamArgsPattern('url', this.params.url),
       };
-    }
-    if (this.params.prompt) {
+    } else if (this.params.prompt) {
       return {
-        argsPattern: buildPatternArgsPattern(this.params.prompt),
+        argsPattern: buildParamArgsPattern('prompt', this.params.prompt),
       };
     }
     return undefined;

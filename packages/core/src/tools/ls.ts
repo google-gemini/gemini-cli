@@ -21,7 +21,7 @@ import type { Config } from '../config/config.js';
 import { DEFAULT_FILE_FILTERING_OPTIONS } from '../config/constants.js';
 import { ToolErrorType } from './tool-error.js';
 import { LS_TOOL_NAME } from './tool-names.js';
-import { buildFilePathArgsPattern } from '../policy/utils.js';
+import { buildDirPathArgsPattern } from '../policy/utils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { LS_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
@@ -130,7 +130,7 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
     return {
-      argsPattern: buildFilePathArgsPattern(this.params.dir_path),
+      argsPattern: buildDirPathArgsPattern(this.params.dir_path),
     };
   }
 

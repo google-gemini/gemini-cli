@@ -505,6 +505,8 @@ describe('createContentGenerator', () => {
   });
 
   it('should not include baseUrl in httpOptions when GOOGLE_GEMINI_BASE_URL is not set', async () => {
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', '');
+
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
