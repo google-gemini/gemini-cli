@@ -2348,6 +2348,7 @@ describe('connectToMcpServer with OAuth', () => {
     const serverUrl = 'http://test-server.com/';
     const authUrl = 'http://auth.example.com/auth';
     const tokenUrl = 'http://auth.example.com/token';
+    const registrationUrl = 'http://auth.example.com/register';
     const wwwAuthHeader = `Bearer realm="test", resource_metadata="http://test-server.com/.well-known/oauth-protected-resource"`;
 
     vi.mocked(mockedClient.connect).mockRejectedValueOnce(
@@ -2360,6 +2361,7 @@ describe('connectToMcpServer with OAuth', () => {
     vi.mocked(OAuthUtils.discoverOAuthConfig).mockResolvedValue({
       authorizationUrl: authUrl,
       tokenUrl,
+      registrationUrl,
       scopes: ['test-scope'],
     });
 
@@ -2383,7 +2385,11 @@ describe('connectToMcpServer with OAuth', () => {
 
     expect(client).toBe(mockedClient);
     expect(mockedClient.connect).toHaveBeenCalledTimes(2);
-    expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
+    expect(mockAuthProvider.authenticate).toHaveBeenCalledWith(
+      'test-server',
+      expect.objectContaining({ registrationUrl }),
+      serverUrl,
+    );
 
     const authHeader = (capturedTransport as TestableTransport)._requestInit
       ?.headers?.['Authorization'];
@@ -2440,6 +2446,7 @@ describe('connectToMcpServer with OAuth', () => {
     const serverUrl = 'http://test-server.com/mcp';
     const authUrl = 'http://auth.example.com/auth';
     const tokenUrl = 'http://auth.example.com/token';
+    const registrationUrl = 'http://auth.example.com/register';
     const wwwAuthHeader = `Bearer realm="test", resource_metadata="http://test-server.com/.well-known/oauth-protected-resource"`;
 
     vi.mocked(mockedClient.connect).mockRejectedValueOnce(
@@ -2452,6 +2459,7 @@ describe('connectToMcpServer with OAuth', () => {
     vi.mocked(OAuthUtils.discoverOAuthFromWWWAuthenticate).mockResolvedValue({
       authorizationUrl: authUrl,
       tokenUrl,
+      registrationUrl,
       scopes: ['read'],
     });
 
@@ -2472,7 +2480,11 @@ describe('connectToMcpServer with OAuth', () => {
       serverUrl,
     );
     expect(OAuthUtils.discoverOAuthConfig).not.toHaveBeenCalled();
-    expect(mockAuthProvider.authenticate).toHaveBeenCalledOnce();
+    expect(mockAuthProvider.authenticate).toHaveBeenCalledWith(
+      'test-server',
+      expect.objectContaining({ registrationUrl }),
+      serverUrl,
+    );
   });
 
   it('should fall back to extractBaseUrl + discoverOAuthConfig when discoverOAuthFromWWWAuthenticate returns null', async () => {
