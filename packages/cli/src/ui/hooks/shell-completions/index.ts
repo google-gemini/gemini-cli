@@ -7,8 +7,15 @@
 import type { ShellCompletionProvider, CompletionResult } from './types.js';
 import { gitProvider } from './gitProvider.js';
 import { npmProvider } from './npmProvider.js';
+import { visualizeProvider } from './visualizeProvider.js'; // ← add
 
-const providers: ShellCompletionProvider[] = [gitProvider, npmProvider];
+const providers: ShellCompletionProvider[] = [
+  gitProvider,
+  npmProvider,
+  visualizeProvider, // ← add
+  { ...visualizeProvider, command: 'viz' },
+  { ...visualizeProvider, command: 'tree' },
+];
 
 export async function getArgumentCompletions(
   commandToken: string,
