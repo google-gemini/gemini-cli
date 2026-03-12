@@ -100,6 +100,7 @@ export * from './utils/fastAckHelper.js';
 export * from './utils/workspaceContext.js';
 export * from './utils/environmentContext.js';
 export * from './utils/ignorePatterns.js';
+export { DEFAULT_FILE_EXCLUDES } from './utils/ignorePatterns.js';
 export * from './utils/partUtils.js';
 export * from './utils/promptIdContext.js';
 export * from './utils/thoughtUtils.js';
