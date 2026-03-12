@@ -31,6 +31,8 @@ import {
   type HierarchicalMemory,
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
+  isValidModelOrAlias,
+  getValidModelsAndAliases,
   getAdminErrorMessage,
   isHeadlessMode,
   Config,
@@ -40,6 +42,7 @@ import {
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
+  detectIdeFromEnv,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -670,6 +673,18 @@ export async function loadCliConfig(
   const specifiedModel =
     argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
 
+  // Validate the model if one was explicitly specified
+  if (specifiedModel && specifiedModel !== GEMINI_MODEL_ALIAS_AUTO) {
+    if (!isValidModelOrAlias(specifiedModel)) {
+      const validModels = getValidModelsAndAliases();
+
+      throw new FatalConfigError(
+        `Invalid model: "${specifiedModel}"\n\n` +
+          `Valid models and aliases:\n${validModels.map((m) => `  - ${m}`).join('\n')}\n\n` +
+          `Use /model to switch models interactively.`,
+      );
+    }
+  }
   const resolvedModel =
     specifiedModel === GEMINI_MODEL_ALIAS_AUTO
       ? defaultModel
@@ -710,8 +725,21 @@ export async function loadCliConfig(
     }
   }
 
+  const isAcpMode = !!argv.acp || !!argv.experimentalAcp;
+  let clientName: string | undefined = undefined;
+  if (isAcpMode) {
+    const ide = detectIdeFromEnv();
+    if (
+      ide &&
+      (ide.name !== 'vscode' || process.env['TERM_PROGRAM'] === 'vscode')
+    ) {
+      clientName = `acp-${ide.name}`;
+    }
+  }
+
   return new Config({
-    acpMode: !!argv.acp || !!argv.experimentalAcp,
+    acpMode: isAcpMode,
+    clientName,
     sessionId,
     clientVersion: await getVersion(),
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,

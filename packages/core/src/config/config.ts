@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { inspect } from 'node:util';
 import process from 'node:process';
+import { z } from 'zod';
 import {
   AuthType,
   createContentGenerator,
@@ -96,7 +97,6 @@ import type {
 import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
 import { OutputFormat } from '../output/types.js';
-//import { type AgentLoopContext } from './agent-loop-context.js';
 import {
   ModelConfigService,
   type ModelConfig,
@@ -318,6 +318,8 @@ export interface BrowserAgentCustomConfig {
   profilePath?: string;
   /** Model override for the visual agent. */
   visualModel?: string;
+  /** Disable user input on the browser window during automation. Default: true in non-headless mode */
+  disableUserInput?: boolean;
 }
 
 /**
@@ -453,9 +455,35 @@ export enum AuthProviderType {
 }
 
 export interface SandboxConfig {
-  command: 'docker' | 'podman' | 'sandbox-exec' | 'runsc' | 'lxc';
-  image: string;
+  enabled: boolean;
+  allowedPaths?: string[];
+  networkAccess?: boolean;
+  command?: 'docker' | 'podman' | 'sandbox-exec' | 'runsc' | 'lxc';
+  image?: string;
 }
+
+export const ConfigSchema = z.object({
+  sandbox: z
+    .object({
+      enabled: z.boolean().default(false),
+      allowedPaths: z.array(z.string()).default([]),
+      networkAccess: z.boolean().default(false),
+      command: z
+        .enum(['docker', 'podman', 'sandbox-exec', 'runsc', 'lxc'])
+        .optional(),
+      image: z.string().optional(),
+    })
+    .superRefine((data, ctx) => {
+      if (data.enabled && !data.command) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Sandbox command is required when sandbox is enabled',
+          path: ['command'],
+        });
+      }
+    })
+    .optional(),
+});
 
 /**
  * Callbacks for checking MCP server enablement status.
@@ -478,6 +506,7 @@ export interface PolicyUpdateConfirmationRequest {
 
 export interface ConfigParameters {
   sessionId: string;
+  clientName?: string;
   clientVersion?: string;
   embeddingModel?: string;
   sandbox?: SandboxConfig;
@@ -623,6 +652,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly acknowledgedAgentsService: AcknowledgedAgentsService;
   private skillManager!: SkillManager;
   private _sessionId: string;
+  private readonly clientName: string | undefined;
   private clientVersion: string;
   private fileSystemService: FileSystemService;
   private trackerService?: TrackerService;
@@ -821,6 +851,7 @@ export class Config implements McpContext, AgentLoopContext {
 
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
+    this.clientName = params.clientName;
     this.clientVersion = params.clientVersion ?? 'unknown';
     this.approvedPlanPath = undefined;
     this.embeddingModel =
@@ -961,7 +992,6 @@ export class Config implements McpContext, AgentLoopContext {
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
-    // // TODO(joshualitt): Re-evaluate the todo tool for 3 family.
     this.useWriteTodos = isPreviewModel(this.model)
       ? false
       : (params.useWriteTodos ?? true);
@@ -1388,6 +1418,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.promptId;
   }
 
+  getClientName(): string | undefined {
+    return this.clientName;
+  }
+
   setSessionId(sessionId: string): void {
     this._sessionId = sessionId;
   }
@@ -1620,6 +1654,18 @@ export class Config implements McpContext, AgentLoopContext {
 
   getSandbox(): SandboxConfig | undefined {
     return this.sandbox;
+  }
+
+  getSandboxEnabled(): boolean {
+    return this.sandbox?.enabled ?? false;
+  }
+
+  getSandboxAllowedPaths(): string[] {
+    return this.sandbox?.allowedPaths ?? [];
+  }
+
+  getSandboxNetworkAccess(): boolean {
+    return this.sandbox?.networkAccess ?? false;
   }
 
   isRestrictiveSandbox(): boolean {
@@ -2853,8 +2899,21 @@ export class Config implements McpContext, AgentLoopContext {
         headless: customConfig.headless ?? false,
         profilePath: customConfig.profilePath,
         visualModel: customConfig.visualModel,
+        disableUserInput: customConfig.disableUserInput,
       },
     };
+  }
+
+  /**
+   * Determines if user input should be disabled during browser automation.
+   * Based on the `disableUserInput` setting and `headless` mode.
+   */
+  shouldDisableBrowserUserInput(): boolean {
+    const browserConfig = this.getBrowserAgentConfig();
+    return (
+      browserConfig.customConfig?.disableUserInput !== false &&
+      !browserConfig.customConfig?.headless
+    );
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {

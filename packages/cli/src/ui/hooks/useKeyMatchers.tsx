@@ -6,8 +6,7 @@
 
 import type React from 'react';
 import { createContext, useContext } from 'react';
-import type { KeyMatchers } from '../key/keyMatchers.js';
-import { defaultKeyMatchers } from '../key/keyMatchers.js';
+import { defaultKeyMatchers, type KeyMatchers } from '../key/keyMatchers.js';
 
 export const KeyMatchersContext =
   createContext<KeyMatchers>(defaultKeyMatchers);

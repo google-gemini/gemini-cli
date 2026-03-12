@@ -2549,10 +2549,8 @@ describe('LocalAgentExecutor', () => {
         executor as unknown as { toolRegistry: ToolRegistry }
       ).toolRegistry.getAllToolNames();
 
-      expect(agentTools).toContain(parentMcpTool2.asFullyQualifiedTool().name);
-      expect(agentTools).not.toContain(
-        parentMcpTool1.asFullyQualifiedTool().name,
-      );
+      expect(agentTools).toContain(parentMcpTool2.name);
+      expect(agentTools).not.toContain(parentMcpTool1.name);
     });
   });
 });
