@@ -26,6 +26,7 @@ import {
   clearOauthClientCache,
   authEvents,
 } from './oauth2.js';
+import { logGoogleAuthStart, logGoogleAuthEnd } from '../telemetry/loggers.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -103,6 +104,11 @@ vi.mock('../mcp/token-storage/hybrid-token-storage.js', () => ({
     setCredentials: vi.fn(),
     deleteCredentials: vi.fn(),
   })),
+}));
+
+vi.mock('../telemetry/loggers.js', () => ({
+  logGoogleAuthStart: vi.fn(),
+  logGoogleAuthEnd: vi.fn(),
 }));
 
 const mockConfig = {
@@ -1383,6 +1389,62 @@ describe('oauth2', () => {
         await expect(
           getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig),
         ).rejects.toThrow(FatalCancellationError);
+      });
+    });
+
+    describe('onboarding telemetry', () => {
+      it('should record onboarding start and end events for LOGIN_WITH_GOOGLE', async () => {
+        const mockOAuth2Client = {
+          setCredentials: vi.fn(),
+          getAccessToken: vi.fn().mockResolvedValue({ token: 'mock-token' }),
+          getTokenInfo: vi.fn().mockResolvedValue({}),
+          on: vi.fn(),
+        } as unknown as OAuth2Client;
+        vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
+
+        const cachedCreds = { refresh_token: 'test-token' };
+        const credsPath = path.join(
+          tempHomeDir,
+          GEMINI_DIR,
+          'oauth_creds.json',
+        );
+        await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
+        await fs.promises.writeFile(credsPath, JSON.stringify(cachedCreds));
+
+        await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
+
+        expect(logGoogleAuthStart).toHaveBeenCalledWith(
+          mockConfig,
+          expect.any(Object),
+        );
+        expect(logGoogleAuthEnd).toHaveBeenCalledWith(
+          mockConfig,
+          expect.any(Object),
+        );
+      });
+
+      it('should NOT record google auth events for non-LOGIN_WITH_GOOGLE auth types', async () => {
+        const mockOAuth2Client = {
+          setCredentials: vi.fn(),
+          getAccessToken: vi.fn().mockResolvedValue({ token: 'mock-token' }),
+          getTokenInfo: vi.fn().mockResolvedValue({}),
+          on: vi.fn(),
+        } as unknown as OAuth2Client;
+        vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
+
+        const cachedCreds = { refresh_token: 'test-token' };
+        const credsPath = path.join(
+          tempHomeDir,
+          GEMINI_DIR,
+          'oauth_creds.json',
+        );
+        await fs.promises.mkdir(path.dirname(credsPath), { recursive: true });
+        await fs.promises.writeFile(credsPath, JSON.stringify(cachedCreds));
+
+        await getOauthClient(AuthType.COMPUTE_ADC, mockConfig);
+
+        expect(recordGoogleAuthStart).not.toHaveBeenCalled();
+        expect(recordGoogleAuthEnd).not.toHaveBeenCalled();
       });
     });
 

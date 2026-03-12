@@ -57,6 +57,8 @@ import {
   type ToolOutputMaskingEvent,
   type KeychainAvailabilityEvent,
   type TokenStorageInitializationEvent,
+  type GoogleAuthStartEvent,
+  type GoogleAuthEndEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -79,6 +81,8 @@ import {
   recordKeychainAvailability,
   recordTokenStorageInitialization,
   recordInvalidChunk,
+  recordGoogleAuthStart,
+  recordGoogleAuthEnd,
 } from './metrics.js';
 import { bufferTelemetryEvent } from './sdk.js';
 import { uiTelemetryService, type UiEvent } from './uiTelemetry.js';
@@ -868,6 +872,40 @@ export function logTokenStorageInitialization(
     logger.emit(logRecord);
 
     recordTokenStorageInitialization(config, event);
+  });
+}
+
+export function logGoogleAuthStart(
+  config: Config,
+  event: GoogleAuthStartEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logGoogleAuthStartEvent(event);
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
+
+    recordGoogleAuthStart(config);
+  });
+}
+
+export function logGoogleAuthEnd(
+  config: Config,
+  event: GoogleAuthEndEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logGoogleAuthEndEvent(event);
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
+
+    recordGoogleAuthEnd(config);
   });
 }
 

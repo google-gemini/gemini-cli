@@ -2360,6 +2360,52 @@ export class KeychainAvailabilityEvent implements BaseTelemetryEvent {
   }
 }
 
+export const EVENT_GOOGLE_AUTH_START = 'gemini_cli.google_auth.start';
+export class GoogleAuthStartEvent implements BaseTelemetryEvent {
+  'event.name': 'google_auth_start';
+  'event.timestamp': string;
+
+  constructor() {
+    this['event.name'] = 'google_auth_start';
+    this['event.timestamp'] = new Date().toISOString();
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_GOOGLE_AUTH_START,
+      'event.timestamp': this['event.timestamp'],
+    };
+  }
+
+  toLogBody(): string {
+    return 'Google auth started.';
+  }
+}
+
+export const EVENT_GOOGLE_AUTH_END = 'gemini_cli.google_auth.end';
+export class GoogleAuthEndEvent implements BaseTelemetryEvent {
+  'event.name': 'google_auth_end';
+  'event.timestamp': string;
+
+  constructor() {
+    this['event.name'] = 'google_auth_end';
+    this['event.timestamp'] = new Date().toISOString();
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_GOOGLE_AUTH_END,
+      'event.timestamp': this['event.timestamp'],
+    };
+  }
+
+  toLogBody(): string {
+    return 'Google auth succeeded.';
+  }
+}
+
 export const EVENT_TOKEN_STORAGE_INITIALIZATION =
   'gemini_cli.token_storage.initialization';
 export class TokenStorageInitializationEvent implements BaseTelemetryEvent {

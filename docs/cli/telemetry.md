@@ -920,6 +920,16 @@ Gemini CLI exports several custom metrics.
 
 Incremented once per CLI startup.
 
+##### Authentication
+
+Tracks "Login with Google" OAuth flow initiation and completion.
+
+- `gemini_cli.google_auth.start` (Counter, Int): Incremented when the "Login
+  with Google" OAuth flow begins.
+
+- `gemini_cli.google_auth.end` (Counter, Int): Incremented when the "Login with
+  Google" OAuth flow completes successfully.
+
 ##### Tools
 
 ##### `gemini_cli.tool.call.count`

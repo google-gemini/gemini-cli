@@ -51,6 +51,8 @@ import type {
   KeychainAvailabilityEvent,
   TokenStorageInitializationEvent,
   StartupStatsEvent,
+  GoogleAuthStartEvent,
+  GoogleAuthEndEvent,
 } from '../types.js';
 import type {
   CreditsUsedEvent,
@@ -124,6 +126,8 @@ export enum EventNames {
   TOOL_OUTPUT_MASKING = 'tool_output_masking',
   KEYCHAIN_AVAILABILITY = 'keychain_availability',
   TOKEN_STORAGE_INITIALIZATION = 'token_storage_initialization',
+  GOOGLE_AUTH_START = 'google_auth_start',
+  GOOGLE_AUTH_END = 'google_auth_end',
   CONSECA_POLICY_GENERATION = 'conseca_policy_generation',
   CONSECA_VERDICT = 'conseca_verdict',
   STARTUP_STATS = 'startup_stats',
@@ -1793,6 +1797,16 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.TOKEN_STORAGE_INITIALIZATION, data),
     );
+    this.flushIfNeeded();
+  }
+
+  logGoogleAuthStartEvent(_event: GoogleAuthStartEvent): void {
+    this.enqueueLogEvent(this.createLogEvent(EventNames.GOOGLE_AUTH_START, []));
+    this.flushIfNeeded();
+  }
+
+  logGoogleAuthEndEvent(_event: GoogleAuthEndEvent): void {
+    this.enqueueLogEvent(this.createLogEvent(EventNames.GOOGLE_AUTH_END, []));
     this.flushIfNeeded();
   }
 
