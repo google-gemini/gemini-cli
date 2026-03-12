@@ -148,10 +148,16 @@ export class ChatRecordingService {
    *
    * @param resumedSessionData Data from a previous session to resume from.
    * @param kind The kind of conversation (main or subagent).
+   * @param initialHistory The starting history for this session.
+   * @param overwriteHistory If true and resuming an existing session, the messages on disk will
+   * be overwritten with initialHistory. Use with caution as this destroys original message
+   * IDs and timestamps.
    */
   initialize(
     resumedSessionData?: ResumedSessionData,
     kind?: 'main' | 'subagent',
+    initialHistory?: Content[],
+    overwriteHistory: boolean = false,
   ): void {
     try {
       this.kind = kind;
@@ -164,6 +170,10 @@ export class ChatRecordingService {
         // Update the session ID in the existing file
         this.updateConversation((conversation) => {
           conversation.sessionId = this.sessionId;
+          if (overwriteHistory && initialHistory) {
+            conversation.messages =
+              this.apiContentToMessageRecords(initialHistory);
+          }
         });
 
         // Clear any cached data to force fresh reads
@@ -193,7 +203,7 @@ export class ChatRecordingService {
           projectHash: this.projectHash,
           startTime: new Date().toISOString(),
           lastUpdated: new Date().toISOString(),
-          messages: [],
+          messages: this.apiContentToMessageRecords(initialHistory || []),
           kind: this.kind,
         });
       }
@@ -216,6 +226,31 @@ export class ChatRecordingService {
       debugLogger.error('Error initializing chat recording service:', error);
       throw error;
     }
+  }
+
+  /**
+   * Converts API Content array to storage-compatible MessageRecord array.
+   * WARNING: Generates new IDs and timestamps. Use only for brand new content
+   * or when explicitly overwriting history (e.g. after compression).
+   */
+  private apiContentToMessageRecords(history: Content[]): MessageRecord[] {
+    return history.map((content): MessageRecord => {
+      if (content.role === 'model') {
+        return {
+          id: randomUUID(),
+          timestamp: new Date().toISOString(),
+          type: 'gemini',
+          content: content.parts || [],
+        };
+      } else {
+        return {
+          id: randomUUID(),
+          timestamp: new Date().toISOString(),
+          type: 'user',
+          content: content.parts || [],
+        };
+      }
+    });
   }
 
   private getLastMessage(
