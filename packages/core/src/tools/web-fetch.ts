@@ -171,6 +171,10 @@ interface GroundingChunkItem {
   web?: GroundingChunkWeb;
 }
 
+function isGroundingChunkItem(item: unknown): item is GroundingChunkItem {
+  return typeof item === 'object' && item !== null;
+}
+
 interface GroundingSupportSegment {
   startIndex: number;
   endIndex: number;
@@ -180,6 +184,10 @@ interface GroundingSupportSegment {
 interface GroundingSupportItem {
   segment?: GroundingSupportSegment;
   groundingChunkIndices?: number[];
+}
+
+function isGroundingSupportItem(item: unknown): item is GroundingSupportItem {
+  return typeof item === 'object' && item !== null;
 }
 
 /**
@@ -320,22 +328,57 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     }
   }
 
+  private filterAndValidateUrls(urls: string[]): {
+    toFetch: string[];
+    skipped: string[];
+  } {
+    const uniqueUrls = [...new Set(urls.map(normalizeUrl))];
+    const toFetch: string[] = [];
+    const skipped: string[] = [];
+
+    for (const url of uniqueUrls) {
+      if (this.isBlockedHost(url)) {
+        debugLogger.warn(
+          `[WebFetchTool] Skipped private or local host: ${url}`,
+        );
+        logWebFetchFallbackAttempt(
+          this.config,
+          new WebFetchFallbackAttemptEvent('private_ip_skipped'),
+        );
+        skipped.push(`[Blocked Host] ${url}`);
+        continue;
+      }
+      if (!checkRateLimit(url).allowed) {
+        debugLogger.warn(`[WebFetchTool] Rate limit exceeded for host: ${url}`);
+        skipped.push(`[Rate limit exceeded] ${url}`);
+        continue;
+      }
+      toFetch.push(url);
+    }
+    return { toFetch, skipped };
+  }
+
   private async executeFallback(
     urls: string[],
     signal: AbortSignal,
   ): Promise<ToolResult> {
-    const contentBudget = Math.floor(MAX_CONTENT_LENGTH / urls.length);
+    const uniqueUrls = [...new Set(urls)];
+    const contentBudget = Math.floor(
+      MAX_CONTENT_LENGTH / (uniqueUrls.length || 1),
+    );
     const results: string[] = [];
 
-    for (const url of urls) {
+    for (const url of uniqueUrls) {
       results.push(
         await this.executeFallbackForUrl(url, signal, contentBudget),
       );
     }
 
+    const randomDelimiter = `---${Math.random().toString(36).substring(2, 15)}---`;
+
     const aggregatedContent = results
-      .map((content, i) => `URL: ${urls[i]}\nContent:\n${content}`)
-      .join('\n\n---\n\n');
+      .map((content, i) => `URL: ${uniqueUrls[i]}\nContent:\n${content}`)
+      .join(`\n\n${randomDelimiter}\n\n`);
 
     try {
       const geminiClient = this.config.getGeminiClient();
@@ -343,9 +386,9 @@ class WebFetchToolInvocation extends BaseToolInvocation<
 
 I was unable to access the URL(s) directly using the primary fetch tool. Instead, I have fetched the raw content of the page(s). Please use the following content to answer the request. Do not attempt to access the URL(s) again.
 
----
+${randomDelimiter}
 ${aggregatedContent}
----
+${randomDelimiter}
 `;
       const result = await geminiClient.generateContent(
         { model: 'web-fetch-fallback' },
@@ -658,30 +701,7 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
     const userPrompt = this.params.prompt!;
     const { validUrls } = parsePrompt(userPrompt);
 
-    // Unit 1: Normalization & Deduplication
-    const uniqueUrls = [...new Set(validUrls.map(normalizeUrl))];
-    const toFetch: string[] = [];
-    const skipped: string[] = [];
-
-    for (const url of uniqueUrls) {
-      if (this.isBlockedHost(url)) {
-        debugLogger.warn(
-          `[WebFetchTool] Skipped private or local host: ${url}`,
-        );
-        logWebFetchFallbackAttempt(
-          this.config,
-          new WebFetchFallbackAttemptEvent('private_ip_skipped'),
-        );
-        skipped.push(`[Blocked Host] ${url}`);
-        continue;
-      }
-      if (!checkRateLimit(url).allowed) {
-        debugLogger.warn(`[WebFetchTool] Rate limit exceeded for host: ${url}`);
-        skipped.push(`[Rate limit exceeded] ${url}`);
-        continue;
-      }
-      toFetch.push(url);
-    }
+    const { toFetch, skipped } = this.filterAndValidateUrls(validUrls);
 
     // If everything was skipped, fail early
     if (toFetch.length === 0 && skipped.length > 0) {
@@ -723,13 +743,9 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
       }
 
       // 1. Apply Grounding Supports (Citations)
-      const rawGroundingSupports = groundingMetadata?.groundingSupports;
-      const groundingSupports = Array.isArray(rawGroundingSupports)
-        ? rawGroundingSupports.filter(
-            (item): item is GroundingSupportItem =>
-              typeof item === 'object' && item !== null,
-          )
-        : undefined;
+      const groundingSupports = groundingMetadata?.groundingSupports?.filter(
+        isGroundingSupportItem,
+      );
       if (groundingSupports && groundingSupports.length > 0) {
         const insertions: Array<{ index: number; marker: string }> = [];
         groundingSupports.forEach((support) => {
@@ -753,13 +769,8 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
       }
 
       // 2. Append Source List
-      const rawSources = groundingMetadata?.groundingChunks;
-      const sources = Array.isArray(rawSources)
-        ? rawSources.filter(
-            (item): item is GroundingChunkItem =>
-              typeof item === 'object' && item !== null,
-          )
-        : undefined;
+      const sources =
+        groundingMetadata?.groundingChunks?.filter(isGroundingChunkItem);
       if (sources && sources.length > 0) {
         const sourceListFormatted: string[] = [];
         sources.forEach((source, index) => {
