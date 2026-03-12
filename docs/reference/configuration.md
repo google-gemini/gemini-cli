@@ -63,8 +63,12 @@ locations for these files:
 variables using either `$VAR_NAME` or `${VAR_NAME}` syntax. These variables will
 be automatically resolved when the settings are loaded. For example, if you have
 an environment variable `MY_API_TOKEN`, you could use it in `settings.json` like
-this: `"apiKey": "$MY_API_TOKEN"`. Additionally, each extension can have its own
-`.env` file in its directory, which will be loaded automatically.
+this: `"apiKey": "$MY_API_TOKEN"`. You can also provide default values using the
+`${VAR_NAME:-default}` syntax — if `VAR_NAME` is unset or empty, the default
+value will be used instead. For example:
+`"endpoint": "${CUSTOM_ENDPOINT:-https://api.example.com/v1}"`. Additionally,
+each extension can have its own `.env` file in its directory, which will be
+loaded automatically.
 
 > **Note for Enterprise Users:** For guidance on deploying and managing Gemini
 > CLI in a corporate environment, please see the

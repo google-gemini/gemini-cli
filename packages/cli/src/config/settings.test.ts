@@ -1490,6 +1490,126 @@ describe('Settings Loading and Merging', () => {
       delete process.env['TEST_PORT'];
     });
 
+    it('should resolve ${VAR:-default} to the default when variable is unset', () => {
+      delete process.env['UNSET_API_KEY'];
+      const userSettingsContent: TestSettings = {
+        apiKey: '${UNSET_API_KEY:-default-key-123}',
+      };
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect((settings.user.settings as TestSettings)['apiKey']).toBe(
+        'default-key-123',
+      );
+    });
+
+    it('should resolve ${VAR:-default} to the env value when variable is set', () => {
+      process.env['MY_API_KEY'] = 'real-key';
+      const userSettingsContent: TestSettings = {
+        apiKey: '${MY_API_KEY:-default-key-123}',
+      };
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect((settings.user.settings as TestSettings)['apiKey']).toBe(
+        'real-key',
+      );
+      delete process.env['MY_API_KEY'];
+    });
+
+    it('should resolve ${VAR:-default} to the default when variable is empty', () => {
+      process.env['EMPTY_KEY'] = '';
+      const userSettingsContent: TestSettings = {
+        apiKey: '${EMPTY_KEY:-fallback}',
+      };
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect((settings.user.settings as TestSettings)['apiKey']).toBe(
+        'fallback',
+      );
+      delete process.env['EMPTY_KEY'];
+    });
+
+    it('should resolve ${VAR:-default} with URL default values', () => {
+      delete process.env['CUSTOM_ENDPOINT'];
+      const userSettingsContent: TestSettings = {
+        endpoint: '${CUSTOM_ENDPOINT:-https://api.example.com/v1}',
+      };
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      expect((settings.user.settings as TestSettings)['endpoint']).toBe(
+        'https://api.example.com/v1',
+      );
+    });
+
+    it('should resolve multiple ${VAR:-default} variables in nested objects', () => {
+      delete process.env['DB_HOST'];
+      process.env['DB_PORT'] = '5432';
+      const userSettingsContent: TestSettings = {
+        database: {
+          host: '${DB_HOST:-localhost}',
+          port: '${DB_PORT:-3306}',
+        },
+      };
+      (mockFsExistsSync as Mock).mockImplementation(
+        (p: fs.PathLike) => p === USER_SETTINGS_PATH,
+      );
+      (fs.readFileSync as Mock).mockImplementation(
+        (p: fs.PathOrFileDescriptor) => {
+          if (p === USER_SETTINGS_PATH)
+            return JSON.stringify(userSettingsContent);
+          return '{}';
+        },
+      );
+
+      const settings = loadSettings(MOCK_WORKSPACE_DIR);
+      const db = (settings.user.settings as TestSettings)['database'] as Record<
+        string,
+        unknown
+      >;
+      expect(db['host']).toBe('localhost');
+      expect(db['port']).toBe('5432');
+      delete process.env['DB_PORT'];
+    });
+
     describe('when GEMINI_CLI_SYSTEM_SETTINGS_PATH is set', () => {
       const MOCK_ENV_SYSTEM_SETTINGS_PATH = path.resolve(
         '/mock/env/system/settings.json',

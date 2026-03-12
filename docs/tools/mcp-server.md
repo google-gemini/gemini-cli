@@ -196,17 +196,20 @@ The expansion utility supports:
 
 - **POSIX/Bash syntax:** `$VARIABLE_NAME` or `${VARIABLE_NAME}` (supported on
   all platforms)
+- **Default values:** `${VARIABLE_NAME:-default_value}` — uses `default_value`
+  if the variable is unset or empty (supported on all platforms)
 - **Windows syntax:** `%VARIABLE_NAME%` (supported only when running on Windows)
 
-If a variable is not defined in the current environment, it resolves to an empty
-string.
+If a variable is not defined in the current environment and no default value is
+provided, it resolves to an empty string.
 
 **Example:**
 
 ```json
 "env": {
   "API_KEY": "$MY_EXTERNAL_TOKEN",
-  "LOG_LEVEL": "$LOG_LEVEL",
+  "LOG_LEVEL": "${LOG_LEVEL:-info}",
+  "ENDPOINT": "${CUSTOM_ENDPOINT:-https://api.example.com}",
   "TEMP_DIR": "%TEMP%"
 }
 ```
