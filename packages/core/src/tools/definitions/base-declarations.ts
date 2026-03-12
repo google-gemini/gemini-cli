@@ -28,6 +28,7 @@ export const PARAM_DESCRIPTION = 'description';
 
 // -- glob --
 export const GLOB_TOOL_NAME = 'glob';
+export const GLOB_PARAM_MAX_RESULTS = 'max_results';
 
 // -- grep_search --
 export const GREP_TOOL_NAME = 'grep_search';

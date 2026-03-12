@@ -34,6 +34,7 @@ import {
   PARAM_RESPECT_GEMINI_IGNORE,
   PARAM_FILE_FILTERING_OPTIONS,
   // Tool-specific parameter names
+  GLOB_PARAM_MAX_RESULTS,
   READ_FILE_PARAM_START_LINE,
   READ_FILE_PARAM_END_LINE,
   WRITE_FILE_PARAM_CONTENT,
@@ -286,6 +287,12 @@ export const DEFAULT_LEGACY_SET: CoreToolSet = {
           description:
             'Optional: Whether to respect .geminiignore patterns when finding files. Defaults to true.',
           type: 'boolean',
+        },
+        [GLOB_PARAM_MAX_RESULTS]: {
+          description:
+            'Optional: Maximum number of results to return. When the match set is larger than this limit the output is truncated and a notice is appended. Use this on large repositories to get faster, more focused results.',
+          type: 'integer',
+          minimum: 1,
         },
       },
       required: [PARAM_PATTERN],
