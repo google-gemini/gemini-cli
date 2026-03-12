@@ -284,6 +284,36 @@ describe('HookRegistry', () => {
         hookRegistry.getHooksForEvent(HookEventName.BeforeTool),
       ).toHaveLength(0);
     });
+
+    it('should set extensionName when hooks come from an extension', async () => {
+      const extensionHooks = {
+        BeforeTool: [
+          {
+            hooks: [
+              {
+                type: 'command',
+                command: './hooks/ext-hook.sh',
+              },
+            ],
+          },
+        ],
+      };
+
+      vi.mocked(mockConfig.getExtensions).mockReturnValue([
+        {
+          name: 'my-test-extension',
+          isActive: true,
+          hooks: extensionHooks,
+        },
+      ] as unknown as ReturnType<typeof mockConfig.getExtensions>);
+
+      await hookRegistry.initialize();
+
+      const hooks = hookRegistry.getAllHooks();
+      expect(hooks).toHaveLength(1);
+      expect(hooks[0].extensionName).toBe('my-test-extension');
+      expect(hooks[0].source).toBe(ConfigSource.Extensions);
+    });
   });
 
   describe('getHooksForEvent', () => {
