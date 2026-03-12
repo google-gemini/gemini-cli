@@ -22,6 +22,7 @@ import type { RemoteAgentDefinition } from './types.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { A2AAuthProvider } from './auth-provider/types.js';
+import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
 
 // Mock A2AClientManager
 vi.mock('./a2a-client-manager.js', () => ({
@@ -58,6 +59,7 @@ describe('RemoteAgentInvocation', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    ExecutionLifecycleService.resetForTest();
     (A2AClientManager.getInstance as Mock).mockReturnValue(mockClientManager);
     (
       RemoteAgentInvocation as unknown as {
@@ -683,6 +685,283 @@ describe('RemoteAgentInvocation', () => {
       // Should contain both the partial output and the error message
       expect(result.returnDisplay).toContain('Partial response');
       expect(result.returnDisplay).toContain('connection reset');
+    });
+  });
+
+  describe('ExecutionLifecycleService Integration', () => {
+    it('should register execution with lifecycle service and call setExecutionIdCallback', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+      mockClientManager.sendMessageStream.mockImplementation(
+        async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'msg-1',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Done' }],
+          };
+        },
+      );
+
+      const setExecutionId = vi.fn();
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+      await invocation.execute(new AbortController().signal, undefined, {
+        setExecutionIdCallback: setExecutionId,
+      });
+
+      expect(setExecutionId).toHaveBeenCalledTimes(1);
+      const executionId = setExecutionId.mock.calls[0][0];
+      expect(typeof executionId).toBe('number');
+      // Execution should be completed (no longer active)
+      expect(ExecutionLifecycleService.isActive(executionId)).toBe(false);
+    });
+
+    it('should support backgrounding and return background result with correct label', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+
+      // Create a stream that we can control
+      let resolveStream: () => void;
+      const streamBlocker = new Promise<void>((r) => {
+        resolveStream = r;
+      });
+
+      mockClientManager.sendMessageStream.mockImplementation(
+        async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'msg-1',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Working...' }],
+          };
+          await streamBlocker;
+          yield {
+            kind: 'message',
+            messageId: 'msg-2',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Final result' }],
+          };
+        },
+      );
+
+      // Listen for background start events to verify label
+      const bgStartListener = vi.fn();
+      ExecutionLifecycleService.onBackground(bgStartListener);
+
+      let capturedExecutionId: number | undefined;
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+
+      // Start execution but don't await yet
+      const executePromise = invocation.execute(
+        new AbortController().signal,
+        undefined,
+        {
+          setExecutionIdCallback: (id) => {
+            capturedExecutionId = id;
+          },
+        },
+      );
+
+      // Wait a tick for the stream to start
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(capturedExecutionId).toBeDefined();
+      expect(ExecutionLifecycleService.isActive(capturedExecutionId!)).toBe(
+        true,
+      );
+
+      // Background the execution
+      ExecutionLifecycleService.background(capturedExecutionId!);
+
+      const result = await executePromise;
+      expect(result.data).toBeDefined();
+      expect(result.data?.['pid']).toBe(capturedExecutionId);
+      expect(result.returnDisplay).toContain('background');
+
+      // Verify the label from onBackground matches the agent's displayName
+      expect(bgStartListener).toHaveBeenCalledTimes(1);
+      const bgInfo = bgStartListener.mock.calls[0][0];
+      expect(bgInfo.label).toBe('Test Agent');
+      expect(bgInfo.executionMethod).toBe('remote_agent');
+
+      // Let the stream finish
+      resolveStream!();
+      // Wait for stream processing to complete
+      await new Promise((r) => setTimeout(r, 50));
+
+      ExecutionLifecycleService.offBackground(bgStartListener);
+    });
+
+    it('should fire onBackgroundComplete with formatted injection text', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+
+      let resolveStream: () => void;
+      const streamBlocker = new Promise<void>((r) => {
+        resolveStream = r;
+      });
+
+      mockClientManager.sendMessageStream.mockImplementation(
+        async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'msg-1',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Agent result' }],
+          };
+          await streamBlocker;
+        },
+      );
+
+      const bgListener = vi.fn();
+      ExecutionLifecycleService.onBackgroundComplete(bgListener);
+
+      let capturedExecutionId: number | undefined;
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+
+      const executePromise = invocation.execute(
+        new AbortController().signal,
+        undefined,
+        {
+          setExecutionIdCallback: (id) => {
+            capturedExecutionId = id;
+          },
+        },
+      );
+
+      await new Promise((r) => setTimeout(r, 50));
+      ExecutionLifecycleService.background(capturedExecutionId!);
+      await executePromise;
+
+      // Let stream complete
+      resolveStream!();
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(bgListener).toHaveBeenCalledTimes(1);
+      const info = bgListener.mock.calls[0][0];
+      expect(info.executionId).toBe(capturedExecutionId);
+      expect(info.executionMethod).toBe('remote_agent');
+      expect(info.injectionText).toContain(
+        "Remote agent 'Test Agent' completed successfully",
+      );
+      expect(info.injectionText).toContain('Agent result');
+
+      ExecutionLifecycleService.offBackgroundComplete(bgListener);
+    });
+
+    it('should stop calling updateOutput after backgrounding', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+
+      let resolveStream: () => void;
+      const streamBlocker = new Promise<void>((r) => {
+        resolveStream = r;
+      });
+
+      mockClientManager.sendMessageStream.mockImplementation(
+        async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'msg-1',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Before background' }],
+          };
+          await streamBlocker;
+          yield {
+            kind: 'message',
+            messageId: 'msg-2',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'After background' }],
+          };
+        },
+      );
+
+      let capturedExecutionId: number | undefined;
+      const updateOutput = vi.fn();
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+
+      const executePromise = invocation.execute(
+        new AbortController().signal,
+        updateOutput,
+        {
+          setExecutionIdCallback: (id) => {
+            capturedExecutionId = id;
+          },
+        },
+      );
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      // Should have called updateOutput for first chunk
+      expect(updateOutput).toHaveBeenCalledWith('Before background');
+      const callCountBeforeBg = updateOutput.mock.calls.length;
+
+      // Background the execution
+      ExecutionLifecycleService.background(capturedExecutionId!);
+      await executePromise;
+
+      // Let stream finish
+      resolveStream!();
+      await new Promise((r) => setTimeout(r, 50));
+
+      // updateOutput should NOT have been called again after backgrounding
+      expect(updateOutput.mock.calls.length).toBe(callCountBeforeBg);
+    });
+
+    it('should support kill via lifecycle service', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+
+      mockClientManager.sendMessageStream.mockImplementation(
+        async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'msg-1',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Working' }],
+          };
+          // Block forever - will be killed
+          await new Promise(() => {});
+        },
+      );
+
+      let capturedExecutionId: number | undefined;
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+
+      const executePromise = invocation.execute(
+        new AbortController().signal,
+        undefined,
+        {
+          setExecutionIdCallback: (id) => {
+            capturedExecutionId = id;
+          },
+        },
+      );
+
+      await new Promise((r) => setTimeout(r, 50));
+      expect(capturedExecutionId).toBeDefined();
+
+      // Kill the execution
+      ExecutionLifecycleService.kill(capturedExecutionId!);
+
+      const result = await executePromise;
+      expect(result.error).toBeDefined();
+      expect(result.error?.message).toContain('Operation cancelled');
     });
   });
 });
