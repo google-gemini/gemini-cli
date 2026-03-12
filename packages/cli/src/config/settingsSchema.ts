@@ -1107,6 +1107,16 @@ const SETTINGS_SCHEMA = {
             description: 'Model override for the visual agent.',
             showInDialog: false,
           },
+          disableUserInput: {
+            type: 'boolean',
+            label: 'Disable User Input',
+            category: 'Advanced',
+            requiresRestart: false,
+            default: true,
+            description:
+              'Disable user input on browser window during automation.',
+            showInDialog: false,
+          },
         },
       },
     },

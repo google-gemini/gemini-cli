@@ -36,6 +36,7 @@ import {
   createBrowserAgentDefinition,
   cleanupBrowserAgent,
 } from './browserAgentFactory.js';
+import { removeInputBlocker } from './inputBlocker.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -490,6 +491,7 @@ ${displayResult}
     } finally {
       // Always cleanup browser resources
       if (browserManager) {
+        await removeInputBlocker(browserManager);
         await cleanupBrowserAgent(browserManager);
       }
     }
