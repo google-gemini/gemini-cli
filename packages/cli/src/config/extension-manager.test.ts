@@ -18,12 +18,8 @@ import {
   loadTrustedFolders,
   isWorkspaceTrusted,
 } from './trustedFolders.js';
-<<<<<<< HEAD
-import { getRealPath } from '@google/gemini-cli-core';
-import type { MergedSettings } from './settings.js';
-=======
 import { getRealPath, type CustomTheme } from '@google/gemini-cli-core';
->>>>>>> 45faf4d31 (fix: register themes on extension load not start (#22148))
+import type { MergedSettings } from './settings.js';
 
 const mockHomedir = vi.hoisted(() => vi.fn(() => '/tmp/mock-home'));
 
