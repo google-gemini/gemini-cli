@@ -26,6 +26,20 @@ policies.
     the CLI will use an available fallback model for the current turn or the
     remainder of the session.
 
+### Local Model Routing (Experimental)
+
+Gemini CLI supports using a local model for routing decisions. When configured,
+Gemini CLI will use a locally-running **Gemma** model to make routing decisions
+(instead of sending routing decisions to a hosted model). This feature can help
+reduce costs associated with hosted model usage while offering similar routing
+decision latency and quality.
+
+In order to use this feature, the local Gemma model **must** be served behind a
+Gemini API and accessible via HTTP at an endpoint configured in `settings.json`.
+
+For more details on how to configure local model routing, see
+[Local Model Routing](../core/local-model-routing.md).
+
 ### Model selection precedence
 
 The model used by Gemini CLI is determined by the following order of precedence:
@@ -38,5 +52,8 @@ The model used by Gemini CLI is determined by the following order of precedence:
 3.  **`model.name` in `settings.json`:** If neither of the above are set, the
     model specified in the `model.name` property of your `settings.json` file
     will be used.
-4.  **Default model:** If none of the above are set, the default model will be
+4.  **Local model (experimental):** If the Gemma local model router is enabled
+    in your `settings.json` file, the CLI will use the local Gemma model
+    (instead of Gemini models) to route the request to an appropriate model.
+5.  **Default model:** If none of the above are set, the default model will be
     used. The default model is `auto`
