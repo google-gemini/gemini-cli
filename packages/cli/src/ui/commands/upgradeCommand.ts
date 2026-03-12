@@ -35,6 +35,15 @@ export const upgradeCommand: SlashCommand = {
       };
     }
 
+    const tierName = context.services.config?.getUserTierName();
+    if (tierName?.toLowerCase().includes('ultra')) {
+      return {
+        type: 'message',
+        messageType: 'info',
+        content: `You are already on the highest tier: ${tierName}.`,
+      };
+    }
+
     if (!shouldLaunchBrowser()) {
       return {
         type: 'message',

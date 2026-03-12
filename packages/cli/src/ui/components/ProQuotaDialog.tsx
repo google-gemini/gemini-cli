@@ -17,6 +17,7 @@ interface ProQuotaDialogProps {
   isTerminalQuotaError: boolean;
   isModelNotFoundError?: boolean;
   authType?: AuthType;
+  tierName?: string;
   onChoice: (
     choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
   ) => void;
@@ -29,6 +30,7 @@ export function ProQuotaDialog({
   isTerminalQuotaError,
   isModelNotFoundError,
   authType,
+  tierName,
   onChoice,
 }: ProQuotaDialogProps): React.JSX.Element {
   let items;
@@ -47,6 +49,8 @@ export function ProQuotaDialog({
       },
     ];
   } else if (isModelNotFoundError || isTerminalQuotaError) {
+    const isUltra = tierName?.toLowerCase().includes('ultra');
+
     // free users and out of quota users on G1 pro and Cloud Console gets an option to upgrade
     items = [
       {
@@ -54,7 +58,7 @@ export function ProQuotaDialog({
         value: 'retry_always' as const,
         key: 'retry_always',
       },
-      ...(authType === AuthType.LOGIN_WITH_GOOGLE
+      ...(authType === AuthType.LOGIN_WITH_GOOGLE && !isUltra
         ? [
             {
               label: 'Upgrade for higher limits',

@@ -33,6 +33,11 @@ export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
     [config, authType],
   );
 
+  const isUltra = useMemo(
+    () => tierName?.toLowerCase().includes('ultra'),
+    [tierName],
+  );
+
   if (!authType) {
     return null;
   }
@@ -60,7 +65,7 @@ export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
           <Text color={theme.text.primary} wrap="truncate-end">
             <Text bold>Plan:</Text> {tierName}
           </Text>
-          <Text color={theme.text.secondary}> /upgrade</Text>
+          {!isUltra && <Text color={theme.text.secondary}> /upgrade</Text>}
         </Box>
       )}
     </Box>
