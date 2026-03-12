@@ -202,6 +202,40 @@ describe('ProQuotaDialog', () => {
         );
         unmount();
       });
+
+      it('should NOT render upgrade option for LOGIN_WITH_GOOGLE if tier is Ultra', () => {
+        const { unmount } = render(
+          <ProQuotaDialog
+            failedModel="gemini-2.5-pro"
+            fallbackModel="gemini-2.5-flash"
+            message="free tier quota error"
+            isTerminalQuotaError={true}
+            isModelNotFoundError={false}
+            authType={AuthType.LOGIN_WITH_GOOGLE}
+            tierName="Gemini Advanced Ultra"
+            onChoice={mockOnChoice}
+          />,
+        );
+
+        expect(RadioButtonSelect).toHaveBeenCalledWith(
+          expect.objectContaining({
+            items: [
+              {
+                label: 'Switch to gemini-2.5-flash',
+                value: 'retry_always',
+                key: 'retry_always',
+              },
+              {
+                label: 'Stop',
+                value: 'retry_later',
+                key: 'retry_later',
+              },
+            ],
+          }),
+          undefined,
+        );
+        unmount();
+      });
     });
 
     describe('when it is a capacity error', () => {
