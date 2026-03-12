@@ -374,11 +374,9 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       );
     }
 
-    const randomDelimiter = `---${Math.random().toString(36).substring(2, 15)}---`;
-
     const aggregatedContent = results
       .map((content, i) => `URL: ${uniqueUrls[i]}\nContent:\n${content}`)
-      .join(`\n\n${randomDelimiter}\n\n`);
+      .join('\n\n---\n\n');
 
     try {
       const geminiClient = this.config.getGeminiClient();
@@ -386,9 +384,9 @@ class WebFetchToolInvocation extends BaseToolInvocation<
 
 I was unable to access the URL(s) directly using the primary fetch tool. Instead, I have fetched the raw content of the page(s). Please use the following content to answer the request. Do not attempt to access the URL(s) again.
 
-${randomDelimiter}
+---
 ${aggregatedContent}
-${randomDelimiter}
+---
 `;
       const result = await geminiClient.generateContent(
         { model: 'web-fetch-fallback' },
