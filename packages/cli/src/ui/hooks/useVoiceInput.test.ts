@@ -183,6 +183,29 @@ describe('useVoiceInput', () => {
     expect(result.current.state.isRecording).toBe(false);
   });
 
+  it('recovers if backend start throws after setting recording state', async () => {
+    mockGeminiStart.mockImplementation(async () => {
+      void capturedGeminiOptions?.onStateChange({
+        isRecording: true,
+        isTranscribing: false,
+        error: null,
+      });
+      throw new Error('Recorder startup failed');
+    });
+
+    const { result } = renderHook(() => useVoiceInput({ config: mockConfig }));
+
+    await act(async () => {
+      await result.current.startRecording();
+    });
+
+    expect(result.current.state).toEqual({
+      isRecording: false,
+      isTranscribing: false,
+      error: 'Recorder startup failed',
+    });
+  });
+
   it('delegates cancelRecording to the active backend', async () => {
     mockGeminiCancel.mockResolvedValue(undefined);
     const { result } = renderHook(() => useVoiceInput({ config: mockConfig }));
@@ -199,5 +222,31 @@ describe('useVoiceInput', () => {
     });
     expect(mockGeminiCancel).not.toHaveBeenCalled();
     expect(mockWhisperCancel).not.toHaveBeenCalled();
+  });
+
+  it('cancelRecording immediately clears stuck recording state', async () => {
+    mockGeminiCancel.mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useVoiceInput({ config: mockConfig }));
+
+    await act(async () => {
+      void capturedGeminiOptions?.onStateChange({
+        isRecording: true,
+        isTranscribing: false,
+        error: null,
+      });
+    });
+
+    expect(result.current.state.isRecording).toBe(true);
+
+    await act(async () => {
+      await result.current.cancelRecording();
+    });
+
+    expect(result.current.state).toEqual({
+      isRecording: false,
+      isTranscribing: false,
+      error: null,
+    });
   });
 });

@@ -32,6 +32,7 @@ export class LocalWhisperBackend implements VoiceBackend {
   private recordingProcess: ReturnType<typeof spawn> | null = null;
   private tempDir: string | null = null;
   private audioFile: string | null = null;
+  private stderrChunks: Buffer[] = [];
 
   constructor(
     private readonly options: VoiceBackendOptions,
@@ -45,18 +46,14 @@ export class LocalWhisperBackend implements VoiceBackend {
     }
 
     try {
-      void this.options.onStateChange({
-        isRecording: true,
-        isTranscribing: false,
-        error: null,
-      });
-
+      this.stderrChunks = [];
       this.tempDir = await mkdtemp(join(tmpdir(), 'gemini-voice-'));
       this.audioFile = join(this.tempDir, `recording.${RECORDING_FORMAT}`);
+      let recordingProcess: ReturnType<typeof spawn> | null = null;
 
       const soxPath = await resolveExecutable('sox');
       if (soxPath) {
-        this.recordingProcess = spawn(soxPath, [
+        recordingProcess = spawn(soxPath, [
           '-d',
           '-b',
           '16',
@@ -73,7 +70,7 @@ export class LocalWhisperBackend implements VoiceBackend {
       } else {
         const arecordPath = await resolveExecutable('arecord');
         if (arecordPath) {
-          this.recordingProcess = spawn(arecordPath, [
+          recordingProcess = spawn(arecordPath, [
             '-f',
             'S16_LE',
             '-r',
@@ -91,6 +88,12 @@ export class LocalWhisperBackend implements VoiceBackend {
         }
       }
 
+      this.recordingProcess = recordingProcess;
+
+      this.recordingProcess.stderr?.on('data', (chunk: Buffer) => {
+        this.stderrChunks.push(chunk);
+      });
+
       this.recordingProcess.on('error', (err) => {
         void this.options.onStateChange({
           isRecording: false,
@@ -98,12 +101,20 @@ export class LocalWhisperBackend implements VoiceBackend {
           error: `Recording error: ${err.message}`,
         });
       });
+
+      void this.options.onStateChange({
+        isRecording: true,
+        isTranscribing: false,
+        error: null,
+      });
     } catch (err) {
       void this.options.onStateChange({
         isRecording: false,
         isTranscribing: false,
         error: err instanceof Error ? err.message : String(err),
       });
+      await this.cleanup();
+      throw err;
     }
   }
 
@@ -111,12 +122,24 @@ export class LocalWhisperBackend implements VoiceBackend {
     if (!this.recordingProcess) return;
     const proc = this.recordingProcess;
     this.recordingProcess = null;
-    proc.kill('SIGINT');
+    const closePromise = new Promise<void>((resolve) => {
+      proc.once('close', () => resolve());
+      setTimeout(() => {
+        try {
+          proc.kill('SIGKILL');
+        } catch (_e) {
+          // ignore
+        }
+        resolve();
+      }, 500);
+    });
+    proc.kill('SIGTERM');
     void this.options.onStateChange({
       isRecording: false,
       isTranscribing: false,
       error: null,
     });
+    await closePromise;
     await this.cleanup();
   }
 
@@ -125,13 +148,22 @@ export class LocalWhisperBackend implements VoiceBackend {
 
     const proc = this.recordingProcess;
     this.recordingProcess = null;
-    proc.kill('SIGINT');
+    const closePromise = new Promise<void>((resolve) => {
+      proc.once('close', () => resolve());
+      setTimeout(() => {
+        try {
+          proc.kill('SIGKILL');
+        } catch (_e) {
+          // ignore
+        }
+        resolve();
+      }, 500);
+    });
+    proc.kill('SIGTERM');
 
     // Wait for the recording process to fully close (stdio streams flushed)
     // before reading the audio file.
-    await new Promise<void>((resolve) => {
-      proc.on('close', resolve);
-    });
+    await closePromise;
 
     await this.options.onStateChange({
       isRecording: false,
@@ -143,15 +175,20 @@ export class LocalWhisperBackend implements VoiceBackend {
       if (!this.audioFile) throw new Error('No audio file');
 
       const stats = await stat(this.audioFile).catch(() => null);
-      if (!stats || stats.size === 0)
-        throw new Error('No audio recorded (file is empty)');
+      if (!stats || stats.size === 0) {
+        const stderrStr = Buffer.concat(this.stderrChunks)
+          .toString('utf8')
+          .trim();
+        throw new Error(`No audio recorded (file is empty). ${stderrStr}`);
+      }
 
       const audioBuffer = await readFile(this.audioFile);
       if (this.isSilentWav(audioBuffer)) {
         void this.options.onStateChange({
           isRecording: false,
           isTranscribing: false,
-          error: null,
+          error:
+            'Audio discarded (too quiet). Try speaking louder or adjust threshold: /voice sensitivity',
         });
         return;
       }

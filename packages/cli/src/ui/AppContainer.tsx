@@ -1688,6 +1688,17 @@ Logging in with Google... Restarting Gemini CLI to continue.
         debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
       }
 
+      if (voice.state.isRecording || voice.state.isTranscribing) {
+        if (key.name === 'escape') {
+          void voice.cancelRecording();
+          return true;
+        }
+        if (keyMatchers[Command.QUIT](key)) {
+          void voice.cancelRecording();
+          return true;
+        }
+      }
+
       if (shortcutsHelpVisible && isHelpDismissKey(key)) {
         setShortcutsHelpVisible(false);
       }

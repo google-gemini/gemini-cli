@@ -800,7 +800,8 @@ const SETTINGS_SCHEMA = {
     category: 'General',
     requiresRestart: false,
     default: {},
-    description: 'Settings for voice input.',
+    description:
+      'Settings for voice input. Note: Voice input is not natively supported in WSL2 (Windows Subsystem for Linux).',
     showInDialog: false,
     properties: {
       enabled: {
@@ -813,7 +814,7 @@ const SETTINGS_SCHEMA = {
         showInDialog: true,
       },
       provider: {
-        type: 'string',
+        type: 'enum',
         label: 'Transcription Backend',
         category: 'General',
         requiresRestart: false,
@@ -821,6 +822,10 @@ const SETTINGS_SCHEMA = {
         description:
           'Transcription backend: "gemini" (default, zero-install) or "whisper" (local).',
         showInDialog: true,
+        options: [
+          { value: 'gemini', label: 'Gemini (Cloud)' },
+          { value: 'whisper', label: 'Whisper (Local)' },
+        ],
       },
       whisperPath: {
         type: 'string',

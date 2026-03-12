@@ -133,7 +133,18 @@ export function useVoiceInput(voiceConfig?: VoiceInputConfig) {
       return;
     }
     debugLogger.debug('useVoiceInput: startRecording');
-    await backendRef.current.start();
+    try {
+      await backendRef.current.start();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      debugLogger.error('useVoiceInput: startRecording failed', error);
+      setState({
+        isRecording: false,
+        isTranscribing: false,
+        error: message,
+      });
+      coreEvents.emitFeedback('error', message);
+    }
   }, []);
 
   const stopRecording = useCallback(async () => {
@@ -143,6 +154,15 @@ export function useVoiceInput(voiceConfig?: VoiceInputConfig) {
   }, []);
 
   const cancelRecording = useCallback(async () => {
+    const clearedState = {
+      isRecording: false,
+      isTranscribing: false,
+      error: null,
+    } satisfies VoiceInputState;
+
+    stateRef.current = clearedState;
+    setState(clearedState);
+
     if (!backendRef.current) return;
     await backendRef.current.cancel();
   }, []);

@@ -352,14 +352,20 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `voice`
 
+**Note:** Voice input is not natively supported in WSL2 (Windows Subsystem for
+Linux) due to lack of microphone device pass-through. If you are using Windows,
+please run Gemini CLI natively in PowerShell or Command Prompt to use voice
+input.
+
 - **`voice.enabled`** (boolean):
   - **Description:** Enable voice input support.
   - **Default:** `false`
 
-- **`voice.provider`** (string):
+- **`voice.provider`** (enum):
   - **Description:** Transcription backend: "gemini" (default, zero-install) or
     "whisper" (local).
   - **Default:** `"gemini"`
+  - **Values:** `"gemini"`, `"whisper"`
 
 - **`voice.whisperPath`** (string):
   - **Description:** Path to the whisper executable. Only used when provider is

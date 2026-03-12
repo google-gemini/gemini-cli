@@ -33,6 +33,7 @@ const CHANNELS = 1;
 export class GeminiRestBackend implements VoiceBackend {
   private recordingProcess: ReturnType<typeof spawn> | null = null;
   private audioChunks: Buffer[] = [];
+  private stderrChunks: Buffer[] = [];
   private isStopping = false;
 
   constructor(
@@ -46,15 +47,12 @@ export class GeminiRestBackend implements VoiceBackend {
     try {
       this.isStopping = false;
       this.audioChunks = [];
-      void this.options.onStateChange({
-        isRecording: true,
-        isTranscribing: false,
-        error: null,
-      });
+      this.stderrChunks = [];
+      let recordingProcess: ReturnType<typeof spawn> | null = null;
 
       const soxPath = await resolveExecutable('sox');
       if (soxPath) {
-        this.recordingProcess = spawn(soxPath, [
+        recordingProcess = spawn(soxPath, [
           '-d',
           '-b',
           '16',
@@ -71,7 +69,7 @@ export class GeminiRestBackend implements VoiceBackend {
       } else {
         const arecordPath = await resolveExecutable('arecord');
         if (arecordPath) {
-          this.recordingProcess = spawn(arecordPath, [
+          recordingProcess = spawn(arecordPath, [
             '-f',
             'S16_LE',
             '-r',
@@ -92,10 +90,16 @@ export class GeminiRestBackend implements VoiceBackend {
         }
       }
 
+      this.recordingProcess = recordingProcess;
+
       this.recordingProcess.stdout?.on('data', (chunk: Buffer) => {
         if (!this.isStopping) {
           this.audioChunks.push(chunk);
         }
+      });
+
+      this.recordingProcess.stderr?.on('data', (chunk: Buffer) => {
+        this.stderrChunks.push(chunk);
       });
 
       this.recordingProcess.on('error', (err) => {
@@ -105,12 +109,19 @@ export class GeminiRestBackend implements VoiceBackend {
           error: `Recording error: ${err.message}`,
         });
       });
+
+      void this.options.onStateChange({
+        isRecording: true,
+        isTranscribing: false,
+        error: null,
+      });
     } catch (err) {
       void this.options.onStateChange({
         isRecording: false,
         isTranscribing: false,
         error: err instanceof Error ? err.message : String(err),
       });
+      throw err;
     }
   }
 
@@ -119,8 +130,9 @@ export class GeminiRestBackend implements VoiceBackend {
     this.isStopping = true;
     const proc = this.recordingProcess;
     this.recordingProcess = null;
-    proc.kill('SIGINT');
+    proc.kill('SIGTERM');
     this.audioChunks = [];
+    this.stderrChunks = [];
     void this.options.onStateChange({
       isRecording: false,
       isTranscribing: false,
@@ -131,14 +143,33 @@ export class GeminiRestBackend implements VoiceBackend {
   async stop(): Promise<void> {
     if (!this.recordingProcess) return;
 
-    this.isStopping = true;
     const proc = this.recordingProcess;
     this.recordingProcess = null;
-    proc.kill('SIGINT');
+    const closePromise = new Promise<void>((resolve) => {
+      proc.once('close', () => resolve());
+      setTimeout(() => {
+        try {
+          proc.kill('SIGKILL');
+        } catch (_e) {
+          // ignore
+        }
+        resolve();
+      }, 500);
+    });
+    proc.kill('SIGTERM');
 
     try {
+      // Wait for the recorder to exit so any final stdout audio chunks flush
+      // before we build the in-memory WAV payload.
+      await closePromise;
+
       const audioBuffer = Buffer.concat(this.audioChunks);
-      if (audioBuffer.length === 0) throw new Error('No audio captured');
+      if (audioBuffer.length === 0) {
+        const stderrStr = Buffer.concat(this.stderrChunks)
+          .toString('utf8')
+          .trim();
+        throw new Error(`No audio captured. ${stderrStr}`);
+      }
 
       // Reject silent recordings before showing the transcribing state, so
       // the ⏳ indicator only appears when an actual API call will be made.
@@ -147,7 +178,8 @@ export class GeminiRestBackend implements VoiceBackend {
         void this.options.onStateChange({
           isRecording: false,
           isTranscribing: false,
-          error: null,
+          error:
+            'Audio discarded (too quiet). Try speaking louder or adjust threshold: /voice sensitivity',
         });
         return;
       }
@@ -267,9 +299,10 @@ export class GeminiRestBackend implements VoiceBackend {
 
   async cleanup(): Promise<void> {
     if (this.recordingProcess) {
-      this.recordingProcess.kill('SIGINT');
+      this.recordingProcess.kill('SIGTERM');
       this.recordingProcess = null;
     }
     this.audioChunks = [];
+    this.stderrChunks = [];
   }
 }

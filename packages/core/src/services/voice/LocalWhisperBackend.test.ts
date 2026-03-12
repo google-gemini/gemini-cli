@@ -30,13 +30,16 @@ vi.mock('../../utils/events.js', () => ({
 }));
 
 function createRecordingProcessMock() {
+  const registerCloseHandler = vi.fn((event: string, callback: () => void) => {
+    if (event === 'close') {
+      callback();
+    }
+  });
+
   return {
     kill: vi.fn(),
-    on: vi.fn((event: string, callback: () => void) => {
-      if (event === 'close') {
-        callback();
-      }
-    }),
+    on: registerCloseHandler,
+    once: registerCloseHandler,
   };
 }
 
@@ -101,7 +104,8 @@ describe('LocalWhisperBackend', () => {
     expect(onStateChange).toHaveBeenLastCalledWith({
       isRecording: false,
       isTranscribing: false,
-      error: null,
+      error:
+        'Audio discarded (too quiet). Try speaking louder or adjust threshold: /voice sensitivity',
     });
   });
 
@@ -127,5 +131,109 @@ describe('LocalWhisperBackend', () => {
 
     expect(transcribeSpy).toHaveBeenCalledWith('/tmp/recording.wav');
     expect(mockEmitVoiceTranscript).toHaveBeenCalledWith('transcribed text');
+  });
+
+  it('registers the close handler before killing the recorder', async () => {
+    const onStateChange = vi.fn().mockResolvedValue(undefined);
+    const backend = new LocalWhisperBackend({
+      onStateChange,
+      silenceThreshold: 0,
+    });
+
+    let closeHandler: (() => void) | null = null;
+    const recordingProcess = {
+      kill: vi.fn(() => closeHandler?.()),
+      once: vi.fn((event: string, callback: () => void) => {
+        if (event === 'close') {
+          closeHandler = callback;
+        }
+      }),
+    };
+
+    (backend as unknown as { recordingProcess: unknown }).recordingProcess =
+      recordingProcess;
+    (backend as unknown as { audioFile: string }).audioFile =
+      '/tmp/recording.wav';
+    (backend as unknown as { tempDir: string }).tempDir = '/tmp/voice';
+
+    mockReadFile.mockResolvedValue(createWavBuffer([0, 1, -1, 2]));
+    const transcribeSpy = vi
+      .spyOn(backend as never, 'transcribe')
+      .mockResolvedValue('transcribed text');
+
+    await backend.stop();
+
+    expect(recordingProcess.once).toHaveBeenCalledWith(
+      'close',
+      expect.any(Function),
+    );
+    expect(recordingProcess.kill).toHaveBeenCalledWith('SIGTERM');
+    expect(transcribeSpy).toHaveBeenCalledWith('/tmp/recording.wav');
+  });
+
+  it('repro: stop remains pending if the recorder never emits close', async () => {
+    const onStateChange = vi.fn().mockResolvedValue(undefined);
+    const backend = new LocalWhisperBackend({
+      onStateChange,
+      silenceThreshold: 0,
+    });
+
+    const recordingProcess = {
+      kill: vi.fn(),
+      once: vi.fn(),
+    };
+
+    (backend as unknown as { recordingProcess: unknown }).recordingProcess =
+      recordingProcess;
+    (backend as unknown as { audioFile: string }).audioFile =
+      '/tmp/recording.wav';
+    (backend as unknown as { tempDir: string }).tempDir = '/tmp/voice';
+
+    let settled = false;
+    void backend.stop().then(() => {
+      settled = true;
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(recordingProcess.once).toHaveBeenCalledWith(
+      'close',
+      expect.any(Function),
+    );
+    expect(recordingProcess.kill).toHaveBeenCalledWith('SIGTERM');
+    expect(settled).toBe(false);
+  });
+
+  it('repro: cancel remains pending if the recorder never emits close', async () => {
+    const onStateChange = vi.fn().mockResolvedValue(undefined);
+    const backend = new LocalWhisperBackend({
+      onStateChange,
+      silenceThreshold: 0,
+    });
+
+    const recordingProcess = {
+      kill: vi.fn(),
+      once: vi.fn(),
+    };
+
+    (backend as unknown as { recordingProcess: unknown }).recordingProcess =
+      recordingProcess;
+    (backend as unknown as { tempDir: string }).tempDir = '/tmp/voice';
+
+    let settled = false;
+    void backend.cancel().then(() => {
+      settled = true;
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(recordingProcess.once).toHaveBeenCalledWith(
+      'close',
+      expect.any(Function),
+    );
+    expect(recordingProcess.kill).toHaveBeenCalledWith('SIGTERM');
+    expect(settled).toBe(false);
   });
 });
