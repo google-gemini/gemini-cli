@@ -425,26 +425,26 @@ export const useGeminiStream = (
 
     if (toolsToPush.length > 0) {
       const newPushed = new Set(pushedToolCallIdsRef.current);
-      let isFirst = isFirstToolInGroupRef.current;
 
       for (const tc of toolsToPush) {
         newPushed.add(tc.request.callId);
-        const isLastInBatch = tc === toolCalls[toolCalls.length - 1];
-
-        const historyItem = mapTrackedToolCallsToDisplay(tc, {
-          borderTop: isFirst,
-          borderBottom: isLastInBatch,
-          ...getToolGroupBorderAppearance(
-            { type: 'tool_group', tools: toolCalls },
-            activeShellPtyId,
-            !!isShellFocused,
-            [],
-            backgroundShells,
-          ),
-        });
-        addItem(historyItem);
-        isFirst = false;
       }
+
+      const isLastInBatch =
+        toolsToPush[toolsToPush.length - 1] === toolCalls[toolCalls.length - 1];
+
+      const historyItem = mapTrackedToolCallsToDisplay(toolsToPush, {
+        borderTop: isFirstToolInGroupRef.current,
+        borderBottom: isLastInBatch,
+        ...getToolGroupBorderAppearance(
+          { type: 'tool_group', tools: toolCalls },
+          activeShellPtyId,
+          !!isShellFocused,
+          [],
+          backgroundShells,
+        ),
+      });
+      addItem(historyItem);
 
       setPushedToolCallIds(newPushed);
       setIsFirstToolInGroup(false);
