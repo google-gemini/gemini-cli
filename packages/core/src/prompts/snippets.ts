@@ -556,7 +556,7 @@ An approved plan is available for this task at \`${approvedPlanPath}\`.
 
 function mandateConfirm(interactive: boolean): string {
   return interactive
-    ? "**Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If the user implies a change (e.g., reports a bug) without explicitly asking for a fix, **ask for confirmation first**. If asked *how* to do something, explain first, don't just do it."
+    ? "**Confirm Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request without confirming with the user. If the user implies a change (e.g., reports a bug) without explicitly asking for a fix, **ask for confirmation first**. If asked *how* to do something, explain first, don't just do it. When executing a multi-step plan, if you ask the user whether to proceed to the next step, you MUST stop and wait for their reply before taking any action — do not ask and immediately act in the same turn."
     : '**Handle Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request. If the user implies a change (e.g., reports a bug) without explicitly asking for a fix, do not perform it automatically.';
 }
 
