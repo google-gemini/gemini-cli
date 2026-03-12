@@ -97,9 +97,7 @@ commandPrefix = [
   "npm test",
   "npm ci",
   "npm list",
-  "npm --version",
-  "node",
-  "npx"
+  "npm --version"
 ]
 decision = "allow"
 priority = 100
