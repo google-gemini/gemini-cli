@@ -241,6 +241,17 @@ class ThemeManager {
   }
 
   /**
+   * Checks if themes for a given extension are already registered.
+   * @param extensionName The name of the extension.
+   * @returns True if any themes from the extension are registered.
+   */
+  hasExtensionThemes(extensionName: string): boolean {
+    return Array.from(this.extensionThemes.keys()).some((name) =>
+      name.endsWith(`(${extensionName})`),
+    );
+  }
+
+  /**
    * Clears all registered extension themes.
    * This is primarily for testing purposes to reset state between tests.
    */
