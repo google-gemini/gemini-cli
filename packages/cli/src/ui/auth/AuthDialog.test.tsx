@@ -22,9 +22,8 @@ import { AuthState } from '../types.js';
 import { RadioButtonSelect } from '../components/shared/RadioButtonSelect.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { validateAuthMethodWithSettings } from './useAuth.js';
-import { runExitCleanup } from '../../utils/cleanup.js';
 import { Text } from 'ink';
-import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
+import { relaunchApp } from '../../utils/processUtils.js';
 
 // Mocks
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -36,12 +35,12 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   };
 });
 
-vi.mock('../../utils/cleanup.js', () => ({
-  runExitCleanup: vi.fn(),
-}));
-
 vi.mock('./useAuth.js', () => ({
   validateAuthMethodWithSettings: vi.fn(),
+}));
+
+vi.mock('../../utils/processUtils.js', () => ({
+  relaunchApp: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../hooks/useKeypress.js', () => ({
@@ -64,7 +63,7 @@ vi.mock('../components/shared/RadioButtonSelect.js', () => ({
 const mockedUseKeypress = useKeypress as Mock;
 const mockedRadioButtonSelect = RadioButtonSelect as Mock;
 const mockedValidateAuthMethod = validateAuthMethodWithSettings as Mock;
-const mockedRunExitCleanup = runExitCleanup as Mock;
+const mockedRelaunchApp = relaunchApp as Mock;
 
 describe('AuthDialog', () => {
   let props: {
@@ -85,6 +84,7 @@ describe('AuthDialog', () => {
     props = {
       config: {
         isBrowserLaunchSuppressed: vi.fn().mockReturnValue(false),
+        getRemoteAdminSettings: vi.fn().mockReturnValue(undefined),
       } as unknown as Config,
       settings: {
         merged: {
@@ -351,11 +351,8 @@ describe('AuthDialog', () => {
       unmount();
     });
 
-    it('exits process for Login with Google when browser is suppressed', async () => {
+    it('restarts for Login with Google when browser is suppressed', async () => {
       vi.useFakeTimers();
-      const exitSpy = vi
-        .spyOn(process, 'exit')
-        .mockImplementation(() => undefined as never);
       const logSpy = vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
       vi.mocked(props.config.isBrowserLaunchSuppressed).mockReturnValue(true);
       mockedValidateAuthMethod.mockReturnValue(null);
@@ -371,10 +368,8 @@ describe('AuthDialog', () => {
         await vi.runAllTimersAsync();
       });
 
-      expect(mockedRunExitCleanup).toHaveBeenCalled();
-      expect(exitSpy).toHaveBeenCalledWith(RELAUNCH_EXIT_CODE);
+      expect(mockedRelaunchApp).toHaveBeenCalledWith(undefined);
 
-      exitSpy.mockRestore();
       logSpy.mockRestore();
       vi.useRealTimers();
       unmount();

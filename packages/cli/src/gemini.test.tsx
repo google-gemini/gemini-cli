@@ -255,6 +255,7 @@ vi.mock('./validateNonInterActiveAuth.js', () => ({
 
 describe('gemini.tsx main function', () => {
   let originalIsTTY: boolean | undefined;
+  const originalArgv = [...process.argv];
   let initialUnhandledRejectionListeners: NodeJS.UnhandledRejectionListener[] =
     [];
 
@@ -270,6 +271,7 @@ describe('gemini.tsx main function', () => {
     originalIsTTY = process.stdin.isTTY;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (process.stdin as any).isTTY = true;
+    process.argv = ['node', 'script.js'];
   });
 
   afterEach(() => {
@@ -282,9 +284,68 @@ describe('gemini.tsx main function', () => {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (process.stdin as any).isTTY = originalIsTTY;
+    process.argv = [...originalArgv];
 
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
+  });
+
+  it('should fast-path --version without loading settings', async () => {
+    process.argv = ['node', 'script.js', '--version'];
+
+    await main();
+
+    expect(loadSettings).not.toHaveBeenCalled();
+    expect(parseArguments).not.toHaveBeenCalled();
+  });
+
+  it('should fast-path --help without loading settings', async () => {
+    process.argv = ['node', 'script.js', '--help'];
+
+    await main();
+
+    expect(loadSettings).not.toHaveBeenCalled();
+    expect(parseArguments).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not relaunch a child process when sandboxing and memory relaunch are unnecessary', async () => {
+    vi.mocked(loadSandboxConfig).mockResolvedValue(undefined);
+    vi.mocked(loadSettings).mockReturnValue(
+      createMockSettings({
+        merged: { advanced: {}, security: { auth: {} }, ui: {} },
+        workspace: { settings: {} },
+        setValue: vi.fn(),
+        forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+      }),
+    );
+    vi.mocked(parseArguments).mockResolvedValue({
+      prompt: 'test',
+    } as unknown as CliArgs);
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => false,
+        getQuestion: () => 'test',
+        getSandbox: () => undefined,
+      }),
+    );
+    const processExitSpy = vi
+      .spyOn(process, 'exit')
+      .mockImplementation((code) => {
+        throw new MockProcessExitError(code);
+      });
+
+    try {
+      await main();
+      expect.fail('Should have thrown MockProcessExitError');
+    } catch (e) {
+      expect(e).toBeInstanceOf(MockProcessExitError);
+      expect((e as MockProcessExitError).code).toBe(0);
+    } finally {
+      processExitSpy.mockRestore();
+    }
+
+    const { relaunchAppInChildProcess } = await import('./utils/relaunch.js');
+    expect(relaunchAppInChildProcess).not.toHaveBeenCalled();
   });
 
   it('should log unhandled promise rejections and open debug console on first error', async () => {
@@ -639,6 +700,42 @@ describe('gemini.tsx main function kitty protocol', () => {
     expect(start_sandbox).toHaveBeenCalled();
     expect(processExitSpy).toHaveBeenCalledWith(0);
     processExitSpy.mockRestore();
+  });
+
+  it('should use bootstrap config for the pre-relaunch startup pass', async () => {
+    const mockSettings = createMockSettings({
+      merged: {
+        advanced: {},
+        security: { auth: {} },
+        ui: {},
+      },
+      workspace: { settings: {} },
+      setValue: vi.fn(),
+      forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
+    });
+    vi.mocked(loadSettings).mockReturnValue(mockSettings);
+    vi.mocked(parseArguments).mockResolvedValue({
+      promptInteractive: false,
+    } as unknown as CliArgs);
+
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      createMockConfig({
+        isInteractive: () => true,
+        getQuestion: () => '',
+        getSandbox: () => undefined,
+      }),
+    );
+
+    await main();
+
+    expect(loadCliConfig).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(loadCliConfig).mock.calls[0][3]).toMatchObject({
+      mode: 'bootstrap',
+      loadedSettings: mockSettings,
+    });
+    expect(vi.mocked(loadCliConfig).mock.calls[1][3]).toMatchObject({
+      loadedSettings: mockSettings,
+    });
   });
 
   it('should log warning when theme is not found', async () => {

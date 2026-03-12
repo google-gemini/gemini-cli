@@ -21,7 +21,11 @@ import {
   loadTrustedFolders,
   type TrustedFoldersError,
 } from './config/trustedFolders.js';
-import { loadSettings, SettingScope } from './config/settings.js';
+import {
+  createDefaultMergedSettings,
+  loadSettings,
+  SettingScope,
+} from './config/settings.js';
 import { getStartupWarnings } from './utils/startupWarnings.js';
 import { getUserStartupWarnings } from './utils/userStartupWarnings.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
@@ -110,6 +114,24 @@ import { runDeferredCommand } from './deferred.js';
 import { SlashCommandConflictHandler } from './services/SlashCommandConflictHandler.js';
 
 const SLOW_RENDER_MS = 200;
+const HELP_FLAGS = new Set(['--help', '-h']);
+const VERSION_FLAGS = new Set(['--version', '-v']);
+
+function getStartupFastPath(args: string[]): 'help' | 'version' | null {
+  if (args.length === 0) {
+    return null;
+  }
+
+  if (args.every((arg) => HELP_FLAGS.has(arg))) {
+    return 'help';
+  }
+
+  if (args.every((arg) => VERSION_FLAGS.has(arg))) {
+    return 'version';
+  }
+
+  return null;
+}
 
 export function validateDnsResolutionOrder(
   order: string | undefined,
@@ -321,7 +343,36 @@ export async function startInteractiveUI(
   registerCleanup(() => instance.unmount());
 }
 
+async function runStartupCleanup(
+  config: Config,
+  settings: LoadedSettings,
+): Promise<void> {
+  const projectTempDir = config.storage.getProjectTempDir();
+  try {
+    await Promise.all([
+      cleanupCheckpoints(projectTempDir),
+      cleanupToolOutputFiles(
+        settings.merged,
+        config.getDebugMode(),
+        projectTempDir,
+      ),
+    ]);
+  } catch (error) {
+    debugLogger.warn('Deferred startup cleanup failed:', error);
+  }
+}
+
 export async function main() {
+  const fastPath = getStartupFastPath(process.argv.slice(2));
+  if (fastPath === 'version') {
+    writeToStdout(`${await getVersion()}\n`);
+    return;
+  }
+  if (fastPath === 'help') {
+    await parseArguments(createDefaultMergedSettings());
+    return;
+  }
+
   const cliStartupHandle = startupProfiler.start('cli_startup');
 
   // Listen for admin controls from parent process (IPC) in non-sandbox mode. In
@@ -353,6 +404,10 @@ export async function main() {
     coreEvents.emitFeedback('warning', error.message);
   });
 
+  const parseArgsHandle = startupProfiler.start('parse_arguments');
+  const argv = await parseArguments(settings.merged);
+  parseArgsHandle?.end();
+
   const trustedFolders = loadTrustedFolders();
   trustedFolders.errors.forEach((error: TrustedFoldersError) => {
     coreEvents.emitFeedback(
@@ -360,15 +415,6 @@ export async function main() {
       `Error in ${error.path}: ${error.message}`,
     );
   });
-
-  await Promise.all([
-    cleanupCheckpoints(),
-    cleanupToolOutputFiles(settings.merged),
-  ]);
-
-  const parseArgsHandle = startupProfiler.start('parse_arguments');
-  const argv = await parseArguments(settings.merged);
-  parseArgsHandle?.end();
 
   if (
     (argv.allowedTools && argv.allowedTools.length > 0) ||
@@ -437,9 +483,13 @@ export async function main() {
     }
   }
 
+  const bootstrapConfigHandle = startupProfiler.start('load_bootstrap_config');
   const partialConfig = await loadCliConfig(settings.merged, sessionId, argv, {
+    mode: 'bootstrap',
+    loadedSettings: settings,
     projectHooks: settings.workspace.settings.hooks,
   });
+  bootstrapConfigHandle?.end();
   adminControlsListner.setConfig(partialConfig);
 
   // Refresh auth to fetch remote admin settings from CCPA and before entering
@@ -549,9 +599,7 @@ export async function main() {
       );
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
-    } else {
-      // Relaunch app so we always have a child process that can be internally
-      // restarted if needed.
+    } else if (memoryArgs.length > 0) {
       await relaunchAppInChildProcess(memoryArgs, [], remoteAdminSettings);
     }
   }
@@ -562,6 +610,7 @@ export async function main() {
   {
     const loadConfigHandle = startupProfiler.start('load_cli_config');
     const config = await loadCliConfig(settings.merged, sessionId, argv, {
+      loadedSettings: settings,
       projectHooks: settings.workspace.settings.hooks,
     });
     loadConfigHandle?.end();
@@ -637,6 +686,13 @@ export async function main() {
       await deleteSession(config, sessionToDelete);
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
+    }
+
+    const startupCleanup = runStartupCleanup(config, settings);
+    if (config.isInteractive()) {
+      void startupCleanup;
+    } else {
+      await startupCleanup;
     }
 
     const wasRaw = process.stdin.isRaw;

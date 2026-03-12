@@ -126,7 +126,7 @@ import { appEvents, AppEvent, TransientMessageType } from '../utils/events.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
-import { RELAUNCH_EXIT_CODE } from '../utils/processUtils.js';
+import { relaunchApp } from '../utils/processUtils.js';
 import type { SessionInfo } from '../utils/sessionUtils.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useMcpStatus } from './hooks/useMcpStatus.js';
@@ -778,13 +778,12 @@ export const AppContainer = (props: AppContainerProps) => {
           authType === AuthType.LOGIN_WITH_GOOGLE &&
           config.isBrowserLaunchSuppressed()
         ) {
-          await runExitCleanup();
           writeToStdout(`
 ----------------------------------------------------------------
 Logging in with Google... Restarting Gemini CLI to continue.
 ----------------------------------------------------------------
           `);
-          process.exit(RELAUNCH_EXIT_CODE);
+          await relaunchApp(config.getRemoteAdminSettings());
         }
       }
       setAuthState(AuthState.Authenticated);
@@ -2522,17 +2521,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       onHintClear: () => {},
       onHintSubmit: () => {},
       handleRestart: async () => {
-        if (process.send) {
-          const remoteSettings = config.getRemoteAdminSettings();
-          if (remoteSettings) {
-            process.send({
-              type: 'admin-settings-update',
-              settings: remoteSettings,
-            });
-          }
-        }
-        await runExitCleanup();
-        process.exit(RELAUNCH_EXIT_CODE);
+        await relaunchApp(config.getRemoteAdminSettings());
       },
       handleNewAgentsSelect: async (choice: NewAgentsChoice) => {
         if (newAgents && choice === NewAgentsChoice.ACKNOWLEDGE) {

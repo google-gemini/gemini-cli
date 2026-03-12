@@ -8,8 +8,7 @@ import { type Config } from '@google/gemini-cli-core';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { runExitCleanup } from '../../utils/cleanup.js';
-import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
+import { relaunchApp } from '../../utils/processUtils.js';
 
 interface LoginWithGoogleRestartDialogProps {
   onDismiss: () => void;
@@ -27,17 +26,7 @@ export const LoginWithGoogleRestartDialog = ({
         return true;
       } else if (key.name === 'r' || key.name === 'R') {
         setTimeout(async () => {
-          if (process.send) {
-            const remoteSettings = config.getRemoteAdminSettings();
-            if (remoteSettings) {
-              process.send({
-                type: 'admin-settings-update',
-                settings: remoteSettings,
-              });
-            }
-          }
-          await runExitCleanup();
-          process.exit(RELAUNCH_EXIT_CODE);
+          await relaunchApp(config.getRemoteAdminSettings());
         }, 100);
         return true;
       }

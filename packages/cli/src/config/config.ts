@@ -40,6 +40,7 @@ import {
   Config,
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
+  startupProfiler,
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
@@ -47,6 +48,7 @@ import {
 import {
   type Settings,
   type MergedSettings,
+  type LoadedSettings,
   saveModelChange,
   loadSettings,
 } from './settings.js';
@@ -436,6 +438,8 @@ export function isDebugMode(argv: CliArgs): boolean {
 
 export interface LoadCliConfigOptions {
   cwd?: string;
+  mode?: 'bootstrap' | 'full';
+  loadedSettings?: LoadedSettings;
   projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
     disabled?: string[];
   };
@@ -447,10 +451,15 @@ export async function loadCliConfig(
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
 ): Promise<Config> {
-  const { cwd = process.cwd(), projectHooks } = options;
+  const {
+    cwd = process.cwd(),
+    mode = 'full',
+    loadedSettings,
+    projectHooks,
+  } = options;
   const debugMode = isDebugMode(argv);
-
-  const loadedSettings = loadSettings(cwd);
+  const resolvedLoadedSettings = loadedSettings ?? loadSettings(cwd);
+  const isBootstrap = mode === 'bootstrap';
 
   if (argv.sandbox) {
     process.env['GEMINI_SANDBOX'] = 'true';
@@ -458,6 +467,17 @@ export async function loadCliConfig(
 
   const memoryImportFormat = settings.context?.importFormat || 'tree';
   const includeDirectoryTree = settings.context?.includeDirectoryTree ?? true;
+  const interactive =
+    !!argv.promptInteractive ||
+    !!argv.experimentalAcp ||
+    (!isHeadlessMode({ prompt: argv.prompt, query: argv.query }) &&
+      !argv.isCommand);
+  const shouldDeferInteractiveStartupWork =
+    !isBootstrap &&
+    interactive &&
+    !argv.listExtensions &&
+    !argv.listSessions &&
+    !argv.deleteSession;
 
   const ideMode = settings.ide?.enabled ?? false;
 
@@ -499,6 +519,7 @@ export async function loadCliConfig(
     .map(resolvePath)
     .concat((argv.includeDirectories || []).map(resolvePath));
 
+  const clientVersion = await getVersion();
   const extensionManager = new ExtensionManager({
     settings,
     requestConsent: requestConsentNonInteractive,
@@ -507,9 +528,15 @@ export async function loadCliConfig(
     enabledExtensionOverrides: argv.extensions,
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     eventEmitter: coreEvents as EventEmitter<ExtensionEvents>,
-    clientVersion: await getVersion(),
+    clientVersion,
   });
-  await extensionManager.loadExtensions();
+  if (!isBootstrap && !shouldDeferInteractiveStartupWork) {
+    const loadExtensionsHandle = startupProfiler.start(
+      'load_extensions_during_config',
+    );
+    await extensionManager.loadExtensions();
+    loadExtensionsHandle?.end();
+  }
 
   const experimentalJitContext = settings.experimental?.jitContext ?? false;
 
@@ -517,7 +544,12 @@ export async function loadCliConfig(
   let fileCount = 0;
   let filePaths: string[] = [];
 
-  if (!experimentalJitContext) {
+  if (
+    !experimentalJitContext &&
+    !isBootstrap &&
+    !shouldDeferInteractiveStartupWork
+  ) {
+    const loadMemoryHandle = startupProfiler.start('load_memory');
     // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
     const result = await loadServerHierarchicalMemory(
       cwd,
@@ -535,6 +567,7 @@ export async function loadCliConfig(
     memoryContent = result.memoryContent;
     fileCount = result.fileCount;
     filePaths = result.filePaths;
+    loadMemoryHandle?.end();
   }
 
   const question = argv.promptInteractive || argv.prompt || '';
@@ -623,14 +656,6 @@ export async function loadCliConfig(
     }
     throw err;
   }
-
-  // -p/--prompt forces non-interactive (headless) mode
-  // -i/--prompt-interactive forces interactive mode with an initial prompt
-  const interactive =
-    !!argv.promptInteractive ||
-    !!argv.experimentalAcp ||
-    (!isHeadlessMode({ prompt: argv.prompt, query: argv.query }) &&
-      !argv.isCommand);
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
   const allowedToolsSet = new Set(allowedTools);
@@ -723,7 +748,7 @@ export async function loadCliConfig(
       ? argv.screenReader
       : (settings.ui?.accessibility?.screenReader ?? false);
 
-  const ptyInfo = await getPty();
+  const ptyInfo = isBootstrap ? null : await getPty();
 
   const mcpEnabled = settings.admin?.mcp?.enabled ?? true;
   const extensionsEnabled = settings.admin?.extensions?.enabled ?? true;
@@ -755,7 +780,7 @@ export async function loadCliConfig(
 
   return new Config({
     sessionId,
-    clientVersion: await getVersion(),
+    clientVersion,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
     targetDir: cwd,
@@ -832,6 +857,8 @@ export async function loadCliConfig(
     skillsSupport: settings.skills?.enabled ?? true,
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
+    deferInitialMemoryLoad:
+      shouldDeferInteractiveStartupWork && !experimentalJitContext,
     modelSteering: settings.experimental?.modelSteering,
     toolOutputMasking: settings.experimental?.toolOutputMasking,
     noBrowser: !!process.env['NO_BROWSER'],
@@ -871,7 +898,8 @@ export async function loadCliConfig(
     hooks: settings.hooks || {},
     disabledHooks: settings.hooksConfig?.disabled || [],
     projectHooks: projectHooks || {},
-    onModelChange: (model: string) => saveModelChange(loadedSettings, model),
+    onModelChange: (model: string) =>
+      saveModelChange(resolvedLoadedSettings, model),
     onReload: async () => {
       const refreshedSettings = loadSettings(cwd);
       return {

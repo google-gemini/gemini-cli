@@ -21,9 +21,8 @@ import {
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { AuthState } from '../types.js';
-import { runExitCleanup } from '../../utils/cleanup.js';
 import { validateAuthMethodWithSettings } from './useAuth.js';
-import { RELAUNCH_EXIT_CODE } from '../../utils/processUtils.js';
+import { relaunchApp } from '../../utils/processUtils.js';
 
 interface AuthDialogProps {
   config: Config;
@@ -134,8 +133,7 @@ export function AuthDialog({
         ) {
           setExiting(true);
           setTimeout(async () => {
-            await runExitCleanup();
-            process.exit(RELAUNCH_EXIT_CODE);
+            await relaunchApp(config.getRemoteAdminSettings());
           }, 100);
           return;
         }

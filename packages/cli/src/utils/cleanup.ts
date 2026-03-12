@@ -100,10 +100,13 @@ async function drainStdin() {
   await new Promise((resolve) => setTimeout(resolve, 50));
 }
 
-export async function cleanupCheckpoints() {
-  const storage = new Storage(process.cwd());
-  await storage.initialize();
-  const tempDir = storage.getProjectTempDir();
+export async function cleanupCheckpoints(projectTempDir?: string) {
+  let tempDir = projectTempDir;
+  if (!tempDir) {
+    const storage = new Storage(process.cwd());
+    await storage.initialize();
+    tempDir = storage.getProjectTempDir();
+  }
   const checkpointsDir = join(tempDir, 'checkpoints');
   try {
     await fs.rm(checkpointsDir, { recursive: true, force: true });

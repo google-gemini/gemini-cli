@@ -90,7 +90,7 @@ interface ExtensionManagerParams {
 /**
  * Actual implementation of an ExtensionLoader.
  *
- * You must call `loadExtensions` prior to calling other methods on this class.
+ * Extension metadata is loaded lazily via `loadExtensions`/`ensureLoaded`.
  */
 export class ExtensionManager extends ExtensionLoader {
   private extensionEnablementManager: ExtensionEnablementManager;
@@ -138,12 +138,24 @@ export class ExtensionManager extends ExtensionLoader {
   }
 
   getExtensions(): GeminiCLIExtension[] {
-    if (!this.loadedExtensions) {
-      throw new Error(
-        'Extensions not yet loaded, must call `loadExtensions` first',
-      );
+    return this.loadedExtensions ?? [];
+  }
+
+  override isLoaded(): boolean {
+    return this.loadedExtensions !== undefined;
+  }
+
+  override async ensureLoaded(): Promise<void> {
+    if (this.loadedExtensions) {
+      return;
     }
-    return this.loadedExtensions;
+
+    if (this.loadingPromise) {
+      await this.loadingPromise;
+      return;
+    }
+
+    await this.loadExtensions();
   }
 
   async installOrUpdateExtension(

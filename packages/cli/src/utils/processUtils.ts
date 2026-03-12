@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { AdminControlsSettings } from '@google/gemini-cli-core';
 import { runExitCleanup } from './cleanup.js';
 
 /**
@@ -12,9 +13,24 @@ import { runExitCleanup } from './cleanup.js';
 export const RELAUNCH_EXIT_CODE = 199;
 
 /**
- * Exits the process with a special code to signal that the parent process should relaunch it.
+ * Restarts the CLI, either by signaling an existing parent wrapper or by
+ * spawning one on demand.
  */
-export async function relaunchApp(): Promise<void> {
+export async function relaunchApp(
+  remoteAdminSettings?: AdminControlsSettings,
+): Promise<void> {
   await runExitCleanup();
-  process.exit(RELAUNCH_EXIT_CODE);
+
+  if (process.send || process.env['SANDBOX']) {
+    if (process.send && remoteAdminSettings) {
+      process.send({
+        type: 'admin-settings-update',
+        settings: remoteAdminSettings,
+      });
+    }
+    process.exit(RELAUNCH_EXIT_CODE);
+  }
+
+  const { relaunchAppInChildProcess } = await import('./relaunch.js');
+  await relaunchAppInChildProcess([], [], remoteAdminSettings);
 }

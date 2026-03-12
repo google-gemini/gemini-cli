@@ -24,6 +24,19 @@ export abstract class ExtensionLoader {
 
   constructor(private readonly eventEmitter?: EventEmitter<ExtensionEvents>) {}
 
+  isLoaded(): boolean {
+    return true;
+  }
+
+  /**
+   * Ensures extension metadata is available before initialization continues.
+   *
+   * Most implementations have nothing to do here, but loaders backed by disk
+   * discovery can override this to defer filesystem work until after first
+   * render.
+   */
+  async ensureLoaded(): Promise<void> {}
+
   /**
    * All currently known extensions, both active and inactive.
    */
