@@ -195,6 +195,7 @@ describe('RemoteAgentInvocation', () => {
       expect(A2AAuthProviderFactory.create).toHaveBeenCalledWith({
         authConfig: mockAuth,
         agentName: 'test-agent',
+        targetUrl: 'http://test-agent/card',
         agentCardUrl: 'http://test-agent/card',
       });
       expect(mockClientManager.loadAgent).toHaveBeenCalledWith(
