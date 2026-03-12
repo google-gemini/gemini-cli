@@ -1,5 +1,5 @@
 #!/bin/bash
-# sync-keith-skills.sh - Syncs custom skills from the repo to the user's global ~/.gemini/skills folder.
+# sync-skills.sh - Syncs custom skills from the repo to the user's global ~/.gemini/skills folder.
 
 SKILLS_DIR="$HOME/.gemini/skills"
 REPO_SKILLS_PATH="packages/core/src/skills/builtin"
@@ -9,7 +9,7 @@ mkdir -p "$SKILLS_DIR"
 echo "Syncing skills to $SKILLS_DIR..."
 
 # List of skills to sync
-CUSTOM_SKILLS=("keith-git-worktree")
+CUSTOM_SKILLS=("git-worktree")
 
 for SKILL in "${CUSTOM_SKILLS[@]}"; do
     if [ -d "$REPO_SKILLS_PATH/$SKILL" ]; then

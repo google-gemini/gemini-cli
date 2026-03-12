@@ -1,9 +1,9 @@
 ---
-name: keith-git-worktree
+name: git-worktree
 description: Manage Git Worktrees according to the "Base Folder Strategy". Use when the user wants to create branches, switch tasks, or manage parallel development environments in the Gemini CLI project.
 ---
 
-# Keith Git Worktree
+# Git Worktree
 
 ## Overview
 
