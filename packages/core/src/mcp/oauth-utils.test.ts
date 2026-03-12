@@ -300,6 +300,39 @@ describe('OAuthUtils', () => {
         scopes: ['read', 'write'],
       });
     });
+
+    it('should preserve registrationUrl for cross-subdomain auth server discovered via path-based URL', async () => {
+      const serverUrl = 'https://example.com/v1/mcp';
+      const resourceMetadata: OAuthProtectedResourceMetadata = {
+        resource: 'https://example.com/v1/mcp',
+        authorization_servers: ['https://oauth.example.com'],
+      };
+      const authServerMetadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://oauth.example.com',
+        authorization_endpoint: 'https://oauth.example.com/authorize',
+        token_endpoint: 'https://oauth.example.com/token',
+        registration_endpoint: 'https://api.example.com/register',
+        scopes_supported: ['read'],
+      };
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(resourceMetadata),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(authServerMetadata),
+        });
+
+      const config = await OAuthUtils.discoverOAuthConfig(serverUrl);
+
+      expect(config?.registrationUrl).toBe('https://api.example.com/register');
+      // Verify the path-based well-known URL was used for discovery
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://example.com/.well-known/oauth-protected-resource/v1/mcp',
+      );
+    });
   });
 
   describe('metadataToOAuthConfig', () => {
@@ -318,6 +351,7 @@ describe('OAuthUtils', () => {
         issuer: 'https://auth.example.com',
         tokenUrl: 'https://auth.example.com/token',
         scopes: ['read', 'write'],
+        registrationUrl: undefined,
       });
     });
 
@@ -330,7 +364,8 @@ describe('OAuthUtils', () => {
 
       const config = OAuthUtils.metadataToOAuthConfig(metadata);
 
-      expect(config.scopes).toEqual([]);
+      expect(config).not.toBeNull();
+      expect(config!.scopes).toEqual([]);
     });
 
     it('should use issuer from metadata', () => {
@@ -343,7 +378,209 @@ describe('OAuthUtils', () => {
 
       const config = OAuthUtils.metadataToOAuthConfig(metadata);
 
-      expect(config.issuer).toBe('https://auth.example.com');
+      expect(config).not.toBeNull();
+      expect(config!.issuer).toBe('https://auth.example.com');
+    });
+
+    it('should include registrationUrl when endpoints share registrable domain with authServerUrl', () => {
+      // Covers multi-subdomain deployments: discovery on one subdomain,
+      // registration on a different subdomain of the same organization.
+      const metadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://login.example.com',
+        authorization_endpoint: 'https://login.example.com/authorize',
+        token_endpoint: 'https://login.example.com/token',
+        registration_endpoint: 'https://api.example.com/register',
+      };
+
+      const config = OAuthUtils.metadataToOAuthConfig(
+        metadata,
+        'https://auth.example.com',
+      );
+
+      expect(config).not.toBeNull();
+      expect(config!.registrationUrl).toBe('https://api.example.com/register');
+    });
+
+    it('should exclude registrationUrl when registration endpoint domain differs from authServerUrl', () => {
+      const metadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.trusted.com',
+        authorization_endpoint: 'https://auth.trusted.com/authorize',
+        token_endpoint: 'https://auth.trusted.com/token',
+        registration_endpoint: 'https://evil.other.com/register',
+      };
+
+      const config = OAuthUtils.metadataToOAuthConfig(
+        metadata,
+        'https://auth.trusted.com',
+      );
+
+      expect(config).not.toBeNull();
+      expect(config!.registrationUrl).toBeUndefined();
+    });
+
+    it('should return null for loopback-looking hostname that is not a true loopback address', () => {
+      // 127.0.0.1.evil.com has 5 labels, so isIPv4() returns false.
+      // It is not a loopback address, so HTTP is rejected.
+      const metadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'http://127.0.0.1.evil.com',
+        authorization_endpoint: 'http://127.0.0.1.evil.com/authorize',
+        token_endpoint: 'http://127.0.0.1.evil.com/token',
+      };
+      expect(OAuthUtils.metadataToOAuthConfig(metadata)).toBeNull();
+    });
+
+    it('should allow http for loopback auth endpoints (local dev exemption)', () => {
+      // RFC 8252 §8.3: loopback is treated as a secure context.
+      // Realistic local-dev scenario: auth server runs on localhost without TLS.
+      const metadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'http://localhost:8080',
+        authorization_endpoint: 'http://localhost:8080/authorize',
+        token_endpoint: 'http://localhost:8080/token',
+        registration_endpoint: 'http://localhost:8080/register',
+      };
+
+      // authServerUrl is HTTP → registration_endpoint discarded, but the
+      // authorization/token endpoints are still usable (loopback exemption).
+      const config = OAuthUtils.metadataToOAuthConfig(
+        metadata,
+        'http://localhost:8080',
+      );
+      expect(config).not.toBeNull();
+      expect(config!.authorizationUrl).toBe('http://localhost:8080/authorize');
+      expect(config!.registrationUrl).toBeUndefined();
+    });
+
+    it('should return null when auth endpoints use http (non-loopback)', () => {
+      // A private non-loopback IP address using HTTP is not a valid auth server.
+      const metadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'http://192.168.1.1',
+        authorization_endpoint: 'http://192.168.1.1/authorize',
+        token_endpoint: 'http://192.168.1.1/token',
+        registration_endpoint: 'http://192.168.1.1/register',
+      };
+
+      expect(
+        OAuthUtils.metadataToOAuthConfig(metadata, 'https://auth.example.com'),
+      ).toBeNull();
+    });
+
+    it('should return null when authorization_endpoint uses http (non-loopback)', () => {
+      const metadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.example.com',
+        authorization_endpoint: 'http://auth.example.com/authorize',
+        token_endpoint: 'https://auth.example.com/token',
+      };
+
+      expect(
+        OAuthUtils.metadataToOAuthConfig(metadata, 'https://auth.example.com'),
+      ).toBeNull();
+    });
+
+    it('should return null when token_endpoint uses http (non-loopback)', () => {
+      const metadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.example.com',
+        authorization_endpoint: 'https://auth.example.com/authorize',
+        token_endpoint: 'http://auth.example.com/token',
+      };
+
+      expect(
+        OAuthUtils.metadataToOAuthConfig(metadata, 'https://auth.example.com'),
+      ).toBeNull();
+    });
+
+    it('should return null when authorization_endpoint domain mismatches authServerUrl', () => {
+      const metadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://evil.com',
+        authorization_endpoint: 'https://evil.com/authorize',
+        token_endpoint: 'https://auth.example.com/token',
+      };
+
+      expect(
+        OAuthUtils.metadataToOAuthConfig(metadata, 'https://auth.example.com'),
+      ).toBeNull();
+    });
+
+    it('should return null when token_endpoint domain mismatches authServerUrl', () => {
+      const metadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.example.com',
+        authorization_endpoint: 'https://auth.example.com/authorize',
+        token_endpoint: 'https://evil.com/token',
+      };
+
+      expect(
+        OAuthUtils.metadataToOAuthConfig(metadata, 'https://auth.example.com'),
+      ).toBeNull();
+    });
+
+    it('should exclude registrationUrl when endpoints share only a compound TLD but different organizations', () => {
+      const metadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.legit.co.uk',
+        authorization_endpoint: 'https://auth.legit.co.uk/authorize',
+        token_endpoint: 'https://auth.legit.co.uk/token',
+        registration_endpoint: 'https://register.evil.co.uk/register',
+      };
+
+      const config = OAuthUtils.metadataToOAuthConfig(
+        metadata,
+        'https://auth.legit.co.uk',
+      );
+      expect(config).not.toBeNull();
+      expect(config!.registrationUrl).toBeUndefined();
+    });
+
+    it('should exclude registrationUrl when registration_endpoint uses http', () => {
+      const metadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.example.com',
+        authorization_endpoint: 'https://auth.example.com/authorize',
+        token_endpoint: 'https://auth.example.com/token',
+        registration_endpoint: 'http://auth.example.com/register',
+      };
+      const config = OAuthUtils.metadataToOAuthConfig(
+        metadata,
+        'https://auth.example.com',
+      );
+      expect(config).not.toBeNull();
+      expect(config!.registrationUrl).toBeUndefined();
+    });
+
+    it('should exclude registrationUrl when authServerUrl uses http', () => {
+      const metadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.example.com',
+        authorization_endpoint: 'https://auth.example.com/authorize',
+        token_endpoint: 'https://auth.example.com/token',
+        registration_endpoint: 'https://auth.example.com/register',
+      };
+      const config = OAuthUtils.metadataToOAuthConfig(
+        metadata,
+        'http://auth.example.com',
+      );
+      expect(config).not.toBeNull();
+      expect(config!.registrationUrl).toBeUndefined();
+    });
+
+    it('should discard registrationUrl when no authServerUrl is provided', () => {
+      const metadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.example.com',
+        authorization_endpoint: 'https://auth.example.com/authorize',
+        token_endpoint: 'https://auth.example.com/token',
+        registration_endpoint: 'https://api.example.com/register',
+      };
+      // No authServerUrl → registration_endpoint is discarded (fail-closed)
+      const config = OAuthUtils.metadataToOAuthConfig(metadata);
+      expect(config).not.toBeNull();
+      expect(config!.registrationUrl).toBeUndefined();
+    });
+
+    it('should discard registrationUrl when no trusted anchor is available', () => {
+      const metadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.example.com',
+        authorization_endpoint: 'https://auth.example.com/authorize',
+        token_endpoint: 'https://auth.example.com/token',
+        registration_endpoint: 'https://auth.example.com/register',
+      };
+      const config = OAuthUtils.metadataToOAuthConfig(metadata);
+      expect(config).not.toBeNull();
+      expect(config!.registrationUrl).toBeUndefined();
     });
   });
 

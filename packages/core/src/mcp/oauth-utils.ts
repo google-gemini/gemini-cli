@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { isIPv4 } from 'node:net';
+
+import * as psl from 'psl';
+
 import type { MCPOAuthConfig } from './oauth-provider.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -136,20 +140,180 @@ export class OAuthUtils {
   }
 
   /**
+   * Returns the registrable domain (e.g. "example.com", "example.co.uk")
+   * for a given hostname using the Mozilla Public Suffix List, or null for
+   * IP addresses, single-label hostnames, and other values that cannot
+   * serve as public OAuth endpoints.
+   *
+   * This is used to compare OAuth endpoint hostnames at the organizational
+   * level, allowing different subdomains of the same domain while rejecting
+   * loopback addresses, IP literals, and entirely different domains.
+   */
+  private static extractRegistrableDomain(hostname: string): string | null {
+    // Reject IP literals (IPv4 and IPv6 including bracketed notation)
+    if (/^[\d.]+$/.test(hostname) || hostname.includes(':')) return null;
+    // Use PSL (Mozilla Public Suffix List) for correct registrable domain
+    // extraction, handling compound TLDs like .co.uk, .com.au correctly.
+    const result: unknown = psl.get(hostname);
+    return typeof result === 'string' ? result : null;
+  }
+
+  /**
+   * Returns true for loopback hostnames (localhost, 127.0.0.0/8, [::1]).
+   * Loopback hosts are exempt from the HTTPS requirement per RFC 8252 §8.3.
+   *
+   * Uses `net.isIPv4()` to validate the full dotted-decimal address before
+   * checking the 127.x.x.x prefix, so hostnames like `127.0.0.1.evil.com`
+   * are correctly rejected (they have 5 labels, not a valid IPv4 address).
+   */
+  private static isLoopback(url: URL): boolean {
+    const { hostname } = url;
+    if (hostname === 'localhost') return true;
+    // isIPv4 validates full dotted-decimal format: 127.0.0.1.evil.com → false.
+    if (isIPv4(hostname)) return hostname.startsWith('127.');
+    return hostname === '[::1]'; // url.hostname keeps brackets for IPv6
+  }
+
+  /**
    * Convert authorization server metadata to OAuth configuration.
    *
    * @param metadata The authorization server metadata
-   * @returns The OAuth configuration
+   * @param authServerUrl The URL from which the metadata was discovered.
+   *   When provided, all endpoints are validated against this URL to prevent
+   *   SSRF via crafted discovery metadata.
+   * @returns The OAuth configuration, or null if endpoint validation fails.
    */
   static metadataToOAuthConfig(
     metadata: OAuthAuthorizationServerMetadata,
-  ): MCPOAuthConfig {
+    authServerUrl?: string,
+  ): MCPOAuthConfig | null {
+    let registrationUrl = metadata.registration_endpoint;
+    if (registrationUrl) {
+      try {
+        const regUrl = new URL(registrationUrl);
+        // RFC 7591 §3.1: the client registration endpoint MUST be an HTTPS URL.
+        if (regUrl.protocol !== 'https:') {
+          debugLogger.debug(
+            'registration_endpoint must use https: protocol; discarding.',
+          );
+          registrationUrl = undefined;
+        } else {
+          const regDomain = OAuthUtils.extractRegistrableDomain(
+            regUrl.hostname,
+          );
+
+          if (authServerUrl) {
+            const authUrl = new URL(authServerUrl);
+            // RFC 8414 §3: the authorization server URL must also use HTTPS.
+            if (authUrl.protocol !== 'https:') {
+              debugLogger.debug(
+                'authServerUrl must use https: protocol; discarding registration_endpoint.',
+              );
+              registrationUrl = undefined;
+            } else {
+              // Anchor validation to the trusted discovery URL (RFC 8414 §3).
+              // The registration_endpoint must share the registrable domain with
+              // the authorization server the metadata was fetched from.
+              // Using registrable domain (rather than full origin) accommodates
+              // deployments where discovery and registration endpoints are on
+              // different subdomains of the same organization.
+              const authDomain = OAuthUtils.extractRegistrableDomain(
+                authUrl.hostname,
+              );
+              if (regDomain && authDomain) {
+                if (regDomain !== authDomain) registrationUrl = undefined;
+              } else if (regUrl.hostname !== authUrl.hostname) {
+                // PSL returned null for one or both sides (e.g., IP addresses).
+                // Fall back to exact hostname comparison.
+                registrationUrl = undefined;
+              }
+            }
+          } else {
+            // When no discovery URL is available to anchor validation, we cannot
+            // safely trust the registration_endpoint. While we could fall back
+            // to comparing against the issuer, the issuer itself is part of the
+            // same untrusted metadata document.
+            debugLogger.debug(
+              'No authServerUrl provided for validation; discarding registration_endpoint.',
+            );
+            registrationUrl = undefined;
+          }
+        }
+      } catch (error) {
+        debugLogger.debug(
+          `Failed to validate registration_endpoint URL: ${getErrorMessage(error)}`,
+        );
+        registrationUrl = undefined;
+      }
+    }
+
+    // Validate required endpoints (RFC 8414 §3, RFC 6749 §3.1).
+    // authorization_endpoint and token_endpoint must use HTTPS unless on a
+    // loopback address (localhost / 127.x.x.x / [::1]), which is treated as
+    // a secure context for local development (RFC 8252 §8.3).
+    // When authServerUrl is a public HTTPS URL, both endpoints must also share
+    // its registrable domain to prevent SSRF via crafted discovery metadata.
+    const authorizationUrl = metadata.authorization_endpoint;
+    const tokenUrl = metadata.token_endpoint;
+    try {
+      const authzUrl = new URL(authorizationUrl);
+      const tokUrl = new URL(tokenUrl);
+
+      if (
+        (authzUrl.protocol !== 'https:' && !OAuthUtils.isLoopback(authzUrl)) ||
+        (tokUrl.protocol !== 'https:' && !OAuthUtils.isLoopback(tokUrl))
+      ) {
+        debugLogger.debug(
+          'authorization_endpoint and token_endpoint must use https: protocol.',
+        );
+        return null;
+      }
+
+      if (authServerUrl) {
+        const authUrl = new URL(authServerUrl);
+        // Only apply domain validation for public HTTPS discovery URLs.
+        // Loopback auth servers are used in local dev and are exempt.
+        if (authUrl.protocol === 'https:' && !OAuthUtils.isLoopback(authUrl)) {
+          const authDomain = OAuthUtils.extractRegistrableDomain(
+            authUrl.hostname,
+          );
+          const authzDomain = OAuthUtils.extractRegistrableDomain(
+            authzUrl.hostname,
+          );
+          const tokDomain = OAuthUtils.extractRegistrableDomain(
+            tokUrl.hostname,
+          );
+
+          // When PSL returns null for one or both sides (e.g., IP addresses),
+          // fall back to exact hostname comparison instead of treating null as mismatch.
+          const mismatch = (eDomain: string | null, eHostname: string) => {
+            if (authDomain && eDomain) return eDomain !== authDomain;
+            return eHostname !== authUrl.hostname;
+          };
+          if (
+            mismatch(authzDomain, authzUrl.hostname) ||
+            mismatch(tokDomain, tokUrl.hostname)
+          ) {
+            debugLogger.debug(
+              'authorization_endpoint or token_endpoint domain does not match authServerUrl.',
+            );
+            return null;
+          }
+        }
+      }
+    } catch (error) {
+      debugLogger.debug(
+        `Failed to validate required OAuth endpoints: ${getErrorMessage(error)}`,
+      );
+      return null;
+    }
+
     return {
-      authorizationUrl: metadata.authorization_endpoint,
+      authorizationUrl,
       issuer: metadata.issuer,
-      tokenUrl: metadata.token_endpoint,
+      tokenUrl,
       scopes: metadata.scopes_supported || [],
-      registrationUrl: metadata.registration_endpoint,
+      registrationUrl,
     };
   }
 
@@ -276,7 +440,10 @@ export class OAuthUtils {
           await this.discoverAuthorizationServerMetadata(authServerUrl);
 
         if (authServerMetadata) {
-          const config = this.metadataToOAuthConfig(authServerMetadata);
+          const config = this.metadataToOAuthConfig(
+            authServerMetadata,
+            authServerUrl,
+          );
           if (authServerMetadata.registration_endpoint) {
             debugLogger.log(
               'Dynamic client registration is supported at:',
@@ -293,7 +460,10 @@ export class OAuthUtils {
         await this.discoverAuthorizationServerMetadata(serverUrl);
 
       if (authServerMetadata) {
-        const config = this.metadataToOAuthConfig(authServerMetadata);
+        const config = this.metadataToOAuthConfig(
+          authServerMetadata,
+          serverUrl,
+        );
         if (authServerMetadata.registration_endpoint) {
           debugLogger.log(
             'Dynamic client registration is supported at:',
@@ -374,7 +544,7 @@ export class OAuthUtils {
       await this.discoverAuthorizationServerMetadata(authServerUrl);
 
     if (authServerMetadata) {
-      return this.metadataToOAuthConfig(authServerMetadata);
+      return this.metadataToOAuthConfig(authServerMetadata, authServerUrl);
     }
 
     return null;
