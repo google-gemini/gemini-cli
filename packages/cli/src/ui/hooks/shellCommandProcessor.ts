@@ -80,7 +80,7 @@ export const useShellCommandProcessor = (
   setShellInputFocused: (value: boolean) => void,
   terminalWidth?: number,
   terminalHeight?: number,
-  activeToolPtyId?: number,
+  activeBackgroundExecutionId?: number,
   isWaitingForConfirmation?: boolean,
 ) => {
   const [state, dispatch] = useReducer(shellReducer, initialState);
@@ -103,7 +103,8 @@ export const useShellCommandProcessor = (
   }
   const m = manager.current;
 
-  const activePtyId = state.activeShellPtyId || activeToolPtyId;
+  const activePtyId =
+    state.activeShellPtyId ?? activeBackgroundExecutionId ?? undefined;
 
   useEffect(() => {
     const isForegroundActive = !!activePtyId || !!isWaitingForConfirmation;
@@ -191,7 +192,8 @@ export const useShellCommandProcessor = (
   ]);
 
   const backgroundCurrentShell = useCallback(() => {
-    const pidToBackground = state.activeShellPtyId || activeToolPtyId;
+    const pidToBackground =
+      state.activeShellPtyId ?? activeBackgroundExecutionId;
     if (pidToBackground) {
       ShellExecutionService.background(pidToBackground);
       m.backgroundedPids.add(pidToBackground);
@@ -202,7 +204,7 @@ export const useShellCommandProcessor = (
         m.restoreTimeout = null;
       }
     }
-  }, [state.activeShellPtyId, activeToolPtyId, m]);
+  }, [state.activeShellPtyId, activeBackgroundExecutionId, m]);
 
   const dismissBackgroundShell = useCallback(
     async (pid: number) => {
