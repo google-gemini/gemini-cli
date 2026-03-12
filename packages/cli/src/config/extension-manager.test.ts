@@ -515,7 +515,6 @@ describe('ExtensionManager', () => {
 
       await extensionManager.loadExtensions();
 
-      expect(themeManager.hasExtensionThemes('themed-ext')).toBe(true);
       expect(themeManager.getCustomThemeNames()).toContain(
         'MyTheme (themed-ext)',
       );
@@ -540,7 +539,9 @@ describe('ExtensionManager', () => {
 
       await manager.loadExtensions();
 
-      expect(themeManager.hasExtensionThemes('disabled-ext')).toBe(false);
+      expect(themeManager.getCustomThemeNames()).not.toContain(
+        'MyTheme (disabled-ext)',
+      );
     });
   });
 });

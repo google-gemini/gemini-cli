@@ -238,22 +238,6 @@ describe('ThemeManager', () => {
       expect(themeManager.isCustomTheme('ExtensionTheme (Ext)')).toBe(true);
       expect(themeManager.isCustomTheme('SettingsTheme')).toBe(true);
     });
-
-    it('should check if extension themes are registered via hasExtensionThemes', () => {
-      const extTheme: CustomTheme = {
-        ...validCustomTheme,
-        name: 'ExtensionTheme',
-      };
-
-      expect(themeManager.hasExtensionThemes('test-ext')).toBe(false);
-
-      themeManager.registerExtensionThemes('test-ext', [extTheme]);
-      expect(themeManager.hasExtensionThemes('test-ext')).toBe(true);
-      expect(themeManager.hasExtensionThemes('other-ext')).toBe(false);
-
-      themeManager.unregisterExtensionThemes('test-ext', [extTheme]);
-      expect(themeManager.hasExtensionThemes('test-ext')).toBe(false);
-    });
   });
 
   describe('terminalBackground override', () => {
