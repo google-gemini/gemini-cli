@@ -3642,6 +3642,19 @@ describe('loadCliConfig acpMode and clientName', () => {
     expect(config.getClientName()).toBe('acp-vscode');
   });
 
+  it('should set acpMode to true but leave clientName undefined for generic terminals', async () => {
+    process.argv = ['node', 'script.js', '--acp'];
+    vi.stubEnv('TERM_PROGRAM', 'iTerm.app'); // Generic terminal
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
+    expect(config.getAcpMode()).toBe(true);
+    expect(config.getClientName()).toBeUndefined();
+  });
+
   it('should set acpMode to false and clientName to undefined by default', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());

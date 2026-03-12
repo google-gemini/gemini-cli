@@ -715,7 +715,10 @@ export async function loadCliConfig(
   let clientName: string | undefined = undefined;
   if (isAcpMode) {
     const ide = detectIdeFromEnv();
-    if (ide) {
+    if (
+      ide &&
+      (ide.name !== 'vscode' || process.env['TERM_PROGRAM'] === 'vscode')
+    ) {
       clientName = `acp-${ide.name}`;
     }
   }
