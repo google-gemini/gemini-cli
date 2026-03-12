@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useMemo } from 'react';
+import { useReducer, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import type { RepoTreeNode } from '@google/gemini-cli-core';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
@@ -65,6 +65,54 @@ function getVisibleNodes(
   return visible;
 }
 
+interface RepoMapState {
+  expandedPaths: Set<string>;
+  activeIndex: number;
+}
+
+type RepoMapAction =
+  | { type: 'NAVIGATE_UP' }
+  | { type: 'NAVIGATE_DOWN'; maxIndex: number }
+  | { type: 'TOGGLE_EXPAND'; path: string; hasChildren: boolean }
+  | { type: 'EXPAND'; path: string; hasChildren: boolean }
+  | { type: 'COLLAPSE'; path: string; hasChildren: boolean }
+  | { type: 'SET_INDEX'; index: number };
+
+function repoMapReducer(state: RepoMapState, action: RepoMapAction): RepoMapState {
+  switch (action.type) {
+    case 'NAVIGATE_UP':
+      return { ...state, activeIndex: Math.max(0, state.activeIndex - 1) };
+    case 'NAVIGATE_DOWN':
+      return { ...state, activeIndex: Math.min(action.maxIndex, state.activeIndex + 1) };
+    case 'TOGGLE_EXPAND': {
+      if (!action.hasChildren) return state;
+      const next = new Set(state.expandedPaths);
+      if (next.has(action.path)) {
+        next.delete(action.path);
+      } else {
+        next.add(action.path);
+      }
+      return { ...state, expandedPaths: next };
+    }
+    case 'EXPAND': {
+      if (!action.hasChildren || state.expandedPaths.has(action.path)) return state;
+      const next = new Set(state.expandedPaths);
+      next.add(action.path);
+      return { ...state, expandedPaths: next };
+    }
+    case 'COLLAPSE': {
+      if (!action.hasChildren || !state.expandedPaths.has(action.path)) return state;
+      const next = new Set(state.expandedPaths);
+      next.delete(action.path);
+      return { ...state, expandedPaths: next };
+    }
+    case 'SET_INDEX':
+      return { ...state, activeIndex: action.index };
+    default:
+      return state;
+  }
+}
+
 export interface InteractiveRepoMapProps {
   tree: RepoTreeNode;
   onClose: () => void;
@@ -76,35 +124,38 @@ export const InteractiveRepoMap = ({
 }: InteractiveRepoMapProps) => {
   const keyMatchers = useKeyMatchers();
   const { terminalHeight, staticExtraHeight } = useUIState();
-  const [expandedPaths, setExpandedPaths] = useState<Set<string>>(
-    new Set([tree.name]),
-  );
-  const [activeIndex, setActiveIndex] = useState(0);
+
+  const [state, dispatch] = useReducer(repoMapReducer, {
+    expandedPaths: new Set([tree.name]),
+    activeIndex: 0,
+  });
 
   const visibleNodes = useMemo(
-    () => getVisibleNodes(tree, expandedPaths),
-    [tree, expandedPaths],
+    () => getVisibleNodes(tree, state.expandedPaths),
+    [tree, state.expandedPaths],
   );
 
   useKeypress(
     (key: Key) => {
       if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
-        setActiveIndex((prev) => Math.max(0, prev - 1));
+        dispatch({ type: 'NAVIGATE_UP' });
         return true;
       }
       if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
-        setActiveIndex((prev) => Math.min(visibleNodes.length - 1, prev + 1));
+        dispatch({ type: 'NAVIGATE_DOWN', maxIndex: visibleNodes.length - 1 });
         return true;
       }
       if (key.name === 'left') {
-        const activeNode = visibleNodes[activeIndex];
+        const activeNode = visibleNodes[state.activeIndex];
         if (
           activeNode?.hasChildren &&
-          expandedPaths.has(activeNode.path)
+          state.expandedPaths.has(activeNode.path)
         ) {
-          const next = new Set(expandedPaths);
-          next.delete(activeNode.path);
-          setExpandedPaths(next);
+          dispatch({
+            type: 'COLLAPSE',
+            path: activeNode.path,
+            hasChildren: true,
+          });
         } else if (activeNode && activeNode.depth > 0) {
           const parts = activeNode.path.split('/');
           parts.pop();
@@ -113,33 +164,33 @@ export const InteractiveRepoMap = ({
             (n) => n.path === parentPath,
           );
           if (parentIndex !== -1) {
-            setActiveIndex(parentIndex);
+            dispatch({ type: 'SET_INDEX', index: parentIndex });
           }
         }
         return true;
       }
       if (key.name === 'right') {
-        const activeNode = visibleNodes[activeIndex];
+        const activeNode = visibleNodes[state.activeIndex];
         if (
           activeNode?.hasChildren &&
-          !expandedPaths.has(activeNode.path)
+          !state.expandedPaths.has(activeNode.path)
         ) {
-          const next = new Set(expandedPaths);
-          next.add(activeNode.path);
-          setExpandedPaths(next);
+          dispatch({
+            type: 'EXPAND',
+            path: activeNode.path,
+            hasChildren: true,
+          });
         }
         return true;
       }
       if (keyMatchers[Command.RETURN](key)) {
-        const activeNode = visibleNodes[activeIndex];
-        if (activeNode?.hasChildren) {
-          const next = new Set(expandedPaths);
-          if (next.has(activeNode.path)) {
-            next.delete(activeNode.path);
-          } else {
-            next.add(activeNode.path);
-          }
-          setExpandedPaths(next);
+        const activeNode = visibleNodes[state.activeIndex];
+        if (activeNode) {
+          dispatch({
+            type: 'TOGGLE_EXPAND',
+            path: activeNode.path,
+            hasChildren: activeNode.hasChildren,
+          });
         }
         return true;
       }
@@ -151,6 +202,8 @@ export const InteractiveRepoMap = ({
     },
     { isActive: true },
   );
+
+  const { activeIndex, expandedPaths } = state;
 
   // Compute a slice of visible nodes to fit within the terminal height
   // taking into account the space consumed by other CLI UI elements (staticExtraHeight)
