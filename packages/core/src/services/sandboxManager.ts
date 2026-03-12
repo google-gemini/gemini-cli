@@ -78,3 +78,24 @@ export class NoopSandboxManager implements SandboxManager {
     };
   }
 }
+
+/**
+ * SandboxManager that implements actual sandboxing.
+ */
+export class LocalSandboxManager implements SandboxManager {
+  async prepareCommand(_req: SandboxRequest): Promise<SandboxedCommand> {
+    throw new Error('Tool sandboxing is not yet implemented.');
+  }
+}
+
+/**
+ * Creates a sandbox manager based on the provided settings.
+ */
+export function createSandboxManager(
+  sandboxingEnabled: boolean,
+): SandboxManager {
+  if (sandboxingEnabled) {
+    return new LocalSandboxManager();
+  }
+  return new NoopSandboxManager();
+}

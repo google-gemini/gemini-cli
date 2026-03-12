@@ -1247,6 +1247,15 @@ const SETTINGS_SCHEMA = {
     description: 'Settings for built-in and custom tools.',
     showInDialog: false,
     properties: {
+      sandboxing: {
+        type: 'boolean',
+        label: 'Tool Sandboxing',
+        category: 'Tools',
+        requiresRestart: false,
+        default: false,
+        description: 'Enable sandboxing for tool execution.',
+        showInDialog: true,
+      },
       sandbox: {
         type: 'string',
         label: 'Sandbox',

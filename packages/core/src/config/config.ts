@@ -42,7 +42,7 @@ import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
 import {
-  NoopSandboxManager,
+  createSandboxManager,
   type SandboxManager,
 } from '../services/sandboxManager.js';
 import {
@@ -496,6 +496,7 @@ export interface ConfigParameters {
   clientVersion?: string;
   embeddingModel?: string;
   sandbox?: SandboxConfig;
+  toolSandboxing?: boolean;
   targetDir: string;
   debugMode: boolean;
   question?: string;
@@ -1094,7 +1095,7 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
     this._geminiClient = new GeminiClient(this);
-    this._sandboxManager = new NoopSandboxManager();
+    this._sandboxManager = createSandboxManager(params.toolSandboxing ?? false);
     this.shellExecutionConfig.sandboxManager = this._sandboxManager;
     this.modelRouterService = new ModelRouterService(this);
 
