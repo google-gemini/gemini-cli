@@ -182,6 +182,7 @@ export enum CommandKind {
   EXTENSION_FILE = 'extension-file',
   MCP_PROMPT = 'mcp-prompt',
   AGENT = 'agent',
+  SKILL = 'skill',
 }
 
 // The standardized contract for any command in the system.
@@ -190,6 +191,11 @@ export interface SlashCommand {
   altNames?: string[];
   description: string;
   hidden?: boolean;
+  /**
+   * Optional grouping label for slash completion UI sections.
+   * Commands with the same label are rendered under one separator.
+   */
+  suggestionGroup?: string;
 
   kind: CommandKind;
 
@@ -217,7 +223,7 @@ export interface SlashCommand {
     | SlashCommandActionReturn
     | Promise<void | SlashCommandActionReturn>;
 
-  // Provides argument completion (e.g., completing a tag for `/chat resume <tag>`).
+  // Provides argument completion (e.g., completing a tag for `/resume resume <tag>`).
   completion?: (
     context: CommandContext,
     partialArg: string,

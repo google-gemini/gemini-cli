@@ -107,7 +107,7 @@ export function isMcpToolAnnotation(
   return (
     typeof annotation === 'object' &&
     annotation !== null &&
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, no-restricted-syntax
     typeof (annotation as Record<string, unknown>)['_serverName'] === 'string'
   );
 }
@@ -184,7 +184,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     );
   }
 
-  protected override getPolicyUpdateOptions(
+  override getPolicyUpdateOptions(
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
     return { mcpName: this.serverName };

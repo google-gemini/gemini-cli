@@ -111,6 +111,12 @@ export interface PolicyRule {
   toolName?: string;
 
   /**
+   * The name of the subagent this rule applies to.
+   * If undefined, the rule applies regardless of whether it's the main agent or a subagent.
+   */
+  subagent?: string;
+
+  /**
    * Identifies the MCP server this rule applies to.
    * Enables precise rule matching against `serverName` metadata instead
    * of parsing composite string names.
@@ -305,6 +311,8 @@ export interface PolicySettings {
   mcpServers?: Record<string, { trust?: boolean }>;
   // User provided policies that will replace the USER level policies in ~/.gemini/policies
   policyPaths?: string[];
+  // Admin provided policies that will supplement the ADMIN level policies
+  adminPolicyPaths?: string[];
   workspacePoliciesDir?: string;
 }
 
