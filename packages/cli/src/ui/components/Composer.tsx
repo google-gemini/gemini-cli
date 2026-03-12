@@ -31,7 +31,6 @@ import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
 import { RawMarkdownIndicator } from './RawMarkdownIndicator.js';
-import { ShortcutsHint } from './ShortcutsHint.js';
 import { ShortcutsHelp } from './ShortcutsHelp.js';
 import { InputPrompt } from './InputPrompt.js';
 import { Footer } from './Footer.js';
@@ -112,27 +111,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     uiState.streamingState === StreamingState.Idle &&
     !hasPendingActionRequired;
 
-  const [showShortcutsHintDebounced, setShowShortcutsHintDebounced] =
-    useState(false);
-  const canShowShortcutsHint =
-    uiState.isInputActive &&
-    uiState.streamingState === StreamingState.Idle &&
-    !hasPendingActionRequired &&
-    uiState.buffer.text.length === 0;
-
-  useEffect(() => {
-    if (!canShowShortcutsHint) {
-      setShowShortcutsHintDebounced(false);
-      return;
-    }
-
-    const timeout = setTimeout(() => {
-      setShowShortcutsHintDebounced(true);
-    }, 200);
-
-    return () => clearTimeout(timeout);
-  }, [canShowShortcutsHint]);
-
   /**
    * Use the setting if provided, otherwise default to true for the new UX.
    * This allows tests to override the collapse behavior.
@@ -194,9 +172,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const shouldReserveSpaceForShortcutsHint =
     settings.merged.ui.showShortcutsHint && !hideUiDetailsForSuggestions;
 
-  const showShortcutsHint =
-    shouldReserveSpaceForShortcutsHint && showShortcutsHintDebounced;
-
   const showMinimalContextBleedThrough =
     !settings.merged.ui.footer.hideContextPercentage &&
     isContextUsageHigh(
@@ -239,7 +214,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
    * Determine the ambient text (tip) to display.
    */
   const ambientContentStr = (() => {
-    // Only show Tips on the right
+    // 1. Proactive Tip (Priority)
     if (showTips && uiState.currentTip) {
       if (
         estimatedStatusLength + uiState.currentTip.length + 10 <=
@@ -247,6 +222,15 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       ) {
         return uiState.currentTip;
       }
+    }
+
+    // 2. Shortcut Hint (Fallback)
+    if (
+      settings.merged.ui.showShortcutsHint &&
+      !hideUiDetailsForSuggestions &&
+      !hasPendingActionRequired
+    ) {
+      return showUiDetails ? '? for shortcuts' : 'press tab twice for more';
     }
 
     return undefined;
@@ -257,9 +241,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     estimatedStatusLength + estimatedAmbientLength + 5 > terminalWidth;
 
   const showAmbientLine =
-    uiState.streamingState !== StreamingState.Idle &&
     !hasPendingActionRequired &&
-    (showTips || showWit) &&
     ambientContentStr &&
     !willCollideAmbient &&
     !isNarrow;
@@ -296,17 +278,22 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const renderAmbientNode = () => {
     if (!ambientContentStr) return null;
 
+    const isShortcutHint =
+      ambientContentStr === '? for shortcuts' ||
+      ambientContentStr === 'press tab twice for more';
+    const color =
+      isShortcutHint && uiState.shortcutsHelpVisible
+        ? theme.text.accent
+        : theme.text.secondary;
+
     return (
-      <Box
-        flexDirection="row"
-        justifyContent="flex-end"
-        marginLeft={1}
-        marginRight={1}
-      >
+      <Box flexDirection="row" justifyContent="flex-end">
         <Text
-          color={theme.text.secondary}
+          color={color}
           wrap="truncate-end"
-          italic={ambientContentStr === uiState.currentWittyPhrase}
+          italic={
+            !isShortcutHint && ambientContentStr === uiState.currentWittyPhrase
+          }
         >
           {ambientContentStr === uiState.currentTip
             ? `Tip: ${ambientContentStr}`
@@ -352,7 +339,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           thought={uiState.thought}
           elapsedTime={uiState.elapsedTime}
           forceRealStatusOnly={false}
-          showCancelAndTimer={false}
           wittyPhrase={uiState.currentWittyPhrase}
         />
       );
@@ -374,7 +360,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           errorVerbosity={settings.merged.ui.errorVerbosity}
           elapsedTime={uiState.elapsedTime}
           forceRealStatusOnly={true}
-          showCancelAndTimer={false}
         />
       )}
       {hasUserHooks && (
@@ -450,12 +435,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             </Box>
 
             <Box flexShrink={0} marginLeft={2} marginRight={isNarrow ? 0 : 1}>
-              {!isNarrow && (
-                <>
-                  {showShortcutsHint && <ShortcutsHint />}
-                  {!showShortcutsHint && showAmbientLine && renderAmbientNode()}
-                </>
-              )}
+              {!isNarrow && showAmbientLine && renderAmbientNode()}
             </Box>
           </Box>
         )}
@@ -464,7 +444,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         {showRow1 &&
           showRow2 &&
           (showUiDetails || (showRow1_MiniMode && showRow2_MiniMode)) && (
-            <Box width="100%" marginLeft={1} marginRight={1}>
+            <Box width="100%">
               <Box
                 borderStyle="single"
                 borderTop

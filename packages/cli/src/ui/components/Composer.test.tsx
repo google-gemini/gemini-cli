@@ -89,10 +89,6 @@ vi.mock('./ShellModeIndicator.js', () => ({
   ShellModeIndicator: () => <Text>ShellModeIndicator</Text>,
 }));
 
-vi.mock('./ShortcutsHint.js', () => ({
-  ShortcutsHint: () => <Text>ShortcutsHint</Text>,
-}));
-
 vi.mock('./ShortcutsHelp.js', () => ({
   ShortcutsHelp: () => <Text>ShortcutsHelp</Text>,
 }));
@@ -847,7 +843,9 @@ describe('Composer', () => {
         await vi.advanceTimersByTimeAsync(250);
       });
 
-      expect(lastFrame({ allowEmpty: true })).toContain('ShortcutsHint');
+      expect(lastFrame({ allowEmpty: true })).toContain(
+        'press tab twice for more',
+      );
     });
 
     it('hides shortcuts hint when text is typed in buffer', async () => {
@@ -901,7 +899,7 @@ describe('Composer', () => {
         await vi.advanceTimersByTimeAsync(250);
       });
 
-      expect(lastFrame()).toContain('ShortcutsHint');
+      expect(lastFrame()).toContain('press tab twice for more');
     });
 
     it('shows shortcuts hint when full UI details are visible', async () => {
@@ -916,7 +914,7 @@ describe('Composer', () => {
       });
 
       // In Refreshed UX, shortcuts hint is in the top multipurpose status row
-      expect(lastFrame()).toContain('ShortcutsHint');
+      expect(lastFrame()).toContain('? for shortcuts');
     });
 
     it('hides shortcuts hint while loading when full UI details are visible', async () => {
@@ -1009,7 +1007,7 @@ describe('Composer', () => {
       });
 
       // In Refreshed UX, shortcuts hint is in the top status row and doesn't collide with suggestions below
-      expect(lastFrame()).toContain('ShortcutsHint');
+      expect(lastFrame()).toContain('press tab twice for more');
     });
   });
 
