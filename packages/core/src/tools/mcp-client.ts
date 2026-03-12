@@ -1319,8 +1319,7 @@ export async function discoverTools(
           cliConfig,
           mcpServerConfig.extension?.name,
           mcpServerConfig.extension?.id,
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          annotations as McpTool['inputSchema'] | undefined,
+          annotations,
         );
 
         discoveredTools.push(tool);
