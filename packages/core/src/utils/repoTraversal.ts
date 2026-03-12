@@ -55,7 +55,7 @@ export async function buildRepoTree(
     }
 
     try {
-      const stats = await fs.stat(currentPath);
+      const stats = await fs.lstat(currentPath);
       const node: RepoTreeNode = {
         name: path.basename(currentPath) || path.basename(projectRoot),
         isDirectory: stats.isDirectory(),
