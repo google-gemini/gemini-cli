@@ -887,7 +887,21 @@ export class Session {
       const confirmationDetails =
         await invocation.shouldConfirmExecute(abortSignal);
 
+      const baseToolCall = {
+        toolCallId: callId,
+        title: invocation.getDescription(),
+        locations: invocation.toolLocations(),
+        kind: toAcpToolKind(tool.kind),
+      };
+
       if (confirmationDetails) {
+        await this.sendUpdate({
+          sessionUpdate: 'tool_call',
+          ...baseToolCall,
+          status: 'pending' as const,
+          content: [],
+        });
+
         const content: acp.ToolCallContent[] = [];
 
         if (confirmationDetails.type === 'edit') {
@@ -910,12 +924,9 @@ export class Session {
           sessionId: this.id,
           options: toPermissionOptions(confirmationDetails),
           toolCall: {
-            toolCallId: callId,
+            ...baseToolCall,
             status: 'pending',
-            title: invocation.getDescription(),
             content,
-            locations: invocation.toolLocations(),
-            kind: toAcpToolKind(tool.kind),
           },
         };
 
@@ -950,12 +961,9 @@ export class Session {
       } else {
         await this.sendUpdate({
           sessionUpdate: 'tool_call',
-          toolCallId: callId,
-          status: 'in_progress',
-          title: invocation.getDescription(),
+          ...baseToolCall,
+          status: 'in_progress' as const,
           content: [],
-          locations: invocation.toolLocations(),
-          kind: toAcpToolKind(tool.kind),
         });
       }
 
