@@ -24,7 +24,7 @@ More information can be found about these systems in the
 
 ## Release cadence and tags
 
-We will follow https://semver.org/ as closely as possible but will call out when
+We will follow [Semantic Versioning](https://semver.org/) as closely as possible but will call out when
 or if we have to deviate from it. Our weekly releases will be minor version
 increments and any bug or hotfixes between releases will go out as patch
 versions on the most recent release.
