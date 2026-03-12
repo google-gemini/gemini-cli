@@ -19,21 +19,28 @@ export const visualizeProvider: ShellCompletionProvider = {
     signal?: AbortSignal,
   ): Promise<CompletionResult> {
     const partial = tokens[cursorIndex] ?? '';
-    const base = resolve(cwd, partial || '.');
-    const prefix = partial.endsWith('/')
-      ? partial
-      : partial.split('/').slice(0, -1).join('/');
+
+    const lastSlash = partial.lastIndexOf('/');
+    const dirPart = lastSlash === -1 ? '' : partial.substring(0, lastSlash + 1);
+    const filePart =
+      lastSlash === -1 ? partial : partial.substring(lastSlash + 1);
+    const baseDir = resolve(cwd, dirPart || '.');
 
     try {
-      const entries = await readdir(base, { withFileTypes: true });
+      const entries = await readdir(baseDir, { withFileTypes: true });
 
       if (signal?.aborted) return { suggestions: [] };
 
       const suggestions: Suggestion[] = entries
-        .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+        .filter(
+          (e) =>
+            e.isDirectory() &&
+            !e.name.startsWith('.') &&
+            e.name.startsWith(filePart),
+        )
         .map((e) => ({
-          label: prefix ? `${prefix}/${e.name}` : e.name,
-          value: prefix ? `${prefix}/${e.name}` : e.name,
+          label: `${dirPart}${e.name}`,
+          value: `${dirPart}${e.name}`,
         }));
 
       return { suggestions };
