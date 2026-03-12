@@ -113,28 +113,6 @@ export class StandardSandboxManager implements SandboxManager {
         
         // Start with explicitly allowed paths from config
         const allowedPaths = [...(sandboxConfig.allowedPaths || [])];
-        
-        // Auto-detect Git Worktree metadata paths
-        try {
-          const gitDotPath = path.join(options.cwd, '.git');
-          if (fs.existsSync(gitDotPath)) {
-            const stat = fs.lstatSync(gitDotPath);
-            if (stat.isFile()) {
-              const content = fs.readFileSync(gitDotPath, 'utf8').trim();
-              const match = content.match(/^gitdir:\s*(.+)$/);
-              if (match?.[1]) {
-                const gitDir = path.resolve(options.cwd, match[1]);
-                allowedPaths.push(gitDir);
-                allowedPaths.push(path.dirname(gitDir));
-                allowedPaths.push(path.dirname(path.dirname(gitDir)));
-              }
-            } else if (stat.isDirectory()) {
-              allowedPaths.push(gitDotPath);
-            }
-          }
-        } catch (e) {
-          debugLogger.debug('Failed to auto-detect git metadata paths:', e);
-        }
 
         fs.writeFileSync(
           profilePath,
@@ -216,11 +194,6 @@ export class StandardSandboxManager implements SandboxManager {
       '(allow file-read* file-write* (literal "/dev/tty"))',
       '(allow file-ioctl (regex #"^/dev/tty.*"))',
       '(allow file-ioctl (literal "/dev/ptmx"))',
-
-      // Git and User Config (Read-only)
-      `(allow file-read* (literal "${path.join(os.homedir(), '.gitconfig')}"))`,
-      `(allow file-read* (subpath "${path.join(os.homedir(), '.config/git')}"))`,
-      ...(process.env['SSH_AUTH_SOCK'] ? [`(allow file-read* file-write* (literal "${process.env['SSH_AUTH_SOCK']}"))`] : []),
 
       // Project Workspace and Temp
       `(allow ${workspacePermission} (subpath "${path.resolve(options.cwd)}"))`,
