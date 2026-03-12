@@ -97,7 +97,6 @@ export class OAuthUtils {
     resourceMetadataUrl: string,
   ): Promise<OAuthProtectedResourceMetadata | null> {
     try {
-      // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
       const response = await fetch(resourceMetadataUrl);
       if (!response.ok) {
         return null;
@@ -122,7 +121,6 @@ export class OAuthUtils {
     authServerMetadataUrl: string,
   ): Promise<OAuthAuthorizationServerMetadata | null> {
     try {
-      // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
       const response = await fetch(authServerMetadataUrl);
       if (!response.ok) {
         return null;

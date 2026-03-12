@@ -700,7 +700,6 @@ async function fetchAndCacheUserInfo(client: OAuth2Client): Promise<void> {
       return;
     }
 
-    // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
     const response = await fetch(
       'https://www.googleapis.com/oauth2/v2/userinfo',
       {
