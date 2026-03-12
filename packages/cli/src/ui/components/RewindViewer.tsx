@@ -24,6 +24,12 @@ import { CliSpinner } from './CliSpinner.js';
 import { ExpandableText } from './shared/ExpandableText.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
+import {
+  DIALOG_PADDING,
+  DIALOG_HEADER_HEIGHT,
+  DIALOG_CONTROLS_HEIGHT,
+} from '../constants.js';
+
 interface RewindViewerProps {
   conversation: ConversationRecord;
   onExit: () => void;
@@ -122,14 +128,13 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
     { isActive: true },
   );
 
-  // Height constraint calculations
-  const DIALOG_PADDING = 2; // Top/bottom padding
-  const HEADER_HEIGHT = 2; // Title + margin
-  const CONTROLS_HEIGHT = 2; // Controls text + margin
-
   const listHeight = Math.max(
     5,
-    terminalHeight - DIALOG_PADDING - HEADER_HEIGHT - CONTROLS_HEIGHT - 2,
+    terminalHeight -
+      DIALOG_PADDING -
+      DIALOG_HEADER_HEIGHT -
+      DIALOG_CONTROLS_HEIGHT -
+      2,
   );
   const maxItemsToShow = Math.max(1, Math.floor(listHeight / 4));
 
