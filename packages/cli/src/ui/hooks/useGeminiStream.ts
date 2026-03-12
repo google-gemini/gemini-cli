@@ -512,11 +512,7 @@ export const useGeminiStream = (
       if (tc.request.name === ASK_USER_TOOL_NAME && isInProgress) {
         return false;
       }
-      return (
-        tc.status !== 'scheduled' &&
-        tc.status !== 'validating' &&
-        tc.status !== 'awaiting_approval'
-      );
+      return tc.status !== 'scheduled' && tc.status !== 'validating';
     });
 
     if (
