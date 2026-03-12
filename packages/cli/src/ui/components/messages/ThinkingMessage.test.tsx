@@ -159,4 +159,22 @@ describe('ThinkingMessage', () => {
     await expect(renderResult).toMatchSvgSnapshot();
     renderResult.unmount();
   });
+
+  it('filters out progress dots and empty lines', async () => {
+    const renderResult = renderWithProviders(
+      <ThinkingMessage
+        thought={{ subject: '...', description: 'Thinking\n.\n..\n...\nDone' }}
+        terminalWidth={80}
+        isFirstThinking={true}
+      />,
+    );
+    await renderResult.waitUntilReady();
+
+    const output = renderResult.lastFrame();
+    expect(output).toContain('Thinking');
+    expect(output).toContain('Done');
+    expect(renderResult.lastFrame()).toMatchSnapshot();
+    await expect(renderResult).toMatchSvgSnapshot();
+    renderResult.unmount();
+  });
 });

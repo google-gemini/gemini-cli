@@ -118,9 +118,10 @@ describe('<ToolGroupMessage />', () => {
         { config: baseMockConfig, settings: fullVerbositySettings },
       );
 
-      // Should render nothing because all tools in the group are confirming
+      // Should now render confirming tools
       await waitUntilReady();
-      expect(lastFrame({ allowEmpty: true })).toBe('');
+      const output = lastFrame();
+      expect(output).toContain('test-tool');
       unmount();
     });
 
@@ -162,11 +163,11 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      // pending-tool should be hidden
+      // pending-tool should now be visible
       await waitUntilReady();
       const output = lastFrame();
       expect(output).toContain('successful-tool');
-      expect(output).not.toContain('pending-tool');
+      expect(output).toContain('pending-tool');
       expect(output).toContain('error-tool');
       expect(output).toMatchSnapshot();
       unmount();
@@ -280,12 +281,12 @@ describe('<ToolGroupMessage />', () => {
           },
         },
       );
-      // write_file (Pending) should be hidden
+      // write_file (Pending) should now be visible
       await waitUntilReady();
       const output = lastFrame();
       expect(output).toContain('read_file');
       expect(output).toContain('run_shell_command');
-      expect(output).not.toContain('write_file');
+      expect(output).toContain('write_file');
       expect(output).toMatchSnapshot();
       unmount();
     });
@@ -841,7 +842,7 @@ describe('<ToolGroupMessage />', () => {
       );
 
       await waitUntilReady();
-      expect(lastFrame({ allowEmpty: true })).toBe('');
+      expect(lastFrame({ allowEmpty: true })).not.toBe('');
       unmount();
     });
 

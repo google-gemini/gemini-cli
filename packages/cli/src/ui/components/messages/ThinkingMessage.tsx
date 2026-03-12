@@ -23,20 +23,26 @@ function normalizeThoughtLines(thought: ThoughtSummary): string[] {
   const subject = normalizeEscapedNewlines(thought.subject).trim();
   const description = normalizeEscapedNewlines(thought.description).trim();
 
-  if (!subject && !description) {
-    return [];
+  const isNoise = (text: string) => {
+    const trimmed = text.trim();
+    return !trimmed || /^\.+$/.test(trimmed);
+  };
+
+  const lines: string[] = [];
+
+  if (subject && !isNoise(subject)) {
+    lines.push(subject);
   }
 
-  if (!subject) {
-    return description.split('\n');
+  if (description) {
+    const descriptionLines = description
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => !isNoise(line));
+    lines.push(...descriptionLines);
   }
 
-  if (!description) {
-    return [subject];
-  }
-
-  const bodyLines = description.split('\n');
-  return [subject, ...bodyLines];
+  return lines;
 }
 
 /**
