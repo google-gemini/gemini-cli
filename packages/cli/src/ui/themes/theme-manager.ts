@@ -20,8 +20,7 @@ import { SolarizedLight } from './builtin/light/solarized-light.js';
 import { XCode } from './builtin/light/xcode-light.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { Theme, ThemeType, ColorsTheme } from './theme.js';
-import type { CustomTheme } from '@google/gemini-cli-core';
+import type { Theme, ThemeType, ColorsTheme, CustomTheme } from './theme.js';
 import {
   createCustomTheme,
   validateCustomTheme,

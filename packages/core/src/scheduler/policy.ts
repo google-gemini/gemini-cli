@@ -52,6 +52,7 @@ export function getPolicyDenialError(
 export async function checkPolicy(
   toolCall: ValidatingToolCall,
   config: Config,
+  subagent?: string,
 ): Promise<CheckResult> {
   const serverName =
     toolCall.tool instanceof DiscoveredMCPTool
@@ -66,6 +67,7 @@ export async function checkPolicy(
       { name: toolCall.request.name, args: toolCall.request.args },
       serverName,
       toolAnnotations,
+      subagent,
     );
 
   const { decision } = result;
@@ -115,6 +117,7 @@ export async function updatePolicy(
   toolInvocation?: AnyToolInvocation,
 ): Promise<void> {
   const deps = { ...context, toolInvocation };
+
   // Mode Transitions (AUTO_EDIT)
   if (isAutoEditTransition(tool, outcome)) {
     deps.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
