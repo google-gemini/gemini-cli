@@ -73,9 +73,6 @@ class McpToolInvocation extends BaseToolInvocation<
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     if (!this.messageBus) {
-      debugLogger.warn(
-        `[McpToolInvocation] No message bus for tool ${this.toolName}`,
-      );
       return false;
     }
 
@@ -86,12 +83,6 @@ class McpToolInvocation extends BaseToolInvocation<
       toolName: this.toolName,
       toolDisplayName: this.toolName,
       onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        if (!this.messageBus) {
-          debugLogger.error(
-            `[McpToolInvocation] Message bus became undefined in onConfirm for tool ${this.toolName}`,
-          );
-          throw new Error('Message bus is undefined');
-        }
         await this.publishPolicyUpdate(outcome);
       },
     };

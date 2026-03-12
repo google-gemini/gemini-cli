@@ -137,7 +137,7 @@ describe('browserAgentFactory', () => {
       );
 
       expect(definition.name).toBe(BROWSER_AGENT_NAME);
-      // 6 MCP tools composite tool (no analyze_screenshot without visualModel)
+      // 6 MCP tools (no analyze_screenshot without visualModel)
       expect(definition.toolConfig?.tools).toHaveLength(6);
     });
 
