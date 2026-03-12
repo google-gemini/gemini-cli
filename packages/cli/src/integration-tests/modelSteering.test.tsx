@@ -8,6 +8,7 @@ import { describe, it, afterEach } from 'vitest';
 import { AppRig } from '../test-utils/AppRig.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { FakeContentGenerator } from '@google/gemini-cli-core';
 import { PolicyDecision } from '@google/gemini-cli-core';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -24,8 +25,9 @@ describe('Model Steering Integration', () => {
       __dirname,
       '../test-utils/fixtures/steering.responses',
     );
+    const contentGenerator = await FakeContentGenerator.fromFile(fakeResponsesPath);
     rig = new AppRig({
-      fakeResponsesPath,
+      contentGenerator,
       configOverrides: { modelSteering: true },
     });
     await rig.initialize();

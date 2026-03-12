@@ -9,6 +9,7 @@ import { act } from 'react';
 import { AppRig } from './AppRig.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { FakeContentGenerator } from '@google/gemini-cli-core';
 import { debugLogger } from '@google/gemini-cli-core';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -26,8 +27,9 @@ describe('AppRig', () => {
       'fixtures',
       'steering.responses',
     );
+    const contentGenerator = await FakeContentGenerator.fromFile(fakeResponsesPath);
     rig = new AppRig({
-      fakeResponsesPath,
+      contentGenerator,
       configOverrides: { modelSteering: true },
     });
     await rig.initialize();
@@ -67,7 +69,8 @@ describe('AppRig', () => {
       'fixtures',
       'simple.responses',
     );
-    rig = new AppRig({ fakeResponsesPath });
+    const contentGenerator = await FakeContentGenerator.fromFile(fakeResponsesPath);
+    rig = new AppRig({ contentGenerator });
     await rig.initialize();
     await act(async () => {
       rig!.render();
