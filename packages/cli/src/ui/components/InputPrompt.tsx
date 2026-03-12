@@ -62,7 +62,6 @@ import * as path from 'node:path';
 import { SCREEN_READER_USER_PREFIX } from '../textConstants.js';
 import { getSafeLowColorBackground } from '../themes/color-utils.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
-import { useShellFocusState } from '../contexts/ShellFocusContext.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import {
   appEvents,
@@ -216,7 +215,6 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   const { stdout } = useStdout();
   const { merged: settings } = useSettings();
   const kittyProtocol = useKittyKeyboardProtocol();
-  const isShellFocused = useShellFocusState();
   const {
     setEmbeddedShellFocused,
     setShortcutsHelpVisible,
@@ -329,7 +327,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     isShellSuggestionsVisible,
   } = completion;
 
-  const showCursor = focus && isShellFocused && !isEmbeddedShellFocused;
+  const showCursor = focus && !isEmbeddedShellFocused;
 
   // Notify parent component about escape prompt state changes
   useEffect(() => {
@@ -1277,7 +1275,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   );
 
   useKeypress(handleInput, {
-    isActive: !isEmbeddedShellFocused,
+    isActive: focus && !isEmbeddedShellFocused,
     priority: true,
   });
 
@@ -1470,7 +1468,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   ) : null;
 
   const borderColor =
-    isShellFocused && !isEmbeddedShellFocused
+    focus && !isEmbeddedShellFocused
       ? (statusColor ?? theme.ui.focus)
       : theme.border.default;
 
