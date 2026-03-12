@@ -44,8 +44,7 @@ interface FrontmatterLocalAgentDefinition
  * Authentication configuration for remote agents in frontmatter format.
  */
 interface FrontmatterAuthConfig {
-  type: 'apiKey' | 'http';
-  agent_card_requires_auth?: boolean;
+  type: 'apiKey' | 'http' | 'google-credentials' | 'oauth2';
   // API Key
   key?: string;
   name?: string;
@@ -55,6 +54,13 @@ interface FrontmatterAuthConfig {
   username?: string;
   password?: string;
   value?: string;
+  // Google Credentials
+  scopes?: string[];
+  // OAuth2
+  client_id?: string;
+  client_secret?: string;
+  authorization_url?: string;
+  token_url?: string;
 }
 
 interface FrontmatterRemoteAgentDefinition
@@ -102,9 +108,11 @@ const localAgentSchema = z
     display_name: z.string().optional(),
     tools: z
       .array(
-        z.string().refine((val) => isValidToolName(val), {
-          message: 'Invalid tool name',
-        }),
+        z
+          .string()
+          .refine((val) => isValidToolName(val, { allowWildcards: true }), {
+            message: 'Invalid tool name',
+          }),
       )
       .optional(),
     model: z.string().optional(),
@@ -117,9 +125,7 @@ const localAgentSchema = z
 /**
  * Base fields shared by all auth configs.
  */
-const baseAuthFields = {
-  agent_card_requires_auth: z.boolean().optional(),
-};
+const baseAuthFields = {};
 
 /**
  * API Key auth schema.
@@ -147,8 +153,36 @@ const httpAuthSchema = z.object({
   value: z.string().min(1).optional(),
 });
 
+/**
+ * Google Credentials auth schema.
+ */
+const googleCredentialsAuthSchema = z.object({
+  ...baseAuthFields,
+  type: z.literal('google-credentials'),
+  scopes: z.array(z.string()).optional(),
+});
+
+/**
+ * OAuth2 auth schema.
+ * authorization_url and token_url can be discovered from the agent card if omitted.
+ */
+const oauth2AuthSchema = z.object({
+  ...baseAuthFields,
+  type: z.literal('oauth2'),
+  client_id: z.string().optional(),
+  client_secret: z.string().optional(),
+  scopes: z.array(z.string()).optional(),
+  authorization_url: z.string().url().optional(),
+  token_url: z.string().url().optional(),
+});
+
 const authConfigSchema = z
-  .discriminatedUnion('type', [apiKeyAuthSchema, httpAuthSchema])
+  .discriminatedUnion('type', [
+    apiKeyAuthSchema,
+    httpAuthSchema,
+    googleCredentialsAuthSchema,
+    oauth2AuthSchema,
+  ])
   .superRefine((data, ctx) => {
     if (data.type === 'http') {
       if (data.value) {
@@ -332,9 +366,7 @@ export async function parseAgentMarkdown(
 function convertFrontmatterAuthToConfig(
   frontmatter: FrontmatterAuthConfig,
 ): A2AAuthConfig {
-  const base = {
-    agent_card_requires_auth: frontmatter.agent_card_requires_auth,
-  };
+  const base = {};
 
   switch (frontmatter.type) {
     case 'apiKey':
@@ -346,6 +378,13 @@ function convertFrontmatterAuthToConfig(
         type: 'apiKey',
         key: frontmatter.key,
         name: frontmatter.name,
+      };
+
+    case 'google-credentials':
+      return {
+        ...base,
+        type: 'google-credentials',
+        scopes: frontmatter.scopes,
       };
 
     case 'http': {
@@ -394,6 +433,17 @@ function convertFrontmatterAuthToConfig(
         }
       }
     }
+
+    case 'oauth2':
+      return {
+        ...base,
+        type: 'oauth2',
+        client_id: frontmatter.client_id,
+        client_secret: frontmatter.client_secret,
+        scopes: frontmatter.scopes,
+        authorization_url: frontmatter.authorization_url,
+        token_url: frontmatter.token_url,
+      };
 
     default: {
       const exhaustive: never = frontmatter.type;
