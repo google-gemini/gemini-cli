@@ -250,24 +250,27 @@ export class OAuthUtils {
       }
     }
 
-    // Validate required endpoints (RFC 8414 §3, RFC 6749 §3.1).
-    // authorization_endpoint and token_endpoint must use HTTPS unless on a
-    // loopback address (localhost / 127.x.x.x / [::1]), which is treated as
-    // a secure context for local development (RFC 8252 §8.3).
-    // When authServerUrl is a public HTTPS URL, both endpoints must also share
-    // its registrable domain to prevent SSRF via crafted discovery metadata.
+    // Validate required endpoints and issuer (RFC 8414 §3, RFC 6749 §3.1).
+    // authorization_endpoint, token_endpoint, and issuer must use HTTPS unless
+    // on a loopback address (localhost / 127.x.x.x / [::1]), which is treated
+    // as a secure context for local development (RFC 8252 §8.3).
+    // When authServerUrl is a public HTTPS URL, all three must also share its
+    // registrable domain to prevent SSRF via crafted discovery metadata.
     const authorizationUrl = metadata.authorization_endpoint;
     const tokenUrl = metadata.token_endpoint;
+    const issuer = metadata.issuer;
     try {
       const authzUrl = new URL(authorizationUrl);
       const tokUrl = new URL(tokenUrl);
+      const issuerUrl = new URL(issuer);
 
       if (
         (authzUrl.protocol !== 'https:' && !OAuthUtils.isLoopback(authzUrl)) ||
-        (tokUrl.protocol !== 'https:' && !OAuthUtils.isLoopback(tokUrl))
+        (tokUrl.protocol !== 'https:' && !OAuthUtils.isLoopback(tokUrl)) ||
+        (issuerUrl.protocol !== 'https:' && !OAuthUtils.isLoopback(issuerUrl))
       ) {
         debugLogger.debug(
-          'authorization_endpoint and token_endpoint must use https: protocol.',
+          'authorization_endpoint, token_endpoint, and issuer must use https: protocol.',
         );
         return null;
       }
@@ -286,6 +289,9 @@ export class OAuthUtils {
           const tokDomain = OAuthUtils.extractRegistrableDomain(
             tokUrl.hostname,
           );
+          const issuerDomain = OAuthUtils.extractRegistrableDomain(
+            issuerUrl.hostname,
+          );
 
           // When PSL returns null for one or both sides (e.g., IP addresses),
           // fall back to exact hostname comparison instead of treating null as mismatch.
@@ -295,10 +301,11 @@ export class OAuthUtils {
           };
           if (
             mismatch(authzDomain, authzUrl.hostname) ||
-            mismatch(tokDomain, tokUrl.hostname)
+            mismatch(tokDomain, tokUrl.hostname) ||
+            mismatch(issuerDomain, issuerUrl.hostname)
           ) {
             debugLogger.debug(
-              'authorization_endpoint or token_endpoint domain does not match authServerUrl.',
+              'authorization_endpoint, token_endpoint, or issuer domain does not match authServerUrl.',
             );
             return null;
           }
@@ -313,7 +320,7 @@ export class OAuthUtils {
 
     return {
       authorizationUrl,
-      issuer: metadata.issuer,
+      issuer,
       tokenUrl,
       scopes: metadata.scopes_supported || [],
       registrationUrl,
