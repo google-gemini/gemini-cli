@@ -120,6 +120,7 @@ tools to detect if they are being run from within the Gemini CLI.
 
 ## Command restrictions
 
+<!-- prettier-ignore -->
 > [!WARNING]
 > The `tools.core` setting is an **allowlist for _all_ built-in
 > tools**, not just shell commands. When you set `tools.core` to any value,
