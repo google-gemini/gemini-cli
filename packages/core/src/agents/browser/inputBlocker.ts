@@ -10,6 +10,14 @@
  * Injects a transparent overlay that captures all user input events
  * and displays an informational banner during automation.
  *
+ * The overlay is PERSISTENT — it stays in the DOM for the entire
+ * browser agent session.  To allow CDP tool calls to interact with
+ * page elements, we temporarily set `pointer-events: none` on the
+ * overlay (via {@link suspendInputBlocker}) which makes it invisible
+ * to hit-testing / interactability checks without any DOM mutation
+ * or visual change.  After the tool call, {@link resumeInputBlocker}
+ * restores `pointer-events: auto`.
+ *
  * IMPORTANT: chrome-devtools-mcp's evaluate_script tool expects:
  *   { function: "() => { ... }" }
  * It takes a function declaration string, NOT raw code.
@@ -27,10 +35,13 @@ import { debugLogger } from '../../utils/debugLogger.js';
  * evaluates it via Puppeteer's page.evaluate().
  */
 const INPUT_BLOCKER_FUNCTION = `() => {
-  // Remove any existing blocker first
-  const existing = document.getElementById('__gemini_input_blocker');
+  // If the blocker already exists, just ensure it's active and return.
+  // This makes re-injection after potentially-navigating tools near-free
+  // when the page didn't actually navigate (most clicks don't navigate).
+  var existing = document.getElementById('__gemini_input_blocker');
   if (existing) {
-    existing.remove();
+    existing.style.pointerEvents = 'auto';
+    return;
   }
 
   const blocker = document.createElement('div');
@@ -45,24 +56,24 @@ const INPUT_BLOCKER_FUNCTION = `() => {
     'background: transparent',
   ].join('; ');
 
-  // Block all input events
-  const blockEvent = (e) => {
+  // Block all input events on the overlay itself
+  var blockEvent = function(e) {
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
   };
 
-  const events = [
+  var events = [
     'click', 'mousedown', 'mouseup', 'keydown', 'keyup',
     'keypress', 'touchstart', 'touchend', 'touchmove', 'wheel',
     'contextmenu', 'dblclick', 'pointerdown', 'pointerup', 'pointermove',
   ];
-  for (const event of events) {
-    blocker.addEventListener(event, blockEvent, { capture: true });
+  for (var i = 0; i < events.length; i++) {
+    blocker.addEventListener(events[i], blockEvent, { capture: true });
   }
 
   // Capsule-shaped floating pill at bottom center
-  const pill = document.createElement('div');
+  var pill = document.createElement('div');
   pill.style.cssText = [
     'position: fixed',
     'bottom: 20px',
@@ -91,7 +102,7 @@ const INPUT_BLOCKER_FUNCTION = `() => {
   ].join('; ');
 
   // Pulsing red dot
-  const dot = document.createElement('span');
+  var dot = document.createElement('span');
   dot.style.cssText = [
     'width: 10px',
     'height: 10px',
@@ -104,14 +115,14 @@ const INPUT_BLOCKER_FUNCTION = `() => {
   ].join('; ');
 
   // Labels
-  const label = document.createElement('span');
+  var label = document.createElement('span');
   label.style.cssText = 'font-weight: 600; letter-spacing: 0.01em;';
   label.textContent = 'Gemini CLI is controlling this browser';
 
-  const sep = document.createElement('span');
+  var sep = document.createElement('span');
   sep.style.cssText = 'width: 1px; height: 14px; background: rgba(255,255,255,0.2); flex-shrink: 0;';
 
-  const sub = document.createElement('span');
+  var sub = document.createElement('span');
   sub.style.cssText = 'color: rgba(255,255,255,0.55); font-size: 12px;';
   sub.textContent = 'Input disabled during automation';
 
@@ -121,17 +132,17 @@ const INPUT_BLOCKER_FUNCTION = `() => {
   pill.appendChild(sub);
 
   // Inject @keyframes for the pulse animation
-  const styleEl = document.createElement('style');
+  var styleEl = document.createElement('style');
   styleEl.id = '__gemini_input_blocker_style';
   styleEl.textContent = '@keyframes __gemini_pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.85); } }';
   document.head.appendChild(styleEl);
 
   blocker.appendChild(pill);
-  const target = document.body || document.documentElement;
+  var target = document.body || document.documentElement;
   if (target) {
     target.appendChild(blocker);
     // Trigger entrance animation
-    requestAnimationFrame(() => {
+    requestAnimationFrame(function() {
       pill.style.opacity = '1';
       pill.style.transform = 'translateX(-50%) translateY(0)';
     });
@@ -139,16 +150,43 @@ const INPUT_BLOCKER_FUNCTION = `() => {
 }`;
 
 /**
- * JavaScript function to remove the input blocker overlay.
+ * JavaScript function to remove the input blocker overlay entirely.
+ * Used only during final cleanup.
  */
 const REMOVE_BLOCKER_FUNCTION = `() => {
-  const blocker = document.getElementById('__gemini_input_blocker');
+  var blocker = document.getElementById('__gemini_input_blocker');
   if (blocker) {
     blocker.remove();
   }
-  const style = document.getElementById('__gemini_input_blocker_style');
+  var style = document.getElementById('__gemini_input_blocker_style');
   if (style) {
     style.remove();
+  }
+}`;
+
+/**
+ * JavaScript to temporarily suspend the input blocker by setting
+ * pointer-events to 'none'.  This makes the overlay invisible to
+ * hit-testing so chrome-devtools-mcp's interactability checks pass
+ * and CDP clicks fall through to page elements.
+ *
+ * The overlay DOM element stays in place — no visual change, no flickering.
+ */
+const SUSPEND_BLOCKER_FUNCTION = `() => {
+  var blocker = document.getElementById('__gemini_input_blocker');
+  if (blocker) {
+    blocker.style.pointerEvents = 'none';
+  }
+}`;
+
+/**
+ * JavaScript to resume the input blocker by restoring pointer-events
+ * to 'auto'.  User clicks are blocked again.
+ */
+const RESUME_BLOCKER_FUNCTION = `() => {
+  var blocker = document.getElementById('__gemini_input_blocker');
+  if (blocker) {
+    blocker.style.pointerEvents = 'auto';
   }
 }`;
 
@@ -176,7 +214,8 @@ export async function injectInputBlocker(
 }
 
 /**
- * Removes the input blocker overlay from the current page.
+ * Removes the input blocker overlay from the current page entirely.
+ * Used only during final cleanup.
  *
  * @param browserManager The browser manager to use for script execution
  * @returns Promise that resolves when the blocker is removed
@@ -195,5 +234,38 @@ export async function removeInputBlocker(
       'Failed to remove input blocker: ' +
         (error instanceof Error ? error.message : String(error)),
     );
+  }
+}
+
+/**
+ * Temporarily suspends the input blocker so CDP tool calls can
+ * interact with page elements.  The overlay stays in the DOM
+ * (no visual change) — only pointer-events is toggled.
+ */
+export async function suspendInputBlocker(
+  browserManager: BrowserManager,
+): Promise<void> {
+  try {
+    await browserManager.callTool('evaluate_script', {
+      function: SUSPEND_BLOCKER_FUNCTION,
+    });
+  } catch {
+    // Non-critical — tool call will still attempt to proceed
+  }
+}
+
+/**
+ * Resumes the input blocker after a tool call completes.
+ * Restores pointer-events so user clicks are blocked again.
+ */
+export async function resumeInputBlocker(
+  browserManager: BrowserManager,
+): Promise<void> {
+  try {
+    await browserManager.callTool('evaluate_script', {
+      function: RESUME_BLOCKER_FUNCTION,
+    });
+  } catch {
+    // Non-critical
   }
 }

@@ -98,10 +98,12 @@ export class BrowserManager {
    * Always false in headless mode (no visible window to decorate).
    */
   private readonly shouldInjectOverlay: boolean;
+  private readonly shouldDisableInput: boolean;
 
   constructor(private config: Config) {
     const browserConfig = config.getBrowserAgentConfig();
     this.shouldInjectOverlay = !browserConfig?.customConfig?.headless;
+    this.shouldDisableInput = config.shouldDisableBrowserUserInput();
   }
 
   /**
@@ -177,20 +179,32 @@ export class BrowserManager {
       }
     }
 
-    // Re-inject the automation overlay after any tool that can cause a
-    // full-page navigation (including implicit navigations from clicking links).
-    // chrome-devtools-mcp emits no MCP notifications, so callTool() is the
-    // only interception point we have — equivalent to a page-load listener.
+    // Re-inject the automation overlay and input blocker after tools that
+    // can cause a full-page navigation. chrome-devtools-mcp emits no MCP
+    // notifications, so callTool() is the only interception point.
     if (
-      this.shouldInjectOverlay &&
       !result.isError &&
       POTENTIALLY_NAVIGATING_TOOLS.has(toolName) &&
       !signal?.aborted
     ) {
       try {
-        await injectAutomationOverlay(this, signal);
+        if (this.shouldInjectOverlay) {
+          await injectAutomationOverlay(this, signal);
+        }
+        // Only re-inject the input blocker for tools that *reliably*
+        // replace the page DOM (navigate_page, new_page, select_page).
+        // click/click_at are handled by pointer-events suspend/resume
+        // in mcpToolWrapper — no full re-inject roundtrip needed.
+        // press_key/handle_dialog only sometimes navigate.
+        const reliableNavigation =
+          toolName === 'navigate_page' ||
+          toolName === 'new_page' ||
+          toolName === 'select_page';
+        if (this.shouldDisableInput && reliableNavigation) {
+          await injectInputBlocker(this);
+        }
       } catch {
-        // Never let overlay failures interrupt the tool result
+        // Never let overlay/blocker failures interrupt the tool result
       }
     }
 
