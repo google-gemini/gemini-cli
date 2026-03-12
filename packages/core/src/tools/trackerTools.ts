@@ -27,7 +27,7 @@ import type { ToolResult, TodoList } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import type { TrackerTask, TaskType } from '../services/trackerTypes.js';
-import { TaskStatus } from '../services/trackerTypes.js';
+import { TaskStatus, TASK_TYPE_LABELS } from '../services/trackerTypes.js';
 import type { TrackerService } from '../services/trackerService.js';
 
 async function buildTodosReturnDisplay(
@@ -68,15 +68,8 @@ async function buildTodosReturnDisplay(
       status = 'completed';
     }
 
-    // TODO: Pull this from a constant of tracker types
-    const typeLabels: Record<TaskType, string> = {
-      epic: '[EPIC]',
-      task: '[TASK]',
-      bug: '[BUG]',
-    };
-
     const indent = '  '.repeat(depth);
-    const description = `${indent}[${task.id}] ${typeLabels[task.type]} ${task.title}`;
+    const description = `${indent}[${task.id}] ${TASK_TYPE_LABELS[task.type]} ${task.title}`;
 
     todos.push({ description, status });
 
@@ -580,12 +573,6 @@ class TrackerVisualizeInvocation extends BaseToolInvocation<
       closed: '✅',
     };
 
-    const typeLabels: Record<TaskType, string> = {
-      epic: '[EPIC]',
-      task: '[TASK]',
-      bug: '[BUG]',
-    };
-
     const childrenMap = new Map<string, TrackerTask[]>();
     const roots: TrackerTask[] = [];
 
@@ -614,7 +601,7 @@ class TrackerVisualizeInvocation extends BaseToolInvocation<
       visited.add(task.id);
 
       const indent = '  '.repeat(depth);
-      output += `${indent}${statusEmojis[task.status]} ${task.id} ${typeLabels[task.type]} ${task.title}\n`;
+      output += `${indent}${statusEmojis[task.status]} ${task.id} ${TASK_TYPE_LABELS[task.type]} ${task.title}\n`;
       if (task.dependencies.length > 0) {
         output += `${indent}  └─ Depends on: ${task.dependencies.join(', ')}\n`;
       }
