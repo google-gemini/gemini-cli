@@ -12,12 +12,17 @@ import { ExtensionManager } from './extension-manager.js';
 import { createTestMergedSettings, type MergedSettings } from './settings.js';
 import { createExtension } from '../test-utils/createExtension.js';
 import { EXTENSIONS_DIRECTORY_NAME } from './extensions/variables.js';
+import { themeManager } from '../ui/themes/theme-manager.js';
 import {
   TrustLevel,
   loadTrustedFolders,
   isWorkspaceTrusted,
 } from './trustedFolders.js';
-import { getRealPath, IntegrityDataStatus } from '@google/gemini-cli-core';
+import {
+  getRealPath,
+  type CustomTheme,
+  IntegrityDataStatus,
+} from '@google/gemini-cli-core';
 
 const mockHomedir = vi.hoisted(() => vi.fn(() => '/tmp/mock-home'));
 const mockIntegrityManager = vi.hoisted(() => ({
@@ -44,6 +49,26 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       .mockImplementation(() => mockIntegrityManager),
   };
 });
+
+const testTheme: CustomTheme = {
+  type: 'custom',
+  name: 'MyTheme',
+  background: {
+    primary: '#282828',
+    diff: { added: '#2b3312', removed: '#341212' },
+  },
+  text: {
+    primary: '#ebdbb2',
+    secondary: '#a89984',
+    link: '#83a598',
+    accent: '#d3869b',
+  },
+  status: {
+    success: '#b8bb26',
+    warning: '#fabd2f',
+    error: '#fb4934',
+  },
+};
 
 describe('ExtensionManager', () => {
   let tempHomeDir: string;
@@ -73,6 +98,7 @@ describe('ExtensionManager', () => {
   });
 
   afterEach(() => {
+    themeManager.clearExtensionThemes();
     try {
       fs.rmSync(tempHomeDir, { recursive: true, force: true });
     } catch (_e) {
@@ -568,6 +594,47 @@ describe('ExtensionManager', () => {
       });
 
       expect(storeSpy).toHaveBeenCalledWith(extName, installMetadata);
+    });
+  });
+
+  describe('early theme registration', () => {
+    it('should register themes with ThemeManager during loadExtensions for active extensions', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'themed-ext',
+        version: '1.0.0',
+        themes: [testTheme],
+      });
+
+      await extensionManager.loadExtensions();
+
+      expect(themeManager.getCustomThemeNames()).toContain(
+        'MyTheme (themed-ext)',
+      );
+    });
+
+    it('should not register themes for inactive extensions', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'disabled-ext',
+        version: '1.0.0',
+        themes: [testTheme],
+      });
+
+      // Disable the extension by creating an enablement override
+      const manager = new ExtensionManager({
+        enabledExtensionOverrides: ['none'],
+        settings: createTestMergedSettings(),
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: vi.fn().mockResolvedValue(true),
+        requestSetting: null,
+      });
+
+      await manager.loadExtensions();
+
+      expect(themeManager.getCustomThemeNames()).not.toContain(
+        'MyTheme (disabled-ext)',
+      );
     });
   });
 });

@@ -22,6 +22,7 @@ import {
   type ShellOutputEvent,
   type ShellExecutionConfig,
 } from './shellExecutionService.js';
+import { ExecutionLifecycleService } from './executionLifecycleService.js';
 import type { AnsiOutput, AnsiToken } from '../utils/terminalSerializer.js';
 
 // Hoisted Mocks
@@ -201,6 +202,7 @@ describe('ShellExecutionService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    ExecutionLifecycleService.resetForTest();
     mockSerializeTerminalToObject.mockReturnValue([]);
     mockIsBinary.mockReturnValue(false);
     mockPlatform.mockReturnValue('linux');
@@ -469,9 +471,10 @@ describe('ShellExecutionService', () => {
   });
 
   describe('pty interaction', () => {
-    let ptySpy: { mockRestore(): void };
+    let activePtysGetSpy: { mockRestore: () => void };
+
     beforeEach(() => {
-      ptySpy = vi
+      activePtysGetSpy = vi
         .spyOn(ShellExecutionService['activePtys'], 'get')
         .mockReturnValue({
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -482,7 +485,7 @@ describe('ShellExecutionService', () => {
     });
 
     afterEach(() => {
-      ptySpy.mockRestore();
+      activePtysGetSpy.mockRestore();
     });
 
     it('should write to the pty and trigger a render', async () => {
@@ -1102,11 +1105,10 @@ describe('ShellExecutionService', () => {
     });
 
     it('should destroy the PTY when an exception occurs after spawn in executeWithPty', async () => {
-      // Simulate: spawn succeeds, Promise executor runs fine (pid accesses 1-2),
-      // but the return statement `{ pid: ptyProcess.pid }` (access 3) throws.
-      // The catch block should call spawnedPty.destroy() to release the fd.
+      // Simulate: spawn succeeds, but accessing ptyProcess.pid throws.
+      // spawnedPty is set before the pid access, so the catch block should
+      // call spawnedPty.destroy() to release the fd.
       const destroySpy = vi.fn();
-      let pidAccessCount = 0;
       const faultyPty = {
         onData: vi.fn(),
         onExit: vi.fn(),
@@ -1114,15 +1116,8 @@ describe('ShellExecutionService', () => {
         kill: vi.fn(),
         resize: vi.fn(),
         destroy: destroySpy,
-        get pid() {
-          pidAccessCount++;
-          // Accesses 1-2 are inside the Promise executor (setup).
-          // Access 3 is at `return { pid: ptyProcess.pid, result }`,
-          // outside the Promise — caught by the outer try/catch.
-          if (pidAccessCount > 2) {
-            throw new Error('Simulated post-spawn failure on pid access');
-          }
-          return 77777;
+        get pid(): number {
+          throw new Error('Simulated post-spawn failure on pid access');
         },
       };
       mockPtySpawn.mockReturnValueOnce(faultyPty);

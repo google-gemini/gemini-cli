@@ -110,10 +110,11 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     () =>
       toolCalls.filter((t) => {
         const displayStatus = mapCoreStatusToDisplayStatus(t.status);
-        return (
-          displayStatus !== ToolCallStatus.Pending &&
-          displayStatus !== ToolCallStatus.Confirming
-        );
+        // We used to filter out Pending and Confirming statuses here to avoid
+        // duplication with the Global Queue, but this causes tools to appear to
+        // "vanish" from the context after approval.
+        // We now allow them to be visible here as well.
+        return displayStatus !== ToolCallStatus.Canceled;
       }),
 
     [toolCalls],
