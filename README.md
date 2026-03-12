@@ -314,7 +314,7 @@ gemini
 
 - [**Headless Mode (Scripting)**](./docs/cli/headless.md) - Use Gemini CLI in
   automated workflows.
-- [**Architecture Overview**](./docs/architecture.md) - How Gemini CLI works.
+- [**Core Architecture**](./docs/core/index.md) - How Gemini CLI works.
 - [**IDE Integration**](./docs/ide-integration/index.md) - VS Code companion.
 - [**Sandboxing & Security**](./docs/cli/sandbox.md) - Safe execution
   environments.
