@@ -68,6 +68,7 @@ async function buildTodosReturnDisplay(
       status = 'completed';
     }
 
+    // TODO: Pull this from a constant of tracker types
     const typeLabels: Record<TaskType, string> = {
       epic: '[EPIC]',
       task: '[TASK]',
