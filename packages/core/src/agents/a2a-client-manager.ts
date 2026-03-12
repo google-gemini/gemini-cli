@@ -55,24 +55,21 @@ export class A2AClientManager {
 
   private constructor(config?: Config) {
     const proxyUrl = config?.getProxy();
+    const agentOptions = {
+      headersTimeout: A2A_TIMEOUT,
+      bodyTimeout: A2A_TIMEOUT,
+      connect: {
+        lookup: safeLookup, // SSRF protection at connection level
+      },
+    };
 
     if (proxyUrl) {
       this.a2aDispatcher = new ProxyAgent({
         uri: proxyUrl,
-        headersTimeout: A2A_TIMEOUT,
-        bodyTimeout: A2A_TIMEOUT,
-        connect: {
-          lookup: safeLookup, // SSRF protection at connection level
-        },
+        ...agentOptions,
       });
     } else {
-      this.a2aDispatcher = new UndiciAgent({
-        headersTimeout: A2A_TIMEOUT,
-        bodyTimeout: A2A_TIMEOUT,
-        connect: {
-          lookup: safeLookup, // SSRF protection at connection level
-        },
-      });
+      this.a2aDispatcher = new UndiciAgent(agentOptions);
     }
 
     this.a2aFetch = (input, init) =>
