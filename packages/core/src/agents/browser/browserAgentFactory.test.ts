@@ -252,6 +252,7 @@ describe('browserAgentFactory', () => {
         { name: 'select_page', description: 'Select page' },
         { name: 'press_key', description: 'Press key' },
         { name: 'hover', description: 'Hover element' },
+        { name: 'type_text', description: 'Type text into an element' },
       ]);
 
       const { definition } = await createBrowserAgentDefinition(
@@ -274,9 +275,8 @@ describe('browserAgentFactory', () => {
       expect(toolNames).toContain('click');
       expect(toolNames).toContain('take_snapshot');
       expect(toolNames).toContain('press_key');
-      // Custom composite tool must also be present
       expect(toolNames).toContain('type_text');
-      // Total: 9 MCP + 1 type_text (no analyze_screenshot without visualModel)
+      // Total: 10 MCP (no analyze_screenshot without visualModel)
       expect(definition.toolConfig?.tools).toHaveLength(10);
     });
   });
