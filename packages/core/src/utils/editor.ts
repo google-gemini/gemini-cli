@@ -93,7 +93,8 @@ const COMMAND_TO_EDITOR: Record<string, BuiltinEditorType> = {
   nvim: 'neovim',
   emacs: 'emacs',
   'emacs.exe': 'emacs',
-  nano: 'vim', // nano lacks diff mode; fall back to opening new file
+  // nano intentionally omitted: it lacks diff mode, so the custom editor
+  // fallback path will open only the new file, which is the safest behavior.
   hx: 'hx',
   zed: 'zed',
   zeditor: 'zed',
