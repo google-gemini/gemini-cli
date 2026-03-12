@@ -23,7 +23,6 @@ const emptyModulePlugin = {
         build.onResolve({ filter: excludeFilter }, args => {
             // Check if we are inside a tools directory to avoid accidental matches
             if (args.importer.includes('chrome-devtools-mcp') && args.importer.includes('/tools/')) {
-                 console.log(`Excluding module: ${args.path} from ${args.importer}`);
                  return { path: args.path, namespace: 'empty' };
             }
             return null;
@@ -55,19 +54,24 @@ async function bundle() {
                 js: 'import { createRequire as __createRequire } from "module"; const require = __createRequire(import.meta.url);',
             },
         });
-        console.log('chrome-devtools-mcp bundled successfully!');
 
         // Copy third_party assets
         const srcThirdParty = path.resolve(__dirname, '../../../node_modules/chrome-devtools-mcp/build/src/third_party');
         const destThirdParty = path.resolve(__dirname, '../dist/bundled/third_party');
         
         if (fs.existsSync(srcThirdParty)) {
-            console.log(`Copying third_party assets from ${srcThirdParty} to ${destThirdParty}...`);
             if (fs.existsSync(destThirdParty)) {
               fs.rmSync(destThirdParty, { recursive: true, force: true });
             }
-            fs.cpSync(srcThirdParty, destThirdParty, { recursive: true });
-            console.log('third_party assets copied successfully');
+            fs.cpSync(srcThirdParty, destThirdParty, { 
+                recursive: true,
+                filter: (src) => {
+                    // Skip large/unnecessary bundles that are either explicitly excluded
+                    // or not required for the browser agent functionality.
+                    return !src.includes('lighthouse-devtools-mcp-bundle.js') && 
+                           !src.includes('devtools-formatter-worker.js');
+                }
+            });
         } else {
             console.warn(`Warning: third_party assets not found at ${srcThirdParty}`);
         }
