@@ -235,6 +235,8 @@ describe('Gemini Client (client.ts)', () => {
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
       getGeminiClient: vi.fn(),
+      getRetryFetchErrors: vi.fn().mockReturnValue(true),
+      getMaxAttempts: vi.fn().mockReturnValue(3),
       getModelRouterService: vi
         .fn()
         .mockReturnValue(mockRouterService as unknown as ModelRouterService),

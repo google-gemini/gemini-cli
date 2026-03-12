@@ -171,6 +171,7 @@ export class ChatRecordingService {
         this.cachedConversation = null;
       } else {
         // Create new session
+        this.sessionId = this.config.getSessionId();
         const chatsDir = path.join(
           this.config.storage.getProjectTempDir(),
           'chats',
@@ -346,7 +347,8 @@ export class ChatRecordingService {
       return {
         ...toolCall,
         displayName: toolInstance?.displayName || toolCall.name,
-        description: toolInstance?.description || '',
+        description:
+          toolCall.description?.trim() || toolInstance?.description || '',
         renderOutputAsMarkdown: toolInstance?.isOutputMarkdown || false,
       };
     });
