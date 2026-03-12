@@ -58,10 +58,39 @@ export async function scheduleAgentTools(
   const agentConfig: Config = Object.create(config);
   agentConfig.getToolRegistry = () => toolRegistry;
   agentConfig.getMessageBus = () => toolRegistry.getMessageBus();
-  // Override toolRegistry property so AgentLoopContext reads the agent-specific registry.
-  Object.defineProperty(agentConfig, 'toolRegistry', {
-    get: () => toolRegistry,
-    configurable: true,
+
+  // Define properties as enumerable own properties to ensure they survive
+  // object spreading (e.g. in scheduler/policy.ts).
+  // Object.defineProperty(agentConfig, 'toolRegistry', {
+  //   get: () => toolRegistry,
+  //   configurable: true,
+  // });
+  Object.defineProperties(agentConfig, {
+    messageBus: {
+      get: () => toolRegistry.getMessageBus(),
+      enumerable: true,
+      configurable: true,
+    },
+    config: {
+      get: () => agentConfig,
+      enumerable: true,
+      configurable: true,
+    },
+    toolRegistry: {
+      get: () => toolRegistry,
+      enumerable: true,
+      configurable: true,
+    },
+    promptId: {
+      get: () => config.promptId,
+      enumerable: true,
+      configurable: true,
+    },
+    geminiClient: {
+      get: () => config.geminiClient,
+      enumerable: true,
+      configurable: true,
+    },
   });
 
   const scheduler = new Scheduler({

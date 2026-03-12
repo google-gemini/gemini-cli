@@ -330,11 +330,10 @@ export class BrowserManager {
     // Create stdio transport to the bundled chrome-devtools-mcp.
     // stderr is piped (not inherited) to prevent MCP server banners and
     // warnings from corrupting the UI in alternate buffer mode.
-    const isCompiled = __dirname.includes(`${path.sep}dist${path.sep}`);
     const bundleMcpPath = path.resolve(
       __dirname,
-      isCompiled
-        ? '../../bundled/chrome-devtools-mcp.mjs'
+      __dirname.includes(`${path.sep}dist${path.sep}`)
+        ? '../../../bundled/chrome-devtools-mcp.mjs'
         : '../../../dist/bundled/chrome-devtools-mcp.mjs',
     );
 

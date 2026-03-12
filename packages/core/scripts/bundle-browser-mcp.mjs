@@ -9,10 +9,7 @@ const manifestPath = path.resolve(__dirname, '../src/agents/browser/browser-tool
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
 
 // Only exclude tools explicitly mentioned in the manifest's exclude list
-const excludedTools = manifest.exclude.map(t => t.name);
-
-console.log('Included tools:', manifest.include);
-console.log('Excluded tools:', excludedTools);
+const excludedTools = (manifest.exclude || []).map(t => t.name);
 
 // Basic esbuild plugin to empty out excluded modules
 const emptyModulePlugin = {
@@ -25,8 +22,7 @@ const emptyModulePlugin = {
         
         build.onResolve({ filter: excludeFilter }, args => {
             // Check if we are inside a tools directory to avoid accidental matches
-            console.log('[args]', args.path, args.importer);
-            if (args.importer.includes('/tools/')) {
+            if (args.importer.includes('chrome-devtools-mcp') && args.importer.includes('/tools/')) {
                  console.log(`Excluding module: ${args.path} from ${args.importer}`);
                  return { path: args.path, namespace: 'empty' };
             }
@@ -34,7 +30,7 @@ const emptyModulePlugin = {
         });
 
         build.onLoad({ filter: /.*/, namespace: 'empty' }, args => ({
-            contents: 'export default {};', // Empty module (ESM)
+            contents: 'export {};', // Empty module (ESM)
             loader: 'js',
         }));
     },
@@ -60,6 +56,22 @@ async function bundle() {
             },
         });
         console.log('chrome-devtools-mcp bundled successfully!');
+
+        // Copy third_party assets
+        const srcThirdParty = path.resolve(__dirname, '../../../node_modules/chrome-devtools-mcp/build/src/third_party');
+        const destThirdParty = path.resolve(__dirname, '../dist/bundled/third_party');
+        
+        if (fs.existsSync(srcThirdParty)) {
+            console.log(`Copying third_party assets from ${srcThirdParty} to ${destThirdParty}...`);
+            if (fs.existsSync(destThirdParty)) {
+              fs.rmSync(destThirdParty, { recursive: true, force: true });
+            }
+            fs.cpSync(srcThirdParty, destThirdParty, { recursive: true });
+            console.log('third_party assets copied successfully');
+        } else {
+            console.warn(`Warning: third_party assets not found at ${srcThirdParty}`);
+        }
+
     } catch (error) {
         console.error('Error bundling chrome-devtools-mcp:', error);
         process.exit(1);
