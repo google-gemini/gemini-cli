@@ -538,25 +538,6 @@ describe('createPolicyEngineConfig', () => {
     vi.doUnmock('node:fs/promises');
   });
 
-  it('should auto-allow tracker tools when trackerEnabled is true', async () => {
-    const { createPolicyEngineConfig } = await import('./config.js');
-    const settings: PolicySettings = {
-      trackerEnabled: true,
-    };
-    const config = await createPolicyEngineConfig(
-      settings,
-      ApprovalMode.DEFAULT,
-      '/tmp/mock/default/policies',
-    );
-    const rule = config.rules?.find(
-      (r) =>
-        r.toolName === 'tracker_create_task' &&
-        r.decision === PolicyDecision.ALLOW,
-    );
-    expect(rule).toBeDefined();
-    expect(rule?.priority).toBeCloseTo(4.3, 5); // Command line allow
-  });
-
   it('should handle MCP servers with undefined trust property', async () => {
     const { createPolicyEngineConfig } = await import('./config.js');
     const settings: PolicySettings = {

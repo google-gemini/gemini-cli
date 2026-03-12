@@ -62,7 +62,6 @@ export async function createPolicyEngineConfig(
     mcpServers: settings.mcpServers,
     policyPaths: settings.policyPaths,
     workspacePoliciesDir,
-    trackerEnabled: settings.experimental?.taskTracker,
   };
 
   return createCorePolicyEngineConfig(policySettings, approvalMode);

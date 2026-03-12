@@ -29,16 +29,7 @@ import { type MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
-import {
-  SHELL_TOOL_NAME,
-  SENSITIVE_TOOLS,
-  TRACKER_CREATE_TASK_TOOL_NAME,
-  TRACKER_UPDATE_TASK_TOOL_NAME,
-  TRACKER_GET_TASK_TOOL_NAME,
-  TRACKER_LIST_TASKS_TOOL_NAME,
-  TRACKER_ADD_DEPENDENCY_TOOL_NAME,
-  TRACKER_VISUALIZE_TOOL_NAME,
-} from '../tools/tool-names.js';
+import { SHELL_TOOL_NAME, SENSITIVE_TOOLS } from '../tools/tool-names.js';
 import { isNodeError } from '../utils/errors.js';
 import { MCP_TOOL_PREFIX } from '../tools/mcp-tool.js';
 
@@ -445,27 +436,6 @@ export async function createPolicyEngineConfig(
           source: 'Settings (Tools Allowed)',
         });
       }
-    }
-  }
-
-  // Auto-allow tracker tools if the tracker feature is enabled
-  // Priority: ALLOWED_TOOLS_FLAG_PRIORITY (user tier)
-  if (settings.trackerEnabled) {
-    const trackerToolNames = [
-      TRACKER_CREATE_TASK_TOOL_NAME,
-      TRACKER_UPDATE_TASK_TOOL_NAME,
-      TRACKER_GET_TASK_TOOL_NAME,
-      TRACKER_LIST_TASKS_TOOL_NAME,
-      TRACKER_ADD_DEPENDENCY_TOOL_NAME,
-      TRACKER_VISUALIZE_TOOL_NAME,
-    ];
-    for (const name of trackerToolNames) {
-      rules.push({
-        toolName: name,
-        decision: PolicyDecision.ALLOW,
-        priority: ALLOWED_TOOLS_FLAG_PRIORITY,
-        source: 'Settings (Tracker Enabled)',
-      });
     }
   }
 
