@@ -23,6 +23,15 @@ import { type ApprovalMode } from '../policy/types.js';
 import type { SubagentProgress } from '../agents/types.js';
 
 /**
+ * Options bag for tool execution, replacing positional parameters that are
+ * only relevant to specific tool types.
+ */
+export interface ExecuteOptions {
+  shellExecutionConfig?: ShellExecutionConfig;
+  setExecutionIdCallback?: (executionId: number) => void;
+}
+
+/**
  * Represents a validated and ready-to-execute tool call.
  * An instance of this is created by a `ToolBuilder`.
  */
@@ -68,8 +77,7 @@ export interface ToolInvocation<
   execute(
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
-    shellExecutionConfig?: ShellExecutionConfig,
-    setExecutionIdCallback?: (executionId: number) => void,
+    options?: ExecuteOptions,
   ): Promise<TResult>;
 
   /**
@@ -324,7 +332,7 @@ export abstract class BaseToolInvocation<
   abstract execute(
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
-    shellExecutionConfig?: ShellExecutionConfig,
+    options?: ExecuteOptions,
   ): Promise<TResult>;
 }
 
@@ -521,10 +529,10 @@ export abstract class DeclarativeTool<
     params: TParams,
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
-    shellExecutionConfig?: ShellExecutionConfig,
+    options?: ExecuteOptions,
   ): Promise<TResult> {
     const invocation = this.build(params);
-    return invocation.execute(signal, updateOutput, shellExecutionConfig);
+    return invocation.execute(signal, updateOutput, options);
   }
 
   /**
