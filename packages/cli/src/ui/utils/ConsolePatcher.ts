@@ -50,7 +50,12 @@ export class ConsolePatcher {
     (type: 'log' | 'warn' | 'error' | 'debug' | 'info') =>
     (...args: unknown[]) => {
       if (this.params.stderr) {
-        if (type !== 'debug' || this.params.debugMode) {
+        // In headless/stderr mode, only forward warnings and errors to stderr.
+        // Suppress log/info/debug to avoid flooding non-interactive output
+        // with internal debug messages (extension loading, theme registration, etc.).
+        if (type === 'warn' || type === 'error') {
+          this.originalConsoleError(this.formatArgs(args));
+        } else if (this.params.debugMode) {
           this.originalConsoleError(this.formatArgs(args));
         }
       } else {
