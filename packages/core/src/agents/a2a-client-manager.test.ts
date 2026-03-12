@@ -7,7 +7,16 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { A2AClientManager } from './a2a-client-manager.js';
 import type { AgentCard } from '@a2a-js/sdk';
-import * as sdkClient from '@a2a-js/sdk/client';
+import {
+  ClientFactory,
+  DefaultAgentCardResolver,
+  createAuthenticatingFetchWithRetry,
+  ClientFactoryOptions,
+  type AuthenticationHandler,
+  type Client,
+} from '@a2a-js/sdk/client';
+import type { Config } from '../config/config.js';
+import { Agent as UndiciAgent, ProxyAgent } from 'undici';
 import { debugLogger } from '../utils/debugLogger.js';
 
 interface MockClient {
@@ -72,35 +81,33 @@ describe('A2AClientManager', () => {
       resolve: vi.fn(),
     };
 
-    vi.mocked(sdkClient.ClientFactory).mockReturnValue(
-      factoryInstance as unknown as sdkClient.ClientFactory,
+    vi.mocked(ClientFactory).mockReturnValue(
+      factoryInstance as unknown as ClientFactory,
     );
-    vi.mocked(sdkClient.DefaultAgentCardResolver).mockReturnValue(
-      resolverInstance as unknown as sdkClient.DefaultAgentCardResolver,
+    vi.mocked(DefaultAgentCardResolver).mockReturnValue(
+      resolverInstance as unknown as DefaultAgentCardResolver,
     );
 
     vi.spyOn(factoryInstance, 'createFromUrl').mockResolvedValue(
-      mockClient as unknown as sdkClient.Client,
+      mockClient as unknown as Client,
     );
     vi.spyOn(factoryInstance, 'createFromAgentCard').mockResolvedValue(
-      mockClient as unknown as sdkClient.Client,
+      mockClient as unknown as Client,
     );
     vi.spyOn(resolverInstance, 'resolve').mockResolvedValue({
       ...mockAgentCard,
       url: 'http://test.agent/real/endpoint',
     } as AgentCard);
 
-    vi.spyOn(sdkClient.ClientFactoryOptions, 'createFrom').mockImplementation(
-      (_defaults, overrides) =>
-        overrides as unknown as sdkClient.ClientFactoryOptions,
+    vi.spyOn(ClientFactoryOptions, 'createFrom').mockImplementation(
+      (_defaults, overrides) => overrides as unknown as ClientFactoryOptions,
     );
 
-    vi.mocked(sdkClient.createAuthenticatingFetchWithRetry).mockImplementation(
-      () =>
-        authFetchMock.mockResolvedValue({
-          ok: true,
-          json: async () => ({}),
-        } as Response),
+    vi.mocked(createAuthenticatingFetchWithRetry).mockImplementation(() =>
+      authFetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({}),
+      } as Response),
     );
 
     vi.stubGlobal(
@@ -123,6 +130,51 @@ describe('A2AClientManager', () => {
     expect(instance1).toBe(instance2);
   });
 
+  describe('getInstance / dispatcher initialization', () => {
+    it('should use UndiciAgent when no proxy is configured', async () => {
+      await manager.loadAgent('TestAgent', 'http://test.agent/card');
+
+      const resolverOptions = vi.mocked(DefaultAgentCardResolver).mock
+        .calls[0][0];
+      const cardFetch = resolverOptions?.fetchImpl as typeof fetch;
+      await cardFetch('http://test.agent/card');
+
+      const fetchCall = vi
+        .mocked(fetch)
+        .mock.calls.find((call) => call[0] === 'http://test.agent/card');
+      expect(fetchCall).toBeDefined();
+      expect(
+        (fetchCall![1] as { dispatcher?: unknown })?.dispatcher,
+      ).toBeInstanceOf(UndiciAgent);
+      expect(
+        (fetchCall![1] as { dispatcher?: unknown })?.dispatcher,
+      ).not.toBeInstanceOf(ProxyAgent);
+    });
+
+    it('should use ProxyAgent when a proxy is configured via Config', async () => {
+      A2AClientManager.resetInstanceForTesting();
+      const mockConfig = {
+        getProxy: () => 'http://my-proxy:8080',
+      } as Config;
+
+      manager = A2AClientManager.getInstance(mockConfig);
+      await manager.loadAgent('TestProxyAgent', 'http://test.proxy.agent/card');
+
+      const resolverOptions = vi.mocked(DefaultAgentCardResolver).mock
+        .calls[0][0];
+      const cardFetch = resolverOptions?.fetchImpl as typeof fetch;
+      await cardFetch('http://test.proxy.agent/card');
+
+      const fetchCall = vi
+        .mocked(fetch)
+        .mock.calls.find((call) => call[0] === 'http://test.proxy.agent/card');
+      expect(fetchCall).toBeDefined();
+      expect(
+        (fetchCall![1] as { dispatcher?: unknown })?.dispatcher,
+      ).toBeInstanceOf(ProxyAgent);
+    });
+  });
+
   describe('loadAgent', () => {
     it('should create and cache an A2AClient', async () => {
       const agentCard = await manager.loadAgent(
@@ -135,7 +187,7 @@ describe('A2AClientManager', () => {
 
     it('should configure ClientFactory with REST, JSON-RPC, and gRPC transports', async () => {
       await manager.loadAgent('TestAgent', 'http://test.agent/card');
-      expect(sdkClient.ClientFactoryOptions.createFrom).toHaveBeenCalled();
+      expect(ClientFactoryOptions.createFrom).toHaveBeenCalled();
     });
 
     it('should throw an error if an agent with the same name is already loaded', async () => {
@@ -147,9 +199,7 @@ describe('A2AClientManager', () => {
 
     it('should use native fetch by default', async () => {
       await manager.loadAgent('TestAgent', 'http://test.agent/card');
-      expect(
-        sdkClient.createAuthenticatingFetchWithRetry,
-      ).not.toHaveBeenCalled();
+      expect(createAuthenticatingFetchWithRetry).not.toHaveBeenCalled();
     });
 
     it('should use provided custom authentication handler for transports only', async () => {
@@ -160,11 +210,11 @@ describe('A2AClientManager', () => {
       await manager.loadAgent(
         'TestAgent',
         'http://test.agent/card',
-        customAuthHandler as unknown as sdkClient.AuthenticationHandler,
+        customAuthHandler as unknown as AuthenticationHandler,
       );
 
       // Card resolver should NOT use the authenticated fetch by default.
-      const resolverOptions = vi.mocked(sdkClient.DefaultAgentCardResolver).mock
+      const resolverOptions = vi.mocked(DefaultAgentCardResolver).mock
         .calls[0][0];
       expect(resolverOptions?.fetchImpl).not.toBe(authFetchMock);
     });
@@ -177,10 +227,10 @@ describe('A2AClientManager', () => {
       await manager.loadAgent(
         'AuthCardAgent',
         'http://authcard.agent/card',
-        customAuthHandler as unknown as sdkClient.AuthenticationHandler,
+        customAuthHandler as unknown as AuthenticationHandler,
       );
 
-      const resolverOptions = vi.mocked(sdkClient.DefaultAgentCardResolver).mock
+      const resolverOptions = vi.mocked(DefaultAgentCardResolver).mock
         .calls[0][0];
       const cardFetch = resolverOptions?.fetchImpl as typeof fetch;
 
@@ -208,10 +258,10 @@ describe('A2AClientManager', () => {
       await manager.loadAgent(
         'AuthCardAgent401',
         'http://authcard.agent/card',
-        customAuthHandler as unknown as sdkClient.AuthenticationHandler,
+        customAuthHandler as unknown as AuthenticationHandler,
       );
 
-      const resolverOptions = vi.mocked(sdkClient.DefaultAgentCardResolver).mock
+      const resolverOptions = vi.mocked(DefaultAgentCardResolver).mock
         .calls[0][0];
       const cardFetch = resolverOptions?.fetchImpl as typeof fetch;
 
@@ -239,8 +289,8 @@ describe('A2AClientManager', () => {
       const resolverInstance = {
         resolve: vi.fn().mockRejectedValue(new Error('Resolution failed')),
       };
-      vi.mocked(sdkClient.DefaultAgentCardResolver).mockReturnValue(
-        resolverInstance as unknown as sdkClient.DefaultAgentCardResolver,
+      vi.mocked(DefaultAgentCardResolver).mockReturnValue(
+        resolverInstance as unknown as DefaultAgentCardResolver,
       );
 
       await expect(
@@ -254,8 +304,8 @@ describe('A2AClientManager', () => {
           .fn()
           .mockRejectedValue(new Error('Factory failed')),
       };
-      vi.mocked(sdkClient.ClientFactory).mockReturnValue(
-        factoryInstance as unknown as sdkClient.ClientFactory,
+      vi.mocked(ClientFactory).mockReturnValue(
+        factoryInstance as unknown as ClientFactory,
       );
 
       await expect(
