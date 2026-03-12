@@ -34,11 +34,16 @@ type VirtualizedListProps<T> = {
   keyExtractor: (item: T, index: number) => string;
   initialScrollIndex?: number;
   initialScrollOffsetInIndex?: number;
+  backgroundColor?: string;
+  scrollbarThumbColor?: string;
 };
 
 interface ScrollableListProps<T> extends VirtualizedListProps<T> {
   hasFocus: boolean;
   width?: string | number;
+  targetScrollIndex?: number;
+  containerHeight?: number;
+  scrollbarThumbColor?: string;
 }
 
 export type ScrollableListRef<T> = VirtualizedListRef<T>;

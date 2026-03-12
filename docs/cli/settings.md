@@ -46,6 +46,7 @@ they appear in the UI.
 
 | UI Label                             | Setting                                | Description                                                                                                                                                       | Default  |
 | ------------------------------------ | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| Scrollable Input Prompt              | `ui.scrollableInputPrompt`             | Whether to display the input prompt with a scrollbar when it contains many lines.                                                                                 | `true`   |
 | Auto Theme Switching                 | `ui.autoThemeSwitching`                | Automatically switch between default light and dark themes based on terminal background color.                                                                    | `true`   |
 | Terminal Background Polling Interval | `ui.terminalBackgroundPollingInterval` | Interval in seconds to poll the terminal background color.                                                                                                        | `60`     |
 | Hide Window Title                    | `ui.hideWindowTitle`                   | Hide the window title bar                                                                                                                                         | `false`  |

@@ -223,6 +223,13 @@
       "default": {},
       "type": "object",
       "properties": {
+        "scrollableInputPrompt": {
+          "title": "Scrollable Input Prompt",
+          "description": "Whether to display the input prompt with a scrollbar when it contains many lines.",
+          "markdownDescription": "Whether to display the input prompt with a scrollbar when it contains many lines.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
         "theme": {
           "title": "Theme",
           "description": "The color theme for the UI. See the CLI themes guide for available options.",
