@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { LocalWhisperBackend } from './LocalWhisperBackend.js';
 
 const { mockReadFile, mockStat, mockRm, mockEmitVoiceTranscript } = vi.hoisted(
@@ -72,6 +72,10 @@ describe('LocalWhisperBackend', () => {
     vi.clearAllMocks();
     mockStat.mockResolvedValue({ size: 128 });
     mockRm.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('skips transcription for silent wav recordings when threshold is enabled', async () => {

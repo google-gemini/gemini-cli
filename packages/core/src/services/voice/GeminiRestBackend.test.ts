@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { GeminiRestBackend } from './GeminiRestBackend.js';
 
 const { mockEmitVoiceTranscript } = vi.hoisted(() => ({
@@ -36,6 +36,10 @@ function createRecordingProcessMock(onClose: () => void) {
 describe('GeminiRestBackend', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('waits for recorder close before reading buffered audio', async () => {
