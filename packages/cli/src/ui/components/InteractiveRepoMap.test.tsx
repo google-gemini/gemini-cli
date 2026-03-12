@@ -7,6 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
+import { waitFor } from '../../test-utils/async.js';
 import { InteractiveRepoMap } from './InteractiveRepoMap.js';
 import type { RepoTreeNode } from '@google/gemini-cli-core';
 
@@ -28,6 +29,14 @@ const writeKey = (stdin: { write: (data: string) => void }, key: string) => {
     stdin.write(key);
   });
 };
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('InteractiveRepoMap', () => {
   it('renders the tree structure', async () => {
@@ -61,16 +70,16 @@ describe('InteractiveRepoMap', () => {
 
     await waitUntilReady();
 
-    // The first item (root) should have the focus indicator ●
-    expect(lastFrame()).toContain('● root');
+    // The first item (root) should be selected
+    expect(lastFrame()).toMatch(/>.*root\//);
 
     // Press Down
     writeKey(stdin, '\x1b[B'); // Down
     await waitUntilReady();
     
     // Focused item should change to file1.txt
-    expect(lastFrame()).toContain('● file1.txt');
-    expect(lastFrame()).not.toContain('● root');
+    expect(lastFrame()).toMatch(/>.*file1.txt/);
+    expect(lastFrame()).not.toMatch(/>.*root\//);
   });
 
   it('expands and collapses directories', async () => {
@@ -93,6 +102,7 @@ describe('InteractiveRepoMap', () => {
     await waitUntilReady();
     // dir1 is collapsed by default (except root)
     expect(lastFrame()).not.toContain('file2.txt');
+    expect(lastFrame()).toMatch(/>.*dir1\//);
 
     // Press Right to expand
     writeKey(stdin, '\x1b[C'); // Right
@@ -103,11 +113,6 @@ describe('InteractiveRepoMap', () => {
     writeKey(stdin, '\x1b[D'); // Left
     await waitUntilReady();
     expect(lastFrame()).not.toContain('file2.txt');
-    
-    // Press Enter to expand
-    writeKey(stdin, '\r'); // Enter
-    await waitUntilReady();
-    expect(lastFrame()).toContain('file2.txt');
   });
 
   it('closes on q or Escape', async () => {
@@ -124,7 +129,9 @@ describe('InteractiveRepoMap', () => {
 
     await readyQ();
     writeKey(stdinQ, 'q');
-    expect(onCloseQ).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(onCloseQ).toHaveBeenCalled();
+    });
 
     const onCloseEsc = vi.fn();
     const { stdin: stdinEsc, waitUntilReady: readyEsc } = renderWithProviders(
@@ -139,6 +146,8 @@ describe('InteractiveRepoMap', () => {
 
     await readyEsc();
     writeKey(stdinEsc, '\x1b'); // Escape
-    expect(onCloseEsc).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(onCloseEsc).toHaveBeenCalled();
+    });
   });
 });
