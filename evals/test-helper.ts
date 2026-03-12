@@ -103,7 +103,11 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         }
 
         // Bypassing terminal keybindings setup prompt for interactive tests
-        const stateFilePath = path.join(rig.homeDir!, '.gemini', 'state.json');
+        const homeDir = rig.homeDir;
+        if (!homeDir) {
+          throw new Error('TestRig homeDir is not initialized');
+        }
+        const stateFilePath = path.join(homeDir, '.gemini', 'state.json');
         let stateData: { terminalSetupPromptShown?: boolean } = {};
         if (fs.existsSync(stateFilePath)) {
           try {
