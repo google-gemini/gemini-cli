@@ -134,7 +134,7 @@ describe('Scheduler (Orchestrator)', () => {
   const req2: ToolCallRequestInfo = {
     callId: 'call-2',
     name: 'test-tool',
-    args: { foo: 'baz' },
+    args: { foo: 'baz', wait_for_previous: true },
     isClientInitiated: false,
     prompt_id: 'prompt-1',
     schedulerId: ROOT_SCHEDULER_ID,
@@ -365,6 +365,32 @@ describe('Scheduler (Orchestrator)', () => {
             }),
           }),
         ]),
+      );
+    });
+
+    it('should propagate subagent name to checkPolicy', async () => {
+      const { checkPolicy } = await import('./policy.js');
+      const scheduler = new Scheduler({
+        context: mockConfig,
+        schedulerId: 'sub-scheduler',
+        subagent: 'my-agent',
+        getPreferredEditor: () => undefined,
+      });
+
+      const request: ToolCallRequestInfo = {
+        callId: 'call-1',
+        name: 'test-tool',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      };
+
+      await scheduler.schedule([request], new AbortController().signal);
+
+      expect(checkPolicy).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        'my-agent',
       );
     });
 
