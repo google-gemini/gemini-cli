@@ -532,12 +532,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       // Capture the index of the last hint before starting to avoid re-injecting old hints.
       // NOTE: Hints added AFTER this point will be broadcast to all currently running
       // local agents via the listener below.
-      const startIndex = this.config.userHintService.getLatestHintIndex();
-      this.config.userHintService.onUserHint(hintListener);
+      const startIndex = this.config.injectionService.getLatestHintIndex();
+      this.config.injectionService.onUserHint(hintListener);
 
       try {
         const initialHints =
-          this.config.userHintService.getUserHintsAfter(startIndex);
+          this.config.injectionService.getUserHintsAfter(startIndex);
         const formattedInitialHints = formatUserHintsForModel(initialHints);
 
         let currentMessage: Content = formattedInitialHints
@@ -598,7 +598,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           }
         }
       } finally {
-        this.config.userHintService.offUserHint(hintListener);
+        this.config.injectionService.offUserHint(hintListener);
       }
 
       // === UNIFIED RECOVERY BLOCK ===

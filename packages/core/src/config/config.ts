@@ -147,7 +147,7 @@ import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
-import { UserHintService } from './userHintService.js';
+import { InjectionService } from './injectionService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
 import { loadPoliciesFromToml } from '../policy/toml-loader.js';
 
@@ -842,7 +842,7 @@ export class Config implements McpContext, AgentLoopContext {
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
   private lastModeSwitchTime: number = performance.now();
-  readonly userHintService: UserHintService;
+  readonly injectionService: InjectionService;
   private approvedPlanPath: string | undefined;
 
   constructor(params: ConfigParameters) {
@@ -935,7 +935,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.modelSteering = params.modelSteering ?? false;
-    this.userHintService = new UserHintService(() =>
+    this.injectionService = new InjectionService(() =>
       this.isModelSteeringEnabled(),
     );
     this.toolOutputMasking = {

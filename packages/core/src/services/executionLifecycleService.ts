@@ -65,12 +65,40 @@ export interface ExternalExecutionRegistration {
   isActive?: () => boolean;
 }
 
+/**
+ * Callback that an execution creator provides to control how its output
+ * is formatted when reinjected into the model conversation after backgrounding.
+ * Return `null` to skip injection entirely.
+ */
+export type FormatInjectionFn = (
+  output: string,
+  error: Error | null,
+) => string | null;
+
 interface ManagedExecutionBase {
   executionMethod: ExecutionMethod;
   output: string;
+  backgrounded?: boolean;
+  formatInjection?: FormatInjectionFn;
   getBackgroundOutput?: () => string;
   getSubscriptionSnapshot?: () => string | AnsiOutput | undefined;
 }
+
+/**
+ * Payload emitted when a previously-backgrounded execution settles.
+ */
+export interface BackgroundCompletionInfo {
+  executionId: number;
+  executionMethod: ExecutionMethod;
+  output: string;
+  error: Error | null;
+  /** Pre-formatted injection text from the execution creator, or `null` if skipped. */
+  injectionText: string | null;
+}
+
+export type BackgroundCompletionListener = (
+  info: BackgroundCompletionInfo,
+) => void;
 
 interface VirtualExecutionState extends ManagedExecutionBase {
   kind: 'virtual';
@@ -108,6 +136,23 @@ export class ExecutionLifecycleService {
     number,
     { exitCode: number; signal?: number }
   >();
+  private static backgroundCompletionListeners =
+    new Set<BackgroundCompletionListener>();
+
+  /**
+   * Registers a listener that fires when a previously-backgrounded
+   * execution settles (completes or errors).
+   */
+  static onBackgroundComplete(listener: BackgroundCompletionListener): void {
+    this.backgroundCompletionListeners.add(listener);
+  }
+
+  /**
+   * Unregisters a background completion listener.
+   */
+  static offBackgroundComplete(listener: BackgroundCompletionListener): void {
+    this.backgroundCompletionListeners.delete(listener);
+  }
 
   private static storeExitInfo(
     executionId: number,
@@ -164,6 +209,7 @@ export class ExecutionLifecycleService {
     this.activeResolvers.clear();
     this.activeListeners.clear();
     this.exitedExecutionInfo.clear();
+    this.backgroundCompletionListeners.clear();
     this.nextExecutionId = NON_PROCESS_EXECUTION_ID_START;
   }
 
@@ -200,6 +246,7 @@ export class ExecutionLifecycleService {
     initialOutput = '',
     onKill?: () => void,
     executionMethod: ExecutionMethod = 'none',
+    formatInjection?: FormatInjectionFn,
   ): ExecutionHandle {
     const executionId = this.allocateExecutionId();
 
@@ -208,6 +255,7 @@ export class ExecutionLifecycleService {
       output: initialOutput,
       kind: 'virtual',
       onKill,
+      formatInjection,
       getBackgroundOutput: () => {
         const state = this.activeExecutions.get(executionId);
         return state?.output ?? initialOutput;
@@ -258,8 +306,26 @@ export class ExecutionLifecycleService {
     executionId: number,
     result: ExecutionResult,
   ): void {
-    if (!this.activeExecutions.has(executionId)) {
+    const execution = this.activeExecutions.get(executionId);
+    if (!execution) {
       return;
+    }
+
+    // Fire background completion listeners if this was a backgrounded execution.
+    if (execution.backgrounded && !result.aborted) {
+      const injectionText = execution.formatInjection
+        ? execution.formatInjection(result.output, result.error)
+        : null;
+      const info: BackgroundCompletionInfo = {
+        executionId,
+        executionMethod: execution.executionMethod,
+        output: result.output,
+        error: result.error,
+        injectionText,
+      };
+      for (const listener of this.backgroundCompletionListeners) {
+        listener(info);
+      }
     }
 
     this.resolvePending(executionId, result);
@@ -341,6 +407,7 @@ export class ExecutionLifecycleService {
     });
 
     this.activeResolvers.delete(executionId);
+    execution.backgrounded = true;
   }
 
   static subscribe(

@@ -85,6 +85,9 @@ import {
   buildUserSteeringHintPrompt,
   logBillingEvent,
   ApiKeyUpdatedEvent,
+  ExecutionLifecycleService,
+  type BackgroundCompletionInfo,
+  type InjectionSource,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -1077,6 +1080,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const pendingHintsRef = useRef<string[]>([]);
   const [pendingHintCount, setPendingHintCount] = useState(0);
+  const pendingBackgroundCompletionsRef = useRef<string[]>([]);
+  const [pendingBgCompletionCount, setPendingBgCompletionCount] = useState(0);
 
   const consumePendingHints = useCallback(() => {
     if (pendingHintsRef.current.length === 0) {
@@ -1088,14 +1093,51 @@ Logging in with Google... Restarting Gemini CLI to continue.
     return hint;
   }, []);
 
+  const consumePendingBackgroundCompletions = useCallback(() => {
+    if (pendingBackgroundCompletionsRef.current.length === 0) {
+      return null;
+    }
+    const output = pendingBackgroundCompletionsRef.current.join('\n');
+    pendingBackgroundCompletionsRef.current = [];
+    setPendingBgCompletionCount(0);
+    return output;
+  }, []);
+
   useEffect(() => {
-    const hintListener = (hint: string) => {
-      pendingHintsRef.current.push(hint);
-      setPendingHintCount((prev) => prev + 1);
+    const injectionListener = (text: string, source: InjectionSource) => {
+      if (source === 'user_steering') {
+        pendingHintsRef.current.push(text);
+        setPendingHintCount((prev) => prev + 1);
+      } else if (source === 'background_completion') {
+        pendingBackgroundCompletionsRef.current.push(text);
+        setPendingBgCompletionCount((prev) => prev + 1);
+      }
     };
-    config.userHintService.onUserHint(hintListener);
+    config.injectionService.onInjection(injectionListener);
     return () => {
-      config.userHintService.offUserHint(hintListener);
+      config.injectionService.offInjection(injectionListener);
+    };
+  }, [config]);
+
+  // Wire background completion events from ExecutionLifecycleService into the
+  // injection service so completed backgrounded executions are reinjected.
+  useEffect(() => {
+    const bgListener = (info: BackgroundCompletionInfo) => {
+      // Use the execution creator's custom injection text if provided.
+      let text = info.injectionText;
+      if (text === null || text === undefined) {
+        // Fallback: generic format for executions without a custom formatter.
+        const header = info.error
+          ? `[Background execution (ID: ${info.executionId}) completed with error: ${info.error.message}]`
+          : `[Background execution (ID: ${info.executionId}) completed]`;
+        const body = info.output ? `\n${info.output}` : '';
+        text = `${header}${body}`;
+      }
+      config.injectionService.addInjection(text, 'background_completion');
+    };
+    ExecutionLifecycleService.onBackgroundComplete(bgListener);
+    return () => {
+      ExecutionLifecycleService.offBackgroundComplete(bgListener);
     };
   }, [config]);
 
@@ -1259,7 +1301,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (!trimmed) {
         return;
       }
-      config.userHintService.addUserHint(trimmed);
+      config.injectionService.addUserHint(trimmed);
       // Render hints with a distinct style.
       historyManager.addItem({
         type: 'hint',
@@ -2128,6 +2170,38 @@ Logging in with Google... Restarting Gemini CLI to continue.
     consumePendingHints,
     pendingHistoryItems,
     pendingHintCount,
+  ]);
+
+  // Reinject completed background execution output into the model conversation.
+  // Unlike user steering hints, this is NOT gated on model steering being enabled.
+  useEffect(() => {
+    if (
+      !isConfigInitialized ||
+      streamingState !== StreamingState.Idle ||
+      !isMcpReady ||
+      isToolAwaitingConfirmation(pendingHistoryItems)
+    ) {
+      return;
+    }
+
+    const bgOutput = consumePendingBackgroundCompletions();
+    if (!bgOutput) {
+      return;
+    }
+
+    void submitQuery([
+      {
+        text: `Background execution update:\n${bgOutput}\n\nThe above background execution has completed. Review the output and continue your work accordingly.`,
+      },
+    ]);
+  }, [
+    isConfigInitialized,
+    isMcpReady,
+    streamingState,
+    submitQuery,
+    consumePendingBackgroundCompletions,
+    pendingHistoryItems,
+    pendingBgCompletionCount,
   ]);
 
   const allToolCalls = useMemo(
