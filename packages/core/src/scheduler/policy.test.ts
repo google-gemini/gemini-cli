@@ -68,6 +68,7 @@ describe('policy.ts', () => {
         { name: 'test-tool', args: {} },
         undefined,
         undefined,
+        undefined,
       );
     });
 
@@ -97,6 +98,7 @@ describe('policy.ts', () => {
         { name: 'mcp-tool', args: {} },
         'my-server',
         { readOnlyHint: true },
+        undefined,
       );
     });
 
@@ -658,7 +660,8 @@ describe('policy.ts', () => {
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
         expect.objectContaining({
           toolName: 'write_file',
-          argsPattern: escapeRegex('"file_path":"src/foo.ts"'),
+          argsPattern:
+            '\\\\0' + escapeRegex('"file_path":"src/foo.ts"') + '\\\\0',
         }),
       );
     });

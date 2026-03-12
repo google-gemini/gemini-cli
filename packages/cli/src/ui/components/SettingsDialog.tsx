@@ -4,14 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import type React from 'react';
 import { Text } from 'ink';
 import { AsyncFzf } from 'fzf';
-import type { Key } from '../hooks/useKeypress.js';
+import { type Key } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
-import type { LoadableSettingScope, Settings } from '../../config/settings.js';
-import { SettingScope } from '../../config/settings.js';
+import {
+  SettingScope,
+  type LoadableSettingScope,
+  type Settings,
+} from '../../config/settings.js';
 import { getScopeMessageForSetting } from '../../utils/dialogScopeUtils.js';
 import {
   getDialogSettingKeys,
