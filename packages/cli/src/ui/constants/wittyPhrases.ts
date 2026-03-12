@@ -145,5 +145,5 @@ export const WITTY_LOADING_PHRASES = [
   "3 SQL databases walked into a NoSQL bar. They couldn't find a table…",
   'There are 2 hard problems in CS: caching, naming, and off-by-1 errors…',
   "You can't have runtime errors if your code doesn't compile…",
-  'I got really angry and smashed my keyboard. I completely lost CTRL…',
+  'I got really angry and smashed my keyboard. I completely lost Ctrl…',
 ];
