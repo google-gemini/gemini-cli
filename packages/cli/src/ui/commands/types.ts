@@ -207,6 +207,11 @@ export interface SlashCommand {
    */
   autoExecute?: boolean;
 
+  /**
+   * Whether this command can be safely executed while the agent is busy (e.g. streaming a response).
+   */
+  isSafeConcurrent?: boolean;
+
   // Optional metadata for extension commands
   extensionName?: string;
   extensionId?: string;
