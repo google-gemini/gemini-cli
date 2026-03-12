@@ -1446,6 +1446,12 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
   - Required for using Vertex AI in non-express mode.
   - Example: `export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"` (Windows
     PowerShell: `$env:GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"`).
+- **`GEMINI_TEXT_FILE_READ_THRESHOLD_BYTES`**:
+  - Sets the size threshold (in bytes) for the `read_file` tool's text file read
+    guard. Text files larger than this threshold will be rejected unless
+    `start_line` or `end_line` is specified.
+  - Default: `524288` (512 KiB).
+  - Set to `-1` to disable the threshold entirely.
 - **`GEMINI_SANDBOX`**:
   - Alternative to the `sandbox` setting in `settings.json`.
   - Accepts `true`, `false`, `docker`, `podman`, or a custom command string.

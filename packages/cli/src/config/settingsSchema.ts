@@ -1415,6 +1415,16 @@ const SETTINGS_SCHEMA = {
           'Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.',
         showInDialog: true,
       },
+      textFileReadSizeThreshold: {
+        type: 'number',
+        label: 'Text File Read Size Threshold',
+        category: 'Tools',
+        requiresRestart: false,
+        default: 524288,
+        description:
+          'Max file size in bytes for broad text file reads. Files exceeding this require start_line/end_line. Set to -1 to disable. Env var GEMINI_TEXT_FILE_READ_THRESHOLD_BYTES is used as fallback when this setting is not configured.',
+        showInDialog: true,
+      },
       disableLLMCorrection: {
         type: 'boolean',
         label: 'Disable LLM Correction',

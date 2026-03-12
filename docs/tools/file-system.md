@@ -27,8 +27,15 @@ and PDF.
 - **Tool name:** `read_file`
 - **Arguments:**
   - `file_path` (string, required): Path to the file.
-  - `offset` (number, optional): Start line for text files (0-based).
-  - `limit` (number, optional): Maximum lines to read.
+  - `start_line` (number, optional): The 1-based line number to start reading
+    from.
+  - `end_line` (number, optional): The 1-based line number to end reading at
+    (inclusive).
+- **Text file read threshold:** Text files larger than 512 KiB will be rejected
+  unless `start_line` or `end_line` is specified, guiding the model to read in
+  targeted chunks. This threshold can be customized via the
+  `GEMINI_TEXT_FILE_READ_THRESHOLD_BYTES` environment variable (set to `-1` to
+  disable).
 
 ### `write_file` (WriteFile)
 
