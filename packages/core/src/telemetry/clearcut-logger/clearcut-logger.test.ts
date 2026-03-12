@@ -51,6 +51,12 @@ import { InstallationManager } from '../../utils/installationManager.js';
 
 import si, { type Systeminformation } from 'systeminformation';
 import * as os from 'node:os';
+import {
+  CreditsUsedEvent,
+  OverageOptionSelectedEvent,
+  EmptyWalletMenuShownEvent,
+  CreditPurchaseClickEvent,
+} from '../billingEvents.js';
 
 interface CustomMatchers<R = unknown> {
   toHaveMetadataValue: ([key, value]: [EventMetadataKey, string]) => R;
@@ -1548,6 +1554,101 @@ describe('ClearcutLogger', () => {
       expect(events[0]).toHaveMetadataValue([
         EventMetadataKey.GEMINI_CLI_HOOK_EXIT_CODE,
         '0',
+      ]);
+    });
+  });
+
+  describe('logCreditsUsedEvent', () => {
+    it('logs an event with model, consumed, and remaining credits', () => {
+      const { logger } = setup();
+      const event = new CreditsUsedEvent('gemini-3-pro-preview', 10, 490);
+
+      logger?.logCreditsUsedEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.CREDITS_USED);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BILLING_MODEL,
+        '"gemini-3-pro-preview"',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BILLING_CREDITS_CONSUMED,
+        '10',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BILLING_CREDITS_REMAINING,
+        '490',
+      ]);
+    });
+  });
+
+  describe('logOverageOptionSelectedEvent', () => {
+    it('logs an event with model, selected option, and credit balance', () => {
+      const { logger } = setup();
+      const event = new OverageOptionSelectedEvent(
+        'gemini-3-pro-preview',
+        'use_credits',
+        350,
+      );
+
+      logger?.logOverageOptionSelectedEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.OVERAGE_OPTION_SELECTED);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BILLING_MODEL,
+        '"gemini-3-pro-preview"',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BILLING_SELECTED_OPTION,
+        '"use_credits"',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BILLING_CREDIT_BALANCE,
+        '350',
+      ]);
+    });
+  });
+
+  describe('logEmptyWalletMenuShownEvent', () => {
+    it('logs an event with the model', () => {
+      const { logger } = setup();
+      const event = new EmptyWalletMenuShownEvent('gemini-3-pro-preview');
+
+      logger?.logEmptyWalletMenuShownEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.EMPTY_WALLET_MENU_SHOWN);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BILLING_MODEL,
+        '"gemini-3-pro-preview"',
+      ]);
+    });
+  });
+
+  describe('logCreditPurchaseClickEvent', () => {
+    it('logs an event with model and source', () => {
+      const { logger } = setup();
+      const event = new CreditPurchaseClickEvent(
+        'empty_wallet_menu',
+        'gemini-3-pro-preview',
+      );
+
+      logger?.logCreditPurchaseClickEvent(event);
+
+      const events = getEvents(logger!);
+      expect(events.length).toBe(1);
+      expect(events[0]).toHaveEventName(EventNames.CREDIT_PURCHASE_CLICK);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BILLING_MODEL,
+        '"gemini-3-pro-preview"',
+      ]);
+      expect(events[0]).toHaveMetadataValue([
+        EventMetadataKey.GEMINI_CLI_BILLING_PURCHASE_SOURCE,
+        '"empty_wallet_menu"',
       ]);
     });
   });
