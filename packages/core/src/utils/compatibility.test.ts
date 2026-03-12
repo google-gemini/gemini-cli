@@ -94,6 +94,8 @@ describe('compatibility', () => {
       },
       { env: {}, expected: false, desc: 'no env vars set' },
     ])('should return $expected when $desc', ({ env, expected }) => {
+      vi.stubEnv('TERMINAL_EMULATOR', '');
+      vi.stubEnv('JETBRAINS_IDE', '');
       for (const [key, value] of Object.entries(env)) {
         vi.stubEnv(key, value);
       }
@@ -140,6 +142,7 @@ describe('compatibility', () => {
 
     it('should return false when TERM=xterm-256color', () => {
       vi.stubEnv('TERM', 'xterm-256color');
+      vi.stubEnv('COLORTERM', '');
       expect(isLowColorTmux()).toBe(false);
     });
   });
@@ -230,6 +233,8 @@ describe('compatibility', () => {
       process.stdout.getColorDepth = vi.fn().mockReturnValue(depth);
       if (term !== undefined) {
         vi.stubEnv('TERM', term);
+      } else {
+        vi.stubEnv('TERM', '');
       }
       expect(supports256Colors()).toBe(expected);
     });
@@ -278,6 +283,14 @@ describe('compatibility', () => {
 
   describe('getCompatibilityWarnings', () => {
     beforeEach(() => {
+      // Clear out potential local environment variables that might trigger warnings
+      vi.stubEnv('TERMINAL_EMULATOR', '');
+      vi.stubEnv('JETBRAINS_IDE', '');
+      vi.stubEnv('TMUX', '');
+      vi.stubEnv('STY', '');
+      vi.stubEnv('TERM', 'xterm-256color'); // Prevent dumb terminal warning
+      vi.stubEnv('TERM_PROGRAM', '');
+
       // Default to supporting true color to keep existing tests simple
       vi.stubEnv('COLORTERM', 'truecolor');
       process.stdout.getColorDepth = vi.fn().mockReturnValue(24);

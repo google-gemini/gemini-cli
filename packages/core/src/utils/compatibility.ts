@@ -160,7 +160,7 @@ export function getCompatibilityWarnings(options?: {
     warnings.push({
       id: 'jetbrains-terminal',
       message:
-        '⚠️  JetBrains terminal detected — alternate buffer mode may cause scroll wheel issues and rendering artifacts. If you experience problems, disable it in /settings → "Use Alternate Screen Buffer".',
+        'Warning: JetBrains terminal detected — alternate buffer mode may cause scroll wheel issues and rendering artifacts. If you experience problems, disable it in /settings → "Use Alternate Screen Buffer".',
       priority: WarningPriority.High,
     });
   }
@@ -169,7 +169,7 @@ export function getCompatibilityWarnings(options?: {
     warnings.push({
       id: 'tmux-alternate-buffer',
       message:
-        '⚠️  tmux detected — alternate buffer mode may cause unexpected scrollback loss and flickering. If you experience issues, disable it in /settings → "Use Alternate Screen Buffer".\n    Tip: Use Ctrl-b [ to access tmux copy mode for scrolling history.',
+        'Warning: tmux detected — alternate buffer mode may cause unexpected scrollback loss and flickering. If you experience issues, disable it in /settings → "Use Alternate Screen Buffer".\n    Tip: Use Ctrl-b [ to access tmux copy mode for scrolling history.',
       priority: WarningPriority.High,
     });
   }
@@ -178,7 +178,7 @@ export function getCompatibilityWarnings(options?: {
     warnings.push({
       id: 'low-color-tmux',
       message:
-        '⚠️  Limited color support detected (TERM=screen). Some visual elements may not render correctly. For better color support in tmux, add to ~/.tmux.conf:\n      set -g default-terminal "tmux-256color"\n      set -ga terminal-overrides ",*256col*:Tc"',
+        'Warning: Limited color support detected (TERM=screen). Some visual elements may not render correctly. For better color support in tmux, add to ~/.tmux.conf:\n      set -g default-terminal "tmux-256color"\n      set -ga terminal-overrides ",*256col*:Tc"',
       priority: WarningPriority.High,
     });
   }
@@ -187,7 +187,7 @@ export function getCompatibilityWarnings(options?: {
     warnings.push({
       id: 'gnu-screen',
       message:
-        '⚠️  GNU screen detected. Some keyboard shortcuts and visual features may behave unexpectedly. For the best experience, consider using tmux or running Gemini CLI directly in your terminal.',
+        'Warning: GNU screen detected. Some keyboard shortcuts and visual features may behave unexpectedly. For the best experience, consider using tmux or running Gemini CLI directly in your terminal.',
       priority: WarningPriority.Low,
     });
   }
@@ -196,7 +196,7 @@ export function getCompatibilityWarnings(options?: {
     warnings.push({
       id: 'dumb-terminal',
       message:
-        '⚠️  Basic terminal detected (TERM=dumb). Visual rendering will be limited. For the best experience, use a terminal emulator with truecolor support.',
+        'Warning: Basic terminal detected (TERM=dumb). Visual rendering will be limited. For the best experience, use a terminal emulator with truecolor support.',
       priority: WarningPriority.High,
     });
   }
