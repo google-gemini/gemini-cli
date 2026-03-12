@@ -295,11 +295,100 @@ describe('loadSandboxConfig', () => {
     it.each([false, 'false', '0', undefined, null, ''])(
       'should disable sandbox for value: %s',
       async (value) => {
-        // \`null\` is not a valid type for the arg, but good to test falsiness
+        // `null` is not a valid type for the arg, but good to test falsiness
         const config = await loadSandboxConfig({}, { sandbox: value });
         expect(config).toBeUndefined();
       },
     );
+  });
+
+  describe('with SandboxConfig object in settings', () => {
+    beforeEach(() => {
+      mockedOsPlatform.mockReturnValue('linux');
+      mockedCommandExistsSync.mockImplementation((cmd) => cmd === 'docker');
+    });
+
+    it('should support object structure with enabled: true', async () => {
+      const config = await loadSandboxConfig(
+        {
+          tools: {
+            sandbox: {
+              enabled: true,
+              allowedPaths: ['/tmp'],
+              networkAccess: true,
+            },
+          },
+        },
+        {},
+      );
+      expect(config).toEqual({
+        enabled: true,
+        allowedPaths: ['/tmp'],
+        networkAccess: true,
+        command: 'docker',
+        image: 'default/image',
+      });
+    });
+
+    it('should support object structure with explicit command', async () => {
+      mockedCommandExistsSync.mockImplementation((cmd) => cmd === 'podman');
+      const config = await loadSandboxConfig(
+        {
+          tools: {
+            sandbox: {
+              enabled: true,
+              command: 'podman',
+            },
+          },
+        },
+        {},
+      );
+      expect(config?.command).toBe('podman');
+    });
+
+    it('should support object structure with custom image', async () => {
+      const config = await loadSandboxConfig(
+        {
+          tools: {
+            sandbox: {
+              enabled: true,
+              image: 'custom/image',
+            },
+          },
+        },
+        {},
+      );
+      expect(config?.image).toBe('custom/image');
+    });
+
+    it('should return undefined if enabled is false in object', async () => {
+      const config = await loadSandboxConfig(
+        {
+          tools: {
+            sandbox: {
+              enabled: false,
+            },
+          },
+        },
+        {},
+      );
+      expect(config).toBeUndefined();
+    });
+
+    it('should prioritize CLI flag over settings object', async () => {
+      const config = await loadSandboxConfig(
+        {
+          tools: {
+            sandbox: {
+              enabled: true,
+              allowedPaths: ['/settings-path'],
+            },
+          },
+        },
+        { sandbox: false },
+      );
+      expect(config).toBeUndefined();
+    });
   });
 
   describe('with sandbox: runsc (gVisor)', () => {

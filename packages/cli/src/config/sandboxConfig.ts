@@ -23,7 +23,7 @@ const __dirname = path.dirname(__filename);
 interface SandboxCliArgs {
   sandbox?: boolean | string | null;
 }
-const VALID_SANDBOX_COMMANDS: ReadonlyArray<SandboxConfig['command']> = [
+const VALID_SANDBOX_COMMANDS = [
   'docker',
   'podman',
   'sandbox-exec',
@@ -120,15 +120,36 @@ export async function loadSandboxConfig(
   argv: SandboxCliArgs,
 ): Promise<SandboxConfig | undefined> {
   const sandboxOption = argv.sandbox ?? settings.tools?.sandbox;
-  const command = getSandboxCommand(sandboxOption);
+
+  let sandboxValue: boolean | string | null | undefined;
+  let allowedPaths: string[] = [];
+  let networkAccess = false;
+  let customImage: string | undefined;
+
+  if (
+    typeof sandboxOption === 'object' &&
+    sandboxOption !== null &&
+    !Array.isArray(sandboxOption)
+  ) {
+    const config = sandboxOption;
+    sandboxValue = config.enabled ? (config.command ?? true) : false;
+    allowedPaths = config.allowedPaths ?? [];
+    networkAccess = config.networkAccess ?? false;
+    customImage = config.image;
+  } else if (typeof sandboxOption !== 'object' || sandboxOption === null) {
+    sandboxValue = sandboxOption;
+  }
+
+  const command = getSandboxCommand(sandboxValue);
 
   const packageJson = await getPackageJson(__dirname);
   const image =
     process.env['GEMINI_SANDBOX_IMAGE'] ??
     process.env['GEMINI_SANDBOX_IMAGE_DEFAULT'] ??
+    customImage ??
     packageJson?.config?.sandboxImageUri;
 
   return command && image
-    ? { enabled: true, allowedPaths: [], networkAccess: false, command, image }
+    ? { enabled: true, allowedPaths, networkAccess, command, image }
     : undefined;
 }

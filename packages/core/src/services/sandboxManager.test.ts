@@ -45,7 +45,7 @@ describe('NoopSandboxManager', () => {
     expect(result.env['MY_SECRET']).toBeUndefined();
   });
 
-  it('should respect environment variable redaction setting in config', async () => {
+  it('should force environment variable redaction even if not requested in config', async () => {
     const req = {
       command: 'echo',
       args: ['hello'],
@@ -62,7 +62,7 @@ describe('NoopSandboxManager', () => {
 
     const result = await sandboxManager.prepareCommand(req);
 
-    expect(result.env['API_KEY']).toBe('sensitive-key');
+    expect(result.env['API_KEY']).toBeUndefined();
   });
 
   it('should respect allowedEnvironmentVariables in config', async () => {

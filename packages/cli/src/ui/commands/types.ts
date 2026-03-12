@@ -182,6 +182,7 @@ export enum CommandKind {
   EXTENSION_FILE = 'extension-file',
   MCP_PROMPT = 'mcp-prompt',
   AGENT = 'agent',
+  SKILL = 'skill',
 }
 
 // The standardized contract for any command in the system.
@@ -205,6 +206,11 @@ export interface SlashCommand {
    * If false or undefined, pressing Enter will autocomplete the command into the prompt window.
    */
   autoExecute?: boolean;
+
+  /**
+   * Whether this command can be safely executed while the agent is busy (e.g. streaming a response).
+   */
+  isSafeConcurrent?: boolean;
 
   // Optional metadata for extension commands
   extensionName?: string;

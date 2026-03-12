@@ -493,6 +493,95 @@ describe('Server Config (config.ts)', () => {
         expect(await config.getUserCaching()).toBeUndefined();
       });
     });
+
+    describe('getNumericalRoutingEnabled', () => {
+      it('should return true by default if there are no experiments', async () => {
+        const config = new Config(baseParams);
+        expect(await config.getNumericalRoutingEnabled()).toBe(true);
+      });
+
+      it('should return true if the remote flag is set to true', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.ENABLE_NUMERICAL_ROUTING]: {
+                boolValue: true,
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getNumericalRoutingEnabled()).toBe(true);
+      });
+
+      it('should return false if the remote flag is explicitly set to false', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.ENABLE_NUMERICAL_ROUTING]: {
+                boolValue: false,
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getNumericalRoutingEnabled()).toBe(false);
+      });
+    });
+
+    describe('getResolvedClassifierThreshold', () => {
+      it('should return 90 by default if there are no experiments', async () => {
+        const config = new Config(baseParams);
+        expect(await config.getResolvedClassifierThreshold()).toBe(90);
+      });
+
+      it('should return the remote flag value if it is within range (0-100)', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.CLASSIFIER_THRESHOLD]: {
+                intValue: '75',
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getResolvedClassifierThreshold()).toBe(75);
+      });
+
+      it('should return 90 if the remote flag is out of range (less than 0)', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.CLASSIFIER_THRESHOLD]: {
+                intValue: '-10',
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getResolvedClassifierThreshold()).toBe(90);
+      });
+
+      it('should return 90 if the remote flag is out of range (greater than 100)', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.CLASSIFIER_THRESHOLD]: {
+                intValue: '110',
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getResolvedClassifierThreshold()).toBe(90);
+      });
+    });
   });
 
   describe('refreshAuth', () => {

@@ -61,19 +61,43 @@ Gemini CLI takes action.
     [`ask_user`](../tools/ask-user.md). Provide your preferences to help guide
     the design.
 3.  **Review the plan:** Once Gemini CLI has a proposed strategy, it creates a
-    detailed implementation plan as a Markdown file in your plans directory. You
-    can open and read this file to understand the proposed changes.
+    detailed implementation plan as a Markdown file in your plans directory.
+    - **View:** You can open and read this file to understand the proposed
+      changes.
+    - **Edit:** Press `Ctrl+X` to open the plan directly in your configured
+      external editor.
+
 4.  **Approve or iterate:** Gemini CLI will present the finalized plan for your
     approval.
     - **Approve:** If you're satisfied with the plan, approve it to start the
       implementation immediately: **Yes, automatically accept edits** or **Yes,
       manually accept edits**.
-    - **Iterate:** If the plan needs adjustments, provide feedback. Gemini CLI
-      will refine the strategy and update the plan.
+    - **Iterate:** If the plan needs adjustments, provide feedback in the input
+      box or [edit the plan file directly](#collaborative-plan-editing). Gemini
+      CLI will refine the strategy and update the plan.
     - **Cancel:** You can cancel your plan with `Esc`.
 
 For more complex or specialized planning tasks, you can
 [customize the planning workflow with skills](#custom-planning-with-skills).
+
+### Collaborative plan editing
+
+You can collaborate with Gemini CLI by making direct changes or leaving comments
+in the implementation plan. This is often faster and more precise than
+describing complex changes in natural language.
+
+1.  **Open the plan:** Press `Ctrl+X` when Gemini CLI presents a plan for
+    review.
+2.  **Edit or comment:** The plan opens in your configured external editor (for
+    example, VS Code or Vim). You can:
+    - **Modify steps:** Directly reorder, delete, or rewrite implementation
+      steps.
+    - **Leave comments:** Add inline questions or feedback (for example, "Wait,
+      shouldn't we use the existing `Logger` class here?").
+3.  **Save and close:** Save your changes and close the editor.
+4.  **Review and refine:** Gemini CLI automatically detects the changes, reviews
+    your comments, and adjusts the implementation strategy. It then presents the
+    refined plan for your final approval.
 
 ## How to exit Plan Mode
 
@@ -149,6 +173,27 @@ Plan Mode's default tool restrictions are managed by the
 [`plan.toml`] file. The built-in policy (Tier 1) enforces the read-only state,
 but you can customize these rules by creating your own policies in your
 `~/.gemini/policies/` directory (Tier 2).
+
+#### Global vs. mode-specific rules
+
+As described in the
+[policy engine documentation](../reference/policy-engine.md#approval-modes), any
+rule that does not explicitly specify `modes` is considered "always active" and
+will apply to Plan Mode as well.
+
+If you want a rule to apply to other modes but _not_ to Plan Mode, you must
+explicitly specify the target modes. For example, to allow `npm test` in default
+and Auto-Edit modes but not in Plan Mode:
+
+```toml
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = "npm test"
+decision = "allow"
+priority = 100
+# By omitting "plan", this rule will not be active in Plan Mode.
+modes = ["default", "autoEdit"]
+```
 
 #### Example: Automatically approve read-only MCP tools
 

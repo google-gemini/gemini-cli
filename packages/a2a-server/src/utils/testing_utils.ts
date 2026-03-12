@@ -21,6 +21,7 @@ import {
   type Config,
   type Storage,
   NoopSandboxManager,
+  type ToolRegistry,
 } from '@google/gemini-cli-core';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
 import { expect, vi } from 'vitest';
@@ -31,6 +32,10 @@ export function createMockConfig(
   const tmpDir = tmpdir();
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const mockConfig = {
+    get toolRegistry(): ToolRegistry {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return (this as unknown as Config).getToolRegistry();
+    },
     getToolRegistry: vi.fn().mockReturnValue({
       getTool: vi.fn(),
       getAllToolNames: vi.fn().mockReturnValue([]),
