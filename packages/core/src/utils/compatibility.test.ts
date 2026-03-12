@@ -13,7 +13,6 @@ import {
   isGnuScreen,
   isLowColorTmux,
   isDumbTerminal,
-  getTerminalNameFromEnv,
   supports256Colors,
   supportsTrueColor,
   getCompatibilityWarnings,
@@ -128,21 +127,31 @@ describe('compatibility', () => {
   });
 
   describe('isLowColorTmux', () => {
-    it('should return true when TERM=screen and COLORTERM is not set', () => {
+    it('should return true when TERM=screen, COLORTERM is not set, and TMUX is set', () => {
       vi.stubEnv('TERM', 'screen');
       vi.stubEnv('COLORTERM', '');
+      vi.stubEnv('TMUX', 'dummy');
       expect(isLowColorTmux()).toBe(true);
     });
 
-    it('should return false when TERM=screen and COLORTERM is set', () => {
+    it('should return false when TERM=screen, COLORTERM is set, and TMUX is set', () => {
       vi.stubEnv('TERM', 'screen');
       vi.stubEnv('COLORTERM', 'truecolor');
+      vi.stubEnv('TMUX', 'dummy');
       expect(isLowColorTmux()).toBe(false);
     });
 
-    it('should return false when TERM=xterm-256color', () => {
+    it('should return false when TERM=xterm-256color and TMUX is set', () => {
       vi.stubEnv('TERM', 'xterm-256color');
       vi.stubEnv('COLORTERM', '');
+      vi.stubEnv('TMUX', 'dummy');
+      expect(isLowColorTmux()).toBe(false);
+    });
+
+    it('should return false when TMUX is not set', () => {
+      vi.stubEnv('TERM', 'screen');
+      vi.stubEnv('COLORTERM', '');
+      vi.stubEnv('TMUX', '');
       expect(isLowColorTmux()).toBe(false);
     });
   });
@@ -161,46 +170,6 @@ describe('compatibility', () => {
     it('should return false when TERM=xterm', () => {
       vi.stubEnv('TERM', 'xterm');
       expect(isDumbTerminal()).toBe(false);
-    });
-  });
-
-  describe('getTerminalNameFromEnv', () => {
-    it('should prioritize TERM_PROGRAM', () => {
-      vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
-      expect(getTerminalNameFromEnv()).toBe('iTerm.app');
-    });
-
-    it('should use JETBRAINS_IDE if TERM_PROGRAM is missing', () => {
-      vi.stubEnv('TERM_PROGRAM', '');
-      vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
-      vi.stubEnv('JETBRAINS_IDE', 'PyCharm');
-      expect(getTerminalNameFromEnv()).toBe('PyCharm');
-    });
-
-    it('should use TMUX if other vars are missing', () => {
-      vi.stubEnv('TERM_PROGRAM', '');
-      vi.stubEnv('TERMINAL_EMULATOR', '');
-      vi.stubEnv('JETBRAINS_IDE', '');
-      vi.stubEnv('TMUX', 'some-socket');
-      expect(getTerminalNameFromEnv()).toBe('tmux');
-    });
-
-    it('should use STY if other vars are missing', () => {
-      vi.stubEnv('TERM_PROGRAM', '');
-      vi.stubEnv('TERMINAL_EMULATOR', '');
-      vi.stubEnv('JETBRAINS_IDE', '');
-      vi.stubEnv('TMUX', '');
-      vi.stubEnv('STY', 'some-session');
-      expect(getTerminalNameFromEnv()).toBe('GNU screen');
-    });
-
-    it('should return Unknown if no vars are set', () => {
-      vi.stubEnv('TERM_PROGRAM', '');
-      vi.stubEnv('TERMINAL_EMULATOR', '');
-      vi.stubEnv('JETBRAINS_IDE', '');
-      vi.stubEnv('TMUX', '');
-      vi.stubEnv('STY', '');
-      expect(getTerminalNameFromEnv()).toBe('Unknown');
     });
   });
 
@@ -340,6 +309,7 @@ describe('compatibility', () => {
     it('should return low-color tmux warning when detected', () => {
       vi.stubEnv('TERM', 'screen');
       vi.stubEnv('COLORTERM', '');
+      vi.stubEnv('TMUX', 'dummy');
 
       const warnings = getCompatibilityWarnings();
       expect(warnings).toContainEqual(

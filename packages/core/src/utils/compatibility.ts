@@ -52,7 +52,7 @@ export function isGnuScreen(): boolean {
  */
 export function isLowColorTmux(): boolean {
   const term = process.env['TERM'] || '';
-  return term.startsWith('screen') && !process.env['COLORTERM'];
+  return isTmux() && term.startsWith('screen') && !process.env['COLORTERM'];
 }
 
 /**
@@ -61,26 +61,6 @@ export function isLowColorTmux(): boolean {
 export function isDumbTerminal(): boolean {
   const term = process.env['TERM'] || '';
   return term === 'dumb' || term === 'vt100';
-}
-
-/**
- * Detects the terminal name from environment variables.
- */
-export function getTerminalNameFromEnv(): string {
-  const env = process.env;
-  if (env['TERM_PROGRAM'] && env['TERM_PROGRAM'] !== 'Unknown') {
-    return env['TERM_PROGRAM'];
-  }
-  if (isJetBrainsTerminal()) {
-    return env['JETBRAINS_IDE'] || 'JetBrains IDE';
-  }
-  if (isTmux()) {
-    return 'tmux';
-  }
-  if (isGnuScreen()) {
-    return 'GNU screen';
-  }
-  return env['TERM_PROGRAM'] || 'Unknown';
 }
 
 /**
