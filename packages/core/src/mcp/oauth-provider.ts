@@ -395,10 +395,12 @@ export class MCPOAuthProvider {
         debugLogger.debug('→ Attempting dynamic client registration...');
         const { metadata: authServerMetadata, issuerUrl } =
           await this.discoverAuthServerMetadataForRegistration(config.issuer);
-        registrationUrl = OAuthUtils.metadataToOAuthConfig(
-          authServerMetadata,
-          issuerUrl,
-        )?.registrationUrl;
+        if (authServerMetadata) {
+          registrationUrl = OAuthUtils.metadataToOAuthConfig(
+            authServerMetadata,
+            issuerUrl,
+          )?.registrationUrl;
+        }
       }
 
       // Register client if registration endpoint is available
