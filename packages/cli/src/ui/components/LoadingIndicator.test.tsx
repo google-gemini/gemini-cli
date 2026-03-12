@@ -258,15 +258,17 @@ describe('<LoadingIndicator />', () => {
     const output = lastFrame();
     expect(output).toBeDefined();
     if (output) {
-      // Should NOT contain "Thinking... " prefix because the subject already starts with "Thinking"
+      // Should NOT contain "Thinking... " prefix because the subject already starts with "Thinking" (or now "Gemini")
       expect(output).not.toContain('Thinking... Thinking');
-      expect(output).toContain('Thinking about something...');
+      expect(output).toContain(
+        'Gemini is thinking about Thinking about something...',
+      );
       expect(output).not.toContain('and other stuff.');
     }
     unmount();
   });
 
-  it('should prepend "Thinking... " if the subject does not start with "Thinking"', async () => {
+  it('should use "Gemini is thinking about" if a subject is provided', async () => {
     const props = {
       thought: {
         subject: 'Planning the response...',
@@ -280,11 +282,13 @@ describe('<LoadingIndicator />', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('Thinking... Planning the response...');
+    expect(output).toContain(
+      'Gemini is thinking about Planning the response...',
+    );
     unmount();
   });
 
-  it('should prioritize thought.subject over currentLoadingPhrase', async () => {
+  it('should prioritize thought.subject over currentLoadingPhrase using the new Gemini pattern', async () => {
     const props = {
       thought: {
         subject: 'This should be displayed',
@@ -299,8 +303,9 @@ describe('<LoadingIndicator />', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('Thinking... ');
-    expect(output).toContain('This should be displayed');
+    expect(output).toContain(
+      'Gemini is thinking about This should be displayed',
+    );
     expect(output).not.toContain('This should not be displayed');
     unmount();
   });
