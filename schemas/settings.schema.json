@@ -1180,6 +1180,13 @@
               "description": "Model override for the visual agent.",
               "markdownDescription": "Model override for the visual agent.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
               "type": "string"
+            },
+            "disableUserInput": {
+              "title": "Disable User Input",
+              "description": "Disable user input on browser window during automation.",
+              "markdownDescription": "Disable user input on browser window during automation.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
             }
           },
           "additionalProperties": false
@@ -1299,7 +1306,7 @@
           "title": "Sandbox",
           "description": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\").",
           "markdownDescription": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\").\n\n- Category: `Tools`\n- Requires restart: `yes`",
-          "$ref": "#/$defs/BooleanOrString"
+          "$ref": "#/$defs/BooleanOrStringOrObject"
         },
         "shell": {
           "title": "Shell",
@@ -2431,14 +2438,45 @@
         }
       ]
     },
-    "BooleanOrString": {
-      "description": "Accepts either a boolean flag or a string command name.",
+    "BooleanOrStringOrObject": {
+      "description": "Accepts either a boolean flag, a string command name, or a configuration object.",
       "anyOf": [
         {
           "type": "boolean"
         },
         {
           "type": "string"
+        },
+        {
+          "type": "object",
+          "description": "Sandbox configuration object.",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enables or disables the sandbox."
+            },
+            "command": {
+              "type": "string",
+              "description": "The sandbox command to use (docker, podman, sandbox-exec, runsc, lxc).",
+              "enum": ["docker", "podman", "sandbox-exec", "runsc", "lxc"]
+            },
+            "image": {
+              "type": "string",
+              "description": "The sandbox image to use."
+            },
+            "allowedPaths": {
+              "type": "array",
+              "description": "A list of absolute host paths that should be accessible within the sandbox.",
+              "items": {
+                "type": "string"
+              }
+            },
+            "networkAccess": {
+              "type": "boolean",
+              "description": "Whether the sandbox should have internet access."
+            }
+          }
         }
       ]
     },
