@@ -15,7 +15,7 @@ import { CoreToolCallStatus } from '@google/gemini-cli-core';
  * These MUST be kept in sync between ToolGroupMessage (for overflow detection)
  * and ToolResultDisplay (for actual truncation).
  */
-export const TOOL_RESULT_ASB_RESERVED_LINE_COUNT = 6;
+export const TOOL_RESULT_STATIC_HEIGHT = 1;
 export const TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT = 2;
 export const TOOL_RESULT_MIN_LINES_SHOWN = 2;
 
@@ -43,7 +43,10 @@ export function calculateToolContentMaxLines(options: {
 
   let contentHeight =
     availableTerminalHeight !== undefined
-      ? Math.max(0, availableTerminalHeight)
+      ? Math.max(
+          0,
+          availableTerminalHeight - TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT,
+        )
       : undefined;
 
   if (maxLinesLimit !== undefined) {
@@ -93,7 +96,10 @@ export function calculateShellMaxLines(options: {
       : undefined;
   }
 
-  const maxLinesBasedOnHeight = Math.max(0, availableTerminalHeight);
+  const maxLinesBasedOnHeight = Math.max(
+    0,
+    availableTerminalHeight - TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT,
+  );
 
   // 3. Handle ASB mode focus expansion.
   // We allow a focused shell in ASB mode to take up the full available height,

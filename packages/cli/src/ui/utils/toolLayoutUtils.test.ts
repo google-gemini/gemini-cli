@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import {
   calculateToolContentMaxLines,
   calculateShellMaxLines,
+  SHELL_CONTENT_OVERHEAD,
 } from './toolLayoutUtils.js';
 import { CoreToolCallStatus } from '@google/gemini-cli-core';
 import {
@@ -41,8 +42,8 @@ describe('toolLayoutUtils', () => {
         isAlternateBuffer: false,
       });
 
-      // Math.max(0, 2) = 2
-      expect(result).toBe(2);
+      // Math.max(0, 2 - 2) = 0
+      expect(result).toBe(0);
     });
 
     it('returns available space directly in constrained terminal (ASB mode)', () => {
@@ -52,8 +53,8 @@ describe('toolLayoutUtils', () => {
         isAlternateBuffer: true,
       });
 
-      // Math.max(0, 4) = 4
-      expect(result).toBe(4);
+      // Math.max(0, 4 - 2) = 2
+      expect(result).toBe(2);
     });
 
     it('returns remaining space if sufficient space exists (Standard mode)', () => {
@@ -63,8 +64,8 @@ describe('toolLayoutUtils', () => {
         isAlternateBuffer: false,
       });
 
-      // Math.max(0, 20) = 20
-      expect(result).toBe(20);
+      // Math.max(0, 20 - 2) = 18
+      expect(result).toBe(18);
     });
 
     it('returns remaining space if sufficient space exists (ASB mode)', () => {
@@ -74,8 +75,8 @@ describe('toolLayoutUtils', () => {
         isAlternateBuffer: true,
       });
 
-      // Math.max(0, 20) = 20
-      expect(result).toBe(20);
+      // Math.max(0, 20 - 2) = 18
+      expect(result).toBe(18);
     });
   });
 
@@ -92,7 +93,7 @@ describe('toolLayoutUtils', () => {
       expect(result).toBeUndefined();
     });
 
-    it('returns ACTIVE_SHELL_MAX_LINES for ASB mode when availableTerminalHeight is undefined', () => {
+    it('returns ACTIVE_SHELL_MAX_LINES - SHELL_CONTENT_OVERHEAD for ASB mode when availableTerminalHeight is undefined', () => {
       const result = calculateShellMaxLines({
         status: CoreToolCallStatus.Executing,
         isAlternateBuffer: true,
@@ -101,7 +102,7 @@ describe('toolLayoutUtils', () => {
         constrainHeight: true,
         isExpandable: false,
       });
-      expect(result).toBe(ACTIVE_SHELL_MAX_LINES);
+      expect(result).toBe(ACTIVE_SHELL_MAX_LINES - SHELL_CONTENT_OVERHEAD);
     });
 
     it('returns undefined for Standard mode when availableTerminalHeight is undefined', () => {
@@ -126,8 +127,8 @@ describe('toolLayoutUtils', () => {
         isExpandable: false,
       });
 
-      // Math.max(0, 2) = 2
-      expect(result).toBe(2);
+      // Math.max(0, 2 - 2) = 0
+      expect(result).toBe(0);
     });
 
     it('handles small availableTerminalHeight gracefully without overflow in ASB mode', () => {
@@ -140,8 +141,8 @@ describe('toolLayoutUtils', () => {
         isExpandable: false,
       });
 
-      // Math.max(0, 6) = 6
-      expect(result).toBe(6);
+      // Math.max(0, 6 - 2) = 4
+      expect(result).toBe(4);
     });
 
     it('handles negative availableTerminalHeight gracefully', () => {
@@ -167,11 +168,11 @@ describe('toolLayoutUtils', () => {
         isExpandable: false,
       });
 
-      // 30
-      expect(result).toBe(30);
+      // 30 - 2 = 28
+      expect(result).toBe(28);
     });
 
-    it('falls back to COMPLETED_SHELL_MAX_LINES for completed shells if space allows', () => {
+    it('falls back to COMPLETED_SHELL_MAX_LINES - SHELL_CONTENT_OVERHEAD for completed shells if space allows', () => {
       const result = calculateShellMaxLines({
         status: CoreToolCallStatus.Success,
         isAlternateBuffer: false,
@@ -181,10 +182,10 @@ describe('toolLayoutUtils', () => {
         isExpandable: false,
       });
 
-      expect(result).toBe(COMPLETED_SHELL_MAX_LINES);
+      expect(result).toBe(COMPLETED_SHELL_MAX_LINES - SHELL_CONTENT_OVERHEAD);
     });
 
-    it('falls back to ACTIVE_SHELL_MAX_LINES for executing shells if space allows', () => {
+    it('falls back to ACTIVE_SHELL_MAX_LINES - SHELL_CONTENT_OVERHEAD for executing shells if space allows', () => {
       const result = calculateShellMaxLines({
         status: CoreToolCallStatus.Executing,
         isAlternateBuffer: false,
@@ -194,7 +195,7 @@ describe('toolLayoutUtils', () => {
         isExpandable: false,
       });
 
-      expect(result).toBe(ACTIVE_SHELL_MAX_LINES);
+      expect(result).toBe(ACTIVE_SHELL_MAX_LINES - SHELL_CONTENT_OVERHEAD);
     });
   });
 });
