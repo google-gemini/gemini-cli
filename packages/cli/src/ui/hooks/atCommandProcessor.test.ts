@@ -13,7 +13,11 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
-import { handleAtCommand } from './atCommandProcessor.js';
+import {
+  handleAtCommand,
+  escapeAtSymbols,
+  unescapeLiteralAt,
+} from './atCommandProcessor.js';
 import {
   FileDiscoveryService,
   GlobTool,
@@ -1479,5 +1483,58 @@ describe('handleAtCommand', () => {
     expect(result.processedQuery).toContainEqual(
       expect.objectContaining({ text: expectedNudge }),
     );
+  });
+});
+
+describe('escapeAtSymbols', () => {
+  it('escapes a bare @ symbol', () => {
+    expect(escapeAtSymbols('test@domain.com')).toBe('test\\@domain.com');
+  });
+
+  it('escapes a leading @ symbol', () => {
+    expect(escapeAtSymbols('@scope/pkg')).toBe('\\@scope/pkg');
+  });
+
+  it('escapes multiple @ symbols', () => {
+    expect(escapeAtSymbols('a@b and c@d')).toBe('a\\@b and c\\@d');
+  });
+
+  it('does not double-escape an already escaped @', () => {
+    expect(escapeAtSymbols('test\\@domain.com')).toBe('test\\@domain.com');
+  });
+
+  it('returns text with no @ unchanged', () => {
+    expect(escapeAtSymbols('hello world')).toBe('hello world');
+  });
+
+  it('returns empty string unchanged', () => {
+    expect(escapeAtSymbols('')).toBe('');
+  });
+});
+
+describe('unescapeLiteralAt', () => {
+  it('unescapes \\@ to @', () => {
+    expect(unescapeLiteralAt('test\\@domain.com')).toBe('test@domain.com');
+  });
+
+  it('unescapes a leading \\@', () => {
+    expect(unescapeLiteralAt('\\@scope/pkg')).toBe('@scope/pkg');
+  });
+
+  it('unescapes multiple \\@ sequences', () => {
+    expect(unescapeLiteralAt('a\\@b and c\\@d')).toBe('a@b and c@d');
+  });
+
+  it('returns text with no \\@ unchanged', () => {
+    expect(unescapeLiteralAt('hello world')).toBe('hello world');
+  });
+
+  it('returns empty string unchanged', () => {
+    expect(unescapeLiteralAt('')).toBe('');
+  });
+
+  it('roundtrips correctly with escapeAtSymbols', () => {
+    const input = 'user@example.com and @scope/pkg';
+    expect(unescapeLiteralAt(escapeAtSymbols(input))).toBe(input);
   });
 });

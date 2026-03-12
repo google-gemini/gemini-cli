@@ -303,6 +303,13 @@
           "default": false,
           "type": "boolean"
         },
+        "escapePastedAtSymbols": {
+          "title": "Escape Pasted @ Symbols",
+          "description": "When enabled, @ symbols in pasted text are escaped to prevent unintended @path expansion.",
+          "markdownDescription": "When enabled, @ symbols in pasted text are escaped to prevent unintended @path expansion.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "showShortcutsHint": {
           "title": "Show Shortcuts Hint",
           "description": "Show the \"? for shortcuts\" hint above the input.",
