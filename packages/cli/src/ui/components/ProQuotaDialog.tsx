@@ -9,6 +9,7 @@ import { Box, Text } from 'ink';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { theme } from '../semantic-colors.js';
 import { AuthType } from '@google/gemini-cli-core';
+import { isUltraTier } from '../../utils/tierUtils.js';
 
 interface ProQuotaDialogProps {
   failedModel: string;
@@ -49,7 +50,7 @@ export function ProQuotaDialog({
       },
     ];
   } else if (isModelNotFoundError || isTerminalQuotaError) {
-    const isUltra = tierName?.toLowerCase().includes('ultra');
+    const isUltra = isUltraTier(tierName);
 
     // free users and out of quota users on G1 pro and Cloud Console gets an option to upgrade
     items = [

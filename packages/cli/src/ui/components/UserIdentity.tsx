@@ -13,6 +13,7 @@ import {
   UserAccountManager,
   AuthType,
 } from '@google/gemini-cli-core';
+import { isUltraTier } from '../../utils/tierUtils.js';
 
 interface UserIdentityProps {
   config: Config;
@@ -33,10 +34,7 @@ export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
     [config, authType],
   );
 
-  const isUltra = useMemo(
-    () => tierName?.toLowerCase().includes('ultra'),
-    [tierName],
-  );
+  const isUltra = useMemo(() => isUltraTier(tierName), [tierName]);
 
   if (!authType) {
     return null;

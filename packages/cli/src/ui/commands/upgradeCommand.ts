@@ -10,6 +10,7 @@ import {
   shouldLaunchBrowser,
   UPGRADE_URL_PAGE,
 } from '@google/gemini-cli-core';
+import { isUltraTier } from '../../utils/tierUtils.js';
 import { CommandKind, type SlashCommand } from './types.js';
 
 /**
@@ -36,7 +37,7 @@ export const upgradeCommand: SlashCommand = {
     }
 
     const tierName = context.services.config?.getUserTierName();
-    if (tierName?.toLowerCase().includes('ultra')) {
+    if (isUltraTier(tierName)) {
       return {
         type: 'message',
         messageType: 'info',
