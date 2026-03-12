@@ -212,12 +212,12 @@ describe('FileTokenStorage', () => {
   });
 
   describe('deleteCredentials', () => {
-    it('should throw when credentials do not exist', async () => {
+    it('should not throw when credentials do not exist', async () => {
       mockFs.readFile.mockRejectedValue({ code: 'ENOENT' });
 
-      await expect(storage.deleteCredentials('test-server')).rejects.toThrow(
-        'No credentials found for test-server',
-      );
+      await expect(
+        storage.deleteCredentials('test-server'),
+      ).resolves.not.toThrow();
     });
 
     it('should delete file when last credential is removed', async () => {
