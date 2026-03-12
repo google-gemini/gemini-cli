@@ -33,17 +33,10 @@ export function calculateToolContentMaxLines(options: {
   isAlternateBuffer: boolean;
   maxLinesLimit?: number;
 }): number | undefined {
-  const { availableTerminalHeight, isAlternateBuffer, maxLinesLimit } = options;
-
-  const reservedLines = isAlternateBuffer
-    ? TOOL_RESULT_ASB_RESERVED_LINE_COUNT
-    : TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT;
+  const { availableTerminalHeight, maxLinesLimit } = options;
 
   let contentHeight = availableTerminalHeight
-    ? Math.max(
-        0,
-        availableTerminalHeight - TOOL_RESULT_STATIC_HEIGHT - reservedLines,
-      )
+    ? Math.max(TOOL_RESULT_STATIC_HEIGHT, availableTerminalHeight)
     : undefined;
 
   if (maxLinesLimit) {
@@ -91,14 +84,7 @@ export function calculateShellMaxLines(options: {
     return isAlternateBuffer ? ACTIVE_SHELL_MAX_LINES : undefined;
   }
 
-  const reservedLines = isAlternateBuffer
-    ? TOOL_RESULT_ASB_RESERVED_LINE_COUNT
-    : TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT;
-
-  const maxLinesBasedOnHeight = Math.max(
-    0,
-    availableTerminalHeight - TOOL_RESULT_STATIC_HEIGHT - reservedLines,
-  );
+  const maxLinesBasedOnHeight = Math.max(1, availableTerminalHeight);
 
   // 3. Handle ASB mode focus expansion.
   // We allow a focused shell in ASB mode to take up the full available height,

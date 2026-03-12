@@ -23,10 +23,7 @@ import { Scrollable } from '../shared/Scrollable.js';
 import { ScrollableList } from '../shared/ScrollableList.js';
 import { SCROLL_TO_ITEM_END } from '../shared/VirtualizedList.js';
 import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
-import {
-  calculateToolContentMaxLines,
-  TOOL_RESULT_MIN_LINES_SHOWN,
-} from '../../utils/toolLayoutUtils.js';
+import { calculateToolContentMaxLines } from '../../utils/toolLayoutUtils.js';
 import { SubagentProgressDisplay } from './SubagentProgressDisplay.js';
 
 // Large threshold to ensure we don't cause performance issues for very large
@@ -63,11 +60,6 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     isAlternateBuffer,
     maxLinesLimit: maxLines,
   });
-
-  const effectiveMaxHeight =
-    availableHeight !== undefined
-      ? Math.max(TOOL_RESULT_MIN_LINES_SHOWN, availableHeight)
-      : undefined;
 
   const combinedPaddingAndBorderWidth = 4;
   const childWidth = terminalWidth - combinedPaddingAndBorderWidth;
@@ -140,7 +132,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   if (isAlternateBuffer && Array.isArray(truncatedResultDisplay)) {
     // If availableHeight is undefined, fallback to a safe default to prevents infinite loop
     // where Container grows -> List renders more -> Container grows.
-    const limit = maxLines ?? effectiveMaxHeight ?? ACTIVE_SHELL_MAX_LINES;
+    const limit = maxLines ?? availableHeight ?? ACTIVE_SHELL_MAX_LINES;
     const listHeight = Math.min(
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       (truncatedResultDisplay as AnsiOutput).length,
@@ -213,7 +205,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         diffContent={(truncatedResultDisplay as FileDiffResult).fileDiff}
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         filename={(truncatedResultDisplay as FileDiffResult).fileName}
-        availableTerminalHeight={effectiveMaxHeight}
+        availableTerminalHeight={availableHeight}
         terminalWidth={childWidth}
       />
     );
@@ -227,7 +219,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         data={truncatedResultDisplay as AnsiOutput}
         availableTerminalHeight={
-          isAlternateBuffer ? undefined : effectiveMaxHeight
+          isAlternateBuffer ? undefined : availableHeight
         }
         width={childWidth}
         maxLines={isAlternateBuffer ? undefined : maxLines}
@@ -241,7 +233,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     return (
       <Scrollable
         width={childWidth}
-        maxHeight={maxLines ?? effectiveMaxHeight}
+        maxHeight={maxLines ?? availableHeight}
         hasFocus={hasFocus} // Allow scrolling via keyboard (Shift+Up/Down)
         scrollToBottom={true}
       >
@@ -253,7 +245,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   return (
     <Box width={childWidth} flexDirection="column">
       <MaxSizedBox
-        maxHeight={effectiveMaxHeight}
+        maxHeight={availableHeight}
         maxWidth={childWidth}
         additionalHiddenLinesCount={hiddenLinesCount}
       >

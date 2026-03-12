@@ -191,7 +191,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         maxLinesLimit: maxLines,
       });
 
-      if (contentMaxLines === undefined) return false;
+      if (!contentMaxLines) return false;
 
       if (typeof tool.resultDisplay === 'string') {
         const text = tool.resultDisplay;
