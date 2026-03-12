@@ -752,6 +752,11 @@ describe('mcp-client', () => {
           param1: {
             $ref: '#/$defs/MyType',
           },
+          wait_for_previous: {
+            type: 'boolean',
+            description:
+              'Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.',
+          },
         },
         $defs: {
           MyType: {
@@ -2053,7 +2058,6 @@ describe('mcp-client', () => {
       expect(callArgs.env!['GEMINI_CLI_EXT_VAR']).toBe('ext-value');
       expect(callArgs.env!['RESOLVED_VAR']).toBe('ext-value');
     });
-
     it('should expand environment variables in mcpServerConfig.env and not redact them', async () => {
       const mockedTransport = vi
         .spyOn(SdkClientStdioLib, 'StdioClientTransport')

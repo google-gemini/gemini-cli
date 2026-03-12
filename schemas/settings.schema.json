@@ -32,6 +32,16 @@
         "type": "string"
       }
     },
+    "adminPolicyPaths": {
+      "title": "Admin Policy Paths",
+      "description": "Additional admin policy files or directories to load.",
+      "markdownDescription": "Additional admin policy files or directories to load.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `[]`",
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "general": {
       "title": "General",
       "description": "General application settings.",
@@ -54,8 +64,8 @@
         },
         "defaultApprovalMode": {
           "title": "Default Approval Mode",
-          "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.",
-          "markdownDescription": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. 'yolo' is not supported yet.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `default`",
+          "description": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. YOLO mode (auto-approve all actions) can only be enabled via command line (--yolo or --approval-mode=yolo).",
+          "markdownDescription": "The default approval mode for tool execution. 'default' prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is read-only mode. YOLO mode (auto-approve all actions) can only be enabled via command line (--yolo or --approval-mode=yolo).\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `default`",
           "default": "default",
           "type": "string",
           "enum": ["default", "auto_edit", "plan"]
@@ -131,8 +141,8 @@
         "retryFetchErrors": {
           "title": "Retry Fetch Errors",
           "description": "Retry on \"exception TypeError: fetch failed sending request\" errors.",
-          "markdownDescription": "Retry on \"exception TypeError: fetch failed sending request\" errors.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `false`",
-          "default": false,
+          "markdownDescription": "Retry on \"exception TypeError: fetch failed sending request\" errors.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "maxAttempts": {
@@ -405,8 +415,8 @@
         },
         "showUserIdentity": {
           "title": "Show User Identity",
-          "description": "Show the logged-in user's identity (e.g. email) in the UI.",
-          "markdownDescription": "Show the logged-in user's identity (e.g. email) in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "description": "Show the signed-in user's identity (e.g. email) in the UI.",
+          "markdownDescription": "Show the signed-in user's identity (e.g. email) in the UI.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
@@ -1170,6 +1180,13 @@
               "description": "Model override for the visual agent.",
               "markdownDescription": "Model override for the visual agent.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
               "type": "string"
+            },
+            "disableUserInput": {
+              "title": "Disable User Input",
+              "description": "Disable user input on browser window during automation.",
+              "markdownDescription": "Disable user input on browser window during automation.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
             }
           },
           "additionalProperties": false
@@ -1222,8 +1239,8 @@
         },
         "loadMemoryFromIncludeDirectories": {
           "title": "Load Memory From Include Directories",
-          "description": "Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.",
-          "markdownDescription": "Controls how /memory refresh loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.\n\n- Category: `Context`\n- Requires restart: `no`\n- Default: `false`",
+          "description": "Controls how /memory reload loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.",
+          "markdownDescription": "Controls how /memory reload loads GEMINI.md files. When true, include directories are scanned; when false, only the current directory is used.\n\n- Category: `Context`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -1289,7 +1306,7 @@
           "title": "Sandbox",
           "description": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\").",
           "markdownDescription": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\").\n\n- Category: `Tools`\n- Requires restart: `yes`",
-          "$ref": "#/$defs/BooleanOrString"
+          "$ref": "#/$defs/BooleanOrStringOrObject"
         },
         "shell": {
           "title": "Shell",
@@ -1458,6 +1475,13 @@
           "title": "Allow Permanent Tool Approval",
           "description": "Enable the \"Allow for all future sessions\" option in tool confirmation dialogs.",
           "markdownDescription": "Enable the \"Allow for all future sessions\" option in tool confirmation dialogs.\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "autoAddToPolicyByDefault": {
+          "title": "Auto-add to Policy by Default",
+          "description": "When enabled, the \"Allow for all future sessions\" option becomes the default choice for low-risk tools in trusted workspaces.",
+          "markdownDescription": "When enabled, the \"Allow for all future sessions\" option becomes the default choice for low-risk tools in trusted workspaces.\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -1682,6 +1706,13 @@
           "default": false,
           "type": "boolean"
         },
+        "extensionRegistryURI": {
+          "title": "Extension Registry URI",
+          "description": "The URI (web URL or local file path) of the extension registry.",
+          "markdownDescription": "The URI (web URL or local file path) of the extension registry.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `https://geminicli.com/extensions.json`",
+          "default": "https://geminicli.com/extensions.json",
+          "type": "string"
+        },
         "extensionReloading": {
           "title": "Extension Reloading",
           "description": "Enables extension loading/unloading within the CLI session.",
@@ -1712,9 +1743,9 @@
         },
         "plan": {
           "title": "Plan",
-          "description": "Enable planning features (Plan Mode and tools).",
-          "markdownDescription": "Enable planning features (Plan Mode and tools).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
-          "default": false,
+          "description": "Enable Plan Mode.",
+          "markdownDescription": "Enable Plan Mode.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `true`",
+          "default": true,
           "type": "boolean"
         },
         "taskTracker": {
@@ -1747,8 +1778,8 @@
           "properties": {
             "enabled": {
               "title": "Enable Gemma Model Router",
-              "description": "Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.",
-              "markdownDescription": "Enable the Gemma Model Router. Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+              "description": "Enable the Gemma Model Router (experimental). Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.",
+              "markdownDescription": "Enable the Gemma Model Router (experimental). Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
               "default": false,
               "type": "boolean"
             },
@@ -2407,14 +2438,45 @@
         }
       ]
     },
-    "BooleanOrString": {
-      "description": "Accepts either a boolean flag or a string command name.",
+    "BooleanOrStringOrObject": {
+      "description": "Accepts either a boolean flag, a string command name, or a configuration object.",
       "anyOf": [
         {
           "type": "boolean"
         },
         {
           "type": "string"
+        },
+        {
+          "type": "object",
+          "description": "Sandbox configuration object.",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enables or disables the sandbox."
+            },
+            "command": {
+              "type": "string",
+              "description": "The sandbox command to use (docker, podman, sandbox-exec, runsc, lxc).",
+              "enum": ["docker", "podman", "sandbox-exec", "runsc", "lxc"]
+            },
+            "image": {
+              "type": "string",
+              "description": "The sandbox image to use."
+            },
+            "allowedPaths": {
+              "type": "array",
+              "description": "A list of absolute host paths that should be accessible within the sandbox.",
+              "items": {
+                "type": "string"
+              }
+            },
+            "networkAccess": {
+              "type": "boolean",
+              "description": "Whether the sandbox should have internet access."
+            }
+          }
         }
       ]
     },

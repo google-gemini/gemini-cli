@@ -11,6 +11,7 @@ import {
   type ToolResult,
 } from '../tools/tools.js';
 import type { Config } from '../config/config.js';
+import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import type { AgentDefinition, AgentInputs } from './types.js';
 import { LocalSubagentInvocation } from './local-invocation.js';
 import { RemoteAgentInvocation } from './remote-invocation.js';
@@ -33,12 +34,12 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
    * parameters based on the subagent's input configuration.
    *
    * @param definition The `AgentDefinition` of the subagent to wrap.
-   * @param config The runtime configuration, passed down to the subagent.
+   * @param context The execution context.
    * @param messageBus Optional message bus for policy enforcement.
    */
   constructor(
     private readonly definition: AgentDefinition,
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     messageBus: MessageBus,
   ) {
     super(
@@ -51,6 +52,10 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ true,
     );
+  }
+
+  private get config(): Config {
+    return this.context.config;
   }
 
   /**
@@ -94,7 +99,7 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
 
     return new LocalSubagentInvocation(
       definition,
-      this.config,
+      this.context,
       params,
       effectiveMessageBus,
       _toolName,

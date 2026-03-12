@@ -128,6 +128,7 @@ export interface ResumedSessionData {
 export class ChatRecordingService {
   private conversationFile: string | null = null;
   private cachedLastConvData: string | null = null;
+  private cachedConversation: ConversationRecord | null = null;
   private sessionId: string;
   private projectHash: string;
   private kind?: 'main' | 'subagent';
@@ -167,8 +168,10 @@ export class ChatRecordingService {
 
         // Clear any cached data to force fresh reads
         this.cachedLastConvData = null;
+        this.cachedConversation = null;
       } else {
         // Create new session
+        this.sessionId = this.config.getSessionId();
         const chatsDir = path.join(
           this.config.storage.getProjectTempDir(),
           'chats',
@@ -308,17 +311,19 @@ export class ChatRecordingService {
         tool: respUsageMetadata.toolUsePromptTokenCount ?? 0,
         total: respUsageMetadata.totalTokenCount ?? 0,
       };
-      this.updateConversation((conversation) => {
-        const lastMsg = this.getLastMessage(conversation);
-        // If the last message already has token info, it's because this new token info is for a
-        // new message that hasn't been recorded yet.
-        if (lastMsg && lastMsg.type === 'gemini' && !lastMsg.tokens) {
-          lastMsg.tokens = tokens;
-          this.queuedTokens = null;
-        } else {
-          this.queuedTokens = tokens;
-        }
-      });
+      const conversation = this.readConversation();
+      const lastMsg = this.getLastMessage(conversation);
+      // If the last message already has token info, it's because this new token info is for a
+      // new message that hasn't been recorded yet.
+      if (lastMsg && lastMsg.type === 'gemini' && !lastMsg.tokens) {
+        lastMsg.tokens = tokens;
+        this.queuedTokens = null;
+        this.writeConversation(conversation);
+      } else {
+        // Only queue tokens in memory; no disk I/O needed since the
+        // conversation record itself hasn't changed.
+        this.queuedTokens = tokens;
+      }
     } catch (error) {
       debugLogger.error(
         'Error updating message tokens in chat history.',
@@ -342,7 +347,8 @@ export class ChatRecordingService {
       return {
         ...toolCall,
         displayName: toolInstance?.displayName || toolCall.name,
-        description: toolInstance?.description || '',
+        description:
+          toolCall.description?.trim() || toolInstance?.description || '',
         renderOutputAsMarkdown: toolInstance?.isOutputMarkdown || false,
       };
     });
@@ -427,12 +433,32 @@ export class ChatRecordingService {
 
   /**
    * Loads up the conversation record from disk.
+   *
+   * NOTE: The returned object is the live in-memory cache reference.
+   * Any mutations to it will be visible to all subsequent reads.
+   * Callers that mutate the result MUST call writeConversation() to
+   * persist the changes to disk.
    */
   private readConversation(): ConversationRecord {
+    if (this.cachedConversation) {
+      return this.cachedConversation;
+    }
     try {
       this.cachedLastConvData = fs.readFileSync(this.conversationFile!, 'utf8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return JSON.parse(this.cachedLastConvData);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      this.cachedConversation = JSON.parse(this.cachedLastConvData);
+      if (!this.cachedConversation) {
+        // File is corrupt or contains "null". Fallback to an empty conversation.
+        this.cachedConversation = {
+          sessionId: this.sessionId,
+          projectHash: this.projectHash,
+          startTime: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+          messages: [],
+          kind: this.kind,
+        };
+      }
+      return this.cachedConversation;
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
@@ -441,7 +467,7 @@ export class ChatRecordingService {
       }
 
       // Placeholder empty conversation if file doesn't exist.
-      return {
+      this.cachedConversation = {
         sessionId: this.sessionId,
         projectHash: this.projectHash,
         startTime: new Date().toISOString(),
@@ -449,6 +475,7 @@ export class ChatRecordingService {
         messages: [],
         kind: this.kind,
       };
+      return this.cachedConversation;
     }
   }
 
@@ -464,15 +491,19 @@ export class ChatRecordingService {
       // Don't write the file yet until there's at least one message.
       if (conversation.messages.length === 0 && !allowEmpty) return;
 
-      // Only write the file if this change would change the file.
-      if (this.cachedLastConvData !== JSON.stringify(conversation, null, 2)) {
-        conversation.lastUpdated = new Date().toISOString();
-        const newContent = JSON.stringify(conversation, null, 2);
-        this.cachedLastConvData = newContent;
-        // Ensure directory exists before writing (handles cases where temp dir was cleaned)
-        fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
-        fs.writeFileSync(this.conversationFile, newContent);
-      }
+      const newContent = JSON.stringify(conversation, null, 2);
+      // Skip the disk write if nothing actually changed (e.g.
+      // updateMessagesFromHistory found no matching tool calls to update).
+      // Compare before updating lastUpdated so the timestamp doesn't
+      // cause a false diff.
+      if (this.cachedLastConvData === newContent) return;
+      this.cachedConversation = conversation;
+      conversation.lastUpdated = new Date().toISOString();
+      const contentToWrite = JSON.stringify(conversation, null, 2);
+      this.cachedLastConvData = contentToWrite;
+      // Ensure directory exists before writing (handles cases where temp dir was cleaned)
+      fs.mkdirSync(path.dirname(this.conversationFile), { recursive: true });
+      fs.writeFileSync(this.conversationFile, contentToWrite);
     } catch (error) {
       // Handle disk full (ENOSPC) gracefully - disable recording but allow conversation to continue
       if (
@@ -482,6 +513,7 @@ export class ChatRecordingService {
         (error as NodeJS.ErrnoException).code === 'ENOSPC'
       ) {
         this.conversationFile = null;
+        this.cachedConversation = null;
         debugLogger.warn(ENOSPC_WARNING_MESSAGE);
         return; // Don't throw - allow the conversation to continue
       }
@@ -634,7 +666,7 @@ export class ChatRecordingService {
    * Updates the conversation history based on the provided API Content array.
    * This is used to persist changes made to the history (like masking) back to disk.
    */
-  updateMessagesFromHistory(history: Content[]): void {
+  updateMessagesFromHistory(history: readonly Content[]): void {
     if (!this.conversationFile) return;
 
     try {

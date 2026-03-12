@@ -97,7 +97,7 @@ export function useToolScheduler(
   const scheduler = useMemo(
     () =>
       new Scheduler({
-        config,
+        context: config,
         messageBus,
         getPreferredEditor: () => getPreferredEditorRef.current(),
         schedulerId: ROOT_SCHEDULER_ID,
@@ -116,6 +116,20 @@ export function useToolScheduler(
   useEffect(() => {
     const handler = (event: ToolCallsUpdateMessage) => {
       const isRoot = event.schedulerId === ROOT_SCHEDULER_ID;
+
+      // Update output timer for UI spinners (Side Effect)
+      const hasExecuting = event.toolCalls.some(
+        (tc) =>
+          tc.status === CoreToolCallStatus.Executing ||
+          ((tc.status === CoreToolCallStatus.Success ||
+            tc.status === CoreToolCallStatus.Error) &&
+            'tailToolCallRequest' in tc &&
+            tc.tailToolCallRequest != null),
+      );
+
+      if (hasExecuting) {
+        setLastToolOutputTime(Date.now());
+      }
 
       setToolCallsMap((prev) => {
         const prevCalls = prev[event.schedulerId] ?? [];
@@ -151,20 +165,6 @@ export function useToolScheduler(
           [event.schedulerId]: adapted,
         };
       });
-
-      // Update output timer for UI spinners (Side Effect)
-      const hasExecuting = event.toolCalls.some(
-        (tc) =>
-          tc.status === CoreToolCallStatus.Executing ||
-          ((tc.status === CoreToolCallStatus.Success ||
-            tc.status === CoreToolCallStatus.Error) &&
-            'tailToolCallRequest' in tc &&
-            tc.tailToolCallRequest != null),
-      );
-
-      if (hasExecuting) {
-        setLastToolOutputTime(Date.now());
-      }
     };
 
     messageBus.subscribe(MessageBusType.TOOL_CALLS_UPDATE, handler);

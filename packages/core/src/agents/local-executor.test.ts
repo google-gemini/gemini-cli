@@ -17,10 +17,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { LocalAgentExecutor, type ActivityCallback } from './local-executor.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import {
-  DiscoveredMCPTool,
-  MCP_QUALIFIED_NAME_SEPARATOR,
-} from '../tools/mcp-tool.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { LSTool } from '../tools/ls.js';
 import { LS_TOOL_NAME, READ_FILE_TOOL_NAME } from '../tools/tool-names.js';
 import {
@@ -36,6 +33,7 @@ import {
   type PartListUnion,
   type Tool,
   type CallableTool,
+  type FunctionDeclaration,
 } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
@@ -310,6 +308,11 @@ describe('LocalAgentExecutor', () => {
     vi.useFakeTimers();
 
     mockConfig = makeFakeConfig();
+    // .config is already set correctly by the getter on the instance.
+    Object.defineProperty(mockConfig, 'promptId', {
+      get: () => 'test-prompt-id',
+      configurable: true,
+    });
     parentToolRegistry = new ToolRegistry(
       mockConfig,
       mockConfig.getMessageBus(),
@@ -322,7 +325,9 @@ describe('LocalAgentExecutor', () => {
     );
     parentToolRegistry.registerTool(MOCK_TOOL_NOT_ALLOWED);
 
-    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(parentToolRegistry);
+    vi.spyOn(mockConfig, 'toolRegistry', 'get').mockReturnValue(
+      parentToolRegistry,
+    );
     vi.spyOn(mockConfig, 'getAgentRegistry').mockReturnValue({
       getAllAgentNames: () => [],
     } as unknown as AgentRegistry);
@@ -385,7 +390,10 @@ describe('LocalAgentExecutor', () => {
 
     it('should use parentPromptId from context to create agentId', async () => {
       const parentId = 'parent-id';
-      mockedPromptIdContext.getStore.mockReturnValue(parentId);
+      Object.defineProperty(mockConfig, 'promptId', {
+        get: () => parentId,
+        configurable: true,
+      });
 
       const definition = createTestDefinition();
       const executor = await LocalAgentExecutor.create(
@@ -503,7 +511,7 @@ describe('LocalAgentExecutor', () => {
     it('should automatically qualify MCP tools in agent definitions', async () => {
       const serverName = 'mcp-server';
       const toolName = 'mcp-tool';
-      const qualifiedName = `${serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${toolName}`;
+      const qualifiedName = `mcp_${serverName}_${toolName}`;
 
       const mockMcpTool = {
         tool: vi.fn(),
@@ -552,6 +560,34 @@ describe('LocalAgentExecutor', () => {
       expect(agentRegistry2.getTool(qualifiedName)).toBeDefined();
 
       getToolSpy.mockRestore();
+    });
+
+    it('should not duplicate schemas when instantiated tools are provided in toolConfig', async () => {
+      // Create an instantiated mock tool
+      const instantiatedTool = new MockTool({ name: 'instantiated_tool' });
+
+      // Create an agent definition containing the instantiated tool
+      const definition = createTestDefinition([instantiatedTool]);
+
+      // Create the executor
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Extract the prepared tools list using the private method
+      const toolsList = (
+        executor as unknown as { prepareToolsList: () => FunctionDeclaration[] }
+      ).prepareToolsList();
+
+      // Filter for the specific tool schema
+      const foundSchemas = (
+        toolsList as unknown as FunctionDeclaration[]
+      ).filter((t: FunctionDeclaration) => t.name === 'instantiated_tool');
+
+      // Assert that there is exactly ONE schema for this tool
+      expect(foundSchemas).toHaveLength(1);
     });
   });
 
@@ -930,11 +966,11 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'ERROR',
-          data: {
+          data: expect.objectContaining({
             context: 'tool_call',
             name: TASK_COMPLETE_TOOL_NAME,
             error: expectedError,
-          },
+          }),
         }),
       );
 
@@ -1216,11 +1252,11 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'ERROR',
-          data: {
+          data: expect.objectContaining({
             context: 'tool_call',
             name: TASK_COMPLETE_TOOL_NAME,
             error: expect.stringContaining('Output validation failed'),
-          },
+          }),
         }),
       );
 
@@ -1341,11 +1377,11 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'ERROR',
-          data: {
+          data: expect.objectContaining({
             context: 'tool_call',
             name: LS_TOOL_NAME,
             error: toolErrorMessage,
-          },
+          }),
         }),
       );
 
@@ -1702,15 +1738,17 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'THOUGHT_CHUNK',
-          data: {
+          data: expect.objectContaining({
             text: 'Execution limit reached (MAX_TURNS). Attempting one final recovery turn with a grace period.',
-          },
+          }),
         }),
       );
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'THOUGHT_CHUNK',
-          data: { text: 'Graceful recovery succeeded.' },
+          data: expect.objectContaining({
+            text: 'Graceful recovery succeeded.',
+          }),
         }),
       );
     });
@@ -1787,9 +1825,9 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'THOUGHT_CHUNK',
-          data: {
+          data: expect.objectContaining({
             text: 'Execution limit reached (ERROR_NO_COMPLETE_TASK_CALL). Attempting one final recovery turn with a grace period.',
-          },
+          }),
         }),
       );
     });
@@ -1885,9 +1923,9 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'THOUGHT_CHUNK',
-          data: {
+          data: expect.objectContaining({
             text: 'Execution limit reached (TIMEOUT). Attempting one final recovery turn with a grace period.',
-          },
+          }),
         }),
       );
     });
@@ -2053,7 +2091,7 @@ describe('LocalAgentExecutor', () => {
         vi.spyOn(configWithHints, 'getAgentRegistry').mockReturnValue({
           getAllAgentNames: () => [],
         } as unknown as AgentRegistry);
-        vi.spyOn(configWithHints, 'getToolRegistry').mockReturnValue(
+        vi.spyOn(configWithHints, 'toolRegistry', 'get').mockReturnValue(
           parentToolRegistry,
         );
       });

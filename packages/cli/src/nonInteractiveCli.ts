@@ -211,7 +211,7 @@ export async function runNonInteractive({
 
       const geminiClient = config.getGeminiClient();
       const scheduler = new Scheduler({
-        config,
+        context: config,
         messageBus: config.getMessageBus(),
         getPreferredEditor: () => undefined,
         schedulerId: ROOT_SCHEDULER_ID,
