@@ -539,6 +539,7 @@ export interface ConfigParameters {
     maxFileCount?: number;
     searchTimeout?: number;
     customIgnoreFilePaths?: string[];
+    customExcludePatterns?: string[];
   };
   checkpointing?: boolean;
   proxy?: string;
@@ -696,6 +697,7 @@ export class Config implements McpContext, AgentLoopContext {
     maxFileCount: number;
     searchTimeout: number;
     customIgnoreFilePaths: string[];
+    customExcludePatterns: string[];
   };
   private fileDiscoveryService: FileDiscoveryService | null = null;
   private gitService: GitService | undefined = undefined;
@@ -913,6 +915,7 @@ export class Config implements McpContext, AgentLoopContext {
         DEFAULT_FILE_FILTERING_OPTIONS.searchTimeout ??
         5000,
       customIgnoreFilePaths: params.fileFiltering?.customIgnoreFilePaths ?? [],
+      customExcludePatterns: params.fileFiltering?.customExcludePatterns ?? [],
     };
     this.checkpointing = params.checkpointing ?? false;
     this.proxy = params.proxy;
@@ -2288,18 +2291,12 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
-   * Gets custom file exclusion patterns from configuration.
-   * TODO: This is a placeholder implementation. In the future, this could
-   * read from settings files, CLI arguments, or environment variables.
+   * Gets custom file exclusion glob patterns from configuration.
+   * These patterns are applied on top of built-in defaults in file search
+   * and tool operations (e.g. read-many-files, glob).
    */
   getCustomExcludes(): string[] {
-    // Placeholder implementation - returns empty array for now
-    // Future implementation could read from:
-    // - User settings file
-    // - Project-specific configuration
-    // - Environment variables
-    // - CLI arguments
-    return [];
+    return this.fileFiltering.customExcludePatterns;
   }
 
   getCheckpointingEnabled(): boolean {

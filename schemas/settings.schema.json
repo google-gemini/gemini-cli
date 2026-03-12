@@ -1295,6 +1295,16 @@
               "items": {
                 "type": "string"
               }
+            },
+            "customExcludePatterns": {
+              "title": "Custom Exclude Patterns",
+              "description": "Additional glob patterns to exclude from file searches and tool operations (e.g. read-many-files, glob). Patterns are applied on top of the built-in defaults. Example: [\"**/generated/**\", \"**/*.min.js\"].",
+              "markdownDescription": "Additional glob patterns to exclude from file searches and tool operations (e.g. read-many-files, glob). Patterns are applied on top of the built-in defaults. Example: `[\"**/generated/**\", \"**/*.min.js\"]`.\n\n- Category: `Context`\n- Requires restart: `yes`\n- Default: `[]`",
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
           "additionalProperties": false

@@ -296,6 +296,49 @@ describe('Server Config (config.ts)', () => {
     });
   });
 
+  describe('getCustomExcludes', () => {
+    it('should return empty array by default', () => {
+      const config = new Config(baseParams);
+      expect(config.getCustomExcludes()).toEqual([]);
+    });
+
+    it('should return customExcludePatterns when provided', () => {
+      const patterns = ['**/generated/**', '**/*.min.js'];
+      const config = new Config({
+        ...baseParams,
+        fileFiltering: {
+          customExcludePatterns: patterns,
+        },
+      });
+      expect(config.getCustomExcludes()).toEqual(patterns);
+    });
+
+    it('should return empty array when fileFiltering is provided without customExcludePatterns', () => {
+      const config = new Config({
+        ...baseParams,
+        fileFiltering: {
+          respectGitIgnore: false,
+        },
+      });
+      expect(config.getCustomExcludes()).toEqual([]);
+    });
+
+    it('should preserve all provided patterns', () => {
+      const patterns = [
+        '**/vendor/**',
+        '**/*.min.js',
+        '**/generated/**',
+        '**/.cache/**',
+      ];
+      const config = new Config({
+        ...baseParams,
+        fileFiltering: { customExcludePatterns: patterns },
+      });
+      expect(config.getCustomExcludes()).toHaveLength(4);
+      patterns.forEach((p) => expect(config.getCustomExcludes()).toContain(p));
+    });
+  });
+
   beforeEach(() => {
     // Reset mocks if necessary
     vi.clearAllMocks();
