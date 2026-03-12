@@ -5,22 +5,29 @@
  */
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Mock, MockInstance } from 'vitest';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  type Mock,
+  type MockInstance,
+} from 'vitest';
 import { act } from 'react';
 import { renderHookWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useGeminiStream } from './useGeminiStream.js';
 import { useKeypress } from './useKeypress.js';
 import * as atCommandProcessor from './atCommandProcessor.js';
-import type {
-  TrackedToolCall,
-  TrackedCompletedToolCall,
-  TrackedExecutingToolCall,
-  TrackedCancelledToolCall,
-  TrackedWaitingToolCall,
+import {
+  useToolScheduler,
+  type TrackedToolCall,
+  type TrackedCompletedToolCall,
+  type TrackedExecutingToolCall,
+  type TrackedCancelledToolCall,
+  type TrackedWaitingToolCall,
 } from './useToolScheduler.js';
-import { useToolScheduler } from './useToolScheduler.js';
 import type {
   Config,
   EditorType,
@@ -50,6 +57,7 @@ import { MessageType, StreamingState } from '../types.js';
 
 import type { LoadedSettings } from '../../config/settings.js';
 import { findLastSafeSplitPoint } from '../utils/markdownUtilities.js';
+import { theme } from '../semantic-colors.js';
 
 // --- MOCKS ---
 const mockSendMessageStream = vi
@@ -95,6 +103,25 @@ const MockedUserPromptEvent = vi.hoisted(() =>
   vi.fn().mockImplementation(() => {}),
 );
 const mockParseAndFormatApiError = vi.hoisted(() => vi.fn());
+const mockIsBackgroundExecutionData = vi.hoisted(
+  () =>
+    (data: unknown): data is { pid?: number } => {
+      if (typeof data !== 'object' || data === null) {
+        return false;
+      }
+      const value = data as {
+        pid?: unknown;
+        command?: unknown;
+        initialOutput?: unknown;
+      };
+      return (
+        (value.pid === undefined || typeof value.pid === 'number') &&
+        (value.command === undefined || typeof value.command === 'string') &&
+        (value.initialOutput === undefined ||
+          typeof value.initialOutput === 'string')
+      );
+    },
+);
 
 const MockValidationRequiredError = vi.hoisted(
   () =>
@@ -120,6 +147,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actualCoreModule = (await importOriginal()) as any;
   return {
     ...actualCoreModule,
+    isBackgroundExecutionData: mockIsBackgroundExecutionData,
     GitService: vi.fn(),
     GeminiClient: MockedGeminiClientClass,
     UserPromptEvent: MockedUserPromptEvent,
@@ -270,6 +298,7 @@ describe('useGeminiStream', () => {
     addHistory: vi.fn(),
     getSessionId: vi.fn(() => 'test-session-id'),
     setQuotaErrorOccurred: vi.fn(),
+    resetBillingTurnState: vi.fn(),
     getQuotaErrorOccurred: vi.fn(() => false),
     getModel: vi.fn(() => 'gemini-2.5-pro'),
     getContentGeneratorConfig: vi.fn(() => ({
@@ -597,6 +626,35 @@ describe('useGeminiStream', () => {
     expect(mockSendMessageStream).not.toHaveBeenCalled(); // submitQuery uses this
   });
 
+  it('should expose activePtyId for non-shell executing tools that report an execution ID', () => {
+    const remoteExecutingTool: TrackedExecutingToolCall = {
+      request: {
+        callId: 'remote-call-1',
+        name: 'remote_agent_call',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'prompt-id-remote',
+      },
+      status: CoreToolCallStatus.Executing,
+      responseSubmittedToGemini: false,
+      tool: {
+        name: 'remote_agent_call',
+        displayName: 'Remote Agent',
+        description: 'Remote agent execution',
+        build: vi.fn(),
+      } as any,
+      invocation: {
+        getDescription: () => 'Calling remote agent',
+      } as unknown as AnyToolInvocation,
+      startTime: Date.now(),
+      liveOutput: 'working...',
+      pid: 4242,
+    };
+
+    const { result } = renderTestHook([remoteExecutingTool]);
+    expect(result.current.activePtyId).toBe(4242);
+  });
+
   it('should submit tool responses when all tool calls are completed and ready', async () => {
     const toolCall1ResponseParts: Part[] = [{ text: 'tool 1 final response' }];
     const toolCall2ResponseParts: Part[] = [{ text: 'tool 2 final response' }];
@@ -806,14 +864,6 @@ describe('useGeminiStream', () => {
     expect(injectedHintPart.text).toContain(
       'Do not cancel/skip tasks unless the user explicitly cancels them.',
     );
-    expect(
-      mockAddItem.mock.calls.some(
-        ([item]) =>
-          item?.type === 'info' &&
-          typeof item.text === 'string' &&
-          item.text.includes('Got it. Focusing on tests only.'),
-      ),
-    ).toBe(true);
 
     expect(mockRunInDevTraceSpan).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1057,9 +1107,9 @@ describe('useGeminiStream', () => {
     );
     expect(noteIndex).toBeGreaterThanOrEqual(0);
     expect(stopIndex).toBeGreaterThanOrEqual(0);
-    expect(failureHintIndex).toBeGreaterThanOrEqual(0);
+    // The failure hint should NOT be present if the suppressed error note was shown
+    expect(failureHintIndex).toBe(-1);
     expect(noteIndex).toBeLessThan(stopIndex);
-    expect(stopIndex).toBeLessThan(failureHintIndex);
   });
 
   it('should group multiple cancelled tool call responses into a single history entry', async () => {
@@ -2300,14 +2350,14 @@ describe('useGeminiStream', () => {
           requestTokens: 20,
           remainingTokens: 80,
           expectedMessage:
-            'Sending this message (20 tokens) might exceed the remaining context window limit (80 tokens).',
+            'Sending this message (20 tokens) might exceed the context window limit (80 tokens left).',
         },
         {
           name: 'with suggestion when remaining tokens are < 75% of limit',
           requestTokens: 30,
           remainingTokens: 70,
           expectedMessage:
-            'Sending this message (30 tokens) might exceed the remaining context window limit (70 tokens). Please try reducing the size of your message or use the `/compress` command to compress the chat history.',
+            'Sending this message (30 tokens) might exceed the context window limit (70 tokens left). Please try reducing the size of your message or use the `/compress` command to compress the chat history.',
         },
       ])(
         'should add message $name',
@@ -2385,6 +2435,43 @@ describe('useGeminiStream', () => {
       // Check that onCancelSubmit was called
       await waitFor(() => {
         expect(onCancelSubmitSpy).toHaveBeenCalledWith(true);
+      });
+    });
+
+    it('should add informational messages when ChatCompressed event is received', async () => {
+      vi.mocked(tokenLimit).mockReturnValue(10000);
+      // Setup mock to return a stream with ChatCompressed event
+      mockSendMessageStream.mockReturnValue(
+        (async function* () {
+          yield {
+            type: ServerGeminiEventType.ChatCompressed,
+            value: {
+              originalTokenCount: 1000,
+              newTokenCount: 500,
+              compressionStatus: 'compressed',
+            },
+          };
+        })(),
+      );
+
+      const { result } = renderHookWithDefaults();
+
+      // Submit a query
+      await act(async () => {
+        await result.current.submitQuery('Test compression');
+      });
+
+      // Check that the succinct info message was added
+      await waitFor(() => {
+        expect(mockAddItem).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: MessageType.INFO,
+            text: 'Context compressed from 10% to 5%.',
+            secondaryText: 'Change threshold in /settings.',
+            color: theme.status.warning,
+          }),
+          expect.any(Number),
+        );
       });
     });
 
@@ -2793,7 +2880,6 @@ describe('useGeminiStream', () => {
           type: 'thinking',
           thought: expect.objectContaining({ subject: 'Full thought' }),
         }),
-        expect.any(Number),
       );
     });
 
@@ -3478,6 +3564,116 @@ describe('useGeminiStream', () => {
       // Then verify loop detection confirmation request was set
       await waitFor(() => {
         expect(result.current.loopDetectionConfirmationRequest).not.toBeNull();
+      });
+    });
+
+    describe('Race Condition Prevention', () => {
+      it('should reject concurrent submitQuery when already responding', async () => {
+        // Stream that stays open (simulates "still responding")
+        mockSendMessageStream.mockReturnValue(
+          (async function* () {
+            yield {
+              type: ServerGeminiEventType.Content,
+              value: 'First response',
+            };
+            // Keep the stream open
+            await new Promise(() => {});
+          })(),
+        );
+
+        const { result } = renderTestHook();
+
+        // Start first query without awaiting (fire-and-forget, like existing tests)
+        await act(async () => {
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          result.current.submitQuery('first query');
+        });
+
+        // Wait for the stream to start responding
+        await waitFor(() => {
+          expect(result.current.streamingState).toBe(StreamingState.Responding);
+        });
+
+        // Try a second query while first is still responding
+        await act(async () => {
+          // eslint-disable-next-line @typescript-eslint/no-floating-promises
+          result.current.submitQuery('second query');
+        });
+
+        // Should have only called sendMessageStream once (second was rejected)
+        expect(mockSendMessageStream).toHaveBeenCalledTimes(1);
+      });
+
+      it('should allow continuation queries via loop detection retry', async () => {
+        const mockLoopDetectionService = {
+          disableForSession: vi.fn(),
+        };
+        const mockClient = {
+          ...new MockedGeminiClientClass(mockConfig),
+          getLoopDetectionService: () => mockLoopDetectionService,
+        };
+        mockConfig.getGeminiClient = vi.fn().mockReturnValue(mockClient);
+
+        // First call triggers loop detection
+        mockSendMessageStream.mockReturnValueOnce(
+          (async function* () {
+            yield {
+              type: ServerGeminiEventType.LoopDetected,
+            };
+          })(),
+        );
+
+        // Retry call succeeds
+        mockSendMessageStream.mockReturnValueOnce(
+          (async function* () {
+            yield {
+              type: ServerGeminiEventType.Content,
+              value: 'Retry success',
+            };
+            yield {
+              type: ServerGeminiEventType.Finished,
+              value: { reason: 'STOP' },
+            };
+          })(),
+        );
+
+        const { result } = renderTestHook();
+
+        await act(async () => {
+          await result.current.submitQuery('test query');
+        });
+
+        await waitFor(() => {
+          expect(
+            result.current.loopDetectionConfirmationRequest,
+          ).not.toBeNull();
+        });
+
+        // User selects "disable" which triggers a continuation query
+        await act(async () => {
+          result.current.loopDetectionConfirmationRequest?.onComplete({
+            userSelection: 'disable',
+          });
+        });
+
+        // Verify disableForSession was called
+        expect(
+          mockLoopDetectionService.disableForSession,
+        ).toHaveBeenCalledTimes(1);
+
+        // Continuation query should have gone through (2 total calls)
+        await waitFor(() => {
+          expect(mockSendMessageStream).toHaveBeenCalledTimes(2);
+          expect(mockSendMessageStream).toHaveBeenNthCalledWith(
+            2,
+            'test query',
+            expect.any(AbortSignal),
+            expect.any(String),
+            undefined,
+            false,
+            'test query',
+          );
+        });
       });
     });
   });

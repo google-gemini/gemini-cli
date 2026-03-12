@@ -484,6 +484,10 @@ describe('shortenPath', () => {
 });
 
 describe('resolveToRealPath', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it.each([
     {
       description:
@@ -510,9 +514,11 @@ describe('resolveToRealPath', () => {
     expect(resolveToRealPath(input)).toBe(expected);
   });
 
-  it('should return decoded path even if fs.realpathSync fails', () => {
+  it('should return decoded path even if fs.realpathSync fails with ENOENT', () => {
     vi.spyOn(fs, 'realpathSync').mockImplementationOnce(() => {
-      throw new Error('File not found');
+      const err = new Error('File not found') as NodeJS.ErrnoException;
+      err.code = 'ENOENT';
+      throw err;
     });
 
     const p = path.resolve('path', 'to', 'New Project');
@@ -520,6 +526,63 @@ describe('resolveToRealPath', () => {
     const expected = p;
 
     expect(resolveToRealPath(input)).toBe(expected);
+  });
+
+  it('should return decoded path even if fs.realpathSync fails with EISDIR', () => {
+    vi.spyOn(fs, 'realpathSync').mockImplementationOnce(() => {
+      const err = new Error(
+        'Illegal operation on a directory',
+      ) as NodeJS.ErrnoException;
+      err.code = 'EISDIR';
+      throw err;
+    });
+
+    const p = path.resolve('path', 'to', 'New Project');
+    const input = pathToFileURL(p).toString();
+    const expected = p;
+
+    expect(resolveToRealPath(input)).toBe(expected);
+  });
+
+  it('should recursively resolve symlinks for non-existent child paths', () => {
+    const parentPath = path.resolve('/some/parent/path');
+    const resolvedParentPath = path.resolve('/resolved/parent/path');
+    const childPath = path.resolve(parentPath, 'child', 'file.txt');
+    const expectedPath = path.resolve(resolvedParentPath, 'child', 'file.txt');
+
+    vi.spyOn(fs, 'realpathSync').mockImplementation((p) => {
+      const pStr = p.toString();
+      if (pStr === parentPath) {
+        return resolvedParentPath;
+      }
+      const err = new Error('ENOENT') as NodeJS.ErrnoException;
+      err.code = 'ENOENT';
+      throw err;
+    });
+
+    expect(resolveToRealPath(childPath)).toBe(expectedPath);
+  });
+
+  it('should prevent infinite recursion on malicious symlink structures', () => {
+    const maliciousPath = path.resolve('malicious', 'symlink');
+
+    vi.spyOn(fs, 'realpathSync').mockImplementation(() => {
+      const err = new Error('ENOENT') as NodeJS.ErrnoException;
+      err.code = 'ENOENT';
+      throw err;
+    });
+
+    vi.spyOn(fs, 'lstatSync').mockImplementation(
+      () => ({ isSymbolicLink: () => true }) as fs.Stats,
+    );
+
+    vi.spyOn(fs, 'readlinkSync').mockImplementation(() =>
+      ['..', 'malicious', 'symlink'].join(path.sep),
+    );
+
+    expect(() => resolveToRealPath(maliciousPath)).toThrow(
+      /Infinite recursion detected/,
+    );
   });
 });
 

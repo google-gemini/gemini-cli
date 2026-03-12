@@ -39,6 +39,10 @@ export interface ToolConfirmationRequest {
    */
   toolAnnotations?: Record<string, unknown>;
   /**
+   * Optional subagent name, if this tool call was initiated by a subagent.
+   */
+  subagent?: string;
+  /**
    * Optional rich details for the confirmation UI (diffs, counts, etc.)
    */
   details?: SerializableConfirmationDetails;
@@ -118,6 +122,7 @@ export interface UpdatePolicy {
   type: MessageBusType.UPDATE_POLICY;
   toolName: string;
   persist?: boolean;
+  persistScope?: 'workspace' | 'user';
   argsPattern?: string;
   commandPrefix?: string | string[];
   mcpName?: string;
@@ -162,6 +167,8 @@ export interface Question {
   multiSelect?: boolean;
   /** Placeholder hint text. For type='text', shown in the input field. For type='choice', shown in the "Other" custom input. */
   placeholder?: string;
+  /** Allow the question to consume more vertical space instead of being strictly capped. */
+  unconstrainedHeight?: boolean;
 }
 
 export interface AskUserRequest {

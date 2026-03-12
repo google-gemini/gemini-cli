@@ -7,7 +7,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SubagentTool } from './subagent-tool.js';
 import { SubagentToolWrapper } from './subagent-tool-wrapper.js';
-import { Kind } from '../tools/tools.js';
+import {
+  Kind,
+  type DeclarativeTool,
+  type ToolCallConfirmationDetails,
+  type ToolInvocation,
+  type ToolResult,
+} from '../tools/tools.js';
 import type {
   LocalAgentDefinition,
   RemoteAgentDefinition,
@@ -17,12 +23,6 @@ import { makeFakeConfig } from '../test-utils/config.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import type { Config } from '../config/config.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import type {
-  DeclarativeTool,
-  ToolCallConfirmationDetails,
-  ToolInvocation,
-  ToolResult,
-} from '../tools/tools.js';
 import {
   GeminiCliOperation,
   GEN_AI_AGENT_DESCRIPTION,
@@ -77,6 +77,11 @@ describe('SubAgentInvocation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfig = makeFakeConfig();
+    // .config is already set correctly by the getter on the instance.
+    Object.defineProperty(mockConfig, 'promptId', {
+      get: () => 'test-prompt-id',
+      configurable: true,
+    });
     mockMessageBus = createMockMessageBus();
     mockInnerInvocation = {
       shouldConfirmExecute: vi.fn(),
@@ -117,6 +122,16 @@ describe('SubAgentInvocation', () => {
       testDefinition,
       mockConfig,
       mockMessageBus,
+    );
+  });
+
+  it('should return the correct description', () => {
+    const tool = new SubagentTool(testDefinition, mockConfig, mockMessageBus);
+    const params = {};
+    // @ts-expect-error - accessing protected method for testing
+    const invocation = tool.createInvocation(params, mockMessageBus);
+    expect(invocation.getDescription()).toBe(
+      "Delegating to agent 'LocalAgent'",
     );
   });
 
@@ -329,6 +344,11 @@ describe('SubagentTool Read-Only logic', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfig = makeFakeConfig();
+    // .config is already set correctly by the getter on the instance.
+    Object.defineProperty(mockConfig, 'promptId', {
+      get: () => 'test-prompt-id',
+      configurable: true,
+    });
     mockMessageBus = createMockMessageBus();
   });
 
@@ -349,7 +369,7 @@ describe('SubagentTool Read-Only logic', () => {
     const registry = {
       getTool: (name: string) => (name === 'read' ? readOnlyTool : undefined),
     };
-    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(
+    vi.spyOn(mockConfig, 'toolRegistry', 'get').mockReturnValue(
       registry as unknown as ToolRegistry,
     );
 
@@ -377,7 +397,7 @@ describe('SubagentTool Read-Only logic', () => {
         return undefined;
       },
     };
-    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(
+    vi.spyOn(mockConfig, 'toolRegistry', 'get').mockReturnValue(
       registry as unknown as ToolRegistry,
     );
 
@@ -391,7 +411,7 @@ describe('SubagentTool Read-Only logic', () => {
 
   it('should be true for local agent with no tools', () => {
     const registry = { getTool: () => undefined };
-    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(
+    vi.spyOn(mockConfig, 'toolRegistry', 'get').mockReturnValue(
       registry as unknown as ToolRegistry,
     );
 

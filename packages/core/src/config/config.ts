@@ -6,19 +6,17 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import { inspect } from 'node:util';
 import process from 'node:process';
-import type {
-  ContentGenerator,
-  ContentGeneratorConfig,
-} from '../core/contentGenerator.js';
-import type { OverageStrategy } from '../billing/billing.js';
+import { z } from 'zod';
 import {
   AuthType,
   createContentGenerator,
   createContentGeneratorConfig,
+  type ContentGenerator,
+  type ContentGeneratorConfig,
 } from '../core/contentGenerator.js';
+import type { OverageStrategy } from '../billing/billing.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
@@ -44,12 +42,12 @@ import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
-import type { TelemetryTarget } from '../telemetry/index.js';
 import {
   initializeTelemetry,
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
   uiTelemetryService,
+  type TelemetryTarget,
 } from '../telemetry/index.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 import { tokenLimit } from '../core/tokenLimits.js';
@@ -69,8 +67,18 @@ import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
-import type { FileSystemService } from '../services/fileSystemService.js';
-import { StandardFileSystemService } from '../services/fileSystemService.js';
+import {
+  StandardFileSystemService,
+  type FileSystemService,
+} from '../services/fileSystemService.js';
+import {
+  TrackerCreateTaskTool,
+  TrackerUpdateTaskTool,
+  TrackerGetTaskTool,
+  TrackerListTasksTool,
+  TrackerAddDependencyTool,
+  TrackerVisualizeTool,
+} from '../tools/trackerTools.js';
 import {
   logRipgrepFallback,
   logFlashFallback,
@@ -90,13 +98,14 @@ import type {
 import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
 import { OutputFormat } from '../output/types.js';
-import type {
-  ModelConfig,
-  ModelConfigServiceConfig,
+import {
+  ModelConfigService,
+  type ModelConfig,
+  type ModelConfigServiceConfig,
 } from '../services/modelConfigService.js';
-import { ModelConfigService } from '../services/modelConfigService.js';
 import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
 import { ContextManager } from '../services/contextManager.js';
+import { TrackerService } from '../services/trackerService.js';
 import type { GenerateContentParameters } from '@google/genai';
 
 // Re-export OAuth config type
@@ -124,19 +133,21 @@ import type {
 } from '../code_assist/types.js';
 import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
-import type { Experiments } from '../code_assist/experiments/experiments.js';
+import {
+  getExperiments,
+  type Experiments,
+} from '../code_assist/experiments/experiments.js';
 import { AgentRegistry } from '../agents/registry.js';
 import { AcknowledgedAgentsService } from '../agents/acknowledgedAgents.js';
 import { setGlobalProxy } from '../utils/fetch.js';
 import { SubagentTool } from '../agents/subagent-tool.js';
-import { getExperiments } from '../code_assist/experiments/experiments.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SkillManager, type SkillDefinition } from '../skills/skillManager.js';
 import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
-import { isSubpath } from '../utils/paths.js';
+import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import { UserHintService } from './userHintService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
 import { loadPoliciesFromToml } from '../policy/toml-loader.js';
@@ -145,6 +156,7 @@ import { CheckerRunner } from '../safety/checker-runner.js';
 import { ContextBuilder } from '../safety/context-builder.js';
 import { CheckerRegistry } from '../safety/registry.js';
 import { ConsecaSafetyChecker } from '../safety/conseca/conseca.js';
+import type { AgentLoopContext } from './agent-loop-context.js';
 
 export interface AccessibilitySettings {
   /** @deprecated Use ui.loadingPhrases instead. */
@@ -251,11 +263,12 @@ export interface CustomTheme {
   };
   border?: {
     default?: string;
-    focused?: string;
   };
   ui?: {
     comment?: string;
     symbol?: string;
+    active?: string;
+    focus?: string;
     gradient?: string[];
   };
   status?: {
@@ -340,6 +353,19 @@ export interface GeminiCLIExtension {
    * Safety checkers contributed by this extension.
    */
   checkers?: SafetyCheckerRule[];
+  /**
+   * Planning features configuration contributed by this extension.
+   */
+  plan?: {
+    /**
+     * The directory where planning artifacts are stored.
+     */
+    directory?: string;
+  };
+  /**
+   * Used to migrate an extension to a new repository source.
+   */
+  migratedTo?: string;
 }
 
 export interface ExtensionInstallMetadata {
@@ -352,10 +378,10 @@ export interface ExtensionInstallMetadata {
 }
 
 import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
-import type { FileFilteringOptions } from './constants.js';
 import {
   DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
+  type FileFilteringOptions,
 } from './constants.js';
 import {
   DEFAULT_TOOL_PROTECTION_THRESHOLD,
@@ -371,11 +397,7 @@ import { McpClientManager } from '../tools/mcp-client-manager.js';
 import { type McpContext } from '../tools/mcp-client.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 import { getErrorMessage } from '../utils/errors.js';
-import {
-  ENTER_PLAN_MODE_TOOL_NAME,
-  EXIT_PLAN_MODE_TOOL_NAME,
-  GENERATE_IMAGE_TOOL_NAME,
-} from '../tools/tool-names.js';
+import { GENERATE_IMAGE_TOOL_NAME } from '../tools/tool-names.js';
 
 export type { FileFilteringOptions };
 export {
@@ -431,9 +453,35 @@ export enum AuthProviderType {
 }
 
 export interface SandboxConfig {
-  command: 'docker' | 'podman' | 'sandbox-exec';
-  image: string;
+  enabled: boolean;
+  allowedPaths?: string[];
+  networkAccess?: boolean;
+  command?: 'docker' | 'podman' | 'sandbox-exec' | 'runsc' | 'lxc';
+  image?: string;
 }
+
+export const ConfigSchema = z.object({
+  sandbox: z
+    .object({
+      enabled: z.boolean().default(false),
+      allowedPaths: z.array(z.string()).default([]),
+      networkAccess: z.boolean().default(false),
+      command: z
+        .enum(['docker', 'podman', 'sandbox-exec', 'runsc', 'lxc'])
+        .optional(),
+      image: z.string().optional(),
+    })
+    .superRefine((data, ctx) => {
+      if (data.enabled && !data.command) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Sandbox command is required when sandbox is enabled',
+          path: ['command'],
+        });
+      }
+    })
+    .optional(),
+});
 
 /**
  * Callbacks for checking MCP server enablement status.
@@ -456,6 +504,7 @@ export interface PolicyUpdateConfirmationRequest {
 
 export interface ConfigParameters {
   sessionId: string;
+  clientName?: string;
   clientVersion?: string;
   embeddingModel?: string;
   sandbox?: SandboxConfig;
@@ -500,7 +549,7 @@ export interface ConfigParameters {
   model: string;
   disableLoopDetection?: boolean;
   maxSessionTurns?: number;
-  experimentalZedIntegration?: boolean;
+  acpMode?: boolean;
   listSessions?: boolean;
   deleteSession?: string;
   listExtensions?: boolean;
@@ -530,9 +579,11 @@ export interface ConfigParameters {
   skipNextSpeakerCheck?: boolean;
   shellExecutionConfig?: ShellExecutionConfig;
   extensionManagement?: boolean;
+  extensionRegistryURI?: string;
   truncateToolOutputThreshold?: number;
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
+  workspacePoliciesDir?: string;
   policyEngineConfig?: PolicyEngineConfig;
   directWebFetch?: boolean;
   policyUpdateConfirmationRequest?: PolicyUpdateConfirmationRequest;
@@ -567,6 +618,7 @@ export interface ConfigParameters {
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
   plan?: boolean;
+  tracker?: boolean;
   planSettings?: PlanSettings;
   modelSteering?: boolean;
   onModelChange?: (model: string) => void;
@@ -584,8 +636,8 @@ export interface ConfigParameters {
   };
 }
 
-export class Config implements McpContext {
-  private toolRegistry!: ToolRegistry;
+export class Config implements McpContext, AgentLoopContext {
+  private _toolRegistry!: ToolRegistry;
   private mcpClientManager?: McpClientManager;
   private allowedMcpServers: string[];
   private blockedMcpServers: string[];
@@ -597,9 +649,11 @@ export class Config implements McpContext {
   private agentRegistry!: AgentRegistry;
   private readonly acknowledgedAgentsService: AcknowledgedAgentsService;
   private skillManager!: SkillManager;
-  private sessionId: string;
+  private _sessionId: string;
+  private readonly clientName: string | undefined;
   private clientVersion: string;
   private fileSystemService: FileSystemService;
+  private trackerService?: TrackerService;
   private contentGeneratorConfig!: ContentGeneratorConfig;
   private contentGenerator!: ContentGenerator;
   readonly modelConfigService: ModelConfigService;
@@ -630,7 +684,7 @@ export class Config implements McpContext {
   private readonly accessibility: AccessibilitySettings;
   private readonly telemetrySettings: TelemetrySettings;
   private readonly usageStatisticsEnabled: boolean;
-  private geminiClient!: GeminiClient;
+  private _geminiClient!: GeminiClient;
   private baseLlmClient!: BaseLlmClient;
   private localLiteRtLmClient?: LocalLiteRtLmClient;
   private modelRouterService: ModelRouterService;
@@ -669,6 +723,7 @@ export class Config implements McpContext {
   fallbackModelHandler?: FallbackModelHandler;
   validationHandler?: ValidationHandler;
   private quotaErrorOccurred: boolean = false;
+  private creditsNotificationShown: boolean = false;
   private modelQuotas: Map<
     string,
     { remaining: number; limit: number; resetTime?: string }
@@ -697,7 +752,7 @@ export class Config implements McpContext {
   private readonly summarizeToolOutput:
     | Record<string, SummarizeToolOutputSettings>
     | undefined;
-  private readonly experimentalZedIntegration: boolean = false;
+  private readonly acpMode: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
   private readonly includeDirectoryTree: boolean = true;
   private readonly importFormat: 'tree' | 'flat';
@@ -715,15 +770,18 @@ export class Config implements McpContext {
   private readonly useAlternateBuffer: boolean;
   private shellExecutionConfig: ShellExecutionConfig;
   private readonly extensionManagement: boolean = true;
+  private readonly extensionRegistryURI: string | undefined;
   private readonly truncateToolOutputThreshold: number;
   private compressionTruncationCounter = 0;
   private initialized = false;
   private initPromise: Promise<void> | undefined;
+  private mcpInitializationPromise: Promise<void> | null = null;
   readonly storage: Storage;
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
   private readonly useWriteTodos: boolean;
-  private readonly messageBus: MessageBus;
+  private readonly workspacePoliciesDir: string | undefined;
+  private readonly _messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
   private policyUpdateConfirmationRequest:
     | PolicyUpdateConfirmationRequest
@@ -752,7 +810,7 @@ export class Config implements McpContext {
     | undefined;
   private disabledHooks: string[];
   private experiments: Experiments | undefined;
-  private experimentsPromise: Promise<void> | undefined;
+  private experimentsPromise: Promise<Experiments | undefined> | undefined;
   private hookSystem?: HookSystem;
   private readonly onModelChange: ((model: string) => void) | undefined;
   private readonly onReload:
@@ -778,6 +836,7 @@ export class Config implements McpContext {
   private readonly imageGeneration: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
+  private readonly trackerEnabled: boolean;
   private readonly planModeRoutingEnabled: boolean;
   private readonly modelSteering: boolean;
   private contextManager?: ContextManager;
@@ -789,7 +848,8 @@ export class Config implements McpContext {
   private approvedPlanPath: string | undefined;
 
   constructor(params: ConfigParameters) {
-    this.sessionId = params.sessionId;
+    this._sessionId = params.sessionId;
+    this.clientName = params.clientName;
     this.clientVersion = params.clientVersion ?? 'unknown';
     this.approvedPlanPath = undefined;
     this.embeddingModel =
@@ -867,7 +927,8 @@ export class Config implements McpContext {
     this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
-    this.planEnabled = params.plan ?? false;
+    this.planEnabled = params.plan ?? true;
+    this.trackerEnabled = params.tracker ?? false;
     this.planModeRoutingEnabled = params.planSettings?.modelRouting ?? true;
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
@@ -893,8 +954,7 @@ export class Config implements McpContext {
         DEFAULT_PROTECT_LATEST_TURN,
     };
     this.maxSessionTurns = params.maxSessionTurns ?? -1;
-    this.experimentalZedIntegration =
-      params.experimentalZedIntegration ?? false;
+    this.acpMode = params.acpMode ?? false;
     this.listSessions = params.listSessions ?? false;
     this.deleteSession = params.deleteSession;
     this.listExtensions = params.listExtensions ?? false;
@@ -930,10 +990,10 @@ export class Config implements McpContext {
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
-    // // TODO(joshualitt): Re-evaluate the todo tool for 3 family.
     this.useWriteTodos = isPreviewModel(this.model)
       ? false
       : (params.useWriteTodos ?? true);
+    this.workspacePoliciesDir = params.workspacePoliciesDir;
     this.enableHooksUI = params.enableHooksUI ?? true;
     this.enableHooks = params.enableHooks ?? true;
     this.disabledHooks = params.disabledHooks ?? [];
@@ -944,8 +1004,9 @@ export class Config implements McpContext {
     this.shellToolInactivityTimeout =
       (params.shellToolInactivityTimeout ?? 300) * 1000; // 5 minutes
     this.extensionManagement = params.extensionManagement ?? true;
+    this.extensionRegistryURI = params.extensionRegistryURI;
     this.enableExtensionReloading = params.enableExtensionReloading ?? false;
-    this.storage = new Storage(this.targetDir, this.sessionId);
+    this.storage = new Storage(this.targetDir, this._sessionId);
     this.storage.setCustomPlansDir(params.planSettings?.directory);
 
     this.fakeResponses = params.fakeResponses;
@@ -981,7 +1042,7 @@ export class Config implements McpContext {
       ConsecaSafetyChecker.getInstance().setConfig(this);
     }
 
-    this.messageBus = new MessageBus(this.policyEngine, this.debugMode);
+    this._messageBus = new MessageBus(this.policyEngine, this.debugMode);
     this.acknowledgedAgentsService = new AcknowledgedAgentsService();
     this.skillManager = new SkillManager();
     this.outputSettings = {
@@ -996,7 +1057,7 @@ export class Config implements McpContext {
           params.gemmaModelRouter?.classifier?.model ?? 'gemma3-1b-gpu-custom',
       },
     };
-    this.retryFetchErrors = params.retryFetchErrors ?? false;
+    this.retryFetchErrors = params.retryFetchErrors ?? true;
     this.maxAttempts = Math.min(
       params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
       DEFAULT_MAX_ATTEMPTS,
@@ -1041,7 +1102,7 @@ export class Config implements McpContext {
         );
       }
     }
-    this.geminiClient = new GeminiClient(this);
+    this._geminiClient = new GeminiClient(this);
     this.modelRouterService = new ModelRouterService(this);
 
     // HACK: The settings loading logic doesn't currently merge the default
@@ -1070,6 +1131,10 @@ export class Config implements McpContext {
     this.modelConfigService = new ModelConfigService(
       modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
     );
+  }
+
+  get config(): Config {
+    return this;
   }
 
   isInitialized(): boolean {
@@ -1101,8 +1166,15 @@ export class Config implements McpContext {
     // Add plans directory to workspace context for plan file storage
     if (this.planEnabled) {
       const plansDir = this.storage.getPlansDir();
-      await fs.promises.mkdir(plansDir, { recursive: true });
-      this.workspaceContext.addDirectory(plansDir);
+      try {
+        await fs.promises.access(plansDir);
+        this.workspaceContext.addDirectory(plansDir);
+      } catch {
+        // Directory does not exist yet, so we don't add it to the workspace context.
+        // It will be created when the first plan is written. Since custom plan
+        // directories must be within the project root, they are automatically
+        // covered by the project-wide file discovery once created.
+      }
     }
 
     // Initialize centralized FileDiscoveryService
@@ -1119,17 +1191,17 @@ export class Config implements McpContext {
 
     coreEvents.on(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
 
-    this.toolRegistry = await this.createToolRegistry();
+    this._toolRegistry = await this.createToolRegistry();
     discoverToolsHandle?.end();
     this.mcpClientManager = new McpClientManager(
       this.clientVersion,
-      this.toolRegistry,
+      this._toolRegistry,
       this,
       this.eventEmitter,
     );
     // We do not await this promise so that the CLI can start up even if
     // MCP servers are slow to connect.
-    const mcpInitialization = Promise.allSettled([
+    this.mcpInitializationPromise = Promise.allSettled([
       this.mcpClientManager.startConfiguredMcpServers(),
       this.getExtensionLoader().start(this),
     ]).then((results) => {
@@ -1140,8 +1212,8 @@ export class Config implements McpContext {
       }
     });
 
-    if (!this.interactive || this.experimentalZedIntegration) {
-      await mcpInitialization;
+    if (!this.interactive || this.acpMode) {
+      await this.mcpInitializationPromise;
     }
 
     if (this.skillsSupport) {
@@ -1175,8 +1247,7 @@ export class Config implements McpContext {
       await this.contextManager.refresh();
     }
 
-    await this.geminiClient.initialize();
-    this.syncPlanModeTools();
+    await this._geminiClient.initialize();
     this.initialized = true;
   }
 
@@ -1184,7 +1255,12 @@ export class Config implements McpContext {
     return this.contentGenerator;
   }
 
-  async refreshAuth(authMethod: AuthType, apiKey?: string) {
+  async refreshAuth(
+    authMethod: AuthType,
+    apiKey?: string,
+    baseUrl?: string,
+    customHeaders?: Record<string, string>,
+  ) {
     // Reset availability service when switching auth
     this.modelAvailabilityService.reset();
 
@@ -1195,7 +1271,7 @@ export class Config implements McpContext {
       authMethod !== AuthType.USE_GEMINI
     ) {
       // Restore the conversation history to the new client
-      this.geminiClient.stripThoughtsFromHistory();
+      this._geminiClient.stripThoughtsFromHistory();
     }
 
     // Reset availability status when switching auth (e.g. from limited key to OAuth)
@@ -1211,6 +1287,8 @@ export class Config implements McpContext {
       this,
       authMethod,
       apiKey,
+      baseUrl,
+      customHeaders,
     );
     this.contentGenerator = await createContentGenerator(
       newContentGeneratorConfig,
@@ -1224,17 +1302,21 @@ export class Config implements McpContext {
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
 
     const codeAssistServer = getCodeAssistServer(this);
-    if (codeAssistServer?.projectId) {
-      await this.refreshUserQuota();
-    }
+    const quotaPromise = codeAssistServer?.projectId
+      ? this.refreshUserQuota()
+      : Promise.resolve();
 
     this.experimentsPromise = getExperiments(codeAssistServer)
       .then((experiments) => {
         this.setExperiments(experiments);
+        return experiments;
       })
       .catch((e) => {
         debugLogger.error('Failed to fetch experiments', e);
+        return undefined;
       });
+
+    await quotaPromise;
 
     const authType = this.contentGeneratorConfig.authType;
     if (
@@ -1251,10 +1333,10 @@ export class Config implements McpContext {
     }
 
     // Fetch admin controls
-    await this.ensureExperimentsLoaded();
+    const experiments = await this.experimentsPromise;
     const adminControlsEnabled =
-      this.experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
-        ?.boolValue ?? false;
+      experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]?.boolValue ??
+      false;
     const adminControls = await fetchAdminControls(
       codeAssistServer,
       this.getRemoteAdminSettings(),
@@ -1344,12 +1426,32 @@ export class Config implements McpContext {
     return this.localLiteRtLmClient;
   }
 
+  get promptId(): string {
+    return this._sessionId;
+  }
+
+  get toolRegistry(): ToolRegistry {
+    return this._toolRegistry;
+  }
+
+  get messageBus(): MessageBus {
+    return this._messageBus;
+  }
+
+  get geminiClient(): GeminiClient {
+    return this._geminiClient;
+  }
+
   getSessionId(): string {
-    return this.sessionId;
+    return this.promptId;
+  }
+
+  getClientName(): string | undefined {
+    return this.clientName;
   }
 
   setSessionId(sessionId: string): void {
-    this.sessionId = sessionId;
+    this._sessionId = sessionId;
   }
 
   setTerminalBackground(terminalBackground: string | undefined): void {
@@ -1410,9 +1512,9 @@ export class Config implements McpContext {
       // When the user explicitly sets a model, that becomes the active model.
       this._activeModel = newModel;
       coreEvents.emitModelChanged(newModel);
-      if (this.onModelChange && !isTemporary) {
-        this.onModelChange(newModel);
-      }
+    }
+    if (this.onModelChange && !isTemporary) {
+      this.onModelChange(newModel);
     }
     this.modelAvailabilityService.reset();
   }
@@ -1455,6 +1557,12 @@ export class Config implements McpContext {
     this.modelAvailabilityService.resetTurn();
   }
 
+  /** Resets billing state (overageStrategy, creditsNotificationShown) once per user prompt. */
+  resetBillingTurnState(overageStrategy?: OverageStrategy): void {
+    this.creditsNotificationShown = false;
+    this.billing.overageStrategy = overageStrategy ?? 'ask';
+  }
+
   getMaxSessionTurns(): number {
     return this.maxSessionTurns;
   }
@@ -1465,6 +1573,14 @@ export class Config implements McpContext {
 
   getQuotaErrorOccurred(): boolean {
     return this.quotaErrorOccurred;
+  }
+
+  setCreditsNotificationShown(value: boolean): void {
+    this.creditsNotificationShown = value;
+  }
+
+  getCreditsNotificationShown(): boolean {
+    return this.creditsNotificationShown;
   }
 
   setQuota(
@@ -1568,6 +1684,18 @@ export class Config implements McpContext {
     return this.sandbox;
   }
 
+  getSandboxEnabled(): boolean {
+    return this.sandbox?.enabled ?? false;
+  }
+
+  getSandboxAllowedPaths(): string[] {
+    return this.sandbox?.allowedPaths ?? [];
+  }
+
+  getSandboxNetworkAccess(): boolean {
+    return this.sandbox?.networkAccess ?? false;
+  }
+
   isRestrictiveSandbox(): boolean {
     const sandboxConfig = this.getSandbox();
     const seatbeltProfile = process.env['SEATBELT_PROFILE'];
@@ -1600,6 +1728,7 @@ export class Config implements McpContext {
     return this.acknowledgedAgentsService;
   }
 
+  /** @deprecated Use toolRegistry getter */
   getToolRegistry(): ToolRegistry {
     return this.toolRegistry;
   }
@@ -1801,6 +1930,10 @@ export class Config implements McpContext {
     return this.extensionsEnabled;
   }
 
+  getExtensionRegistryURI(): string | undefined {
+    return this.extensionRegistryURI;
+  }
+
   getMcpClientManager(): McpClientManager | undefined {
     return this.mcpClientManager;
   }
@@ -1876,9 +2009,9 @@ export class Config implements McpContext {
       );
       await refreshServerHierarchicalMemory(this);
     }
-    if (this.geminiClient?.isInitialized()) {
-      await this.geminiClient.setTools();
-      this.geminiClient.updateSystemInstruction();
+    if (this._geminiClient?.isInitialized()) {
+      await this._geminiClient.setTools();
+      this._geminiClient.updateSystemInstruction();
     }
   }
 
@@ -1963,6 +2096,10 @@ export class Config implements McpContext {
     return this.geminiMdFilePaths;
   }
 
+  getWorkspacePoliciesDir(): string | undefined {
+    return this.workspacePoliciesDir;
+  }
+
   setGeminiMdFilePaths(paths: string[]): void {
     this.geminiMdFilePaths = paths;
   }
@@ -2032,49 +2169,12 @@ export class Config implements McpContext {
       (currentMode === ApprovalMode.YOLO || mode === ApprovalMode.YOLO);
 
     if (isPlanModeTransition || isYoloModeTransition) {
-      this.syncPlanModeTools();
+      if (this._geminiClient?.isInitialized()) {
+        this._geminiClient.setTools().catch((err) => {
+          debugLogger.error('Failed to update tools', err);
+        });
+      }
       this.updateSystemInstructionIfInitialized();
-    }
-  }
-
-  /**
-   * Synchronizes enter/exit plan mode tools based on current mode.
-   */
-  syncPlanModeTools(): void {
-    const registry = this.getToolRegistry();
-    if (!registry) {
-      return;
-    }
-    const approvalMode = this.getApprovalMode();
-    const isPlanMode = approvalMode === ApprovalMode.PLAN;
-    const isYoloMode = approvalMode === ApprovalMode.YOLO;
-
-    if (isPlanMode) {
-      if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
-        registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
-      }
-      if (!registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
-        registry.registerTool(new ExitPlanModeTool(this, this.messageBus));
-      }
-    } else {
-      if (registry.getTool(EXIT_PLAN_MODE_TOOL_NAME)) {
-        registry.unregisterTool(EXIT_PLAN_MODE_TOOL_NAME);
-      }
-      if (this.planEnabled && !isYoloMode) {
-        if (!registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
-          registry.registerTool(new EnterPlanModeTool(this, this.messageBus));
-        }
-      } else {
-        if (registry.getTool(ENTER_PLAN_MODE_TOOL_NAME)) {
-          registry.unregisterTool(ENTER_PLAN_MODE_TOOL_NAME);
-        }
-      }
-    }
-
-    if (this.geminiClient?.isInitialized()) {
-      this.geminiClient.setTools().catch((err) => {
-        debugLogger.error('Failed to update tools', err);
-      });
     }
   }
 
@@ -2166,6 +2266,7 @@ export class Config implements McpContext {
     return this.telemetrySettings.useCliAuth ?? false;
   }
 
+  /** @deprecated Use geminiClient getter */
   getGeminiClient(): GeminiClient {
     return this.geminiClient;
   }
@@ -2250,6 +2351,15 @@ export class Config implements McpContext {
     return this.bugCommand;
   }
 
+  getTrackerService(): TrackerService {
+    if (!this.trackerService) {
+      this.trackerService = new TrackerService(
+        this.storage.getProjectTempTrackerDir(),
+      );
+    }
+    return this.trackerService;
+  }
+
   getFileService(): FileDiscoveryService {
     if (!this.fileDiscoveryService) {
       this.fileDiscoveryService = new FileDiscoveryService(this.targetDir, {
@@ -2265,8 +2375,14 @@ export class Config implements McpContext {
     return this.usageStatisticsEnabled;
   }
 
-  getExperimentalZedIntegration(): boolean {
-    return this.experimentalZedIntegration;
+  getAcpMode(): boolean {
+    return this.acpMode;
+  }
+
+  async waitForMcpInit(): Promise<void> {
+    if (this.mcpInitializationPromise) {
+      await this.mcpInitializationPromise;
+    }
   }
 
   isImageGenerationEnabled(): boolean {
@@ -2313,6 +2429,10 @@ export class Config implements McpContext {
 
   isPlanEnabled(): boolean {
     return this.planEnabled;
+  }
+
+  isTrackerEnabled(): boolean {
+    return this.trackerEnabled;
   }
 
   getApprovedPlanPath(): string | undefined {
@@ -2397,17 +2517,7 @@ export class Config implements McpContext {
    * @returns true if the path is allowed, false otherwise.
    */
   isPathAllowed(absolutePath: string): boolean {
-    const realpath = (p: string) => {
-      let resolved: string;
-      try {
-        resolved = fs.realpathSync(p);
-      } catch {
-        resolved = path.resolve(p);
-      }
-      return os.platform() === 'win32' ? resolved.toLowerCase() : resolved;
-    };
-
-    const resolvedPath = realpath(absolutePath);
+    const resolvedPath = resolveToRealPath(absolutePath);
 
     const workspaceContext = this.getWorkspaceContext();
     if (workspaceContext.isPathWithinWorkspace(resolvedPath)) {
@@ -2415,7 +2525,7 @@ export class Config implements McpContext {
     }
 
     const projectTempDir = this.storage.getProjectTempDir();
-    const resolvedTempDir = realpath(projectTempDir);
+    const resolvedTempDir = resolveToRealPath(projectTempDir);
 
     return isSubpath(resolvedTempDir, resolvedPath);
   }
@@ -2485,8 +2595,30 @@ export class Config implements McpContext {
   async getNumericalRoutingEnabled(): Promise<boolean> {
     await this.ensureExperimentsLoaded();
 
-    return !!this.experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING]
-      ?.boolValue;
+    const flag =
+      this.experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING];
+    return flag?.boolValue ?? true;
+  }
+
+  /**
+   * Returns the resolved complexity threshold for routing.
+   * If a remote threshold is provided and within range (0-100), it is returned.
+   * Otherwise, the default threshold (90) is returned.
+   */
+  async getResolvedClassifierThreshold(): Promise<number> {
+    const remoteValue = await this.getClassifierThreshold();
+    const defaultValue = 90;
+
+    if (
+      remoteValue !== undefined &&
+      !isNaN(remoteValue) &&
+      remoteValue >= 0 &&
+      remoteValue <= 100
+    ) {
+      return remoteValue;
+    }
+
+    return defaultValue;
   }
 
   async getClassifierThreshold(): Promise<number | undefined> {
@@ -2522,6 +2654,26 @@ export class Config implements McpContext {
   async getGemini31Launched(): Promise<boolean> {
     await this.ensureExperimentsLoaded();
     return this.getGemini31LaunchedSync();
+  }
+
+  /**
+   * Returns whether the custom tool model should be used.
+   */
+  async getUseCustomToolModel(): Promise<boolean> {
+    const useGemini3_1 = await this.getGemini31Launched();
+    const authType = this.contentGeneratorConfig?.authType;
+    return useGemini3_1 && authType === AuthType.USE_GEMINI;
+  }
+
+  /**
+   * Returns whether the custom tool model should be used.
+   *
+   * Note: This method should only be called after startup, once experiments have been loaded.
+   */
+  getUseCustomToolModelSync(): boolean {
+    const useGemini3_1 = this.getGemini31LaunchedSync();
+    const authType = this.contentGeneratorConfig?.authType;
+    return useGemini3_1 && authType === AuthType.USE_GEMINI;
   }
 
   /**
@@ -2722,6 +2874,7 @@ export class Config implements McpContext {
     return this.fileExclusions;
   }
 
+  /** @deprecated Use messageBus getter */
   getMessageBus(): MessageBus {
     return this.messageBus;
   }
@@ -2893,6 +3046,29 @@ export class Config implements McpContext {
       }
     }
 
+    if (this.isTrackerEnabled()) {
+      maybeRegister(TrackerCreateTaskTool, () =>
+        registry.registerTool(new TrackerCreateTaskTool(this, this.messageBus)),
+      );
+      maybeRegister(TrackerUpdateTaskTool, () =>
+        registry.registerTool(new TrackerUpdateTaskTool(this, this.messageBus)),
+      );
+      maybeRegister(TrackerGetTaskTool, () =>
+        registry.registerTool(new TrackerGetTaskTool(this, this.messageBus)),
+      );
+      maybeRegister(TrackerListTasksTool, () =>
+        registry.registerTool(new TrackerListTasksTool(this, this.messageBus)),
+      );
+      maybeRegister(TrackerAddDependencyTool, () =>
+        registry.registerTool(
+          new TrackerAddDependencyTool(this, this.messageBus),
+        ),
+      );
+      maybeRegister(TrackerVisualizeTool, () =>
+        registry.registerTool(new TrackerVisualizeTool(this, this.messageBus)),
+      );
+    }
+
     // Register Subagents as Tools
     this.registerSubAgentTools(registry);
 
@@ -3016,8 +3192,8 @@ export class Config implements McpContext {
   }
 
   private onAgentsRefreshed = async () => {
-    if (this.toolRegistry) {
-      this.registerSubAgentTools(this.toolRegistry);
+    if (this._toolRegistry) {
+      this.registerSubAgentTools(this._toolRegistry);
     }
     // Propagate updates to the active chat session
     const client = this.getGeminiClient();
@@ -3038,7 +3214,7 @@ export class Config implements McpContext {
     this.logCurrentModeDuration(this.getApprovalMode());
     coreEvents.off(CoreEvent.AgentsRefreshed, this.onAgentsRefreshed);
     this.agentRegistry?.dispose();
-    this.geminiClient?.dispose();
+    this._geminiClient?.dispose();
     if (this.mcpClientManager) {
       await this.mcpClientManager.stop();
     }

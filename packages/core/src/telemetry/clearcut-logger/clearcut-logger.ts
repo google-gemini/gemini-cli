@@ -27,6 +27,7 @@ import type {
   InvalidChunkEvent,
   ContentRetryEvent,
   ContentRetryFailureEvent,
+  NetworkRetryAttemptEvent,
   ExtensionInstallEvent,
   ToolOutputTruncatedEvent,
   ExtensionUninstallEvent,
@@ -49,6 +50,7 @@ import type {
   ToolOutputMaskingEvent,
   KeychainAvailabilityEvent,
   TokenStorageInitializationEvent,
+  StartupStatsEvent,
 } from '../types.js';
 import { EventMetadataKey } from './event-metadata-key.js';
 import type { Config } from '../../config/config.js';
@@ -93,6 +95,7 @@ export enum EventNames {
   INVALID_CHUNK = 'invalid_chunk',
   CONTENT_RETRY = 'content_retry',
   CONTENT_RETRY_FAILURE = 'content_retry_failure',
+  RETRY_ATTEMPT = 'retry_attempt',
   EXTENSION_ENABLE = 'extension_enable',
   EXTENSION_DISABLE = 'extension_disable',
   EXTENSION_INSTALL = 'extension_install',
@@ -117,6 +120,7 @@ export enum EventNames {
   TOKEN_STORAGE_INITIALIZATION = 'token_storage_initialization',
   CONSECA_POLICY_GENERATION = 'conseca_policy_generation',
   CONSECA_VERDICT = 'conseca_verdict',
+  STARTUP_STATS = 'startup_stats',
 }
 
 export interface LogResponse {
@@ -186,6 +190,34 @@ function determineGHWorkflowName(): string | undefined {
  */
 function determineGHRepositoryName(): string | undefined {
   return process.env['GITHUB_REPOSITORY'];
+}
+
+/**
+ * Determines the GitHub event name if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHEventName(): string | undefined {
+  return process.env['GITHUB_EVENT_NAME'];
+}
+
+/**
+ * Determines the GitHub Pull Request number if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHPRNumber(): string | undefined {
+  return process.env['GH_PR_NUMBER'];
+}
+
+/**
+ * Determines the GitHub Issue number if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHIssueNumber(): string | undefined {
+  return process.env['GH_ISSUE_NUMBER'];
+}
+
+/**
+ * Determines the GitHub custom tracking ID if the CLI is running in a GitHub Actions environment.
+ */
+function determineGHCustomTrackingId(): string | undefined {
+  return process.env['GH_CUSTOM_TRACKING_ID'];
 }
 
 /**
@@ -370,6 +402,10 @@ export class ClearcutLogger {
     const email = this.userAccountManager.getCachedGoogleAccount();
     const surface = determineSurface();
     const ghWorkflowName = determineGHWorkflowName();
+    const ghEventName = determineGHEventName();
+    const ghPRNumber = determineGHPRNumber();
+    const ghIssueNumber = determineGHIssueNumber();
+    const ghCustomTrackingId = determineGHCustomTrackingId();
     const baseMetadata: EventValue[] = [
       ...data,
       {
@@ -401,6 +437,34 @@ export class ClearcutLogger {
       baseMetadata.push({
         gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_REPOSITORY_NAME_HASH,
         value: this.hashedGHRepositoryName,
+      });
+    }
+
+    if (ghEventName) {
+      baseMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_EVENT_NAME,
+        value: ghEventName,
+      });
+    }
+
+    if (ghPRNumber) {
+      baseMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_PR_NUMBER,
+        value: ghPRNumber,
+      });
+    }
+
+    if (ghIssueNumber) {
+      baseMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_ISSUE_NUMBER,
+        value: ghIssueNumber,
+      });
+    }
+
+    if (ghCustomTrackingId) {
+      baseMetadata.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_GH_CUSTOM_TRACKING_ID,
+        value: ghCustomTrackingId,
       });
     }
 
@@ -472,6 +536,7 @@ export class ClearcutLogger {
     let result: LogResponse = {};
 
     try {
+      // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
       const response = await fetch(CLEARCUT_URL, {
         method: 'POST',
         body: safeJsonStringify(request),
@@ -1168,6 +1233,32 @@ export class ClearcutLogger {
     this.flushIfNeeded();
   }
 
+  logNetworkRetryAttemptEvent(event: NetworkRetryAttemptEvent): void {
+    // This event is generic for any retry attempt (Gemini, WebFetch, etc.)
+    const data: EventValue[] = [
+      {
+        gemini_cli_key:
+          EventMetadataKey.GEMINI_CLI_NETWORK_RETRY_ATTEMPT_NUMBER,
+        value: String(event.attempt),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_NETWORK_RETRY_DELAY_MS,
+        value: String(event.delay_ms),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_NETWORK_RETRY_ERROR_TYPE,
+        value: event.error_type,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_API_REQUEST_MODEL,
+        value: event.model,
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.RETRY_ATTEMPT, data));
+    this.flushIfNeeded();
+  }
+
   async logExtensionInstallEvent(event: ExtensionInstallEvent): Promise<void> {
     const data: EventValue[] = [
       {
@@ -1688,6 +1779,30 @@ export class ClearcutLogger {
     this.enqueueLogEvent(
       this.createLogEvent(EventNames.TOKEN_STORAGE_INITIALIZATION, data),
     );
+    this.flushIfNeeded();
+  }
+
+  logStartupStatsEvent(event: StartupStatsEvent): void {
+    const data: EventValue[] = [
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_STARTUP_PHASES,
+        value: JSON.stringify(event.phases),
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_STARTUP_OS_PLATFORM,
+        value: event.os_platform,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_STARTUP_OS_RELEASE,
+        value: event.os_release,
+      },
+      {
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_STARTUP_IS_DOCKER,
+        value: JSON.stringify(event.is_docker),
+      },
+    ];
+
+    this.enqueueLogEvent(this.createLogEvent(EventNames.STARTUP_STATS, data));
     this.flushIfNeeded();
   }
 
