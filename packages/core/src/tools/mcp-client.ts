@@ -1082,7 +1082,8 @@ class LenientJsonSchemaValidator implements jsonSchemaValidator {
     } catch (error) {
       debugLogger.warn(
         `Failed to compile MCP tool output schema (${
-          (schema as Record<string, unknown>)?.['$id'] ?? '<no $id>'
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          (schema as McpTool['inputSchema'])?.['$id'] ?? '<no $id>'
         }): ${error instanceof Error ? error.message : String(error)}. ` +
           'Skipping output validation for this tool.',
       );
@@ -1205,6 +1206,48 @@ export async function connectAndDiscover(
 }
 
 /**
+ * Sanitizes an MCP tool's JSON schema to ensure compatibility with the Gemini API.
+ * The Gemini API does not fully support certain JSON Schema features like $defs, $ref,
+ * additionalProperties, and complex union types (anyOf, allOf, oneOf).
+ * This recursively removes those unsupported keys.
+ */
+function sanitizeMcpSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) {
+    return schema.map(sanitizeMcpSchema);
+  }
+  if (schema !== null && typeof schema === 'object') {
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(schema)) {
+      // Skip unsupported JSON schema keys
+      if (
+        [
+          '$defs',
+          'definitions',
+          '$ref',
+          'anyOf',
+          'allOf',
+          'oneOf',
+          'additionalProperties',
+          'default',
+        ].includes(key)
+      ) {
+        continue;
+      }
+      sanitized[key] = sanitizeMcpSchema(value);
+    }
+
+    // If the schema is an object but has no properties, some APIs reject it.
+    // Ensure minimal valid structure if properties were stripped.
+    if (sanitized['type'] === 'object' && !sanitized['properties']) {
+      sanitized['properties'] = {};
+    }
+
+    return sanitized;
+  }
+  return schema;
+}
+
+/**
  * Discovers and sanitizes tools from a connected MCP client.
  * It retrieves function declarations from the client, filters out disabled tools,
  * generates valid names for them, and wraps them in `DiscoveredMCPTool` instances.
@@ -1241,23 +1284,34 @@ export async function discoverTools(
           continue;
         }
 
+        // Sanitize the input schema to remove unsupported Gemini API JSON schema features
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const sanitizedSchema = sanitizeMcpSchema(
+          toolDef.inputSchema,
+        ) as McpTool['inputSchema'];
+        // Use the sanitized schema instead of the original
+        const safeToolDef = {
+          ...toolDef,
+          inputSchema: sanitizedSchema ?? { type: 'object', properties: {} },
+        };
+
         const mcpCallableTool = new McpCallableTool(
           mcpClient,
-          toolDef,
+          safeToolDef,
           mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
           options?.progressReporter,
         );
 
         // Extract annotations from the tool definition
-        const annotations = toolDef.annotations;
+        const annotations = safeToolDef.annotations;
         const isReadOnly = annotations?.readOnlyHint === true;
 
         const tool = new DiscoveredMCPTool(
           mcpCallableTool,
           mcpServerName,
-          toolDef.name,
-          toolDef.description ?? '',
-          toolDef.inputSchema ?? { type: 'object', properties: {} },
+          safeToolDef.name,
+          safeToolDef.description ?? '',
+          safeToolDef.inputSchema,
           messageBus,
           mcpServerConfig.trust,
           isReadOnly,
@@ -1265,7 +1319,8 @@ export async function discoverTools(
           cliConfig,
           mcpServerConfig.extension?.name,
           mcpServerConfig.extension?.id,
-          annotations as Record<string, unknown> | undefined,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          annotations as McpTool['inputSchema'] | undefined,
         );
 
         discoveredTools.push(tool);
@@ -1341,7 +1396,7 @@ class McpCallableTool implements CallableTool {
         {
           name: call.name!,
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          arguments: call.args as Record<string, unknown>,
+          arguments: call.args as McpTool['inputSchema'],
           _meta: { progressToken },
         },
         undefined,

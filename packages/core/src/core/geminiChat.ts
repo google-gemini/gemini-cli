@@ -29,6 +29,7 @@ import type { Config } from '../config/config.js';
 import {
   resolveModel,
   isGemini2Model,
+  isGemini3Model,
   supportsModernFeatures,
 } from '../config/models.js';
 import { hasCycleInSchema } from '../tools/tools.js';
@@ -421,7 +422,8 @@ export class GeminiChat {
               : getRetryErrorType(error);
 
             if (
-              (isContentError && isGemini2Model(model)) ||
+              (isContentError &&
+                (isGemini2Model(model) || isGemini3Model(model))) ||
               (isRetryable && !signal.aborted)
             ) {
               // The issue requests exactly 3 retries (4 attempts) for API errors during stream iteration.

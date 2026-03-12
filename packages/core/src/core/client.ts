@@ -292,7 +292,10 @@ export class GeminiClient {
 
     const toolRegistry = this.context.toolRegistry;
     const toolDeclarations = toolRegistry.getFunctionDeclarations(modelId);
-    const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
+    const tools: Tool[] =
+      toolDeclarations.length > 0
+        ? [{ functionDeclarations: toolDeclarations }]
+        : [];
     this.getChat().setTools(tools);
   }
 
@@ -356,7 +359,10 @@ export class GeminiClient {
 
     const toolRegistry = this.context.toolRegistry;
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
-    const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
+    const tools: Tool[] =
+      toolDeclarations.length > 0
+        ? [{ functionDeclarations: toolDeclarations }]
+        : [];
 
     const history = await getInitialChatHistory(this.config, extraHistory);
 
@@ -374,7 +380,9 @@ export class GeminiClient {
           const toolRegistry = this.context.toolRegistry;
           const toolDeclarations =
             toolRegistry.getFunctionDeclarations(modelId);
-          return [{ functionDeclarations: toolDeclarations }];
+          return toolDeclarations.length > 0
+            ? [{ functionDeclarations: toolDeclarations }]
+            : [];
         },
       );
     } catch (error) {
