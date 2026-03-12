@@ -174,11 +174,6 @@ class ThemeManager {
       return;
     }
 
-    debugLogger.log(
-      `Registering extension themes for "${extensionName}":`,
-      customThemes,
-    );
-
     for (const customThemeConfig of customThemes) {
       const namespacedName = `${customThemeConfig.name} (${extensionName})`;
 
