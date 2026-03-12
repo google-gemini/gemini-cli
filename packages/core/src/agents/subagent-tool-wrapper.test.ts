@@ -103,9 +103,19 @@ describe('SubagentToolWrapper', () => {
 
       expect(schema.name).toBe(mockDefinition.name);
       expect(schema.description).toBe(mockDefinition.description);
-      expect(schema.parametersJsonSchema).toEqual(
-        mockDefinition.inputConfig.inputSchema,
-      );
+      expect(schema.parametersJsonSchema).toEqual({
+        ...(mockDefinition.inputConfig.inputSchema as Record<string, unknown>),
+        properties: {
+          ...((
+            mockDefinition.inputConfig.inputSchema as Record<string, unknown>
+          )['properties'] as Record<string, unknown>),
+          wait_for_previous: {
+            type: 'boolean',
+            description:
+              'Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.',
+          },
+        },
+      });
     });
   });
 

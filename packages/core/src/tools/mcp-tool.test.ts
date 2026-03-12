@@ -150,7 +150,17 @@ describe('DiscoveredMCPTool', () => {
       );
       expect(tool.schema.description).toBe(baseDescription);
       expect(tool.schema.parameters).toBeUndefined();
-      expect(tool.schema.parametersJsonSchema).toEqual(inputSchema);
+      expect(tool.schema.parametersJsonSchema).toEqual({
+        ...inputSchema,
+        properties: {
+          ...(inputSchema['properties'] as Record<string, unknown>),
+          wait_for_previous: {
+            type: 'boolean',
+            description:
+              'Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.',
+          },
+        },
+      });
       expect(tool.serverToolName).toBe(serverToolName);
     });
   });
