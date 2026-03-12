@@ -248,4 +248,70 @@ describe('gemini.tsx main function cleanup', () => {
       expect.objectContaining({ message: 'Cleanup failed' }),
     );
   });
+
+  it('should register SessionEnd hook exactly once in non-interactive mode', async () => {
+    const { loadCliConfig, parseArguments } = await import(
+      './config/config.js'
+    );
+    const { registerCleanup } = await import('./utils/cleanup.js');
+
+    const mockHookSystem = {
+      fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
+      fireSessionStartEvent: vi.fn().mockResolvedValue(undefined),
+    };
+
+    vi.mocked(parseArguments).mockResolvedValue({
+      promptInteractive: false,
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    vi.mocked(loadCliConfig).mockResolvedValue({
+      isInteractive: vi.fn(() => false),
+      getQuestion: vi.fn(() => 'test'),
+      getSandbox: vi.fn(() => false),
+      getDebugMode: vi.fn(() => false),
+      getPolicyEngine: vi.fn(),
+      getMessageBus: () => ({ subscribe: vi.fn() }),
+      getEnableHooks: vi.fn(() => true),
+      getHookSystem: () => mockHookSystem,
+      initialize: vi.fn(),
+      storage: { initialize: vi.fn().mockResolvedValue(undefined) },
+      getContentGeneratorConfig: vi.fn(),
+      getMcpServers: () => ({}),
+      getMcpClientManager: vi.fn(),
+      getIdeMode: vi.fn(() => false),
+      getAcpMode: vi.fn(() => false),
+      getScreenReader: vi.fn(() => false),
+      getGeminiMdFileCount: vi.fn(() => 0),
+      getProjectRoot: vi.fn(() => '/'),
+      getListExtensions: vi.fn(() => false),
+      getListSessions: vi.fn(() => false),
+      getDeleteSession: vi.fn(() => undefined),
+      getToolRegistry: vi.fn(),
+      getExtensions: vi.fn(() => []),
+      getModel: vi.fn(() => 'gemini-pro'),
+      getEmbeddingModel: vi.fn(() => 'embedding-001'),
+      getApprovalMode: vi.fn(() => 'default'),
+      getCoreTools: vi.fn(() => []),
+      getTelemetryEnabled: vi.fn(() => false),
+      getTelemetryLogPromptsEnabled: vi.fn(() => false),
+      getFileFilteringRespectGitIgnore: vi.fn(() => true),
+      getOutputFormat: vi.fn(() => 'text'),
+      getUsageStatisticsEnabled: vi.fn(() => false),
+      setTerminalBackground: vi.fn(),
+      refreshAuth: vi.fn(),
+      getRemoteAdminSettings: vi.fn(() => undefined),
+      getUseAlternateBuffer: vi.fn(() => false),
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+
+    await main();
+
+    const sessionEndCalls = vi
+      .mocked(registerCleanup)
+      .mock.calls.filter(([fn]) =>
+        fn.toString().includes('fireSessionEndEvent'),
+      );
+    expect(sessionEndCalls).toHaveLength(1);
+  });
 });
