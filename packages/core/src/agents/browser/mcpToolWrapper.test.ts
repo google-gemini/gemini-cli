@@ -68,6 +68,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       expect(tools).toHaveLength(2);
@@ -79,6 +80,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       // Descriptions include augmented hints, so we check they contain the original
@@ -92,6 +94,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const schema = tools[0].schema;
@@ -105,6 +108,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const invocation = tools[0].build({ verbose: true });
@@ -117,6 +121,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const invocation = tools[0].build({});
@@ -130,6 +135,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const invocation = tools[1].build({ uid: 'elem-123' });
@@ -148,6 +154,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const invocation = tools[0].build({ verbose: true });
@@ -166,6 +173,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const invocation = tools[1].build({ uid: 'invalid' });
@@ -183,6 +191,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const invocation = tools[0].build({});

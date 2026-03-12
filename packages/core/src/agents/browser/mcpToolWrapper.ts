@@ -235,11 +235,13 @@ class McpDeclarativeTool extends DeclarativeTool<
  *
  * @param browserManager The browser manager with isolated MCP client
  * @param messageBus Message bus for tool invocations
+ * @param shouldDisableInput Whether input should be disabled for this agent
  * @returns Array of DeclarativeTools that dispatch to the isolated MCP client
  */
 export async function createMcpDeclarativeTools(
   browserManager: BrowserManager,
   messageBus: MessageBus,
+  shouldDisableInput: boolean,
 ): Promise<McpDeclarativeTool[]> {
   // Get dynamically discovered tools from the MCP server
   const mcpTools = await browserManager.getDiscoveredTools();
@@ -262,6 +264,7 @@ export async function createMcpDeclarativeTools(
       augmentedDescription,
       schema.parametersJsonSchema,
       messageBus,
+      shouldDisableInput,
     );
   });
 

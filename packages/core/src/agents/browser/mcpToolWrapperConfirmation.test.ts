@@ -51,6 +51,7 @@ describe('mcpToolWrapper Confirmation', () => {
     const tools = await createMcpDeclarativeTools(
       mockBrowserManager,
       mockMessageBus,
+      false,
     );
     const invocation = tools[0].build({}) as unknown as TestableConfirmation;
 
@@ -86,6 +87,7 @@ describe('mcpToolWrapper Confirmation', () => {
     const tools = await createMcpDeclarativeTools(
       mockBrowserManager,
       mockMessageBus,
+      false,
     );
     const invocation = tools[0].build({}) as unknown as TestableConfirmation;
 
