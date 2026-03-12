@@ -28,9 +28,10 @@ import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import { ToolErrorType } from './tool-error.js';
 import type { TrackerTask, TaskType } from '../services/trackerTypes.js';
 import { TaskStatus } from '../services/trackerTypes.js';
+import type { TrackerService } from '../services/trackerService.js';
 
 async function buildTodosReturnDisplay(
-  service: ReturnType<Config['getTrackerService']>,
+  service: TrackerService,
 ): Promise<TodoList> {
   const tasks = await service.listTasks();
   const childrenMap = new Map<string, TrackerTask[]>();

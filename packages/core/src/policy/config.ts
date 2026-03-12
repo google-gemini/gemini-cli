@@ -29,7 +29,16 @@ import { type MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
-import { SHELL_TOOL_NAME, SENSITIVE_TOOLS } from '../tools/tool-names.js';
+import {
+  SHELL_TOOL_NAME,
+  SENSITIVE_TOOLS,
+  TRACKER_CREATE_TASK_TOOL_NAME,
+  TRACKER_UPDATE_TASK_TOOL_NAME,
+  TRACKER_GET_TASK_TOOL_NAME,
+  TRACKER_LIST_TASKS_TOOL_NAME,
+  TRACKER_ADD_DEPENDENCY_TOOL_NAME,
+  TRACKER_VISUALIZE_TOOL_NAME,
+} from '../tools/tool-names.js';
 import { isNodeError } from '../utils/errors.js';
 import { MCP_TOOL_PREFIX } from '../tools/mcp-tool.js';
 
@@ -443,12 +452,12 @@ export async function createPolicyEngineConfig(
   // Priority: ALLOWED_TOOLS_FLAG_PRIORITY (user tier)
   if (settings.trackerEnabled) {
     const trackerToolNames = [
-      'tracker_create_task',
-      'tracker_update_task',
-      'tracker_get_task',
-      'tracker_list_tasks',
-      'tracker_add_dependency',
-      'tracker_visualize',
+      TRACKER_CREATE_TASK_TOOL_NAME,
+      TRACKER_UPDATE_TASK_TOOL_NAME,
+      TRACKER_GET_TASK_TOOL_NAME,
+      TRACKER_LIST_TASKS_TOOL_NAME,
+      TRACKER_ADD_DEPENDENCY_TOOL_NAME,
+      TRACKER_VISUALIZE_TOOL_NAME,
     ];
     for (const name of trackerToolNames) {
       rules.push({
