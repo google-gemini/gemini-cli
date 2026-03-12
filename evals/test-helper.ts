@@ -132,33 +132,14 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         execSync('git commit --allow-empty -m "Initial commit"', execOptions);
       }
 
-      let result = '';
-      if (evalCase.interactive) {
-        const run = await rig.runInteractive({
-          approvalMode: evalCase.approvalMode ?? 'yolo',
-          env: {
-            GEMINI_CLI_ACTIVITY_LOG_TARGET: activityLogFile,
-          },
-        });
-        await run.sendKeys(evalCase.prompt);
-        await run.type('\r');
-
-        // Let it process until it shows the prompt again
-        await poll(
-          () => stripAnsi(run.output).trimEnd().endsWith('>'),
-          evalCase.timeout ?? 30000,
-        );
-        result = run.output;
-      } else {
-        result = await rig.run({
-          args: evalCase.prompt,
-          approvalMode: evalCase.approvalMode ?? 'yolo',
-          timeout: evalCase.timeout,
-          env: {
-            GEMINI_CLI_ACTIVITY_LOG_TARGET: activityLogFile,
-          },
-        });
-      }
+      const result = await rig.run({
+        args: evalCase.prompt,
+        approvalMode: evalCase.approvalMode ?? 'yolo',
+        timeout: evalCase.timeout,
+        env: {
+          GEMINI_CLI_ACTIVITY_LOG_TARGET: activityLogFile,
+        },
+      });
 
       const unauthorizedErrorPrefix =
         createUnauthorizedToolError('').split("'")[0];
@@ -236,7 +217,6 @@ export interface EvalCase {
   params?: Record<string, any>;
   prompt: string;
   timeout?: number;
-  interactive?: boolean;
   files?: Record<string, string>;
   approvalMode?: 'default' | 'auto_edit' | 'yolo' | 'plan';
   assert: (rig: TestRig, result: string) => Promise<void>;
