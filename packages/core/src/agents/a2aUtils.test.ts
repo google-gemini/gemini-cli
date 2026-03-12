@@ -12,7 +12,6 @@ import {
   A2AResultReassembler,
   AUTH_REQUIRED_MSG,
   normalizeAgentCard,
-  getGrpcCredentials,
 } from './a2aUtils.js';
 import type { SendMessageResult } from './a2a-client-manager.js';
 import type {
@@ -32,18 +31,6 @@ describe('a2aUtils', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
-  });
-
-  describe('getGrpcCredentials', () => {
-    it('should return secure credentials for https', () => {
-      const credentials = getGrpcCredentials('https://test.agent');
-      expect(credentials).toBeDefined();
-    });
-
-    it('should return insecure credentials for http', () => {
-      const credentials = getGrpcCredentials('http://test.agent');
-      expect(credentials).toBeDefined();
-    });
   });
 
   describe('isTerminalState', () => {

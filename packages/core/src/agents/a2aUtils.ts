@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as grpc from '@grpc/grpc-js';
 import type {
   Message,
   Part,
@@ -249,15 +248,6 @@ export function normalizeAgentCard(card: unknown): AgentCard {
   }
 
   return result;
-}
-
-/**
- * Returns gRPC channel credentials based on the URL scheme.
- */
-export function getGrpcCredentials(url: string): grpc.ChannelCredentials {
-  return url.startsWith('https://')
-    ? grpc.credentials.createSsl()
-    : grpc.credentials.createInsecure();
 }
 
 /**

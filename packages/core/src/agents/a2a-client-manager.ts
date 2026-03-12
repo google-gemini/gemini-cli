@@ -22,9 +22,10 @@ import {
   createAuthenticatingFetchWithRetry,
 } from '@a2a-js/sdk/client';
 import { GrpcTransportFactory } from '@a2a-js/sdk/client/grpc';
+import * as grpc from '@grpc/grpc-js';
 import { v4 as uuidv4 } from 'uuid';
 import { Agent as UndiciAgent } from 'undici';
-import { getGrpcCredentials, normalizeAgentCard } from './a2aUtils.js';
+import { normalizeAgentCard } from './a2aUtils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { classifyAgentError } from './a2a-errors.js';
 
@@ -138,7 +139,9 @@ export class A2AClientManager {
           new RestTransportFactory({ fetchImpl: authFetch }),
           new JsonRpcTransportFactory({ fetchImpl: authFetch }),
           new GrpcTransportFactory({
-            grpcChannelCredentials: getGrpcCredentials(grpcUrl),
+            grpcChannelCredentials: grpcUrl.startsWith('https://')
+              ? grpc.credentials.createSsl()
+              : grpc.credentials.createInsecure(),
           }),
         ],
         cardResolver: resolver,
