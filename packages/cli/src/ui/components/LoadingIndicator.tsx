@@ -87,7 +87,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   const cancelAndTimerContent =
     showCancelAndTimer &&
     streamingState !== StreamingState.WaitingForConfirmation
-      ? `esc to cancel, ${elapsedTime < 60 ? `${elapsedTime}s` : formatDuration(elapsedTime * 1000)}`
+      ? `(esc to cancel, ${elapsedTime < 60 ? `${elapsedTime}s` : formatDuration(elapsedTime * 1000)})`
       : null;
 
   const wittyPhraseNode =
