@@ -119,6 +119,37 @@ describe('bugCommand', () => {
     expect(open).toHaveBeenCalledWith(expectedUrl);
   });
 
+  it("should treat SANDBOX='0' as no sandbox in bug report info", async () => {
+    vi.stubEnv('SANDBOX', '0');
+    const mockContext = createMockCommandContext({
+      services: {
+        config: {
+          getModel: () => 'gemini-pro',
+          getBugCommand: () => undefined,
+          getIdeMode: () => true,
+          getGeminiClient: () => ({
+            getChat: () => ({
+              getHistory: () => [],
+            }),
+          }),
+          getContentGeneratorConfig: () => ({ authType: 'oauth-personal' }),
+        },
+      },
+    });
+
+    if (!bugCommand.action) throw new Error('Action is not defined');
+    await bugCommand.action(mockContext, 'sandbox zero');
+
+    const calledUrl = vi.mocked(open).mock.calls[0]?.[0];
+    expect(calledUrl).toBeTruthy();
+    if (!calledUrl) {
+      throw new Error('Expected bug report URL to be generated');
+    }
+    const parsed = new URL(calledUrl);
+    const info = parsed.searchParams.get('info');
+    expect(info).toContain('* **Sandbox Environment:** no sandbox');
+  });
+
   it('should export chat history if available', async () => {
     const history = [
       { role: 'user', parts: [{ text: 'hello' }] },

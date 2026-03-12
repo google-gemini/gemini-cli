@@ -77,6 +77,7 @@ import {
   ValidationCancelledError,
   ValidationRequiredError,
   type AdminControlsSettings,
+  isInsideSandboxEnvironment,
 } from '@google/gemini-cli-core';
 import {
   initializeApp,
@@ -521,7 +522,7 @@ export async function main() {
   await runDeferredCommand(settings.merged);
 
   // hop into sandbox if we are outside and sandboxing is enabled
-  if (!process.env['SANDBOX']) {
+  if (!isInsideSandboxEnvironment()) {
     const memoryArgs = settings.merged.advanced.autoConfigureMemory
       ? getNodeMemoryArgs(isDebugMode)
       : [];

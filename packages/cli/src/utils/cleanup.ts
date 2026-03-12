@@ -11,6 +11,7 @@ import {
   shutdownTelemetry,
   isTelemetrySdkInitialized,
   ExitCodes,
+  isInsideSandboxEnvironment,
 } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 
@@ -135,7 +136,7 @@ export function setupTtyCheck(): () => void {
       return;
     }
 
-    if (process.env['SANDBOX']) {
+    if (isInsideSandboxEnvironment()) {
       return;
     }
 

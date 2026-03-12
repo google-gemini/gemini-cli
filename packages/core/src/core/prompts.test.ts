@@ -348,6 +348,16 @@ describe('Core System Prompt (prompts.ts)', () => {
     },
   );
 
+  it("should treat SANDBOX='0' as outside sandbox", () => {
+    vi.stubEnv('SANDBOX', '0');
+    vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
+    const prompt = getCoreSystemPrompt(mockConfig);
+    expect(prompt).toContain('You are Gemini CLI, an interactive CLI agent');
+    expect(prompt).not.toContain('# Sandbox');
+    expect(prompt).not.toContain('# macOS Seatbelt');
+    expect(prompt).not.toContain('# Outside of Sandbox');
+  });
+
   it.each([
     [true, true],
     [false, false],

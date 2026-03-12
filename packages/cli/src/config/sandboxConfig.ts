@@ -8,6 +8,7 @@ import {
   getPackageJson,
   type SandboxConfig,
   FatalSandboxError,
+  isInsideSandboxEnvironment,
 } from '@google/gemini-cli-core';
 import commandExists from 'command-exists';
 import * as os from 'node:os';
@@ -40,8 +41,8 @@ function isSandboxCommand(
 function getSandboxCommand(
   sandbox?: boolean | string | null,
 ): SandboxConfig['command'] | '' {
-  // If the SANDBOX env var is set, we're already inside the sandbox.
-  if (process.env['SANDBOX']) {
+  // Skip sandbox setup when already running inside a sandbox.
+  if (isInsideSandboxEnvironment()) {
     return '';
   }
 

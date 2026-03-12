@@ -117,6 +117,21 @@ describe('aboutCommand', () => {
     );
   });
 
+  it("should treat SANDBOX='0' as no sandbox", async () => {
+    process.env['SANDBOX'] = '0';
+    if (!aboutCommand.action) {
+      throw new Error('The about command must have an action.');
+    }
+
+    await aboutCommand.action(mockContext, '');
+
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sandboxEnv: 'no sandbox',
+      }),
+    );
+  });
+
   it('should show sandbox-exec profile when applicable', async () => {
     process.env['SANDBOX'] = 'sandbox-exec';
     process.env['SEATBELT_PROFILE'] = 'test-profile';

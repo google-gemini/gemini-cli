@@ -8,15 +8,20 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 
-vi.mock('@google/gemini-cli-core', () => ({
-  Storage: vi.fn().mockImplementation(() => ({
-    getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
-    initialize: vi.fn().mockResolvedValue(undefined),
-  })),
-  shutdownTelemetry: vi.fn(),
-  isTelemetrySdkInitialized: vi.fn().mockReturnValue(false),
-  ExitCodes: { SUCCESS: 0 },
-}));
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
+  return {
+    ...actual,
+    Storage: vi.fn().mockImplementation(() => ({
+      getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
+      initialize: vi.fn().mockResolvedValue(undefined),
+    })),
+    shutdownTelemetry: vi.fn(),
+    isTelemetrySdkInitialized: vi.fn().mockReturnValue(false),
+    ExitCodes: { SUCCESS: 0 },
+  };
+});
 
 vi.mock('node:fs', () => ({
   promises: {
@@ -271,6 +276,28 @@ describe('signal and TTY handling', () => {
       const cleanup = setupTtyCheck();
       await vi.advanceTimersByTimeAsync(5000);
       expect(process.exit).not.toHaveBeenCalled();
+      cleanup();
+      process.env['SANDBOX'] = originalSandbox;
+    });
+
+    it("should still check TTY when SANDBOX='0'", async () => {
+      const originalSandbox = process.env['SANDBOX'];
+      process.env['SANDBOX'] = '0';
+
+      Object.defineProperty(process.stdin, 'isTTY', {
+        value: false,
+        writable: true,
+        configurable: true,
+      });
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: false,
+        writable: true,
+        configurable: true,
+      });
+
+      const cleanup = setupTtyCheck();
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(process.exit).toHaveBeenCalledWith(0);
       cleanup();
       process.env['SANDBOX'] = originalSandbox;
     });

@@ -20,6 +20,9 @@ import {
   getVersion,
   INITIAL_HISTORY_LENGTH,
   debugLogger,
+  getSandboxEnv,
+  isInsideSandboxEnvironment,
+  isMacOsSeatbeltSandbox,
 } from '@google/gemini-cli-core';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 import { exportHistoryToFile } from '../utils/historyExportUtils.js';
@@ -35,10 +38,14 @@ export const bugCommand: SlashCommand = {
     const { config } = context.services;
 
     const osVersion = `${process.platform} ${process.version}`;
+    const sandboxEnvValue = getSandboxEnv();
     let sandboxEnv = 'no sandbox';
-    if (process.env['SANDBOX'] && process.env['SANDBOX'] !== 'sandbox-exec') {
-      sandboxEnv = process.env['SANDBOX'].replace(/^gemini-(?:code-)?/, '');
-    } else if (process.env['SANDBOX'] === 'sandbox-exec') {
+    if (
+      isInsideSandboxEnvironment(sandboxEnvValue) &&
+      !isMacOsSeatbeltSandbox(sandboxEnvValue)
+    ) {
+      sandboxEnv = (sandboxEnvValue ?? '').replace(/^gemini-(?:code-)?/, '');
+    } else if (isMacOsSeatbeltSandbox(sandboxEnvValue)) {
       sandboxEnv = `sandbox-exec (${
         process.env['SEATBELT_PROFILE'] || 'unknown'
       })`;

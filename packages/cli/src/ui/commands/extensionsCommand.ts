@@ -8,6 +8,8 @@ import {
   debugLogger,
   listExtensions,
   type ExtensionInstallMetadata,
+  isInsideSandboxEnvironment,
+  isMacOsSeatbeltSandbox,
 } from '@google/gemini-cli-core';
 import type { ExtensionUpdateInfo } from '../../config/extension.js';
 import { getErrorMessage } from '../../utils/errors.js';
@@ -299,10 +301,7 @@ async function exploreAction(
       type: MessageType.INFO,
       text: `Would open extensions page in your browser: ${extensionsUrl} (skipped in test environment)`,
     });
-  } else if (
-    process.env['SANDBOX'] &&
-    process.env['SANDBOX'] !== 'sandbox-exec'
-  ) {
+  } else if (isInsideSandboxEnvironment() && !isMacOsSeatbeltSandbox()) {
     context.ui.addItem({
       type: MessageType.INFO,
       text: `View available extensions at ${extensionsUrl}`,

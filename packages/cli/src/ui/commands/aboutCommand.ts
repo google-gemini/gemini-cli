@@ -16,6 +16,9 @@ import {
   UserAccountManager,
   debugLogger,
   getVersion,
+  getSandboxEnv,
+  isInsideSandboxEnvironment,
+  isMacOsSeatbeltSandbox,
 } from '@google/gemini-cli-core';
 
 export const aboutCommand: SlashCommand = {
@@ -25,10 +28,14 @@ export const aboutCommand: SlashCommand = {
   autoExecute: true,
   action: async (context) => {
     const osVersion = process.platform;
+    const sandboxEnvValue = getSandboxEnv();
     let sandboxEnv = 'no sandbox';
-    if (process.env['SANDBOX'] && process.env['SANDBOX'] !== 'sandbox-exec') {
-      sandboxEnv = process.env['SANDBOX'];
-    } else if (process.env['SANDBOX'] === 'sandbox-exec') {
+    if (
+      isInsideSandboxEnvironment(sandboxEnvValue) &&
+      !isMacOsSeatbeltSandbox(sandboxEnvValue)
+    ) {
+      sandboxEnv = sandboxEnvValue ?? sandboxEnv;
+    } else if (isMacOsSeatbeltSandbox(sandboxEnvValue)) {
       sandboxEnv = `sandbox-exec (${
         process.env['SEATBELT_PROFILE'] || 'unknown'
       })`;

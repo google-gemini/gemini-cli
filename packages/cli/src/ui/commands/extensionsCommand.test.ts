@@ -528,6 +528,20 @@ describe('extensionsCommand', () => {
       expect(open).not.toHaveBeenCalled();
     });
 
+    it("should open extensions page when SANDBOX='0'", async () => {
+      vi.stubEnv('NODE_ENV', '');
+      vi.stubEnv('SANDBOX', '0');
+      const extensionsUrl = 'https://geminicli.com/extensions/';
+
+      await exploreAction(mockContext, '');
+
+      expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+        type: MessageType.INFO,
+        text: `Opening extensions page in your browser: ${extensionsUrl}`,
+      });
+      expect(open).toHaveBeenCalledWith(extensionsUrl);
+    });
+
     it('should add an info message and not call open in NODE_ENV test environment', async () => {
       vi.stubEnv('NODE_ENV', 'test');
       vi.stubEnv('SANDBOX', '');
