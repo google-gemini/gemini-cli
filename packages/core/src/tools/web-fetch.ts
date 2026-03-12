@@ -268,64 +268,59 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     const url = convertGithubUrlToRaw(urlStr);
     if (this.isBlockedHost(url)) {
       debugLogger.warn(`[WebFetchTool] Blocked access to host: ${url}`);
-      return `Error fetching ${url}: Access to blocked or private host is not allowed.`;
+      throw new Error(
+        `Access to blocked or private host ${url} is not allowed.`,
+      );
     }
 
-    try {
-      const response = await retryWithBackoff(
-        async () => {
-          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
-            signal,
-            headers: {
-              'User-Agent': USER_AGENT,
-            },
-          });
-          if (!res.ok) {
-            const error = new Error(
-              `Request failed with status code ${res.status} ${res.statusText}`,
-            );
-            (error as ErrorWithStatus).status = res.status;
-            throw error;
-          }
-          return res;
-        },
-        {
-          retryFetchErrors: this.config.getRetryFetchErrors(),
-          onRetry: (attempt, error, delayMs) =>
-            this.handleRetry(attempt, error, delayMs),
+    const response = await retryWithBackoff(
+      async () => {
+        const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
           signal,
-        },
-      );
-
-      const bodyBuffer = await this.readResponseWithLimit(
-        response,
-        MAX_EXPERIMENTAL_FETCH_SIZE,
-      );
-      const rawContent = bodyBuffer.toString('utf8');
-      const contentType = response.headers.get('content-type') || '';
-      let textContent: string;
-
-      // Only use html-to-text if content type is HTML, or if no content type is provided (assume HTML)
-      if (
-        contentType.toLowerCase().includes('text/html') ||
-        contentType === ''
-      ) {
-        textContent = convert(rawContent, {
-          wordwrap: false,
-          selectors: [
-            { selector: 'a', options: { ignoreHref: true } },
-            { selector: 'img', format: 'skip' },
-          ],
+          headers: {
+            'User-Agent': USER_AGENT,
+          },
         });
-      } else {
-        // For other content types (text/plain, application/json, etc.), use raw text
-        textContent = rawContent;
-      }
+        if (!res.ok) {
+          const error = new Error(
+            `Request failed with status code ${res.status} ${res.statusText}`,
+          );
+          (error as ErrorWithStatus).status = res.status;
+          throw error;
+        }
+        return res;
+      },
+      {
+        retryFetchErrors: this.config.getRetryFetchErrors(),
+        onRetry: (attempt, error, delayMs) =>
+          this.handleRetry(attempt, error, delayMs),
+        signal,
+      },
+    );
 
-      return truncateString(textContent, contentBudget, TRUNCATION_WARNING);
-    } catch (e) {
-      return `Error fetching ${url}: ${getErrorMessage(e)}`;
+    const bodyBuffer = await this.readResponseWithLimit(
+      response,
+      MAX_EXPERIMENTAL_FETCH_SIZE,
+    );
+    const rawContent = bodyBuffer.toString('utf8');
+    const contentType = response.headers.get('content-type') || '';
+    let textContent: string;
+
+    // Only use html-to-text if content type is HTML, or if no content type is provided (assume HTML)
+    if (contentType.toLowerCase().includes('text/html') || contentType === '') {
+      textContent = convert(rawContent, {
+        wordwrap: false,
+        selectors: [
+          { selector: 'a', options: { ignoreHref: true } },
+          { selector: 'img', format: 'skip' },
+        ],
+      });
+    } else {
+      // For other content types (text/plain, application/json, etc.), use raw text
+      textContent = rawContent;
     }
+
+    return truncateString(textContent, contentBudget, TRUNCATION_WARNING);
   }
 
   private filterAndValidateUrls(urls: string[]): {
@@ -366,17 +361,50 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     const contentBudget = Math.floor(
       MAX_CONTENT_LENGTH / (uniqueUrls.length || 1),
     );
-    const results: string[] = [];
+    const successes: Array<{ url: string; content: string }> = [];
+    const errors: Array<{ url: string; error: string }> = [];
 
     for (const url of uniqueUrls) {
-      results.push(
-        await this.executeFallbackForUrl(url, signal, contentBudget),
-      );
+      try {
+        const content = await this.executeFallbackForUrl(
+          url,
+          signal,
+          contentBudget,
+        );
+        successes.push({ url, content });
+      } catch (e) {
+        const msg = getErrorMessage(e);
+        debugLogger.warn(
+          `[WebFetchTool] Failed to fetch fallback for ${url}: ${msg}`,
+        );
+        errors.push({ url, error: msg });
+      }
     }
 
-    const aggregatedContent = results
-      .map((content, i) => `URL: ${uniqueUrls[i]}\nContent:\n${content}`)
+    // Short-circuit: if every URL failed, return an error immediately
+    // without wasting an LLM call on empty content.
+    if (successes.length === 0) {
+      const errorSummary = errors.map((e) => `${e.url}: ${e.error}`).join('\n');
+      const errorMessage = `All fallback URLs failed:\n${errorSummary}`;
+      debugLogger.error(`[WebFetchTool] ${errorMessage}`);
+      return {
+        llmContent: `Error: ${errorMessage}`,
+        returnDisplay: `Error: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.WEB_FETCH_FALLBACK_FAILED,
+        },
+      };
+    }
+
+    const aggregatedContent = successes
+      .map((s) => `URL: ${s.url}\nContent:\n${s.content}`)
       .join('\n\n---\n\n');
+
+    const errorNotes =
+      errors.length > 0
+        ? `\n\nNote: The following URL(s) could not be fetched:\n${errors.map((e) => `- ${e.url}: ${e.error}`).join('\n')}`
+        : '';
 
     try {
       const geminiClient = this.config.getGeminiClient();
@@ -387,7 +415,7 @@ I was unable to access the URL(s) directly using the primary fetch tool. Instead
 ---
 ${aggregatedContent}
 ---
-`;
+${errorNotes}`;
       const result = await geminiClient.generateContent(
         { model: 'web-fetch-fallback' },
         [{ role: 'user', parts: [{ text: fallbackPrompt }] }],
