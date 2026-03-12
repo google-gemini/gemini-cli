@@ -25,6 +25,7 @@ import {
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import { runNonInteractive } from './nonInteractiveCli.js';
+import { voiceCommand } from './ui/commands/voiceCommand.js';
 import {
   describe,
   it,
@@ -1390,6 +1391,45 @@ describe('runNonInteractive', () => {
     expect(mockAction).toHaveBeenCalledWith(expect.any(Object), 'arg1 arg2');
 
     expect(getWrittenOutput()).toBe('Acknowledged\n');
+  });
+
+  it('should print /voice status in non-interactive mode', async () => {
+    mockSettings.merged.voice = {
+      enabled: true,
+      provider: 'whisper',
+      whisperPath: '/usr/local/bin/whisper',
+      silenceThreshold: 0,
+    } as never;
+    mockGetCommands.mockReturnValue([voiceCommand]);
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: '/voice',
+      prompt_id: 'prompt-id-voice-status',
+    });
+
+    expect(getWrittenOutput()).toContain('Voice Settings:');
+    expect(getWrittenOutput()).toContain('- Provider: whisper');
+    expect(getWrittenOutput()).toContain(
+      '- Whisper Path: /usr/local/bin/whisper',
+    );
+  });
+
+  it('should print /voice help in non-interactive mode', async () => {
+    mockGetCommands.mockReturnValue([voiceCommand]);
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: '/voice help',
+      prompt_id: 'prompt-id-voice-help',
+    });
+
+    expect(getWrittenOutput()).toContain('Voice Input Help:');
+    expect(getWrittenOutput()).toContain(
+      'Space Space (on empty prompt): Start/Stop recording',
+    );
   });
 
   it('should instantiate CommandService with correct loaders for slash commands', async () => {
