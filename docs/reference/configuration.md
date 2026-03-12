@@ -701,6 +701,10 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`agents.browser.disableUserInput`** (boolean):
+  - **Description:** Disable user input on browser window during automation.
+  - **Default:** `true`
+
 #### `context`
 
 - **`context.fileName`** (string | string[]):
