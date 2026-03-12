@@ -20,12 +20,14 @@ const voiceHelpCommand: SlashCommand = {
     const item: Omit<HistoryItemVoiceHelp, 'id'> = {
       type: MessageType.VOICE_HELP,
       timestamp: new Date(),
+      text: 'Voice Input Help:\n- Space Space (on empty prompt): Start/Stop recording\n- Esc (while recording): Cancel\n- /voice: Show current settings',
     };
     context.ui.addItem(item);
   },
 };
 
 const voiceEnableCommand: SlashCommand = {
+  // ... existing voiceEnableCommand ...
   name: 'enable',
   description: 'Enable voice input (double-tap Space on empty input to record)',
   kind: CommandKind.BUILT_IN,
@@ -45,6 +47,7 @@ const voiceEnableCommand: SlashCommand = {
 };
 
 const voiceDisableCommand: SlashCommand = {
+  // ... existing voiceDisableCommand ...
   name: 'disable',
   description: 'Disable voice input',
   kind: CommandKind.BUILT_IN,
@@ -63,6 +66,7 @@ const voiceDisableCommand: SlashCommand = {
 };
 
 const voiceProviderCommand: SlashCommand = {
+  // ... existing voiceProviderCommand ...
   name: 'provider',
   description: 'Set transcription backend: gemini (default) or whisper',
   kind: CommandKind.BUILT_IN,
@@ -89,6 +93,7 @@ const voiceProviderCommand: SlashCommand = {
 };
 
 const voiceSensitivityCommand: SlashCommand = {
+  // ... existing voiceSensitivityCommand ...
   name: 'sensitivity',
   description: 'Set silence threshold (0=off, 80=default, 300+=loud only)',
   kind: CommandKind.BUILT_IN,
@@ -128,6 +133,32 @@ const voiceSensitivityCommand: SlashCommand = {
   },
 };
 
+const voiceSetPathCommand: SlashCommand = {
+  name: 'set-path',
+  description: 'Set the path to the Whisper binary',
+  kind: CommandKind.BUILT_IN,
+  action: async (context, args) => {
+    const path = args?.trim();
+    if (!path) {
+      return {
+        type: 'message',
+        messageType: MessageType.ERROR,
+        content: 'Usage: /voice set-path <path>',
+      };
+    }
+    context.services.settings.setValue(
+      SettingScope.User,
+      'voice.whisperPath',
+      path,
+    );
+    return {
+      type: 'message',
+      messageType: MessageType.INFO,
+      content: `Whisper binary path set to: ${path}`,
+    };
+  },
+};
+
 export const voiceCommand: SlashCommand = {
   name: 'voice',
   description: 'Configure voice input settings',
@@ -138,52 +169,21 @@ export const voiceCommand: SlashCommand = {
     voiceDisableCommand,
     voiceProviderCommand,
     voiceSensitivityCommand,
+    voiceSetPathCommand,
   ],
   action: async (context, args) => {
     const trimmedArgs = args?.trim() || '';
-    const parts = trimmedArgs.split(/\s+/);
-    const subCommand = parts[0]?.toLowerCase();
+    if (trimmedArgs) {
+      const parts = trimmedArgs.split(/\s+/);
+      const subCommandName = parts[0]?.toLowerCase();
+      const subCommandArgs = trimmedArgs.slice(parts[0].length).trim();
 
-    if (subCommand === 'enable') {
-      return voiceEnableCommand.action!(context, parts.slice(1).join(' '));
-    }
-
-    if (subCommand === 'disable') {
-      return voiceDisableCommand.action!(context, parts.slice(1).join(' '));
-    }
-
-    if (subCommand === 'provider') {
-      return voiceProviderCommand.action!(context, parts.slice(1).join(' '));
-    }
-
-    if (subCommand === 'sensitivity') {
-      return voiceSensitivityCommand.action!(context, parts.slice(1).join(' '));
-    }
-
-    // /voice set-path <path> — functional but not in autocomplete hints
-    if (subCommand === 'set-path') {
-      const path = parts[1];
-      if (!path) {
-        return {
-          type: 'message',
-          messageType: MessageType.ERROR,
-          content: 'Usage: /voice set-path <path>',
-        };
-      }
-      context.services.settings.setValue(
-        SettingScope.User,
-        'voice.whisperPath',
-        path,
+      const subCommand = voiceCommand.subCommands?.find(
+        (sc) => sc.name === subCommandName,
       );
-      return {
-        type: 'message',
-        messageType: MessageType.INFO,
-        content: `Whisper binary path set to: ${path}`,
-      };
-    }
-
-    if (subCommand === 'help') {
-      return voiceHelpCommand.action!(context, '');
+      if (subCommand?.action) {
+        return subCommand.action(context, subCommandArgs);
+      }
     }
 
     // Default: show current voice settings status
@@ -201,6 +201,13 @@ export const voiceCommand: SlashCommand = {
             ? `${threshold} (moderate)`
             : `${threshold} (loud speech only)`;
 
+    const statusText =
+      `Voice Settings:\n` +
+      `- Enabled: ${enabled}\n` +
+      `- Provider: ${provider}\n` +
+      `- Sensitivity: ${sensitivityLabel}\n` +
+      `- Whisper Path: ${whisperPath}`;
+
     const statusItem: Omit<HistoryItemVoiceStatus, 'id'> = {
       type: MessageType.VOICE_STATUS,
       timestamp: new Date(),
@@ -208,6 +215,7 @@ export const voiceCommand: SlashCommand = {
       provider,
       sensitivityLabel,
       whisperPath,
+      text: statusText,
     };
     context.ui.addItem(statusItem);
     return;

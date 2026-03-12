@@ -61,6 +61,28 @@ describe('voiceCommand', () => {
     });
   });
 
+  it('sets whisper path correctly via /voice set-path including spaces', async () => {
+    if (!voiceCommand.action) {
+      throw new Error('voice command has no action');
+    }
+
+    const result = await voiceCommand.action(
+      mockContext,
+      'set-path C:\\Program Files\\whisper.exe',
+    );
+
+    expect(mockContext.services.settings.setValue).toHaveBeenCalledWith(
+      SettingScope.User,
+      'voice.whisperPath',
+      'C:\\Program Files\\whisper.exe',
+    );
+    expect(result).toEqual({
+      type: 'message',
+      messageType: MessageType.INFO,
+      content: 'Whisper binary path set to: C:\\Program Files\\whisper.exe',
+    });
+  });
+
   it('shows current voice status for bare /voice', async () => {
     if (!voiceCommand.action) {
       throw new Error('voice command has no action');
