@@ -8,85 +8,55 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as vscode from 'vscode';
 import { OpenFilesManager, MAX_FILES } from './open-files-manager.js';
 
+const { vscodeMock: baseVscodeMock, createMockTextEditor } = await vi.hoisted(
+  () => import('./utils/vscode-mock.js'),
+);
+
+let onDidChangeActiveTextEditorListener: (
+  editor: vscode.TextEditor | undefined,
+) => void;
+let onDidChangeTextEditorSelectionListener: (
+  e: vscode.TextEditorSelectionChangeEvent,
+) => void;
+let onDidDeleteFilesListener: (e: vscode.FileDeleteEvent) => void;
+let onDidCloseTextDocumentListener: (doc: vscode.TextDocument) => void;
+let onDidRenameFilesListener: (e: vscode.FileRenameEvent) => void;
+
 vi.mock('vscode', () => ({
-  EventEmitter: vi.fn(() => {
-    const listeners: Array<(e: void) => unknown> = [];
-    return {
-      event: vi.fn((listener) => {
-        listeners.push(listener);
-        return { dispose: vi.fn() };
-      }),
-      fire: vi.fn(() => {
-        listeners.forEach((listener) => listener(undefined));
-      }),
-      dispose: vi.fn(),
-    };
-  }),
+  ...baseVscodeMock,
   window: {
-    onDidChangeActiveTextEditor: vi.fn(),
-    onDidChangeTextEditorSelection: vi.fn(),
-  },
-  workspace: {
-    onDidDeleteFiles: vi.fn(),
-    onDidCloseTextDocument: vi.fn(),
-    onDidRenameFiles: vi.fn(),
-  },
-  Uri: {
-    file: (path: string) => ({
-      fsPath: path,
-      scheme: 'file',
+    ...baseVscodeMock.window,
+    onDidChangeActiveTextEditor: vi.fn((listener) => {
+      onDidChangeActiveTextEditorListener = listener;
+      return { dispose: vi.fn() };
+    }),
+    onDidChangeTextEditorSelection: vi.fn((listener) => {
+      onDidChangeTextEditorSelectionListener = listener;
+      return { dispose: vi.fn() };
     }),
   },
-  TextEditorSelectionChangeKind: {
-    Mouse: 2,
+  workspace: {
+    ...baseVscodeMock.workspace,
+    onDidDeleteFiles: vi.fn((listener) => {
+      onDidDeleteFilesListener = listener;
+      return { dispose: vi.fn() };
+    }),
+    onDidCloseTextDocument: vi.fn((listener) => {
+      onDidCloseTextDocumentListener = listener;
+      return { dispose: vi.fn() };
+    }),
+    onDidRenameFiles: vi.fn((listener) => {
+      onDidRenameFilesListener = listener;
+      return { dispose: vi.fn() };
+    }),
   },
 }));
 
 describe('OpenFilesManager', () => {
   let context: vscode.ExtensionContext;
-  let onDidChangeActiveTextEditorListener: (
-    editor: vscode.TextEditor | undefined,
-  ) => void;
-  let onDidChangeTextEditorSelectionListener: (
-    e: vscode.TextEditorSelectionChangeEvent,
-  ) => void;
-  let onDidDeleteFilesListener: (e: vscode.FileDeleteEvent) => void;
-  let onDidCloseTextDocumentListener: (doc: vscode.TextDocument) => void;
-  let onDidRenameFilesListener: (e: vscode.FileRenameEvent) => void;
 
   beforeEach(() => {
     vi.useFakeTimers();
-
-    vi.mocked(vscode.window.onDidChangeActiveTextEditor).mockImplementation(
-      (listener) => {
-        onDidChangeActiveTextEditorListener = listener;
-        return { dispose: vi.fn() };
-      },
-    );
-    vi.mocked(vscode.window.onDidChangeTextEditorSelection).mockImplementation(
-      (listener) => {
-        onDidChangeTextEditorSelectionListener = listener;
-        return { dispose: vi.fn() };
-      },
-    );
-    vi.mocked(vscode.workspace.onDidDeleteFiles).mockImplementation(
-      (listener) => {
-        onDidDeleteFilesListener = listener;
-        return { dispose: vi.fn() };
-      },
-    );
-    vi.mocked(vscode.workspace.onDidCloseTextDocument).mockImplementation(
-      (listener) => {
-        onDidCloseTextDocumentListener = listener;
-        return { dispose: vi.fn() };
-      },
-    );
-    vi.mocked(vscode.workspace.onDidRenameFiles).mockImplementation(
-      (listener) => {
-        onDidRenameFilesListener = listener;
-        return { dispose: vi.fn() };
-      },
-    );
 
     context = {
       subscriptions: [],
@@ -98,19 +68,10 @@ describe('OpenFilesManager', () => {
     vi.useRealTimers();
   });
 
-  const getUri = (path: string) =>
-    vscode.Uri.file(path) as unknown as vscode.Uri;
+  const getUri = (path: string) => vscode.Uri.file(path);
 
   const addFile = (uri: vscode.Uri) => {
-    onDidChangeActiveTextEditorListener({
-      document: {
-        uri,
-        getText: () => '',
-      },
-      selection: {
-        active: { line: 0, character: 0 },
-      },
-    } as unknown as vscode.TextEditor);
+    onDidChangeActiveTextEditorListener(createMockTextEditor(uri));
   };
 
   it('adds a file to the list', async () => {
@@ -203,7 +164,7 @@ describe('OpenFilesManager', () => {
     await vi.advanceTimersByTimeAsync(100);
     expect(manager.state.workspaceState!.openFiles).toHaveLength(2);
 
-    onDidDeleteFilesListener({ files: [uri1] });
+    onDidDeleteFilesListener({ files: [uri1] } as vscode.FileDeleteEvent);
     await vi.advanceTimersByTimeAsync(100);
 
     expect(manager.state.workspaceState!.openFiles).toHaveLength(1);
@@ -221,7 +182,7 @@ describe('OpenFilesManager', () => {
     const onDidChangeSpy = vi.fn();
     manager.onDidChange(onDidChangeSpy);
 
-    onDidDeleteFilesListener({ files: [uri] });
+    onDidDeleteFilesListener({ files: [uri] } as vscode.FileDeleteEvent);
     await vi.advanceTimersByTimeAsync(100);
 
     expect(onDidChangeSpy).toHaveBeenCalled();
@@ -238,7 +199,7 @@ describe('OpenFilesManager', () => {
     await vi.advanceTimersByTimeAsync(100);
     expect(manager.state.workspaceState!.openFiles).toHaveLength(3);
 
-    onDidDeleteFilesListener({ files: [uri1, uri3] });
+    onDidDeleteFilesListener({ files: [uri1, uri3] } as vscode.FileDeleteEvent);
     await vi.advanceTimersByTimeAsync(100);
 
     expect(manager.state.workspaceState!.openFiles).toHaveLength(1);
@@ -272,7 +233,9 @@ describe('OpenFilesManager', () => {
       '/test/file1.txt',
     );
 
-    onDidRenameFilesListener({ files: [{ oldUri, newUri }] });
+    onDidRenameFilesListener({
+      files: [{ oldUri, newUri }],
+    } as vscode.FileRenameEvent);
     await vi.advanceTimersByTimeAsync(100);
 
     expect(manager.state.workspaceState!.openFiles).toHaveLength(1);
@@ -304,11 +267,11 @@ describe('OpenFilesManager', () => {
       active: { line: 10, character: 20 },
     } as vscode.Selection;
 
+    const editor = createMockTextEditor(uri) as vscode.TextEditor;
+    editor.selection = selection;
+
     onDidChangeTextEditorSelectionListener({
-      textEditor: {
-        document: { uri, getText: () => '' },
-        selection,
-      } as vscode.TextEditor,
+      textEditor: editor,
       selections: [selection],
       kind: vscode.TextEditorSelectionChangeKind.Mouse,
     });
@@ -326,20 +289,17 @@ describe('OpenFilesManager', () => {
       active: { line: 10, character: 20 },
     } as vscode.Selection;
 
-    // We need to override the mock for getText for this test
-    const textEditor = {
-      document: {
-        uri,
-        getText: vi.fn().mockReturnValue('selected text'),
-      },
-      selection,
-    } as unknown as vscode.TextEditor;
+    const editor = createMockTextEditor(
+      uri,
+      'selected text',
+    ) as vscode.TextEditor;
+    editor.selection = selection;
 
-    onDidChangeActiveTextEditorListener(textEditor);
+    addFile(uri);
     await vi.advanceTimersByTimeAsync(100);
 
     onDidChangeTextEditorSelectionListener({
-      textEditor,
+      textEditor: editor,
       selections: [selection],
       kind: vscode.TextEditorSelectionChangeKind.Mouse,
     });
@@ -348,7 +308,7 @@ describe('OpenFilesManager', () => {
 
     const file = manager.state.workspaceState!.openFiles![0];
     expect(file.selectedText).toBe('selected text');
-    expect(textEditor.document.getText).toHaveBeenCalledWith(selection);
+    expect(editor.document.getText).toHaveBeenCalledWith(selection);
   });
 
   it('truncates long selected text', async () => {
@@ -361,19 +321,14 @@ describe('OpenFilesManager', () => {
       active: { line: 10, character: 20 },
     } as vscode.Selection;
 
-    const textEditor = {
-      document: {
-        uri,
-        getText: vi.fn().mockReturnValue(longText),
-      },
-      selection,
-    } as unknown as vscode.TextEditor;
+    const editor = createMockTextEditor(uri, longText) as vscode.TextEditor;
+    editor.selection = selection;
 
-    onDidChangeActiveTextEditorListener(textEditor);
+    addFile(uri);
     await vi.advanceTimersByTimeAsync(100);
 
     onDidChangeTextEditorSelectionListener({
-      textEditor,
+      textEditor: editor,
       selections: [selection],
       kind: vscode.TextEditorSelectionChangeKind.Mouse,
     });
@@ -396,11 +351,11 @@ describe('OpenFilesManager', () => {
       active: { line: 10, character: 20 },
     } as vscode.Selection;
 
+    const editor = createMockTextEditor(uri1) as vscode.TextEditor;
+    editor.selection = selection;
+
     onDidChangeTextEditorSelectionListener({
-      textEditor: {
-        document: { uri: uri1, getText: () => '' },
-        selection,
-      } as vscode.TextEditor,
+      textEditor: editor,
       selections: [selection],
       kind: vscode.TextEditorSelectionChangeKind.Mouse,
     });
