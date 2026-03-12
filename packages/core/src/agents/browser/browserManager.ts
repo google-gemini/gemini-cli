@@ -24,10 +24,11 @@ import { debugLogger } from '../../utils/debugLogger.js';
 import type { Config } from '../../config/config.js';
 import { Storage } from '../../config/storage.js';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { injectAutomationOverlay } from './automationOverlay.js';
 
-// Pin chrome-devtools-mcp version for reproducibility.
-const CHROME_DEVTOOLS_MCP_VERSION = '0.17.1';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Default browser profile directory name within ~/.gemini/
 const BROWSER_PROFILE_DIR = 'cli-browser-profile';
@@ -251,7 +252,7 @@ export class BrowserManager {
       this.rawMcpClient = undefined;
     }
 
-    // Close transport (this terminates the npx process and browser)
+    // Close transport (this terminates the browser)
     if (this.mcpTransport) {
       try {
         await this.mcpTransport.close();
@@ -269,8 +270,7 @@ export class BrowserManager {
   /**
    * Connects to chrome-devtools-mcp which manages the browser process.
    *
-   * Spawns npx chrome-devtools-mcp with:
-   * - --isolated: Manages its own browser instance
+   * Spawns node with the bundled chrome-devtools-mcp.mjs.
    * - --experimental-vision: Enables visual tools (click_at, etc.)
    *
    * IMPORTANT: This does NOT use McpClientManager and does NOT register
@@ -295,11 +295,7 @@ export class BrowserManager {
     const browserConfig = this.config.getBrowserAgentConfig();
     const sessionMode = browserConfig.customConfig.sessionMode ?? 'persistent';
 
-    const mcpArgs = [
-      '-y',
-      `chrome-devtools-mcp@${CHROME_DEVTOOLS_MCP_VERSION}`,
-      '--experimental-vision',
-    ];
+    const mcpArgs = ['--experimental-vision'];
 
     // Session mode determines how the browser is managed:
     // - "isolated": Temp profile, cleaned up after session (--isolated)
@@ -328,15 +324,23 @@ export class BrowserManager {
     }
 
     debugLogger.log(
-      `Launching chrome-devtools-mcp (${sessionMode} mode) with args: ${mcpArgs.join(' ')}`,
+      `Launching bundled chrome-devtools-mcp (${sessionMode} mode) with args: ${mcpArgs.join(' ')}`,
     );
 
-    // Create stdio transport to npx chrome-devtools-mcp.
+    // Create stdio transport to the bundled chrome-devtools-mcp.
     // stderr is piped (not inherited) to prevent MCP server banners and
     // warnings from corrupting the UI in alternate buffer mode.
+    const isCompiled = __dirname.includes(`${path.sep}dist${path.sep}`);
+    const bundleMcpPath = path.resolve(
+      __dirname,
+      isCompiled
+        ? '../../bundled/chrome-devtools-mcp.mjs'
+        : '../../../dist/bundled/chrome-devtools-mcp.mjs',
+    );
+
     this.mcpTransport = new StdioClientTransport({
-      command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
-      args: mcpArgs,
+      command: 'node',
+      args: [bundleMcpPath, ...mcpArgs],
       stderr: 'pipe',
     });
 
@@ -446,8 +450,7 @@ export class BrowserManager {
         `Timed out connecting to Chrome: ${message}\n\n` +
           `Possible causes:\n` +
           `  1. Chrome is not installed or not in PATH\n` +
-          `  2. npx cannot download chrome-devtools-mcp (check network/proxy)\n` +
-          `  3. Chrome failed to start (try setting headless: true in settings.json)`,
+          `  2. Chrome failed to start (try setting headless: true in settings.json)`,
       );
     }
 

@@ -6,5 +6,10 @@
   },
   "general": {
     "devtools": true
+  },
+  "agents": {
+    "overrides": {
+      "browser_agent": { "enabled": true }
+    }
   }
 }

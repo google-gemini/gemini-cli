@@ -31,6 +31,13 @@ const packageName = basename(process.cwd());
 // build typescript files
 execSync('tsc --build', { stdio: 'inherit' });
 
+// Run package-specific bundling if the script exists
+const bundleScript = join(process.cwd(), 'scripts', 'bundle-browser-mcp.mjs');
+if (packageName === 'core' && existsSync(bundleScript)) {
+  console.log('Running browser MCP bundling...');
+  execSync(`node ${bundleScript}`, { stdio: 'inherit' });
+}
+
 // copy .{md,json} files
 execSync('node ../../scripts/copy_files.js', { stdio: 'inherit' });
 

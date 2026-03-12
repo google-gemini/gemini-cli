@@ -153,10 +153,9 @@ describe('BrowserManager', () => {
       // Verify StdioClientTransport was created with correct args
       expect(StdioClientTransport).toHaveBeenCalledWith(
         expect.objectContaining({
-          command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
+          command: 'node',
           args: expect.arrayContaining([
-            '-y',
-            expect.stringMatching(/chrome-devtools-mcp@/),
+            expect.stringMatching(/chrome-devtools-mcp\.mjs$/),
             '--experimental-vision',
           ]),
         }),
@@ -166,6 +165,7 @@ describe('BrowserManager', () => {
         ?.args as string[];
       expect(args).not.toContain('--isolated');
       expect(args).not.toContain('--autoConnect');
+      expect(args).not.toContain('-y');
       // Persistent mode should set the default --userDataDir under ~/.gemini
       expect(args).toContain('--userDataDir');
       const userDataDirIndex = args.indexOf('--userDataDir');
@@ -191,7 +191,7 @@ describe('BrowserManager', () => {
 
       expect(StdioClientTransport).toHaveBeenCalledWith(
         expect.objectContaining({
-          command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
+          command: 'node',
           args: expect.arrayContaining(['--headless']),
         }),
       );
@@ -216,7 +216,7 @@ describe('BrowserManager', () => {
 
       expect(StdioClientTransport).toHaveBeenCalledWith(
         expect.objectContaining({
-          command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
+          command: 'node',
           args: expect.arrayContaining(['--userDataDir', '/path/to/profile']),
         }),
       );
