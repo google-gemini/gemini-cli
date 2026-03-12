@@ -211,13 +211,14 @@ export const Scrollable: React.FC<ScrollableProps> = ({
   );
 
   const getScrollState = useCallback(() => {
-    const maxScroll = Math.max(0, size.scrollHeight - size.innerHeight);
+    const { scrollHeight, innerHeight } = sizeRef.current;
+    const maxScroll = Math.max(0, scrollHeight - innerHeight);
     return {
       scrollTop: Math.min(getScrollTop(), maxScroll),
-      scrollHeight: size.scrollHeight,
-      innerHeight: size.innerHeight,
+      scrollHeight,
+      innerHeight,
     };
-  }, [getScrollTop, size.scrollHeight, size.innerHeight]);
+  }, [getScrollTop]);
 
   const hasFocusCallback = useCallback(() => hasFocus, [hasFocus]);
 

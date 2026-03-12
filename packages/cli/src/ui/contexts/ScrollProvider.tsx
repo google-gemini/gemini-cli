@@ -75,26 +75,15 @@ const findScrollableCandidates = (
 export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [scrollables, setScrollables] = useState(
-    new Map<string, ScrollableEntry>(),
-  );
+  const scrollablesRef = useRef(new Map<string, ScrollableEntry>());
 
   const register = useCallback((entry: ScrollableEntry) => {
-    setScrollables((prev) => new Map(prev).set(entry.id, entry));
+    scrollablesRef.current.set(entry.id, entry);
   }, []);
 
   const unregister = useCallback((id: string) => {
-    setScrollables((prev) => {
-      const next = new Map(prev);
-      next.delete(id);
-      return next;
-    });
+    scrollablesRef.current.delete(id);
   }, []);
-
-  const scrollablesRef = useRef(scrollables);
-  useEffect(() => {
-    scrollablesRef.current = scrollables;
-  }, [scrollables]);
 
   const pendingScrollsRef = useRef(new Map<string, number>());
   const flushScheduledRef = useRef(false);
