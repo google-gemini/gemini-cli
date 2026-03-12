@@ -72,6 +72,8 @@ const findScrollableCandidates = (
   return candidates;
 };
 
+const MOUSE_SCROLL_DELTA = 3;
+
 export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -126,7 +128,7 @@ export const ScrollProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const handleScroll = (direction: 'up' | 'down', mouseEvent: MouseEvent) => {
-    const delta = direction === 'up' ? -3 : 3;
+    const delta = direction === 'up' ? -MOUSE_SCROLL_DELTA : MOUSE_SCROLL_DELTA;
     const candidates = findScrollableCandidates(
       mouseEvent,
       scrollablesRef.current,
