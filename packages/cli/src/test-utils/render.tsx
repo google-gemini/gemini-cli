@@ -11,10 +11,10 @@ import {
 } from 'ink';
 import { EventEmitter } from 'node:events';
 import { Box } from 'ink';
-import type React from 'react';
 import { Terminal } from '@xterm/headless';
 import { vi } from 'vitest';
 import stripAnsi from 'strip-ansi';
+import type React from 'react';
 import { act, useState } from 'react';
 import os from 'node:os';
 import path from 'node:path';

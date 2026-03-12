@@ -30,6 +30,7 @@ import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
+import { NoopSandboxManager } from './sandboxManager.js';
 import { killProcessGroup } from '../utils/process-utils.js';
 const { Terminal } = pkg;
 
@@ -326,6 +327,15 @@ export class ShellExecutionService {
     shouldUseNodePty: boolean,
     shellExecutionConfig: ShellExecutionConfig,
   ): Promise<ShellExecutionHandle> {
+    const sandboxManager = new NoopSandboxManager();
+    const { env: sanitizedEnv } = await sandboxManager.prepareCommand({
+      command: commandToExecute,
+      args: [],
+      env: process.env,
+      cwd,
+      config: shellExecutionConfig,
+    });
+
     if (shouldUseNodePty) {
       const ptyInfo = await getPty();
       if (ptyInfo) {
@@ -337,6 +347,7 @@ export class ShellExecutionService {
             abortSignal,
             shellExecutionConfig,
             ptyInfo,
+            sanitizedEnv,
           );
         } catch (_e) {
           // Fallback to child_process
@@ -695,6 +706,7 @@ export class ShellExecutionService {
     abortSignal: AbortSignal,
     shellExecutionConfig: ShellExecutionConfig,
     ptyInfo: PtyImplementation,
+    sanitizedEnv: Record<string, string | undefined>,
   ): Promise<ShellExecutionHandle> {
     if (!ptyInfo) {
       // This should not happen, but as a safeguard...
@@ -724,10 +736,7 @@ export class ShellExecutionService {
         cols,
         rows,
         env: {
-          ...sanitizeEnvironment(
-            process.env,
-            shellExecutionConfig.sanitizationConfig,
-          ),
+          ...sanitizedEnv,
           GEMINI_CLI: '1',
           TERM: 'xterm-256color',
           PAGER: shellExecutionConfig.pager ?? 'cat',
@@ -1181,10 +1190,12 @@ export class ShellExecutionService {
     await this.cleanupLogStream(pid);
 
     if (activeChild) {
-      killProcessGroup({ pid }).catch(() => {});
+      await killProcessGroup({ pid }).catch(() => {});
       this.activeChildProcesses.delete(pid);
     } else if (activePty) {
-      killProcessGroup({ pid, pty: activePty.ptyProcess }).catch(() => {});
+      await killProcessGroup({ pid, pty: activePty.ptyProcess }).catch(
+        () => {},
+      );
       try {
         (activePty.ptyProcess as IPty & { destroy?: () => void }).destroy?.();
       } catch {

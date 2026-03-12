@@ -36,6 +36,7 @@ const createTestState = (
   visualLayout: defaultVisualLayout,
   pastedContent: {},
   expandedPaste: null,
+  yankRegister: null,
 });
 
 describe('vim-buffer-actions', () => {
@@ -2225,6 +2226,444 @@ describe('vim-buffer-actions', () => {
       });
       expect(result.lines[0]).toBe('h');
       expect(result.cursorCol).toBe(0);
+    });
+  });
+
+  describe('vim yank and paste', () => {
+    describe('vim_yank_line (yy)', () => {
+      it('should yank current line into register as linewise', () => {
+        const state = createTestState(['hello world'], 0, 0);
+        const result = handleVimAction(state, {
+          type: 'vim_yank_line' as const,
+          payload: { count: 1 },
+        });
+        expect(result.yankRegister).toEqual({
+          text: 'hello world',
+          linewise: true,
+        });
+      });
+
+      it('should not modify the buffer or cursor position', () => {
+        const state = createTestState(['hello world'], 0, 3);
+        const result = handleVimAction(state, {
+          type: 'vim_yank_line' as const,
+          payload: { count: 1 },
+        });
+        expect(result.lines).toEqual(['hello world']);
+        expect(result.cursorRow).toBe(0);
+        expect(result.cursorCol).toBe(3);
+      });
+
+      it('should yank multiple lines with count', () => {
+        const state = createTestState(['line1', 'line2', 'line3'], 0, 0);
+        const result = handleVimAction(state, {
+          type: 'vim_yank_line' as const,
+          payload: { count: 2 },
+        });
+        expect(result.yankRegister).toEqual({
+          text: 'line1\nline2',
+          linewise: true,
+        });
+        expect(result.lines).toEqual(['line1', 'line2', 'line3']);
+      });
+
+      it('should clamp count to available lines', () => {
+        const state = createTestState(['only'], 0, 0);
+        const result = handleVimAction(state, {
+          type: 'vim_yank_line' as const,
+          payload: { count: 99 },
+        });
+        expect(result.yankRegister).toEqual({ text: 'only', linewise: true });
+      });
+    });
+
+    describe('vim_yank_word_forward (yw)', () => {
+      it('should yank from cursor to start of next word', () => {
+        const state = createTestState(['hello world'], 0, 0);
+        const result = handleVimAction(state, {
+          type: 'vim_yank_word_forward' as const,
+          payload: { count: 1 },
+        });
+        expect(result.yankRegister).toEqual({
+          text: 'hello ',
+          linewise: false,
+        });
+        expect(result.lines).toEqual(['hello world']);
+      });
+    });
+
+    describe('vim_yank_big_word_forward (yW)', () => {
+      it('should yank from cursor to start of next big word', () => {
+        const state = createTestState(['hello world'], 0, 0);
+        const result = handleVimAction(state, {
+          type: 'vim_yank_big_word_forward' as const,
+          payload: { count: 1 },
+        });
+        expect(result.yankRegister).toEqual({
+          text: 'hello ',
+          linewise: false,
+        });
+        expect(result.lines).toEqual(['hello world']);
+      });
+    });
+
+    describe('vim_yank_word_end (ye)', () => {
+      it('should yank from cursor to end of current word', () => {
+        const state = createTestState(['hello world'], 0, 0);
+        const result = handleVimAction(state, {
+          type: 'vim_yank_word_end' as const,
+          payload: { count: 1 },
+        });
+        expect(result.yankRegister).toEqual({ text: 'hello', linewise: false });
+        expect(result.lines).toEqual(['hello world']);
+      });
+    });
+
+    describe('vim_yank_big_word_end (yE)', () => {
+      it('should yank from cursor to end of current big word', () => {
+        const state = createTestState(['hello world'], 0, 0);
+        const result = handleVimAction(state, {
+          type: 'vim_yank_big_word_end' as const,
+          payload: { count: 1 },
+        });
+        expect(result.yankRegister).toEqual({ text: 'hello', linewise: false });
+        expect(result.lines).toEqual(['hello world']);
+      });
+    });
+
+    describe('vim_yank_to_end_of_line (y$)', () => {
+      it('should yank from cursor to end of line', () => {
+        const state = createTestState(['hello world'], 0, 6);
+        const result = handleVimAction(state, {
+          type: 'vim_yank_to_end_of_line' as const,
+          payload: { count: 1 },
+        });
+        expect(result.yankRegister).toEqual({ text: 'world', linewise: false });
+        expect(result.lines).toEqual(['hello world']);
+      });
+
+      it('should do nothing when cursor is at end of line', () => {
+        const state = createTestState(['hello'], 0, 5);
+        const result = handleVimAction(state, {
+          type: 'vim_yank_to_end_of_line' as const,
+          payload: { count: 1 },
+        });
+        expect(result.yankRegister).toBeNull();
+      });
+    });
+
+    describe('delete operations populate yankRegister', () => {
+      it('should populate register on x (vim_delete_char)', () => {
+        const state = createTestState(['hello'], 0, 1);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_char' as const,
+          payload: { count: 1 },
+        });
+        expect(result.yankRegister).toEqual({ text: 'e', linewise: false });
+        expect(result.lines[0]).toBe('hllo');
+      });
+
+      it('should populate register on X (vim_delete_char_before)', () => {
+        // cursor at col 2 ('l'); X deletes the char before = col 1 ('e')
+        const state = createTestState(['hello'], 0, 2);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_char_before' as const,
+          payload: { count: 1 },
+        });
+        expect(result.yankRegister).toEqual({ text: 'e', linewise: false });
+        expect(result.lines[0]).toBe('hllo');
+      });
+
+      it('should populate register on dd (vim_delete_line) as linewise', () => {
+        const state = createTestState(['hello', 'world'], 0, 0);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_line' as const,
+          payload: { count: 1 },
+        });
+        expect(result.yankRegister).toEqual({ text: 'hello', linewise: true });
+        expect(result.lines).toEqual(['world']);
+      });
+
+      it('should populate register on 2dd with multiple lines', () => {
+        const state = createTestState(['one', 'two', 'three'], 0, 0);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_line' as const,
+          payload: { count: 2 },
+        });
+        expect(result.yankRegister).toEqual({
+          text: 'one\ntwo',
+          linewise: true,
+        });
+        expect(result.lines).toEqual(['three']);
+      });
+
+      it('should populate register on dw (vim_delete_word_forward)', () => {
+        const state = createTestState(['hello world'], 0, 0);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_word_forward' as const,
+          payload: { count: 1 },
+        });
+        expect(result.yankRegister).toEqual({
+          text: 'hello ',
+          linewise: false,
+        });
+        expect(result.lines[0]).toBe('world');
+      });
+
+      it('should populate register on dW (vim_delete_big_word_forward)', () => {
+        const state = createTestState(['hello world'], 0, 0);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_big_word_forward' as const,
+          payload: { count: 1 },
+        });
+        expect(result.yankRegister).toEqual({
+          text: 'hello ',
+          linewise: false,
+        });
+      });
+
+      it('should populate register on de (vim_delete_word_end)', () => {
+        const state = createTestState(['hello world'], 0, 0);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_word_end' as const,
+          payload: { count: 1 },
+        });
+        expect(result.yankRegister).toEqual({ text: 'hello', linewise: false });
+      });
+
+      it('should populate register on dE (vim_delete_big_word_end)', () => {
+        const state = createTestState(['hello world'], 0, 0);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_big_word_end' as const,
+          payload: { count: 1 },
+        });
+        expect(result.yankRegister).toEqual({ text: 'hello', linewise: false });
+      });
+
+      it('should populate register on D (vim_delete_to_end_of_line)', () => {
+        const state = createTestState(['hello world'], 0, 6);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_to_end_of_line' as const,
+          payload: { count: 1 },
+        });
+        expect(result.yankRegister).toEqual({ text: 'world', linewise: false });
+        expect(result.lines[0]).toBe('hello ');
+      });
+
+      it('should populate register on df (vim_delete_to_char_forward, inclusive)', () => {
+        const state = createTestState(['hello world'], 0, 0);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_to_char_forward' as const,
+          payload: { char: 'o', count: 1, till: false },
+        });
+        expect(result.yankRegister).toEqual({ text: 'hello', linewise: false });
+      });
+
+      it('should populate register on dt (vim_delete_to_char_forward, till)', () => {
+        const state = createTestState(['hello world'], 0, 0);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_to_char_forward' as const,
+          payload: { char: 'o', count: 1, till: true },
+        });
+        // dt stops before 'o', so deletes 'hell'
+        expect(result.yankRegister).toEqual({ text: 'hell', linewise: false });
+      });
+
+      it('should populate register on dF (vim_delete_to_char_backward, inclusive)', () => {
+        // cursor at 7 ('o' in world), dFo finds 'o' at col 4, deletes [4, 8)
+        const state = createTestState(['hello world'], 0, 7);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_to_char_backward' as const,
+          payload: { char: 'o', count: 1, till: false },
+        });
+        expect(result.yankRegister).toEqual({ text: 'o wo', linewise: false });
+      });
+
+      it('should populate register on dT (vim_delete_to_char_backward, till)', () => {
+        // cursor at 7 ('o' in world), dTo finds 'o' at col 4, deletes [5, 8) = ' wo'
+        const state = createTestState(['hello world'], 0, 7);
+        const result = handleVimAction(state, {
+          type: 'vim_delete_to_char_backward' as const,
+          payload: { char: 'o', count: 1, till: true },
+        });
+        expect(result.yankRegister).toEqual({ text: ' wo', linewise: false });
+      });
+
+      it('should preserve existing register when delete finds nothing to delete', () => {
+        const state = {
+          ...createTestState(['hello'], 0, 5),
+          yankRegister: { text: 'preserved', linewise: false },
+        };
+        // x at end-of-line does nothing
+        const result = handleVimAction(state, {
+          type: 'vim_delete_char' as const,
+          payload: { count: 1 },
+        });
+        expect(result.yankRegister).toEqual({
+          text: 'preserved',
+          linewise: false,
+        });
+      });
+    });
+
+    describe('vim_paste_after (p)', () => {
+      it('should paste charwise text after cursor and land on last pasted char', () => {
+        const state = {
+          ...createTestState(['abc'], 0, 1),
+          yankRegister: { text: 'XY', linewise: false },
+        };
+        const result = handleVimAction(state, {
+          type: 'vim_paste_after' as const,
+          payload: { count: 1 },
+        });
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe('abXYc');
+        expect(result.cursorCol).toBe(3);
+      });
+
+      it('should paste charwise at end of line when cursor is on last char', () => {
+        const state = {
+          ...createTestState(['ab'], 0, 1),
+          yankRegister: { text: 'Z', linewise: false },
+        };
+        const result = handleVimAction(state, {
+          type: 'vim_paste_after' as const,
+          payload: { count: 1 },
+        });
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe('abZ');
+        expect(result.cursorCol).toBe(2);
+      });
+
+      it('should paste linewise below current row', () => {
+        const state = {
+          ...createTestState(['hello', 'world'], 0, 0),
+          yankRegister: { text: 'inserted', linewise: true },
+        };
+        const result = handleVimAction(state, {
+          type: 'vim_paste_after' as const,
+          payload: { count: 1 },
+        });
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines).toEqual(['hello', 'inserted', 'world']);
+        expect(result.cursorRow).toBe(1);
+        expect(result.cursorCol).toBe(0);
+      });
+
+      it('should do nothing when register is empty', () => {
+        const state = createTestState(['hello'], 0, 0);
+        const result = handleVimAction(state, {
+          type: 'vim_paste_after' as const,
+          payload: { count: 1 },
+        });
+        expect(result.lines).toEqual(['hello']);
+        expect(result.cursorCol).toBe(0);
+      });
+
+      it('should paste charwise text count times', () => {
+        const state = {
+          ...createTestState(['abc'], 0, 1),
+          yankRegister: { text: 'X', linewise: false },
+        };
+        const result = handleVimAction(state, {
+          type: 'vim_paste_after' as const,
+          payload: { count: 2 },
+        });
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe('abXXc');
+      });
+
+      it('should paste linewise count times', () => {
+        const state = {
+          ...createTestState(['hello', 'world'], 0, 0),
+          yankRegister: { text: 'foo', linewise: true },
+        };
+        const result = handleVimAction(state, {
+          type: 'vim_paste_after' as const,
+          payload: { count: 2 },
+        });
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines).toEqual(['hello', 'foo', 'foo', 'world']);
+        expect(result.cursorRow).toBe(1);
+      });
+
+      it('should land cursor on last char when pasting multiline charwise text', () => {
+        // Simulates yanking across a line boundary and pasting charwise.
+        // Cursor must land on the last pasted char, not a large out-of-bounds column.
+        const state = {
+          ...createTestState(['ab', 'cd'], 0, 1),
+          yankRegister: { text: 'b\nc', linewise: false },
+        };
+        const result = handleVimAction(state, {
+          type: 'vim_paste_after' as const,
+          payload: { count: 1 },
+        });
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.cursorRow).toBe(1);
+        expect(result.cursorCol).toBe(0);
+      });
+
+      it('should land cursor correctly for count > 1 multiline charwise paste', () => {
+        const state = {
+          ...createTestState(['ab', 'cd'], 0, 0),
+          yankRegister: { text: 'x\ny', linewise: false },
+        };
+        const result = handleVimAction(state, {
+          type: 'vim_paste_after' as const,
+          payload: { count: 2 },
+        });
+        expect(result).toHaveOnlyValidCharacters();
+        // cursor should be on the last char of the last pasted copy, not off-screen
+        expect(result.cursorCol).toBeLessThanOrEqual(
+          result.lines[result.cursorRow].length - 1,
+        );
+      });
+    });
+
+    describe('vim_paste_before (P)', () => {
+      it('should paste charwise text before cursor and land on last pasted char', () => {
+        const state = {
+          ...createTestState(['abc'], 0, 2),
+          yankRegister: { text: 'XY', linewise: false },
+        };
+        const result = handleVimAction(state, {
+          type: 'vim_paste_before' as const,
+          payload: { count: 1 },
+        });
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines[0]).toBe('abXYc');
+        expect(result.cursorCol).toBe(3);
+      });
+
+      it('should land cursor on last char when pasting multiline charwise text', () => {
+        const state = {
+          ...createTestState(['ab', 'cd'], 0, 1),
+          yankRegister: { text: 'b\nc', linewise: false },
+        };
+        const result = handleVimAction(state, {
+          type: 'vim_paste_before' as const,
+          payload: { count: 1 },
+        });
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.cursorCol).toBeLessThanOrEqual(
+          result.lines[result.cursorRow].length - 1,
+        );
+      });
+
+      it('should paste linewise above current row', () => {
+        const state = {
+          ...createTestState(['hello', 'world'], 1, 0),
+          yankRegister: { text: 'inserted', linewise: true },
+        };
+        const result = handleVimAction(state, {
+          type: 'vim_paste_before' as const,
+          payload: { count: 1 },
+        });
+        expect(result).toHaveOnlyValidCharacters();
+        expect(result.lines).toEqual(['hello', 'inserted', 'world']);
+        expect(result.cursorRow).toBe(1);
+        expect(result.cursorCol).toBe(0);
+      });
     });
   });
 });
