@@ -74,6 +74,10 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls incl
 │ ⊶  run_shell_command Run command                                         │
 │                                                                          │
 │ Test result                                                              │
+│                                                                          │
+│ o  write_file Write to file                                              │
+│                                                                          │
+│ Test result                                                              │
 ╰──────────────────────────────────────────────────────────────────────────╯
 "
 `;
@@ -81,6 +85,10 @@ exports[`<ToolGroupMessage /> > Golden Snapshots > renders mixed tool calls incl
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders multiple tool calls with different statuses (only visible ones) 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────╮
 │ ✓  successful-tool This tool succeeded                                   │
+│                                                                          │
+│ Test result                                                              │
+│                                                                          │
+│ o  pending-tool This tool is pending                                     │
 │                                                                          │
 │ Test result                                                              │
 │                                                                          │

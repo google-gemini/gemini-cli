@@ -1,5 +1,20 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`ThinkingMessage > filters out progress dots and empty lines 1`] = `
+" Thinking... 
+ │
+ │ Thinking
+ │ Done
+"
+`;
+
+exports[`ThinkingMessage > filters out progress dots and empty lines 2`] = `
+" Thinking... 
+ │
+ │ Thinking
+ │ Done"
+`;
+
 exports[`ThinkingMessage > normalizes escaped newline tokens 1`] = `
 " Thinking... 
  │
