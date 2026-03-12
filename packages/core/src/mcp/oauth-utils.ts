@@ -173,7 +173,8 @@ export class OAuthUtils {
     if (hostname === 'localhost') return true;
     // isIPv4 validates full dotted-decimal format: 127.0.0.1.evil.com → false.
     if (isIPv4(hostname)) return hostname.startsWith('127.');
-    return hostname === '[::1]'; // url.hostname keeps brackets for IPv6
+    // WHATWG URL always preserves brackets, but check both forms defensively.
+    return hostname === '[::1]' || hostname === '::1';
   }
 
   /**
