@@ -214,79 +214,112 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     );
   }
 
-  private async executeFallback(signal: AbortSignal): Promise<ToolResult> {
-    const { validUrls: urls } = parsePrompt(this.params.prompt!);
-    // For now, we only support one URL for fallback
-    let url = urls[0];
-
+  private async executeFallbackForUrl(
+    url: string,
+    perUrlContentBudget: number,
+    signal: AbortSignal,
+  ): Promise<string> {
     // Convert GitHub blob URL to raw URL
     url = convertGithubUrlToRaw(url);
 
-    try {
-      const response = await retryWithBackoff(
-        async () => {
-          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
-            signal,
-            headers: {
-              'User-Agent': USER_AGENT,
-            },
-          });
-          if (!res.ok) {
-            const error = new Error(
-              `Request failed with status code ${res.status} ${res.statusText}`,
-            );
-            (error as ErrorWithStatus).status = res.status;
-            throw error;
-          }
-          return res;
-        },
-        {
-          retryFetchErrors: this.config.getRetryFetchErrors(),
-          onRetry: (attempt, error, delayMs) =>
-            this.handleRetry(attempt, error, delayMs),
-        },
-      );
-
-      const bodyBuffer = await this.readResponseWithLimit(
-        response,
-        MAX_EXPERIMENTAL_FETCH_SIZE,
-      );
-      const rawContent = bodyBuffer.toString('utf8');
-      const contentType = response.headers.get('content-type') || '';
-      let textContent: string;
-
-      // Only use html-to-text if content type is HTML, or if no content type is provided (assume HTML)
-      if (
-        contentType.toLowerCase().includes('text/html') ||
-        contentType === ''
-      ) {
-        textContent = convert(rawContent, {
-          wordwrap: false,
-          selectors: [
-            { selector: 'a', options: { ignoreHref: true } },
-            { selector: 'img', format: 'skip' },
-          ],
+    const response = await retryWithBackoff(
+      async () => {
+        const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
+          signal,
+          headers: {
+            'User-Agent': USER_AGENT,
+          },
         });
-      } else {
-        // For other content types (text/plain, application/json, etc.), use raw text
-        textContent = rawContent;
+        if (!res.ok) {
+          const error = new Error(
+            `Request failed with status code ${res.status} ${res.statusText}`,
+          );
+          (error as ErrorWithStatus).status = res.status;
+          throw error;
+        }
+        return res;
+      },
+      {
+        retryFetchErrors: this.config.getRetryFetchErrors(),
+        onRetry: (attempt, error, delayMs) =>
+          this.handleRetry(attempt, error, delayMs),
+        signal,
+      },
+    );
+
+    const bodyBuffer = await this.readResponseWithLimit(
+      response,
+      MAX_EXPERIMENTAL_FETCH_SIZE,
+    );
+    const rawContent = bodyBuffer.toString('utf8');
+    const contentType = response.headers.get('content-type') || '';
+    let textContent: string;
+
+    // Only use html-to-text if content type is HTML, or if no content type is provided (assume HTML)
+    if (contentType.toLowerCase().includes('text/html') || contentType === '') {
+      textContent = convert(rawContent, {
+        wordwrap: false,
+        selectors: [
+          { selector: 'a', options: { ignoreHref: true } },
+          { selector: 'img', format: 'skip' },
+        ],
+      });
+    } else {
+      // For other content types (text/plain, application/json, etc.), use raw text
+      textContent = rawContent;
+    }
+
+    return truncateString(textContent, perUrlContentBudget, TRUNCATION_WARNING);
+  }
+
+  private async executeFallback(signal: AbortSignal): Promise<ToolResult> {
+    const { validUrls: urls } = parsePrompt(this.params.prompt!);
+    const perUrlContentBudget = Math.floor(
+      MAX_CONTENT_LENGTH / Math.max(urls.length, 1),
+    );
+
+    const contentParts: string[] = [];
+    const fetchedUrls: string[] = [];
+    const errors: string[] = [];
+
+    for (const rawUrl of urls) {
+      try {
+        const textContent = await this.executeFallbackForUrl(
+          rawUrl,
+          perUrlContentBudget,
+          signal,
+        );
+        contentParts.push(
+          `--- Content from ${rawUrl} ---\n${textContent}\n---`,
+        );
+        fetchedUrls.push(rawUrl);
+      } catch (e) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const error = e as Error;
+        errors.push(`Error fetching ${rawUrl}: ${error.message}`);
       }
+    }
 
-      textContent = truncateString(
-        textContent,
-        MAX_CONTENT_LENGTH,
-        TRUNCATION_WARNING,
-      );
+    if (fetchedUrls.length === 0) {
+      const errorMessage = `Error during fallback fetch: ${errors.join('; ')}`;
+      return {
+        llmContent: `Error: ${errorMessage}`,
+        returnDisplay: `Error: ${errorMessage}`,
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.WEB_FETCH_FALLBACK_FAILED,
+        },
+      };
+    }
 
+    try {
       const geminiClient = this.config.getGeminiClient();
       const fallbackPrompt = `The user requested the following: "${this.params.prompt}".
 
-I was unable to access the URL directly. Instead, I have fetched the raw content of the page. Please use the following content to answer the request. Do not attempt to access the URL again.
+I was unable to access the URL(s) directly. Instead, I have fetched the raw content. Please use the following content to answer the request. Do not attempt to access the URLs again.
 
----
-${textContent}
----
-`;
+${contentParts.join('\n\n')}
+${errors.length > 0 ? `\nNote: Some URLs could not be fetched: ${errors.join('; ')}` : ''}`;
       const result = await geminiClient.generateContent(
         { model: 'web-fetch-fallback' },
         [{ role: 'user', parts: [{ text: fallbackPrompt }] }],
@@ -296,12 +329,12 @@ ${textContent}
       const resultText = getResponseText(result) || '';
       return {
         llmContent: resultText,
-        returnDisplay: `Content for ${url} processed using fallback fetch.`,
+        returnDisplay: `Content for ${fetchedUrls.join(', ')} processed using fallback fetch.`,
       };
     } catch (e) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const error = e as Error;
-      const errorMessage = `Error during fallback fetch for ${url}: ${error.message}`;
+      const errorMessage = `Error during fallback fetch: ${error.message}`;
       return {
         llmContent: `Error: ${errorMessage}`,
         returnDisplay: `Error: ${errorMessage}`,
@@ -560,27 +593,31 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
     }
     const userPrompt = this.params.prompt!;
     const { validUrls: urls } = parsePrompt(userPrompt);
-    const url = urls[0];
 
-    // Enforce rate limiting
-    const rateLimitResult = checkRateLimit(url);
-    if (!rateLimitResult.allowed) {
-      const waitTimeSecs = Math.ceil((rateLimitResult.waitTimeMs || 0) / 1000);
-      const errorMessage = `Rate limit exceeded for host. Please wait ${waitTimeSecs} seconds before trying again.`;
-      debugLogger.warn(`[WebFetchTool] Rate limit exceeded for ${url}`);
-      return {
-        llmContent: `Error: ${errorMessage}`,
-        returnDisplay: `Error: ${errorMessage}`,
-        error: {
-          message: errorMessage,
-          type: ToolErrorType.WEB_FETCH_PROCESSING_ERROR,
-        },
-      };
+    // Enforce rate limiting for all URLs
+    for (const url of urls) {
+      const rateLimitResult = checkRateLimit(url);
+      if (!rateLimitResult.allowed) {
+        const waitTimeSecs = Math.ceil(
+          (rateLimitResult.waitTimeMs || 0) / 1000,
+        );
+        const errorMessage = `Rate limit exceeded for host. Please wait ${waitTimeSecs} seconds before trying again.`;
+        debugLogger.warn(`[WebFetchTool] Rate limit exceeded for ${url}`);
+        return {
+          llmContent: `Error: ${errorMessage}`,
+          returnDisplay: `Error: ${errorMessage}`,
+          error: {
+            message: errorMessage,
+            type: ToolErrorType.WEB_FETCH_PROCESSING_ERROR,
+          },
+        };
+      }
     }
 
-    const isPrivate = isPrivateIp(url);
+    // Check for private IPs across all URLs
+    const hasPrivateIp = urls.some((url) => isPrivateIp(url));
 
-    if (isPrivate) {
+    if (hasPrivateIp) {
       logWebFetchFallbackAttempt(
         this.config,
         new WebFetchFallbackAttemptEvent('private_ip'),
