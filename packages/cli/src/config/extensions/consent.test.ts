@@ -287,6 +287,25 @@ describe('consent', () => {
         expect(requestConsent).toHaveBeenCalledTimes(1);
       });
 
+      it('should request consent if extension is migrated', async () => {
+        const requestConsent = vi.fn().mockResolvedValue(true);
+        await maybeRequestConsentOrFail(
+          baseConfig,
+          requestConsent,
+          false,
+          { ...baseConfig, name: 'old-ext' },
+          false,
+          [],
+          [],
+          true,
+        );
+
+        expect(requestConsent).toHaveBeenCalledTimes(1);
+        let consentString = requestConsent.mock.calls[0][0] as string;
+        consentString = normalizePathsForSnapshot(consentString, tempDir);
+        await expectConsentSnapshot(consentString);
+      });
+
       it('should request consent if skills change', async () => {
         const skill1Dir = path.join(tempDir, 'skill1');
         const skill2Dir = path.join(tempDir, 'skill2');

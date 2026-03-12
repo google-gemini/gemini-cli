@@ -194,7 +194,7 @@ returns coordinates and element descriptions that the browser agent uses with
 the `click_at` tool for precise, coordinate-based interactions.
 
 > **Note:** The visual agent requires API key or Vertex AI authentication. It is
-> not available when using Google Login.
+> not available when using "Sign in with Google".
 
 ## Creating custom subagents
 
@@ -297,7 +297,7 @@ Gemini CLI can also delegate tasks to remote subagents using the Agent-to-Agent
 
 > **Note: Remote subagents are currently an experimental feature.**
 
-See the [Remote Subagents documentation](/docs/core/remote-agents) for detailed
+See the [Remote Subagents documentation](remote-agents) for detailed
 configuration and usage instructions.
 
 ## Extension subagents

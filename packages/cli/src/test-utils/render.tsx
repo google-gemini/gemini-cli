@@ -11,12 +11,13 @@ import {
 } from 'ink';
 import { EventEmitter } from 'node:events';
 import { Box } from 'ink';
-import type React from 'react';
 import { Terminal } from '@xterm/headless';
 import { vi } from 'vitest';
 import stripAnsi from 'strip-ansi';
+import type React from 'react';
 import { act, useState } from 'react';
 import os from 'node:os';
+import path from 'node:path';
 import { LoadedSettings } from '../config/settings.js';
 import { KeypressProvider } from '../ui/contexts/KeypressContext.js';
 import { SettingsContext } from '../ui/contexts/SettingsContext.js';
@@ -49,7 +50,7 @@ import { AppContext, type AppState } from '../ui/contexts/AppContext.js';
 import { createMockSettings } from './settings.js';
 import { SessionStatsProvider } from '../ui/contexts/SessionContext.js';
 import { themeManager, DEFAULT_THEME } from '../ui/themes/theme-manager.js';
-import { DefaultLight } from '../ui/themes/default-light.js';
+import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
 import { pickDefaultThemeName } from '../ui/themes/theme.js';
 import { generateSvgForTerminal } from './svg.js';
 
@@ -95,6 +96,7 @@ function isInkRenderMetrics(
     typeof m === 'object' &&
     m !== null &&
     'output' in m &&
+    // eslint-disable-next-line no-restricted-syntax
     typeof m['output'] === 'string'
   );
 }
@@ -502,7 +504,22 @@ const configProxy = new Proxy({} as Config, {
   get(_target, prop) {
     if (prop === 'getTargetDir') {
       return () =>
-        '/Users/test/project/foo/bar/and/some/more/directories/to/make/it/long';
+        path.join(
+          path.parse(process.cwd()).root,
+          'Users',
+          'test',
+          'project',
+          'foo',
+          'bar',
+          'and',
+          'some',
+          'more',
+          'directories',
+          'to',
+          'make',
+          'it',
+          'long',
+        );
     }
     if (prop === 'getUseBackgroundColor') {
       return () => true;
@@ -528,12 +545,13 @@ export const mockSettings = new LoadedSettings(
 // A minimal mock UIState to satisfy the context provider.
 // Tests that need specific UIState values should provide their own.
 const baseMockUiState = {
+  history: [],
   renderMarkdown: true,
   streamingState: StreamingState.Idle,
   terminalWidth: 100,
   terminalHeight: 40,
   currentModel: 'gemini-pro',
-  terminalBackgroundColor: 'black',
+  terminalBackgroundColor: 'black' as const,
   cleanUiDetailsVisible: false,
   allowPlanMode: true,
   activePtyId: undefined,
@@ -547,6 +565,14 @@ const baseMockUiState = {
   },
   hintMode: false,
   hintBuffer: '',
+  bannerData: {
+    defaultText: '',
+    warningText: '',
+  },
+  bannerVisible: false,
+  nightly: false,
+  updateInfo: null,
+  pendingHistoryItems: [],
 };
 
 export const mockAppState: AppState = {
@@ -586,6 +612,8 @@ const mockUIActions: UIActions = {
   handleClearScreen: vi.fn(),
   handleProQuotaChoice: vi.fn(),
   handleValidationChoice: vi.fn(),
+  handleOverageMenuChoice: vi.fn(),
+  handleEmptyWalletChoice: vi.fn(),
   setQueueErrorMessage: vi.fn(),
   popAllMessages: vi.fn(),
   handleApiKeySubmit: vi.fn(),
@@ -608,6 +636,7 @@ const mockUIActions: UIActions = {
   handleRestart: vi.fn(),
   handleNewAgentsSelect: vi.fn(),
   getPreferredEditor: vi.fn(),
+  clearAccountSuspension: vi.fn(),
 };
 
 let capturedOverflowState: OverflowState | undefined;
@@ -698,6 +727,21 @@ export const renderWithProviders = (
     });
   }
 
+  // Wrap config in a Proxy so useAlternateBuffer hook (which reads from Config) gets the correct value,
+  // without replacing the entire config object and its other values.
+  let finalConfig = config;
+  if (useAlternateBuffer !== undefined) {
+    finalConfig = new Proxy(config, {
+      get(target, prop, receiver) {
+        if (prop === 'getUseAlternateBuffer') {
+          return () => useAlternateBuffer;
+        }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+  }
+
   const mainAreaWidth = terminalWidth;
 
   const finalUiState = {
@@ -726,10 +770,10 @@ export const renderWithProviders = (
 
   const renderResult = render(
     <AppContext.Provider value={appState}>
-      <ConfigContext.Provider value={config}>
+      <ConfigContext.Provider value={finalConfig}>
         <SettingsContext.Provider value={finalSettings}>
           <UIStateContext.Provider value={finalUiState}>
-            <VimModeProvider settings={finalSettings}>
+            <VimModeProvider>
               <ShellFocusContext.Provider value={shellFocus}>
                 <SessionStatsProvider>
                   <StreamingContext.Provider
@@ -738,7 +782,7 @@ export const renderWithProviders = (
                     <UIActionsContext.Provider value={finalUIActions}>
                       <OverflowProvider>
                         <ToolActionsProvider
-                          config={config}
+                          config={finalConfig}
                           toolCalls={allToolCalls}
                         >
                           <AskUserActionsProvider

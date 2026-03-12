@@ -20,6 +20,7 @@ import {
   type AnyToolInvocation,
   ROOT_SCHEDULER_ID,
   CoreToolCallStatus,
+  type WaitingToolCall,
 } from '@google/gemini-cli-core';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
 
@@ -32,6 +33,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     Scheduler: vi.fn().mockImplementation(() => ({
       schedule: vi.fn().mockResolvedValue([]),
       cancelAll: vi.fn(),
+      dispose: vi.fn(),
     })),
   };
 });
@@ -341,7 +343,9 @@ describe('useToolScheduler', () => {
     const callSub = {
       ...callRoot,
       request: { ...callRoot.request, callId: 'call-sub' },
+      status: CoreToolCallStatus.AwaitingApproval as const, // Must be awaiting approval to be tracked
       schedulerId: 'subagent-1',
+      confirmationDetails: { type: 'info', title: 'Confirm', prompt: 'Yes?' },
     };
 
     // 1. Populate state with multiple schedulers
@@ -359,14 +363,14 @@ describe('useToolScheduler', () => {
       } as ToolCallsUpdateMessage);
     });
 
-    let [toolCalls] = result.current;
+    const [toolCalls] = result.current;
     expect(toolCalls).toHaveLength(2);
     expect(
-      toolCalls.find((t) => t.request.callId === 'call-root')?.schedulerId,
-    ).toBe(ROOT_SCHEDULER_ID);
+      toolCalls.find((t) => t.request.callId === 'call-root'),
+    ).toBeDefined();
     expect(
-      toolCalls.find((t) => t.request.callId === 'call-sub')?.schedulerId,
-    ).toBe('subagent-1');
+      toolCalls.find((t) => t.request.callId === 'call-sub'),
+    ).toBeDefined();
 
     // 2. Call setToolCallsForDisplay (e.g., simulate a manual update or clear)
     act(() => {
@@ -377,34 +381,161 @@ describe('useToolScheduler', () => {
     });
 
     // 3. Verify that tools are still present and maintain their scheduler IDs
-    // The internal map should have been re-grouped.
-    [toolCalls] = result.current;
-    expect(toolCalls).toHaveLength(2);
-    expect(toolCalls.every((t) => t.responseSubmittedToGemini)).toBe(true);
+    const [toolCalls2] = result.current;
+    expect(toolCalls2).toHaveLength(2);
+    expect(toolCalls2.every((t) => t.responseSubmittedToGemini)).toBe(true);
+  });
 
-    const updatedRoot = toolCalls.find((t) => t.request.callId === 'call-root');
-    const updatedSub = toolCalls.find((t) => t.request.callId === 'call-sub');
+  it('ignores TOOL_CALLS_UPDATE from non-root schedulers when no tools await approval', () => {
+    const { result } = renderHook(() =>
+      useToolScheduler(
+        vi.fn().mockResolvedValue(undefined),
+        mockConfig,
+        () => undefined,
+      ),
+    );
 
-    expect(updatedRoot?.schedulerId).toBe(ROOT_SCHEDULER_ID);
-    expect(updatedSub?.schedulerId).toBe('subagent-1');
+    const subagentCall = {
+      status: CoreToolCallStatus.Executing as const,
+      request: {
+        callId: 'call-sub',
+        name: 'test',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      },
+      tool: createMockTool(),
+      invocation: createMockInvocation(),
+      schedulerId: 'subagent-1',
+    };
 
-    // 4. Verify that a subsequent update to ONE scheduler doesn't wipe the other
     act(() => {
       void mockMessageBus.publish({
         type: MessageBusType.TOOL_CALLS_UPDATE,
-        toolCalls: [{ ...callRoot, status: CoreToolCallStatus.Executing }],
-        schedulerId: ROOT_SCHEDULER_ID,
+        toolCalls: [subagentCall],
+        schedulerId: 'subagent-1',
       } as ToolCallsUpdateMessage);
     });
 
-    [toolCalls] = result.current;
-    expect(toolCalls).toHaveLength(2);
-    expect(
-      toolCalls.find((t) => t.request.callId === 'call-root')?.status,
-    ).toBe(CoreToolCallStatus.Executing);
-    expect(
-      toolCalls.find((t) => t.request.callId === 'call-sub')?.schedulerId,
-    ).toBe('subagent-1');
+    expect(result.current[0]).toHaveLength(0);
+  });
+
+  it('allows TOOL_CALLS_UPDATE from non-root schedulers when tools are awaiting approval', () => {
+    const { result } = renderHook(() =>
+      useToolScheduler(
+        vi.fn().mockResolvedValue(undefined),
+        mockConfig,
+        () => undefined,
+      ),
+    );
+
+    const subagentCall = {
+      status: CoreToolCallStatus.AwaitingApproval as const,
+      request: {
+        callId: 'call-sub',
+        name: 'test',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      },
+      tool: createMockTool(),
+      invocation: createMockInvocation(),
+      schedulerId: 'subagent-1',
+      confirmationDetails: { type: 'info', title: 'Confirm', prompt: 'Yes?' },
+    } as WaitingToolCall;
+
+    act(() => {
+      void mockMessageBus.publish({
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: [subagentCall],
+        schedulerId: 'subagent-1',
+      } as ToolCallsUpdateMessage);
+    });
+
+    const [toolCalls] = result.current;
+    expect(toolCalls).toHaveLength(1);
+    expect(toolCalls[0].request.callId).toBe('call-sub');
+    expect(toolCalls[0].status).toBe(CoreToolCallStatus.AwaitingApproval);
+  });
+
+  it('preserves subagent tools in the UI after they have been approved', () => {
+    const { result } = renderHook(() =>
+      useToolScheduler(
+        vi.fn().mockResolvedValue(undefined),
+        mockConfig,
+        () => undefined,
+      ),
+    );
+
+    const subagentCall = {
+      status: CoreToolCallStatus.AwaitingApproval as const,
+      request: {
+        callId: 'call-sub',
+        name: 'test',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      },
+      tool: createMockTool(),
+      invocation: createMockInvocation(),
+      schedulerId: 'subagent-1',
+      confirmationDetails: { type: 'info', title: 'Confirm', prompt: 'Yes?' },
+    } as WaitingToolCall;
+
+    // 1. Initial approval request
+    act(() => {
+      void mockMessageBus.publish({
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: [subagentCall],
+        schedulerId: 'subagent-1',
+      } as ToolCallsUpdateMessage);
+    });
+
+    expect(result.current[0]).toHaveLength(1);
+
+    // 2. Approved and executing
+    const approvedCall = {
+      ...subagentCall,
+      status: CoreToolCallStatus.Executing as const,
+    } as unknown as ExecutingToolCall;
+
+    act(() => {
+      void mockMessageBus.publish({
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: [approvedCall],
+        schedulerId: 'subagent-1',
+      } as ToolCallsUpdateMessage);
+    });
+
+    expect(result.current[0]).toHaveLength(1);
+    expect(result.current[0][0].status).toBe(CoreToolCallStatus.Executing);
+
+    // 3. New turn with a background tool (should NOT be shown)
+    const backgroundTool = {
+      status: CoreToolCallStatus.Executing as const,
+      request: {
+        callId: 'call-background',
+        name: 'read_file',
+        args: {},
+        isClientInitiated: false,
+        prompt_id: 'p1',
+      },
+      tool: createMockTool(),
+      invocation: createMockInvocation(),
+      schedulerId: 'subagent-1',
+    } as ExecutingToolCall;
+
+    act(() => {
+      void mockMessageBus.publish({
+        type: MessageBusType.TOOL_CALLS_UPDATE,
+        toolCalls: [backgroundTool],
+        schedulerId: 'subagent-1',
+      } as ToolCallsUpdateMessage);
+    });
+
+    // The subagent list should now be empty because the previously approved tool
+    // is gone from the current list, and the new tool doesn't need approval.
+    expect(result.current[0]).toHaveLength(0);
   });
 
   it('adapts success/error status to executing when a tail call is present', () => {

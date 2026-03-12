@@ -62,7 +62,9 @@ describe('IdeTrustChangeDialog', () => {
   });
 
   it('calls relaunchApp when "r" is pressed', async () => {
-    const relaunchAppSpy = vi.spyOn(processUtils, 'relaunchApp');
+    const relaunchAppSpy = vi
+      .spyOn(processUtils, 'relaunchApp')
+      .mockResolvedValue(undefined);
     const { stdin, waitUntilReady, unmount } = renderWithProviders(
       <IdeTrustChangeDialog reason="NONE" />,
     );
@@ -78,7 +80,9 @@ describe('IdeTrustChangeDialog', () => {
   });
 
   it('calls relaunchApp when "R" is pressed', async () => {
-    const relaunchAppSpy = vi.spyOn(processUtils, 'relaunchApp');
+    const relaunchAppSpy = vi
+      .spyOn(processUtils, 'relaunchApp')
+      .mockResolvedValue(undefined);
     const { stdin, waitUntilReady, unmount } = renderWithProviders(
       <IdeTrustChangeDialog reason="CONNECTION_CHANGE" />,
     );
@@ -94,7 +98,9 @@ describe('IdeTrustChangeDialog', () => {
   });
 
   it('does not call relaunchApp when another key is pressed', async () => {
-    const relaunchAppSpy = vi.spyOn(processUtils, 'relaunchApp');
+    const relaunchAppSpy = vi
+      .spyOn(processUtils, 'relaunchApp')
+      .mockResolvedValue(undefined);
     const { stdin, waitUntilReady, unmount } = renderWithProviders(
       <IdeTrustChangeDialog reason="CONNECTION_CHANGE" />,
     );

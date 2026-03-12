@@ -46,6 +46,7 @@ export {
   logExtensionUninstall,
   logExtensionUpdateEvent,
   logWebFetchFallbackAttempt,
+  logNetworkRetryAttempt,
   logRewind,
 } from './loggers.js';
 export {
@@ -66,6 +67,7 @@ export {
   ConversationFinishedEvent,
   ToolOutputTruncatedEvent,
   WebFetchFallbackAttemptEvent,
+  NetworkRetryAttemptEvent,
   ToolCallDecision,
   RewindEvent,
   ConsecaPolicyGenerationEvent,
@@ -77,6 +79,7 @@ export type { TelemetryEvent } from './types.js';
 export { SpanStatusCode, ValueType } from '@opentelemetry/api';
 export { SemanticAttributes } from '@opentelemetry/semantic-conventions';
 export * from './uiTelemetry.js';
+export * from './billingEvents.js';
 export {
   MemoryMonitor,
   initializeMemoryMonitor,
@@ -110,6 +113,7 @@ export {
   recordApiErrorMetrics,
   recordFileOperationMetric,
   recordInvalidChunk,
+  recordRetryAttemptMetrics,
   recordContentRetry,
   recordContentRetryFailure,
   recordModelRoutingMetrics,
@@ -145,6 +149,10 @@ export {
   GenAiOperationName,
   GenAiProviderName,
   GenAiTokenType,
+  // Billing metrics functions
+  recordOverageOptionSelected,
+  recordCreditPurchaseClick,
 } from './metrics.js';
 export { runInDevTraceSpan, type SpanMetadata } from './trace.js';
 export { startupProfiler, StartupProfiler } from './startupProfiler.js';
+export * from './constants.js';
