@@ -123,7 +123,6 @@ async function downloadFiles({
     downloads.push(
       (async () => {
         const endpoint = `${REPO_DOWNLOAD_URL}/refs/tags/${releaseTag}/${SOURCE_DIR}/${fileBasename}`;
-        // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
         const response = await fetch(endpoint, {
           method: 'GET',
           dispatcher: proxy ? new ProxyAgent(proxy) : undefined,

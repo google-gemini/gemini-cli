@@ -546,7 +546,6 @@ export class ClearcutLogger {
     let result: LogResponse = {};
 
     try {
-      // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
       const response = await fetch(CLEARCUT_URL, {
         method: 'POST',
         body: safeJsonStringify(request),
