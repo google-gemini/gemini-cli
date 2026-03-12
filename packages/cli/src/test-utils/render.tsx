@@ -11,10 +11,10 @@ import {
 } from 'ink';
 import { EventEmitter } from 'node:events';
 import { Box } from 'ink';
-import type React from 'react';
 import { Terminal } from '@xterm/headless';
 import { vi } from 'vitest';
 import stripAnsi from 'strip-ansi';
+import type React from 'react';
 import { act, useState } from 'react';
 import os from 'node:os';
 import path from 'node:path';
@@ -50,7 +50,7 @@ import { AppContext, type AppState } from '../ui/contexts/AppContext.js';
 import { createMockSettings } from './settings.js';
 import { SessionStatsProvider } from '../ui/contexts/SessionContext.js';
 import { themeManager, DEFAULT_THEME } from '../ui/themes/theme-manager.js';
-import { DefaultLight } from '../ui/themes/default-light.js';
+import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
 import { pickDefaultThemeName } from '../ui/themes/theme.js';
 import { generateSvgForTerminal } from './svg.js';
 
@@ -96,6 +96,7 @@ function isInkRenderMetrics(
     typeof m === 'object' &&
     m !== null &&
     'output' in m &&
+    // eslint-disable-next-line no-restricted-syntax
     typeof m['output'] === 'string'
   );
 }

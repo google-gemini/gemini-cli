@@ -160,6 +160,7 @@ vi.mock('./hooks/useIdeTrustListener.js');
 vi.mock('./hooks/useMessageQueue.js');
 vi.mock('./hooks/useApprovalModeIndicator.js');
 vi.mock('./hooks/useGitBranchName.js');
+vi.mock('./hooks/useExtensionUpdates.js');
 vi.mock('./contexts/VimModeContext.js');
 vi.mock('./contexts/SessionContext.js');
 vi.mock('./components/shared/text-buffer.js');
@@ -218,6 +219,10 @@ import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
 import { useMessageQueue } from './hooks/useMessageQueue.js';
 import { useApprovalModeIndicator } from './hooks/useApprovalModeIndicator.js';
 import { useGitBranchName } from './hooks/useGitBranchName.js';
+import {
+  useConfirmUpdateRequests,
+  useExtensionUpdates,
+} from './hooks/useExtensionUpdates.js';
 import { useVimMode } from './contexts/VimModeContext.js';
 import { useSessionStats } from './contexts/SessionContext.js';
 import { useTextBuffer } from './components/shared/text-buffer.js';
@@ -227,10 +232,7 @@ import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import * as useKeypressModule from './hooks/useKeypress.js';
 import { useSuspend } from './hooks/useSuspend.js';
-import { measureElement } from 'ink';
-import { useTerminalSize } from './hooks/useTerminalSize.js';
 import {
-  ShellExecutionService,
   writeToStdout,
   enableMouseEvents,
   disableMouseEvents,
@@ -299,6 +301,8 @@ describe('AppContainer State Management', () => {
   const mockedUseMessageQueue = useMessageQueue as Mock;
   const mockedUseApprovalModeIndicator = useApprovalModeIndicator as Mock;
   const mockedUseGitBranchName = useGitBranchName as Mock;
+  const mockedUseConfirmUpdateRequests = useConfirmUpdateRequests as Mock;
+  const mockedUseExtensionUpdates = useExtensionUpdates as Mock;
   const mockedUseVimMode = useVimMode as Mock;
   const mockedUseSessionStats = useSessionStats as Mock;
   const mockedUseTextBuffer = useTextBuffer as Mock;
@@ -450,6 +454,15 @@ describe('AppContainer State Management', () => {
     mockedUseFocusState.mockReturnValue({
       isFocused: true,
       hasReceivedFocusEvent: true,
+    });
+    mockedUseConfirmUpdateRequests.mockReturnValue({
+      addConfirmUpdateExtensionRequest: vi.fn(),
+      confirmUpdateExtensionRequests: [],
+    });
+    mockedUseExtensionUpdates.mockReturnValue({
+      extensionsUpdateState: new Map(),
+      extensionsUpdateStateInternal: new Map(),
+      dispatchExtensionStateUpdate: vi.fn(),
     });
 
     // Mock Config
@@ -2181,35 +2194,6 @@ describe('AppContainer State Management', () => {
     });
   });
 
-  describe('Terminal Height Calculation', () => {
-    const mockedMeasureElement = measureElement as Mock;
-    const mockedUseTerminalSize = useTerminalSize as Mock;
-
-    it('should prevent terminal height from being less than 1', async () => {
-      const resizePtySpy = vi.spyOn(ShellExecutionService, 'resizePty');
-      // Arrange: Simulate a small terminal and a large footer
-      mockedUseTerminalSize.mockReturnValue({ columns: 80, rows: 5 });
-      mockedMeasureElement.mockReturnValue({ width: 80, height: 10 }); // Footer is taller than the screen
-
-      mockedUseGeminiStream.mockReturnValue({
-        ...DEFAULT_GEMINI_STREAM_MOCK,
-        activePtyId: 'some-id',
-      });
-
-      let unmount: () => void;
-      await act(async () => {
-        const result = renderAppContainer();
-        unmount = result.unmount;
-      });
-      await waitFor(() => expect(resizePtySpy).toHaveBeenCalled());
-      const lastCall =
-        resizePtySpy.mock.calls[resizePtySpy.mock.calls.length - 1];
-      // Check the height argument specifically
-      expect(lastCall[2]).toBe(1);
-      unmount!();
-    });
-  });
-
   describe('Keyboard Input Handling (CTRL+C / CTRL+D)', () => {
     let mockHandleSlashCommand: Mock;
     let mockCancelOngoingRequest: Mock;
@@ -2786,7 +2770,7 @@ describe('AppContainer State Management', () => {
           unmount();
         });
 
-        it('should exit copy mode on any key press', async () => {
+        it('should exit copy mode on non-scroll key press', async () => {
           await setupCopyModeTest(isAlternateMode);
 
           // Enter copy mode
@@ -2805,6 +2789,61 @@ describe('AppContainer State Management', () => {
 
           // Should have re-enabled mouse
           expect(enableMouseEvents).toHaveBeenCalled();
+          unmount();
+        });
+
+        it('should not exit copy mode on PageDown and should pass it through', async () => {
+          const childHandler = vi.fn().mockReturnValue(false);
+          await setupCopyModeTest(true, childHandler);
+
+          // Enter copy mode
+          act(() => {
+            stdin.write('\x13'); // Ctrl+S
+          });
+          rerender();
+          expect(disableMouseEvents).toHaveBeenCalled();
+
+          childHandler.mockClear();
+          (enableMouseEvents as Mock).mockClear();
+
+          // PageDown should be passed through to lower-priority handlers.
+          act(() => {
+            stdin.write('\x1b[6~');
+          });
+          rerender();
+
+          expect(enableMouseEvents).not.toHaveBeenCalled();
+          expect(childHandler).toHaveBeenCalled();
+          expect(childHandler).toHaveBeenCalledWith(
+            expect.objectContaining({ name: 'pagedown' }),
+          );
+          unmount();
+        });
+
+        it('should not exit copy mode on Shift+Down and should pass it through', async () => {
+          const childHandler = vi.fn().mockReturnValue(false);
+          await setupCopyModeTest(true, childHandler);
+
+          // Enter copy mode
+          act(() => {
+            stdin.write('\x13'); // Ctrl+S
+          });
+          rerender();
+          expect(disableMouseEvents).toHaveBeenCalled();
+
+          childHandler.mockClear();
+          (enableMouseEvents as Mock).mockClear();
+
+          act(() => {
+            stdin.write('\x1b[1;2B'); // Shift+Down
+          });
+          rerender();
+
+          expect(enableMouseEvents).not.toHaveBeenCalled();
+          expect(childHandler).toHaveBeenCalled();
+          expect(childHandler).toHaveBeenCalledWith(
+            expect.objectContaining({ name: 'down', shift: true }),
+          );
           unmount();
         });
 
@@ -3125,30 +3164,6 @@ describe('AppContainer State Management', () => {
     });
   });
 
-  describe('Shell Interaction', () => {
-    it('should not crash if resizing the pty fails', async () => {
-      const resizePtySpy = vi
-        .spyOn(ShellExecutionService, 'resizePty')
-        .mockImplementation(() => {
-          throw new Error('Cannot resize a pty that has already exited');
-        });
-
-      mockedUseGeminiStream.mockReturnValue({
-        ...DEFAULT_GEMINI_STREAM_MOCK,
-        activePtyId: 'some-pty-id', // Make sure activePtyId is set
-      });
-
-      // The main assertion is that the render does not throw.
-      let unmount: () => void;
-      await act(async () => {
-        const result = renderAppContainer();
-        unmount = result.unmount;
-      });
-
-      await waitFor(() => expect(resizePtySpy).toHaveBeenCalled());
-      unmount!();
-    });
-  });
   describe('Banner Text', () => {
     it('should render placeholder banner text for USE_GEMINI auth type', async () => {
       const config = makeFakeConfig();
@@ -3185,7 +3200,7 @@ describe('AppContainer State Management', () => {
       });
     });
 
-    it('clears the prompt when onCancelSubmit is called with shouldRestorePrompt=false', async () => {
+    it('preserves buffer when cancelling, even if empty (user is in control)', async () => {
       let unmount: () => void;
       await act(async () => {
         const result = renderAppContainer();
@@ -3201,7 +3216,45 @@ describe('AppContainer State Management', () => {
         onCancelSubmit(false);
       });
 
-      expect(mockSetText).toHaveBeenCalledWith('');
+      // Should NOT modify buffer when cancelling - user is in control
+      expect(mockSetText).not.toHaveBeenCalled();
+
+      unmount!();
+    });
+
+    it('preserves prompt text when cancelling streaming, even if same as last message (regression test for issue #13387)', async () => {
+      // Mock buffer with text that user typed while streaming (same as last message)
+      const promptText = 'What is Python?';
+      mockedUseTextBuffer.mockReturnValue({
+        text: promptText,
+        setText: mockSetText,
+      });
+
+      // Mock input history with same message
+      mockedUseInputHistoryStore.mockReturnValue({
+        inputHistory: [promptText],
+        addInput: vi.fn(),
+        initializeFromLogger: vi.fn(),
+      });
+
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      const { onCancelSubmit } = extractUseGeminiStreamArgs(
+        mockedUseGeminiStream.mock.lastCall!,
+      );
+
+      act(() => {
+        // Simulate Escape key cancelling streaming (shouldRestorePrompt=false)
+        onCancelSubmit(false);
+      });
+
+      // Should NOT call setText - prompt should be preserved regardless of content
+      expect(mockSetText).not.toHaveBeenCalled();
 
       unmount!();
     });
@@ -3449,6 +3502,63 @@ describe('AppContainer State Management', () => {
       unmount!();
     });
 
+    it('resets the hint timer when a new component overflows (overflowingIdsSize increases)', async () => {
+      let unmount: () => void;
+      await act(async () => {
+        const result = renderAppContainer();
+        unmount = result.unmount;
+      });
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      // 1. Trigger first overflow
+      act(() => {
+        capturedOverflowActions.addOverflowingId('test-id-1');
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(true);
+      });
+
+      // 2. Advance half the duration
+      act(() => {
+        vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2);
+      });
+      expect(capturedUIState.showIsExpandableHint).toBe(true);
+
+      // 3. Trigger second overflow (this should reset the timer)
+      act(() => {
+        capturedOverflowActions.addOverflowingId('test-id-2');
+      });
+
+      // Advance by 1ms to allow the OverflowProvider's 0ms batching timeout to fire
+      // and flush the state update to AppContainer, triggering the reset.
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(true);
+      });
+
+      // 4. Advance enough that the ORIGINAL timer would have expired
+      // Subtracting 1ms since we advanced it above to flush the state.
+      act(() => {
+        vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2 + 100 - 1);
+      });
+      // The hint should STILL be visible because the timer reset at step 3
+      expect(capturedUIState.showIsExpandableHint).toBe(true);
+
+      // 5. Advance to the end of the NEW timer
+      act(() => {
+        vi.advanceTimersByTime(EXPAND_HINT_DURATION_MS / 2 - 100);
+      });
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(false);
+      });
+
+      unmount!();
+    });
+
     it('toggles expansion state and resets the hint timer when Ctrl+O is pressed in Standard Mode', async () => {
       let unmount: () => void;
       let stdin: ReturnType<typeof renderAppContainer>['stdin'];
@@ -3590,7 +3700,7 @@ describe('AppContainer State Management', () => {
       unmount!();
     });
 
-    it('does NOT set showIsExpandableHint when overflow occurs in Alternate Buffer Mode', async () => {
+    it('DOES set showIsExpandableHint when overflow occurs in Alternate Buffer Mode', async () => {
       const alternateSettings = mergeSettings({}, {}, {}, {}, true);
       const settingsWithAlternateBuffer = {
         merged: {
@@ -3618,8 +3728,10 @@ describe('AppContainer State Management', () => {
         capturedOverflowActions.addOverflowingId('test-id');
       });
 
-      // Should NOT show hint because we are in Alternate Buffer Mode
-      expect(capturedUIState.showIsExpandableHint).toBe(false);
+      // Should NOW show hint because we are in Alternate Buffer Mode
+      await waitFor(() => {
+        expect(capturedUIState.showIsExpandableHint).toBe(true);
+      });
 
       unmount!();
     });

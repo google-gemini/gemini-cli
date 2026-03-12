@@ -9,8 +9,11 @@ import { act, useState } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { useSlashCompletion } from './useSlashCompletion.js';
-import type { CommandContext, SlashCommand } from '../commands/types.js';
-import { CommandKind } from '../commands/types.js';
+import {
+  CommandKind,
+  type CommandContext,
+  type SlashCommand,
+} from '../commands/types.js';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
 
 // Test utility type and helper function for creating test SlashCommands
@@ -438,6 +441,129 @@ describe('useSlashCompletion', () => {
       unmount();
     });
 
+    it('should show the same selectable auto/checkpoint menu for /chat and /resume', async () => {
+      const checkpointSubCommands = [
+        createTestCommand({
+          name: 'list',
+          description: 'List checkpoints',
+          suggestionGroup: 'checkpoints',
+          action: vi.fn(),
+        }),
+        createTestCommand({
+          name: 'save',
+          description: 'Save checkpoint',
+          suggestionGroup: 'checkpoints',
+          action: vi.fn(),
+        }),
+      ];
+
+      const slashCommands = [
+        createTestCommand({
+          name: 'chat',
+          description: 'Chat command',
+          action: vi.fn(),
+          subCommands: checkpointSubCommands,
+        }),
+        createTestCommand({
+          name: 'resume',
+          description: 'Resume command',
+          action: vi.fn(),
+          subCommands: checkpointSubCommands,
+        }),
+      ];
+
+      const { result: chatResult, unmount: unmountChat } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/chat',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(chatResult.current.suggestions[0]).toMatchObject({
+          label: 'list',
+          sectionTitle: 'auto',
+          submitValue: '/chat',
+        });
+      });
+
+      const { result: resumeResult, unmount: unmountResume } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/resume',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(resumeResult.current.suggestions[0]).toMatchObject({
+          label: 'list',
+          sectionTitle: 'auto',
+          submitValue: '/resume',
+        });
+      });
+
+      const chatCheckpointLabels = chatResult.current.suggestions
+        .slice(1)
+        .map((s) => s.label);
+      const resumeCheckpointLabels = resumeResult.current.suggestions
+        .slice(1)
+        .map((s) => s.label);
+
+      expect(chatCheckpointLabels).toEqual(resumeCheckpointLabels);
+
+      unmountChat();
+      unmountResume();
+    });
+
+    it('should show the grouped /resume menu for unique /resum prefix input', async () => {
+      const slashCommands = [
+        createTestCommand({
+          name: 'resume',
+          description: 'Resume command',
+          action: vi.fn(),
+          subCommands: [
+            createTestCommand({
+              name: 'list',
+              description: 'List checkpoints',
+              suggestionGroup: 'checkpoints',
+            }),
+            createTestCommand({
+              name: 'save',
+              description: 'Save checkpoint',
+              suggestionGroup: 'checkpoints',
+            }),
+          ],
+        }),
+      ];
+
+      const { result, unmount } = renderHook(() =>
+        useTestHarnessForSlashCompletion(
+          true,
+          '/resum',
+          slashCommands,
+          mockCommandContext,
+        ),
+      );
+
+      await waitFor(() => {
+        expect(result.current.suggestions[0]).toMatchObject({
+          label: 'list',
+          sectionTitle: 'auto',
+          submitValue: '/resume',
+        });
+        expect(result.current.isPerfectMatch).toBe(false);
+        expect(result.current.suggestions.slice(1).map((s) => s.label)).toEqual(
+          expect.arrayContaining(['list', 'save']),
+        );
+      });
+
+      unmount();
+    });
+
     it('should sort exact altName matches to the top', async () => {
       const slashCommands = [
         createTestCommand({
@@ -492,8 +618,13 @@ describe('useSlashCompletion', () => {
       );
 
       await waitFor(() => {
-        // Should show subcommands of 'chat'
-        expect(result.current.suggestions).toHaveLength(2);
+        // Should show the auto-session entry plus subcommands of 'chat'
+        expect(result.current.suggestions).toHaveLength(3);
+        expect(result.current.suggestions[0]).toMatchObject({
+          label: 'list',
+          sectionTitle: 'auto',
+          submitValue: '/chat',
+        });
         expect(result.current.suggestions.map((s) => s.label)).toEqual(
           expect.arrayContaining(['list', 'save']),
         );
@@ -1079,7 +1210,7 @@ describe('useSlashCompletion', () => {
         {
           name: 'custom-script',
           description: 'Run custom script',
-          kind: CommandKind.FILE,
+          kind: CommandKind.USER_FILE,
           action: vi.fn(),
         },
       ] as SlashCommand[];
@@ -1099,7 +1230,7 @@ describe('useSlashCompletion', () => {
             label: 'custom-script',
             value: 'custom-script',
             description: 'Run custom script',
-            commandKind: CommandKind.FILE,
+            commandKind: CommandKind.USER_FILE,
           },
         ]);
         expect(result.current.completionStart).toBe(1);
