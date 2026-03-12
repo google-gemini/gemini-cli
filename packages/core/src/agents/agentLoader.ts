@@ -107,9 +107,11 @@ const localAgentSchema = z
     display_name: z.string().optional(),
     tools: z
       .array(
-        z.string().refine((val) => isValidToolName(val), {
-          message: 'Invalid tool name',
-        }),
+        z
+          .string()
+          .refine((val) => isValidToolName(val, { allowWildcards: true }), {
+            message: 'Invalid tool name',
+          }),
       )
       .optional(),
     model: z.string().optional(),
