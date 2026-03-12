@@ -48,6 +48,11 @@
             "slug": "docs/cli/tutorials/task-planning"
           },
           {
+            "label": "Use Plan Mode with model steering",
+            "badge": "🔬",
+            "slug": "docs/cli/tutorials/plan-mode-steering"
+          },
+          {
             "label": "Web search and fetch",
             "slug": "docs/cli/tutorials/web-tools"
           },
@@ -106,6 +111,11 @@
           { "label": "MCP servers", "slug": "docs/tools/mcp-server" },
           { "label": "Model routing", "slug": "docs/cli/model-routing" },
           { "label": "Model selection", "slug": "docs/cli/model" },
+          {
+            "label": "Model steering",
+            "badge": "🔬",
+            "slug": "docs/cli/model-steering"
+          },
           {
             "label": "Notifications",
             "badge": "🔬",
