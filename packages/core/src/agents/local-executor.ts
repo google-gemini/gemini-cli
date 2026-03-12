@@ -1101,6 +1101,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         toolRequests,
         {
           schedulerId: this.agentId,
+          subagent: this.definition.name,
           parentCallId: this.parentCallId,
           toolRegistry: this.toolRegistry,
           signal,
