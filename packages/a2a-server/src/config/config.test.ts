@@ -115,7 +115,7 @@ describe('loadConfig', () => {
     });
 
     it('should pass clientName as a2a-server to Config', async () => {
-      await loadConfig(mockSettings, mockExtensionLoader, taskId);
+      await loadConfig(mockLoadedSettings, mockExtensionLoader, taskId);
       expect(Config).toHaveBeenCalledWith(
         expect.objectContaining({
           clientName: 'a2a-server',
