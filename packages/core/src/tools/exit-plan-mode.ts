@@ -203,8 +203,16 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
       };
     }
 
-    const payload = this.approvalPayload;
-    if (payload?.approved) {
+    // When a user policy grants `allow` for exit_plan_mode, the scheduler
+    // skips the confirmation phase entirely and shouldConfirmExecute is never
+    // called, leaving approvalPayload null.  Treat that as an approval with
+    // the default mode — consistent with the ALLOW branch inside
+    // shouldConfirmExecute.
+    const payload = this.approvalPayload ?? {
+      approved: true,
+      approvalMode: ApprovalMode.DEFAULT,
+    };
+    if (payload.approved) {
       const newMode = payload.approvalMode ?? ApprovalMode.DEFAULT;
 
       if (newMode === ApprovalMode.PLAN || newMode === ApprovalMode.YOLO) {

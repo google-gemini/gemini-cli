@@ -339,6 +339,26 @@ Ask the user for specific feedback on how to improve the plan.`,
     });
   });
 
+  describe('execute when shouldConfirmExecute is never called', () => {
+    it('should approve with DEFAULT mode when approvalPayload is null (policy ALLOW skips confirmation)', async () => {
+      const planRelativePath = createPlanFile('test.md', '# Content');
+      const invocation = tool.build({ plan_path: planRelativePath });
+
+      // Simulate the scheduler's policy ALLOW path: execute() is called
+      // directly without ever calling shouldConfirmExecute(), leaving
+      // approvalPayload null.
+      const result = await invocation.execute(new AbortController().signal);
+      const expectedPath = path.join(mockPlansDir, 'test.md');
+
+      expect(result.llmContent).toContain('Plan approved');
+      expect(result.returnDisplay).toContain('Plan approved');
+      expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
+        ApprovalMode.DEFAULT,
+      );
+      expect(mockConfig.setApprovedPlanPath).toHaveBeenCalledWith(expectedPath);
+    });
+  });
+
   describe('getApprovalModeDescription (internal)', () => {
     it('should handle all valid approval modes', async () => {
       const planRelativePath = createPlanFile('test.md', '# Content');
