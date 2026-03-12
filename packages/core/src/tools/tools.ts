@@ -61,19 +61,64 @@ export interface ToolInvocation<
    * Executes the tool with the validated parameters.
    * @param signal AbortSignal for tool cancellation.
    * @param updateOutput Optional callback to stream output.
+   * @param setExecutionIdCallback Optional callback for tools that expose a background execution handle.
    * @returns Result of the tool execution.
    */
   execute(
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
     shellExecutionConfig?: ShellExecutionConfig,
+    setExecutionIdCallback?: (executionId: number) => void,
   ): Promise<TResult>;
+
+  /**
+   * Returns tool-specific options for policy updates.
+   * This is used by the scheduler to narrow policy rules when a tool is approved.
+   */
+  getPolicyUpdateOptions?(
+    outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined;
+}
+
+/**
+ * Structured payload used by tools to surface background execution metadata to
+ * the CLI UI.
+ *
+ * NOTE: `pid` is used as the canonical identifier for now to stay consistent
+ * with existing types (ExecutingToolCall.pid, ExecutionHandle.pid, etc.).
+ * A future rename to `executionId` is planned once the codebase is fully
+ * migrated — not done in this PR to keep the diff focused on the abstraction.
+ */
+export interface BackgroundExecutionData extends Record<string, unknown> {
+  pid?: number;
+  command?: string;
+  initialOutput?: string;
+}
+
+export function isBackgroundExecutionData(
+  data: unknown,
+): data is BackgroundExecutionData {
+  if (typeof data !== 'object' || data === null) {
+    return false;
+  }
+
+  const pid = 'pid' in data ? data.pid : undefined;
+  const command = 'command' in data ? data.command : undefined;
+  const initialOutput =
+    'initialOutput' in data ? data.initialOutput : undefined;
+
+  return (
+    (pid === undefined || typeof pid === 'number') &&
+    (command === undefined || typeof command === 'string') &&
+    (initialOutput === undefined || typeof initialOutput === 'string')
+  );
 }
 
 /**
  * Options for policy updates that can be customized by tool invocations.
  */
 export interface PolicyUpdateOptions {
+  argsPattern?: string;
   commandPrefix?: string | string[];
   mcpName?: string;
 }
@@ -130,7 +175,7 @@ export abstract class BaseToolInvocation<
    * Subclasses can override this to provide additional options like
    * commandPrefix (for shell) or mcpName (for MCP tools).
    */
-  protected getPolicyUpdateOptions(
+  getPolicyUpdateOptions(
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
     return undefined;

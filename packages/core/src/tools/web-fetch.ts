@@ -12,7 +12,9 @@ import {
   type ToolInvocation,
   type ToolResult,
   type ToolConfirmationOutcome,
+  type PolicyUpdateOptions,
 } from './tools.js';
+import { buildParamArgsPattern } from '../policy/utils.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
@@ -25,11 +27,14 @@ import { convert } from 'html-to-text';
 import {
   logWebFetchFallbackAttempt,
   WebFetchFallbackAttemptEvent,
+  logNetworkRetryAttempt,
+  NetworkRetryAttemptEvent,
 } from '../telemetry/index.js';
 import { LlmRole } from '../telemetry/llmRole.js';
 import { WEB_FETCH_TOOL_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { retryWithBackoff } from '../utils/retry.js';
+import { coreEvents } from '../utils/events.js';
+import { retryWithBackoff, getRetryErrorType } from '../utils/retry.js';
 import { WEB_FETCH_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { LRUCache } from 'mnemonist';
@@ -184,6 +189,31 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     super(params, messageBus, _toolName, _toolDisplayName);
   }
 
+  private handleRetry(attempt: number, error: unknown, delayMs: number): void {
+    const maxAttempts = this.config.getMaxAttempts();
+    const modelName = 'Web Fetch';
+    const errorType = getRetryErrorType(error);
+
+    coreEvents.emitRetryAttempt({
+      attempt,
+      maxAttempts,
+      delayMs,
+      error: errorType,
+      model: modelName,
+    });
+
+    logNetworkRetryAttempt(
+      this.config,
+      new NetworkRetryAttemptEvent(
+        attempt,
+        maxAttempts,
+        errorType,
+        delayMs,
+        modelName,
+      ),
+    );
+  }
+
   private async executeFallback(signal: AbortSignal): Promise<ToolResult> {
     const { validUrls: urls } = parsePrompt(this.params.prompt!);
     // For now, we only support one URL for fallback
@@ -212,6 +242,8 @@ class WebFetchToolInvocation extends BaseToolInvocation<
         },
         {
           retryFetchErrors: this.config.getRetryFetchErrors(),
+          onRetry: (attempt, error, delayMs) =>
+            this.handleRetry(attempt, error, delayMs),
         },
       );
 
@@ -289,6 +321,21 @@ ${textContent}
     const displayPrompt =
       prompt.length > 100 ? prompt.substring(0, 97) + '...' : prompt;
     return `Processing URLs and instructions from prompt: "${displayPrompt}"`;
+  }
+
+  override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    if (this.params.url) {
+      return {
+        argsPattern: buildParamArgsPattern('url', this.params.url),
+      };
+    } else if (this.params.prompt) {
+      return {
+        argsPattern: buildParamArgsPattern('prompt', this.params.prompt),
+      };
+    }
+    return undefined;
   }
 
   protected override async getConfirmationDetails(
@@ -405,6 +452,8 @@ ${textContent}
         },
         {
           retryFetchErrors: this.config.getRetryFetchErrors(),
+          onRetry: (attempt, error, delayMs) =>
+            this.handleRetry(attempt, error, delayMs),
         },
       );
 

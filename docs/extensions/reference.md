@@ -123,6 +123,7 @@ The manifest file defines the extension's behavior and configuration.
   },
   "contextFileName": "GEMINI.md",
   "excludeTools": ["run_shell_command"],
+  "migratedTo": "https://github.com/new-owner/new-extension-repo",
   "plan": {
     "directory": ".gemini/plans"
   }
@@ -138,6 +139,9 @@ The manifest file defines the extension's behavior and configuration.
 - `version`: The version of the extension.
 - `description`: A short description of the extension. This will be displayed on
   [geminicli.com/extensions](https://geminicli.com/extensions).
+- `migratedTo`: The URL of the new repository source for the extension. If this
+  is set, the CLI will automatically check this new source for updates and
+  migrate the extension's installation to the new source if an update is found.
 - `mcpServers`: A map of MCP servers to settings. The key is the name of the
   server, and the value is the server configuration. These servers will be
   loaded on startup just like MCP servers defined in a
@@ -258,12 +262,14 @@ but lower priority than user or admin policies.
 
 ```toml
 [[rule]]
-toolName = "my_server__dangerous_tool"
+mcpName = "my_server"
+toolName = "dangerous_tool"
 decision = "ask_user"
 priority = 100
 
 [[safety_checker]]
-toolName = "my_server__write_data"
+mcpName = "my_server"
+toolName = "write_data"
 priority = 200
 [safety_checker.checker]
 type = "in-process"

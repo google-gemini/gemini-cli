@@ -23,11 +23,13 @@ import {
 } from './contentGenerator.js';
 import { GeminiChat } from './geminiChat.js';
 import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import {
   CompressionStatus,
   GeminiEventType,
   Turn,
   type ChatCompressionInfo,
+  type ServerGeminiStreamEvent,
 } from './turn.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { DEFAULT_GEMINI_MODEL_AUTO } from '../config/models.js';
@@ -233,6 +235,8 @@ describe('Gemini Client (client.ts)', () => {
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
       getGeminiClient: vi.fn(),
+      getRetryFetchErrors: vi.fn().mockReturnValue(true),
+      getMaxAttempts: vi.fn().mockReturnValue(3),
       getModelRouterService: vi
         .fn()
         .mockReturnValue(mockRouterService as unknown as ModelRouterService),
@@ -277,7 +281,16 @@ describe('Gemini Client (client.ts)', () => {
     } as unknown as Config;
     mockConfig.getHookSystem = vi.fn().mockReturnValue(mockHookSystem);
 
-    client = new GeminiClient(mockConfig);
+    (
+      mockConfig as unknown as { toolRegistry: typeof mockToolRegistry }
+    ).toolRegistry = mockToolRegistry;
+    (mockConfig as unknown as { messageBus: undefined }).messageBus = undefined;
+    (mockConfig as unknown as { config: Config; promptId: string }).config =
+      mockConfig;
+    (mockConfig as unknown as { config: Config; promptId: string }).promptId =
+      'test-prompt-id';
+
+    client = new GeminiClient(mockConfig as unknown as AgentLoopContext);
     await client.initialize();
     vi.mocked(mockConfig.getGeminiClient).mockReturnValue(client);
 
@@ -727,6 +740,23 @@ describe('Gemini Client (client.ts)', () => {
       );
     });
 
+    it('yields UserCancelled when processTurn throws AbortError', async () => {
+      const abortError = new Error('Aborted');
+      abortError.name = 'AbortError';
+      vi.spyOn(client['loopDetector'], 'turnStarted').mockRejectedValueOnce(
+        abortError,
+      );
+
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-abort-error',
+      );
+      const events = await fromAsync(stream);
+
+      expect(events).toEqual([{ type: GeminiEventType.UserCancelled }]);
+    });
+
     it.each([
       {
         compressionStatus:
@@ -1116,6 +1146,54 @@ ${JSON.stringify(
       expect(countTokensSpy).not.toHaveBeenCalled();
 
       // The actual token calculation is unit tested in tokenCalculation.test.ts
+    });
+
+    it('should cleanly abort and return Turn on LoopDetected without unhandled promise rejections', async () => {
+      // Arrange
+      const mockStream = (async function* () {
+        // Yield an event that will trigger the loop detector
+        yield { type: 'content', value: 'Looping content' };
+      })();
+      mockTurnRunFn.mockReturnValue(mockStream);
+
+      const mockChat: Partial<GeminiChat> = {
+        addHistory: vi.fn(),
+        setTools: vi.fn(),
+        getHistory: vi.fn().mockReturnValue([]),
+        getLastPromptTokenCount: vi.fn(),
+      };
+      client['chat'] = mockChat as GeminiChat;
+
+      // Mock loop detector to return count > 1 on the first event (loop detected)
+      vi.spyOn(client['loopDetector'], 'addAndCheck').mockReturnValue({
+        count: 2,
+      });
+
+      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
+
+      // Act
+      const stream = client.sendMessageStream(
+        [{ text: 'Hi' }],
+        new AbortController().signal,
+        'prompt-id-1',
+      );
+
+      const events: ServerGeminiStreamEvent[] = [];
+      let finalResult: Turn | undefined;
+
+      while (true) {
+        const result = await stream.next();
+        if (result.done) {
+          finalResult = result.value;
+          break;
+        }
+        events.push(result.value);
+      }
+
+      // Assert
+      expect(events).toContainEqual({ type: GeminiEventType.LoopDetected });
+      expect(abortSpy).toHaveBeenCalled();
+      expect(finalResult).toBeInstanceOf(Turn);
     });
 
     it('should return the turn instance after the stream is complete', async () => {
@@ -3251,6 +3329,7 @@ ${JSON.stringify(
         expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
           partToString(request),
           'Hook Response',
+          false,
         );
 
         // Map should be empty
@@ -3292,6 +3371,7 @@ ${JSON.stringify(
         expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
           partToString(request),
           'Response 1\nResponse 2',
+          false,
         );
 
         expect(client['hookStateMap'].size).toBe(0);
@@ -3322,6 +3402,7 @@ ${JSON.stringify(
         expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledWith(
           partToString(request), // Should be 'Do something'
           expect.stringContaining('Ok'),
+          false,
         );
       });
 
@@ -3491,6 +3572,21 @@ ${JSON.stringify(
           [{ text: 'Please explain' }],
           expect.anything(),
           undefined,
+        );
+
+        // First call should have stopHookActive=false, retry should have stopHookActive=true
+        expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenCalledTimes(2);
+        expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenNthCalledWith(
+          1,
+          expect.any(String),
+          expect.any(String),
+          false,
+        );
+        expect(mockHookSystem.fireAfterAgentEvent).toHaveBeenNthCalledWith(
+          2,
+          expect.any(String),
+          expect.any(String),
+          true,
         );
       });
 

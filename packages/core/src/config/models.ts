@@ -32,6 +32,15 @@ export const GEMINI_MODEL_ALIAS_PRO = 'pro';
 export const GEMINI_MODEL_ALIAS_FLASH = 'flash';
 export const GEMINI_MODEL_ALIAS_FLASH_LITE = 'flash-lite';
 
+export const VALID_ALIASES = new Set([
+  GEMINI_MODEL_ALIAS_AUTO,
+  GEMINI_MODEL_ALIAS_PRO,
+  GEMINI_MODEL_ALIAS_FLASH,
+  GEMINI_MODEL_ALIAS_FLASH_LITE,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  DEFAULT_GEMINI_MODEL_AUTO,
+]);
+
 export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 
 // Cap the thinking at 8192 to prevent run-away thinking loops.
@@ -43,38 +52,70 @@ export const DEFAULT_THINKING_MODE = 8192;
  *
  * @param requestedModel The model alias or concrete model name requested by the user.
  * @param useGemini3_1 Whether to use Gemini 3.1 Pro Preview for auto/pro aliases.
+ * @param hasAccessToPreview Whether the user has access to preview models.
  * @returns The resolved concrete model name.
  */
 export function resolveModel(
   requestedModel: string,
   useGemini3_1: boolean = false,
   useCustomToolModel: boolean = false,
+  hasAccessToPreview: boolean = true,
 ): string {
+  let resolved: string;
   switch (requestedModel) {
     case PREVIEW_GEMINI_MODEL:
     case PREVIEW_GEMINI_MODEL_AUTO:
     case GEMINI_MODEL_ALIAS_AUTO:
     case GEMINI_MODEL_ALIAS_PRO: {
       if (useGemini3_1) {
-        return useCustomToolModel
+        resolved = useCustomToolModel
           ? PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
           : PREVIEW_GEMINI_3_1_MODEL;
+      } else {
+        resolved = PREVIEW_GEMINI_MODEL;
       }
-      return PREVIEW_GEMINI_MODEL;
+      break;
     }
     case DEFAULT_GEMINI_MODEL_AUTO: {
-      return DEFAULT_GEMINI_MODEL;
+      resolved = DEFAULT_GEMINI_MODEL;
+      break;
     }
     case GEMINI_MODEL_ALIAS_FLASH: {
-      return PREVIEW_GEMINI_FLASH_MODEL;
+      resolved = PREVIEW_GEMINI_FLASH_MODEL;
+      break;
     }
     case GEMINI_MODEL_ALIAS_FLASH_LITE: {
-      return DEFAULT_GEMINI_FLASH_LITE_MODEL;
+      resolved = DEFAULT_GEMINI_FLASH_LITE_MODEL;
+      break;
     }
     default: {
-      return requestedModel;
+      resolved = requestedModel;
+      break;
     }
   }
+
+  if (!hasAccessToPreview && isPreviewModel(resolved)) {
+    // Downgrade to stable models if user lacks preview access.
+    switch (resolved) {
+      case PREVIEW_GEMINI_FLASH_MODEL:
+        return DEFAULT_GEMINI_FLASH_MODEL;
+      case PREVIEW_GEMINI_MODEL:
+      case PREVIEW_GEMINI_3_1_MODEL:
+      case PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL:
+        return DEFAULT_GEMINI_MODEL;
+      default:
+        // Fallback for unknown preview models, preserving original logic.
+        if (resolved.includes('flash-lite')) {
+          return DEFAULT_GEMINI_FLASH_LITE_MODEL;
+        }
+        if (resolved.includes('flash')) {
+          return DEFAULT_GEMINI_FLASH_MODEL;
+        }
+        return DEFAULT_GEMINI_MODEL;
+    }
+  }
+
+  return resolved;
 }
 
 /**
@@ -136,7 +177,8 @@ export function isPreviewModel(model: string): boolean {
     model === PREVIEW_GEMINI_3_1_MODEL ||
     model === PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL ||
     model === PREVIEW_GEMINI_FLASH_MODEL ||
-    model === PREVIEW_GEMINI_MODEL_AUTO
+    model === PREVIEW_GEMINI_MODEL_AUTO ||
+    model === GEMINI_MODEL_ALIAS_AUTO
   );
 }
 
@@ -249,4 +291,38 @@ export function isActiveModel(
       model !== PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
     );
   }
+}
+
+/**
+ * Checks if the model name is valid (either a valid model or a valid alias).
+ *
+ * @param model The model name to check.
+ * @returns True if the model is valid.
+ */
+export function isValidModelOrAlias(model: string): boolean {
+  // Check if it's a valid alias
+  if (VALID_ALIASES.has(model)) {
+    return true;
+  }
+
+  // Check if it's a valid model name
+  if (VALID_GEMINI_MODELS.has(model)) {
+    return true;
+  }
+
+  // Allow custom models (non-gemini models)
+  if (!model.startsWith('gemini-')) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Gets a list of all valid model names and aliases for error messages.
+ *
+ * @returns Array of valid model names and aliases.
+ */
+export function getValidModelsAndAliases(): string[] {
+  return [...new Set([...VALID_ALIASES, ...VALID_GEMINI_MODELS])].sort();
 }
