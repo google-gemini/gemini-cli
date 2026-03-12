@@ -132,7 +132,9 @@ export function AuthDialog({
           config.isBrowserLaunchSuppressed()
         ) {
           setExiting(true);
-          setTimeout(relaunchApp, 100);
+          setTimeout(async () => {
+            await relaunchApp(config.getRemoteAdminSettings());
+          }, 100);
           return;
         }
 

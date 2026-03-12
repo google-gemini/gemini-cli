@@ -26,16 +26,7 @@ export const LoginWithGoogleRestartDialog = ({
         return true;
       } else if (key.name === 'r' || key.name === 'R') {
         setTimeout(async () => {
-          if (process.send) {
-            const remoteSettings = config.getRemoteAdminSettings();
-            if (remoteSettings) {
-              process.send({
-                type: 'admin-settings-update',
-                settings: remoteSettings,
-              });
-            }
-          }
-          await relaunchApp();
+          await relaunchApp(config.getRemoteAdminSettings());
         }, 100);
         return true;
       }

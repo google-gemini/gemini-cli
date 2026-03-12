@@ -614,6 +614,7 @@ export interface ConfigParameters {
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
+  deferInitialMemoryLoad?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
   plan?: boolean;
@@ -832,6 +833,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly adminSkillsEnabled: boolean;
 
   private readonly experimentalJitContext: boolean;
+  private readonly deferInitialMemoryLoad: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
   private readonly trackerEnabled: boolean;
@@ -934,6 +936,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.experimentalJitContext = params.experimentalJitContext ?? false;
+    this.deferInitialMemoryLoad = params.deferInitialMemoryLoad ?? false;
     this.modelSteering = params.modelSteering ?? false;
     this.userHintService = new UserHintService(() =>
       this.isModelSteeringEnabled(),
@@ -1172,6 +1175,23 @@ export class Config implements McpContext, AgentLoopContext {
         // directories must be within the project root, they are automatically
         // covered by the project-wide file discovery once created.
       }
+    }
+
+    if (!this.getExtensionLoader().isLoaded()) {
+      const extensionLoadHandle = startupProfiler.start('load_extensions');
+      await this.getExtensionLoader().ensureLoaded();
+      extensionLoadHandle?.end();
+    } else {
+      await this.getExtensionLoader().ensureLoaded();
+    }
+
+    if (this.deferInitialMemoryLoad) {
+      const memoryLoadHandle = startupProfiler.start('load_memory');
+      const { refreshServerHierarchicalMemory } = await import(
+        '../utils/memoryDiscovery.js'
+      );
+      await refreshServerHierarchicalMemory(this);
+      memoryLoadHandle?.end();
     }
 
     // Initialize centralized FileDiscoveryService

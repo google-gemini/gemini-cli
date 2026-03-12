@@ -289,6 +289,11 @@ export function createTestMergedSettings(
   ) as MergedSettings;
 }
 
+export function createDefaultMergedSettings(): MergedSettings {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return getDefaultsFromSchema() as MergedSettings;
+}
+
 /**
  * An immutable snapshot of settings state.
  * Used with useSyncExternalStore for reactive updates.

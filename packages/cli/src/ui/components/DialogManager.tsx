@@ -231,7 +231,9 @@ export const DialogManager = ({
       <Box flexDirection="column">
         <SettingsDialog
           onSelect={() => uiActions.closeSettingsDialog()}
-          onRestartRequest={relaunchApp}
+          onRestartRequest={async () => {
+            await relaunchApp(config.getRemoteAdminSettings());
+          }}
           availableTerminalHeight={terminalHeight - staticExtraHeight}
         />
       </Box>

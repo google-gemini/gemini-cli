@@ -28,6 +28,7 @@ import {
   type MergedSettings,
   createTestMergedSettings,
 } from './settings.js';
+import * as SettingsModule from './settings.js';
 import * as ServerConfig from '@google/gemini-cli-core';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
@@ -813,7 +814,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   });
 
   it('should pass extension context file paths to loadServerHierarchicalMemory', async () => {
-    process.argv = ['node', 'script.js'];
+    process.argv = ['node', 'script.js', '--prompt', 'test'];
     const settings = createTestMergedSettings();
     vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
       {
@@ -862,7 +863,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   });
 
   it('should pass includeDirectories to loadServerHierarchicalMemory when loadMemoryFromIncludeDirectories is true', async () => {
-    process.argv = ['node', 'script.js'];
+    process.argv = ['node', 'script.js', '--prompt', 'test'];
     const includeDir = path.resolve(path.sep, 'path', 'to', 'include');
     const settings = createTestMergedSettings({
       context: {
@@ -890,7 +891,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   });
 
   it('should NOT pass includeDirectories to loadServerHierarchicalMemory when loadMemoryFromIncludeDirectories is false', async () => {
-    process.argv = ['node', 'script.js'];
+    process.argv = ['node', 'script.js', '--prompt', 'test'];
     const settings = createTestMergedSettings({
       context: {
         includeDirectories: ['/path/to/include'],
@@ -914,6 +915,39 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
       }),
       200,
     );
+  });
+
+  it('should skip extension, memory, and PTY discovery in bootstrap mode', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings();
+    const argv = await parseArguments(settings);
+    const loadSettingsSpy = vi.spyOn(SettingsModule, 'loadSettings');
+    const getPtySpy = vi.spyOn(ServerConfig, 'getPty');
+
+    await loadCliConfig(settings, 'session-id', argv, {
+      mode: 'bootstrap',
+      loadedSettings: { merged: settings } as SettingsModule.LoadedSettings,
+    });
+
+    expect(loadSettingsSpy).not.toHaveBeenCalled();
+    expect(ExtensionManager.prototype.loadExtensions).not.toHaveBeenCalled();
+    expect(ServerConfig.loadServerHierarchicalMemory).not.toHaveBeenCalled();
+    expect(getPtySpy).not.toHaveBeenCalled();
+  });
+
+  it('should defer extension and memory discovery during interactive startup', async () => {
+    process.argv = ['node', 'script.js'];
+    const settings = createTestMergedSettings();
+    const argv = await parseArguments(settings);
+    const getPtySpy = vi.spyOn(ServerConfig, 'getPty');
+
+    await loadCliConfig(settings, 'session-id', argv, {
+      loadedSettings: { merged: settings } as SettingsModule.LoadedSettings,
+    });
+
+    expect(ExtensionManager.prototype.loadExtensions).not.toHaveBeenCalled();
+    expect(ServerConfig.loadServerHierarchicalMemory).not.toHaveBeenCalled();
+    expect(getPtySpy).toHaveBeenCalled();
   });
 });
 

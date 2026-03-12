@@ -103,6 +103,21 @@ async function drainStdin() {
   await new Promise((resolve) => setTimeout(resolve, 50));
 }
 
+export async function cleanupCheckpoints(projectTempDir?: string) {
+  let tempDir = projectTempDir;
+  if (!tempDir) {
+    const storage = new Storage(process.cwd());
+    await storage.initialize();
+    tempDir = storage.getProjectTempDir();
+  }
+  const checkpointsDir = join(tempDir, 'checkpoints');
+  try {
+    await fs.rm(checkpointsDir, { recursive: true, force: true });
+  } catch {
+    // Ignore errors if the directory doesn't exist or fails to delete.
+  }
+}
+
 /**
  * Gracefully shuts down the process, ensuring cleanup runs exactly once.
  * Guards against concurrent shutdown from signals (SIGHUP, SIGTERM, SIGINT)
@@ -160,16 +175,4 @@ export function setupTtyCheck(): () => void {
       intervalId = null;
     }
   };
-}
-
-export async function cleanupCheckpoints() {
-  const storage = new Storage(process.cwd());
-  await storage.initialize();
-  const tempDir = storage.getProjectTempDir();
-  const checkpointsDir = join(tempDir, 'checkpoints');
-  try {
-    await fs.rm(checkpointsDir, { recursive: true, force: true });
-  } catch {
-    // Ignore errors if the directory doesn't exist or fails to delete.
-  }
 }

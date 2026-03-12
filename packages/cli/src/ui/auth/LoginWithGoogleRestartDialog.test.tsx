@@ -8,30 +8,23 @@ import { render } from '../../test-utils/render.js';
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { LoginWithGoogleRestartDialog } from './LoginWithGoogleRestartDialog.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { runExitCleanup } from '../../utils/cleanup.js';
-import {
-  RELAUNCH_EXIT_CODE,
-  _resetRelaunchStateForTesting,
-} from '../../utils/processUtils.js';
 import { type Config } from '@google/gemini-cli-core';
+import { relaunchApp } from '../../utils/processUtils.js';
 
 // Mocks
 vi.mock('../hooks/useKeypress.js', () => ({
   useKeypress: vi.fn(),
 }));
 
-vi.mock('../../utils/cleanup.js', () => ({
-  runExitCleanup: vi.fn(),
+vi.mock('../../utils/processUtils.js', () => ({
+  relaunchApp: vi.fn().mockResolvedValue(undefined),
 }));
 
 const mockedUseKeypress = useKeypress as Mock;
-const mockedRunExitCleanup = runExitCleanup as Mock;
+const mockedRelaunchApp = relaunchApp as Mock;
 
 describe('LoginWithGoogleRestartDialog', () => {
   const onDismiss = vi.fn();
-  const exitSpy = vi
-    .spyOn(process, 'exit')
-    .mockImplementation(() => undefined as never);
 
   const mockConfig = {
     getRemoteAdminSettings: vi.fn(),
@@ -39,9 +32,7 @@ describe('LoginWithGoogleRestartDialog', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    exitSpy.mockClear();
     vi.useRealTimers();
-    _resetRelaunchStateForTesting();
   });
 
   it('renders correctly', async () => {
@@ -78,36 +69,33 @@ describe('LoginWithGoogleRestartDialog', () => {
     unmount();
   });
 
-  it.each(['r', 'R'])(
-    'calls runExitCleanup and process.exit when %s is pressed',
-    async (keyName) => {
-      vi.useFakeTimers();
+  it.each(['r', 'R'])('restarts when %s is pressed', async (keyName) => {
+    vi.useFakeTimers();
 
-      const { waitUntilReady, unmount } = render(
-        <LoginWithGoogleRestartDialog
-          onDismiss={onDismiss}
-          config={mockConfig}
-        />,
-      );
-      await waitUntilReady();
-      const keypressHandler = mockedUseKeypress.mock.calls[0][0];
+    const { waitUntilReady, unmount } = render(
+      <LoginWithGoogleRestartDialog
+        onDismiss={onDismiss}
+        config={mockConfig}
+      />,
+    );
+    await waitUntilReady();
+    const keypressHandler = mockedUseKeypress.mock.calls[0][0];
 
-      keypressHandler({
-        name: keyName,
-        shift: false,
-        ctrl: false,
-        cmd: false,
-        sequence: keyName,
-      });
+    keypressHandler({
+      name: keyName,
+      shift: false,
+      ctrl: false,
+      cmd: false,
+      sequence: keyName,
+    });
 
-      // Advance timers to trigger the setTimeout callback
-      await vi.runAllTimersAsync();
+    // Advance timers to trigger the setTimeout callback
+    await vi.runAllTimersAsync();
 
-      expect(mockedRunExitCleanup).toHaveBeenCalledTimes(1);
-      expect(exitSpy).toHaveBeenCalledWith(RELAUNCH_EXIT_CODE);
+    expect(mockedRelaunchApp).toHaveBeenCalledTimes(1);
+    expect(mockedRelaunchApp).toHaveBeenCalledWith(undefined);
 
-      vi.useRealTimers();
-      unmount();
-    },
-  );
+    vi.useRealTimers();
+    unmount();
+  });
 });

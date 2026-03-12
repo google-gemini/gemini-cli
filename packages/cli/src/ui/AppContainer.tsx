@@ -796,7 +796,7 @@ export const AppContainer = (props: AppContainerProps) => {
 Logging in with Google... Restarting Gemini CLI to continue.
 ----------------------------------------------------------------
           `);
-          await relaunchApp();
+          await relaunchApp(config.getRemoteAdminSettings());
         }
       }
       setAuthState(AuthState.Authenticated);
@@ -2478,16 +2478,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       onHintClear: () => {},
       onHintSubmit: () => {},
       handleRestart: async () => {
-        if (process.send) {
-          const remoteSettings = config.getRemoteAdminSettings();
-          if (remoteSettings) {
-            process.send({
-              type: 'admin-settings-update',
-              settings: remoteSettings,
-            });
-          }
-        }
-        await relaunchApp();
+        await relaunchApp(config.getRemoteAdminSettings());
       },
       handleNewAgentsSelect: async (choice: NewAgentsChoice) => {
         if (newAgents && choice === NewAgentsChoice.ACKNOWLEDGE) {
