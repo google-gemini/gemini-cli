@@ -315,6 +315,7 @@ export interface ConversationOffered {
   streamingLatency?: StreamingLatency;
   isAgentic?: boolean;
   initiationMethod?: InitiationMethod;
+  trajectoryId?: string;
 }
 
 export interface StreamingLatency {
