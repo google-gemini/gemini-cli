@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { inspect } from 'node:util';
 import process from 'node:process';
+import { z } from 'zod';
 import {
   AuthType,
   createContentGenerator,
@@ -40,6 +41,10 @@ import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
+import {
+  createSandboxManager,
+  type SandboxManager,
+} from '../services/sandboxManager.js';
 import {
   initializeTelemetry,
   DEFAULT_TELEMETRY_TARGET,
@@ -96,7 +101,6 @@ import type {
 import { ModelAvailabilityService } from '../availability/modelAvailabilityService.js';
 import { ModelRouterService } from '../routing/modelRouterService.js';
 import { OutputFormat } from '../output/types.js';
-//import { type AgentLoopContext } from './agent-loop-context.js';
 import {
   ModelConfigService,
   type ModelConfig,
@@ -316,6 +320,10 @@ export interface BrowserAgentCustomConfig {
   profilePath?: string;
   /** Model override for the visual agent. */
   visualModel?: string;
+  /** List of allowed domains for the browser agent (e.g., ["github.com", "*.google.com"]). */
+  allowedDomains?: string[];
+  /** Disable user input on the browser window during automation. Default: true in non-headless mode */
+  disableUserInput?: boolean;
 }
 
 /**
@@ -451,9 +459,35 @@ export enum AuthProviderType {
 }
 
 export interface SandboxConfig {
-  command: 'docker' | 'podman' | 'sandbox-exec' | 'runsc' | 'lxc';
-  image: string;
+  enabled: boolean;
+  allowedPaths?: string[];
+  networkAccess?: boolean;
+  command?: 'docker' | 'podman' | 'sandbox-exec' | 'runsc' | 'lxc';
+  image?: string;
 }
+
+export const ConfigSchema = z.object({
+  sandbox: z
+    .object({
+      enabled: z.boolean().default(false),
+      allowedPaths: z.array(z.string()).default([]),
+      networkAccess: z.boolean().default(false),
+      command: z
+        .enum(['docker', 'podman', 'sandbox-exec', 'runsc', 'lxc'])
+        .optional(),
+      image: z.string().optional(),
+    })
+    .superRefine((data, ctx) => {
+      if (data.enabled && !data.command) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Sandbox command is required when sandbox is enabled',
+          path: ['command'],
+        });
+      }
+    })
+    .optional(),
+});
 
 /**
  * Callbacks for checking MCP server enablement status.
@@ -476,9 +510,11 @@ export interface PolicyUpdateConfirmationRequest {
 
 export interface ConfigParameters {
   sessionId: string;
+  clientName?: string;
   clientVersion?: string;
   embeddingModel?: string;
   sandbox?: SandboxConfig;
+  toolSandboxing?: boolean;
   targetDir: string;
   debugMode: boolean;
   question?: string;
@@ -621,6 +657,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly acknowledgedAgentsService: AcknowledgedAgentsService;
   private skillManager!: SkillManager;
   private _sessionId: string;
+  private readonly clientName: string | undefined;
   private clientVersion: string;
   private fileSystemService: FileSystemService;
   private trackerService?: TrackerService;
@@ -655,6 +692,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly telemetrySettings: TelemetrySettings;
   private readonly usageStatisticsEnabled: boolean;
   private _geminiClient!: GeminiClient;
+  private readonly _sandboxManager: SandboxManager;
   private baseLlmClient!: BaseLlmClient;
   private localLiteRtLmClient?: LocalLiteRtLmClient;
   private modelRouterService: ModelRouterService;
@@ -781,7 +819,7 @@ export class Config implements McpContext, AgentLoopContext {
     | undefined;
   private disabledHooks: string[];
   private experiments: Experiments | undefined;
-  private experimentsPromise: Promise<void> | undefined;
+  private experimentsPromise: Promise<Experiments | undefined> | undefined;
   private hookSystem?: HookSystem;
   private readonly onModelChange: ((model: string) => void) | undefined;
   private readonly onReload:
@@ -819,12 +857,25 @@ export class Config implements McpContext, AgentLoopContext {
 
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
+    this.clientName = params.clientName;
     this.clientVersion = params.clientVersion ?? 'unknown';
     this.approvedPlanPath = undefined;
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.fileSystemService = new StandardFileSystemService();
-    this.sandbox = params.sandbox;
+    this.sandbox = params.sandbox
+      ? {
+          enabled: params.sandbox.enabled ?? false,
+          allowedPaths: params.sandbox.allowedPaths ?? [],
+          networkAccess: params.sandbox.networkAccess ?? false,
+          command: params.sandbox.command,
+          image: params.sandbox.image,
+        }
+      : {
+          enabled: false,
+          allowedPaths: [],
+          networkAccess: false,
+        };
     this.targetDir = path.resolve(params.targetDir);
     this.folderTrust = params.folderTrust ?? false;
     this.workspaceContext = new WorkspaceContext(this.targetDir, []);
@@ -954,11 +1005,11 @@ export class Config implements McpContext, AgentLoopContext {
       showColor: params.shellExecutionConfig?.showColor ?? false,
       pager: params.shellExecutionConfig?.pager ?? 'cat',
       sanitizationConfig: this.sanitizationConfig,
+      sandboxManager: this.sandboxManager,
     };
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
-    // // TODO(joshualitt): Re-evaluate the todo tool for 3 family.
     this.useWriteTodos = isPreviewModel(this.model)
       ? false
       : (params.useWriteTodos ?? true);
@@ -1010,7 +1061,7 @@ export class Config implements McpContext, AgentLoopContext {
     // Register Conseca if enabled
     if (this.enableConseca) {
       debugLogger.log('[SAFETY] Registering Conseca Safety Checker');
-      ConsecaSafetyChecker.getInstance().setConfig(this);
+      ConsecaSafetyChecker.getInstance().setContext(this);
     }
 
     this._messageBus = new MessageBus(this.policyEngine, this.debugMode);
@@ -1028,7 +1079,7 @@ export class Config implements McpContext, AgentLoopContext {
           params.gemmaModelRouter?.classifier?.model ?? 'gemma3-1b-gpu-custom',
       },
     };
-    this.retryFetchErrors = params.retryFetchErrors ?? false;
+    this.retryFetchErrors = params.retryFetchErrors ?? true;
     this.maxAttempts = Math.min(
       params.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
       DEFAULT_MAX_ATTEMPTS,
@@ -1074,6 +1125,8 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
     this._geminiClient = new GeminiClient(this);
+    this._sandboxManager = createSandboxManager(params.toolSandboxing ?? false);
+    this.shellExecutionConfig.sandboxManager = this._sandboxManager;
     this.modelRouterService = new ModelRouterService(this);
 
     // HACK: The settings loading logic doesn't currently merge the default
@@ -1102,6 +1155,10 @@ export class Config implements McpContext, AgentLoopContext {
     this.modelConfigService = new ModelConfigService(
       modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
     );
+  }
+
+  get config(): Config {
+    return this;
   }
 
   isInitialized(): boolean {
@@ -1195,8 +1252,8 @@ export class Config implements McpContext, AgentLoopContext {
 
         // Re-register ActivateSkillTool to update its schema with the discovered enabled skill enums
         if (this.getSkillManager().getSkills().length > 0) {
-          this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
-          this.getToolRegistry().registerTool(
+          this.toolRegistry.unregisterTool(ActivateSkillTool.Name);
+          this.toolRegistry.registerTool(
             new ActivateSkillTool(this, this.messageBus),
           );
         }
@@ -1269,17 +1326,21 @@ export class Config implements McpContext, AgentLoopContext {
     this.baseLlmClient = new BaseLlmClient(this.contentGenerator, this);
 
     const codeAssistServer = getCodeAssistServer(this);
-    if (codeAssistServer?.projectId) {
-      await this.refreshUserQuota();
-    }
+    const quotaPromise = codeAssistServer?.projectId
+      ? this.refreshUserQuota()
+      : Promise.resolve();
 
     this.experimentsPromise = getExperiments(codeAssistServer)
       .then((experiments) => {
         this.setExperiments(experiments);
+        return experiments;
       })
       .catch((e) => {
         debugLogger.error('Failed to fetch experiments', e);
+        return undefined;
       });
+
+    await quotaPromise;
 
     const authType = this.contentGeneratorConfig.authType;
     if (
@@ -1296,10 +1357,10 @@ export class Config implements McpContext, AgentLoopContext {
     }
 
     // Fetch admin controls
-    await this.ensureExperimentsLoaded();
+    const experiments = await this.experimentsPromise;
     const adminControlsEnabled =
-      this.experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]
-        ?.boolValue ?? false;
+      experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]?.boolValue ??
+      false;
     const adminControls = await fetchAdminControls(
       codeAssistServer,
       this.getRemoteAdminSettings(),
@@ -1363,20 +1424,40 @@ export class Config implements McpContext, AgentLoopContext {
     return this._sessionId;
   }
 
+  /**
+   * @deprecated Do not access directly on Config.
+   * Use the injected AgentLoopContext instead.
+   */
   get toolRegistry(): ToolRegistry {
     return this._toolRegistry;
   }
 
+  /**
+   * @deprecated Do not access directly on Config.
+   * Use the injected AgentLoopContext instead.
+   */
   get messageBus(): MessageBus {
     return this._messageBus;
   }
 
+  /**
+   * @deprecated Do not access directly on Config.
+   * Use the injected AgentLoopContext instead.
+   */
   get geminiClient(): GeminiClient {
     return this._geminiClient;
   }
 
+  get sandboxManager(): SandboxManager {
+    return this._sandboxManager;
+  }
+
   getSessionId(): string {
     return this.promptId;
+  }
+
+  getClientName(): string | undefined {
+    return this.clientName;
   }
 
   setSessionId(sessionId: string): void {
@@ -1611,6 +1692,18 @@ export class Config implements McpContext, AgentLoopContext {
 
   getSandbox(): SandboxConfig | undefined {
     return this.sandbox;
+  }
+
+  getSandboxEnabled(): boolean {
+    return this.sandbox?.enabled ?? false;
+  }
+
+  getSandboxAllowedPaths(): string[] {
+    return this.sandbox?.allowedPaths ?? [];
+  }
+
+  getSandboxNetworkAccess(): boolean {
+    return this.sandbox?.networkAccess ?? false;
   }
 
   isRestrictiveSandbox(): boolean {
@@ -2197,7 +2290,7 @@ export class Config implements McpContext, AgentLoopContext {
    * Whenever the user memory (GEMINI.md files) is updated.
    */
   updateSystemInstructionIfInitialized(): void {
-    const geminiClient = this.getGeminiClient();
+    const geminiClient = this.geminiClient;
     if (geminiClient?.isInitialized()) {
       geminiClient.updateSystemInstruction();
     }
@@ -2512,8 +2605,30 @@ export class Config implements McpContext, AgentLoopContext {
   async getNumericalRoutingEnabled(): Promise<boolean> {
     await this.ensureExperimentsLoaded();
 
-    return !!this.experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING]
-      ?.boolValue;
+    const flag =
+      this.experiments?.flags[ExperimentFlags.ENABLE_NUMERICAL_ROUTING];
+    return flag?.boolValue ?? true;
+  }
+
+  /**
+   * Returns the resolved complexity threshold for routing.
+   * If a remote threshold is provided and within range (0-100), it is returned.
+   * Otherwise, the default threshold (90) is returned.
+   */
+  async getResolvedClassifierThreshold(): Promise<number> {
+    const remoteValue = await this.getClassifierThreshold();
+    const defaultValue = 90;
+
+    if (
+      remoteValue !== undefined &&
+      !isNaN(remoteValue) &&
+      remoteValue >= 0 &&
+      remoteValue <= 100
+    ) {
+      return remoteValue;
+    }
+
+    return defaultValue;
   }
 
   async getClassifierThreshold(): Promise<number | undefined> {
@@ -2641,16 +2756,16 @@ export class Config implements McpContext, AgentLoopContext {
 
       // Re-register ActivateSkillTool to update its schema with the newly discovered skills
       if (this.getSkillManager().getSkills().length > 0) {
-        this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
-        this.getToolRegistry().registerTool(
+        this.toolRegistry.unregisterTool(ActivateSkillTool.Name);
+        this.toolRegistry.registerTool(
           new ActivateSkillTool(this, this.messageBus),
         );
       } else {
-        this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
+        this.toolRegistry.unregisterTool(ActivateSkillTool.Name);
       }
     } else {
       this.getSkillManager().clearSkills();
-      this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
+      this.toolRegistry.unregisterTool(ActivateSkillTool.Name);
     }
 
     // Notify the client that system instructions might need updating
@@ -2728,6 +2843,8 @@ export class Config implements McpContext, AgentLoopContext {
       sanitizationConfig:
         config.sanitizationConfig ??
         this.shellExecutionConfig.sanitizationConfig,
+      sandboxManager:
+        config.sandboxManager ?? this.shellExecutionConfig.sandboxManager,
     };
   }
   getScreenReader(): boolean {
@@ -2822,8 +2939,22 @@ export class Config implements McpContext, AgentLoopContext {
         headless: customConfig.headless ?? false,
         profilePath: customConfig.profilePath,
         visualModel: customConfig.visualModel,
+        allowedDomains: customConfig.allowedDomains,
+        disableUserInput: customConfig.disableUserInput,
       },
     };
+  }
+
+  /**
+   * Determines if user input should be disabled during browser automation.
+   * Based on the `disableUserInput` setting and `headless` mode.
+   */
+  shouldDisableBrowserUserInput(): boolean {
+    const browserConfig = this.getBrowserAgentConfig();
+    return (
+      browserConfig.customConfig?.disableUserInput !== false &&
+      !browserConfig.customConfig?.headless
+    );
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
@@ -2973,7 +3104,7 @@ export class Config implements McpContext, AgentLoopContext {
 
       for (const definition of definitions) {
         try {
-          const tool = new SubagentTool(definition, this, this.getMessageBus());
+          const tool = new SubagentTool(definition, this, this.messageBus);
           registry.registerTool(tool);
         } catch (e: unknown) {
           debugLogger.warn(
@@ -3078,7 +3209,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.registerSubAgentTools(this._toolRegistry);
     }
     // Propagate updates to the active chat session
-    const client = this.getGeminiClient();
+    const client = this.geminiClient;
     if (client?.isInitialized()) {
       await client.setTools();
       client.updateSystemInstruction();

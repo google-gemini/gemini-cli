@@ -97,7 +97,7 @@ export function useToolScheduler(
   const scheduler = useMemo(
     () =>
       new Scheduler({
-        config,
+        context: config,
         messageBus,
         getPreferredEditor: () => getPreferredEditorRef.current(),
         schedulerId: ROOT_SCHEDULER_ID,
