@@ -908,7 +908,7 @@ export class Session {
 
         const params: acp.RequestPermissionRequest = {
           sessionId: this.id,
-          options: toPermissionOptions(confirmationDetails),
+          options: toPermissionOptions(confirmationDetails, this.config),
           toolCall: {
             toolCallId: callId,
             status: 'pending',
@@ -1457,60 +1457,76 @@ const basicPermissionOptions = [
 
 function toPermissionOptions(
   confirmation: ToolCallConfirmationDetails,
+  config: Config,
 ): acp.PermissionOption[] {
-  switch (confirmation.type) {
-    case 'edit':
-      return [
-        {
+  const disableAlwaysAllow = config.getDisableAlwaysAllow();
+  const options: acp.PermissionOption[] = [];
+
+  if (!disableAlwaysAllow) {
+    switch (confirmation.type) {
+      case 'edit':
+        options.push({
           optionId: ToolConfirmationOutcome.ProceedAlways,
           name: 'Allow All Edits',
           kind: 'allow_always',
-        },
-        ...basicPermissionOptions,
-      ];
-    case 'exec':
-      return [
-        {
+        });
+        break;
+      case 'exec':
+        options.push({
           optionId: ToolConfirmationOutcome.ProceedAlways,
           name: `Always Allow ${confirmation.rootCommand}`,
           kind: 'allow_always',
-        },
-        ...basicPermissionOptions,
-      ];
-    case 'mcp':
-      return [
-        {
-          optionId: ToolConfirmationOutcome.ProceedAlwaysServer,
-          name: `Always Allow ${confirmation.serverName}`,
-          kind: 'allow_always',
-        },
-        {
-          optionId: ToolConfirmationOutcome.ProceedAlwaysTool,
-          name: `Always Allow ${confirmation.toolName}`,
-          kind: 'allow_always',
-        },
-        ...basicPermissionOptions,
-      ];
-    case 'info':
-      return [
-        {
+        });
+        break;
+      case 'mcp':
+        options.push(
+          {
+            optionId: ToolConfirmationOutcome.ProceedAlwaysServer,
+            name: `Always Allow ${confirmation.serverName}`,
+            kind: 'allow_always',
+          },
+          {
+            optionId: ToolConfirmationOutcome.ProceedAlwaysTool,
+            name: `Always Allow ${confirmation.toolName}`,
+            kind: 'allow_always',
+          },
+        );
+        break;
+      case 'info':
+        options.push({
           optionId: ToolConfirmationOutcome.ProceedAlways,
           name: `Always Allow`,
           kind: 'allow_always',
-        },
-        ...basicPermissionOptions,
-      ];
+        });
+        break;
+      case 'ask_user':
+      case 'exit_plan_mode':
+        // askuser and exit_plan_mode don't need "always allow" options
+        break;
+      default:
+        // No "always allow" options for other types
+        break;
+    }
+  }
+
+  options.push(...basicPermissionOptions);
+
+  // Exhaustive check
+  switch (confirmation.type) {
+    case 'edit':
+    case 'exec':
+    case 'mcp':
+    case 'info':
     case 'ask_user':
-      // askuser doesn't need "always allow" options since it's asking questions
-      return [...basicPermissionOptions];
     case 'exit_plan_mode':
-      // exit_plan_mode doesn't need "always allow" options since it's a plan approval flow
-      return [...basicPermissionOptions];
+      break;
     default: {
       const unreachable: never = confirmation;
       throw new Error(`Unexpected: ${unreachable}`);
     }
   }
+
+  return options;
 }
 
 /**

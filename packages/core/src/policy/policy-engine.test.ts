@@ -14,6 +14,7 @@ import {
   InProcessCheckerType,
   ApprovalMode,
   PRIORITY_SUBAGENT_TOOL,
+  ALWAYS_ALLOW_PRIORITY_FRACTION,
 } from './types.js';
 import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision } from '../safety/protocol.js';
@@ -3227,6 +3228,118 @@ describe('PolicyEngine', () => {
       expect(hookCheckers).toHaveLength(2);
       expect(hookCheckers[0].priority).toBe(10);
       expect(hookCheckers[1].priority).toBe(5);
+    });
+  });
+
+  describe('disableAlwaysAllow', () => {
+    it('should ignore "Always Allow" rules when disableAlwaysAllow is true', async () => {
+      const alwaysAllowRule: PolicyRule = {
+        toolName: 'test-tool',
+        decision: PolicyDecision.ALLOW,
+        priority: 3 + ALWAYS_ALLOW_PRIORITY_FRACTION / 1000, // 3.95
+        source: 'Dynamic (Confirmed)',
+      };
+
+      const engine = new PolicyEngine({
+        rules: [alwaysAllowRule],
+        disableAlwaysAllow: true,
+        defaultDecision: PolicyDecision.ASK_USER,
+      });
+
+      const result = await engine.check(
+        { name: 'test-tool', args: {} },
+        undefined,
+      );
+      expect(result.decision).toBe(PolicyDecision.ASK_USER);
+    });
+
+    it('should respect "Always Allow" rules when disableAlwaysAllow is false', async () => {
+      const alwaysAllowRule: PolicyRule = {
+        toolName: 'test-tool',
+        decision: PolicyDecision.ALLOW,
+        priority: 3 + ALWAYS_ALLOW_PRIORITY_FRACTION / 1000, // 3.95
+        source: 'Dynamic (Confirmed)',
+      };
+
+      const engine = new PolicyEngine({
+        rules: [alwaysAllowRule],
+        disableAlwaysAllow: false,
+        defaultDecision: PolicyDecision.ASK_USER,
+      });
+
+      const result = await engine.check(
+        { name: 'test-tool', args: {} },
+        undefined,
+      );
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+
+    it('should NOT ignore other rules when disableAlwaysAllow is true', async () => {
+      const normalRule: PolicyRule = {
+        toolName: 'test-tool',
+        decision: PolicyDecision.ALLOW,
+        priority: 1.5, // Not a .950 fraction
+        source: 'Normal Rule',
+      };
+
+      const engine = new PolicyEngine({
+        rules: [normalRule],
+        disableAlwaysAllow: true,
+        defaultDecision: PolicyDecision.ASK_USER,
+      });
+
+      const result = await engine.check(
+        { name: 'test-tool', args: {} },
+        undefined,
+      );
+      expect(result.decision).toBe(PolicyDecision.ALLOW);
+    });
+  });
+
+  describe('getExcludedTools with disableAlwaysAllow', () => {
+    it('should exclude tool if an Always Allow rule says ALLOW but disableAlwaysAllow is true (falling back to DENY)', async () => {
+      // To prove the ALWAYS_ALLOW rule is ignored, we set the default decision to DENY.
+      // If the rule was honored, the decision would be ALLOW (tool not excluded).
+      // Since it's ignored, it falls back to the default DENY (tool is excluded).
+      // In the real app, it usually falls back to ASK_USER, but ASK_USER also doesn't
+      // exclude the tool, so we use DENY here purely to make the test observable.
+      const alwaysAllowRule: PolicyRule = {
+        toolName: 'test-tool',
+        decision: PolicyDecision.ALLOW,
+        priority: 3 + ALWAYS_ALLOW_PRIORITY_FRACTION / 1000,
+      };
+
+      const engine = new PolicyEngine({
+        rules: [alwaysAllowRule],
+        disableAlwaysAllow: true,
+        defaultDecision: PolicyDecision.DENY,
+      });
+
+      const excluded = engine.getExcludedTools(
+        undefined,
+        new Set(['test-tool']),
+      );
+      expect(excluded.has('test-tool')).toBe(true);
+    });
+
+    it('should NOT exclude tool if ALWAYS_ALLOW is enabled and rule says ALLOW', async () => {
+      const alwaysAllowRule: PolicyRule = {
+        toolName: 'test-tool',
+        decision: PolicyDecision.ALLOW,
+        priority: 3 + ALWAYS_ALLOW_PRIORITY_FRACTION / 1000,
+      };
+
+      const engine = new PolicyEngine({
+        rules: [alwaysAllowRule],
+        disableAlwaysAllow: false,
+        defaultDecision: PolicyDecision.DENY,
+      });
+
+      const excluded = engine.getExcludedTools(
+        undefined,
+        new Set(['test-tool']),
+      );
+      expect(excluded.has('test-tool')).toBe(false);
     });
   });
 });
