@@ -95,6 +95,7 @@ describe('extensions configure command', () => {
   });
 
   afterEach(() => {
+    fs.rmSync(tempWorkspaceDir, { recursive: true, force: true });
     vi.restoreAllMocks();
   });
 

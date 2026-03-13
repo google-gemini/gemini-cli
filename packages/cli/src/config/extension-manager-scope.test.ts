@@ -88,7 +88,8 @@ describe('ExtensionManager Settings Scope', () => {
   });
 
   afterEach(() => {
-    // Clean up files if needed, or rely on temp dir cleanup
+    fs.rmSync(currentTempHome, { recursive: true, force: true });
+    fs.rmSync(tempWorkspace, { recursive: true, force: true });
     vi.clearAllMocks();
   });
 
