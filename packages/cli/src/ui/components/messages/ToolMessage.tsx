@@ -24,6 +24,7 @@ import {
 import { type Config, CoreToolCallStatus, Kind } from '@google/gemini-cli-core';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import { SUBAGENT_MAX_LINES } from '../../constants.js';
+import { CopySafeBox } from '../shared/CopySafeBox.js';
 
 export type { TextEmphasis };
 
@@ -109,7 +110,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
         />
         {emphasis === 'high' && <TrailingIndicator />}
       </StickyHeader>
-      <Box
+      <CopySafeBox
         width={terminalWidth}
         borderStyle="round"
         borderColor={borderColor}
@@ -150,7 +151,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
             />
           </Box>
         )}
-      </Box>
+      </CopySafeBox>
     </>
   );
 };

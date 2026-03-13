@@ -25,6 +25,7 @@ import {
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { getToolGroupBorderAppearance } from '../../utils/borderStyles.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
+import { CopySafeBox } from '../shared/CopySafeBox.js';
 
 interface ToolGroupMessageProps {
   item: HistoryItem | HistoryItemWithoutId;
@@ -197,7 +198,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
               <ToolMessage {...commonProps} />
             )}
             {tool.outputFile && (
-              <Box
+              <CopySafeBox
                 borderLeft={true}
                 borderRight={true}
                 borderTop={false}
@@ -214,7 +215,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
                     Output too long and was saved to: {tool.outputFile}
                   </Text>
                 </Box>
-              </Box>
+              </CopySafeBox>
             )}
           </Box>
         );
@@ -225,7 +226,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             drawn over by the sticky header directly inside it.
            */
         (visibleToolCalls.length > 0 || borderBottomOverride !== undefined) && (
-          <Box
+          <CopySafeBox
             height={0}
             width={contentWidth}
             borderLeft={true}

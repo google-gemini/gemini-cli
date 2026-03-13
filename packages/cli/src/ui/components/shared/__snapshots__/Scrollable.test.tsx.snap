@@ -1,5 +1,12 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`<Scrollable /> > disables scrolling and removes padding in copy mode 1`] = `
+"Line 1
+Line 2
+Line 3
+"
+`;
+
 exports[`<Scrollable /> > matches snapshot 1`] = `
 "Line 1
 Line 2

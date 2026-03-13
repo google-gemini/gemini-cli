@@ -44,7 +44,13 @@ const MAC_TERMINAL_ICON = `▝▜▄
 export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
   const settings = useSettings();
   const config = useConfig();
-  const { terminalWidth, bannerData, bannerVisible, updateInfo } = useUIState();
+  const {
+    terminalWidth,
+    bannerData,
+    bannerVisible,
+    updateInfo,
+    copyModeEnabled,
+  } = useUIState();
 
   const { bannerText } = useBanner(bannerData);
   const { showTips } = useTips();
@@ -63,7 +69,7 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
             flexDirection="row"
             marginTop={1}
             marginBottom={1}
-            paddingLeft={2}
+            paddingLeft={copyModeEnabled ? 0 : 2}
           >
             <Box flexShrink={0}>
               <ThemedGradient>{ICON}</ThemedGradient>
@@ -85,7 +91,12 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
   return (
     <Box flexDirection="column">
       {showHeader && (
-        <Box flexDirection="row" marginTop={1} marginBottom={1} paddingLeft={2}>
+        <Box
+          flexDirection="row"
+          marginTop={1}
+          marginBottom={1}
+          paddingLeft={copyModeEnabled ? 0 : 2}
+        >
           <Box flexShrink={0}>
             <ThemedGradient>{ICON}</ThemedGradient>
           </Box>

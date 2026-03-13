@@ -9,7 +9,9 @@ import { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import type { ThoughtSummary } from '@google/gemini-cli-core';
 import { theme } from '../../semantic-colors.js';
+import { useUIState } from '../../contexts/UIStateContext.js';
 import { normalizeEscapedNewlines } from '../../utils/textUtils.js';
+import { CopySafeBox } from '../shared/CopySafeBox.js';
 
 interface ThinkingMessageProps {
   thought: ThoughtSummary;
@@ -54,6 +56,7 @@ export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({
   terminalWidth,
   isFirstThinking,
 }) => {
+  const { copyModeEnabled } = useUIState();
   const fullLines = useMemo(() => normalizeThoughtLines(thought), [thought]);
 
   if (fullLines.length === 0) {
@@ -69,9 +72,9 @@ export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({
         </Text>
       )}
 
-      <Box
-        marginLeft={THINKING_LEFT_PADDING}
-        paddingLeft={1}
+      <CopySafeBox
+        marginLeft={copyModeEnabled ? 0 : THINKING_LEFT_PADDING}
+        paddingLeft={copyModeEnabled ? 0 : 1}
         borderStyle="single"
         borderLeft={true}
         borderRight={false}
@@ -91,7 +94,7 @@ export const ThinkingMessage: React.FC<ThinkingMessageProps> = ({
             {line}
           </Text>
         ))}
-      </Box>
+      </CopySafeBox>
     </Box>
   );
 };

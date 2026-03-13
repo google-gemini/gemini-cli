@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Box, type DOMElement } from 'ink';
+import { type DOMElement } from 'ink';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import { StickyHeader } from '../StickyHeader.js';
 import { useUIActions } from '../../contexts/UIActionsContext.js';
@@ -34,6 +34,7 @@ import {
   calculateToolContentMaxLines,
   SHELL_CONTENT_OVERHEAD,
 } from '../../utils/toolLayoutUtils.js';
+import { CopySafeBox } from '../shared/CopySafeBox.js';
 
 export interface ShellToolMessageProps extends ToolMessageProps {
   config?: Config;
@@ -196,7 +197,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
         {emphasis === 'high' && <TrailingIndicator />}
       </StickyHeader>
 
-      <Box
+      <CopySafeBox
         ref={contentRef}
         width={terminalWidth}
         borderStyle="round"
@@ -224,7 +225,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
             scrollPageSize={availableTerminalHeight ?? ACTIVE_SHELL_MAX_LINES}
           />
         )}
-      </Box>
+      </CopySafeBox>
     </>
   );
 };

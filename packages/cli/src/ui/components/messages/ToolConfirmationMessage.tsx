@@ -43,6 +43,7 @@ import {
   type DeceptiveUrlDetails,
 } from '../../utils/urlSecurityUtils.js';
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
+import { CopySafeBox } from '../shared/CopySafeBox.js';
 
 export interface ToolConfirmationMessageProps {
   callId: string;
@@ -713,7 +714,7 @@ export const ToolConfirmationMessage: React.FC<
   }
 
   return (
-    <Box
+    <CopySafeBox
       flexDirection="column"
       paddingTop={0}
       paddingBottom={handlesOwnUI ? 0 : 1}
@@ -752,6 +753,6 @@ export const ToolConfirmationMessage: React.FC<
           </Box>
         </>
       )}
-    </Box>
+    </CopySafeBox>
   );
 };

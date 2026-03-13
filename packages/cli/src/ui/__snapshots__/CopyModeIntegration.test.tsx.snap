@@ -1,0 +1,20 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Copy Mode Alignment Regression > GeminiMessage > aligns with prefix in normal mode 1`] = `
+"✦ Response
+"
+`;
+
+exports[`Copy Mode Alignment Regression > ThinkingMessage > aligns in normal mode 1`] = `
+" │
+ │ Thinking summary
+ │ Thinking body
+"
+`;
+
+exports[`Copy Mode Alignment Regression > UserMessage > aligns with prefix in normal mode 1`] = `
+"▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+ > Hello                                                                        
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+"
+`;
