@@ -706,6 +706,17 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
+- **`agents.browser.allowedDomains`** (array):
+  - **Description:** A list of allowed domains for the browser agent (e.g.,
+    ["github.com", "*.google.com"]).
+  - **Default:**
+
+    ```json
+    ["github.com", "*.google.com", "localhost"]
+    ```
+
+  - **Requires restart:** Yes
+
 - **`agents.browser.disableUserInput`** (boolean):
   - **Description:** Disable user input on browser window during automation.
   - **Default:** `true`
@@ -773,9 +784,10 @@ their corresponding top-level category object in your `settings.json` file.
 #### `tools`
 
 - **`tools.sandbox`** (string):
-  - **Description:** Sandbox execution environment. Set to a boolean to enable
-    or disable the sandbox, provide a string path to a sandbox profile, or
-    specify an explicit sandbox command (e.g., "docker", "podman", "lxc").
+  - **Description:** Legacy full-process sandbox execution environment. Set to a
+    boolean to enable or disable the sandbox, provide a string path to a sandbox
+    profile, or specify an explicit sandbox command (e.g., "docker", "podman",
+    "lxc").
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
@@ -878,6 +890,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
 
 #### `security`
+
+- **`security.toolSandboxing`** (boolean):
+  - **Description:** Experimental tool-level sandboxing (implementation in
+    progress).
+  - **Default:** `false`
 
 - **`security.disableYoloMode`** (boolean):
   - **Description:** Disable YOLO mode, even if enabled by a flag.
