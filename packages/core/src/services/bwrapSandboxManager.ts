@@ -62,8 +62,8 @@ export class BwrapSandboxManager implements SandboxManager {
       '--dev',
       '/dev',
       '--dev-bind',
-      '/dev/pts',
-      '/dev/pts',
+      '/dev/shm',
+      '/dev/shm',
       // Strict allow-list for nested sandbox
       '--ro-bind',
       '/usr',
@@ -77,7 +77,13 @@ export class BwrapSandboxManager implements SandboxManager {
     ];
 
     // Optional system paths
-    const optionalPaths = ['/lib', '/lib64', '/etc/alternatives'];
+    const optionalPaths = [
+      '/lib',
+      '/lib64',
+      '/etc/alternatives',
+      '/etc/ssl',
+      '/etc/pki',
+    ];
     for (const p of optionalPaths) {
       if (fs.existsSync(p)) {
         bwrapArgs.push('--ro-bind', p, p);
