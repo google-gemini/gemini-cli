@@ -146,6 +146,7 @@ export * from './ide/types.js';
 
 // Export Shell Execution Service
 export * from './services/shellExecutionService.js';
+export * from './services/sandboxManager.js';
 
 // Export base tool definitions
 export * from './tools/tools.js';

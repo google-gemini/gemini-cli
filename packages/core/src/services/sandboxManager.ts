@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -37,6 +37,8 @@ export interface SandboxedCommand {
   args: string[];
   /** Sanitized environment variables. */
   env: NodeJS.ProcessEnv;
+  /** The working directory. */
+  cwd?: string;
 }
 
 /**
@@ -64,7 +66,9 @@ export class NoopSandboxManager implements SandboxManager {
         req.config?.sanitizationConfig?.allowedEnvironmentVariables ?? [],
       blockedEnvironmentVariables:
         req.config?.sanitizationConfig?.blockedEnvironmentVariables ?? [],
-      enableEnvironmentVariableRedaction: true, // Forced for safety
+      enableEnvironmentVariableRedaction:
+        req.config?.sanitizationConfig?.enableEnvironmentVariableRedaction ??
+        true,
     };
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
@@ -75,4 +79,25 @@ export class NoopSandboxManager implements SandboxManager {
       env: sanitizedEnv,
     };
   }
+}
+
+/**
+ * SandboxManager that implements actual sandboxing.
+ */
+export class LocalSandboxManager implements SandboxManager {
+  async prepareCommand(_req: SandboxRequest): Promise<SandboxedCommand> {
+    throw new Error('Tool sandboxing is not yet implemented.');
+  }
+}
+
+/**
+ * Creates a sandbox manager based on the provided settings.
+ */
+export function createSandboxManager(
+  sandboxingEnabled: boolean,
+): SandboxManager {
+  if (sandboxingEnabled) {
+    return new LocalSandboxManager();
+  }
+  return new NoopSandboxManager();
 }
