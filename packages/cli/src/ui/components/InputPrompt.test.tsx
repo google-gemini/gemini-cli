@@ -254,6 +254,7 @@ describe('InputPrompt', () => {
       replaceRange: vi.fn(),
       deleteWordLeft: vi.fn(),
       deleteWordRight: vi.fn(),
+      scrollBy: vi.fn(),
       visualToLogicalMap: [[0, 0]],
       visualToTransformedMap: [0],
       transformationsByLine: [],
@@ -3360,6 +3361,57 @@ describe('InputPrompt', () => {
   });
 
   describe('mouse interaction', () => {
+    it('should scroll input on wheel when active editing is enabled (no tap required)', async () => {
+      props.buffer.text = 'line1\nline2';
+      props.buffer.lines = ['line1', 'line2'];
+      props.buffer.viewportVisualLines = ['line1'];
+      props.buffer.allVisualLines = ['line1', 'line2'];
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          mouseEventsEnabled: true,
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x1b[<65;5;2M');
+      });
+
+      await waitFor(() => {
+        expect(props.buffer.scrollBy).toHaveBeenCalledWith(1);
+      });
+
+      unmount();
+    });
+
+    it('should not scroll input on wheel when not in active editing mode', async () => {
+      props.isEmbeddedShellFocused = true;
+      props.buffer.text = 'line1\nline2';
+      props.buffer.lines = ['line1', 'line2'];
+      props.buffer.viewportVisualLines = ['line1'];
+      props.buffer.allVisualLines = ['line1', 'line2'];
+
+      const { stdin, unmount } = renderWithProviders(
+        <InputPrompt {...props} />,
+        {
+          mouseEventsEnabled: true,
+          uiActions,
+        },
+      );
+
+      await act(async () => {
+        stdin.write('\x1b[<65;5;2M');
+      });
+
+      await waitFor(() => {
+        expect(props.buffer.scrollBy).not.toHaveBeenCalled();
+      });
+
+      unmount();
+    });
+
     it.each([
       {
         name: 'first line, first char',
