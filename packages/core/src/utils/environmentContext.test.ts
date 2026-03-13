@@ -16,6 +16,7 @@ import {
 import {
   getEnvironmentContext,
   getDirectoryContextString,
+  getInitialChatHistory,
 } from './environmentContext.js';
 import type { Config } from '../config/config.js';
 import type { Storage } from '../config/storage.js';
@@ -184,5 +185,27 @@ describe('getEnvironmentContext', () => {
     const parts = await getEnvironmentContext(mockConfig as Config);
 
     expect(parts.length).toBe(1); // No extra part added
+  });
+});
+
+describe('getInitialChatHistory', () => {
+  it('should omit environment context when disabled', async () => {
+    const history = await getInitialChatHistory({
+      getIncludeEnvironmentContext: vi.fn().mockReturnValue(false),
+    } as unknown as Config);
+
+    expect(history).toEqual([]);
+  });
+
+  it('should include extra history when environment context is disabled', async () => {
+    const extraHistory = [{ role: 'user', parts: [{ text: 'hello' }] }];
+    const history = await getInitialChatHistory(
+      {
+        getIncludeEnvironmentContext: vi.fn().mockReturnValue(false),
+      } as unknown as Config,
+      extraHistory,
+    );
+
+    expect(history).toEqual(extraHistory);
   });
 });

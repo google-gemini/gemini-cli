@@ -3671,3 +3671,99 @@ describe('loadCliConfig acpMode and clientName', () => {
     expect(config.getClientName()).toBeUndefined();
   });
 });
+
+describe('non-interactive prompt context controls', () => {
+  it('should parse --no-prompt-context', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--prompt',
+      'test',
+      '--no-prompt-context',
+    ];
+
+    const argv = await parseArguments(createTestMergedSettings());
+
+    expect(argv.promptContext).toBe(false);
+  });
+
+  it('should disable startup context in non-interactive mode when --no-prompt-context is used', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--prompt',
+      'test',
+      '--no-prompt-context',
+    ];
+
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session-id',
+      argv,
+    );
+
+    expect(config.getIncludeEnvironmentContext()).toBe(false);
+    expect(config.getIncludeSystemPrompt()).toBe(false);
+  });
+
+  it('should skip memory discovery in non-interactive mode when prompt context is disabled', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--prompt',
+      'test',
+      '--no-prompt-context',
+    ];
+
+    const argv = await parseArguments(createTestMergedSettings());
+    await loadCliConfig(createTestMergedSettings(), 'test-session-id', argv);
+
+    expect(ServerConfig.loadServerHierarchicalMemory).not.toHaveBeenCalled();
+  });
+
+  it('should disable startup context in non-interactive mode when config disables it', async () => {
+    process.argv = ['node', 'script.js', '--prompt', 'test'];
+
+    const settings = createTestMergedSettings({
+      context: { includePromptContextInNonInteractive: false },
+    });
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session-id', argv);
+
+    expect(config.getIncludeEnvironmentContext()).toBe(false);
+    expect(config.getIncludeSystemPrompt()).toBe(false);
+  });
+
+  it('should allow CLI flag to re-enable startup context when config disables it', async () => {
+    process.argv = [
+      'node',
+      'script.js',
+      '--prompt',
+      'test',
+      '--prompt-context',
+    ];
+
+    const settings = createTestMergedSettings({
+      context: { includePromptContextInNonInteractive: false },
+    });
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session-id', argv);
+
+    expect(config.getIncludeEnvironmentContext()).toBe(true);
+    expect(config.getIncludeSystemPrompt()).toBe(true);
+  });
+
+  it('should keep startup context in interactive mode even when context setting is false', async () => {
+    process.argv = ['node', 'script.js', '--prompt-interactive', 'test'];
+
+    const settings = createTestMergedSettings({
+      context: { includePromptContextInNonInteractive: false },
+    });
+    const argv = await parseArguments(settings);
+    const config = await loadCliConfig(settings, 'test-session-id', argv);
+
+    expect(config.getIncludeEnvironmentContext()).toBe(true);
+    expect(config.getIncludeSystemPrompt()).toBe(true);
+  });
+});

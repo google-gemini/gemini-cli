@@ -339,14 +339,24 @@ export class GeminiClient {
     });
   }
 
+  private getSystemInstruction(): string {
+    if (
+      typeof this.config.getIncludeSystemPrompt === 'function' &&
+      !this.config.getIncludeSystemPrompt()
+    ) {
+      return '';
+    }
+
+    const systemMemory = this.config.getUserMemory();
+    return getCoreSystemPrompt(this.config, systemMemory);
+  }
+
   updateSystemInstruction(): void {
     if (!this.isInitialized()) {
       return;
     }
 
-    const systemMemory = this.config.getUserMemory();
-    const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
-    this.getChat().setSystemInstruction(systemInstruction);
+    this.getChat().setSystemInstruction(this.getSystemInstruction());
   }
 
   async startChat(
@@ -364,11 +374,9 @@ export class GeminiClient {
     const history = await getInitialChatHistory(this.config, extraHistory);
 
     try {
-      const systemMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(this.config, systemMemory);
       return new GeminiChat(
         this.config,
-        systemInstruction,
+        this.getSystemInstruction(),
         tools,
         history,
         resumedSessionData,
@@ -1027,8 +1035,7 @@ export class GeminiClient {
     } = desiredModelConfig;
 
     try {
-      const userMemory = this.config.getUserMemory();
-      const systemInstruction = getCoreSystemPrompt(this.config, userMemory);
+      const systemInstruction = this.getSystemInstruction();
       const {
         model,
         config: newConfig,

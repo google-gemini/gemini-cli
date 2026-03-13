@@ -1171,6 +1171,16 @@ const SETTINGS_SCHEMA = {
           'Whether to include the directory tree of the current working directory in the initial request to the model.',
         showInDialog: false,
       },
+      includePromptContextInNonInteractive: {
+        type: 'boolean',
+        label: 'Include Prompt Context In Non-Interactive',
+        category: 'Context',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Whether non-interactive mode should include startup context (system prompt and workspace context).',
+        showInDialog: false,
+      },
       discoveryMaxDirs: {
         type: 'number',
         label: 'Memory Discovery Max Dirs',

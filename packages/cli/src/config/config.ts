@@ -75,6 +75,7 @@ export interface CliArgs {
   debug: boolean | undefined;
   prompt: string | undefined;
   promptInteractive: string | undefined;
+  promptContext: boolean | undefined;
 
   yolo: boolean | undefined;
   approvalMode: string | undefined;
@@ -158,6 +159,11 @@ export async function parseArguments(
           nargs: 1,
           description:
             'Execute the provided prompt and continue in interactive mode',
+        })
+        .option('prompt-context', {
+          type: 'boolean',
+          description:
+            'Include startup context (system prompt and workspace context) in non-interactive mode. Use --no-prompt-context to disable.',
         })
         .option('sandbox', {
           alias: 's',
@@ -439,6 +445,10 @@ export async function loadCliConfig(
 
   const memoryImportFormat = settings.context?.importFormat || 'tree';
   const includeDirectoryTree = settings.context?.includeDirectoryTree ?? true;
+  const includePromptContextInNonInteractive =
+    argv.promptContext ??
+    settings.context?.includePromptContextInNonInteractive ??
+    true;
 
   const ideMode = settings.ide?.enabled ?? false;
 
@@ -495,6 +505,17 @@ export async function loadCliConfig(
   const extensionPlanSettings = extensionManager
     .getExtensions()
     .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
+  // -p/--prompt forces non-interactive (headless) mode
+  // -i/--prompt-interactive forces interactive mode with an initial prompt
+  const interactive =
+    !!argv.promptInteractive ||
+    !!argv.acp ||
+    !!argv.experimentalAcp ||
+    (!isHeadlessMode({ prompt: argv.prompt, query: argv.query }) &&
+      !argv.isCommand);
+
+  const includePromptContext =
+    interactive || includePromptContextInNonInteractive;
 
   const experimentalJitContext = settings.experimental?.jitContext ?? false;
 
@@ -511,7 +532,7 @@ export async function loadCliConfig(
   let fileCount = 0;
   let filePaths: string[] = [];
 
-  if (!experimentalJitContext) {
+  if (!experimentalJitContext && includePromptContext) {
     // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
     const result = await loadServerHierarchicalMemory(
       cwd,
@@ -616,15 +637,6 @@ export async function loadCliConfig(
     }
     throw err;
   }
-
-  // -p/--prompt forces non-interactive (headless) mode
-  // -i/--prompt-interactive forces interactive mode with an initial prompt
-  const interactive =
-    !!argv.promptInteractive ||
-    !!argv.acp ||
-    !!argv.experimentalAcp ||
-    (!isHeadlessMode({ prompt: argv.prompt, query: argv.query }) &&
-      !argv.isCommand);
 
   const allowedTools = argv.allowedTools || settings.tools?.allowed || [];
 
@@ -746,6 +758,8 @@ export async function loadCliConfig(
     sandbox: sandboxConfig,
     targetDir: cwd,
     includeDirectoryTree,
+    includeEnvironmentContext: includePromptContext,
+    includeSystemPrompt: includePromptContext,
     includeDirectories,
     loadMemoryFromIncludeDirectories:
       settings.context?.loadMemoryFromIncludeDirectories || false,
