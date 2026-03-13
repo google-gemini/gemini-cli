@@ -540,6 +540,16 @@ const SETTINGS_SCHEMA = {
         description: 'Hide helpful tips in the UI',
         showInDialog: true,
       },
+      escapePastedAtSymbols: {
+        type: 'boolean',
+        label: 'Escape Pasted @ Symbols',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'When enabled, @ symbols in pasted text are escaped to prevent unintended @path expansion.',
+        showInDialog: true,
+      },
       showShortcutsHint: {
         type: 'boolean',
         label: 'Show Shortcuts Hint',
@@ -1105,6 +1115,16 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: undefined as string | undefined,
             description: 'Model override for the visual agent.',
+            showInDialog: false,
+          },
+          disableUserInput: {
+            type: 'boolean',
+            label: 'Disable User Input',
+            category: 'Advanced',
+            requiresRestart: false,
+            default: true,
+            description:
+              'Disable user input on browser window during automation.',
             showInDialog: false,
           },
         },
