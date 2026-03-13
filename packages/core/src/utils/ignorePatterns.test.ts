@@ -49,6 +49,7 @@ describe('FileExclusions', () => {
       // Should include binary patterns
       expect(patterns).toContain('**/*.exe');
       expect(patterns).toContain('**/*.jar');
+      expect(patterns).toContain('**/*.sqlite');
 
       // Should include system files
       expect(patterns).toContain('**/.DS_Store');
@@ -202,9 +203,12 @@ describe('FileExclusions', () => {
 
 describe('BINARY_EXTENSIONS', () => {
   it.each([
-    ['common binary file extensions', ['.exe', '.dll', '.jar', '.zip']],
+    [
+      'common binary file extensions',
+      ['.exe', '.dll', '.jar', '.zip', '.sqlite'],
+    ],
     ['additional binary extensions', ['.dat', '.obj', '.wasm']],
-    ['media file extensions', ['.pdf', '.png', '.jpg']],
+    ['media file extensions', ['.pdf', '.png', '.jpg', '.mp4', '.woff2']],
   ])('should include %s', (_, extensions) => {
     extensions.forEach((ext) => {
       expect(BINARY_EXTENSIONS).toContain(ext);
