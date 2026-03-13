@@ -1192,6 +1192,11 @@ async function start_bwrap_sandbox(
     '/proc',
     '--dev',
     '/dev',
+    // Private system paths to block escapes (X11, D-Bus, etc.)
+    '--tmpfs',
+    '/tmp',
+    '--tmpfs',
+    '/run/user',
     // --- STRICT ALLOW LIST ---
     // Only mount essential system paths for binaries and libraries
     '--ro-bind',
@@ -1295,15 +1300,60 @@ async function start_bwrap_sandbox(
   const innerCmd = [
     'SANDBOX=bwrap',
     `NODE_OPTIONS="${nodeOptions}"`,
-    'DEV=true',
     ...finalArgv.map((arg) => quote([arg])),
   ].join(' ');
 
   const args = [...bwrapArgs, '--', shell, '-c', innerCmd];
 
+  // Filter environment variables to prevent leakage of host credentials into the outer sandbox
+  const safeEnvKeys = [
+    'PATH',
+    'TERM',
+    'COLORTERM',
+    'LANG',
+    'LC_ALL',
+    'HOME',
+    'USER',
+    'LOGNAME',
+    'SHELL',
+    'PWD',
+    'EDITOR',
+    'VISUAL',
+    'DEBUG',
+    'DEBUG_PORT',
+    'NODE_ENV',
+    'NODE_OPTIONS',
+    'GEMINI_SANDBOX',
+    'GEMINI_SANDBOX_IMAGE',
+    'GEMINI_SANDBOX_IMAGE_DEFAULT',
+    'GEMINI_DIR',
+    'GEMINI_CLI_HOME',
+    'GEMINI_CLI_NO_RELAUNCH',
+    'SANDBOX_PORTS',
+    'SANDBOX_SET_UID_GID',
+    'SANDBOX_MOUNTS',
+    'SANDBOX_FLAGS',
+    'SEATBELT_PROFILE',
+    'HTTP_PROXY',
+    'HTTPS_PROXY',
+    'NO_PROXY',
+    'http_proxy',
+    'https_proxy',
+    'no_proxy',
+    'NO_BROWSER',
+  ];
+
+  const sandboxEnv: NodeJS.ProcessEnv = {};
+  for (const key of safeEnvKeys) {
+    if (process.env[key] !== undefined) {
+      sandboxEnv[key] = process.env[key];
+    }
+  }
+
   process.stdin.pause();
   const sandboxProcess = spawn('bwrap', args, {
     stdio: 'inherit',
+    env: sandboxEnv,
   });
 
   return new Promise((resolve, reject) => {
