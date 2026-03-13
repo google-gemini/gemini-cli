@@ -5,6 +5,7 @@
  */
 
 import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
 import * as path from 'node:path';
 import { isSubpath } from './paths.js';
 import { debugLogger } from './debugLogger.js';
@@ -384,7 +385,20 @@ export function validateImportPath(
 
   const resolvedPath = path.resolve(basePath, importPath);
 
+  // Resolve symlinks to prevent symlink-based path traversal.
+  // Without this, a symlink inside the project pointing outside (e.g.,
+  // docs/ref -> ~/.ssh/id_rsa) passes the lexical isSubpath check but
+  // fs.readFile follows the symlink to read the target file.
+  let realPath: string;
+  try {
+    realPath = fsSync.realpathSync(resolvedPath);
+  } catch {
+    // File does not exist — fall back to lexical check.
+    // The subsequent fs.readFile will also fail, so this is safe.
+    realPath = resolvedPath;
+  }
+
   return allowedDirectories.some((allowedDir) =>
-    isSubpath(allowedDir, resolvedPath),
+    isSubpath(allowedDir, realPath),
   );
 }

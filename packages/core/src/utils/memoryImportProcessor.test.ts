@@ -6,7 +6,9 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import { marked } from 'marked';
 import { processImports, validateImportPath } from './memoryImportProcessor.js';
 import { debugLogger } from './debugLogger.js';
@@ -866,6 +868,60 @@ describe('memoryImportProcessor', () => {
         'file.md',
       );
       expect(validateImportPath(dotPath, basePath, [allowedPath])).toBe(true);
+    });
+
+    it('should reject symlinks that point outside allowed directories', () => {
+      // Use sync fs (not mocked) to create real temp directory structure
+      const tmpDir = fsSync.mkdtempSync(
+        path.join(os.tmpdir(), 'gemini-import-test-'),
+      );
+      const projectDir = path.join(tmpDir, 'project');
+      const secretDir = path.join(tmpDir, 'secrets');
+
+      try {
+        fsSync.mkdirSync(projectDir, { recursive: true });
+        fsSync.mkdirSync(secretDir, { recursive: true });
+        fsSync.writeFileSync(path.join(secretDir, 'key.pem'), 'SECRET_KEY');
+
+        // Create a symlink inside the project that points to the secret file
+        const symlinkPath = path.join(projectDir, 'innocent-ref');
+        fsSync.symlinkSync(path.join(secretDir, 'key.pem'), symlinkPath);
+
+        // The symlink lexically resolves inside the project, but its real
+        // target is outside — validateImportPath must reject it.
+        expect(
+          validateImportPath('innocent-ref', projectDir, [projectDir]),
+        ).toBe(false);
+      } finally {
+        fsSync.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
+
+    it('should allow symlinks that point within allowed directories', () => {
+      const tmpDir = fsSync.mkdtempSync(
+        path.join(os.tmpdir(), 'gemini-import-test-'),
+      );
+      const projectDir = path.join(tmpDir, 'project');
+      const docsDir = path.join(projectDir, 'docs');
+      const srcDir = path.join(projectDir, 'src');
+
+      try {
+        fsSync.mkdirSync(docsDir, { recursive: true });
+        fsSync.mkdirSync(srcDir, { recursive: true });
+        fsSync.writeFileSync(path.join(srcDir, 'README.md'), 'hello');
+
+        // Symlink within the project directory — should be allowed
+        fsSync.symlinkSync(
+          path.join(srcDir, 'README.md'),
+          path.join(docsDir, 'link.md'),
+        );
+
+        expect(
+          validateImportPath('docs/link.md', projectDir, [projectDir]),
+        ).toBe(true);
+      } finally {
+        fsSync.rmSync(tmpDir, { recursive: true, force: true });
+      }
     });
   });
 });
