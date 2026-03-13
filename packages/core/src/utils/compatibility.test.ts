@@ -13,7 +13,6 @@ import {
   isGnuScreen,
   isLowColorTmux,
   isDumbTerminal,
-  getTerminalNameFromEnv,
   supports256Colors,
   supportsTrueColor,
   getCompatibilityWarnings,
@@ -167,46 +166,6 @@ describe('compatibility', () => {
     it('should return false when TERM=xterm', () => {
       vi.stubEnv('TERM', 'xterm');
       expect(isDumbTerminal()).toBe(false);
-    });
-  });
-
-  describe('getTerminalNameFromEnv', () => {
-    it('should prioritize TERM_PROGRAM', () => {
-      vi.stubEnv('TERM_PROGRAM', 'iTerm.app');
-      expect(getTerminalNameFromEnv()).toBe('iTerm.app');
-    });
-
-    it('should use JETBRAINS_IDE if TERM_PROGRAM is missing', () => {
-      vi.stubEnv('TERM_PROGRAM', '');
-      vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
-      vi.stubEnv('JETBRAINS_IDE', 'PyCharm');
-      expect(getTerminalNameFromEnv()).toBe('PyCharm');
-    });
-
-    it('should use TMUX if other vars are missing', () => {
-      vi.stubEnv('TERM_PROGRAM', '');
-      vi.stubEnv('TERMINAL_EMULATOR', '');
-      vi.stubEnv('JETBRAINS_IDE', '');
-      vi.stubEnv('TMUX', 'some-socket');
-      expect(getTerminalNameFromEnv()).toBe('tmux');
-    });
-
-    it('should use STY if other vars are missing', () => {
-      vi.stubEnv('TERM_PROGRAM', '');
-      vi.stubEnv('TERMINAL_EMULATOR', '');
-      vi.stubEnv('JETBRAINS_IDE', '');
-      vi.stubEnv('TMUX', '');
-      vi.stubEnv('STY', 'some-session');
-      expect(getTerminalNameFromEnv()).toBe('GNU screen');
-    });
-
-    it('should return Unknown if no vars are set', () => {
-      vi.stubEnv('TERM_PROGRAM', '');
-      vi.stubEnv('TERMINAL_EMULATOR', '');
-      vi.stubEnv('JETBRAINS_IDE', '');
-      vi.stubEnv('TMUX', '');
-      vi.stubEnv('STY', '');
-      expect(getTerminalNameFromEnv()).toBe('Unknown');
     });
   });
 

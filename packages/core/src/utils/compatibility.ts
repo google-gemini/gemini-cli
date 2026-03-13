@@ -64,26 +64,6 @@ export function isDumbTerminal(): boolean {
 }
 
 /**
- * Detects the terminal name from environment variables.
- */
-export function getTerminalNameFromEnv(): string {
-  const env = process.env;
-  if (env['TERM_PROGRAM'] && env['TERM_PROGRAM'] !== 'Unknown') {
-    return env['TERM_PROGRAM'];
-  }
-  if (isJetBrainsTerminal()) {
-    return env['JETBRAINS_IDE'] || 'JetBrains IDE';
-  }
-  if (isTmux()) {
-    return 'tmux';
-  }
-  if (isGnuScreen()) {
-    return 'GNU screen';
-  }
-  return 'Unknown';
-}
-
-/**
  * Detects if the current terminal is the default Apple Terminal.app.
  */
 export function isAppleTerminal(): boolean {
