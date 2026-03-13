@@ -12,6 +12,7 @@ import { type OAuthCredentials, TokenStorageType } from './types.js';
 vi.mock('./keychain-token-storage.js', () => ({
   KeychainTokenStorage: vi.fn().mockImplementation(() => ({
     isAvailable: vi.fn(),
+    isUsingFileFallback: vi.fn(),
     getCredentials: vi.fn(),
     setCredentials: vi.fn(),
     deleteCredentials: vi.fn(),
@@ -37,6 +38,7 @@ vi.mock('../../core/apiKeyCredentialStorage.js', () => ({
 
 interface MockStorage {
   isAvailable?: ReturnType<typeof vi.fn>;
+  isUsingFileFallback: ReturnType<typeof vi.fn>;
   getCredentials: ReturnType<typeof vi.fn>;
   setCredentials: ReturnType<typeof vi.fn>;
   deleteCredentials: ReturnType<typeof vi.fn>;
@@ -57,6 +59,7 @@ describe('HybridTokenStorage', () => {
     // Create mock instances before creating HybridTokenStorage
     mockKeychainStorage = {
       isAvailable: vi.fn(),
+      isUsingFileFallback: vi.fn(),
       getCredentials: vi.fn(),
       setCredentials: vi.fn(),
       deleteCredentials: vi.fn(),
@@ -78,6 +81,7 @@ describe('HybridTokenStorage', () => {
 
   describe('storage selection', () => {
     it('should use keychain normally', async () => {
+      mockKeychainStorage.isUsingFileFallback.mockResolvedValue(false);
       mockKeychainStorage.getCredentials.mockResolvedValue(null);
 
       await storage.getCredentials('test-server');
@@ -88,8 +92,8 @@ describe('HybridTokenStorage', () => {
       expect(await storage.getStorageType()).toBe(TokenStorageType.KEYCHAIN);
     });
 
-    it('should use file storage when GEMINI_FORCE_FILE_STORAGE is set', async () => {
-      process.env['GEMINI_FORCE_FILE_STORAGE'] = 'true';
+    it('should use file storage when isUsingFileFallback is true', async () => {
+      mockKeychainStorage.isUsingFileFallback.mockResolvedValue(true);
       mockKeychainStorage.getCredentials.mockResolvedValue(null);
 
       const forceStorage = new HybridTokenStorage('test-service-forced');

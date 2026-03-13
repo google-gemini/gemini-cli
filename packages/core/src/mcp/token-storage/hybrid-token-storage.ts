@@ -27,20 +27,19 @@ export class HybridTokenStorage extends BaseTokenStorage {
   private async initializeStorage(): Promise<TokenStorage> {
     const forceFileStorage = process.env[FORCE_FILE_STORAGE_ENV_VAR] === 'true';
 
-    this.storage = new KeychainTokenStorage(this.serviceName);
+    const keychainStorage = new KeychainTokenStorage(this.serviceName);
+    this.storage = keychainStorage;
 
-    // We emit telemetry based on whether it is forced to use file storage or not.
-    // The actual determination of what backend KeychainTokenStorage uses is handled inside KeychainService.
-    const isFileStorageForced = forceFileStorage;
+    const isUsingFileFallback = await keychainStorage.isUsingFileFallback();
 
-    this.storageType = isFileStorageForced
+    this.storageType = isUsingFileFallback
       ? TokenStorageType.ENCRYPTED_FILE
       : TokenStorageType.KEYCHAIN;
 
     coreEvents.emitTelemetryTokenStorageType(
       new TokenStorageInitializationEvent(
-        isFileStorageForced ? 'encrypted_file' : 'keychain',
-        isFileStorageForced,
+        isUsingFileFallback ? 'encrypted_file' : 'keychain',
+        forceFileStorage,
       ),
     );
 

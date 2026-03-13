@@ -35,6 +35,14 @@ export class KeychainService {
   }
 
   /**
+   * Returns true if the service is using the encrypted file fallback backend.
+   */
+  async isUsingFileFallback(): Promise<boolean> {
+    const keychain = await this.getKeychain();
+    return keychain instanceof FileKeychain;
+  }
+
+  /**
    * Retrieves a secret for the given account.
    * @throws Error if the keychain is unavailable.
    */
