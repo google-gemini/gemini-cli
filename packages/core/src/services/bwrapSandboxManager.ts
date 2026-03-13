@@ -61,8 +61,7 @@ export class BwrapSandboxManager implements SandboxManager {
       '/proc',
       '--dev',
       '/dev',
-      '--dev-bind',
-      '/dev/shm',
+      '--tmpfs',
       '/dev/shm',
       // Strict allow-list for nested sandbox
       '--ro-bind',
