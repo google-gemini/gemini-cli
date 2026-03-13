@@ -12,6 +12,11 @@ export interface ToolActionReturn {
   type: 'tool';
   toolName: string;
   toolArgs: Record<string, unknown>;
+  /**
+   * Optional content to be submitted as a prompt to the Gemini model
+   * after the tool call completes.
+   */
+  postSubmitPrompt?: PartListUnion;
 }
 
 /**
@@ -31,7 +36,7 @@ export interface MessageActionReturn {
 export interface LoadHistoryActionReturn<HistoryType = unknown> {
   type: 'load_history';
   history: HistoryType;
-  clientHistory: Content[]; // The history for the generative client
+  clientHistory: readonly Content[]; // The history for the generative client
 }
 
 /**

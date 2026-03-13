@@ -148,11 +148,30 @@ async function extensionConsentString(
   extensionConfig: ExtensionConfig,
   hasHooks: boolean,
   skills: SkillDefinition[] = [],
+  previousName?: string,
+  wasMigrated?: boolean,
 ): Promise<string> {
   const sanitizedConfig = escapeAnsiCtrlCodes(extensionConfig);
   const output: string[] = [];
   const mcpServerEntries = Object.entries(sanitizedConfig.mcpServers || {});
-  output.push(`Installing extension "${sanitizedConfig.name}".`);
+
+  if (wasMigrated) {
+    if (previousName && previousName !== sanitizedConfig.name) {
+      output.push(
+        `Migrating extension "${previousName}" to a new repository, renaming to "${sanitizedConfig.name}", and installing updates.`,
+      );
+    } else {
+      output.push(
+        `Migrating extension "${sanitizedConfig.name}" to a new repository and installing updates.`,
+      );
+    }
+  } else if (previousName && previousName !== sanitizedConfig.name) {
+    output.push(
+      `Renaming extension "${previousName}" to "${sanitizedConfig.name}" and installing updates.`,
+    );
+  } else {
+    output.push(`Installing extension "${sanitizedConfig.name}".`);
+  }
 
   if (mcpServerEntries.length) {
     output.push('This extension will run the following MCP servers:');
@@ -231,11 +250,14 @@ export async function maybeRequestConsentOrFail(
   previousHasHooks?: boolean,
   skills: SkillDefinition[] = [],
   previousSkills: SkillDefinition[] = [],
+  isMigrating: boolean = false,
 ) {
   const extensionConsent = await extensionConsentString(
     extensionConfig,
     hasHooks,
     skills,
+    previousExtensionConfig?.name,
+    isMigrating,
   );
   if (previousExtensionConfig) {
     const previousExtensionConsent = await extensionConsentString(

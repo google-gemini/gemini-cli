@@ -32,6 +32,15 @@ export const GEMINI_MODEL_ALIAS_PRO = 'pro';
 export const GEMINI_MODEL_ALIAS_FLASH = 'flash';
 export const GEMINI_MODEL_ALIAS_FLASH_LITE = 'flash-lite';
 
+export const VALID_ALIASES = new Set([
+  GEMINI_MODEL_ALIAS_AUTO,
+  GEMINI_MODEL_ALIAS_PRO,
+  GEMINI_MODEL_ALIAS_FLASH,
+  GEMINI_MODEL_ALIAS_FLASH_LITE,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  DEFAULT_GEMINI_MODEL_AUTO,
+]);
+
 export const DEFAULT_GEMINI_EMBEDDING_MODEL = 'gemini-embedding-001';
 
 // Cap the thinking at 8192 to prevent run-away thinking loops.
@@ -168,7 +177,8 @@ export function isPreviewModel(model: string): boolean {
     model === PREVIEW_GEMINI_3_1_MODEL ||
     model === PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL ||
     model === PREVIEW_GEMINI_FLASH_MODEL ||
-    model === PREVIEW_GEMINI_MODEL_AUTO
+    model === PREVIEW_GEMINI_MODEL_AUTO ||
+    model === GEMINI_MODEL_ALIAS_AUTO
   );
 }
 
@@ -281,4 +291,38 @@ export function isActiveModel(
       model !== PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL
     );
   }
+}
+
+/**
+ * Checks if the model name is valid (either a valid model or a valid alias).
+ *
+ * @param model The model name to check.
+ * @returns True if the model is valid.
+ */
+export function isValidModelOrAlias(model: string): boolean {
+  // Check if it's a valid alias
+  if (VALID_ALIASES.has(model)) {
+    return true;
+  }
+
+  // Check if it's a valid model name
+  if (VALID_GEMINI_MODELS.has(model)) {
+    return true;
+  }
+
+  // Allow custom models (non-gemini models)
+  if (!model.startsWith('gemini-')) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Gets a list of all valid model names and aliases for error messages.
+ *
+ * @returns Array of valid model names and aliases.
+ */
+export function getValidModelsAndAliases(): string[] {
+  return [...new Set([...VALID_ALIASES, ...VALID_GEMINI_MODELS])].sort();
 }
