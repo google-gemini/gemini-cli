@@ -28,6 +28,7 @@ import { makeRelative } from '../utils/paths.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { EDIT_TOOL_NAMES } from '../tools/tool-names.js';
 import type { ValidatingToolCall } from './types.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 /**
  * Helper to format the policy denial error.
@@ -51,6 +52,7 @@ export function getPolicyDenialError(
 export async function checkPolicy(
   toolCall: ValidatingToolCall,
   config: Config,
+  subagent?: string,
 ): Promise<CheckResult> {
   const serverName =
     toolCall.tool instanceof DiscoveredMCPTool
@@ -65,6 +67,7 @@ export async function checkPolicy(
       { name: toolCall.request.name, args: toolCall.request.args },
       serverName,
       toolAnnotations,
+      subagent,
     );
 
   const { decision } = result;
@@ -110,12 +113,11 @@ export async function updatePolicy(
   tool: AnyDeclarativeTool,
   outcome: ToolConfirmationOutcome,
   confirmationDetails: SerializableConfirmationDetails | undefined,
-  deps: {
-    config: Config;
-    messageBus: MessageBus;
-    toolInvocation?: AnyToolInvocation;
-  },
+  context: AgentLoopContext,
+  toolInvocation?: AnyToolInvocation,
 ): Promise<void> {
+  const deps = { ...context, toolInvocation };
+
   // Mode Transitions (AUTO_EDIT)
   if (isAutoEditTransition(tool, outcome)) {
     deps.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
