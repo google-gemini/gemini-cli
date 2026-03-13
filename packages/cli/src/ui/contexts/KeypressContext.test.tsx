@@ -647,6 +647,15 @@ describe('KeypressContext', () => {
         sequence: `\x1b[27;6;9~`,
         expected: { name: 'tab', shift: true, ctrl: true },
       },
+      // Unicode CJK (Kitty/modifyOtherKeys scalar values)
+      {
+        sequence: '\x1b[44032u',
+        expected: { name: '가', sequence: '가', insertable: true },
+      },
+      {
+        sequence: '\x1b[27;1;44032~',
+        expected: { name: '가', sequence: '가', insertable: true },
+      },
       // XTerm Function Key
       { sequence: `\x1b[1;129A`, expected: { name: 'up' } },
       { sequence: `\x1b[1;2H`, expected: { name: 'home', shift: true } },
@@ -1403,7 +1412,7 @@ describe('KeypressContext', () => {
       expect(keyHandler).toHaveBeenCalledTimes(inputString.length);
       for (const char of inputString) {
         expect(keyHandler).toHaveBeenCalledWith(
-          expect.objectContaining({ sequence: char }),
+          expect.objectContaining({ sequence: char, name: char.toLowerCase() }),
         );
       }
     });

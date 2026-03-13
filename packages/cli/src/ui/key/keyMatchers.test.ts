@@ -475,6 +475,22 @@ describe('keyMatchers', () => {
       expect(matchers[Command.QUIT](createKey('q', { ctrl: true }))).toBe(true);
       expect(matchers[Command.QUIT](createKey('q', { alt: true }))).toBe(true);
     });
+    it('should support matching non-ASCII and CJK characters', () => {
+      const config = new Map(defaultKeyBindingConfig);
+      config.set(Command.QUIT, [new KeyBinding('Å'), new KeyBinding('가')]);
+
+      const matchers = createKeyMatchers(config);
+
+      // Å is normalized to å with shift=true by the parser
+      expect(matchers[Command.QUIT](createKey('å', { shift: true }))).toBe(
+        true,
+      );
+      expect(matchers[Command.QUIT](createKey('å'))).toBe(false);
+
+      // CJK characters do not have a lower/upper case
+      expect(matchers[Command.QUIT](createKey('가'))).toBe(true);
+      expect(matchers[Command.QUIT](createKey('나'))).toBe(false);
+    });
   });
 
   describe('Edge Cases', () => {

@@ -86,7 +86,7 @@ export function formatKeyBinding(
   if (binding.shift) parts.push(modMap.shift);
   if (binding.cmd) parts.push(modMap.cmd);
 
-  const keyName = KEY_NAME_MAP[binding.key] || binding.key.toUpperCase();
+  const keyName = KEY_NAME_MAP[binding.name] || binding.name.toUpperCase();
   parts.push(keyName);
 
   return parts.join('+');
