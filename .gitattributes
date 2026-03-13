@@ -22,4 +22,3 @@ Makefile eol=lf
 *.eot binary
 *.ttf binary
 *.otf binary
-scripts/review.sh text eol=lf
