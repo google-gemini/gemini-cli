@@ -20,6 +20,7 @@ import { SafetyCheckDecision } from '../safety/protocol.js';
 import type { CheckerRunner } from '../safety/checker-runner.js';
 import { initializeShellParsers } from '../utils/shell-utils.js';
 import { buildArgsPatterns } from './utils.js';
+import { PRIORITY_YOLO_ALLOW_ALL } from './config.js';
 
 // Mock shell-utils to ensure consistent behavior across platforms (especially Windows CI)
 // We want to test PolicyEngine logic, not the shell parser's ability to parse commands
@@ -2851,7 +2852,7 @@ describe('PolicyEngine', () => {
         },
         {
           decision: PolicyDecision.ALLOW,
-          priority: 998,
+          priority: PRIORITY_YOLO_ALLOW_ALL,
           modes: [ApprovalMode.YOLO],
         },
       ];
@@ -2878,7 +2879,7 @@ describe('PolicyEngine', () => {
         },
         {
           decision: PolicyDecision.ALLOW,
-          priority: 998,
+          priority: PRIORITY_YOLO_ALLOW_ALL,
           modes: [ApprovalMode.YOLO],
         },
       ];

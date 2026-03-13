@@ -165,6 +165,9 @@ export class AgentRegistry {
           agent.metadata.hash = agent.agentCardUrl;
         }
 
+        // Store the definition so it can be looked up by name for acknowledgment
+        this.allDefinitions.set(agent.name, agent);
+
         if (!agent.metadata?.hash) {
           agentsToRegister.push(agent);
           continue;
@@ -431,64 +434,68 @@ export class AgentRegistry {
         authHandler = provider;
       }
 
-      const agentCard = await clientManager.loadAgent(
-        remoteDef.name,
-        remoteDef.agentCardUrl,
-        authHandler,
-      );
-
-      // Validate auth configuration against the agent card's security schemes.
-      if (agentCard.securitySchemes) {
-        const validation = A2AAuthProviderFactory.validateAuthConfig(
-          definition.auth,
-          agentCard.securitySchemes,
+      if (!clientManager.getClient(remoteDef.name)) {
+        const agentCard = await clientManager.loadAgent(
+          remoteDef.name,
+          remoteDef.agentCardUrl,
+          authHandler,
         );
-        if (!validation.valid && validation.diff) {
-          const requiredAuth = A2AAuthProviderFactory.describeRequiredAuth(
+
+        // Validate auth configuration against the agent card's security schemes.
+        if (agentCard.securitySchemes) {
+          const validation = A2AAuthProviderFactory.validateAuthConfig(
+            definition.auth,
             agentCard.securitySchemes,
           );
-          const authError = new AgentAuthConfigMissingError(
-            definition.name,
-            requiredAuth,
-            validation.diff.missingConfig,
-          );
-          coreEvents.emitFeedback(
-            'warning',
-            `[${definition.name}] Agent requires authentication: ${requiredAuth}`,
-          );
-          debugLogger.warn(`[AgentRegistry] ${authError.message}`);
-          // Still register the agent — the user can fix config and retry.
+          if (!validation.valid && validation.diff) {
+            const requiredAuth = A2AAuthProviderFactory.describeRequiredAuth(
+              agentCard.securitySchemes,
+            );
+            const authError = new AgentAuthConfigMissingError(
+              definition.name,
+              requiredAuth,
+              validation.diff.missingConfig,
+            );
+            coreEvents.emitFeedback(
+              'warning',
+              `[${definition.name}] Agent requires authentication: ${requiredAuth}`,
+            );
+            debugLogger.warn(`[AgentRegistry] ${authError.message}`);
+            // Still register the agent — the user can fix config and retry.
+          }
         }
-      }
 
-      const userDescription = remoteDef.originalDescription;
-      const agentDescription = agentCard.description;
-      const descriptions: string[] = [];
+        const userDescription = remoteDef.originalDescription;
+        const agentDescription = agentCard.description;
+        const descriptions: string[] = [];
 
-      if (userDescription?.trim()) {
-        descriptions.push(`User Description: ${userDescription.trim()}`);
-      }
-      if (agentDescription?.trim()) {
-        descriptions.push(`Agent Description: ${agentDescription.trim()}`);
-      }
-      if (agentCard.skills && agentCard.skills.length > 0) {
-        const skillsList = agentCard.skills
-          .map(
-            (skill: { name: string; description: string }) =>
-              `${skill.name}: ${skill.description || 'No description provided'}`,
-          )
-          .join('\n');
-        descriptions.push(`Skills:\n${skillsList}`);
-      }
+        if (userDescription?.trim()) {
+          descriptions.push(`User Description: ${userDescription.trim()}`);
+        }
+        if (agentDescription?.trim()) {
+          descriptions.push(`Agent Description: ${agentDescription.trim()}`);
+        }
+        if (agentCard.skills && agentCard.skills.length > 0) {
+          const skillsList = agentCard.skills
+            .map(
+              (skill: { name: string; description: string }) =>
+                `${skill.name}: ${skill.description || 'No description provided'}`,
+            )
+            .join('\n');
+          descriptions.push(`Skills:\n${skillsList}`);
+        }
 
-      if (descriptions.length > 0) {
-        definition.description = descriptions.join('\n');
-      }
+        if (descriptions.length > 0) {
+          definition.description = descriptions.join('\n');
+        }
 
-      if (this.config.getDebugMode()) {
-        debugLogger.log(
-          `[AgentRegistry] Registered remote agent '${definition.name}' with card: ${definition.agentCardUrl}`,
-        );
+        if (this.config.getDebugMode()) {
+          debugLogger.log(
+            `[AgentRegistry] Registered remote agent '${definition.name}' with card: ${definition.agentCardUrl}`,
+          );
+        }
+        this.agents.set(definition.name, definition);
+        this.addAgentPolicy(definition);
       }
       this.agents.set(definition.name, definition);
       this.addAgentPolicy(definition);

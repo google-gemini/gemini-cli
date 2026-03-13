@@ -73,6 +73,12 @@ export const ADMIN_POLICY_TIER = 5;
 export const ALWAYS_ALLOW_PRIORITY_FRACTION = 950;
 
 /**
+ * Priority for the YOLO "allow all" rule.
+ * Matches the raw priority used in yolo.toml.
+ */
+export const PRIORITY_YOLO_ALLOW_ALL = 998;
+
+/**
  * The fractional priority offset for "Always allow" rules (e.g., 0.95).
  * This ensures consistency between in-memory rules and persisted rules.
  */
