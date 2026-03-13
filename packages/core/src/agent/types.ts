@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export type WithMeta = { _meta?: Record<string, unknown> };
+
 export interface AgentSession<
   ConfigType = Record<string, unknown>,
   ActionType = { type: string; data: unknown },
@@ -40,24 +42,39 @@ export interface AgentSession<
   readonly events: AgentEvent[];
 }
 
+export type NullSend = {
+  message: never;
+  elicitations: never;
+  update: never;
+  action: never;
+};
+
+/** Send a user message to the agent. Acts as steering when mid-stream. */
+export type MessageSend = NullSend & { message: ContentPart[] };
+/** Send responses to one or more elicitations to the agent. */
+export type ElicitationSend = NullSend & {
+  elicitations: ElicitationResponse[];
+};
+/** Update session properties. */
+export type UpdateSend<ConfigType = Record<string, unknown>> = NullSend & {
+  update: { title?: string; model?: string; config?: ConfigType };
+};
+/** Send an action to the agent. */
+export type ActionSend<ActionType = { type: string; data: unknown }> = {
+  action: ActionType;
+};
+
 export type AgentSend<
   ConfigType = Record<string, unknown>,
   ActionType = { type: string; data: unknown },
-> = {
-  /** Additional metadata, agent *may* change behavior based on custom contract. */
-  _meta?: Record<string, unknown>;
-} &
-  /** Send a user message to the agent. Acts as steering when mid-stream. */
-  (| { message: ContentPart[] }
-    /** Resolve pending elicitations. */
-    | { elicitations: ElicitationResponse[] }
-    /** Update durable properties of the current session. */
-    | {
-        update: { title?: string; model?: string; config?: ConfigType };
-      }
-    /** Send a concrete action the agent understands (e.g. 'detach' a tool) */
-    | { action: ActionType }
-  );
+> = (
+  | MessageSend
+  | ElicitationSend
+  | UpdateSend<ConfigType>
+  | ActionSend<ActionType>
+) &
+  WithMeta;
+
 export interface Trajectory {
   readonly events: AgentEvent[];
 }
@@ -157,7 +174,8 @@ export type ContentPart =
         uri?: string;
         mimeType?: string;
       }
-  ) & { _meta?: Record<string, unknown> };
+  ) &
+    WithMeta;
 
 export interface Message {
   role: 'user' | 'agent' | 'developer';
@@ -198,7 +216,7 @@ export interface ToolResponse {
   isError?: boolean;
 }
 
-export interface ElicitationRequest {
+export type ElicitationRequest = {
   /**
    * Whether the elicitation should be displayed as part of the message stream or
    * as a standalone dialog box.
@@ -211,15 +229,13 @@ export interface ElicitationRequest {
   /** The question / content to display to the user. */
   message: string;
   requestedSchema: Record<string, unknown>;
-  _meta: Record<string, unknown>;
-}
+} & WithMeta;
 
-export interface ElicitationResponse {
+export type ElicitationResponse = {
   requestId: string;
   action: 'accept' | 'decline' | 'cancel';
   content: Record<string, unknown>;
-  _meta?: Record<string, unknown>;
-}
+} & WithMeta;
 
 export interface ErrorData {
   // One of https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto
