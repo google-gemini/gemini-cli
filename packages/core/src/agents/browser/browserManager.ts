@@ -147,6 +147,19 @@ export class BrowserManager {
       throw signal.reason ?? new Error('Operation cancelled');
     }
 
+    const errorMessage = this.checkNavigationRestrictions(toolName, args);
+    if (errorMessage) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: errorMessage,
+          },
+        ],
+        isError: true,
+      };
+    }
+
     const client = await this.getRawMcpClient();
     const callPromise = client.callTool(
       { name: toolName, arguments: args },
@@ -342,6 +355,23 @@ export class BrowserManager {
       mcpArgs.push('--userDataDir', defaultProfilePath);
     }
 
+    if (
+      browserConfig.customConfig.allowedDomains &&
+      browserConfig.customConfig.allowedDomains.length > 0
+    ) {
+      const exclusionRules = browserConfig.customConfig.allowedDomains
+        .map((domain) => {
+          if (!/^(\*\.)?([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+$/.test(domain)) {
+            throw new Error(`Invalid domain in allowedDomains: ${domain}`);
+          }
+          return `EXCLUDE ${domain}`;
+        })
+        .join(', ');
+      mcpArgs.push(
+        `--chromeArg="--host-rules=MAP * 127.0.0.1, ${exclusionRules}, EXCLUDE 127.0.0.1"`,
+      );
+    }
+
     debugLogger.log(
       `Launching chrome-devtools-mcp (${sessionMode} mode) with args: ${mcpArgs.join(' ')}`,
     );
@@ -500,6 +530,63 @@ export class BrowserManager {
       `Discovered ${this.discoveredTools.length} tools from chrome-devtools-mcp: ` +
         this.discoveredTools.map((t) => t.name).join(', '),
     );
+  }
+
+  /**
+   * Check navigation restrictions based on tools and the args sent
+   * along with them.
+   *
+   * @returns error message if failed, undefined if passed.
+   */
+  private checkNavigationRestrictions(
+    toolName: string,
+    args: Record<string, unknown>,
+  ): string | undefined {
+    const pageNavigationTools = ['navigate_page', 'new_page'];
+
+    if (!pageNavigationTools.includes(toolName)) {
+      return undefined;
+    }
+
+    const allowedDomains =
+      this.config.getBrowserAgentConfig().customConfig.allowedDomains;
+    if (!allowedDomains || allowedDomains.length === 0) {
+      return undefined;
+    }
+
+    const url = args['url'];
+    if (!url) {
+      return undefined;
+    }
+    if (typeof url !== 'string') {
+      return `Invalid URL: URL must be a string.`;
+    }
+
+    try {
+      const parsedUrl = new URL(url);
+      const urlHostname = parsedUrl.hostname.replace(/\.$/, '');
+
+      for (const domainPattern of allowedDomains) {
+        if (domainPattern.startsWith('*.')) {
+          const baseDomain = domainPattern.substring(2);
+          if (
+            urlHostname === baseDomain ||
+            urlHostname.endsWith(`.${baseDomain}`)
+          ) {
+            return undefined;
+          }
+        } else {
+          if (urlHostname === domainPattern) {
+            return undefined;
+          }
+        }
+      }
+    } catch {
+      return `Invalid URL: Malformed URL string.`;
+    }
+
+    // If none matched, then deny
+    return `Tool '${toolName}' is not permitted for the requested URL/domain based on your current browser settings.`;
   }
 
   /**

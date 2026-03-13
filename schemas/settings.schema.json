@@ -1188,6 +1188,16 @@
               "markdownDescription": "Model override for the visual agent.\n\n- Category: `Advanced`\n- Requires restart: `yes`",
               "type": "string"
             },
+            "allowedDomains": {
+              "title": "Allowed Domains",
+              "description": "A list of allowed domains for the browser agent (e.g., [\"github.com\", \"*.google.com\"]).",
+              "markdownDescription": "A list of allowed domains for the browser agent (e.g., [\"github.com\", \"*.google.com\"]).\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `[\n  \"github.com\",\n  \"*.google.com\",\n  \"localhost\"\n]`",
+              "default": ["github.com", "*.google.com", "localhost"],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "disableUserInput": {
               "title": "Disable User Input",
               "description": "Disable user input on browser window during automation.",
