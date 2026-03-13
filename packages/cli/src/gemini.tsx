@@ -223,11 +223,16 @@ export async function main() {
     );
   });
 
-  await Promise.all([
-    cleanupCheckpoints(),
-    cleanupToolOutputFiles(settings.merged),
-    cleanupBackgroundLogs(),
-  ]);
+  // Run background tasks without awaiting them to speed up startup.
+  cleanupCheckpoints().catch((err) =>
+    debugLogger.error('Failed to cleanup checkpoints:', err),
+  );
+  cleanupToolOutputFiles(settings.merged).catch((err) =>
+    debugLogger.error('Failed to cleanup tool output files:', err),
+  );
+  cleanupBackgroundLogs().catch((err) =>
+    debugLogger.error('Failed to cleanup background logs:', err),
+  );
 
   const parseArgsHandle = startupProfiler.start('parse_arguments');
   const argv = await parseArguments(settings.merged);

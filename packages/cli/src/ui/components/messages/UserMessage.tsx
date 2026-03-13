@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import { Text, Box } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import { SCREEN_READER_USER_PREFIX } from '../../textConstants.js';
@@ -22,7 +21,7 @@ interface UserMessageProps {
   width: number;
 }
 
-export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
+const UserMessageInner = ({ text, width }: UserMessageProps) => {
   const prefix = '> ';
   const prefixWidth = prefix.length;
   const isSlashCommand = checkIsSlashCommand(text);
@@ -80,3 +79,6 @@ export const UserMessage: React.FC<UserMessageProps> = ({ text, width }) => {
     </HalfLinePaddedBox>
   );
 };
+
+export const UserMessage = memo(UserMessageInner);
+UserMessage.displayName = 'UserMessage';

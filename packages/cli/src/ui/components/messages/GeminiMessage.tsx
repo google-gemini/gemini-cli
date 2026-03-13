@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
+import { memo } from 'react';
 import { Text, Box } from 'ink';
 import { MarkdownDisplay } from '../../utils/MarkdownDisplay.js';
 import { theme } from '../../semantic-colors.js';
@@ -18,12 +18,12 @@ interface GeminiMessageProps {
   terminalWidth: number;
 }
 
-export const GeminiMessage: React.FC<GeminiMessageProps> = ({
+const GeminiMessageInner = ({
   text,
   isPending,
   availableTerminalHeight,
   terminalWidth,
-}) => {
+}: GeminiMessageProps) => {
   const { renderMarkdown } = useUIState();
   const prefix = '✦ ';
   const prefixWidth = prefix.length;
@@ -51,3 +51,6 @@ export const GeminiMessage: React.FC<GeminiMessageProps> = ({
     </Box>
   );
 };
+
+export const GeminiMessage = memo(GeminiMessageInner);
+GeminiMessage.displayName = 'GeminiMessage';

@@ -20,21 +20,7 @@ import type { OverageStrategy } from '../billing/billing.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import { LSTool } from '../tools/ls.js';
-import { ReadFileTool } from '../tools/read-file.js';
-import { GrepTool } from '../tools/grep.js';
-import { canUseRipgrep, RipGrepTool } from '../tools/ripGrep.js';
-import { GlobTool } from '../tools/glob.js';
-import { ActivateSkillTool } from '../tools/activate-skill.js';
-import { EditTool } from '../tools/edit.js';
-import { ShellTool } from '../tools/shell.js';
-import { WriteFileTool } from '../tools/write-file.js';
-import { WebFetchTool } from '../tools/web-fetch.js';
-import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
-import { WebSearchTool } from '../tools/web-search.js';
-import { AskUserTool } from '../tools/ask-user.js';
-import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
-import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
+import { canUseRipgrep } from '../tools/ripGrep.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
@@ -65,19 +51,10 @@ import {
 import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { ideContextStore } from '../ide/ideContext.js';
-import { WriteTodosTool } from '../tools/write-todos.js';
 import {
   StandardFileSystemService,
   type FileSystemService,
 } from '../services/fileSystemService.js';
-import {
-  TrackerCreateTaskTool,
-  TrackerUpdateTaskTool,
-  TrackerGetTaskTool,
-  TrackerListTasksTool,
-  TrackerAddDependencyTool,
-  TrackerVisualizeTool,
-} from '../tools/trackerTools.js';
 import {
   logRipgrepFallback,
   logFlashFallback,
@@ -1082,7 +1059,10 @@ export class Config implements McpContext, AgentLoopContext {
     };
 
     if (params.contextFileName) {
-      setGeminiMdFilename(params.contextFileName);
+      // Lazily import to avoid eager tool loading
+      void import('../tools/memoryTool.js').then((m) =>
+        m.setGeminiMdFilename(params.contextFileName!),
+      );
     }
 
     if (this.telemetrySettings.enabled) {
@@ -1228,6 +1208,9 @@ export class Config implements McpContext, AgentLoopContext {
 
         // Re-register ActivateSkillTool to update its schema with the discovered enabled skill enums
         if (this.getSkillManager().getSkills().length > 0) {
+          const { ActivateSkillTool } = await import(
+            '../tools/activate-skill.js'
+          );
           this.toolRegistry.unregisterTool(ActivateSkillTool.Name);
           this.toolRegistry.registerTool(
             new ActivateSkillTool(this, this.messageBus),
@@ -2716,15 +2699,22 @@ export class Config implements McpContext, AgentLoopContext {
 
       // Re-register ActivateSkillTool to update its schema with the newly discovered skills
       if (this.getSkillManager().getSkills().length > 0) {
+        const { ActivateSkillTool } = await import(
+          '../tools/activate-skill.js'
+        );
         this.toolRegistry.unregisterTool(ActivateSkillTool.Name);
         this.toolRegistry.registerTool(
           new ActivateSkillTool(this, this.messageBus),
         );
       } else {
+        const { ActivateSkillTool } = await import(
+          '../tools/activate-skill.js'
+        );
         this.toolRegistry.unregisterTool(ActivateSkillTool.Name);
       }
     } else {
       this.getSkillManager().clearSkills();
+      const { ActivateSkillTool } = await import('../tools/activate-skill.js');
       this.toolRegistry.unregisterTool(ActivateSkillTool.Name);
     }
 
@@ -2916,18 +2906,15 @@ export class Config implements McpContext, AgentLoopContext {
 
   async createToolRegistry(): Promise<ToolRegistry> {
     const registry = new ToolRegistry(this, this.messageBus);
+    const coreTools = this.getCoreTools();
 
-    // helper to create & register core tools that are enabled
-    const maybeRegister = (
-      toolClass: { name: string; Name?: string },
-      registerFn: () => void,
+    const maybeRegister = async (
+      toolName: string,
+      normalizedClassName: string,
+      importPath: string,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      registerFn: (module: any) => void,
     ) => {
-      const className = toolClass.name;
-      const toolName = toolClass.Name || className;
-      const coreTools = this.getCoreTools();
-      // On some platforms, the className can be minified to _ClassName.
-      const normalizedClassName = className.replace(/^_+/, '');
-
       let isEnabled = true; // Enabled by default if coreTools is not set.
       if (coreTools) {
         isEnabled = coreTools.some(
@@ -2940,15 +2927,20 @@ export class Config implements McpContext, AgentLoopContext {
       }
 
       if (isEnabled) {
-        registerFn();
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const module = await import(importPath);
+        registerFn(module);
       }
     };
 
-    maybeRegister(LSTool, () =>
-      registry.registerTool(new LSTool(this, this.messageBus)),
+    await maybeRegister('LSTool', 'LSTool', '../tools/ls.js', (m) =>
+      registry.registerTool(new m.LSTool(this, this.messageBus)),
     );
-    maybeRegister(ReadFileTool, () =>
-      registry.registerTool(new ReadFileTool(this, this.messageBus)),
+    await maybeRegister(
+      'ReadFileTool',
+      'ReadFileTool',
+      '../tools/read-file.js',
+      (m) => registry.registerTool(new m.ReadFileTool(this, this.messageBus)),
     );
 
     if (this.getUseRipgrep()) {
@@ -2960,82 +2952,150 @@ export class Config implements McpContext, AgentLoopContext {
         errorString = String(error);
       }
       if (useRipgrep) {
-        maybeRegister(RipGrepTool, () =>
-          registry.registerTool(new RipGrepTool(this, this.messageBus)),
+        await maybeRegister(
+          'RipGrepTool',
+          'RipGrepTool',
+          '../tools/ripGrep.js',
+          (m) =>
+            registry.registerTool(new m.RipGrepTool(this, this.messageBus)),
         );
       } else {
         logRipgrepFallback(this, new RipgrepFallbackEvent(errorString));
-        maybeRegister(GrepTool, () =>
-          registry.registerTool(new GrepTool(this, this.messageBus)),
+        await maybeRegister('GrepTool', 'GrepTool', '../tools/grep.js', (m) =>
+          registry.registerTool(new m.GrepTool(this, this.messageBus)),
         );
       }
     } else {
-      maybeRegister(GrepTool, () =>
-        registry.registerTool(new GrepTool(this, this.messageBus)),
+      await maybeRegister('GrepTool', 'GrepTool', '../tools/grep.js', (m) =>
+        registry.registerTool(new m.GrepTool(this, this.messageBus)),
       );
     }
 
-    maybeRegister(GlobTool, () =>
-      registry.registerTool(new GlobTool(this, this.messageBus)),
+    await maybeRegister('GlobTool', 'GlobTool', '../tools/glob.js', (m) =>
+      registry.registerTool(new m.GlobTool(this, this.messageBus)),
     );
-    maybeRegister(ActivateSkillTool, () =>
-      registry.registerTool(new ActivateSkillTool(this, this.messageBus)),
+    await maybeRegister(
+      'ActivateSkillTool',
+      'ActivateSkillTool',
+      '../tools/activate-skill.js',
+      (m) =>
+        registry.registerTool(new m.ActivateSkillTool(this, this.messageBus)),
     );
-    maybeRegister(EditTool, () =>
-      registry.registerTool(new EditTool(this, this.messageBus)),
+    await maybeRegister('EditTool', 'EditTool', '../tools/edit.js', (m) =>
+      registry.registerTool(new m.EditTool(this, this.messageBus)),
     );
-    maybeRegister(WriteFileTool, () =>
-      registry.registerTool(new WriteFileTool(this, this.messageBus)),
+    await maybeRegister(
+      'WriteFileTool',
+      'WriteFileTool',
+      '../tools/write-file.js',
+      (m) => registry.registerTool(new m.WriteFileTool(this, this.messageBus)),
     );
-    maybeRegister(WebFetchTool, () =>
-      registry.registerTool(new WebFetchTool(this, this.messageBus)),
+    await maybeRegister(
+      'WebFetchTool',
+      'WebFetchTool',
+      '../tools/web-fetch.js',
+      (m) => registry.registerTool(new m.WebFetchTool(this, this.messageBus)),
     );
-    maybeRegister(ShellTool, () =>
-      registry.registerTool(new ShellTool(this, this.messageBus)),
+    await maybeRegister('ShellTool', 'ShellTool', '../tools/shell.js', (m) =>
+      registry.registerTool(new m.ShellTool(this, this.messageBus)),
     );
-    maybeRegister(MemoryTool, () =>
-      registry.registerTool(new MemoryTool(this.messageBus)),
+    await maybeRegister(
+      'MemoryTool',
+      'MemoryTool',
+      '../tools/memoryTool.js',
+      (m) => registry.registerTool(new m.MemoryTool(this.messageBus)),
     );
-    maybeRegister(WebSearchTool, () =>
-      registry.registerTool(new WebSearchTool(this, this.messageBus)),
+    await maybeRegister(
+      'WebSearchTool',
+      'WebSearchTool',
+      '../tools/web-search.js',
+      (m) => registry.registerTool(new m.WebSearchTool(this, this.messageBus)),
     );
-    maybeRegister(AskUserTool, () =>
-      registry.registerTool(new AskUserTool(this.messageBus)),
+    await maybeRegister(
+      'AskUserTool',
+      'AskUserTool',
+      '../tools/ask-user.js',
+      (m) => registry.registerTool(new m.AskUserTool(this.messageBus)),
     );
     if (this.getUseWriteTodos()) {
-      maybeRegister(WriteTodosTool, () =>
-        registry.registerTool(new WriteTodosTool(this.messageBus)),
+      await maybeRegister(
+        'WriteTodosTool',
+        'WriteTodosTool',
+        '../tools/write-todos.js',
+        (m) => registry.registerTool(new m.WriteTodosTool(this.messageBus)),
       );
     }
     if (this.isPlanEnabled()) {
-      maybeRegister(ExitPlanModeTool, () =>
-        registry.registerTool(new ExitPlanModeTool(this, this.messageBus)),
+      await maybeRegister(
+        'ExitPlanModeTool',
+        'ExitPlanModeTool',
+        '../tools/exit-plan-mode.js',
+        (m) =>
+          registry.registerTool(new m.ExitPlanModeTool(this, this.messageBus)),
       );
-      maybeRegister(EnterPlanModeTool, () =>
-        registry.registerTool(new EnterPlanModeTool(this, this.messageBus)),
+      await maybeRegister(
+        'EnterPlanModeTool',
+        'EnterPlanModeTool',
+        '../tools/enter-plan-mode.js',
+        (m) =>
+          registry.registerTool(new m.EnterPlanModeTool(this, this.messageBus)),
       );
     }
 
     if (this.isTrackerEnabled()) {
-      maybeRegister(TrackerCreateTaskTool, () =>
-        registry.registerTool(new TrackerCreateTaskTool(this, this.messageBus)),
+      await maybeRegister(
+        'TrackerCreateTaskTool',
+        'TrackerCreateTaskTool',
+        '../tools/trackerTools.js',
+        (m) =>
+          registry.registerTool(
+            new m.TrackerCreateTaskTool(this, this.messageBus),
+          ),
       );
-      maybeRegister(TrackerUpdateTaskTool, () =>
-        registry.registerTool(new TrackerUpdateTaskTool(this, this.messageBus)),
+      await maybeRegister(
+        'TrackerUpdateTaskTool',
+        'TrackerUpdateTaskTool',
+        '../tools/trackerTools.js',
+        (m) =>
+          registry.registerTool(
+            new m.TrackerUpdateTaskTool(this, this.messageBus),
+          ),
       );
-      maybeRegister(TrackerGetTaskTool, () =>
-        registry.registerTool(new TrackerGetTaskTool(this, this.messageBus)),
+      await maybeRegister(
+        'TrackerGetTaskTool',
+        'TrackerGetTaskTool',
+        '../tools/trackerTools.js',
+        (m) =>
+          registry.registerTool(
+            new m.TrackerGetTaskTool(this, this.messageBus),
+          ),
       );
-      maybeRegister(TrackerListTasksTool, () =>
-        registry.registerTool(new TrackerListTasksTool(this, this.messageBus)),
+      await maybeRegister(
+        'TrackerListTasksTool',
+        'TrackerListTasksTool',
+        '../tools/trackerTools.js',
+        (m) =>
+          registry.registerTool(
+            new m.TrackerListTasksTool(this, this.messageBus),
+          ),
       );
-      maybeRegister(TrackerAddDependencyTool, () =>
-        registry.registerTool(
-          new TrackerAddDependencyTool(this, this.messageBus),
-        ),
+      await maybeRegister(
+        'TrackerAddDependencyTool',
+        'TrackerAddDependencyTool',
+        '../tools/trackerTools.js',
+        (m) =>
+          registry.registerTool(
+            new m.TrackerAddDependencyTool(this, this.messageBus),
+          ),
       );
-      maybeRegister(TrackerVisualizeTool, () =>
-        registry.registerTool(new TrackerVisualizeTool(this, this.messageBus)),
+      await maybeRegister(
+        'TrackerVisualizeTool',
+        'TrackerVisualizeTool',
+        '../tools/trackerTools.js',
+        (m) =>
+          registry.registerTool(
+            new m.TrackerVisualizeTool(this, this.messageBus),
+          ),
       );
     }
 

@@ -16,6 +16,8 @@ export type PackageJson = BasePackageJson & {
   };
 };
 
+const packageJsonCache = new Map<string, PackageJson | undefined>();
+
 /**
  * Reads package.json from the current directory or any parent directory.
  *
@@ -33,15 +35,25 @@ export type PackageJson = BasePackageJson & {
 export async function getPackageJson(
   cwd: string,
 ): Promise<PackageJson | undefined> {
+  if (packageJsonCache.has(cwd)) {
+    return packageJsonCache.get(cwd);
+  }
+
   try {
     const result = await readPackageUp({ cwd, normalize: false });
-    if (!result) {
-      return undefined;
-    }
-
-    return result.packageJson;
+    const pkg = result?.packageJson;
+    packageJsonCache.set(cwd, pkg);
+    return pkg;
   } catch (error) {
     debugLogger.error('Error occurred while reading package.json', error);
     return undefined;
   }
+}
+
+/**
+ * Clears the package.json cache.
+ * Useful for testing.
+ */
+export function clearPackageJsonCache(): void {
+  packageJsonCache.clear();
 }
