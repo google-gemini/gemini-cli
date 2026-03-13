@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -17,6 +17,8 @@ import * as readline from 'node:readline';
 import { Language, Parser, Query, type Node, type Tree } from 'web-tree-sitter';
 import { loadWasmBinary } from './fileUtils.js';
 import { debugLogger } from './debugLogger.js';
+import type { SandboxManager } from '../services/sandboxManager.js';
+import { NoopSandboxManager } from '../services/sandboxManager.js';
 
 export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];
 
@@ -737,13 +739,26 @@ export function stripShellWrapper(command: string): string {
  * @param config The application configuration.
  * @returns An object with 'allowed' boolean and optional 'reason' string if not allowed.
  */
-export const spawnAsync = (
+export const spawnAsync = async (
   command: string,
   args: string[],
-  options?: SpawnOptionsWithoutStdio,
-): Promise<{ stdout: string; stderr: string }> =>
-  new Promise((resolve, reject) => {
-    const child = spawn(command, args, options);
+  options?: SpawnOptionsWithoutStdio & { sandboxManager?: SandboxManager },
+): Promise<{ stdout: string; stderr: string }> => {
+  const sandboxManager = options?.sandboxManager ?? new NoopSandboxManager();
+  const prepared = await sandboxManager.prepareCommand({
+    command,
+    args,
+    cwd: options?.cwd?.toString() ?? process.cwd(),
+    env: options?.env ?? process.env,
+  });
+
+  const { program: finalCommand, args: finalArgs, env: finalEnv } = prepared;
+
+  return new Promise((resolve, reject) => {
+    const child = spawn(finalCommand, finalArgs, {
+      ...options,
+      env: finalEnv,
+    });
     let stdout = '';
     let stderr = '';
 
@@ -767,6 +782,7 @@ export const spawnAsync = (
       reject(err);
     });
   });
+};
 
 /**
  * Executes a command and yields lines of output as they appear.
@@ -782,10 +798,22 @@ export async function* execStreaming(
   options?: SpawnOptionsWithoutStdio & {
     signal?: AbortSignal;
     allowedExitCodes?: number[];
+    sandboxManager?: SandboxManager;
   },
 ): AsyncGenerator<string, void, void> {
-  const child = spawn(command, args, {
+  const sandboxManager = options?.sandboxManager ?? new NoopSandboxManager();
+  const prepared = await sandboxManager.prepareCommand({
+    command,
+    args,
+    cwd: options?.cwd?.toString() ?? process.cwd(),
+    env: options?.env ?? process.env,
+  });
+
+  const { program: finalCommand, args: finalArgs, env: finalEnv } = prepared;
+
+  const child = spawn(finalCommand, finalArgs, {
     ...options,
+    env: finalEnv,
     // ensure we don't open a window on windows if possible/relevant
     windowsHide: true,
   });

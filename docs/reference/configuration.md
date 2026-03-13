@@ -784,9 +784,10 @@ their corresponding top-level category object in your `settings.json` file.
 #### `tools`
 
 - **`tools.sandbox`** (string):
-  - **Description:** Sandbox execution environment. Set to a boolean to enable
-    or disable the sandbox, provide a string path to a sandbox profile, or
-    specify an explicit sandbox command (e.g., "docker", "podman", "lxc").
+  - **Description:** Legacy full-process sandbox execution environment. Set to a
+    boolean to enable or disable the sandbox, provide a string path to a sandbox
+    profile, or specify an explicit sandbox command (e.g., "docker", "podman",
+    "lxc").
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
@@ -889,6 +890,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
 
 #### `security`
+
+- **`security.toolSandboxing`** (boolean):
+  - **Description:** Experimental tool-level sandboxing (implementation in
+    progress).
+  - **Default:** `false`
 
 - **`security.disableYoloMode`** (boolean):
   - **Description:** Disable YOLO mode, even if enabled by a flag.

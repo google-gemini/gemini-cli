@@ -1321,8 +1321,8 @@
       "properties": {
         "sandbox": {
           "title": "Sandbox",
-          "description": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\").",
-          "markdownDescription": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\").\n\n- Category: `Tools`\n- Requires restart: `yes`",
+          "description": "Legacy full-process sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\").",
+          "markdownDescription": "Legacy full-process sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\").\n\n- Category: `Tools`\n- Requires restart: `yes`",
           "$ref": "#/$defs/BooleanOrStringOrObject"
         },
         "shell": {
@@ -1481,6 +1481,13 @@
       "default": {},
       "type": "object",
       "properties": {
+        "toolSandboxing": {
+          "title": "Tool Sandboxing",
+          "description": "Experimental tool-level sandboxing (implementation in progress).",
+          "markdownDescription": "Experimental tool-level sandboxing (implementation in progress).\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "disableYoloMode": {
           "title": "Disable YOLO Mode",
           "description": "Disable YOLO mode, even if enabled by a flag.",

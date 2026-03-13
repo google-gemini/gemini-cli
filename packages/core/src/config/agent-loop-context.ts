@@ -7,6 +7,7 @@
 import type { GeminiClient } from '../core/client.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
+import type { SandboxManager } from '../services/sandboxManager.js';
 import type { Config } from './config.js';
 
 /**
@@ -28,4 +29,7 @@ export interface AgentLoopContext {
 
   /** The client used to communicate with the LLM in this context. */
   readonly geminiClient: GeminiClient;
+
+  /** The service used to prepare commands for sandboxed execution. */
+  readonly sandboxManager: SandboxManager;
 }

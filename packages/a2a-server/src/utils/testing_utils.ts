@@ -21,6 +21,7 @@ import {
   tmpdir,
   type Config,
   type Storage,
+  NoopSandboxManager,
   type ToolRegistry,
 } from '@google/gemini-cli-core';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
@@ -97,6 +98,14 @@ export function createMockConfig(
     }),
     getGitService: vi.fn(),
     validatePathAccess: vi.fn().mockReturnValue(undefined),
+    getShellExecutionConfig: vi.fn().mockReturnValue({
+      sandboxManager: new NoopSandboxManager(),
+      sanitizationConfig: {
+        allowedEnvironmentVariables: [],
+        blockedEnvironmentVariables: [],
+        enableEnvironmentVariableRedaction: false,
+      },
+    }),
     ...overrides,
   } as unknown as Config;
 
