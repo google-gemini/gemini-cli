@@ -154,6 +154,22 @@ export const LS_TOOL_NAME_LEGACY = 'list_directory'; // Just to be safe if anyth
 
 export const EDIT_TOOL_NAMES = new Set([EDIT_TOOL_NAME, WRITE_FILE_TOOL_NAME]);
 
+/**
+ * Tools that can access local files or remote resources and should be
+ * treated with extra caution when updating policies.
+ */
+export const SENSITIVE_TOOLS = new Set([
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
+  READ_MANY_FILES_TOOL_NAME,
+  WEB_FETCH_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  LS_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+  EDIT_TOOL_NAME,
+  SHELL_TOOL_NAME,
+]);
+
 export const TRACKER_CREATE_TASK_TOOL_NAME = 'tracker_create_task';
 export const TRACKER_UPDATE_TASK_TOOL_NAME = 'tracker_update_task';
 export const TRACKER_GET_TASK_TOOL_NAME = 'tracker_get_task';
@@ -205,6 +221,12 @@ export const DISCOVERED_TOOL_PREFIX = 'discovered_tool_';
 /**
  * List of all built-in tool names.
  */
+import {
+  isMcpToolName,
+  parseMcpToolName,
+  MCP_TOOL_PREFIX,
+} from './mcp-tool.js';
+
 export const ALL_BUILTIN_TOOL_NAMES = [
   GLOB_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
@@ -274,25 +296,44 @@ export function isValidToolName(
     return true;
   }
 
-  // MCP tools (format: server__tool)
-  if (name.includes('__')) {
-    const parts = name.split('__');
-    if (parts.length !== 2 || parts[0].length === 0 || parts[1].length === 0) {
+  // Handle standard MCP FQNs (mcp_server_tool or wildcards mcp_*, mcp_server_*)
+  if (isMcpToolName(name)) {
+    // Global wildcard: mcp_*
+    if (name === `${MCP_TOOL_PREFIX}*` && options.allowWildcards) {
+      return true;
+    }
+
+    // Explicitly reject names with empty server component (e.g. mcp__tool)
+    if (name.startsWith(`${MCP_TOOL_PREFIX}_`)) {
       return false;
     }
 
-    const server = parts[0];
-    const tool = parts[1];
+    const parsed = parseMcpToolName(name);
+    // Ensure that both components are populated. parseMcpToolName splits at the second _,
+    // so `mcp__tool` has serverName="", toolName="tool"
+    if (parsed.serverName && parsed.toolName) {
+      // Basic slug validation for server and tool names.
+      // We allow dots (.) and colons (:) as they are valid in function names and
+      // used for truncation markers.
+      const slugRegex = /^[a-z0-9_.:-]+$/i;
 
-    if (tool === '*') {
-      return !!options.allowWildcards;
+      if (!slugRegex.test(parsed.serverName)) {
+        return false;
+      }
+
+      if (parsed.toolName === '*') {
+        return options.allowWildcards === true;
+      }
+
+      // A tool name consisting only of underscores is invalid.
+      if (/^_*$/.test(parsed.toolName)) {
+        return false;
+      }
+
+      return slugRegex.test(parsed.toolName);
     }
 
-    // Basic slug validation for server and tool names.
-    // We allow dots (.) and colons (:) as they are valid in function names and
-    // used for truncation markers.
-    const slugRegex = /^[a-z0-9_.:-]+$/i;
-    return slugRegex.test(server) && slugRegex.test(tool);
+    return false;
   }
 
   return false;

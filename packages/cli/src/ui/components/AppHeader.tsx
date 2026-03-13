@@ -17,15 +17,29 @@ import { theme } from '../semantic-colors.js';
 import { ThemedGradient } from './ThemedGradient.js';
 import { CliSpinner } from './CliSpinner.js';
 
+import { isAppleTerminal } from '@google/gemini-cli-core';
+
 interface AppHeaderProps {
   version: string;
   showDetails?: boolean;
 }
 
-const ICON = `▝▜▄  
+const DEFAULT_ICON = `▝▜▄  
   ▝▜▄
  ▗▟▀ 
 ▝▀    `;
+
+/**
+ * The default Apple Terminal.app adds significant line-height padding between
+ * rows. This breaks Unicode block-drawing characters that rely on vertical
+ * adjacency (like half-blocks). This version is perfectly symmetric vertically,
+ * which makes the padding gaps look like an intentional "scanline" design
+ * rather than a broken image.
+ */
+const MAC_TERMINAL_ICON = `▝▜▄  
+  ▝▜▄
+  ▗▟▀
+▗▟▀  `;
 
 export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
   const settings = useSettings();
@@ -38,6 +52,8 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
   const showHeader = !(
     settings.merged.ui.hideBanner || config.getScreenReader()
   );
+
+  const ICON = isAppleTerminal() ? MAC_TERMINAL_ICON : DEFAULT_ICON;
 
   if (!showDetails) {
     return (

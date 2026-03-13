@@ -15,11 +15,10 @@ import {
   type ExtensionUpdateStatus,
 } from '../../ui/state/extensions.js';
 import { ExtensionStorage } from './storage.js';
-import { copyExtension } from '../extension-manager.js';
+import { copyExtension, type ExtensionManager } from '../extension-manager.js';
 import { checkForExtensionUpdate } from './github.js';
 import { loadInstallMetadata } from '../extension.js';
 import * as fs from 'node:fs';
-import type { ExtensionManager } from '../extension-manager.js';
 import type { GeminiCLIExtension } from '@google/gemini-cli-core';
 
 // Mock dependencies
@@ -182,6 +181,54 @@ describe('Extension Update Logic', () => {
         recursive: true,
         force: true,
       });
+    });
+
+    it('should migrate source if migratedTo is set and an update is available', async () => {
+      vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue(
+        Promise.resolve({
+          name: 'test-extension',
+          version: '1.0.0',
+        }),
+      );
+      vi.mocked(
+        mockExtensionManager.installOrUpdateExtension,
+      ).mockResolvedValue({
+        ...mockExtension,
+        version: '1.1.0',
+      });
+      vi.mocked(checkForExtensionUpdate).mockResolvedValue(
+        ExtensionUpdateState.UPDATE_AVAILABLE,
+      );
+
+      const extensionWithMigratedTo = {
+        ...mockExtension,
+        migratedTo: 'https://new-source.com/repo.git',
+      };
+
+      await updateExtension(
+        extensionWithMigratedTo,
+        mockExtensionManager,
+        ExtensionUpdateState.UPDATE_AVAILABLE,
+        mockDispatch,
+      );
+
+      expect(checkForExtensionUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          installMetadata: expect.objectContaining({
+            source: 'https://new-source.com/repo.git',
+          }),
+        }),
+        mockExtensionManager,
+      );
+
+      expect(
+        mockExtensionManager.installOrUpdateExtension,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          source: 'https://new-source.com/repo.git',
+        }),
+        expect.anything(),
+      );
     });
 
     it('should set state to UPDATED if enableExtensionReloading is true', async () => {

@@ -201,7 +201,7 @@ export class ToolRegistry {
   // and `isActive` to get only the active tools.
   private allKnownTools: Map<string, AnyDeclarativeTool> = new Map();
   private config: Config;
-  private messageBus: MessageBus;
+  readonly messageBus: MessageBus;
 
   constructor(config: Config, messageBus: MessageBus) {
     this.config = config;
@@ -222,14 +222,10 @@ export class ToolRegistry {
    */
   registerTool(tool: AnyDeclarativeTool): void {
     if (this.allKnownTools.has(tool.name)) {
-      if (tool instanceof DiscoveredMCPTool) {
-        tool = tool.asFullyQualifiedTool();
-      } else {
-        // Decide on behavior: throw error, log warning, or allow overwrite
-        debugLogger.warn(
-          `Tool with name "${tool.name}" is already registered. Overwriting.`,
-        );
-      }
+      // Decide on behavior: throw error, log warning, or allow overwrite
+      debugLogger.warn(
+        `Tool with name "${tool.name}" is already registered. Overwriting.`,
+      );
     }
     this.allKnownTools.set(tool.name, tool);
   }
@@ -445,13 +441,15 @@ export class ToolRegistry {
   private buildToolMetadata(): Map<string, Record<string, unknown>> {
     const toolMetadata = new Map<string, Record<string, unknown>>();
     for (const [name, tool] of this.allKnownTools) {
-      if (tool.toolAnnotations) {
-        const metadata: Record<string, unknown> = { ...tool.toolAnnotations };
-        // Include server name so the policy engine can resolve composite
-        // wildcard patterns (e.g. "*__*") against unqualified tool names.
-        if (tool instanceof DiscoveredMCPTool) {
-          metadata['_serverName'] = tool.serverName;
-        }
+      const metadata: Record<string, unknown> = tool.toolAnnotations
+        ? { ...tool.toolAnnotations }
+        : {};
+      // Include server name so the policy engine can resolve composite
+      // wildcard patterns (e.g. "*__*") against unqualified tool names.
+      if (tool instanceof DiscoveredMCPTool) {
+        metadata['_serverName'] = tool.serverName;
+      }
+      if (Object.keys(metadata).length > 0) {
         toolMetadata.set(name, metadata);
       }
     }
@@ -592,7 +590,17 @@ export class ToolRegistry {
     for (const name of toolNames) {
       const tool = this.getTool(name);
       if (tool) {
-        declarations.push(tool.getSchema(modelId));
+        let schema = tool.getSchema(modelId);
+
+        // Ensure the schema name matches the qualified name for MCP tools
+        if (tool instanceof DiscoveredMCPTool) {
+          schema = {
+            ...schema,
+            name: tool.getFullyQualifiedName(),
+          };
+        }
+
+        declarations.push(schema);
       }
     }
     return declarations;
@@ -665,17 +673,6 @@ export class ToolRegistry {
         debugLogger.debug(
           `Resolved legacy tool name "${name}" to current name "${currentName}"`,
         );
-      }
-    }
-
-    if (!tool && name.includes('__')) {
-      for (const t of this.allKnownTools.values()) {
-        if (t instanceof DiscoveredMCPTool) {
-          if (t.getFullyQualifiedName() === name) {
-            tool = t;
-            break;
-          }
-        }
       }
     }
 

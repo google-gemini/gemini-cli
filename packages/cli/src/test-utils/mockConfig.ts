@@ -6,8 +6,11 @@
 
 import { vi } from 'vitest';
 import type { Config } from '@google/gemini-cli-core';
-import type { LoadedSettings, Settings } from '../config/settings.js';
-import { createTestMergedSettings } from '../config/settings.js';
+import {
+  createTestMergedSettings,
+  type LoadedSettings,
+  type Settings,
+} from '../config/settings.js';
 
 /**
  * Creates a mocked Config object with default values and allows overrides.
@@ -42,7 +45,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     setSessionId: vi.fn(),
     getSessionId: vi.fn().mockReturnValue('mock-session-id'),
     getContentGeneratorConfig: vi.fn(() => ({ authType: 'google' })),
-    getExperimentalZedIntegration: vi.fn(() => false),
+    getAcpMode: vi.fn(() => false),
     isBrowserLaunchSuppressed: vi.fn(() => false),
     setRemoteAdminSettings: vi.fn(),
     isYoloModeDisabled: vi.fn(() => false),
@@ -125,7 +128,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getEnableInteractiveShell: vi.fn().mockReturnValue(false),
     getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
     getContinueOnFailedApiCall: vi.fn().mockReturnValue(false),
-    getRetryFetchErrors: vi.fn().mockReturnValue(false),
+    getRetryFetchErrors: vi.fn().mockReturnValue(true),
     getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
     getShellToolInactivityTimeout: vi.fn().mockReturnValue(300000),
     getShellExecutionConfig: vi.fn().mockReturnValue({}),

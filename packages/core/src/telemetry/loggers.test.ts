@@ -33,6 +33,7 @@ import {
   logFlashFallback,
   logChatCompression,
   logMalformedJsonResponse,
+  logInvalidChunk,
   logFileOperation,
   logRipgrepFallback,
   logToolOutputTruncated,
@@ -44,6 +45,7 @@ import {
   logAgentStart,
   logAgentFinish,
   logWebFetchFallbackAttempt,
+  logNetworkRetryAttempt,
   logExtensionUpdateEvent,
   logHookCall,
 } from './loggers.js';
@@ -68,6 +70,8 @@ import {
   EVENT_AGENT_START,
   EVENT_AGENT_FINISH,
   EVENT_WEB_FETCH_FALLBACK_ATTEMPT,
+  EVENT_INVALID_CHUNK,
+  EVENT_NETWORK_RETRY_ATTEMPT,
   ApiErrorEvent,
   ApiRequestEvent,
   ApiResponseEvent,
@@ -77,6 +81,7 @@ import {
   FlashFallbackEvent,
   RipgrepFallbackEvent,
   MalformedJsonResponseEvent,
+  InvalidChunkEvent,
   makeChatCompressionEvent,
   FileOperationEvent,
   ToolOutputTruncatedEvent,
@@ -88,6 +93,7 @@ import {
   AgentStartEvent,
   AgentFinishEvent,
   WebFetchFallbackAttemptEvent,
+  NetworkRetryAttemptEvent,
   ExtensionUpdateEvent,
   EVENT_EXTENSION_UPDATE,
   HookCallEvent,
@@ -1114,6 +1120,10 @@ describe('loggers', () => {
       getUserMemory: () => 'user-memory',
     } as unknown as Config;
 
+    (cfg2 as unknown as { config: Config; promptId: string }).config = cfg2;
+    (cfg2 as unknown as { config: Config; promptId: string }).promptId =
+      'test-prompt-id';
+
     const mockGeminiClient = new GeminiClient(cfg2);
     const mockConfig = {
       getSessionId: () => 'test-session-id',
@@ -1733,6 +1743,39 @@ describe('loggers', () => {
           model: 'test-model',
         },
       });
+    });
+  });
+
+  describe('logInvalidChunk', () => {
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logInvalidChunkEvent');
+      vi.spyOn(metrics, 'recordInvalidChunk');
+    });
+
+    it('logs the event to Clearcut and OTEL', () => {
+      const mockConfig = makeFakeConfig();
+      const event = new InvalidChunkEvent('Unexpected token');
+
+      logInvalidChunk(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logInvalidChunkEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Invalid chunk received from stream.',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
+          'event.name': EVENT_INVALID_CHUNK,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
+          'error.message': 'Unexpected token',
+        },
+      });
+
+      expect(metrics.recordInvalidChunk).toHaveBeenCalledWith(mockConfig);
     });
   });
 
@@ -2385,6 +2428,56 @@ describe('loggers', () => {
         '/path/to/script.sh',
         150,
         true,
+      );
+    });
+  });
+
+  describe('logNetworkRetryAttempt', () => {
+    const mockConfig = makeFakeConfig();
+
+    beforeEach(() => {
+      vi.spyOn(ClearcutLogger.prototype, 'logNetworkRetryAttemptEvent');
+      vi.spyOn(metrics, 'recordRetryAttemptMetrics');
+    });
+
+    it('logs the network retry attempt event to Clearcut and OTEL', () => {
+      const event = new NetworkRetryAttemptEvent(
+        2,
+        5,
+        'Overloaded',
+        1000,
+        'test-model',
+      );
+
+      logNetworkRetryAttempt(mockConfig, event);
+
+      expect(
+        ClearcutLogger.prototype.logNetworkRetryAttemptEvent,
+      ).toHaveBeenCalledWith(event);
+
+      expect(mockLogger.emit).toHaveBeenCalledWith({
+        body: 'Network retry attempt 2/5 for test-model. Delay: 1000ms. Error type: Overloaded',
+        attributes: {
+          'session.id': 'test-session-id',
+          'user.email': 'test-user@example.com',
+          'installation.id': 'test-installation-id',
+          'event.name': EVENT_NETWORK_RETRY_ATTEMPT,
+          'event.timestamp': '2025-01-01T00:00:00.000Z',
+          interactive: false,
+          attempt: 2,
+          max_attempts: 5,
+          error_type: 'Overloaded',
+          delay_ms: 1000,
+          model: 'test-model',
+        },
+      });
+
+      expect(metrics.recordRetryAttemptMetrics).toHaveBeenCalledWith(
+        mockConfig,
+        {
+          model: 'test-model',
+          attempt: 2,
+        },
       );
     });
   });

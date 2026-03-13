@@ -25,6 +25,7 @@ import {
   type ChatCompressionInfo,
 } from './turn.js';
 import type { Config } from '../config/config.js';
+import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
 import { reportError } from '../utils/errorReporting.js';
@@ -34,7 +35,7 @@ import {
   type RetryAvailabilityContext,
 } from '../utils/retry.js';
 import type { ValidationRequiredError } from '../utils/googleQuotaErrors.js';
-import { getErrorMessage } from '../utils/errors.js';
+import { getErrorMessage, isAbortError } from '../utils/errors.js';
 import { tokenLimit } from './tokenLimits.js';
 import type {
   ChatRecordingService,
@@ -69,7 +70,11 @@ import {
   applyModelSelection,
   createAvailabilityContextProvider,
 } from '../availability/policyHelpers.js';
-import { resolveModel, isGemini2Model } from '../config/models.js';
+import {
+  getDisplayString,
+  resolveModel,
+  isGemini2Model,
+} from '../config/models.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 
@@ -105,13 +110,17 @@ export class GeminiClient {
    */
   private hasFailedCompressionAttempt = false;
 
-  constructor(private readonly config: Config) {
-    this.loopDetector = new LoopDetectionService(config);
+  constructor(private readonly context: AgentLoopContext) {
+    this.loopDetector = new LoopDetectionService(this.config);
     this.compressionService = new ChatCompressionService();
     this.toolOutputMaskingService = new ToolOutputMaskingService();
     this.lastPromptId = this.config.getSessionId();
 
     coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
+  }
+
+  private get config(): Config {
+    return this.context.config;
   }
 
   private handleModelChanged = () => {
@@ -191,10 +200,11 @@ export class GeminiClient {
     currentRequest: PartListUnion,
     prompt_id: string,
     turn?: Turn,
+    stopHookActive: boolean = false,
   ): Promise<DefaultHookOutput | undefined> {
     const hookState = this.hookStateMap.get(prompt_id);
     // Only fire on the outermost call (when activeCalls is 1)
-    if (!hookState || hookState.activeCalls !== 1) {
+    if (!hookState || (hookState.activeCalls !== 1 && !stopHookActive)) {
       return undefined;
     }
 
@@ -210,7 +220,11 @@ export class GeminiClient {
 
     const hookOutput = await this.config
       .getHookSystem()
-      ?.fireAfterAgentEvent(partToString(finalRequest), finalResponseText);
+      ?.fireAfterAgentEvent(
+        partToString(finalRequest),
+        finalResponseText,
+        stopHookActive,
+      );
 
     return hookOutput;
   }
@@ -250,7 +264,7 @@ export class GeminiClient {
     return this.chat !== undefined;
   }
 
-  getHistory(): Content[] {
+  getHistory(): readonly Content[] {
     return this.getChat().getHistory();
   }
 
@@ -258,7 +272,7 @@ export class GeminiClient {
     this.getChat().stripThoughtsFromHistory();
   }
 
-  setHistory(history: Content[]) {
+  setHistory(history: readonly Content[]) {
     this.getChat().setHistory(history);
     this.updateTelemetryTokenCount();
     this.forceFullIdeContext = true;
@@ -276,7 +290,7 @@ export class GeminiClient {
     }
     this.lastUsedModelId = modelId;
 
-    const toolRegistry = this.config.getToolRegistry();
+    const toolRegistry = this.context.toolRegistry;
     const toolDeclarations = toolRegistry.getFunctionDeclarations(modelId);
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
     this.getChat().setTools(tools);
@@ -285,6 +299,9 @@ export class GeminiClient {
   async resetChat(): Promise<void> {
     this.chat = await this.startChat();
     this.updateTelemetryTokenCount();
+    // Reset JIT context loaded paths so subdirectory context can be
+    // re-discovered in the new session.
+    await this.config.getContextManager()?.refresh();
   }
 
   dispose() {
@@ -340,7 +357,7 @@ export class GeminiClient {
     this.hasFailedCompressionAttempt = false;
     this.lastUsedModelId = undefined;
 
-    const toolRegistry = this.config.getToolRegistry();
+    const toolRegistry = this.context.toolRegistry;
     const toolDeclarations = toolRegistry.getFunctionDeclarations();
     const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
 
@@ -357,7 +374,7 @@ export class GeminiClient {
         resumedSessionData,
         async (modelId: string) => {
           this.lastUsedModelId = modelId;
-          const toolRegistry = this.config.getToolRegistry();
+          const toolRegistry = this.context.toolRegistry;
           const toolDeclarations =
             toolRegistry.getFunctionDeclarations(modelId);
           return [{ functionDeclarations: toolDeclarations }];
@@ -642,10 +659,23 @@ export class GeminiClient {
     const controller = new AbortController();
     const linkedSignal = AbortSignal.any([signal, controller.signal]);
 
-    const loopDetected = await this.loopDetector.turnStarted(signal);
-    if (loopDetected) {
+    const loopResult = await this.loopDetector.turnStarted(signal);
+    if (loopResult.count > 1) {
       yield { type: GeminiEventType.LoopDetected };
       return turn;
+    } else if (loopResult.count === 1) {
+      if (boundedTurns <= 1) {
+        yield { type: GeminiEventType.MaxSessionTurns };
+        return turn;
+      }
+      return yield* this._recoverFromLoop(
+        loopResult,
+        signal,
+        prompt_id,
+        boundedTurns,
+        isInvalidStreamRetry,
+        displayContent,
+      );
     }
 
     const routingContext: RoutingContext = {
@@ -695,11 +725,22 @@ export class GeminiClient {
     let isError = false;
     let isInvalidStream = false;
 
+    let loopDetectedAbort = false;
+    let loopRecoverResult: { detail?: string } | undefined;
     for await (const event of resultStream) {
-      if (this.loopDetector.addAndCheck(event)) {
+      const loopResult = this.loopDetector.addAndCheck(event);
+      if (loopResult.count > 1) {
         yield { type: GeminiEventType.LoopDetected };
-        controller.abort();
-        return turn;
+        loopDetectedAbort = true;
+        break;
+      } else if (loopResult.count === 1) {
+        if (boundedTurns <= 1) {
+          yield { type: GeminiEventType.MaxSessionTurns };
+          loopDetectedAbort = true;
+          break;
+        }
+        loopRecoverResult = loopResult;
+        break;
       }
       yield event;
 
@@ -711,6 +752,23 @@ export class GeminiClient {
       if (event.type === GeminiEventType.Error) {
         isError = true;
       }
+    }
+
+    if (loopDetectedAbort) {
+      controller.abort();
+      return turn;
+    }
+
+    if (loopRecoverResult) {
+      return yield* this._recoverFromLoop(
+        loopRecoverResult,
+        signal,
+        prompt_id,
+        boundedTurns,
+        isInvalidStreamRetry,
+        displayContent,
+        controller,
+      );
     }
 
     if (isError) {
@@ -804,13 +862,14 @@ export class GeminiClient {
     turns: number = MAX_TURNS,
     isInvalidStreamRetry: boolean = false,
     displayContent?: PartListUnion,
+    stopHookActive: boolean = false,
   ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
     if (!isInvalidStreamRetry) {
       this.config.resetTurn();
     }
 
     const hooksEnabled = this.config.getEnableHooks();
-    const messageBus = this.config.getMessageBus();
+    const messageBus = this.context.messageBus;
 
     if (this.lastPromptId !== prompt_id) {
       this.loopDetector.reset(prompt_id, partListUnionToString(request));
@@ -851,6 +910,7 @@ export class GeminiClient {
 
     const boundedTurns = Math.min(turns, MAX_TURNS);
     let turn = new Turn(this.getChat(), prompt_id);
+    let continuationHandled = false;
 
     try {
       turn = yield* this.processTurn(
@@ -868,6 +928,7 @@ export class GeminiClient {
           request,
           prompt_id,
           turn,
+          stopHookActive,
         );
 
         // Cast to AfterAgentHookOutput for access to shouldClearContext()
@@ -906,27 +967,44 @@ export class GeminiClient {
             await this.resetChat();
           }
           const continueRequest = [{ text: continueReason }];
-          yield* this.sendMessageStream(
+          // Reset hook state so the continuation fires BeforeAgent fresh
+          // and fireAfterAgentHookSafe sees activeCalls=1, not 2.
+          const contHookState = this.hookStateMap.get(prompt_id);
+          if (contHookState) {
+            contHookState.hasFiredBeforeAgent = false;
+            contHookState.activeCalls--;
+          }
+          continuationHandled = true;
+          turn = yield* this.sendMessageStream(
             continueRequest,
             signal,
             prompt_id,
             boundedTurns - 1,
             false,
             displayContent,
+            true, // stopHookActive: signal retry to AfterAgent hooks
           );
         }
       }
+    } catch (error) {
+      if (signal?.aborted || isAbortError(error)) {
+        yield { type: GeminiEventType.UserCancelled };
+        return turn;
+      }
+      throw error;
     } finally {
-      const hookState = this.hookStateMap.get(prompt_id);
-      if (hookState) {
-        hookState.activeCalls--;
-        const isPendingTools =
-          turn?.pendingToolCalls && turn.pendingToolCalls.length > 0;
-        const isAborted = signal?.aborted;
+      if (!continuationHandled) {
+        const hookState = this.hookStateMap.get(prompt_id);
+        if (hookState) {
+          hookState.activeCalls--;
+          const isPendingTools =
+            turn?.pendingToolCalls && turn.pendingToolCalls.length > 0;
+          const isAborted = signal?.aborted;
 
-        if (hookState.activeCalls <= 0) {
-          if (!isPendingTools || isAborted) {
-            this.hookStateMap.delete(prompt_id);
+          if (hookState.activeCalls <= 0) {
+            if (!isPendingTools || isAborted) {
+              this.hookStateMap.delete(prompt_id);
+            }
           }
         }
       }
@@ -1033,7 +1111,18 @@ export class GeminiClient {
         onValidationRequired: onValidationRequiredCallback,
         authType: this.config.getContentGeneratorConfig()?.authType,
         maxAttempts: availabilityMaxAttempts,
+        retryFetchErrors: this.config.getRetryFetchErrors(),
         getAvailabilityContext,
+        onRetry: (attempt, error, delayMs) => {
+          coreEvents.emitRetryAttempt({
+            attempt,
+            maxAttempts:
+              availabilityMaxAttempts ?? this.config.getMaxAttempts(),
+            delayMs,
+            error: error instanceof Error ? error.message : String(error),
+            model: getDisplayString(currentAttemptModel),
+          });
+        },
       });
 
       return result;
@@ -1116,7 +1205,7 @@ export class GeminiClient {
   /**
    * Masks bulky tool outputs to save context window space.
    */
-  private async tryMaskToolOutputs(history: Content[]): Promise<void> {
+  private async tryMaskToolOutputs(history: readonly Content[]): Promise<void> {
     if (!this.config.getToolOutputMaskingEnabled()) {
       return;
     }
@@ -1127,5 +1216,43 @@ export class GeminiClient {
     if (result.maskedCount > 0) {
       this.getChat().setHistory(result.newHistory);
     }
+  }
+
+  /**
+   * Handles loop recovery by providing feedback to the model and initiating a new turn.
+   */
+  private _recoverFromLoop(
+    loopResult: { detail?: string },
+    signal: AbortSignal,
+    prompt_id: string,
+    boundedTurns: number,
+    isInvalidStreamRetry: boolean,
+    displayContent?: PartListUnion,
+    controllerToAbort?: AbortController,
+  ): AsyncGenerator<ServerGeminiStreamEvent, Turn> {
+    controllerToAbort?.abort();
+
+    // Clear the detection flag so the recursive turn can proceed, but the count remains 1.
+    this.loopDetector.clearDetection();
+
+    const feedbackText = `System: Potential loop detected. Details: ${loopResult.detail || 'Repetitive patterns identified'}. Please take a step back and confirm you're making forward progress. If not, take a step back, analyze your previous actions and rethink how you're approaching the problem. Avoid repeating the same tool calls or responses without new results.`;
+
+    if (this.config.getDebugMode()) {
+      debugLogger.warn(
+        'Iterative Loop Recovery: Injecting feedback message to model.',
+      );
+    }
+
+    const feedback = [{ text: feedbackText }];
+
+    // Recursive call with feedback
+    return this.sendMessageStream(
+      feedback,
+      signal,
+      prompt_id,
+      boundedTurns - 1,
+      isInvalidStreamRetry,
+      displayContent,
+    );
   }
 }
