@@ -1192,6 +1192,9 @@ async function start_bwrap_sandbox(
     '/proc',
     '--dev',
     '/dev',
+    '--dev-bind',
+    '/dev/pts',
+    '/dev/pts',
     // Private system paths to block escapes (X11, D-Bus, etc.)
     '--tmpfs',
     '/tmp',
