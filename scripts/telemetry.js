@@ -69,7 +69,7 @@ if (targetArg) {
 
 if (!allowedTargets.includes(target)) {
   console.error(
-    `Invalid telemetry target '${target}'. Allowed targets are: ${allowedTargets.join(', ')}.`,
+    `🛑 Error: Invalid telemetry target '${target}'. Allowed targets are: ${allowedTargets.join(', ')}.`,
   );
   process.exit(1);
 }
