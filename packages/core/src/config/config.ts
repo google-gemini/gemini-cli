@@ -56,6 +56,7 @@ import {
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
   isAutoModel,
+  isGemini3Model,
   isPreviewModel,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
@@ -1793,8 +1794,11 @@ export class Config implements McpContext, AgentLoopContext {
       }
 
       const hasAccess =
-        quota.buckets?.some((b) => b.modelId && isPreviewModel(b.modelId)) ??
-        false;
+        quota.buckets?.some(
+          (b) =>
+            b.modelId &&
+            (isPreviewModel(b.modelId) || isGemini3Model(b.modelId)),
+        ) ?? false;
       this.setHasAccessToPreviewModel(hasAccess);
       return quota;
     } catch (e) {
