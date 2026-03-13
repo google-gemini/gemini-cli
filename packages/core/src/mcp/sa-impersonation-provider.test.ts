@@ -8,19 +8,23 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ServiceAccountImpersonationProvider } from './sa-impersonation-provider.js';
 import type { MCPServerConfig } from '../config/config.js';
 
-const mockRequest = vi.fn();
-const mockGetClient = vi.fn(() => ({
-  request: mockRequest,
-}));
+const { mockRequest, mockGoogleAuth } = vi.hoisted(() => {
+  const mockRequest = vi.fn();
+  const mockGetClient = vi.fn(() => ({
+    request: mockRequest,
+  }));
+  const mockGoogleAuth = vi.fn().mockImplementation(() => ({
+    getClient: mockGetClient,
+  }));
+  return { mockRequest, mockGoogleAuth };
+});
 
-// Mock the google-auth-library to use a shared mock function
+// Mock the google-auth-library to use the hoisted mocks
 vi.mock('google-auth-library', async (importOriginal) => {
   const actual = await importOriginal<typeof import('google-auth-library')>();
   return {
     ...actual,
-    GoogleAuth: vi.fn().mockImplementation(() => ({
-      getClient: mockGetClient,
-    })),
+    GoogleAuth: mockGoogleAuth,
   };
 });
 
@@ -99,6 +103,13 @@ describe('ServiceAccountImpersonationProvider', () => {
     });
   });
 
+  it('should initialize GoogleAuth with the correct scopes', () => {
+    new ServiceAccountImpersonationProvider(defaultSAConfig);
+    expect(mockGoogleAuth).toHaveBeenCalledWith({
+      scopes: 'https://www.googleapis.com/auth/cloud-platform',
+    });
+  });
+
   it('should return a cached token if it is not expired', async () => {
     const provider = new ServiceAccountImpersonationProvider(defaultSAConfig);
     vi.useFakeTimers();
@@ -115,7 +126,7 @@ describe('ServiceAccountImpersonationProvider', () => {
     // Advance time by 30 minutes
     vi.advanceTimersByTime(1800 * 1000);
 
-    // Seturn cached token
+    // Return cached token
     const secondTokens = await provider.tokens();
     expect(secondTokens).toBe(firstTokens);
     expect(mockRequest).toHaveBeenCalledTimes(1);

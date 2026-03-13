@@ -62,7 +62,9 @@ export class ServiceAccountImpersonationProvider implements McpAuthProvider {
     }
     this.targetServiceAccount = config.targetServiceAccount;
 
-    this.auth = new GoogleAuth();
+    this.auth = new GoogleAuth({
+      scopes: 'https://www.googleapis.com/auth/cloud-platform',
+    });
   }
 
   clientInformation(): OAuthClientInformation | undefined {
