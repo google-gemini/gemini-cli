@@ -116,14 +116,16 @@ vi.mock('@google/gemini-cli-core', async () => {
       (
         cwd,
         dirs,
-        debug,
         fileService,
         extensionLoader: ExtensionLoader,
+        _folderTrust,
+        _importFormat,
+        _fileFilteringOptions,
         _maxDirs,
       ) => {
-        const extensionPaths = extensionLoader
-          .getExtensions()
-          .flatMap((e) => e.contextFiles);
+        const extensionPaths =
+          extensionLoader?.getExtensions?.()?.flatMap((e) => e.contextFiles) ||
+          [];
         return Promise.resolve({
           memoryContent: extensionPaths.join(',') || '',
           fileCount: extensionPaths?.length || 0,
@@ -847,7 +849,6 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
       expect.any(String),
       [],
-      false,
       expect.any(Object),
       expect.any(ExtensionManager),
       true,
@@ -876,7 +877,6 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
       expect.any(String),
       [includeDir],
-      false,
       expect.any(Object),
       expect.any(ExtensionManager),
       true,
@@ -904,7 +904,6 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     expect(ServerConfig.loadServerHierarchicalMemory).toHaveBeenCalledWith(
       expect.any(String),
       [],
-      false,
       expect.any(Object),
       expect.any(ExtensionManager),
       true,
@@ -953,12 +952,6 @@ describe('mergeMcpServers', () => {
 });
 
 describe('mergeExcludeTools', () => {
-  const defaultExcludes = new Set([
-    SHELL_TOOL_NAME,
-    EDIT_TOOL_NAME,
-    WRITE_FILE_TOOL_NAME,
-    WEB_FETCH_TOOL_NAME,
-  ]);
   const originalIsTTY = process.stdin.isTTY;
 
   beforeEach(() => {
@@ -1080,9 +1073,7 @@ describe('mergeExcludeTools', () => {
     process.argv = ['node', 'script.js', '-p', 'test'];
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getExcludeTools()).toEqual(
-      new Set([...defaultExcludes, ASK_USER_TOOL_NAME]),
-    );
+    expect(config.getExcludeTools()).toEqual(new Set([ASK_USER_TOOL_NAME]));
   });
 
   it('should handle settings with excludeTools but no extensions', async () => {
@@ -1163,9 +1154,9 @@ describe('Approval mode tool exclusion logic', () => {
     const config = await loadCliConfig(settings, 'test-session', argv);
 
     const excludedTools = config.getExcludeTools();
-    expect(excludedTools).toContain(SHELL_TOOL_NAME);
-    expect(excludedTools).toContain(EDIT_TOOL_NAME);
-    expect(excludedTools).toContain(WRITE_FILE_TOOL_NAME);
+    expect(excludedTools).not.toContain(SHELL_TOOL_NAME);
+    expect(excludedTools).not.toContain(EDIT_TOOL_NAME);
+    expect(excludedTools).not.toContain(WRITE_FILE_TOOL_NAME);
     expect(excludedTools).toContain(ASK_USER_TOOL_NAME);
   });
 
@@ -1184,9 +1175,9 @@ describe('Approval mode tool exclusion logic', () => {
     const config = await loadCliConfig(settings, 'test-session', argv);
 
     const excludedTools = config.getExcludeTools();
-    expect(excludedTools).toContain(SHELL_TOOL_NAME);
-    expect(excludedTools).toContain(EDIT_TOOL_NAME);
-    expect(excludedTools).toContain(WRITE_FILE_TOOL_NAME);
+    expect(excludedTools).not.toContain(SHELL_TOOL_NAME);
+    expect(excludedTools).not.toContain(EDIT_TOOL_NAME);
+    expect(excludedTools).not.toContain(WRITE_FILE_TOOL_NAME);
     expect(excludedTools).toContain(ASK_USER_TOOL_NAME);
   });
 
@@ -1205,7 +1196,7 @@ describe('Approval mode tool exclusion logic', () => {
     const config = await loadCliConfig(settings, 'test-session', argv);
 
     const excludedTools = config.getExcludeTools();
-    expect(excludedTools).toContain(SHELL_TOOL_NAME);
+    expect(excludedTools).not.toContain(SHELL_TOOL_NAME);
     expect(excludedTools).not.toContain(EDIT_TOOL_NAME);
     expect(excludedTools).not.toContain(WRITE_FILE_TOOL_NAME);
     expect(excludedTools).toContain(ASK_USER_TOOL_NAME);
@@ -1251,9 +1242,9 @@ describe('Approval mode tool exclusion logic', () => {
     const config = await loadCliConfig(settings, 'test-session', argv);
 
     const excludedTools = config.getExcludeTools();
-    expect(excludedTools).toContain(SHELL_TOOL_NAME);
-    expect(excludedTools).toContain(EDIT_TOOL_NAME);
-    expect(excludedTools).toContain(WRITE_FILE_TOOL_NAME);
+    expect(excludedTools).not.toContain(SHELL_TOOL_NAME);
+    expect(excludedTools).not.toContain(EDIT_TOOL_NAME);
+    expect(excludedTools).not.toContain(WRITE_FILE_TOOL_NAME);
     expect(excludedTools).toContain(ASK_USER_TOOL_NAME);
   });
 
@@ -1315,9 +1306,10 @@ describe('Approval mode tool exclusion logic', () => {
 
     const excludedTools = config.getExcludeTools();
     expect(excludedTools).toContain('custom_tool'); // From settings
-    expect(excludedTools).toContain(SHELL_TOOL_NAME); // From approval mode
+    expect(excludedTools).not.toContain(SHELL_TOOL_NAME); // No longer from approval mode
     expect(excludedTools).not.toContain(EDIT_TOOL_NAME); // Should be allowed in auto_edit
     expect(excludedTools).not.toContain(WRITE_FILE_TOOL_NAME); // Should be allowed in auto_edit
+    expect(excludedTools).toContain(ASK_USER_TOOL_NAME);
   });
 
   it('should throw an error if YOLO mode is attempted when disableYoloMode is true', async () => {
@@ -1781,7 +1773,7 @@ describe('loadCliConfig model selection', () => {
   });
 
   it('always prefers model from argv', async () => {
-    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-flash-preview'];
+    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-flash'];
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(
       createTestMergedSettings({
@@ -1793,11 +1785,11 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('gemini-2.5-flash-preview');
+    expect(config.getModel()).toBe('gemini-2.5-flash');
   });
 
   it('selects the model from argv if provided', async () => {
-    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-flash-preview'];
+    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-flash'];
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(
       createTestMergedSettings({
@@ -1807,7 +1799,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('gemini-2.5-flash-preview');
+    expect(config.getModel()).toBe('gemini-2.5-flash');
   });
 
   it('selects the default auto model if provided via auto alias', async () => {
@@ -2164,9 +2156,9 @@ describe('loadCliConfig tool exclusions', () => {
       'test-session',
       argv,
     );
-    expect(config.getExcludeTools()).toContain('run_shell_command');
-    expect(config.getExcludeTools()).toContain('replace');
-    expect(config.getExcludeTools()).toContain('write_file');
+    expect(config.getExcludeTools()).not.toContain('run_shell_command');
+    expect(config.getExcludeTools()).not.toContain('replace');
+    expect(config.getExcludeTools()).not.toContain('write_file');
     expect(config.getExcludeTools()).toContain('ask_user');
   });
 
@@ -2204,7 +2196,7 @@ describe('loadCliConfig tool exclusions', () => {
     expect(config.getExcludeTools()).not.toContain(SHELL_TOOL_NAME);
   });
 
-  it('should exclude web-fetch in non-interactive mode when not allowed', async () => {
+  it('should not exclude web-fetch in non-interactive mode at config level', async () => {
     process.stdin.isTTY = false;
     process.argv = ['node', 'script.js', '-p', 'test'];
     const argv = await parseArguments(createTestMergedSettings());
@@ -2213,7 +2205,7 @@ describe('loadCliConfig tool exclusions', () => {
       'test-session',
       argv,
     );
-    expect(config.getExcludeTools()).toContain(WEB_FETCH_TOOL_NAME);
+    expect(config.getExcludeTools()).not.toContain(WEB_FETCH_TOOL_NAME);
   });
 
   it('should not exclude web-fetch in non-interactive mode when allowed', async () => {
@@ -2630,13 +2622,13 @@ describe('loadCliConfig approval mode', () => {
     expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
   });
 
-  it('should throw error when --approval-mode=plan is used but experimental.plan setting is missing', async () => {
+  it('should allow plan approval mode by default when --approval-mode=plan is used', async () => {
     process.argv = ['node', 'script.js', '--approval-mode', 'plan'];
     const argv = await parseArguments(createTestMergedSettings());
     const settings = createTestMergedSettings({});
 
     const config = await loadCliConfig(settings, 'test-session', argv);
-    expect(config.getApprovalMode()).toBe(ApprovalMode.DEFAULT);
+    expect(config.getApprovalMode()).toBe(ApprovalMode.PLAN);
   });
 
   it('should pass planSettings.directory from settings to config', async () => {
@@ -3326,11 +3318,11 @@ describe('Policy Engine Integration in loadCliConfig', () => {
 
     await loadCliConfig(settings, 'test-session', argv);
 
-    // In non-interactive mode, ShellTool, etc. are excluded
+    // In non-interactive mode, only ask_user is excluded by default
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.objectContaining({
         tools: expect.objectContaining({
-          exclude: expect.arrayContaining([SHELL_TOOL_NAME]),
+          exclude: expect.arrayContaining([ASK_USER_TOOL_NAME]),
         }),
       }),
       expect.anything(),
@@ -3622,5 +3614,60 @@ describe('loadCliConfig mcpEnabled', () => {
         ),
       );
     });
+  });
+});
+
+describe('loadCliConfig acpMode and clientName', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('should set acpMode to true and detect clientName when --acp flag is used', async () => {
+    process.argv = ['node', 'script.js', '--acp'];
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('VSCODE_GIT_ASKPASS_MAIN', '');
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
+    expect(config.getAcpMode()).toBe(true);
+    expect(config.getClientName()).toBe('acp-vscode');
+  });
+
+  it('should set acpMode to true but leave clientName undefined for generic terminals', async () => {
+    process.argv = ['node', 'script.js', '--acp'];
+    vi.stubEnv('TERM_PROGRAM', 'iTerm.app'); // Generic terminal
+    vi.stubEnv('VSCODE_GIT_ASKPASS_MAIN', '');
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
+    expect(config.getAcpMode()).toBe(true);
+    expect(config.getClientName()).toBeUndefined();
+  });
+
+  it('should set acpMode to false and clientName to undefined by default', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
+    expect(config.getAcpMode()).toBe(false);
+    expect(config.getClientName()).toBeUndefined();
   });
 });

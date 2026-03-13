@@ -4,6 +4,10 @@ To use Gemini CLI, you'll need to authenticate with Google. This guide helps you
 quickly find the best way to sign in based on your account type and how you're
 using the CLI.
 
+> **Note:** Looking for a high-level comparison of all available subscriptions?
+> To compare features and find the right quota for your needs, see our
+> [Plans page](https://geminicli.com/plans/).
+
 For most users, we recommend starting Gemini CLI and logging in with your
 personal Google account.
 
@@ -13,8 +17,8 @@ Select the authentication method that matches your situation in the table below:
 
 | User Type / Scenario                                                   | Recommended Authentication Method                                | Google Cloud Project Required                               |
 | :--------------------------------------------------------------------- | :--------------------------------------------------------------- | :---------------------------------------------------------- |
-| Individual Google accounts                                             | [Login with Google](#login-google)                               | No, with exceptions                                         |
-| Organization users with a company, school, or Google Workspace account | [Login with Google](#login-google)                               | [Yes](#set-gcp)                                             |
+| Individual Google accounts                                             | [Sign in with Google](#login-google)                             | No, with exceptions                                         |
+| Organization users with a company, school, or Google Workspace account | [Sign in with Google](#login-google)                             | [Yes](#set-gcp)                                             |
 | AI Studio user with a Gemini API key                                   | [Use Gemini API Key](#gemini-api)                                | No                                                          |
 | Google Cloud Vertex AI user                                            | [Vertex AI](#vertex-ai)                                          | [Yes](#set-gcp)                                             |
 | [Headless mode](#headless)                                             | [Use Gemini API Key](#gemini-api) or<br> [Vertex AI](#vertex-ai) | No (for Gemini API Key)<br> [Yes](#set-gcp) (for Vertex AI) |
@@ -32,7 +36,7 @@ Select the authentication method that matches your situation in the table below:
   [Google AI Ultra for Business](https://support.google.com/a/answer/16345165)
   subscriptions.
 
-## (Recommended) Login with Google <a id="login-google"></a>
+## (Recommended) Sign in with Google <a id="login-google"></a>
 
 If you run Gemini CLI on your local machine, the simplest authentication method
 is logging in with your Google account. This method requires a web browser on a
@@ -50,9 +54,9 @@ To authenticate and use Gemini CLI:
    gemini
    ```
 
-2. Select **Login with Google**. Gemini CLI opens a login prompt using your web
-   browser. Follow the on-screen instructions. Your credentials will be cached
-   locally for future sessions.
+2. Select **Sign in with Google**. Gemini CLI opens a sign in prompt using your
+   web browser. Follow the on-screen instructions. Your credentials will be
+   cached locally for future sessions.
 
 ### Do I need to set my Google Cloud project?
 
@@ -387,7 +391,7 @@ on this page.
 [Headless mode](../cli/headless) will use your existing authentication method,
 if an existing authentication credential is cached.
 
-If you have not already logged in with an authentication credential, you must
+If you have not already signed in with an authentication credential, you must
 configure authentication using environment variables:
 
 - [Use Gemini API Key](#gemini-api)

@@ -24,10 +24,14 @@ import type { CommandContext } from '../commands/types.js';
 import type { Config } from '@google/gemini-cli-core';
 import { useTextBuffer } from '../components/shared/text-buffer.js';
 import type { Suggestion } from '../components/SuggestionsDisplay.js';
-import type { UseAtCompletionProps } from './useAtCompletion.js';
-import { useAtCompletion } from './useAtCompletion.js';
-import type { UseSlashCompletionProps } from './useSlashCompletion.js';
-import { useSlashCompletion } from './useSlashCompletion.js';
+import {
+  useAtCompletion,
+  type UseAtCompletionProps,
+} from './useAtCompletion.js';
+import {
+  useSlashCompletion,
+  type UseSlashCompletionProps,
+} from './useSlashCompletion.js';
 import { useShellCompletion } from './useShellCompletion.js';
 
 vi.mock('./useAtCompletion', () => ({
@@ -491,6 +495,31 @@ describe('useCommandCompletion', () => {
       });
 
       expect(result.current.textBuffer.text).toBe('@src/file1.txt ');
+    });
+
+    it('should insert canonical slash command text when suggestion provides insertValue', async () => {
+      setupMocks({
+        slashSuggestions: [
+          {
+            label: 'list',
+            value: 'list',
+            insertValue: 'resume list',
+          },
+        ],
+        slashCompletionRange: { completionStart: 1, completionEnd: 5 },
+      });
+
+      const { result } = renderCommandCompletionHook('/resu');
+
+      await waitFor(() => {
+        expect(result.current.suggestions.length).toBe(1);
+      });
+
+      act(() => {
+        result.current.handleAutocomplete(0);
+      });
+
+      expect(result.current.textBuffer.text).toBe('/resume list ');
     });
 
     it('should complete a file path when cursor is not at the end of the line', async () => {

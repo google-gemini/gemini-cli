@@ -22,6 +22,7 @@ import {
   GEMINI_MODEL_ALIAS_PRO,
   GEMINI_MODEL_ALIAS_FLASH,
   GEMINI_MODEL_ALIAS_AUTO,
+  GEMINI_MODEL_ALIAS_FLASH_LITE,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL_AUTO,
@@ -30,6 +31,10 @@ import {
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   isPreviewModel,
   isProModel,
+  isValidModelOrAlias,
+  getValidModelsAndAliases,
+  VALID_GEMINI_MODELS,
+  VALID_ALIASES,
 } from './models.js';
 
 describe('isPreviewModel', () => {
@@ -217,6 +222,38 @@ describe('resolveModel', () => {
       expect(model).toBe(customModel);
     });
   });
+
+  describe('hasAccessToPreview logic', () => {
+    it('should return default model when access to preview is false and preview model is requested', () => {
+      expect(resolveModel(PREVIEW_GEMINI_MODEL, false, false, false)).toBe(
+        DEFAULT_GEMINI_MODEL,
+      );
+    });
+
+    it('should return default flash model when access to preview is false and preview flash model is requested', () => {
+      expect(
+        resolveModel(PREVIEW_GEMINI_FLASH_MODEL, false, false, false),
+      ).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+    });
+
+    it('should return default model when access to preview is false and auto-gemini-3 is requested', () => {
+      expect(resolveModel(PREVIEW_GEMINI_MODEL_AUTO, false, false, false)).toBe(
+        DEFAULT_GEMINI_MODEL,
+      );
+    });
+
+    it('should return default model when access to preview is false and Gemini 3.1 is requested', () => {
+      expect(resolveModel(PREVIEW_GEMINI_MODEL_AUTO, true, false, false)).toBe(
+        DEFAULT_GEMINI_MODEL,
+      );
+    });
+
+    it('should still return default model when access to preview is false and auto-gemini-2.5 is requested', () => {
+      expect(resolveModel(DEFAULT_GEMINI_MODEL_AUTO, false, false, false)).toBe(
+        DEFAULT_GEMINI_MODEL,
+      );
+    });
+  });
 });
 
 describe('isGemini2Model', () => {
@@ -355,5 +392,64 @@ describe('isActiveModel', () => {
     expect(
       isActiveModel(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL, false, false),
     ).toBe(false);
+  });
+});
+
+describe('isValidModelOrAlias', () => {
+  it('should return true for valid model names', () => {
+    expect(isValidModelOrAlias(DEFAULT_GEMINI_MODEL)).toBe(true);
+    expect(isValidModelOrAlias(PREVIEW_GEMINI_MODEL)).toBe(true);
+    expect(isValidModelOrAlias(DEFAULT_GEMINI_FLASH_MODEL)).toBe(true);
+    expect(isValidModelOrAlias(DEFAULT_GEMINI_FLASH_LITE_MODEL)).toBe(true);
+    expect(isValidModelOrAlias(PREVIEW_GEMINI_FLASH_MODEL)).toBe(true);
+    expect(isValidModelOrAlias(PREVIEW_GEMINI_3_1_MODEL)).toBe(true);
+    expect(isValidModelOrAlias(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL)).toBe(
+      true,
+    );
+  });
+
+  it('should return true for valid aliases', () => {
+    expect(isValidModelOrAlias(GEMINI_MODEL_ALIAS_AUTO)).toBe(true);
+    expect(isValidModelOrAlias(GEMINI_MODEL_ALIAS_PRO)).toBe(true);
+    expect(isValidModelOrAlias(GEMINI_MODEL_ALIAS_FLASH)).toBe(true);
+    expect(isValidModelOrAlias(GEMINI_MODEL_ALIAS_FLASH_LITE)).toBe(true);
+    expect(isValidModelOrAlias(PREVIEW_GEMINI_MODEL_AUTO)).toBe(true);
+    expect(isValidModelOrAlias(DEFAULT_GEMINI_MODEL_AUTO)).toBe(true);
+  });
+
+  it('should return true for custom (non-gemini) models', () => {
+    expect(isValidModelOrAlias('gpt-4')).toBe(true);
+    expect(isValidModelOrAlias('claude-3')).toBe(true);
+    expect(isValidModelOrAlias('my-custom-model')).toBe(true);
+  });
+
+  it('should return false for invalid gemini model names', () => {
+    expect(isValidModelOrAlias('gemini-4-pro')).toBe(false);
+    expect(isValidModelOrAlias('gemini-99-flash')).toBe(false);
+    expect(isValidModelOrAlias('gemini-invalid')).toBe(false);
+  });
+});
+
+describe('getValidModelsAndAliases', () => {
+  it('should return a sorted array', () => {
+    const result = getValidModelsAndAliases();
+    const sorted = [...result].sort();
+    expect(result).toEqual(sorted);
+  });
+
+  it('should include all valid models and aliases', () => {
+    const result = getValidModelsAndAliases();
+    for (const model of VALID_GEMINI_MODELS) {
+      expect(result).toContain(model);
+    }
+    for (const alias of VALID_ALIASES) {
+      expect(result).toContain(alias);
+    }
+  });
+
+  it('should not contain duplicates', () => {
+    const result = getValidModelsAndAliases();
+    const unique = [...new Set(result)];
+    expect(result).toEqual(unique);
   });
 });
