@@ -16,7 +16,7 @@ import {
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { HookSystem } from '../hooks/hookSystem.js';
 import type { Config } from '../config/config.js';
-import type { DefaultHookOutput} from '../hooks/types.js';
+import type { DefaultHookOutput } from '../hooks/types.js';
 import { BeforeToolHookOutput } from '../hooks/types.js';
 
 class MockInvocation extends BaseToolInvocation<{ key?: string }, ToolResult> {
