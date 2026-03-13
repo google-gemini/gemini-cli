@@ -350,7 +350,7 @@ configurations.
         "enabled": false,
         "runConfig": {
           "maxTurns": 20,
-          "timeout_mins": 10
+          "maxTimeMinutes": 10
         }
       }
     }
