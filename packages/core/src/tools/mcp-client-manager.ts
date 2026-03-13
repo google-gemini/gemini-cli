@@ -20,6 +20,11 @@ import type { EventEmitter } from 'node:events';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
+import { createHash } from 'node:crypto';
+import { stableStringify } from '../policy/stable-stringify.js';
+import type { PromptRegistry } from '../prompts/prompt-registry.js';
+import type { ResourceRegistry } from '../resources/resource-registry.js';
+
 /**
  * Manages the lifecycle of multiple MCP clients, including local child processes.
  * This class is responsible for starting, stopping, and discovering tools from
@@ -30,7 +35,6 @@ export class McpClientManager {
   // Track all configured servers (including disabled ones) for UI display
   private allServerConfigs: Map<string, MCPServerConfig> = new Map();
   private readonly clientVersion: string;
-  private readonly toolRegistry: ToolRegistry;
   private readonly cliConfig: Config;
   // If we have ongoing MCP client discovery, this completes once that is done.
   private discoveryPromise: Promise<void> | undefined;
@@ -41,6 +45,10 @@ export class McpClientManager {
     name: string;
     extensionName: string;
   }> = [];
+
+  private mainToolRegistry: ToolRegistry | undefined;
+  private mainPromptRegistry: PromptRegistry | undefined;
+  private mainResourceRegistry: ResourceRegistry | undefined;
 
   /**
    * Track whether the user has explicitly interacted with MCP in this session
@@ -66,14 +74,22 @@ export class McpClientManager {
 
   constructor(
     clientVersion: string,
-    toolRegistry: ToolRegistry,
     cliConfig: Config,
     eventEmitter?: EventEmitter,
   ) {
     this.clientVersion = clientVersion;
-    this.toolRegistry = toolRegistry;
     this.cliConfig = cliConfig;
     this.eventEmitter = eventEmitter;
+  }
+
+  setMainRegistries(registries: {
+    toolRegistry: ToolRegistry;
+    promptRegistry: PromptRegistry;
+    resourceRegistry: ResourceRegistry;
+  }) {
+    this.mainToolRegistry = registries.toolRegistry;
+    this.mainPromptRegistry = registries.promptRegistry;
+    this.mainResourceRegistry = registries.resourceRegistry;
   }
 
   setUserInteractedWithMcp() {
@@ -236,16 +252,17 @@ export class McpClientManager {
     return false;
   }
 
-  private async disconnectClient(name: string, skipRefresh = false) {
-    const existing = this.clients.get(name);
+  private async disconnectClient(clientKey: string, skipRefresh = false) {
+    const existing = this.clients.get(clientKey);
     if (existing) {
+      const serverName = existing.getServerName();
       try {
-        this.clients.delete(name);
+        this.clients.delete(clientKey);
         this.eventEmitter?.emit('mcp-client-update', this.clients);
         await existing.disconnect();
       } catch (error) {
         debugLogger.warn(
-          `Error stopping client '${name}': ${getErrorMessage(error)}`,
+          `Error stopping client '${serverName}': ${getErrorMessage(error)}`,
         );
       } finally {
         if (!skipRefresh) {
@@ -257,22 +274,61 @@ export class McpClientManager {
     }
   }
 
+  private getClientKey(name: string, config: MCPServerConfig): string {
+    const { extension, ...rest } = config;
+    const keyData = {
+      name,
+      config: rest,
+      extensionId: extension?.id,
+    };
+    return createHash('sha256').update(stableStringify(keyData)).digest('hex');
+  }
+
   async maybeDiscoverMcpServer(
     name: string,
     config: MCPServerConfig,
+    registries?: {
+      toolRegistry: ToolRegistry;
+      promptRegistry: PromptRegistry;
+      resourceRegistry: ResourceRegistry;
+    },
   ): Promise<void> {
-    const existing = this.clients.get(name);
-    if (
-      existing &&
-      existing.getServerConfig().extension?.id !== config.extension?.id
-    ) {
-      const extensionText = config.extension
-        ? ` from extension "${config.extension.name}"`
-        : '';
-      debugLogger.warn(
-        `Skipping MCP config for server with name "${name}"${extensionText} as it already exists.`,
+    const clientKey = this.getClientKey(name, config);
+    const existing = this.clients.get(clientKey);
+
+    // If no registries are provided (main agent) and a server with this name already exists
+    // but with a different configuration, handle potential conflicts.
+    if (!registries) {
+      const existingSameName = Array.from(this.clients.values()).find(
+        (c) => c.getServerName() === name,
       );
-      return;
+      if (existingSameName) {
+        const existingConfig = existingSameName.getServerConfig();
+        const existingKey = this.getClientKey(name, existingConfig);
+
+        if (existingKey !== clientKey) {
+          const bothMain = !config.extension && !existingConfig.extension;
+          const sameExtension =
+            config.extension &&
+            existingConfig.extension &&
+            config.extension.id === existingConfig.extension.id;
+
+          if (bothMain || sameExtension) {
+            // This is a configuration update from the same source (hot-reload).
+            // We should stop the old client before starting the new one.
+            await this.disconnectClient(existingKey, true);
+          } else {
+            // This is a conflict (e.g. an extension trying to overwrite a main server).
+            const extensionText = config.extension
+              ? ` from extension "${config.extension.name}"`
+              : '';
+            debugLogger.warn(
+              `Skipping MCP config for server with name "${name}"${extensionText} as a server with that name already exists from a different source.`,
+            );
+            return;
+          }
+        }
+      }
     }
 
     // Always track server config for UI display
@@ -291,7 +347,7 @@ export class McpClientManager {
     // User-disabled servers: disconnect if running, don't start
     if (await this.isDisabledByUser(name)) {
       if (existing) {
-        await this.disconnectClient(name);
+        await this.disconnectClient(clientKey);
       }
       return;
     }
@@ -302,34 +358,46 @@ export class McpClientManager {
       return;
     }
 
-    const currentDiscoveryPromise = new Promise<void>((resolve, reject) => {
-      (async () => {
+    const currentDiscoveryPromise = new Promise<void>((resolve) => {
+      void (async () => {
         try {
-          if (existing) {
-            this.clients.delete(name);
-            await existing.disconnect();
+          let client = existing;
+          if (!client) {
+            client = new McpClient(
+              name,
+              config,
+              this.cliConfig.getWorkspaceContext(),
+              this.cliConfig,
+              this.cliConfig.getDebugMode(),
+              this.clientVersion,
+              async () => {
+                debugLogger.log(
+                  `🔔 Refreshing context for server '${name}'...`,
+                );
+                await this.scheduleMcpContextRefresh();
+              },
+            );
+            this.clients.set(clientKey, client);
+            this.eventEmitter?.emit('mcp-client-update', this.clients);
           }
 
-          const client = new McpClient(
-            name,
-            config,
-            this.toolRegistry,
-            this.cliConfig.getPromptRegistry(),
-            this.cliConfig.getResourceRegistry(),
-            this.cliConfig.getWorkspaceContext(),
-            this.cliConfig,
-            this.cliConfig.getDebugMode(),
-            this.clientVersion,
-            async () => {
-              debugLogger.log(`🔔 Refreshing context for server '${name}'...`);
-              await this.scheduleMcpContextRefresh();
-            },
-          );
-          this.clients.set(name, client);
-          this.eventEmitter?.emit('mcp-client-update', this.clients);
+          const targetRegistries =
+            registries ??
+            (this.mainToolRegistry &&
+            this.mainPromptRegistry &&
+            this.mainResourceRegistry
+              ? {
+                  toolRegistry: this.mainToolRegistry,
+                  promptRegistry: this.mainPromptRegistry,
+                  resourceRegistry: this.mainResourceRegistry,
+                }
+              : undefined);
+
           try {
             await client.connect();
-            await client.discover(this.cliConfig);
+            if (targetRegistries) {
+              await client.discoverInto(this.cliConfig, targetRegistries);
+            }
             this.eventEmitter?.emit('mcp-client-update', this.clients);
           } catch (error) {
             this.eventEmitter?.emit('mcp-client-update', this.clients);
@@ -349,13 +417,13 @@ export class McpClientManager {
           const errorMessage = getErrorMessage(error);
           this.emitDiagnostic(
             'error',
-            `Error initializing MCP server '${name}': ${errorMessage}`,
+            `Fatal error ensuring MCP server '${name}' is connected: ${errorMessage}`,
             error,
           );
         } finally {
           resolve();
         }
-      })().catch(reject);
+      })();
     });
 
     if (this.discoveryPromise) {
@@ -438,6 +506,11 @@ export class McpClientManager {
    * Restarts all MCP servers (including newly enabled ones).
    */
   async restart(): Promise<void> {
+    const disconnectionPromises = Array.from(this.clients.keys()).map((key) =>
+      this.disconnectClient(key, true),
+    );
+    await Promise.all(disconnectionPromises);
+
     await Promise.all(
       Array.from(this.allServerConfigs.entries()).map(
         async ([name, config]) => {
@@ -462,6 +535,8 @@ export class McpClientManager {
     if (!config) {
       throw new Error(`No MCP server registered with the name "${name}"`);
     }
+    const clientKey = this.getClientKey(name, config);
+    await this.disconnectClient(clientKey, true);
     await this.maybeDiscoverMcpServer(name, config);
     await this.scheduleMcpContextRefresh();
   }
@@ -506,11 +581,12 @@ export class McpClientManager {
 
   getMcpInstructions(): string {
     const instructions: string[] = [];
-    for (const [name, client] of this.clients) {
+    for (const client of this.clients.values()) {
+      const serverName = client.getServerName();
       const clientInstructions = client.getInstructions();
       if (clientInstructions) {
         instructions.push(
-          `The following are instructions provided by the tool server '${name}':\n---[start of server instructions]---\n${clientInstructions}\n---[end of server instructions]---`,
+          `The following are instructions provided by the tool server '${serverName}':\n---[start of server instructions]---\n${clientInstructions}\n---[end of server instructions]---`,
         );
       }
     }
