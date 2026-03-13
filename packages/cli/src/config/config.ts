@@ -31,8 +31,6 @@ import {
   type HierarchicalMemory,
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
-  isValidModelOrAlias,
-  getValidModelsAndAliases,
   getAdminErrorMessage,
   isHeadlessMode,
   Config,
@@ -673,18 +671,6 @@ export async function loadCliConfig(
   const specifiedModel =
     argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
 
-  // Validate the model if one was explicitly specified
-  if (specifiedModel && specifiedModel !== GEMINI_MODEL_ALIAS_AUTO) {
-    if (!isValidModelOrAlias(specifiedModel)) {
-      const validModels = getValidModelsAndAliases();
-
-      throw new FatalConfigError(
-        `Invalid model: "${specifiedModel}"\n\n` +
-          `Valid models and aliases:\n${validModels.map((m) => `  - ${m}`).join('\n')}\n\n` +
-          `Use /model to switch models interactively.`,
-      );
-    }
-  }
   const resolvedModel =
     specifiedModel === GEMINI_MODEL_ALIAS_AUTO
       ? defaultModel
