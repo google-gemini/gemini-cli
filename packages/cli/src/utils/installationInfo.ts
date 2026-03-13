@@ -105,10 +105,37 @@ export function getInstallationInfo(
       }
     }
 
-    // Check for pnpm
+    // Check for local install
     if (
+      normalizedProjectRoot &&
+      (realPath.startsWith(`${normalizedProjectRoot}/node_modules`) ||
+        realPath.startsWith(`${normalizedProjectRoot}/.yarn/`))
+    ) {
+      let pm = PackageManager.NPM;
+      if (fs.existsSync(path.join(projectRoot, 'yarn.lock'))) {
+        pm = PackageManager.YARN;
+      } else if (fs.existsSync(path.join(projectRoot, 'pnpm-lock.yaml'))) {
+        pm = PackageManager.PNPM;
+      } else if (fs.existsSync(path.join(projectRoot, 'bun.lockb'))) {
+        pm = PackageManager.BUN;
+      }
+      return {
+        packageManager: pm,
+        isGlobal: false,
+        updateMessage:
+          "Locally installed. Please update via your project's package.json.",
+      };
+    }
+
+    // Check for pnpm
+    const pnpmHome = process.env['PNPM_HOME']?.replace(/\\/g, '/');
+    if (
+      (pnpmHome && realPath.includes(pnpmHome)) ||
       realPath.includes('/.pnpm/global') ||
-      realPath.includes('/.local/share/pnpm')
+      realPath.includes('/pnpm/global') ||
+      realPath.includes('/pnpm-home/global') ||
+      realPath.includes('/.local/share/pnpm') ||
+      realPath.includes('pnpm-global')
     ) {
       const updateCommand = 'pnpm add -g @google/gemini-cli@latest';
       return {
@@ -122,7 +149,10 @@ export function getInstallationInfo(
     }
 
     // Check for yarn
-    if (realPath.includes('/.yarn/global')) {
+    if (
+      realPath.includes('/.yarn/global') ||
+      realPath.includes('/.config/yarn/global')
+    ) {
       const updateCommand = 'yarn global add @google/gemini-cli@latest';
       return {
         packageManager: PackageManager.YARN,
@@ -151,27 +181,6 @@ export function getInstallationInfo(
         updateMessage: isAutoUpdateEnabled
           ? 'Installed with bun. Attempting to automatically update now...'
           : `Please run ${updateCommand} to update`,
-      };
-    }
-
-    // Check for local install
-    if (
-      normalizedProjectRoot &&
-      realPath.startsWith(`${normalizedProjectRoot}/node_modules`)
-    ) {
-      let pm = PackageManager.NPM;
-      if (fs.existsSync(path.join(projectRoot, 'yarn.lock'))) {
-        pm = PackageManager.YARN;
-      } else if (fs.existsSync(path.join(projectRoot, 'pnpm-lock.yaml'))) {
-        pm = PackageManager.PNPM;
-      } else if (fs.existsSync(path.join(projectRoot, 'bun.lockb'))) {
-        pm = PackageManager.BUN;
-      }
-      return {
-        packageManager: pm,
-        isGlobal: false,
-        updateMessage:
-          "Locally installed. Please update via your project's package.json.",
       };
     }
 
