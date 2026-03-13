@@ -102,6 +102,7 @@ vi.mock('../core/geminiChat.js', async (importOriginal) => {
       getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
       setHistory: mockSetHistory,
       setSystemInstruction: mockSetSystemInstruction,
+      recordCompletedToolCalls: vi.fn(),
     })),
   };
 });
@@ -302,6 +303,7 @@ describe('LocalAgentExecutor', () => {
           getHistory: vi.fn((_curated?: boolean) => [...mockChatHistory]),
           getLastPromptTokenCount: vi.fn(() => 100),
           setHistory: mockSetHistory,
+          recordCompletedToolCalls: vi.fn(),
         }) as unknown as GeminiChat,
     );
 

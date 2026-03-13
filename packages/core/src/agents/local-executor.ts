@@ -291,8 +291,10 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     await this.tryCompressChat(chat, promptId);
 
-    const { functionCalls } = await promptIdContext.run(promptId, async () =>
-      this.callModel(chat, currentMessage, combinedSignal, promptId),
+    const { functionCalls, model } = await promptIdContext.run(
+      promptId,
+      async () =>
+        this.callModel(chat, currentMessage, combinedSignal, promptId),
     );
 
     if (combinedSignal.aborted) {
@@ -321,6 +323,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     const { nextMessage, submittedOutput, taskCompleted, aborted } =
       await this.processFunctionCalls(
+        chat,
+        model,
         functionCalls,
         combinedSignal,
         promptId,
@@ -768,7 +772,11 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     message: Content,
     signal: AbortSignal,
     promptId: string,
-  ): Promise<{ functionCalls: FunctionCall[]; textResponse: string }> {
+  ): Promise<{
+    functionCalls: FunctionCall[];
+    textResponse: string;
+    model: string;
+  }> {
     const modelConfigAlias = getModelConfigAlias(this.definition);
 
     // Resolve the model config early to get the concrete model string (which may be `auto`).
@@ -852,7 +860,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       }
     }
 
-    return { functionCalls, textResponse };
+    return { functionCalls, textResponse, model: modelToUse };
   }
 
   /** Initializes a `GeminiChat` instance for the agent run. */
@@ -906,6 +914,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
    * @returns A new `Content` object for history, any submitted output, and completion status.
    */
   private async processFunctionCalls(
+    chat: GeminiChat,
+    model: string,
     functionCalls: FunctionCall[],
     signal: AbortSignal,
     promptId: string,
@@ -1139,6 +1149,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           onWaitingForConfirmation,
         },
       );
+
+      // Record completed tool calls in the session log
+      chat.recordCompletedToolCalls(model, completedCalls);
 
       for (const call of completedCalls) {
         const toolName =
