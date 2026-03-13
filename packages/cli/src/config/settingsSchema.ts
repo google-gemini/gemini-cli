@@ -1551,6 +1551,16 @@ const SETTINGS_SCHEMA = {
         description: 'Disable YOLO mode, even if enabled by a flag.',
         showInDialog: true,
       },
+      disableAlwaysAllow: {
+        type: 'boolean',
+        label: 'Disable Always Allow',
+        category: 'Security',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Disable "Always allow" options in tool confirmation dialogs.',
+        showInDialog: true,
+      },
       enablePermanentToolApproval: {
         type: 'boolean',
         label: 'Allow Permanent Tool Approval',
@@ -2277,7 +2287,8 @@ const SETTINGS_SCHEMA = {
         category: 'Admin',
         requiresRestart: false,
         default: false,
-        description: 'If true, disallows yolo mode from being used.',
+        description:
+          'If true, disallows YOLO mode and "Always allow" options from being used.',
         showInDialog: false,
         mergeStrategy: MergeStrategy.REPLACE,
       },
