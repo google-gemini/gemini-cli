@@ -562,14 +562,6 @@ export class ToolRegistry {
       }
 
       if (
-        this.isMainRegistry &&
-        tool instanceof DiscoveredMCPTool &&
-        tool.serverName.startsWith('__agent__')
-      ) {
-        return;
-      }
-
-      if (
         mainAgentTools &&
         !mainAgentTools.includes(toolName) &&
         !mainAgentTools.includes(tool.constructor.name) &&

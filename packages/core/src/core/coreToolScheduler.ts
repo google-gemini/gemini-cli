@@ -47,11 +47,7 @@ import {
   type ToolCallResponseInfo,
 } from '../scheduler/types.js';
 import { ToolExecutor } from '../scheduler/tool-executor.js';
-import {
-  DiscoveredMCPTool,
-  MCP_TOOL_PREFIX,
-  MCP_QUALIFIED_NAME_SEPARATOR,
-} from '../tools/mcp-tool.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getPolicyDenialError } from '../scheduler/policy.js';
 import { GeminiCliOperation } from '../telemetry/constants.js';
 
@@ -642,16 +638,12 @@ export class CoreToolScheduler {
         // Policy Check using PolicyEngine
         // We must reconstruct the FunctionCall format expected by PolicyEngine
         const toolCallForPolicy = {
-          name:
-            toolCall.tool instanceof DiscoveredMCPTool &&
-            toolCall.tool.originalServerName
-              ? `${MCP_TOOL_PREFIX}${toolCall.tool.originalServerName}${MCP_QUALIFIED_NAME_SEPARATOR}${toolCall.tool.serverToolName}`
-              : toolCall.request.name,
+          name: toolCall.request.name,
           args: toolCall.request.args,
         };
         const serverName =
           toolCall.tool instanceof DiscoveredMCPTool
-            ? (toolCall.tool.originalServerName ?? toolCall.tool.serverName)
+            ? toolCall.tool.serverName
             : undefined;
         const toolAnnotations = toolCall.tool.toolAnnotations;
 

@@ -48,6 +48,8 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { LocalAgentExecutor, type ActivityCallback } from './local-executor.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
+import { PromptRegistry } from '../prompts/prompt-registry.js';
+import { ResourceRegistry } from '../resources/resource-registry.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { LSTool } from '../tools/ls.js';
 import { LS_TOOL_NAME, READ_FILE_TOOL_NAME } from '../tools/tool-names.js';
@@ -2506,31 +2508,27 @@ describe('LocalAgentExecutor', () => {
 
       const mcpManager = mockConfig.getMcpClientManager();
       expect(mcpManager?.maybeDiscoverMcpServer).toHaveBeenCalledWith(
-        '__agent__TestAgent__test-server',
+        'test-server',
         mcpServers['test-server'],
+        expect.objectContaining({
+          toolRegistry: expect.any(ToolRegistry),
+          promptRegistry: expect.any(PromptRegistry),
+          resourceRegistry: expect.any(ResourceRegistry),
+        }),
       );
     });
 
-    it('should filter out other agents MCP tools when inheriting tools from parent registry', async () => {
-      const parentMcpTool1 = new DiscoveredMCPTool(
+    it('should inherit main registry tools', async () => {
+      const parentMcpTool = new DiscoveredMCPTool(
         {} as unknown as CallableTool,
-        '__agent__OtherAgent__server1',
+        'main-server',
         'tool1',
         'desc1',
         {},
         mockConfig.getMessageBus(),
       );
-      const parentMcpTool2 = new DiscoveredMCPTool(
-        {} as unknown as CallableTool,
-        '__agent__TestAgent__server2',
-        'tool2',
-        'desc2',
-        {},
-        mockConfig.getMessageBus(),
-      );
 
-      parentToolRegistry.registerTool(parentMcpTool1);
-      parentToolRegistry.registerTool(parentMcpTool2);
+      parentToolRegistry.registerTool(parentMcpTool);
 
       const definition = createTestDefinition();
       definition.toolConfig = undefined; // trigger inheritance
@@ -2549,8 +2547,7 @@ describe('LocalAgentExecutor', () => {
         executor as unknown as { toolRegistry: ToolRegistry }
       ).toolRegistry.getAllToolNames();
 
-      expect(agentTools).toContain(parentMcpTool2.name);
-      expect(agentTools).not.toContain(parentMcpTool1.name);
+      expect(agentTools).toContain(parentMcpTool.name);
     });
   });
 });

@@ -284,34 +284,23 @@ describe('ToolRegistry', () => {
     });
   });
 
-  describe('subagent MCP tools filtering', () => {
-    it('should hide __agent__ prefixed tools when isMainRegistry is true', async () => {
-      const mainRegistry = new ToolRegistry(config, mockMessageBus, true);
-      const subagentRegistry = new ToolRegistry(config, mockMessageBus, false);
+  describe('removeMcpToolsByServer', () => {
+    it('should remove all tools from a specific server', () => {
+      const serverName = 'test-server';
+      const mcpTool1 = createMCPTool(serverName, 'tool1', 'desc1');
+      const mcpTool2 = createMCPTool(serverName, 'tool2', 'desc2');
+      const otherTool = createMCPTool('other-server', 'tool3', 'desc3');
 
-      const mcpTool = createMCPTool(
-        '__agent__TestAgent__myServer',
-        'my-tool',
-        'description',
-      );
-      vi.spyOn(mcpTool, 'getSchema').mockReturnValue({
-        name: 'my_tool',
-        description: 'description',
-      } as unknown as FunctionDeclaration);
+      toolRegistry.registerTool(mcpTool1);
+      toolRegistry.registerTool(mcpTool2);
+      toolRegistry.registerTool(otherTool);
 
-      mainRegistry.registerTool(mcpTool);
-      subagentRegistry.registerTool(mcpTool);
+      expect(toolRegistry.getToolsByServer(serverName)).toHaveLength(2);
 
-      const mainDeclarations =
-        mainRegistry.getFunctionDeclarations('test-model');
-      const subagentDeclarations =
-        subagentRegistry.getFunctionDeclarations('test-model');
+      toolRegistry.removeMcpToolsByServer(serverName);
 
-      expect(mainDeclarations.length).toBe(0);
-      expect(subagentDeclarations.length).toBe(1);
-      expect(subagentDeclarations[0].name).toBe(
-        'mcp___agent__TestAgent__myServer_my-tool',
-      );
+      expect(toolRegistry.getToolsByServer(serverName)).toHaveLength(0);
+      expect(toolRegistry.getToolsByServer('other-server')).toHaveLength(1);
     });
   });
 

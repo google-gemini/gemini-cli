@@ -17,6 +17,8 @@ import {
   type Schema,
 } from '@google/genai';
 import { ToolRegistry } from '../tools/tool-registry.js';
+import { PromptRegistry } from '../prompts/prompt-registry.js';
+import { ResourceRegistry } from '../resources/resource-registry.js';
 import { type AnyDeclarativeTool } from '../tools/tools.js';
 import {
   DiscoveredMCPTool,
@@ -99,6 +101,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
   private readonly agentId: string;
   private readonly toolRegistry: ToolRegistry;
+  private readonly promptRegistry: PromptRegistry;
+  private readonly resourceRegistry: ResourceRegistry;
   private readonly context: AgentLoopContext;
   private readonly onActivity?: ActivityCallback;
   private readonly compressionService: ChatCompressionService;
@@ -106,7 +110,18 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private hasFailedCompressionAttempt = false;
 
   private get config(): Config {
-    return this.context.config;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const agentConfig: Config = Object.create(this.context.config);
+    agentConfig.getToolRegistry = () => this.toolRegistry;
+    agentConfig.getPromptRegistry = () => this.promptRegistry;
+    agentConfig.getResourceRegistry = () => this.resourceRegistry;
+    agentConfig.getMessageBus = () => this.toolRegistry.getMessageBus();
+
+    Object.defineProperty(agentConfig, 'toolRegistry', {
+      get: () => this.toolRegistry,
+      configurable: true,
+    });
+    return agentConfig;
   }
 
   /**
@@ -142,17 +157,23 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       return parentMessageBus.publish(message);
     };
 
-    // Create an isolated tool registry for this agent instance.
+    // Create isolated registries for this agent instance.
     const agentToolRegistry = new ToolRegistry(
       context.config,
       subagentMessageBus,
     );
+    const agentPromptRegistry = new PromptRegistry();
+    const agentResourceRegistry = new ResourceRegistry();
+
     if (definition.mcpServers) {
       const globalMcpManager = context.config.getMcpClientManager();
       if (globalMcpManager) {
         for (const [name, config] of Object.entries(definition.mcpServers)) {
-          const prefixedName = `__agent__${definition.name}__${name}`;
-          await globalMcpManager.maybeDiscoverMcpServer(prefixedName, config);
+          await globalMcpManager.maybeDiscoverMcpServer(name, config, {
+            toolRegistry: agentToolRegistry,
+            promptRegistry: agentPromptRegistry,
+            resourceRegistry: agentResourceRegistry,
+          });
         }
       }
     }
@@ -233,31 +254,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     } else {
       // If no tools are explicitly configured, default to all available tools.
       for (const toolName of parentToolRegistry.getAllToolNames()) {
-        const tool = parentToolRegistry.getTool(toolName);
-        if (
-          tool instanceof DiscoveredMCPTool &&
-          tool.serverName.startsWith('__agent__')
-        ) {
-          if (!tool.serverName.startsWith(`__agent__${definition.name}__`)) {
-            continue; // Skip other agents' MCP tools
-          }
-        }
         registerToolByName(toolName);
       }
     }
-
-    // Always ensure this agent's own MCP servers are included, even if toolConfig is restricted
-    parentToolRegistry.getAllTools().forEach((tool) => {
-      if (
-        tool instanceof DiscoveredMCPTool &&
-        tool.serverName.startsWith(`__agent__${definition.name}__`)
-      ) {
-        const qualifiedName = tool.name;
-        if (!agentToolRegistry.getTool(qualifiedName)) {
-          registerToolByName(qualifiedName);
-        }
-      }
-    });
 
     agentToolRegistry.sortTools();
 
@@ -271,10 +270,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     return new LocalAgentExecutor(
       definition,
       context,
-      agentToolRegistry,
       parentPromptId,
-      parentCallId,
+      agentToolRegistry,
+      agentPromptRegistry,
+      agentResourceRegistry,
       onActivity,
+      parentCallId,
     );
   }
 
@@ -287,14 +288,18 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private constructor(
     definition: LocalAgentDefinition<TOutput>,
     context: AgentLoopContext,
-    toolRegistry: ToolRegistry,
     parentPromptId: string | undefined,
-    parentCallId: string | undefined,
+    toolRegistry: ToolRegistry,
+    promptRegistry: PromptRegistry,
+    resourceRegistry: ResourceRegistry,
     onActivity?: ActivityCallback,
+    parentCallId?: string,
   ) {
     this.definition = definition;
     this.context = context;
     this.toolRegistry = toolRegistry;
+    this.promptRegistry = promptRegistry;
+    this.resourceRegistry = resourceRegistry;
     this.onActivity = onActivity;
     this.compressionService = new ChatCompressionService();
     this.parentCallId = parentCallId;
@@ -538,7 +543,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     const combinedSignal = AbortSignal.any([signal, deadlineTimer.signal]);
 
     logAgentStart(
-      this.config,
+      this.context.config,
       new AgentStartEvent(this.agentId, this.definition.name),
     );
 
@@ -745,7 +750,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     } finally {
       deadlineTimer.abort();
       logAgentFinish(
-        this.config,
+        this.context.config,
         new AgentFinishEvent(
           this.agentId,
           this.definition.name,
@@ -1165,10 +1170,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         this.config,
         toolRequests,
         {
-          schedulerId: this.agentId,
+          schedulerId: promptId,
           subagent: this.definition.name,
           parentCallId: this.parentCallId,
           toolRegistry: this.toolRegistry,
+          promptRegistry: this.promptRegistry,
+          resourceRegistry: this.resourceRegistry,
           signal,
           onWaitingForConfirmation,
         },

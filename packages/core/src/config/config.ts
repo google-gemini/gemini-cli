@@ -445,11 +445,6 @@ export class MCPServerConfig {
     readonly targetAudience?: string,
     /* targetServiceAccount format: <service-account-name>@<project-num>.iam.gserviceaccount.com */
     readonly targetServiceAccount?: string,
-    /**
-     * The original name of the server before any prefixing (e.g. for subagents).
-     * This is used by the policy engine to match rules.
-     */
-    readonly originalName?: string,
   ) {}
 }
 
@@ -1202,10 +1197,14 @@ export class Config implements McpContext, AgentLoopContext {
     discoverToolsHandle?.end();
     this.mcpClientManager = new McpClientManager(
       this.clientVersion,
-      this._toolRegistry,
       this,
       this.eventEmitter,
     );
+    this.mcpClientManager.setMainRegistries({
+      toolRegistry: this._toolRegistry,
+      promptRegistry: this.promptRegistry,
+      resourceRegistry: this.resourceRegistry,
+    });
     // We do not await this promise so that the CLI can start up even if
     // MCP servers are slow to connect.
     this.mcpInitializationPromise = Promise.allSettled([

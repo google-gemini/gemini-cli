@@ -367,6 +367,7 @@ describe('Server Config (config.ts)', () => {
               mcpStarted = true;
             }),
             getMcpInstructions: vi.fn(),
+            setMainRegistries: vi.fn(),
           }) as Partial<McpClientManager> as McpClientManager,
       );
 
@@ -400,6 +401,7 @@ describe('Server Config (config.ts)', () => {
               mcpStarted = true;
             }),
             getMcpInstructions: vi.fn(),
+            setMainRegistries: vi.fn(),
           }) as Partial<McpClientManager> as McpClientManager,
       );
 
