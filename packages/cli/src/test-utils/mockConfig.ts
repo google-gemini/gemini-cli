@@ -5,6 +5,7 @@
  */
 
 import { vi } from 'vitest';
+import { NoopSandboxManager } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 import {
   createTestMergedSettings,
@@ -131,7 +132,14 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getRetryFetchErrors: vi.fn().mockReturnValue(true),
     getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
     getShellToolInactivityTimeout: vi.fn().mockReturnValue(300000),
-    getShellExecutionConfig: vi.fn().mockReturnValue({}),
+    getShellExecutionConfig: vi.fn().mockReturnValue({
+      sandboxManager: new NoopSandboxManager(),
+      sanitizationConfig: {
+        allowedEnvironmentVariables: [],
+        blockedEnvironmentVariables: [],
+        enableEnvironmentVariableRedaction: false,
+      },
+    }),
     setShellExecutionConfig: vi.fn(),
     getEnableToolOutputTruncation: vi.fn().mockReturnValue(true),
     getTruncateToolOutputThreshold: vi.fn().mockReturnValue(1000),
