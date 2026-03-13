@@ -370,23 +370,31 @@ export const ToolConfirmationMessage: React.FC<
 
     // Calculate the vertical space (in lines) consumed by UI elements
     // surrounding the main body content.
-    const PADDING_OUTER_Y = 2; // Main container has `padding={1}` (top & bottom).
-    const MARGIN_BODY_BOTTOM = 1; // margin on the body container.
+    const PADDING_OUTER_Y = 1; // Main container has `paddingBottom={1}`.
     const HEIGHT_QUESTION = 1; // The question text is one line.
     const MARGIN_QUESTION_BOTTOM = 1; // Margin on the question container.
 
     const optionsCount = getOptions().length;
 
+    let securityWarningsHeight = 0;
+    if (deceptiveUrlWarningText) {
+      securityWarningsHeight = deceptiveUrlWarningText.split('\n').length + 1; // +1 for marginBottom
+    }
+
     const surroundingElementsHeight =
       PADDING_OUTER_Y +
-      MARGIN_BODY_BOTTOM +
       HEIGHT_QUESTION +
       MARGIN_QUESTION_BOTTOM +
       optionsCount +
-      1; // Reserve one line for 'ShowMoreLines' hint
+      securityWarningsHeight;
 
     return Math.max(availableTerminalHeight - surroundingElementsHeight, 1);
-  }, [availableTerminalHeight, getOptions, handlesOwnUI]);
+  }, [
+    availableTerminalHeight,
+    getOptions,
+    handlesOwnUI,
+    deceptiveUrlWarningText,
+  ]);
 
   const { question, bodyContent, options, securityWarnings, initialIndex } =
     useMemo<{
@@ -527,10 +535,6 @@ export const ToolConfirmationMessage: React.FC<
 
         let bodyContentHeight = availableBodyContentHeight();
         let warnings: React.ReactNode = null;
-
-        if (bodyContentHeight !== undefined) {
-          bodyContentHeight -= 2; // Account for padding;
-        }
 
         if (containsRedirection) {
           // Calculate lines needed for Note and Tip
