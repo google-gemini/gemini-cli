@@ -123,13 +123,17 @@ export function runShellcheck() {
     return;
   }
 
-  const command = `npx shellcheck \
-    --check-sourced \
-    --enable=all \
-    --exclude=SC2002,SC2129,SC2310 \
-    --severity=style \
-    --format=gcc \
-    --color=never ${files.join(' ')}`;
+  const args = [
+    '--check-sourced',
+    '--enable=all',
+    '--exclude=SC2002,SC2129,SC2310',
+    '--severity=style',
+    '--format=gcc',
+    '--color=never',
+    ...files,
+  ];
+
+  const command = `npx shellcheck ${args.join(' ')}`;
 
   try {
     const output = execSync(command, {
