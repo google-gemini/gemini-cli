@@ -31,7 +31,8 @@ import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
-import { NoopSandboxManager } from './sandboxManager.js';
+import { NoopSandboxManager, type SandboxManager } from './sandboxManager.js';
+import type { SandboxConfig } from '../config/config.js';
 import { killProcessGroup } from '../utils/process-utils.js';
 import {
   ExecutionLifecycleService,
@@ -94,6 +95,8 @@ export interface ShellExecutionConfig {
   disableDynamicLineTrimming?: boolean;
   scrollback?: number;
   maxSerializedLines?: number;
+  sandboxManager?: SandboxManager;
+  sandboxConfig?: SandboxConfig;
 }
 
 /**
@@ -274,13 +277,17 @@ export class ShellExecutionService {
     shouldUseNodePty: boolean,
     shellExecutionConfig: ShellExecutionConfig,
   ): Promise<ShellExecutionHandle> {
-    const sandboxManager = new NoopSandboxManager();
+    const sandboxManager =
+      shellExecutionConfig.sandboxManager ?? new NoopSandboxManager();
     const { env: sanitizedEnv } = await sandboxManager.prepareCommand({
       command: commandToExecute,
       args: [],
       env: process.env,
       cwd,
-      config: shellExecutionConfig,
+      config: {
+        ...shellExecutionConfig,
+        ...(shellExecutionConfig.sandboxConfig || {}),
+      },
     });
 
     if (shouldUseNodePty) {

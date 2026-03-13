@@ -28,14 +28,20 @@ const __dirname = path.dirname(__filename);
  */
 export class WindowsSandboxManager implements SandboxManager {
   private readonly helperPath: string;
+  private readonly platform: string;
   private initialized = false;
 
-  constructor() {
+  constructor(platform: string = process.platform) {
+    this.platform = platform;
     this.helperPath = path.resolve(__dirname, 'scripts', 'GeminiSandbox.exe');
   }
 
   private ensureInitialized(): void {
     if (this.initialized) return;
+    if (this.platform !== 'win32') {
+      this.initialized = true;
+      return;
+    }
 
     if (!fs.existsSync(this.helperPath)) {
       // If the exe doesn't exist, we try to compile it from the .cs file
@@ -60,13 +66,15 @@ export class WindowsSandboxManager implements SandboxManager {
           ),
         ];
 
-        let compiled = false;
         for (const csc of cscPaths) {
-          const result = spawnSync(csc, ['/out:' + this.helperPath, sourcePath], {
-            stdio: 'ignore',
-          });
+          const result = spawnSync(
+            csc,
+            ['/out:' + this.helperPath, sourcePath],
+            {
+              stdio: 'ignore',
+            },
+          );
           if (result.status === 0) {
-            compiled = true;
             break;
           }
         }
@@ -128,11 +136,14 @@ export class WindowsSandboxManager implements SandboxManager {
    * Grants "Low Mandatory Level" access to a path using icacls.
    */
   private grantLowIntegrityAccess(targetPath: string): void {
+    if (this.platform !== 'win32') {
+      return;
+    }
     try {
       spawnSync('icacls', [targetPath, '/setintegritylevel', 'Low'], {
         stdio: 'ignore',
       });
-    } catch (e) {
+    } catch (_e) {
       // Best effort
     }
   }

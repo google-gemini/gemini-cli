@@ -24,6 +24,8 @@ export interface SandboxRequest {
   /** Optional sandbox-specific configuration. */
   config?: {
     sanitizationConfig?: Partial<EnvironmentSanitizationConfig>;
+    allowedPaths?: string[];
+    networkAccess?: boolean;
   };
 }
 

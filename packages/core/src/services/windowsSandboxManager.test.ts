@@ -7,48 +7,62 @@
 import { describe, it, expect } from 'vitest';
 import { WindowsSandboxManager } from './windowsSandboxManager.js';
 import type { SandboxRequest } from './sandboxManager.js';
-import * as os from 'node:os';
 
 describe('WindowsSandboxManager', () => {
-  const manager = new WindowsSandboxManager();
+  const manager = new WindowsSandboxManager('win32');
 
-  it.skipIf(os.platform() !== 'win32')(
-    'should prepare a GeminiSandbox.exe command',
-    async () => {
-      const req: SandboxRequest = {
-        command: 'whoami',
-        args: ['/groups'],
-        cwd: process.cwd(),
-        env: { TEST_VAR: 'test_value' },
-        config: {
-          networkAccess: false,
+  it('should prepare a GeminiSandbox.exe command', async () => {
+    const req: SandboxRequest = {
+      command: 'whoami',
+      args: ['/groups'],
+      cwd: '/test/cwd',
+      env: { TEST_VAR: 'test_value' },
+      config: {
+        networkAccess: false,
+      },
+    };
+
+    const result = await manager.prepareCommand(req);
+
+    expect(result.program).toContain('GeminiSandbox.exe');
+    expect(result.args).toEqual(['0', '/test/cwd', 'whoami', '/groups']);
+  });
+
+  it('should handle networkAccess from config', async () => {
+    const req: SandboxRequest = {
+      command: 'whoami',
+      args: [],
+      cwd: '/test/cwd',
+      env: {},
+      config: {
+        networkAccess: true,
+      },
+    };
+
+    const result = await manager.prepareCommand(req);
+    expect(result.args[0]).toBe('1');
+  });
+
+  it('should sanitize environment variables', async () => {
+    const req: SandboxRequest = {
+      command: 'test',
+      args: [],
+      cwd: '/test/cwd',
+      env: {
+        API_KEY: 'secret',
+        PATH: '/usr/bin',
+      },
+      config: {
+        sanitizationConfig: {
+          allowedEnvironmentVariables: ['PATH'],
+          blockedEnvironmentVariables: ['API_KEY'],
+          enableEnvironmentVariableRedaction: true,
         },
-      };
+      },
+    };
 
-      const result = await manager.prepareCommand(req);
-
-      expect(result.program).toContain('GeminiSandbox.exe');
-      expect(result.args).toEqual(
-        expect.arrayContaining(['0', process.cwd(), 'whoami', '/groups']),
-      );
-    },
-  );
-
-  it.skipIf(os.platform() !== 'win32')(
-    'should handle networkAccess from config',
-    async () => {
-      const req: SandboxRequest = {
-        command: 'whoami',
-        args: [],
-        cwd: process.cwd(),
-        env: {},
-        config: {
-          networkAccess: true,
-        },
-      };
-
-      const result = await manager.prepareCommand(req);
-      expect(result.args[0]).toBe('1');
-    },
-  );
+    const result = await manager.prepareCommand(req);
+    expect(result.env['PATH']).toBe('/usr/bin');
+    expect(result.env['API_KEY']).toBeUndefined();
+  });
 });
