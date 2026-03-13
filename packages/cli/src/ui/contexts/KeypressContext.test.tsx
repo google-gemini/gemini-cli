@@ -9,6 +9,18 @@ import type React from 'react';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
+import type { Mock } from 'vitest';
+import {
+  vi,
+  afterAll,
+  beforeAll,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+} from 'vitest';
+import type { Key } from './KeypressContext.js';
 import { vi, afterAll, beforeAll, type Mock } from 'vitest';
 import {
   KeypressProvider,
@@ -396,6 +408,60 @@ describe('KeypressContext', () => {
         );
       },
     );
+  });
+
+  describe('Windows Terminal Backspace handling', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('should NOT treat \\b as ctrl when WT_SESSION is NOT present', async () => {
+      vi.stubEnv('WT_SESSION', '');
+      const { keyHandler } = setupKeypressTest();
+
+      act(() => {
+        stdin.write('\b');
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          ctrl: false,
+        }),
+      );
+    });
+
+    it('should treat \\b as ctrl when WT_SESSION IS present', async () => {
+      vi.stubEnv('WT_SESSION', 'some-id');
+      const { keyHandler } = setupKeypressTest();
+
+      act(() => {
+        stdin.write('\b');
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          ctrl: true,
+        }),
+      );
+    });
+
+    it('should treat \\x7f as regular backspace regardless of WT_SESSION', async () => {
+      vi.stubEnv('WT_SESSION', 'some-id');
+      const { keyHandler } = setupKeypressTest();
+
+      act(() => {
+        stdin.write('\x7f');
+      });
+
+      expect(keyHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'backspace',
+          ctrl: false,
+        }),
+      );
+    });
   });
 
   describe('paste mode', () => {
