@@ -158,6 +158,9 @@ async function processIntent(
       await handleUpgrade();
       return false;
 
+    case null:
+      return false;
+
     default:
       throw new Error(
         `Unexpected fallback intent received from fallbackModelHandler: "${intent}"`,
