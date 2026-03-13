@@ -73,6 +73,8 @@ import {
   ASK_USER_OPTION_PARAM_LABEL,
   ASK_USER_OPTION_PARAM_DESCRIPTION,
   PLAN_MODE_PARAM_REASON,
+  CREATE_NEW_TOPIC_TOOL_NAME,
+  TOPIC_PARAM_TITLE,
 } from '../base-declarations.js';
 import {
   getShellDeclaration,
@@ -729,6 +731,22 @@ The agent did not use the todo list because this task could be completed by a ti
             'Short reason explaining why you are entering plan mode.',
         },
       },
+    },
+  },
+
+  [CREATE_NEW_TOPIC_TOOL_NAME]: {
+    name: CREATE_NEW_TOPIC_TOOL_NAME,
+    description:
+      'Organizes work into a new "Chapter" or "Topic". Call this when transitioning between major phases (e.g., from Research to Implementation).',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        [TOPIC_PARAM_TITLE]: {
+          type: 'string',
+          description: 'The title of the new topic or chapter.',
+        },
+      },
+      required: [TOPIC_PARAM_TITLE],
     },
   },
 

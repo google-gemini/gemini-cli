@@ -8,6 +8,7 @@ import type { HierarchicalMemory } from '../config/memory.js';
 import {
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
+  CREATE_NEW_TOPIC_TOOL_NAME,
   EDIT_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
@@ -132,11 +133,16 @@ ${renderFinalReminder(options.finalReminder)}
 export function renderFinalShell(
   basePrompt: string,
   userMemory?: string | HierarchicalMemory,
+  activeTopic?: string,
 ): string {
+  const topicHeader = activeTopic
+    ? `\n---\n\n[Active Topic: ${activeTopic}]\n(If this phase is complete, use \`create_new_topic\` to start the next chapter.)`
+    : '';
+
   return `
 ${basePrompt.trim()}
 
-${renderUserMemory(userMemory)}
+${renderUserMemory(userMemory)}${topicHeader}
 `.trim();
 }
 
@@ -163,7 +169,9 @@ export function renderCoreMandates(options?: CoreMandatesOptions): string {
 - **User Hints:** During execution, the user may provide real-time hints (marked as "User hint:" or "User hints:"). Treat these as high-priority but scope-preserving course corrections: apply the minimal plan change needed, keep unaffected user tasks active, and never cancel/skip tasks unless cancellation is explicit for those tasks. Hints may add new tasks, modify one or more tasks, cancel specific tasks, or provide extra context only. If scope is ambiguous, ask for clarification before dropping work.
 - ${mandateConfirm(options.interactive)}
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
-- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}${mandateExplainBeforeActing(options.isGemini3)}${mandateContinueWork(options.interactive)}
+- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}
+- **Topic Management:** You MUST organize your work into logical "Chapters" or "Topics" using the \`${CREATE_NEW_TOPIC_TOOL_NAME}\` tool (with the \`title\` parameter). This is critical for UI organization. Call this tool at the beginning of every major phase (e.g., Researching, Proposing Strategy, Implementing Fix, Validating).
+${mandateContinueWork(options.interactive)}
 `.trim();
 }
 
@@ -472,12 +480,6 @@ function mandateSkillGuidance(hasSkills: boolean): string {
 function mandateConflictResolution(hasHierarchicalMemory: boolean): string {
   if (!hasHierarchicalMemory) return '';
   return '\n- **Conflict Resolution:** Instructions are provided in hierarchical context tags: `<global_context>`, `<extension_context>`, and `<project_context>`. In case of contradictory instructions, follow this priority: `<project_context>` (highest) > `<extension_context>` > `<global_context>` (lowest).';
-}
-
-function mandateExplainBeforeActing(isGemini3: boolean): string {
-  if (!isGemini3) return '';
-  return `
-- **Explain Before Acting:** Never call tools in silence. You MUST provide a concise, one-sentence explanation of your intent or strategy immediately before executing tool calls. This is essential for transparency, especially when confirming a request or answering a question. Silence is only acceptable for repetitive, low-level discovery operations (e.g., sequential file reads) where narration would be noisy.`;
 }
 
 function mandateContinueWork(interactive: boolean): string {

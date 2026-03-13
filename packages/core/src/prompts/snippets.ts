@@ -7,6 +7,7 @@
 import {
   ACTIVATE_SKILL_TOOL_NAME,
   ASK_USER_TOOL_NAME,
+  CREATE_NEW_TOPIC_TOOL_NAME,
   EDIT_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
@@ -145,11 +146,16 @@ export function renderFinalShell(
   basePrompt: string,
   userMemory?: string | HierarchicalMemory,
   contextFilenames?: string[],
+  activeTopic?: string,
 ): string {
+  const topicHeader = activeTopic
+    ? `\n---\n\n[Active Topic: ${activeTopic}]\n(If this phase is complete, use \`create_new_topic\` to start the next chapter.)`
+    : '';
+
   return `
 ${basePrompt.trim()}
 
-${renderUserMemory(userMemory, contextFilenames)}
+${renderUserMemory(userMemory, contextFilenames)}${topicHeader}
 `.trim();
 }
 
@@ -226,7 +232,7 @@ Use the following guidelines to optimize your search and read patterns.
 - ${mandateConfirm(options.interactive)}
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}
-- **Explain Before Acting:** Never call tools in silence. You MUST provide a concise, one-sentence explanation of your intent or strategy immediately before executing tool calls. This is essential for transparency, especially when confirming a request or answering a question. Silence is only acceptable for repetitive, low-level discovery operations (e.g., sequential file reads) where narration would be noisy.${mandateContinueWork(options.interactive)}
+- **Topic Management:** You MUST organize your work into logical "Chapters" or "Topics" using the \`${CREATE_NEW_TOPIC_TOOL_NAME}\` tool (with the \`title\` parameter). This is critical for UI organization. Call this tool at the beginning of every major phase (e.g., Researching, Proposing Strategy, Implementing Fix, Validating).${mandateContinueWork(options.interactive)}
 `.trim();
 }
 

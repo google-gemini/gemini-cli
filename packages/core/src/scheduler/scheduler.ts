@@ -48,6 +48,7 @@ import {
   type McpProgressPayload,
 } from '../utils/events.js';
 import { GeminiCliOperation } from '../telemetry/constants.js';
+import { CREATE_NEW_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
 
 interface SchedulerQueueItem {
   requests: ToolCallRequestInfo[];
@@ -299,9 +300,16 @@ export class Scheduler {
     this.state.clearBatch();
     const currentApprovalMode = this.config.getApprovalMode();
 
+    // Sort requests to ensure create_new_topic runs first in a batch for proper UI grouping.
+    const sortedRequests = [...requests].sort((a, b) => {
+      if (a.name === CREATE_NEW_TOPIC_TOOL_NAME) return -1;
+      if (b.name === CREATE_NEW_TOPIC_TOOL_NAME) return 1;
+      return 0;
+    });
+
     try {
       const toolRegistry = this.context.toolRegistry;
-      const newCalls: ToolCall[] = requests.map((request) => {
+      const newCalls: ToolCall[] = sortedRequests.map((request) => {
         const enrichedRequest: ToolCallRequestInfo = {
           ...request,
           schedulerId: this.schedulerId,

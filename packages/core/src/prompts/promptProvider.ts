@@ -31,6 +31,7 @@ import {
 import { resolveModel, supportsModernFeatures } from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
+import { TopicManager } from '../tools/topicTool.js';
 
 /**
  * Orchestrates prompt generation by gathering context and building options.
@@ -200,21 +201,35 @@ export class PromptProvider {
             })),
       } as snippets.SystemPromptOptions;
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const getCoreSystemPrompt = activeSnippets.getCoreSystemPrompt as (
+      /* eslint-disable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
+      const getCoreSystemPrompt = (activeSnippets as any)
+        .getCoreSystemPrompt as (
         options: snippets.SystemPromptOptions,
       ) => string;
       basePrompt = getCoreSystemPrompt(options);
+      /* eslint-enable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
     }
 
     // --- Finalization (Shell) ---
-    const finalPrompt = activeSnippets.renderFinalShell(
-      basePrompt,
-      userMemory,
-      contextFilenames,
-    );
+    const activeTopic = TopicManager.getInstance().getTopic();
+
+    /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
+    const finalPrompt = isModernModel
+      ? (activeSnippets.renderFinalShell as any)(
+          basePrompt,
+          userMemory,
+          contextFilenames,
+          activeTopic,
+        )
+      : (activeSnippets.renderFinalShell as any)(
+          basePrompt,
+          userMemory,
+          activeTopic,
+        );
+    /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
 
     // Sanitize erratic newlines from composition
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');
 
     // Write back to file if requested
@@ -224,6 +239,7 @@ export class PromptProvider {
       path.resolve(path.join(GEMINI_DIR, 'system.md')),
     );
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return sanitizedPrompt;
   }
 

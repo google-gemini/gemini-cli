@@ -35,6 +35,7 @@ import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
+import { CreateNewTopicTool } from '../tools/topicTool.js';
 import { GeminiClient } from '../core/client.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
@@ -2986,6 +2987,10 @@ export class Config implements McpContext, AgentLoopContext {
         registry.registerTool(new EnterPlanModeTool(this, this.messageBus)),
       );
     }
+
+    maybeRegister(CreateNewTopicTool, () =>
+      registry.registerTool(new CreateNewTopicTool(this.messageBus)),
+    );
 
     if (this.isTrackerEnabled()) {
       maybeRegister(TrackerCreateTaskTool, () =>
