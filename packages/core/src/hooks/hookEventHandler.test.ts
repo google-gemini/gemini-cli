@@ -11,12 +11,13 @@ import type {
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HookEventHandler } from './hookEventHandler.js';
 import type { Config } from '../config/config.js';
-import type { HookConfig, HookExecutionResult } from './types.js';
 import {
   NotificationType,
   SessionStartSource,
   HookEventName,
   HookType,
+  type HookConfig,
+  type HookExecutionResult,
 } from './types.js';
 import type { HookPlanner } from './hookPlanner.js';
 import type { HookRunner } from './hookRunner.js';
@@ -63,16 +64,22 @@ describe('HookEventHandler', () => {
   beforeEach(() => {
     vi.resetAllMocks();
 
+    const mockGeminiClient = {
+      getChatRecordingService: vi.fn().mockReturnValue({
+        getConversationFilePath: vi
+          .fn()
+          .mockReturnValue('/test/project/.gemini/tmp/chats/session.json'),
+      }),
+    };
+
     mockConfig = {
+      get config() {
+        return this;
+      },
+      geminiClient: mockGeminiClient,
+      getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
       getSessionId: vi.fn().mockReturnValue('test-session'),
       getWorkingDir: vi.fn().mockReturnValue('/test/project'),
-      getGeminiClient: vi.fn().mockReturnValue({
-        getChatRecordingService: vi.fn().mockReturnValue({
-          getConversationFilePath: vi
-            .fn()
-            .mockReturnValue('/test/project/.gemini/tmp/chats/session.json'),
-        }),
-      }),
     } as unknown as Config;
 
     mockHookPlanner = {

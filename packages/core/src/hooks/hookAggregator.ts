@@ -5,11 +5,6 @@
  */
 
 import { FunctionCallingConfigMode } from '@google/genai';
-import type {
-  HookOutput,
-  HookExecutionResult,
-  BeforeToolSelectionOutput,
-} from './types.js';
 import {
   DefaultHookOutput,
   BeforeToolHookOutput,
@@ -18,6 +13,9 @@ import {
   AfterModelHookOutput,
   AfterAgentHookOutput,
   HookEventName,
+  type HookOutput,
+  type HookExecutionResult,
+  type BeforeToolSelectionOutput,
 } from './types.js';
 
 /**
@@ -357,6 +355,7 @@ export class HookAggregator {
     // Extract additionalContext from various hook types
     if (
       'additionalContext' in specific &&
+      // eslint-disable-next-line no-restricted-syntax
       typeof specific['additionalContext'] === 'string'
     ) {
       contexts.push(specific['additionalContext']);

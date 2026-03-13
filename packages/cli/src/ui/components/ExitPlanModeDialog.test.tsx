@@ -10,8 +10,7 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { ExitPlanModeDialog } from './ExitPlanModeDialog.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
-import { openFileInEditor } from '../utils/editorUtils.js';
+import { Command } from '../key/keyMatchers.js';
 import {
   ApprovalMode,
   validatePlanContent,
@@ -19,6 +18,7 @@ import {
   type FileSystemService,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
+import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
 vi.mock('../utils/editorUtils.js', () => ({
   openFileInEditor: vi.fn(),
@@ -41,10 +41,6 @@ vi.mock('node:fs', async (importOriginal) => {
     ...actual,
     existsSync: vi.fn(),
     realpathSync: vi.fn((p) => p),
-    promises: {
-      ...actual.promises,
-      readFile: vi.fn(),
-    },
   };
 });
 
@@ -167,6 +163,7 @@ Implement a comprehensive authentication system with multiple providers.
             readTextFile: vi.fn(),
             writeTextFile: vi.fn(),
           }),
+          getUseAlternateBuffer: () => options?.useAlternateBuffer ?? true,
         } as unknown as import('@google/gemini-cli-core').Config,
       },
     );
@@ -406,6 +403,7 @@ Implement a comprehensive authentication system with multiple providers.
         }: {
           children: React.ReactNode;
         }) => {
+          const keyMatchers = useKeyMatchers();
           useKeypress(
             (key) => {
               if (keyMatchers[Command.QUIT](key)) {
@@ -443,6 +441,7 @@ Implement a comprehensive authentication system with multiple providers.
                 readTextFile: vi.fn(),
                 writeTextFile: vi.fn(),
               }),
+              getUseAlternateBuffer: () => useAlternateBuffer ?? true,
             } as unknown as import('@google/gemini-cli-core').Config,
           },
         );
@@ -544,7 +543,7 @@ Implement a comprehensive authentication system with multiple providers.
         expect(onFeedback).not.toHaveBeenCalled();
       });
 
-      it('opens plan in external editor when Ctrl+X is pressed', async () => {
+      it('automatically submits feedback when Ctrl+X is used to edit the plan', async () => {
         const { stdin, lastFrame } = renderDialog({ useAlternateBuffer });
 
         await act(async () => {
@@ -555,26 +554,15 @@ Implement a comprehensive authentication system with multiple providers.
           expect(lastFrame()).toContain('Add user authentication');
         });
 
-        // Reset the mock to track the second call during refresh
-        vi.mocked(processSingleFileContent).mockClear();
-
         // Press Ctrl+X
         await act(async () => {
           writeKey(stdin, '\x18'); // Ctrl+X
         });
 
         await waitFor(() => {
-          expect(openFileInEditor).toHaveBeenCalledWith(
-            mockPlanFullPath,
-            expect.anything(),
-            expect.anything(),
-            undefined,
+          expect(onFeedback).toHaveBeenCalledWith(
+            'I have edited the plan or annotated it with feedback. Review the edited plan, update if necessary, and present it again for approval.',
           );
-        });
-
-        // Verify that content is refreshed (processSingleFileContent called again)
-        await waitFor(() => {
-          expect(processSingleFileContent).toHaveBeenCalled();
         });
       });
     },
