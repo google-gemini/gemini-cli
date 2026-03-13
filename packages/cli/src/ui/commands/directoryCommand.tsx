@@ -9,25 +9,27 @@ import {
   loadTrustedFolders,
 } from '../../config/trustedFolders.js';
 import { MultiFolderTrustDialog } from '../components/MultiFolderTrustDialog.js';
-import type { SlashCommand, CommandContext } from './types.js';
-import { CommandKind } from './types.js';
-import { MessageType, type HistoryItem } from '../types.js';
-import { refreshServerHierarchicalMemory } from '@google/gemini-cli-core';
+import {
+  CommandKind,
+  type SlashCommand,
+  type CommandContext,
+} from './types.js';
+import { MessageType, type HistoryItemWithoutId } from '../types.js';
+import {
+  refreshServerHierarchicalMemory,
+  type Config,
+} from '@google/gemini-cli-core';
 import {
   expandHomeDir,
   getDirectorySuggestions,
   batchAddDirectories,
 } from '../utils/directoryUtils.js';
-import type { Config } from '@google/gemini-cli-core';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 
 async function finishAddingDirectories(
   config: Config,
-  addItem: (
-    itemData: Omit<HistoryItem, 'id'>,
-    baseTimestamp?: number,
-  ) => number,
+  addItem: (itemData: HistoryItemWithoutId, baseTimestamp?: number) => number,
   added: string[],
   errors: string[],
 ) {

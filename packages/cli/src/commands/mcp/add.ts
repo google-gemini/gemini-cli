@@ -213,7 +213,15 @@ export const addCommand: CommandModule = {
         // Handle -- separator args as server args if present
         if (argv['--'] && Array.isArray(argv['--'])) {
           const args = argv['args'];
-          const existingArgs = Array.isArray(args) ? args : [];
+          let existingArgs: Array<string | number> = [];
+          if (Array.isArray(args)) {
+            existingArgs = args.filter(
+              (a): a is string | number =>
+                typeof a === 'string' || typeof a === 'number',
+            );
+          } else if (typeof args === 'string' || typeof args === 'number') {
+            existingArgs = [args];
+          }
           // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           argv['args'] = [...existingArgs, ...argv['--']];
         }

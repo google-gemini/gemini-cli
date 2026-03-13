@@ -11,6 +11,7 @@ import { debugLogger, getErrorMessage } from '@google/gemini-cli-core';
 import { loadSettings, SettingScope } from '../../config/settings.js';
 import { exitCli } from '../utils.js';
 import stripJsonComments from 'strip-json-comments';
+import { isRecord } from '../../utils/typeGuards.js';
 
 /**
  * Mapping from Claude Code event names to Gemini event names
@@ -56,10 +57,6 @@ function transformMatcher(matcher: string | undefined): string | undefined {
   }
 
   return transformed;
-}
-
-function isRecord(obj: unknown): obj is Record<string, unknown> {
-  return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
 }
 
 /**
