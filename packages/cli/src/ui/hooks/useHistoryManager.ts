@@ -70,7 +70,6 @@ export function useHistory({
       const id = getNextMessageId(baseTimestamp);
       const newItem: HistoryItem = { ...itemData, id };
 
-
       setHistory((prevHistory) => {
         if (prevHistory.length > 0) {
           const lastItem = prevHistory[prevHistory.length - 1];
