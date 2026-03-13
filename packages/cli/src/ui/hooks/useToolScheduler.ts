@@ -145,6 +145,8 @@ export function useToolScheduler(
           : event.toolCalls.filter(
               (tc) =>
                 tc.status === CoreToolCallStatus.AwaitingApproval ||
+                (tc.status === CoreToolCallStatus.Executing &&
+                  tc.pid !== undefined) ||
                 prevCallIds.has(tc.request.callId),
             );
 
