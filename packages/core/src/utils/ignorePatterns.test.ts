@@ -52,6 +52,7 @@ describe('FileExclusions', () => {
 
       // Should include system files
       expect(patterns).toContain('**/.DS_Store');
+      expect(patterns).toContain('**/Thumbs.db');
       expect(patterns).toContain('**/.env');
 
       // Should include dynamic patterns
