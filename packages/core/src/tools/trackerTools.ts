@@ -13,6 +13,7 @@ import {
   TRACKER_LIST_TASKS_DEFINITION,
   TRACKER_UPDATE_TASK_DEFINITION,
   TRACKER_VISUALIZE_DEFINITION,
+  TRACKER_DELETE_TASK_DEFINITION,
 } from './definitions/trackerTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import {
@@ -22,6 +23,7 @@ import {
   TRACKER_LIST_TASKS_TOOL_NAME,
   TRACKER_UPDATE_TASK_TOOL_NAME,
   TRACKER_VISUALIZE_TOOL_NAME,
+  TRACKER_DELETE_TASK_TOOL_NAME,
 } from './tool-names.js';
 import type { ToolResult } from './tools.js';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
@@ -602,5 +604,84 @@ export class TrackerVisualizeTool extends BaseDeclarativeTool<
   }
   override getSchema(modelId?: string) {
     return resolveToolDeclaration(TRACKER_VISUALIZE_DEFINITION, modelId);
+  }
+}
+
+// --- tracker_delete_task ---
+
+interface DeleteTaskParams {
+  id: string;
+}
+
+class TrackerDeleteTaskInvocation extends BaseToolInvocation<
+  DeleteTaskParams,
+  ToolResult
+> {
+  constructor(
+    private readonly config: Config,
+    params: DeleteTaskParams,
+    messageBus: MessageBus,
+    toolName: string,
+  ) {
+    super(params, messageBus, toolName);
+  }
+
+  private get service() {
+    return this.config.getTrackerService();
+  }
+  getDescription(): string {
+    return `Deleting task ${this.params.id}`;
+  }
+
+  override async execute(_signal: AbortSignal): Promise<ToolResult> {
+    try {
+      await this.service.deleteTask(this.params.id);
+      return {
+        llmContent: `Deleted task ${this.params.id}.`,
+        returnDisplay: `Deleted task ${this.params.id}.`,
+      };
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      return {
+        llmContent: `Error deleting task: ${errorMessage}`,
+        returnDisplay: 'Failed to delete task.',
+        error: {
+          message: errorMessage,
+          type: ToolErrorType.EXECUTION_FAILED,
+        },
+      };
+    }
+  }
+}
+
+export class TrackerDeleteTaskTool extends BaseDeclarativeTool<
+  DeleteTaskParams,
+  ToolResult
+> {
+  static readonly Name = TRACKER_DELETE_TASK_TOOL_NAME;
+  constructor(
+    private config: Config,
+    messageBus: MessageBus,
+  ) {
+    super(
+      TrackerDeleteTaskTool.Name,
+      'Delete Task',
+      TRACKER_DELETE_TASK_DEFINITION.base.description!,
+      Kind.Edit,
+      TRACKER_DELETE_TASK_DEFINITION.base.parametersJsonSchema,
+      messageBus,
+    );
+  }
+  protected createInvocation(params: DeleteTaskParams, messageBus: MessageBus) {
+    return new TrackerDeleteTaskInvocation(
+      this.config,
+      params,
+      messageBus,
+      this.name,
+    );
+  }
+  override getSchema(modelId?: string) {
+    return resolveToolDeclaration(TRACKER_DELETE_TASK_DEFINITION, modelId);
   }
 }

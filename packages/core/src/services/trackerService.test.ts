@@ -139,4 +139,73 @@ describe('TrackerService', () => {
       service.updateTask(taskA.id, { dependencies: [taskB.id] }),
     ).rejects.toThrow(/Circular dependency detected/);
   });
+
+  it('should delete a task if no other tasks depend on it', async () => {
+    const task = await service.createTask({
+      title: 'Task to be deleted',
+      description: 'Will be deleted',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
+      dependencies: [],
+    });
+
+    await service.deleteTask(task.id);
+    const retrieved = await service.getTask(task.id);
+    expect(retrieved).toBeNull();
+  });
+
+  it('should throw when deleting a non-existent task', async () => {
+    await expect(service.deleteTask('nonexistent')).rejects.toThrow(
+      /Task with ID nonexistent not found/,
+    );
+  });
+
+  it('should prevent deleting a task that is a dependency for another task', async () => {
+    const dep = await service.createTask({
+      title: 'Dependency',
+      description: 'Used by main',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
+      dependencies: [],
+    });
+
+    const main = await service.createTask({
+      title: 'Main Task',
+      description: 'Depends on dep',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
+      dependencies: [dep.id],
+    });
+
+    await expect(service.deleteTask(dep.id)).rejects.toThrow(
+      new RegExp(
+        `Cannot delete task ${dep.id} because it is a dependency of other tasks: ${main.id}`,
+      ),
+    );
+  });
+
+  it('should prevent deleting a task that has children', async () => {
+    const parent = await service.createTask({
+      title: 'Parent',
+      description: 'Has child',
+      type: TaskType.EPIC,
+      status: TaskStatus.OPEN,
+      dependencies: [],
+    });
+
+    const child = await service.createTask({
+      title: 'Child Task',
+      description: 'Has parent',
+      type: TaskType.TASK,
+      status: TaskStatus.OPEN,
+      dependencies: [],
+      parentId: parent.id,
+    });
+
+    await expect(service.deleteTask(parent.id)).rejects.toThrow(
+      new RegExp(
+        `Cannot delete task ${parent.id} because it has child tasks: ${child.id}`,
+      ),
+    );
+  });
 });

@@ -30,6 +30,7 @@ import {
   TRACKER_CREATE_TASK_TOOL_NAME,
   TRACKER_LIST_TASKS_TOOL_NAME,
   TRACKER_UPDATE_TASK_TOOL_NAME,
+  TRACKER_DELETE_TASK_TOOL_NAME,
 } from '../tools/tool-names.js';
 import type { HierarchicalMemory } from '../config/memory.js';
 import { DEFAULT_CONTEXT_FILENAME } from '../tools/memoryTool.js';
@@ -479,12 +480,13 @@ export function renderTaskTracker(): string {
   const trackerCreate = formatToolName(TRACKER_CREATE_TASK_TOOL_NAME);
   const trackerList = formatToolName(TRACKER_LIST_TASKS_TOOL_NAME);
   const trackerUpdate = formatToolName(TRACKER_UPDATE_TASK_TOOL_NAME);
+  const trackerDelete = formatToolName(TRACKER_DELETE_TASK_TOOL_NAME);
 
   return `
 # TASK MANAGEMENT PROTOCOL
 You are operating with a persistent file-based task tracking system located at \`.tracker/tasks/\`. You must adhere to the following rules:
 
-1.  **NO IN-MEMORY LISTS**: Do not maintain a mental list of tasks or write markdown checkboxes in the chat. Use the provided tools (${trackerCreate}, ${trackerList}, ${trackerUpdate}) for all state management.
+1.  **NO IN-MEMORY LISTS**: Do not maintain a mental list of tasks or write markdown checkboxes in the chat. Use the provided tools (${trackerCreate}, ${trackerList}, ${trackerUpdate}, ${trackerDelete}) for all state management.
 2.  **IMMEDIATE DECOMPOSITION**: Upon receiving a task, evaluate its functional complexity and scope. If the request involves more than a single atomic modification, or necessitates research before execution, you MUST immediately decompose it into discrete entries using ${trackerCreate}.
 3.  **IGNORE FORMATTING BIAS**: Trigger the protocol based on the **objective complexity** of the goal, regardless of whether the user provided a structured list or a single block of text/paragraph. "Paragraph-style" goals that imply multiple actions are multi-step projects and MUST be tracked.
 4.  **PLAN MODE INTEGRATION**: If an approved plan exists, you MUST use the ${trackerCreate} tool to decompose it into discrete tasks before writing any code. Maintain a bidirectional understanding between the plan document and the task graph.
