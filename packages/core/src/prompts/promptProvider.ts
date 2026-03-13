@@ -193,7 +193,10 @@ export class PromptProvider {
         ),
         gitRepo: this.withSection(
           'git',
-          () => ({ interactive: interactiveMode }),
+          () => ({
+            interactive: interactiveMode,
+            isWindows: process.platform === 'win32',
+          }),
           isGitRepository(process.cwd()) ? true : false,
         ),
         finalReminder: isModernModel
