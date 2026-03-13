@@ -382,7 +382,8 @@ describe('handleFallback', () => {
       expect(policyConfig.activateFallbackMode).toHaveBeenCalledWith(
         FALLBACK_MODEL,
       );
-      // TODO: add logging expect statement
+      expect(debugLogger.error).not.toHaveBeenCalled();
+      expect(debugLogger.warn).not.toHaveBeenCalled();
     });
 
     it('does NOT call activateFallbackMode when handler returns "stop"', async () => {
@@ -396,7 +397,8 @@ describe('handleFallback', () => {
 
       expect(result).toBe(false);
       expect(policyConfig.activateFallbackMode).not.toHaveBeenCalled();
-      // TODO: add logging expect statement
+      expect(debugLogger.error).not.toHaveBeenCalled();
+      expect(debugLogger.warn).not.toHaveBeenCalled();
     });
 
     it('does NOT call activateFallbackMode when handler returns "retry_once"', async () => {
