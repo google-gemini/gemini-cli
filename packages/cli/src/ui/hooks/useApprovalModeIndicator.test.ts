@@ -17,10 +17,12 @@ import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { useApprovalModeIndicator } from './useApprovalModeIndicator.js';
 
-import { Config, ApprovalMode } from '@google/gemini-cli-core';
-import type { Config as ActualConfigType } from '@google/gemini-cli-core';
-import type { Key } from './useKeypress.js';
-import { useKeypress } from './useKeypress.js';
+import {
+  Config,
+  ApprovalMode,
+  type Config as ActualConfigType,
+} from '@google/gemini-cli-core';
+import { useKeypress, type Key } from './useKeypress.js';
 import { MessageType } from '../types.js';
 
 vi.mock('./useKeypress.js');
@@ -86,7 +88,7 @@ describe('useApprovalModeIndicator', () => {
           (value: ApprovalMode) => void
         >,
         isYoloModeDisabled: vi.fn().mockReturnValue(false),
-        isPlanEnabled: vi.fn().mockReturnValue(false),
+        isPlanEnabled: vi.fn().mockReturnValue(true),
         isTrustedFolder: vi.fn().mockReturnValue(true) as Mock<() => boolean>,
         getCoreTools: vi.fn().mockReturnValue([]) as Mock<() => string[]>,
         getToolDiscoveryCommand: vi.fn().mockReturnValue(undefined) as Mock<

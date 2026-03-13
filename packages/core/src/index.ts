@@ -6,6 +6,7 @@
 
 // Export config
 export * from './config/config.js';
+export * from './config/agent-loop-context.js';
 export * from './config/memory.js';
 export * from './config/defaultModelConfigs.js';
 export * from './config/models.js';
@@ -47,6 +48,7 @@ export * from './scheduler/tool-executor.js';
 export * from './core/recordingContentGenerator.js';
 
 export * from './fallback/types.js';
+export * from './fallback/handler.js';
 
 export * from './code_assist/codeAssist.js';
 export * from './code_assist/oauth2.js';
@@ -112,6 +114,7 @@ export * from './utils/apiConversionUtils.js';
 export * from './utils/channel.js';
 export * from './utils/constants.js';
 export * from './utils/sessionUtils.js';
+export * from './utils/cache.js';
 
 // Export services
 export * from './services/fileDiscoveryService.js';
@@ -121,6 +124,10 @@ export * from './services/chatRecordingService.js';
 export * from './services/fileSystemService.js';
 export * from './services/sessionSummaryUtils.js';
 export * from './services/contextManager.js';
+export * from './services/trackerService.js';
+export * from './services/trackerTypes.js';
+export * from './services/keychainService.js';
+export * from './services/keychainTypes.js';
 export * from './skills/skillManager.js';
 export * from './skills/skillLoader.js';
 
@@ -128,7 +135,11 @@ export * from './skills/skillLoader.js';
 export * from './ide/ide-client.js';
 export * from './ide/ideContext.js';
 export * from './ide/ide-installer.js';
-export { IDE_DEFINITIONS, type IdeInfo } from './ide/detect-ide.js';
+export {
+  IDE_DEFINITIONS,
+  type IdeInfo,
+  isCloudShell,
+} from './ide/detect-ide.js';
 export * from './ide/constants.js';
 export * from './ide/types.js';
 
@@ -167,6 +178,7 @@ export * from './tools/read-many-files.js';
 export * from './tools/mcp-client.js';
 export * from './tools/mcp-tool.js';
 export * from './tools/write-todos.js';
+export * from './tools/trackerTools.js';
 export * from './tools/activate-skill.js';
 export * from './tools/ask-user.js';
 
@@ -188,6 +200,7 @@ export { OAuthUtils } from './mcp/oauth-utils.js';
 export * from './telemetry/index.js';
 export * from './telemetry/billingEvents.js';
 export { logBillingEvent } from './telemetry/loggers.js';
+export * from './telemetry/constants.js';
 export { sessionId, createSessionId } from './utils/session.js';
 export * from './utils/compatibility.js';
 export * from './utils/browser.js';
@@ -205,6 +218,9 @@ export * from './agents/types.js';
 // Export stdio utils
 export * from './utils/stdio.js';
 export * from './utils/terminal.js';
+
+// Export voice utilities
+export * from './voice/responseFormatter.js';
 
 // Export types from @google/genai
 export type { Content, Part, FunctionCall } from '@google/genai';

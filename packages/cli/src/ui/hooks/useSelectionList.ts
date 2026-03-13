@@ -6,8 +6,9 @@
 
 import { useReducer, useRef, useEffect, useCallback } from 'react';
 import { useKeypress, type Key } from './useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
 import { debugLogger } from '@google/gemini-cli-core';
+import { useKeyMatchers } from './useKeyMatchers.js';
 
 export interface SelectionListItem<T> {
   key: string;
@@ -213,8 +214,7 @@ function selectionListReducer(
     case 'INITIALIZE': {
       const { initialIndex, items, wrapAround } = action.payload;
       const activeKey =
-        initialIndex === state.initialIndex &&
-        state.activeIndex !== state.initialIndex
+        initialIndex === state.initialIndex
           ? state.items[state.activeIndex]?.key
           : undefined;
 
@@ -291,6 +291,7 @@ export function useSelectionList<T>({
   focusKey,
   priority,
 }: UseSelectionListOptions<T>): UseSelectionListResult {
+  const keyMatchers = useKeyMatchers();
   const baseItems = toBaseItems(items);
 
   const [state, dispatch] = useReducer(selectionListReducer, {
@@ -461,7 +462,7 @@ export function useSelectionList<T>({
       }
       return false;
     },
-    [dispatch, itemsLength, showNumbers],
+    [dispatch, itemsLength, showNumbers, keyMatchers],
   );
 
   useKeypress(handleKeypress, {
