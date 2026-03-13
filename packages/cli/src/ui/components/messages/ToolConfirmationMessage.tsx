@@ -378,7 +378,7 @@ export const ToolConfirmationMessage: React.FC<
 
     let securityWarningsHeight = 0;
     if (deceptiveUrlWarningText) {
-      securityWarningsHeight = deceptiveUrlWarningText.split('\n').length + 1; // +1 for marginBottom
+securityWarningsHeight = deceptiveUrlWarningText.split('\n').reduce((acc, line) => acc + Math.max(Math.ceil(line.length / Math.max(terminalWidth - 5, 1)), 1), 0) + 2;
     }
 
     const surroundingElementsHeight =
