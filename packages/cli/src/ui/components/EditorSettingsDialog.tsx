@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useState } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import {
@@ -66,18 +66,37 @@ export function EditorSettingsDialog({
 
   const currentPreference =
     settings.forScope(selectedScope).settings.general?.preferredEditor;
-  let editorIndex = currentPreference
-    ? editorItems.findIndex(
-        (item: EditorDisplay) => item.type === currentPreference,
-      )
-    : 0;
-  if (editorIndex === -1) {
-    coreEvents.emitFeedback(
-      'error',
-      `Editor is not supported: ${currentPreference}`,
-    );
-    editorIndex = 0;
-  }
+
+  // Derive editorIndex and isInvalidEditor using useMemo to avoid mutation during render
+  const [editorIndex, isInvalidEditor] = useMemo(() => {
+    const idx = currentPreference
+      ? editorItems.findIndex(
+          (item: EditorDisplay) => item.type === currentPreference,
+        )
+      : 0;
+    const isInvalid = idx === -1;
+    // Default to 0 for invalid editors
+    const finalIndex = isInvalid ? 0 : idx;
+    return [finalIndex, isInvalid];
+  }, [currentPreference, editorItems]);
+
+  // Track which invalid editors we've already warned about to prevent spam
+  const warnedEditorsRef = useRef<Set<string>>(new Set());
+
+  // Emit error only once per invalid editor preference
+  useEffect(() => {
+    if (
+      isInvalidEditor &&
+      currentPreference &&
+      !warnedEditorsRef.current.has(currentPreference)
+    ) {
+      warnedEditorsRef.current.add(currentPreference);
+      coreEvents.emitFeedback(
+        'error',
+        `Editor is not supported: ${currentPreference}`,
+      );
+    }
+  }, [isInvalidEditor, currentPreference]);
 
   const scopeItems: Array<{
     label: string;
