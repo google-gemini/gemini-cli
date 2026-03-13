@@ -10,7 +10,11 @@ import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 import { StreamingState } from '../types.js';
 import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
-import { type Config, CoreToolCallStatus } from '@google/gemini-cli-core';
+import {
+  type Config,
+  CoreToolCallStatus,
+  type SerializableConfirmationDetails,
+} from '@google/gemini-cli-core';
 import type { ConfirmingToolState } from '../hooks/useConfirmingTool.js';
 import { theme } from '../semantic-colors.js';
 
@@ -412,5 +416,103 @@ describe('ToolConfirmationQueue', () => {
     const stickyHeaderProps = vi.mocked(StickyHeader).mock.calls[0][0];
     expect(stickyHeaderProps.borderColor).toBe(theme.status.success);
     unmount();
+  });
+
+  describe('height allocation and layout (SVG snapshots)', () => {
+    it('should render the full queue wrapper with borders and content for large edit diffs', async () => {
+      let largeDiff = '--- a/file.ts\n+++ b/file.ts\n@@ -1,10 +1,15 @@\n';
+      for (let i = 1; i <= 20; i++) {
+        largeDiff += `-const oldLine${i} = true;\n`;
+        largeDiff += `+const newLine${i} = true;\n`;
+      }
+
+      const confirmationDetails: SerializableConfirmationDetails = {
+        type: 'edit',
+        title: 'Confirm Edit',
+        fileName: 'file.ts',
+        filePath: '/file.ts',
+        fileDiff: largeDiff,
+        originalContent: 'old',
+        newContent: 'new',
+        isModifying: false,
+      };
+
+      const confirmingTool = {
+        tool: {
+          callId: 'test-call-id',
+          name: 'replace',
+          status: CoreToolCallStatus.AwaitingApproval,
+          description: 'Replaces content in a file',
+          confirmationDetails,
+        },
+        index: 1,
+        total: 1,
+      };
+
+      const renderResult = renderWithProviders(
+        <ToolConfirmationQueue
+          confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+        />,
+        {
+          uiState: {
+            mainAreaWidth: 80,
+            terminalHeight: 50,
+            constrainHeight: true,
+            availableTerminalHeight: 40,
+          },
+          config: mockConfig,
+        },
+      );
+      await renderResult.waitUntilReady();
+
+      await expect(renderResult).toMatchSvgSnapshot();
+      renderResult.unmount();
+    });
+
+    it('should render the full queue wrapper with borders and content for large exec commands', async () => {
+      let largeCommand = '';
+      for (let i = 1; i <= 50; i++) {
+        largeCommand += `echo "Line ${i}"\n`;
+      }
+
+      const confirmationDetails: SerializableConfirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Execution',
+        command: largeCommand.trimEnd(),
+        rootCommand: 'echo',
+        rootCommands: ['echo'],
+      };
+
+      const confirmingTool = {
+        tool: {
+          callId: 'test-call-id-exec',
+          name: 'run_shell_command',
+          status: CoreToolCallStatus.AwaitingApproval,
+          description: 'Executes a bash command',
+          confirmationDetails,
+        },
+        index: 2,
+        total: 3,
+      };
+
+      const renderResult = renderWithProviders(
+        <ToolConfirmationQueue
+          confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+        />,
+        {
+          uiState: {
+            mainAreaWidth: 80,
+            terminalHeight: 50,
+            constrainHeight: true,
+            availableTerminalHeight: 40,
+          },
+          config: mockConfig,
+        },
+      );
+      await renderResult.waitUntilReady();
+
+      await expect(renderResult).toMatchSvgSnapshot();
+      renderResult.unmount();
+    });
   });
 });
