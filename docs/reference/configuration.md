@@ -245,6 +245,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hide helpful tips in the UI
   - **Default:** `false`
 
+- **`ui.escapePastedAtSymbols`** (boolean):
+  - **Description:** When enabled, @ symbols in pasted text are escaped to
+    prevent unintended @path expansion.
+  - **Default:** `false`
+
 - **`ui.showShortcutsHint`** (boolean):
   - **Description:** Show the "? for shortcuts" hint above the input.
   - **Default:** `true`
