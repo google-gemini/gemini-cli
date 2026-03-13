@@ -17,7 +17,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { copyFileSync, existsSync, mkdirSync, cpSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, cpSync, rmSync } from 'node:fs';
 import { dirname, join, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { glob } from 'glob';
@@ -25,6 +25,12 @@ import { glob } from 'glob';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 const bundleDir = join(root, 'bundle');
+
+// Remove the destination first so repeated bundle runs stay idempotent.
+function copyDirFresh(src, dest) {
+  rmSync(dest, { recursive: true, force: true });
+  cpSync(src, dest, { recursive: true, dereference: true });
+}
 
 // Create the bundle directory if it doesn't exist
 if (!existsSync(bundleDir)) {
@@ -58,7 +64,7 @@ console.log(`Copied ${policyFiles.length} policy files to bundle/policies/`);
 const docsSrc = join(root, 'docs');
 const docsDest = join(bundleDir, 'docs');
 if (existsSync(docsSrc)) {
-  cpSync(docsSrc, docsDest, { recursive: true, dereference: true });
+  copyDirFresh(docsSrc, docsDest);
   console.log('Copied docs to bundle/docs/');
 }
 
@@ -66,10 +72,7 @@ if (existsSync(docsSrc)) {
 const builtinSkillsSrc = join(root, 'packages/core/src/skills/builtin');
 const builtinSkillsDest = join(bundleDir, 'builtin');
 if (existsSync(builtinSkillsSrc)) {
-  cpSync(builtinSkillsSrc, builtinSkillsDest, {
-    recursive: true,
-    dereference: true,
-  });
+  copyDirFresh(builtinSkillsSrc, builtinSkillsDest);
   console.log('Copied built-in skills to bundle/builtin/');
 }
 
@@ -82,12 +85,11 @@ const devtoolsDest = join(
   'gemini-cli-devtools',
 );
 const devtoolsDistSrc = join(devtoolsSrc, 'dist');
+const devtoolsDistDest = join(devtoolsDest, 'dist');
 if (existsSync(devtoolsDistSrc)) {
+  rmSync(devtoolsDest, { recursive: true, force: true });
   mkdirSync(devtoolsDest, { recursive: true });
-  cpSync(devtoolsDistSrc, join(devtoolsDest, 'dist'), {
-    recursive: true,
-    dereference: true,
-  });
+  copyDirFresh(devtoolsDistSrc, devtoolsDistDest);
   copyFileSync(
     join(devtoolsSrc, 'package.json'),
     join(devtoolsDest, 'package.json'),
