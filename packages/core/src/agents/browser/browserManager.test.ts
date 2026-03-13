@@ -143,6 +143,75 @@ describe('BrowserManager', () => {
         isError: false,
       });
     });
+
+    it('should block navigate_page to disallowed domain', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['google.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('navigate_page', {
+        url: 'https://evil.com',
+      });
+
+      expect(result.isError).toBe(true);
+      expect((result.content || [])[0]?.text).toContain('not permitted');
+      expect(Client).not.toHaveBeenCalled();
+    });
+
+    it('should allow navigate_page to allowed domain', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['google.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('navigate_page', {
+        url: 'https://google.com/search',
+      });
+
+      expect(result.isError).toBe(false);
+      expect((result.content || [])[0]?.text).toBe('Tool result');
+    });
+
+    it('should allow navigate_page to subdomain when wildcard is used', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['*.google.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('navigate_page', {
+        url: 'https://mail.google.com',
+      });
+
+      expect(result.isError).toBe(false);
+      expect((result.content || [])[0]?.text).toBe('Tool result');
+    });
+
+    it('should block new_page to disallowed domain', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['google.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('new_page', {
+        url: 'https://evil.com',
+      });
+
+      expect(result.isError).toBe(true);
+      expect((result.content || [])[0]?.text).toContain('not permitted');
+    });
   });
 
   describe('MCP connection', () => {
@@ -170,6 +239,40 @@ describe('BrowserManager', () => {
       expect(args).toContain('--userDataDir');
       const userDataDirIndex = args.indexOf('--userDataDir');
       expect(args[userDataDirIndex + 1]).toMatch(/cli-browser-profile$/);
+    });
+
+    it('should pass --host-rules when allowedDomains is configured', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['google.com', '*.openai.com'],
+          },
+        },
+      });
+
+      const manager = new BrowserManager(restrictedConfig);
+      await manager.ensureConnection();
+
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+        ?.args as string[];
+      expect(args).toContain(
+        '--chromeArg="--host-rules=MAP * 127.0.0.1, EXCLUDE google.com, EXCLUDE *.openai.com, EXCLUDE 127.0.0.1"',
+      );
+    });
+
+    it('should throw error when invalid domain is configured in allowedDomains', async () => {
+      const invalidConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['invalid domain!'],
+          },
+        },
+      });
+
+      const manager = new BrowserManager(invalidConfig);
+      await expect(manager.ensureConnection()).rejects.toThrow(
+        'Invalid domain in allowedDomains: invalid domain!',
+      );
     });
 
     it('should pass headless flag when configured', async () => {
