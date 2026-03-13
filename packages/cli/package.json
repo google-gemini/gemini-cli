@@ -65,7 +65,7 @@
     "strip-json-comments": "^3.1.1",
     "tar": "^7.5.8",
     "tinygradient": "^1.1.5",
-    "undici": "^7.10.0",
+    "undici": "^7.24.0",
     "ws": "^8.16.0",
     "yargs": "^17.7.2",
     "zod": "^3.23.8"
