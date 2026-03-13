@@ -241,7 +241,10 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
 
   constructor() {
     super();
+    // Increase default max listeners for this global event bus.
+    this.setMaxListeners(100);
   }
+
 
   private _emitOrQueue<K extends keyof CoreEvents>(
     event: K,

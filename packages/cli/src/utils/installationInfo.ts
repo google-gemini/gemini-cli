@@ -31,6 +31,28 @@ export interface InstallationInfo {
   updateMessage?: string;
 }
 
+/**
+ * Checks if a path is writable by the current process.
+ */
+function isWritable(dir: string): boolean {
+  try {
+    fs.accessSync(dir, fs.constants.W_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Checks if the current user is root/admin.
+ */
+function isRoot(): boolean {
+  if (process.getuid) {
+    return process.getuid() === 0;
+  }
+  return false;
+}
+
 export function getInstallationInfo(
   projectRoot: string,
   isAutoUpdateEnabled: boolean,
@@ -43,21 +65,17 @@ export function getInstallationInfo(
   try {
     // Normalize path separators to forward slashes for consistent matching.
     const realPath = fs.realpathSync(cliPath).replace(/\\/g, '/');
+    const cliDir = path.dirname(realPath);
     const normalizedProjectRoot = projectRoot?.replace(/\\/g, '/');
-    const isGit = isGitRepository(process.cwd());
 
-    // Check for local git clone first
-    if (
-      isGit &&
-      normalizedProjectRoot &&
-      realPath.startsWith(normalizedProjectRoot) &&
-      !realPath.includes('/node_modules/')
-    ) {
+    // Check for local git clone first.
+    // We check if the CLI binary itself is inside a git repository (and not in a node_modules folder).
+    if (isGitRepository(cliDir) && !realPath.includes('/node_modules/')) {
       return {
         packageManager: PackageManager.UNKNOWN, // Not managed by a package manager in this sense
         isGlobal: false,
         updateMessage:
-          'Running from a local git clone. Please update with "git pull".',
+          'Running from a local git clone/fork. Please update with "git pull".',
       };
     }
 
@@ -110,27 +128,43 @@ export function getInstallationInfo(
       realPath.includes('/.pnpm/global') ||
       realPath.includes('/.local/share/pnpm')
     ) {
-      const updateCommand = 'pnpm add -g @google/gemini-cli@latest';
+      let updateCommand = 'pnpm add -g @google/gemini-cli@latest';
+      const needsSudo =
+        process.platform !== 'win32' && !isRoot() && !isWritable(cliDir);
+      if (needsSudo) {
+        updateCommand = `sudo ${updateCommand}`;
+      }
+
       return {
         packageManager: PackageManager.PNPM,
         isGlobal: true,
-        updateCommand,
-        updateMessage: isAutoUpdateEnabled
-          ? 'Installed with pnpm. Attempting to automatically update now...'
-          : `Please run ${updateCommand} to update`,
+        updateCommand: needsSudo ? undefined : updateCommand,
+        updateMessage: needsSudo
+          ? `Please run "${updateCommand}" to update (requires sudo).`
+          : isAutoUpdateEnabled
+            ? 'Installed with pnpm. Attempting to automatically update now...'
+            : `Please run ${updateCommand} to update`,
       };
     }
 
     // Check for yarn
     if (realPath.includes('/.yarn/global')) {
-      const updateCommand = 'yarn global add @google/gemini-cli@latest';
+      let updateCommand = 'yarn global add @google/gemini-cli@latest';
+      const needsSudo =
+        process.platform !== 'win32' && !isRoot() && !isWritable(cliDir);
+      if (needsSudo) {
+        updateCommand = `sudo ${updateCommand}`;
+      }
+
       return {
         packageManager: PackageManager.YARN,
         isGlobal: true,
-        updateCommand,
-        updateMessage: isAutoUpdateEnabled
-          ? 'Installed with yarn. Attempting to automatically update now...'
-          : `Please run ${updateCommand} to update`,
+        updateCommand: needsSudo ? undefined : updateCommand,
+        updateMessage: needsSudo
+          ? `Please run "${updateCommand}" to update (requires sudo).`
+          : isAutoUpdateEnabled
+            ? 'Installed with yarn. Attempting to automatically update now...'
+            : `Please run ${updateCommand} to update`,
       };
     }
 
@@ -143,14 +177,22 @@ export function getInstallationInfo(
       };
     }
     if (realPath.includes('/.bun/install/global')) {
-      const updateCommand = 'bun add -g @google/gemini-cli@latest';
+      let updateCommand = 'bun add -g @google/gemini-cli@latest';
+      const needsSudo =
+        process.platform !== 'win32' && !isRoot() && !isWritable(cliDir);
+      if (needsSudo) {
+        updateCommand = `sudo ${updateCommand}`;
+      }
+
       return {
         packageManager: PackageManager.BUN,
         isGlobal: true,
-        updateCommand,
-        updateMessage: isAutoUpdateEnabled
-          ? 'Installed with bun. Attempting to automatically update now...'
-          : `Please run ${updateCommand} to update`,
+        updateCommand: needsSudo ? undefined : updateCommand,
+        updateMessage: needsSudo
+          ? `Please run "${updateCommand}" to update (requires sudo).`
+          : isAutoUpdateEnabled
+            ? 'Installed with bun. Attempting to automatically update now...'
+            : `Please run ${updateCommand} to update`,
       };
     }
 
@@ -176,17 +218,26 @@ export function getInstallationInfo(
     }
 
     // Assume global npm
-    const updateCommand = 'npm install -g @google/gemini-cli@latest';
+    let updateCommand = 'npm install -g @google/gemini-cli@latest';
+    const needsSudo =
+      process.platform !== 'win32' && !isRoot() && !isWritable(cliDir);
+    if (needsSudo) {
+      updateCommand = `sudo ${updateCommand}`;
+    }
+
     return {
       packageManager: PackageManager.NPM,
       isGlobal: true,
-      updateCommand,
-      updateMessage: isAutoUpdateEnabled
-        ? 'Installed with npm. Attempting to automatically update now...'
-        : `Please run ${updateCommand} to update`,
+      updateCommand: needsSudo ? undefined : updateCommand,
+      updateMessage: needsSudo
+        ? `Please run "${updateCommand}" to update (requires sudo).`
+        : isAutoUpdateEnabled
+          ? 'Installed with npm. Attempting to automatically update now...'
+          : `Please run ${updateCommand} to update`,
     };
   } catch (error) {
     debugLogger.log(error);
     return { packageManager: PackageManager.UNKNOWN, isGlobal: false };
   }
 }
+

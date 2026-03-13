@@ -477,7 +477,36 @@ describe('setUpdateHandler', () => {
     );
   });
 
+  it('should not show update-received message if update-failed was called', () => {
+    const updateInfo: UpdateObject = {
+      update: {
+        latest: '2.0.0',
+        current: '1.0.0',
+        type: 'major',
+        name: '@google/gemini-cli',
+      },
+      message: 'Update available',
+    };
+
+    updateEventEmitter.emit('update-received', updateInfo);
+    updateEventEmitter.emit('update-failed', { message: 'Failed' });
+
+    // Advance timers
+    vi.advanceTimersByTime(60000);
+
+    // Should only have called addItem for failed, not for received (after timeout)
+    expect(addItem).toHaveBeenCalledTimes(1);
+    expect(addItem).toHaveBeenCalledWith(
+      {
+        type: MessageType.ERROR,
+        text: 'Automatic update failed. Please try updating manually',
+      },
+      expect.any(Number),
+    );
+  });
+
   it('should handle update-info event', () => {
+
     updateEventEmitter.emit('update-info', { message: 'Info message' });
 
     expect(addItem).toHaveBeenCalledWith(

@@ -26,6 +26,7 @@ vi.mock('fs', async (importOriginal) => {
     ...actualFs,
     realpathSync: vi.fn(),
     existsSync: vi.fn(),
+    accessSync: vi.fn(),
   };
 });
 
@@ -40,6 +41,7 @@ vi.mock('child_process', async (importOriginal) => {
 const mockedIsGitRepository = vi.mocked(isGitRepository);
 const mockedRealPathSync = vi.mocked(fs.realpathSync);
 const mockedExistsSync = vi.mocked(fs.existsSync);
+const mockedAccessSync = vi.mocked(fs.accessSync);
 const mockedExecSync = vi.mocked(childProcess.execSync);
 
 describe('getInstallationInfo', () => {
@@ -52,11 +54,16 @@ describe('getInstallationInfo', () => {
     // Mock process.cwd() for isGitRepository
     vi.spyOn(process, 'cwd').mockReturnValue(projectRoot);
     vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
+    // Default to writable and non-root
+    mockedAccessSync.mockImplementation(() => {});
+    vi.spyOn(process, 'getuid').mockReturnValue(1000);
   });
 
   afterEach(() => {
     process.argv = originalArgv;
+    vi.restoreAllMocks();
   });
+
 
   it('should return UNKNOWN when cliPath is not available', () => {
     process.argv[1] = '';
@@ -339,6 +346,58 @@ describe('getInstallationInfo', () => {
     expect(infoDisabled.updateMessage).toContain('Please run npm install');
   });
 
+  it('should detect when sudo is required on Linux/macOS and suggest it', () => {
+    const globalPath = `/usr/local/bin/gemini`;
+    process.argv[1] = globalPath;
+    mockedRealPathSync.mockReturnValue(globalPath);
+
+    // Mock non-writable directory and non-root user
+    mockedAccessSync.mockImplementation(() => {
+      throw new Error('Permission denied');
+    });
+    vi.spyOn(process, 'getuid').mockReturnValue(1000);
+
+    const info = getInstallationInfo(projectRoot, true);
+
+    expect(info.packageManager).toBe(PackageManager.NPM);
+    expect(info.isGlobal).toBe(true);
+    expect(info.updateCommand).toBeUndefined(); // Auto-update disabled
+    expect(info.updateMessage).toContain('sudo npm install -g');
+    expect(info.updateMessage).toContain('requires sudo');
+  });
+
+  it('should NOT suggest sudo if already running as root', () => {
+    const globalPath = `/usr/local/bin/gemini`;
+    process.argv[1] = globalPath;
+    mockedRealPathSync.mockReturnValue(globalPath);
+
+    // Mock non-writable but root user
+    mockedAccessSync.mockImplementation(() => {
+      throw new Error('Permission denied');
+    });
+    vi.spyOn(process, 'getuid').mockReturnValue(0);
+
+    const info = getInstallationInfo(projectRoot, true);
+
+    expect(info.packageManager).toBe(PackageManager.NPM);
+    expect(info.isGlobal).toBe(true);
+    expect(info.updateCommand).toBe('npm install -g @google/gemini-cli@latest');
+    expect(info.updateMessage).toContain('Attempting to automatically update');
+  });
+
+  it('should detect running from a local git clone even if not in project root', () => {
+    const forkPath = '/home/user/fork/gemini-cli/bundle/gemini.js';
+    process.argv[1] = forkPath;
+    mockedRealPathSync.mockReturnValue(forkPath);
+    mockedIsGitRepository.mockReturnValue(true);
+
+    const info = getInstallationInfo(projectRoot, true);
+
+    expect(info.packageManager).toBe(PackageManager.UNKNOWN);
+    expect(info.isGlobal).toBe(false);
+    expect(info.updateMessage).toContain('Running from a local git clone/fork');
+  });
+
   it('should NOT detect Homebrew if gemini-cli is installed in brew but running from npm location', () => {
     Object.defineProperty(process, 'platform', {
       value: 'darwin',
@@ -374,3 +433,4 @@ describe('getInstallationInfo', () => {
     expect(info.packageManager).toBe(PackageManager.NPM);
   });
 });
+
