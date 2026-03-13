@@ -14,6 +14,8 @@ export interface HeadlessModeOptions {
   prompt?: string | boolean;
   /** Initial query positional argument. */
   query?: string | boolean;
+  /** Whether YOLO (auto-approve) mode is enabled. */
+  yolo?: boolean;
 }
 
 /**
@@ -40,7 +42,7 @@ export function isHeadlessMode(options?: HeadlessModeOptions): boolean {
     (!!process.stdin && !process.stdin.isTTY) ||
     (!!process.stdout && !process.stdout.isTTY);
 
-  if (isNotTTY || !!options?.prompt || !!options?.query) {
+  if (isNotTTY || !!options?.prompt || !!options?.query || !!options?.yolo) {
     return true;
   }
 

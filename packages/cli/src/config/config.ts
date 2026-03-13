@@ -451,6 +451,7 @@ export async function loadCliConfig(
     isWorkspaceTrusted(settings, cwd, undefined, {
       prompt: argv.prompt,
       query: argv.query,
+      yolo: argv.yolo,
     })?.isTrusted ?? false;
 
   // Set the context filename in the server's memoryTool module BEFORE loading memory
