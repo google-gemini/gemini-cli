@@ -342,7 +342,9 @@ policies, as it is much more robust than manually writing Fully Qualified Names
 
 **1. Targeting a specific tool on a server**
 
-Combine `mcpName` and `toolName` to target a single operation.
+Combine `mcpName` and `toolName` to target a single operation. When using
+`mcpName`, the `toolName` field should strictly be the simple name of the tool
+(e.g., `search`), **not** the Fully Qualified Name (e.g., `mcp_server_search`).
 
 ```toml
 # Allows the `search` tool on the `my-jira-server` MCP
