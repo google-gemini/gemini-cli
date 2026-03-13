@@ -378,7 +378,18 @@ export const ToolConfirmationMessage: React.FC<
 
     let securityWarningsHeight = 0;
     if (deceptiveUrlWarningText) {
-securityWarningsHeight = deceptiveUrlWarningText.split('\n').reduce((acc, line) => acc + Math.max(Math.ceil(line.length / Math.max(terminalWidth - 5, 1)), 1), 0) + 2;
+      securityWarningsHeight =
+        deceptiveUrlWarningText
+          .split('\n')
+          .reduce(
+            (acc, line) =>
+              acc +
+              Math.max(
+                Math.ceil(line.length / Math.max(terminalWidth - 5, 1)),
+                1,
+              ),
+            0,
+          ) + 2;
     }
 
     const surroundingElementsHeight =
@@ -391,9 +402,10 @@ securityWarningsHeight = deceptiveUrlWarningText.split('\n').reduce((acc, line) 
     return Math.max(availableTerminalHeight - surroundingElementsHeight, 1);
   }, [
     availableTerminalHeight,
-    getOptions,
     handlesOwnUI,
+    getOptions,
     deceptiveUrlWarningText,
+    terminalWidth,
   ]);
 
   const { question, bodyContent, options, securityWarnings, initialIndex } =

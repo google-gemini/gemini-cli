@@ -1375,7 +1375,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     !proQuotaRequest;
 
   const [controlsHeight, setControlsHeight] = useState(0);
-  const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
 
   useLayoutEffect(() => {
     if (mainControlsRef.current) {
@@ -1385,15 +1384,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         setControlsHeight(roundedHeight);
       }
     }
-  }, [
-    buffer,
-    terminalWidth,
-    terminalHeight,
-    controlsHeight,
-    isInputActive,
-    streamingState,
-    showErrorDetails,
-  ]);
+  }, [buffer, terminalWidth, terminalHeight, controlsHeight, isInputActive]);
 
   // Compute available terminal height based on controls measurement
   const availableTerminalHeight = Math.max(
@@ -1478,6 +1469,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       !idePromptAnswered,
   );
 
+  const [showErrorDetails, setShowErrorDetails] = useState<boolean>(false);
   const [showFullTodos, setShowFullTodos] = useState<boolean>(false);
   const [renderMarkdown, setRenderMarkdown] = useState<boolean>(true);
 
