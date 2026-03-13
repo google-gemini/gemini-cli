@@ -6,129 +6,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync } from 'node:child_process';
-import {
-  mkdirSync,
-  rmSync,
-  readFileSync,
-  existsSync,
-  lstatSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { execSync, spawnSync } from 'node:child_process';
+import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const ACTIONLINT_VERSION = '1.7.7';
-const SHELLCHECK_VERSION = '0.11.0';
-const YAMLLINT_VERSION = '1.35.1';
-
-const TEMP_DIR =
-  process.env.GEMINI_LINT_TEMP_DIR || join(tmpdir(), 'gemini-cli-linters');
-
-function getPlatformArch() {
-  const platform = process.platform;
-  const arch = process.arch;
-  if (platform === 'linux' && arch === 'x64') {
-    return {
-      actionlint: 'linux_amd64',
-      shellcheck: 'linux.x86_64',
-    };
-  }
-  if (platform === 'darwin' && arch === 'x64') {
-    return {
-      actionlint: 'darwin_amd64',
-      shellcheck: 'darwin.x86_64',
-    };
-  }
-  if (platform === 'darwin' && arch === 'arm64') {
-    return {
-      actionlint: 'darwin_arm64',
-      shellcheck: 'darwin.aarch64',
-    };
-  }
-  if (platform === 'win32' && arch === 'x64') {
-    return {
-      actionlint: 'windows_amd64',
-      // shellcheck is not used for Windows since it uses the .zip release
-      // which has a consistent name across architectures
-    };
-  }
-  throw new Error(`Unsupported platform/architecture: ${platform}/${arch}`);
-}
-
-const platformArch = getPlatformArch();
-
-const PYTHON_VENV_PATH = join(TEMP_DIR, 'python_venv');
-
-const pythonVenvPythonPath = join(
-  PYTHON_VENV_PATH,
-  process.platform === 'win32' ? 'Scripts' : 'bin',
-  process.platform === 'win32' ? 'python.exe' : 'python',
-);
-
-const isWindows = process.platform === 'win32';
-
-const actionlintCheck = isWindows
-  ? `where actionlint 2>nul`
-  : 'command -v actionlint';
-
-const actionlintInstaller = isWindows
-  ? `powershell -Command "` +
-    `New-Item -ItemType Directory -Force -Path '${TEMP_DIR}/actionlint' | Out-Null; ` +
-    `Invoke-WebRequest -Uri 'https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_${platformArch.actionlint}.zip' -OutFile '${TEMP_DIR}/.actionlint.zip'; ` +
-    `Add-Type -AssemblyName System.IO.Compression.FileSystem; ` +
-    `[System.IO.Compression.ZipFile]::ExtractToDirectory('${TEMP_DIR}/.actionlint.zip', '${TEMP_DIR}/actionlint')"`
-  : `
-      mkdir -p "${TEMP_DIR}/actionlint"
-      curl -sSLo "${TEMP_DIR}/.actionlint.tgz" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_${platformArch.actionlint}.tar.gz"
-      tar -xzf "${TEMP_DIR}/.actionlint.tgz" -C "${TEMP_DIR}/actionlint"
-    `;
-
-const shellcheckCheck = isWindows
-  ? `where shellcheck 2>nul`
-  : 'command -v shellcheck';
-
-const shellcheckInstaller = isWindows
-  ? `powershell -Command "` +
-    `Invoke-WebRequest -Uri 'https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.zip' -OutFile '${TEMP_DIR}/.shellcheck.zip'; ` +
-    `Add-Type -AssemblyName System.IO.Compression.FileSystem; ` +
-    `[System.IO.Compression.ZipFile]::ExtractToDirectory('${TEMP_DIR}/.shellcheck.zip', '${TEMP_DIR}/shellcheck')"`
-  : `
-      mkdir -p "${TEMP_DIR}/shellcheck"
-      curl -sSLo "${TEMP_DIR}/.shellcheck.txz" "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.${platformArch.shellcheck}.tar.xz"
-      tar -xf "${TEMP_DIR}/.shellcheck.txz" -C "${TEMP_DIR}/shellcheck" --strip-components=1
-    `;
-
-const yamllintCheck = isWindows
-  ? `if exist "${PYTHON_VENV_PATH}\\Scripts\\yamllint.exe" (exit 0) else (exit 1)`
-  : `test -x "${PYTHON_VENV_PATH}/bin/yamllint"`;
-
-const yamllintInstaller = isWindows
-  ? `python -m venv "${PYTHON_VENV_PATH}" && ` +
-    `"${pythonVenvPythonPath}" -m pip install --upgrade pip && ` +
-    `"${pythonVenvPythonPath}" -m pip install "yamllint==${YAMLLINT_VERSION}" --index-url https://pypi.org/simple`
-  : `
-    python3 -m venv "${PYTHON_VENV_PATH}" && \
-    "${pythonVenvPythonPath}" -m pip install --upgrade pip && \
-    "${pythonVenvPythonPath}" -m pip install "yamllint==${YAMLLINT_VERSION}" --index-url https://pypi.org/simple
-  `;
-
-/**
- * @typedef {{
- *   check: string;
- *   installer: string;
- *   run: string;
- * }}
- */
-
-/**
- * @type {{[linterName: string]: Linter}}
- */
 const LINTERS = {
   actionlint: {
-    check: actionlintCheck,
-    installer: actionlintInstaller,
+    check: 'npm list @tktco/node-actionlint --depth=0',
+    installer: 'npm install --save-dev @tktco/node-actionlint',
     run: `
-      actionlint \
+      npx node-actionlint \
         -color \
         -ignore 'SC2002:' \
         -ignore 'SC2016:' \
@@ -137,45 +24,59 @@ const LINTERS = {
     `,
   },
   shellcheck: {
-    check: shellcheckCheck,
-    installer: shellcheckInstaller,
-    run: `
-      git ls-files | grep -E '^([^.]+|.*\\.(sh|zsh|bash))' | xargs file --mime-type \
-        | grep "text/x-shellscript" | awk '{ print substr($1, 1, length($1)-1) }' \
-        | xargs shellcheck \
-          --check-sourced \
-          --enable=all \
-          --exclude=SC2002,SC2129,SC2310 \
-          --severity=style \
-          --format=gcc \
-          --color=never | sed -e 's/note:/warning:/g' -e 's/style:/warning:/g'
-    `,
+    check: 'npm list shellcheck --depth=0',
+    installer: 'npm install --save-dev shellcheck',
   },
   yamllint: {
-    check: yamllintCheck,
-    installer: yamllintInstaller,
-    run: "git ls-files | grep -E '\\.(yaml|yml)' | xargs yamllint --format github",
+    check: 'npm list yaml-lint --depth=0',
+    installer: 'npm install --save-dev yaml-lint',
   },
 };
 
+function getShellScripts() {
+  const allFiles = execSync('git ls-files', { encoding: 'utf-8' })
+    .split('\n')
+    .filter(Boolean);
+
+  return allFiles.filter((file) => {
+    if (
+      file.endsWith('.sh') ||
+      file.endsWith('.zsh') ||
+      file.endsWith('.bash')
+    ) {
+      return true;
+    }
+    if (
+      !file.includes('.') &&
+      existsSync(file) &&
+      !lstatSync(file).isDirectory()
+    ) {
+      try {
+        const content = readFileSync(file, 'utf-8');
+        const firstLine = content.split('\n')[0];
+        return (
+          firstLine.startsWith('#!') &&
+          (firstLine.includes('sh') ||
+            firstLine.includes('bash') ||
+            firstLine.includes('zsh'))
+        );
+      } catch (_e) {
+        return false;
+      }
+    }
+    return false;
+  });
+}
+
+function getYamlFiles() {
+  return execSync('git ls-files', { encoding: 'utf-8' })
+    .split('\n')
+    .filter((file) => file.endsWith('.yaml') || file.endsWith('.yml'));
+}
+
 function runCommand(command, stdio = 'inherit') {
   try {
-    const env = { ...process.env };
-    const nodeBin = join(process.cwd(), 'node_modules', '.bin');
-    const sep = isWindows ? ';' : ':';
-    const pythonBin = isWindows
-      ? join(PYTHON_VENV_PATH, 'Scripts')
-      : join(PYTHON_VENV_PATH, 'bin');
-    // Windows sometimes uses 'Path' instead of 'PATH'
-    const pathKey = 'Path' in env ? 'Path' : 'PATH';
-    env[pathKey] = [
-      nodeBin,
-      join(TEMP_DIR, 'actionlint'),
-      join(TEMP_DIR, 'shellcheck'),
-      pythonBin,
-      env[pathKey],
-    ].join(sep);
-    execSync(command, { stdio, env, shell: true });
+    execSync(command, { stdio, env: process.env, shell: true });
     return true;
   } catch (_e) {
     return false;
@@ -184,10 +85,6 @@ function runCommand(command, stdio = 'inherit') {
 
 export function setupLinters() {
   console.log('Setting up linters...');
-  if (!process.env.GEMINI_LINT_TEMP_DIR) {
-    rmSync(TEMP_DIR, { recursive: true, force: true });
-  }
-  mkdirSync(TEMP_DIR, { recursive: true });
 
   for (const linter in LINTERS) {
     const { check, installer } = LINTERS[linter];
@@ -220,21 +117,67 @@ export function runActionlint() {
 
 export function runShellcheck() {
   console.log('\nRunning shellcheck...');
-  if (!runCommand(LINTERS.shellcheck.run)) {
+  const files = getShellScripts();
+  if (files.length === 0) {
+    console.log('No shell scripts found.');
+    return;
+  }
+
+  const args = [
+    'shellcheck',
+    '--check-sourced',
+    '--enable=all',
+    '--exclude=SC2002,SC2129,SC2310',
+    '--severity=style',
+    '--format=gcc',
+    '--color=never',
+    ...files,
+  ];
+
+  const result = spawnSync('npx', args, {
+    env: process.env,
+    encoding: 'utf-8',
+    shell: true, // Needed for npx on Windows and some Unix environments
+  });
+
+  if (result.stdout) {
+    console.log(
+      result.stdout
+        .replace(/note:/g, 'warning:')
+        .replace(/style:/g, 'warning:'),
+    );
+  }
+
+  if (result.status !== 0) {
+    if (result.stderr) {
+      console.error(result.stderr);
+    }
     process.exit(1);
   }
 }
 
 export function runYamllint() {
   console.log('\nRunning yamllint...');
-  if (!runCommand(LINTERS.yamllint.run)) {
+  const files = getYamlFiles();
+  if (files.length === 0) {
+    console.log('No YAML files found.');
+    return;
+  }
+
+  const result = spawnSync('npx', ['yaml-lint', ...files], {
+    env: process.env,
+    stdio: 'inherit',
+    shell: true,
+  });
+
+  if (result.status !== 0) {
     process.exit(1);
   }
 }
 
 export function runPrettier() {
   console.log('\nRunning Prettier...');
-  if (!runCommand('prettier --check .')) {
+  if (!runCommand('npx prettier --check .')) {
     console.log(
       'Prettier check failed. Please run "npm run format" to fix formatting issues.',
     );
@@ -258,27 +201,43 @@ export function runSensitiveKeywordLinter() {
   function getChangedFiles() {
     const baseRef = process.env.GITHUB_BASE_REF || 'main';
     try {
-      execSync(`git fetch origin ${baseRef}`);
-      const mergeBase = execSync(`git merge-base HEAD origin/${baseRef}`)
+      // In CI, we often have the remote main already fetched or can diff against it directly
+      // Try to find merge base if possible
+      const mergeBase = execSync(
+        `git merge-base HEAD origin/${baseRef} 2>/dev/null || git merge-base HEAD ${baseRef} 2>/dev/null`,
+      )
         .toString()
         .trim();
-      return execSync(`git diff --name-only ${mergeBase}..HEAD`)
-        .toString()
-        .trim()
-        .split('\n')
-        .filter(Boolean);
-    } catch (_error) {
-      console.error(`Could not get changed files against origin/${baseRef}.`);
-      try {
-        console.log('Falling back to diff against HEAD~1');
-        return execSync(`git diff --name-only HEAD~1..HEAD`)
+
+      if (mergeBase) {
+        return execSync(`git diff --name-only ${mergeBase}..HEAD`)
           .toString()
           .trim()
           .split('\n')
           .filter(Boolean);
-      } catch (_fallbackError) {
-        console.error('Could not get changed files against HEAD~1 either.');
-        process.exit(1);
+      }
+    } catch (_error) {
+      // Fall through to other methods
+    }
+
+    try {
+      console.log('Falling back to diff against HEAD~1');
+      return execSync(`git diff --name-only HEAD~1..HEAD`)
+        .toString()
+        .trim()
+        .split('\n')
+        .filter(Boolean);
+    } catch (_fallbackError) {
+      console.log('Falling back to all tracked files (slowest)');
+      try {
+        return execSync('git ls-files')
+          .toString()
+          .trim()
+          .split('\n')
+          .filter(Boolean);
+      } catch (_ultimateError) {
+        console.error('Could not get any files to lint.');
+        return [];
       }
     }
   }

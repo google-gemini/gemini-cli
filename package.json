@@ -88,6 +88,7 @@
   "devDependencies": {
     "@agentclientprotocol/sdk": "^0.12.0",
     "@octokit/rest": "^22.0.0",
+    "@tktco/node-actionlint": "^1.6.0",
     "@types/marked": "^5.0.2",
     "@types/mime-types": "^3.0.1",
     "@types/minimatch": "^5.1.2",
@@ -126,11 +127,13 @@
     "react-devtools-core": "^6.1.2",
     "react-dom": "^19.2.0",
     "semver": "^7.7.2",
+    "shellcheck": "^4.1.0",
     "strip-ansi": "^7.1.2",
     "ts-prune": "^0.10.3",
     "tsx": "^4.20.3",
     "typescript-eslint": "^8.30.1",
     "vitest": "^3.2.4",
+    "yaml-lint": "^1.7.0",
     "yargs": "^17.7.2"
   },
   "dependencies": {
