@@ -19,10 +19,11 @@ import { TextInput } from './TextInput.js';
 import type { TextBuffer } from './text-buffer.js';
 import { cpSlice, cpLen, cpIndexToOffset } from '../../utils/textUtils.js';
 import { useKeypress, type Key } from '../../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../key/keyMatchers.js';
 import { useSettingsNavigation } from '../../hooks/useSettingsNavigation.js';
 import { useInlineEditBuffer } from '../../hooks/useInlineEditBuffer.js';
-import { formatCommand } from '../../utils/keybindingUtils.js';
+import { formatCommand } from '../../key/keybindingUtils.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 /**
  * Represents a single item in the settings dialog.
@@ -136,6 +137,7 @@ export function BaseSettingsDialog({
   availableHeight,
   footer,
 }: BaseSettingsDialogProps): React.JSX.Element {
+  const keyMatchers = useKeyMatchers();
   // Calculate effective max items and scope visibility based on terminal height
   const { effectiveMaxItemsToShow, finalShowScopeSelector } = useMemo(() => {
     const initialShowScope = showScopeSelector;
@@ -323,13 +325,18 @@ export function BaseSettingsDialog({
           return;
         }
 
-        // Up/Down in edit mode - commit and navigate
-        if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
+        // Up/Down in edit mode - commit and navigate.
+        // Only trigger on non-insertable keys (arrow keys) so that typing
+        // j/k characters into the edit buffer is not intercepted.
+        if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key) && !key.insertable) {
           commitEdit();
           moveUp();
           return;
         }
-        if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
+        if (
+          keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key) &&
+          !key.insertable
+        ) {
           commitEdit();
           moveDown();
           return;

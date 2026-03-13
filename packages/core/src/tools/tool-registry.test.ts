@@ -310,13 +310,13 @@ describe('ToolRegistry', () => {
         excludedTools: ['tool-a'],
       },
       {
-        name: 'should match simple MCP tool names, when qualified or unqualified',
-        tools: [mcpTool, mcpTool.asFullyQualifiedTool()],
+        name: 'should match simple MCP tool names',
+        tools: [mcpTool],
         excludedTools: [mcpTool.name],
       },
       {
-        name: 'should match qualified MCP tool names when qualified or unqualified',
-        tools: [mcpTool, mcpTool.asFullyQualifiedTool()],
+        name: 'should match qualified MCP tool names',
+        tools: [mcpTool],
         excludedTools: [mcpTool.name],
       },
       {
@@ -414,9 +414,9 @@ describe('ToolRegistry', () => {
       const toolName = 'my-tool';
       const mcpTool = createMCPTool(serverName, toolName, 'desc');
 
-      // Register same MCP tool twice (one as alias, one as qualified)
+      // Register same MCP tool twice
       toolRegistry.registerTool(mcpTool);
-      toolRegistry.registerTool(mcpTool.asFullyQualifiedTool());
+      toolRegistry.registerTool(mcpTool);
 
       const toolNames = toolRegistry.getAllToolNames();
       expect(toolNames).toEqual([`mcp_${serverName}_${toolName}`]);
@@ -540,6 +540,11 @@ describe('ToolRegistry', () => {
           some_string: {
             type: 'string',
             format: 'uuid',
+          },
+          wait_for_previous: {
+            type: 'boolean',
+            description:
+              'Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.',
           },
         },
       });
@@ -698,9 +703,8 @@ describe('ToolRegistry', () => {
       const toolName = 'my-tool';
       const mcpTool = createMCPTool(serverName, toolName, 'description');
 
-      // Register both alias and qualified
       toolRegistry.registerTool(mcpTool);
-      toolRegistry.registerTool(mcpTool.asFullyQualifiedTool());
+      toolRegistry.registerTool(mcpTool);
 
       const declarations = toolRegistry.getFunctionDeclarations();
       expect(declarations).toHaveLength(1);

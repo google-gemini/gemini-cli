@@ -57,7 +57,7 @@ describe('patch-create-comment', () => {
       );
 
       expect(result.success).toBe(true);
-      expect(result.stdout).toContain('🚀 **Patch PR Created!**');
+      expect(result.stdout).toContain('🚀 **[Step 2/4] Patch PR Created!**');
       expect(result.stdout).toContain('Environment**: `prod`');
     });
 
@@ -68,7 +68,7 @@ describe('patch-create-comment', () => {
       );
 
       expect(result.success).toBe(true);
-      expect(result.stdout).toContain('🚀 **Patch PR Created!**');
+      expect(result.stdout).toContain('🚀 **[Step 2/4] Patch PR Created!**');
       expect(result.stdout).toContain('Environment**: `dev`');
     });
 
@@ -90,7 +90,7 @@ describe('patch-create-comment', () => {
       );
 
       expect(result.success).toBe(true);
-      expect(result.stdout).toContain('🚀 **Patch PR Created!**');
+      expect(result.stdout).toContain('🚀 **[Step 2/4] Patch PR Created!**');
       expect(result.stdout).toContain('Environment**: `prod`');
     });
   });
@@ -106,7 +106,7 @@ describe('patch-create-comment', () => {
       );
 
       expect(result.success).toBe(true);
-      expect(result.stdout).toContain('🚀 **Patch PR Created!**');
+      expect(result.stdout).toContain('🚀 **[Step 2/4] Patch PR Created!**');
       expect(result.stdout).toContain('Channel**: `preview`');
       expect(result.stdout).toContain('Commit**: `abc1234`');
     });
@@ -118,7 +118,9 @@ describe('patch-create-comment', () => {
       );
 
       expect(result.success).toBe(true);
-      expect(result.stdout).toContain('❌ **Patch creation failed!**');
+      expect(result.stdout).toContain(
+        '❌ **[Step 2/4] Patch creation failed!**',
+      );
       expect(result.stdout).toContain(
         'There was an error creating the patch release',
       );
@@ -136,7 +138,7 @@ describe('patch-create-comment', () => {
       );
 
       expect(result.success).toBe(true);
-      expect(result.stdout).toContain('🚀 **Patch PR Created!**');
+      expect(result.stdout).toContain('🚀 **[Step 2/4] Patch PR Created!**');
       expect(result.stdout).toContain('Channel**: `stable`');
       expect(result.stdout).toContain('Commit**: `abc1234`');
       expect(result.stdout).not.toContain('⚠️ Status');
@@ -152,7 +154,7 @@ describe('patch-create-comment', () => {
       );
 
       expect(result.success).toBe(true);
-      expect(result.stdout).toContain('🚀 **Patch PR Created!**');
+      expect(result.stdout).toContain('🚀 **[Step 2/4] Patch PR Created!**');
       expect(result.stdout).toContain(
         '⚠️ Status**: Cherry-pick conflicts detected',
       );
@@ -174,7 +176,9 @@ describe('patch-create-comment', () => {
       );
 
       expect(result.success).toBe(true);
-      expect(result.stdout).toContain('ℹ️ **Patch PR already exists!**');
+      expect(result.stdout).toContain(
+        'ℹ️ **[Step 2/4] Patch PR already exists!**',
+      );
       expect(result.stdout).toContain(
         'A patch PR for this change already exists: [#8700](https://github.com/google-gemini/gemini-cli/pull/8700)',
       );
@@ -194,7 +198,7 @@ describe('patch-create-comment', () => {
 
       expect(result.success).toBe(true);
       expect(result.stdout).toContain(
-        'ℹ️ **Patch branch exists but no PR found!**',
+        'ℹ️ **[Step 2/4] Patch branch exists but no PR found!**',
       );
       expect(result.stdout).toContain(
         'Delete the branch: `git branch -D hotfix/v0.5.0-preview.2/preview/cherry-pick-jkl3456`',
@@ -213,7 +217,9 @@ describe('patch-create-comment', () => {
       );
 
       expect(result.success).toBe(true);
-      expect(result.stdout).toContain('❌ **Patch creation failed!**');
+      expect(result.stdout).toContain(
+        '❌ **[Step 2/4] Patch creation failed!**',
+      );
       expect(result.stdout).toContain(
         'There was an error creating the patch release',
       );
@@ -231,7 +237,9 @@ describe('patch-create-comment', () => {
       );
 
       expect(result.success).toBe(true);
-      expect(result.stdout).toContain('❌ **Patch creation failed!**');
+      expect(result.stdout).toContain(
+        '❌ **[Step 2/4] Patch creation failed!**',
+      );
       expect(result.stdout).toContain(
         'There was an error creating the patch release',
       );
@@ -292,7 +300,9 @@ describe('patch-create-comment', () => {
       );
 
       expect(result.success).toBe(true);
-      expect(result.stdout).toContain('❌ **Patch creation failed!**');
+      expect(result.stdout).toContain(
+        '❌ **[Step 2/4] Patch creation failed!**',
+      );
       expect(result.stdout).toContain(
         'There was an error creating the patch release',
       );
@@ -316,7 +326,9 @@ git push origin hotfix/v0.4.1/stable/cherry-pick-abc1234
       );
 
       expect(result.success).toBe(true);
-      expect(result.stdout).toContain('🔒 **GitHub App Permission Issue**');
+      expect(result.stdout).toContain(
+        '🔒 **[Step 2/4] GitHub App Permission Issue**',
+      );
       expect(result.stdout).toContain(
         'Please run these commands manually to create the release branch:',
       );
@@ -339,7 +351,7 @@ git push origin hotfix/v0.4.1/stable/cherry-pick-abc1234
       expect(result.stdout).toContain(
         '🧪 TEST MODE - No API calls will be made',
       );
-      expect(result.stdout).toContain('🚀 **Patch PR Created!**');
+      expect(result.stdout).toContain('🚀 **[Step 2/4] Patch PR Created!**');
     });
 
     it('should generate mock content in test mode for failure', () => {
@@ -348,7 +360,9 @@ git push origin hotfix/v0.4.1/stable/cherry-pick-abc1234
       );
 
       expect(result.success).toBe(true);
-      expect(result.stdout).toContain('❌ **Patch creation failed!**');
+      expect(result.stdout).toContain(
+        '❌ **[Step 2/4] Patch creation failed!**',
+      );
     });
   });
 });

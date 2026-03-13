@@ -10,7 +10,7 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { ExitPlanModeDialog } from './ExitPlanModeDialog.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
 import {
   ApprovalMode,
   validatePlanContent,
@@ -18,6 +18,7 @@ import {
   type FileSystemService,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
+import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
 vi.mock('../utils/editorUtils.js', () => ({
   openFileInEditor: vi.fn(),
@@ -402,6 +403,7 @@ Implement a comprehensive authentication system with multiple providers.
         }: {
           children: React.ReactNode;
         }) => {
+          const keyMatchers = useKeyMatchers();
           useKeypress(
             (key) => {
               if (keyMatchers[Command.QUIT](key)) {
