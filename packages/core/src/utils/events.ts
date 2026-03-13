@@ -238,13 +238,13 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
   private _eventBacklog: EventBacklogItem[] = [];
   private _backlogHead = 0;
   private static readonly MAX_BACKLOG_SIZE = 10000;
+  private static readonly MAX_LISTENERS = 100;
 
   constructor() {
     super();
     // Increase default max listeners for this global event bus.
-    this.setMaxListeners(100);
+    this.setMaxListeners(CoreEventEmitter.MAX_LISTENERS);
   }
-
 
   private _emitOrQueue<K extends keyof CoreEvents>(
     event: K,

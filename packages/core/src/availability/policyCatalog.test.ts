@@ -30,8 +30,9 @@ describe('policyCatalog', () => {
       useGemini31: true,
     });
     expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_MODEL);
-    expect(chain).toHaveLength(2);
-    expect(chain[1]?.model).toBe('gemini-3-flash-preview');
+    expect(chain).toHaveLength(3);
+    expect(chain[1]?.model).toBe(PREVIEW_GEMINI_MODEL);
+    expect(chain[2]?.model).toBe('gemini-3-flash-preview');
   });
 
   it('returns Gemini 3.1 Custom Tools chain when useGemini31 and useCustomToolModel are true', () => {
@@ -41,8 +42,10 @@ describe('policyCatalog', () => {
       useCustomToolModel: true,
     });
     expect(chain[0]?.model).toBe(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL);
-    expect(chain).toHaveLength(2);
-    expect(chain[1]?.model).toBe('gemini-3-flash-preview');
+    expect(chain).toHaveLength(4);
+    expect(chain[1]?.model).toBe(PREVIEW_GEMINI_3_1_MODEL);
+    expect(chain[2]?.model).toBe(PREVIEW_GEMINI_MODEL);
+    expect(chain[3]?.model).toBe('gemini-3-flash-preview');
   });
 
   it('returns default chain when preview disabled', () => {
