@@ -899,8 +899,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
               selectedIndices.has(optionItem.index)) ||
             (optionItem.type === 'other' && isCustomOptionSelected) ||
             (optionItem.type === 'all' &&
-              selectedIndices.size > 0 &&
-              selectedIndices.size === questionOptions.length);
+              questionOptions.every((_, i) => selectedIndices.has(i)));
           const showCheck =
             question.multiSelect &&
             (optionItem.type === 'option' ||
