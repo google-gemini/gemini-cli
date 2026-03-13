@@ -1182,6 +1182,12 @@ async function start_bwrap_sandbox(
     '--new-session',
     '--die-with-parent',
     '--unshare-pid',
+    '--unshare-user',
+    '--unshare-ipc',
+    '--unshare-uts',
+    '--unshare-cgroup',
+    '--hostname',
+    'gemini-sandbox',
     '--proc',
     '/proc',
     '--dev',
@@ -1192,18 +1198,33 @@ async function start_bwrap_sandbox(
     '/usr',
     '/usr',
     '--ro-bind',
-    '/lib',
-    '/lib',
-    '--ro-bind',
-    '/lib64',
-    '/lib64',
-    '--ro-bind',
     '/bin',
     '/bin',
     '--ro-bind',
     '/sbin',
     '/sbin',
   ];
+
+  // Optional system paths (might be symlinks or missing on some distros)
+  const optionalPaths = ['/lib', '/lib64', '/etc/alternatives'];
+  for (const p of optionalPaths) {
+    if (fs.existsSync(p)) {
+      bwrapArgs.push('--ro-bind', p, p);
+    }
+  }
+
+  // Essential /etc files for tool compatibility (passwd, hosts, etc.)
+  const etcFiles = [
+    '/etc/passwd',
+    '/etc/group',
+    '/etc/hosts',
+    '/etc/nsswitch.conf',
+  ];
+  for (const p of etcFiles) {
+    if (fs.existsSync(p)) {
+      bwrapArgs.push('--ro-bind', p, p);
+    }
+  }
 
   // Allow the current node binary (essential for relaunching)
   // This is especially important for NVM/Asdf users where node is in $HOME

@@ -51,23 +51,20 @@ export class BwrapSandboxManager implements SandboxManager {
       '--new-session',
       '--die-with-parent',
       '--unshare-pid',
+      '--unshare-user',
+      '--unshare-ipc',
+      '--unshare-uts',
+      '--unshare-cgroup',
+      '--hostname',
+      'gemini-tool-sandbox',
       '--proc',
       '/proc',
       '--dev',
       '/dev',
-      '--dev-bind',
-      '/dev/pts',
-      '/dev/pts',
       // Strict allow-list for nested sandbox
       '--ro-bind',
       '/usr',
       '/usr',
-      '--ro-bind',
-      '/lib',
-      '/lib',
-      '--ro-bind',
-      '/lib64',
-      '/lib64',
       '--ro-bind',
       '/bin',
       '/bin',
@@ -75,6 +72,27 @@ export class BwrapSandboxManager implements SandboxManager {
       '/sbin',
       '/sbin',
     ];
+
+    // Optional system paths
+    const optionalPaths = ['/lib', '/lib64', '/etc/alternatives'];
+    for (const p of optionalPaths) {
+      if (fs.existsSync(p)) {
+        bwrapArgs.push('--ro-bind', p, p);
+      }
+    }
+
+    // Essential /etc files for tool compatibility
+    const etcFiles = [
+      '/etc/passwd',
+      '/etc/group',
+      '/etc/hosts',
+      '/etc/nsswitch.conf',
+    ];
+    for (const p of etcFiles) {
+      if (fs.existsSync(p)) {
+        bwrapArgs.push('--ro-bind', p, p);
+      }
+    }
 
     // Force network off for tools if requested
     if (req.forceNetworkOff) {
@@ -106,7 +124,8 @@ export class BwrapSandboxManager implements SandboxManager {
     bwrapArgs.push('--bind', workdir, workdir);
     const geminiSettingsDir = path.join(homeDir, GEMINI_DIR);
     if (fs.existsSync(geminiSettingsDir)) {
-      bwrapArgs.push('--bind', geminiSettingsDir, geminiSettingsDir);
+      // Gemini settings are read-only for tools to prevent persistent poisoning
+      bwrapArgs.push('--ro-bind', geminiSettingsDir, geminiSettingsDir);
     }
 
     // Private, isolated system paths to block Unix socket escapes
