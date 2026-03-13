@@ -203,6 +203,12 @@ describe('FileExclusions', () => {
 describe('BINARY_EXTENSIONS', () => {
   it.each([
     ['common binary file extensions', ['.exe', '.dll', '.jar', '.zip']],
+    ['archive extensions', ['.7z', '.bz2', '.gz', '.lz4', '.xz', '.zst']],
+    ['database extensions', ['.db', '.mdb', '.sqlite']],
+    ['disk image extensions', ['.dmg', '.iso']],
+    ['font extensions', ['.otf', '.ttf', '.woff', '.woff2']],
+    ['video extensions', ['.avi', '.mkv', '.mov', '.mp4', '.wmv']],
+    ['audio extensions', ['.flac', '.mp3', '.ogg', '.wav']],
     ['additional binary extensions', ['.dat', '.obj', '.wasm']],
     ['media file extensions', ['.pdf', '.png', '.jpg']],
   ])('should include %s', (_, extensions) => {

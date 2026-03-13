@@ -24,29 +24,55 @@ export const COMMON_IGNORE_PATTERNS: string[] = [
  * Binary file extension patterns that are typically excluded from text processing.
  */
 export const BINARY_FILE_PATTERNS: string[] = [
-  '**/*.bin',
-  '**/*.exe',
-  '**/*.dll',
-  '**/*.so',
-  '**/*.dylib',
-  '**/*.class',
-  '**/*.jar',
-  '**/*.war',
-  '**/*.zip',
-  '**/*.tar',
-  '**/*.gz',
-  '**/*.bz2',
-  '**/*.rar',
+  // Archives & compressed files
   '**/*.7z',
+  '**/*.bz2',
+  '**/*.gz',
+  '**/*.lz4',
+  '**/*.rar',
+  '**/*.tar',
+  '**/*.xz',
+  '**/*.zip',
+  '**/*.zst',
+  // Database files
+  '**/*.db',
+  '**/*.mdb',
+  '**/*.sqlite',
+  '**/*.sqlite-journal',
+  '**/*.sqlite-wal',
+  // Disk images
+  '**/*.dmg',
+  '**/*.iso',
+  // Executables & libraries
+  '**/*.bin',
+  '**/*.class',
+  '**/*.dll',
+  '**/*.dylib',
+  '**/*.exe',
+  '**/*.jar',
+  '**/*.so',
+  '**/*.war',
+  // Font files
+  '**/*.otf',
+  '**/*.ttf',
+  '**/*.woff',
+  '**/*.woff2',
+  // Office documents
   '**/*.doc',
   '**/*.docx',
-  '**/*.xls',
-  '**/*.xlsx',
+  '**/*.odp',
+  '**/*.ods',
+  '**/*.odt',
   '**/*.ppt',
   '**/*.pptx',
-  '**/*.odt',
-  '**/*.ods',
-  '**/*.odp',
+  '**/*.xls',
+  '**/*.xlsx',
+  // Video files (no inlineData support, unlike audio/images)
+  '**/*.avi',
+  '**/*.mkv',
+  '**/*.mov',
+  '**/*.mp4',
+  '**/*.wmv',
 ];
 
 /**
@@ -54,14 +80,21 @@ export const BINARY_FILE_PATTERNS: string[] = [
  * These files can be processed as inlineData when explicitly requested.
  */
 export const MEDIA_FILE_PATTERNS: string[] = [
-  '**/*.pdf',
-  '**/*.png',
-  '**/*.jpg',
-  '**/*.jpeg',
-  '**/*.gif',
-  '**/*.webp',
+  // Audio files (supported as inlineData by Gemini)
+  '**/*.flac',
+  '**/*.mp3',
+  '**/*.ogg',
+  '**/*.wav',
+  // Image files
   '**/*.bmp',
+  '**/*.gif',
+  '**/*.jpeg',
+  '**/*.jpg',
+  '**/*.png',
   '**/*.svg',
+  '**/*.webp',
+  // Document files
+  '**/*.pdf',
 ];
 
 /**
