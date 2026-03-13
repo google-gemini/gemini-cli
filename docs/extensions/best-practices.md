@@ -161,8 +161,9 @@ If your extension doesn't appear in `/extensions list`:
 
 - **Check the manifest:** Ensure `gemini-extension.json` is in the root
   directory and contains valid JSON.
-- **Verify the name:** The `name` field in the manifest must match the extension
-  directory name exactly.
+- **Verify the name:** The `name` field in the manifest must use a valid
+  extension name (letters, numbers, and dashes). It does not need to match the
+  directory name.
 - **Restart the CLI:** Extensions are loaded at the start of a session. Restart
   Gemini CLI after making changes to the manifest or linking a new extension.
 
