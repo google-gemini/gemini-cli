@@ -584,7 +584,6 @@ export class Scheduler {
       this.state.updateStatus(
         callId,
         CoreToolCallStatus.Error,
-        signal,
         createErrorResponse(
           toolCall.request,
           hookResult.error,

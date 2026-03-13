@@ -7,7 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { CoreToolScheduler } from './coreToolScheduler.js';
 import type { ToolCall, ErroredToolCall } from '../scheduler/types.js';
-import type { Config, ToolRegistry } from '../index.js';
+import type { Config, ToolRegistry, AgentLoopContext } from '../index.js';
 import {
   ApprovalMode,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
@@ -118,7 +118,11 @@ describe('CoreToolScheduler Hooks', () => {
 
     const onAllToolCallsComplete = vi.fn();
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: {
+        config: mockConfig,
+        messageBus: mockMessageBus,
+        toolRegistry,
+      } as unknown as AgentLoopContext,
       onAllToolCallsComplete,
       getPreferredEditor: () => 'vscode',
     });
@@ -188,7 +192,11 @@ describe('CoreToolScheduler Hooks', () => {
 
     const onAllToolCallsComplete = vi.fn();
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: {
+        config: mockConfig,
+        messageBus: mockMessageBus,
+        toolRegistry,
+      } as unknown as AgentLoopContext,
       onAllToolCallsComplete,
       getPreferredEditor: () => 'vscode',
     });
@@ -261,7 +269,11 @@ describe('CoreToolScheduler Hooks', () => {
 
     const onAllToolCallsComplete = vi.fn();
     const scheduler = new CoreToolScheduler({
-      config: mockConfig,
+      context: {
+        config: mockConfig,
+        messageBus: mockMessageBus,
+        toolRegistry,
+      } as unknown as AgentLoopContext,
       onAllToolCallsComplete,
       getPreferredEditor: () => 'vscode',
     });
