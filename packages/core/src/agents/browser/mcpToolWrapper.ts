@@ -30,6 +30,23 @@ import {
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import type { BrowserManager, McpToolCallResult } from './browserManager.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import { suspendInputBlocker, resumeInputBlocker } from './inputBlocker.js';
+
+/**
+ * Tools that interact with page elements and require the input blocker
+ * overlay to be temporarily SUSPENDED (pointer-events: none) so
+ * chrome-devtools-mcp's interactability checks pass.  The overlay
+ * stays in the DOM — only the CSS property toggles, zero flickering.
+ */
+const INTERACTIVE_TOOLS = new Set([
+  'click',
+  'click_at',
+  'fill',
+  'fill_form',
+  'hover',
+  'drag',
+  'upload_file',
+]);
 
 /**
  * Tool invocation that dispatches to BrowserManager's isolated MCP client.
@@ -43,6 +60,7 @@ class McpToolInvocation extends BaseToolInvocation<
     protected readonly toolName: string,
     params: Record<string, unknown>,
     messageBus: MessageBus,
+    private readonly shouldDisableInput: boolean,
   ) {
     super(params, messageBus, toolName, toolName);
   }
@@ -78,15 +96,28 @@ class McpToolInvocation extends BaseToolInvocation<
     };
   }
 
+  /**
+   * Whether this specific tool needs the input blocker suspended
+   * (pointer-events toggled to 'none') before execution.
+   */
+  private get needsBlockerSuspend(): boolean {
+    return this.shouldDisableInput && INTERACTIVE_TOOLS.has(this.toolName);
+  }
+
   async execute(signal: AbortSignal): Promise<ToolResult> {
     try {
-      const callToolPromise = this.browserManager.callTool(
+      // Suspend the input blocker for interactive tools so
+      // chrome-devtools-mcp's interactability checks pass.
+      // Only toggles pointer-events CSS — no DOM change, no flicker.
+      if (this.needsBlockerSuspend) {
+        await suspendInputBlocker(this.browserManager);
+      }
+
+      const result: McpToolCallResult = await this.browserManager.callTool(
         this.toolName,
         this.params,
         signal,
       );
-
-      const result: McpToolCallResult = await callToolPromise;
 
       // Extract text content from MCP response
       let textContent = '';
@@ -102,6 +133,11 @@ class McpToolInvocation extends BaseToolInvocation<
         this.toolName,
         textContent,
       );
+
+      // Resume input blocker after interactive tool completes.
+      if (this.needsBlockerSuspend) {
+        await resumeInputBlocker(this.browserManager);
+      }
 
       if (result.isError) {
         return {
@@ -122,6 +158,11 @@ class McpToolInvocation extends BaseToolInvocation<
       // immediately instead of returning a result the LLM would retry.
       if (errorMsg.includes('Could not connect to Chrome')) {
         throw error;
+      }
+
+      // Resume on error path too so the blocker is always restored
+      if (this.needsBlockerSuspend) {
+        await resumeInputBlocker(this.browserManager).catch(() => {});
       }
 
       debugLogger.error(`MCP tool ${this.toolName} failed: ${errorMsg}`);
@@ -285,6 +326,7 @@ class McpDeclarativeTool extends DeclarativeTool<
     description: string,
     parameterSchema: unknown,
     messageBus: MessageBus,
+    private readonly shouldDisableInput: boolean,
   ) {
     super(
       name,
@@ -306,6 +348,7 @@ class McpDeclarativeTool extends DeclarativeTool<
       this.name,
       params,
       this.messageBus,
+      this.shouldDisableInput,
     );
   }
 }
@@ -385,12 +428,14 @@ class TypeTextDeclarativeTool extends DeclarativeTool<
 export async function createMcpDeclarativeTools(
   browserManager: BrowserManager,
   messageBus: MessageBus,
+  shouldDisableInput: boolean = false,
 ): Promise<Array<McpDeclarativeTool | TypeTextDeclarativeTool>> {
   // Get dynamically discovered tools from the MCP server
   const mcpTools = await browserManager.getDiscoveredTools();
 
   debugLogger.log(
-    `Creating ${mcpTools.length} declarative tools for browser agent`,
+    `Creating ${mcpTools.length} declarative tools for browser agent` +
+      (shouldDisableInput ? ' (input blocker enabled)' : ''),
   );
 
   const tools: Array<McpDeclarativeTool | TypeTextDeclarativeTool> =
@@ -407,6 +452,7 @@ export async function createMcpDeclarativeTools(
         augmentedDescription,
         schema.parametersJsonSchema,
         messageBus,
+        shouldDisableInput,
       );
     });
 

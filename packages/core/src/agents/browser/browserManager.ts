@@ -23,6 +23,7 @@ import type { Tool as McpTool } from '@modelcontextprotocol/sdk/types.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import type { Config } from '../../config/config.js';
 import { Storage } from '../../config/storage.js';
+import { injectInputBlocker } from './inputBlocker.js';
 import * as path from 'node:path';
 import { injectAutomationOverlay } from './automationOverlay.js';
 
@@ -97,10 +98,12 @@ export class BrowserManager {
    * Always false in headless mode (no visible window to decorate).
    */
   private readonly shouldInjectOverlay: boolean;
+  private readonly shouldDisableInput: boolean;
 
   constructor(private config: Config) {
     const browserConfig = config.getBrowserAgentConfig();
     this.shouldInjectOverlay = !browserConfig?.customConfig?.headless;
+    this.shouldDisableInput = config.shouldDisableBrowserUserInput();
   }
 
   /**
@@ -176,20 +179,32 @@ export class BrowserManager {
       }
     }
 
-    // Re-inject the automation overlay after any tool that can cause a
-    // full-page navigation (including implicit navigations from clicking links).
-    // chrome-devtools-mcp emits no MCP notifications, so callTool() is the
-    // only interception point we have — equivalent to a page-load listener.
+    // Re-inject the automation overlay and input blocker after tools that
+    // can cause a full-page navigation. chrome-devtools-mcp emits no MCP
+    // notifications, so callTool() is the only interception point.
     if (
-      this.shouldInjectOverlay &&
       !result.isError &&
       POTENTIALLY_NAVIGATING_TOOLS.has(toolName) &&
       !signal?.aborted
     ) {
       try {
-        await injectAutomationOverlay(this, signal);
+        if (this.shouldInjectOverlay) {
+          await injectAutomationOverlay(this, signal);
+        }
+        // Only re-inject the input blocker for tools that *reliably*
+        // replace the page DOM (navigate_page, new_page, select_page).
+        // click/click_at are handled by pointer-events suspend/resume
+        // in mcpToolWrapper — no full re-inject roundtrip needed.
+        // press_key/handle_dialog only sometimes navigate.
+        const reliableNavigation =
+          toolName === 'navigate_page' ||
+          toolName === 'new_page' ||
+          toolName === 'select_page';
+        if (this.shouldDisableInput && reliableNavigation) {
+          await injectInputBlocker(this);
+        }
       } catch {
-        // Never let overlay failures interrupt the tool result
+        // Never let overlay/blocker failures interrupt the tool result
       }
     }
 
@@ -375,6 +390,7 @@ export class BrowserManager {
           await this.rawMcpClient!.connect(this.mcpTransport!);
           debugLogger.log('MCP client connected to chrome-devtools-mcp');
           await this.discoverTools();
+          this.registerInputBlockerHandler();
         })(),
         new Promise<never>((_, reject) => {
           timeoutId = setTimeout(
@@ -483,6 +499,47 @@ export class BrowserManager {
     debugLogger.log(
       `Discovered ${this.discoveredTools.length} tools from chrome-devtools-mcp: ` +
         this.discoveredTools.map((t) => t.name).join(', '),
+    );
+  }
+
+  /**
+   * Registers a fallback notification handler on the MCP client to
+   * automatically re-inject the input blocker after any server-side
+   * notification (e.g. page navigation, resource updates).
+   *
+   * This covers ALL navigation types (link clicks, form submissions,
+   * history navigation) — not just explicit navigate_page tool calls.
+   */
+  private registerInputBlockerHandler(): void {
+    if (!this.rawMcpClient) {
+      return;
+    }
+
+    if (!this.config.shouldDisableBrowserUserInput()) {
+      return;
+    }
+
+    const existingHandler = this.rawMcpClient.fallbackNotificationHandler;
+    this.rawMcpClient.fallbackNotificationHandler = async (notification: {
+      method: string;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      params?: any;
+    }) => {
+      // Chain with any existing handler first.
+      if (existingHandler) {
+        await existingHandler(notification);
+      }
+
+      // Only re-inject on resource update notifications which indicate
+      // page content has changed (navigation, new page, etc.)
+      if (notification.method === 'notifications/resources/updated') {
+        debugLogger.log('Page content changed, re-injecting input blocker...');
+        void injectInputBlocker(this);
+      }
+    };
+
+    debugLogger.log(
+      'Registered global notification handler for input blocker re-injection',
     );
   }
 }
