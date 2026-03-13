@@ -68,8 +68,8 @@ export function useHistory({
       isResuming: boolean = false,
     ): number => {
       const id = getNextMessageId(baseTimestamp);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const newItem: HistoryItem = { ...itemData, id } as HistoryItem;
+      const newItem: HistoryItem = { ...itemData, id };
+
 
       setHistory((prevHistory) => {
         if (prevHistory.length > 0) {

@@ -503,22 +503,28 @@ export const useSlashCommandProcessor = (
                       return { type: 'handled' };
                     case 'agentConfig': {
                       const props = result.props;
+                      const name = isRecord(props) ? props['name'] : undefined;
+                      const displayName = isRecord(props)
+                        ? props['displayName']
+                        : undefined;
+                      const definition = isRecord(props)
+                        ? props['definition']
+                        : undefined;
+
                       if (
-                        !isRecord(props) ||
-                        typeof props['name'] !== 'string' ||
-                        // eslint-disable-next-line no-restricted-syntax
-                        typeof props['displayName'] !== 'string' ||
-                        !props['definition']
-                      ) {                        throw new Error(
+                        typeof name !== 'string' ||
+                        typeof displayName !== 'string' ||
+                        !definition
+                      ) {
+                        throw new Error(
                           'Received invalid properties for agentConfig dialog action.',
                         );
                       }
-
                       actions.openAgentConfigDialog(
-                        props['name'],
-                        props['displayName'],
+                        name,
+                        displayName,
                         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-                        props['definition'] as AgentDefinition,
+                        definition as AgentDefinition,
                       );
                       return { type: 'handled' };
                     }
