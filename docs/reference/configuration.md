@@ -242,7 +242,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Requires restart:** Yes
 
 - **`ui.hideTips`** (boolean):
-  - **Description:** Hide helpful tips in the UI
+  - **Description:** Hide the introductory tips shown at the top of the screen.
   - **Default:** `false`
 
 - **`ui.hideIntroTips`** (boolean):
@@ -340,24 +340,24 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Show the spinner during operations.
   - **Default:** `true`
 
-- **`ui.showStatusTips`** (boolean):
-  - **Description:** Show helpful tips in the footer while the model is working.
-  - **Default:** `true`
-
-- **`ui.showStatusWit`** (boolean):
-  - **Description:** Show witty loading phrases in the footer while the model is
-    working.
+- **`ui.hideStatusTips`** (boolean):
+  - **Description:** Hide helpful tips in the footer while the model is working.
   - **Default:** `false`
 
+- **`ui.hideStatusWit`** (boolean):
+  - **Description:** Hide witty loading phrases in the footer while the model is
+    working.
+  - **Default:** `true`
+
 - **`ui.statusHints`** (enum):
-  - **Description:** @deprecated Use ui.showStatusTips and ui.showStatusWit
+  - **Description:** @deprecated Use ui.hideStatusTips and ui.hideStatusWit
     instead. What to show in the status line: tips, witty comments, both, or off
     (fallback to shortcuts help).
   - **Default:** `"tips"`
   - **Values:** `"tips"`, `"witty"`, `"all"`, `"off"`
 
 - **`ui.loadingPhrases`** (enum):
-  - **Description:** @deprecated Use ui.showStatusTips and ui.showStatusWit
+  - **Description:** @deprecated Use ui.hideStatusTips and ui.hideStatusWit
     instead. What to show in the status line: tips, witty comments, both, or off
     (fallback to shortcuts help).
   - **Default:** `"tips"`

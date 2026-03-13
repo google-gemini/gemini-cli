@@ -35,8 +35,6 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   currentLoadingPhrase,
   wittyPhrase,
   showWit = false,
-  showTips: _showTips = true,
-  errorVerbosity: _errorVerbosity = 'full',
   elapsedTime,
   inline = false,
   rightContent,
