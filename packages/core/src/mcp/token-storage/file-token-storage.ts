@@ -24,7 +24,11 @@ export class FileTokenStorage extends BaseTokenStorage {
   }
 
   private deriveEncryptionKey(): Buffer {
-    const salt = `${os.hostname()}-${os.userInfo().username}-gemini-cli`;
+    // Use homedir + username as salt — both are stable across network changes.
+    // os.hostname() was used previously but on macOS with DHCP it can return
+    // the current IP address, which changes across networks/leases and
+    // silently corrupts all encrypted tokens.
+    const salt = `${os.homedir()}-${os.userInfo().username}-gemini-cli`;
     return crypto.scryptSync('gemini-cli-oauth', salt, 32);
   }
 
@@ -87,12 +91,10 @@ export class FileTokenStorage extends BaseTokenStorage {
           'Unsupported state or unable to authenticate data',
         )
       ) {
-        // Decryption failed - this can happen when switching between auth types
-        // or if the file is genuinely corrupted.
-        throw new Error(
-          `Corrupted token file detected at: ${this.tokenFilePath}\n` +
-            `Please delete or rename this file to resolve the issue.`,
-        );
+        // Decryption failed — stale/corrupt token file from a previous
+        // auth session. Auto-delete and return empty so login can proceed.
+        await fs.unlink(this.tokenFilePath).catch(() => {});
+        return new Map();
       }
       throw error;
     }
@@ -142,7 +144,8 @@ export class FileTokenStorage extends BaseTokenStorage {
     const tokens = await this.loadTokens();
 
     if (!tokens.has(serverName)) {
-      throw new Error(`No credentials found for ${serverName}`);
+      // Already gone — nothing to delete.
+      return;
     }
 
     tokens.delete(serverName);
