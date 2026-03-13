@@ -95,6 +95,12 @@ afterEach(() => {
 
 const mockSlashCommands: SlashCommand[] = [
   {
+    name: 'stats',
+    description: 'Check stats',
+    kind: CommandKind.BUILT_IN,
+    isSafeConcurrent: true,
+  },
+  {
     name: 'clear',
     kind: CommandKind.BUILT_IN,
     description: 'Clear screen',
@@ -3875,6 +3881,13 @@ describe('InputPrompt', () => {
         shellMode: false,
         shouldSubmit: false,
         errorMessage: 'Slash commands cannot be queued',
+      },
+      {
+        name: 'should allow concurrent-safe slash commands',
+        bufferText: '/stats',
+        shellMode: false,
+        shouldSubmit: true,
+        errorMessage: null,
       },
       {
         name: 'should prevent shell commands',
