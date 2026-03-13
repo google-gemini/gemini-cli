@@ -251,6 +251,7 @@ describe('browserAgentFactory', () => {
         { name: 'close_page', description: 'Close page' },
         { name: 'select_page', description: 'Select page' },
         { name: 'press_key', description: 'Press key' },
+        { name: 'type_text', description: 'Type text into an element' },
         { name: 'hover', description: 'Hover element' },
       ]);
 

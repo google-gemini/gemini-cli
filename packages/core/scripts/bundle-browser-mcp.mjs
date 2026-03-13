@@ -28,9 +28,9 @@ const emptyModulePlugin = {
             return null;
         });
 
-        build.onLoad({ filter: /.*/, namespace: 'empty' }, args => ({
-            contents: 'export {};', // Empty module (ESM)
-            loader: 'js',
+        build.onLoad({ filter: /.*/, namespace: 'empty' }, (_args) => ({
+          contents: 'export {};', // Empty module (ESM)
+          loader: 'js',
         }));
     },
 };
