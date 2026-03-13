@@ -9,6 +9,7 @@ import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import * as path from 'node:path';
 import { mcpCommand } from '../commands/mcp.js';
+import { evalCommand } from '../commands/eval.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
@@ -303,6 +304,8 @@ export async function parseArguments(
     )
     // Register MCP subcommands
     .command(mcpCommand)
+    // Register eval command
+    .command(evalCommand)
     // Ensure validation flows through .fail() for clean UX
     .fail((msg, err) => {
       if (err) throw err;
