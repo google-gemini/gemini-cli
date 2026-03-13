@@ -1151,7 +1151,8 @@ export const useGeminiStream = (
       const isMoreThan25PercentUsed =
         limit > 0 && remainingTokenCount < limit * 0.75;
 
-      let text = `Sending this message (${estimatedRequestTokenCount} tokens) might exceed the context window limit (${remainingTokenCount.toLocaleString()} tokens left).`;
+      const displayRemaining = Math.max(0, remainingTokenCount);
+      let text = `Sending this message (${estimatedRequestTokenCount} tokens) might exceed the remaining context window limit (${displayRemaining.toLocaleString()} tokens).`;
 
       if (isMoreThan25PercentUsed) {
         text +=
