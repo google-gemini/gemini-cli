@@ -14,6 +14,7 @@ import { ExitWarning } from '../components/ExitWarning.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useFlickerDetector } from '../hooks/useFlickerDetector.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+import { TokenBudgetWarning } from '../components/TokenBudgetWarning.js';
 import { CopyModeWarning } from '../components/CopyModeWarning.js';
 import { BackgroundShellDisplay } from '../components/BackgroundShellDisplay.js';
 import { StreamingState } from '../types.js';
@@ -67,6 +68,7 @@ export const DefaultAppLayout: React.FC = () => {
         width={uiState.terminalWidth}
       >
         <Notifications />
+        <TokenBudgetWarning />
         <CopyModeWarning />
 
         {uiState.customDialog ? (

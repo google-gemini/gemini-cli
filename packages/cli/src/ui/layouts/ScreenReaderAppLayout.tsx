@@ -12,6 +12,7 @@ import { DialogManager } from '../components/DialogManager.js';
 import { Composer } from '../components/Composer.js';
 import { Footer } from '../components/Footer.js';
 import { ExitWarning } from '../components/ExitWarning.js';
+import { TokenBudgetWarning } from '../components/TokenBudgetWarning.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useFlickerDetector } from '../hooks/useFlickerDetector.js';
 
@@ -28,6 +29,7 @@ export const ScreenReaderAppLayout: React.FC = () => {
       ref={uiState.rootUiRef}
     >
       <Notifications />
+      <TokenBudgetWarning />
       <Footer />
       <Box flexGrow={1} overflow="hidden">
         <MainContent />
