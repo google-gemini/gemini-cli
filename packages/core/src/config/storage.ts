@@ -302,6 +302,13 @@ export class Storage {
   }
 
   getProjectTempTrackerDir(): string {
+    if (this.sessionId) {
+      const sessionDir = path.join(this.getProjectTempDir(), this.sessionId);
+      if (!isSubpath(this.getProjectTempDir(), sessionDir)) {
+        throw new Error(`Invalid sessionId: ${this.sessionId}`);
+      }
+      return path.join(sessionDir, 'tracker');
+    }
     return path.join(this.getProjectTempDir(), 'tracker');
   }
 
