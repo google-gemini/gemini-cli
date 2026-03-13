@@ -76,6 +76,7 @@ export async function executeToolWithHooks(
   setExecutionIdCallback?: (executionId: number) => void,
   config?: Config,
   originalRequestName?: string,
+  skipBeforeHook?: boolean,
 ): Promise<ToolResult> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const toolInput = (invocation.params || {}) as Record<string, unknown>;
@@ -86,7 +87,7 @@ export async function executeToolWithHooks(
   const mcpContext = config ? extractMcpContext(invocation, config) : undefined;
   const hookSystem = config?.getHookSystem();
 
-  if (hookSystem) {
+  if (hookSystem && !skipBeforeHook) {
     const beforeOutput = await hookSystem.fireBeforeToolEvent(
       toolName,
       toolInput,

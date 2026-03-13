@@ -2017,6 +2017,10 @@ console.log(JSON.stringify({
 
       // 3. Final setup with full settings
       rig.setup('Hook Disabling Multiple Ops', {
+        fakeResponsesPath: join(
+          import.meta.dirname,
+          'hooks-system.multiple-ops.responses',
+        ),
         settings: {
           hooksConfig: {
             enabled: true,

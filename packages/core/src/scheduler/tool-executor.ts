@@ -116,6 +116,7 @@ export class ToolExecutor {
             setExecutionIdCallback,
             this.config,
             request.originalRequestName,
+            true, // skipBeforeHook
           );
 
           const toolResult: ToolResult = await promise;
