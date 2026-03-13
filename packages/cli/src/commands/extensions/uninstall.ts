@@ -95,6 +95,8 @@ export const uninstallCommand: CommandModule = {
     let namesArray: string[] = [];
     if (Array.isArray(names)) {
       namesArray = names.filter((n): n is string => typeof n === 'string');
+    } else if (typeof names === 'string') {
+      namesArray = [names];
     }
     await handleUninstall({
       names: namesArray,

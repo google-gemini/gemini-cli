@@ -63,10 +63,7 @@ import {
   LogoutChoice,
 } from '../components/LogoutConfirmationDialog.js';
 import { runExitCleanup } from '../../utils/cleanup.js';
-
-function isRecord(obj: unknown): obj is Record<string, unknown> {
-  return typeof obj === 'object' && obj !== null && !Array.isArray(obj);
-}
+import { isRecord } from '../../utils/typeGuards.js';
 
 interface SlashCommandProcessorActions {
   openAuthDialog: () => void;

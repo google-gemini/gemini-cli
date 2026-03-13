@@ -14,7 +14,7 @@ import {
   type SlashCommand,
   type CommandContext,
 } from './types.js';
-import { MessageType, type HistoryItem } from '../types.js';
+import { MessageType, type HistoryItemWithoutId } from '../types.js';
 import {
   refreshServerHierarchicalMemory,
   type Config,
@@ -29,10 +29,7 @@ import * as fs from 'node:fs';
 
 async function finishAddingDirectories(
   config: Config,
-  addItem: (
-    itemData: Omit<HistoryItem, 'id'>,
-    baseTimestamp?: number,
-  ) => number,
+  addItem: (itemData: HistoryItemWithoutId, baseTimestamp?: number) => number,
   added: string[],
   errors: string[],
 ) {
