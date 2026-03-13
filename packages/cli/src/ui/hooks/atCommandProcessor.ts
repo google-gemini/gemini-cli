@@ -94,8 +94,10 @@ function parseAllAtCommands(
   let lastIndex = 0;
 
   // Create a new RegExp instance for each call to avoid shared state/lastIndex issues.
+  // We use a negative lookbehind to ensure @ is not part of an email address
+  // and is not preceded by a backslash (escaping).
   const atCommandRegex = new RegExp(
-    `(?<!\\\\)@${AT_COMMAND_PATH_REGEX_SOURCE}`,
+    `(?<![a-zA-Z0-9._%+-]|\\\\)@${AT_COMMAND_PATH_REGEX_SOURCE}`,
     'g',
   );
 

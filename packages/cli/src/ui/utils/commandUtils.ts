@@ -16,7 +16,7 @@ import { AT_COMMAND_PATH_REGEX_SOURCE } from '../hooks/atCommandProcessor.js';
 // Uses the same AT_COMMAND_PATH_REGEX_SOURCE so that isAtCommand is true whenever
 // parseAllAtCommands would find at least one atPath part.
 const AT_COMMAND_DETECT_REGEX = new RegExp(
-  `(?<!\\\\)@${AT_COMMAND_PATH_REGEX_SOURCE}`,
+  `(?<![a-zA-Z0-9._%+-]|\\\\)@${AT_COMMAND_PATH_REGEX_SOURCE}`,
 );
 
 /**

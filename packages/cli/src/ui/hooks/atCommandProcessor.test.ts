@@ -1484,6 +1484,26 @@ describe('handleAtCommand', () => {
       expect.objectContaining({ text: expectedNudge }),
     );
   });
+
+  it('should ignore email addresses', async () => {
+    const query = 'Contact me at somebody@example.com';
+
+    const result = await handleAtCommand({
+      query,
+      config: mockConfig,
+      addItem: mockAddItem,
+      onDebugMessage: mockOnDebugMessage,
+      messageId: 700,
+      signal: abortController.signal,
+    });
+
+    expect(result).toEqual({
+      processedQuery: [{ text: query }],
+    });
+    expect(mockOnDebugMessage).toHaveBeenCalledWith(
+      'No valid file paths, resources, or agents found in @ commands.',
+    );
+  });
 });
 
 describe('escapeAtSymbols', () => {
