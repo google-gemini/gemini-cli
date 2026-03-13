@@ -72,8 +72,14 @@ async function listSubcommandAction(
           results.push(`### ${dir.name} Commands (${dir.path})`);
           files.forEach((file) => results.push(`- ${file}`));
         }
-      } catch (_e) {
-        // Silently skip if directory does not exist or is not readable
+      } catch (e) {
+        if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
+          continue;
+        }
+        results.push(`### ${dir.name} Commands (${dir.path})`);
+        results.push(
+          `- (Error reading directory: ${e instanceof Error ? e.message : String(e)})`,
+        );
       }
     }
 
