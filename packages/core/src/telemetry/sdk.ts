@@ -69,12 +69,12 @@ class DiagLoggerAdapter {
   private recoveryTimeout: NodeJS.Timeout | null = null;
 
   error(message: string, ...args: unknown[]): void {
+    const RECOVERY_TIMEOUT_MS = 35000;
     const errorStr = typeof message === 'string' ? message : String(message);
-    if (
-      errorStr.includes('export failed') ||
-      errorStr.includes('Exporting failed') ||
-      errorStr.includes('ECONNREFUSED')
-    ) {
+    const isExportError =
+      /export failed/i.test(errorStr) || /ECONNREFUSED/i.test(errorStr);
+
+    if (isExportError) {
       if (this.recoveryTimeout) {
         clearTimeout(this.recoveryTimeout);
       }
@@ -84,7 +84,7 @@ class DiagLoggerAdapter {
           debugLogger.log('Telemetry connection successfully established.');
           this.hasLoggedExportError = false;
         }
-      }, 35000).unref();
+      }, RECOVERY_TIMEOUT_MS).unref();
 
       if (!this.hasLoggedExportError) {
         debugLogger.error(
