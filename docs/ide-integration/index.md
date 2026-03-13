@@ -300,4 +300,4 @@ to connect using the provided PID.
 ### ACP integration errors
 
 For issues related to ACP integration, please refer to the debugging and
-telemetry section in the [ACP Mode](./acp-mode.md) documentation.
+telemetry section in the [ACP Mode](../cli/acp-mode.md) documentation.
