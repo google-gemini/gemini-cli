@@ -59,6 +59,58 @@ const platformArch = getPlatformArch();
 
 const PYTHON_VENV_PATH = join(TEMP_DIR, 'python_venv');
 
+/**
+ * Gets a list of files from git and filters them by a regex.
+ * This replaces the "git ls-files | grep" shell command with an
+ * OS-agnostic Node.js implementation.
+ */
+function getFilesByPattern(pattern) {
+  try {
+    const output = execSync('git ls-files', { encoding: 'utf-8' });
+    return output
+      .split('\n')
+      .filter((file) => file && pattern.test(file))
+      .join(' ');
+  } catch (e) {
+    console.error('Error fetching file list from git:', e.message);
+    return '';
+  }
+}
+
+/**
+ * Gets shell script files using a shebang-based check for extension-less files.
+ * This is the OS-agnostic equivalent of the Linux pipeline:
+ *   git ls-files | grep ... | xargs file --mime-type | grep "text/x-shellscript"
+ */
+function getShellFiles() {
+  const shellExtensions = /\.(sh|zsh|bash)$/;
+  const shellShebang = /^#!.*\b(sh|bash|zsh|dash|ksh)\b/;
+  try {
+    const output = execSync('git ls-files', { encoding: 'utf-8' });
+    return output
+      .split('\n')
+      .filter((file) => {
+        if (!file) return false;
+        // Files with shell extensions are always included
+        if (shellExtensions.test(file)) return true;
+        // For extension-less files, check the shebang line
+        if (!file.includes('.')) {
+          try {
+            const firstLine = readFileSync(file, 'utf-8').split('\n')[0];
+            return shellShebang.test(firstLine);
+          } catch (_e) {
+            return false;
+          }
+        }
+        return false;
+      })
+      .join(' ');
+  } catch (e) {
+    console.error('Error fetching file list from git:', e.message);
+    return '';
+  }
+}
+
 const pythonVenvPythonPath = join(
   PYTHON_VENV_PATH,
   process.platform === 'win32' ? 'Scripts' : 'bin',
@@ -127,34 +179,26 @@ const LINTERS = {
   actionlint: {
     check: actionlintCheck,
     installer: actionlintInstaller,
-    run: `
-      actionlint \
-        -color \
-        -ignore 'SC2002:' \
-        -ignore 'SC2016:' \
-        -ignore 'SC2129:' \
-        -ignore 'label ".+" is unknown'
-    `,
+    // On Windows, cmd.exe doesn't recognize single quotes as grouping characters,
+    // so we use double quotes and a simplified regex to avoid nested-quote issues.
+    run: isWindows
+      ? `actionlint -color -ignore "SC2002:" -ignore "SC2016:" -ignore "SC2129:" -ignore "label .+ is unknown"`
+      : `actionlint -color -ignore 'SC2002:' -ignore 'SC2016:' -ignore 'SC2129:' -ignore 'label ".+" is unknown'`,
   },
   shellcheck: {
     check: shellcheckCheck,
     installer: shellcheckInstaller,
-    run: `
-      git ls-files | grep -E '^([^.]+|.*\\.(sh|zsh|bash))' | xargs file --mime-type \
-        | grep "text/x-shellscript" | awk '{ print substr($1, 1, length($1)-1) }' \
-        | xargs shellcheck \
-          --check-sourced \
-          --enable=all \
-          --exclude=SC2002,SC2129,SC2310 \
-          --severity=style \
-          --format=gcc \
-          --color=never | sed -e 's/note:/warning:/g' -e 's/style:/warning:/g'
-    `,
+    // If Linux/Mac, keep the original "smart" command (sed masks the exit code).
+    // If Windows, use JS-filtered version with || exit 0 to match Linux's behavior.
+    run: !isWindows
+      ? `git ls-files | grep -E '^([^.]+|.*\\.(sh|zsh|bash))' | xargs file --mime-type | grep "text/x-shellscript" | awk '{ print substr($1, 1, length($1)-1) }' | xargs shellcheck --check-sourced --enable=all --exclude=SC2002,SC2129,SC2310 --severity=style --format=gcc --color=never | sed -e 's/note:/warning:/g' -e 's/style:/warning:/g'`
+      : `shellcheck --check-sourced --enable=all --exclude=SC2002,SC2129,SC2310 --severity=style --format=gcc --color=never ${getShellFiles()} || exit 0`,
   },
   yamllint: {
     check: yamllintCheck,
     installer: yamllintInstaller,
-    run: "git ls-files | grep -E '\\.(yaml|yml)' | xargs yamllint --format github",
+    // Unified: use JS filtering for both platforms — simple and fast
+    run: `yamllint --format github ${getFilesByPattern(/\.(yaml|yml)$/)}`,
   },
 };
 
@@ -175,6 +219,10 @@ function runCommand(command, stdio = 'inherit') {
       pythonBin,
       env[pathKey],
     ].join(sep);
+    // Force Python to use UTF-8 on Windows (default cp1252 can't handle some files)
+    if (isWindows) {
+      env.PYTHONUTF8 = '1';
+    }
     execSync(command, { stdio, env, shell: true });
     return true;
   } catch (_e) {
