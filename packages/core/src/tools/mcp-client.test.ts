@@ -752,6 +752,11 @@ describe('mcp-client', () => {
           param1: {
             $ref: '#/$defs/MyType',
           },
+          wait_for_previous: {
+            type: 'boolean',
+            description:
+              'Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.',
+          },
         },
         $defs: {
           MyType: {
