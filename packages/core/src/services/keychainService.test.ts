@@ -4,10 +4,19 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { KeychainService } from './keychainService.js';
 import { coreEvents } from '../utils/events.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { FileKeychain } from './fileKeychain.js';
 
 type MockKeychain = {
   getPassword: Mock | undefined;
@@ -23,7 +32,18 @@ const mockKeytar: MockKeychain = {
   findCredentials: vi.fn(),
 };
 
+const mockFileKeychain: MockKeychain = {
+  getPassword: vi.fn(),
+  setPassword: vi.fn(),
+  deletePassword: vi.fn(),
+  findCredentials: vi.fn(),
+};
+
 vi.mock('keytar', () => ({ default: mockKeytar }));
+
+vi.mock('./fileKeychain.js', () => ({
+  FileKeychain: vi.fn(() => mockFileKeychain),
+}));
 
 vi.mock('../utils/events.js', () => ({
   coreEvents: { emitTelemetryKeychainAvailability: vi.fn() },
@@ -37,13 +57,15 @@ describe('KeychainService', () => {
   let service: KeychainService;
   const SERVICE_NAME = 'test-service';
   let passwords: Record<string, string> = {};
+  const originalEnv = process.env;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env = { ...originalEnv };
     service = new KeychainService(SERVICE_NAME);
     passwords = {};
 
-    // Stateful mock implementation to verify behavioral correctness
+    // Stateful mock implementation for native keychain
     mockKeytar.setPassword?.mockImplementation((_svc, acc, val) => {
       passwords[acc] = val;
       return Promise.resolve();
@@ -64,10 +86,36 @@ describe('KeychainService', () => {
         })),
       ),
     );
+
+    // Stateful mock implementation for fallback file keychain
+    mockFileKeychain.setPassword?.mockImplementation((_svc, acc, val) => {
+      passwords[acc] = val;
+      return Promise.resolve();
+    });
+    mockFileKeychain.getPassword?.mockImplementation((_svc, acc) =>
+      Promise.resolve(passwords[acc] ?? null),
+    );
+    mockFileKeychain.deletePassword?.mockImplementation((_svc, acc) => {
+      const exists = !!passwords[acc];
+      delete passwords[acc];
+      return Promise.resolve(exists);
+    });
+    mockFileKeychain.findCredentials?.mockImplementation(() =>
+      Promise.resolve(
+        Object.entries(passwords).map(([account, password]) => ({
+          account,
+          password,
+        })),
+      ),
+    );
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
   });
 
   describe('isAvailable', () => {
-    it('should return true and emit telemetry on successful functional test', async () => {
+    it('should return true and emit telemetry on successful functional test with native keychain', async () => {
       const available = await service.isAvailable();
 
       expect(available).toBe(true);
@@ -77,12 +125,13 @@ describe('KeychainService', () => {
       );
     });
 
-    it('should return false, log error, and emit telemetry on failed functional test', async () => {
+    it('should return true (via fallback), log error, and emit telemetry indicating native is unavailable on failed functional test', async () => {
       mockKeytar.setPassword?.mockRejectedValue(new Error('locked'));
 
       const available = await service.isAvailable();
 
-      expect(available).toBe(false);
+      // Because it falls back to FileKeychain, it is always available.
+      expect(available).toBe(true);
       expect(debugLogger.log).toHaveBeenCalledWith(
         expect.stringContaining('encountered an error'),
         'locked',
@@ -90,15 +139,19 @@ describe('KeychainService', () => {
       expect(coreEvents.emitTelemetryKeychainAvailability).toHaveBeenCalledWith(
         expect.objectContaining({ available: false }),
       );
+      expect(debugLogger.log).toHaveBeenCalledWith(
+        expect.stringContaining('Using FileKeychain fallback'),
+      );
+      expect(FileKeychain).toHaveBeenCalled();
     });
 
-    it('should return false, log validation error, and emit telemetry on module load failure', async () => {
+    it('should return true (via fallback), log validation error, and emit telemetry on module load failure', async () => {
       const originalMock = mockKeytar.getPassword;
       mockKeytar.getPassword = undefined; // Break schema
 
       const available = await service.isAvailable();
 
-      expect(available).toBe(false);
+      expect(available).toBe(true);
       expect(debugLogger.log).toHaveBeenCalledWith(
         expect.stringContaining('failed structural validation'),
         expect.objectContaining({ getPassword: expect.any(Array) }),
@@ -106,18 +159,30 @@ describe('KeychainService', () => {
       expect(coreEvents.emitTelemetryKeychainAvailability).toHaveBeenCalledWith(
         expect.objectContaining({ available: false }),
       );
+      expect(FileKeychain).toHaveBeenCalled();
 
       mockKeytar.getPassword = originalMock;
     });
 
-    it('should log failure if functional test cycle returns false', async () => {
+    it('should log failure if functional test cycle returns false, then fallback', async () => {
       mockKeytar.getPassword?.mockResolvedValue('wrong-password');
 
       const available = await service.isAvailable();
 
-      expect(available).toBe(false);
+      expect(available).toBe(true);
       expect(debugLogger.log).toHaveBeenCalledWith(
         expect.stringContaining('functional verification failed'),
+      );
+      expect(FileKeychain).toHaveBeenCalled();
+    });
+
+    it('should fallback to FileKeychain when GEMINI_FORCE_FILE_STORAGE is true', async () => {
+      process.env['GEMINI_FORCE_FILE_STORAGE'] = 'true';
+      const available = await service.isAvailable();
+      expect(available).toBe(true);
+      expect(FileKeychain).toHaveBeenCalled();
+      expect(coreEvents.emitTelemetryKeychainAvailability).toHaveBeenCalledWith(
+        expect.objectContaining({ available: false }),
       );
     });
 
@@ -159,25 +224,5 @@ describe('KeychainService', () => {
     });
   });
 
-  describe('When Unavailable', () => {
-    beforeEach(() => {
-      mockKeytar.setPassword?.mockRejectedValue(new Error('Unavailable'));
-    });
-
-    it.each([
-      { method: 'getPassword', args: ['acc'] },
-      { method: 'setPassword', args: ['acc', 'val'] },
-      { method: 'deletePassword', args: ['acc'] },
-      { method: 'findCredentials', args: [] },
-    ])('$method should throw a consistent error', async ({ method, args }) => {
-      await expect(
-        (
-          service as unknown as Record<
-            string,
-            (...args: unknown[]) => Promise<unknown>
-          >
-        )[method](...args),
-      ).rejects.toThrow('Keychain is not available');
-    });
-  });
+  // Removing 'When Unavailable' tests since the service is always available via fallback
 });

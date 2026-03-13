@@ -159,6 +159,10 @@ export class KeychainTokenStorage
     return this.keychainService.isAvailable();
   }
 
+  async isUsingFileFallback(): Promise<boolean> {
+    return this.keychainService.isUsingFileFallback();
+  }
+
   async setSecret(key: string, value: string): Promise<void> {
     await this.keychainService.setPassword(`${SECRET_PREFIX}${key}`, value);
   }

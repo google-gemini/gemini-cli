@@ -14,6 +14,9 @@ import {
   KEYCHAIN_TEST_PREFIX,
 } from './keychainTypes.js';
 import { isRecord } from '../utils/markdownUtils.js';
+import { FileKeychain } from './fileKeychain.js';
+
+export const FORCE_FILE_STORAGE_ENV_VAR = 'GEMINI_FORCE_FILE_STORAGE';
 
 /**
  * Service for interacting with OS-level secure storage (e.g. keytar).
@@ -29,6 +32,14 @@ export class KeychainService {
 
   async isAvailable(): Promise<boolean> {
     return (await this.getKeychain()) !== null;
+  }
+
+  /**
+   * Returns true if the service is using the encrypted file fallback backend.
+   */
+  async isUsingFileFallback(): Promise<boolean> {
+    const keychain = await this.getKeychain();
+    return keychain instanceof FileKeychain;
   }
 
   /**
@@ -85,25 +96,39 @@ export class KeychainService {
   // High-level orchestration of the loading and testing cycle.
   private async initializeKeychain(): Promise<Keychain | null> {
     let resultKeychain: Keychain | null = null;
+    const forceFileStorage = process.env[FORCE_FILE_STORAGE_ENV_VAR] === 'true';
 
-    try {
-      const keychainModule = await this.loadKeychainModule();
-      if (keychainModule) {
-        if (await this.isKeychainFunctional(keychainModule)) {
-          resultKeychain = keychainModule;
-        } else {
-          debugLogger.log('Keychain functional verification failed');
+    if (!forceFileStorage) {
+      try {
+        const keychainModule = await this.loadKeychainModule();
+        if (keychainModule) {
+          if (await this.isKeychainFunctional(keychainModule)) {
+            resultKeychain = keychainModule;
+          } else {
+            debugLogger.log('Keychain functional verification failed');
+          }
         }
+      } catch (error) {
+        // Avoid logging full error objects to prevent PII exposure.
+        const message = error instanceof Error ? error.message : String(error);
+        debugLogger.log(
+          'Keychain initialization encountered an error:',
+          message,
+        );
       }
-    } catch (error) {
-      // Avoid logging full error objects to prevent PII exposure.
-      const message = error instanceof Error ? error.message : String(error);
-      debugLogger.log('Keychain initialization encountered an error:', message);
     }
 
     coreEvents.emitTelemetryKeychainAvailability(
-      new KeychainAvailabilityEvent(resultKeychain !== null),
+      new KeychainAvailabilityEvent(
+        resultKeychain !== null && !forceFileStorage,
+      ),
     );
+
+    // Fallback to FileKeychain if native keychain is unavailable or file storage is forced
+    if (!resultKeychain) {
+      resultKeychain = new FileKeychain();
+      debugLogger.log('Using FileKeychain fallback for secure storage.');
+    }
 
     return resultKeychain;
   }
