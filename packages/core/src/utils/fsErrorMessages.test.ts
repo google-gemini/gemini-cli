@@ -67,7 +67,8 @@ describe('getFsErrorMessage', () => {
       {
         code: 'ENOSPC',
         message: 'ENOSPC: no space left on device',
-        expected: 'No space left on device. Free up some disk space and try again.',
+        expected:
+          'No space left on device. Free up some disk space and try again.',
       },
       {
         code: 'EISDIR',

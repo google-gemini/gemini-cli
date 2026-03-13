@@ -12,11 +12,9 @@ import { isNodeError, getErrorMessage } from './errors.js';
  */
 const errorMessageGenerators: Record<string, (path?: string) => string> = {
   EACCES: (path) =>
-    (
-      path
-        ? `Permission denied: cannot access '${path}'. `
-        : 'Permission denied. '
-    ) +
+    (path
+      ? `Permission denied: cannot access '${path}'. `
+      : 'Permission denied. ') +
     'Check file permissions or run with elevated privileges.',
   ENOENT: (path) =>
     (path
