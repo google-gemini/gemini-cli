@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useMemo, useCallback, useState } from 'react';
+import { useEffect, useMemo, useCallback, useState } from 'react';
 import { Box, Text } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
@@ -79,6 +79,7 @@ export const ToolConfirmationMessage: React.FC<
     callId,
     expanded: false,
   });
+  const [isCancelling, setIsCancelling] = useState(false);
   const isMcpToolDetailsExpanded =
     mcpDetailsExpansionState.callId === callId
       ? mcpDetailsExpansionState.expanded
@@ -181,7 +182,7 @@ export const ToolConfirmationMessage: React.FC<
         return true;
       }
       if (keyMatchers[Command.ESCAPE](key)) {
-        handleConfirm(ToolConfirmationOutcome.Cancel);
+        setIsCancelling(true);
         return true;
       }
       if (keyMatchers[Command.QUIT](key)) {
@@ -193,6 +194,12 @@ export const ToolConfirmationMessage: React.FC<
     },
     { isActive: isFocused, priority: true },
   );
+
+  useEffect(() => {
+    if (isCancelling) {
+      handleConfirm(ToolConfirmationOutcome.Cancel);
+    }
+  }, [isCancelling, handleConfirm]);
 
   const handleSelect = useCallback(
     (item: ToolConfirmationOutcome) => handleConfirm(item),
