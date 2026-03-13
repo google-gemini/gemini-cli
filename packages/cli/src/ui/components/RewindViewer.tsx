@@ -134,7 +134,7 @@ export const RewindViewer: React.FC<RewindViewerProps> = ({
       DIALOG_PADDING -
       DIALOG_HEADER_HEIGHT -
       DIALOG_CONTROLS_HEIGHT -
-      2,
+      DIALOG_BORDER_HEIGHT,
   );
   const maxItemsToShow = Math.max(1, Math.floor(listHeight / 4));
 
