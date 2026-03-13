@@ -94,6 +94,12 @@ export function handleAutoUpdate(
     return;
   }
 
+  // Git clones and unknown installs have no updateCommand — there is nothing
+  // actionable to show. The user manages updates themselves (e.g. git pull).
+  if (!installationInfo.updateCommand) {
+    return;
+  }
+
   let combinedMessage = info.message;
   if (installationInfo.updateMessage) {
     combinedMessage += `\n${installationInfo.updateMessage}`;
