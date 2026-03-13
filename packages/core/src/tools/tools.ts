@@ -85,6 +85,7 @@ export interface PolicyUpdateOptions {
   argsPattern?: string;
   commandPrefix?: string | string[];
   mcpName?: string;
+  toolName?: string;
 }
 
 /**

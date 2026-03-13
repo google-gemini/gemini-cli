@@ -605,11 +605,22 @@ export class Scheduler {
 
     // Handle Policy Updates
     if (decision === PolicyDecision.ASK_USER && outcome) {
+<<<<<<< HEAD
       await updatePolicy(toolCall.tool, outcome, lastDetails, {
         config: this.config,
         messageBus: this.messageBus,
         toolInvocation: toolCall.invocation,
       });
+=======
+      await updatePolicy(
+        toolCall.tool,
+        outcome,
+        lastDetails,
+        this.context,
+        this.messageBus,
+        toolCall.invocation,
+      );
+>>>>>>> 1d2585dba (fix(core): explicitly pass messageBus to policy engine for MCP tool saves (#22255))
     }
 
     // Handle cancellation (cascades to entire batch)

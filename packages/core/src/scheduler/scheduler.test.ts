@@ -812,10 +812,16 @@ describe('Scheduler (Orchestrator)', () => {
         mockTool,
         resolution.outcome,
         resolution.lastDetails,
+<<<<<<< HEAD
         expect.objectContaining({
           config: mockConfig,
           messageBus: mockMessageBus,
         }),
+=======
+        mockConfig,
+        expect.anything(),
+        expect.anything(),
+>>>>>>> 1d2585dba (fix(core): explicitly pass messageBus to policy engine for MCP tool saves (#22255))
       );
 
       expect(mockExecutor.execute).toHaveBeenCalled();

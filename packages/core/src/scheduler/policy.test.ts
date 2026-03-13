@@ -221,7 +221,12 @@ describe('policy.ts', () => {
         tool,
         ToolConfirmationOutcome.ProceedAlways,
         undefined,
+<<<<<<< HEAD
         { config: mockConfig, messageBus: mockMessageBus },
+=======
+        mockConfig,
+        mockMessageBus,
+>>>>>>> 1d2585dba (fix(core): explicitly pass messageBus to policy engine for MCP tool saves (#22255))
       );
 
       expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
@@ -246,7 +251,12 @@ describe('policy.ts', () => {
         tool,
         ToolConfirmationOutcome.ProceedAlways,
         undefined,
+<<<<<<< HEAD
         { config: mockConfig, messageBus: mockMessageBus },
+=======
+        mockConfig,
+        mockMessageBus,
+>>>>>>> 1d2585dba (fix(core): explicitly pass messageBus to policy engine for MCP tool saves (#22255))
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -276,7 +286,12 @@ describe('policy.ts', () => {
         tool,
         ToolConfirmationOutcome.ProceedAlwaysAndSave,
         undefined,
+<<<<<<< HEAD
         { config: mockConfig, messageBus: mockMessageBus },
+=======
+        mockConfig,
+        mockMessageBus,
+>>>>>>> 1d2585dba (fix(core): explicitly pass messageBus to policy engine for MCP tool saves (#22255))
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -308,10 +323,20 @@ describe('policy.ts', () => {
         onConfirm: vi.fn(),
       };
 
+<<<<<<< HEAD
       await updatePolicy(tool, ToolConfirmationOutcome.ProceedAlways, details, {
         config: mockConfig,
         messageBus: mockMessageBus,
       });
+=======
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.ProceedAlways,
+        details,
+        mockConfig,
+        mockMessageBus,
+      );
+>>>>>>> 1d2585dba (fix(core): explicitly pass messageBus to policy engine for MCP tool saves (#22255))
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -346,13 +371,18 @@ describe('policy.ts', () => {
         tool,
         ToolConfirmationOutcome.ProceedAlwaysServer,
         details,
+<<<<<<< HEAD
         { config: mockConfig, messageBus: mockMessageBus },
+=======
+        mockConfig,
+        mockMessageBus,
+>>>>>>> 1d2585dba (fix(core): explicitly pass messageBus to policy engine for MCP tool saves (#22255))
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageBusType.UPDATE_POLICY,
-          toolName: 'my-server__*',
+          toolName: 'mcp_my-server_*',
           mcpName: 'my-server',
           persist: false,
         }),
@@ -371,10 +401,20 @@ describe('policy.ts', () => {
       } as unknown as Mocked<MessageBus>;
       const tool = { name: 'test-tool' } as AnyDeclarativeTool;
 
+<<<<<<< HEAD
       await updatePolicy(tool, ToolConfirmationOutcome.ProceedOnce, undefined, {
         config: mockConfig,
         messageBus: mockMessageBus,
       });
+=======
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.ProceedOnce,
+        undefined,
+        mockConfig,
+        mockMessageBus,
+      );
+>>>>>>> 1d2585dba (fix(core): explicitly pass messageBus to policy engine for MCP tool saves (#22255))
 
       expect(mockMessageBus.publish).not.toHaveBeenCalled();
       expect(mockConfig.setApprovalMode).not.toHaveBeenCalled();
@@ -392,10 +432,20 @@ describe('policy.ts', () => {
       } as unknown as Mocked<MessageBus>;
       const tool = { name: 'test-tool' } as AnyDeclarativeTool;
 
+<<<<<<< HEAD
       await updatePolicy(tool, ToolConfirmationOutcome.Cancel, undefined, {
         config: mockConfig,
         messageBus: mockMessageBus,
       });
+=======
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.Cancel,
+        undefined,
+        mockConfig,
+        mockMessageBus,
+      );
+>>>>>>> 1d2585dba (fix(core): explicitly pass messageBus to policy engine for MCP tool saves (#22255))
 
       expect(mockMessageBus.publish).not.toHaveBeenCalled();
     });
@@ -416,7 +466,12 @@ describe('policy.ts', () => {
         tool,
         ToolConfirmationOutcome.ModifyWithEditor,
         undefined,
+<<<<<<< HEAD
         { config: mockConfig, messageBus: mockMessageBus },
+=======
+        mockConfig,
+        mockMessageBus,
+>>>>>>> 1d2585dba (fix(core): explicitly pass messageBus to policy engine for MCP tool saves (#22255))
       );
 
       expect(mockMessageBus.publish).not.toHaveBeenCalled();
@@ -446,7 +501,12 @@ describe('policy.ts', () => {
         tool,
         ToolConfirmationOutcome.ProceedAlwaysTool,
         details,
+<<<<<<< HEAD
         { config: mockConfig, messageBus: mockMessageBus },
+=======
+        mockConfig,
+        mockMessageBus,
+>>>>>>> 1d2585dba (fix(core): explicitly pass messageBus to policy engine for MCP tool saves (#22255))
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -479,10 +539,20 @@ describe('policy.ts', () => {
         onConfirm: vi.fn(),
       };
 
+<<<<<<< HEAD
       await updatePolicy(tool, ToolConfirmationOutcome.ProceedAlways, details, {
         config: mockConfig,
         messageBus: mockMessageBus,
       });
+=======
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.ProceedAlways,
+        details,
+        mockConfig,
+        mockMessageBus,
+      );
+>>>>>>> 1d2585dba (fix(core): explicitly pass messageBus to policy engine for MCP tool saves (#22255))
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -520,7 +590,12 @@ describe('policy.ts', () => {
         tool,
         ToolConfirmationOutcome.ProceedAlwaysAndSave,
         details,
+<<<<<<< HEAD
         { config: mockConfig, messageBus: mockMessageBus },
+=======
+        mockConfig,
+        mockMessageBus,
+>>>>>>> 1d2585dba (fix(core): explicitly pass messageBus to policy engine for MCP tool saves (#22255))
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -550,7 +625,14 @@ describe('policy.ts', () => {
         tool,
         ToolConfirmationOutcome.ProceedAlwaysAndSave,
         undefined,
+<<<<<<< HEAD
         { config: mockConfig, messageBus: mockMessageBus },
+=======
+        {
+          config: mockConfig,
+        } as unknown as AgentLoopContext,
+        mockMessageBus,
+>>>>>>> 1d2585dba (fix(core): explicitly pass messageBus to policy engine for MCP tool saves (#22255))
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -577,7 +659,14 @@ describe('policy.ts', () => {
         tool,
         ToolConfirmationOutcome.ProceedAlwaysAndSave,
         undefined,
+<<<<<<< HEAD
         { config: mockConfig, messageBus: mockMessageBus },
+=======
+        {
+          config: mockConfig,
+        } as unknown as AgentLoopContext,
+        mockMessageBus,
+>>>>>>> 1d2585dba (fix(core): explicitly pass messageBus to policy engine for MCP tool saves (#22255))
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -612,7 +701,14 @@ describe('policy.ts', () => {
         tool,
         ToolConfirmationOutcome.ProceedAlwaysAndSave,
         details,
+<<<<<<< HEAD
         { config: mockConfig, messageBus: mockMessageBus },
+=======
+        {
+          config: mockConfig,
+        } as unknown as AgentLoopContext,
+        mockMessageBus,
+>>>>>>> 1d2585dba (fix(core): explicitly pass messageBus to policy engine for MCP tool saves (#22255))
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
