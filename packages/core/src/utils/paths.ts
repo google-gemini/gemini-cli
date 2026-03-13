@@ -375,24 +375,45 @@ export function resolveToRealPath(pathStr: string): string {
   return robustRealpath(path.resolve(resolvedPath));
 }
 
-function robustRealpath(p: string): string {
+function robustRealpath(p: string, visited = new Set<string>()): string {
+  const key = process.platform === 'win32' ? p.toLowerCase() : p;
+  if (visited.has(key)) {
+    throw new Error(`Infinite recursion detected in robustRealpath: ${p}`);
+  }
+  visited.add(key);
   try {
     return fs.realpathSync(p);
   } catch (e: unknown) {
-    if (e && typeof e === 'object' && 'code' in e && e.code === 'ENOENT') {
+    if (
+      e &&
+      typeof e === 'object' &&
+      'code' in e &&
+      (e.code === 'ENOENT' || e.code === 'EISDIR')
+    ) {
       try {
         const stat = fs.lstatSync(p);
         if (stat.isSymbolicLink()) {
           const target = fs.readlinkSync(p);
           const resolvedTarget = path.resolve(path.dirname(p), target);
-          return robustRealpath(resolvedTarget);
+          return robustRealpath(resolvedTarget, visited);
         }
-      } catch {
-        // Not a symlink, or lstat failed. Just resolve parent.
+      } catch (lstatError: unknown) {
+        // Not a symlink, or lstat failed. Re-throw if it's not an expected
+        // ENOENT (e.g., a permissions error), otherwise resolve parent.
+        if (
+          !(
+            lstatError &&
+            typeof lstatError === 'object' &&
+            'code' in lstatError &&
+            (lstatError.code === 'ENOENT' || lstatError.code === 'EISDIR')
+          )
+        ) {
+          throw lstatError;
+        }
       }
       const parent = path.dirname(p);
       if (parent === p) return p;
-      return path.join(robustRealpath(parent), path.basename(p));
+      return path.join(robustRealpath(parent, visited), path.basename(p));
     }
     throw e;
   }

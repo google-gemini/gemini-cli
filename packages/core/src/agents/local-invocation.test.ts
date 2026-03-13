@@ -68,6 +68,11 @@ describe('LocalSubagentInvocation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfig = makeFakeConfig();
+    // .config is already set correctly by the getter on the instance.
+    Object.defineProperty(mockConfig, 'promptId', {
+      get: () => 'test-prompt-id',
+      configurable: true,
+    });
     mockMessageBus = createMockMessageBus();
 
     mockExecutorInstance = {
@@ -203,8 +208,24 @@ describe('LocalSubagentInvocation', () => {
           ),
         },
       ]);
-      expect(result.returnDisplay).toContain('Result:\nAnalysis complete.');
-      expect(result.returnDisplay).toContain('Termination Reason:\n GOAL');
+      expect(result.returnDisplay).toBe('Analysis complete.');
+      expect(result.returnDisplay).not.toContain('Termination Reason');
+    });
+
+    it('should show detailed UI for non-goal terminations (e.g., TIMEOUT)', async () => {
+      const mockOutput = {
+        result: 'Partial progress...',
+        terminate_reason: AgentTerminateMode.TIMEOUT,
+      };
+      mockExecutorInstance.run.mockResolvedValue(mockOutput);
+
+      const result = await invocation.execute(signal, updateOutput);
+
+      expect(result.returnDisplay).toContain(
+        '### Subagent MockAgent Finished Early',
+      );
+      expect(result.returnDisplay).toContain('**Termination Reason:** TIMEOUT');
+      expect(result.returnDisplay).toContain('Partial progress...');
     });
 
     it('should render recovered subagent completions distinctly', async () => {
@@ -316,7 +337,7 @@ describe('LocalSubagentInvocation', () => {
       // Execute without the optional callback
       const result = await invocation.execute(signal);
       expect(result.error).toBeUndefined();
-      expect(result.returnDisplay).toContain('Result:\nDone');
+      expect(result.returnDisplay).toBe('Done');
     });
 
     it('should handle executor run failure', async () => {

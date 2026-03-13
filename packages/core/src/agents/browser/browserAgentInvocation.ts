@@ -16,7 +16,9 @@
 
 import { randomUUID } from 'node:crypto';
 import type { Config } from '../../config/config.js';
+import { type AgentLoopContext } from '../../config/agent-loop-context.js';
 import { LocalAgentExecutor } from '../local-executor.js';
+import { safeJsonToMarkdown } from '../../utils/markdownUtils.js';
 import {
   BaseToolInvocation,
   type ToolResult,
@@ -34,6 +36,7 @@ import {
   createBrowserAgentDefinition,
   cleanupBrowserAgent,
 } from './browserAgentFactory.js';
+import { removeInputBlocker } from './inputBlocker.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -178,7 +181,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: AgentInputs,
     messageBus: MessageBus,
     _toolName?: string,
@@ -191,6 +194,10 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
       _toolName ?? 'browser_agent',
       _toolDisplayName ?? 'Browser Agent',
     );
+  }
+
+  private get config(): Config {
+    return this.context.config;
   }
 
   /**
@@ -408,12 +415,13 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
       // Create and run executor with the configured definition
       const executor = await LocalAgentExecutor.create(
         definition,
-        this.config,
+        this.context,
         onActivity,
       );
 
       const output = await executor.run(this.params, signal);
 
+      const displayResult = safeJsonToMarkdown(output.result);
       const statusHeader = output.recovered_from
         ? 'Browser agent finished after recovery.'
         : 'Browser agent finished.';
@@ -438,8 +446,9 @@ ${displayHeader}
 Termination Reason: ${output.terminate_reason}
 
 ${displayRecoveredLine}Result:
-${output.result}
+${displayResult}
 `;
+
 
       if (updateOutput) {
         updateOutput({
@@ -495,6 +504,7 @@ ${output.result}
     } finally {
       // Always cleanup browser resources
       if (browserManager) {
+        await removeInputBlocker(browserManager);
         await cleanupBrowserAgent(browserManager);
       }
     }

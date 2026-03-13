@@ -119,7 +119,7 @@ import { type InitializationResult } from '../core/initializer.js';
 import { useFocus } from './hooks/useFocus.js';
 import { useKeypress, type Key } from './hooks/useKeypress.js';
 import { KeypressPriority } from './contexts/KeypressContext.js';
-import { keyMatchers, Command } from './keyMatchers.js';
+import { Command } from './key/keyMatchers.js';
 import { useLoadingIndicator } from './hooks/useLoadingIndicator.js';
 import { useShellInactivityStatus } from './hooks/useShellInactivityStatus.js';
 import { useFolderTrust } from './hooks/useFolderTrust.js';
@@ -162,9 +162,10 @@ import {
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
 import { NewAgentsChoice } from './components/NewAgentsNotification.js';
 import { isSlashCommand } from './utils/commandUtils.js';
+import { parseSlashCommand } from '../utils/commands.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useTimedMessage } from './hooks/useTimedMessage.js';
-import { shouldDismissShortcutsHelpOnHotkey } from './utils/shortcutsHelp.js';
+import { useIsHelpDismissKey } from './utils/shortcutsHelp.js';
 import { useSuspend } from './hooks/useSuspend.js';
 import { useRunEventNotifications } from './hooks/useRunEventNotifications.js';
 import { isNotificationsEnabled } from '../utils/terminalNotifications.js';
@@ -205,6 +206,7 @@ import {
   useVisibilityToggle,
   APPROVAL_MODE_REVEAL_DURATION_MS,
 } from './hooks/useVisibilityToggle.js';
+import { useKeyMatchers } from './hooks/useKeyMatchers.js';
 
 /**
  * The fraction of the terminal width to allocate to the shell.
@@ -219,6 +221,8 @@ const SHELL_WIDTH_FRACTION = 0.89;
 const SHELL_HEIGHT_PADDING = 10;
 
 export const AppContainer = (props: AppContainerProps) => {
+  const isHelpDismissKey = useIsHelpDismissKey();
+  const keyMatchers = useKeyMatchers();
   const { config, initializationResult, resumedSessionData } = props;
   const settings = useSettings();
   const { reset } = useOverflowActions()!;
@@ -470,9 +474,11 @@ export const AppContainer = (props: AppContainerProps) => {
       disableMouseEvents();
 
       // Kill all background shells
-      for (const pid of backgroundShellsRef.current.keys()) {
-        ShellExecutionService.kill(pid);
-      }
+      await Promise.all(
+        Array.from(backgroundShellsRef.current.keys()).map((pid) =>
+          ShellExecutionService.kill(pid),
+        ),
+      );
 
       const ideClient = await IdeClient.getInstance();
       await ideClient.disconnect();
@@ -1217,8 +1223,15 @@ Logging in with Google... Restarting Gemini CLI to continue.
         return;
       }
 
+      // If cancelling (shouldRestorePrompt=false), never modify the buffer
+      // User is in control - preserve whatever text they typed, pasted, or restored
+      if (!shouldRestorePrompt) {
+        return;
+      }
+
+      // Restore the last message when shouldRestorePrompt=true
       const lastUserMessage = inputHistory.at(-1);
-      let textToSet = shouldRestorePrompt ? lastUserMessage || '' : '';
+      let textToSet = lastUserMessage || '';
 
       const queuedText = getQueuedMessagesText();
       if (queuedText) {
@@ -1226,7 +1239,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         clearQueue();
       }
 
-      if (textToSet || !shouldRestorePrompt) {
+      if (textToSet) {
         buffer.setText(textToSet);
       }
     },
@@ -1277,6 +1290,18 @@ Logging in with Google... Restarting Gemini CLI to continue.
           ...pendingGeminiHistoryItems,
         ]);
 
+      if (isSlash && isAgentRunning) {
+        const { commandToExecute } = parseSlashCommand(
+          submittedValue,
+          slashCommands ?? [],
+        );
+        if (commandToExecute?.isSafeConcurrent) {
+          void handleSlashCommand(submittedValue);
+          addInput(submittedValue);
+          return;
+        }
+      }
+
       if (config.isModelSteeringEnabled() && isAgentRunning && !isSlash) {
         handleHintSubmit(submittedValue);
         addInput(submittedValue);
@@ -1320,6 +1345,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       addMessage,
       addInput,
       submitQuery,
+      handleSlashCommand,
+      slashCommands,
       isMcpReady,
       streamingState,
       messageQueue.length,
@@ -1386,11 +1413,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   // Compute available terminal height based on controls measurement
   const availableTerminalHeight = Math.max(
     0,
-    terminalHeight -
-      controlsHeight -
-      staticExtraHeight -
-      2 -
-      backgroundShellHeight,
+    terminalHeight - controlsHeight - backgroundShellHeight - 1,
   );
 
   config.setShellExecutionConfig({
@@ -1654,7 +1677,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
       }
 
-      if (shortcutsHelpVisible && shouldDismissShortcutsHelpOnHotkey(key)) {
+      if (shortcutsHelpVisible && isHelpDismissKey(key)) {
         setShortcutsHelpVisible(false);
       }
 
@@ -1848,13 +1871,26 @@ Logging in with Google... Restarting Gemini CLI to continue.
       settings.merged.general.devtools,
       showErrorDetails,
       triggerExpandHint,
+      keyMatchers,
+      isHelpDismissKey,
     ],
   );
 
   useKeypress(handleGlobalKeypress, { isActive: true, priority: true });
 
   useKeypress(
-    () => {
+    (key: Key) => {
+      if (
+        keyMatchers[Command.SCROLL_UP](key) ||
+        keyMatchers[Command.SCROLL_DOWN](key) ||
+        keyMatchers[Command.PAGE_UP](key) ||
+        keyMatchers[Command.PAGE_DOWN](key) ||
+        keyMatchers[Command.SCROLL_HOME](key) ||
+        keyMatchers[Command.SCROLL_END](key)
+      ) {
+        return false;
+      }
+
       setCopyModeEnabled(false);
       enableMouseEvents();
       return true;
