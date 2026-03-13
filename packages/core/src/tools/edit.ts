@@ -712,13 +712,13 @@ class EditToolInvocation
    * It needs to calculate the diff to show the user.
    */
   protected override async getConfirmationDetails(
-    _abortSignal: AbortSignal,
+    abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     let editData: CalculatedEdit;
     try {
-      editData = await this.calculateEdit(this.params, _abortSignal);
+      editData = await this.calculateEdit(this.params, abortSignal);
     } catch (error) {
-      if (_abortSignal.aborted) {
+      if (abortSignal.aborted) {
         throw error;
       }
       const errorMsg = error instanceof Error ? error.message : String(error);

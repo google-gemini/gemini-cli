@@ -50,8 +50,7 @@ import { ToolExecutor } from '../scheduler/tool-executor.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getPolicyDenialError } from '../scheduler/policy.js';
 import { GeminiCliOperation } from '../telemetry/constants.js';
-import { extractMcpContext } from './coreToolHookTriggers.js';
-import { BeforeToolHookOutput } from '../hooks/types.js';
+import { evaluateBeforeToolHook } from '../scheduler/hook-utils.js';
 
 export type {
   ToolCall,
@@ -639,85 +638,48 @@ export class CoreToolScheduler {
         }
 
         // 1. Hook Check (BeforeTool)
-        let hookDecision: 'ask' | 'block' | undefined;
-        let hookSystemMessage: string | undefined;
+        const hookResult = await evaluateBeforeToolHook(
+          this.config,
+          toolCall.tool,
+          reqInfo,
+          invocation,
+        );
 
-        const hookSystem = this.config.getHookSystem();
-        if (hookSystem) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const toolInput = (invocation.params || {}) as Record<
-            string,
-            unknown
-          >;
-          const mcpContext = extractMcpContext(invocation, this.config);
-
-          const beforeOutput = await hookSystem.fireBeforeToolEvent(
-            toolCall.request.name,
-            toolInput,
-            mcpContext,
-            toolCall.request.originalRequestName,
+        if (hookResult.status === 'error') {
+          this.setStatusInternal(
+            reqInfo.callId,
+            CoreToolCallStatus.Error,
+            signal,
+            createErrorResponse(
+              reqInfo,
+              hookResult.error,
+              hookResult.errorType,
+            ),
           );
+          await this.checkAndNotifyCompletion(signal);
+          return;
+        }
 
-          if (beforeOutput) {
-            // Check if hook requested to stop entire agent execution
-            if (beforeOutput.shouldStopExecution()) {
-              const reason = beforeOutput.getEffectiveReason();
-              this.setStatusInternal(
-                reqInfo.callId,
-                CoreToolCallStatus.Error,
-                signal,
-                createErrorResponse(
-                  reqInfo,
-                  new Error(`Agent execution stopped by hook: ${reason}`),
-                  ToolErrorType.STOP_EXECUTION,
-                ),
-              );
-              await this.checkAndNotifyCompletion(signal);
-              return;
-            }
+        const { hookDecision, hookSystemMessage, modifiedArgs, newInvocation } =
+          hookResult;
 
-            // Check if hook blocked the tool execution
-            const blockingError = beforeOutput.getBlockingError();
-            if (blockingError?.blocked) {
-              this.setStatusInternal(
-                reqInfo.callId,
-                CoreToolCallStatus.Error,
-                signal,
-                createErrorResponse(
-                  reqInfo,
-                  new Error(`Tool execution blocked: ${blockingError.reason}`),
-                  ToolErrorType.POLICY_VIOLATION,
-                ),
-              );
-              await this.checkAndNotifyCompletion(signal);
-              return;
-            }
+        if (hookDecision === 'ask') {
+          // Mark the request so UI knows not to auto-approve it
+          toolCall.request.forcedAsk = true;
+        }
 
-            if (beforeOutput.isAskDecision()) {
-              hookDecision = 'ask';
-              hookSystemMessage = beforeOutput.systemMessage;
-              // Mark the request so UI knows not to auto-approve it
-              toolCall.request.forcedAsk = true;
-            }
+        if (modifiedArgs && newInvocation) {
+          this.setArgsInternal(reqInfo.callId, modifiedArgs);
 
-            // Check if hook requested to update tool input
-            if (beforeOutput instanceof BeforeToolHookOutput) {
-              const modifiedInput = beforeOutput.getModifiedToolInput();
-              if (modifiedInput) {
-                this.setArgsInternal(reqInfo.callId, modifiedInput);
-
-                // IMPORTANT: toolCall and invocation must be updated because setArgsInternal created a new one
-                const updatedCall = this.toolCalls.find(
-                  (c) => c.request.callId === reqInfo.callId,
-                );
-                if (updatedCall) {
-                  toolCall = updatedCall;
-                  toolCall.request.inputModifiedByHook = true;
-                  if ('invocation' in updatedCall) {
-                    invocation = updatedCall.invocation;
-                  }
-                }
-              }
+          // IMPORTANT: toolCall and invocation must be updated because setArgsInternal created a new one
+          const updatedCall = this.toolCalls.find(
+            (c) => c.request.callId === reqInfo.callId,
+          );
+          if (updatedCall) {
+            toolCall = updatedCall;
+            toolCall.request.inputModifiedByHook = true;
+            if ('invocation' in updatedCall) {
+              invocation = updatedCall.invocation;
             }
           }
         }

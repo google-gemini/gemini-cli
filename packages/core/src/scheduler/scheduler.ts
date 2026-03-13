@@ -25,8 +25,8 @@ import {
   type ScheduledToolCall,
 } from './types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
-import { extractMcpContext } from '../core/coreToolHookTriggers.js';
-import { BeforeToolHookOutput } from '../hooks/types.js';
+import { evaluateBeforeToolHook } from './hook-utils.js';
+
 import { PolicyDecision, type ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
@@ -564,85 +564,37 @@ export class Scheduler {
   ): Promise<void> {
     const callId = toolCall.request.callId;
 
-    let hookDecision: 'ask' | 'block' | undefined;
-    let hookSystemMessage: string | undefined;
+    const hookResult = await evaluateBeforeToolHook(
+      this.config,
+      toolCall.tool,
+      toolCall.request,
+      toolCall.invocation,
+    );
 
-    const hookSystem = this.config.getHookSystem();
-    if (hookSystem) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const toolInput = (toolCall.invocation.params || {}) as Record<
-        string,
-        unknown
-      >;
-      const mcpContext = extractMcpContext(toolCall.invocation, this.config);
-
-      const beforeOutput = await hookSystem.fireBeforeToolEvent(
-        toolCall.request.name,
-        toolInput,
-        mcpContext,
-        toolCall.request.originalRequestName,
+    if (hookResult.status === 'error') {
+      this.state.updateStatus(
+        callId,
+        CoreToolCallStatus.Error,
+        createErrorResponse(
+          toolCall.request,
+          hookResult.error,
+          hookResult.errorType,
+        ),
       );
+      return;
+    }
 
-      if (beforeOutput) {
-        if (beforeOutput.shouldStopExecution()) {
-          this.state.updateStatus(
-            callId,
-            CoreToolCallStatus.Error,
-            createErrorResponse(
-              toolCall.request,
-              new Error(
-                `Agent execution stopped by hook: ${beforeOutput.getEffectiveReason()}`,
-              ),
-              ToolErrorType.STOP_EXECUTION,
-            ),
-          );
-          return;
-        }
+    const { hookDecision, hookSystemMessage, modifiedArgs, newInvocation } =
+      hookResult;
 
-        const blockingError = beforeOutput.getBlockingError();
-        if (blockingError?.blocked) {
-          this.state.updateStatus(
-            callId,
-            CoreToolCallStatus.Error,
-            createErrorResponse(
-              toolCall.request,
-              new Error(`Tool execution blocked: ${blockingError.reason}`),
-              ToolErrorType.POLICY_VIOLATION,
-            ),
-          );
-          return;
-        }
+    if (hookDecision === 'ask') {
+      toolCall.request.forcedAsk = true;
+    }
 
-        if (beforeOutput.isAskDecision()) {
-          hookDecision = 'ask';
-          hookSystemMessage = beforeOutput.systemMessage;
-          toolCall.request.forcedAsk = true;
-        }
-
-        if (beforeOutput instanceof BeforeToolHookOutput) {
-          const modifiedInput = beforeOutput.getModifiedToolInput();
-          if (modifiedInput) {
-            toolCall.request.args = modifiedInput;
-            toolCall.request.inputModifiedByHook = true;
-            try {
-              toolCall.invocation = toolCall.tool.build(modifiedInput);
-            } catch (error) {
-              this.state.updateStatus(
-                callId,
-                CoreToolCallStatus.Error,
-                createErrorResponse(
-                  toolCall.request,
-                  new Error(
-                    `Tool parameter modification by hook failed validation: ${error instanceof Error ? error.message : String(error)}`,
-                  ),
-                  ToolErrorType.INVALID_TOOL_PARAMS,
-                ),
-              );
-              return;
-            }
-          }
-        }
-      }
+    if (modifiedArgs && newInvocation) {
+      toolCall.request.args = modifiedArgs;
+      toolCall.request.inputModifiedByHook = true;
+      toolCall.invocation = newInvocation;
     }
 
     // Policy & Security

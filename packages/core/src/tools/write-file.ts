@@ -181,13 +181,13 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   }
 
   protected override async getConfirmationDetails(
-    _abortSignal: AbortSignal,
+    abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
     const correctedContentResult = await getCorrectedFileContent(
       this.config,
       this.resolvedPath,
       this.params.content,
-      _abortSignal,
+      abortSignal,
     );
 
     if (correctedContentResult.error) {
