@@ -470,4 +470,17 @@ describe('DiagLoggerAdapter', () => {
     );
     expect(debugLogger.debug).toHaveBeenCalledWith('export failed again');
   });
+
+  it('should detect export errors passed in arguments, not just the main message', () => {
+    const errorObj = new Error('connect ECONNREFUSED 127.0.0.1:4317');
+    adapter.error('Failed to export traces', errorObj);
+
+    expect(debugLogger.error).toHaveBeenCalledWith(
+      'Telemetry export failed. Suppressing further export errors.',
+    );
+    expect(debugLogger.debug).toHaveBeenCalledWith(
+      'Failed to export traces',
+      errorObj,
+    );
+  });
 });

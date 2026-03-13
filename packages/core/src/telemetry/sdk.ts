@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as util from 'node:util';
 import {
   DiagLogLevel,
   diag,
@@ -77,9 +78,9 @@ export class DiagLoggerAdapter {
   private recoveryTimeout: NodeJS.Timeout | null = null;
 
   error(message: string, ...args: unknown[]): void {
-    const errorStr = typeof message === 'string' ? message : String(message);
+    const fullErrorString = util.format(message, ...args);
     const isExportError = DiagLoggerAdapter.EXPORT_ERROR_PATTERNS.some(
-      (pattern) => pattern.test(errorStr),
+      (pattern) => pattern.test(fullErrorString),
     );
 
     if (isExportError) {
