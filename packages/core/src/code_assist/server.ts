@@ -481,30 +481,10 @@ export class CodeAssistServer implements ContentGenerator {
       });
 
       let bufferedLines: string[] = [];
-      for await (const line of rl) {
-        if (line.startsWith('data: ')) {
-          bufferedLines.push(line.slice(6).trim());
-        } else if (line === '') {
-          if (bufferedLines.length === 0) {
-            continue; // no data to yield
-          }
-          const chunk = bufferedLines.join('\n');
-          try {
-            yield JSON.parse(chunk);
-          } catch (_e) {
-            if (server.config) {
-              logInvalidChunk(
-                server.config,
-                // Don't include the chunk content in the log for security/privacy reasons.
-                new InvalidChunkEvent('Malformed JSON chunk'),
-              );
-            }
-          }
-          bufferedLines = []; // Reset the buffer after yielding
+      const yieldBufferedChunk = async function* (): AsyncGenerator<T> {
+        if (bufferedLines.length === 0) {
+          return;
         }
-        // Ignore other lines like comments or id fields
-      }
-      if (bufferedLines.length > 0) {
         const chunk = bufferedLines.join('\n');
         try {
           yield JSON.parse(chunk);
@@ -517,7 +497,18 @@ export class CodeAssistServer implements ContentGenerator {
             );
           }
         }
+        bufferedLines = [];
+      };
+
+      for await (const line of rl) {
+        if (line.startsWith('data: ')) {
+          bufferedLines.push(line.slice(6).trim());
+        } else if (line === '') {
+          yield* yieldBufferedChunk();
+        }
+        // Ignore other lines like comments or id fields
       }
+      yield* yieldBufferedChunk();
     })(this);
   }
 
