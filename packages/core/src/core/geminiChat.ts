@@ -421,7 +421,7 @@ export class GeminiChat {
               : getRetryErrorType(error);
 
             if (
-              (isContentError && isGemini2Model(model, this.config)) ||
+              (isContentError && isGemini2Model(model, this.context.config)) ||
               (isRetryable && !signal.aborted)
             ) {
               // The issue requests exactly 3 retries (4 attempts) for API errors during stream iteration.
@@ -553,7 +553,7 @@ export class GeminiChat {
 
       let contentsToUse: Content[] = supportsModernFeatures(
         modelToUse,
-        this.config,
+        this.context.config,
       )
         ? [...contentsForPreviewModel]
         : [...requestContents];
