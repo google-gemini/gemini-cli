@@ -1,10 +1,10 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   resolvePolicyChain,
   buildFallbackPolicyContext,
@@ -22,11 +22,16 @@ import {
 import { AuthType } from '../core/contentGenerator.js';
 import { coreEvents } from '../utils/events.js';
 
-vi.mock('../utils/events.js', () => ({
-  coreEvents: {
-    emitFeedback: vi.fn(),
-  },
-}));
+vi.mock('../utils/events.js', async (importActual) => {
+  const actual = await importActual<typeof import('../utils/events.js')>();
+  return {
+    ...actual,
+    coreEvents: {
+      ...actual.coreEvents,
+      emitFeedback: vi.fn(),
+    },
+  };
+});
 
 const createMockConfig = (overrides: Partial<Config> = {}): Config => {
   const config = {
@@ -45,6 +50,10 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config => {
 };
 
 describe('policyHelpers', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('resolvePolicyChain', () => {
     it('returns a single-model chain for a custom model', () => {
       const config = createMockConfig({
