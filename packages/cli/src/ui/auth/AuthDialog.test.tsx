@@ -273,7 +273,7 @@ describe('AuthDialog', () => {
       unmount();
     });
 
-    it('skips API key dialog on initial setup if env var is present', async () => {
+    it('shows API key dialog on initial setup even when env var is present', async () => {
       mockedValidateAuthMethod.mockReturnValue(null);
       vi.stubEnv('GEMINI_API_KEY', 'test-key-from-env');
       // props.settings.merged.security.auth.selectedType is undefined here, simulating initial setup
@@ -287,12 +287,12 @@ describe('AuthDialog', () => {
       await handleAuthSelect(AuthType.USE_GEMINI);
 
       expect(props.setAuthState).toHaveBeenCalledWith(
-        AuthState.Unauthenticated,
+        AuthState.AwaitingApiKeyInput,
       );
       unmount();
     });
 
-    it('skips API key dialog if env var is present but empty', async () => {
+    it('shows API key dialog even when env var is empty string', async () => {
       mockedValidateAuthMethod.mockReturnValue(null);
       vi.stubEnv('GEMINI_API_KEY', ''); // Empty string
       // props.settings.merged.security.auth.selectedType is undefined here
@@ -306,7 +306,7 @@ describe('AuthDialog', () => {
       await handleAuthSelect(AuthType.USE_GEMINI);
 
       expect(props.setAuthState).toHaveBeenCalledWith(
-        AuthState.Unauthenticated,
+        AuthState.AwaitingApiKeyInput,
       );
       unmount();
     });
@@ -330,7 +330,7 @@ describe('AuthDialog', () => {
       unmount();
     });
 
-    it('skips API key dialog on re-auth if env var is present (cannot edit)', async () => {
+    it('shows API key dialog on re-auth even when env var is present', async () => {
       mockedValidateAuthMethod.mockReturnValue(null);
       vi.stubEnv('GEMINI_API_KEY', 'test-key-from-env');
       // Simulate that the user has already authenticated once
@@ -346,7 +346,7 @@ describe('AuthDialog', () => {
       await handleAuthSelect(AuthType.USE_GEMINI);
 
       expect(props.setAuthState).toHaveBeenCalledWith(
-        AuthState.Unauthenticated,
+        AuthState.AwaitingApiKeyInput,
       );
       unmount();
     });
