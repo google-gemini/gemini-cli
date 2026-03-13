@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import {
   type SandboxManager,
   type SandboxRequest,
@@ -13,6 +15,10 @@ import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from '../../services/environmentSanitization.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const HELPER_PATH = join(__dirname, 'gemini-linux-sandbox-helper');
 
 /**
  * Options for configuring the LinuxSandboxManager.
@@ -66,7 +72,7 @@ export class LinuxSandboxManager implements SandboxManager {
       }
     }
 
-    bwrapArgs.push('--', req.command, ...req.args);
+    bwrapArgs.push('--', HELPER_PATH, req.command, ...req.args);
 
     return {
       program: 'bwrap',

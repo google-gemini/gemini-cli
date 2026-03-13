@@ -42,6 +42,19 @@ if (packageName === 'core') {
     cpSync(docsSource, docsTarget, { recursive: true, dereference: true });
     console.log('Copied documentation to dist/docs');
   }
+
+  // Compile linux sandbox helper
+  if (process.platform === 'linux') {
+    try {
+      execSync(
+        'gcc src/sandbox/linux/sandbox_helper.c -o dist/src/sandbox/linux/gemini-linux-sandbox-helper',
+        { stdio: 'inherit' },
+      );
+      console.log('Compiled gemini-linux-sandbox-helper');
+    } catch (e) {
+      console.warn('Failed to compile linux sandbox helper:', e.message);
+    }
+  }
 }
 
 // touch dist/.last_build
