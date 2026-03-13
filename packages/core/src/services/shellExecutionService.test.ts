@@ -935,7 +935,11 @@ describe('ShellExecutionService', () => {
 
       expect(mockPtySpawn).toHaveBeenCalledWith(
         'powershell.exe',
-        ['-NoProfile', '-Command', 'dir "foo bar"'],
+        [
+          '-NoProfile',
+          '-Command',
+          '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; dir "foo bar"',
+        ],
         expect.any(Object),
       );
     });
@@ -1519,7 +1523,11 @@ describe('ShellExecutionService child_process fallback', () => {
 
       expect(mockCpSpawn).toHaveBeenCalledWith(
         'powershell.exe',
-        ['-NoProfile', '-Command', 'dir "foo bar"'],
+        [
+          '-NoProfile',
+          '-Command',
+          '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; dir "foo bar"',
+        ],
         expect.objectContaining({
           shell: false,
           detached: false,

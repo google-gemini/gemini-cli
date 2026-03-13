@@ -22,6 +22,7 @@ import {
   stripShellWrapper,
   hasRedirection,
   resolveExecutable,
+  ensurePowerShellUtf8Encoding,
 } from './shell-utils.js';
 import path from 'node:path';
 
@@ -336,6 +337,47 @@ describe('stripShellWrapper', () => {
 
   it('should not strip anything if no wrapper is present', () => {
     expect(stripShellWrapper('ls -l')).toEqual('ls -l');
+  });
+});
+
+describe('ensurePowerShellUtf8Encoding', () => {
+  const utf8Prefix =
+    '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8;';
+
+  it('should not modify command for non-powershell shells', () => {
+    expect(ensurePowerShellUtf8Encoding('echo "test"', 'bash')).toEqual(
+      'echo "test"',
+    );
+    expect(ensurePowerShellUtf8Encoding('echo "test"', 'cmd')).toEqual(
+      'echo "test"',
+    );
+  });
+
+  it('should prepend utf8 configuration for powershell', () => {
+    expect(ensurePowerShellUtf8Encoding('echo "test"', 'powershell')).toEqual(
+      `${utf8Prefix} echo "test"`,
+    );
+  });
+
+  it('should not double-prepend if already present', () => {
+    expect(
+      ensurePowerShellUtf8Encoding(`${utf8Prefix} echo "test"`, 'powershell'),
+    ).toEqual(`${utf8Prefix} echo "test"`);
+  });
+
+  it('should inject utf8 configuration into a powershell script block', () => {
+    expect(
+      ensurePowerShellUtf8Encoding('{ Get-Process }', 'powershell'),
+    ).toEqual(`{ ${utf8Prefix} Get-Process }`);
+  });
+
+  it('should not double-inject into a powershell script block', () => {
+    expect(
+      ensurePowerShellUtf8Encoding(
+        `{ ${utf8Prefix} Get-Process }`,
+        'powershell',
+      ),
+    ).toEqual(`{ ${utf8Prefix} Get-Process }`);
   });
 });
 
