@@ -1,0 +1,34 @@
+# Priority system for policy rules:
+# - Higher priority numbers win over lower priority numbers
+# - When multiple rules match, the highest priority rule is applied
+# - Rules are evaluated in order of priority (highest first)
+#
+# Priority bands (tiers):
+# - Default policies (TOML): 1 + priority/1000 (e.g., priority 100 → 1.100)
+# - Extension policies (TOML): 2 + priority/1000 (e.g., priority 100 → 2.100)
+# - Workspace policies (TOML): 3 + priority/1000 (e.g., priority 100 → 3.100)
+# - User policies (TOML): 4 + priority/1000 (e.g., priority 100 → 4.100)
+# - Admin policies (TOML): 5 + priority/1000 (e.g., priority 100 → 5.100)
+#
+# Settings-based and dynamic rules (all in user tier 4.x):
+#   4.95: Tools that the user has selected as "Always Allow" in the interactive UI
+#   4.9:  MCP servers excluded list (security: persistent server blocks)
+#   4.4:  Command line flag --exclude-tools (explicit temporary blocks)
+#   4.3:  Command line flag --allowed-tools (explicit temporary allows)
+#   4.2:  MCP servers with trust=true (persistent trusted servers)
+#   4.1:  MCP servers allowed list (persistent general server allows)
+
+# Allow tracker tools to execute without asking the user.
+# These tools are only registered when the tracker feature is enabled,
+# so this rule is a no-op when the feature is disabled.
+[[rule]]
+toolName = [
+  "tracker_create_task",
+  "tracker_update_task",
+  "tracker_get_task",
+  "tracker_list_tasks",
+  "tracker_add_dependency",
+  "tracker_visualize"
+]
+decision = "allow"
+priority = 50
