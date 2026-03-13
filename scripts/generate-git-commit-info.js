@@ -18,7 +18,7 @@
 // limitations under the License.
 
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readPackageUp } from 'read-package-up';
@@ -72,3 +72,21 @@ export const CLI_VERSION = '${cliVersion}';
 
 writeFileSync(cliGitCommitFile, fileContent);
 writeFileSync(coreGitCommitFile, fileContent);
+
+// Update package.json version with the new nightly version (including current hash)
+const packageJsonPaths = [
+  join(root, 'package.json'),
+  join(root, 'packages/cli/package.json'),
+  join(root, 'packages/core/package.json'),
+];
+for (const pkgPath of packageJsonPaths) {
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+  pkg.version = cliVersion;
+  if (pkg.config?.sandboxImageUri) {
+    pkg.config.sandboxImageUri = pkg.config.sandboxImageUri.replace(
+      /:.*$/,
+      `:${cliVersion}`,
+    );
+  }
+  writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
+}
