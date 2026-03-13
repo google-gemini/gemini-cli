@@ -251,6 +251,8 @@ Operate as a **strategic orchestrator**. Your own context window is your most pr
 
 When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
 
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
+
 **High-Impact Delegation Candidates:**
 - **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
 - **High-Volume Output:** Commands or tools expected to return large amounts of data (e.g., verbose builds, exhaustive file searches).
@@ -353,7 +355,8 @@ export function renderOperationalGuidelines(
 - **Security First:** Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.
 
 ## Tool Usage
-- **Parallelism:** Execute multiple independent tool calls in parallel when feasible (i.e. searching the codebase).
+- **Parallelism & Sequencing:** Tools execute in parallel by default. Execute multiple independent tool calls in parallel when feasible (e.g., searching, reading files, independent shell commands, or editing *different* files). If a tool depends on the output or side-effects of a previous tool in the same turn (e.g., running a shell command that depends on the success of a previous command), you MUST set the \`wait_for_previous\` parameter to \`true\` on the dependent tool to ensure sequential execution.
+- **File Editing Collisions:** Do NOT make multiple calls to the ${formatToolName(EDIT_TOOL_NAME)} tool for the SAME file in a single turn. To make multiple edits to the same file, you MUST perform them sequentially across multiple conversational turns to prevent race conditions and ensure the file state is accurate before each edit.
 - **Command Execution:** Use the ${formatToolName(SHELL_TOOL_NAME)} tool for running shell commands, remembering the safety rule to explain modifying commands first.${toolUsageInteractive(
     options.interactive,
     options.interactiveShellEnabled,
@@ -571,7 +574,7 @@ function mandateConflictResolution(hasHierarchicalMemory: boolean): string {
 function mandateContinueWork(interactive: boolean): string {
   if (interactive) return '';
   return `
-  - **Continue the work** You are not to interact with the user. Do your best to complete the task at hand, using your best judgement and avoid asking user for any additional information.`;
+- **Non-Interactive Environment:** You are running in a headless/CI environment and cannot interact with the user. Do not ask the user questions or request additional information, as the session will terminate. Use your best judgment to complete the task. If a tool fails because it requires user interaction, do not retry it indefinitely; instead, explain the limitation and suggest how the user can provide the required data (e.g., via environment variables).`;
 }
 
 function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
@@ -606,11 +609,12 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
 }
 
 function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
-  if (options.approvedPlan) {
-    return `2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements. Once all implementation and verification steps are finished, provide a **final summary** of the work completed against the plan and offer clear **next steps** to the user (e.g., 'Open a pull request').`;
-  }
   if (options.approvedPlan && options.taskTracker) {
     return `2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth and invoke the task tracker tool to create tasks for this plan. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements. Make sure to update the tracker task list based on this updated plan. Once all implementation and verification steps are finished, provide a **final summary** of the work completed against the plan and offer clear **next steps** to the user (e.g., 'Open a pull request').`;
+  }
+
+  if (options.approvedPlan) {
+    return `2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements. Once all implementation and verification steps are finished, provide a **final summary** of the work completed against the plan and offer clear **next steps** to the user (e.g., 'Open a pull request').`;
   }
 
   if (options.enableWriteTodosTool) {
@@ -731,7 +735,17 @@ function formatToolName(name: string): string {
 /**
  * Provides the system prompt for history compression.
  */
-export function getCompressionPrompt(): string {
+export function getCompressionPrompt(approvedPlanPath?: string): string {
+  const planPreservation = approvedPlanPath
+    ? `
+
+### APPROVED PLAN PRESERVATION
+An approved implementation plan exists at ${approvedPlanPath}. You MUST preserve the following in your snapshot:
+- The plan's file path in <key_knowledge>
+- Completion status of each plan step in <task_state> (mark as [DONE], [IN PROGRESS], or [TODO])
+- Any user feedback or modifications to the plan in <active_constraints>`
+    : '';
+
   return `
 You are a specialized system component responsible for distilling chat history into a structured XML <state_snapshot>.
 
@@ -747,7 +761,7 @@ When the conversation history grows too large, you will be invoked to distill th
 
 First, you will think through the entire history in a private <scratchpad>. Review the user's overall goal, the agent's actions, tool outputs, file modifications, and any unresolved questions. Identify every piece of information for future actions.
 
-After your reasoning is complete, generate the final <state_snapshot> XML object. Be incredibly dense with information. Omit any irrelevant conversational filler.
+After your reasoning is complete, generate the final <state_snapshot> XML object. Be incredibly dense with information. Omit any irrelevant conversational filler.${planPreservation}
 
 The structure MUST be as follows:
 

@@ -104,6 +104,10 @@ export enum MCPServerStatus {
   CONNECTING = 'connecting',
   /** Server is connected and ready to use */
   CONNECTED = 'connected',
+  /** Server is blocked via configuration and cannot be used */
+  BLOCKED = 'blocked',
+  /** Server is disabled and cannot be used */
+  DISABLED = 'disabled',
 }
 
 /**
@@ -298,7 +302,7 @@ export class McpClient implements McpProgressReporter {
       this.serverConfig,
       this.client!,
       cliConfig,
-      this.toolRegistry.getMessageBus(),
+      this.toolRegistry.messageBus,
       {
         ...(options ?? {
           timeout: this.serverConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC,
@@ -1163,7 +1167,7 @@ export async function connectAndDiscover(
       mcpServerConfig,
       mcpClient,
       cliConfig,
-      toolRegistry.getMessageBus(),
+      toolRegistry.messageBus,
       { timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC },
     );
 

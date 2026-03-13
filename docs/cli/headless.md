@@ -6,7 +6,7 @@ structured text or JSON output without an interactive terminal UI.
 ## Technical reference
 
 Headless mode is triggered when the CLI is run in a non-TTY environment or when
-providing a query as a positional argument without the interactive flag.
+providing a query with the `-p` (or `--prompt`) flag.
 
 ### Output formats
 
@@ -31,7 +31,8 @@ Returns a stream of newline-delimited JSON (JSONL) events.
   - `tool_use`: Tool call requests with arguments.
   - `tool_result`: Output from executed tools.
   - `error`: Non-fatal warnings and system errors.
-  - `result`: Final outcome with aggregated statistics.
+  - `result`: Final outcome with aggregated statistics and per-model token usage
+    breakdowns.
 
 ## Exit codes
 

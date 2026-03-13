@@ -28,9 +28,9 @@ describe('LogoutConfirmationDialog', () => {
     );
     await waitUntilReady();
 
-    expect(lastFrame()).toContain('You are now logged out.');
+    expect(lastFrame()).toContain('You are now signed out');
     expect(lastFrame()).toContain(
-      'Login again to continue using Gemini CLI, or exit the application.',
+      'Sign in again to continue using Gemini CLI, or exit the application.',
     );
     expect(lastFrame()).toContain('(Use Enter to select, Esc to close)');
     unmount();
@@ -45,7 +45,7 @@ describe('LogoutConfirmationDialog', () => {
     expect(RadioButtonSelect).toHaveBeenCalled();
     const mockCall = vi.mocked(RadioButtonSelect).mock.calls[0][0];
     expect(mockCall.items).toEqual([
-      { label: 'Login', value: LogoutChoice.LOGIN, key: 'login' },
+      { label: 'Sign in', value: LogoutChoice.LOGIN, key: 'login' },
       { label: 'Exit', value: LogoutChoice.EXIT, key: 'exit' },
     ]);
     expect(mockCall.isFocused).toBe(true);

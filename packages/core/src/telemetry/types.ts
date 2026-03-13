@@ -1341,6 +1341,51 @@ export class ContentRetryEvent implements BaseTelemetryEvent {
 
 export const EVENT_CONTENT_RETRY_FAILURE =
   'gemini_cli.chat.content_retry_failure';
+
+export const EVENT_NETWORK_RETRY_ATTEMPT = 'gemini_cli.network_retry_attempt';
+export class NetworkRetryAttemptEvent implements BaseTelemetryEvent {
+  'event.name': 'network_retry_attempt';
+  'event.timestamp': string;
+  attempt: number;
+  max_attempts: number;
+  error_type: string;
+  delay_ms: number;
+  model: string;
+
+  constructor(
+    attempt: number,
+    max_attempts: number,
+    error_type: string,
+    delay_ms: number,
+    model: string,
+  ) {
+    this['event.name'] = 'network_retry_attempt';
+    this['event.timestamp'] = new Date().toISOString();
+    this.attempt = attempt;
+    this.max_attempts = max_attempts;
+    this.error_type = error_type;
+    this.delay_ms = delay_ms;
+    this.model = model;
+  }
+
+  toOpenTelemetryAttributes(config: Config): LogAttributes {
+    return {
+      ...getCommonAttributes(config),
+      'event.name': EVENT_NETWORK_RETRY_ATTEMPT,
+      'event.timestamp': this['event.timestamp'],
+      attempt: this.attempt,
+      max_attempts: this.max_attempts,
+      error_type: this.error_type,
+      delay_ms: this.delay_ms,
+      model: this.model,
+    };
+  }
+
+  toLogBody(): string {
+    return `Network retry attempt ${this.attempt}/${this.max_attempts} for ${this.model}. Delay: ${this.delay_ms}ms. Error type: ${this.error_type}`;
+  }
+}
+
 export class ContentRetryFailureEvent implements BaseTelemetryEvent {
   'event.name': 'content_retry_failure';
   'event.timestamp': string;
@@ -2084,12 +2129,17 @@ export class RecoveryAttemptEvent extends BaseAgentEvent {
 
 export const EVENT_WEB_FETCH_FALLBACK_ATTEMPT =
   'gemini_cli.web_fetch_fallback_attempt';
+export type WebFetchFallbackReason =
+  | 'private_ip'
+  | 'primary_failed'
+  | 'private_ip_skipped';
+
 export class WebFetchFallbackAttemptEvent implements BaseTelemetryEvent {
   'event.name': 'web_fetch_fallback_attempt';
   'event.timestamp': string;
-  reason: 'private_ip' | 'primary_failed';
+  reason: WebFetchFallbackReason;
 
-  constructor(reason: 'private_ip' | 'primary_failed') {
+  constructor(reason: WebFetchFallbackReason) {
     this['event.name'] = 'web_fetch_fallback_attempt';
     this['event.timestamp'] = new Date().toISOString();
     this.reason = reason;
