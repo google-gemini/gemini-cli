@@ -18,7 +18,7 @@ export const TodoTray: React.FC = () => {
   const uiState = useUIState();
 
   const todos: TodoList | null = useMemo(() => {
-    // Find the most recent todo list written by the WriteTodosTool
+    // Find the most recent todo list written by tools that output a TodoList (e.g., WriteTodosTool or Tracker tools)
     for (let i = uiState.history.length - 1; i >= 0; i--) {
       const entry = uiState.history[i];
       if (entry.type !== 'tool_group') {

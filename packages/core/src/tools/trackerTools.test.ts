@@ -14,12 +14,14 @@ import {
   TrackerUpdateTaskTool,
   TrackerVisualizeTool,
   TrackerAddDependencyTool,
+  buildTodosReturnDisplay,
 } from './trackerTools.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
 
 import { TaskStatus, TaskType } from '../services/trackerTypes.js';
+import type { TrackerService } from '../services/trackerService.js';
 
 describe('Tracker Tools Integration', () => {
   let tempDir: string;
@@ -141,5 +143,91 @@ describe('Tracker Tools Integration', () => {
     expect(vizResult.llmContent).toContain('Parent Task');
     expect(vizResult.llmContent).toContain('Child Task');
     expect(vizResult.llmContent).toContain(childId);
+  });
+
+  describe('buildTodosReturnDisplay', () => {
+    it('returns empty list for no tasks', async () => {
+      const mockService = {
+        listTasks: async () => [],
+      } as unknown as TrackerService;
+      const result = await buildTodosReturnDisplay(mockService);
+      expect(result.todos).toEqual([]);
+    });
+
+    it('returns formatted todos', async () => {
+      const parent = {
+        id: 'p1',
+        title: 'Parent',
+        type: TaskType.TASK,
+        status: TaskStatus.IN_PROGRESS,
+        dependencies: [],
+      };
+      const child = {
+        id: 'c1',
+        title: 'Child',
+        type: TaskType.EPIC,
+        status: TaskStatus.OPEN,
+        parentId: 'p1',
+        dependencies: [],
+      };
+      const closedLeaf = {
+        id: 'leaf',
+        title: 'Closed Leaf',
+        type: TaskType.BUG,
+        status: TaskStatus.CLOSED,
+        parentId: 'c1',
+        dependencies: [],
+      };
+
+      const mockService = {
+        listTasks: async () => [parent, child, closedLeaf],
+      } as unknown as TrackerService;
+      const display = await buildTodosReturnDisplay(mockService);
+
+      expect(display.todos).toEqual([
+        {
+          description: `[p1] [TASK] Parent`,
+          status: 'in_progress',
+        },
+        {
+          description: `  [c1] [EPIC] Child`,
+          status: 'pending',
+        },
+        {
+          description: `    [leaf] [BUG] Closed Leaf`,
+          status: 'completed',
+        },
+      ]);
+    });
+
+    it('detects cycles', async () => {
+      // Since TrackerTask only has a single parentId, a true cycle is unreachable from roots.
+      // We simulate a database corruption (two tasks with same ID, one root, one child)
+      // just to exercise the protective cycle detection branch.
+      const rootP1 = {
+        id: 'p1',
+        title: 'Parent',
+        type: TaskType.TASK,
+        status: TaskStatus.OPEN,
+        dependencies: [],
+      };
+      const childP1 = { ...rootP1, parentId: 'p1' };
+
+      const mockService = {
+        listTasks: async () => [rootP1, childP1],
+      } as unknown as TrackerService;
+      const display = await buildTodosReturnDisplay(mockService);
+
+      expect(display.todos).toEqual([
+        {
+          description: `[p1] [TASK] Parent`,
+          status: 'pending',
+        },
+        {
+          description: `  [CYCLE DETECTED: p1]`,
+          status: 'cancelled',
+        },
+      ]);
+    });
   });
 });
