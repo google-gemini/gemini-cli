@@ -53,6 +53,13 @@ import { isGemini3Model } from '../config/models.js';
 import { discoverJitContext, appendJitContext } from './jit-context.js';
 
 /**
+ * Line count threshold above which write_file forces user confirmation,
+ * even in AUTO_EDIT mode. This protects large, fragile documents from
+ * accidental truncation caused by full-file overwrites.
+ */
+const LARGE_FILE_LINE_THRESHOLD = 200;
+
+/**
  * Parameters for the WriteFile tool
  */
 export interface WriteFileToolParams {
@@ -186,8 +193,17 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   protected override async getConfirmationDetails(
     abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
+    // In AUTO_EDIT mode, skip confirmation for most writes — but still
+    // require it when the target is a large existing file, to guard
+    // against accidental truncation (native-tool-bias mitigation).
     if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
-      return false;
+      const isLargeExistingFile = await this.isLargeExistingFile();
+      if (!isLargeExistingFile) {
+        return false;
+      }
+      debugLogger.warn(
+        `write_file: forcing confirmation for large file (${this.resolvedPath})`,
+      );
     }
 
     const correctedContentResult = await getCorrectedFileContent(
@@ -445,6 +461,25 @@ class WriteFileToolInvocation extends BaseToolInvocation<
           type: errorType,
         },
       };
+    }
+  }
+
+  /**
+   * Checks whether the target file exists and exceeds the large-file
+   * line threshold.  Used to force confirmation even in AUTO_EDIT mode
+   * so that full-file overwrites on big documents require explicit
+   * human approval.
+   */
+  private async isLargeExistingFile(): Promise<boolean> {
+    try {
+      const content = await this.config
+        .getFileSystemService()
+        .readTextFile(this.resolvedPath);
+      const lineCount = content.split('\n').length;
+      return lineCount >= LARGE_FILE_LINE_THRESHOLD;
+    } catch {
+      // File doesn't exist or is unreadable — not a "large existing file".
+      return false;
     }
   }
 }
