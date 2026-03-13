@@ -197,27 +197,43 @@ export function runSensitiveKeywordLinter() {
   function getChangedFiles() {
     const baseRef = process.env.GITHUB_BASE_REF || 'main';
     try {
-      execSync(`git fetch origin ${baseRef}`);
-      const mergeBase = execSync(`git merge-base HEAD origin/${baseRef}`)
+      // In CI, we often have the remote main already fetched or can diff against it directly
+      // Try to find merge base if possible
+      const mergeBase = execSync(
+        `git merge-base HEAD origin/${baseRef} 2>/dev/null || git merge-base HEAD ${baseRef} 2>/dev/null`,
+      )
         .toString()
         .trim();
-      return execSync(`git diff --name-only ${mergeBase}..HEAD`)
-        .toString()
-        .trim()
-        .split('\n')
-        .filter(Boolean);
-    } catch (_error) {
-      console.error(`Could not get changed files against origin/${baseRef}.`);
-      try {
-        console.log('Falling back to diff against HEAD~1');
-        return execSync(`git diff --name-only HEAD~1..HEAD`)
+
+      if (mergeBase) {
+        return execSync(`git diff --name-only ${mergeBase}..HEAD`)
           .toString()
           .trim()
           .split('\n')
           .filter(Boolean);
-      } catch (_fallbackError) {
-        console.error('Could not get changed files against HEAD~1 either.');
-        process.exit(1);
+      }
+    } catch (_error) {
+      // Fall through to other methods
+    }
+
+    try {
+      console.log('Falling back to diff against HEAD~1');
+      return execSync(`git diff --name-only HEAD~1..HEAD`)
+        .toString()
+        .trim()
+        .split('\n')
+        .filter(Boolean);
+    } catch (_fallbackError) {
+      console.log('Falling back to all tracked files (slowest)');
+      try {
+        return execSync('git ls-files')
+          .toString()
+          .trim()
+          .split('\n')
+          .filter(Boolean);
+      } catch (_ultimateError) {
+        console.error('Could not get any files to lint.');
+        return [];
       }
     }
   }
