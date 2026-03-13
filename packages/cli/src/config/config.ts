@@ -99,6 +99,15 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
+
+  // Daemon and Client mode options
+  daemon: boolean | undefined;
+  daemonStatus: boolean | undefined;
+  daemonStop: boolean | undefined;
+  client: boolean | undefined;
+  session: string | undefined;
+  close: boolean | undefined;
+  verbose: boolean | undefined;
 }
 
 /**
@@ -299,6 +308,37 @@ export async function parseArguments(
         .option('accept-raw-output-risk', {
           type: 'boolean',
           description: 'Suppress the security warning when using --raw-output.',
+        })
+        .option('daemon', {
+          type: 'boolean',
+          description:
+            'Run the Gemini CLI engine as a persistent background process.',
+        })
+        .option('daemon-status', {
+          type: 'boolean',
+          description: 'Check if the daemon is running.',
+        })
+        .option('daemon-stop', {
+          type: 'boolean',
+          description: 'Stop the running daemon gracefully.',
+        })
+        .option('client', {
+          type: 'boolean',
+          description: 'Connect to the running daemon to send prompts.',
+        })
+        .option('session', {
+          type: 'string',
+          description:
+            'Named session for client connections to maintain context.',
+        })
+        .option('close', {
+          type: 'boolean',
+          description: 'Close the specified session with the daemon.',
+        })
+        .option('verbose', {
+          type: 'boolean',
+          description:
+            'Verbose intermediate tool call and logging output for the client.',
         }),
     )
     // Register MCP subcommands
@@ -420,6 +460,13 @@ export interface LoadCliConfigOptions {
   projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
     disabled?: string[];
   };
+  /**
+   * When true, forces the config to treat this as an interactive session,
+   * which means MCP server initialization happens in the background rather
+   * than blocking startup. Used by daemon mode to avoid blocking on slow
+   * or unavailable MCP servers.
+   */
+  forceInteractive?: boolean;
 }
 
 export async function loadCliConfig(
@@ -428,7 +475,7 @@ export async function loadCliConfig(
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
 ): Promise<Config> {
-  const { cwd = process.cwd(), projectHooks } = options;
+  const { cwd = process.cwd(), projectHooks, forceInteractive } = options;
   const debugMode = isDebugMode(argv);
 
   const loadedSettings = loadSettings(cwd);
@@ -620,6 +667,7 @@ export async function loadCliConfig(
   // -p/--prompt forces non-interactive (headless) mode
   // -i/--prompt-interactive forces interactive mode with an initial prompt
   const interactive =
+    !!forceInteractive ||
     !!argv.promptInteractive ||
     !!argv.acp ||
     !!argv.experimentalAcp ||
