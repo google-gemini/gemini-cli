@@ -47,6 +47,13 @@ if (!telemetrySettings) {
 let target = telemetrySettings?.target || 'local';
 const allowedTargets = ['local', 'gcp', 'genkit'];
 
+if (!allowedTargets.includes(target)) {
+  console.error(
+    `Error: Invalid telemetry target '${target}' in settings.json. Allowed targets are: ${allowedTargets.join(', ')}.`,
+  );
+  process.exit(1);
+}
+
 const targetArg = process.argv.find((arg) => arg.startsWith('--target='));
 if (targetArg) {
   const potentialTarget = targetArg.split('=')[1];
