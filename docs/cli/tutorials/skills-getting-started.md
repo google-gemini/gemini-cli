@@ -1,120 +1,195 @@
-# Get started with Agent Skills
+# Developer guide: Build Agent Skills
 
-Agent Skills extend Gemini CLI with specialized expertise. In this guide, you'll
-learn how to create your first skill, bundle custom scripts, and activate them
-during a session.
+Agent Skills let you extend Gemini CLI with specialized expertise, procedural
+workflows, and task-specific resources. This guide walks you through creating
+your first skill, from defining its purpose to bundling custom scripts and
+assets.
 
-## How to create a skill
+## Quickstart: Create a Code Reviewer skill
 
-A skill is defined by a directory containing a `SKILL.md` file. Let's create an
-**API Auditor** skill that helps you verify if local or remote endpoints are
-responding correctly.
+A skill is defined by a directory containing a `SKILL.md` file. In this
+quickstart, you'll create a **Code Reviewer** skill that analyzes local files
+for common errors and style violations.
 
-### Create the directory structure
+### 1. Create the directory structure
 
 The first step is to create the necessary folders for your skill and its
 scripts.
 
-1.  Run the following command to create the folders:
+**macOS/Linux**
 
-    **macOS/Linux**
+```bash
+mkdir -p .gemini/skills/code-reviewer/scripts
+```
 
-    ```bash
-    mkdir -p .gemini/skills/api-auditor/scripts
-    ```
+**Windows (PowerShell)**
 
-    **Windows (PowerShell)**
+```powershell
+New-Item -ItemType Directory -Force -Path ".gemini\skills\code-reviewer\scripts"
+```
 
-    ```powershell
-    New-Item -ItemType Directory -Force -Path ".gemini\skills\api-auditor\scripts"
-    ```
-
-### Create the definition
+### 2. Define the skill (`SKILL.md`)
 
 The `SKILL.md` file defines the skill's purpose and instructions for the agent.
+Create a file at `.gemini/skills/code-reviewer/SKILL.md`.
 
-1.  Create a file at `.gemini/skills/api-auditor/SKILL.md`. This tells the agent
-    _when_ to use the skill and _how_ to behave.
+```markdown
+---
+name: code-reviewer
+description:
+  Expertise in reviewing code changes for correctness, security, and style. Use
+  when the user asks to "review" their code or a PR.
+---
 
-    ```markdown
-    ---
-    name: api-auditor
-    description:
-      Expertise in auditing and testing API endpoints. Use when the user asks to
-      "check", "test", or "audit" a URL or API.
-    ---
+# Code Reviewer Instructions
 
-    # API Auditor Instructions
+You act as a senior software engineer specialized in code quality. When this
+skill is active, you MUST:
 
-    You act as a QA engineer specialized in API reliability. When this skill is
-    active, you MUST:
+1.  **Analyze**: Review the provided code for logical errors, security
+    vulnerabilities, and style violations.
+2.  **Review**: Use the bundled `scripts/review.js` utility to perform an
+    automated check.
+3.  **Feedback**: Provide constructive feedback, clearly distinguishing between
+    critical issues and minor improvements.
+```
 
-    1.  **Audit**: Use the bundled `scripts/audit.js` utility to check the
-        status of the provided URL.
-    2.  **Report**: Analyze the output (status codes, latency) and explain any
-        failures in plain English.
-    3.  **Secure**: Remind the user if they are testing a sensitive endpoint
-        without an `https://` protocol.
-    ```
+### 3. Add the tool logic
 
-### Add the tool logic
+Skills can bundle resources like scripts to perform deterministic tasks. Create
+a file at `.gemini/skills/code-reviewer/scripts/review.js`.
 
-Skills can bundle resources like scripts to perform deterministic tasks.
+```javascript
+// .gemini/skills/code-reviewer/scripts/review.js
+const file = process.argv[2];
 
-1.  Create a file at `.gemini/skills/api-auditor/scripts/audit.js`. This is the
-    code the agent will run.
+if (!file) {
+  console.error('Usage: node review.js <file>');
+  process.exit(1);
+}
 
-    ```javascript
-    // .gemini/skills/api-auditor/scripts/audit.js
-    const url = process.argv[2];
+console.log(`Reviewing ${file}...`);
+// Simple mock review logic
+setTimeout(() => {
+  console.log(`Result: Success (No major issues found in ${file})`);
+}, 500);
+```
 
-    if (!url) {
-      console.error('Usage: node audit.js <url>');
-      process.exit(1);
-    }
+### 4. Test the skill
 
-    console.log(`Auditing ${url}...`);
-    fetch(url, { method: 'HEAD' })
-      .then((r) => console.log(`Result: Success (Status ${r.status})`))
-      .catch((e) => console.error(`Result: Failed (${e.message})`));
-    ```
+Gemini CLI automatically discovers skills in the `.gemini/skills` directory.
 
-## How to verify discovery
+1.  Start a new session and ask a question that triggers the skill's
+    description: "Can you review index.js"
+2.  Gemini identifies the request matches the `code-reviewer` description and
+    asks for permission to activate it.
+3.  Once you approve, Gemini executes the bundled script:
+    `node .gemini/skills/code-reviewer/scripts/review.js index.js`
 
-Gemini CLI automatically discovers skills in the `.gemini/skills` directory. You
-can also use `.agents/skills` as a more generic alternative.
+To determine whether your skill has been correctly loaded, run the command:
 
-1.  Check that Gemini CLI found your new skill by running the following command:
+```bash
+/skills
+```
 
-    **Command:** `/skills list`
+### 5. Optional: Share your skill
 
-    You should see `api-auditor` in the list of available skills.
+You can share your skills in several ways depending on your target audience.
 
-## How to use the skill
+- **Workspace skills**: Commit your skill to a `.gemini/skills/` directory in
+  your project repository.
+- **Extensions**: Bundle your skill within a
+  [Gemini CLI extension](../extensions/writing-extensions.md).
+- **Git repositories**: Share the skill directory as a standalone Git repo and
+  install it using `gemini skills install <url>`.
 
-Now that the skill is discovered, you can trigger its activation by asking a
-relevant question.
+---
 
-1. Start a new session and ask a question that triggers the skill's description.
+## Core concepts
 
-   **User:** "Can you audit http://geminicli.com"
+Now that you've built your first skill, let's explore the core components and
+workflows for developing more complex expertise.
 
-   Gemini recognizes the request matches the `api-auditor` description and asks
-   for permission to activate it.
+### Skill structure
 
-   **Model:** (After calling `activate_skill`) "I've activated the
-   **api-auditor** skill. I'll run the audit script now..."
+While a `SKILL.md` file is the only required component, we recommend the
+following structure for organizing your skill's resources.
 
-   Gemini then uses the `run_shell_command` tool to execute your bundled Node
-   script:
+```text
+my-skill/
+├── SKILL.md       (Required) Instructions and metadata
+├── scripts/       (Optional) Executable scripts
+├── references/    (Optional) Static documentation
+└── assets/        (Optional) Templates and other resources
+```
 
-   `node .gemini/skills/api-auditor/scripts/audit.js http://geminicli.com`
+When a skill is activated, the model is granted access to this entire directory.
+You can instruct the model to use the tools and files found within these
+folders.
+
+### Metadata and triggers
+
+The `SKILL.md` file uses YAML frontmatter for metadata.
+
+- **`name`**: A unique identifier for the skill. This should match the directory
+  name.
+- **`description`**: **CRITICAL.** This is how Gemini decides when to use the
+  skill. Be specific about the tasks it handles and the keywords that should
+  trigger it.
+
+### Discovery tiers
+
+Gemini CLI discovers skills from several locations, following a specific order
+of precedence (lowest to highest):
+
+1.  **Built-in Skills**: Included with Gemini CLI (pre-approved).
+2.  **Extension Skills**: Bundled within [extensions](../extensions/).
+3.  **User Skills**: `~/.gemini/skills/` or the `~/.agents/skills/` alias.
+4.  **Workspace Skills**: `.gemini/skills/` or the `.agents/skills/` alias.
+
+### Discovery aliases
+
+You can use `.agents/skills` as an alternative to `.gemini/skills`. This alias
+is compatible with other AI agent tools following the
+[Agent Skills](https://agentskills.io) standard.
+
+## Advanced development
+
+Once you've built a basic skill, you can use built-in tools and advanced
+workflows to streamline your development process.
+
+### Using built-in creation tools
+
+The built-in `skill-creator` skill is a powerful meta-skill that helps you
+design, validate, and package your own skills. You can trigger it by asking
+Gemini CLI: "create a new skill called 'my-new-skill'". It will guide you
+through creating the directory structure and writing high-quality instructions.
+
+### Creation scripts
+
+If you are developing a skill and want to use the same scripts the built-in
+tools use, you can find them in the core package. These scripts help automate
+the initialization, validation, and packaging of skills.
+
+- **Initialize**: `node scripts/init_skill.cjs <name> --path <dir>`
+- **Validate**: `node scripts/validate_skill.cjs <path/to/skill>`
+- **Package**: `node scripts/package_skill.cjs <path/to/skill>` (Creates a
+  `.skill` zip file)
+
+### Linking for local development
+
+If you are developing a skill in a separate directory, you can link it to your
+user skills directory for testing:
+
+```bash
+gemini skills link .
+```
 
 ## Next steps
 
-Continue exploring the Agent Skills framework to build even more powerful
-extensions.
-
-- Explore the [Build agent skills](../../cli/creating-skills.md) guide to learn
-  about more advanced features.
-- Learn how to share skills via [Extensions](../../extensions/index.md).
+- [Skill best practices](./skills-best-practices.md): Learn strategies for
+  building reliable and effective skills.
+- [Use and manage Agent Skills](./using-skills.md): Learn how to discover and
+  install skills.
+- [Extension developer guide](../extensions/writing-extensions.md): Learn how to
+  bundle your skills into shareable extensions.

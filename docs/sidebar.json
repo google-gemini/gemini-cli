@@ -28,7 +28,7 @@
             "slug": "docs/cli/tutorials/file-management"
           },
           {
-            "label": "Get started with Agent skills",
+            "label": "Get started with Agent Skills",
             "slug": "docs/cli/tutorials/skills-getting-started"
           },
           {
@@ -97,11 +97,15 @@
             "items": [
               { "label": "Overview", "slug": "docs/cli/skills" },
               {
-                "label": "Create skills",
-                "slug": "docs/cli/creating-skills"
+                "label": "User guide: Use and manage",
+                "slug": "docs/cli/using-skills"
               },
               {
-                "label": "Best practices",
+                "label": "Developer guide: Build Agent Skills",
+                "slug": "docs/cli/tutorials/skills-getting-started"
+              },
+              {
+                "label": "Developer guide: Best practices",
                 "slug": "docs/cli/skills-best-practices"
               }
             ]

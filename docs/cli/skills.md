@@ -8,7 +8,7 @@ discoverable capability.
 
 Unlike general context files ([`GEMINI.md`](../gemini-md.md)), which provide
 persistent workspace-wide background, Skills represent **on-demand expertise**.
-This lets Gemini maintain a vast library of specialized capabilities—such as
+This lets Gemini CLI maintain a vast library of specialized capabilities—such as
 security auditing, cloud deployments, or codebase migrations—without cluttering
 the model's immediate context window.
 
@@ -34,54 +34,41 @@ resource access.
 
 ## Discovery tiers
 
-Gemini CLI discovers skills from three primary locations:
+Gemini CLI discovers skills from several locations, following a specific order
+of precedence (lowest to highest):
 
-1.  **Workspace Skills**: Located in `.gemini/skills/` or the `.agents/skills/`
-    alias. Workspace skills are typically committed to version control and
-    shared with the team.
-2.  **User Skills**: Located in `~/.gemini/skills/` or the `~/.agents/skills/`
-    alias. These are personal skills available across all your workspaces.
-3.  **Extension Skills**: Skills bundled within installed
+1.  **Built-in skills**: Standard skills included with Gemini CLI that provide
+    foundational capabilities.
+2.  **Extension skills**: Skills bundled within installed
     [extensions](../extensions/index.md).
+3.  **User skills**: Located in `~/.gemini/skills/` or the `~/.agents/skills/`
+    alias.
+4.  **Workspace skills**: Located in `.gemini/skills/` or the `.agents/skills/`
+    alias. Workspace skills are shared with your team via version control.
 
-### Precedence rules
+### Precedence and aliases
 
-If multiple skills share the same name, higher-precedence locations override
-lower ones: **Workspace > User > Extension**.
+If multiple skills share the same name, the version from the higher-precedence
+location is used. Within the same tier (user or workspace), the
+`.agents/skills/` alias takes precedence over the `.gemini/skills/` directory.
 
-Within the same tier (user or workspace), the `.agents/skills/` alias takes
-precedence over the `.gemini/skills/` directory. This generic alias provides an
-interactive path for managing agent-specific expertise that remains compatible
-across different AI agent tools.
+The `.agents/skills/` alias provides an interoperable path for managing
+agent-specific expertise that remains compatible across different AI tools.
 
 ## Key benefits
 
 Agent Skills provide several advantages for managing specialized knowledge and
 complex workflows.
 
-- **Shared Expertise**: Package complex workflows (like a specific team's PR
+- **Shared expertise**: Package complex workflows (like a specific team's PR
   review process) into a folder that anyone can use.
-- **Repeatable Workflows**: Ensure complex multi-step tasks are performed
+- **Repeatable workflows**: Ensure complex multi-step tasks are performed
   consistently by providing a procedural framework.
-- **Resource Bundling**: Include scripts, templates, or example data alongside
+- **Resource bundling**: Include scripts, templates, or example data alongside
   instructions so the agent has everything it needs.
-- **Progressive Disclosure**: Only skill metadata (name and description) is
+- **Progressive disclosure**: Only skill metadata (name and description) is
   loaded initially. Detailed instructions and resources are only disclosed when
   the model explicitly activates the skill, saving context tokens.
-
-## Standard skills
-
-Gemini CLI includes several high-value standard skills that showcase the power
-of the framework. These skills are often used for:
-
-- **`pr-creator`**: Automates the creation of pull requests following repo
-  templates.
-- **`code-reviewer`**: Provides systematic reviews of code changes against
-  security and style guidelines.
-- **`docs-writer`**: Expert assistance for technical writing and documentation
-  management.
-- **`skill-creator`**: A specialized meta-skill that helps you build, validate,
-  and package new skills.
 
 To see all available skills in your current session, use the `/skills list`
 command.
@@ -95,12 +82,14 @@ from your terminal.
 
 Use the `/skills` slash command to view and manage available expertise:
 
-- `/skills list [--all]`: Shows discovered skills. Use `--all` to include
-  built-in skills.
-- `/skills link <path>`: Links agent skills from a local directory via symlink.
-- `/skills disable <name> [--scope]`: Prevents a specific skill from being used.
-- `/skills enable <name> [--scope]`: Re-enables a disabled skill.
-- `/skills reload`: Refreshes the list of discovered skills from all tiers.
+- `/skills list [all] [nodesc]`: Shows discovered skills. Use `all` to include
+  built-in skills and `nodesc` to hide descriptions.
+- `/skills link <path> [--scope user|workspace]`: Links skills from a local
+  directory.
+- `/skills disable <name>`: Prevents a specific skill from being used.
+- `/skills enable <name>`: Re-enables a disabled skill.
+- `/skills reload` (or `/skills refresh`): Refreshes the list of discovered
+  skills from all tiers.
 
 ### From the terminal
 
@@ -137,9 +126,9 @@ For more details on CLI commands, see the
 Explore these resources to refine your skills and understand the framework
 better.
 
-- [Get started with skills](./tutorials/skills-getting-started.md): Create your
-  first skill.
-- [Build agent skills](./creating-skills.md): Deepen your knowledge of skill
-  creation.
+- [Use and manage Agent Skills](./using-skills.md): Learn how to leverage
+  built-in and custom skills.
+- [Build Agent Skills](./tutorials/skills-getting-started.md): Create your first
+  skill and bundle custom logic.
 - [Best practices](./skills-best-practices.md): Learn strategies for building
   effective skills.
