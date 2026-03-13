@@ -82,8 +82,8 @@ class McpToolInvocation extends BaseToolInvocation<
       serverName: 'browser-agent',
       toolName: this.toolName,
       toolDisplayName: this.toolName,
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        await this.publishPolicyUpdate(outcome);
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // Policy updates are now handled centrally by the scheduler
       },
     };
   }
@@ -212,8 +212,8 @@ class TypeTextInvocation extends BaseToolInvocation<
       serverName: 'browser-agent',
       toolName: 'type_text',
       toolDisplayName: 'type_text',
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        await this.publishPolicyUpdate(outcome);
+      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
+        // Policy updates are now handled centrally by the scheduler
       },
     };
   }
@@ -327,6 +327,7 @@ class McpDeclarativeTool extends DeclarativeTool<
     parameterSchema: unknown,
     messageBus: MessageBus,
     private readonly shouldDisableInput: boolean,
+    serverName?: string,
   ) {
     super(
       name,
@@ -337,6 +338,9 @@ class McpDeclarativeTool extends DeclarativeTool<
       messageBus,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ false,
+      /* extensionName */ undefined,
+      /* extensionId */ undefined,
+      serverName,
     );
   }
 
@@ -363,6 +367,7 @@ class TypeTextDeclarativeTool extends DeclarativeTool<
   constructor(
     private readonly browserManager: BrowserManager,
     messageBus: MessageBus,
+    serverName?: string,
   ) {
     super(
       'type_text',
@@ -392,6 +397,9 @@ class TypeTextDeclarativeTool extends DeclarativeTool<
       messageBus,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ false,
+      /* extensionName */ undefined,
+      /* extensionId */ undefined,
+      serverName,
     );
   }
 
@@ -453,11 +461,14 @@ export async function createMcpDeclarativeTools(
         schema.parametersJsonSchema,
         messageBus,
         shouldDisableInput,
+        'browser-agent',
       );
     });
 
   // Add custom composite tools
-  tools.push(new TypeTextDeclarativeTool(browserManager, messageBus));
+  tools.push(
+    new TypeTextDeclarativeTool(browserManager, messageBus, 'browser-agent'),
+  );
 
   debugLogger.log(
     `Total tools registered: ${tools.length} (${mcpTools.length} MCP + 1 custom)`,

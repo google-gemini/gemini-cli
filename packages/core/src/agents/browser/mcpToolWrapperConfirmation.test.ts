@@ -8,7 +8,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createMcpDeclarativeTools } from './mcpToolWrapper.js';
 import type { BrowserManager } from './browserManager.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
-import { MessageBusType } from '../../confirmation-bus/types.js';
 import {
   ToolConfirmationOutcome,
   type ToolCallConfirmationDetails,
@@ -66,20 +65,14 @@ describe('mcpToolWrapper Confirmation', () => {
       }),
     );
 
-    // Verify onConfirm publishes policy update
+    // Verify onConfirm NO LONGER publishes policy update (handled by scheduler)
     const outcome = ToolConfirmationOutcome.ProceedAlways;
 
     if (details && typeof details === 'object' && 'onConfirm' in details) {
       await details.onConfirm(outcome);
     }
 
-    expect(mockMessageBus.publish).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: MessageBusType.UPDATE_POLICY,
-        mcpName: 'browser-agent',
-        persist: false,
-      }),
-    );
+    expect(mockMessageBus.publish).not.toHaveBeenCalled();
   });
 
   it('getPolicyUpdateOptions returns correct options', async () => {

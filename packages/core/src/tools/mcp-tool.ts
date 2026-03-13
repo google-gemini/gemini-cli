@@ -188,10 +188,7 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
   override getPolicyUpdateOptions(
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
-    return {
-      mcpName: this.serverName,
-      toolName: this.serverToolName,
-    };
+    return { mcpName: this.serverName };
   }
 
   protected override async getConfirmationDetails(
@@ -339,7 +336,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
 > {
   constructor(
     private readonly mcpTool: CallableTool,
-    readonly serverName: string,
+    override readonly serverName: string,
     readonly serverToolName: string,
     description: string,
     override readonly parameterSchema: unknown,
@@ -366,6 +363,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       false, // canUpdateOutput,
       extensionName,
       extensionId,
+      serverName,
     );
     this._isReadOnly = isReadOnly;
   }

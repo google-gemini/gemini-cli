@@ -122,7 +122,6 @@ export interface PolicyUpdateOptions {
   argsPattern?: string;
   commandPrefix?: string | string[];
   mcpName?: string;
-  toolName?: string;
 }
 
 /**
@@ -389,6 +388,11 @@ export interface ToolBuilder<
   isReadOnly: boolean;
 
   /**
+   * The name of the server this tool belongs to, if any.
+   */
+  readonly serverName?: string;
+
+  /**
    * Validates raw parameters and builds a ready-to-execute invocation.
    * @param params The raw, untrusted parameters from the model.
    * @returns A valid `ToolInvocation` if successful. Throws an error if validation fails.
@@ -425,6 +429,7 @@ export abstract class DeclarativeTool<
     readonly canUpdateOutput: boolean = false,
     readonly extensionName?: string,
     readonly extensionId?: string,
+    readonly serverName?: string,
   ) {}
 
   get isReadOnly(): boolean {

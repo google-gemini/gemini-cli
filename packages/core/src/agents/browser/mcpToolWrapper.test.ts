@@ -9,6 +9,10 @@ import { createMcpDeclarativeTools } from './mcpToolWrapper.js';
 import type { BrowserManager, McpToolCallResult } from './browserManager.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import type { Tool as McpTool } from '@modelcontextprotocol/sdk/types.js';
+import {
+  type ToolCallConfirmationDetails,
+  ToolConfirmationOutcome,
+} from '../../tools/tools.js';
 
 describe('mcpToolWrapper', () => {
   let mockBrowserManager: BrowserManager;
@@ -291,6 +295,54 @@ describe('mcpToolWrapper', () => {
       expect(result.error).toBeDefined();
       // Should still try to resume
       expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  describe('McpToolInvocation.getConfirmationDetails', () => {
+    it('should NOT call publishPolicyUpdate when onConfirm is invoked (handled by scheduler)', async () => {
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+      );
+
+      const invocation = tools[1].build({ uid: 'elem-1' });
+      // Use unknown and then cast to an interface that exposes the protected method for testing
+      const details = (await (
+        invocation as unknown as {
+          getConfirmationDetails(signal: AbortSignal): Promise<unknown>;
+        }
+      ).getConfirmationDetails(new AbortController().signal)) as
+        | ToolCallConfirmationDetails
+        | false;
+
+      expect(details).toBeDefined();
+      if (details) {
+        await details.onConfirm(ToolConfirmationOutcome.ProceedAlways);
+        expect(mockMessageBus.publish).not.toHaveBeenCalled();
+      }
+    });
+
+    it('should handle session-only MCP outcomes by NOT publishing persistent updates from the tool itself', async () => {
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+      );
+
+      const invocation = tools[1].build({ uid: 'elem-1' });
+      // Use unknown and then cast to an interface that exposes the protected method for testing
+      const details = (await (
+        invocation as unknown as {
+          getConfirmationDetails(signal: AbortSignal): Promise<unknown>;
+        }
+      ).getConfirmationDetails(new AbortController().signal)) as
+        | ToolCallConfirmationDetails
+        | false;
+
+      if (details) {
+        // ProceedAlwaysTool is handled by the scheduler, not by the tool invocation itself
+        await details.onConfirm(ToolConfirmationOutcome.ProceedAlwaysTool);
+        expect(mockMessageBus.publish).not.toHaveBeenCalled();
+      }
     });
   });
 });
