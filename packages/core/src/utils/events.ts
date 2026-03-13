@@ -241,6 +241,9 @@ export class CoreEventEmitter extends EventEmitter<CoreEvents> {
 
   constructor() {
     super();
+    // Increase default max listeners to avoid spurious MaxListenersExceededWarning
+    // when multiple Scheduler instances are active simultaneously on the global bus.
+    this.setMaxListeners(100);
   }
 
   private _emitOrQueue<K extends keyof CoreEvents>(
