@@ -102,6 +102,8 @@ describe('mcp-client', () => {
   });
 
   afterEach(() => {
+    fs.rmSync(testWorkspace, { recursive: true, force: true });
+    workspaceContext = null as unknown as WorkspaceContext;
     vi.restoreAllMocks();
     vi.useRealTimers();
   });
@@ -2346,6 +2348,8 @@ describe('connectToMcpServer with OAuth', () => {
   });
 
   afterEach(() => {
+    fs.rmSync(testWorkspace, { recursive: true, force: true });
+    workspaceContext = null as unknown as WorkspaceContext;
     vi.clearAllMocks();
   });
 
@@ -2553,6 +2557,8 @@ describe('connectToMcpServer - HTTP→SSE fallback', () => {
   });
 
   afterEach(() => {
+    fs.rmSync(testWorkspace, { recursive: true, force: true });
+    workspaceContext = null as unknown as WorkspaceContext;
     vi.clearAllMocks();
   });
 
@@ -2716,6 +2722,8 @@ describe('connectToMcpServer - OAuth with transport fallback', () => {
   });
 
   afterEach(() => {
+    fs.rmSync(testWorkspace, { recursive: true, force: true });
+    workspaceContext = null as unknown as WorkspaceContext;
     vi.clearAllMocks();
     vi.unstubAllGlobals();
   });
