@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Config } from './config.js';
+
 export const PREVIEW_GEMINI_MODEL = 'gemini-3-pro-preview';
 export const PREVIEW_GEMINI_3_1_MODEL = 'gemini-3.1-pro-preview';
 export const PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL =
@@ -148,7 +150,14 @@ export function resolveClassifierModel(
   }
   return resolveModel(requestedModel, useGemini3_1, useCustomToolModel);
 }
-export function getDisplayString(model: string) {
+export function getDisplayString(model: string, config?: Config) {
+  if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
+    const definition = config.modelConfigService.getModelDefinition(model);
+    if (definition?.displayName) {
+      return definition.displayName;
+    }
+  }
+
   switch (model) {
     case PREVIEW_GEMINI_MODEL_AUTO:
       return 'Auto (Gemini 3)';
@@ -169,9 +178,16 @@ export function getDisplayString(model: string) {
  * Checks if the model is a preview model.
  *
  * @param model The model name to check.
+ * @param config Optional config object for dynamic model configuration.
  * @returns True if the model is a preview model.
  */
-export function isPreviewModel(model: string): boolean {
+export function isPreviewModel(model: string, config?: Config): boolean {
+  if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
+    return (
+      config.modelConfigService.getModelDefinition(model)?.isPreview === true
+    );
+  }
+
   return (
     model === PREVIEW_GEMINI_MODEL ||
     model === PREVIEW_GEMINI_3_1_MODEL ||
@@ -186,9 +202,13 @@ export function isPreviewModel(model: string): boolean {
  * Checks if the model is a Pro model.
  *
  * @param model The model name to check.
+ * @param config Optional config object for dynamic model configuration.
  * @returns True if the model is a Pro model.
  */
-export function isProModel(model: string): boolean {
+export function isProModel(model: string, config?: Config): boolean {
+  if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
+    return config.modelConfigService.getModelDefinition(model)?.tier === 'pro';
+  }
   return model.toLowerCase().includes('pro');
 }
 
@@ -196,9 +216,19 @@ export function isProModel(model: string): boolean {
  * Checks if the model is a Gemini 3 model.
  *
  * @param model The model name to check.
+ * @param config Optional config object for dynamic model configuration.
  * @returns True if the model is a Gemini 3 model.
  */
-export function isGemini3Model(model: string): boolean {
+export function isGemini3Model(model: string, config?: Config): boolean {
+  if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
+    // Legacy behavior resolves the model first.
+    const resolved = resolveModel(model);
+    return (
+      config.modelConfigService.getModelDefinition(resolved)?.family ===
+      'gemini-3'
+    );
+  }
+
   const resolved = resolveModel(model);
   return /^gemini-3(\.|-|$)/.test(resolved);
 }
@@ -207,9 +237,17 @@ export function isGemini3Model(model: string): boolean {
  * Checks if the model is a Gemini 2.x model.
  *
  * @param model The model name to check.
+ * @param config Optional config object for dynamic model configuration.
  * @returns True if the model is a Gemini-2.x model.
  */
-export function isGemini2Model(model: string): boolean {
+export function isGemini2Model(model: string, config?: Config): boolean {
+  if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
+    // Legacy behavior does NOT resolve the model first for Gemini 2 check.
+    return (
+      config.modelConfigService.getModelDefinition(model)?.family ===
+      'gemini-2.5'
+    );
+  }
   return /^gemini-2(\.|$)/.test(model);
 }
 
@@ -217,9 +255,17 @@ export function isGemini2Model(model: string): boolean {
  * Checks if the model is a "custom" model (not Gemini branded).
  *
  * @param model The model name to check.
+ * @param config Optional config object for dynamic model configuration.
  * @returns True if the model is not a Gemini branded model.
  */
-export function isCustomModel(model: string): boolean {
+export function isCustomModel(model: string, config?: Config): boolean {
+  if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
+    const resolved = resolveModel(model);
+    return (
+      config.modelConfigService.getModelDefinition(resolved)?.tier ===
+        'custom' || !resolved.startsWith('gemini-')
+    );
+  }
   const resolved = resolveModel(model);
   return !resolved.startsWith('gemini-');
 }
@@ -229,20 +275,28 @@ export function isCustomModel(model: string): boolean {
  * This includes Gemini 3 models and any custom models.
  *
  * @param model The model name to check.
+ * @param config Optional config object for dynamic model configuration.
  * @returns True if the model supports modern features like thoughts.
  */
-export function supportsModernFeatures(model: string): boolean {
-  if (isGemini3Model(model)) return true;
-  return isCustomModel(model);
+export function supportsModernFeatures(
+  model: string,
+  config?: Config,
+): boolean {
+  if (isGemini3Model(model, config)) return true;
+  return isCustomModel(model, config);
 }
 
 /**
  * Checks if the model is an auto model.
  *
  * @param model The model name to check.
+ * @param config Optional config object for dynamic model configuration.
  * @returns True if the model is an auto model.
  */
-export function isAutoModel(model: string): boolean {
+export function isAutoModel(model: string, config?: Config): boolean {
+  if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
+    return config.modelConfigService.getModelDefinition(model)?.tier === 'auto';
+  }
   return (
     model === GEMINI_MODEL_ALIAS_AUTO ||
     model === PREVIEW_GEMINI_MODEL_AUTO ||

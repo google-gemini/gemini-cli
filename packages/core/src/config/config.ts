@@ -601,6 +601,7 @@ export interface ConfigParameters {
   disableYoloMode?: boolean;
   rawOutput?: boolean;
   acceptRawOutputRisk?: boolean;
+  dynamicModelConfiguration?: boolean;
   modelConfigServiceConfig?: ModelConfigServiceConfig;
   enableHooks?: boolean;
   enableHooksUI?: boolean;
@@ -799,6 +800,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly disableYoloMode: boolean;
   private readonly rawOutput: boolean;
   private readonly acceptRawOutputRisk: boolean;
+  private readonly dynamicModelConfiguration: boolean;
   private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
   private readonly enableHooksUI: boolean;
@@ -987,7 +989,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
-    this.useWriteTodos = isPreviewModel(this.model)
+    this.useWriteTodos = isPreviewModel(this.model, this)
       ? false
       : (params.useWriteTodos ?? true);
     this.workspacePoliciesDir = params.workspacePoliciesDir;
@@ -1062,6 +1064,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.rawOutput = params.rawOutput ?? false;
     this.acceptRawOutputRisk = params.acceptRawOutputRisk ?? false;
+    this.dynamicModelConfiguration = params.dynamicModelConfiguration ?? false;
 
     if (params.hooks) {
       this.hooks = params.hooks;
@@ -1110,19 +1113,28 @@ export class Config implements McpContext, AgentLoopContext {
     // TODO(12593): Fix the settings loading logic to properly merge defaults and
     // remove this hack.
     let modelConfigServiceConfig = params.modelConfigServiceConfig;
+    const defaultsToApply: Partial<ModelConfigServiceConfig> = {};
     if (modelConfigServiceConfig) {
       if (!modelConfigServiceConfig.aliases) {
-        modelConfigServiceConfig = {
-          ...modelConfigServiceConfig,
-          aliases: DEFAULT_MODEL_CONFIGS.aliases,
-        };
+        defaultsToApply.aliases = DEFAULT_MODEL_CONFIGS.aliases;
       }
       if (!modelConfigServiceConfig.overrides) {
-        modelConfigServiceConfig = {
-          ...modelConfigServiceConfig,
-          overrides: DEFAULT_MODEL_CONFIGS.overrides,
-        };
+        defaultsToApply.overrides = DEFAULT_MODEL_CONFIGS.overrides;
       }
+      if (
+        !modelConfigServiceConfig.modelDefinitions ||
+        Object.keys(modelConfigServiceConfig.modelDefinitions).length === 0
+      ) {
+        defaultsToApply.modelDefinitions =
+          DEFAULT_MODEL_CONFIGS.modelDefinitions;
+      }
+    }
+
+    if (Object.keys(defaultsToApply).length > 0) {
+      modelConfigServiceConfig = {
+        ...modelConfigServiceConfig,
+        ...defaultsToApply,
+      };
     }
 
     this.modelConfigService = new ModelConfigService(
@@ -1325,7 +1337,10 @@ export class Config implements McpContext, AgentLoopContext {
 
     // Only reset when we have explicit "no access" (hasAccessToPreviewModel === false).
     // When null (quota not fetched) or true, we preserve the saved model.
-    if (isPreviewModel(this.model) && this.hasAccessToPreviewModel === false) {
+    if (
+      isPreviewModel(this.model, this) &&
+      this.hasAccessToPreviewModel === false
+    ) {
       this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
     }
 
@@ -1581,7 +1596,7 @@ export class Config implements McpContext, AgentLoopContext {
 
     const isPreview =
       model === PREVIEW_GEMINI_MODEL_AUTO ||
-      isPreviewModel(this.getActiveModel());
+      isPreviewModel(this.getActiveModel(), this);
     const proModel = isPreview ? PREVIEW_GEMINI_MODEL : DEFAULT_GEMINI_MODEL;
     const flashModel = isPreview
       ? PREVIEW_GEMINI_FLASH_MODEL
@@ -1779,8 +1794,9 @@ export class Config implements McpContext, AgentLoopContext {
       }
 
       const hasAccess =
-        quota.buckets?.some((b) => b.modelId && isPreviewModel(b.modelId)) ??
-        false;
+        quota.buckets?.some(
+          (b) => b.modelId && isPreviewModel(b.modelId, this),
+        ) ?? false;
       this.setHasAccessToPreviewModel(hasAccess);
       return quota;
     } catch (e) {
@@ -2170,6 +2186,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getAcceptRawOutputRisk(): boolean {
     return this.acceptRawOutputRisk;
+  }
+
+  getExperimentalDynamicModelConfiguration(): boolean {
+    return this.dynamicModelConfiguration;
   }
 
   getPendingIncludeDirectories(): string[] {

@@ -61,7 +61,7 @@ export class PromptProvider {
       config.getActiveModel(),
       config.getGemini31LaunchedSync?.() ?? false,
     );
-    const isModernModel = supportsModernFeatures(desiredModel);
+    const isModernModel = supportsModernFeatures(desiredModel, config);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
     const contextFilenames = getAllGeminiMdFilenames();
 
@@ -232,7 +232,7 @@ export class PromptProvider {
       config.getActiveModel(),
       config.getGemini31LaunchedSync?.() ?? false,
     );
-    const isModernModel = supportsModernFeatures(desiredModel);
+    const isModernModel = supportsModernFeatures(desiredModel, config);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
     return activeSnippets.getCompressionPrompt(config.getApprovedPlanPath());
   }
