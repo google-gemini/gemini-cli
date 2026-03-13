@@ -139,7 +139,7 @@ export interface SessionUpdate {
   config?: Record<string, unknown>;
 }
 
-type ContentPart =
+export type ContentPart =
   /** Represents text. */
   (
     | { type: 'text'; text: string }

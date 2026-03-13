@@ -12,15 +12,15 @@ import type { AgentEvent, AgentSend, AgentSession } from './types.js';
  */
 export class MockAgentSession implements AgentSession {
   private _events: AgentEvent[] = [];
-  private _responses: AgentEvent[][] = [];
+  private _responses: Array<Array<Partial<AgentEvent> & { type: string }>> = [];
   private _streams = new Map<string, AgentEvent[]>();
   private _activeStreamIds = new Set<string>();
   private _lastStreamId?: string;
   private _nextEventId = 1;
 
-  public title?: string;
-  public model?: string;
-  public config?: Record<string, unknown>;
+  title?: string;
+  model?: string;
+  config?: Record<string, unknown>;
 
   constructor(initialEvents: AgentEvent[] = []) {
     this._events = [...initialEvents];
@@ -39,14 +39,13 @@ export class MockAgentSession implements AgentSession {
    */
   pushResponse(events: Array<Partial<AgentEvent> & { type: string }>) {
     // We store them as partials and normalize them when send() is called
-    this._responses.push(events as AgentEvent[]);
+    this._responses.push(events);
   }
 
   async send(payload: AgentSend): Promise<{ streamId: string }> {
     const response = this._responses.shift() ?? [];
     const streamId =
-      (response[0] as AgentEvent)?.streamId ??
-      `mock-stream-${this._streams.size + 1}`;
+      response[0]?.streamId ?? `mock-stream-${this._streams.size + 1}`;
 
     const now = new Date().toISOString();
 
@@ -54,7 +53,7 @@ export class MockAgentSession implements AgentSession {
       response.unshift({
         type: 'stream_start',
         streamId,
-      } as unknown as AgentEvent);
+      });
     }
 
     const startIndex = response.findIndex((e) => e.type === 'stream_start');
@@ -65,26 +64,26 @@ export class MockAgentSession implements AgentSession {
         role: 'user',
         content: payload.message,
         _meta: payload._meta,
-      } as unknown as AgentEvent);
+      } as Partial<AgentEvent>);
     } else if ('elicitations' in payload && payload.elicitations) {
       payload.elicitations.forEach((elicitation, i) => {
         response.splice(startIndex + 1 + i, 0, {
           type: 'elicitation_response',
           ...elicitation,
           _meta: payload._meta,
-        } as unknown as AgentEvent);
+        } as Partial<AgentEvent>);
       });
     } else if ('update' in payload && payload.update) {
       if (payload.update.title) this.title = payload.update.title;
       if (payload.update.model) this.model = payload.update.model;
       if (payload.update.config) {
-        this.config = payload.update.config as Record<string, unknown>;
+        this.config = payload.update.config;
       }
       response.splice(startIndex + 1, 0, {
         type: 'session_update',
         ...payload.update,
         _meta: payload._meta,
-      } as unknown as AgentEvent);
+      } as Partial<AgentEvent>);
     } else if ('action' in payload && payload.action) {
       throw new Error(
         `Actions not supported in MockAgentSession: ${payload.action.type}`,
@@ -96,7 +95,7 @@ export class MockAgentSession implements AgentSession {
         type: 'stream_end',
         reason: 'completed',
         streamId,
-      } as unknown as AgentEvent);
+      });
     }
 
     const normalizedResponse = response.map((e) => {
@@ -121,12 +120,15 @@ export class MockAgentSession implements AgentSession {
     eventId?: string;
   }): AsyncIterableIterator<AgentEvent> {
     let streamId = options?.streamId;
-    if (!streamId && options?.eventId) {
+
+    if (options?.eventId) {
       const event = this._events.find((e) => e.id === options.eventId);
-      if (event) {
-        streamId = event.streamId;
+      if (!event) {
+        throw new Error(`Event not found: ${options.eventId}`);
       }
+      streamId = streamId ?? event.streamId;
     }
+
     streamId = streamId ?? this._lastStreamId;
 
     if (!streamId) {
@@ -144,7 +146,11 @@ export class MockAgentSession implements AgentSession {
       if (idx !== -1) {
         startAt = idx + 1;
       } else {
-        throw new Error(`Event not found: ${options.eventId}`);
+        // This should theoretically not happen if the event was found in this._events
+        // but the trajectories match.
+        throw new Error(
+          `Event ${options.eventId} not found in stream ${streamId}`,
+        );
       }
     }
 
