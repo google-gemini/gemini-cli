@@ -22,6 +22,7 @@ import {
   stripShellWrapper,
   hasRedirection,
   resolveExecutable,
+  normalizePowerShellCommand,
 } from './shell-utils.js';
 import path from 'node:path';
 
@@ -564,5 +565,208 @@ describe('resolveExecutable', () => {
     mockAccess.mockRejectedValue(new Error('ENOENT'));
 
     expect(await resolveExecutable('unknown')).toBeUndefined();
+  });
+});
+
+describe('normalizePowerShellCommand', () => {
+  it('should replace && with ; for PowerShell', () => {
+    const result = normalizePowerShellCommand(
+      'echo "hello" && ls',
+      'powershell',
+    );
+    expect(result).toBe('echo "hello"; ls');
+  });
+
+  it('should handle multiple && operators', () => {
+    const result = normalizePowerShellCommand(
+      'cmd1 && cmd2 && cmd3',
+      'powershell',
+    );
+    expect(result).toBe('cmd1; cmd2; cmd3');
+  });
+
+  it('should handle && with various spacing', () => {
+    const result = normalizePowerShellCommand(
+      'cmd1&&cmd2 &&  cmd3  &&cmd4',
+      'powershell',
+    );
+    expect(result).toBe('cmd1; cmd2; cmd3; cmd4');
+  });
+
+  it('should not modify commands for non-PowerShell shells', () => {
+    const command = 'echo "hello" && ls';
+    expect(normalizePowerShellCommand(command, 'bash')).toBe(command);
+    expect(normalizePowerShellCommand(command, 'cmd')).toBe(command);
+  });
+
+  it('should return empty string for empty input', () => {
+    expect(normalizePowerShellCommand('', 'powershell')).toBe('');
+    expect(normalizePowerShellCommand('', 'bash')).toBe('');
+  });
+
+  it('should handle commands without && operators', () => {
+    const command = 'Get-ChildItem -Path C:\\';
+    expect(normalizePowerShellCommand(command, 'powershell')).toBe(command);
+  });
+
+  it('should handle commands that already use semicolons', () => {
+    const command = 'cmd1; cmd2 && cmd3';
+    const result = normalizePowerShellCommand(command, 'powershell');
+    expect(result).toBe('cmd1; cmd2; cmd3');
+  });
+
+  it('should handle edge case with && inside strings (known limitation)', () => {
+    // Note: This is a known limitation - the function will incorrectly replace
+    // && inside strings. This is documented as acceptable for this use case.
+    const command = 'Write-Output "foo && bar" && Get-ChildItem';
+    const result = normalizePowerShellCommand(command, 'powershell');
+    expect(result).toBe('Write-Output "foo; bar"; Get-ChildItem');
+  });
+
+  it('should handle invalid input types gracefully', () => {
+    // @ts-expect-error - Testing invalid input
+    expect(normalizePowerShellCommand(null, 'powershell')).toBe('');
+    // @ts-expect-error - Testing invalid input
+    expect(normalizePowerShellCommand(undefined, 'powershell')).toBe('');
+    // @ts-expect-error - Testing invalid input
+    expect(normalizePowerShellCommand(123, 'powershell')).toBe('');
+    // @ts-expect-error - Testing invalid input
+    expect(normalizePowerShellCommand('test', null)).toBe('test');
+  });
+
+  it('should handle null bytes in commands gracefully', () => {
+    const commandWithNullByte = 'echo "test\0malicious"';
+    const result = normalizePowerShellCommand(
+      commandWithNullByte,
+      'powershell',
+    );
+    // Should return original command without normalization due to null byte detection
+    expect(result).toBe(commandWithNullByte);
+  });
+
+  it('should handle extremely long commands by returning original', () => {
+    const longCommand = 'echo "test"' + ' && echo "test"'.repeat(10000);
+    const result = normalizePowerShellCommand(longCommand, 'powershell');
+    // Should return original command if too long (over 100KB limit)
+    expect(result).toBe(longCommand);
+    expect(result.length).toBeGreaterThan(100000);
+  });
+
+  it('should handle regex errors gracefully', () => {
+    // Mock String.prototype.replace to throw an error
+    const originalReplace = String.prototype.replace;
+    String.prototype.replace = vi.fn().mockImplementation(() => {
+      throw new Error('Regex error');
+    });
+
+    const command = 'echo "hello" && ls';
+    const result = normalizePowerShellCommand(command, 'powershell');
+
+    // Should return original command on error
+    expect(result).toBe(command);
+
+    // Restore original replace method
+    String.prototype.replace = originalReplace;
+  });
+
+  it('should complete quickly and avoid ReDoS', () => {
+    // Test with command that could potentially cause ReDoS
+    const maliciousCommand = 'a'.repeat(1000) + '&&' + 'b'.repeat(1000);
+    const start = Date.now();
+    const result = normalizePowerShellCommand(maliciousCommand, 'powershell');
+    const duration = Date.now() - start;
+
+    // Should complete quickly (under 100ms) and not hang
+    expect(duration).toBeLessThan(100);
+    expect(result).toContain(';');
+  });
+
+  it('should handle null and undefined shellType gracefully', () => {
+    const command = 'echo "test"';
+    // @ts-expect-error - Testing invalid input
+    expect(normalizePowerShellCommand(command, null)).toBe(command);
+    // @ts-expect-error - Testing invalid input
+    expect(normalizePowerShellCommand(command, undefined)).toBe(command);
+  });
+
+  it('should handle empty and whitespace-only commands', () => {
+    expect(normalizePowerShellCommand('', 'powershell')).toBe('');
+    expect(normalizePowerShellCommand('   ', 'powershell')).toBe('   ');
+    expect(normalizePowerShellCommand('\t\n', 'powershell')).toBe('\t\n');
+  });
+});
+
+describe('initializeShellParsers timeout behavior', () => {
+  beforeEach(() => {
+    // Reset the module state before each test
+    vi.resetModules();
+  });
+
+  it('should timeout if initialization takes too long', async () => {
+    // Mock a very slow initialization
+    vi.doMock('./fileUtils.js', () => ({
+      loadWasmBinary: vi.fn().mockImplementation(
+        () => new Promise((resolve) => setTimeout(resolve, 10000)), // 10 second delay
+      ),
+    }));
+
+    const shellUtils = await import('./shell-utils.js');
+
+    const startTime = Date.now();
+    await expect(shellUtils.initializeShellParsers()).rejects.toThrow(
+      /Shell parser initialization timed out after 5000ms/,
+    );
+    const duration = Date.now() - startTime;
+
+    // Should timeout around 5 seconds, not wait 10 seconds
+    expect(duration).toBeLessThan(7000);
+    expect(duration).toBeGreaterThan(4000);
+  });
+
+  it('should propagate initialization errors to subsequent callers', async () => {
+    // Mock initialization to fail
+    const initError = new Error('Wasm loading failed');
+    vi.doMock('./fileUtils.js', () => ({
+      loadWasmBinary: vi.fn().mockRejectedValue(initError),
+    }));
+
+    const shellUtils = await import('./shell-utils.js');
+
+    // First call should fail with the original error
+    await expect(shellUtils.initializeShellParsers()).rejects.toThrow(
+      'Wasm loading failed',
+    );
+
+    // Subsequent calls should also fail with the same error
+    await expect(shellUtils.initializeShellParsers()).rejects.toThrow(
+      'Wasm loading failed',
+    );
+  });
+
+  it('should handle concurrent initialization attempts with timeout', async () => {
+    let resolveInit: () => void;
+    const initPromise = new Promise<void>((resolve) => {
+      resolveInit = resolve;
+    });
+
+    // Mock slow initialization
+    vi.doMock('./fileUtils.js', () => ({
+      loadWasmBinary: vi.fn().mockImplementation(() => initPromise),
+    }));
+
+    const shellUtils = await import('./shell-utils.js');
+
+    // Start multiple concurrent initializations
+    const promises = [
+      shellUtils.initializeShellParsers(),
+      shellUtils.initializeShellParsers(),
+      shellUtils.initializeShellParsers(),
+    ];
+
+    // Let them wait for a bit, then resolve
+    setTimeout(() => resolveInit(), 100);
+
+    // All should complete successfully
+    await expect(Promise.all(promises)).resolves.not.toThrow();
   });
 });

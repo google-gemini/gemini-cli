@@ -55,7 +55,7 @@ export function getShellToolDescription(
     const backgroundInstructions = enableInteractiveShell
       ? `To run a command in the background, set the \`${SHELL_PARAM_IS_BACKGROUND}\` parameter to true. Do NOT use PowerShell background constructs.`
       : 'Command can start background processes using PowerShell constructs such as `Start-Process -NoNewWindow` or `Start-Job`.';
-    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. ${backgroundInstructions}${efficiencyGuidelines}${returnedInfo}`;
+    return `This tool executes a given shell command as \`powershell.exe -NoProfile -Command <command>\`. For command chaining in PowerShell, use \`;\` (semicolon) NOT \`&&\`. ${backgroundInstructions}${efficiencyGuidelines}${returnedInfo}`;
   } else {
     const backgroundInstructions = enableInteractiveShell
       ? `To run a command in the background, set the \`${SHELL_PARAM_IS_BACKGROUND}\` parameter to true. Do NOT use \`&\` to background commands.`
@@ -69,7 +69,7 @@ export function getShellToolDescription(
  */
 export function getCommandDescription(): string {
   if (os.platform() === 'win32') {
-    return 'Exact command to execute as `powershell.exe -NoProfile -Command <command>`';
+    return 'Exact command to execute as `powershell.exe -NoProfile -Command <command>`. For command chaining, use `;` (semicolon) NOT `&&`.';
   }
   return 'Exact bash command to execute as `bash -c <command>`';
 }

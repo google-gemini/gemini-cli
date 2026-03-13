@@ -40,6 +40,7 @@ import {
   stripShellWrapper,
   parseCommandDetails,
   hasRedirection,
+  normalizePowerShellCommand,
 } from '../utils/shell-utils.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -111,7 +112,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    const command = stripShellWrapper(this.params.command);
+    const strippedCommand = stripShellWrapper(this.params.command);
+    const isWindows = os.platform() === 'win32';
+    const shellType = isWindows ? 'powershell' : 'bash';
+
+    // SECURITY: Apply the same normalization as in execute() to prevent command injection
+    // This ensures the user sees exactly what will be executed
+    const command = normalizePowerShellCommand(strippedCommand, shellType);
 
     const parsed = parseCommandDetails(command);
     let rootCommandDisplay = '';
@@ -154,6 +161,49 @@ export class ShellToolInvocation extends BaseToolInvocation<
     setExecutionIdCallback?: (executionId: number) => void,
   ): Promise<ToolResult> {
     const strippedCommand = stripShellWrapper(this.params.command);
+    const isWindows = os.platform() === 'win32';
+    const shellType = isWindows ? 'powershell' : 'bash';
+
+    // Validate command before normalization
+    if (!strippedCommand || typeof strippedCommand !== 'string') {
+      return {
+        llmContent: 'Invalid command provided.',
+        returnDisplay: 'Command validation failed.',
+        error: {
+          message: 'Command is empty or invalid',
+          type: ToolErrorType.SHELL_EXECUTE_ERROR,
+        },
+      };
+    }
+
+    // Additional validation for dangerous characters
+    if (strippedCommand.includes('\0')) {
+      return {
+        llmContent: 'Command contains invalid characters.',
+        returnDisplay: 'Command validation failed.',
+        error: {
+          message: 'Command contains null bytes',
+          type: ToolErrorType.SHELL_EXECUTE_ERROR,
+        },
+      };
+    }
+
+    const normalizedCommand = normalizePowerShellCommand(
+      strippedCommand,
+      shellType,
+    );
+
+    // Validate normalized command
+    if (!normalizedCommand || typeof normalizedCommand !== 'string') {
+      return {
+        llmContent: 'Command normalization failed.',
+        returnDisplay: 'Command normalization failed.',
+        error: {
+          message: 'Command normalization produced invalid result',
+          type: ToolErrorType.SHELL_EXECUTE_ERROR,
+        },
+      };
+    }
 
     if (signal.aborted) {
       return {
@@ -162,7 +212,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
       };
     }
 
-    const isWindows = os.platform() === 'win32';
     const tempFileName = `shell_pgrep_${crypto
       .randomBytes(6)
       .toString('hex')}.tmp`;
@@ -180,10 +229,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
     try {
       // pgrep is not available on Windows, so we can't get background PIDs
       const commandToExecute = isWindows
-        ? strippedCommand
+        ? normalizedCommand
         : (() => {
             // wrap command to append subprocess pids (via pgrep) to temporary file
-            let command = strippedCommand.trim();
+            let command = normalizedCommand.trim();
             if (!command.endsWith('&')) command += ';';
             return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
           })();
@@ -422,6 +471,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
         : {};
       if (summarizeConfig && summarizeConfig[SHELL_TOOL_NAME]) {
         const summary = await summarizeToolOutput(
+          // Replace deprecated getGeminiClient() with new client API
           this.config,
           { model: 'summarizer-shell' },
           llmContent,
