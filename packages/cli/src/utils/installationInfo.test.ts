@@ -56,14 +56,14 @@ describe('getInstallationInfo', () => {
     vi.spyOn(debugLogger, 'log').mockImplementation(() => {});
     // Default to writable and non-root
     mockedAccessSync.mockImplementation(() => {});
-    vi.spyOn(process, 'getuid').mockReturnValue(1000);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.spyOn(process, 'getuid' as any).mockReturnValue(1000);
   });
 
   afterEach(() => {
     process.argv = originalArgv;
     vi.restoreAllMocks();
   });
-
 
   it('should return UNKNOWN when cliPath is not available', () => {
     process.argv[1] = '';
@@ -355,7 +355,8 @@ describe('getInstallationInfo', () => {
     mockedAccessSync.mockImplementation(() => {
       throw new Error('Permission denied');
     });
-    vi.spyOn(process, 'getuid').mockReturnValue(1000);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.spyOn(process, 'getuid' as any).mockReturnValue(1000);
 
     const info = getInstallationInfo(projectRoot, true);
 
@@ -375,7 +376,8 @@ describe('getInstallationInfo', () => {
     mockedAccessSync.mockImplementation(() => {
       throw new Error('Permission denied');
     });
-    vi.spyOn(process, 'getuid').mockReturnValue(0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.spyOn(process, 'getuid' as any).mockReturnValue(0);
 
     const info = getInstallationInfo(projectRoot, true);
 
@@ -433,4 +435,3 @@ describe('getInstallationInfo', () => {
     expect(info.packageManager).toBe(PackageManager.NPM);
   });
 });
-

@@ -8,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { writeFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { wasmLoader } from 'esbuild-plugin-wasm';
 
 let esbuild;
@@ -22,6 +23,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const require = createRequire(import.meta.url);
 const pkg = require(path.resolve(__dirname, 'package.json'));
+
+const gitHash = (() => {
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim();
+  } catch {
+    return 'unknown';
+  }
+})();
+const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+const baseVersion = pkg.version.split('-')[0];
+const dynamicVersion = `${baseVersion}-nightly.${dateStr}.${gitHash}-euxaristia`;
+const dynamicSandboxImageUri = pkg.config?.sandboxImageUri?.replace(
+  /:.*$/,
+  `:${dynamicVersion}`,
+);
 
 function createWasmPlugins() {
   const wasmBinaryPlugin = {
@@ -90,9 +106,9 @@ const cliConfig = {
   define: {
     __filename: '__chunk_filename',
     __dirname: '__chunk_dirname',
-    'process.env.CLI_VERSION': JSON.stringify(pkg.version),
+    'process.env.CLI_VERSION': JSON.stringify(dynamicVersion),
     'process.env.GEMINI_SANDBOX_IMAGE_DEFAULT': JSON.stringify(
-      pkg.config?.sandboxImageUri,
+      dynamicSandboxImageUri,
     ),
   },
   plugins: createWasmPlugins(),
@@ -113,7 +129,7 @@ const a2aServerConfig = {
   define: {
     __filename: '__chunk_filename',
     __dirname: '__chunk_dirname',
-    'process.env.CLI_VERSION': JSON.stringify(pkg.version),
+    'process.env.CLI_VERSION': JSON.stringify(dynamicVersion),
   },
   plugins: createWasmPlugins(),
   alias: commonAliases,

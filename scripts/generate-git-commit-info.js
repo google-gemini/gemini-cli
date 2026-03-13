@@ -50,7 +50,10 @@ try {
   }
 
   const result = await readPackageUp();
-  cliVersion = result?.packageJson?.version ?? 'UNKNOWN';
+  const pkgVersion = result?.packageJson?.version ?? 'UNKNOWN';
+  const baseVersion = pkgVersion.split('-')[0];
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  cliVersion = `${baseVersion}-nightly.${dateStr}.${gitCommitInfo}-euxaristia`;
 } catch {
   // ignore
 }
