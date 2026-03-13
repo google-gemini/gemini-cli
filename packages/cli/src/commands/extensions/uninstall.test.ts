@@ -18,7 +18,7 @@ import { type Argv } from 'yargs';
 import { handleUninstall, uninstallCommand } from './uninstall.js';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { loadSettings, type LoadedSettings } from '../../config/settings.js';
-import { getErrorMessage } from '../../utils/errors.js';
+import { getErrorMessage } from '@google/gemini-cli-core';
 
 // NOTE: This file uses vi.hoisted() mocks to enable testing of sequential
 // mock behaviors (mockResolvedValueOnce/mockRejectedValueOnce chaining).
@@ -66,11 +66,11 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       emitConsoleLog,
     },
     debugLogger,
+    getErrorMessage: vi.fn(),
   };
 });
 
 vi.mock('../../config/settings.js');
-vi.mock('../../utils/errors.js');
 vi.mock('../../config/extensions/consent.js', () => ({
   requestConsentNonInteractive: vi.fn(),
 }));

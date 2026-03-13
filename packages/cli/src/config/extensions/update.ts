@@ -11,9 +11,12 @@ import {
 } from '../../ui/state/extensions.js';
 import { loadInstallMetadata } from '../extension.js';
 import { checkForExtensionUpdate } from './github.js';
-import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  getErrorMessage,
+  type GeminiCLIExtension,
+} from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
-import { getErrorMessage } from '../../utils/errors.js';
 import { copyExtension, type ExtensionManager } from '../extension-manager.js';
 import { ExtensionStorage } from './storage.js';
 
