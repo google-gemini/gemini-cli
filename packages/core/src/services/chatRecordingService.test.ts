@@ -43,6 +43,13 @@ describe('ChatRecordingService', () => {
     );
 
     mockConfig = {
+      get config() {
+        return this;
+      },
+      toolRegistry: {
+        getTool: vi.fn(),
+      },
+      promptId: 'test-session-id',
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       storage: {
@@ -368,6 +375,36 @@ describe('ChatRecordingService', () => {
       };
       expect(geminiMsg.toolCalls).toHaveLength(1);
       expect(geminiMsg.toolCalls![0].name).toBe('testTool');
+    });
+
+    it('should preserve dynamic description and NOT overwrite with generic one', () => {
+      chatRecordingService.recordMessage({
+        type: 'gemini',
+        content: '',
+        model: 'gemini-pro',
+      });
+
+      const dynamicDescription = 'DYNAMIC DESCRIPTION (e.g. Read file foo.txt)';
+      const toolCall: ToolCallRecord = {
+        id: 'tool-1',
+        name: 'testTool',
+        args: {},
+        status: CoreToolCallStatus.Success,
+        timestamp: new Date().toISOString(),
+        description: dynamicDescription,
+      };
+
+      chatRecordingService.recordToolCalls('gemini-pro', [toolCall]);
+
+      const sessionFile = chatRecordingService.getConversationFilePath()!;
+      const conversation = JSON.parse(
+        fs.readFileSync(sessionFile, 'utf8'),
+      ) as ConversationRecord;
+      const geminiMsg = conversation.messages[0] as MessageRecord & {
+        type: 'gemini';
+      };
+
+      expect(geminiMsg.toolCalls![0].description).toBe(dynamicDescription);
     });
 
     it('should create a new message if the last message is not from gemini', () => {

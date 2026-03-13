@@ -27,6 +27,8 @@ import {
 } from './browserAgentDefinition.js';
 import { createMcpDeclarativeTools } from './mcpToolWrapper.js';
 import { createAnalyzeScreenshotTool } from './analyzeScreenshot.js';
+import { injectAutomationOverlay } from './automationOverlay.js';
+import { injectInputBlocker } from './inputBlocker.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 
 /**
@@ -61,9 +63,30 @@ export async function createBrowserAgentDefinition(
     printOutput('Browser connected with isolated MCP client.');
   }
 
+  // Determine if input blocker should be active (non-headless + enabled)
+  const shouldDisableInput = config.shouldDisableBrowserUserInput();
+  // Inject automation overlay and input blocker if not in headless mode
+  const browserConfig = config.getBrowserAgentConfig();
+  if (!browserConfig?.customConfig?.headless) {
+    if (printOutput) {
+      printOutput('Injecting automation overlay...');
+    }
+    await injectAutomationOverlay(browserManager);
+    if (shouldDisableInput) {
+      if (printOutput) {
+        printOutput('Injecting input blocker...');
+      }
+      await injectInputBlocker(browserManager);
+    }
+  }
+
   // Create declarative tools from dynamically discovered MCP tools
   // These tools dispatch to browserManager's isolated client
-  const mcpTools = await createMcpDeclarativeTools(browserManager, messageBus);
+  const mcpTools = await createMcpDeclarativeTools(
+    browserManager,
+    messageBus,
+    shouldDisableInput,
+  );
   const availableToolNames = mcpTools.map((t) => t.name);
 
   // Validate required semantic tools are available
