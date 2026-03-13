@@ -11,8 +11,8 @@ import {
   debugLogger,
   FolderTrustDiscoveryService,
   getRealPath,
+  getErrorMessage,
 } from '@google/gemini-cli-core';
-import { getErrorMessage } from '../../utils/errors.js';
 import {
   INSTALL_WARNING_MESSAGE,
   promptForConsentNonInteractive,

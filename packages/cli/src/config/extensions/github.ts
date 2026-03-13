@@ -5,9 +5,9 @@
  */
 
 import { simpleGit } from 'simple-git';
-import { getErrorMessage } from '../../utils/errors.js';
 import {
   debugLogger,
+  getErrorMessage,
   type ExtensionInstallMetadata,
   type GeminiCLIExtension,
 } from '@google/gemini-cli-core';

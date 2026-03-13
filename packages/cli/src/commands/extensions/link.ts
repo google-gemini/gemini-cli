@@ -8,10 +8,10 @@ import type { CommandModule } from 'yargs';
 import chalk from 'chalk';
 import {
   debugLogger,
+  getErrorMessage,
   type ExtensionInstallMetadata,
 } from '@google/gemini-cli-core';
 
-import { getErrorMessage } from '../../utils/errors.js';
 import {
   INSTALL_WARNING_MESSAGE,
   requestConsentNonInteractive,

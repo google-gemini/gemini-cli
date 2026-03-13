@@ -21,7 +21,6 @@ import {
   coreEvents,
 } from '@google/gemini-cli-core';
 import {
-  getErrorMessage,
   handleError,
   handleToolError,
   handleCancellationError,
@@ -150,25 +149,6 @@ describe('errors', () => {
     debugLoggerErrorSpy.mockRestore();
     debugLoggerWarnSpy.mockRestore();
     processExitSpy.mockRestore();
-  });
-
-  describe('getErrorMessage', () => {
-    it('should return error message for Error instances', () => {
-      const error = new Error('Test error message');
-      expect(getErrorMessage(error)).toBe('Test error message');
-    });
-
-    it('should convert non-Error values to strings', () => {
-      expect(getErrorMessage('string error')).toBe('string error');
-      expect(getErrorMessage(123)).toBe('123');
-      expect(getErrorMessage(null)).toBe('null');
-      expect(getErrorMessage(undefined)).toBe('undefined');
-    });
-
-    it('should handle objects', () => {
-      const obj = { message: 'test' };
-      expect(getErrorMessage(obj)).toBe('[object Object]');
-    });
   });
 
   describe('handleError', () => {

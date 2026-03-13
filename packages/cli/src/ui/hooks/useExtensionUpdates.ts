@@ -7,9 +7,9 @@
 import {
   debugLogger,
   checkExhaustive,
+  getErrorMessage,
   type GeminiCLIExtension,
 } from '@google/gemini-cli-core';
-import { getErrorMessage } from '../../utils/errors.js';
 import {
   ExtensionUpdateState,
   extensionUpdatesReducer,

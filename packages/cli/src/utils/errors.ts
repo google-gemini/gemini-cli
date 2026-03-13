@@ -18,15 +18,9 @@ import {
   isFatalToolError,
   debugLogger,
   coreEvents,
+  getErrorMessage,
 } from '@google/gemini-cli-core';
 import { runSyncCleanup } from './cleanup.js';
-
-export function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
-}
 
 interface ErrorWithCode extends Error {
   exitCode?: number;

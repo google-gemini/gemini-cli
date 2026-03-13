@@ -24,6 +24,9 @@ const { debugLogger } = await vi.hoisted(async () => {
 
 vi.mock('@google/gemini-cli-core', () => ({
   debugLogger,
+  getErrorMessage: vi.fn((e: unknown) =>
+    e instanceof Error ? e.message : String(e),
+  ),
 }));
 
 vi.mock('../../config/extensions/consent.js', () => ({

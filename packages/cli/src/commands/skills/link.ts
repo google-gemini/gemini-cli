@@ -5,10 +5,9 @@
  */
 
 import type { CommandModule } from 'yargs';
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger, getErrorMessage } from '@google/gemini-cli-core';
 import chalk from 'chalk';
 
-import { getErrorMessage } from '../../utils/errors.js';
 import { exitCli } from '../utils.js';
 import {
   requestConsentNonInteractive,
