@@ -23,6 +23,7 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useVimMode } from '../contexts/VimModeContext.js';
+import { calculateCost, formatCostEstimate } from '../utils/costCalculator.js';
 
 export const Footer: React.FC = () => {
   const uiState = useUIState();
@@ -40,6 +41,8 @@ export const Footer: React.FC = () => {
     errorCount,
     showErrorDetails,
     promptTokenCount,
+    candidateTokenCount,
+    modelName,
     isTrustedFolder,
     terminalWidth,
     quotaStats,
@@ -53,6 +56,8 @@ export const Footer: React.FC = () => {
     errorCount: uiState.errorCount,
     showErrorDetails: uiState.showErrorDetails,
     promptTokenCount: uiState.sessionStats.lastPromptTokenCount,
+    candidateTokenCount: 0,
+    modelName: uiState.currentModel || 'gemini-2.5-flash',
     isTrustedFolder: uiState.isTrustedFolder,
     terminalWidth: uiState.terminalWidth,
     quotaStats: uiState.quota.stats,
@@ -64,6 +69,7 @@ export const Footer: React.FC = () => {
   const hideSandboxStatus = settings.merged.ui.footer.hideSandboxStatus;
   const hideModelInfo = settings.merged.ui.footer.hideModelInfo;
   const hideContextPercentage = settings.merged.ui.footer.hideContextPercentage;
+  const showCostEstimate = settings.merged.ui.footer.showCostEstimate;
 
   const pathLength = Math.max(20, Math.floor(terminalWidth * 0.25));
   const displayPath = shortenPath(tildeifyPath(targetDir), pathLength);
@@ -72,6 +78,12 @@ export const Footer: React.FC = () => {
   const displayVimMode = vimEnabled ? vimMode : undefined;
 
   const showDebugProfiler = debugMode || isDevelopment;
+  const estimatedCost = showCostEstimate
+    ? calculateCost(modelName, promptTokenCount || 0, candidateTokenCount || 0)
+    : 0;
+  const formattedCost = showCostEstimate
+    ? formatCostEstimate(estimatedCost)
+    : '';
 
   return (
     <Box
@@ -151,6 +163,13 @@ export const Footer: React.FC = () => {
                     model={model}
                     terminalWidth={terminalWidth}
                   />
+                </>
+              )}
+              {showCostEstimate && (
+                <>
+                  <Text color={theme.ui.comment}> • </Text>
+                  <Text color={theme.text.secondary}>[Cost Est] </Text>
+                  <Text color={theme.text.primary}>{formattedCost}</Text>
                 </>
               )}
               {quotaStats && (

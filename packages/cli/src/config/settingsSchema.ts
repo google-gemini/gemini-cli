@@ -590,6 +590,15 @@ const SETTINGS_SCHEMA = {
             description: 'Hide the sandbox status indicator in the footer.',
             showInDialog: true,
           },
+          showCostEstimate: {
+            type: 'boolean',
+            default: false,
+            label: 'Show Cost Estimate',
+            description:
+              'Display a real-time estimated cost of the current session in the footer.',
+            category: 'UI',
+            requiresRestart: false,
+          },
           hideModelInfo: {
             type: 'boolean',
             label: 'Hide Model Info',
