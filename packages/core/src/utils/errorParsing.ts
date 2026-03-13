@@ -18,6 +18,30 @@ const getRateLimitErrorMessageDefault = (
 ) =>
   `\nPossible quota limitations in place or slow response times detected. Switching to the ${fallbackModel} model for the rest of this session.`;
 
+const DNS_ERROR_CODES = ['ENOTFOUND', 'EAI_AGAIN'] as const;
+
+function getDnsResolutionHint(message: string): string {
+  const upperMessage = message.toUpperCase();
+  const hasDnsErrorCode = DNS_ERROR_CODES.some((code) =>
+    upperMessage.includes(code),
+  );
+
+  if (!hasDnsErrorCode) {
+    return '';
+  }
+
+  // Typical shapes:
+  // - getaddrinfo ENOTFOUND cloudcode-pa.googleapis.com
+  // - getaddrinfo EAI_AGAIN cloudcode-pa.googleapis.com
+  const hostMatch = message.match(
+    /\b(?:ENOTFOUND|EAI_AGAIN)\b\s+([A-Za-z0-9.-]+)/i,
+  );
+  const host = hostMatch?.[1];
+  const hostText = host ? ` for ${host}` : '';
+
+  return `\nNetwork error: DNS resolution failed${hostText}. Check your internet connection, DNS settings, and proxy/firewall configuration, then try again.`;
+}
+
 function getRateLimitMessage(
   authType?: AuthType,
   fallbackModel?: string,
@@ -44,6 +68,7 @@ export function parseAndFormatApiError(
     if (error.status === 429) {
       text += getRateLimitMessage(authType, fallbackModel);
     }
+    text += getDnsResolutionHint(error.message);
     return text;
   }
 
@@ -51,7 +76,7 @@ export function parseAndFormatApiError(
   if (typeof error === 'string') {
     const jsonStart = error.indexOf('{');
     if (jsonStart === -1) {
-      return `[API Error: ${error}]`; // Not a JSON error, return as is.
+      return `[API Error: ${error}]${getDnsResolutionHint(error)}`;
     }
 
     const jsonString = error.substring(jsonStart);
@@ -73,12 +98,13 @@ export function parseAndFormatApiError(
         if (parsedError.error.code === 429) {
           text += getRateLimitMessage(authType, fallbackModel);
         }
+        text += getDnsResolutionHint(finalMessage);
         return text;
       }
     } catch (_e) {
       // Not a valid JSON, fall through and return the original message.
     }
-    return `[API Error: ${error}]`;
+    return `[API Error: ${error}]${getDnsResolutionHint(error)}`;
   }
 
   return '[API Error: An unknown error occurred.]';
