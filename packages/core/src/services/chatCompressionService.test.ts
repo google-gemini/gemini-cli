@@ -179,6 +179,7 @@ describe('ChatCompressionService', () => {
       getBaseLlmClient: vi.fn().mockReturnValue({
         generateContent: mockGenerateContent,
       }),
+      getUserMemory: vi.fn().mockReturnValue(''),
       isInteractive: vi.fn().mockReturnValue(false),
       getActiveModel: vi.fn().mockReturnValue(mockModel),
       getContentGenerator: vi.fn().mockReturnValue({
@@ -414,6 +415,39 @@ describe('ChatCompressionService', () => {
         .systemInstruction as Part
     ).text;
     expect(firstCallText).not.toContain('### APPROVED PLAN PRESERVATION');
+  });
+
+  it('should pass loaded user memory into compression system instruction', async () => {
+    const memorySentinel = 'SENTINEL_USER_MEMORY_FOR_COMPRESSION_12345';
+    (
+      mockConfig as unknown as {
+        getUserMemory: () => string;
+      }
+    ).getUserMemory = vi.fn().mockReturnValue(memorySentinel);
+    vi.mocked(mockConfig.getApprovedPlanPath).mockReturnValue(undefined);
+
+    const history: Content[] = [
+      { role: 'user', parts: [{ text: 'msg1' }] },
+      { role: 'model', parts: [{ text: 'msg2' }] },
+    ];
+    vi.mocked(mockChat.getHistory).mockReturnValue(history);
+    vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(600000);
+
+    await service.compress(
+      mockChat,
+      mockPromptId,
+      false,
+      mockModel,
+      mockConfig,
+      false,
+    );
+
+    const firstCallText = (
+      vi.mocked(mockConfig.getBaseLlmClient().generateContent).mock.calls[0][0]
+        .systemInstruction as Part
+    ).text;
+    expect(firstCallText).toContain(memorySentinel);
+    expect(firstCallText).toContain('<saved_memory>');
   });
 
   it('should force compress even if under threshold', async () => {
