@@ -4,15 +4,34 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AuthType } from '@google/gemini-cli-core';
+import {
+  AuthType,
+  hasConfiguredProjectId,
+  getMissingProjectIdMessage,
+} from '@google/gemini-cli-core';
 import { loadEnvironment, loadSettings } from './settings.js';
 
 export function validateAuthMethod(authMethod: string): string | null {
+  // Validate input
+  if (typeof authMethod !== 'string' || !authMethod) {
+    return 'Invalid auth method selected.';
+  }
+
   loadEnvironment(loadSettings().merged, process.cwd());
+
   if (
     authMethod === AuthType.LOGIN_WITH_GOOGLE ||
     authMethod === AuthType.COMPUTE_ADC
   ) {
+    // For LOGIN_WITH_GOOGLE, check if GOOGLE_CLOUD_PROJECT is set
+    if (authMethod === AuthType.LOGIN_WITH_GOOGLE) {
+      if (!hasConfiguredProjectId()) {
+        return getMissingProjectIdMessage(
+          'When using "Sign in with Google" authentication, you must set the GOOGLE_CLOUD_PROJECT environment variable.\n' +
+            'This is required to associate your requests with a Google Cloud project.',
+        );
+      }
+    }
     return null;
   }
 

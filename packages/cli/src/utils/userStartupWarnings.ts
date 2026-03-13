@@ -12,6 +12,8 @@ import {
   getCompatibilityWarnings,
   WarningPriority,
   type StartupWarning,
+  AuthType,
+  hasConfiguredProjectId,
 } from '@google/gemini-cli-core';
 import type { Settings } from '../config/settingsSchema.js';
 import {
@@ -79,10 +81,45 @@ const rootDirectoryCheck: WarningCheck = {
   },
 };
 
+const googleCloudProjectCheck: WarningCheck = {
+  id: 'google-cloud-project-missing',
+  priority: WarningPriority.High,
+  check: async (_workspaceRoot: string, settings: Settings) => {
+    try {
+      const authType = settings.security?.auth?.selectedType;
+
+      // Only check for LOGIN_WITH_GOOGLE auth type
+      if (authType !== AuthType.LOGIN_WITH_GOOGLE) {
+        return null;
+      }
+
+      // Use centralized validation
+      if (!hasConfiguredProjectId()) {
+        return (
+          'Warning: GOOGLE_CLOUD_PROJECT environment variable is not set.\n' +
+          'This may cause authentication errors (403 PERMISSION_DENIED).\n\n' +
+          'To fix this:\n' +
+          '1. Set the environment variable: export GOOGLE_CLOUD_PROJECT="your-project-id"\n' +
+          '2. Or add it to your .env file: GOOGLE_CLOUD_PROJECT=your-project-id\n' +
+          '3. Get your project ID from: https://console.cloud.google.com/\n\n' +
+          'Learn more: https://goo.gle/gemini-cli-auth-docs#workspace-gca'
+        );
+      }
+
+      return null;
+    } catch (_err: unknown) {
+      // Silently fail if there's an error checking project ID
+      // This prevents the warning check from breaking the startup flow
+      return null;
+    }
+  },
+};
+
 // All warning checks
 const WARNING_CHECKS: readonly WarningCheck[] = [
   homeDirectoryCheck,
   rootDirectoryCheck,
+  googleCloudProjectCheck,
 ];
 
 export async function getUserStartupWarnings(

@@ -13,6 +13,11 @@ import {
   type RetryInfo,
 } from './googleErrors.js';
 import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
+import {
+  getConfiguredProjectId,
+  getMissingProjectIdMessage,
+  getInvalidProjectIdMessage,
+} from './projectIdValidator.js';
 
 /**
  * A non-retryable error indicating a hard quota limit has been reached (e.g., daily limit).
@@ -80,6 +85,20 @@ export class ValidationRequiredError extends Error {
     this.validationLink = validationLink;
     this.validationDescription = validationDescription;
     this.learnMoreUrl = learnMoreUrl;
+  }
+}
+
+/**
+ * An error indicating that the Google Cloud project is invalid or not set.
+ * This typically occurs when GOOGLE_CLOUD_PROJECT is missing or incorrect.
+ */
+export class InvalidProjectError extends Error {
+  constructor(
+    message: string,
+    override readonly cause?: GoogleApiError,
+  ) {
+    super(message);
+    this.name = 'InvalidProjectError';
   }
 }
 
@@ -191,6 +210,45 @@ function classifyValidationRequiredError(
     learnMoreUrl,
   );
 }
+
+/**
+ * Checks if a 403 error is due to an invalid or missing Google Cloud project.
+ *
+ * @param googleApiError The parsed Google API error to check.
+ * @returns An `InvalidProjectError` if the error is CONSUMER_INVALID, otherwise `null`.
+ */
+function classifyConsumerInvalidError(
+  googleApiError: GoogleApiError,
+): InvalidProjectError | null {
+  const errorInfo = googleApiError.details.find(
+    (d): d is ErrorInfo =>
+      d['@type'] === 'type.googleapis.com/google.rpc.ErrorInfo',
+  );
+
+  if (!errorInfo) {
+    return null;
+  }
+
+  // Check for CONSUMER_INVALID reason from cloudaicompanion API
+  if (
+    errorInfo.reason === 'CONSUMER_INVALID' &&
+    errorInfo.domain?.includes('cloudaicompanion')
+  ) {
+    // Read project ID once to avoid multiple environment variable accesses
+    const projectId = getConfiguredProjectId();
+
+    // Generate appropriate error message based on whether project ID is set
+    const message = projectId
+      ? getInvalidProjectIdMessage(projectId)
+      : getMissingProjectIdMessage(
+          'This error occurs when your Google Cloud project is missing or invalid.',
+        );
+
+    return new InvalidProjectError(message, googleApiError);
+  }
+
+  return null;
+}
 /**
  * Analyzes a caught error and classifies it as a specific error type if applicable.
  *
@@ -224,6 +282,12 @@ export function classifyGoogleError(error: unknown): unknown {
     const validationError = classifyValidationRequiredError(googleApiError);
     if (validationError) {
       return validationError;
+    }
+
+    // Check for CONSUMER_INVALID errors (missing or invalid project ID)
+    const consumerInvalidError = classifyConsumerInvalidError(googleApiError);
+    if (consumerInvalidError) {
+      return consumerInvalidError;
     }
   }
 
