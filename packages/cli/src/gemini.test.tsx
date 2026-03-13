@@ -529,6 +529,13 @@ describe('gemini.tsx main function kitty protocol', () => {
     );
     vi.mocked(parseArguments).mockResolvedValue({
       model: undefined,
+      modelSeed: undefined,
+      modelTemperature: undefined,
+      modelTopK: undefined,
+      modelTopP: undefined,
+      modelThinkingLevel: undefined,
+      modelIncludeThoughts: undefined,
+      modelThinkingBudget: undefined,
       sandbox: undefined,
       debug: undefined,
       prompt: undefined,
@@ -587,6 +594,13 @@ describe('gemini.tsx main function kitty protocol', () => {
     );
     vi.mocked(parseArguments).mockResolvedValue({
       model: undefined,
+      modelSeed: undefined,
+      modelTemperature: undefined,
+      modelTopK: undefined,
+      modelTopP: undefined,
+      modelThinkingLevel: undefined,
+      modelIncludeThoughts: undefined,
+      modelThinkingBudget: undefined,
       sandbox: undefined,
       debug: undefined,
       prompt: undefined,
