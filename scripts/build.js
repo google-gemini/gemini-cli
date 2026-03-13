@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 
-const isBun = typeof process.versions.bun !== 'undefined';
+const isBun = 'bun' in process.versions;
 const pm = isBun ? 'bun' : 'npm';
 
 // install if node_modules was removed (e.g. via npm run clean or scripts/clean.js)
