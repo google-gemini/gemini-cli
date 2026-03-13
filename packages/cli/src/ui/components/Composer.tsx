@@ -36,7 +36,7 @@ import { useSettings } from '../contexts/SettingsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { StreamingState, type HistoryItemToolGroup } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
-import { TodoTray } from './messages/Todo.js';
+import { TasksTray } from './messages/Tasks.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { isContextUsageHigh } from '../utils/contextUsage.js';
 import { theme } from '../semantic-colors.js';
@@ -208,7 +208,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
       )}
 
-      {showUiDetails && <TodoTray />}
+      {showUiDetails && <TasksTray />}
 
       <Box width="100%" flexDirection="column">
         <Box
