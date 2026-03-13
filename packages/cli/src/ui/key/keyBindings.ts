@@ -144,14 +144,14 @@ export class KeyBinding {
   ]);
 
   /** The key name (e.g., 'a', 'enter', 'tab', 'escape') */
-  readonly key: string;
+  readonly name: string;
   readonly shift: boolean;
   readonly alt: boolean;
   readonly ctrl: boolean;
   readonly cmd: boolean;
 
   constructor(pattern: string) {
-    let remains = pattern.toLowerCase().trim();
+    let remains = pattern.trim();
     let shift = false;
     let alt = false;
     let ctrl = false;
@@ -160,31 +160,32 @@ export class KeyBinding {
     let matched: boolean;
     do {
       matched = false;
-      if (remains.startsWith('ctrl+')) {
+      const lowerRemains = remains.toLowerCase();
+      if (lowerRemains.startsWith('ctrl+')) {
         ctrl = true;
         remains = remains.slice(5);
         matched = true;
-      } else if (remains.startsWith('shift+')) {
+      } else if (lowerRemains.startsWith('shift+')) {
         shift = true;
         remains = remains.slice(6);
         matched = true;
-      } else if (remains.startsWith('alt+')) {
+      } else if (lowerRemains.startsWith('alt+')) {
         alt = true;
         remains = remains.slice(4);
         matched = true;
-      } else if (remains.startsWith('option+')) {
+      } else if (lowerRemains.startsWith('option+')) {
         alt = true;
         remains = remains.slice(7);
         matched = true;
-      } else if (remains.startsWith('opt+')) {
+      } else if (lowerRemains.startsWith('opt+')) {
         alt = true;
         remains = remains.slice(4);
         matched = true;
-      } else if (remains.startsWith('cmd+')) {
+      } else if (lowerRemains.startsWith('cmd+')) {
         cmd = true;
         remains = remains.slice(4);
         matched = true;
-      } else if (remains.startsWith('meta+')) {
+      } else if (lowerRemains.startsWith('meta+')) {
         cmd = true;
         remains = remains.slice(5);
         matched = true;
@@ -193,15 +194,17 @@ export class KeyBinding {
 
     const key = remains;
 
-    if ([...key].length !== 1 && !KeyBinding.VALID_LONG_KEYS.has(key)) {
+    const isSingleChar = [...key].length === 1;
+
+    if (!isSingleChar && !KeyBinding.VALID_LONG_KEYS.has(key.toLowerCase())) {
       throw new Error(
         `Invalid keybinding key: "${key}" in "${pattern}".` +
           ` Must be a single character or one of: ${[...KeyBinding.VALID_LONG_KEYS].join(', ')}`,
       );
     }
 
-    this.key = key;
-    this.shift = shift;
+    this.name = key.toLowerCase();
+    this.shift = shift || (isSingleChar && this.name !== key);
     this.alt = alt;
     this.ctrl = ctrl;
     this.cmd = cmd;
@@ -209,7 +212,7 @@ export class KeyBinding {
 
   matches(key: Key): boolean {
     return (
-      this.key === key.name &&
+      key.name === this.name &&
       !!key.shift === !!this.shift &&
       !!key.alt === !!this.alt &&
       !!key.ctrl === !!this.ctrl &&
@@ -219,7 +222,7 @@ export class KeyBinding {
 
   equals(other: KeyBinding): boolean {
     return (
-      this.key === other.key &&
+      this.name === other.name &&
       this.shift === other.shift &&
       this.alt === other.alt &&
       this.ctrl === other.ctrl &&
