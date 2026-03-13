@@ -7,7 +7,7 @@
 import { render } from '../../../test-utils/render.js';
 import { describe, it, expect } from 'vitest';
 import { Box } from 'ink';
-import { TodoTray } from './Todo.js';
+import { TasksTray } from './Tasks.js';
 import { CoreToolCallStatus, type Todo } from '@google/gemini-cli-core';
 import { UIStateContext, type UIState } from '../../contexts/UIStateContext.js';
 import { type HistoryItem } from '../../types.js';
@@ -29,12 +29,12 @@ const createTodoHistoryItem = (todos: Todo[]): HistoryItem =>
   }) as unknown as HistoryItem;
 
 describe.each([true, false])(
-  '<TodoTray /> (showFullTodos: %s)',
+  '<TasksTray /> (showFullTodos: %s)',
   async (showFullTodos: boolean) => {
     const renderWithUiState = async (uiState: Partial<UIState>) => {
       const result = render(
         <UIStateContext.Provider value={uiState as UIState}>
-          <TodoTray />
+          <TasksTray />
         </UIStateContext.Provider>,
       );
       await result.waitUntilReady();
@@ -114,7 +114,7 @@ describe.each([true, false])(
               } as UIState
             }
           >
-            <TodoTray />
+            <TasksTray />
           </UIStateContext.Provider>
         </Box>,
       );

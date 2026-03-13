@@ -14,7 +14,7 @@ import type { ChecklistItemData } from '../ChecklistItem.js';
 import { formatCommand } from '../../key/keybindingUtils.js';
 import { Command } from '../../key/keyBindings.js';
 
-export const TodoTray: React.FC = () => {
+export const TasksTray: React.FC = () => {
   const uiState = useUIState();
 
   const todos: TodoList | null = useMemo(() => {
