@@ -25,6 +25,19 @@ import { ScopeSelector } from './shared/ScopeSelector.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { ColorsDisplay } from './ColorsDisplay.js';
 import { isDevelopment } from '../../utils/installationInfo.js';
+import {
+  DIALOG_PADDING,
+  THEME_DIALOG_PREVIEW_PANE_WIDTH_PERCENTAGE,
+  THEME_DIALOG_SELECTION_PANE_WIDTH_PERCENTAGE,
+  THEME_DIALOG_PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
+  THEME_DIALOG_TOTAL_HORIZONTAL_PADDING,
+  THEME_DIALOG_PREVIEW_PANE_FIXED_VERTICAL_SPACE,
+  THEME_DIALOG_TAB_TO_SELECT_HEIGHT,
+  THEME_DIALOG_PREVIEW_CODE_BLOCK_HEIGHT_PERCENTAGE,
+  THEME_DIALOG_PREVIEW_DIFF_HEIGHT_PERCENTAGE,
+  THEME_DIALOG_COLUMN_PADDING,
+  THEME_DIALOG_MAX_ITEMS_TO_SHOW,
+} from '../constants.js';
 
 interface ThemeDialogProps {
   /** Callback function when a theme is selected */
@@ -190,29 +203,19 @@ export function ThemeDialog({
     settings,
   );
 
-  // Constants for calculating preview pane layout.
-  // These values are based on the JSX structure below.
-  const PREVIEW_PANE_WIDTH_PERCENTAGE = 0.55;
-  // A safety margin to prevent text from touching the border.
-  // This is a complete hack unrelated to the 0.9 used in App.tsx
-  const PREVIEW_PANE_WIDTH_SAFETY_MARGIN = 0.9;
-  // Combined horizontal padding from the dialog and preview pane.
-  const TOTAL_HORIZONTAL_PADDING = 4;
   const colorizeCodeWidth = Math.max(
     Math.floor(
-      (terminalWidth - TOTAL_HORIZONTAL_PADDING) *
-        PREVIEW_PANE_WIDTH_PERCENTAGE *
-        PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
+      (terminalWidth - THEME_DIALOG_TOTAL_HORIZONTAL_PADDING) *
+        THEME_DIALOG_PREVIEW_PANE_WIDTH_PERCENTAGE *
+        THEME_DIALOG_PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
     ),
     1,
   );
 
-  const DIALOG_PADDING = 2;
   const selectThemeHeight = themeItems.length + 1;
-  const TAB_TO_SELECT_HEIGHT = 2;
   availableTerminalHeight = availableTerminalHeight ?? Number.MAX_SAFE_INTEGER;
   availableTerminalHeight -= 2; // Top and bottom borders.
-  availableTerminalHeight -= TAB_TO_SELECT_HEIGHT;
+  availableTerminalHeight -= THEME_DIALOG_TAB_TO_SELECT_HEIGHT;
 
   let totalLeftHandSideHeight = DIALOG_PADDING + selectThemeHeight;
 
@@ -224,10 +227,6 @@ export function ThemeDialog({
     totalLeftHandSideHeight -= DIALOG_PADDING;
   }
 
-  // Vertical space taken by elements other than the two code blocks in the preview pane.
-  // Includes "Preview" title, borders, and margin between blocks.
-  const PREVIEW_PANE_FIXED_VERTICAL_SPACE = 8;
-
   // The right column doesn't need to ever be shorter than the left column.
   availableTerminalHeight = Math.max(
     availableTerminalHeight,
@@ -235,7 +234,7 @@ export function ThemeDialog({
   );
   const availableTerminalHeightCodeBlock =
     availableTerminalHeight -
-    PREVIEW_PANE_FIXED_VERTICAL_SPACE -
+    THEME_DIALOG_PREVIEW_PANE_FIXED_VERTICAL_SPACE -
     (includePadding ? 2 : 0) * 2;
 
   // Subtract margin between code blocks from available height.
@@ -245,8 +244,12 @@ export function ThemeDialog({
   );
 
   // The code block is slightly longer than the diff, so give it more space.
-  const codeBlockHeight = Math.ceil(availableHeightForPanes * 0.6);
-  const diffHeight = Math.floor(availableHeightForPanes * 0.4);
+  const codeBlockHeight = Math.ceil(
+    availableHeightForPanes * THEME_DIALOG_PREVIEW_CODE_BLOCK_HEIGHT_PERCENTAGE,
+  );
+  const diffHeight = Math.floor(
+    availableHeightForPanes * THEME_DIALOG_PREVIEW_DIFF_HEIGHT_PERCENTAGE,
+  );
 
   const previewTheme =
     themeManager.getTheme(highlightedThemeName || DEFAULT_THEME.name) ||
@@ -266,7 +269,11 @@ export function ThemeDialog({
       {mode === 'theme' ? (
         <Box flexDirection="row">
           {/* Left Column: Selection */}
-          <Box flexDirection="column" width="45%" paddingRight={2}>
+          <Box
+            flexDirection="column"
+            width={`${THEME_DIALOG_SELECTION_PANE_WIDTH_PERCENTAGE * 100}%`}
+            paddingRight={THEME_DIALOG_COLUMN_PADDING}
+          >
             <Text bold={mode === 'theme'} wrap="truncate">
               {mode === 'theme' ? '> ' : '  '}Select Theme{' '}
               <Text color={theme.text.secondary}>
@@ -279,7 +286,7 @@ export function ThemeDialog({
               onSelect={handleThemeSelect}
               onHighlight={handleThemeHighlight}
               isFocused={mode === 'theme'}
-              maxItemsToShow={12}
+              maxItemsToShow={THEME_DIALOG_MAX_ITEMS_TO_SHOW}
               showScrollArrows={true}
               showNumbers={mode === 'theme'}
               renderItem={(item, { titleColor }) => {
@@ -331,7 +338,11 @@ export function ThemeDialog({
           </Box>
 
           {/* Right Column: Preview */}
-          <Box flexDirection="column" width="55%" paddingLeft={2}>
+          <Box
+            flexDirection="column"
+            width={`${THEME_DIALOG_PREVIEW_PANE_WIDTH_PERCENTAGE * 100}%`}
+            paddingLeft={THEME_DIALOG_COLUMN_PADDING}
+          >
             <Text bold color={theme.text.primary}>
               Preview
             </Text>
