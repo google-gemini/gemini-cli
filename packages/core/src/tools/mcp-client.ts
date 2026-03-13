@@ -1208,7 +1208,7 @@ export async function connectAndDiscover(
       mcpServerConfig,
       mcpClient,
       cliConfig,
-      toolRegistry.getMessageBus(),
+      toolRegistry.messageBus,
       { timeout: mcpServerConfig.timeout ?? MCP_DEFAULT_TIMEOUT_MSEC },
     );
 
@@ -1944,7 +1944,6 @@ export async function connectToMcpServer(
             acceptHeader = 'application/json';
           }
 
-          // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
           const response = await fetch(urlToFetch, {
             method: 'HEAD',
             headers: {
