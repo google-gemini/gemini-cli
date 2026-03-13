@@ -80,7 +80,7 @@ export function getTerminalNameFromEnv(): string {
   if (isGnuScreen()) {
     return 'GNU screen';
   }
-  return env['TERM_PROGRAM'] || 'Unknown';
+  return 'Unknown';
 }
 
 /**
