@@ -44,13 +44,18 @@ export function resolvePolicyChain(
   const configuredModel = config.getModel();
 
   let chain;
+  const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
+  const useCustomToolModel = config.getUseCustomToolModelSync?.() ?? false;
+  const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? true;
+
   const resolvedModel = resolveModel(
     modelFromConfig,
-    config.getGemini31LaunchedSync?.() ?? false,
+    useGemini31,
+    useCustomToolModel,
+    hasAccessToPreview,
   );
   const isAutoPreferred = preferredModel ? isAutoModel(preferredModel) : false;
   const isAutoConfigured = isAutoModel(configuredModel);
-  const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? true;
 
   if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
     chain = getFlashLitePolicyChain();
@@ -67,13 +72,17 @@ export function resolvePolicyChain(
       chain = getModelPolicyChain({
         previewEnabled,
         userTier: config.getUserTier(),
+        useGemini31,
+        useCustomToolModel,
       });
     } else {
       // User requested Gemini 3 but has no access. Proactively downgrade
       // to the stable Gemini 2.5 chain.
-      return getModelPolicyChain({
+      chain = getModelPolicyChain({
         previewEnabled: false,
         userTier: config.getUserTier(),
+        useGemini31,
+        useCustomToolModel,
       });
     }
   } else {
@@ -203,7 +212,9 @@ export function applyModelSelection(
     generateContentConfig = fallbackResolved.generateContentConfig;
   }
 
-  config.setActiveModel(finalModel);
+  if (modelConfigKey.isChatModel) {
+    config.setActiveModel(finalModel);
+  }
 
   if (selection.attempts && options.consumeAttempt !== false) {
     config.getModelAvailabilityService().consumeStickyAttempt(finalModel);

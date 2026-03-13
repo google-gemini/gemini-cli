@@ -10,9 +10,19 @@ confirmation.
 To create your first policy:
 
 1.  **Create the policy directory** if it doesn't exist:
+
+    **macOS/Linux**
+
     ```bash
     mkdir -p ~/.gemini/policies
     ```
+
+    **Windows (PowerShell)**
+
+    ```powershell
+    New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.gemini\policies"
+    ```
+
 2.  **Create a new policy file** (e.g., `~/.gemini/policies/my-rules.toml`). You
     can use any filename ending in `.toml`; all such files in this directory
     will be loaded and combined:
@@ -64,9 +74,15 @@ primary conditions are the tool's name and its arguments.
 
 The `toolName` in the rule must match the name of the tool being called.
 
-- **Wildcards**: For Model-hosting-protocol (MCP) servers, you can use a
-  wildcard. A `toolName` of `my-server__*` will match any tool from the
-  `my-server` MCP.
+- **Wildcards**: You can use wildcards to match multiple tools.
+  - `*`: Matches **any tool** (built-in or MCP).
+  - `mcp_server_*`: Matches any tool from a specific MCP server.
+  - `mcp_*_toolName`: Matches a specific tool name across **all** MCP servers.
+  - `mcp_*`: Matches **any tool from any MCP server**.
+
+> **Recommendation:** While FQN wildcards are supported, the recommended
+> approach for MCP tools is to use the `mcpName` field in your TOML rules. See
+> [Special syntax for MCP tools](#special-syntax-for-mcp-tools).
 
 #### Arguments pattern
 
@@ -79,9 +95,16 @@ the arguments don't match the pattern, the rule does not apply.
 There are three possible decisions a rule can enforce:
 
 - `allow`: The tool call is executed automatically without user interaction.
-- `deny`: The tool call is blocked and is not executed.
+- `deny`: The tool call is blocked and is not executed. For global rules (those
+  without an `argsPattern`), tools that are denied are **completely excluded
+  from the model's memory**. This means the model will not even see the tool as
+  an option, which is more secure and saves context window space.
 - `ask_user`: The user is prompted to approve or deny the tool call. (In
   non-interactive mode, this is treated as `deny`.)
+
+> **Note:** The `deny` decision is the recommended way to exclude tools. The
+> legacy `tools.exclude` setting in `settings.json` is deprecated in favor of
+> policy rules with a `deny` decision.
 
 ### Priority system and tiers
 
@@ -95,9 +118,10 @@ has a designated number that forms the base of the final priority calculation.
 | Tier      | Base | Description                                                                |
 | :-------- | :--- | :------------------------------------------------------------------------- |
 | Default   | 1    | Built-in policies that ship with the Gemini CLI.                           |
-| Workspace | 2    | Policies defined in the current workspace's configuration directory.       |
-| User      | 3    | Custom policies defined by the user.                                       |
-| Admin     | 4    | Policies managed by an administrator (e.g., in an enterprise environment). |
+| Extension | 2    | Policies defined in extensions.                                            |
+| Workspace | 3    | Policies defined in the current workspace's configuration directory.       |
+| User      | 4    | Custom policies defined by the user.                                       |
+| Admin     | 5    | Policies managed by an administrator (e.g., in an enterprise environment). |
 
 Within a TOML policy file, you assign a priority value from **0 to 999**. The
 engine transforms this into a final priority using the following formula:
@@ -130,8 +154,8 @@ always active.
   confirmation.
 - `autoEdit`: Optimized for automated code editing; some write tools may be
   auto-approved.
-- `plan`: A strict, read-only mode for research and design. See [Customizing
-  Plan Mode Policies].
+- `plan`: A strict, read-only mode for research and design. See
+  [Customizing Plan Mode Policies](../cli/plan-mode.md#customizing-policies).
 - `yolo`: A mode where all tools are auto-approved (use with extreme caution).
 
 ## Rule matching
@@ -144,9 +168,9 @@ A rule matches a tool call if all of its conditions are met:
 
 1.  **Tool name**: The `toolName` in the rule must match the name of the tool
     being called.
-    - **Wildcards**: For Model-hosting-protocol (MCP) servers, you can use a
-      wildcard. A `toolName` of `my-server__*` will match any tool from the
-      `my-server` MCP.
+    - **Wildcards**: You can use wildcards like `*`, `mcp_server_*`, or
+      `mcp_*_toolName` to match multiple tools. See [Tool Name](#tool-name) for
+      details.
 2.  **Arguments pattern**: If `argsPattern` is specified, the tool's arguments
     are converted to a stable JSON string, which is then tested against the
     provided regular expression. If the arguments don't match the pattern, the
@@ -167,9 +191,13 @@ User, and (if configured) Admin directories.
 
 #### System-wide policies (Admin)
 
-Administrators can enforce system-wide policies (Tier 3) that override all user
-and default settings. These policies must be placed in specific, secure
-directories:
+Administrators can enforce system-wide policies (Tier 4) that override all user
+and default settings. These policies can be loaded from standard system
+locations or supplemental paths.
+
+##### Standard Locations
+
+These are the default paths the CLI searches for admin policies:
 
 | OS          | Policy Directory Path                             |
 | :---------- | :------------------------------------------------ |
@@ -177,10 +205,25 @@ directories:
 | **macOS**   | `/Library/Application Support/GeminiCli/policies` |
 | **Windows** | `C:\ProgramData\gemini-cli\policies`              |
 
-**Security Requirements:**
+##### Supplemental Admin Policies
 
-To prevent privilege escalation, the CLI enforces strict security checks on
-admin directories. If checks fail, system policies are **ignored**.
+Administrators can also specify supplemental policy paths using:
+
+- The `--admin-policy` command-line flag.
+- The `adminPolicyPaths` setting in a system settings file.
+
+These supplemental policies are assigned the same **Admin** tier (Base 4) as
+policies in standard locations.
+
+**Security Guard**: Supplemental admin policies are **ignored** if any `.toml`
+policy files are found in the standard system location. This prevents flag-based
+overrides when a central system policy has already been established.
+
+#### Security Requirements
+
+To prevent privilege escalation, the CLI enforces strict security checks on the
+**standard system policy directory**. If checks fail, the policies in that
+directory are **ignored**.
 
 - **Linux / macOS:** Must be owned by `root` (UID 0) and NOT writable by group
   or others (e.g., `chmod 755`).
@@ -189,6 +232,11 @@ admin directories. If checks fail, system policies are **ignored**.
   see a security warning, use the folder properties to remove write permissions
   for non-admin groups. You may need to "Disable inheritance" in Advanced
   Security Settings._
+
+**Note:** Supplemental admin policies (provided via `--admin-policy` or
+`adminPolicyPaths` settings) are **NOT** subject to these strict ownership
+checks, as they are explicitly provided by the user or administrator in their
+current execution context.
 
 ### TOML rule schema
 
@@ -199,9 +247,17 @@ Here is a breakdown of the fields available in a TOML policy rule:
 # A unique name for the tool, or an array of names.
 toolName = "run_shell_command"
 
+# (Optional) The name of a subagent. If provided, the rule only applies to tool calls
+# made by this specific subagent.
+subagent = "generalist"
+
 # (Optional) The name of an MCP server. Can be combined with toolName
-# to form a composite name like "mcpName__toolName".
+# to form a composite FQN internally like "mcp_mcpName_toolName".
 mcpName = "my-custom-server"
+
+# (Optional) Metadata hints provided by the tool. A rule matches if all
+# key-value pairs provided here are present in the tool's annotations.
+toolAnnotations = { readOnlyHint = true }
 
 # (Optional) A regex to match against the tool's arguments.
 argsPattern = '"command":"(git|npm)'
@@ -272,13 +328,23 @@ priority = 100
 
 ### Special syntax for MCP tools
 
-You can create rules that target tools from Model-hosting-protocol (MCP) servers
-using the `mcpName` field or a wildcard pattern.
+You can create rules that target tools from Model Context Protocol (MCP) servers
+using the `mcpName` field. **This is the recommended approach** for defining MCP
+policies, as it is much more robust than manually writing Fully Qualified Names
+(FQNs) or string wildcards.
 
-**1. Using `mcpName`**
+> **Warning:** Do not use underscores (`_`) in your MCP server names (e.g., use
+> `my-server` rather than `my_server`). The policy parser splits Fully Qualified
+> Names (`mcp_server_tool`) on the _first_ underscore following the `mcp_`
+> prefix. If your server name contains an underscore, the parser will
+> misinterpret the server identity, which can cause wildcard rules and security
+> policies to fail silently.
 
-To target a specific tool from a specific server, combine `mcpName` and
-`toolName`.
+**1. Targeting a specific tool on a server**
+
+Combine `mcpName` and `toolName` to target a single operation. When using
+`mcpName`, the `toolName` field should strictly be the simple name of the tool
+(e.g., `search`), **not** the Fully Qualified Name (e.g., `mcp_server_search`).
 
 ```toml
 # Allows the `search` tool on the `my-jira-server` MCP
@@ -289,10 +355,10 @@ decision = "allow"
 priority = 200
 ```
 
-**2. Using a wildcard**
+**2. Targeting all tools on a specific server**
 
-To create a rule that applies to _all_ tools on a specific MCP server, specify
-only the `mcpName`.
+Specify only the `mcpName` to apply a rule to every tool provided by that
+server.
 
 ```toml
 # Denies all tools from the `untrusted-server` MCP
@@ -301,6 +367,33 @@ mcpName = "untrusted-server"
 decision = "deny"
 priority = 500
 deny_message = "This server is not trusted by the admin."
+```
+
+**3. Targeting all MCP servers**
+
+Use `mcpName = "*"` to create a rule that applies to **all** tools from **any**
+registered MCP server. This is useful for setting category-wide defaults.
+
+```toml
+# Ask user for any tool call from any MCP server
+[[rule]]
+mcpName = "*"
+decision = "ask_user"
+priority = 10
+```
+
+**4. Targeting a tool name across all servers**
+
+Use `mcpName = "*"` with a specific `toolName` to target that operation
+regardless of which server provides it.
+
+```toml
+# Allow the `search` tool across all connected MCP servers
+[[rule]]
+mcpName = "*"
+toolName = "search"
+decision = "allow"
+priority = 50
 ```
 
 ## Default policies
@@ -317,5 +410,3 @@ out-of-the-box experience.
 - In **`yolo`** mode, a high-priority rule allows all tools.
 - In **`autoEdit`** mode, rules allow certain write operations to happen without
   prompting.
-
-[Customizing Plan Mode Policies]: /docs/cli/plan-mode.md#customizing-policies

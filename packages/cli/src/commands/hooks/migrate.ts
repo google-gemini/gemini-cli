@@ -75,6 +75,7 @@ function migrateClaudeHook(claudeHook: unknown): unknown {
     migrated['command'] = hook['command'];
 
     // Replace CLAUDE_PROJECT_DIR with GEMINI_PROJECT_DIR in command
+    // eslint-disable-next-line no-restricted-syntax
     if (typeof migrated['command'] === 'string') {
       migrated['command'] = migrated['command'].replace(
         /\$CLAUDE_PROJECT_DIR/g,
@@ -89,6 +90,7 @@ function migrateClaudeHook(claudeHook: unknown): unknown {
   }
 
   // Map timeout field (Claude uses seconds, Gemini uses seconds)
+  // eslint-disable-next-line no-restricted-syntax
   if ('timeout' in hook && typeof hook['timeout'] === 'number') {
     migrated['timeout'] = hook['timeout'];
   }
@@ -129,8 +131,9 @@ function migrateClaudeHooks(claudeConfig: unknown): Record<string, unknown> {
       const migratedDef: Record<string, unknown> = {};
 
       // Transform matcher
-      if ('matcher' in def && typeof def['matcher'] === 'string') {
-        migratedDef['matcher'] = transformMatcher(def['matcher']);
+      const matcher = def['matcher'];
+      if (typeof matcher === 'string') {
+        migratedDef['matcher'] = transformMatcher(matcher);
       }
 
       // Copy sequential flag
@@ -173,8 +176,7 @@ export async function handleMigrateFromClaude() {
       const content = fs.readFileSync(claudeLocalSettingsPath, 'utf-8');
       const parsed = JSON.parse(stripJsonComments(content));
       if (isRecord(parsed)) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-        claudeSettings = parsed as any;
+        claudeSettings = parsed;
       }
     } catch (error) {
       debugLogger.error(
@@ -187,8 +189,7 @@ export async function handleMigrateFromClaude() {
       const content = fs.readFileSync(claudeSettingsPath, 'utf-8');
       const parsed = JSON.parse(stripJsonComments(content));
       if (isRecord(parsed)) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
-        claudeSettings = parsed as any;
+        claudeSettings = parsed;
       }
     } catch (error) {
       debugLogger.error(

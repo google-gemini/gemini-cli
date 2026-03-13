@@ -36,7 +36,7 @@ describe('AboutBox', () => {
     expect(output).toContain('gemini-pro');
     expect(output).toContain('default');
     expect(output).toContain('macOS');
-    expect(output).toContain('Logged in with Google');
+    expect(output).toContain('Signed in with Google');
     unmount();
   });
 
@@ -63,7 +63,7 @@ describe('AboutBox', () => {
     );
     await waitUntilReady();
     const output = lastFrame();
-    expect(output).toContain('Logged in with Google (test@example.com)');
+    expect(output).toContain('Signed in with Google (test@example.com)');
     unmount();
   });
 

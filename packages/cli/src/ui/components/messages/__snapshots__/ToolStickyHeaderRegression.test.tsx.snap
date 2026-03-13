@@ -2,7 +2,7 @@
 
 exports[`ToolMessage Sticky Header Regression > verifies that ShellToolMessage in a ToolGroupMessage in a ScrollableList has sticky headers 1`] = `
 "╭────────────────────────────────────────────────────────────────────────╮     █
-│ ✓  Shell Command Description for Shell Command                         │     ▀
+│ ✓  Shell Command Description for Shell Command                         │     █
 │                                                                        │
 │ shell-01                                                               │
 │ shell-02                                                               │
@@ -11,7 +11,7 @@ exports[`ToolMessage Sticky Header Regression > verifies that ShellToolMessage i
 
 exports[`ToolMessage Sticky Header Regression > verifies that ShellToolMessage in a ToolGroupMessage in a ScrollableList has sticky headers 2`] = `
 "╭────────────────────────────────────────────────────────────────────────╮
-│ ✓  Shell Command Description for Shell Command                         │
+│ ✓  Shell Command Description for Shell Command                         │     ▄
 │────────────────────────────────────────────────────────────────────────│     █
 │ shell-06                                                               │     ▀
 │ shell-07                                                               │

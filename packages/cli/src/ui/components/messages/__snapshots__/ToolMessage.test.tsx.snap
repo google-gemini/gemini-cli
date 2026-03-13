@@ -29,7 +29,7 @@ exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows - for Canceled 
 
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows MockRespondingSpinner for Executing status when streamingState is Responding 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ MockRespondingSpinnertest-tool A tool for testing                            │
+│ ⊶  test-tool A tool for testing                                              │
 │                                                                              │
 │ Test result                                                                  │
 "
@@ -45,7 +45,7 @@ exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows o for Pending s
 
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows paused spinner for Executing status when streamingState is Idle 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ MockRespondingSpinnertest-tool A tool for testing                            │
+│ ⊶  test-tool A tool for testing                                              │
 │                                                                              │
 │ Test result                                                                  │
 "
@@ -53,7 +53,7 @@ exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows paused spinner 
 
 exports[`<ToolMessage /> > ToolStatusIndicator rendering > shows paused spinner for Executing status when streamingState is WaitingForConfirmation 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
-│ MockRespondingSpinnertest-tool A tool for testing                            │
+│ ⊶  test-tool A tool for testing                                              │
 │                                                                              │
 │ Test result                                                                  │
 "
@@ -92,6 +92,16 @@ exports[`<ToolMessage /> > renders DiffRenderer for diff results 1`] = `
 "
 `;
 
+exports[`<ToolMessage /> > renders McpProgressIndicator with percentage and message for executing tools 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ⊶  test-tool A tool for testing                                              │
+│                                                                              │
+│ ████████░░░░░░░░░░░░ 42%                                                     │
+│ Working on it...                                                             │
+│ Test result                                                                  │
+"
+`;
+
 exports[`<ToolMessage /> > renders basic tool information 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool A tool for testing                                              │
@@ -112,6 +122,24 @@ exports[`<ToolMessage /> > renders emphasis correctly 2`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ ✓  test-tool A tool for testing                                              │
 │                                                                              │
+│ Test result                                                                  │
+"
+`;
+
+exports[`<ToolMessage /> > renders indeterminate progress when total is missing 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ⊶  test-tool A tool for testing                                              │
+│                                                                              │
+│ ███████░░░░░░░░░░░░░ 7                                                       │
+│ Test result                                                                  │
+"
+`;
+
+exports[`<ToolMessage /> > renders only percentage when progressMessage is missing 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│ ⊶  test-tool A tool for testing                                              │
+│                                                                              │
+│ ███████████████░░░░░ 75%                                                     │
 │ Test result                                                                  │
 "
 `;

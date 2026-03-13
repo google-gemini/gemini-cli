@@ -27,10 +27,19 @@ export interface Settings {
   mcpServers?: Record<string, MCPServerConfig>;
   coreTools?: string[];
   excludeTools?: string[];
+  allowedTools?: string[];
+  tools?: {
+    allowed?: string[];
+    exclude?: string[];
+    core?: string[];
+  };
   telemetry?: TelemetrySettings;
   showMemoryUsage?: boolean;
   checkpointing?: CheckpointingSettings;
   folderTrust?: boolean;
+  general?: {
+    previewFeatures?: boolean;
+  };
 
   // Git-aware file filtering settings
   fileFiltering?: {
@@ -147,7 +156,7 @@ function resolveEnvVarsInObject<T>(obj: T): T {
   }
 
   if (Array.isArray(obj)) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-return
     return obj.map((item) => resolveEnvVarsInObject(item)) as unknown as T;
   }
 

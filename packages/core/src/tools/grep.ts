@@ -10,13 +10,20 @@ import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { globStream } from 'glob';
-import type { ToolInvocation, ToolResult } from './tools.js';
 import { execStreaming } from '../utils/shell-utils.js';
 import {
   DEFAULT_TOTAL_MAX_MATCHES,
   DEFAULT_SEARCH_TIMEOUT_MS,
 } from './constants.js';
-import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
+import {
+  BaseDeclarativeTool,
+  BaseToolInvocation,
+  Kind,
+  type ToolInvocation,
+  type ToolResult,
+  type PolicyUpdateOptions,
+  type ToolConfirmationOutcome,
+} from './tools.js';
 import { makeRelative, shortenPath } from '../utils/paths.js';
 import { getErrorMessage, isNodeError } from '../utils/errors.js';
 import { isGitRepository } from '../utils/gitUtils.js';
@@ -24,9 +31,11 @@ import type { Config } from '../config/config.js';
 import type { FileExclusions } from '../utils/ignorePatterns.js';
 import { ToolErrorType } from './tool-error.js';
 import { GREP_TOOL_NAME } from './tool-names.js';
+import { buildPatternArgsPattern } from '../policy/utils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { GREP_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { type GrepMatch, formatGrepResults } from './grep-utils.js';
 
 // --- Interfaces ---
 
@@ -47,7 +56,7 @@ export interface GrepToolParams {
   /**
    * File pattern to include in the search (e.g. "*.js", "*.{ts,tsx}")
    */
-  include?: string;
+  include_pattern?: string;
 
   /**
    * Optional: A regular expression pattern to exclude from the search results.
@@ -68,15 +77,6 @@ export interface GrepToolParams {
    * Optional: Maximum number of total matches to return. Use this to limit the overall size of the response. Defaults to 100 if omitted.
    */
   total_max_matches?: number;
-}
-
-/**
- * Result object for a single grep match
- */
-interface GrepMatch {
-  filePath: string;
-  lineNumber: number;
-  line: string;
 }
 
 class GrepToolInvocation extends BaseToolInvocation<
@@ -130,6 +130,7 @@ class GrepToolInvocation extends BaseToolInvocation<
 
       return {
         filePath: relativeFilePath || path.basename(absoluteFilePath),
+        absolutePath: absoluteFilePath,
         lineNumber,
         line: lineContent,
       };
@@ -234,7 +235,7 @@ class GrepToolInvocation extends BaseToolInvocation<
           const matches = await this.performGrepSearch({
             pattern: this.params.pattern,
             path: searchDir,
-            include: this.params.include,
+            include_pattern: this.params.include_pattern,
             exclude_pattern: this.params.exclude_pattern,
             maxMatches: remainingLimit,
             max_matches_per_file: this.params.max_matches_per_file,
@@ -267,62 +268,12 @@ class GrepToolInvocation extends BaseToolInvocation<
         searchLocationDescription = `in path "${searchDirDisplay}"`;
       }
 
-      if (allMatches.length === 0) {
-        const noMatchMsg = `No matches found for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}.`;
-        return { llmContent: noMatchMsg, returnDisplay: `No matches found` };
-      }
-
-      const wasTruncated = allMatches.length >= totalMaxMatches;
-
-      // Group matches by file
-      const matchesByFile = allMatches.reduce(
-        (acc, match) => {
-          const fileKey = match.filePath;
-          if (!acc[fileKey]) {
-            acc[fileKey] = [];
-          }
-          acc[fileKey].push(match);
-          acc[fileKey].sort((a, b) => a.lineNumber - b.lineNumber);
-          return acc;
-        },
-        {} as Record<string, GrepMatch[]>,
+      return await formatGrepResults(
+        allMatches,
+        this.params,
+        searchLocationDescription,
+        totalMaxMatches,
       );
-
-      const matchCount = allMatches.length;
-      const matchTerm = matchCount === 1 ? 'match' : 'matches';
-
-      if (this.params.names_only) {
-        const filePaths = Object.keys(matchesByFile).sort();
-        let llmContent = `Found ${filePaths.length} files with matches for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}${wasTruncated ? ` (results limited to ${totalMaxMatches} matches for performance)` : ''}:\n`;
-        llmContent += filePaths.join('\n');
-        return {
-          llmContent: llmContent.trim(),
-          returnDisplay: `Found ${filePaths.length} files${wasTruncated ? ' (limited)' : ''}`,
-        };
-      }
-
-      let llmContent = `Found ${matchCount} ${matchTerm} for pattern "${this.params.pattern}" ${searchLocationDescription}${this.params.include ? ` (filter: "${this.params.include}")` : ''}`;
-
-      if (wasTruncated) {
-        llmContent += ` (results limited to ${totalMaxMatches} matches for performance)`;
-      }
-
-      llmContent += `:\n---\n`;
-
-      for (const filePath in matchesByFile) {
-        llmContent += `File: ${filePath}
-`;
-        matchesByFile[filePath].forEach((match) => {
-          const trimmedLine = match.line.trim();
-          llmContent += `L${match.lineNumber}: ${trimmedLine}\n`;
-        });
-        llmContent += '---\n';
-      }
-
-      return {
-        llmContent: llmContent.trim(),
-        returnDisplay: `Found ${matchCount} ${matchTerm}${wasTruncated ? ' (limited)' : ''}`,
-      };
     } catch (error) {
       debugLogger.warn(`Error during GrepLogic execution: ${error}`);
       const errorMessage = getErrorMessage(error);
@@ -335,6 +286,14 @@ class GrepToolInvocation extends BaseToolInvocation<
         },
       };
     }
+  }
+
+  override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    return {
+      argsPattern: buildPatternArgsPattern(this.params.pattern),
+    };
   }
 
   /**
@@ -374,7 +333,7 @@ class GrepToolInvocation extends BaseToolInvocation<
   private async performGrepSearch(options: {
     pattern: string;
     path: string; // Expects absolute path
-    include?: string;
+    include_pattern?: string;
     exclude_pattern?: string;
     maxMatches: number;
     max_matches_per_file?: number;
@@ -383,7 +342,7 @@ class GrepToolInvocation extends BaseToolInvocation<
     const {
       pattern,
       path: absolutePath,
-      include,
+      include_pattern,
       exclude_pattern,
       maxMatches,
       max_matches_per_file,
@@ -413,8 +372,8 @@ class GrepToolInvocation extends BaseToolInvocation<
         if (max_matches_per_file) {
           gitArgs.push('--max-count', max_matches_per_file.toString());
         }
-        if (include) {
-          gitArgs.push('--', include);
+        if (include_pattern) {
+          gitArgs.push('--', include_pattern);
         }
 
         try {
@@ -481,8 +440,8 @@ class GrepToolInvocation extends BaseToolInvocation<
         if (max_matches_per_file) {
           grepArgs.push('--max-count', max_matches_per_file.toString());
         }
-        if (include) {
-          grepArgs.push(`--include=${include}`);
+        if (include_pattern) {
+          grepArgs.push(`--include=${include_pattern}`);
         }
         grepArgs.push(pattern);
         grepArgs.push('.');
@@ -528,7 +487,7 @@ class GrepToolInvocation extends BaseToolInvocation<
         'GrepLogic: Falling back to JavaScript grep implementation.',
       );
       strategyUsed = 'javascript fallback';
-      const globPattern = include ? include : '**/*';
+      const globPattern = include_pattern ? include_pattern : '**/*';
       const ignorePatterns = this.fileExclusions.getGlobExcludes();
 
       const filesStream = globStream(globPattern, {
@@ -569,6 +528,7 @@ class GrepToolInvocation extends BaseToolInvocation<
                 filePath:
                   path.relative(absolutePath, fileAbsolutePath) ||
                   path.basename(fileAbsolutePath),
+                absolutePath: fileAbsolutePath,
                 lineNumber: index + 1,
                 line,
               });
@@ -607,8 +567,8 @@ class GrepToolInvocation extends BaseToolInvocation<
 
   getDescription(): string {
     let description = `'${this.params.pattern}'`;
-    if (this.params.include) {
-      description += ` in ${this.params.include}`;
+    if (this.params.include_pattern) {
+      description += ` in ${this.params.include_pattern}`;
     }
     if (this.params.dir_path) {
       const resolvedPath = path.resolve(
