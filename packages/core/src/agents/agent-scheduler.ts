@@ -60,7 +60,6 @@ export async function scheduleAgentTools(
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const agentConfig: Config = Object.create(config);
   agentConfig.getToolRegistry = () => toolRegistry;
-  agentConfig.getMessageBus = () => toolRegistry.getMessageBus();
   // Override toolRegistry and messageBus properties so AgentLoopContext reads the agent-specific registry and bus.
   Object.defineProperty(agentConfig, 'toolRegistry', {
     get: () => toolRegistry,

@@ -677,9 +677,10 @@ export function createPolicyUpdater(
 
             if (message.mcpName) {
               newRule.mcpName = message.mcpName;
-              // Extract simple tool name
-              newRule.toolName = toolName.startsWith(`${message.mcpName}__`)
-                ? toolName.slice(message.mcpName.length + 2)
+              // Extract simple tool name if it has the server prefix
+              const prefix = `${message.mcpName}__`;
+              newRule.toolName = toolName.startsWith(prefix)
+                ? toolName.substring(prefix.length)
                 : toolName;
             } else {
               newRule.toolName = toolName;

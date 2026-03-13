@@ -36,6 +36,12 @@ function isWildcardPattern(name: string): boolean {
 }
 
 /**
+ * Wildcard suffix used for MCP server-wide policies.
+ * Matches the format used in handleMcpPolicyUpdate.
+ */
+export const MCP_SERVER_WILDCARD_SUFFIX = '__*';
+
+/**
  * Checks if a tool call matches a wildcard pattern.
  * Supports global (*) and the explicit MCP (*mcp_serverName_**) format.
  */
@@ -64,8 +70,11 @@ function matchesWildcard(
   }
 
   // Handle {server}__* format (used for non-prefixed tools in subagents)
-  if (pattern.endsWith('__*')) {
-    const expectedServerName = pattern.slice(0, -3);
+  if (pattern.endsWith(MCP_SERVER_WILDCARD_SUFFIX)) {
+    const expectedServerName = pattern.slice(
+      0,
+      -MCP_SERVER_WILDCARD_SUFFIX.length,
+    );
     return serverName === expectedServerName;
   }
 

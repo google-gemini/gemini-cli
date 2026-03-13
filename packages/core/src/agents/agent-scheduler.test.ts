@@ -29,6 +29,7 @@ describe('agent-scheduler', () => {
     mockToolRegistry = {
       getTool: vi.fn(),
       messageBus: mockMessageBus,
+      getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
     } as unknown as Mocked<ToolRegistry>;
     mockConfig = {
       messageBus: mockMessageBus,
@@ -41,11 +42,6 @@ describe('agent-scheduler', () => {
   });
 
   it('should create a scheduler with agent-specific config', async () => {
-    const mockConfig = {
-      messageBus: mockMessageBus,
-      toolRegistry: mockToolRegistry,
-    } as unknown as Mocked<Config>;
-
     const requests: ToolCallRequestInfo[] = [
       {
         callId: 'call-1',
@@ -88,6 +84,7 @@ describe('agent-scheduler', () => {
     const agentRegistry = {
       _id: 'agent',
       messageBus: mockMessageBus,
+      getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
     } as unknown as Mocked<ToolRegistry>;
 
     const config = {
