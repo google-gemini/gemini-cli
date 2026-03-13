@@ -1176,6 +1176,63 @@ name = "yolo-checker"
       );
     });
 
+    it('should allow relinking an extension from the same path', async () => {
+      const sourceExtDir = createExtension({
+        extensionsDir: tempHomeDir,
+        name: 'my-linked-extension',
+        version: '1.0.0',
+      });
+
+      await extensionManager.loadExtensions();
+      await extensionManager.installOrUpdateExtension({
+        source: sourceExtDir,
+        type: 'link',
+      });
+
+      await expect(
+        extensionManager.installOrUpdateExtension({
+          source: sourceExtDir,
+          type: 'link',
+        }),
+      ).resolves.toMatchObject({
+        name: 'my-linked-extension',
+        installMetadata: {
+          source: sourceExtDir,
+          type: 'link',
+        },
+      });
+    });
+
+    it('should still reject relinking an extension from a different path with the same name', async () => {
+      const originalSourceExtDir = createExtension({
+        extensionsDir: tempHomeDir,
+        name: 'my-linked-extension',
+        version: '1.0.0',
+      });
+      const secondSourceExtDir = createExtension({
+        extensionsDir: fs.mkdtempSync(
+          path.join(tempHomeDir, 'other-ext-root-'),
+        ),
+        name: 'my-linked-extension',
+        version: '1.0.0',
+      });
+
+      await extensionManager.loadExtensions();
+      await extensionManager.installOrUpdateExtension({
+        source: originalSourceExtDir,
+        type: 'link',
+      });
+
+      await expect(
+        extensionManager.installOrUpdateExtension({
+          source: secondSourceExtDir,
+          type: 'link',
+        }),
+      ).rejects.toThrow(
+        'Extension "my-linked-extension" is already installed. Please uninstall it first.',
+      );
+    });
+
     it('should throw an error and cleanup if gemini-extension.json is missing', async () => {
       const sourceExtDir = getRealPath(path.join(tempHomeDir, 'bad-extension'));
       fs.mkdirSync(sourceExtDir, { recursive: true });
