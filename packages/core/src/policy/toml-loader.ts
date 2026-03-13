@@ -47,8 +47,10 @@ const PolicyRuleSchema = z.object({
   // Priority must be in range [0, 999] to prevent tier overflow.
   // With tier transformation (tier + priority/1000), this ensures:
   // - Tier 1 (default): range [1.000, 1.999]
-  // - Tier 2 (user): range [2.000, 2.999]
-  // - Tier 3 (admin): range [3.000, 3.999]
+  // - Tier 2 (extension): range [2.000, 2.999]
+  // - Tier 3 (workspace): range [3.000, 3.999]
+  // - Tier 4 (user): range [4.000, 4.999]
+  // - Tier 5 (admin): range [5.000, 5.999]
   priority: z
     .number({
       required_error: 'priority is required',

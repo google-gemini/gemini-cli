@@ -138,9 +138,9 @@ This system guarantees that:
 For example:
 
 - A `priority: 50` rule in a Default policy file becomes `1.050`.
-- A `priority: 10` rule in a Workspace policy policy file becomes `2.010`.
-- A `priority: 100` rule in a User policy file becomes `3.100`.
-- A `priority: 20` rule in an Admin policy file becomes `4.020`.
+- A `priority: 10` rule in a Workspace policy file becomes `3.010`.
+- A `priority: 100` rule in a User policy file becomes `4.100`.
+- A `priority: 20` rule in an Admin policy file becomes `5.020`.
 
 ### Approval modes
 
@@ -191,7 +191,7 @@ User, and (if configured) Admin directories.
 
 #### System-wide policies (Admin)
 
-Administrators can enforce system-wide policies (Tier 4) that override all user
+Administrators can enforce system-wide policies (Tier 5) that override all user
 and default settings. These policies can be loaded from standard system
 locations or supplemental paths.
 
