@@ -29,7 +29,6 @@ import { PolicyDecision, type ApprovalMode } from '../policy/types.js';
 import {
   ToolConfirmationOutcome,
   type AnyDeclarativeTool,
-  Kind,
 } from '../tools/tools.js';
 import { getToolSuggestion } from '../utils/tool-utils.js';
 import { runInDevTraceSpan } from '../telemetry/trace.js';
@@ -434,10 +433,10 @@ export class Scheduler {
       }
 
       // If the first tool is parallelizable, batch all contiguous parallelizable tools.
-      if (this._isParallelizable(next.tool)) {
+      if (this._isParallelizable(next.request)) {
         while (this.state.queueLength > 0) {
           const peeked = this.state.peekQueue();
-          if (peeked && this._isParallelizable(peeked.tool)) {
+          if (peeked && this._isParallelizable(peeked.request)) {
             this.state.dequeue();
           } else {
             break;
@@ -522,9 +521,16 @@ export class Scheduler {
     return false;
   }
 
-  private _isParallelizable(tool?: AnyDeclarativeTool): boolean {
-    if (!tool) return false;
-    return tool.isReadOnly || tool.kind === Kind.Agent;
+  private _isParallelizable(request: ToolCallRequestInfo): boolean {
+    if (request.args) {
+      const wait = request.args['wait_for_previous'];
+      if (typeof wait === 'boolean') {
+        return !wait;
+      }
+    }
+
+    // Default to parallel if the flag is omitted.
+    return true;
   }
 
   private async _processValidatingCall(
@@ -617,6 +623,7 @@ export class Scheduler {
         outcome,
         lastDetails,
         this.context,
+        this.messageBus,
         toolCall.invocation,
       );
     }
