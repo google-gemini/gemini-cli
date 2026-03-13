@@ -317,8 +317,21 @@ ${displayResult}
         throw error;
       }
 
+      let isApiError = false;
+      if (typeof error === 'object' && error !== null) {
+        const status = (error as { status?: unknown }).status;
+        const code = (error as { code?: unknown }).code;
+        isApiError =
+          (typeof status === 'number' && status === 400) ||
+          (typeof code === 'number' && code === 400);
+      }
+
+      const apiHint = isApiError
+        ? '\nNote: This failure may be due to a Gemini API INVALID_ARGUMENT response. The agent may need to retry with a different tool or smaller task.'
+        : '';
+
       return {
-        llmContent: `Subagent '${this.definition.name}' failed. Error: ${errorMessage}`,
+        llmContent: `Subagent '${this.definition.name}' failed. Error: ${errorMessage}${apiHint}`,
         returnDisplay: progress,
         // We omit the 'error' property so that the UI renders our rich returnDisplay
         // instead of the raw error message. The llmContent still informs the agent of the failure.

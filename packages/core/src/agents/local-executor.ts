@@ -548,53 +548,83 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           : { role: 'user', parts: [{ text: query }] };
 
         while (true) {
-          // Check for termination conditions like max turns.
-          const reason = this.checkTermination(turnCounter, maxTurns);
-          if (reason) {
-            terminateReason = reason;
-            break;
-          }
-
-          // Check for timeout or external abort.
-          if (combinedSignal.aborted) {
-            // Determine which signal caused the abort.
-            terminateReason = deadlineTimer.signal.aborted
-              ? AgentTerminateMode.TIMEOUT
-              : AgentTerminateMode.ABORTED;
-            break;
-          }
-
-          const turnResult = await this.executeTurn(
-            chat,
-            currentMessage,
-            turnCounter++,
-            combinedSignal,
-            deadlineTimer.signal,
-            onWaitingForConfirmation,
-          );
-
-          if (turnResult.status === 'stop') {
-            terminateReason = turnResult.terminateReason;
-            // Only set finalResult if the turn provided one (e.g., error or goal).
-            if (turnResult.finalResult) {
-              finalResult = turnResult.finalResult;
+          try {
+            // Check for termination conditions like max turns.
+            const reason = this.checkTermination(turnCounter, maxTurns);
+            if (reason) {
+              terminateReason = reason;
+              break;
             }
-            break; // Exit the loop for *any* stop reason.
-          }
 
-          // If status is 'continue', update message for the next loop
-          currentMessage = turnResult.nextMessage;
-
-          // Check for new user steering hints collected via subscription
-          if (pendingHintsQueue.length > 0) {
-            const hintsToProcess = [...pendingHintsQueue];
-            pendingHintsQueue.length = 0;
-            const formattedHints = formatUserHintsForModel(hintsToProcess);
-            if (formattedHints) {
-              // Append hints to the current message (next turn)
-              currentMessage.parts ??= [];
-              currentMessage.parts.unshift({ text: formattedHints });
+            // Check for timeout or external abort.
+            if (combinedSignal.aborted) {
+              // Determine which signal caused the abort.
+              terminateReason = deadlineTimer.signal.aborted
+                ? AgentTerminateMode.TIMEOUT
+                : AgentTerminateMode.ABORTED;
+              break;
             }
+
+            const turnResult = await this.executeTurn(
+              chat,
+              currentMessage,
+              turnCounter++,
+              combinedSignal,
+              deadlineTimer.signal,
+              onWaitingForConfirmation,
+            );
+
+            if (turnResult.status === 'stop') {
+              terminateReason = turnResult.terminateReason;
+              // Only set finalResult if the turn provided one (e.g., error or goal).
+              if (turnResult.finalResult) {
+                finalResult = turnResult.finalResult;
+              }
+              break; // Exit the loop for *any* stop reason.
+            }
+
+            // If status is 'continue', update message for the next loop
+            currentMessage = turnResult.nextMessage;
+
+            // Check for new user steering hints collected via subscription
+            if (pendingHintsQueue.length > 0) {
+              const hintsToProcess = [...pendingHintsQueue];
+              pendingHintsQueue.length = 0;
+              const formattedHints = formatUserHintsForModel(hintsToProcess);
+              if (formattedHints) {
+                // Append hints to the current message (next turn)
+                currentMessage.parts ??= [];
+                currentMessage.parts.unshift({ text: formattedHints });
+              }
+            }
+          } catch (error) {
+            const errorMessage = getErrorMessage(error);
+
+            let isApiError = false;
+            if (typeof error === 'object' && error !== null) {
+              const status = (error as { status?: unknown }).status;
+              const code = (error as { code?: unknown }).code;
+              isApiError =
+                (typeof status === 'number' && status === 400) ||
+                (typeof code === 'number' && code === 400);
+            }
+
+            this.emitActivity('ERROR', {
+              error: `Turn failed: ${errorMessage}`,
+              context: isApiError ? 'api_error' : 'execution_error',
+            });
+
+            terminateReason = AgentTerminateMode.ERROR;
+
+            const truncatedErrorMessage =
+              errorMessage.length > 2000
+                ? errorMessage.slice(0, 2000) + '... [truncated]'
+                : errorMessage;
+
+            finalResult = isApiError
+              ? `The Gemini API returned an Invalid Argument error (400). This usually happens when the conversation context is too large or malformed.\n\nDetails: ${truncatedErrorMessage}`
+              : `Subagent execution failed due to an unexpected error: ${truncatedErrorMessage}`;
+            break;
           }
         }
       } finally {
