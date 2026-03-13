@@ -43,6 +43,7 @@ export class PromptProvider {
     config: Config,
     userMemory?: string | HierarchicalMemory,
     interactiveOverride?: boolean,
+    includeSubagents: boolean = true,
   ): string {
     const systemMdResolution = resolvePathFromEnv(
       process.env['GEMINI_SYSTEM_MD'],
@@ -124,13 +125,15 @@ export class PromptProvider {
           contextFilenames,
         })),
         subAgents: this.withSection('agentContexts', () =>
-          config
-            .getAgentRegistry()
-            .getAllDefinitions()
-            .map((d) => ({
-              name: d.name,
-              description: d.description,
-            })),
+          includeSubagents
+            ? config
+                .getAgentRegistry()
+                .getAllDefinitions()
+                .map((d) => ({
+                  name: d.name,
+                  description: d.description,
+                }))
+            : [],
         ),
         agentSkills: this.withSection(
           'agentSkills',

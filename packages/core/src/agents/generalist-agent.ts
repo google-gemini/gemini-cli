@@ -57,6 +57,7 @@ export const GeneralistAgent = (
         config,
         /*useMemory=*/ undefined,
         /*interactiveOverride=*/ false,
+        /*includeSubagents=*/ false,
       ),
       query: '${request}',
     };
