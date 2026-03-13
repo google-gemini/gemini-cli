@@ -22,6 +22,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { IDE_REQUEST_TIMEOUT_MS } from './constants.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { getVersion } from '../utils/version.js';
 import {
   getConnectionConfigFromFile,
   getIdeServerHost,
@@ -41,13 +42,13 @@ const logger = {
 
 export type DiffUpdateResult =
   | {
-      status: 'accepted';
-      content?: string;
-    }
+    status: 'accepted';
+    content?: string;
+  }
   | {
-      status: 'rejected';
-      content: undefined;
-    };
+    status: 'rejected';
+    content: undefined;
+  };
 
 export type IDEConnectionState = {
   status: IDEConnectionStatus;
@@ -85,7 +86,7 @@ export class IdeClient {
    */
   private diffMutex = Promise.resolve();
 
-  private constructor() {}
+  private constructor() { }
 
   static getInstance(): Promise<IdeClient> {
     if (!IdeClient.instancePromise) {
@@ -588,8 +589,7 @@ export class IdeClient {
       logger.debug(`Server URL: ${serverUrl}`);
       this.client = new Client({
         name: 'streamable-http-client',
-        // TODO(#3487): use the CLI version here.
-        version: '1.0.0',
+        version: await getVersion(),
       });
       transport = new StreamableHTTPClientTransport(new URL(serverUrl), {
         fetch: await createProxyAwareFetch(ideServerHost),
@@ -623,8 +623,7 @@ export class IdeClient {
       logger.debug('Attempting to connect to IDE via stdio');
       this.client = new Client({
         name: 'stdio-client',
-        // TODO(#3487): use the CLI version here.
-        version: '1.0.0',
+        version: await getVersion(),
       });
 
       transport = new StdioClientTransport({
