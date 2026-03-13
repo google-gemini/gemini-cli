@@ -173,7 +173,7 @@ export async function handleMigrateFromClaude() {
     sourceFile = claudeLocalSettingsPath;
     try {
       const content = fs.readFileSync(claudeLocalSettingsPath, 'utf-8');
-      const parsed = JSON.parse(stripJsonComments(content));
+      const parsed: unknown = JSON.parse(stripJsonComments(content));
       if (isRecord(parsed)) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
         claudeSettings = parsed as any;
@@ -187,7 +187,7 @@ export async function handleMigrateFromClaude() {
     sourceFile = claudeSettingsPath;
     try {
       const content = fs.readFileSync(claudeSettingsPath, 'utf-8');
-      const parsed = JSON.parse(stripJsonComments(content));
+      const parsed: unknown = JSON.parse(stripJsonComments(content));
       if (isRecord(parsed)) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
         claudeSettings = parsed as any;
