@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { execSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -124,6 +124,7 @@ export function runShellcheck() {
   }
 
   const args = [
+    'shellcheck',
     '--check-sourced',
     '--enable=all',
     '--exclude=SC2002,SC2129,SC2310',
@@ -133,28 +134,23 @@ export function runShellcheck() {
     ...files,
   ];
 
-  const command = `npx shellcheck ${args.join(' ')}`;
+  const result = spawnSync('npx', args, {
+    env: process.env,
+    encoding: 'utf-8',
+    shell: true, // Needed for npx on Windows and some Unix environments
+  });
 
-  try {
-    const output = execSync(command, {
-      env: process.env,
-      encoding: 'utf-8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+  if (result.stdout) {
     console.log(
-      output.replace(/note:/g, 'warning:').replace(/style:/g, 'warning:'),
+      result.stdout
+        .replace(/note:/g, 'warning:')
+        .replace(/style:/g, 'warning:'),
     );
-  } catch (e) {
-    if (e.stdout) {
-      console.log(
-        e.stdout
-          .toString()
-          .replace(/note:/g, 'warning:')
-          .replace(/style:/g, 'warning:'),
-      );
-    }
-    if (e.stderr) {
-      console.error(e.stderr.toString());
+  }
+
+  if (result.status !== 0) {
+    if (result.stderr) {
+      console.error(result.stderr);
     }
     process.exit(1);
   }
@@ -168,9 +164,13 @@ export function runYamllint() {
     return;
   }
 
-  // Use xargs-like behavior but via Node to avoid shell limits and ensure portability
-  // Passing all files at once is generally supported by yaml-lint
-  if (!runCommand(`npx yaml-lint ${files.join(' ')}`)) {
+  const result = spawnSync('npx', ['yaml-lint', ...files], {
+    env: process.env,
+    stdio: 'inherit',
+    shell: true,
+  });
+
+  if (result.status !== 0) {
     process.exit(1);
   }
 }
