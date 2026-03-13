@@ -3297,9 +3297,12 @@ describe('PolicyEngine', () => {
   });
 
   describe('getExcludedTools with disableAlwaysAllow', () => {
-    it('should NOT exclude tool even if an Always Allow rule says ALLOW (correctly reflecting that the rule is ignored)', async () => {
-      // If default is DENY, and we have an ALWAYS_ALLOW rule, normally it's NOT excluded.
-      // But if we disable ALWAYS_ALLOW, it SHOULD be excluded (fallback to default DENY).
+    it('should exclude tool if an Always Allow rule says ALLOW but disableAlwaysAllow is true (falling back to DENY)', async () => {
+      // To prove the ALWAYS_ALLOW rule is ignored, we set the default decision to DENY.
+      // If the rule was honored, the decision would be ALLOW (tool not excluded).
+      // Since it's ignored, it falls back to the default DENY (tool is excluded).
+      // In the real app, it usually falls back to ASK_USER, but ASK_USER also doesn't
+      // exclude the tool, so we use DENY here purely to make the test observable.
       const alwaysAllowRule: PolicyRule = {
         toolName: 'test-tool',
         decision: PolicyDecision.ALLOW,
