@@ -8,6 +8,7 @@ import type React from 'react';
 import { Text } from 'ink';
 import { type ActiveHook } from '../types.js';
 import { GENERIC_WORKING_LABEL } from '../textConstants.js';
+import { theme } from '../semantic-colors.js';
 
 interface HookStatusDisplayProps {
   activeHooks: ActiveHook[];
@@ -38,9 +39,17 @@ export const HookStatusDisplay: React.FC<HookStatusDisplayProps> = ({
     });
 
     const text = `${label}: ${displayNames.join(', ')}`;
-    return <Text color="inherit">{text}</Text>;
+    return (
+      <Text color={theme.text.secondary} italic={true}>
+        {text}
+      </Text>
+    );
   }
 
   // If only system/extension hooks are running, show a generic message.
-  return <Text color="inherit">{GENERIC_WORKING_LABEL}</Text>;
+  return (
+    <Text color={theme.text.secondary} italic={true}>
+      {GENERIC_WORKING_LABEL}
+    </Text>
+  );
 };

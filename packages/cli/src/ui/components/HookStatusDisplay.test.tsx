@@ -78,4 +78,14 @@ describe('<HookStatusDisplay />', () => {
     expect(lastFrame()).toContain('Working...');
     unmount();
   });
+
+  it('matches SVG snapshot for single hook', async () => {
+    const props = {
+      activeHooks: [{ name: 'test-hook', eventName: 'BeforeAgent', source: 'user' }],
+    };
+    const renderResult = render(<HookStatusDisplay {...props} />);
+    await renderResult.waitUntilReady();
+    await expect(renderResult).toMatchSvgSnapshot();
+    renderResult.unmount();
+  });
 });

@@ -310,22 +310,16 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       const hookIcon = activeHook?.eventName?.startsWith('After') ? '↩' : '↪';
 
       return (
-        <Box flexDirection="row" alignItems="center">
-          <Box marginRight={1}>
-            <GeminiRespondingSpinner
-              nonRespondingDisplay={hookIcon}
-              isHookActive={true}
-            />
-          </Box>
-          <Text color={theme.text.primary} italic wrap="truncate-end">
-            <HookStatusDisplay activeHooks={userHooks} />
-          </Text>
+        <Box flexDirection="row" alignItems="center" columnGap={1}>
+          <GeminiRespondingSpinner
+            nonRespondingDisplay={hookIcon}
+            isHookActive={true}
+          />
+          <HookStatusDisplay activeHooks={userHooks} />
           {showWit && uiState.currentWittyPhrase && (
-            <Box marginLeft={1}>
-              <Text color={theme.text.secondary} dimColor italic>
-                {uiState.currentWittyPhrase} :)
-              </Text>
-            </Box>
+            <Text color={theme.text.secondary} dimColor italic>
+              {uiState.currentWittyPhrase}
+            </Text>
           )}
         </Box>
       );
@@ -353,7 +347,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
    * Renders the minimal metadata row content shown when UI details are hidden.
    */
   const renderMinimalMetaRowContent = () => (
-    <Box flexDirection="row">
+    <Box flexDirection="row" columnGap={1}>
       {showMinimalInlineLoading && (
         <LoadingIndicator
           inline
@@ -364,33 +358,16 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         />
       )}
       {hasUserHooks && (
-        <Box marginLeft={showMinimalInlineLoading ? 1 : 0}>
-          <Box marginRight={1}>
-            <GeminiRespondingSpinner isHookActive={true} />
-          </Box>
-          <Text color={theme.text.primary} italic>
-            <HookStatusDisplay activeHooks={userHooks} />
-          </Text>
+        <Box flexDirection="row" columnGap={1}>
+          <GeminiRespondingSpinner isHookActive={true} />
+          <HookStatusDisplay activeHooks={userHooks} />
         </Box>
       )}
       {showMinimalBleedThroughRow && (
-        <Box marginLeft={showMinimalInlineLoading || hasUserHooks ? 1 : 0}>
+        <Box>
           {miniMode_ShowApprovalMode && modeContentObj && (
             <Text color={modeContentObj.color}>● {modeContentObj.text}</Text>
           )}
-          {/* {zenMode_ShowToast && (
-            <Box
-              marginLeft={
-                showMinimalInlineLoading ||
-                zenMode_ShowApprovalMode ||
-                hasUserHooks
-                  ? 1
-                  : 0
-              }
-            >
-              <ToastDisplay />
-            </Box>
-          )} */}
         </Box>
       )}
     </Box>
