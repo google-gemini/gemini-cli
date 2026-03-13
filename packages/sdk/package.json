@@ -15,6 +15,7 @@
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
     "test": "vitest run",
+    "test:vitest": "vitest run",
     "test:ci": "vitest run",
     "typecheck": "tsc --noEmit"
   },

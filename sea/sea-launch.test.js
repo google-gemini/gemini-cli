@@ -18,6 +18,10 @@ import {
 
 // Mocking fs and os
 // We need to use vi.mock factory for ESM mocking of built-in modules in Vitest
+vi.mock('node:sea', () => ({
+  getAsset: vi.fn(),
+}));
+
 vi.mock('node:fs', async () => {
   const fsMock = {
     mkdirSync: vi.fn(),

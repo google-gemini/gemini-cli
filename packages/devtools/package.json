@@ -13,7 +13,8 @@
   },
   "scripts": {
     "build": "npm run build:client && tsc -p tsconfig.build.json",
-    "build:client": "node esbuild.client.js"
+    "build:client": "node esbuild.client.js",
+    "test:vitest": "echo 'No tests for devtools'"
   },
   "files": [
     "dist",
