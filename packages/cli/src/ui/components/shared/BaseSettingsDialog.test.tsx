@@ -760,6 +760,48 @@ describe('BaseSettingsDialog', () => {
       });
       unmount();
     });
+
+    it('should allow j and k characters to be typed in string edit fields without triggering navigation', async () => {
+      const items = createMockItems(4);
+      const stringItem = items.find((i) => i.type === 'string')!;
+      const { stdin, waitUntilReady, unmount } = await renderDialog({
+        items: [stringItem],
+      });
+
+      // Enter edit mode
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+      await waitUntilReady();
+
+      // Type 'j' - should appear in field, NOT trigger navigation
+      await act(async () => {
+        stdin.write('j');
+      });
+      await waitUntilReady();
+
+      // Type 'k' - should appear in field, NOT trigger navigation
+      await act(async () => {
+        stdin.write('k');
+      });
+      await waitUntilReady();
+
+      // Commit with Enter
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+      await waitUntilReady();
+
+      // j and k should be typed into the field
+      await waitFor(() => {
+        expect(mockOnEditCommit).toHaveBeenCalledWith(
+          'string-setting',
+          'test-valuejk', // entered value + j and k
+          expect.objectContaining({ type: 'string' }),
+        );
+      });
+      unmount();
+    });
   });
 
   describe('custom key handling', () => {
