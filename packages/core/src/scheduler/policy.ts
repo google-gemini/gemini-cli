@@ -116,7 +116,11 @@ export async function updatePolicy(
   context: AgentLoopContext,
   toolInvocation?: AnyToolInvocation,
 ): Promise<void> {
-  const deps = { ...context, toolInvocation };
+  const deps = {
+    config: context.config,
+    messageBus: context.messageBus,
+    toolInvocation,
+  };
 
   // Mode Transitions (AUTO_EDIT)
   if (isAutoEditTransition(tool, outcome)) {
