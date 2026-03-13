@@ -36,6 +36,7 @@ import {
   RetryableQuotaError,
   TerminalQuotaError,
 } from '../utils/googleQuotaErrors.js';
+import { coreEvents } from '../utils/events.js';
 
 // Mock the telemetry logger and event class
 vi.mock('../telemetry/index.js', () => ({
@@ -45,6 +46,38 @@ vi.mock('../telemetry/index.js', () => ({
 vi.mock('../utils/secure-browser-launcher.js', () => ({
   openBrowserSecurely: vi.fn(),
   shouldLaunchBrowser: vi.fn().mockReturnValue(true),
+}));
+
+// Mock coreEvents
+vi.mock('../utils/events.js', () => ({
+  coreEvents: {
+    emitFeedback: vi.fn(),
+  },
+  CoreEvent: {
+    UserFeedback: 'user-feedback',
+    ModelChanged: 'model-changed',
+    ConsoleLog: 'console-log',
+    Output: 'output',
+    MemoryChanged: 'memory-changed',
+    ExternalEditorClosed: 'external-editor-closed',
+    McpClientUpdate: 'mcp-client-update',
+    OauthDisplayMessage: 'oauth-display-message',
+    SettingsChanged: 'settings-changed',
+    HookStart: 'hook-start',
+    HookEnd: 'hook-end',
+    AgentsRefreshed: 'agents-refreshed',
+    AdminSettingsChanged: 'admin-settings-changed',
+    RetryAttempt: 'retry-attempt',
+    ConsentRequest: 'consent-request',
+    McpProgress: 'mcp-progress',
+    AgentsDiscovered: 'agents-discovered',
+    RequestEditorSelection: 'request-editor-selection',
+    EditorSelected: 'editor-selected',
+    SlashCommandConflicts: 'slash-command-conflicts',
+    QuotaChanged: 'quota-changed',
+    TelemetryKeychainAvailability: 'telemetry-keychain-availability',
+    TelemetryTokenStorageType: 'telemetry-token-storage-type',
+  },
 }));
 
 // Mock debugLogger to prevent console pollution and allow spying
@@ -410,6 +443,51 @@ describe('handleFallback', () => {
 
       expect(result).toBe(true);
       expect(policyConfig.activateFallbackMode).not.toHaveBeenCalled();
+    });
+
+    it('emits feedback when quota is exhausted in auto mode', async () => {
+      vi.mocked(policyConfig.getModel).mockReturnValue(
+        DEFAULT_GEMINI_MODEL_AUTO,
+      );
+      policyHandler.mockResolvedValue('retry_always');
+
+      const terminalError = new TerminalQuotaError('Quota error', {
+        code: 429,
+        message: 'Quota exceeded',
+        details: [],
+      });
+
+      await handleFallback(
+        policyConfig,
+        MOCK_PRO_MODEL,
+        AUTH_OAUTH,
+        terminalError,
+      );
+
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'warning',
+        `Quota exhausted for ${MOCK_PRO_MODEL}. Switching to a fallback model.`,
+      );
+    });
+
+    it('does NOT emit feedback when quota is exhausted in manual mode', async () => {
+      vi.mocked(policyConfig.getModel).mockReturnValue(MOCK_PRO_MODEL);
+      policyHandler.mockResolvedValue('retry_always');
+
+      const terminalError = new TerminalQuotaError('Quota error', {
+        code: 429,
+        message: 'Quota exceeded',
+        details: [],
+      });
+
+      await handleFallback(
+        policyConfig,
+        MOCK_PRO_MODEL,
+        AUTH_OAUTH,
+        terminalError,
+      );
+
+      expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
     });
   });
 });
