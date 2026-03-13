@@ -59,6 +59,14 @@ describe('policy/utils', () => {
       expect(isSafeRegExp('([a-z]+)+')).toBe(false);
       expect(isSafeRegExp('(.*)+')).toBe(false);
     });
+
+    it('should return true for optional groups with inner quantifiers', () => {
+      // '?' as an outer quantifier allows only 0 or 1 match, so no
+      // exponential backtracking is possible.
+      expect(isSafeRegExp('(a+)?')).toBe(true);
+      expect(isSafeRegExp('(.*)?')).toBe(true);
+      expect(isSafeRegExp('(?:(.*?)\\s+)?')).toBe(true);
+    });
   });
 
   describe('buildArgsPatterns', () => {
