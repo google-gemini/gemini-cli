@@ -163,6 +163,31 @@ function findCodeRegions(content: string): Array<[number, number]> {
   return regions;
 }
 
+function stripHtmlComments(content: string): string {
+  const startToken = '<!--';
+  const endToken = '-->';
+  let start = content.indexOf(startToken);
+  if (start === -1) return content;
+
+  const parts: string[] = [];
+  let cursor = 0;
+
+  while (start !== -1) {
+    parts.push(content.slice(cursor, start));
+
+    const end = content.indexOf(endToken, start + startToken.length);
+    if (end === -1) {
+      return parts.join('');
+    }
+
+    cursor = end + endToken.length;
+    start = content.indexOf(startToken, cursor);
+  }
+
+  parts.push(content.slice(cursor));
+  return parts.join('');
+}
+
 /**
  * Processes import statements in GEMINI.md content
  * Supports @path/to/file syntax for importing content from other files
@@ -186,6 +211,8 @@ export async function processImports(
   projectRoot?: string,
   importFormat: 'flat' | 'tree' = 'tree',
 ): Promise<ProcessImportsResult> {
+  content = stripHtmlComments(content);
+
   if (!projectRoot) {
     projectRoot = await findProjectRoot(basePath);
   }
@@ -216,6 +243,7 @@ export async function processImports(
       filePath: string,
       depth: number,
     ) {
+      const sanitizedContent = stripHtmlComments(fileContent);
       // Normalize the file path to ensure consistent comparison
       const normalizedPath = path.normalize(filePath);
 
@@ -226,11 +254,11 @@ export async function processImports(
       processedFiles.add(normalizedPath);
 
       // Add this file to the flat list
-      flatFiles.push({ path: normalizedPath, content: fileContent });
+      flatFiles.push({ path: normalizedPath, content: sanitizedContent });
 
       // Find imports in this file
-      const codeRegions = findCodeRegions(fileContent);
-      const imports = findImports(fileContent);
+      const codeRegions = findCodeRegions(sanitizedContent);
+      const imports = findImports(sanitizedContent);
 
       // Process imports in reverse order to handle indices correctly
       for (let i = imports.length - 1; i >= 0; i--) {
