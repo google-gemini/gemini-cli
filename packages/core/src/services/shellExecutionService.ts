@@ -279,6 +279,14 @@ export class ShellExecutionService {
   ): Promise<ShellExecutionHandle> {
     const sandboxManager =
       shellExecutionConfig.sandboxManager ?? new NoopSandboxManager();
+
+    // Strict sandbox on Windows (network disabled) requires cmd.exe
+    const isStrictSandbox =
+      os.platform() === 'win32' &&
+      shellExecutionConfig.sandboxConfig?.enabled &&
+      shellExecutionConfig.sandboxConfig?.command === 'windows-native' &&
+      !shellExecutionConfig.sandboxConfig?.networkAccess;
+
     const { env: sanitizedEnv } = await sandboxManager.prepareCommand({
       command: commandToExecute,
       args: [],
@@ -302,6 +310,7 @@ export class ShellExecutionService {
             shellExecutionConfig,
             ptyInfo,
             sanitizedEnv,
+            isStrictSandbox,
           );
         } catch (_e) {
           // Fallback to child_process
@@ -316,6 +325,7 @@ export class ShellExecutionService {
       abortSignal,
       shellExecutionConfig.sanitizationConfig,
       shouldUseNodePty,
+      isStrictSandbox,
     );
   }
 
@@ -356,10 +366,18 @@ export class ShellExecutionService {
     abortSignal: AbortSignal,
     sanitizationConfig: EnvironmentSanitizationConfig,
     isInteractive: boolean,
+    isStrictSandbox?: boolean,
   ): ShellExecutionHandle {
     try {
       const isWindows = os.platform() === 'win32';
-      const { executable, argsPrefix, shell } = getShellConfiguration();
+      let { executable, argsPrefix, shell } = getShellConfiguration();
+
+      if (isStrictSandbox) {
+        shell = 'cmd';
+        argsPrefix = ['/c'];
+        executable = 'cmd.exe';
+      }
+
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
       const spawnArgs = [...argsPrefix, guardedCommand];
 
@@ -690,6 +708,7 @@ export class ShellExecutionService {
     shellExecutionConfig: ShellExecutionConfig,
     ptyInfo: PtyImplementation,
     sanitizedEnv: Record<string, string | undefined>,
+    isStrictSandbox?: boolean,
   ): Promise<ShellExecutionHandle> {
     if (!ptyInfo) {
       // This should not happen, but as a safeguard...
@@ -700,7 +719,13 @@ export class ShellExecutionService {
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
-      const { executable, argsPrefix, shell } = getShellConfiguration();
+      let { executable, argsPrefix, shell } = getShellConfiguration();
+
+      if (isStrictSandbox) {
+        shell = 'cmd';
+        argsPrefix = ['/c'];
+        executable = 'cmd.exe';
+      }
 
       const resolvedExecutable = await resolveExecutable(executable);
       if (!resolvedExecutable) {

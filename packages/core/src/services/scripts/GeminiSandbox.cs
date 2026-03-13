@@ -273,7 +273,12 @@ public class GeminiSandbox {
         si.hStdOutput = GetStdHandle(-11);
         si.hStdError = GetStdHandle(-12);
 
-        string commandLine = string.Join(" ", args, 2, args.Length - 2);
+        List<string> quotedArgs = new List<string>();
+        for (int i = 2; i < args.Length; i++) {
+            quotedArgs.Add(QuoteArgument(args[i]));
+        }
+        string commandLine = string.Join(" ", quotedArgs.ToArray());
+
         PROCESS_INFORMATION pi;
         if (!CreateProcessAsUser(hRestrictedToken, null, commandLine, IntPtr.Zero, IntPtr.Zero, true, CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT, IntPtr.Zero, cwd, ref si, out pi)) {
             Console.Error.WriteLine("Failed to create process. Error: " + Marshal.GetLastWin32Error());
@@ -297,6 +302,14 @@ public class GeminiSandbox {
         if (hJob != IntPtr.Zero) CloseHandle(hJob);
 
         return (int)exitCode;
+    }
+
+    private static string QuoteArgument(string arg) {
+        if (string.IsNullOrEmpty(arg)) return "\"\"";
+        if (arg.IndexOfAny(new char[] { ' ', '\t', '\n', '\v', '\"' }) == -1) return arg;
+
+        string escaped = arg.Replace("\"", "\\\"");
+        return "\"" + escaped + "\"";
     }
 
     private static int RunInImpersonation(IntPtr hToken, Func<int> action) {
