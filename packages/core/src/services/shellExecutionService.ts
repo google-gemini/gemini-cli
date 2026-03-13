@@ -17,6 +17,7 @@ import { getCachedEncodingForBuffer } from '../utils/systemEncoding.js';
 import {
   getShellConfiguration,
   resolveExecutable,
+  getCommandRoots,
   type ShellType,
 } from '../utils/shell-utils.js';
 import { isBinary } from '../utils/textUtils.js';
@@ -283,7 +284,10 @@ export class ShellExecutionService {
       config: shellExecutionConfig,
     });
 
-    if (shouldUseNodePty) {
+    if (
+      shouldUseNodePty &&
+      !(await this.isWslWindowsBinary(commandToExecute))
+    ) {
       const ptyInfo = await getPty();
       if (ptyInfo) {
         try {
@@ -310,6 +314,51 @@ export class ShellExecutionService {
       shellExecutionConfig.sanitizationConfig,
       shouldUseNodePty,
     );
+  }
+
+  private static async isWslWindowsBinary(
+    commandToExecute: string,
+  ): Promise<boolean> {
+    if (os.platform() !== 'linux') return false;
+
+    const roots = getCommandRoots(commandToExecute);
+
+    for (const root of roots) {
+      const executablePath = await resolveExecutable(root).catch(
+        () => undefined,
+      );
+      if (!executablePath) continue;
+
+      const canonicalPath = await fs.promises
+        .realpath(executablePath)
+        .catch(() => undefined);
+      if (!canonicalPath) continue;
+
+      if (await this.hasWindowsMagicBytes(canonicalPath)) {
+        debugLogger.debug(
+          `WSL Windows binary detected in pipeline: "${root}" (${canonicalPath}), disabling PTY`,
+        );
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private static async hasWindowsMagicBytes(
+    filePath: string,
+  ): Promise<boolean> {
+    const fd = await fs.promises.open(filePath, 'r').catch(() => undefined);
+    if (!fd) return false;
+
+    try {
+      const { bytesRead, buffer } = await fd.read(Buffer.alloc(2), 0, 2, 0);
+      return bytesRead === 2 && buffer.toString() === 'MZ';
+    } catch {
+      return false;
+    } finally {
+      await fd.close();
+    }
   }
 
   private static appendAndTruncate(
