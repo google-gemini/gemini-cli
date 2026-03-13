@@ -136,9 +136,9 @@ describe('Answer vs. ask eval', () => {
    */
   evalTest('USUALLY_PASSES', {
     name: 'should not edit files when user notes an issue',
+    timeout: 20000,
     prompt: 'The add function subtracts numbers.',
     files: FILES,
-    params: { timeout: 20000 }, // 20s timeout
     assert: async (rig) => {
       const toolLogs = rig.readToolLogs();
 
