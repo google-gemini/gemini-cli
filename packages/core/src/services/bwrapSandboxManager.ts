@@ -108,7 +108,10 @@ export class BwrapSandboxManager implements SandboxManager {
     if (fs.existsSync(geminiSettingsDir)) {
       bwrapArgs.push('--bind', geminiSettingsDir, geminiSettingsDir);
     }
-    bwrapArgs.push('--bind', os.tmpdir(), os.tmpdir());
+
+    // Private, isolated system paths to block Unix socket escapes
+    bwrapArgs.push('--tmpfs', '/tmp');
+    bwrapArgs.push('--tmpfs', '/run/user');
 
     // Execute via shell
     const shell = process.env['SHELL'] || '/bin/bash';
