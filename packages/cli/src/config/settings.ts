@@ -846,11 +846,11 @@ export function migrateDeprecatedSettings(
     const oldValue = settings[oldKey];
     const newValue = settings[newKey];
 
-    if (typeof oldValue === 'boolean') {
+    if (oldValue === true || oldValue === false) {
       if (foundDeprecated) {
         foundDeprecated.push(prefix ? `${prefix}.${oldKey}` : oldKey);
       }
-      if (typeof newValue === 'boolean') {
+      if (newValue === true || newValue === false) {
         // Both exist, trust the new one
         if (removeDeprecated) {
           delete settings[oldKey];
@@ -913,7 +913,7 @@ export function migrateDeprecatedSettings(
       let uiModified = false;
 
       // Migrate hideIntroTips → hideTips (backward compatibility)
-      if (typeof newUi['hideIntroTips'] === 'boolean') {
+      if (newUi['hideIntroTips'] === true || newUi['hideIntroTips'] === false) {
         foundDeprecated.push('ui.hideIntroTips');
         if (newUi['hideTips'] === undefined) {
           newUi['hideTips'] = newUi['hideIntroTips'];
@@ -959,6 +959,8 @@ export function migrateDeprecatedSettings(
               newUi['hideStatusTips'] = true;
               newUi['hideStatusWit'] = true;
               uiModified = true;
+              break;
+            default:
               break;
           }
         }
@@ -1015,7 +1017,7 @@ export function migrateDeprecatedSettings(
 
         // Migrate enableLoadingPhrases: false → hideStatusTips/hideStatusWit: true
         const enableLP = newAccessibility['enableLoadingPhrases'];
-        if (typeof enableLP === 'boolean') {
+        if (enableLP === true || enableLP === false) {
           foundDeprecated.push('ui.accessibility.enableLoadingPhrases');
           if (
             !enableLP &&

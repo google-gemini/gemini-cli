@@ -8,6 +8,7 @@ import {
   renderWithProviders,
   persistentStateMock,
 } from '../../test-utils/render.js';
+import type { LoadedSettings } from '../../config/settings.js';
 import { AppHeader } from './AppHeader.js';
 import { describe, it, expect, vi } from 'vitest';
 import { makeFakeConfig } from '@google/gemini-cli-core';
@@ -279,7 +280,7 @@ describe('<AppHeader />', () => {
           merged: {
             ui: { hideTips: true },
           },
-        } as any,
+        } as unknown as LoadedSettings,
       },
     );
     await waitUntilReady();
