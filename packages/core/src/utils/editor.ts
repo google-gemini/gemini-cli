@@ -127,6 +127,25 @@ const editorCommands: Record<
   hx: { win32: ['hx'], default: ['hx'] },
 };
 
+// Executable basenames (lowercased, no .exe/.cmd suffix) for every GUI editor.
+// Derived from editorCommands so it stays in sync automatically.
+const GUI_EDITOR_EXES = new Set<string>(
+  GUI_EDITORS.flatMap((editor) => [
+    ...editorCommands[editor].win32,
+    ...editorCommands[editor].default,
+  ]).map((exe) => exe.replace(/\.(exe|cmd)$/i, '').toLowerCase()),
+);
+
+/**
+ * Returns true if the given executable basename corresponds to a known GUI
+ * editor that forks into the background and requires `--wait` to block until
+ * the file is closed. Use this when the editor command comes from `$VISUAL` or
+ * `$EDITOR` rather than from the configured `EditorType`.
+ */
+export function isGuiEditorCommand(exeName: string): boolean {
+  return GUI_EDITOR_EXES.has(exeName.toLowerCase());
+}
+
 function getEditorCommands(editor: EditorType): string[] {
   const commandConfig = editorCommands[editor];
   return process.platform === 'win32'
