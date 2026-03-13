@@ -77,6 +77,17 @@ function generateThemeItem(
   };
 }
 
+// Constants for calculating preview pane layout.
+// These values are based on the JSX structure below.
+const PREVIEW_PANE_WIDTH_PERCENTAGE = 0.55;
+// A safety margin to prevent text from touching the border.
+// This is a complete hack unrelated to the 0.9 used in App.tsx
+const PREVIEW_PANE_WIDTH_SAFETY_MARGIN = 0.9;
+// Combined horizontal padding from the dialog and preview pane.
+const TOTAL_HORIZONTAL_PADDING = 4;
+const DIALOG_PADDING = 2;
+const TAB_TO_SELECT_HEIGHT = 2;
+
 export function ThemeDialog({
   onSelect,
   onCancel,
@@ -190,26 +201,16 @@ export function ThemeDialog({
     settings,
   );
 
-  // Constants for calculating preview pane layout.
-  // These values are based on the JSX structure below.
-  const PREVIEW_PANE_WIDTH_PERCENTAGE = 0.55;
-  // A safety margin to prevent text from touching the border.
-  // This is a complete hack unrelated to the 0.9 used in App.tsx
-  const PREVIEW_PANE_WIDTH_SAFETY_MARGIN = 0.9;
-  // Combined horizontal padding from the dialog and preview pane.
-  const TOTAL_HORIZONTAL_PADDING = 4;
-  const colorizeCodeWidth = Math.max(
-    Math.floor(
-      (terminalWidth - TOTAL_HORIZONTAL_PADDING) *
-        PREVIEW_PANE_WIDTH_PERCENTAGE *
-        PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
-    ),
-    1,
-  );
+const colorizeCodeWidth = Math.max(
+      Math.floor(
+        (terminalWidth - TOTAL_HORIZONTAL_PADDING) *
+          PREVIEW_PANE_WIDTH_PERCENTAGE *
+          PREVIEW_PANE_WIDTH_SAFETY_MARGIN,
+      ),
+      1,
+    );
 
-  const DIALOG_PADDING = 2;
-  const selectThemeHeight = themeItems.length + 1;
-  const TAB_TO_SELECT_HEIGHT = 2;
+    const selectThemeHeight = themeItems.length + 1;
   availableTerminalHeight = availableTerminalHeight ?? Number.MAX_SAFE_INTEGER;
   availableTerminalHeight -= 2; // Top and bottom borders.
   availableTerminalHeight -= TAB_TO_SELECT_HEIGHT;
