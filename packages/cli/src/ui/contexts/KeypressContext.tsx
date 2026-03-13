@@ -617,7 +617,11 @@ function* emitKeys(
                 sequence = mapped.sequence;
                 insertable = true;
               }
-            } else if (codeNumber >= 33 && codeNumber <= 0x10ffff) {
+            } else if (
+              codeNumber >= 33 && // Printable characters start after space (32),
+              codeNumber <= 0x10ffff && // Valid Unicode scalar values (excluding control characters)
+              (codeNumber < 0xd800 || codeNumber > 0xdfff) // Exclude UTF-16 surrogate halves
+            ) {
               // Valid printable Unicode scalar values (up to Unicode maximum)
               // Note: Kitty maps its special keys to the PUA (57344+), which are handled by KITTY_CODE_MAP above.
               const char = String.fromCodePoint(codeNumber);
