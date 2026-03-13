@@ -25,6 +25,7 @@ import { Footer } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
 import { ContextUsageDisplay } from './ContextUsageDisplay.js';
+import { CliSpinner } from './CliSpinner.js';
 import { HorizontalLine } from './shared/HorizontalLine.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
@@ -35,7 +36,6 @@ import { useConfig } from '../contexts/ConfigContext.js';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { StreamingState, type HistoryItemToolGroup } from '../types.js';
-import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
 import { isContextUsageHigh } from '../utils/contextUsage.js';
@@ -196,16 +196,20 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       flexGrow={0}
       flexShrink={0}
     >
-      {(!uiState.slashCommands ||
-        !uiState.isConfigInitialized ||
-        uiState.isResuming) && (
-        <ConfigInitDisplay
-          message={uiState.isResuming ? 'Resuming session...' : undefined}
-        />
-      )}
-
       {showUiDetails && (
-        <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
+        <Box flexDirection="row" justifyContent="space-between" width="100%">
+          <QueuedMessageDisplay messageQueue={uiState.messageQueue} />
+          {(!uiState.isConfigInitialized ||
+            uiState.isAuthenticating ||
+            uiState.isResuming) && (
+            <Box marginRight={1}>
+              <Text color="cyan" dimColor>
+                <CliSpinner type="dots" />{' '}
+                {uiState.isResuming ? 'Resuming session...' : 'Initializing...'}
+              </Text>
+            </Box>
+          )}
+        </Box>
       )}
 
       {showUiDetails && <TodoTray />}

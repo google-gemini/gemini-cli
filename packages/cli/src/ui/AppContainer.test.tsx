@@ -34,12 +34,19 @@ import {
 } from '@google/gemini-cli-core';
 
 // Mock coreEvents
-const mockCoreEvents = vi.hoisted(() => ({
-  on: vi.fn(),
-  off: vi.fn(),
-  drainBacklogs: vi.fn(),
-  emit: vi.fn(),
-}));
+const mockCoreEvents = vi.hoisted(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mock: any = {
+    on: vi.fn(),
+    off: vi.fn(),
+    drainBacklogs: vi.fn(),
+    emit: vi.fn(),
+  };
+  mock.emitFeedback = vi.fn((severity, message, error) => {
+    mock.emit('feedback', { type: severity, message, error });
+  });
+  return mock;
+});
 
 // Mock IdeClient
 const mockIdeClient = vi.hoisted(() => ({
@@ -98,7 +105,7 @@ import ansiEscapes from 'ansi-escapes';
 import { mergeSettings, type LoadedSettings } from '../config/settings.js';
 import type { InitializationResult } from '../core/initializer.js';
 import { useQuotaAndFallback } from './hooks/useQuotaAndFallback.js';
-import { StreamingState } from './types.js';
+import { StreamingState, AuthState } from './types.js';
 import { UIStateContext, type UIState } from './contexts/UIStateContext.js';
 import {
   UIActionsContext,
@@ -3394,7 +3401,10 @@ describe('AppContainer State Management', () => {
         }).unmount;
       });
 
-      await waitFor(() => expect(capturedUIActions).toBeTruthy());
+      await waitFor(() => {
+        expect(capturedUIActions).toBeTruthy();
+        expect(capturedUIState.isConfigInitialized).toBe(true);
+      });
 
       // Expand first
       act(() => capturedUIActions.setConstrainHeight(false));
@@ -3436,7 +3446,10 @@ describe('AppContainer State Management', () => {
         }).unmount;
       });
 
-      await waitFor(() => expect(capturedUIActions).toBeTruthy());
+      await waitFor(() => {
+        expect(capturedUIActions).toBeTruthy();
+        expect(capturedUIState.isConfigInitialized).toBe(true);
+      });
 
       // Expand first
       act(() => capturedUIActions.setConstrainHeight(false));
@@ -3747,7 +3760,10 @@ describe('AppContainer State Management', () => {
       let unmount: () => void;
       await act(async () => (unmount = renderAppContainer().unmount));
 
-      await waitFor(() => expect(capturedUIActions).toBeTruthy());
+      await waitFor(() => {
+        expect(capturedUIActions).toBeTruthy();
+        expect(capturedUIState.isConfigInitialized).toBe(true);
+      });
 
       await act(async () =>
         capturedUIActions.handleFinalSubmit('read @file.txt'),
@@ -3776,7 +3792,10 @@ describe('AppContainer State Management', () => {
         let unmount: () => void;
         await act(async () => (unmount = renderAppContainer().unmount));
 
-        await waitFor(() => expect(capturedUIActions).toBeTruthy());
+        await waitFor(() => {
+          expect(capturedUIActions).toBeTruthy();
+          expect(capturedUIState.isConfigInitialized).toBe(true);
+        });
 
         await act(async () =>
           capturedUIActions.handleFinalSubmit('read @file.txt'),
@@ -3890,6 +3909,162 @@ describe('AppContainer State Management', () => {
         expect(capturedUIState).toBeTruthy();
         expect(capturedUIState.allowPlanMode).toBe(false);
       });
+      unmount!();
+    });
+  });
+
+  describe('Authentication Optimization', () => {
+    it('does NOT show AuthInProgress and unblocks UI during initial authentication', async () => {
+      const mockedUseAuthCommand = useAuthCommand as Mock;
+      mockedUseAuthCommand.mockReturnValue({
+        authState: AuthState.Unauthenticated, // isAuthenticating will be true
+        setAuthState: vi.fn(),
+        authError: null,
+        onAuthError: vi.fn(),
+      });
+
+      let unmount: () => void;
+      await act(async () => {
+        unmount = renderAppContainer().unmount;
+      });
+
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+
+      // dialogsVisible should be false even if isAuthenticating is true
+      expect(capturedUIState.isAuthenticating).toBe(true);
+      expect(capturedUIState.dialogsVisible).toBe(false);
+      unmount!();
+    });
+
+    it('allows typing and queues prompts if submitted while initializing', async () => {
+      mockedUseAuthCommand.mockReturnValue({
+        authState: AuthState.Authenticated,
+        setAuthState: vi.fn(),
+        authError: null,
+        onAuthError: vi.fn(),
+      });
+
+      let unmount: () => void;
+      await act(async () => {
+        vi.spyOn(mockConfig, 'isInitialized').mockReturnValue(false);
+        const initPromise = new Promise(() => {}); // Never resolves
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        vi.spyOn(mockConfig, 'initialize').mockReturnValue(initPromise as any);
+
+        unmount = renderAppContainer().unmount;
+      });
+
+      await waitFor(() => expect(capturedUIState).toBeTruthy());
+      expect(capturedUIState.isInputActive).toBe(true);
+      expect(capturedUIState.isConfigInitialized).toBe(false);
+
+      // Reset mockCoreEvents.emit feedback call count
+      mockCoreEvents.emit.mockClear();
+
+      // Submit the prompt while still initializing
+      await act(async () => {
+        await capturedUIActions.handleFinalSubmit('hello');
+      });
+
+      // Feedback should be emitted with "Initializing..." message
+      expect(mockCoreEvents.emit).toHaveBeenCalledWith(
+        'feedback',
+        expect.objectContaining({
+          type: 'info',
+          message:
+            'Initializing... Slash commands are still available and prompts will be queued.',
+        }),
+      );
+
+      unmount!();
+    });
+
+    it('queues prompts and shows feedback if submitted while authenticating', async () => {
+      const mockedUseAuthCommand = useAuthCommand as Mock;
+      mockedUseAuthCommand.mockReturnValue({
+        authState: AuthState.Unauthenticated,
+        setAuthState: vi.fn(),
+        authError: null,
+        onAuthError: vi.fn(),
+      });
+
+      let unmount: () => void;
+      await act(async () => {
+        unmount = renderAppContainer().unmount;
+      });
+
+      await waitFor(() => {
+        expect(capturedUIActions).toBeTruthy();
+        expect(capturedUIState.isConfigInitialized).toBe(true);
+      });
+
+      // Reset mockCoreEvents.emit feedback call count
+      mockCoreEvents.emit.mockClear();
+
+      // Submit a prompt while authenticating
+      await act(async () => {
+        await capturedUIActions.handleFinalSubmit('hello');
+      });
+
+      // Feedback should be emitted
+      expect(mockCoreEvents.emit).toHaveBeenCalledWith(
+        'feedback',
+        expect.objectContaining({
+          type: 'info',
+          message:
+            'Authentication is still in progress... Slash commands are still available and prompts will be queued.',
+        }),
+      );
+
+      unmount!();
+    });
+
+    it('queues prompts and shows feedback if submitted while initializing', async () => {
+      mockedUseAuthCommand.mockReturnValue({
+        authState: AuthState.Authenticated,
+        setAuthState: vi.fn(),
+        authError: null,
+        onAuthError: vi.fn(),
+      });
+
+      // Override the default mock to simulate non-initialized config
+      let unmount: () => void;
+      await act(async () => {
+        // We need to render with isConfigInitialized = false
+        // AppContainer state starts with isConfigInitialized = false
+        // and only sets it to true after config.initialize() completes.
+        // In tests, we can control how long config.initialize() takes.
+        vi.spyOn(mockConfig, 'isInitialized').mockReturnValue(false);
+        const initPromise = new Promise(() => {}); // Never resolves
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        vi.spyOn(mockConfig, 'initialize').mockReturnValue(initPromise as any);
+
+        unmount = renderAppContainer().unmount;
+      });
+
+      await waitFor(() => expect(capturedUIActions).toBeTruthy());
+
+      // isConfigInitialized should be false because we mocked initialize() to never resolve
+      expect(capturedUIState.isConfigInitialized).toBe(false);
+
+      // Reset mockCoreEvents.emit feedback call count
+      mockCoreEvents.emit.mockClear();
+
+      // Submit a prompt while initializing
+      await act(async () => {
+        await capturedUIActions.handleFinalSubmit('hello');
+      });
+
+      // Feedback should be emitted with "Initializing..." message
+      expect(mockCoreEvents.emit).toHaveBeenCalledWith(
+        'feedback',
+        expect.objectContaining({
+          type: 'info',
+          message:
+            'Initializing... Slash commands are still available and prompts will be queued.',
+        }),
+      );
+
       unmount!();
     });
   });

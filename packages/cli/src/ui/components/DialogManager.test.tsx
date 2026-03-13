@@ -31,9 +31,6 @@ vi.mock('./ThemeDialog.js', () => ({
 vi.mock('./SettingsDialog.js', () => ({
   SettingsDialog: () => <Text>SettingsDialog</Text>,
 }));
-vi.mock('../auth/AuthInProgress.js', () => ({
-  AuthInProgress: () => <Text>AuthInProgress</Text>,
-}));
 vi.mock('../auth/AuthDialog.js', () => ({
   AuthDialog: () => <Text>AuthDialog</Text>,
 }));
@@ -169,7 +166,6 @@ describe('DialogManager', () => {
     [{ isThemeDialogOpen: true }, 'ThemeDialog'],
     [{ isSettingsDialogOpen: true }, 'SettingsDialog'],
     [{ isModelDialogOpen: true }, 'ModelDialog'],
-    [{ isAuthenticating: true }, 'AuthInProgress'],
     [{ isAwaitingApiKeyInput: true }, 'ApiAuthDialog'],
     [{ isAuthDialogOpen: true }, 'AuthDialog'],
     [{ isEditorDialogOpen: true }, 'EditorSettingsDialog'],

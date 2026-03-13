@@ -110,6 +110,7 @@ export interface UIState {
   themeError: string | null;
   isAuthenticating: boolean;
   isConfigInitialized: boolean;
+  isMcpReady: boolean;
   authError: string | null;
   accountSuspensionInfo: AccountSuspensionInfo | null;
   isAuthDialogOpen: boolean;
