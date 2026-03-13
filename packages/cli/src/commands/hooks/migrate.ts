@@ -174,7 +174,7 @@ export async function handleMigrateFromClaude() {
     sourceFile = claudeLocalSettingsPath;
     try {
       const content = fs.readFileSync(claudeLocalSettingsPath, 'utf-8');
-      const parsed = JSON.parse(stripJsonComments(content));
+      const parsed: unknown = JSON.parse(stripJsonComments(content));
       if (isRecord(parsed)) {
         claudeSettings = parsed;
       }
@@ -187,7 +187,7 @@ export async function handleMigrateFromClaude() {
     sourceFile = claudeSettingsPath;
     try {
       const content = fs.readFileSync(claudeSettingsPath, 'utf-8');
-      const parsed = JSON.parse(stripJsonComments(content));
+      const parsed: unknown = JSON.parse(stripJsonComments(content));
       if (isRecord(parsed)) {
         claudeSettings = parsed;
       }
