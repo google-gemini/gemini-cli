@@ -106,6 +106,46 @@ vi.mock('node:os', () => ({
     },
   },
 }));
+
+vi.mock('./sandboxManager.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./sandboxManager.js')>();
+  return {
+    ...actual,
+    NoopSandboxManager: class extends actual.NoopSandboxManager {
+      override async prepareCommand(
+        req: import('./sandboxManager.js').SandboxRequest,
+      ) {
+        // If we're not explicitly testing sanitization, pass through the environment
+        // to keep existing unit tests simple.
+        if (
+          !req.env['GITHUB_SHA'] &&
+          req.env['SURFACE'] !== 'Github' &&
+          !req.config?.sanitizationConfig
+        ) {
+          return {
+            program: req.command,
+            args: req.args,
+            env: req.env,
+          };
+        }
+        return super.prepareCommand(req);
+      }
+    },
+  };
+});
+
+vi.mock('./bwrapSandboxManager.js', () => ({
+  BwrapSandboxManager: class {
+    async prepareCommand(req: import('./sandboxManager.js').SandboxRequest) {
+      return {
+        program: req.command,
+        args: req.args,
+        env: req.env,
+      };
+    }
+  },
+}));
+
 vi.mock('../utils/getPty.js', () => ({
   getPty: mockGetPty,
 }));

@@ -16,7 +16,6 @@ import {
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import { quote } from 'shell-quote';
 
 /**
  * A SandboxManager implementation that uses bubblewrap (bwrap) to provide
@@ -140,15 +139,7 @@ export class BwrapSandboxManager implements SandboxManager {
     bwrapArgs.push('--tmpfs', '/tmp');
     bwrapArgs.push('--tmpfs', '/run/user');
 
-    // Execute via shell
-    const shell = process.env['SHELL'] || '/bin/bash';
-    // If we have args, we quote everything. If not, we assume command is a shell string.
-    const innerCmd =
-      req.args.length > 0
-        ? [req.command, ...req.args].map((arg) => quote([arg])).join(' ')
-        : req.command;
-
-    const finalArgs = [...bwrapArgs, '--', shell, '-c', innerCmd];
+    const finalArgs = [...bwrapArgs, '--', req.command, ...req.args];
 
     // Ensure a safe, empty HOME directory for tools
     const env = { ...sanitizedEnv, HOME: '/tmp' };

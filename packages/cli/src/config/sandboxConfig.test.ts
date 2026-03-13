@@ -148,7 +148,7 @@ describe('loadSandboxConfig', () => {
       expect(config).toEqual({
         enabled: true,
         allowedPaths: [],
-        networkAccess: false,
+        networkAccess: true,
         command: 'sandbox-exec',
         image: 'default/image',
       });
@@ -161,7 +161,7 @@ describe('loadSandboxConfig', () => {
       expect(config).toEqual({
         enabled: true,
         allowedPaths: [],
-        networkAccess: false,
+        networkAccess: true,
         command: 'sandbox-exec',
         image: 'default/image',
       });
@@ -193,12 +193,25 @@ describe('loadSandboxConfig', () => {
       });
     });
 
+    it('should use bwrap if available on linux and sandbox is true', async () => {
+      mockedOsPlatform.mockReturnValue('linux');
+      mockedCommandExistsSync.mockImplementation((cmd) => cmd === 'bwrap');
+      const config = await loadSandboxConfig({}, { sandbox: true });
+      expect(config).toEqual({
+        enabled: true,
+        allowedPaths: [],
+        networkAccess: true,
+        command: 'bwrap',
+        image: 'default/image',
+      });
+    });
+
     it('should throw if sandbox: true but no command is found', async () => {
       mockedOsPlatform.mockReturnValue('linux');
       mockedCommandExistsSync.mockReturnValue(false);
       await expect(loadSandboxConfig({}, { sandbox: true })).rejects.toThrow(
         'GEMINI_SANDBOX is true but failed to determine command for sandbox; ' +
-          'install docker or podman or specify command in GEMINI_SANDBOX',
+          'install bwrap, docker or podman or specify command in GEMINI_SANDBOX',
       );
     });
   });
