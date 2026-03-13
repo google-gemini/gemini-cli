@@ -19,17 +19,12 @@ export function getErrorStatus(error: unknown): number | undefined {
       return error.status;
     }
     // Check for error.response.status (common in axios errors)
-    if (
-      'response' in error &&
-      typeof (error as { response?: unknown }).response === 'object' &&
-      (error as { response?: unknown }).response !== null
-    ) {
-      const response =
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        (error as { response: { status?: unknown; headers?: unknown } })
-          .response;
-      if ('status' in response && typeof response.status === 'number') {
-        return response.status;
+    if ('response' in error) {
+      const resp: unknown = error.response;
+      if (typeof resp === 'object' && resp !== null) {
+        if ('status' in resp && typeof resp.status === 'number') {
+          return resp.status;
+        }
       }
     }
   }
