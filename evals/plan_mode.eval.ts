@@ -50,10 +50,13 @@ describe('plan_mode', () => {
       ).not.toContain('README.md');
 
       assertModelHasOutput(result);
-      checkModelOutputContent(result, {
-        expectedContent: [/plan mode|read-only|cannot modify|refuse|exiting/i],
-        testName: `${TEST_PREFIX}should refuse file modification`,
-      });
+      expect(
+        checkModelOutputContent(result, {
+          expectedContent: [/plan mode|read-only|cannot modify|refuse|exiting/i],
+          testName: `${TEST_PREFIX}should refuse file modification`,
+        }),
+        'Model output content check failed for refuse file modification',
+      ).toBe(true);
     },
   });
 
@@ -91,10 +94,13 @@ describe('plan_mode', () => {
       ).toBe(false);
 
       assertModelHasOutput(result);
-      checkModelOutputContent(result, {
-        expectedContent: [/plan mode|read-only|cannot modify|refuse|exit/i],
-        testName: `${TEST_PREFIX}should refuse saving docs to repo`,
-      });
+      expect(
+        checkModelOutputContent(result, {
+          expectedContent: [/plan mode|read-only|cannot modify|refuse|exit/i],
+          testName: `${TEST_PREFIX}should refuse saving docs to repo`,
+        }),
+        'Model output content check failed for refuse saving docs to repo',
+      ).toBe(true);
     },
   });
 
