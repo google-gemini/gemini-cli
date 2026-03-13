@@ -348,6 +348,7 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
     override readonly extensionName?: string,
     override readonly extensionId?: string,
     private readonly _toolAnnotations?: Record<string, unknown>,
+    readonly originalServerName?: string,
   ) {
     super(
       nameOverride ??

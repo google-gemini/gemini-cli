@@ -38,6 +38,13 @@ describe('NewAgentsNotification', () => {
         },
       },
     },
+    {
+      name: 'Agent C',
+      description: 'Description C',
+      kind: 'remote' as const,
+      agentCardUrl: '',
+      inputConfig: { inputSchema: {} },
+    },
   ];
   const onSelect = vi.fn();
 

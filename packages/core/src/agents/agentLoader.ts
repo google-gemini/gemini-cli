@@ -550,6 +550,12 @@ export function markdownToAgentDefinition(
         config.description,
         config.include_tools,
         config.exclude_tools,
+        undefined, // extension
+        undefined, // oauth
+        undefined, // authProviderType
+        undefined, // targetAudience
+        undefined, // targetServiceAccount
+        name, // originalName
       );
     }
   }

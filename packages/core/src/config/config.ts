@@ -445,6 +445,11 @@ export class MCPServerConfig {
     readonly targetAudience?: string,
     /* targetServiceAccount format: <service-account-name>@<project-num>.iam.gserviceaccount.com */
     readonly targetServiceAccount?: string,
+    /**
+     * The original name of the server before any prefixing (e.g. for subagents).
+     * This is used by the policy engine to match rules.
+     */
+    readonly originalName?: string,
   ) {}
 }
 

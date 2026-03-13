@@ -1266,6 +1266,7 @@ export async function discoverTools(
           mcpServerConfig.extension?.name,
           mcpServerConfig.extension?.id,
           annotations as Record<string, unknown> | undefined,
+          mcpServerConfig.originalName,
         );
 
         discoveredTools.push(tool);
