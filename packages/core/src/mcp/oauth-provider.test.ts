@@ -639,6 +639,125 @@ describe('MCPOAuthProvider', () => {
       );
     });
 
+    it('should preserve registrationUrl from WWW-Authenticate discovery and use it for dynamic client registration', async () => {
+      const mcpServerUrl = 'https://mcp.example.com/mcp';
+      const registrationUrl = 'https://auth.example.com/register';
+
+      const configWithoutClient: MCPOAuthConfig = {
+        enabled: true,
+        scopes: ['read'],
+      };
+
+      const mockResourceMetadata: OAuthProtectedResourceMetadata = {
+        resource: mcpServerUrl,
+        authorization_servers: ['https://auth.example.com'],
+      };
+
+      const mockAuthServerMetadata: OAuthAuthorizationServerMetadata = {
+        issuer: 'https://auth.example.com',
+        authorization_endpoint: 'https://auth.example.com/authorize',
+        token_endpoint: 'https://auth.example.com/token',
+        registration_endpoint: registrationUrl,
+        code_challenge_methods_supported: ['S256'],
+      };
+
+      const mockRegistrationResponse: OAuthClientRegistrationResponse = {
+        client_id: 'dynamic_client_id',
+        redirect_uris: ['http://localhost:7777/oauth/callback'],
+        grant_types: ['authorization_code'],
+        response_types: ['code'],
+        token_endpoint_auth_method: 'none',
+      };
+
+      mockFetch
+        // 1. HEAD mcpServerUrl → 401 + WWW-Authenticate
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 401,
+          headers: {
+            get: (name: string) =>
+              name.toLowerCase() === 'www-authenticate'
+                ? `Bearer resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource/mcp"`
+                : null,
+          },
+        })
+        // 2. GET resource metadata
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockResourceMetadata),
+            json: mockResourceMetadata,
+          }),
+        )
+        // 3. GET auth server metadata (includes registration_endpoint)
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockAuthServerMetadata),
+            json: mockAuthServerMetadata,
+          }),
+        )
+        // 4. POST registration endpoint
+        .mockResolvedValueOnce(
+          createMockResponse({
+            ok: true,
+            contentType: 'application/json',
+            text: JSON.stringify(mockRegistrationResponse),
+            json: mockRegistrationResponse,
+          }),
+        );
+
+      // Setup callback server to simulate browser redirect with auth code
+      let callbackHandler: unknown;
+      vi.mocked(http.createServer).mockImplementation((handler) => {
+        callbackHandler = handler;
+        return mockHttpServer as unknown as http.Server;
+      });
+
+      mockHttpServer.listen.mockImplementation((port, callback) => {
+        callback?.();
+        setTimeout(() => {
+          const mockReq = {
+            url: '/oauth/callback?code=auth_code_123&state=bW9ja19zdGF0ZV8xNl9ieXRlcw',
+          };
+          const mockRes = { writeHead: vi.fn(), end: vi.fn() };
+          (callbackHandler as (req: unknown, res: unknown) => void)(
+            mockReq,
+            mockRes,
+          );
+        }, 10);
+      });
+
+      // 5. Token exchange
+      mockFetch.mockResolvedValueOnce(
+        createMockResponse({
+          ok: true,
+          contentType: 'application/json',
+          text: JSON.stringify(mockTokenResponse),
+          json: mockTokenResponse,
+        }),
+      );
+
+      const authProvider = new MCPOAuthProvider();
+      const result = await authProvider.authenticate(
+        'test-server',
+        configWithoutClient,
+        mcpServerUrl,
+      );
+
+      expect(result).toBeDefined();
+      // registerClient must have been called with the registrationUrl from WWW-Authenticate discovery
+      expect(mockFetch).toHaveBeenCalledWith(
+        registrationUrl,
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    });
+
     it('should throw error when issuer is missing and dynamic registration is needed', async () => {
       const configWithoutIssuer: MCPOAuthConfig = {
         enabled: mockConfig.enabled,

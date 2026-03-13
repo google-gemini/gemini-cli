@@ -896,6 +896,7 @@ async function handleAutomaticOAuth(
       authorizationUrl: oauthConfig.authorizationUrl,
       issuer: oauthConfig.issuer,
       tokenUrl: oauthConfig.tokenUrl,
+      registrationUrl: oauthConfig.registrationUrl,
       scopes: oauthConfig.scopes || [],
     };
 
@@ -1996,6 +1997,7 @@ export async function connectToMcpServer(
               authorizationUrl: oauthConfig.authorizationUrl,
               issuer: oauthConfig.issuer,
               tokenUrl: oauthConfig.tokenUrl,
+              registrationUrl: oauthConfig.registrationUrl,
               scopes: oauthConfig.scopes || [],
             };
 
