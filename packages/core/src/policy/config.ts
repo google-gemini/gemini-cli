@@ -584,6 +584,7 @@ export function createPolicyUpdater(
             // which is safe and won't contain ReDoS patterns.
             policyEngine.addRule({
               toolName,
+              mcpName: message.mcpName,
               decision: PolicyDecision.ALLOW,
               priority,
               argsPattern: new RegExp(pattern),
@@ -617,8 +618,15 @@ export function createPolicyUpdater(
           return;
         }
 
+        // Normalize toolName for in-memory rules if it's an MCP server wildcard
+        let effectiveToolName = toolName;
+        if (message.mcpName && toolName === `${message.mcpName}__*`) {
+          effectiveToolName = '*';
+        }
+
         policyEngine.addRule({
-          toolName,
+          toolName: effectiveToolName,
+          mcpName: message.mcpName,
           decision: PolicyDecision.ALLOW,
           priority,
           argsPattern,
@@ -669,13 +677,10 @@ export function createPolicyUpdater(
 
             if (message.mcpName) {
               newRule.mcpName = message.mcpName;
-
-              const expectedPrefix = `${MCP_TOOL_PREFIX}${message.mcpName}_`;
-              if (toolName.startsWith(expectedPrefix)) {
-                newRule.toolName = toolName.slice(expectedPrefix.length);
-              } else {
-                newRule.toolName = toolName;
-              }
+              // Extract simple tool name
+              newRule.toolName = toolName.startsWith(`${message.mcpName}__`)
+                ? toolName.slice(message.mcpName.length + 2)
+                : toolName;
             } else {
               newRule.toolName = toolName;
             }

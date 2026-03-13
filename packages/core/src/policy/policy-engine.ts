@@ -63,6 +63,12 @@ function matchesWildcard(
     return toolName.startsWith(`${MCP_TOOL_PREFIX}${expectedServerName}_`);
   }
 
+  // Handle {server}__* format (used for non-prefixed tools in subagents)
+  if (pattern.endsWith('__*')) {
+    const expectedServerName = pattern.slice(0, -3);
+    return serverName === expectedServerName;
+  }
+
   // Not a recognized wildcard pattern, fallback to exact match just in case
   return toolName === pattern;
 }
