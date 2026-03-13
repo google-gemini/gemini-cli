@@ -33,15 +33,26 @@ const esbuildProblemMatcherPlugin = {
 
 async function main() {
   const ctx = await esbuild.context({
-    entryPoints: ['src/extension.ts'],
+    entryPoints: [
+      { in: 'src/extension.ts', out: 'extension' },
+      {
+        in: 'src/integration-tests/run-test.ts',
+        out: 'integration-tests/run-test',
+      },
+      {
+        in: 'src/integration-tests/focus.test.ts',
+        out: 'integration-tests/focus.test',
+      },
+    ],
     bundle: true,
     format: 'cjs',
     minify: production,
     sourcemap: !production,
     sourcesContent: false,
     platform: 'node',
-    outfile: 'dist/extension.cjs',
-    external: ['vscode'],
+    outdir: 'dist',
+    outExtension: { '.js': '.cjs' },
+    external: ['vscode', 'vitest'],
     logLevel: 'silent',
     banner: {
       js: `const import_meta = { url: require('url').pathToFileURL(__filename).href };`,
@@ -52,12 +63,10 @@ async function main() {
     alias: {
       punycode: 'punycode/',
     },
-    plugins: [
-      /* add to the end of plugins array */
-      esbuildProblemMatcherPlugin,
-    ],
+    plugins: [esbuildProblemMatcherPlugin],
     loader: { '.node': 'file', '.wasm': 'binary' },
   });
+
   if (watch) {
     await ctx.watch();
   } else {

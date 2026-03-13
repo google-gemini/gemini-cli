@@ -38,9 +38,6 @@ describe('DiffManager', () => {
     diffManager = new DiffManager(log, diffContentProvider);
   });
 
-  /**
-   * Helper to setup a mock tab in vscode.window.tabGroups.all
-   */
   function setupMockTab(rightDocUri: vscode.Uri) {
     const mockTab = {
       input: new vscode.TabInputTextDiff(
@@ -49,7 +46,6 @@ describe('DiffManager', () => {
       ),
     };
 
-    // We cast to unknown then to a custom type here to override the read-only 'all' property for the test
     (
       vscode.window.tabGroups as unknown as {
         all: Array<{ tabs: Array<{ input: vscode.TabInputTextDiff }> }>;
@@ -59,9 +55,6 @@ describe('DiffManager', () => {
     return mockTab;
   }
 
-  /**
-   * Helper to extract the rightDocUri from the first call to vscode.diff
-   */
   function getRightDocUriFromDiffCall(): vscode.Uri {
     const diffCall = vi
       .mocked(vscode.commands.executeCommand)
@@ -92,17 +85,13 @@ describe('DiffManager', () => {
       const filePath = '/test/file.ts';
       const newContent = 'new content';
 
-      // 1. Show the diff
       await diffManager.showDiff(filePath, newContent);
 
-      // 2. Setup mock tabs based on what was actually opened
       const rightDocUri = getRightDocUriFromDiffCall();
       const mockTab = setupMockTab(rightDocUri);
 
-      // 3. Perform the action
       await action(filePath, rightDocUri);
 
-      // 4. Verify the tab was closed
       expect(vscode.window.tabGroups.close).toHaveBeenCalledWith(mockTab, true);
     });
   }
@@ -113,12 +102,10 @@ describe('DiffManager', () => {
     const rightDocUri = getRightDocUriFromDiffCall();
     setupMockTab(rightDocUri);
 
-    // Verify content exists before
     expect(diffContentProvider.getContent(rightDocUri)).toBe('content');
 
     await diffManager.closeDiff(filePath);
 
-    // Verify content is cleaned up
     expect(diffContentProvider.getContent(rightDocUri)).toBeUndefined();
   });
 });

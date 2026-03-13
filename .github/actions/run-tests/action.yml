@@ -35,4 +35,11 @@ runs:
         echo "::group::Integration Tests (docker sandbox)"
         npm run test:integration:sandbox:docker
         echo "::endgroup::"
+        echo "::group::Integration Tests (VS Code)"
+        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+          xvfb-run -a npm run test:integration:vscode
+        else
+          npm run test:integration:vscode
+        fi
+        echo "::endgroup::"
       shell: 'bash'
