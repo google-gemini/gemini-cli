@@ -593,6 +593,54 @@ function doIt() {
       const expectedContent = '  // some comment\n\n  function newFunc() {}';
       expect(result.newContent).toBe(expectedContent);
     });
+
+    it('should preserve newline boundary in flexible replacement with trailing content (regression)', async () => {
+      const content = 'hello\nworld\nend';
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.txt',
+          instruction: 'test',
+          old_string: '  hello\n  world',
+          new_string: 'goodbye\nmoon',
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.newContent).toBe('goodbye\nmoon\nend');
+    });
+
+    it('should preserve newline boundary with indented file content (issue #22111)', async () => {
+      const content = '  hello\n    world\n  end\n';
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.txt',
+          instruction: 'test',
+          old_string: 'hello\nworld',
+          new_string: 'goodbye\nmoon',
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.newContent).toBe('  goodbye\n  moon\n  end\n');
+    });
+
+    it('should replace adjacent multi-line occurrences without skipping', async () => {
+      const content = 'hello\nworld\nhello\nworld\nend\n';
+      const result = await calculateReplacement(mockConfig, {
+        params: {
+          file_path: 'test.txt',
+          instruction: 'test',
+          old_string: '  hello\n  world',
+          new_string: 'goodbye\nmoon',
+        },
+        currentContent: content,
+        abortSignal,
+      });
+
+      expect(result.newContent).toBe('goodbye\nmoon\ngoodbye\nmoon\nend\n');
+    });
   });
 
   describe('validateToolParams', () => {
