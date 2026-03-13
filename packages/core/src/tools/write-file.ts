@@ -50,6 +50,7 @@ import { WRITE_FILE_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 import { isGemini3Model } from '../config/models.js';
+import { discoverJitContext, appendJitContext } from './jit-context.js';
 
 /**
  * Parameters for the WriteFile tool
@@ -391,8 +392,18 @@ class WriteFileToolInvocation extends BaseToolInvocation<
         isNewFile,
       };
 
+      // Discover JIT subdirectory context for the written file path
+      const jitContext = await discoverJitContext(
+        this.config,
+        this.resolvedPath,
+      );
+      let llmContent = llmSuccessMessageParts.join(' ');
+      if (jitContext) {
+        llmContent = appendJitContext(llmContent, jitContext);
+      }
+
       return {
-        llmContent: llmSuccessMessageParts.join(' '),
+        llmContent,
         returnDisplay: displayResult,
       };
     } catch (error) {

@@ -25,6 +25,7 @@ import { buildDirPathArgsPattern } from '../policy/utils.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { LS_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { discoverJitContext, appendJitContext } from './jit-context.js';
 
 /**
  * Parameters for the LS tool
@@ -268,6 +269,12 @@ class LSToolInvocation extends BaseToolInvocation<LSToolParams, ToolResult> {
       let resultMessage = `Directory listing for ${resolvedDirPath}:\n${directoryContent}`;
       if (ignoredCount > 0) {
         resultMessage += `\n\n(${ignoredCount} ignored)`;
+      }
+
+      // Discover JIT subdirectory context for the listed directory
+      const jitContext = await discoverJitContext(this.config, resolvedDirPath);
+      if (jitContext) {
+        resultMessage = appendJitContext(resultMessage, jitContext);
       }
 
       let displayMessage = `Listed ${entries.length} item(s).`;
