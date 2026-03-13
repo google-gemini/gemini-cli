@@ -43,6 +43,8 @@ import {
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
+const PROXY_HEALTH_CHECK_TIMEOUT_SECS = 30;
+
 export async function start_sandbox(
   config: SandboxConfig,
   nodeArgs: string[] = [],
@@ -200,18 +202,38 @@ export async function start_sandbox(
         proxyProcess.stderr?.on('data', (data) => {
           debugLogger.debug(`[PROXY STDERR]: ${data.toString().trim()}`);
         });
-        proxyProcess.on('close', (code, signal) => {
-          if (sandboxProcess?.pid) {
-            process.kill(-sandboxProcess.pid, 'SIGTERM');
-          }
-          throw new FatalSandboxError(
-            `Proxy command '${proxyCommand}' exited with code ${code}, signal ${signal}`,
+        // Use a shared promise so early proxy crashes and health check
+        // timeouts are both handled through a single awaited promise,
+        // avoiding unhandled exceptions from the close event callback.
+        const seatbeltProxyReady = new Promise<void>((resolve, reject) => {
+          proxyProcess!.on('close', (code, signal) => {
+            if (sandboxProcess?.pid) {
+              process.kill(-sandboxProcess.pid, 'SIGTERM');
+            }
+            reject(
+              new FatalSandboxError(
+                `Proxy command '${proxyCommand}' exited with code ${code}, signal ${signal}`,
+              ),
+            );
+          });
+
+          execAsync(
+            `timeout ${PROXY_HEALTH_CHECK_TIMEOUT_SECS} bash -c 'until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done'`,
+          ).then(
+            () => resolve(),
+            (e) => {
+              debugLogger.error('Proxy health check failed:', e);
+              reject(
+                new FatalSandboxError(
+                  `Proxy health check failed or timed out after ${PROXY_HEALTH_CHECK_TIMEOUT_SECS}s. Verify that GEMINI_SANDBOX_PROXY_COMMAND is correct: '${proxyCommand}'`,
+                ),
+              );
+            },
           );
         });
+
         debugLogger.log('waiting for proxy to start ...');
-        await execAsync(
-          `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
-        );
+        await seatbeltProxyReady;
       }
       // spawn child and let it inherit stdio
       process.stdin.pause();
@@ -756,18 +778,38 @@ export async function start_sandbox(
       proxyProcess.stderr?.on('data', (data) => {
         debugLogger.debug(`[PROXY STDERR]: ${data.toString().trim()}`);
       });
-      proxyProcess.on('close', (code, signal) => {
-        if (sandboxProcess?.pid) {
-          process.kill(-sandboxProcess.pid, 'SIGTERM');
-        }
-        throw new FatalSandboxError(
-          `Proxy container command '${command} ${proxyContainerArgs.join(' ')}' exited with code ${code}, signal ${signal}`,
+// Use a shared promise so early proxy crashes and health check
+      // timeouts are both handled through a single awaited promise,
+      // avoiding unhandled exceptions from the close event callback.
+      const dockerProxyReady = new Promise<void>((resolve, reject) => {
+        proxyProcess!.on('close', (code, signal) => {
+          if (sandboxProcess?.pid) {
+            process.kill(-sandboxProcess.pid, 'SIGTERM');
+          }
+          reject(
+            new FatalSandboxError(
+              `Proxy container command '${command} ${proxyContainerArgs.join(' ')}' exited with code ${code}, signal ${signal}`,
+            ),
+          );
+        });
+
+        execAsync(
+          `timeout ${PROXY_HEALTH_CHECK_TIMEOUT_SECS} bash -c 'until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done'`,
+        ).then(
+          () => resolve(),
+          (e) => {
+            debugLogger.error('Proxy health check failed:', e);
+            reject(
+              new FatalSandboxError(
+                `Proxy health check failed or timed out after ${PROXY_HEALTH_CHECK_TIMEOUT_SECS}s. Verify that GEMINI_SANDBOX_PROXY_COMMAND is correct: '${proxyCommand}'`,
+              ),
+            );
+          },
         );
       });
+
       debugLogger.log('waiting for proxy to start ...');
-      await execAsync(
-        `until timeout 0.25 curl -s http://localhost:8877; do sleep 0.25; done`,
-      );
+      await dockerProxyReady;
       // connect proxy container to sandbox network
       // (workaround for older versions of docker that don't support multiple --network args)
       await execAsync(
