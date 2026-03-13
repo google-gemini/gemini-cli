@@ -10,6 +10,7 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
+    "bundle:browser-mcp": "node scripts/bundle-browser-mcp.mjs",
     "build": "node ../../scripts/build_package.js",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
@@ -73,6 +74,7 @@
     "open": "^10.1.2",
     "picomatch": "^4.0.1",
     "proper-lockfile": "^4.1.2",
+    "puppeteer-core": "^24.0.0",
     "read-package-up": "^11.0.0",
     "shell-quote": "^1.8.3",
     "simple-git": "^3.28.0",
@@ -101,6 +103,7 @@
     "@types/fast-levenshtein": "^0.0.4",
     "@types/js-yaml": "^4.0.9",
     "@types/picomatch": "^4.0.1",
+    "chrome-devtools-mcp": "^0.19.0",
     "msw": "^2.3.4",
     "typescript": "^5.3.3",
     "vitest": "^3.1.1"
