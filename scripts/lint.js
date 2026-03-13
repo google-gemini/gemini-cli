@@ -7,12 +7,12 @@
  */
 
 import { execSync } from 'node:child_process';
-
-const isWindows = process.platform === 'win32';
+import { existsSync, lstatSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const LINTERS = {
   actionlint: {
-    check: isWindows ? 'where npx node-actionlint 2>nul' : 'command -v npx node-actionlint',
+    check: 'npm list @tktco/node-actionlint --depth=0',
     installer: 'npm install --save-dev @tktco/node-actionlint',
     run: `
       npx node-actionlint \
@@ -24,28 +24,55 @@ const LINTERS = {
     `,
   },
   shellcheck: {
-    check: isWindows ? 'where npx shellcheck 2>nul' : 'command -v npx shellcheck',
+    check: 'npm list shellcheck --depth=0',
     installer: 'npm install --save-dev shellcheck',
-    run: `
-      git ls-files | grep -E '^([^.]+|.*\\.(sh|zsh|bash))' | xargs file --mime-type \
-        | grep "text/x-shellscript" | awk '{ print substr($1, 1, length($1)-1) }' \
-        | xargs npx shellcheck \
-          --check-sourced \
-          --enable=all \
-          --exclude=SC2002,SC2129,SC2310 \
-          --severity=style \
-          --format=gcc \
-          --color=never | sed -e 's/note:/warning:/g' -e 's/style:/warning:/g'
-    `,
   },
   yamllint: {
-    check: isWindows ? 'where npx yaml-lint 2>nul' : 'command -v npx yaml-lint',
+    check: 'npm list yaml-lint --depth=0',
     installer: 'npm install --save-dev yaml-lint',
-    run: isWindows
-      ? `powershell -Command "Get-ChildItem -Recurse -Include *.yaml,*.yml | ForEach-Object { npx yaml-lint $_.FullName }"`
-      : "git ls-files | grep -E '\\.(yaml|yml)' | xargs npx yaml-lint",
   },
 };
+
+function getShellScripts() {
+  const allFiles = execSync('git ls-files', { encoding: 'utf-8' })
+    .split('\n')
+    .filter(Boolean);
+
+  return allFiles.filter((file) => {
+    if (
+      file.endsWith('.sh') ||
+      file.endsWith('.zsh') ||
+      file.endsWith('.bash')
+    ) {
+      return true;
+    }
+    if (
+      !file.includes('.') &&
+      existsSync(file) &&
+      !lstatSync(file).isDirectory()
+    ) {
+      try {
+        const content = readFileSync(file, 'utf-8');
+        const firstLine = content.split('\n')[0];
+        return (
+          firstLine.startsWith('#!') &&
+          (firstLine.includes('sh') ||
+            firstLine.includes('bash') ||
+            firstLine.includes('zsh'))
+        );
+      } catch (_e) {
+        return false;
+      }
+    }
+    return false;
+  });
+}
+
+function getYamlFiles() {
+  return execSync('git ls-files', { encoding: 'utf-8' })
+    .split('\n')
+    .filter((file) => file.endsWith('.yaml') || file.endsWith('.yml'));
+}
 
 function runCommand(command, stdio = 'inherit') {
   try {
@@ -58,7 +85,7 @@ function runCommand(command, stdio = 'inherit') {
 
 export function setupLinters() {
   console.log('Setting up linters...');
-  
+
   for (const linter in LINTERS) {
     const { check, installer } = LINTERS[linter];
     if (!runCommand(check, 'ignore')) {
@@ -90,14 +117,56 @@ export function runActionlint() {
 
 export function runShellcheck() {
   console.log('\nRunning shellcheck...');
-  if (!runCommand(LINTERS.shellcheck.run)) {
+  const files = getShellScripts();
+  if (files.length === 0) {
+    console.log('No shell scripts found.');
+    return;
+  }
+
+  const command = `npx shellcheck \
+    --check-sourced \
+    --enable=all \
+    --exclude=SC2002,SC2129,SC2310 \
+    --severity=style \
+    --format=gcc \
+    --color=never ${files.join(' ')}`;
+
+  try {
+    const output = execSync(command, {
+      env: process.env,
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    console.log(
+      output.replace(/note:/g, 'warning:').replace(/style:/g, 'warning:'),
+    );
+  } catch (e) {
+    if (e.stdout) {
+      console.log(
+        e.stdout
+          .toString()
+          .replace(/note:/g, 'warning:')
+          .replace(/style:/g, 'warning:'),
+      );
+    }
+    if (e.stderr) {
+      console.error(e.stderr.toString());
+    }
     process.exit(1);
   }
 }
 
 export function runYamllint() {
   console.log('\nRunning yamllint...');
-  if (!runCommand(LINTERS.yamllint.run)) {
+  const files = getYamlFiles();
+  if (files.length === 0) {
+    console.log('No YAML files found.');
+    return;
+  }
+
+  // Use xargs-like behavior but via Node to avoid shell limits and ensure portability
+  // Passing all files at once is generally supported by yaml-lint
+  if (!runCommand(`npx yaml-lint ${files.join(' ')}`)) {
     process.exit(1);
   }
 }
