@@ -37,6 +37,8 @@ export interface SandboxedCommand {
   args: string[];
   /** Sanitized environment variables. */
   env: NodeJS.ProcessEnv;
+  /** The working directory. */
+  cwd?: string;
 }
 
 /**

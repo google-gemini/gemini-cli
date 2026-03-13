@@ -337,11 +337,16 @@ export class ShellExecutionService {
     env: NodeJS.ProcessEnv,
     shellExecutionConfig: ShellExecutionConfig,
     sanitizationConfigOverride?: EnvironmentSanitizationConfig,
-  ): Promise<{ program: string; args: string[]; env: NodeJS.ProcessEnv }> {
+  ): Promise<{
+    program: string;
+    args: string[];
+    env: NodeJS.ProcessEnv;
+    cwd: string;
+  }> {
     const resolvedExecutable =
       (await resolveExecutable(executable)) ?? executable;
 
-    return shellExecutionConfig.sandboxManager.prepareCommand({
+    const prepared = await shellExecutionConfig.sandboxManager.prepareCommand({
       command: resolvedExecutable,
       args,
       cwd,
@@ -351,6 +356,13 @@ export class ShellExecutionService {
           sanitizationConfigOverride ?? shellExecutionConfig.sanitizationConfig,
       },
     });
+
+    return {
+      program: prepared.program,
+      args: prepared.args,
+      env: prepared.env,
+      cwd: prepared.cwd ?? cwd,
+    };
   }
 
   private static async childProcessFallback(
@@ -394,6 +406,7 @@ export class ShellExecutionService {
         program: finalExecutable,
         args: finalArgs,
         env: sanitizedEnv,
+        cwd: finalCwd,
       } = await this.prepareExecution(
         executable,
         spawnArgs,
@@ -427,7 +440,7 @@ export class ShellExecutionService {
       }
 
       const child = cpSpawn(finalExecutable, finalArgs, {
-        cwd,
+        cwd: finalCwd,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsVerbatimArguments: isWindows ? false : undefined,
         shell: false,
@@ -732,21 +745,37 @@ export class ShellExecutionService {
         GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
       };
 
+      // Specifically allow GIT_CONFIG_* variables to pass through sanitization
+      // so we can safely append our overrides if needed.
+      const gitConfigKeys = Object.keys(process.env).filter((k) =>
+        k.startsWith('GIT_CONFIG_'),
+      );
+      const localSanitizationConfig = {
+        ...shellExecutionConfig.sanitizationConfig,
+        allowedEnvironmentVariables: [
+          ...(shellExecutionConfig.sanitizationConfig
+            ?.allowedEnvironmentVariables ?? []),
+          ...gitConfigKeys,
+        ],
+      };
+
       const {
         program: finalExecutable,
         args: finalArgs,
         env: finalEnv,
+        cwd: finalCwd,
       } = await this.prepareExecution(
         executable,
         args,
         cwd,
         env,
         shellExecutionConfig,
+        localSanitizationConfig,
       );
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const ptyProcess = ptyInfo.module.spawn(finalExecutable, finalArgs, {
-        cwd,
+        cwd: finalCwd,
         name: 'xterm-256color',
         cols,
         rows,
