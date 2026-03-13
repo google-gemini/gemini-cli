@@ -587,6 +587,9 @@ export class BrowserManager {
 
     // If none matched, then deny
     return `Tool '${toolName}' is not permitted for the requested URL/domain based on your current browser settings.`;
+  }
+
+  /**
    * Registers a fallback notification handler on the MCP client to
    * automatically re-inject the input blocker after any server-side
    * notification (e.g. page navigation, resource updates).
