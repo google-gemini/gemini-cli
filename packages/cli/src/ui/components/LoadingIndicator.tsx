@@ -15,7 +15,6 @@ import { formatDuration } from '../utils/formatters.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
-import { GENERIC_WORKING_LABEL } from '../textConstants.js';
 
 interface LoadingIndicatorProps {
   currentLoadingPhrase?: string;
@@ -67,16 +66,8 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
         ? (thoughtLabel ?? thought.subject)
         : currentLoadingPhrase ||
           (streamingState === StreamingState.Responding
-            ? GENERIC_WORKING_LABEL
+            ? 'Thinking...'
             : undefined);
-  const hasThoughtIndicator =
-    currentLoadingPhrase !== INTERACTIVE_SHELL_WAITING_PHRASE &&
-    Boolean(thought?.subject?.trim());
-  // Avoid "Thinking... Thinking..." duplication if primaryText already starts with "Thinking"
-  const thinkingIndicator =
-    hasThoughtIndicator && !primaryText?.startsWith('Thinking')
-      ? 'Thinking... '
-      : '';
 
   const cancelAndTimerContent =
     showCancelAndTimer &&
@@ -88,7 +79,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
     !forceRealStatusOnly &&
     showWit &&
     wittyPhrase &&
-    primaryText === GENERIC_WORKING_LABEL ? (
+    primaryText === 'Thinking...' ? (
       <Box marginLeft={1}>
         <Text color={theme.text.secondary} dimColor italic>
           {wittyPhrase}
@@ -111,7 +102,6 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
         {primaryText && (
           <Box flexShrink={1}>
             <Text color={theme.text.primary} italic wrap="truncate-end">
-              {thinkingIndicator}
               {primaryText}
             </Text>
             {primaryText === INTERACTIVE_SHELL_WAITING_PHRASE && (
@@ -122,13 +112,13 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
             )}
           </Box>
         )}
-        {wittyPhraseNode}
         {cancelAndTimerContent && (
           <>
             <Box flexShrink={0} width={1} />
             <Text color={theme.text.secondary}>{cancelAndTimerContent}</Text>
           </>
         )}
+        {wittyPhraseNode}
       </Box>
     );
   }
@@ -154,7 +144,6 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
           {primaryText && (
             <Box flexShrink={1}>
               <Text color={theme.text.primary} italic wrap="truncate-end">
-                {thinkingIndicator}
                 {primaryText}
               </Text>
               {primaryText === INTERACTIVE_SHELL_WAITING_PHRASE && (
@@ -165,13 +154,13 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
               )}
             </Box>
           )}
-          {wittyPhraseNode}
           {!isNarrow && cancelAndTimerContent && (
             <>
               <Box flexShrink={0} width={1} />
               <Text color={theme.text.secondary}>{cancelAndTimerContent}</Text>
             </>
           )}
+          {!isNarrow && wittyPhraseNode}
         </Box>
         {!isNarrow && <Box flexGrow={1}>{/* Spacer */}</Box>}
         {!isNarrow && rightContent && <Box>{rightContent}</Box>}
@@ -181,6 +170,7 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
           <Text color={theme.text.secondary}>{cancelAndTimerContent}</Text>
         </Box>
       )}
+      {isNarrow && wittyPhraseNode}
       {isNarrow && rightContent && <Box>{rightContent}</Box>}
     </Box>
   );
