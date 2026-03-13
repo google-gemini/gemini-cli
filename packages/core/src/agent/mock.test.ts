@@ -115,20 +115,90 @@ describe('MockAgentSession', () => {
     }).rejects.toThrow('Event not found: invalid');
   });
 
-  it('should handle abort', async () => {
+  it('should handle abort on a waiting stream', async () => {
     const session = new MockAgentSession();
-    session.pushResponse([{ type: 'stream_start' }]); // Explicitly test we can use manual start
-    const { streamId } = await session.send({
-      update: {},
-    });
+    // Use keepOpen to prevent auto stream_end
+    session.pushResponse([{ type: 'message' }], { keepOpen: true });
+    const { streamId } = await session.send({ update: {} });
 
-    await session.abort({ streamId });
+    const stream = session.stream({ streamId });
+
+    // Read initial events
+    const e1 = await stream.next();
+    expect(e1.value.type).toBe('stream_start');
+    const e2 = await stream.next();
+    expect(e2.value.type).toBe('session_update');
+    const e3 = await stream.next();
+    expect(e3.value.type).toBe('message');
+
+    // At this point, the stream should be "waiting" for more events because it's still active
+    // and hasn't seen a stream_end.
+    const abortPromise = session.abort();
+    const e4 = await stream.next();
+    expect(e4.value.type).toBe('stream_end');
+    expect((e4.value as AgentEvent<'stream_end'>).reason).toBe('aborted');
+
+    await abortPromise;
+    expect(await stream.next()).toEqual({ done: true, value: undefined });
+  });
+
+  it('should handle pushToStream on a waiting stream', async () => {
+    const session = new MockAgentSession();
+    session.pushResponse([], { keepOpen: true });
+    const { streamId } = await session.send({ update: {} });
+
+    const stream = session.stream({ streamId });
+    await stream.next(); // start
+    await stream.next(); // update
+
+    // Push new event to active stream
+    session.pushToStream(streamId, [{ type: 'message' }]);
+
+    const e3 = await stream.next();
+    expect(e3.value.type).toBe('message');
+
+    await session.abort();
+    const e4 = await stream.next();
+    expect(e4.value.type).toBe('stream_end');
+  });
+
+  it('should handle pushToStream with close option', async () => {
+    const session = new MockAgentSession();
+    session.pushResponse([], { keepOpen: true });
+    const { streamId } = await session.send({ update: {} });
+
+    const stream = session.stream({ streamId });
+    await stream.next(); // start
+    await stream.next(); // update
+
+    // Push new event and close
+    session.pushToStream(streamId, [{ type: 'message' }], { close: true });
+
+    const e3 = await stream.next();
+    expect(e3.value.type).toBe('message');
+
+    const e4 = await stream.next();
+    expect(e4.value.type).toBe('stream_end');
+    expect((e4.value as AgentEvent<'stream_end'>).reason).toBe('completed');
+
+    expect(await stream.next()).toEqual({ done: true, value: undefined });
+  });
+
+  it('should not double up on stream_end if provided manually', async () => {
+    const session = new MockAgentSession();
+    session.pushResponse([
+      { type: 'message' },
+      { type: 'stream_end', reason: 'completed' },
+    ]);
+    const { streamId } = await session.send({ update: {} });
 
     const events: AgentEvent[] = [];
     for await (const e of session.stream({ streamId })) {
       events.push(e);
     }
-    expect(events).toHaveLength(0);
+
+    const endEvents = events.filter((e) => e.type === 'stream_end');
+    expect(endEvents).toHaveLength(1);
   });
 
   it('should stream after eventId', async () => {

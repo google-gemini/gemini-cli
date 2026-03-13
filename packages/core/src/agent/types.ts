@@ -30,11 +30,9 @@ export interface AgentSession<
   }): AsyncIterableIterator<AgentEvent>;
 
   /**
-   * Aborts an active stream of agent activity. If called with no options, aborts
-   * any activity on the main thread. If a specific `streamId` is provided, should
-   * throw if that stream is not active.
+   * Aborts an active stream of agent activity.
    */
-  abort(options?: { streamId?: string }): Promise<void>;
+  abort(): Promise<void>;
 
   /**
    * AgentSession implements the Trajectory interface and can retrieve existing events.
