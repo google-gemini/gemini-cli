@@ -61,6 +61,7 @@ export async function createPolicyEngineConfig(
     tools: settings.tools,
     mcpServers: settings.mcpServers,
     policyPaths: settings.policyPaths,
+    adminPolicyPaths: settings.adminPolicyPaths,
     workspacePoliciesDir,
   };
 

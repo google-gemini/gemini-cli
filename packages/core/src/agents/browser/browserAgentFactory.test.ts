@@ -9,6 +9,7 @@ import {
   createBrowserAgentDefinition,
   cleanupBrowserAgent,
 } from './browserAgentFactory.js';
+import { injectAutomationOverlay } from './automationOverlay.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import type { Config } from '../../config/config.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
@@ -35,6 +36,10 @@ vi.mock('./browserManager.js', () => ({
   BrowserManager: vi.fn(() => mockBrowserManager),
 }));
 
+vi.mock('./automationOverlay.js', () => ({
+  injectAutomationOverlay: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('../../utils/debugLogger.js', () => ({
   debugLogger: {
     log: vi.fn(),
@@ -54,6 +59,8 @@ describe('browserAgentFactory', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    vi.mocked(injectAutomationOverlay).mockClear();
 
     // Reset mock implementations
     mockBrowserManager.ensureConnection.mockResolvedValue(undefined);
@@ -97,6 +104,28 @@ describe('browserAgentFactory', () => {
       await createBrowserAgentDefinition(mockConfig, mockMessageBus);
 
       expect(mockBrowserManager.ensureConnection).toHaveBeenCalled();
+    });
+
+    it('should inject automation overlay when not in headless mode', async () => {
+      await createBrowserAgentDefinition(mockConfig, mockMessageBus);
+      expect(injectAutomationOverlay).toHaveBeenCalledWith(mockBrowserManager);
+    });
+
+    it('should not inject automation overlay when in headless mode', async () => {
+      const headlessConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: true,
+          },
+        },
+      });
+      await createBrowserAgentDefinition(headlessConfig, mockMessageBus);
+      expect(injectAutomationOverlay).not.toHaveBeenCalled();
     });
 
     it('should return agent definition with discovered tools', async () => {

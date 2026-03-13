@@ -22,45 +22,12 @@ import {
   type SendMessageResult,
 } from './a2a-client-manager.js';
 import { extractIdsFromResponse, A2AResultReassembler } from './a2aUtils.js';
-import { GoogleAuth } from 'google-auth-library';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
 import { debugLogger } from '../utils/debugLogger.js';
 import { safeJsonToMarkdown } from '../utils/markdownUtils.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
-
-/**
- * Authentication handler implementation using Google Application Default Credentials (ADC).
- */
-export class ADCHandler implements AuthenticationHandler {
-  private auth = new GoogleAuth({
-    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-  });
-
-  async headers(): Promise<Record<string, string>> {
-    try {
-      const client = await this.auth.getClient();
-      const token = await client.getAccessToken();
-      if (token.token) {
-        return { Authorization: `Bearer ${token.token}` };
-      }
-      throw new Error('Failed to retrieve ADC access token.');
-    } catch (e) {
-      const errorMessage = `Failed to get ADC token: ${
-        e instanceof Error ? e.message : String(e)
-      }`;
-      debugLogger.log('ERROR', errorMessage);
-      throw new Error(errorMessage);
-    }
-  }
-
-  async shouldRetryWithHeaders(
-    _response: unknown,
-  ): Promise<Record<string, string> | undefined> {
-    // For ADC, we usually just re-fetch the token if needed.
-    return this.headers();
-  }
-}
+import { A2AAgentError } from './a2a-errors.js';
 
 /**
  * A tool invocation that proxies to a remote A2A agent.
@@ -120,6 +87,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       const provider = await A2AAuthProviderFactory.create({
         authConfig: this.definition.auth,
         agentName: this.definition.name,
+        targetUrl: this.definition.agentCardUrl,
         agentCardUrl: this.definition.agentCardUrl,
       });
       if (!provider) {
@@ -228,7 +196,8 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       };
     } catch (error: unknown) {
       const partialOutput = reassembler.toString();
-      const errorMessage = `Error calling remote agent: ${error instanceof Error ? error.message : String(error)}`;
+      // Surface structured, user-friendly error messages.
+      const errorMessage = this.formatExecutionError(error);
       const fullDisplay = partialOutput
         ? `${partialOutput}\n\n${errorMessage}`
         : errorMessage;
@@ -244,5 +213,23 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         taskId: this.taskId,
       });
     }
+  }
+
+  /**
+   * Formats an execution error into a user-friendly message.
+   * Recognizes typed A2AAgentError subclasses and falls back to
+   * a generic message for unknown errors.
+   */
+  private formatExecutionError(error: unknown): string {
+    // All A2A-specific errors include a human-friendly `userMessage` on the
+    // A2AAgentError base class. Rely on that to avoid duplicating messages
+    // for specific subclasses, which improves maintainability.
+    if (error instanceof A2AAgentError) {
+      return error.userMessage;
+    }
+
+    return `Error calling remote agent: ${
+      error instanceof Error ? error.message : String(error)
+    }`;
   }
 }

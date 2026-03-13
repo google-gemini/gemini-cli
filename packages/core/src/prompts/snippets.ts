@@ -355,7 +355,8 @@ export function renderOperationalGuidelines(
 - **Security First:** Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.
 
 ## Tool Usage
-- **Parallelism:** Execute multiple independent tool calls in parallel when feasible (i.e. searching the codebase).
+- **Parallelism & Sequencing:** Tools execute in parallel by default. Execute multiple independent tool calls in parallel when feasible (e.g., searching, reading files, independent shell commands, or editing *different* files). If a tool depends on the output or side-effects of a previous tool in the same turn (e.g., running a shell command that depends on the success of a previous command), you MUST set the \`wait_for_previous\` parameter to \`true\` on the dependent tool to ensure sequential execution.
+- **File Editing Collisions:** Do NOT make multiple calls to the ${formatToolName(EDIT_TOOL_NAME)} tool for the SAME file in a single turn. To make multiple edits to the same file, you MUST perform them sequentially across multiple conversational turns to prevent race conditions and ensure the file state is accurate before each edit.
 - **Command Execution:** Use the ${formatToolName(SHELL_TOOL_NAME)} tool for running shell commands, remembering the safety rule to explain modifying commands first.${toolUsageInteractive(
     options.interactive,
     options.interactiveShellEnabled,
@@ -573,7 +574,7 @@ function mandateConflictResolution(hasHierarchicalMemory: boolean): string {
 function mandateContinueWork(interactive: boolean): string {
   if (interactive) return '';
   return `
-  - **Continue the work** You are not to interact with the user. Do your best to complete the task at hand, using your best judgement and avoid asking user for any additional information.`;
+- **Non-Interactive Environment:** You are running in a headless/CI environment and cannot interact with the user. Do not ask the user questions or request additional information, as the session will terminate. Use your best judgment to complete the task. If a tool fails because it requires user interaction, do not retry it indefinitely; instead, explain the limitation and suggest how the user can provide the required data (e.g., via environment variables).`;
 }
 
 function workflowStepResearch(options: PrimaryWorkflowsOptions): string {

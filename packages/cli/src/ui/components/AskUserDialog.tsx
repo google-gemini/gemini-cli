@@ -15,13 +15,12 @@ import {
 } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import type { Question } from '@google/gemini-cli-core';
+import { checkExhaustive, type Question } from '@google/gemini-cli-core';
 import { BaseSelectionList } from './shared/BaseSelectionList.js';
 import type { SelectionListItem } from '../hooks/useSelectionList.js';
 import { TabHeader, type Tab } from './shared/TabHeader.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { Command } from '../key/keyMatchers.js';
-import { checkExhaustive } from '@google/gemini-cli-core';
 import { TextInput } from './shared/TextInput.js';
 import { formatCommand } from '../key/keybindingUtils.js';
 import {
@@ -807,16 +806,21 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
   const TITLE_MARGIN = 1;
   const FOOTER_HEIGHT = 2; // DialogFooter + margin
   const overhead = HEADER_HEIGHT + TITLE_MARGIN + FOOTER_HEIGHT;
+
   const listHeight = availableHeight
     ? Math.max(1, availableHeight - overhead)
     : undefined;
-  const questionHeight =
+
+  const questionHeightLimit =
     listHeight && !isAlternateBuffer
-      ? Math.min(15, Math.max(1, listHeight - DIALOG_PADDING))
+      ? question.unconstrainedHeight
+        ? Math.max(1, listHeight - selectionItems.length * 2)
+        : Math.min(15, Math.max(1, listHeight - DIALOG_PADDING))
       : undefined;
+
   const maxItemsToShow =
-    listHeight && questionHeight
-      ? Math.max(1, Math.floor((listHeight - questionHeight) / 2))
+    listHeight && questionHeightLimit
+      ? Math.max(1, Math.floor((listHeight - questionHeightLimit) / 2))
       : selectionItems.length;
 
   return (
@@ -824,7 +828,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       {progressHeader}
       <Box marginBottom={TITLE_MARGIN}>
         <MaxSizedBox
-          maxHeight={questionHeight}
+          maxHeight={questionHeightLimit}
           maxWidth={availableWidth}
           overflowDirection="bottom"
         >
