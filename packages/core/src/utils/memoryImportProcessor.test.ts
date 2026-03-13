@@ -923,5 +923,29 @@ describe('memoryImportProcessor', () => {
         fsSync.rmSync(tmpDir, { recursive: true, force: true });
       }
     });
+
+    it('should allow imports when allowedDir is accessed via a symlink', () => {
+      // Regression test: if the project root itself is reached through a
+      // symlink (e.g., /tmp → /private/tmp on macOS), both the import target
+      // and the allowedDir must be canonicalized for isSubpath to match.
+      const tmpDir = fsSync.realpathSync(
+        fsSync.mkdtempSync(path.join(os.tmpdir(), 'gemini-import-test-')),
+      );
+      const realRoot = path.join(tmpDir, 'real-root');
+      const symlinkRoot = path.join(tmpDir, 'link-root');
+
+      try {
+        fsSync.mkdirSync(realRoot, { recursive: true });
+        fsSync.writeFileSync(path.join(realRoot, 'file.md'), 'hello');
+        fsSync.symlinkSync(realRoot, symlinkRoot);
+
+        // allowedDir is the symlink path; import resolves canonically
+        expect(validateImportPath('file.md', symlinkRoot, [symlinkRoot])).toBe(
+          true,
+        );
+      } finally {
+        fsSync.rmSync(tmpDir, { recursive: true, force: true });
+      }
+    });
   });
 });

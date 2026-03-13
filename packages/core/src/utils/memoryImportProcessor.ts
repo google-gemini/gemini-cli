@@ -392,13 +392,33 @@ export function validateImportPath(
   let realPath: string;
   try {
     realPath = fsSync.realpathSync(resolvedPath);
-  } catch {
-    // File does not exist — fall back to lexical check.
-    // The subsequent fs.readFile will also fail, so this is safe.
-    realPath = resolvedPath;
+  } catch (e: unknown) {
+    if (
+      e &&
+      typeof e === 'object' &&
+      'code' in e &&
+      (e as { code: unknown }).code === 'ENOENT'
+    ) {
+      // File does not exist — fall back to lexical check.
+      // The subsequent fs.readFile will also fail, so this is safe.
+      realPath = resolvedPath;
+    } else {
+      // EACCES, ELOOP, etc. — deny access rather than bypassing the check.
+      return false;
+    }
   }
 
-  return allowedDirectories.some((allowedDir) =>
-    isSubpath(allowedDir, realPath),
-  );
+  // Canonicalize allowedDirectories too, so that both sides of the
+  // isSubpath comparison use the same path form. Without this, a project
+  // accessed via a symlinked path (e.g., /tmp → /private/tmp on macOS)
+  // would fail the check because one side is canonical and the other is not.
+  return allowedDirectories.some((allowedDir) => {
+    let realAllowedDir: string;
+    try {
+      realAllowedDir = fsSync.realpathSync(allowedDir);
+    } catch {
+      realAllowedDir = allowedDir;
+    }
+    return isSubpath(realAllowedDir, realPath);
+  });
 }
