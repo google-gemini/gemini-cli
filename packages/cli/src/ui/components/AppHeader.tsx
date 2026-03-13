@@ -73,7 +73,7 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
                 <Text bold color={theme.text.primary}>
                   Gemini CLI
                 </Text>
-                <Text color={theme.text.secondary}> v{version}</Text>
+                <Text color={theme.text.secondary}> {version}</Text>
               </Box>
             </Box>
           </Box>
@@ -95,7 +95,7 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
               <Text bold color={theme.text.primary}>
                 Gemini CLI
               </Text>
-              <Text color={theme.text.secondary}> v{version}</Text>
+              <Text color={theme.text.secondary}> {version}</Text>
               {updateInfo && (
                 <Box marginLeft={2}>
                   <Text color={theme.text.secondary}>
