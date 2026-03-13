@@ -221,7 +221,10 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     if (
       showTips &&
       uiState.currentTip &&
-      !(isInteractiveShellWaiting && uiState.currentTip === INTERACTIVE_SHELL_WAITING_PHRASE)
+      !(
+        isInteractiveShellWaiting &&
+        uiState.currentTip === INTERACTIVE_SHELL_WAITING_PHRASE
+      )
     ) {
       if (
         estimatedStatusLength + uiState.currentTip.length + 10 <=
