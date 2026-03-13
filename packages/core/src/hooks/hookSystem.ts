@@ -10,9 +10,13 @@ import { HookRunner } from './hookRunner.js';
 import { HookAggregator, type AggregatedHookResult } from './hookAggregator.js';
 import { HookPlanner } from './hookPlanner.js';
 import { HookEventHandler } from './hookEventHandler.js';
+import { createLspDiagnosticsHook } from './lspDiagnostics.js';
+import { LspService } from '../services/lspService.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import {
   NotificationType,
+  HookEventName,
+  ConfigSource,
   type SessionStartSource,
   type SessionEndReason,
   type PreCompressTrigger,
@@ -22,8 +26,6 @@ import {
   type BeforeToolSelectionHookOutput,
   type McpToolContext,
   type HookConfig,
-  type HookEventName,
-  type ConfigSource,
 } from './types.js';
 import type {
   GenerateContentParameters,
@@ -152,6 +154,7 @@ export class HookSystem {
   private readonly hookAggregator: HookAggregator;
   private readonly hookPlanner: HookPlanner;
   private readonly hookEventHandler: HookEventHandler;
+  private readonly lspService: LspService;
 
   constructor(config: Config) {
     // Initialize components
@@ -165,12 +168,20 @@ export class HookSystem {
       this.hookRunner,
       this.hookAggregator,
     );
+    this.lspService = new LspService(config);
   }
 
   /**
    * Initialize the hook system
    */
   async initialize(): Promise<void> {
+    // Register built-in runtime hooks
+    this.registerHook(
+      createLspDiagnosticsHook(this.lspService),
+      HookEventName.AfterTool,
+      { source: ConfigSource.Runtime },
+    );
+
     await this.hookRegistry.initialize();
     debugLogger.debug('Hook system initialized successfully');
   }

@@ -873,6 +873,7 @@ export async function loadCliConfig(
       };
     },
     enableConseca: settings.security?.enableConseca,
+    lsp: settings.general?.lsp,
   });
 }
 

@@ -39,6 +39,7 @@ export interface ToolResultDisplayProps {
 interface FileDiffResult {
   fileDiff: string;
   fileName: string;
+  diagnostics?: string;
 }
 
 export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
@@ -119,17 +120,31 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         </Text>
       );
     } else if (typeof contentData === 'object' && 'fileDiff' in contentData) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const diffResult = contentData as FileDiffResult;
       content = (
-        <DiffRenderer
-          diffContent={
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            (contentData as FileDiffResult).fileDiff
-          }
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          filename={(contentData as FileDiffResult).fileName}
-          availableTerminalHeight={availableHeight}
-          terminalWidth={childWidth}
-        />
+        <Box flexDirection="column" width={childWidth}>
+          <DiffRenderer
+            diffContent={diffResult.fileDiff}
+            filename={diffResult.fileName}
+            availableTerminalHeight={availableHeight}
+            terminalWidth={childWidth}
+          />
+          {diffResult.diagnostics && (
+            <Box
+              marginTop={1}
+              borderStyle="round"
+              borderColor={theme.status.error}
+              flexDirection="column"
+              paddingX={1}
+            >
+              <Text bold color={theme.status.error}>
+                LSP Diagnostics:
+              </Text>
+              <Text color={theme.text.primary}>{diffResult.diagnostics}</Text>
+            </Box>
+          )}
+        </Box>
       );
     } else {
       const shouldDisableTruncation =

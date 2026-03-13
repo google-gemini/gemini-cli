@@ -183,6 +183,29 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Minimum retention period (safety limit, defaults to "1d")
   - **Default:** `"1d"`
 
+- **`general.lsp.lintEnabled`** (boolean):
+  - **Description:** Enable automatic linting after file edits.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`general.lsp.lintCommand`** (string):
+  - **Description:** Command to run for linting (e.g., "npx eslint"). The file
+    path will be automatically appended to the command.
+  - **Default:** `"npx eslint"`
+  - **Requires restart:** Yes
+
+- **`general.lsp.typeCheckEnabled`** (boolean):
+  - **Description:** Enable automatic type checking after file edits.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`general.lsp.typeCheckCommand`** (string):
+  - **Description:** Command to run for type checking (e.g., "tsc --noEmit
+    --skipLibCheck"). The file path will be automatically appended to the
+    command.
+  - **Default:** `"tsc --noEmit --skipLibCheck"`
+  - **Requires restart:** Yes
+
 #### `output`
 
 - **`output.format`** (enum):

@@ -191,6 +191,17 @@ export interface OutputSettings {
   format?: OutputFormat;
 }
 
+export interface LspSettings {
+  /** Whether linting is enabled */
+  lintEnabled?: boolean;
+  /** Command to run for linting (e.g., 'eslint') */
+  lintCommand?: string;
+  /** Whether type checking is enabled */
+  typeCheckEnabled?: boolean;
+  /** Command to run for type checking (e.g., 'tsc --noEmit') */
+  typeCheckCommand?: string;
+}
+
 export interface ToolOutputMaskingConfig {
   enabled: boolean;
   toolProtectionThreshold: number;
@@ -630,6 +641,7 @@ export interface ConfigParameters {
     agents?: AgentSettings;
   }>;
   enableConseca?: boolean;
+  lsp?: LspSettings;
   billing?: {
     overageStrategy?: OverageStrategy;
   };
@@ -845,6 +857,8 @@ export class Config implements McpContext, AgentLoopContext {
   readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
 
+  private readonly lspSettings: LspSettings;
+
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
     this.clientName = params.clientName;
@@ -860,6 +874,14 @@ export class Config implements McpContext, AgentLoopContext {
     this.pendingIncludeDirectories = params.includeDirectories ?? [];
     this.debugMode = params.debugMode;
     this.question = params.question;
+
+    this.lspSettings = {
+      lintEnabled: params.lsp?.lintEnabled ?? true,
+      lintCommand: params.lsp?.lintCommand ?? 'npx eslint',
+      typeCheckEnabled: params.lsp?.typeCheckEnabled ?? true,
+      typeCheckCommand:
+        params.lsp?.typeCheckCommand ?? 'tsc --noEmit --skipLibCheck',
+    };
 
     this.coreTools = params.coreTools;
     this.allowedTools = params.allowedTools;
@@ -1705,6 +1727,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getAcknowledgedAgentsService(): AcknowledgedAgentsService {
     return this.acknowledgedAgentsService;
+  }
+
+  getLspSettings(): LspSettings {
+    return this.lspSettings;
   }
 
   /** @deprecated Use toolRegistry getter */

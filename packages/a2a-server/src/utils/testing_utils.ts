@@ -69,6 +69,7 @@ export function createMockConfig(
     }),
     getTargetDir: () => tmpDir,
     getCheckpointingEnabled: vi.fn().mockReturnValue(false),
+    getProjectRoot: vi.fn().mockReturnValue(tmpDir),
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     storage: {
       getProjectTempDir: () => tmpDir,

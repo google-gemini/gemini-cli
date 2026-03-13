@@ -194,6 +194,44 @@
             }
           },
           "additionalProperties": false
+        },
+        "lsp": {
+          "title": "LSP Diagnostics",
+          "description": "Language Server Protocol (LSP) diagnostics settings.",
+          "markdownDescription": "Language Server Protocol (LSP) diagnostics settings.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "lintEnabled": {
+              "title": "Enable Linting",
+              "description": "Enable automatic linting after file edits.",
+              "markdownDescription": "Enable automatic linting after file edits.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
+            "lintCommand": {
+              "title": "Lint Command",
+              "description": "Command to run for linting (e.g., \"npx eslint\"). The file path will be automatically appended to the command.",
+              "markdownDescription": "Command to run for linting (e.g., \"npx eslint\"). The file path will be automatically appended to the command.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `npx eslint`",
+              "default": "npx eslint",
+              "type": "string"
+            },
+            "typeCheckEnabled": {
+              "title": "Enable Type Checking",
+              "description": "Enable automatic type checking after file edits.",
+              "markdownDescription": "Enable automatic type checking after file edits.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
+            "typeCheckCommand": {
+              "title": "Type Check Command",
+              "description": "Command to run for type checking (e.g., \"tsc --noEmit --skipLibCheck\"). The file path will be automatically appended to the command.",
+              "markdownDescription": "Command to run for type checking (e.g., \"tsc --noEmit --skipLibCheck\"). The file path will be automatically appended to the command.\n\n- Category: `General`\n- Requires restart: `no`\n- Default: `tsc --noEmit --skipLibCheck`",
+              "default": "tsc --noEmit --skipLibCheck",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
