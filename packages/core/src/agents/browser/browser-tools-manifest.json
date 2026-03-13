@@ -1,17 +1,6 @@
 {
   "description": "Explicitly promoted tools from chrome-devtools-mcp for the gemini-cli browser agent.",
   "targetVersion": "0.19.0",
-  "include": [
-    "input",
-    "pages",
-    "screenshot",
-    "snapshot",
-    "script",
-    "console",
-    "network",
-    "emulation",
-    "memory"
-  ],
   "exclude": [
     {
       "name": "lighthouse",

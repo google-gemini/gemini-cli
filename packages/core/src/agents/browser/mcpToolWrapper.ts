@@ -232,7 +232,7 @@ class McpDeclarativeTool extends DeclarativeTool<
 export async function createMcpDeclarativeTools(
   browserManager: BrowserManager,
   messageBus: MessageBus,
-  shouldDisableInput: boolean,
+  shouldDisableInput: boolean = false,
 ): Promise<McpDeclarativeTool[]> {
   // Get dynamically discovered tools from the MCP server
   const mcpTools = await browserManager.getDiscoveredTools();

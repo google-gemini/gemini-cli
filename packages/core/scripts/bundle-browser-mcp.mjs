@@ -9,20 +9,20 @@ const manifestPath = path.resolve(__dirname, '../src/agents/browser/browser-tool
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
 
 // Only exclude tools explicitly mentioned in the manifest's exclude list
-const excludedTools = (manifest.exclude || []).map(t => t.name);
+const excludedToolsFiles = (manifest.exclude || []).map(t => t.name);
 
 // Basic esbuild plugin to empty out excluded modules
 const emptyModulePlugin = {
     name: 'empty-modules',
     setup(build) {
-        if (excludedTools.length === 0) return;
+        if (excludedToolsFiles.length === 0) return;
 
         // Create a filter that matches any of the excluded tools
-        const excludeFilter = new RegExp(`(${excludedTools.join('|')})\\.js$`);
+        const excludeFilter = new RegExp(`(${excludedToolsFiles.join('|')})\\.js$`);
         
         build.onResolve({ filter: excludeFilter }, args => {
             // Check if we are inside a tools directory to avoid accidental matches
-            if (args.importer.includes('chrome-devtools-mcp') && args.importer.includes('/tools/')) {
+            if (args.importer.includes('chrome-devtools-mcp') && /[\\/]tools[\\/]/.test(args.importer)) {
                  return { path: args.path, namespace: 'empty' };
             }
             return null;
