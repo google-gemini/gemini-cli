@@ -41,7 +41,11 @@ import { READ_MANY_FILES_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 
 import { REFERENCE_CONTENT_END } from '../utils/constants.js';
-import { discoverJitContext, appendJitContext } from './jit-context.js';
+import {
+  discoverJitContext,
+  JIT_CONTEXT_PREFIX,
+  JIT_CONTEXT_SUFFIX,
+} from './jit-context.js';
 
 /**
  * Parameters for the ReadManyFilesTool.
@@ -418,15 +422,14 @@ ${finalExclusionPatternsForDescription
     const uniqueDirs = new Set(
       Array.from(filesToConsider).map((f) => path.dirname(f)),
     );
-    const jitParts: string[] = [];
-    for (const dir of uniqueDirs) {
-      const jitContext = await discoverJitContext(this.config, dir);
-      if (jitContext) {
-        jitParts.push(jitContext);
-      }
-    }
+    const jitResults = await Promise.all(
+      Array.from(uniqueDirs).map((dir) => discoverJitContext(this.config, dir)),
+    );
+    const jitParts = jitResults.filter(Boolean);
     if (jitParts.length > 0) {
-      contentParts.push(appendJitContext('', jitParts.join('\n')));
+      contentParts.push(
+        `${JIT_CONTEXT_PREFIX}${jitParts.join('\n')}${JIT_CONTEXT_SUFFIX}`,
+      );
     }
 
     let displayMessage = `### ReadManyFiles Result (Target Dir: \`${this.config.getTargetDir()}\`)\n\n`;

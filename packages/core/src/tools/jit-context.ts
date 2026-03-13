@@ -31,14 +31,20 @@ export async function discoverJitContext(
 
   const trustedRoots = [...config.getWorkspaceContext().getDirectories()];
 
-  return contextManager.discoverContext(accessedPath, trustedRoots);
+  try {
+    return await contextManager.discoverContext(accessedPath, trustedRoots);
+  } catch {
+    // JIT context is supplementary — never fail the tool's primary operation.
+    return '';
+  }
 }
 
 /**
  * Format string to delimit JIT context in tool output.
  */
-const JIT_CONTEXT_PREFIX = '\n\n--- Newly Discovered Project Context ---\n';
-const JIT_CONTEXT_SUFFIX = '\n--- End Project Context ---';
+export const JIT_CONTEXT_PREFIX =
+  '\n\n--- Newly Discovered Project Context ---\n';
+export const JIT_CONTEXT_SUFFIX = '\n--- End Project Context ---';
 
 /**
  * Appends JIT context to tool LLM content if any was discovered.

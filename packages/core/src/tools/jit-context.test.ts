@@ -84,6 +84,17 @@ describe('jit-context', () => {
 
       expect(result).toBe('');
     });
+
+    it('should return empty string when discoverContext throws', async () => {
+      vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(true);
+      vi.mocked(mockContextManager.discoverContext).mockRejectedValue(
+        new Error('Permission denied'),
+      );
+
+      const result = await discoverJitContext(mockConfig, '/app/src/file.ts');
+
+      expect(result).toBe('');
+    });
   });
 
   describe('appendJitContext', () => {
