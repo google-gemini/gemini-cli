@@ -203,4 +203,33 @@ describe.skipIf(!chromeAvailable)('browser-agent', () => {
     // Should successfully complete all operations
     assertModelHasOutput(result);
   });
+
+  it('should handle tool confirmation for write_file without crashing', async () => {
+    rig.setup('tool-confirmation', {
+      fakeResponsesPath: join(
+        __dirname,
+        'browser-agent.confirmation.responses',
+      ),
+      settings: {
+        agents: {
+          browser_agent: {
+            headless: true,
+            sessionMode: 'isolated',
+          },
+        },
+      },
+    });
+
+    const run = await rig.runInteractive({ approvalMode: 'default' });
+
+    await run.type('Write hello to test.txt');
+    await run.type('\r');
+
+    await run.expectText('Allow', 15000);
+
+    await run.type('y');
+    await run.type('\r');
+
+    await run.expectText('successfully written', 15000);
+  });
 });

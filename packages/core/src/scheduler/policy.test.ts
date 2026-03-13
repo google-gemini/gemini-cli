@@ -676,6 +676,43 @@ describe('policy.ts', () => {
         }),
       );
     });
+
+    it('should work when context is created via Object.create (prototype chain)', async () => {
+      const mockConfig = {
+        setApprovalMode: vi.fn(),
+      } as unknown as Mocked<Config>;
+      const mockMessageBus = {
+        publish: vi.fn(),
+      } as unknown as Mocked<MessageBus>;
+
+      const baseContext = {
+        config: mockConfig,
+        messageBus: mockMessageBus,
+      };
+      const protoContext: AgentLoopContext = Object.create(baseContext);
+
+      expect(Object.keys(protoContext)).toHaveLength(0);
+      expect(protoContext.config).toBe(mockConfig);
+      expect(protoContext.messageBus).toBe(mockMessageBus);
+
+      const tool = { name: 'test-tool' } as AnyDeclarativeTool;
+
+      await updatePolicy(
+        tool,
+        ToolConfirmationOutcome.ProceedAlways,
+        undefined,
+        protoContext,
+        mockMessageBus,
+      );
+
+      expect(mockMessageBus.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageBusType.UPDATE_POLICY,
+          toolName: 'test-tool',
+          persist: false,
+        }),
+      );
+    });
   });
 
   describe('getPolicyDenialError', () => {
