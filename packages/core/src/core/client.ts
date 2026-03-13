@@ -299,6 +299,9 @@ export class GeminiClient {
   async resetChat(): Promise<void> {
     this.chat = await this.startChat();
     this.updateTelemetryTokenCount();
+    // Reset JIT context loaded paths so subdirectory context can be
+    // re-discovered in the new session.
+    await this.config.getContextManager()?.refresh();
   }
 
   dispose() {
@@ -866,7 +869,7 @@ export class GeminiClient {
     }
 
     const hooksEnabled = this.config.getEnableHooks();
-    const messageBus = this.config.getMessageBus();
+    const messageBus = this.context.messageBus;
 
     if (this.lastPromptId !== prompt_id) {
       this.loopDetector.reset(prompt_id, partListUnionToString(request));

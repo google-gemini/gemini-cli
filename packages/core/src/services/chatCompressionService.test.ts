@@ -173,6 +173,9 @@ describe('ChatCompressionService', () => {
       } as unknown as GenerateContentResponse);
 
     mockConfig = {
+      get config() {
+        return this;
+      },
       getCompressionThreshold: vi.fn(),
       getBaseLlmClient: vi.fn().mockReturnValue({
         generateContent: mockGenerateContent,

@@ -26,7 +26,7 @@ describe('Task Event-Driven Scheduler', () => {
     mockConfig = createMockConfig({
       isEventDrivenSchedulerEnabled: () => true,
     }) as Config;
-    messageBus = mockConfig.getMessageBus();
+    messageBus = mockConfig.messageBus;
     mockEventBus = {
       publish: vi.fn(),
       on: vi.fn(),
@@ -360,7 +360,7 @@ describe('Task Event-Driven Scheduler', () => {
       isEventDrivenSchedulerEnabled: () => true,
       getApprovalMode: () => ApprovalMode.YOLO,
     }) as Config;
-    const yoloMessageBus = yoloConfig.getMessageBus();
+    const yoloMessageBus = yoloConfig.messageBus;
 
     // @ts-expect-error - Calling private constructor
     const task = new Task('task-id', 'context-id', yoloConfig, mockEventBus);

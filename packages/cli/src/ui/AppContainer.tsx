@@ -162,6 +162,7 @@ import {
 import { LoginWithGoogleRestartDialog } from './auth/LoginWithGoogleRestartDialog.js';
 import { NewAgentsChoice } from './components/NewAgentsNotification.js';
 import { isSlashCommand } from './utils/commandUtils.js';
+import { parseSlashCommand } from '../utils/commands.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useTimedMessage } from './hooks/useTimedMessage.js';
 import { useIsHelpDismissKey } from './utils/shortcutsHelp.js';
@@ -1289,6 +1290,18 @@ Logging in with Google... Restarting Gemini CLI to continue.
           ...pendingGeminiHistoryItems,
         ]);
 
+      if (isSlash && isAgentRunning) {
+        const { commandToExecute } = parseSlashCommand(
+          submittedValue,
+          slashCommands ?? [],
+        );
+        if (commandToExecute?.isSafeConcurrent) {
+          void handleSlashCommand(submittedValue);
+          addInput(submittedValue);
+          return;
+        }
+      }
+
       if (config.isModelSteeringEnabled() && isAgentRunning && !isSlash) {
         handleHintSubmit(submittedValue);
         addInput(submittedValue);
@@ -1332,6 +1345,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       addMessage,
       addInput,
       submitQuery,
+      handleSlashCommand,
+      slashCommands,
       isMcpReady,
       streamingState,
       messageQueue.length,
@@ -1410,6 +1425,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     pager: settings.merged.tools.shell.pager,
     showColor: settings.merged.tools.shell.showColor,
     sanitizationConfig: config.sanitizationConfig,
+    sandboxManager: config.sandboxManager,
   });
 
   const { isFocused, hasReceivedFocusEvent } = useFocus();

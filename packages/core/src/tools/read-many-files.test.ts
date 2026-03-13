@@ -65,6 +65,16 @@ vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
 }));
 
+vi.mock('./jit-context.js', () => ({
+  discoverJitContext: vi.fn().mockResolvedValue(''),
+  appendJitContext: vi.fn().mockImplementation((content, context) => {
+    if (!context) return content;
+    return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
+  }),
+  JIT_CONTEXT_PREFIX: '\n\n--- Newly Discovered Project Context ---\n',
+  JIT_CONTEXT_SUFFIX: '\n--- End Project Context ---',
+}));
+
 describe('ReadManyFilesTool', () => {
   let tool: ReadManyFilesTool;
   let tempRootDir: string;
@@ -807,6 +817,48 @@ Content of file[1]
       expect(startsBeforeFirstEnd).toBe(startEvents); // Should PASS with parallel implementation
 
       detectFileTypeSpy.mockRestore();
+    });
+  });
+
+  describe('JIT context discovery', () => {
+    it('should append JIT context to output when enabled and context is found', async () => {
+      const { discoverJitContext } = await import('./jit-context.js');
+      vi.mocked(discoverJitContext).mockResolvedValue('Use the useAuth hook.');
+
+      fs.writeFileSync(
+        path.join(tempRootDir, 'jit-test.ts'),
+        'const x = 1;',
+        'utf8',
+      );
+
+      const invocation = tool.build({ include: ['jit-test.ts'] });
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(discoverJitContext).toHaveBeenCalled();
+      const llmContent = Array.isArray(result.llmContent)
+        ? result.llmContent.join('')
+        : String(result.llmContent);
+      expect(llmContent).toContain('Newly Discovered Project Context');
+      expect(llmContent).toContain('Use the useAuth hook.');
+    });
+
+    it('should not append JIT context when disabled', async () => {
+      const { discoverJitContext } = await import('./jit-context.js');
+      vi.mocked(discoverJitContext).mockResolvedValue('');
+
+      fs.writeFileSync(
+        path.join(tempRootDir, 'jit-disabled-test.ts'),
+        'const y = 2;',
+        'utf8',
+      );
+
+      const invocation = tool.build({ include: ['jit-disabled-test.ts'] });
+      const result = await invocation.execute(new AbortController().signal);
+
+      const llmContent = Array.isArray(result.llmContent)
+        ? result.llmContent.join('')
+        : String(result.llmContent);
+      expect(llmContent).not.toContain('Newly Discovered Project Context');
     });
   });
 });
