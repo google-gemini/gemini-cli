@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export { default as RepoVisualizer } from './RepoVisualizer.js';
+export { RepoVisualizer } from './RepoVisualizer.js';
 export type {
   RepoVisualizerProps,
   FileNode,

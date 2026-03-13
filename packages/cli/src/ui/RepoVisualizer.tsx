@@ -25,7 +25,7 @@
  *   q / Ctrl+C   quit
  */
 
-import { useState, useEffect, useMemo, type FC } from 'react';
+import { useState, useEffect, useMemo, useCallback, type FC } from 'react';
 import { Box, Text, useInput, useApp, useStdout } from 'ink';
 import { buildTree } from '../utils/buildTree.js';
 
@@ -511,8 +511,23 @@ const RepoVisualizer: FC<RepoVisualizerProps> = ({
   const { exit } = useApp();
   const { stdout } = useStdout();
 
-  const termCols = stdout?.columns ?? 120;
-  const termRows = stdout?.rows ?? 30;
+  const [termCols, setTermCols] = useState(stdout?.columns ?? 120);
+  const [termRows, setTermRows] = useState(stdout?.rows ?? 30);
+
+  const handleResize = useCallback(() => {
+    setTermCols(stdout?.columns ?? 120);
+    setTermRows(stdout?.rows ?? 30);
+  }, [stdout]);
+
+  useEffect(() => {
+    if (!stdout) return;
+    stdout.on('resize', handleResize);
+    // Re-read immediately in case terminal was resized before mount
+    handleResize();
+    return () => {
+      stdout.off('resize', handleResize);
+    };
+  }, [stdout, handleResize]);
 
   // ── Data ────────────────────────────────────────────────────────────
 

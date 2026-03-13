@@ -8,7 +8,7 @@ import type { CommandModule, Argv } from 'yargs';
 import { resolve } from 'node:path';
 import React from 'react';
 import { render } from 'ink';
-import RepoVisualizer from '../ui/RepoVisualizer.js';
+import { RepoVisualizer } from '../ui/RepoVisualizer.js';
 import { initializeOutputListenersAndFlush } from '../gemini.js';
 import { runExitCleanup } from '../utils/cleanup.js';
 import { ExitCodes } from '@google/gemini-cli-core';
