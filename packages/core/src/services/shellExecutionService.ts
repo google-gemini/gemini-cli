@@ -31,7 +31,8 @@ import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
-import { NoopSandboxManager } from './sandboxManager.js';
+import { NoopSandboxManager, type SandboxManager } from './sandboxManager.js';
+import type { SandboxConfig } from '../config/config.js';
 import { killProcessGroup } from '../utils/process-utils.js';
 import {
   ExecutionLifecycleService,
@@ -94,6 +95,8 @@ export interface ShellExecutionConfig {
   disableDynamicLineTrimming?: boolean;
   scrollback?: number;
   maxSerializedLines?: number;
+  sandboxManager?: SandboxManager;
+  sandboxConfig?: SandboxConfig;
 }
 
 /**
@@ -274,13 +277,25 @@ export class ShellExecutionService {
     shouldUseNodePty: boolean,
     shellExecutionConfig: ShellExecutionConfig,
   ): Promise<ShellExecutionHandle> {
-    const sandboxManager = new NoopSandboxManager();
+    const sandboxManager =
+      shellExecutionConfig.sandboxManager ?? new NoopSandboxManager();
+
+    // Strict sandbox on Windows (network disabled) requires cmd.exe
+    const isStrictSandbox =
+      os.platform() === 'win32' &&
+      shellExecutionConfig.sandboxConfig?.enabled &&
+      shellExecutionConfig.sandboxConfig?.command === 'windows-native' &&
+      !shellExecutionConfig.sandboxConfig?.networkAccess;
+
     const { env: sanitizedEnv } = await sandboxManager.prepareCommand({
       command: commandToExecute,
       args: [],
       env: process.env,
       cwd,
-      config: shellExecutionConfig,
+      config: {
+        ...shellExecutionConfig,
+        ...(shellExecutionConfig.sandboxConfig || {}),
+      },
     });
 
     if (shouldUseNodePty) {
@@ -295,6 +310,7 @@ export class ShellExecutionService {
             shellExecutionConfig,
             ptyInfo,
             sanitizedEnv,
+            isStrictSandbox,
           );
         } catch (_e) {
           // Fallback to child_process
@@ -309,6 +325,7 @@ export class ShellExecutionService {
       abortSignal,
       shellExecutionConfig.sanitizationConfig,
       shouldUseNodePty,
+      isStrictSandbox,
     );
   }
 
@@ -349,10 +366,18 @@ export class ShellExecutionService {
     abortSignal: AbortSignal,
     sanitizationConfig: EnvironmentSanitizationConfig,
     isInteractive: boolean,
+    isStrictSandbox?: boolean,
   ): ShellExecutionHandle {
     try {
       const isWindows = os.platform() === 'win32';
-      const { executable, argsPrefix, shell } = getShellConfiguration();
+      let { executable, argsPrefix, shell } = getShellConfiguration();
+
+      if (isStrictSandbox) {
+        shell = 'cmd';
+        argsPrefix = ['/c'];
+        executable = 'cmd.exe';
+      }
+
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
       const spawnArgs = [...argsPrefix, guardedCommand];
 
@@ -683,6 +708,7 @@ export class ShellExecutionService {
     shellExecutionConfig: ShellExecutionConfig,
     ptyInfo: PtyImplementation,
     sanitizedEnv: Record<string, string | undefined>,
+    isStrictSandbox?: boolean,
   ): Promise<ShellExecutionHandle> {
     if (!ptyInfo) {
       // This should not happen, but as a safeguard...
@@ -693,7 +719,13 @@ export class ShellExecutionService {
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
-      const { executable, argsPrefix, shell } = getShellConfiguration();
+      let { executable, argsPrefix, shell } = getShellConfiguration();
+
+      if (isStrictSandbox) {
+        shell = 'cmd';
+        argsPrefix = ['/c'];
+        executable = 'cmd.exe';
+      }
 
       const resolvedExecutable = await resolveExecutable(executable);
       if (!resolvedExecutable) {
