@@ -16,6 +16,11 @@ import {
 import { isRecord } from '../utils/markdownUtils.js';
 
 /**
+ * Timeout in milliseconds for keychain availability checks.
+ */
+const KEYCHAIN_AVAILABILITY_TIMEOUT_MS = 10000;
+
+/**
  * Service for interacting with OS-level secure storage (e.g. keytar).
  */
 export class KeychainService {
@@ -24,8 +29,13 @@ export class KeychainService {
 
   /**
    * @param serviceName Unique identifier for the app in the OS keychain.
+   * @param keychainTimeoutMs Maximum ms to wait for keychain write operations
+   *   during the availability check before falling back to file storage.
    */
-  constructor(private readonly serviceName: string) {}
+  constructor(
+    private readonly serviceName: string,
+    private readonly keychainTimeoutMs: number = KEYCHAIN_AVAILABILITY_TIMEOUT_MS,
+  ) {}
 
   async isAvailable(): Promise<boolean> {
     return (await this.getKeychain()) !== null;
@@ -89,10 +99,19 @@ export class KeychainService {
     try {
       const keychainModule = await this.loadKeychainModule();
       if (keychainModule) {
-        if (await this.isKeychainFunctional(keychainModule)) {
+        const timeoutPromise = new Promise<false>((resolve) =>
+          setTimeout(() => resolve(false), this.keychainTimeoutMs),
+        );
+        const functionalResult = await Promise.race([
+          this.isKeychainFunctional(keychainModule),
+          timeoutPromise,
+        ]);
+        if (functionalResult) {
           resultKeychain = keychainModule;
         } else {
-          debugLogger.log('Keychain functional verification failed');
+          debugLogger.log(
+            'Keychain functional verification failed or timed out; falling back to file storage.',
+          );
         }
       }
     } catch (error) {

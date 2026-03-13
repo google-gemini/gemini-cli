@@ -117,7 +117,26 @@ describe('KeychainService', () => {
 
       expect(available).toBe(false);
       expect(debugLogger.log).toHaveBeenCalledWith(
-        expect.stringContaining('functional verification failed'),
+        expect.stringContaining('functional verification failed or timed out'),
+      );
+    });
+
+    it('should fall back to unavailable if setPassword hangs beyond timeout', async () => {
+      const fastService = new KeychainService(SERVICE_NAME, 10);
+
+      // Simulate setPassword that never resolves
+      mockKeytar.setPassword?.mockImplementation(
+        () => new Promise<void>(() => {}),
+      );
+
+      const available = await fastService.isAvailable();
+
+      expect(available).toBe(false);
+      expect(debugLogger.log).toHaveBeenCalledWith(
+        expect.stringContaining('functional verification failed or timed out'),
+      );
+      expect(coreEvents.emitTelemetryKeychainAvailability).toHaveBeenCalledWith(
+        expect.objectContaining({ available: false }),
       );
     });
 
