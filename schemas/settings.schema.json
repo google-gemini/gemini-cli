@@ -303,6 +303,13 @@
           "default": false,
           "type": "boolean"
         },
+        "hideIntroTips": {
+          "title": "Hide Intro Tips",
+          "description": "@deprecated Use ui.hideTips instead. Hide the intro tips in the header.",
+          "markdownDescription": "@deprecated Use ui.hideTips instead. Hide the intro tips in the header.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "escapePastedAtSymbols": {
           "title": "Escape Pasted @ Symbols",
           "description": "When enabled, @ symbols in pasted text are escaped to prevent unintended @path expansion.",
@@ -312,8 +319,8 @@
         },
         "showShortcutsHint": {
           "title": "Show Shortcuts Hint",
-          "description": "Show the \"? for shortcuts\" hint above the input.",
-          "markdownDescription": "Show the \"? for shortcuts\" hint above the input.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "description": "Show basic shortcut help ('?') when the status line is idle.",
+          "markdownDescription": "Show basic shortcut help ('?') when the status line is idle.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
@@ -455,10 +462,32 @@
           "default": true,
           "type": "boolean"
         },
+        "showStatusTips": {
+          "title": "Show Tips",
+          "description": "Show helpful tips in the footer while the model is working.",
+          "markdownDescription": "Show helpful tips in the footer while the model is working.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "showStatusWit": {
+          "title": "Show Wit",
+          "description": "Show witty loading phrases in the footer while the model is working.",
+          "markdownDescription": "Show witty loading phrases in the footer while the model is working.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "statusHints": {
+          "title": "Status Line Hints",
+          "description": "@deprecated Use ui.showStatusTips and ui.showStatusWit instead. What to show in the status line: tips, witty comments, both, or off (fallback to shortcuts help).",
+          "markdownDescription": "@deprecated Use ui.showStatusTips and ui.showStatusWit instead. What to show in the status line: tips, witty comments, both, or off (fallback to shortcuts help).\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `tips`",
+          "default": "tips",
+          "type": "string",
+          "enum": ["tips", "witty", "all", "off"]
+        },
         "loadingPhrases": {
           "title": "Loading Phrases",
-          "description": "What to show while the model is working: tips, witty comments, both, or nothing.",
-          "markdownDescription": "What to show while the model is working: tips, witty comments, both, or nothing.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `tips`",
+          "description": "@deprecated Use ui.showStatusTips and ui.showStatusWit instead. What to show in the status line: tips, witty comments, both, or off (fallback to shortcuts help).",
+          "markdownDescription": "@deprecated Use ui.showStatusTips and ui.showStatusWit instead. What to show in the status line: tips, witty comments, both, or off (fallback to shortcuts help).\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `tips`",
           "default": "tips",
           "type": "string",
           "enum": ["tips", "witty", "all", "off"]

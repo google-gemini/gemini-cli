@@ -2051,7 +2051,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     !!emptyWalletRequest ||
     !!customDialog;
 
-  const loadingPhrases = settings.merged.ui.loadingPhrases;
+  const showStatusTips = settings.merged.ui.showStatusTips;
+  const showStatusWit = settings.merged.ui.showStatusWit;
 
   const showLoadingIndicator =
     (!embeddedShellFocused || isBackgroundShellVisible) &&
@@ -2084,7 +2085,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       streamingState,
       shouldShowFocusHint,
       retryStatus,
-      loadingPhrasesMode: loadingPhrases,
+      showTips: showStatusTips,
+      showWit: showStatusWit,
       customWittyPhrases: settings.merged.ui.customWittyPhrases,
       errorVerbosity: settings.merged.ui.errorVerbosity,
       maxLength,

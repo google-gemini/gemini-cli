@@ -368,7 +368,7 @@ describe('SettingsSchema', () => {
       ).toBe(true);
       expect(
         getSettingsSchema().ui.properties.showShortcutsHint.description,
-      ).toBe('Show the "? for shortcuts" hint above the input.');
+      ).toBe("Show basic shortcut help ('?') when the status line is idle.");
     });
 
     it('should have enableNotifications setting in schema', () => {

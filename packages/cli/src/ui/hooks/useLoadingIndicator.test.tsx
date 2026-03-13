@@ -16,7 +16,6 @@ import {
 import { WITTY_LOADING_PHRASES } from '../constants/wittyPhrases.js';
 import { INFORMATIVE_TIPS } from '../constants/tips.js';
 import type { RetryAttemptPayload } from '@google/gemini-cli-core';
-import type { LoadingPhrasesMode } from '../../config/settings.js';
 
 describe('useLoadingIndicator', () => {
   beforeEach(() => {
@@ -34,7 +33,8 @@ describe('useLoadingIndicator', () => {
     initialStreamingState: StreamingState,
     initialShouldShowFocusHint: boolean = false,
     initialRetryStatus: RetryAttemptPayload | null = null,
-    loadingPhrases: LoadingPhrasesMode = 'all',
+    initialShowTips: boolean = true,
+    initialShowWit: boolean = true,
     initialErrorVerbosity: 'low' | 'full' = 'full',
   ) => {
     let hookResult: ReturnType<typeof useLoadingIndicator>;
@@ -42,30 +42,35 @@ describe('useLoadingIndicator', () => {
       streamingState,
       shouldShowFocusHint,
       retryStatus,
-      loadingPhrases,
+      showTips,
+      showWit,
       errorVerbosity,
     }: {
       streamingState: StreamingState;
       shouldShowFocusHint?: boolean;
       retryStatus?: RetryAttemptPayload | null;
-      loadingPhrases?: LoadingPhrasesMode;
+      showTips?: boolean;
+      showWit?: boolean;
       errorVerbosity?: 'low' | 'full';
     }) {
       hookResult = useLoadingIndicator({
         streamingState,
         shouldShowFocusHint: !!shouldShowFocusHint,
         retryStatus: retryStatus || null,
-        loadingPhrasesMode: loadingPhrases,
+        showTips,
+        showWit,
         errorVerbosity,
       });
       return null;
     }
+
     const { rerender } = render(
       <TestComponent
         streamingState={initialStreamingState}
         shouldShowFocusHint={initialShouldShowFocusHint}
         retryStatus={initialRetryStatus}
-        loadingPhrases={loadingPhrases}
+        showTips={initialShowTips}
+        showWit={initialShowWit}
         errorVerbosity={initialErrorVerbosity}
       />,
     );
@@ -79,12 +84,14 @@ describe('useLoadingIndicator', () => {
         streamingState: StreamingState;
         shouldShowFocusHint?: boolean;
         retryStatus?: RetryAttemptPayload | null;
-        loadingPhrases?: LoadingPhrasesMode;
+        showTips?: boolean;
+        showWit?: boolean;
         errorVerbosity?: 'low' | 'full';
       }) =>
         rerender(
           <TestComponent
-            loadingPhrases={loadingPhrases}
+            showTips={initialShowTips}
+            showWit={initialShowWit}
             errorVerbosity={initialErrorVerbosity}
             {...newProps}
           />,
@@ -240,7 +247,8 @@ describe('useLoadingIndicator', () => {
       StreamingState.Responding,
       false,
       retryStatus,
-      'all',
+      true,
+      true,
       'low',
     );
 
@@ -260,7 +268,8 @@ describe('useLoadingIndicator', () => {
       StreamingState.Responding,
       false,
       retryStatus,
-      'all',
+      true,
+      true,
       'low',
     );
 
@@ -269,12 +278,13 @@ describe('useLoadingIndicator', () => {
     );
   });
 
-  it('should show no phrases when loadingPhrasesMode is "off"', () => {
+  it('should show no phrases when showTips and showWit are false', () => {
     const { result } = renderLoadingIndicatorHook(
       StreamingState.Responding,
       false,
       null,
-      'off',
+      false,
+      false,
     );
 
     expect(result.current.currentLoadingPhrase).toBeUndefined();

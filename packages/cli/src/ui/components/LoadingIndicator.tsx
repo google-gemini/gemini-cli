@@ -16,14 +16,12 @@ import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
 import { GENERIC_WORKING_LABEL } from '../textConstants.js';
-import type { LoadingPhrasesMode } from '../../config/settings.js';
 
 interface LoadingIndicatorProps {
   currentLoadingPhrase?: string;
   wittyPhrase?: string;
   showWit?: boolean;
   showTips?: boolean;
-  loadingPhrases?: LoadingPhrasesMode;
   errorVerbosity?: 'low' | 'full';
   elapsedTime: number;
   inline?: boolean;
@@ -37,9 +35,8 @@ interface LoadingIndicatorProps {
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   currentLoadingPhrase,
   wittyPhrase,
-  showWit: showWitProp,
-  showTips: _showTipsProp,
-  loadingPhrases = 'all',
+  showWit = false,
+  showTips = true,
   errorVerbosity: _errorVerbosity = 'full',
   elapsedTime,
   inline = false,
@@ -52,9 +49,6 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   const streamingState = useStreamingContext();
   const { columns: terminalWidth } = useTerminalSize();
   const isNarrow = isNarrowWidth(terminalWidth);
-
-  const showWit =
-    showWitProp ?? (loadingPhrases === 'witty' || loadingPhrases === 'all');
 
   if (
     streamingState === StreamingState.Idle &&

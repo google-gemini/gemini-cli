@@ -268,4 +268,23 @@ describe('<AppHeader />', () => {
     expect(session2.lastFrame()).not.toContain('Tips');
     session2.unmount();
   });
+
+  it('should NOT render Tips when ui.hideTips is true', async () => {
+    const mockConfig = makeFakeConfig();
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      {
+        config: mockConfig,
+        settings: {
+          merged: {
+            ui: { hideTips: true },
+          },
+        } as any,
+      },
+    );
+    await waitUntilReady();
+
+    expect(lastFrame()).not.toContain('Tips');
+    unmount();
+  });
 });

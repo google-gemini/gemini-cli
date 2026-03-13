@@ -56,9 +56,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
   const isAlternateBuffer = useAlternateBuffer();
   const { showApprovalModeIndicator } = uiState;
-  const loadingPhrases = settings.merged.ui.loadingPhrases;
-  const showTips = loadingPhrases === 'tips' || loadingPhrases === 'all';
-  const showWit = loadingPhrases === 'witty' || loadingPhrases === 'all';
+  const showTips = settings.merged.ui.showStatusTips;
+  const showWit = settings.merged.ui.showStatusWit;
 
   const showUiDetails = uiState.cleanUiDetailsVisible;
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';
@@ -329,7 +328,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       return (
         <LoadingIndicator
           inline
-          loadingPhrases={loadingPhrases}
+          showTips={showTips}
+          showWit={showWit}
           errorVerbosity={settings.merged.ui.errorVerbosity}
           thought={uiState.thought}
           elapsedTime={uiState.elapsedTime}
@@ -351,7 +351,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
       {showMinimalInlineLoading && (
         <LoadingIndicator
           inline
-          loadingPhrases={loadingPhrases}
+          showTips={showTips}
+          showWit={showWit}
           errorVerbosity={settings.merged.ui.errorVerbosity}
           elapsedTime={uiState.elapsedTime}
           forceRealStatusOnly={true}
