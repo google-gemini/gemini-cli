@@ -48,7 +48,8 @@ exports[`ToolConfirmationQueue > height allocation and layout (SVG snapshots) > 
 │                                                                                                  │
 │ ?  replace Replaces content in a file                                                            │
 │                                                                                                  │
-│ ... first 15 lines hidden (Ctrl+O to show) ...                                                   │
+│ ... first 14 lines hidden (Ctrl+O to show) ...                                                   │
+│  8 - const oldLine8 = true;                                                                      │
 │  8 + const newLine8 = true;                                                                      │
 │  9 - const oldLine9 = true;                                                                      │
 │  9 + const newLine9 = true;                                                                      │
@@ -92,7 +93,8 @@ exports[`ToolConfirmationQueue > height allocation and layout (SVG snapshots) > 
 │                                                                                                  │
 │ ?  run_shell_command Executes a bash command                                                     │
 │                                                                                                  │
-│ ... first 24 lines hidden (Ctrl+O to show) ...                                                   │
+│ ... first 23 lines hidden (Ctrl+O to show) ...                                                   │
+│ echo "Line 24"                                                                                   │
 │ echo "Line 25"                                                                                   │
 │ echo "Line 26"                                                                                   │
 │ echo "Line 27"                                                                                   │
