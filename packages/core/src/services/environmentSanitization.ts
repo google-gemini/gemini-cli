@@ -140,6 +140,73 @@ export const NEVER_ALLOWED_VALUE_PATTERNS = [
   /xox[abpr]-[a-zA-Z0-9-]+/i,
 ] as const;
 
+/**
+ * Additional value patterns for content-level redaction.
+ * Covers common API key formats not already in NEVER_ALLOWED_VALUE_PATTERNS.
+ */
+const CONTENT_REDACTION_EXTRA_PATTERNS = [
+  // OpenAI API keys (classic and project-scoped)
+  /sk-(?:proj-[a-zA-Z0-9_-]{50,}|[a-zA-Z0-9]{32,})/,
+  // Anthropic API keys
+  /sk-ant-[a-zA-Z0-9_-]{80,}/,
+] as const;
+
+/**
+ * Redacts sensitive credential values from arbitrary text content (e.g. shell
+ * output, file reads) before the text is sent to the model or shown in the UI.
+ *
+ * This is distinct from {@link sanitizeEnvironment}, which filters env vars
+ * *before* shell execution. This function scans tool output *after* execution
+ * to prevent secrets from reaching the model or being persisted in session
+ * history.
+ *
+ * Two strategies are applied:
+ * 1. Pattern-match known token/key formats (GitHub, Google, AWS, JWT, Stripe,
+ *    Slack, OpenAI, Anthropic, PEM blocks, credentialed URLs).
+ * 2. Redact the value of any assignment whose left-hand side looks like a
+ *    secret variable name (e.g. `OPENAI_API_KEY=…`, `export TOKEN=…`,
+ *    `Environment="MISTRAL_KEY=…"`, `secret_key: "…"`).
+ */
+export function redactSensitiveContent(text: string): string {
+  if (!text) return text;
+
+  let result = text;
+
+  // Strategy 1: Replace known secret value patterns inline.
+  const allValuePatterns = [
+    ...NEVER_ALLOWED_VALUE_PATTERNS,
+    ...CONTENT_REDACTION_EXTRA_PATTERNS,
+  ];
+  for (const pattern of allValuePatterns) {
+    const globalPattern = new RegExp(
+      pattern.source,
+      pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`,
+    );
+    result = result.replace(globalPattern, '[REDACTED]');
+  }
+
+  // Strategy 2: Redact values assigned to variables with sensitive names.
+  // Handles common formats found in shell output and config files:
+  //   OPENAI_API_KEY=sk-abc123          (printenv / .env)
+  //   export TOKEN=abc123               (shell export)
+  //   Environment="MISTRAL_KEY=abc123"  (systemd service files)
+  //   secret_key: abc123                (YAML)
+  //   "api_key": "abc123"               (JSON)
+  const sensitiveNameParts = NEVER_ALLOWED_NAME_PATTERNS.map(
+    (p) => p.source,
+  ).join('|');
+  // Variable name must contain one of the sensitive words; value must be ≥6 chars.
+  const assignmentRedactor = new RegExp(
+    `\\b(\\w*(?:${sensitiveNameParts})\\w*)` + // variable name
+      `(?:\\s*[=:]\\s*)` + // delimiter (= or :)
+      `(?:"([^"\\n]{6,})"|'([^'\\n]{6,})'|([^\\s\\n"'<]{6,}))`, // value
+    'gi',
+  );
+  result = result.replace(assignmentRedactor, '$1=[REDACTED]');
+
+  return result;
+}
+
 function shouldRedactEnvironmentVariable(
   key: string,
   value: string | undefined,

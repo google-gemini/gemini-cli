@@ -32,6 +32,7 @@ import {
   type ShellExecutionConfig,
   type ShellOutputEvent,
 } from '../services/shellExecutionService.js';
+import { redactSensitiveContent } from '../services/environmentSanitization.js';
 import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
@@ -296,6 +297,10 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
       const result = await resultPromise;
 
+      // Redact sensitive credentials (API keys, tokens, etc.) from the raw
+      // shell output before it is sent to the model or shown in the UI.
+      const safeOutput = redactSensitiveContent(result.output);
+
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {
         let tempFileExists = false;
@@ -339,8 +344,8 @@ export class ShellToolInvocation extends BaseToolInvocation<
           llmContent =
             'Command was cancelled by user before it could complete.';
         }
-        if (result.output.trim()) {
-          llmContent += ` Below is the output before it was cancelled:\n${result.output}`;
+        if (safeOutput.trim()) {
+          llmContent += ` Below is the output before it was cancelled:\n${safeOutput}`;
         } else {
           llmContent += ' There was no output before it was cancelled.';
         }
@@ -349,12 +354,12 @@ export class ShellToolInvocation extends BaseToolInvocation<
         data = {
           pid: result.pid,
           command: this.params.command,
-          initialOutput: result.output,
+          initialOutput: safeOutput,
         };
       } else {
         // Create a formatted error string for display, replacing the wrapper command
         // with the user-facing command.
-        const llmContentParts = [`Output: ${result.output || '(empty)'}`];
+        const llmContentParts = [`Output: ${safeOutput || '(empty)'}`];
 
         if (result.error) {
           const finalError = result.error.message.replaceAll(
@@ -389,13 +394,13 @@ export class ShellToolInvocation extends BaseToolInvocation<
           returnDisplayMessage = `Command moved to background (PID: ${result.pid}). Output hidden. Press Ctrl+B to view.`;
         } else if (result.aborted) {
           const cancelMsg = timeoutMessage || 'Command cancelled by user.';
-          if (result.output.trim()) {
-            returnDisplayMessage = `${cancelMsg}\n\nOutput before cancellation:\n${result.output}`;
+          if (safeOutput.trim()) {
+            returnDisplayMessage = `${cancelMsg}\n\nOutput before cancellation:\n${safeOutput}`;
           } else {
             returnDisplayMessage = cancelMsg;
           }
-        } else if (result.output.trim()) {
-          returnDisplayMessage = result.output;
+        } else if (safeOutput.trim()) {
+          returnDisplayMessage = safeOutput;
         } else {
           if (result.signal) {
             returnDisplayMessage = `Command terminated by signal: ${result.signal}`;
