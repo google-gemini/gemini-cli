@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -130,6 +130,7 @@ export const SubagentGroupDisplay: React.FC<SubagentGroupDisplayProps> = ({
         // Collapsed View: Show single compact line per agent
         if (!isExpanded) {
           let content = 'Starting...';
+          let formattedArgs: string | undefined;
 
           if (progress.state === 'completed') {
             if (
@@ -141,30 +142,30 @@ export const SubagentGroupDisplay: React.FC<SubagentGroupDisplayProps> = ({
               content = 'Completed successfully';
             }
           } else if (lastActivity) {
+            // Match expanded view logic exactly:
+            // Primary text: displayName || content
             if (
               'displayName' in lastActivity &&
               typeof lastActivity.displayName === 'string'
             ) {
               content = lastActivity.displayName;
             } else if (
-              'description' in lastActivity &&
-              typeof lastActivity.description === 'string'
-            ) {
-              content = lastActivity.description;
-            } else if (
               'content' in lastActivity &&
               typeof lastActivity.content === 'string'
             ) {
               content = lastActivity.content;
             }
-          }
 
-          const formattedArgs =
-            lastActivity &&
-            lastActivity.type === 'tool_call' &&
-            lastActivity.args
-              ? formatToolArgs(lastActivity.args)
-              : '';
+            // Secondary text: description || formatToolArgs(args)
+            if (
+              'description' in lastActivity &&
+              typeof lastActivity.description === 'string'
+            ) {
+              formattedArgs = lastActivity.description;
+            } else if (lastActivity.type === 'tool_call' && lastActivity.args) {
+              formattedArgs = formatToolArgs(lastActivity.args);
+            }
+          }
 
           const displayArgs =
             progress.state === 'completed' ? '' : formattedArgs;

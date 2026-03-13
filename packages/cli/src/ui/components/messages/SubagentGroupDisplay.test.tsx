@@ -98,9 +98,10 @@ describe('<SubagentGroupDisplay />', () => {
       const output = lastFrame() || '';
       expect(output).toContain('2 Agents (1 running, 1 completed)...');
       expect(output).toContain('(ctrl+o to expand)');
-      // Agent 1 Check
+      // Agent 1 Check (displayName is set, description should be secondary arg text)
       expect(output).toContain('api-monitor');
       expect(output).toContain('Action Required');
+      expect(output).toContain('Verify server is running');
       expect(output).toContain('!');
       expect(output).toContain('db-manager');
       expect(output).toContain('Completed successfully');
