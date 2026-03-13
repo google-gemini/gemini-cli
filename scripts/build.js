@@ -25,14 +25,21 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 
-// npm install if node_modules was removed (e.g. via npm run clean or scripts/clean.js)
+const isBun = typeof process.versions.bun !== 'undefined';
+const pm = isBun ? 'bun' : 'npm';
+
+// install if node_modules was removed (e.g. via npm run clean or scripts/clean.js)
 if (!existsSync(join(root, 'node_modules'))) {
-  execSync('npm install', { stdio: 'inherit', cwd: root });
+  execSync(`${pm} install`, { stdio: 'inherit', cwd: root });
 }
 
 // build all workspaces/packages
-execSync('npm run generate', { stdio: 'inherit', cwd: root });
-execSync('npm run build --workspaces', { stdio: 'inherit', cwd: root });
+execSync(`${pm} run generate`, { stdio: 'inherit', cwd: root });
+// bun uses --filter '*' for workspaces; npm uses --workspaces
+const buildWorkspaces = isBun
+  ? `${pm} run --filter '*' build`
+  : `${pm} run build --workspaces`;
+execSync(buildWorkspaces, { stdio: 'inherit', cwd: root });
 
 // also build container image if sandboxing is enabled
 // skip (-s) npm install + build since we did that above

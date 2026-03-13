@@ -56,11 +56,11 @@ SOFTWARE.
 
 ============================================================
 ajv@6.14.0
-(https://github.com/ajv-validator/ajv.git)
+(No repository found)
 
 The MIT License (MIT)
 
-Copyright (c) 2015-2017 Evgeny Poberezkin
+Copyright (c) 2015-2021 Evgeny Poberezkin
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -418,7 +418,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ============================================================
 which@2.0.2
-(git://github.com/isaacs/node-which.git)
+(git+https://github.com/npm/node-which.git)
 
 The ISC License
 
@@ -927,7 +927,7 @@ SOFTWARE.
 
 ============================================================
 iconv-lite@0.6.3
-(git://github.com/ashtuchkin/iconv-lite.git)
+(https://github.com/pillarjs/iconv-lite.git)
 
 Copyright (c) 2011 Alexander Shtuchkin
 
