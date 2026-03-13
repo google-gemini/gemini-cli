@@ -126,6 +126,30 @@ describe('Dynamic Configuration Parity', () => {
       expect(dynamic).toBe(legacy);
     }
   });
+
+  it('isActiveModel should match legacy behavior', () => {
+    for (const model of modelsToTest) {
+      const legacy = isActiveModel(model, false, false, legacyConfig);
+      const dynamic = isActiveModel(model, false, false, dynamicConfig);
+      expect(dynamic).toBe(legacy);
+    }
+  });
+
+  it('isValidModelOrAlias should match legacy behavior', () => {
+    for (const model of modelsToTest) {
+      const legacy = isValidModelOrAlias(model, legacyConfig);
+      const dynamic = isValidModelOrAlias(model, dynamicConfig);
+      expect(dynamic).toBe(legacy);
+    }
+  });
+
+  it('supportsMultimodalFunctionResponse should match legacy behavior', () => {
+    for (const model of modelsToTest) {
+      const legacy = supportsMultimodalFunctionResponse(model, legacyConfig);
+      const dynamic = supportsMultimodalFunctionResponse(model, dynamicConfig);
+      expect(dynamic).toBe(legacy);
+    }
+  });
 });
 
 describe('isPreviewModel', () => {
