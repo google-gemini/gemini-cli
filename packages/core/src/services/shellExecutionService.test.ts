@@ -286,7 +286,7 @@ describe('ShellExecutionService', () => {
         'bash',
         [
           '-c',
-          'shopt -u promptvars nullglob extglob nocaseglob dotglob; ls -l',
+          "trap '' HUP; shopt -u promptvars nullglob extglob nocaseglob dotglob; ls -l",
         ],
         expect.any(Object),
       );
@@ -950,7 +950,7 @@ describe('ShellExecutionService', () => {
         'bash',
         [
           '-c',
-          'shopt -u promptvars nullglob extglob nocaseglob dotglob; ls "foo bar"',
+          'trap \'\' HUP; shopt -u promptvars nullglob extglob nocaseglob dotglob; ls "foo bar"',
         ],
         expect.any(Object),
       );
@@ -1204,7 +1204,7 @@ describe('ShellExecutionService child_process fallback', () => {
         'bash',
         [
           '-c',
-          'shopt -u promptvars nullglob extglob nocaseglob dotglob; ls -l',
+          "trap '' HUP; shopt -u promptvars nullglob extglob nocaseglob dotglob; ls -l",
         ],
         expect.objectContaining({ shell: false, detached: true }),
       );
@@ -1538,7 +1538,7 @@ describe('ShellExecutionService child_process fallback', () => {
         'bash',
         [
           '-c',
-          'shopt -u promptvars nullglob extglob nocaseglob dotglob; ls "foo bar"',
+          'trap \'\' HUP; shopt -u promptvars nullglob extglob nocaseglob dotglob; ls "foo bar"',
         ],
         expect.objectContaining({
           shell: false,
