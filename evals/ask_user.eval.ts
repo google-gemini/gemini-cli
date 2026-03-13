@@ -60,7 +60,7 @@ describe('ask_user', () => {
   // confirm shell commands. Fixed via prompt refinements and tool definition
   // updates to clarify that shell command confirmation is handled by the UI.
   // See fix: https://github.com/google-gemini/gemini-cli/pull/20504
-  evalTest('USUALLY_PASSES', {
+  evalTest('ALWAYS_PASSES', {
     name: 'Agent does NOT use AskUser to confirm shell commands',
     files: {
       'package.json': JSON.stringify({
