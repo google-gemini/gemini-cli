@@ -14,6 +14,7 @@ export interface StickyHeaderProps {
   isFirst: boolean;
   borderColor: string;
   borderDimColor: boolean;
+  hideSideBorders?: boolean;
   containerRef?: React.RefObject<DOMElement | null>;
 }
 
@@ -23,6 +24,7 @@ export const StickyHeader: React.FC<StickyHeaderProps> = ({
   isFirst,
   borderColor,
   borderDimColor,
+  hideSideBorders = false,
   containerRef,
 }) => (
   <Box
@@ -64,8 +66,8 @@ export const StickyHeader: React.FC<StickyHeaderProps> = ({
       borderDimColor={borderDimColor}
       borderBottom={false}
       borderTop={isFirst}
-      borderLeft={true}
-      borderRight={true}
+      borderLeft={!hideSideBorders}
+      borderRight={!hideSideBorders}
       paddingX={1}
       paddingBottom={1}
       paddingTop={isFirst ? 0 : 1}

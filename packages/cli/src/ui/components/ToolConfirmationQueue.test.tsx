@@ -376,6 +376,54 @@ describe('ToolConfirmationQueue', () => {
     unmount();
   });
 
+  it('hides side borders when a code snippet is detected in ask_user', async () => {
+    const confirmingTool = {
+      tool: {
+        callId: 'call-1',
+        name: 'ask_user',
+        description: 'ask user',
+        status: CoreToolCallStatus.AwaitingApproval,
+        confirmationDetails: {
+          type: 'ask_user' as const,
+          questions: [
+            {
+              type: 'choice',
+              header: 'Review code',
+              // Contains markdown code block
+              question: 'Does this code look correct?\n```python\nprint("hello")\n```',
+              options: [{ label: 'Yes', description: 'Looks good' }, { label: 'No', description: 'Needs changes' }],
+            },
+          ],
+          onConfirm: vi.fn(),
+        },
+      },
+      index: 1,
+      total: 1,
+    };
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <ToolConfirmationQueue
+        confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+      />,
+      {
+        config: mockConfig,
+        uiState: {
+          terminalWidth: 80,
+        },
+      },
+    );
+    await waitUntilReady();
+
+    const output = lastFrame();
+    // Snapshot should show no left/right borders
+    expect(output).toMatchSnapshot();
+
+    const stickyHeaderProps = vi.mocked(StickyHeader).mock.calls[0][0];
+    // StickyHeader should receive hideSideBorders=true
+    expect(stickyHeaderProps.hideSideBorders).toBe(true);
+    unmount();
+  });
+
   it('renders ExitPlanMode tool confirmation with Success color', async () => {
     const confirmingTool = {
       tool: {
