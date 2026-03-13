@@ -81,7 +81,9 @@ describe('<HookStatusDisplay />', () => {
 
   it('matches SVG snapshot for single hook', async () => {
     const props = {
-      activeHooks: [{ name: 'test-hook', eventName: 'BeforeAgent', source: 'user' }],
+      activeHooks: [
+        { name: 'test-hook', eventName: 'BeforeAgent', source: 'user' },
+      ],
     };
     const renderResult = render(<HookStatusDisplay {...props} />);
     await renderResult.waitUntilReady();

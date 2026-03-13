@@ -537,7 +537,8 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: false,
-        description: 'Hide the introductory tips shown at the top of the screen.',
+        description:
+          'Hide the introductory tips shown at the top of the screen.',
         showInDialog: true,
       },
       hideIntroTips: {
@@ -546,7 +547,8 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: false,
-        description: '@deprecated Use ui.hideTips instead. Hide the intro tips in the header.',
+        description:
+          '@deprecated Use ui.hideTips instead. Hide the intro tips in the header.',
         showInDialog: false,
       },
       escapePastedAtSymbols: {
@@ -565,7 +567,8 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: true,
-        description: "Show basic shortcut help ('?') when the status line is idle.",
+        description:
+          "Show basic shortcut help ('?') when the status line is idle.",
         showInDialog: true,
       },
       hideBanner: {
@@ -754,7 +757,8 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: false,
-        description: 'Hide helpful tips in the footer while the model is working.',
+        description:
+          'Hide helpful tips in the footer while the model is working.',
         showInDialog: true,
       },
       hideStatusWit: {
@@ -763,7 +767,8 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: true,
-        description: 'Hide witty loading phrases in the footer while the model is working.',
+        description:
+          'Hide witty loading phrases in the footer while the model is working.',
         showInDialog: true,
       },
       statusHints: {
