@@ -62,8 +62,16 @@ if (targetArg) {
     process.exit(1);
   }
 } else if (telemetrySettings?.target) {
+  if (!allowedTargets.includes(target)) {
+    console.error(
+      `\u{1F6D1} Error: Invalid telemetry target '${target}' in settings.json. Allowed targets are: ${allowedTargets.join(
+        ', ',
+      )}.`,
+    );
+    process.exit(1);
+  }
   console.log(
-    `⚙️ Using telemetry target from settings.json: ${telemetrySettings.target}`,
+    `\u{2699}\u{FE0F} Using telemetry target from settings.json: ${telemetrySettings.target}`,
   );
 }
 
