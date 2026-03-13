@@ -1113,27 +1113,23 @@ export class Config implements McpContext, AgentLoopContext {
     // TODO(12593): Fix the settings loading logic to properly merge defaults and
     // remove this hack.
     let modelConfigServiceConfig = params.modelConfigServiceConfig;
-    const defaultsToApply: Partial<ModelConfigServiceConfig> = {};
     if (modelConfigServiceConfig) {
-      if (!modelConfigServiceConfig.aliases) {
-        defaultsToApply.aliases = DEFAULT_MODEL_CONFIGS.aliases;
-      }
-      if (!modelConfigServiceConfig.overrides) {
-        defaultsToApply.overrides = DEFAULT_MODEL_CONFIGS.overrides;
-      }
-      if (
-        !modelConfigServiceConfig.modelDefinitions ||
-        Object.keys(modelConfigServiceConfig.modelDefinitions).length === 0
-      ) {
-        defaultsToApply.modelDefinitions =
-          DEFAULT_MODEL_CONFIGS.modelDefinitions;
-      }
-    }
+      // Ensure user-defined model definitions augment, not replace, the defaults.
+      const mergedModelDefinitions = {
+        ...DEFAULT_MODEL_CONFIGS.modelDefinitions,
+        ...modelConfigServiceConfig.modelDefinitions,
+      };
 
-    if (Object.keys(defaultsToApply).length > 0) {
       modelConfigServiceConfig = {
+        // Preserve other user settings like customAliases
         ...modelConfigServiceConfig,
-        ...defaultsToApply,
+        // Apply defaults for aliases and overrides if they are not provided
+        aliases:
+          modelConfigServiceConfig.aliases ?? DEFAULT_MODEL_CONFIGS.aliases,
+        overrides:
+          modelConfigServiceConfig.overrides ?? DEFAULT_MODEL_CONFIGS.overrides,
+        // Use the merged model definitions
+        modelDefinitions: mergedModelDefinitions,
       };
     }
 
