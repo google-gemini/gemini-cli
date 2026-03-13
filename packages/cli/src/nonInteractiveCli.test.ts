@@ -2034,6 +2034,96 @@ describe('runNonInteractive', () => {
       expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
       expect(getWrittenOutput()).toBe('Final answer\n');
     });
+
+    it('should emit warning event for AgentExecutionBlocked in streaming JSON mode', async () => {
+      vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
+        OutputFormat.STREAM_JSON,
+      );
+      vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+
+      const allEvents: ServerGeminiStreamEvent[] = [
+        {
+          type: GeminiEventType.AgentExecutionBlocked,
+          value: { reason: 'Blocked by safety filter' },
+        },
+        { type: GeminiEventType.Content, value: 'Recovered answer' },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+        },
+      ];
+
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(allEvents),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test block stream',
+        prompt_id: 'prompt-id-block-stream',
+      });
+
+      const output = getWrittenOutput();
+      // Should contain the warning event for the block
+      expect(output).toContain('"type":"error"');
+      expect(output).toContain('"severity":"warning"');
+      expect(output).toContain(
+        'Agent execution blocked: Blocked by safety filter',
+      );
+      // Should also contain the final result event
+      expect(output).toContain('"type":"result"');
+      expect(output).toContain('"status":"success"');
+    });
+
+    it('should write warning to stderr for AgentExecutionBlocked in JSON mode', async () => {
+      vi.mocked(mockConfig.getOutputFormat).mockReturnValue(OutputFormat.JSON);
+      vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+
+      const allEvents: ServerGeminiStreamEvent[] = [
+        {
+          type: GeminiEventType.AgentExecutionBlocked,
+          value: { reason: 'Blocked by policy' },
+        },
+        { type: GeminiEventType.Content, value: 'Recovered answer' },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: { totalTokenCount: 10 } },
+        },
+      ];
+
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(allEvents),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'test block json',
+        prompt_id: 'prompt-id-block-json',
+      });
+
+      // Should write warning to stderr
+      expect(processStderrSpy).toHaveBeenCalledWith(
+        '[WARNING] Agent execution blocked: Blocked by policy\n',
+      );
+      // Should still produce valid JSON output
+      expect(processStdoutSpy).toHaveBeenCalledWith(
+        JSON.stringify(
+          {
+            session_id: 'test-session-id',
+            response: 'Recovered answer',
+            stats: MOCK_SESSION_METRICS,
+          },
+          null,
+          2,
+        ),
+      );
+    });
   });
 
   describe('Output Sanitization', () => {

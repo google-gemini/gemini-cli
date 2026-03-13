@@ -386,7 +386,17 @@ export async function runNonInteractive({
             return;
           } else if (event.type === GeminiEventType.AgentExecutionBlocked) {
             const blockMessage = `Agent execution blocked: ${event.value.systemMessage?.trim() || event.value.reason}`;
-            if (config.getOutputFormat() === OutputFormat.TEXT) {
+            if (streamFormatter) {
+              streamFormatter.emitEvent({
+                type: JsonStreamEventType.ERROR,
+                timestamp: new Date().toISOString(),
+                severity: 'warning',
+                message: blockMessage,
+              });
+            } else {
+              // For both JSON and TEXT modes, write the warning to stderr.
+              // JSON mode uses a single final JSON blob so mid-stream warnings
+              // go to stderr like TEXT mode.
               process.stderr.write(`[WARNING] ${blockMessage}\n`);
             }
           }
