@@ -180,6 +180,10 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         : undefined,
     );
 
+  const isInteractiveShellWaiting = uiState.currentLoadingPhrase?.includes(
+    INTERACTIVE_SHELL_WAITING_PHRASE,
+  );
+
   /**
    * Calculate the estimated length of the status message to avoid collisions
    * with the tips area.
@@ -214,7 +218,11 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
    */
   const ambientContentStr = (() => {
     // 1. Proactive Tip (Priority)
-    if (showTips && uiState.currentTip) {
+    if (
+      showTips &&
+      uiState.currentTip &&
+      !(isInteractiveShellWaiting && uiState.currentTip === INTERACTIVE_SHELL_WAITING_PHRASE)
+    ) {
       if (
         estimatedStatusLength + uiState.currentTip.length + 10 <=
         terminalWidth
@@ -270,10 +278,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
   const showMinimalInlineLoading = !showUiDetails && showLoadingIndicator;
   const showMinimalBleedThroughRow = !showUiDetails && showRow2_MiniMode;
-
-  const isInteractiveShellWaiting = uiState.currentLoadingPhrase?.includes(
-    INTERACTIVE_SHELL_WAITING_PHRASE,
-  );
 
   const renderAmbientNode = () => {
     if (!ambientContentStr) return null;
