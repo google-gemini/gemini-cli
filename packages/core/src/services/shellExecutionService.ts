@@ -63,6 +63,13 @@ export const SCROLLBACK_LIMIT = 300000;
 const BASH_SHOPT_OPTIONS = 'promptvars nullglob extglob nocaseglob dotglob';
 const BASH_SHOPT_GUARD = `shopt -u ${BASH_SHOPT_OPTIONS};`;
 
+/**
+ * PowerShell snippet to force stdout/stderr to UTF-8 on Windows, avoiding
+ * misinterpretation of non-ASCII characters when the default code page is not UTF-8.
+ */
+const POWERSHELL_UTF8_PREFIX =
+  '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; [Console]::InputEncoding = [System.Text.Encoding]::UTF8; ';
+
 function ensurePromptvarsDisabled(command: string, shell: ShellType): string {
   if (shell !== 'bash') {
     return command;
@@ -354,7 +361,9 @@ export class ShellExecutionService {
       const isWindows = os.platform() === 'win32';
       const { executable, argsPrefix, shell } = getShellConfiguration();
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-      const spawnArgs = [...argsPrefix, guardedCommand];
+      const commandWithEncoding =
+        (shell === 'powershell' ? POWERSHELL_UTF8_PREFIX : '') + guardedCommand;
+      const spawnArgs = [...argsPrefix, commandWithEncoding];
 
       // Specifically allow GIT_CONFIG_* variables to pass through sanitization
       // in non-interactive mode so we can safely append our overrides.
@@ -703,7 +712,9 @@ export class ShellExecutionService {
       }
 
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-      const args = [...argsPrefix, guardedCommand];
+      const commandWithEncoding =
+        (shell === 'powershell' ? POWERSHELL_UTF8_PREFIX : '') + guardedCommand;
+      const args = [...argsPrefix, commandWithEncoding];
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const ptyProcess = ptyInfo.module.spawn(executable, args, {
