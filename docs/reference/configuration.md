@@ -767,6 +767,10 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `tools`
 
+- **`tools.sandboxing`** (boolean):
+  - **Description:** Enable sandboxing for tool execution.
+  - **Default:** `false`
+
 - **`tools.sandbox`** (string):
   - **Description:** Sandbox execution environment. Set to a boolean to enable
     or disable the sandbox, provide a string path to a sandbox profile, or

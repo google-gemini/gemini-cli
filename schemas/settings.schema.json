@@ -1302,6 +1302,13 @@
       "default": {},
       "type": "object",
       "properties": {
+        "sandboxing": {
+          "title": "Tool Sandboxing",
+          "description": "Enable sandboxing for tool execution.",
+          "markdownDescription": "Enable sandboxing for tool execution.\n\n- Category: `Tools`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "sandbox": {
           "title": "Sandbox",
           "description": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\").",
