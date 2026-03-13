@@ -715,7 +715,7 @@ export function stripShellWrapper(command: string): string {
     }
     return newCommand;
   }
-  return command.trim();
+  return command.trimStart();
 }
 
 /**
