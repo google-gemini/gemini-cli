@@ -623,7 +623,6 @@ export class Scheduler {
         outcome,
         lastDetails,
         this.context,
-        this.messageBus,
         toolCall.invocation,
       );
     }
