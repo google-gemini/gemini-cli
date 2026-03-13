@@ -11,6 +11,9 @@ A test server
   Tools:
   - tool-1
     A test tool
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers
 "
 `;
 
@@ -18,6 +21,9 @@ exports[`McpStatus > renders correctly with a blocked server 1`] = `
 "Configured MCP servers:
 
 🔴 server-1 (from test-extension) - Blocked
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers
 "
 `;
 
@@ -29,6 +35,9 @@ A test server
   Tools:
   - tool-1
     A test tool
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers
 "
 `;
 
@@ -40,6 +49,9 @@ A test server
   Tools:
   - tool-1
     A test tool
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers
 "
 `;
 
@@ -51,6 +63,9 @@ A test server
   Tools:
   - tool-1
     A test tool
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers
 "
 `;
 
@@ -63,6 +78,9 @@ A test server
   Tools:
   - tool-1
     A test tool
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers
 "
 `;
 
@@ -74,6 +92,9 @@ A test server
   Tools:
   - tool-1
     A test tool
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers
 "
 `;
 
@@ -87,6 +108,9 @@ A test server
     A test tool
 
 🔴 server-2 (from test-extension) - Blocked
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers
 "
 `;
 
@@ -98,6 +122,9 @@ A test server
   Tools:
   - tool-1
     A test tool
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers
 "
 `;
 
@@ -118,6 +145,9 @@ A test server
           }
         }
       }
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers
 "
 `;
 
@@ -132,6 +162,9 @@ A test server
   Prompts:
   - prompt-1
     A test prompt
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers
 "
 `;
 
@@ -146,6 +179,9 @@ A test server
   Resources:
   - resource-1 (file:///tmp/resource-1.txt)
     A test resource
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers
 "
 `;
 
@@ -166,6 +202,9 @@ A test server
           }
         }
       }
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers
 "
 `;
 
@@ -177,6 +216,9 @@ A test server
   Tools:
   - tool-1
     A test tool
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers
 "
 `;
 
@@ -184,5 +226,8 @@ exports[`McpStatus > renders only blocked servers when no configured servers exi
 "Configured MCP servers:
 
 🔴 server-1 (from test-extension) - Blocked
+
+
+Tip: /mcp enable|disable|remove <name> to manage servers
 "
 `;
