@@ -68,6 +68,7 @@ describe('policy.ts', () => {
         { name: 'test-tool', args: {} },
         undefined,
         undefined,
+        undefined,
       );
     });
 
@@ -97,6 +98,7 @@ describe('policy.ts', () => {
         { name: 'mcp-tool', args: {} },
         'my-server',
         { readOnlyHint: true },
+        undefined,
       );
     });
 
@@ -225,6 +227,7 @@ describe('policy.ts', () => {
         ToolConfirmationOutcome.ProceedAlways,
         undefined,
         mockConfig,
+        mockMessageBus,
       );
 
       expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
@@ -252,6 +255,7 @@ describe('policy.ts', () => {
         ToolConfirmationOutcome.ProceedAlways,
         undefined,
         mockConfig,
+        mockMessageBus,
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -284,6 +288,7 @@ describe('policy.ts', () => {
         ToolConfirmationOutcome.ProceedAlwaysAndSave,
         undefined,
         mockConfig,
+        mockMessageBus,
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -322,6 +327,7 @@ describe('policy.ts', () => {
         ToolConfirmationOutcome.ProceedAlways,
         details,
         mockConfig,
+        mockMessageBus,
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -360,12 +366,13 @@ describe('policy.ts', () => {
         ToolConfirmationOutcome.ProceedAlwaysServer,
         details,
         mockConfig,
+        mockMessageBus,
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
         expect.objectContaining({
           type: MessageBusType.UPDATE_POLICY,
-          toolName: 'my-server__*',
+          toolName: 'mcp_my-server_*',
           mcpName: 'my-server',
           persist: false,
         }),
@@ -391,6 +398,7 @@ describe('policy.ts', () => {
         ToolConfirmationOutcome.ProceedOnce,
         undefined,
         mockConfig,
+        mockMessageBus,
       );
 
       expect(mockMessageBus.publish).not.toHaveBeenCalled();
@@ -416,6 +424,7 @@ describe('policy.ts', () => {
         ToolConfirmationOutcome.Cancel,
         undefined,
         mockConfig,
+        mockMessageBus,
       );
 
       expect(mockMessageBus.publish).not.toHaveBeenCalled();
@@ -440,6 +449,7 @@ describe('policy.ts', () => {
         ToolConfirmationOutcome.ModifyWithEditor,
         undefined,
         mockConfig,
+        mockMessageBus,
       );
 
       expect(mockMessageBus.publish).not.toHaveBeenCalled();
@@ -472,6 +482,7 @@ describe('policy.ts', () => {
         ToolConfirmationOutcome.ProceedAlwaysTool,
         details,
         mockConfig,
+        mockMessageBus,
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -511,6 +522,7 @@ describe('policy.ts', () => {
         ToolConfirmationOutcome.ProceedAlways,
         details,
         mockConfig,
+        mockMessageBus,
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -552,6 +564,7 @@ describe('policy.ts', () => {
         ToolConfirmationOutcome.ProceedAlwaysAndSave,
         details,
         mockConfig,
+        mockMessageBus,
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -583,8 +596,8 @@ describe('policy.ts', () => {
         undefined,
         {
           config: mockConfig,
-          messageBus: mockMessageBus,
         } as unknown as AgentLoopContext,
+        mockMessageBus,
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -613,8 +626,8 @@ describe('policy.ts', () => {
         undefined,
         {
           config: mockConfig,
-          messageBus: mockMessageBus,
         } as unknown as AgentLoopContext,
+        mockMessageBus,
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
@@ -651,14 +664,15 @@ describe('policy.ts', () => {
         details,
         {
           config: mockConfig,
-          messageBus: mockMessageBus,
         } as unknown as AgentLoopContext,
+        mockMessageBus,
       );
 
       expect(mockMessageBus.publish).toHaveBeenCalledWith(
         expect.objectContaining({
           toolName: 'write_file',
-          argsPattern: escapeRegex('"file_path":"src/foo.ts"'),
+          argsPattern:
+            '\\\\0' + escapeRegex('"file_path":"src/foo.ts"') + '\\\\0',
         }),
       );
     });
@@ -774,7 +788,11 @@ describe('Plan Mode Denial Consistency', () => {
 
       if (enableEventDrivenScheduler) {
         const scheduler = new Scheduler({
-          context: mockConfig,
+          context: {
+            config: mockConfig,
+            messageBus: mockMessageBus,
+            toolRegistry: mockToolRegistry,
+          } as unknown as AgentLoopContext,
           getPreferredEditor: () => undefined,
           schedulerId: ROOT_SCHEDULER_ID,
         });
@@ -790,7 +808,11 @@ describe('Plan Mode Denial Consistency', () => {
       } else {
         let capturedCalls: CompletedToolCall[] = [];
         const scheduler = new CoreToolScheduler({
-          config: mockConfig,
+          context: {
+            config: mockConfig,
+            messageBus: mockMessageBus,
+            toolRegistry: mockToolRegistry,
+          } as unknown as AgentLoopContext,
           getPreferredEditor: () => undefined,
           onAllToolCallsComplete: async (calls) => {
             capturedCalls = calls;

@@ -124,6 +124,21 @@ topics on:
     `advanced.excludedEnvVars` setting in your `settings.json` to exclude fewer
     variables.
 
+- **Warning: `npm WARN deprecated node-domexception@1.0.0` or
+  `npm WARN deprecated glob` during install/update**
+  - **Issue:** When installing or updating the Gemini CLI globally via
+    `npm install -g @google/gemini-cli` or `npm update -g @google/gemini-cli`,
+    you might see deprecation warnings regarding `node-domexception` or old
+    versions of `glob`.
+  - **Cause:** These warnings occur because some dependencies (or their
+    sub-dependencies, like `google-auth-library`) rely on older package
+    versions. Since Gemini CLI requires Node.js 20 or higher, the platform's
+    native features (like the native `DOMException`) are used, making these
+    warnings purely informational.
+  - **Solution:** These warnings are harmless and can be safely ignored. Your
+    installation or update will complete successfully and function properly
+    without any action required.
+
 ## Exit codes
 
 The Gemini CLI uses specific exit codes to indicate the reason for termination.
