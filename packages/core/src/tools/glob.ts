@@ -92,6 +92,13 @@ export interface GlobToolParams {
    * Whether to respect .geminiignore patterns (optional, defaults to true)
    */
   respect_gemini_ignore?: boolean;
+
+  /**
+   * Maximum number of results to return (optional).
+   * When the result set exceeds this limit the output is truncated and
+   * a notice is appended so the caller knows more files matched.
+   */
+  max_results?: number;
 }
 
 class GlobToolInvocation extends BaseToolInvocation<
@@ -242,8 +249,18 @@ class GlobToolInvocation extends BaseToolInvocation<
       const sortedAbsolutePaths = sortedEntries.map((entry) =>
         entry.fullpath(),
       );
-      const fileListDescription = sortedAbsolutePaths.join('\n');
-      const fileCount = sortedAbsolutePaths.length;
+
+      // Apply max_results truncation when the caller requested a cap
+      const totalFound = sortedAbsolutePaths.length;
+      const maxResults = this.params.max_results;
+      const wasTruncated =
+        maxResults !== undefined && maxResults > 0 && totalFound > maxResults;
+      const displayPaths = wasTruncated
+        ? sortedAbsolutePaths.slice(0, maxResults)
+        : sortedAbsolutePaths;
+      const fileCount = displayPaths.length;
+
+      const fileListDescription = displayPaths.join('\n');
 
       let resultMessage = `Found ${fileCount} file(s) matching "${this.params.pattern}"`;
       if (searchDirectories.length === 1) {
@@ -251,14 +268,18 @@ class GlobToolInvocation extends BaseToolInvocation<
       } else {
         resultMessage += ` across ${searchDirectories.length} workspace directories`;
       }
+      if (wasTruncated) {
+        resultMessage += ` (showing ${fileCount} of ${totalFound} total matches - use a more specific pattern to narrow results)`;
+      }
       if (ignoredCount > 0) {
         resultMessage += ` (${ignoredCount} additional files were ignored)`;
       }
       resultMessage += `, sorted by modification time (newest first):\n${fileListDescription}`;
 
+      const truncatedSuffix = wasTruncated ? ' (truncated)' : '';
       return {
         llmContent: resultMessage,
-        returnDisplay: `Found ${fileCount} matching file(s)`,
+        returnDisplay: `Found ${fileCount} matching file(s)${truncatedSuffix}`,
       };
     } catch (error) {
       debugLogger.warn(`GlobLogic execute Error`, error);
@@ -334,6 +355,10 @@ export class GlobTool extends BaseDeclarativeTool<GlobToolParams, ToolResult> {
       params.pattern.trim() === ''
     ) {
       return "The 'pattern' parameter cannot be empty.";
+    }
+
+    if (params.max_results !== undefined && params.max_results < 1) {
+      return 'max_results must be at least 1.';
     }
 
     return null;

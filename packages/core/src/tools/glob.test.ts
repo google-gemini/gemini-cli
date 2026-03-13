@@ -247,6 +247,37 @@ describe('GlobTool', () => {
       const result = await invocation.execute(abortSignal);
       expect(result.error?.type).toBe(ToolErrorType.GLOB_EXECUTION_ERROR);
     }, 30000);
+
+    it('should truncate results when max_results is set', async () => {
+      const params: GlobToolParams = { pattern: '**/*.*', max_results: 2 };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
+      // The temp dir has at least 7 files but we asked for only 2
+      expect(result.llmContent).toContain('Found 2 file(s)');
+      expect(result.llmContent).toContain('showing 2 of');
+      expect(result.llmContent).toContain(
+        'use a more specific pattern to narrow results',
+      );
+      expect(result.returnDisplay).toContain('(truncated)');
+    }, 30000);
+
+    it('should not truncate when max_results exceeds total matches', async () => {
+      const params: GlobToolParams = { pattern: '*.txt', max_results: 100 };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
+      expect(result.llmContent).toContain('Found 2 file(s)');
+      expect(result.llmContent).not.toContain('showing');
+      expect(result.returnDisplay).not.toContain('(truncated)');
+    }, 30000);
+
+    it('should return all results when max_results is omitted', async () => {
+      const params: GlobToolParams = { pattern: '**/*.*' };
+      const invocation = globTool.build(params);
+      const result = await invocation.execute(abortSignal);
+      // Should find all files without any truncation notice
+      expect(result.llmContent).not.toContain('showing');
+      expect(result.returnDisplay).not.toContain('(truncated)');
+    }, 30000);
   });
 
   describe('validateToolParams', () => {
@@ -287,6 +318,18 @@ describe('GlobTool', () => {
       expect(globTool.validateToolParams(params)).toContain(
         "The 'pattern' parameter cannot be empty",
       );
+    });
+
+    it('should return error if max_results is less than 1', () => {
+      const params: GlobToolParams = { pattern: '*.txt', max_results: 0 };
+      expect(globTool.validateToolParams(params)).toContain(
+        'max_results must be >= 1',
+      );
+    });
+
+    it('should accept valid max_results', () => {
+      const params: GlobToolParams = { pattern: '*.txt', max_results: 10 };
+      expect(globTool.validateToolParams(params)).toBeNull();
     });
 
     it('should return error if dir_path is not a string', () => {
