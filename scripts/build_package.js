@@ -35,7 +35,9 @@ execSync('tsc --build', { stdio: 'inherit' });
 const bundleScript = join(process.cwd(), 'scripts', 'bundle-browser-mcp.mjs');
 if (packageName === 'core' && existsSync(bundleScript)) {
   console.log('Running chrome devtools MCP bundling...');
-  execSync(`node ${bundleScript}`, { stdio: 'inherit' });
+  execSync(`node ../packages/core/scripts/bundle-browser-mcp.mjs`, {
+    stdio: 'inherit',
+  });
 }
 
 // copy .{md,json} files
