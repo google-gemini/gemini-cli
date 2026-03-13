@@ -3,7 +3,12 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-const { getAsset } = require('node:sea');
+let getAsset;
+try {
+  getAsset = require('node:sea').getAsset;
+} catch (_) {
+  // node:sea is not available (e.g. running in Bun or as a regular script)
+}
 const process = require('node:process');
 const nodeModule = require('node:module');
 const path = require('node:path');
