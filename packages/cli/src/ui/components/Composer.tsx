@@ -56,8 +56,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
   const isAlternateBuffer = useAlternateBuffer();
   const { showApprovalModeIndicator } = uiState;
-  const showTips = settings.merged.ui.showStatusTips;
-  const showWit = settings.merged.ui.showStatusWit;
+  const showTips = !settings.merged.ui.hideStatusTips;
+  const showWit = !settings.merged.ui.hideStatusWit;
 
   const showUiDetails = uiState.cleanUiDetailsVisible;
   const suggestionsPosition = isAlternateBuffer ? 'above' : 'below';

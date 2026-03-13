@@ -2,13 +2,13 @@
 
 exports[`ConfigInitDisplay > handles empty clients map 1`] = `
 "
-Spinner Initializing...
+Spinner Working...
 "
 `;
 
 exports[`ConfigInitDisplay > renders initial state 1`] = `
 "
-Spinner Initializing...
+Spinner Working...
 "
 `;
 

@@ -925,7 +925,7 @@ export function migrateDeprecatedSettings(
         }
       }
 
-      // Migrate loadingPhrases/statusHints (enums) → showStatusTips/showStatusWit (booleans)
+      // Migrate loadingPhrases/statusHints (enums) → hideStatusTips/hideStatusWit (booleans)
       const oldHintSetting = newUi['statusHints'] ?? newUi['loadingPhrases'];
       if (oldHintSetting !== undefined) {
         if (newUi['loadingPhrases'] !== undefined) {
@@ -936,28 +936,28 @@ export function migrateDeprecatedSettings(
         }
 
         if (
-          newUi['showStatusTips'] === undefined &&
-          newUi['showStatusWit'] === undefined
+          newUi['hideStatusTips'] === undefined &&
+          newUi['hideStatusWit'] === undefined
         ) {
           switch (oldHintSetting) {
             case 'all':
-              newUi['showStatusTips'] = true;
-              newUi['showStatusWit'] = true;
+              newUi['hideStatusTips'] = false;
+              newUi['hideStatusWit'] = false;
               uiModified = true;
               break;
             case 'tips':
-              newUi['showStatusTips'] = true;
-              newUi['showStatusWit'] = false;
+              newUi['hideStatusTips'] = false;
+              newUi['hideStatusWit'] = true;
               uiModified = true;
               break;
             case 'witty':
-              newUi['showStatusTips'] = false;
-              newUi['showStatusWit'] = true;
+              newUi['hideStatusTips'] = true;
+              newUi['hideStatusWit'] = false;
               uiModified = true;
               break;
             case 'off':
-              newUi['showStatusTips'] = false;
-              newUi['showStatusWit'] = false;
+              newUi['hideStatusTips'] = true;
+              newUi['hideStatusWit'] = true;
               uiModified = true;
               break;
           }
@@ -974,6 +974,24 @@ export function migrateDeprecatedSettings(
           }
         }
       }
+
+      // Handle the recently added (now deprecated) showStatusTips and showStatusWit
+      uiModified =
+        migrateBoolean(
+          newUi,
+          'showStatusTips',
+          'hideStatusTips',
+          'ui',
+          foundDeprecated,
+        ) || uiModified;
+      uiModified =
+        migrateBoolean(
+          newUi,
+          'showStatusWit',
+          'hideStatusWit',
+          'ui',
+          foundDeprecated,
+        ) || uiModified;
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const accessibilitySettings = newUi['accessibility'] as
@@ -995,17 +1013,17 @@ export function migrateDeprecatedSettings(
           uiModified = true;
         }
 
-        // Migrate enableLoadingPhrases: false → showStatusTips/showStatusWit: false
+        // Migrate enableLoadingPhrases: false → hideStatusTips/hideStatusWit: true
         const enableLP = newAccessibility['enableLoadingPhrases'];
         if (typeof enableLP === 'boolean') {
           foundDeprecated.push('ui.accessibility.enableLoadingPhrases');
           if (
             !enableLP &&
-            newUi['showStatusTips'] === undefined &&
-            newUi['showStatusWit'] === undefined
+            newUi['hideStatusTips'] === undefined &&
+            newUi['hideStatusWit'] === undefined
           ) {
-            newUi['showStatusTips'] = false;
-            newUi['showStatusWit'] = false;
+            newUi['hideStatusTips'] = true;
+            newUi['hideStatusWit'] = true;
             uiModified = true;
           }
           if (removeDeprecated) {

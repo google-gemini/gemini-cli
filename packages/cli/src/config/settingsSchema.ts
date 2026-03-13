@@ -533,11 +533,11 @@ const SETTINGS_SCHEMA = {
       },
       hideTips: {
         type: 'boolean',
-        label: 'Hide Tips',
+        label: 'Hide Startup Tips',
         category: 'UI',
         requiresRestart: false,
         default: false,
-        description: 'Hide helpful tips in the UI',
+        description: 'Hide the introductory tips shown at the top of the screen.',
         showInDialog: true,
       },
       hideIntroTips: {
@@ -748,24 +748,22 @@ const SETTINGS_SCHEMA = {
         description: 'Show the spinner during operations.',
         showInDialog: true,
       },
-      showStatusTips: {
+      hideStatusTips: {
         type: 'boolean',
-        label: 'Show Tips',
-        category: 'UI',
-        requiresRestart: false,
-        default: true,
-        description:
-          'Show helpful tips in the footer while the model is working.',
-        showInDialog: true,
-      },
-      showStatusWit: {
-        type: 'boolean',
-        label: 'Show Wit',
+        label: 'Hide Footer Tips',
         category: 'UI',
         requiresRestart: false,
         default: false,
-        description:
-          'Show witty loading phrases in the footer while the model is working.',
+        description: 'Hide helpful tips in the footer while the model is working.',
+        showInDialog: true,
+      },
+      hideStatusWit: {
+        type: 'boolean',
+        label: 'Hide Footer Wit',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description: 'Hide witty loading phrases in the footer while the model is working.',
         showInDialog: true,
       },
       statusHints: {
@@ -775,7 +773,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: 'tips',
         description:
-          '@deprecated Use ui.showStatusTips and ui.showStatusWit instead. What to show in the status line: tips, witty comments, both, or off (fallback to shortcuts help).',
+          '@deprecated Use ui.hideStatusTips and ui.hideStatusWit instead. What to show in the status line: tips, witty comments, both, or off (fallback to shortcuts help).',
         showInDialog: false,
         options: [
           { value: 'tips', label: 'Tips' },
@@ -791,7 +789,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: 'tips',
         description:
-          '@deprecated Use ui.showStatusTips and ui.showStatusWit instead. What to show in the status line: tips, witty comments, both, or off (fallback to shortcuts help).',
+          '@deprecated Use ui.hideStatusTips and ui.hideStatusWit instead. What to show in the status line: tips, witty comments, both, or off (fallback to shortcuts help).',
         showInDialog: false,
         options: [
           { value: 'tips', label: 'Tips' },

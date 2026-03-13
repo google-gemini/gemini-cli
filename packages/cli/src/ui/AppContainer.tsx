@@ -2051,8 +2051,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     !!emptyWalletRequest ||
     !!customDialog;
 
-  const showStatusTips = settings.merged.ui.showStatusTips;
-  const showStatusWit = settings.merged.ui.showStatusWit;
+  const showStatusTips = !settings.merged.ui.hideStatusTips;
+  const showStatusWit = !settings.merged.ui.hideStatusWit;
 
   const showLoadingIndicator =
     (!embeddedShellFocused || isBackgroundShellVisible) &&
