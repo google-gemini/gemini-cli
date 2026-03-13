@@ -1,0 +1,148 @@
+# --- CORE TOOLS ---
+[[rule]]
+toolName = "read_file"
+decision = "allow"
+priority = 100
+
+[[rule]]
+toolName = "write_file"
+decision = "allow"
+priority = 100
+
+[[rule]]
+toolName = "grep_search"
+decision = "allow"
+priority = 100
+
+[[rule]]
+toolName = "glob"
+decision = "allow"
+priority = 100
+
+[[rule]]
+toolName = "list_directory"
+decision = "allow"
+priority = 100
+
+[[rule]]
+toolName = "codebase_investigator"
+decision = "allow"
+priority = 100
+
+# --- SHELL COMMANDS ---
+
+# Git (Safe/Read-only)
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = [
+  "git blame",
+  "git show",
+  "git grep",
+  "git show-ref",
+  "git ls-tree",
+  "git ls-remote",
+  "git reflog",
+  "git remote -v",
+  "git diff",
+  "git rev-list",
+  "git rev-parse",
+  "git merge-base",
+  "git cherry",
+  "git fetch",
+  "git status",
+  "git st",
+  "git branch",
+  "git br",
+  "git log",
+  "git --version"
+]
+decision = "allow"
+priority = 100
+
+# GitHub CLI (Read-only)
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = [
+  "gh workflow list",
+  "gh auth status",
+  "gh checkout view",
+  "gh run view",
+  "gh run job view",
+  "gh run list",
+  "gh run --help",
+  "gh issue view",
+  "gh issue list",
+  "gh label list",
+  "gh pr diff",
+  "gh pr check",
+  "gh pr checks",
+  "gh pr view",
+  "gh pr list",
+  "gh pr status",
+  "gh repo view",
+  "gh job view",
+  "gh api",
+  "gh log"
+]
+decision = "allow"
+priority = 100
+
+# Node.js/NPM (Generic Tests, Checks, and Build)
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = [
+  "npm run start",
+  "npm install",
+  "npm run",
+  "npm test",
+  "npm ci",
+  "npm list",
+  "npm --version"
+]
+decision = "allow"
+priority = 100
+
+# Core Utilities (Safe)
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = [
+  "sleep",
+  "env",
+  "break",
+  "xargs",
+  "base64",
+  "uniq",
+  "sort",
+  "echo",
+  "which",
+  "ls",
+  "find",
+  "tail",
+  "head",
+  "cat",
+  "cd",
+  "grep",
+  "ps",
+  "pwd",
+  "wc",
+  "file",
+  "stat",
+  "diff",
+  "lsof",
+  "date",
+  "whoami",
+  "uname",
+  "du",
+  "cut",
+  "true",
+  "false",
+  "readlink",
+  "awk",
+  "jq",
+  "rg",
+  "less",
+  "more",
+  "tree"
+]
+decision = "allow"
+priority = 100
