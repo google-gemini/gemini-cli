@@ -16,6 +16,7 @@ import { CoreToolCallStatus } from '@google/gemini-cli-core';
  * and ToolResultDisplay (for actual truncation).
  */
 export const TOOL_RESULT_STATIC_HEIGHT = 1;
+export const TOOL_RESULT_ASB_RESERVED_LINE_COUNT = 6;
 export const TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT = 2;
 export const TOOL_RESULT_MIN_LINES_SHOWN = 2;
 
@@ -39,13 +40,17 @@ export function calculateToolContentMaxLines(options: {
   isAlternateBuffer: boolean;
   maxLinesLimit?: number;
 }): number | undefined {
-  const { availableTerminalHeight, maxLinesLimit } = options;
+  const { availableTerminalHeight, isAlternateBuffer, maxLinesLimit } = options;
+
+  const reservedLines = isAlternateBuffer
+    ? TOOL_RESULT_ASB_RESERVED_LINE_COUNT
+    : TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT;
 
   let contentHeight =
     availableTerminalHeight !== undefined
       ? Math.max(
-          0,
-          availableTerminalHeight - TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT,
+          availableTerminalHeight - TOOL_RESULT_STATIC_HEIGHT - reservedLines,
+          TOOL_RESULT_MIN_LINES_SHOWN + 1,
         )
       : undefined;
 

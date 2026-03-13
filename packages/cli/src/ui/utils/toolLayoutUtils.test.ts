@@ -48,7 +48,7 @@ describe('toolLayoutUtils', () => {
           availableTerminalHeight: 2,
           isAlternateBuffer: false,
         },
-        expected: 0,
+        expected: 3,
       },
       {
         desc: 'returns available space directly in constrained terminal (ASB mode)',
@@ -56,7 +56,7 @@ describe('toolLayoutUtils', () => {
           availableTerminalHeight: 4,
           isAlternateBuffer: true,
         },
-        expected: 2,
+        expected: 3,
       },
       {
         desc: 'returns remaining space if sufficient space exists (Standard mode)',
@@ -64,7 +64,7 @@ describe('toolLayoutUtils', () => {
           availableTerminalHeight: 20,
           isAlternateBuffer: false,
         },
-        expected: 18,
+        expected: 17,
       },
       {
         desc: 'returns remaining space if sufficient space exists (ASB mode)',
@@ -72,7 +72,7 @@ describe('toolLayoutUtils', () => {
           availableTerminalHeight: 20,
           isAlternateBuffer: true,
         },
-        expected: 18,
+        expected: 13,
       },
     ];
 
