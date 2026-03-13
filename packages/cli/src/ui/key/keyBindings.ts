@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs/promises';
+import { z } from 'zod';
+import { parse as parseIgnoringComments } from 'comment-json';
+import { isNodeError, Storage } from '@google/gemini-cli-core';
+
 /**
  * Command enum for all available keyboard shortcuts
  */
@@ -73,16 +78,6 @@ export enum Command {
   OPEN_EXTERNAL_EDITOR = 'input.openExternalEditor',
   PASTE_CLIPBOARD = 'input.paste',
 
-  BACKGROUND_SHELL_ESCAPE = 'backgroundShellEscape',
-  BACKGROUND_SHELL_SELECT = 'backgroundShellSelect',
-  TOGGLE_BACKGROUND_SHELL = 'toggleBackgroundShell',
-  TOGGLE_BACKGROUND_SHELL_LIST = 'toggleBackgroundShellList',
-  KILL_BACKGROUND_SHELL = 'backgroundShell.kill',
-  UNFOCUS_BACKGROUND_SHELL = 'backgroundShell.unfocus',
-  UNFOCUS_BACKGROUND_SHELL_LIST = 'backgroundShell.listUnfocus',
-  SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING = 'backgroundShell.unfocusWarning',
-  SHOW_SHELL_INPUT_UNFOCUS_WARNING = 'shellInput.unfocusWarning',
-
   // App Controls
   SHOW_ERROR_DETAILS = 'app.showErrorDetails',
   SHOW_FULL_TODOS = 'app.showFullTodos',
@@ -98,27 +93,26 @@ export enum Command {
   CLEAR_SCREEN = 'app.clearScreen',
   RESTART_APP = 'app.restart',
   SUSPEND_APP = 'app.suspend',
+  SHOW_SHELL_INPUT_UNFOCUS_WARNING = 'app.showShellUnfocusWarning',
+
+  // Background Shell Controls
+  BACKGROUND_SHELL_ESCAPE = 'background.escape',
+  BACKGROUND_SHELL_SELECT = 'background.select',
+  TOGGLE_BACKGROUND_SHELL = 'background.toggle',
+  TOGGLE_BACKGROUND_SHELL_LIST = 'background.toggleList',
+  KILL_BACKGROUND_SHELL = 'background.kill',
+  UNFOCUS_BACKGROUND_SHELL = 'background.unfocus',
+  UNFOCUS_BACKGROUND_SHELL_LIST = 'background.unfocusList',
+  SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING = 'background.unfocusWarning',
 }
 
 /**
  * Data-driven key binding structure for user configuration
  */
 export class KeyBinding {
-  private static readonly VALID_KEYS = new Set([
-    // Letters & Numbers
-    ...'abcdefghijklmnopqrstuvwxyz0123456789',
-    // Punctuation
-    '`',
-    '-',
-    '=',
-    '[',
-    ']',
-    '\\',
-    ';',
-    "'",
-    ',',
-    '.',
-    '/',
+  private static readonly VALID_LONG_KEYS = new Set([
+    ...Array.from({ length: 35 }, (_, i) => `f${i + 1}`), // Function Keys
+    ...Array.from({ length: 10 }, (_, i) => `numpad${i}`), // Numpad Numbers
     // Navigation & Actions
     'left',
     'up',
@@ -134,15 +128,13 @@ export class KeyBinding {
     'space',
     'backspace',
     'delete',
+    'clear',
     'pausebreak',
     'capslock',
     'insert',
     'numlock',
     'scrolllock',
-    // Function Keys
-    ...Array.from({ length: 19 }, (_, i) => `f${i + 1}`),
-    // Numpad
-    ...Array.from({ length: 10 }, (_, i) => `numpad${i}`),
+    'printscreen',
     'numpad_multiply',
     'numpad_add',
     'numpad_separator',
@@ -201,8 +193,11 @@ export class KeyBinding {
 
     const key = remains;
 
-    if (!KeyBinding.VALID_KEYS.has(key)) {
-      throw new Error(`Invalid keybinding key: "${key}" in "${pattern}"`);
+    if ([...key].length !== 1 && !KeyBinding.VALID_LONG_KEYS.has(key)) {
+      throw new Error(
+        `Invalid keybinding key: "${key}" in "${pattern}".` +
+          ` Must be a single character or one of: ${[...KeyBinding.VALID_LONG_KEYS].join(', ')}`,
+      );
     }
 
     this.key = key;
@@ -221,156 +216,187 @@ export class KeyBinding {
       !!key.cmd === !!this.cmd
     );
   }
+
+  equals(other: KeyBinding): boolean {
+    return (
+      this.key === other.key &&
+      this.shift === other.shift &&
+      this.alt === other.alt &&
+      this.ctrl === other.ctrl &&
+      this.cmd === other.cmd
+    );
+  }
 }
 
 /**
  * Configuration type mapping commands to their key bindings
  */
-export type KeyBindingConfig = {
-  readonly [C in Command]: readonly KeyBinding[];
-};
+export type KeyBindingConfig = Map<Command, readonly KeyBinding[]>;
 
 /**
  * Default key binding configuration
  * Matches the original hard-coded logic exactly
  */
-export const defaultKeyBindings: KeyBindingConfig = {
+export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   // Basic Controls
-  [Command.RETURN]: [new KeyBinding('enter')],
-  [Command.ESCAPE]: [new KeyBinding('escape'), new KeyBinding('ctrl+[')],
-  [Command.QUIT]: [new KeyBinding('ctrl+c')],
-  [Command.EXIT]: [new KeyBinding('ctrl+d')],
+  [Command.RETURN, [new KeyBinding('enter')]],
+  [Command.ESCAPE, [new KeyBinding('escape'), new KeyBinding('ctrl+[')]],
+  [Command.QUIT, [new KeyBinding('ctrl+c')]],
+  [Command.EXIT, [new KeyBinding('ctrl+d')]],
 
   // Cursor Movement
-  [Command.HOME]: [new KeyBinding('ctrl+a'), new KeyBinding('home')],
-  [Command.END]: [new KeyBinding('ctrl+e'), new KeyBinding('end')],
-  [Command.MOVE_UP]: [new KeyBinding('up')],
-  [Command.MOVE_DOWN]: [new KeyBinding('down')],
-  [Command.MOVE_LEFT]: [new KeyBinding('left')],
-  [Command.MOVE_RIGHT]: [new KeyBinding('right'), new KeyBinding('ctrl+f')],
-  [Command.MOVE_WORD_LEFT]: [
-    new KeyBinding('ctrl+left'),
-    new KeyBinding('alt+left'),
-    new KeyBinding('alt+b'),
+  [Command.HOME, [new KeyBinding('ctrl+a'), new KeyBinding('home')]],
+  [Command.END, [new KeyBinding('ctrl+e'), new KeyBinding('end')]],
+  [Command.MOVE_UP, [new KeyBinding('up')]],
+  [Command.MOVE_DOWN, [new KeyBinding('down')]],
+  [Command.MOVE_LEFT, [new KeyBinding('left')]],
+  [Command.MOVE_RIGHT, [new KeyBinding('right'), new KeyBinding('ctrl+f')]],
+  [
+    Command.MOVE_WORD_LEFT,
+    [
+      new KeyBinding('ctrl+left'),
+      new KeyBinding('alt+left'),
+      new KeyBinding('alt+b'),
+    ],
   ],
-  [Command.MOVE_WORD_RIGHT]: [
-    new KeyBinding('ctrl+right'),
-    new KeyBinding('alt+right'),
-    new KeyBinding('alt+f'),
+  [
+    Command.MOVE_WORD_RIGHT,
+    [
+      new KeyBinding('ctrl+right'),
+      new KeyBinding('alt+right'),
+      new KeyBinding('alt+f'),
+    ],
   ],
 
   // Editing
-  [Command.KILL_LINE_RIGHT]: [new KeyBinding('ctrl+k')],
-  [Command.KILL_LINE_LEFT]: [new KeyBinding('ctrl+u')],
-  [Command.CLEAR_INPUT]: [new KeyBinding('ctrl+c')],
-  [Command.DELETE_WORD_BACKWARD]: [
-    new KeyBinding('ctrl+backspace'),
-    new KeyBinding('alt+backspace'),
-    new KeyBinding('ctrl+w'),
+  [Command.KILL_LINE_RIGHT, [new KeyBinding('ctrl+k')]],
+  [Command.KILL_LINE_LEFT, [new KeyBinding('ctrl+u')]],
+  [Command.CLEAR_INPUT, [new KeyBinding('ctrl+c')]],
+  [
+    Command.DELETE_WORD_BACKWARD,
+    [
+      new KeyBinding('ctrl+backspace'),
+      new KeyBinding('alt+backspace'),
+      new KeyBinding('ctrl+w'),
+    ],
   ],
-  [Command.DELETE_WORD_FORWARD]: [
-    new KeyBinding('ctrl+delete'),
-    new KeyBinding('alt+delete'),
-    new KeyBinding('alt+d'),
+  [
+    Command.DELETE_WORD_FORWARD,
+    [
+      new KeyBinding('ctrl+delete'),
+      new KeyBinding('alt+delete'),
+      new KeyBinding('alt+d'),
+    ],
   ],
-  [Command.DELETE_CHAR_LEFT]: [
-    new KeyBinding('backspace'),
-    new KeyBinding('ctrl+h'),
+  [
+    Command.DELETE_CHAR_LEFT,
+    [new KeyBinding('backspace'), new KeyBinding('ctrl+h')],
   ],
-  [Command.DELETE_CHAR_RIGHT]: [
-    new KeyBinding('delete'),
-    new KeyBinding('ctrl+d'),
+  [
+    Command.DELETE_CHAR_RIGHT,
+    [new KeyBinding('delete'), new KeyBinding('ctrl+d')],
   ],
-  [Command.UNDO]: [new KeyBinding('cmd+z'), new KeyBinding('alt+z')],
-  [Command.REDO]: [
-    new KeyBinding('ctrl+shift+z'),
-    new KeyBinding('cmd+shift+z'),
-    new KeyBinding('alt+shift+z'),
+  [Command.UNDO, [new KeyBinding('cmd+z'), new KeyBinding('alt+z')]],
+  [
+    Command.REDO,
+    [
+      new KeyBinding('ctrl+shift+z'),
+      new KeyBinding('cmd+shift+z'),
+      new KeyBinding('alt+shift+z'),
+    ],
   ],
 
   // Scrolling
-  [Command.SCROLL_UP]: [new KeyBinding('shift+up')],
-  [Command.SCROLL_DOWN]: [new KeyBinding('shift+down')],
-  [Command.SCROLL_HOME]: [
-    new KeyBinding('ctrl+home'),
-    new KeyBinding('shift+home'),
+  [Command.SCROLL_UP, [new KeyBinding('shift+up')]],
+  [Command.SCROLL_DOWN, [new KeyBinding('shift+down')]],
+  [
+    Command.SCROLL_HOME,
+    [new KeyBinding('ctrl+home'), new KeyBinding('shift+home')],
   ],
-  [Command.SCROLL_END]: [
-    new KeyBinding('ctrl+end'),
-    new KeyBinding('shift+end'),
+  [
+    Command.SCROLL_END,
+    [new KeyBinding('ctrl+end'), new KeyBinding('shift+end')],
   ],
-  [Command.PAGE_UP]: [new KeyBinding('pageup')],
-  [Command.PAGE_DOWN]: [new KeyBinding('pagedown')],
+  [Command.PAGE_UP, [new KeyBinding('pageup')]],
+  [Command.PAGE_DOWN, [new KeyBinding('pagedown')]],
 
   // History & Search
-  [Command.HISTORY_UP]: [new KeyBinding('ctrl+p')],
-  [Command.HISTORY_DOWN]: [new KeyBinding('ctrl+n')],
-  [Command.REVERSE_SEARCH]: [new KeyBinding('ctrl+r')],
-  [Command.SUBMIT_REVERSE_SEARCH]: [new KeyBinding('enter')],
-  [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH]: [new KeyBinding('tab')],
+  [Command.HISTORY_UP, [new KeyBinding('ctrl+p')]],
+  [Command.HISTORY_DOWN, [new KeyBinding('ctrl+n')]],
+  [Command.REVERSE_SEARCH, [new KeyBinding('ctrl+r')]],
+  [Command.SUBMIT_REVERSE_SEARCH, [new KeyBinding('enter')]],
+  [Command.ACCEPT_SUGGESTION_REVERSE_SEARCH, [new KeyBinding('tab')]],
 
   // Navigation
-  [Command.NAVIGATION_UP]: [new KeyBinding('up')],
-  [Command.NAVIGATION_DOWN]: [new KeyBinding('down')],
+  [Command.NAVIGATION_UP, [new KeyBinding('up')]],
+  [Command.NAVIGATION_DOWN, [new KeyBinding('down')]],
   // Navigation shortcuts appropriate for dialogs where we do not need to accept
   // text input.
-  [Command.DIALOG_NAVIGATION_UP]: [new KeyBinding('up'), new KeyBinding('k')],
-  [Command.DIALOG_NAVIGATION_DOWN]: [
-    new KeyBinding('down'),
-    new KeyBinding('j'),
+  [Command.DIALOG_NAVIGATION_UP, [new KeyBinding('up'), new KeyBinding('k')]],
+  [
+    Command.DIALOG_NAVIGATION_DOWN,
+    [new KeyBinding('down'), new KeyBinding('j')],
   ],
-  [Command.DIALOG_NEXT]: [new KeyBinding('tab')],
-  [Command.DIALOG_PREV]: [new KeyBinding('shift+tab')],
+  [Command.DIALOG_NEXT, [new KeyBinding('tab')]],
+  [Command.DIALOG_PREV, [new KeyBinding('shift+tab')]],
 
   // Suggestions & Completions
-  [Command.ACCEPT_SUGGESTION]: [new KeyBinding('tab'), new KeyBinding('enter')],
-  [Command.COMPLETION_UP]: [new KeyBinding('up'), new KeyBinding('ctrl+p')],
-  [Command.COMPLETION_DOWN]: [new KeyBinding('down'), new KeyBinding('ctrl+n')],
-  [Command.EXPAND_SUGGESTION]: [new KeyBinding('right')],
-  [Command.COLLAPSE_SUGGESTION]: [new KeyBinding('left')],
+  [Command.ACCEPT_SUGGESTION, [new KeyBinding('tab'), new KeyBinding('enter')]],
+  [Command.COMPLETION_UP, [new KeyBinding('up'), new KeyBinding('ctrl+p')]],
+  [Command.COMPLETION_DOWN, [new KeyBinding('down'), new KeyBinding('ctrl+n')]],
+  [Command.EXPAND_SUGGESTION, [new KeyBinding('right')]],
+  [Command.COLLAPSE_SUGGESTION, [new KeyBinding('left')]],
 
   // Text Input
   // Must also exclude shift to allow shift+enter for newline
-  [Command.SUBMIT]: [new KeyBinding('enter')],
-  [Command.NEWLINE]: [
-    new KeyBinding('ctrl+enter'),
-    new KeyBinding('cmd+enter'),
-    new KeyBinding('alt+enter'),
-    new KeyBinding('shift+enter'),
-    new KeyBinding('ctrl+j'),
+  [Command.SUBMIT, [new KeyBinding('enter')]],
+  [
+    Command.NEWLINE,
+    [
+      new KeyBinding('ctrl+enter'),
+      new KeyBinding('cmd+enter'),
+      new KeyBinding('alt+enter'),
+      new KeyBinding('shift+enter'),
+      new KeyBinding('ctrl+j'),
+    ],
   ],
-  [Command.OPEN_EXTERNAL_EDITOR]: [new KeyBinding('ctrl+x')],
-  [Command.PASTE_CLIPBOARD]: [
-    new KeyBinding('ctrl+v'),
-    new KeyBinding('cmd+v'),
-    new KeyBinding('alt+v'),
+  [Command.OPEN_EXTERNAL_EDITOR, [new KeyBinding('ctrl+x')]],
+  [
+    Command.PASTE_CLIPBOARD,
+    [
+      new KeyBinding('ctrl+v'),
+      new KeyBinding('cmd+v'),
+      new KeyBinding('alt+v'),
+    ],
   ],
 
   // App Controls
-  [Command.SHOW_ERROR_DETAILS]: [new KeyBinding('f12')],
-  [Command.SHOW_FULL_TODOS]: [new KeyBinding('ctrl+t')],
-  [Command.SHOW_IDE_CONTEXT_DETAIL]: [new KeyBinding('ctrl+g')],
-  [Command.TOGGLE_MARKDOWN]: [new KeyBinding('alt+m')],
-  [Command.TOGGLE_COPY_MODE]: [new KeyBinding('ctrl+s')],
-  [Command.TOGGLE_YOLO]: [new KeyBinding('ctrl+y')],
-  [Command.CYCLE_APPROVAL_MODE]: [new KeyBinding('shift+tab')],
-  [Command.TOGGLE_BACKGROUND_SHELL]: [new KeyBinding('ctrl+b')],
-  [Command.TOGGLE_BACKGROUND_SHELL_LIST]: [new KeyBinding('ctrl+l')],
-  [Command.KILL_BACKGROUND_SHELL]: [new KeyBinding('ctrl+k')],
-  [Command.UNFOCUS_BACKGROUND_SHELL]: [new KeyBinding('shift+tab')],
-  [Command.UNFOCUS_BACKGROUND_SHELL_LIST]: [new KeyBinding('tab')],
-  [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]: [new KeyBinding('tab')],
-  [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]: [new KeyBinding('tab')],
-  [Command.BACKGROUND_SHELL_SELECT]: [new KeyBinding('enter')],
-  [Command.BACKGROUND_SHELL_ESCAPE]: [new KeyBinding('escape')],
-  [Command.SHOW_MORE_LINES]: [new KeyBinding('ctrl+o')],
-  [Command.EXPAND_PASTE]: [new KeyBinding('ctrl+o')],
-  [Command.FOCUS_SHELL_INPUT]: [new KeyBinding('tab')],
-  [Command.UNFOCUS_SHELL_INPUT]: [new KeyBinding('shift+tab')],
-  [Command.CLEAR_SCREEN]: [new KeyBinding('ctrl+l')],
-  [Command.RESTART_APP]: [new KeyBinding('r'), new KeyBinding('shift+r')],
-  [Command.SUSPEND_APP]: [new KeyBinding('ctrl+z')],
-};
+  [Command.SHOW_ERROR_DETAILS, [new KeyBinding('f12')]],
+  [Command.SHOW_FULL_TODOS, [new KeyBinding('ctrl+t')]],
+  [Command.SHOW_IDE_CONTEXT_DETAIL, [new KeyBinding('ctrl+g')]],
+  [Command.TOGGLE_MARKDOWN, [new KeyBinding('alt+m')]],
+  [Command.TOGGLE_COPY_MODE, [new KeyBinding('ctrl+s')]],
+  [Command.TOGGLE_YOLO, [new KeyBinding('ctrl+y')]],
+  [Command.CYCLE_APPROVAL_MODE, [new KeyBinding('shift+tab')]],
+  [Command.SHOW_MORE_LINES, [new KeyBinding('ctrl+o')]],
+  [Command.EXPAND_PASTE, [new KeyBinding('ctrl+o')]],
+  [Command.FOCUS_SHELL_INPUT, [new KeyBinding('tab')]],
+  [Command.UNFOCUS_SHELL_INPUT, [new KeyBinding('shift+tab')]],
+  [Command.CLEAR_SCREEN, [new KeyBinding('ctrl+l')]],
+  [Command.RESTART_APP, [new KeyBinding('r'), new KeyBinding('shift+r')]],
+  [Command.SUSPEND_APP, [new KeyBinding('ctrl+z')]],
+  [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING, [new KeyBinding('tab')]],
+
+  // Background Shell Controls
+  [Command.BACKGROUND_SHELL_ESCAPE, [new KeyBinding('escape')]],
+  [Command.BACKGROUND_SHELL_SELECT, [new KeyBinding('enter')]],
+  [Command.TOGGLE_BACKGROUND_SHELL, [new KeyBinding('ctrl+b')]],
+  [Command.TOGGLE_BACKGROUND_SHELL_LIST, [new KeyBinding('ctrl+l')]],
+  [Command.KILL_BACKGROUND_SHELL, [new KeyBinding('ctrl+k')]],
+  [Command.UNFOCUS_BACKGROUND_SHELL, [new KeyBinding('shift+tab')]],
+  [Command.UNFOCUS_BACKGROUND_SHELL_LIST, [new KeyBinding('tab')]],
+  [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING, [new KeyBinding('tab')]],
+]);
 
 interface CommandCategory {
   readonly title: string;
@@ -475,20 +501,25 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.CYCLE_APPROVAL_MODE,
       Command.SHOW_MORE_LINES,
       Command.EXPAND_PASTE,
-      Command.TOGGLE_BACKGROUND_SHELL,
-      Command.TOGGLE_BACKGROUND_SHELL_LIST,
-      Command.KILL_BACKGROUND_SHELL,
-      Command.BACKGROUND_SHELL_SELECT,
-      Command.BACKGROUND_SHELL_ESCAPE,
-      Command.UNFOCUS_BACKGROUND_SHELL,
-      Command.UNFOCUS_BACKGROUND_SHELL_LIST,
-      Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING,
-      Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING,
       Command.FOCUS_SHELL_INPUT,
       Command.UNFOCUS_SHELL_INPUT,
       Command.CLEAR_SCREEN,
       Command.RESTART_APP,
       Command.SUSPEND_APP,
+      Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING,
+    ],
+  },
+  {
+    title: 'Background Shell Controls',
+    commands: [
+      Command.BACKGROUND_SHELL_ESCAPE,
+      Command.BACKGROUND_SHELL_SELECT,
+      Command.TOGGLE_BACKGROUND_SHELL,
+      Command.TOGGLE_BACKGROUND_SHELL_LIST,
+      Command.KILL_BACKGROUND_SHELL,
+      Command.UNFOCUS_BACKGROUND_SHELL,
+      Command.UNFOCUS_BACKGROUND_SHELL_LIST,
+      Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING,
     ],
   },
 ];
@@ -576,9 +607,18 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
     'Expand and collapse blocks of content when not in alternate buffer mode.',
   [Command.EXPAND_PASTE]:
     'Expand or collapse a paste placeholder when cursor is over placeholder.',
+  [Command.FOCUS_SHELL_INPUT]: 'Move focus from Gemini to the active shell.',
+  [Command.UNFOCUS_SHELL_INPUT]: 'Move focus from the shell back to Gemini.',
+  [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
+  [Command.RESTART_APP]: 'Restart the application.',
+  [Command.SUSPEND_APP]: 'Suspend the CLI and move it to the background.',
+  [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]:
+    'Show warning when trying to move focus away from shell input.',
+
+  // Background Shell Controls
+  [Command.BACKGROUND_SHELL_ESCAPE]: 'Dismiss background shell list.',
   [Command.BACKGROUND_SHELL_SELECT]:
     'Confirm selection in background shell list.',
-  [Command.BACKGROUND_SHELL_ESCAPE]: 'Dismiss background shell list.',
   [Command.TOGGLE_BACKGROUND_SHELL]:
     'Toggle current background shell visibility.',
   [Command.TOGGLE_BACKGROUND_SHELL_LIST]: 'Toggle background shell list.',
@@ -589,11 +629,99 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
     'Move focus from background shell list to Gemini.',
   [Command.SHOW_BACKGROUND_SHELL_UNFOCUS_WARNING]:
     'Show warning when trying to move focus away from background shell.',
-  [Command.SHOW_SHELL_INPUT_UNFOCUS_WARNING]:
-    'Show warning when trying to move focus away from shell input.',
-  [Command.FOCUS_SHELL_INPUT]: 'Move focus from Gemini to the active shell.',
-  [Command.UNFOCUS_SHELL_INPUT]: 'Move focus from the shell back to Gemini.',
-  [Command.CLEAR_SCREEN]: 'Clear the terminal screen and redraw the UI.',
-  [Command.RESTART_APP]: 'Restart the application.',
-  [Command.SUSPEND_APP]: 'Suspend the CLI and move it to the background.',
 };
+
+const keybindingsSchema = z.array(
+  z
+    .object({
+      command: z.string().transform((val, ctx) => {
+        const negate = val.startsWith('-');
+        const commandId = negate ? val.slice(1) : val;
+
+        const result = z.nativeEnum(Command).safeParse(commandId);
+        if (!result.success) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Invalid command: "${val}".`,
+          });
+          return z.NEVER;
+        }
+
+        return {
+          command: result.data,
+          negate,
+        };
+      }),
+      key: z.string(),
+    })
+    .transform((val) => ({
+      commandEntry: val.command,
+      key: val.key,
+    })),
+);
+
+/**
+ * Loads custom keybindings from the user's keybindings.json file.
+ * Keybindings are merged with the default bindings.
+ */
+export async function loadCustomKeybindings(): Promise<{
+  config: KeyBindingConfig;
+  errors: string[];
+}> {
+  const errors: string[] = [];
+  let config = defaultKeyBindingConfig;
+
+  const userKeybindingsPath = Storage.getUserKeybindingsPath();
+
+  try {
+    const content = await fs.readFile(userKeybindingsPath, 'utf8');
+    const parsedJson = parseIgnoringComments(content);
+    const result = keybindingsSchema.safeParse(parsedJson);
+
+    if (result.success) {
+      config = new Map(defaultKeyBindingConfig);
+      for (const { commandEntry, key } of result.data) {
+        const { command, negate } = commandEntry;
+        const currentBindings = config.get(command) ?? [];
+
+        try {
+          const keyBinding = new KeyBinding(key);
+
+          if (negate) {
+            const updatedBindings = currentBindings.filter(
+              (b) => !b.equals(keyBinding),
+            );
+            if (updatedBindings.length === currentBindings.length) {
+              throw new Error(`cannot remove "${key}" since it is not bound`);
+            }
+            config.set(command, updatedBindings);
+          } else {
+            // Add new binding (prepend so it's the primary one shown in UI)
+            config.set(command, [keyBinding, ...currentBindings]);
+          }
+        } catch (e) {
+          errors.push(
+            `Invalid keybinding for command "${negate ? '-' : ''}${command}": ${e}`,
+          );
+        }
+      }
+    } else {
+      errors.push(
+        ...result.error.issues.map(
+          (issue) =>
+            `Keybindings file "${userKeybindingsPath}" error at ${issue.path.join('.')}: ${issue.message}`,
+        ),
+      );
+    }
+  } catch (error) {
+    if (isNodeError(error) && error.code === 'ENOENT') {
+      // File doesn't exist, use default bindings
+    } else {
+      errors.push(
+        `Error reading keybindings file "${userKeybindingsPath}": ${error}`,
+      );
+    }
+  }
+
+  return { config, errors };
+}
