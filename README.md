@@ -1,10 +1,11 @@
-# Gemini CLI
+# Gemini CLI (euxaristia fork)
 
-[![Gemini CLI CI](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/ci.yml)
-[![Gemini CLI E2E (Chained)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml/badge.svg)](https://github.com/google-gemini/gemini-cli/actions/workflows/chained_e2e.yml)
-[![Version](https://img.shields.io/npm/v/@google/gemini-cli)](https://www.npmjs.com/package/@google/gemini-cli)
 [![License](https://img.shields.io/github/license/google-gemini/gemini-cli)](https://github.com/google-gemini/gemini-cli/blob/main/LICENSE)
-[![View Code Wiki](https://assets.codewiki.google/readme-badge/static.svg)](https://codewiki.google/github.com/google-gemini/gemini-cli?utm_source=badge&utm_medium=github&utm_campaign=github.com/google-gemini/gemini-cli)
+
+> **This is a performance-focused fork of
+> [google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli) with
+> first-class [Bun](https://bun.sh) support.** It tracks upstream closely while
+> optimizing the build and runtime for Bun.
 
 ![Gemini CLI Screenshot](/docs/assets/gemini-screenshot.png)
 
@@ -12,97 +13,66 @@ Gemini CLI is an open-source AI agent that brings the power of Gemini directly
 into your terminal. It provides lightweight access to Gemini, giving you the
 most direct path from your prompt to our model.
 
-Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
+Learn all about Gemini CLI in the
+[upstream documentation](https://geminicli.com/docs/).
 
-## 🚀 Why Gemini CLI?
+## Why this fork?
 
-- **🎯 Free tier**: 60 requests/min and 1,000 requests/day with personal Google
-  account.
-- **🧠 Powerful Gemini 3 models**: Access to improved reasoning and 1M token
-  context window.
-- **🔧 Built-in tools**: Google Search grounding, file operations, shell
-  commands, web fetching.
-- **🔌 Extensible**: MCP (Model Context Protocol) support for custom
-  integrations.
-- **💻 Terminal-first**: Designed for developers who live in the command line.
-- **🛡️ Open source**: Apache 2.0 licensed.
+- **Bun-first**: builds, tests, and runs with [Bun](https://bun.sh) out of the
+  box — faster installs, faster startup.
+- **Simplified versioning**: version strings use `v.YYYYMMDD.<hash>` instead of
+  semver nightly tags.
+- **Auto-versioning on install**: `install.sh` regenerates the version string
+  from the current git state before installing.
+- Everything else from upstream: free tier, Gemini models, MCP, tools, etc.
 
 ## 📦 Installation
 
-See
-[Gemini CLI installation, execution, and releases](./docs/get-started/installation.md)
-for recommended system specifications and a detailed installation guide.
+### Install from this fork (recommended)
 
-### Quick Install
-
-#### Run instantly with npx
+**1. Install Bun** (if you don't have it):
 
 ```bash
-# Using npx (no installation required)
+curl -fsSL https://bun.sh/install | bash
+```
+
+**2. Clone and install:**
+
+```bash
+git clone https://github.com/euxaristia/gemini-cli.git
+cd gemini-cli
+./install.sh
+```
+
+`install.sh` will generate the version info from your local git state and
+install the CLI globally via `bun add -g`.
+
+### Install upstream from npm
+
+```bash
+npm install -g @google/gemini-cli
+```
+
+### Run instantly without installing
+
+```bash
 npx @google/gemini-cli
 ```
 
-#### Install globally with npm
+## Building from source
 
 ```bash
-npm install -g @google/gemini-cli
-```
+# Install dependencies
+bun install
 
-#### Install globally with Homebrew (macOS/Linux)
+# Generate version info
+bun run generate
 
-```bash
-brew install gemini-cli
-```
+# Build
+bun run build
 
-#### Install globally with MacPorts (macOS)
-
-```bash
-sudo port install gemini-cli
-```
-
-#### Install with Anaconda (for restricted environments)
-
-```bash
-# Create and activate a new environment
-conda create -y -n gemini_env -c conda-forge nodejs
-conda activate gemini_env
-
-# Install Gemini CLI globally via npm (inside the environment)
-npm install -g @google/gemini-cli
-```
-
-## Release Cadence and Tags
-
-See [Releases](./docs/releases.md) for more details.
-
-### Preview
-
-New preview releases will be published each week at UTC 23:59 on Tuesdays. These
-releases will not have been fully vetted and may contain regressions or other
-outstanding issues. Please help us test and install with `preview` tag.
-
-```bash
-npm install -g @google/gemini-cli@preview
-```
-
-### Stable
-
-- New stable releases will be published each week at UTC 20:00 on Tuesdays, this
-  will be the full promotion of last week's `preview` release + any bug fixes
-  and validations. Use `latest` tag.
-
-```bash
-npm install -g @google/gemini-cli@latest
-```
-
-### Nightly
-
-- New releases will be published each day at UTC 00:00. This will be all changes
-  from the main branch as represented at time of release. It should be assumed
-  there are pending validations and issues. Use `nightly` tag.
-
-```bash
-npm install -g @google/gemini-cli@nightly
+# Build + install globally
+./install.sh
 ```
 
 ## 📋 Key Features
