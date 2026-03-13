@@ -65,14 +65,22 @@ import type {
 
 // For troubleshooting, set the log level to DiagLogLevel.DEBUG
 export class DiagLoggerAdapter {
+  private static readonly RECOVERY_TIMEOUT_MS = 35000;
+  // These patterns are based on observed error messages from OpenTelemetry.
+  // They might need to be updated if the library's error logging changes.
+  private static readonly EXPORT_ERROR_PATTERNS = [
+    /export failed/i,
+    /ECONNREFUSED/i,
+  ];
+
   private hasLoggedExportError = false;
   private recoveryTimeout: NodeJS.Timeout | null = null;
 
   error(message: string, ...args: unknown[]): void {
-    const RECOVERY_TIMEOUT_MS = 35000;
     const errorStr = typeof message === 'string' ? message : String(message);
-    const isExportError =
-      /export failed/i.test(errorStr) || /ECONNREFUSED/i.test(errorStr);
+    const isExportError = DiagLoggerAdapter.EXPORT_ERROR_PATTERNS.some(
+      (pattern) => pattern.test(errorStr),
+    );
 
     if (isExportError) {
       if (this.recoveryTimeout) {
@@ -84,7 +92,7 @@ export class DiagLoggerAdapter {
           debugLogger.log('Telemetry connection successfully established.');
           this.hasLoggedExportError = false;
         }
-      }, RECOVERY_TIMEOUT_MS).unref();
+      }, DiagLoggerAdapter.RECOVERY_TIMEOUT_MS).unref();
 
       if (!this.hasLoggedExportError) {
         debugLogger.error(
