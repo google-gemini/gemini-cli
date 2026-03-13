@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type Config } from '../config/config.js';
 import { type Status } from '../core/coreToolScheduler.js';
 import { type ThoughtSummary } from '../utils/thoughtUtils.js';
 import { getProjectHash } from '../utils/paths.js';
@@ -20,6 +19,7 @@ import type {
 } from '@google/genai';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ToolResultDisplay } from '../tools/tools.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 export const SESSION_FILE_PREFIX = 'session-';
 
@@ -134,12 +134,12 @@ export class ChatRecordingService {
   private kind?: 'main' | 'subagent';
   private queuedThoughts: Array<ThoughtSummary & { timestamp: string }> = [];
   private queuedTokens: TokensSummary | null = null;
-  private config: Config;
+  private context: AgentLoopContext;
 
-  constructor(config: Config) {
-    this.config = config;
-    this.sessionId = config.getSessionId();
-    this.projectHash = getProjectHash(config.getProjectRoot());
+  constructor(context: AgentLoopContext) {
+    this.context = context;
+    this.sessionId = context.promptId;
+    this.projectHash = getProjectHash(context.config.getProjectRoot());
   }
 
   /**
@@ -171,9 +171,9 @@ export class ChatRecordingService {
         this.cachedConversation = null;
       } else {
         // Create new session
-        this.sessionId = this.config.getSessionId();
+        this.sessionId = this.context.promptId;
         const chatsDir = path.join(
-          this.config.storage.getProjectTempDir(),
+          this.context.config.storage.getProjectTempDir(),
           'chats',
         );
         fs.mkdirSync(chatsDir, { recursive: true });
@@ -341,7 +341,7 @@ export class ChatRecordingService {
     if (!this.conversationFile) return;
 
     // Enrich tool calls with metadata from the ToolRegistry
-    const toolRegistry = this.config.getToolRegistry();
+    const toolRegistry = this.context.toolRegistry;
     const enrichedToolCalls = toolCalls.map((toolCall) => {
       const toolInstance = toolRegistry.getTool(toolCall.name);
       return {
@@ -594,7 +594,7 @@ export class ChatRecordingService {
    */
   deleteSession(sessionId: string): void {
     try {
-      const tempDir = this.config.storage.getProjectTempDir();
+      const tempDir = this.context.config.storage.getProjectTempDir();
       const chatsDir = path.join(tempDir, 'chats');
       const sessionPath = path.join(chatsDir, `${sessionId}.json`);
       if (fs.existsSync(sessionPath)) {

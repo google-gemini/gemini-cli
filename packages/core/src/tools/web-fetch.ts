@@ -18,7 +18,6 @@ import { buildParamArgsPattern } from '../policy/utils.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
-import type { Config } from '../config/config.js';
 import { ApprovalMode } from '../policy/types.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
@@ -38,6 +37,7 @@ import { retryWithBackoff, getRetryErrorType } from '../utils/retry.js';
 import { WEB_FETCH_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 import { LRUCache } from 'mnemonist';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
@@ -213,7 +213,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: WebFetchToolParams,
     messageBus: MessageBus,
     _toolName?: string,
@@ -223,7 +223,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
   }
 
   private handleRetry(attempt: number, error: unknown, delayMs: number): void {
-    const maxAttempts = this.config.getMaxAttempts();
+    const maxAttempts = this.context.config.getMaxAttempts();
     const modelName = 'Web Fetch';
     const errorType = getRetryErrorType(error);
 
@@ -236,7 +236,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     });
 
     logNetworkRetryAttempt(
-      this.config,
+      this.context.config,
       new NetworkRetryAttemptEvent(
         attempt,
         maxAttempts,
@@ -290,7 +290,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
           return res;
         },
         {
-          retryFetchErrors: this.config.getRetryFetchErrors(),
+          retryFetchErrors: this.context.config.getRetryFetchErrors(),
           onRetry: (attempt, error, delayMs) =>
             this.handleRetry(attempt, error, delayMs),
           signal,
@@ -342,7 +342,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
           `[WebFetchTool] Skipped private or local host: ${url}`,
         );
         logWebFetchFallbackAttempt(
-          this.config,
+          this.context.config,
           new WebFetchFallbackAttemptEvent('private_ip_skipped'),
         );
         skipped.push(`[Blocked Host] ${url}`);
@@ -379,7 +379,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
       .join('\n\n---\n\n');
 
     try {
-      const geminiClient = this.config.getGeminiClient();
+      const geminiClient = this.context.geminiClient;
       const fallbackPrompt = `The user requested the following: "${this.params.prompt}".
 
 I was unable to access the URL(s) directly using the primary fetch tool. Instead, I have fetched the raw content of the page(s). Please use the following content to answer the request. Do not attempt to access the URL(s) again.
@@ -458,7 +458,7 @@ ${aggregatedContent}
   ): Promise<ToolCallConfirmationDetails | false> {
     // Check for AUTO_EDIT approval mode. This tool has a specific behavior
     // where ProceedAlways switches the entire session to AUTO_EDIT.
-    if (this.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
+    if (this.context.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
       return false;
     }
 
@@ -581,7 +581,7 @@ ${aggregatedContent}
           return res;
         },
         {
-          retryFetchErrors: this.config.getRetryFetchErrors(),
+          retryFetchErrors: this.context.config.getRetryFetchErrors(),
           onRetry: (attempt, error, delayMs) =>
             this.handleRetry(attempt, error, delayMs),
           signal,
@@ -692,7 +692,7 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
   }
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
-    if (this.config.getDirectWebFetch()) {
+    if (this.context.config.getDirectWebFetch()) {
       return this.executeExperimental(signal);
     }
     const userPrompt = this.params.prompt!;
@@ -715,7 +715,7 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
     }
 
     try {
-      const geminiClient = this.config.getGeminiClient();
+      const geminiClient = this.context.geminiClient;
       const response = await geminiClient.generateContent(
         { model: 'web-fetch' },
         [{ role: 'user', parts: [{ text: userPrompt }] }],
@@ -797,7 +797,7 @@ Response: ${truncateString(rawResponseText, 10000, '\n\n... [Error response trun
         `[WebFetchTool] Primary fetch failed, falling back: ${getErrorMessage(error)}`,
       );
       logWebFetchFallbackAttempt(
-        this.config,
+        this.context.config,
         new WebFetchFallbackAttemptEvent('primary_failed'),
       );
       // Simple All-or-Nothing Fallback
@@ -816,7 +816,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
   static readonly Name = WEB_FETCH_TOOL_NAME;
 
   constructor(
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     messageBus: MessageBus,
   ) {
     super(
@@ -834,7 +834,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
   protected override validateToolParamValues(
     params: WebFetchToolParams,
   ): string | null {
-    if (this.config.getDirectWebFetch()) {
+    if (this.context.config.getDirectWebFetch()) {
       if (!params.url) {
         return "The 'url' parameter is required.";
       }
@@ -870,7 +870,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
     _toolDisplayName?: string,
   ): ToolInvocation<WebFetchToolParams, ToolResult> {
     return new WebFetchToolInvocation(
-      this.config,
+      this.context.config,
       params,
       messageBus,
       _toolName,
@@ -880,7 +880,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
 
   override getSchema(modelId?: string) {
     const schema = resolveToolDeclaration(WEB_FETCH_DEFINITION, modelId);
-    if (this.config.getDirectWebFetch()) {
+    if (this.context.config.getDirectWebFetch()) {
       return {
         ...schema,
         description:

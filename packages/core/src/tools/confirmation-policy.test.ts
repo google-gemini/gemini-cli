@@ -47,6 +47,9 @@ describe('Tool Confirmation Policy Updates', () => {
     } as unknown as MessageBus;
 
     mockConfig = {
+      get config() {
+        return this;
+      },
       getTargetDir: () => rootDir,
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
       setApprovalMode: vi.fn(),

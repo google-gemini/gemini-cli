@@ -22,9 +22,19 @@ describe('GeneralistAgent', () => {
 
   it('should create a valid generalist agent definition', () => {
     const config = makeFakeConfig();
-    vi.spyOn(config, 'getToolRegistry').mockReturnValue({
+    const mockToolRegistry = {
       getAllToolNames: () => ['tool1', 'tool2', 'agent-tool'],
-    } as unknown as ToolRegistry);
+    } as unknown as ToolRegistry;
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue(mockToolRegistry);
+    Object.defineProperty(config, 'toolRegistry', {
+      get: () => mockToolRegistry,
+    });
+    Object.defineProperty(config, 'config', {
+      get() {
+        return this;
+      },
+    });
+
     vi.spyOn(config, 'getAgentRegistry').mockReturnValue({
       getDirectoryContext: () => 'mock directory context',
       getAllAgentNames: () => ['agent-tool'],

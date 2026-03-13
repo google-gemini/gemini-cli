@@ -866,7 +866,7 @@ export class GeminiClient {
     }
 
     const hooksEnabled = this.config.getEnableHooks();
-    const messageBus = this.config.getMessageBus();
+    const messageBus = this.context.messageBus;
 
     if (this.lastPromptId !== prompt_id) {
       this.loopDetector.reset(prompt_id, partListUnionToString(request));

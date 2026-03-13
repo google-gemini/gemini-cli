@@ -5,6 +5,7 @@
  */
 
 import {
+  type AgentLoopContext,
   ShellExecutionService,
   ShellTool,
   type Config as CoreConfig,
@@ -26,7 +27,8 @@ export class SdkAgentShell implements AgentShell {
     const abortController = new AbortController();
 
     // Use ShellTool to check policy
-    const shellTool = new ShellTool(this.config, this.config.getMessageBus());
+    const loopContext: AgentLoopContext = this.config;
+    const shellTool = new ShellTool(this.config, loopContext.messageBus);
     try {
       const invocation = shellTool.build({
         command,

@@ -16,6 +16,7 @@ import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   GeminiClient,
   HookSystem,
+  type MessageBus,
   PolicyDecision,
   tmpdir,
   type Config,
@@ -31,9 +32,27 @@ export function createMockConfig(
   const tmpDir = tmpdir();
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const mockConfig = {
-    get toolRegistry(): ToolRegistry {
+    get config() {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return (this as unknown as Config).getToolRegistry();
+      return this as unknown as Config;
+    },
+    get toolRegistry() {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const config = this as unknown as Config;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return config.getToolRegistry?.() as unknown as ToolRegistry;
+    },
+    get messageBus() {
+      return (
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        (this as unknown as Config).getMessageBus?.() as unknown as MessageBus
+      );
+    },
+    get geminiClient() {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const config = this as unknown as Config;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      return config.getGeminiClient?.() as unknown as GeminiClient;
     },
     getToolRegistry: vi.fn().mockReturnValue({
       getTool: vi.fn(),
@@ -81,9 +100,6 @@ export function createMockConfig(
     ...overrides,
   } as unknown as Config;
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  (mockConfig as unknown as { config: Config; promptId: string }).config =
-    mockConfig;
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   (mockConfig as unknown as { config: Config; promptId: string }).promptId =
     'test-prompt-id';
