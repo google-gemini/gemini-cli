@@ -91,11 +91,9 @@ export function createWorkingStdio() {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const value = Reflect.get(target, prop, receiver);
       if (typeof value === 'function') {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-        return value.bind(target);
+        return value.bind(target) as unknown;
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return value;
+      return value as unknown;
     },
   });
 
@@ -107,11 +105,9 @@ export function createWorkingStdio() {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const value = Reflect.get(target, prop, receiver);
       if (typeof value === 'function') {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-        return value.bind(target);
+        return value.bind(target) as unknown;
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      return value;
+      return value as unknown;
     },
   });
 
