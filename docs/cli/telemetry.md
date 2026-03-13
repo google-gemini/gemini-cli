@@ -124,7 +124,9 @@ You must complete several setup steps before enabling Google Cloud telemetry.
       }
       ```
 
-      > **Note:** This setting requires **Direct export** (in-process exporters)
+      <!-- prettier-ignore -->
+      > [!NOTE]
+      > This setting requires **Direct export** (in-process exporters)
       > and cannot be used when `useCollector` is `true`. If both are enabled,
       > telemetry will be disabled.
 

@@ -4,7 +4,9 @@ Model steering lets you provide real-time guidance and feedback to Gemini CLI
 while it is actively executing a task. This lets you correct course, add missing
 context, or skip unnecessary steps without having to stop and restart the agent.
 
-> **Note:** This is a preview feature under active development. Preview features
+<!-- prettier-ignore -->
+> [!NOTE]
+> This is a preview feature under active development. Preview features
 > may only be available in the **Preview** channel or may need to be enabled
 > under `/settings`.
 
