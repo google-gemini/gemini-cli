@@ -33,6 +33,14 @@ vi.mock('../utils/editor.js', () => ({
   openDiff: mockOpenDiff,
 }));
 
+vi.mock('./jit-context.js', () => ({
+  discoverJitContext: vi.fn().mockResolvedValue(''),
+  appendJitContext: vi.fn().mockImplementation((content, context) => {
+    if (!context) return content;
+    return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
+  }),
+}));
+
 import {
   describe,
   it,
@@ -1229,6 +1237,66 @@ function doIt() {
       await invocation.execute(new AbortController().signal);
 
       expect(mockFixLLMEditWithInstruction).toHaveBeenCalled();
+    });
+  });
+
+  describe('JIT context discovery', () => {
+    it('should append JIT context to output when enabled and context is found', async () => {
+      const { discoverJitContext, appendJitContext } = await import(
+        './jit-context.js'
+      );
+      vi.mocked(discoverJitContext).mockResolvedValue('Use the useAuth hook.');
+      vi.mocked(appendJitContext).mockImplementation((content, context) => {
+        if (!context) return content;
+        return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
+      });
+
+      const filePath = path.join(rootDir, 'jit-edit-test.txt');
+      const initialContent = 'some old text here';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace old with new',
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(discoverJitContext).toHaveBeenCalled();
+      expect(result.llmContent).toContain('Newly Discovered Project Context');
+      expect(result.llmContent).toContain('Use the useAuth hook.');
+    });
+
+    it('should not append JIT context when disabled', async () => {
+      const { discoverJitContext, appendJitContext } = await import(
+        './jit-context.js'
+      );
+      vi.mocked(discoverJitContext).mockResolvedValue('');
+      vi.mocked(appendJitContext).mockImplementation((content, context) => {
+        if (!context) return content;
+        return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
+      });
+
+      const filePath = path.join(rootDir, 'jit-disabled-edit-test.txt');
+      const initialContent = 'some old text here';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace old with new',
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).not.toContain(
+        'Newly Discovered Project Context',
+      );
     });
   });
 });
