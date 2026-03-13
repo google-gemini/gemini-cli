@@ -315,6 +315,75 @@ class AntigravityInstaller implements IdeInstaller {
   }
 }
 
+class JetBrainsInstaller implements IdeInstaller {
+  constructor(
+    readonly ideInfo: IdeInfo,
+    readonly platform = process.platform,
+  ) {}
+
+  async install(): Promise<InstallResult> {
+    // Map IDE names to their CLI command names
+    const ideCommandMap: Record<string, string> = {
+      intellijidea: 'idea',
+      webstorm: 'webstorm',
+      pycharm: 'pycharm',
+      goland: 'goland',
+      androidstudio: 'studio',
+      clion: 'clion',
+      rustrover: 'rustrover',
+      datagrip: 'datagrip',
+      phpstorm: 'phpstorm',
+      jetbrains: 'idea', // default to IntelliJ IDEA
+    };
+
+    const cliCommand = ideCommandMap[this.ideInfo.name];
+    if (!cliCommand) {
+      return {
+        success: false,
+        message: `No CLI command mapping found for ${this.ideInfo.displayName}. Please install the Gemini CLI Companion plugin manually from Settings > Plugins > Marketplace.`,
+      };
+    }
+
+    const commandPath = await findCommand(cliCommand, this.platform);
+    if (commandPath) {
+      try {
+        const result = child_process.spawnSync(
+          commandPath,
+          ['installPlugins', 'com.google.geminicli.jetbrains'],
+          { stdio: 'pipe', shell: this.platform === 'win32' },
+        );
+
+        if (result.status === 0) {
+          return {
+            success: true,
+            message: `${this.ideInfo.displayName} companion plugin was installed successfully. Please restart ${this.ideInfo.displayName} to activate the plugin.`,
+          };
+        }
+      } catch {
+        // Fall through to manual instructions
+      }
+    }
+
+    return {
+      success: false,
+      message: `Could not automatically install the Gemini CLI Companion plugin for ${this.ideInfo.displayName}. Please install it manually: open ${this.ideInfo.displayName}, go to Settings > Plugins > Marketplace, and search for "Gemini CLI Companion".`,
+    };
+  }
+}
+
+const JETBRAINS_IDE_NAMES = new Set<string>([
+  IDE_DEFINITIONS.jetbrains.name,
+  IDE_DEFINITIONS.intellijidea.name,
+  IDE_DEFINITIONS.webstorm.name,
+  IDE_DEFINITIONS.pycharm.name,
+  IDE_DEFINITIONS.goland.name,
+  IDE_DEFINITIONS.androidstudio.name,
+  IDE_DEFINITIONS.clion.name,
+  IDE_DEFINITIONS.rustrover.name,
+  IDE_DEFINITIONS.datagrip.name,
+  IDE_DEFINITIONS.phpstorm.name,
+]);
+
 export function getIdeInstaller(
   ide: IdeInfo,
   platform = process.platform,
@@ -328,6 +397,9 @@ export function getIdeInstaller(
     case IDE_DEFINITIONS.antigravity.name:
       return new AntigravityInstaller(ide, platform);
     default:
+      if (JETBRAINS_IDE_NAMES.has(ide.name)) {
+        return new JetBrainsInstaller(ide, platform);
+      }
       return null;
   }
 }
