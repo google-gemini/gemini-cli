@@ -99,6 +99,7 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
+  sessionId: string | undefined;
 }
 
 /**
@@ -251,6 +252,12 @@ export async function parseArguments(
             }
             return value;
           },
+        })
+        .option('session-id', {
+          type: 'string',
+          nargs: 1,
+          description:
+            'Use a specific session ID instead of a randomly generated one.',
         })
         .option('list-sessions', {
           type: 'boolean',
