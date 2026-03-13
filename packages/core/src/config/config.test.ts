@@ -98,6 +98,7 @@ vi.mock('../tools/mcp-client-manager.js', () => ({
   McpClientManager: vi.fn().mockImplementation(() => ({
     startConfiguredMcpServers: vi.fn(),
     getMcpInstructions: vi.fn().mockReturnValue('MCP Instructions'),
+    setMainRegistries: vi.fn(),
   })),
 }));
 

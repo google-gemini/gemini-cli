@@ -17,6 +17,8 @@ import { McpClientManager } from './mcp-client-manager.js';
 import { McpClient, MCPDiscoveryState } from './mcp-client.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { Config, GeminiCLIExtension } from '../config/config.js';
+import type { PromptRegistry } from '../prompts/prompt-registry.js';
+import type { ResourceRegistry } from '../resources/resource-registry.js';
 
 vi.mock('./mcp-client.js', async () => {
   const originalModule = await vi.importActual('./mcp-client.js');
