@@ -43,12 +43,12 @@ export const DEFAULT_QUERY_STRING = 'Get Started!';
 /**
  * The default maximum number of conversational turns for an agent.
  */
-export const DEFAULT_MAX_TURNS = 15;
+export const DEFAULT_MAX_TURNS = 30;
 
 /**
  * The default maximum execution time for an agent in minutes.
  */
-export const DEFAULT_MAX_TIME_MINUTES = 5;
+export const DEFAULT_MAX_TIME_MINUTES = 10;
 
 /**
  * Represents the validated input parameters passed to an agent upon invocation.
@@ -223,12 +223,12 @@ export interface OutputConfig<T extends z.ZodTypeAny> {
 export interface RunConfig {
   /**
    * The maximum execution time for the agent in minutes.
-   * If not specified, defaults to DEFAULT_MAX_TIME_MINUTES (5).
+   * If not specified, defaults to DEFAULT_MAX_TIME_MINUTES (10).
    */
   maxTimeMinutes?: number;
   /**
    * The maximum number of conversational turns.
-   * If not specified, defaults to DEFAULT_MAX_TURNS (15).
+   * If not specified, defaults to DEFAULT_MAX_TURNS (30).
    */
   maxTurns?: number;
 }
