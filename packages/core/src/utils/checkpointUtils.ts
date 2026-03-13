@@ -49,12 +49,12 @@ export function generateCheckpointFileName(
   toolCall: ToolCallRequestInfo,
 ): string | null {
   const toolArgs = toolCall.args;
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const toolFilePath = toolArgs['file_path'] as string;
+  const rawFilePath = toolArgs['file_path'];
 
-  if (!toolFilePath) {
+  if (typeof rawFilePath !== 'string' || !rawFilePath) {
     return null;
   }
+  const toolFilePath = rawFilePath;
 
   const timestamp = new Date()
     .toISOString()
@@ -168,11 +168,14 @@ export function getCheckpointInfoList(
 
   for (const [file, content] of checkpointFiles) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const toolCallData = JSON.parse(content) as ToolCallData;
-      if (toolCallData.messageId) {
+      const parsed: unknown = JSON.parse(content);
+      const result = z
+        .object({ messageId: z.string() })
+        .passthrough()
+        .safeParse(parsed);
+      if (result.success) {
         checkpointInfoList.push({
-          messageId: toolCallData.messageId,
+          messageId: result.data.messageId,
           checkpoint: file.replace('.json', ''),
         });
       }
