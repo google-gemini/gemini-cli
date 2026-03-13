@@ -4,18 +4,37 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GeneralistAgent } from './generalist-agent.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import type { AgentRegistry } from './registry.js';
 
 describe('GeneralistAgent', () => {
+  beforeEach(() => {
+    vi.stubEnv('GEMINI_SYSTEM_MD', '');
+    vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', '');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('should create a valid generalist agent definition', () => {
     const config = makeFakeConfig();
-    vi.spyOn(config, 'getToolRegistry').mockReturnValue({
+    const mockToolRegistry = {
       getAllToolNames: () => ['tool1', 'tool2', 'agent-tool'],
-    } as unknown as ToolRegistry);
+    } as unknown as ToolRegistry;
+    vi.spyOn(config, 'getToolRegistry').mockReturnValue(mockToolRegistry);
+    Object.defineProperty(config, 'toolRegistry', {
+      get: () => mockToolRegistry,
+    });
+    Object.defineProperty(config, 'config', {
+      get() {
+        return this;
+      },
+    });
+
     vi.spyOn(config, 'getAgentRegistry').mockReturnValue({
       getDirectoryContext: () => 'mock directory context',
       getAllAgentNames: () => ['agent-tool'],

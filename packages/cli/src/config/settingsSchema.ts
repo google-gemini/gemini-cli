@@ -18,6 +18,7 @@ import {
   type AuthType,
   type AgentOverride,
   type CustomTheme,
+  type SandboxConfig,
 } from '@google/gemini-cli-core';
 import type { SessionRetentionSettings } from './settings.js';
 import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
@@ -118,6 +119,10 @@ export interface SettingDefinition {
    */
   additionalProperties?: SettingCollectionDefinition;
   /**
+   * Optional unit to display after the value (e.g. '%').
+   */
+  unit?: string;
+  /**
    * Optional reference identifier for generators that emit a `$ref`.
    */
   ref?: string;
@@ -129,6 +134,18 @@ export interface SettingsSchema {
 
 export type MemoryImportFormat = 'tree' | 'flat';
 export type DnsResolutionOrder = 'ipv4first' | 'verbatim';
+
+const pathArraySetting = (label: string, description: string) => ({
+  type: 'array' as const,
+  label,
+  category: 'Advanced' as const,
+  requiresRestart: true as const,
+  default: [] as string[],
+  description,
+  showInDialog: false as const,
+  items: { type: 'string' as const },
+  mergeStrategy: MergeStrategy.UNION,
+});
 
 /**
  * The canonical schema for all settings.
@@ -152,17 +169,15 @@ const SETTINGS_SCHEMA = {
     },
   },
 
-  policyPaths: {
-    type: 'array',
-    label: 'Policy Paths',
-    category: 'Advanced',
-    requiresRestart: true,
-    default: [] as string[],
-    description: 'Additional policy files or directories to load.',
-    showInDialog: false,
-    items: { type: 'string' },
-    mergeStrategy: MergeStrategy.UNION,
-  },
+  policyPaths: pathArraySetting(
+    'Policy Paths',
+    'Additional policy files or directories to load.',
+  ),
+
+  adminPolicyPaths: pathArraySetting(
+    'Admin Policy Paths',
+    'Additional admin policy files or directories to load.',
+  ),
 
   general: {
     type: 'object',
@@ -200,7 +215,8 @@ const SETTINGS_SCHEMA = {
         description: oneLine`
           The default approval mode for tool execution.
           'default' prompts for approval, 'auto_edit' auto-approves edit tools,
-          and 'plan' is read-only mode. 'yolo' is not supported yet.
+          and 'plan' is read-only mode. YOLO mode (auto-approve all actions) can
+          only be enabled via command line (--yolo or --approval-mode=yolo).
         `,
         showInDialog: true,
         options: [
@@ -285,6 +301,16 @@ const SETTINGS_SCHEMA = {
               'The directory where planning artifacts are stored. If not specified, defaults to the system temporary directory.',
             showInDialog: true,
           },
+          modelRouting: {
+            type: 'boolean',
+            label: 'Plan Model Routing',
+            category: 'General',
+            requiresRestart: false,
+            default: true,
+            description:
+              'Automatically switch between Pro and Flash models based on Plan Mode status. Uses Pro for the planning phase and Flash for the implementation phase.',
+            showInDialog: true,
+          },
         },
       },
       retryFetchErrors: {
@@ -292,10 +318,10 @@ const SETTINGS_SCHEMA = {
         label: 'Retry Fetch Errors',
         category: 'General',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Retry on "exception TypeError: fetch failed sending request" errors.',
-        showInDialog: false,
+        showInDialog: true,
       },
       maxAttempts: {
         type: 'number',
@@ -329,7 +355,7 @@ const SETTINGS_SCHEMA = {
             label: 'Enable Session Cleanup',
             category: 'General',
             requiresRestart: false,
-            default: false,
+            default: true as boolean,
             description: 'Enable automatic session cleanup',
             showInDialog: true,
           },
@@ -338,7 +364,7 @@ const SETTINGS_SCHEMA = {
             label: 'Keep chat history',
             category: 'General',
             requiresRestart: false,
-            default: undefined as string | undefined,
+            default: '30d' as string,
             description:
               'Automatically delete chats older than this time period (e.g., "30d", "7d", "24h", "1w")',
             showInDialog: true,
@@ -361,16 +387,6 @@ const SETTINGS_SCHEMA = {
             default: DEFAULT_MIN_RETENTION,
             description: `Minimum retention period (safety limit, defaults to "${DEFAULT_MIN_RETENTION}")`,
             showInDialog: false,
-          },
-          warningAcknowledged: {
-            type: 'boolean',
-            label: 'Warning Acknowledged',
-            category: 'General',
-            requiresRestart: false,
-            default: false,
-            showInDialog: false,
-            description:
-              'INTERNAL: Whether the user has acknowledged the session retention warning',
           },
         },
         description: 'Settings for automatic session cleanup.',
@@ -524,6 +540,16 @@ const SETTINGS_SCHEMA = {
         description: 'Hide helpful tips in the UI',
         showInDialog: true,
       },
+      escapePastedAtSymbols: {
+        type: 'boolean',
+        label: 'Escape Pasted @ Symbols',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'When enabled, @ symbols in pasted text are escaped to prevent unintended @path expansion.',
+        showInDialog: true,
+      },
       showShortcutsHint: {
         type: 'boolean',
         label: 'Show Shortcuts Hint',
@@ -561,14 +587,34 @@ const SETTINGS_SCHEMA = {
         description: 'Settings for the footer.',
         showInDialog: false,
         properties: {
+          items: {
+            type: 'array',
+            label: 'Footer Items',
+            category: 'UI',
+            requiresRestart: false,
+            default: undefined as string[] | undefined,
+            description:
+              'List of item IDs to display in the footer. Rendered in order',
+            showInDialog: false,
+            items: { type: 'string' },
+          },
+          showLabels: {
+            type: 'boolean',
+            label: 'Show Footer Labels',
+            category: 'UI',
+            requiresRestart: false,
+            default: true,
+            description:
+              'Display a second line above the footer items with descriptive headers (e.g., /model).',
+            showInDialog: false,
+          },
           hideCWD: {
             type: 'boolean',
             label: 'Hide CWD',
             category: 'UI',
             requiresRestart: false,
             default: false,
-            description:
-              'Hide the current working directory path in the footer.',
+            description: 'Hide the current working directory in the footer.',
             showInDialog: true,
           },
           hideSandboxStatus: {
@@ -595,7 +641,7 @@ const SETTINGS_SCHEMA = {
             category: 'UI',
             requiresRestart: false,
             default: true,
-            description: 'Hides the context window remaining percentage.',
+            description: 'Hides the context window usage percentage.',
             showInDialog: true,
           },
         },
@@ -652,7 +698,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: true,
         description:
-          "Show the logged-in user's identity (e.g. email) in the UI.",
+          "Show the signed-in user's identity (e.g. email) in the UI.",
         showInDialog: true,
       },
       useAlternateBuffer: {
@@ -707,6 +753,20 @@ const SETTINGS_SCHEMA = {
           { value: 'witty', label: 'Witty' },
           { value: 'all', label: 'All' },
           { value: 'off', label: 'Off' },
+        ],
+      },
+      errorVerbosity: {
+        type: 'enum',
+        label: 'Error Verbosity',
+        category: 'UI',
+        requiresRestart: false,
+        default: 'low',
+        description:
+          'Controls whether recoverable errors are hidden (low) or fully shown (full).',
+        showInDialog: true,
+        options: [
+          { value: 'low', label: 'Low' },
+          { value: 'full', label: 'Full' },
         ],
       },
       customWittyPhrases: {
@@ -818,6 +878,36 @@ const SETTINGS_SCHEMA = {
     ref: 'TelemetrySettings',
   },
 
+  billing: {
+    type: 'object',
+    label: 'Billing',
+    category: 'Advanced',
+    requiresRestart: false,
+    default: {},
+    description: 'Billing and AI credits settings.',
+    showInDialog: false,
+    properties: {
+      overageStrategy: {
+        type: 'enum',
+        label: 'Overage Strategy',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: 'ask',
+        description: oneLine`
+          How to handle quota exhaustion when AI credits are available.
+          'ask' prompts each time, 'always' automatically uses credits,
+          'never' disables credit usage.
+        `,
+        showInDialog: true,
+        options: [
+          { value: 'ask', label: 'Ask each time' },
+          { value: 'always', label: 'Always use credits' },
+          { value: 'never', label: 'Never use credits' },
+        ],
+      },
+    },
+  },
+
   model: {
     type: 'object',
     label: 'Model',
@@ -834,7 +924,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: undefined as string | undefined,
         description: 'The Gemini model to use for conversations.',
-        showInDialog: false,
+        showInDialog: true,
       },
       maxSessionTurns: {
         type: 'number',
@@ -869,13 +959,14 @@ const SETTINGS_SCHEMA = {
       },
       compressionThreshold: {
         type: 'number',
-        label: 'Compression Threshold',
+        label: 'Context Compression Threshold',
         category: 'Model',
         requiresRestart: true,
         default: 0.5 as number,
         description:
           'The fraction of context usage at which to trigger context compression (e.g. 0.2, 0.3).',
         showInDialog: true,
+        unit: '%',
       },
       disableLoopDetection: {
         type: 'boolean',
@@ -1026,6 +1117,29 @@ const SETTINGS_SCHEMA = {
             description: 'Model override for the visual agent.',
             showInDialog: false,
           },
+          allowedDomains: {
+            type: 'array',
+            label: 'Allowed Domains',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: ['github.com', '*.google.com', 'localhost'] as string[],
+            description: oneLine`
+              A list of allowed domains for the browser agent
+              (e.g., ["github.com", "*.google.com"]).
+            `,
+            showInDialog: false,
+            items: { type: 'string' },
+          },
+          disableUserInput: {
+            type: 'boolean',
+            label: 'Disable User Input',
+            category: 'Advanced',
+            requiresRestart: false,
+            default: true,
+            description:
+              'Disable user input on browser window during automation.',
+            showInDialog: false,
+          },
         },
       },
     },
@@ -1100,7 +1214,7 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description: oneLine`
-          Controls how /memory refresh loads GEMINI.md files.
+          Controls how /memory reload loads GEMINI.md files.
           When true, include directories are scanned; when false, only the current directory is used.
         `,
         showInDialog: true,
@@ -1183,11 +1297,12 @@ const SETTINGS_SCHEMA = {
         label: 'Sandbox',
         category: 'Tools',
         requiresRestart: true,
-        default: undefined as boolean | string | undefined,
-        ref: 'BooleanOrString',
+        default: undefined as boolean | string | SandboxConfig | undefined,
+        ref: 'BooleanOrStringOrObject',
         description: oneLine`
-          Sandbox execution environment.
-          Set to a boolean to enable or disable the sandbox, or provide a string path to a sandbox profile.
+          Legacy full-process sandbox execution environment.
+          Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile,
+          or specify an explicit sandbox command (e.g., "docker", "podman", "lxc").
         `,
         showInDialog: false,
       },
@@ -1407,6 +1522,16 @@ const SETTINGS_SCHEMA = {
     description: 'Security-related settings.',
     showInDialog: false,
     properties: {
+      toolSandboxing: {
+        type: 'boolean',
+        label: 'Tool Sandboxing',
+        category: 'Security',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Experimental tool-level sandboxing (implementation in progress).',
+        showInDialog: true,
+      },
       disableYoloMode: {
         type: 'boolean',
         label: 'Disable YOLO Mode',
@@ -1424,6 +1549,18 @@ const SETTINGS_SCHEMA = {
         default: false,
         description:
           'Enable the "Allow for all future sessions" option in tool confirmation dialogs.',
+        showInDialog: true,
+      },
+      autoAddToPolicyByDefault: {
+        type: 'boolean',
+        label: 'Auto-add to Policy by Default',
+        category: 'Security',
+        requiresRestart: false,
+        default: false,
+        description: oneLine`
+          When enabled, the "Allow for all future sessions" option becomes the
+          default choice for low-risk tools in trusted workspaces.
+        `,
         showInDialog: true,
       },
       blockGitExtensions: {
@@ -1709,6 +1846,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable extension registry explore UI.',
         showInDialog: false,
       },
+      extensionRegistryURI: {
+        type: 'string',
+        label: 'Extension Registry URI',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 'https://geminicli.com/extensions.json',
+        description:
+          'The URI (web URL or local file path) of the extension registry.',
+        showInDialog: false,
+      },
       extensionReloading: {
         type: 'boolean',
         label: 'Extension Reloading',
@@ -1753,9 +1900,18 @@ const SETTINGS_SCHEMA = {
         label: 'Plan',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
-        description: 'Enable planning features (Plan Mode and tools).',
+        default: true,
+        description: 'Enable Plan Mode.',
         showInDialog: true,
+      },
+      taskTracker: {
+        type: 'boolean',
+        label: 'Task Tracker',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable task tracker tools.',
+        showInDialog: false,
       },
       modelSteering: {
         type: 'boolean',
@@ -1776,6 +1932,57 @@ const SETTINGS_SCHEMA = {
         description:
           'Enable web fetch behavior that bypasses LLM summarization.',
         showInDialog: true,
+      },
+      gemmaModelRouter: {
+        type: 'object',
+        label: 'Gemma Model Router',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: {},
+        description: 'Enable Gemma model router (experimental).',
+        showInDialog: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            label: 'Enable Gemma Model Router',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: false,
+            description:
+              'Enable the Gemma Model Router (experimental). Requires a local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.',
+            showInDialog: false,
+          },
+          classifier: {
+            type: 'object',
+            label: 'Classifier',
+            category: 'Experimental',
+            requiresRestart: true,
+            default: {},
+            description: 'Classifier configuration.',
+            showInDialog: false,
+            properties: {
+              host: {
+                type: 'string',
+                label: 'Host',
+                category: 'Experimental',
+                requiresRestart: true,
+                default: 'http://localhost:9379',
+                description: 'The host of the classifier.',
+                showInDialog: false,
+              },
+              model: {
+                type: 'string',
+                label: 'Model',
+                category: 'Experimental',
+                requiresRestart: true,
+                default: 'gemma3-1b-gpu-custom',
+                description:
+                  'The model to use for the classifier. Only tested on `gemma3-1b-gpu-custom`.',
+                showInDialog: false,
+              },
+            },
+          },
+        },
       },
     },
   },
@@ -2455,9 +2662,44 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
     description: 'Accepts either a single string or an array of strings.',
     anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
   },
-  BooleanOrString: {
-    description: 'Accepts either a boolean flag or a string command name.',
-    anyOf: [{ type: 'boolean' }, { type: 'string' }],
+  BooleanOrStringOrObject: {
+    description:
+      'Accepts either a boolean flag, a string command name, or a configuration object.',
+    anyOf: [
+      { type: 'boolean' },
+      { type: 'string' },
+      {
+        type: 'object',
+        description: 'Sandbox configuration object.',
+        additionalProperties: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            description: 'Enables or disables the sandbox.',
+          },
+          command: {
+            type: 'string',
+            description:
+              'The sandbox command to use (docker, podman, sandbox-exec, runsc, lxc).',
+            enum: ['docker', 'podman', 'sandbox-exec', 'runsc', 'lxc'],
+          },
+          image: {
+            type: 'string',
+            description: 'The sandbox image to use.',
+          },
+          allowedPaths: {
+            type: 'array',
+            description:
+              'A list of absolute host paths that should be accessible within the sandbox.',
+            items: { type: 'string' },
+          },
+          networkAccess: {
+            type: 'boolean',
+            description: 'Whether the sandbox should have internet access.',
+          },
+        },
+      },
+    ],
   },
   HookDefinitionArray: {
     type: 'array',
@@ -2522,7 +2764,11 @@ type InferSettings<T extends SettingsSchema> = {
         : T[K]['default']
       : T[K]['default'] extends boolean
         ? boolean
-        : T[K]['default'];
+        : T[K]['default'] extends string
+          ? string
+          : T[K]['default'] extends ReadonlyArray<infer U>
+            ? U[]
+            : T[K]['default'];
 };
 
 type InferMergedSettings<T extends SettingsSchema> = {
@@ -2534,7 +2780,11 @@ type InferMergedSettings<T extends SettingsSchema> = {
         : T[K]['default']
       : T[K]['default'] extends boolean
         ? boolean
-        : T[K]['default'];
+        : T[K]['default'] extends string
+          ? string
+          : T[K]['default'] extends ReadonlyArray<infer U>
+            ? U[]
+            : T[K]['default'];
 };
 
 export type Settings = InferSettings<SettingsSchemaType>;

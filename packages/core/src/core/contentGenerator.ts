@@ -4,24 +4,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type {
-  CountTokensResponse,
-  GenerateContentResponse,
-  GenerateContentParameters,
-  CountTokensParameters,
-  EmbedContentResponse,
-  EmbedContentParameters,
+import {
+  GoogleGenAI,
+  type CountTokensResponse,
+  type GenerateContentResponse,
+  type GenerateContentParameters,
+  type CountTokensParameters,
+  type EmbedContentResponse,
+  type EmbedContentParameters,
 } from '@google/genai';
-import { GoogleGenAI } from '@google/genai';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import type { Config } from '../config/config.js';
 import { loadApiKey } from './apiKeyCredentialStorage.js';
 
-import type { UserTierId } from '../code_assist/types.js';
+import type { UserTierId, GeminiUserTier } from '../code_assist/types.js';
 import { LoggingContentGenerator } from './loggingContentGenerator.js';
 import { InstallationManager } from '../utils/installationManager.js';
 import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { parseCustomHeaders } from '../utils/customHeaderUtils.js';
+import { determineSurface } from '../utils/surface.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
@@ -49,6 +50,8 @@ export interface ContentGenerator {
   userTier?: UserTierId;
 
   userTierName?: string;
+
+  paidTier?: GeminiUserTier;
 }
 
 export enum AuthType {
@@ -57,6 +60,7 @@ export enum AuthType {
   USE_VERTEX_AI = 'vertex-ai',
   LEGACY_CLOUD_SHELL = 'cloud-shell',
   COMPUTE_ADC = 'compute-default-credentials',
+  GATEWAY = 'gateway',
 }
 
 /**
@@ -77,6 +81,12 @@ export function getAuthTypeFromEnv(): AuthType | undefined {
   if (process.env['GEMINI_API_KEY']) {
     return AuthType.USE_GEMINI;
   }
+  if (
+    process.env['CLOUD_SHELL'] === 'true' ||
+    process.env['GEMINI_CLI_USE_COMPUTE_ADC'] === 'true'
+  ) {
+    return AuthType.COMPUTE_ADC;
+  }
   return undefined;
 }
 
@@ -85,14 +95,22 @@ export type ContentGeneratorConfig = {
   vertexai?: boolean;
   authType?: AuthType;
   proxy?: string;
+  baseUrl?: string;
+  customHeaders?: Record<string, string>;
 };
 
 export async function createContentGeneratorConfig(
   config: Config,
   authType: AuthType | undefined,
+  apiKey?: string,
+  baseUrl?: string,
+  customHeaders?: Record<string, string>,
 ): Promise<ContentGeneratorConfig> {
   const geminiApiKey =
-    process.env['GEMINI_API_KEY'] || (await loadApiKey()) || undefined;
+    apiKey ||
+    process.env['GEMINI_API_KEY'] ||
+    (await loadApiKey()) ||
+    undefined;
   const googleApiKey = process.env['GOOGLE_API_KEY'] || undefined;
   const googleCloudProject =
     process.env['GOOGLE_CLOUD_PROJECT'] ||
@@ -103,6 +121,8 @@ export async function createContentGeneratorConfig(
   const contentGeneratorConfig: ContentGeneratorConfig = {
     authType,
     proxy: config?.getProxy(),
+    baseUrl,
+    customHeaders,
   };
 
   // If we are using Google auth or we are in Cloud Shell, there is nothing else to validate for now
@@ -154,7 +174,12 @@ export async function createContentGenerator(
     );
     const customHeadersEnv =
       process.env['GEMINI_CLI_CUSTOM_HEADERS'] || undefined;
-    const userAgent = `GeminiCLI/${version}/${model} (${process.platform}; ${process.arch})`;
+    const clientName = gcConfig.getClientName();
+    const userAgentPrefix = clientName
+      ? `GeminiCLI-${clientName}`
+      : 'GeminiCLI';
+    const surface = determineSurface();
+    const userAgent = `${userAgentPrefix}/${version}/${model} (${process.platform}; ${process.arch}; ${surface})`;
     const customHeadersMap = parseCustomHeaders(customHeadersEnv);
     const apiKeyAuthMechanism =
       process.env['GEMINI_API_KEY_AUTH_MECHANISM'] || 'x-goog-api-key';
@@ -191,9 +216,13 @@ export async function createContentGenerator(
 
     if (
       config.authType === AuthType.USE_GEMINI ||
-      config.authType === AuthType.USE_VERTEX_AI
+      config.authType === AuthType.USE_VERTEX_AI ||
+      config.authType === AuthType.GATEWAY
     ) {
       let headers: Record<string, string> = { ...baseHeaders };
+      if (config.customHeaders) {
+        headers = { ...headers, ...config.customHeaders };
+      }
       if (gcConfig?.getUsageStatisticsEnabled()) {
         const installationManager = new InstallationManager();
         const installationId = installationManager.getInstallationId();
@@ -202,7 +231,26 @@ export async function createContentGenerator(
           'x-gemini-api-privileged-user-id': `${installationId}`,
         };
       }
-      const httpOptions = { headers };
+      let baseUrl = config.baseUrl;
+      if (!baseUrl) {
+        const envBaseUrl = config.vertexai
+          ? process.env['GOOGLE_VERTEX_BASE_URL']
+          : process.env['GOOGLE_GEMINI_BASE_URL'];
+        if (envBaseUrl) {
+          validateBaseUrl(envBaseUrl);
+          baseUrl = envBaseUrl;
+        }
+      } else {
+        validateBaseUrl(baseUrl);
+      }
+      const httpOptions: {
+        baseUrl?: string;
+        headers: Record<string, string>;
+      } = { headers };
+
+      if (baseUrl) {
+        httpOptions.baseUrl = baseUrl;
+      }
 
       const googleGenAI = new GoogleGenAI({
         apiKey: config.apiKey === '' ? undefined : config.apiKey,
@@ -222,4 +270,18 @@ export async function createContentGenerator(
   }
 
   return generator;
+}
+
+const LOCAL_HOSTNAMES = ['localhost', '127.0.0.1', '[::1]'];
+
+export function validateBaseUrl(baseUrl: string): void {
+  let url: URL;
+  try {
+    url = new URL(baseUrl);
+  } catch {
+    throw new Error(`Invalid custom base URL: ${baseUrl}`);
+  }
+  if (url.protocol !== 'https:' && !LOCAL_HOSTNAMES.includes(url.hostname)) {
+    throw new Error('Custom base URL must use HTTPS unless it is localhost.');
+  }
 }

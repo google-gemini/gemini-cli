@@ -35,7 +35,7 @@ Footer
 `;
 
 exports[`Composer > Snapshots > matches snapshot while streaming 1`] = `
-" LoadingIndicator: Thinking                                                            ShortcutsHint
+" LoadingIndicator: Thinking
 ────────────────────────────────────────────────────────────────────────────────────────────────────
  ApprovalModeIndicator
 InputPrompt:   Type your message or @path/to/file
