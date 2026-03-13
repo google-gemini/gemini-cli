@@ -352,6 +352,11 @@ export class ChatCompressionService {
       ? 'A previous <state_snapshot> exists in the history. You MUST integrate all still-relevant information from that snapshot into the new one, updating it with the more recent events. Do not lose established constraints or critical knowledge.'
       : 'Generate a new <state_snapshot> based on the provided history.';
 
+    // Create a single fallback AbortController so both API calls share the same
+    // cancellation signal instead of creating separate orphaned controllers.
+    const fallbackController = abortSignal ? undefined : new AbortController();
+    const effectiveSignal = abortSignal ?? fallbackController!.signal;
+
     const summaryResponse = await config.getBaseLlmClient().generateContent({
       modelConfigKey: { model: modelStringToModelConfigAlias(model) },
       contents: [
@@ -367,8 +372,7 @@ export class ChatCompressionService {
       ],
       systemInstruction: { text: getCompressionPrompt(config) },
       promptId,
-      // TODO(joshualitt): wire up a sensible abort signal,
-      abortSignal: abortSignal ?? new AbortController().signal,
+      abortSignal: effectiveSignal,
       role: LlmRole.UTILITY_COMPRESSOR,
     });
     const summary = getResponseText(summaryResponse) ?? '';
@@ -397,7 +401,7 @@ export class ChatCompressionService {
         systemInstruction: { text: getCompressionPrompt(config) },
         promptId: `${promptId}-verify`,
         role: LlmRole.UTILITY_COMPRESSOR,
-        abortSignal: abortSignal ?? new AbortController().signal,
+        abortSignal: effectiveSignal,
       });
 
     const finalSummary = (
