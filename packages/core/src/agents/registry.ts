@@ -69,7 +69,7 @@ export class AgentRegistry {
    * Clears the current registry and re-scans for agents.
    */
   async reload(): Promise<void> {
-    A2AClientManager.getInstance().clearCache();
+    A2AClientManager.getInstance(this.config).clearCache();
     await this.config.reloadAgents();
     this.agents.clear();
     this.allDefinitions.clear();
@@ -414,7 +414,7 @@ export class AgentRegistry {
 
     // Load the remote A2A agent card and register.
     try {
-      const clientManager = A2AClientManager.getInstance();
+      const clientManager = A2AClientManager.getInstance(this.config);
       let authHandler: AuthenticationHandler | undefined;
       if (definition.auth) {
         const provider = await A2AAuthProviderFactory.create({
