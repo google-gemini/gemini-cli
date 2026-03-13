@@ -64,14 +64,14 @@ export class MockAgentSession implements AgentSession {
         role: 'user',
         content: payload.message,
         _meta: payload._meta,
-      } as Partial<AgentEvent>);
+      });
     } else if ('elicitations' in payload && payload.elicitations) {
       payload.elicitations.forEach((elicitation, i) => {
         response.splice(startIndex + 1 + i, 0, {
           type: 'elicitation_response',
           ...elicitation,
           _meta: payload._meta,
-        } as Partial<AgentEvent>);
+        });
       });
     } else if ('update' in payload && payload.update) {
       if (payload.update.title) this.title = payload.update.title;
@@ -83,7 +83,7 @@ export class MockAgentSession implements AgentSession {
         type: 'session_update',
         ...payload.update,
         _meta: payload._meta,
-      } as Partial<AgentEvent>);
+      });
     } else if ('action' in payload && payload.action) {
       throw new Error(
         `Actions not supported in MockAgentSession: ${payload.action.type}`,
@@ -104,8 +104,8 @@ export class MockAgentSession implements AgentSession {
         id: e.id ?? `e-${this._nextEventId++}`,
         timestamp: e.timestamp ?? now,
         streamId: e.streamId ?? streamId,
-      } as AgentEvent;
-      return event;
+      };
+      return event as AgentEvent;
     });
 
     this._streams.set(streamId, normalizedResponse);
