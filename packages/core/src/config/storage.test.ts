@@ -180,6 +180,25 @@ describe('Storage – additional helpers', () => {
     expect(storageWithSession.getProjectTempPlansDir()).toBe(expected);
   });
 
+  it('getProjectTempTrackerDir returns ~/.gemini/tmp/<identifier>/tracker when no sessionId is provided', async () => {
+    await storage.initialize();
+    const tempDir = storage.getProjectTempDir();
+    const expected = path.join(tempDir, 'tracker');
+    expect(storage.getProjectTempTrackerDir()).toBe(expected);
+  });
+
+  it('getProjectTempTrackerDir returns ~/.gemini/tmp/<identifier>/<sessionId>/tracker when sessionId is provided', async () => {
+    const sessionId = 'test-session-id';
+    const storageWithSession = new Storage(projectRoot, sessionId);
+    ProjectRegistry.prototype.getShortId = vi
+      .fn()
+      .mockReturnValue(PROJECT_SLUG);
+    await storageWithSession.initialize();
+    const tempDir = storageWithSession.getProjectTempDir();
+    const expected = path.join(tempDir, sessionId, 'tracker');
+    expect(storageWithSession.getProjectTempTrackerDir()).toBe(expected);
+  });
+
   describe('Session and JSON Loading', () => {
     beforeEach(async () => {
       await storage.initialize();
