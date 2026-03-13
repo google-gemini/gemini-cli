@@ -187,6 +187,7 @@ export function formatPolicyError(error: PolicyFileError): string {
   const tierLabel = error.tier.toUpperCase();
   const severityLabel = error.severity === 'warning' ? 'warning' : 'error';
   let message = `[${tierLabel}] Policy file ${severityLabel} in ${error.fileName}:\n`;
+  message += `  Location: ${error.filePath}\n`;
   message += `  ${error.message}`;
   if (error.details) {
     message += `\n${error.details}`;
