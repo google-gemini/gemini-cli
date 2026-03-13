@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as util from 'node:util';
 import {
   DiagLogLevel,
   diag,
@@ -64,8 +65,45 @@ import type {
 } from './types.js';
 
 // For troubleshooting, set the log level to DiagLogLevel.DEBUG
-class DiagLoggerAdapter {
+export class DiagLoggerAdapter {
+  private static readonly RECOVERY_TIMEOUT_MS = 35000;
+  // These patterns are based on observed error messages from OpenTelemetry.
+  // They might need to be updated if the library's error logging changes.
+  private static readonly EXPORT_ERROR_PATTERNS = [
+    /export failed/i,
+    /ECONNREFUSED/i,
+  ];
+
+  private hasLoggedExportError = false;
+  private recoveryTimeout: NodeJS.Timeout | null = null;
+
   error(message: string, ...args: unknown[]): void {
+    const fullErrorString = util.format(message, ...args);
+    const isExportError = DiagLoggerAdapter.EXPORT_ERROR_PATTERNS.some(
+      (pattern) => pattern.test(fullErrorString),
+    );
+
+    if (isExportError) {
+      if (this.recoveryTimeout) {
+        clearTimeout(this.recoveryTimeout);
+      }
+      // If we don't see another export error in 35s, assume the connection recovered.
+      this.recoveryTimeout = setTimeout(() => {
+        if (this.hasLoggedExportError) {
+          debugLogger.log('Telemetry connection successfully established.');
+          this.hasLoggedExportError = false;
+        }
+      }, DiagLoggerAdapter.RECOVERY_TIMEOUT_MS).unref();
+
+      if (!this.hasLoggedExportError) {
+        debugLogger.error(
+          'Telemetry export failed. Suppressing further export errors.',
+        );
+        this.hasLoggedExportError = true;
+      }
+      debugLogger.debug(message, ...args);
+      return;
+    }
     debugLogger.error(message, ...args);
   }
 

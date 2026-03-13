@@ -10,6 +10,7 @@ import {
   initializeTelemetry,
   shutdownTelemetry,
   bufferTelemetryEvent,
+  DiagLoggerAdapter,
 } from './sdk.js';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-grpc';
@@ -404,6 +405,82 @@ describe('Telemetry SDK', () => {
     // 3. Verify NO error log
     expect(debugLogger.error).not.toHaveBeenCalledWith(
       expect.stringContaining('Telemetry credentials have changed'),
+    );
+  });
+});
+
+describe('DiagLoggerAdapter', () => {
+  let adapter: DiagLoggerAdapter;
+
+  beforeEach(() => {
+    adapter = new DiagLoggerAdapter();
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+  });
+
+  it('should log a single export error and suppress subsequent ones', () => {
+    adapter.error('export failed');
+    expect(debugLogger.error).toHaveBeenCalledWith(
+      'Telemetry export failed. Suppressing further export errors.',
+    );
+    expect(debugLogger.debug).toHaveBeenCalledWith('export failed');
+
+    // Second error
+    adapter.error('ECONNREFUSED');
+    expect(debugLogger.error).toHaveBeenCalledTimes(1); // Still 1 error log
+    expect(debugLogger.debug).toHaveBeenCalledWith('ECONNREFUSED');
+  });
+
+  it('should still log non-export errors as errors', () => {
+    adapter.error('Some other error');
+    expect(debugLogger.error).toHaveBeenCalledWith('Some other error');
+  });
+
+  it('should log recovery message after timeout period without new export errors', () => {
+    adapter.error('export failed');
+    expect(debugLogger.error).toHaveBeenCalledTimes(1);
+
+    // Fast-forward 35 seconds
+    vi.advanceTimersByTime(35000);
+
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      'Telemetry connection successfully established.',
+    );
+  });
+
+  it('should reset suppression state after recovery, allowing a new cycle', () => {
+    adapter.error('export failed');
+    expect(debugLogger.error).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(35000);
+    expect(debugLogger.log).toHaveBeenCalledWith(
+      'Telemetry connection successfully established.',
+    );
+
+    // Another export error should trigger the suppression message again
+    adapter.error('export failed again');
+    expect(debugLogger.error).toHaveBeenCalledTimes(2); // New suppression message
+    expect(debugLogger.error).toHaveBeenLastCalledWith(
+      'Telemetry export failed. Suppressing further export errors.',
+    );
+    expect(debugLogger.debug).toHaveBeenCalledWith('export failed again');
+  });
+
+  it('should detect export errors passed in arguments, not just the main message', () => {
+    const errorObj = new Error('connect ECONNREFUSED 127.0.0.1:4317');
+    adapter.error('Failed to export traces', errorObj);
+
+    expect(debugLogger.error).toHaveBeenCalledWith(
+      'Telemetry export failed. Suppressing further export errors.',
+    );
+    expect(debugLogger.debug).toHaveBeenCalledWith(
+      'Failed to export traces',
+      errorObj,
     );
   });
 });
