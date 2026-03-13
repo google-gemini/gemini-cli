@@ -120,7 +120,7 @@
     "package": "vsce package --no-dependencies",
     "test": "vitest run",
     "test:ci": "vitest run --coverage",
-    "test:integration": "node ./scripts/run-integration-tests.js",
+    "test:integration": "npm run build && node ./scripts/run-integration-tests.js",
     "validate:notices": "node ./scripts/validate-notices.js"
   },
   "devDependencies": {
