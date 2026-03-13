@@ -36,6 +36,9 @@ describe('LoopDetectionService', () => {
 
   beforeEach(() => {
     mockConfig = {
+      get config() {
+        return this;
+      },
       getTelemetryEnabled: () => true,
       isInteractive: () => false,
       getDisableLoopDetection: () => false,
@@ -806,7 +809,13 @@ describe('LoopDetectionService LLM Checks', () => {
     vi.mocked(mockAvailability.snapshot).mockReturnValue({ available: true });
 
     mockConfig = {
+      get config() {
+        return this;
+      },
       getGeminiClient: () => mockGeminiClient,
+      get geminiClient() {
+        return mockGeminiClient;
+      },
       getBaseLlmClient: () => mockBaseLlmClient,
       getDisableLoopDetection: () => false,
       getDebugMode: () => false,

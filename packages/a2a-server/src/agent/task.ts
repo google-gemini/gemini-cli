@@ -5,6 +5,7 @@
  */
 
 import {
+  type AgentLoopContext,
   Scheduler,
   type GeminiClient,
   GeminiEventType,
@@ -114,7 +115,8 @@ export class Task {
 
     this.scheduler = this.setupEventDrivenScheduler();
 
-    this.geminiClient = this.config.getGeminiClient();
+    const loopContext: AgentLoopContext = this.config;
+    this.geminiClient = loopContext.geminiClient;
     this.pendingToolConfirmationDetails = new Map();
     this.taskState = 'submitted';
     this.eventBus = eventBus;
@@ -143,7 +145,8 @@ export class Task {
   // process. This is not scoped to the individual task but reflects the global connection
   // state managed within the @gemini-cli/core module.
   async getMetadata(): Promise<TaskMetadata> {
-    const toolRegistry = this.config.getToolRegistry();
+    const loopContext: AgentLoopContext = this.config;
+    const toolRegistry = loopContext.toolRegistry;
     const mcpServers = this.config.getMcpClientManager()?.getMcpServers() || {};
     const serverStatuses = getAllMCPServerStatuses();
     const servers = Object.keys(mcpServers).map((serverName) => ({
@@ -376,7 +379,8 @@ export class Task {
   private messageBusListener?: (message: ToolCallsUpdateMessage) => void;
 
   private setupEventDrivenScheduler(): Scheduler {
-    const messageBus = this.config.getMessageBus();
+    const loopContext: AgentLoopContext = this.config;
+    const messageBus = loopContext.messageBus;
     const scheduler = new Scheduler({
       schedulerId: this.id,
       context: this.config,
@@ -395,9 +399,11 @@ export class Task {
 
   dispose(): void {
     if (this.messageBusListener) {
-      this.config
-        .getMessageBus()
-        .unsubscribe(MessageBusType.TOOL_CALLS_UPDATE, this.messageBusListener);
+      const loopContext: AgentLoopContext = this.config;
+      loopContext.messageBus.unsubscribe(
+        MessageBusType.TOOL_CALLS_UPDATE,
+        this.messageBusListener,
+      );
       this.messageBusListener = undefined;
     }
 
@@ -948,7 +954,8 @@ export class Task {
 
         try {
           if (correlationId) {
-            await this.config.getMessageBus().publish({
+            const loopContext: AgentLoopContext = this.config;
+            await loopContext.messageBus.publish({
               type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
               correlationId,
               confirmed:

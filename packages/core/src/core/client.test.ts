@@ -52,6 +52,7 @@ import * as policyCatalog from '../availability/policyCatalog.js';
 import { LlmRole, LoopType } from '../telemetry/types.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents } from '../utils/events.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -284,7 +285,10 @@ describe('Gemini Client (client.ts)', () => {
     (
       mockConfig as unknown as { toolRegistry: typeof mockToolRegistry }
     ).toolRegistry = mockToolRegistry;
-    (mockConfig as unknown as { messageBus: undefined }).messageBus = undefined;
+    (mockConfig as unknown as { messageBus: MessageBus }).messageBus = {
+      publish: vi.fn(),
+      subscribe: vi.fn(),
+    } as unknown as MessageBus;
     (mockConfig as unknown as { config: Config; promptId: string }).config =
       mockConfig;
     (mockConfig as unknown as { config: Config; promptId: string }).promptId =
@@ -293,6 +297,8 @@ describe('Gemini Client (client.ts)', () => {
     client = new GeminiClient(mockConfig as unknown as AgentLoopContext);
     await client.initialize();
     vi.mocked(mockConfig.getGeminiClient).mockReturnValue(client);
+    (mockConfig as unknown as { geminiClient: GeminiClient }).geminiClient =
+      client;
 
     vi.mocked(uiTelemetryService.setLastPromptTokenCount).mockClear();
   });

@@ -79,7 +79,20 @@ describe('GeminiChat Network Retries', () => {
     // Default mock implementation: execute the function immediately
     mockRetryWithBackoff.mockImplementation(async (apiCall) => apiCall());
 
+    const mockToolRegistry = { getTool: vi.fn() };
+    const testMessageBus = { publish: vi.fn(), subscribe: vi.fn() };
+
     mockConfig = {
+      get config() {
+        return this;
+      },
+      get toolRegistry() {
+        return mockToolRegistry;
+      },
+      get messageBus() {
+        return testMessageBus;
+      },
+      promptId: 'test-session-id',
       getSessionId: () => 'test-session-id',
       getTelemetryLogPromptsEnabled: () => true,
       getUsageStatisticsEnabled: () => true,

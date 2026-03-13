@@ -13,7 +13,6 @@ import {
   ToolConfirmationOutcome,
 } from '../tools/tools.js';
 import type { EditorType } from '../utils/editor.js';
-import type { Config } from '../config/config.js';
 import { PolicyDecision } from '../policy/types.js';
 import { logToolCall } from '../telemetry/loggers.js';
 import { ToolErrorType } from '../tools/tool-error.js';
@@ -50,6 +49,7 @@ import { ToolExecutor } from '../scheduler/tool-executor.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getPolicyDenialError } from '../scheduler/policy.js';
 import { GeminiCliOperation } from '../telemetry/constants.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 export type {
   ToolCall,
@@ -92,7 +92,7 @@ const createErrorResponse = (
 });
 
 interface CoreToolSchedulerOptions {
-  config: Config;
+  context: AgentLoopContext;
   outputUpdateHandler?: OutputUpdateHandler;
   onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   onToolCallsUpdate?: ToolCallsUpdateHandler;
@@ -112,7 +112,7 @@ export class CoreToolScheduler {
   private onAllToolCallsComplete?: AllToolCallsCompleteHandler;
   private onToolCallsUpdate?: ToolCallsUpdateHandler;
   private getPreferredEditor: () => EditorType | undefined;
-  private config: Config;
+  private context: AgentLoopContext;
   private isFinalizingToolCalls = false;
   private isScheduling = false;
   private isCancelling = false;
@@ -128,19 +128,19 @@ export class CoreToolScheduler {
   private toolModifier: ToolModificationHandler;
 
   constructor(options: CoreToolSchedulerOptions) {
-    this.config = options.config;
+    this.context = options.context;
     this.outputUpdateHandler = options.outputUpdateHandler;
     this.onAllToolCallsComplete = options.onAllToolCallsComplete;
     this.onToolCallsUpdate = options.onToolCallsUpdate;
     this.getPreferredEditor = options.getPreferredEditor;
-    this.toolExecutor = new ToolExecutor(this.config);
+    this.toolExecutor = new ToolExecutor(this.context.config);
     this.toolModifier = new ToolModificationHandler();
 
     // Subscribe to message bus for ASK_USER policy decisions
     // Use a static WeakMap to ensure we only subscribe ONCE per MessageBus instance
     // This prevents memory leaks when multiple CoreToolScheduler instances are created
     // (e.g., on every React render, or for each non-interactive tool call)
-    const messageBus = this.config.getMessageBus();
+    const messageBus = this.context.messageBus;
 
     // Check if we've already subscribed a handler to this message bus
     if (!CoreToolScheduler.subscribedMessageBuses.has(messageBus)) {
@@ -526,18 +526,16 @@ export class CoreToolScheduler {
         );
       }
       const requestsToProcess = Array.isArray(request) ? request : [request];
-      const currentApprovalMode = this.config.getApprovalMode();
+      const currentApprovalMode = this.context.config.getApprovalMode();
       this.completedToolCallsForBatch = [];
 
       const newToolCalls: ToolCall[] = requestsToProcess.map(
         (reqInfo): ToolCall => {
-          const toolInstance = this.config
-            .getToolRegistry()
-            .getTool(reqInfo.name);
+          const toolInstance = this.context.toolRegistry.getTool(reqInfo.name);
           if (!toolInstance) {
             const suggestion = getToolSuggestion(
               reqInfo.name,
-              this.config.getToolRegistry().getAllToolNames(),
+              this.context.toolRegistry.getAllToolNames(),
             );
             const errorMessage = `Tool "${reqInfo.name}" not found in registry. Tools must use the exact names that are registered.${suggestion}`;
             return {
@@ -647,13 +645,13 @@ export class CoreToolScheduler {
             : undefined;
         const toolAnnotations = toolCall.tool.toolAnnotations;
 
-        const { decision, rule } = await this.config
+        const { decision, rule } = await this.context.config
           .getPolicyEngine()
           .check(toolCallForPolicy, serverName, toolAnnotations);
 
         if (decision === PolicyDecision.DENY) {
           const { errorMessage, errorType } = getPolicyDenialError(
-            this.config,
+            this.context.config,
             rule,
           );
           this.setStatusInternal(
@@ -694,7 +692,7 @@ export class CoreToolScheduler {
               signal,
             );
           } else {
-            if (!this.config.isInteractive()) {
+            if (!this.context.config.isInteractive()) {
               throw new Error(
                 `Tool execution for "${
                   toolCall.tool.displayName || toolCall.tool.name
@@ -703,7 +701,7 @@ export class CoreToolScheduler {
             }
 
             // Fire Notification hook before showing confirmation to user
-            const hookSystem = this.config.getHookSystem();
+            const hookSystem = this.context.config.getHookSystem();
             if (hookSystem) {
               await hookSystem.fireToolNotificationEvent(confirmationDetails);
             }
@@ -988,7 +986,7 @@ export class CoreToolScheduler {
       // The active tool is finished. Move it to the completed batch.
       const completedCall = activeCall as CompletedToolCall;
       this.completedToolCallsForBatch.push(completedCall);
-      logToolCall(this.config, new ToolCallEvent(completedCall));
+      logToolCall(this.context.config, new ToolCallEvent(completedCall));
 
       // Clear the active tool slot. This is crucial for the sequential processing.
       this.toolCalls = [];
