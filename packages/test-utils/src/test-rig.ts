@@ -353,6 +353,7 @@ export class TestRig {
     testName: string,
     options: {
       settings?: Record<string, unknown>;
+      state?: Record<string, unknown>;
       fakeResponsesPath?: string;
     } = {},
   ) {
@@ -382,6 +383,9 @@ export class TestRig {
 
     // Create a settings file to point the CLI to the local collector
     this._createSettingsFile(options.settings);
+
+    // Create persistent state file
+    this._createStateFile(options.state);
   }
 
   private _cleanDir(dir: string) {
@@ -470,6 +474,24 @@ export class TestRig {
     writeFileSync(
       join(userGeminiDir, 'settings.json'),
       JSON.stringify(settings, null, 2),
+    );
+  }
+
+  private _createStateFile(overrideState?: Record<string, unknown>) {
+    if (!this.homeDir) throw new Error('TestRig homeDir is not initialized');
+    const userGeminiDir = join(this.homeDir, GEMINI_DIR);
+    mkdirSync(userGeminiDir, { recursive: true });
+
+    const state = deepMerge(
+      {
+        terminalSetupPromptShown: true, // Default to true in tests to avoid blocking prompts
+      },
+      overrideState ?? {},
+    );
+
+    writeFileSync(
+      join(userGeminiDir, 'state.json'),
+      JSON.stringify(state, null, 2),
     );
   }
 
