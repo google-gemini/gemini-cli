@@ -201,7 +201,7 @@ export class ToolRegistry {
   // and `isActive` to get only the active tools.
   private allKnownTools: Map<string, AnyDeclarativeTool> = new Map();
   private config: Config;
-  private messageBus: MessageBus;
+  readonly messageBus: MessageBus;
 
   constructor(config: Config, messageBus: MessageBus) {
     this.config = config;
