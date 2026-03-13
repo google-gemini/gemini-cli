@@ -64,7 +64,7 @@ import type {
 } from './types.js';
 
 // For troubleshooting, set the log level to DiagLogLevel.DEBUG
-class DiagLoggerAdapter {
+export class DiagLoggerAdapter {
   private hasLoggedExportError = false;
   private recoveryTimeout: NodeJS.Timeout | null = null;
 
