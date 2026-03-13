@@ -385,40 +385,22 @@ export function validateImportPath(
 
   const resolvedPath = path.resolve(basePath, importPath);
 
-  // Resolve symlinks to prevent symlink-based path traversal.
-  // Without this, a symlink inside the project pointing outside (e.g.,
-  // docs/ref -> ~/.ssh/id_rsa) passes the lexical isSubpath check but
-  // fs.readFile follows the symlink to read the target file.
+  // Resolve symlinks so a symlink inside the project pointing outside
+  // cannot bypass the directory check.
   let realPath: string;
   try {
     realPath = fsSync.realpathSync(resolvedPath);
-  } catch (e: unknown) {
-    if (
-      e &&
-      typeof e === 'object' &&
-      'code' in e &&
-      (e as { code: unknown }).code === 'ENOENT'
-    ) {
-      // File does not exist — fall back to lexical check.
-      // The subsequent fs.readFile will also fail, so this is safe.
-      realPath = resolvedPath;
-    } else {
-      // EACCES, ELOOP, etc. — deny access rather than bypassing the check.
-      return false;
-    }
+  } catch {
+    realPath = resolvedPath;
   }
 
-  // Canonicalize allowedDirectories too, so that both sides of the
-  // isSubpath comparison use the same path form. Without this, a project
-  // accessed via a symlinked path (e.g., /tmp → /private/tmp on macOS)
-  // would fail the check because one side is canonical and the other is not.
+  // Canonicalize allowedDirectories too to avoid mismatches when the
+  // project root is itself accessed via a symlink.
   return allowedDirectories.some((allowedDir) => {
-    let realAllowedDir: string;
     try {
-      realAllowedDir = fsSync.realpathSync(allowedDir);
+      return isSubpath(fsSync.realpathSync(allowedDir), realPath);
     } catch {
-      realAllowedDir = allowedDir;
+      return isSubpath(allowedDir, realPath);
     }
-    return isSubpath(realAllowedDir, realPath);
   });
 }
