@@ -5,10 +5,33 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { glob } from 'glob';
+import { Storage } from '@google/gemini-cli-core';
 import { commandsCommand } from './commandsCommand.js';
 import { MessageType } from '../types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import type { CommandContext } from './types.js';
+
+vi.mock('glob', () => ({
+  glob: vi.fn(),
+}));
+
+vi.mock('@google/gemini-cli-core', async () => {
+  const actual = await vi.importActual<
+    typeof import('@google/gemini-cli-core')
+  >('@google/gemini-cli-core');
+  return {
+    ...actual,
+    Storage: class extends actual.Storage {
+      static override getUserCommandsDir = vi
+        .fn()
+        .mockReturnValue('/mock/user/commands');
+      override getProjectCommandsDir = vi
+        .fn()
+        .mockReturnValue('/mock/project/commands');
+    },
+  };
+});
 
 describe('commandsCommand', () => {
   let context: CommandContext;
@@ -18,6 +41,18 @@ describe('commandsCommand', () => {
     context = createMockCommandContext({
       ui: {
         reloadCommands: vi.fn(),
+        addItem: vi.fn(),
+      },
+      services: {
+        config: {
+          getProjectRoot: vi.fn().mockReturnValue('/mock/project'),
+          getExtensions: vi.fn().mockReturnValue([
+            { name: 'ext1', path: '/mock/ext1', isActive: true },
+            { name: 'ext2', path: '/mock/ext2', isActive: false },
+          ]),
+          storage: new Storage('/mock/project'),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any,
       },
     });
   });
@@ -30,7 +65,87 @@ describe('commandsCommand', () => {
         type: 'message',
         messageType: 'info',
         content:
-          'Use "/commands reload" to reload custom command definitions from .toml files.',
+          'Use "/commands list" to view available .toml files, or "/commands reload" to reload custom command definitions.',
+      });
+    });
+  });
+
+  describe('list', () => {
+    it('should list .toml files from available sources', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      vi.mocked(glob).mockImplementation(async (pattern, options: any) => {
+        if (options?.cwd === '/mock/user/commands') return ['user1.toml'];
+        if (options?.cwd === '/mock/project/commands') return ['proj1.toml'];
+        if (options?.cwd === '/mock/ext1/commands') return ['ext1.toml'];
+        return [];
+      });
+
+      const listCmd = commandsCommand.subCommands!.find(
+        (s) => s.name === 'list',
+      )!;
+
+      await listCmd.action!(context, '');
+
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.INFO,
+          text: expect.stringContaining('### User Commands'),
+        }),
+        expect.any(Number),
+      );
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('- user1.toml'),
+        }),
+        expect.any(Number),
+      );
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('### Project Commands'),
+        }),
+        expect.any(Number),
+      );
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('- proj1.toml'),
+        }),
+        expect.any(Number),
+      );
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('### Extension: ext1 Commands'),
+        }),
+        expect.any(Number),
+      );
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('- ext1.toml'),
+        }),
+        expect.any(Number),
+      );
+      expect(context.ui.addItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('MCP prompts are dynamically loaded'),
+        }),
+        expect.any(Number),
+      );
+    });
+
+    it('should show "No custom command files found" message if no .toml files exist', async () => {
+      vi.mocked(glob).mockResolvedValue([]);
+
+      const listCmd = commandsCommand.subCommands!.find(
+        (s) => s.name === 'list',
+      )!;
+
+      const result = await listCmd.action!(context, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'info',
+        content: expect.stringContaining(
+          'No custom command files (.toml) found.',
+        ),
       });
     });
   });
