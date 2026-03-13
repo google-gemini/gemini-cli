@@ -94,6 +94,7 @@
           { "label": "Agent Skills", "slug": "docs/cli/skills" },
           { "label": "Checkpointing", "slug": "docs/cli/checkpointing" },
           { "label": "Headless mode", "slug": "docs/cli/headless" },
+          { "label": "ACP mode", "slug": "docs/cli/acp-mode" },
           {
             "label": "Hooks",
             "collapsed": true,
