@@ -225,23 +225,30 @@ export class HookTranslatorGenAIv1 extends HookTranslator {
     hookRequest: LLMRequest,
     baseRequest?: GenerateContentParameters,
   ): GenerateContentParameters {
-    // Convert hook messages back to SDK Content format
-    const contents = hookRequest.messages.map((message) => ({
-      role: message.role === 'model' ? 'model' : message.role,
-      parts: [
-        {
-          text:
-            typeof message.content === 'string'
-              ? message.content
-              : String(message.content),
-        },
-      ],
-    }));
+    // Convert hook messages back to SDK Content format.
+    // If the hook returned a partial request without messages (e.g. only
+    // overriding `model`), fall back to the base request's contents so the
+    // conversation is preserved.
+    const contents = hookRequest.messages
+      ? hookRequest.messages.map((message) => ({
+          role: message.role === 'model' ? 'model' : message.role,
+          parts: [
+            {
+              text:
+                typeof message.content === 'string'
+                  ? message.content
+                  : String(message.content),
+            },
+          ],
+        }))
+      : (baseRequest?.contents ?? []);
 
-    // Build the result with proper typing
+    // Build the result with proper typing.
+    // Use nullish coalescing so a hook that only sets `model` still works --
+    // fall back to the base request's model rather than overwriting with undefined.
     const result: GenerateContentParameters = {
       ...baseRequest,
-      model: hookRequest.model,
+      model: hookRequest.model ?? baseRequest?.model ?? '',
       contents,
     };
 
