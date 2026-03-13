@@ -95,6 +95,13 @@ describe('ShellTool', () => {
     fs.mkdirSync(path.join(tempRootDir, 'subdir'));
 
     mockConfig = {
+      get config() {
+        return this;
+      },
+      geminiClient: {
+        stripThoughtsFromHistory: vi.fn(),
+      },
+
       getAllowedTools: vi.fn().mockReturnValue([]),
       getApprovalMode: vi.fn().mockReturnValue('strict'),
       getCoreTools: vi.fn().mockReturnValue([]),
@@ -459,7 +466,7 @@ describe('ShellTool', () => {
         mockConfig,
         { model: 'summarizer-shell' },
         expect.any(String),
-        mockConfig.getGeminiClient(),
+        mockConfig.geminiClient,
         mockAbortSignal,
       );
       expect(result.llmContent).toBe('summarized output');

@@ -1055,7 +1055,7 @@ export class Config implements McpContext, AgentLoopContext {
     // Register Conseca if enabled
     if (this.enableConseca) {
       debugLogger.log('[SAFETY] Registering Conseca Safety Checker');
-      ConsecaSafetyChecker.getInstance().setConfig(this);
+      ConsecaSafetyChecker.getInstance().setContext(this);
     }
 
     this._messageBus = new MessageBus(this.policyEngine, this.debugMode);
@@ -1246,8 +1246,8 @@ export class Config implements McpContext, AgentLoopContext {
 
         // Re-register ActivateSkillTool to update its schema with the discovered enabled skill enums
         if (this.getSkillManager().getSkills().length > 0) {
-          this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
-          this.getToolRegistry().registerTool(
+          this.toolRegistry.unregisterTool(ActivateSkillTool.Name);
+          this.toolRegistry.registerTool(
             new ActivateSkillTool(this, this.messageBus),
           );
         }
@@ -1418,14 +1418,26 @@ export class Config implements McpContext, AgentLoopContext {
     return this._sessionId;
   }
 
+  /**
+   * @deprecated Do not access directly on Config.
+   * Use the injected AgentLoopContext instead.
+   */
   get toolRegistry(): ToolRegistry {
     return this._toolRegistry;
   }
 
+  /**
+   * @deprecated Do not access directly on Config.
+   * Use the injected AgentLoopContext instead.
+   */
   get messageBus(): MessageBus {
     return this._messageBus;
   }
 
+  /**
+   * @deprecated Do not access directly on Config.
+   * Use the injected AgentLoopContext instead.
+   */
   get geminiClient(): GeminiClient {
     return this._geminiClient;
   }
@@ -2268,7 +2280,7 @@ export class Config implements McpContext, AgentLoopContext {
    * Whenever the user memory (GEMINI.md files) is updated.
    */
   updateSystemInstructionIfInitialized(): void {
-    const geminiClient = this.getGeminiClient();
+    const geminiClient = this.geminiClient;
     if (geminiClient?.isInitialized()) {
       geminiClient.updateSystemInstruction();
     }
@@ -2734,16 +2746,16 @@ export class Config implements McpContext, AgentLoopContext {
 
       // Re-register ActivateSkillTool to update its schema with the newly discovered skills
       if (this.getSkillManager().getSkills().length > 0) {
-        this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
-        this.getToolRegistry().registerTool(
+        this.toolRegistry.unregisterTool(ActivateSkillTool.Name);
+        this.toolRegistry.registerTool(
           new ActivateSkillTool(this, this.messageBus),
         );
       } else {
-        this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
+        this.toolRegistry.unregisterTool(ActivateSkillTool.Name);
       }
     } else {
       this.getSkillManager().clearSkills();
-      this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
+      this.toolRegistry.unregisterTool(ActivateSkillTool.Name);
     }
 
     // Notify the client that system instructions might need updating
@@ -3081,7 +3093,7 @@ export class Config implements McpContext, AgentLoopContext {
 
       for (const definition of definitions) {
         try {
-          const tool = new SubagentTool(definition, this, this.getMessageBus());
+          const tool = new SubagentTool(definition, this, this.messageBus);
           registry.registerTool(tool);
         } catch (e: unknown) {
           debugLogger.warn(
@@ -3186,7 +3198,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.registerSubAgentTools(this._toolRegistry);
     }
     // Propagate updates to the active chat session
-    const client = this.getGeminiClient();
+    const client = this.geminiClient;
     if (client?.isInitialized()) {
       await client.setTools();
       client.updateSystemInstruction();
