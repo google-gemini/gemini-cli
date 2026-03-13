@@ -1,4 +1,5 @@
-#!/usr/bin/env -S node --no-warnings=DEP0040
+#!/usr/bin/env sh
+':' //; exec node --no-warnings=DEP0040 "$0" "$@"
 
 /**
  * @license
