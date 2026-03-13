@@ -114,7 +114,14 @@ function ruleMatches(
         return false;
       }
     } else if (toolCall.name !== rule.toolName) {
-      return false;
+      // Check if an unqualified rule name matches a qualified MCP tool call
+      const isUnqualifiedMatch =
+        serverName &&
+        !rule.toolName.includes('__') &&
+        toolCall.name === `${serverName}__${rule.toolName}`;
+      if (!isUnqualifiedMatch) {
+        return false;
+      }
     }
   }
 
