@@ -1197,6 +1197,7 @@
               "items": {
                 "type": "string"
               }
+            },
             "disableUserInput": {
               "title": "Disable User Input",
               "description": "Disable user input on browser window during automation.",
