@@ -226,6 +226,93 @@ describe('McpPromptLoader', () => {
       });
     });
 
+    it('should process all messages from GetPromptResult', async () => {
+      vi.spyOn(mockPrompt, 'invoke').mockResolvedValue({
+        messages: [
+          { content: { type: 'text', text: 'First message.' } },
+          { content: { type: 'text', text: 'Second message.' } },
+          { content: { type: 'text', text: 'Third message.' } },
+        ],
+      });
+      const loader = new McpPromptLoader(mockConfigWithPrompts);
+      const commands = await loader.loadCommands(new AbortController().signal);
+      const action = commands[0].action!;
+      const context = {} as CommandContext;
+      const result = await action(context, 'test-name 123 tiger');
+      expect(result).toEqual({
+        type: 'submit_prompt',
+        content: JSON.stringify(
+          'First message.\n\nSecond message.\n\nThird message.',
+        ),
+      });
+    });
+
+    it('should skip non-text messages and collect only text content', async () => {
+      vi.spyOn(mockPrompt, 'invoke').mockResolvedValue({
+        messages: [
+          { content: { type: 'text', text: 'Text message.' } },
+          {
+            content: {
+              type: 'image',
+              data: 'base64data',
+              mimeType: 'image/png',
+            },
+          },
+          { content: { type: 'text', text: 'Another text.' } },
+        ],
+      });
+      const loader = new McpPromptLoader(mockConfigWithPrompts);
+      const commands = await loader.loadCommands(new AbortController().signal);
+      const action = commands[0].action!;
+      const context = {} as CommandContext;
+      const result = await action(context, 'test-name 123 tiger');
+      expect(result).toEqual({
+        type: 'submit_prompt',
+        content: JSON.stringify('Text message.\n\nAnother text.'),
+      });
+    });
+
+    it('should return an error when messages array is empty', async () => {
+      vi.spyOn(mockPrompt, 'invoke').mockResolvedValue({
+        messages: [],
+      });
+      const loader = new McpPromptLoader(mockConfigWithPrompts);
+      const commands = await loader.loadCommands(new AbortController().signal);
+      const action = commands[0].action!;
+      const context = {} as CommandContext;
+      const result = await action(context, 'test-name 123 tiger');
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Received an empty prompt response from the server.',
+      });
+    });
+
+    it('should return an error when all messages are non-text', async () => {
+      vi.spyOn(mockPrompt, 'invoke').mockResolvedValue({
+        messages: [
+          {
+            content: {
+              type: 'image',
+              data: 'base64data',
+              mimeType: 'image/png',
+            },
+          },
+        ],
+      });
+      const loader = new McpPromptLoader(mockConfigWithPrompts);
+      const commands = await loader.loadCommands(new AbortController().signal);
+      const action = commands[0].action!;
+      const context = {} as CommandContext;
+      const result = await action(context, 'test-name 123 tiger');
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content:
+          'Received an empty or invalid prompt response from the server.',
+      });
+    });
+
     it('should return an error for missing required arguments', async () => {
       const loader = new McpPromptLoader(mockConfigWithPrompts);
       const commands = await loader.loadCommands(new AbortController().signal);
