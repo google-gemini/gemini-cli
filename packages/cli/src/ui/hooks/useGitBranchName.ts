@@ -13,63 +13,82 @@ import path from 'node:path';
 export function useGitBranchName(cwd: string): string | undefined {
   const [branchName, setBranchName] = useState<string | undefined>(undefined);
 
-  const fetchBranchName = useCallback(async () => {
-    try {
-      const { stdout } = await spawnAsync(
-        'git',
-        ['rev-parse', '--abbrev-ref', 'HEAD'],
-        { cwd },
-      );
-      const branch = stdout.toString().trim();
-      if (branch && branch !== 'HEAD') {
-        setBranchName(branch);
-      } else {
-        const { stdout: hashStdout } = await spawnAsync(
+  const fetchBranchName = useCallback(
+    async (isMounted: () => boolean) => {
+      try {
+        const { stdout } = await spawnAsync(
           'git',
-          ['rev-parse', '--short', 'HEAD'],
+          ['rev-parse', '--abbrev-ref', 'HEAD'],
           { cwd },
         );
-        setBranchName(hashStdout.toString().trim());
+        if (!isMounted()) return;
+        const branch = stdout.toString().trim();
+        if (branch && branch !== 'HEAD') {
+          setBranchName(branch);
+        } else {
+          const { stdout: hashStdout } = await spawnAsync(
+            'git',
+            ['rev-parse', '--short', 'HEAD'],
+            { cwd },
+          );
+          if (!isMounted()) return;
+          setBranchName(hashStdout.toString().trim());
+        }
+      } catch (_error) {
+        if (isMounted()) {
+          setBranchName(undefined);
+        }
       }
-    } catch (_error) {
-      setBranchName(undefined);
-    }
-  }, [cwd, setBranchName]);
+    },
+    [cwd, setBranchName],
+  );
 
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    fetchBranchName(); // Initial fetch
-
-    const gitLogsHeadPath = path.join(cwd, '.git', 'logs', 'HEAD');
-    let watcher: fs.FSWatcher | undefined;
     let cancelled = false;
+    const isMounted = () => !cancelled;
 
-    const setupWatcher = async () => {
-      try {
-        // Check if .git/logs/HEAD exists, as it might not in a new repo or orphaned head
-        await fsPromises.access(gitLogsHeadPath, fs.constants.F_OK);
-        if (cancelled) return;
-        watcher = fs.watch(gitLogsHeadPath, (eventType: string) => {
-          // Changes to .git/logs/HEAD (appends) indicate HEAD has likely changed
-          if (eventType === 'change' || eventType === 'rename') {
-            // Handle rename just in case
-            // eslint-disable-next-line @typescript-eslint/no-floating-promises
-            fetchBranchName();
-          }
-        });
-      } catch (_watchError) {
-        // Silently ignore watcher errors (e.g. permissions or file not existing),
-        // similar to how exec errors are handled.
-        // The branch name will simply not update automatically.
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    fetchBranchName(isMounted); // Initial fetch
+
+    const gitHeadPath = path.join(cwd, '.git', 'HEAD');
+    const gitLogsHeadPath = path.join(cwd, '.git', 'logs', 'HEAD');
+    const watchers: fs.FSWatcher[] = [];
+
+    const onFileChange = (eventType: string) => {
+      if (eventType === 'change' || eventType === 'rename') {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        fetchBranchName(isMounted);
       }
     };
 
+    const watchFile = async (filePath: string) => {
+      try {
+        await fsPromises.access(filePath, fs.constants.F_OK);
+        if (cancelled) return;
+        const watcher = fs.watch(filePath, onFileChange);
+        watchers.push(watcher);
+      } catch {
+        // Silently ignore if the file doesn't exist or can't be watched.
+      }
+    };
+
+    const setupWatchers = async () => {
+      // Watch .git/HEAD — the canonical source for the current branch ref.
+      // This file is always updated on branch switches (git checkout, git switch).
+      await watchFile(gitHeadPath);
+      // Also watch .git/logs/HEAD for reflog-based updates, which covers
+      // additional operations like commits and resets.
+      await watchFile(gitLogsHeadPath);
+    };
+
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    setupWatcher();
+    setupWatchers();
 
     return () => {
       cancelled = true;
-      watcher?.close();
+      for (const watcher of watchers) {
+        watcher.close();
+      }
     };
   }, [cwd, fetchBranchName]);
 
