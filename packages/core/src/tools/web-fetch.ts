@@ -20,7 +20,12 @@ import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { ApprovalMode } from '../policy/types.js';
 import { getResponseText } from '../utils/partUtils.js';
-import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
+import {
+  fetchWithTimeout,
+  isPrivateIp,
+  isAddressPrivate,
+} from '../utils/fetch.js';
+import { lookup } from 'node:dns/promises';
 import { truncateString } from '../utils/textUtils.js';
 import { convert } from 'html-to-text';
 import {
@@ -42,6 +47,7 @@ import type { AgentLoopContext } from '../config/agent-loop-context.js';
 const URL_FETCH_TIMEOUT_MS = 10000;
 const MAX_CONTENT_LENGTH = 100000;
 const MAX_EXPERIMENTAL_FETCH_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_REDIRECTS = 5;
 const USER_AGENT =
   'Mozilla/5.0 (compatible; Google-Gemini-CLI/1.0; +https://github.com/google-gemini/gemini-cli)';
 const TRUNCATION_WARNING = '\n\n... [Content truncated due to size limit] ...';
@@ -260,6 +266,45 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     }
   }
 
+  // Resolves DNS to catch domain names that point to private IPs
+  // (e.g., metadata.google.internal → 169.254.169.254).
+  private async isBlockedHostAsync(urlStr: string): Promise<boolean> {
+    if (this.isBlockedHost(urlStr)) return true;
+    try {
+      const hostname = new URL(urlStr).hostname;
+      const { address } = await lookup(hostname);
+      return isAddressPrivate(address);
+    } catch {
+      // DNS resolution failed — the fetch will also fail, so no bypass.
+      return false;
+    }
+  }
+
+  // Fetches a URL with SSRF-safe redirect handling: uses redirect:'manual'
+  // and validates each hop against the blocked host list with DNS resolution.
+  private async safeFetch(
+    url: string,
+    signal: AbortSignal,
+    headers: Record<string, string>,
+  ): Promise<Response> {
+    let currentUrl = url;
+    for (let i = 0; i <= MAX_REDIRECTS; i++) {
+      if (await this.isBlockedHostAsync(currentUrl)) {
+        throw new Error(`Access to blocked host: ${currentUrl}`);
+      }
+      const res = await fetchWithTimeout(currentUrl, URL_FETCH_TIMEOUT_MS, {
+        signal,
+        redirect: 'manual',
+        headers,
+      });
+      if (res.status < 300 || res.status >= 400) return res;
+      const location = res.headers.get('location');
+      if (!location) return res;
+      currentUrl = new URL(location, currentUrl).toString();
+    }
+    throw new Error(`Too many redirects (max ${MAX_REDIRECTS})`);
+  }
+
   private async executeFallbackForUrl(
     urlStr: string,
     signal: AbortSignal,
@@ -274,11 +319,8 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     try {
       const response = await retryWithBackoff(
         async () => {
-          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
-            signal,
-            headers: {
-              'User-Agent': USER_AGENT,
-            },
+          const res = await this.safeFetch(url, signal, {
+            'User-Agent': USER_AGENT,
           });
           if (!res.ok) {
             const error = new Error(
@@ -570,13 +612,10 @@ ${aggregatedContent}
     try {
       const response = await retryWithBackoff(
         async () => {
-          const res = await fetchWithTimeout(url, URL_FETCH_TIMEOUT_MS, {
-            signal,
-            headers: {
-              Accept:
-                'text/markdown, text/plain;q=0.9, application/json;q=0.9, text/html;q=0.8, application/pdf;q=0.7, video/*;q=0.7, */*;q=0.5',
-              'User-Agent': USER_AGENT,
-            },
+          const res = await this.safeFetch(url, signal, {
+            Accept:
+              'text/markdown, text/plain;q=0.9, application/json;q=0.9, text/html;q=0.8, application/pdf;q=0.7, video/*;q=0.7, */*;q=0.5',
+            'User-Agent': USER_AGENT,
           });
           return res;
         },
