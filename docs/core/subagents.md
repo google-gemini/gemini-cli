@@ -298,7 +298,7 @@ Gemini CLI can also delegate tasks to remote subagents using the Agent-to-Agent
 > **Note: Remote subagents are currently an experimental feature.**
 
 See the [Remote Subagents documentation](remote-agents) for detailed
-configuration and usage instructions.
+configuration, authentication, and usage instructions.
 
 ## Extension subagents
 
