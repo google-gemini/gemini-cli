@@ -504,6 +504,20 @@ export class CodeAssistServer implements ContentGenerator {
         }
         // Ignore other lines like comments or id fields
       }
+      if (bufferedLines.length > 0) {
+        const chunk = bufferedLines.join('\n');
+        try {
+          yield JSON.parse(chunk);
+        } catch (_e) {
+          if (server.config) {
+            logInvalidChunk(
+              server.config,
+              // Don't include the chunk content in the log for security/privacy reasons.
+              new InvalidChunkEvent('Malformed JSON chunk'),
+            );
+          }
+        }
+      }
     })(this);
   }
 
