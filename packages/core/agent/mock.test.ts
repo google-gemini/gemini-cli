@@ -48,7 +48,12 @@ describe('MockAgentSession', () => {
     // Test with empty payload (no message injected)
     session.pushResponse([]);
     session.pushResponse([
-      { type: 'error', message: 'fail', fatal: true, status: '...' },
+      {
+        type: 'error',
+        message: 'fail',
+        fatal: true,
+        status: 'RESOURCE_EXHAUSTED',
+      },
     ]);
 
     // First send
@@ -57,9 +62,10 @@ describe('MockAgentSession', () => {
     });
     const events1: AgentEvent[] = [];
     for await (const e of session.stream()) events1.push(e);
-    expect(events1).toHaveLength(2); // stream_start, stream_end
+    expect(events1).toHaveLength(3); // stream_start, session_update, stream_end
     expect(events1[0].type).toBe('stream_start');
-    expect(events1[1].type).toBe('stream_end');
+    expect(events1[1].type).toBe('session_update');
+    expect(events1[2].type).toBe('stream_end');
 
     // Second send
     const { streamId: s2 } = await session.send({
@@ -68,10 +74,11 @@ describe('MockAgentSession', () => {
     expect(s1).not.toBe(s2);
     const events2: AgentEvent[] = [];
     for await (const e of session.stream()) events2.push(e);
-    expect(events2).toHaveLength(3); // stream_start, error, stream_end
-    expect(events2[1].type).toBe('error');
+    expect(events2).toHaveLength(4); // stream_start, session_update, error, stream_end
+    expect(events2[1].type).toBe('session_update');
+    expect(events2[2].type).toBe('error');
 
-    expect(session.events).toHaveLength(5);
+    expect(session.events).toHaveLength(7);
   });
 
   it('should allow streaming by streamId', async () => {
@@ -86,7 +93,7 @@ describe('MockAgentSession', () => {
     for await (const e of session.stream({ streamId })) {
       events.push(e);
     }
-    expect(events).toHaveLength(3); // start, message, end
+    expect(events).toHaveLength(4); // start, update, message, end
   });
 
   it('should throw when streaming non-existent streamId', async () => {
@@ -95,6 +102,17 @@ describe('MockAgentSession', () => {
       const stream = session.stream({ streamId: 'invalid' });
       await stream.next();
     }).rejects.toThrow('Stream not found: invalid');
+  });
+
+  it('should throw when streaming non-existent eventId', async () => {
+    const session = new MockAgentSession();
+    session.pushResponse([{ type: 'message' }]);
+    await session.send({ update: {} });
+
+    await expect(async () => {
+      const stream = session.stream({ eventId: 'invalid' });
+      await stream.next();
+    }).rejects.toThrow('Event not found: invalid');
   });
 
   it('should handle abort', async () => {
@@ -138,8 +156,52 @@ describe('MockAgentSession', () => {
     for await (const e of session.stream({ eventId: 'e1' })) {
       second.push(e);
     }
-    expect(second).toHaveLength(2);
-    expect(second[0].id).toBe('e2');
-    expect(second[1].id).toBe('e3');
+    expect(second).toHaveLength(3); // update, message, end
+    expect(second[0].type).toBe('session_update');
+    expect(second[1].id).toBe('e2');
+    expect(second[2].id).toBe('e3');
+  });
+
+  it('should handle elicitations', async () => {
+    const session = new MockAgentSession();
+    session.pushResponse([]);
+
+    await session.send({
+      elicitations: [
+        { requestId: 'r1', action: 'accept', content: { foo: 'bar' } },
+      ],
+    });
+
+    const events: AgentEvent[] = [];
+    for await (const e of session.stream()) events.push(e);
+
+    expect(events[1].type).toBe('elicitation_response');
+    expect((events[1] as AgentEvent<'elicitation_response'>).requestId).toBe(
+      'r1',
+    );
+  });
+
+  it('should handle updates and track state', async () => {
+    const session = new MockAgentSession();
+    session.pushResponse([]);
+
+    await session.send({
+      update: { title: 'New Title', model: 'gpt-4', config: { x: 1 } },
+    });
+
+    expect(session.title).toBe('New Title');
+    expect(session.model).toBe('gpt-4');
+    expect(session.config).toEqual({ x: 1 });
+
+    const events: AgentEvent[] = [];
+    for await (const e of session.stream()) events.push(e);
+    expect(events[1].type).toBe('session_update');
+  });
+
+  it('should throw on action', async () => {
+    const session = new MockAgentSession();
+    await expect(
+      session.send({ action: { type: 'foo', data: {} } }),
+    ).rejects.toThrow('Actions not supported in MockAgentSession: foo');
   });
 });

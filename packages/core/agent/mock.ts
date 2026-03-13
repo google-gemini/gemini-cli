@@ -18,6 +18,10 @@ export class MockAgentSession implements AgentSession {
   private _lastStreamId?: string;
   private _nextEventId = 1;
 
+  public title?: string;
+  public model?: string;
+  public config?: Record<string, unknown>;
+
   constructor(initialEvents: AgentEvent[] = []) {
     this._events = [...initialEvents];
   }
@@ -53,14 +57,38 @@ export class MockAgentSession implements AgentSession {
       } as unknown as AgentEvent);
     }
 
+    const startIndex = response.findIndex((e) => e.type === 'stream_start');
+
     if ('message' in payload && payload.message) {
-      const startIndex = response.findIndex((e) => e.type === 'stream_start');
       response.splice(startIndex + 1, 0, {
         type: 'message',
         role: 'user',
         content: payload.message,
         _meta: payload._meta,
       } as unknown as AgentEvent);
+    } else if ('elicitations' in payload && payload.elicitations) {
+      payload.elicitations.forEach((elicitation, i) => {
+        response.splice(startIndex + 1 + i, 0, {
+          type: 'elicitation_response',
+          ...elicitation,
+          _meta: payload._meta,
+        } as unknown as AgentEvent);
+      });
+    } else if ('update' in payload && payload.update) {
+      if (payload.update.title) this.title = payload.update.title;
+      if (payload.update.model) this.model = payload.update.model;
+      if (payload.update.config) {
+        this.config = payload.update.config as Record<string, unknown>;
+      }
+      response.splice(startIndex + 1, 0, {
+        type: 'session_update',
+        ...payload.update,
+        _meta: payload._meta,
+      } as unknown as AgentEvent);
+    } else if ('action' in payload && payload.action) {
+      throw new Error(
+        `Actions not supported in MockAgentSession: ${payload.action.type}`,
+      );
     }
 
     if (!response.some((e) => e.type === 'stream_end')) {
@@ -115,6 +143,8 @@ export class MockAgentSession implements AgentSession {
       const idx = events.findIndex((e) => e.id === options.eventId);
       if (idx !== -1) {
         startAt = idx + 1;
+      } else {
+        throw new Error(`Event not found: ${options.eventId}`);
       }
     }
 

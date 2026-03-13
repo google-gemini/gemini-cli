@@ -221,7 +221,34 @@ export interface ElicitationResponse {
 
 export interface ErrorData {
   // One of https://github.com/googleapis/googleapis/blob/master/google/rpc/code.proto
-  status: 'RESOURCE_EXHAUSTED' | '...';
+  status: // 400
+  | 'INVALID_ARGUMENT'
+    | 'FAILED_PRECONDITION'
+    | 'OUT_OF_RANGE'
+    // 401
+    | 'UNAUTHENTICATED'
+    // 403
+    | 'PERMISSION_DENIED'
+    // 404
+    | 'NOT_FOUND'
+    // 409
+    | 'ABORTED'
+    | 'ALREADY_EXISTS'
+    // 429
+    | 'RESOURCE_EXHAUSTED'
+    // 499
+    | 'CANCELLED'
+    // 500
+    | 'UNKNOWN'
+    | 'INTERNAL'
+    | 'DATA_LOSS'
+    // 501
+    | 'UNIMPLEMENTED'
+    // 503
+    | 'UNAVAILABLE'
+    // 504
+    | 'DEADLINE_EXCEEDED'
+    | (string & {});
   /** User-facing message to be displayed. */
   message: string;
   /** When true, agent execution is halting because of the error. */
@@ -254,7 +281,7 @@ type StreamEndReason =
 export interface StreamEnd {
   streamId: string;
   reason: StreamEndReason;
-  eliciationIds?: string[];
+  elicitationIds?: string[];
   /** End-of-stream summary data (cost, usage, turn count, refusal reason, etc.) */
   data?: Record<string, unknown>;
 }
