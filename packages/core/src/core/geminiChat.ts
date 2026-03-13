@@ -90,7 +90,7 @@ interface MidStreamRetryOptions {
 
 const MID_STREAM_RETRY_OPTIONS: MidStreamRetryOptions = {
   maxAttempts: 4, // 1 initial call + 3 retries mid-stream
-  initialDelayMs: 500,
+  initialDelayMs: 1000,
 };
 
 export const SYNTHETIC_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
