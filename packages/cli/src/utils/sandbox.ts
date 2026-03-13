@@ -231,6 +231,10 @@ export async function start_sandbox(
       return await start_lxc_sandbox(config, nodeArgs, cliArgs);
     }
 
+    if (config.command === 'bwrap') {
+      return await start_bwrap_sandbox(config, nodeArgs, cliConfig, cliArgs);
+    }
+
     // runsc uses docker with --runtime=runsc
     const command = config.command === 'runsc' ? 'docker' : config.command;
     if (!command) throw new FatalSandboxError('Sandbox command is required');
@@ -1150,6 +1154,143 @@ async function pullImage(
     }
     pullProcess.on('error', onError);
     pullProcess.on('close', onClose);
+  });
+}
+
+async function start_bwrap_sandbox(
+  config: SandboxConfig,
+  nodeArgs: string[] = [],
+  cliConfig?: Config,
+  cliArgs: string[] = [],
+): Promise<number> {
+  if (os.platform() !== 'linux') {
+    throw new FatalSandboxError(
+      'bubblewrap sandboxing is only supported on Linux',
+    );
+  }
+
+  debugLogger.log('hopping into bubblewrap sandbox ...');
+
+  const workdir = path.resolve(process.cwd());
+  const homeDir = homedir();
+  const nodeOptions = [
+    ...(process.env['DEBUG'] ? ['--inspect-brk'] : []),
+    ...nodeArgs,
+  ].join(' ');
+
+  const bwrapArgs: string[] = [
+    '--new-session',
+    '--die-with-parent',
+    '--unshare-pid',
+    '--proc',
+    '/proc',
+    '--dev',
+    '/dev',
+    // --- STRICT ALLOW LIST ---
+    // Only mount essential system paths for binaries and libraries
+    '--ro-bind',
+    '/usr',
+    '/usr',
+    '--ro-bind',
+    '/lib',
+    '/lib',
+    '--ro-bind',
+    '/lib64',
+    '/lib64',
+    '--ro-bind',
+    '/bin',
+    '/bin',
+    '--ro-bind',
+    '/sbin',
+    '/sbin',
+  ];
+
+  // Allow the current node binary (essential for relaunching)
+  // This is especially important for NVM/Asdf users where node is in $HOME
+  const nodePath = process.execPath;
+  if (nodePath.startsWith(homeDir)) {
+    bwrapArgs.push('--ro-bind', nodePath, nodePath);
+    // Also bind the directory containing node to ensure shared libs are found
+    const nodeDir = path.dirname(nodePath);
+    bwrapArgs.push('--ro-bind', nodeDir, nodeDir);
+  }
+
+  // Ensure we have a valid resolv.conf for DNS if network is enabled
+  if (config.networkAccess !== false) {
+    const resolvPaths = [
+      '/etc/resolv.conf',
+      '/run/systemd/resolve/stub-resolv.conf',
+      '/run/systemd/resolve/resolv.conf',
+    ];
+    for (const p of resolvPaths) {
+      if (fs.existsSync(p)) {
+        bwrapArgs.push('--ro-bind', p, p);
+      }
+    }
+  }
+
+  // Bind SSL certificates for HTTPS access
+  const sslPaths = [
+    '/etc/ssl',
+    '/etc/pki',
+    '/usr/share/ca-certificates',
+    '/usr/local/share/ca-certificates',
+  ];
+  for (const p of sslPaths) {
+    if (fs.existsSync(p)) {
+      bwrapArgs.push('--ro-bind', p, p);
+    }
+  }
+
+  // Allow writes ONLY to specific permitted paths
+  const writablePaths = new Set<string>();
+  writablePaths.add(workdir);
+  writablePaths.add(path.join(homeDir, GEMINI_DIR));
+  writablePaths.add(os.tmpdir());
+
+  if (config.allowedPaths) {
+    for (const p of config.allowedPaths) {
+      if (p && path.isAbsolute(p) && fs.existsSync(p)) {
+        writablePaths.add(fs.realpathSync(p));
+      }
+    }
+  }
+
+  for (const p of writablePaths) {
+    if (fs.existsSync(p)) {
+      bwrapArgs.push('--bind', p, p);
+    }
+  }
+
+  // Handle network access
+  if (config.networkAccess === false) {
+    bwrapArgs.push('--unshare-net');
+  }
+
+  // Use current shell or bash
+  const shell = process.env['SHELL'] || '/bin/bash';
+
+  const finalArgv = cliArgs;
+  const innerCmd = [
+    'SANDBOX=bwrap',
+    `NODE_OPTIONS="${nodeOptions}"`,
+    'DEV=true',
+    ...finalArgv.map((arg) => quote([arg])),
+  ].join(' ');
+
+  const args = [...bwrapArgs, '--', shell, '-c', innerCmd];
+
+  process.stdin.pause();
+  const sandboxProcess = spawn('bwrap', args, {
+    stdio: 'inherit',
+  });
+
+  return new Promise((resolve, reject) => {
+    sandboxProcess.on('error', reject);
+    sandboxProcess.on('close', (code) => {
+      process.stdin.resume();
+      resolve(code ?? 1);
+    });
   });
 }
 

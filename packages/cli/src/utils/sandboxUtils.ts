@@ -22,6 +22,18 @@ export const BUILTIN_SEATBELT_PROFILES = [
   'strict-proxied',
 ];
 
+export function isSelinuxEnforced(): boolean {
+  if (os.platform() !== 'linux') {
+    return false;
+  }
+  try {
+    const enforce = fs.readFileSync('/sys/fs/selinux/enforce', 'utf8');
+    return enforce.trim() === '1';
+  } catch {
+    return false;
+  }
+}
+
 export function getContainerPath(hostPath: string): string {
   if (os.platform() !== 'win32') {
     return hostPath;
@@ -45,18 +57,20 @@ export async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
     return false;
   }
 
-  // If environment variable is not explicitly set, check for Debian/Ubuntu Linux
+  // If environment variable is not explicitly set, check for Debian/Ubuntu/Fedora Linux
   if (os.platform() === 'linux') {
     try {
       const osReleaseContent = await readFile('/etc/os-release', 'utf8');
       if (
         osReleaseContent.includes('ID=debian') ||
         osReleaseContent.includes('ID=ubuntu') ||
+        osReleaseContent.includes('ID=fedora') ||
         osReleaseContent.match(/^ID_LIKE=.*debian.*/m) || // Covers derivatives
-        osReleaseContent.match(/^ID_LIKE=.*ubuntu.*/m) // Covers derivatives
+        osReleaseContent.match(/^ID_LIKE=.*ubuntu.*/m) || // Covers derivatives
+        osReleaseContent.match(/^ID_LIKE=.*fedora.*/m) // Covers derivatives
       ) {
         debugLogger.log(
-          'Defaulting to use current user UID/GID for Debian/Ubuntu-based Linux.',
+          'Defaulting to use current user UID/GID for Debian/Ubuntu/Fedora-based Linux.',
         );
         return true;
       }
@@ -64,7 +78,7 @@ export async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
       // Silently ignore if /etc/os-release is not found or unreadable.
       // The default (false) will be applied in this case.
       debugLogger.warn(
-        'Warning: Could not read /etc/os-release to auto-detect Debian/Ubuntu for UID/GID default.',
+        'Warning: Could not read /etc/os-release to auto-detect Debian/Ubuntu/Fedora for UID/GID default.',
       );
     }
   }
