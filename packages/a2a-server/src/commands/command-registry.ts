@@ -9,6 +9,7 @@ import { debugLogger } from '@google/gemini-cli-core';
 import { ExtensionsCommand } from './extensions.js';
 import { InitCommand } from './init.js';
 import { RestoreCommand } from './restore.js';
+import { AcknowledgeAgentCommand } from './acknowledge-agent.js';
 import type { Command } from './types.js';
 
 export class CommandRegistry {
@@ -24,6 +25,7 @@ export class CommandRegistry {
     this.register(new RestoreCommand());
     this.register(new InitCommand());
     this.register(new MemoryCommand());
+    this.register(new AcknowledgeAgentCommand());
   }
 
   register(command: Command) {

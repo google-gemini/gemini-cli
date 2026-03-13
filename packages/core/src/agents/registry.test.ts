@@ -45,6 +45,13 @@ vi.mock('./a2a-client-manager.js', () => ({
   },
 }));
 
+const mockClientManager = {
+  getClient: vi.fn(),
+  getAgentCard: vi.fn(),
+  loadAgent: vi.fn(),
+  clearCache: vi.fn(),
+};
+
 vi.mock('./auth-provider/factory.js', () => ({
   A2AAuthProviderFactory: {
     create: vi.fn(),
@@ -110,6 +117,17 @@ describe('AgentRegistry', () => {
       agents: [],
       errors: [],
     });
+
+    // Setup client manager mock
+    vi.mocked(A2AClientManager.getInstance).mockReturnValue(
+      mockClientManager as unknown as A2AClientManager,
+    );
+    mockClientManager.getClient.mockReturnValue(undefined);
+    mockClientManager.getAgentCard.mockReturnValue(undefined);
+    mockClientManager.loadAgent.mockImplementation(async (name) => ({
+      name,
+      description: 'Loaded from card',
+    }));
   });
 
   afterEach(() => {
@@ -450,10 +468,7 @@ describe('AgentRegistry', () => {
       );
 
       // Mock A2AClientManager to avoid network calls
-      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
-        loadAgent: vi.fn().mockResolvedValue({ name: 'RemoteAgent' }),
-        clearCache: vi.fn(),
-      } as unknown as A2AClientManager);
+      mockClientManager.loadAgent.mockResolvedValue({ name: 'RemoteAgent' });
 
       await registry.initialize();
 
@@ -548,12 +563,13 @@ describe('AgentRegistry', () => {
         inputConfig: { inputSchema: { type: 'object' } },
       };
 
-      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
-        loadAgent: vi.fn().mockResolvedValue({ name: 'RemoteAgent' }),
-      } as unknown as A2AClientManager);
-
       await registry.testRegisterAgent(remoteAgent);
-      expect(registry.getDefinition('RemoteAgent')).toEqual(remoteAgent);
+      expect(registry.getDefinition('RemoteAgent')).toEqual(
+        expect.objectContaining({
+          name: 'RemoteAgent',
+          kind: 'remote',
+        }),
+      );
     });
 
     it('should register a remote agent with authentication configuration', async () => {
@@ -580,14 +596,6 @@ describe('AgentRegistry', () => {
       } as unknown as A2AAuthProvider;
       vi.mocked(A2AAuthProviderFactory.create).mockResolvedValue(mockHandler);
 
-      const loadAgentSpy = vi
-        .fn()
-        .mockResolvedValue({ name: 'RemoteAgentWithAuth' });
-      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
-        loadAgent: loadAgentSpy,
-        clearCache: vi.fn(),
-      } as unknown as A2AClientManager);
-
       await registry.testRegisterAgent(remoteAgent);
 
       expect(A2AAuthProviderFactory.create).toHaveBeenCalledWith({
@@ -596,13 +604,16 @@ describe('AgentRegistry', () => {
         targetUrl: 'https://example.com/card',
         agentCardUrl: 'https://example.com/card',
       });
-      expect(loadAgentSpy).toHaveBeenCalledWith(
+      expect(mockClientManager.loadAgent).toHaveBeenCalledWith(
         'RemoteAgentWithAuth',
         'https://example.com/card',
         mockHandler,
       );
       expect(registry.getDefinition('RemoteAgentWithAuth')).toEqual(
-        remoteAgent,
+        expect.objectContaining({
+          name: 'RemoteAgentWithAuth',
+          kind: 'remote',
+        }),
       );
     });
 
@@ -621,11 +632,6 @@ describe('AgentRegistry', () => {
       };
 
       vi.mocked(A2AAuthProviderFactory.create).mockResolvedValue(undefined);
-      const loadAgentSpy = vi.fn();
-      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
-        loadAgent: loadAgentSpy,
-        clearCache: vi.fn(),
-      } as unknown as A2AClientManager);
 
       const warnSpy = vi
         .spyOn(debugLogger, 'warn')
@@ -633,7 +639,7 @@ describe('AgentRegistry', () => {
 
       await registry.testRegisterAgent(remoteAgent);
 
-      expect(loadAgentSpy).not.toHaveBeenCalled();
+      expect(mockClientManager.loadAgent).not.toHaveBeenCalled();
       expect(registry.getDefinition('RemoteAgentBadAuth')).toBeUndefined();
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Error loading A2A agent'),
@@ -656,10 +662,6 @@ describe('AgentRegistry', () => {
         agentCardUrl: 'https://example.com/card',
         inputConfig: { inputSchema: { type: 'object' } },
       };
-
-      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
-        loadAgent: vi.fn().mockResolvedValue({ name: 'RemoteAgent' }),
-      } as unknown as A2AClientManager);
 
       await debugRegistry.testRegisterAgent(remoteAgent);
 
@@ -688,9 +690,7 @@ describe('AgentRegistry', () => {
         new Error('ECONNREFUSED'),
       );
 
-      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
-        loadAgent: vi.fn().mockRejectedValue(a2aError),
-      } as unknown as A2AClientManager);
+      mockClientManager.loadAgent.mockRejectedValue(a2aError);
 
       await registry.testRegisterAgent(remoteAgent);
 
@@ -714,9 +714,9 @@ describe('AgentRegistry', () => {
         inputConfig: { inputSchema: { type: 'object' } },
       };
 
-      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
-        loadAgent: vi.fn().mockRejectedValue(new Error('unexpected crash')),
-      } as unknown as A2AClientManager);
+      mockClientManager.loadAgent.mockRejectedValue(
+        new Error('unexpected crash'),
+      );
 
       await registry.testRegisterAgent(remoteAgent);
 
@@ -749,18 +749,16 @@ describe('AgentRegistry', () => {
         // No auth configured
       };
 
-      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
-        loadAgent: vi.fn().mockResolvedValue({
-          name: 'SecuredAgent',
-          securitySchemes: {
-            api_key: {
-              type: 'apiKey',
-              in: 'header',
-              name: 'x-api-key',
-            },
+      mockClientManager.loadAgent.mockResolvedValue({
+        name: 'SecuredAgent',
+        securitySchemes: {
+          api_key: {
+            type: 'apiKey',
+            in: 'header',
+            name: 'x-api-key',
           },
-        }),
-      } as unknown as A2AClientManager);
+        },
+      });
 
       await registry.testRegisterAgent(remoteAgent);
 
@@ -783,9 +781,7 @@ describe('AgentRegistry', () => {
       };
 
       const error = new Error('401 Unauthorized');
-      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
-        loadAgent: vi.fn().mockRejectedValue(error),
-      } as unknown as A2AClientManager);
+      mockClientManager.loadAgent.mockRejectedValue(error);
 
       const feedbackSpy = vi.spyOn(coreEvents, 'emitFeedback');
 
@@ -815,10 +811,7 @@ describe('AgentRegistry', () => {
         ],
       };
 
-      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
-        loadAgent: vi.fn().mockResolvedValue(mockAgentCard),
-        clearCache: vi.fn(),
-      } as unknown as A2AClientManager);
+      mockClientManager.loadAgent.mockResolvedValue(mockAgentCard);
 
       await registry.testRegisterAgent(remoteAgent);
 
@@ -843,10 +836,7 @@ describe('AgentRegistry', () => {
         skills: [{ name: 'Skill1', description: 'Desc1' }],
       };
 
-      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
-        loadAgent: vi.fn().mockResolvedValue(mockAgentCard),
-        clearCache: vi.fn(),
-      } as unknown as A2AClientManager);
+      mockClientManager.loadAgent.mockResolvedValue(mockAgentCard);
 
       await registry.testRegisterAgent(remoteAgent);
 
@@ -871,10 +861,7 @@ describe('AgentRegistry', () => {
         skills: [],
       };
 
-      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
-        loadAgent: vi.fn().mockResolvedValue(mockAgentCard),
-        clearCache: vi.fn(),
-      } as unknown as A2AClientManager);
+      mockClientManager.loadAgent.mockResolvedValue(mockAgentCard);
 
       await registry.testRegisterAgent(remoteAgent);
 
@@ -902,10 +889,7 @@ describe('AgentRegistry', () => {
         skills: [{ name: 'Skill1', description: 'Desc1' }],
       };
 
-      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
-        loadAgent: vi.fn().mockResolvedValue(mockAgentCard),
-        clearCache: vi.fn(),
-      } as unknown as A2AClientManager);
+      mockClientManager.loadAgent.mockResolvedValue(mockAgentCard);
 
       // Register first time
       await registry.testRegisterAgent(remoteAgent);
@@ -930,13 +914,10 @@ describe('AgentRegistry', () => {
         inputConfig: { inputSchema: { type: 'object' } },
       };
 
-      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
-        loadAgent: vi.fn().mockResolvedValue({
-          name: 'EmptyDescAgent',
-          description: 'Loaded from card',
-        }),
-        clearCache: vi.fn(),
-      } as unknown as A2AClientManager);
+      mockClientManager.loadAgent.mockResolvedValue({
+        name: 'EmptyDescAgent',
+        description: 'Loaded from card',
+      });
 
       await registry.testRegisterAgent(remoteAgent);
 
@@ -955,14 +936,11 @@ describe('AgentRegistry', () => {
         inputConfig: { inputSchema: { type: 'object' } },
       };
 
-      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
-        loadAgent: vi.fn().mockResolvedValue({
-          name: 'SkillFallbackAgent',
-          description: 'Card description',
-          skills: [{ name: 'SkillNoDesc' }], // Missing description
-        }),
-        clearCache: vi.fn(),
-      } as unknown as A2AClientManager);
+      mockClientManager.loadAgent.mockResolvedValue({
+        name: 'SkillFallbackAgent',
+        description: 'Card description',
+        skills: [{ name: 'SkillNoDesc' }], // Missing description
+      });
 
       await registry.testRegisterAgent(remoteAgent);
 
@@ -1084,6 +1062,9 @@ describe('AgentRegistry', () => {
     });
 
     it('should dynamically register an ASK_USER policy for remote agents', async () => {
+      const policyEngine = mockConfig.getPolicyEngine();
+      const addRuleSpy = vi.spyOn(policyEngine, 'addRule');
+
       const remoteAgent: AgentDefinition = {
         kind: 'remote',
         name: 'RemotePolicyAgent',
@@ -1092,13 +1073,6 @@ describe('AgentRegistry', () => {
         inputConfig: { inputSchema: { type: 'object' } },
       };
 
-      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
-        loadAgent: vi.fn().mockResolvedValue({ name: 'RemotePolicyAgent' }),
-      } as unknown as A2AClientManager);
-
-      const policyEngine = mockConfig.getPolicyEngine();
-      const addRuleSpy = vi.spyOn(policyEngine, 'addRule');
-
       await registry.testRegisterAgent(remoteAgent);
 
       expect(addRuleSpy).toHaveBeenCalledWith(
@@ -1106,6 +1080,7 @@ describe('AgentRegistry', () => {
           toolName: 'RemotePolicyAgent',
           decision: PolicyDecision.ASK_USER,
           priority: 1.05,
+          source: 'AgentRegistry (Dynamic)',
         }),
       );
     });
@@ -1129,6 +1104,10 @@ describe('AgentRegistry', () => {
     });
 
     it('should replace an existing dynamic policy when an agent is overwritten', async () => {
+      const policyEngine = mockConfig.getPolicyEngine();
+      const removeRuleSpy = vi.spyOn(policyEngine, 'removeRulesForTool');
+      const addRuleSpy = vi.spyOn(policyEngine, 'addRule');
+
       const localAgent: AgentDefinition = {
         ...MOCK_AGENT_V1,
         name: 'OverwrittenAgent',
@@ -1140,14 +1119,6 @@ describe('AgentRegistry', () => {
         agentCardUrl: 'https://example.com/card',
         inputConfig: { inputSchema: { type: 'object' } },
       };
-
-      vi.mocked(A2AClientManager.getInstance).mockReturnValue({
-        loadAgent: vi.fn().mockResolvedValue({ name: 'OverwrittenAgent' }),
-      } as unknown as A2AClientManager);
-
-      const policyEngine = mockConfig.getPolicyEngine();
-      const removeRuleSpy = vi.spyOn(policyEngine, 'removeRulesForTool');
-      const addRuleSpy = vi.spyOn(policyEngine, 'addRule');
 
       // 1. Register local
       await registry.testRegisterAgent(localAgent);
