@@ -12,45 +12,41 @@ import type {
   TaskStatusUpdateEvent,
   TaskArtifactUpdateEvent,
 } from '@a2a-js/sdk';
+import type { AuthenticationHandler, Client } from '@a2a-js/sdk/client';
 import {
-  type Client,
   ClientFactory,
   ClientFactoryOptions,
   DefaultAgentCardResolver,
-  RestTransportFactory,
   JsonRpcTransportFactory,
-  type AuthenticationHandler,
+  RestTransportFactory,
   createAuthenticatingFetchWithRetry,
 } from '@a2a-js/sdk/client';
+import { GrpcTransportFactory } from '@a2a-js/sdk/client/grpc';
+import * as grpc from '@grpc/grpc-js';
 import { v4 as uuidv4 } from 'uuid';
-import { Agent as UndiciAgent } from 'undici';
+import { Agent as UndiciAgent, ProxyAgent } from 'undici';
+import { normalizeAgentCard } from './a2aUtils.js';
+import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { safeLookup } from '../utils/fetch.js';
 import { classifyAgentError } from './a2a-errors.js';
 
-// Remote agents can take 10+ minutes (e.g. Deep Research).
-// Use a dedicated dispatcher so the global 5-min timeout isn't affected.
-const A2A_TIMEOUT = 1800000; // 30 minutes
-const a2aDispatcher = new UndiciAgent({
-  headersTimeout: A2A_TIMEOUT,
-  bodyTimeout: A2A_TIMEOUT,
-  connect: {
-    lookup: safeLookup, // SSRF protection at connection level
-  },
-});
-const a2aFetch: typeof fetch = (input, init) =>
-  // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
-  fetch(input, { ...init, dispatcher: a2aDispatcher } as RequestInit);
-
+/**
+ * Result of sending a message, which can be a full message, a task,
+ * or an incremental status/artifact update.
+ */
 export type SendMessageResult =
   | Message
   | Task
   | TaskStatusUpdateEvent
   | TaskArtifactUpdateEvent;
 
+// Remote agents can take 10+ minutes (e.g. Deep Research).
+// Use a dedicated dispatcher so the global 5-min timeout isn't affected.
+const A2A_TIMEOUT = 1800000; // 30 minutes
+
 /**
- * Manages A2A clients and caches loaded agent information.
- * Follows a singleton pattern to ensure a single client instance.
+ * Orchestrates communication with remote A2A agents.
+ * Manages protocol negotiation, authentication, and transport selection.
  */
 export class A2AClientManager {
   private static instance: A2AClientManager;
@@ -59,14 +55,35 @@ export class A2AClientManager {
   private clients = new Map<string, Client>();
   private agentCards = new Map<string, AgentCard>();
 
-  private constructor() {}
+  private a2aDispatcher: UndiciAgent | ProxyAgent;
+  private a2aFetch: typeof fetch;
+
+  private constructor(config?: Config) {
+    const proxyUrl = config?.getProxy();
+    const agentOptions = {
+      headersTimeout: A2A_TIMEOUT,
+      bodyTimeout: A2A_TIMEOUT,
+    };
+
+    if (proxyUrl) {
+      this.a2aDispatcher = new ProxyAgent({
+        uri: proxyUrl,
+        ...agentOptions,
+      });
+    } else {
+      this.a2aDispatcher = new UndiciAgent(agentOptions);
+    }
+
+    this.a2aFetch = (input, init) =>
+      fetch(input, { ...init, dispatcher: this.a2aDispatcher } as RequestInit);
+  }
 
   /**
    * Gets the singleton instance of the A2AClientManager.
    */
-  static getInstance(): A2AClientManager {
+  static getInstance(config?: Config): A2AClientManager {
     if (!A2AClientManager.instance) {
-      A2AClientManager.instance = new A2AClientManager();
+      A2AClientManager.instance = new A2AClientManager(config);
     }
     return A2AClientManager.instance;
   }
@@ -97,9 +114,12 @@ export class A2AClientManager {
     }
 
     // Authenticated fetch for API calls (transports).
-    let authFetch: typeof fetch = a2aFetch;
+    let authFetch: typeof fetch = this.a2aFetch;
     if (authHandler) {
-      authFetch = createAuthenticatingFetchWithRetry(a2aFetch, authHandler);
+      authFetch = createAuthenticatingFetchWithRetry(
+        this.a2aFetch,
+        authHandler,
+      );
     }
 
     // Use unauthenticated fetch for the agent card unless explicitly required.
@@ -109,7 +129,7 @@ export class A2AClientManager {
       init?: RequestInit,
     ): Promise<Response> => {
       // Try without auth first
-      const response = await a2aFetch(input, init);
+      const response = await this.a2aFetch(input, init);
 
       // Retry with auth if we hit a 401/403
       if ((response.status === 401 || response.status === 403) && authFetch) {
@@ -120,22 +140,35 @@ export class A2AClientManager {
     };
 
     const resolver = new DefaultAgentCardResolver({ fetchImpl: cardFetch });
+    const rawCard = await resolver.resolve(agentCardUrl, '');
+    // TODO: Remove normalizeAgentCard once @a2a-js/sdk handles
+    // proto field name aliases (supportedInterfaces → additionalInterfaces,
+    // protocolBinding → transport).
+    const agentCard = normalizeAgentCard(rawCard);
 
-    const options = ClientFactoryOptions.createFrom(
+    const grpcUrl =
+      agentCard.additionalInterfaces?.find((i) => i.transport === 'GRPC')
+        ?.url ?? agentCard.url;
+
+    const clientOptions = ClientFactoryOptions.createFrom(
       ClientFactoryOptions.default,
       {
         transports: [
           new RestTransportFactory({ fetchImpl: authFetch }),
           new JsonRpcTransportFactory({ fetchImpl: authFetch }),
+          new GrpcTransportFactory({
+            grpcChannelCredentials: grpcUrl.startsWith('https://')
+              ? grpc.credentials.createSsl()
+              : grpc.credentials.createInsecure(),
+          }),
         ],
         cardResolver: resolver,
       },
     );
 
     try {
-      const factory = new ClientFactory(options);
-      const client = await factory.createFromUrl(agentCardUrl, '');
-      const agentCard = await client.getAgentCard();
+      const factory = new ClientFactory(clientOptions);
+      const client = await factory.createFromAgentCard(agentCard);
 
       this.clients.set(name, client);
       this.agentCards.set(name, agentCard);
@@ -173,9 +206,7 @@ export class A2AClientManager {
     options?: { contextId?: string; taskId?: string; signal?: AbortSignal },
   ): AsyncIterable<SendMessageResult> {
     const client = this.clients.get(agentName);
-    if (!client) {
-      throw new Error(`Agent '${agentName}' not found.`);
-    }
+    if (!client) throw new Error(`Agent '${agentName}' not found.`);
 
     const messageParams: MessageSendParams = {
       message: {
@@ -188,9 +219,19 @@ export class A2AClientManager {
       },
     };
 
-    yield* client.sendMessageStream(messageParams, {
-      signal: options?.signal,
-    });
+    try {
+      yield* client.sendMessageStream(messageParams, {
+        signal: options?.signal,
+      });
+    } catch (error: unknown) {
+      const prefix = `[A2AClientManager] sendMessageStream Error [${agentName}]`;
+      if (error instanceof Error) {
+        throw new Error(`${prefix}: ${error.message}`, { cause: error });
+      }
+      throw new Error(
+        `${prefix}: Unexpected error during sendMessageStream: ${String(error)}`,
+      );
+    }
   }
 
   /**
@@ -219,9 +260,7 @@ export class A2AClientManager {
    */
   async getTask(agentName: string, taskId: string): Promise<Task> {
     const client = this.clients.get(agentName);
-    if (!client) {
-      throw new Error(`Agent '${agentName}' not found.`);
-    }
+    if (!client) throw new Error(`Agent '${agentName}' not found.`);
     try {
       return await client.getTask({ id: taskId });
     } catch (error: unknown) {
@@ -241,9 +280,7 @@ export class A2AClientManager {
    */
   async cancelTask(agentName: string, taskId: string): Promise<Task> {
     const client = this.clients.get(agentName);
-    if (!client) {
-      throw new Error(`Agent '${agentName}' not found.`);
-    }
+    if (!client) throw new Error(`Agent '${agentName}' not found.`);
     try {
       return await client.cancelTask({ id: taskId });
     } catch (error: unknown) {
