@@ -84,6 +84,7 @@ export interface CliArgs {
   allowedTools: string[] | undefined;
   acp?: boolean;
   experimentalAcp?: boolean;
+  experimentalVoice: boolean | undefined;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
   resume: string | typeof RESUME_LATEST | undefined;
@@ -203,6 +204,11 @@ export async function parseArguments(
           type: 'boolean',
           description:
             'Starts the agent in ACP mode (deprecated, use --acp instead)',
+        })
+        .option('experimental-voice', {
+          type: 'boolean',
+          description: '[Experimental] Start in hands-free voice mode',
+          hidden: true,
         })
         .option('allowed-mcp-server-names', {
           type: 'array',
@@ -803,7 +809,7 @@ export async function loadCliConfig(
     bugCommand: settings.advanced?.bugCommand,
     model: resolvedModel,
     maxSessionTurns: settings.model?.maxSessionTurns,
-
+    experimentalVoice: argv.experimentalVoice || false,
     listExtensions: argv.listExtensions || false,
     listSessions: argv.listSessions || false,
     deleteSession: argv.deleteSession,
