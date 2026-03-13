@@ -7,6 +7,7 @@
 import * as vscode from 'vscode';
 import { IDEServer } from './ide-server.js';
 import semver from 'semver';
+import { z } from 'zod';
 import { DiffContentProvider, DiffManager } from './diff-manager.js';
 import { createLogger } from './utils/logger.js';
 import {
@@ -32,14 +33,42 @@ let logger: vscode.OutputChannel;
 
 let log: (message: string) => void = () => {};
 
+const VscodePackageJsonSchema = z.object({
+  version: z.string(),
+});
+
+const MarketplaceResponseSchema = z.object({
+  results: z.array(
+    z.object({
+      extensions: z.array(
+        z.object({
+          versions: z.array(
+            z.object({
+              version: z.string(),
+            }),
+          ),
+        }),
+      ),
+    }),
+  ),
+});
+
 async function checkForUpdates(
   context: vscode.ExtensionContext,
   log: (message: string) => void,
   isManagedExtensionSurface: boolean,
 ) {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const currentVersion = context.extension.packageJSON.version;
+    const packageJsonResult = VscodePackageJsonSchema.safeParse(
+      context.extension.packageJSON,
+    );
+    if (!packageJsonResult.success) {
+      log(
+        `Could not determine current extension version: ${packageJsonResult.error.message}`,
+      );
+      return;
+    }
+    const currentVersion = packageJsonResult.data.version;
 
     // Fetch extension details from the VSCode Marketplace.
     const response = await fetch(
@@ -76,12 +105,16 @@ async function checkForUpdates(
       return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const data = await response.json();
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const extension = data?.results?.[0]?.extensions?.[0];
+    const rawData: unknown = await response.json();
+    const marketplaceResult = MarketplaceResponseSchema.safeParse(rawData);
+    if (!marketplaceResult.success) {
+      log(
+        `Unexpected marketplace API response shape: ${marketplaceResult.error.message}`,
+      );
+      return;
+    }
+    const extension = marketplaceResult.data.results?.[0]?.extensions?.[0];
     // The versions are sorted by date, so the first one is the latest.
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const latestVersion = extension?.versions?.[0]?.version;
 
     if (
