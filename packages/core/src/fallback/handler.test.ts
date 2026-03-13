@@ -53,31 +53,6 @@ vi.mock('../utils/events.js', () => ({
   coreEvents: {
     emitFeedback: vi.fn(),
   },
-  CoreEvent: {
-    UserFeedback: 'user-feedback',
-    ModelChanged: 'model-changed',
-    ConsoleLog: 'console-log',
-    Output: 'output',
-    MemoryChanged: 'memory-changed',
-    ExternalEditorClosed: 'external-editor-closed',
-    McpClientUpdate: 'mcp-client-update',
-    OauthDisplayMessage: 'oauth-display-message',
-    SettingsChanged: 'settings-changed',
-    HookStart: 'hook-start',
-    HookEnd: 'hook-end',
-    AgentsRefreshed: 'agents-refreshed',
-    AdminSettingsChanged: 'admin-settings-changed',
-    RetryAttempt: 'retry-attempt',
-    ConsentRequest: 'consent-request',
-    McpProgress: 'mcp-progress',
-    AgentsDiscovered: 'agents-discovered',
-    RequestEditorSelection: 'request-editor-selection',
-    EditorSelected: 'editor-selected',
-    SlashCommandConflicts: 'slash-command-conflicts',
-    QuotaChanged: 'quota-changed',
-    TelemetryKeychainAvailability: 'telemetry-keychain-availability',
-    TelemetryTokenStorageType: 'telemetry-token-storage-type',
-  },
 }));
 
 // Mock debugLogger to prevent console pollution and allow spying
