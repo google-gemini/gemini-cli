@@ -19,7 +19,9 @@ import {
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
+  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
   AuthType,
+  UserTierId,
 } from '@google/gemini-cli-core';
 import type { Config, ModelSlashCommandEvent } from '@google/gemini-cli-core';
 
@@ -28,8 +30,9 @@ const mockGetDisplayString = vi.fn();
 const mockLogModelSlashCommand = vi.fn();
 const mockModelSlashCommandEvent = vi.fn();
 
-vi.mock('@google/gemini-cli-core', async () => {
-  const actual = await vi.importActual('@google/gemini-cli-core');
+vi.mock('@google/gemini-cli-core', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@google/gemini-cli-core')>();
   return {
     ...actual,
     getDisplayString: (val: string) => mockGetDisplayString(val),
@@ -40,6 +43,7 @@ vi.mock('@google/gemini-cli-core', async () => {
         mockModelSlashCommandEvent(model);
       }
     },
+    PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL: 'gemini-3.1-flash-lite-preview',
   };
 });
 
@@ -49,6 +53,7 @@ describe('<ModelDialog />', () => {
   const mockOnClose = vi.fn();
   const mockGetHasAccessToPreviewModel = vi.fn();
   const mockGetGemini31LaunchedSync = vi.fn();
+  const mockGetUserTier = vi.fn();
 
   interface MockConfig extends Partial<Config> {
     setModel: (model: string, isTemporary?: boolean) => void;
@@ -56,6 +61,7 @@ describe('<ModelDialog />', () => {
     getHasAccessToPreviewModel: () => boolean;
     getIdeMode: () => boolean;
     getGemini31LaunchedSync: () => boolean;
+    getUserTier: () => string | undefined;
   }
 
   const mockConfig: MockConfig = {
@@ -64,6 +70,7 @@ describe('<ModelDialog />', () => {
     getHasAccessToPreviewModel: mockGetHasAccessToPreviewModel,
     getIdeMode: () => false,
     getGemini31LaunchedSync: mockGetGemini31LaunchedSync,
+    getUserTier: mockGetUserTier,
   };
 
   beforeEach(() => {
@@ -71,6 +78,7 @@ describe('<ModelDialog />', () => {
     mockGetModel.mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO);
     mockGetHasAccessToPreviewModel.mockReturnValue(false);
     mockGetGemini31LaunchedSync.mockReturnValue(false);
+    mockGetUserTier.mockReturnValue(undefined);
 
     // Default implementation for getDisplayString
     mockGetDisplayString.mockImplementation((val: string) => {
@@ -106,6 +114,52 @@ describe('<ModelDialog />', () => {
     expect(lastFrame()).toContain('Remember model for future sessions: false');
     expect(lastFrame()).toContain('Auto');
     expect(lastFrame()).toContain('Manual');
+    unmount();
+  });
+
+  it('renders the "manual" view initially for free tier users and filters Pro models with correct order', async () => {
+    mockGetUserTier.mockReturnValue(UserTierId.FREE);
+    mockGetHasAccessToPreviewModel.mockReturnValue(true);
+    mockGetDisplayString.mockImplementation((val: string) => val);
+
+    const { lastFrame, unmount } = await renderComponent();
+
+    const output = lastFrame();
+    expect(output).toContain('Select Model');
+    expect(output).not.toContain(DEFAULT_GEMINI_MODEL);
+    expect(output).not.toContain(PREVIEW_GEMINI_MODEL);
+
+    // Verify order: Flash Preview -> Flash Lite Preview -> Flash -> Flash Lite
+    const flashPreviewIdx = output.indexOf(PREVIEW_GEMINI_FLASH_MODEL);
+    const flashLitePreviewIdx = output.indexOf(
+      PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+    );
+    const flashIdx = output.indexOf(DEFAULT_GEMINI_FLASH_MODEL);
+    const flashLiteIdx = output.indexOf(DEFAULT_GEMINI_FLASH_LITE_MODEL);
+
+    expect(flashPreviewIdx).toBeLessThan(flashLitePreviewIdx);
+    expect(flashLitePreviewIdx).toBeLessThan(flashIdx);
+    expect(flashIdx).toBeLessThan(flashLiteIdx);
+
+    expect(output).not.toContain('Auto');
+    unmount();
+  });
+
+  it('closes dialog on escape in "manual" view for free tier users', async () => {
+    mockGetUserTier.mockReturnValue(UserTierId.FREE);
+    const { stdin, waitUntilReady, unmount } = await renderComponent();
+
+    // Already in manual view
+    await act(async () => {
+      stdin.write('\u001B'); // Escape
+    });
+    await act(async () => {
+      await waitUntilReady();
+    });
+
+    await waitFor(() => {
+      expect(mockOnClose).toHaveBeenCalled();
+    });
     unmount();
   });
 

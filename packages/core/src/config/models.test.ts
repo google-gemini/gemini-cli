@@ -28,6 +28,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   isActiveModel,
   PREVIEW_GEMINI_3_1_MODEL,
+  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   isPreviewModel,
   isProModel,
@@ -157,6 +158,12 @@ describe('getDisplayString', () => {
   it('should return PREVIEW_GEMINI_3_1_MODEL for PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL', () => {
     expect(getDisplayString(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL)).toBe(
       PREVIEW_GEMINI_3_1_MODEL,
+    );
+  });
+
+  it('should return PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL for PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL', () => {
+    expect(getDisplayString(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL)).toBe(
+      PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
     );
   });
 
@@ -354,6 +361,7 @@ describe('isActiveModel', () => {
     expect(isActiveModel(DEFAULT_GEMINI_MODEL)).toBe(true);
     expect(isActiveModel(PREVIEW_GEMINI_MODEL)).toBe(true);
     expect(isActiveModel(DEFAULT_GEMINI_FLASH_MODEL)).toBe(true);
+    expect(isActiveModel(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL)).toBe(true);
   });
 
   it('should return true for unknown models and aliases', () => {
@@ -367,6 +375,7 @@ describe('isActiveModel', () => {
 
   it('should return true for other valid models when useGemini3_1 is true', () => {
     expect(isActiveModel(DEFAULT_GEMINI_MODEL, true)).toBe(true);
+    expect(isActiveModel(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL, true)).toBe(true);
   });
 
   it('should correctly filter Gemini 3.1 models based on useCustomToolModel when useGemini3_1 is true', () => {
@@ -402,6 +411,7 @@ describe('isValidModelOrAlias', () => {
     expect(isValidModelOrAlias(DEFAULT_GEMINI_FLASH_MODEL)).toBe(true);
     expect(isValidModelOrAlias(DEFAULT_GEMINI_FLASH_LITE_MODEL)).toBe(true);
     expect(isValidModelOrAlias(PREVIEW_GEMINI_FLASH_MODEL)).toBe(true);
+    expect(isValidModelOrAlias(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL)).toBe(true);
     expect(isValidModelOrAlias(PREVIEW_GEMINI_3_1_MODEL)).toBe(true);
     expect(isValidModelOrAlias(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL)).toBe(
       true,

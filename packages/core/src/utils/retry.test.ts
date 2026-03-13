@@ -257,6 +257,7 @@ describe('retryWithBackoff', () => {
       maxAttempts: 4,
       initialDelayMs: 100,
       maxDelayMs: 250, // Max delay is less than 100 * 2 * 2 = 400
+      exponentialBackoffFactor: 2,
     });
 
     await vi.advanceTimersByTimeAsync(1000); // Advance well past all delays
@@ -759,8 +760,8 @@ describe('retryWithBackoff', () => {
       ).rejects.toThrow(TerminalQuotaError);
 
       // Verify failures
-      expect(mockService.markTerminal).not.toHaveBeenCalled();
-      expect(mockService.markTerminal).not.toHaveBeenCalled();
+      expect(mockService.markTerminal).toHaveBeenCalledWith('model-1', 'quota');
+      expect(mockService.markTerminal).toHaveBeenCalledWith('model-2', 'quota');
 
       // Verify sequences
     });
@@ -791,8 +792,8 @@ describe('retryWithBackoff', () => {
       expect(result).toBe(transientError);
 
       expect(fn).toHaveBeenCalledTimes(3);
-      expect(mockService.markRetryOncePerTurn).not.toHaveBeenCalled();
-      expect(mockService.markRetryOncePerTurn).not.toHaveBeenCalled();
+      expect(mockService.markRetryOncePerTurn).toHaveBeenCalledTimes(1);
+      expect(mockService.markRetryOncePerTurn).toHaveBeenCalledWith('model-1');
       expect(mockService.markTerminal).not.toHaveBeenCalled();
     });
 
@@ -830,7 +831,7 @@ describe('retryWithBackoff', () => {
         maxAttempts: 1,
         getAvailabilityContext: getContext,
       }).catch(() => {});
-      expect(mockService.markTerminal).not.toHaveBeenCalled();
+      expect(mockService.markTerminal).toHaveBeenCalledWith('model-1', 'quota');
     });
   });
 });

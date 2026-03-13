@@ -15,6 +15,9 @@ import {
   EDIT_TOOL_NAME,
   WEB_FETCH_TOOL_NAME,
   ASK_USER_TOOL_NAME,
+  DEFAULT_GEMINI_FLASH_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  UserTierId,
   type ExtensionLoader,
   debugLogger,
   ApprovalMode,
@@ -684,6 +687,38 @@ describe('loadCliConfig', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
+  });
+
+  describe('Model default', () => {
+    it('should default to Flash model for free tier users', async () => {
+      process.argv = ['node', 'script.js'];
+      const settings = createTestMergedSettings({
+        userTier: { id: UserTierId.FREE, name: 'Free' },
+      });
+      const argv = await parseArguments(settings);
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getModel()).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+    });
+
+    it('should default to Auto model for other users', async () => {
+      process.argv = ['node', 'script.js'];
+      const settings = createTestMergedSettings({
+        userTier: { id: UserTierId.PRO, name: 'Pro' },
+      });
+      const argv = await parseArguments(settings);
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getModel()).toBe(PREVIEW_GEMINI_MODEL_AUTO);
+    });
+
+    it('should use specified model even for free tier users', async () => {
+      process.argv = ['node', 'script.js', '--model', 'gemini-2.5-pro'];
+      const settings = createTestMergedSettings({
+        userTier: { id: UserTierId.FREE, name: 'Free' },
+      });
+      const argv = await parseArguments(settings);
+      const config = await loadCliConfig(settings, 'test-session', argv);
+      expect(config.getModel()).toBe('gemini-2.5-pro');
+    });
   });
 
   describe('Proxy configuration', () => {

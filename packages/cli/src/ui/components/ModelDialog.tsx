@@ -11,6 +11,7 @@ import {
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
+  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
@@ -21,6 +22,8 @@ import {
   getDisplayString,
   AuthType,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  UserTierId,
+  isProModel,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
@@ -35,7 +38,9 @@ interface ModelDialogProps {
 export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const config = useContext(ConfigContext);
   const settings = useSettings();
-  const [view, setView] = useState<'main' | 'manual'>('main');
+  const [view, setView] = useState<'main' | 'manual'>(() =>
+    config?.getUserTier() === UserTierId.FREE ? 'manual' : 'main',
+  );
   const [persistMode, setPersistMode] = useState(false);
 
   // Determine the Preferred Model (read once when the dialog opens).
@@ -66,7 +71,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   useKeypress(
     (key) => {
       if (key.name === 'escape') {
-        if (view === 'manual') {
+        if (view === 'manual' && config?.getUserTier() !== UserTierId.FREE) {
           setView('main');
         } else {
           onClose();
@@ -115,6 +120,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   }, [shouldShowPreviewModels, manualModelSelected, useGemini31]);
 
   const manualOptions = useMemo(() => {
+    const isFreeTier = config?.getUserTier() === UserTierId.FREE;
     const list = [
       {
         value: DEFAULT_GEMINI_MODEL,
@@ -153,10 +159,21 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
           title: getDisplayString(PREVIEW_GEMINI_FLASH_MODEL),
           key: PREVIEW_GEMINI_FLASH_MODEL,
         },
+        {
+          value: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+          title: getDisplayString(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL),
+          key: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+        },
       );
     }
+
+    if (isFreeTier) {
+      // Filter out all Pro models for free tier
+      return list.filter((option) => !isProModel(option.value));
+    }
+
     return list;
-  }, [shouldShowPreviewModels, useGemini31, useCustomToolModel]);
+  }, [shouldShowPreviewModels, useGemini31, useCustomToolModel, config]);
 
   const options = view === 'main' ? mainOptions : manualOptions;
 

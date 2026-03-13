@@ -15,6 +15,8 @@ import { delay, createAbortError } from './delay.js';
 import { debugLogger } from './debugLogger.js';
 import { getErrorStatus, ModelNotFoundError } from './httpErrors.js';
 import type { RetryAvailabilityContext } from '../availability/modelPolicy.js';
+import { classifyFailureKind } from '../availability/errorClassification.js';
+import { applyAvailabilityTransition } from '../availability/policyHelpers.js';
 
 export type { RetryAvailabilityContext };
 export const DEFAULT_MAX_ATTEMPTS = 10;
@@ -37,13 +39,15 @@ export interface RetryOptions {
   signal?: AbortSignal;
   getAvailabilityContext?: () => RetryAvailabilityContext | undefined;
   onRetry?: (attempt: number, error: unknown, delayMs: number) => void;
+  exponentialBackoffFactor: number;
 }
 
 const DEFAULT_RETRY_OPTIONS: RetryOptions = {
   maxAttempts: DEFAULT_MAX_ATTEMPTS,
   initialDelayMs: 5000,
-  maxDelayMs: 30000, // 30 seconds
+  maxDelayMs: 60000, // 60 seconds
   shouldRetryOnError: isRetryableError,
+  exponentialBackoffFactor: 3,
 };
 
 const RETRYABLE_NETWORK_CODES = [
@@ -224,6 +228,7 @@ export async function retryWithBackoff<T>(
     signal,
     getAvailabilityContext,
     onRetry,
+    exponentialBackoffFactor,
   } = {
     ...DEFAULT_RETRY_OPTIONS,
     shouldRetryOnError: isRetryableError,
@@ -252,7 +257,10 @@ export async function retryWithBackoff<T>(
           onRetry(attempt, new Error('Invalid content'), delayWithJitter);
         }
         await delay(delayWithJitter, signal);
-        currentDelay = Math.min(maxDelayMs, currentDelay * 2);
+        currentDelay = Math.min(
+          maxDelayMs,
+          currentDelay * exponentialBackoffFactor,
+        );
         continue;
       }
 
@@ -275,6 +283,9 @@ export async function retryWithBackoff<T>(
         classifiedError instanceof TerminalQuotaError ||
         classifiedError instanceof ModelNotFoundError
       ) {
+        const failureKind = classifyFailureKind(classifiedError);
+        applyAvailabilityTransition(getAvailabilityContext, failureKind);
+
         if (onPersistent429) {
           try {
             const fallbackModel = await onPersistent429(
@@ -290,7 +301,6 @@ export async function retryWithBackoff<T>(
             debugLogger.warn('Fallback to Flash model failed:', fallbackError);
           }
         }
-        // Terminal/not_found already recorded; nothing else to mark here.
         throw classifiedError; // Throw if no fallback or fallback failed.
       }
 
@@ -324,6 +334,10 @@ export async function retryWithBackoff<T>(
           debugLogger.warn(
             `Attempt ${attempt} failed${errorMessage ? `: ${errorMessage}` : ''}. Max attempts reached`,
           );
+
+          const failureKind = classifyFailureKind(classifiedError);
+          applyAvailabilityTransition(getAvailabilityContext, failureKind);
+
           if (onPersistent429) {
             try {
               const fallbackModel = await onPersistent429(
@@ -359,7 +373,10 @@ export async function retryWithBackoff<T>(
             onRetry(attempt, error, delayWithJitter);
           }
           await delay(delayWithJitter, signal);
-          currentDelay = Math.min(maxDelayMs, currentDelay * 2);
+          currentDelay = Math.min(
+            maxDelayMs,
+            currentDelay * exponentialBackoffFactor,
+          );
           continue;
         } else {
           const errorStatus = getErrorStatus(error);
@@ -372,7 +389,10 @@ export async function retryWithBackoff<T>(
             onRetry(attempt, error, delayWithJitter);
           }
           await delay(delayWithJitter, signal);
-          currentDelay = Math.min(maxDelayMs, currentDelay * 2);
+          currentDelay = Math.min(
+            maxDelayMs,
+            currentDelay * exponentialBackoffFactor,
+          );
           continue;
         }
       }
@@ -383,6 +403,8 @@ export async function retryWithBackoff<T>(
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         !shouldRetryOnError(error as Error, retryFetchErrors)
       ) {
+        const failureKind = classifyFailureKind(classifiedError);
+        applyAvailabilityTransition(getAvailabilityContext, failureKind);
         throw error;
       }
 
@@ -396,7 +418,10 @@ export async function retryWithBackoff<T>(
         onRetry(attempt, error, delayWithJitter);
       }
       await delay(delayWithJitter, signal);
-      currentDelay = Math.min(maxDelayMs, currentDelay * 2);
+      currentDelay = Math.min(
+        maxDelayMs,
+        currentDelay * exponentialBackoffFactor,
+      );
     }
   }
 
