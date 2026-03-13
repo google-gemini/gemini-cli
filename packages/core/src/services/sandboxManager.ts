@@ -21,6 +21,8 @@ export interface SandboxRequest {
   cwd: string;
   /** Environment variables to be passed to the program. */
   env: NodeJS.ProcessEnv;
+  /** Force network access off for this command. */
+  forceNetworkOff?: boolean;
   /** Optional sandbox-specific configuration. */
   config?: {
     sanitizationConfig?: Partial<EnvironmentSanitizationConfig>;

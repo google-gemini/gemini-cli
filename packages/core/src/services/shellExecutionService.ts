@@ -31,7 +31,8 @@ import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
-import { NoopSandboxManager } from './sandboxManager.js';
+import { NoopSandboxManager, type SandboxManager } from './sandboxManager.js';
+import { BwrapSandboxManager } from './bwrapSandboxManager.js';
 import { killProcessGroup } from '../utils/process-utils.js';
 import {
   ExecutionLifecycleService,
@@ -94,6 +95,7 @@ export interface ShellExecutionConfig {
   disableDynamicLineTrimming?: boolean;
   scrollback?: number;
   maxSerializedLines?: number;
+  argsPrefix?: string[];
 }
 
 /**
@@ -274,12 +276,21 @@ export class ShellExecutionService {
     shouldUseNodePty: boolean,
     shellExecutionConfig: ShellExecutionConfig,
   ): Promise<ShellExecutionHandle> {
-    const sandboxManager = new NoopSandboxManager();
-    const { env: sanitizedEnv } = await sandboxManager.prepareCommand({
+    const isBwrapSandbox = process.env['SANDBOX'] === 'bwrap';
+    const sandboxManager: SandboxManager = isBwrapSandbox
+      ? new BwrapSandboxManager()
+      : new NoopSandboxManager();
+
+    const {
+      program: sandboxedProgram,
+      args: sandboxedArgs,
+      env: sanitizedEnv,
+    } = await sandboxManager.prepareCommand({
       command: commandToExecute,
       args: [],
       env: process.env,
       cwd,
+      forceNetworkOff: isBwrapSandbox, // Force network off for tools in bwrap
       config: shellExecutionConfig,
     });
 
@@ -288,11 +299,15 @@ export class ShellExecutionService {
       if (ptyInfo) {
         try {
           return await this.executeWithPty(
-            commandToExecute,
+            sandboxedProgram,
             cwd,
             onOutputEvent,
             abortSignal,
-            shellExecutionConfig,
+            {
+              ...shellExecutionConfig,
+              // When using bwrap as a wrapper, we need to pass the arguments
+              argsPrefix: sandboxedArgs,
+            },
             ptyInfo,
             sanitizedEnv,
           );
@@ -303,12 +318,13 @@ export class ShellExecutionService {
     }
 
     return this.childProcessFallback(
-      commandToExecute,
+      sandboxedProgram,
       cwd,
       onOutputEvent,
       abortSignal,
       shellExecutionConfig.sanitizationConfig,
       shouldUseNodePty,
+      sandboxedArgs, // Pass sandboxed args to fallback
     );
   }
 
@@ -349,12 +365,21 @@ export class ShellExecutionService {
     abortSignal: AbortSignal,
     sanitizationConfig: EnvironmentSanitizationConfig,
     isInteractive: boolean,
+    argsPrefix?: string[],
   ): ShellExecutionHandle {
     try {
       const isWindows = os.platform() === 'win32';
-      const { executable, argsPrefix, shell } = getShellConfiguration();
+      const {
+        executable: shellExecutable,
+        argsPrefix: shellArgsPrefix,
+        shell,
+      } = getShellConfiguration();
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-      const spawnArgs = [...argsPrefix, guardedCommand];
+
+      const executable = argsPrefix ? commandToExecute : shellExecutable;
+      const spawnArgs = argsPrefix
+        ? argsPrefix
+        : [...shellArgsPrefix, guardedCommand];
 
       // Specifically allow GIT_CONFIG_* variables to pass through sanitization
       // in non-interactive mode so we can safely append our overrides.
@@ -693,7 +718,15 @@ export class ShellExecutionService {
     try {
       const cols = shellExecutionConfig.terminalWidth ?? 80;
       const rows = shellExecutionConfig.terminalHeight ?? 30;
-      const { executable, argsPrefix, shell } = getShellConfiguration();
+      const {
+        executable: shellExecutable,
+        argsPrefix: shellArgsPrefix,
+        shell,
+      } = getShellConfiguration();
+
+      const executable = shellExecutionConfig.argsPrefix
+        ? commandToExecute
+        : shellExecutable;
 
       const resolvedExecutable = await resolveExecutable(executable);
       if (!resolvedExecutable) {
@@ -703,7 +736,9 @@ export class ShellExecutionService {
       }
 
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
-      const args = [...argsPrefix, guardedCommand];
+      const args = shellExecutionConfig.argsPrefix
+        ? shellExecutionConfig.argsPrefix
+        : [...shellArgsPrefix, guardedCommand];
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const ptyProcess = ptyInfo.module.spawn(executable, args, {
