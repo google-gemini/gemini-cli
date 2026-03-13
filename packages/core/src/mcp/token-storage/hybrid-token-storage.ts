@@ -5,7 +5,7 @@
  */
 
 import { BaseTokenStorage } from './base-token-storage.js';
-import { FileTokenStorage } from './file-token-storage.js';
+import { KeychainTokenStorage } from './keychain-token-storage.js';
 import {
   TokenStorageType,
   type TokenStorage,
@@ -13,8 +13,7 @@ import {
 } from './types.js';
 import { coreEvents } from '../../utils/events.js';
 import { TokenStorageInitializationEvent } from '../../telemetry/types.js';
-
-const FORCE_FILE_STORAGE_ENV_VAR = 'GEMINI_FORCE_FILE_STORAGE';
+import { FORCE_FILE_STORAGE_ENV_VAR } from '../../services/keychainService.js';
 
 export class HybridTokenStorage extends BaseTokenStorage {
   private storage: TokenStorage | null = null;
@@ -28,34 +27,21 @@ export class HybridTokenStorage extends BaseTokenStorage {
   private async initializeStorage(): Promise<TokenStorage> {
     const forceFileStorage = process.env[FORCE_FILE_STORAGE_ENV_VAR] === 'true';
 
-    if (!forceFileStorage) {
-      try {
-        const { KeychainTokenStorage } = await import(
-          './keychain-token-storage.js'
-        );
-        const keychainStorage = new KeychainTokenStorage(this.serviceName);
+    this.storage = new KeychainTokenStorage(this.serviceName);
 
-        const isAvailable = await keychainStorage.isAvailable();
-        if (isAvailable) {
-          this.storage = keychainStorage;
-          this.storageType = TokenStorageType.KEYCHAIN;
+    // We emit telemetry based on whether it is forced to use file storage or not.
+    // The actual determination of what backend KeychainTokenStorage uses is handled inside KeychainService.
+    const isFileStorageForced = forceFileStorage;
 
-          coreEvents.emitTelemetryTokenStorageType(
-            new TokenStorageInitializationEvent('keychain', forceFileStorage),
-          );
-
-          return this.storage;
-        }
-      } catch (_e) {
-        // Fallback to file storage if keychain fails to initialize
-      }
-    }
-
-    this.storage = new FileTokenStorage(this.serviceName);
-    this.storageType = TokenStorageType.ENCRYPTED_FILE;
+    this.storageType = isFileStorageForced
+      ? TokenStorageType.ENCRYPTED_FILE
+      : TokenStorageType.KEYCHAIN;
 
     coreEvents.emitTelemetryTokenStorageType(
-      new TokenStorageInitializationEvent('encrypted_file', forceFileStorage),
+      new TokenStorageInitializationEvent(
+        isFileStorageForced ? 'encrypted_file' : 'keychain',
+        isFileStorageForced,
+      ),
     );
 
     return this.storage;
