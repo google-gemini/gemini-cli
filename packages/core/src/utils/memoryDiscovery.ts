@@ -467,9 +467,11 @@ export async function getGlobalMemoryPaths(): Promise<string[]> {
     }
   });
 
-  return (await Promise.all(accessChecks)).filter(
-    (p): p is string => p !== null,
-  );
+  return (
+    await deduplicatePathsByFileIdentity(
+      (await Promise.all(accessChecks)).filter((p): p is string => p !== null),
+    )
+  ).paths;
 }
 
 export function getExtensionMemoryPaths(
@@ -503,7 +505,8 @@ export async function getEnvironmentMemoryPaths(
   const pathArrays = await Promise.all(traversalPromises);
   pathArrays.flat().forEach((p) => allPaths.add(p));
 
-  return Array.from(allPaths).sort();
+  return (await deduplicatePathsByFileIdentity(Array.from(allPaths).sort()))
+    .paths;
 }
 
 export function categorizeAndConcatenate(
@@ -658,6 +661,16 @@ export async function loadServerHierarchicalMemory(
   const { paths: allFilePaths } = await deduplicatePathsByFileIdentity(
     allFilePathsStringDeduped,
   );
+  const allFilePathSet = new Set(allFilePaths);
+  const globalDeduped = discoveryResult.global.filter((filePath) =>
+    allFilePathSet.has(filePath),
+  );
+  const projectDeduped = discoveryResult.project.filter((filePath) =>
+    allFilePathSet.has(filePath),
+  );
+  const extensionDeduped = extensionPaths.filter((filePath) =>
+    allFilePathSet.has(filePath),
+  );
 
   if (allFilePaths.length === 0) {
     debugLogger.debug(
@@ -677,9 +690,9 @@ export async function loadServerHierarchicalMemory(
   // 3. CATEGORIZE: Back into Global, Project, Extension
   const hierarchicalMemory = categorizeAndConcatenate(
     {
-      global: discoveryResult.global,
-      extension: extensionPaths,
-      project: discoveryResult.project,
+      global: globalDeduped,
+      extension: extensionDeduped,
+      project: projectDeduped,
     },
     contentsMap,
     currentWorkingDirectory,

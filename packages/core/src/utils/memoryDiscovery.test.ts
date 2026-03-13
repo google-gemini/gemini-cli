@@ -176,6 +176,37 @@ describe('memoryDiscovery', () => {
     });
   });
 
+  describe('deduplicateRealPaths', () => {
+    it('should deduplicate GEMINI.md and gemini.md variants if they resolve to the same real file', async () => {
+      // Configure the test to search for both case variants.
+      setGeminiMdFilename(['GEMINI.md', 'gemini.md']);
+
+      // On a case-insensitive file system, creating 'GEMINI.md' means that
+      // fs.access for 'gemini.md' will also succeed. The discovery logic will
+      // find both paths, and `deduplicateRealPaths` should handle it.
+      const filePath = await createTestFile(
+        path.join(cwd, DEFAULT_CONTEXT_FILENAME), // Creates GEMINI.md
+        'Real file memory',
+      );
+
+      const result = flattenResult(
+        await loadServerHierarchicalMemory(
+          cwd,
+          [],
+          new FileDiscoveryService(projectRoot),
+          new SimpleExtensionLoader([]),
+          DEFAULT_FOLDER_TRUST,
+        ),
+      );
+
+      // Even though discovery may find two paths on some filesystems, the deduplication
+      // should ensure we only load the file once.
+      expect(result.fileCount).toEqual(1);
+      // The result should contain the path that was physically created.
+      expect(result.filePaths).toEqual([filePath]);
+    });
+  });
+
   it('should return empty memory and count if no context files are found', async () => {
     const result = flattenResult(
       await loadServerHierarchicalMemory(
