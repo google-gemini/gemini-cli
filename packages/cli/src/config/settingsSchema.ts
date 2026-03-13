@@ -18,6 +18,7 @@ import {
   type AuthType,
   type AgentOverride,
   type CustomTheme,
+  type SandboxConfig,
 } from '@google/gemini-cli-core';
 import type { SessionRetentionSettings } from './settings.js';
 import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
@@ -537,6 +538,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description: 'Hide helpful tips in the UI',
+        showInDialog: true,
+      },
+      escapePastedAtSymbols: {
+        type: 'boolean',
+        label: 'Escape Pasted @ Symbols',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'When enabled, @ symbols in pasted text are escaped to prevent unintended @path expansion.',
         showInDialog: true,
       },
       showShortcutsHint: {
@@ -1106,6 +1117,16 @@ const SETTINGS_SCHEMA = {
             description: 'Model override for the visual agent.',
             showInDialog: false,
           },
+          disableUserInput: {
+            type: 'boolean',
+            label: 'Disable User Input',
+            category: 'Advanced',
+            requiresRestart: false,
+            default: true,
+            description:
+              'Disable user input on browser window during automation.',
+            showInDialog: false,
+          },
         },
       },
     },
@@ -1263,8 +1284,8 @@ const SETTINGS_SCHEMA = {
         label: 'Sandbox',
         category: 'Tools',
         requiresRestart: true,
-        default: undefined as boolean | string | undefined,
-        ref: 'BooleanOrString',
+        default: undefined as boolean | string | SandboxConfig | undefined,
+        ref: 'BooleanOrStringOrObject',
         description: oneLine`
           Sandbox execution environment.
           Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile,
@@ -2618,9 +2639,44 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
     description: 'Accepts either a single string or an array of strings.',
     anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
   },
-  BooleanOrString: {
-    description: 'Accepts either a boolean flag or a string command name.',
-    anyOf: [{ type: 'boolean' }, { type: 'string' }],
+  BooleanOrStringOrObject: {
+    description:
+      'Accepts either a boolean flag, a string command name, or a configuration object.',
+    anyOf: [
+      { type: 'boolean' },
+      { type: 'string' },
+      {
+        type: 'object',
+        description: 'Sandbox configuration object.',
+        additionalProperties: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            description: 'Enables or disables the sandbox.',
+          },
+          command: {
+            type: 'string',
+            description:
+              'The sandbox command to use (docker, podman, sandbox-exec, runsc, lxc).',
+            enum: ['docker', 'podman', 'sandbox-exec', 'runsc', 'lxc'],
+          },
+          image: {
+            type: 'string',
+            description: 'The sandbox image to use.',
+          },
+          allowedPaths: {
+            type: 'array',
+            description:
+              'A list of absolute host paths that should be accessible within the sandbox.',
+            items: { type: 'string' },
+          },
+          networkAccess: {
+            type: 'boolean',
+            description: 'Whether the sandbox should have internet access.',
+          },
+        },
+      },
+    ],
   },
   HookDefinitionArray: {
     type: 'array',

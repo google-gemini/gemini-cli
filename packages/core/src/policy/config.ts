@@ -124,7 +124,9 @@ export function getPolicyDirectories(
     ...(adminPolicyPaths ?? []),
 
     // User tier (second highest priority)
-    ...(policyPaths ?? [Storage.getUserPoliciesDir()]),
+    ...(policyPaths && policyPaths.length > 0
+      ? policyPaths
+      : [Storage.getUserPoliciesDir()]),
 
     // Workspace Tier (third highest)
     workspacePoliciesDir,
@@ -667,10 +669,13 @@ export function createPolicyUpdater(
 
             if (message.mcpName) {
               newRule.mcpName = message.mcpName;
-              // Extract simple tool name
-              newRule.toolName = toolName.startsWith(`${message.mcpName}__`)
-                ? toolName.slice(message.mcpName.length + 2)
-                : toolName;
+
+              const expectedPrefix = `${MCP_TOOL_PREFIX}${message.mcpName}_`;
+              if (toolName.startsWith(expectedPrefix)) {
+                newRule.toolName = toolName.slice(expectedPrefix.length);
+              } else {
+                newRule.toolName = toolName;
+              }
             } else {
               newRule.toolName = toolName;
             }

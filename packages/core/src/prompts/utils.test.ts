@@ -11,6 +11,7 @@ import {
   applySubstitutions,
 } from './utils.js';
 import type { Config } from '../config/config.js';
+import type { ToolRegistry } from '../tools/tool-registry.js';
 
 vi.mock('../utils/paths.js', () => ({
   homedir: vi.fn().mockReturnValue('/mock/home'),
@@ -208,6 +209,13 @@ describe('applySubstitutions', () => {
 
   beforeEach(() => {
     mockConfig = {
+      get config() {
+        return this;
+      },
+      toolRegistry: {
+        getAllToolNames: vi.fn().mockReturnValue([]),
+        getAllTools: vi.fn().mockReturnValue([]),
+      },
       getAgentRegistry: vi.fn().mockReturnValue({
         getAllDefinitions: vi.fn().mockReturnValue([]),
       }),
@@ -256,10 +264,10 @@ describe('applySubstitutions', () => {
   });
 
   it('should replace ${AvailableTools} with tool names list', () => {
-    vi.mocked(mockConfig.getToolRegistry).mockReturnValue({
+    (mockConfig as unknown as { toolRegistry: ToolRegistry }).toolRegistry = {
       getAllToolNames: vi.fn().mockReturnValue(['read_file', 'write_file']),
       getAllTools: vi.fn().mockReturnValue([]),
-    } as unknown as ReturnType<Config['getToolRegistry']>);
+    } as unknown as ToolRegistry;
 
     const result = applySubstitutions(
       'Tools: ${AvailableTools}',
@@ -280,10 +288,10 @@ describe('applySubstitutions', () => {
   });
 
   it('should replace tool-specific ${toolName_ToolName} variables', () => {
-    vi.mocked(mockConfig.getToolRegistry).mockReturnValue({
+    (mockConfig as unknown as { toolRegistry: ToolRegistry }).toolRegistry = {
       getAllToolNames: vi.fn().mockReturnValue(['read_file']),
       getAllTools: vi.fn().mockReturnValue([]),
-    } as unknown as ReturnType<Config['getToolRegistry']>);
+    } as unknown as ToolRegistry;
 
     const result = applySubstitutions(
       'Use ${read_file_ToolName} to read',

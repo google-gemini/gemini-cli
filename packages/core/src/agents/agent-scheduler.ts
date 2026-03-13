@@ -19,6 +19,8 @@ import type { EditorType } from '../utils/editor.js';
 export interface AgentSchedulingOptions {
   /** The unique ID for this agent's scheduler. */
   schedulerId: string;
+  /** The name of the subagent. */
+  subagent?: string;
   /** The ID of the tool call that invoked this agent. */
   parentCallId?: string;
   /** The tool registry specific to this agent. */
@@ -46,6 +48,7 @@ export async function scheduleAgentTools(
 ): Promise<CompletedToolCall[]> {
   const {
     schedulerId,
+    subagent,
     parentCallId,
     toolRegistry,
     signal,
@@ -57,7 +60,7 @@ export async function scheduleAgentTools(
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const agentConfig: Config = Object.create(config);
   agentConfig.getToolRegistry = () => toolRegistry;
-  agentConfig.getMessageBus = () => toolRegistry.getMessageBus();
+  agentConfig.getMessageBus = () => toolRegistry.messageBus;
   // Override toolRegistry property so AgentLoopContext reads the agent-specific registry.
   Object.defineProperty(agentConfig, 'toolRegistry', {
     get: () => toolRegistry,
@@ -66,9 +69,10 @@ export async function scheduleAgentTools(
 
   const scheduler = new Scheduler({
     context: agentConfig,
-    messageBus: toolRegistry.getMessageBus(),
+    messageBus: toolRegistry.messageBus,
     getPreferredEditor: getPreferredEditor ?? (() => undefined),
     schedulerId,
+    subagent,
     parentCallId,
     onWaitingForConfirmation,
   });
