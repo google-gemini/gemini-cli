@@ -51,6 +51,13 @@ export function unescapeLiteralAt(text: string): string {
 }
 
 /**
+ * Regex source for the negative lookbehind prefix of an @ command.
+ * It prevents matching @ if it's part of an email address or escaped with a backslash.
+ */
+export const AT_COMMAND_NEGATIVE_LOOKBEHIND_PREFIX_SOURCE =
+  '[a-zA-Z0-9._%+-]|\\\\\\\\';
+
+/**
  * Regex source for the path/command part of an @ reference.
  * It uses strict ASCII whitespace delimiters to allow Unicode characters like NNBSP in filenames.
  *
@@ -94,8 +101,10 @@ function parseAllAtCommands(
   let lastIndex = 0;
 
   // Create a new RegExp instance for each call to avoid shared state/lastIndex issues.
+  // We use a negative lookbehind to ensure @ is not part of an email address
+  // and is not preceded by a backslash (escaping).
   const atCommandRegex = new RegExp(
-    `(?<!\\\\)@${AT_COMMAND_PATH_REGEX_SOURCE}`,
+    `(?<!${AT_COMMAND_NEGATIVE_LOOKBEHIND_PREFIX_SOURCE})@${AT_COMMAND_PATH_REGEX_SOURCE}`,
     'g',
   );
 
