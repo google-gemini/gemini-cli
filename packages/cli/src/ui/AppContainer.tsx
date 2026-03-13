@@ -166,6 +166,10 @@ import { parseSlashCommand } from '../utils/commands.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useTimedMessage } from './hooks/useTimedMessage.js';
 import { useIsHelpDismissKey } from './utils/shortcutsHelp.js';
+import {
+  getContextUsagePercentage,
+  TOKEN_BUDGET_WARNING_THRESHOLD,
+} from './utils/contextUsage.js';
 import { useSuspend } from './hooks/useSuspend.js';
 import { useRunEventNotifications } from './hooks/useRunEventNotifications.js';
 import { isNotificationsEnabled } from '../utils/terminalNotifications.js';
@@ -303,6 +307,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const [defaultBannerText, setDefaultBannerText] = useState('');
   const [warningBannerText, setWarningBannerText] = useState('');
   const [bannerVisible, setBannerVisible] = useState(true);
+  const [hasWarnedTokenBudget, setHasWarnedTokenBudget] = useState(false);
 
   const bannerData = useMemo(
     () => ({
@@ -415,6 +420,34 @@ export const AppContainer = (props: AppContainerProps) => {
   // Additional hooks moved from App.tsx
   const { stats: sessionStats } = useSessionStats();
   const branchName = useGitBranchName(config.getTargetDir());
+
+  useEffect(() => {
+    const usagePercentage = getContextUsagePercentage(
+      sessionStats.lastPromptTokenCount,
+      typeof currentModel === 'string' ? currentModel : undefined,
+    );
+
+    if (usagePercentage >= TOKEN_BUDGET_WARNING_THRESHOLD) {
+      if (!hasWarnedTokenBudget) {
+        setWarningBannerText(
+          'Token budget exceeds 80%. Context will be truncated soon.',
+        );
+        setBannerVisible(true);
+        setHasWarnedTokenBudget(true); // Only warn once per crossing
+      }
+    } else {
+      // If it drops back below, reset so we can warn again if it climbs
+      if (hasWarnedTokenBudget) {
+        setHasWarnedTokenBudget(false);
+      }
+    }
+  }, [
+    sessionStats.lastPromptTokenCount,
+    currentModel,
+    hasWarnedTokenBudget,
+    setWarningBannerText,
+    setBannerVisible,
+  ]);
 
   // Layout measurements
   const mainControlsRef = useRef<DOMElement>(null);
