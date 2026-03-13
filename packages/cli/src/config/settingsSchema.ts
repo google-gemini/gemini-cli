@@ -1265,6 +1265,18 @@ const SETTINGS_SCHEMA = {
             items: { type: 'string' },
             mergeStrategy: MergeStrategy.UNION,
           },
+          excludePatterns: {
+            type: 'array',
+            label: 'Custom Exclude Patterns',
+            category: 'Context',
+            requiresRestart: true,
+            default: [] as string[],
+            description:
+              'Additional file patterns to exclude from all operations (e.g. ["**/logs/**", "**/temp/**"]). Patterns follow glob syntax.',
+            showInDialog: true,
+            items: { type: 'string' },
+            mergeStrategy: MergeStrategy.UNION,
+          },
         },
       },
     },

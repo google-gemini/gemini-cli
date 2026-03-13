@@ -474,6 +474,7 @@ export async function loadCliConfig(
   const fileFiltering = {
     ...DEFAULT_FILE_FILTERING_OPTIONS,
     ...settings.context?.fileFiltering,
+    excludePatterns: settings.context?.fileFiltering?.excludePatterns || [],
   };
 
   const includeDirectories = (settings.context?.includeDirectories || [])
