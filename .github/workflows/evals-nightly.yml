@@ -23,10 +23,12 @@ jobs:
   evals:
     name: 'Evals (USUALLY_PASSING) nightly run'
     runs-on: 'gemini-cli-ubuntu-16-core'
+    if: "github.repository == 'google-gemini/gemini-cli'"
     strategy:
       fail-fast: false
       matrix:
         model:
+          - 'gemini-3.1-pro-preview-customtools'
           - 'gemini-3-pro-preview'
           - 'gemini-3-flash-preview'
           - 'gemini-2.5-pro'
@@ -61,7 +63,7 @@ jobs:
           TEST_NAME_PATTERN: '${{ github.event.inputs.test_name_pattern }}'
         run: |
           CMD="npm run test:all_evals"
-          PATTERN="${{ env.TEST_NAME_PATTERN }}"
+          PATTERN="${TEST_NAME_PATTERN}"
 
           if [[ -n "$PATTERN" ]]; then
             if [[ "$PATTERN" == *.ts || "$PATTERN" == *.js || "$PATTERN" == */* ]]; then
@@ -84,7 +86,7 @@ jobs:
   aggregate-results:
     name: 'Aggregate Results'
     needs: ['evals']
-    if: 'always()'
+    if: "github.repository == 'google-gemini/gemini-cli' && always()"
     runs-on: 'gemini-cli-ubuntu-16-core'
     steps:
       - name: 'Checkout'

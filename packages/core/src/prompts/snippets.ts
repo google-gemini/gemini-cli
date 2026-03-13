@@ -17,6 +17,19 @@ import {
   SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
+  GREP_PARAM_TOTAL_MAX_MATCHES,
+  GREP_PARAM_INCLUDE_PATTERN,
+  GREP_PARAM_EXCLUDE_PATTERN,
+  GREP_PARAM_CONTEXT,
+  GREP_PARAM_BEFORE,
+  GREP_PARAM_AFTER,
+  READ_FILE_PARAM_START_LINE,
+  READ_FILE_PARAM_END_LINE,
+  SHELL_PARAM_IS_BACKGROUND,
+  EDIT_PARAM_OLD_STRING,
+  TRACKER_CREATE_TASK_TOOL_NAME,
+  TRACKER_LIST_TASKS_TOOL_NAME,
+  TRACKER_UPDATE_TASK_TOOL_NAME,
 } from '../tools/tool-names.js';
 import type { HierarchicalMemory } from '../config/memory.js';
 import { DEFAULT_CONTEXT_FILENAME } from '../tools/memoryTool.js';
@@ -31,6 +44,7 @@ export interface SystemPromptOptions {
   hookContext?: boolean;
   primaryWorkflows?: PrimaryWorkflowsOptions;
   planningWorkflow?: PlanningWorkflowOptions;
+  taskTracker?: boolean;
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
   interactiveYoloMode?: boolean;
@@ -56,6 +70,7 @@ export interface PrimaryWorkflowsOptions {
   enableGrep: boolean;
   enableGlob: boolean;
   approvedPlan?: { path: string };
+  taskTracker?: boolean;
 }
 
 export interface OperationalGuidelinesOptions {
@@ -73,6 +88,7 @@ export interface PlanningWorkflowOptions {
   planModeToolsList: string;
   plansDir: string;
   approvedPlanPath?: string;
+  taskTracker?: boolean;
 }
 
 export interface AgentSkillOptions {
@@ -109,6 +125,8 @@ ${
     ? renderPlanningWorkflow(options.planningWorkflow)
     : renderPrimaryWorkflows(options.primaryWorkflows)
 }
+
+${options.taskTracker ? renderTaskTracker() : ''}
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
 
@@ -183,16 +201,16 @@ Use the following guidelines to optimize your search and read patterns.
 - Prefer using tools like ${GREP_TOOL_NAME} to identify points of interest instead of reading lots of files individually.
 - If you need to read multiple ranges in a file, do so parallel, in as few turns as possible.
 - It is more important to reduce extra turns, but please also try to minimize unnecessarily large file reads and search results, when doing so doesn't result in extra turns. Do this by always providing conservative limits and scopes to tools like ${READ_FILE_TOOL_NAME} and ${GREP_TOOL_NAME}.
-- ${READ_FILE_TOOL_NAME} fails if old_string is ambiguous, causing extra turns. Take care to read enough with ${READ_FILE_TOOL_NAME} and ${GREP_TOOL_NAME} to make the edit unambiguous.
+- ${READ_FILE_TOOL_NAME} fails if ${EDIT_PARAM_OLD_STRING} is ambiguous, causing extra turns. Take care to read enough with ${READ_FILE_TOOL_NAME} and ${GREP_TOOL_NAME} to make the edit unambiguous.
 - You can compensate for the risk of missing results with scoped or limited searches by doing multiple searches in parallel.
 - Your primary goal is still to do your best quality work. Efficiency is an important, but secondary concern.
 </guidelines>
 
 <examples>
-- **Searching:** utilize search tools like ${GREP_TOOL_NAME} and ${GLOB_TOOL_NAME} with a conservative result count (\`total_max_matches\`) and a narrow scope (\`include\` and \`exclude\` parameters).
-- **Searching and editing:** utilize search tools like ${GREP_TOOL_NAME} with a conservative result count and a narrow scope. Use \`context\`, \`before\`, and/or \`after\` to request enough context to avoid the need to read the file before editing matches.
+- **Searching:** utilize search tools like ${GREP_TOOL_NAME} and ${GLOB_TOOL_NAME} with a conservative result count (\`${GREP_PARAM_TOTAL_MAX_MATCHES}\`) and a narrow scope (\`${GREP_PARAM_INCLUDE_PATTERN}\` and \`${GREP_PARAM_EXCLUDE_PATTERN}\` parameters).
+- **Searching and editing:** utilize search tools like ${GREP_TOOL_NAME} with a conservative result count and a narrow scope. Use \`${GREP_PARAM_CONTEXT}\`, \`${GREP_PARAM_BEFORE}\`, and/or \`${GREP_PARAM_AFTER}\` to request enough context to avoid the need to read the file before editing matches.
 - **Understanding:** minimize turns needed to understand a file. It's most efficient to read small files in their entirety.
-- **Large files:** utilize search tools like ${GREP_TOOL_NAME} and/or ${READ_FILE_TOOL_NAME} called in parallel with 'start_line' and 'end_line' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
+- **Large files:** utilize search tools like ${GREP_TOOL_NAME} and/or ${READ_FILE_TOOL_NAME} called in parallel with '${READ_FILE_PARAM_START_LINE}' and '${READ_FILE_PARAM_END_LINE}' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
 
@@ -227,6 +245,20 @@ export function renderSubAgents(subAgents?: SubAgentOptions[]): string {
 # Available Sub-Agents
 
 Sub-agents are specialized expert agents. Each sub-agent is available as a tool of the same name. You MUST delegate tasks to the sub-agent with the most relevant expertise.
+
+### Strategic Orchestration & Delegation
+Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
+
+When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
+
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
+
+**High-Impact Delegation Candidates:**
+- **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
+- **High-Volume Output:** Commands or tools expected to return large amounts of data (e.g., verbose builds, exhaustive file searches).
+- **Speculative Research:** Investigations that require many "trial and error" steps before a clear path is found.
+
+**Assertive Action:** Continue to handle "surgical" tasks directly—simple reads, single-file edits, or direct questions that can be resolved in 1-2 turns. Delegation is an efficiency tool, not a way to avoid direct action when it is the fastest path.
 
 <available_subagents>
 ${subAgentsXml}
@@ -319,11 +351,12 @@ export function renderOperationalGuidelines(
 - **Handling Inability:** If unable/unwilling to fulfill a request, state so briefly without excessive justification. Offer alternatives if appropriate.
 
 ## Security and Safety Rules
-- **Explain Critical Commands:** Before executing commands with ${formatToolName(SHELL_TOOL_NAME)} that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this).
+- **Explain Critical Commands:** Before executing commands with ${formatToolName(SHELL_TOOL_NAME)} that modify the file system, codebase, or system state, you *must* provide a brief explanation of the command's purpose and potential impact. Prioritize user understanding and safety. You should not ask permission to use the tool; the user will be presented with a confirmation dialogue upon use (you do not need to tell them this). You MUST NOT use ${formatToolName(ASK_USER_TOOL_NAME)} to ask for permission to run a command.
 - **Security First:** Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.
 
 ## Tool Usage
-- **Parallelism:** Execute multiple independent tool calls in parallel when feasible (i.e. searching the codebase).
+- **Parallelism & Sequencing:** Tools execute in parallel by default. Execute multiple independent tool calls in parallel when feasible (e.g., searching, reading files, independent shell commands, or editing *different* files). If a tool depends on the output or side-effects of a previous tool in the same turn (e.g., running a shell command that depends on the success of a previous command), you MUST set the \`wait_for_previous\` parameter to \`true\` on the dependent tool to ensure sequential execution.
+- **File Editing Collisions:** Do NOT make multiple calls to the ${formatToolName(EDIT_TOOL_NAME)} tool for the SAME file in a single turn. To make multiple edits to the same file, you MUST perform them sequentially across multiple conversational turns to prevent race conditions and ensure the file state is accurate before each edit.
 - **Command Execution:** Use the ${formatToolName(SHELL_TOOL_NAME)} tool for running shell commands, remembering the safety rule to explain modifying commands first.${toolUsageInteractive(
     options.interactive,
     options.interactiveShellEnabled,
@@ -442,6 +475,24 @@ ${trimmed}
   return `\n---\n\n<loaded_context>\n${sections.join('\n')}\n</loaded_context>`;
 }
 
+export function renderTaskTracker(): string {
+  const trackerCreate = formatToolName(TRACKER_CREATE_TASK_TOOL_NAME);
+  const trackerList = formatToolName(TRACKER_LIST_TASKS_TOOL_NAME);
+  const trackerUpdate = formatToolName(TRACKER_UPDATE_TASK_TOOL_NAME);
+
+  return `
+# TASK MANAGEMENT PROTOCOL
+You are operating with a persistent file-based task tracking system located at \`.tracker/tasks/\`. You must adhere to the following rules:
+
+1.  **NO IN-MEMORY LISTS**: Do not maintain a mental list of tasks or write markdown checkboxes in the chat. Use the provided tools (${trackerCreate}, ${trackerList}, ${trackerUpdate}) for all state management.
+2.  **IMMEDIATE DECOMPOSITION**: Upon receiving a task, evaluate its functional complexity and scope. If the request involves more than a single atomic modification, or necessitates research before execution, you MUST immediately decompose it into discrete entries using ${trackerCreate}.
+3.  **IGNORE FORMATTING BIAS**: Trigger the protocol based on the **objective complexity** of the goal, regardless of whether the user provided a structured list or a single block of text/paragraph. "Paragraph-style" goals that imply multiple actions are multi-step projects and MUST be tracked.
+4.  **PLAN MODE INTEGRATION**: If an approved plan exists, you MUST use the ${trackerCreate} tool to decompose it into discrete tasks before writing any code. Maintain a bidirectional understanding between the plan document and the task graph.
+5.  **VERIFICATION**: Before marking a task as complete, verify the work is actually done (e.g., run the test, check the file existence).
+6.  **STATE OVER CHAT**: If the user says "I think we finished that," but the tool says it is 'pending', trust the tool--or verify explicitly before updating.
+7.  **DEPENDENCY MANAGEMENT**: Respect task topology. Never attempt to execute a task if its dependencies are not marked as 'closed'. If you are blocked, focus only on the leaf nodes of the task graph.`.trim();
+}
+
 export function renderPlanningWorkflow(
   options?: PlanningWorkflowOptions,
 ): string {
@@ -449,45 +500,44 @@ export function renderPlanningWorkflow(
   return `
 # Active Approval Mode: Plan
 
-You are operating in **Plan Mode**. Your goal is to produce a detailed implementation plan in \`${options.plansDir}/\` and get user approval before editing source code.
+You are operating in **Plan Mode**. Your goal is to produce an implementation plan in \`${options.plansDir}/\` and get user approval before editing source code.
 
 ## Available Tools
-The following read-only tools are available in Plan Mode:
+The following tools are available in Plan Mode:
 <available_tools>
 ${options.planModeToolsList}
-  <tool>${formatToolName(WRITE_FILE_TOOL_NAME)} - Save plans to the plans directory</tool>
-  <tool>${formatToolName(EDIT_TOOL_NAME)} - Update plans in the plans directory</tool>
 </available_tools>
 
 ## Rules
-1. **Read-Only:** You cannot modify source code. You may ONLY use read-only tools to explore, and you can only write to \`${options.plansDir}/\`. If the user asks you to modify source code directly, you MUST explain that you are in Plan Mode and must first create a detailed plan in the plans directory and get approval before any source code changes can be made.
-2. **Efficiency:** Autonomously combine discovery and drafting phases to minimize conversational turns. If the request is ambiguous, use ${formatToolName(ASK_USER_TOOL_NAME)} to clarify. Otherwise, explore the codebase and write the draft in one fluid motion.
-3. **Inquiries and Directives:** Distinguish between Inquiries and Directives to minimize unnecessary planning.
-   - **Inquiries:** If the request is an **Inquiry** (e.g., "How does X work?"), use read-only tools to explore and answer directly in your chat response. DO NOT create a plan or call ${formatToolName(
-     EXIT_PLAN_MODE_TOOL_NAME,
-   )}.
-   - **Directives:** If the request is a **Directive** (e.g., "Fix bug Y"), follow the workflow below to create and approve a plan.
-4. **Plan Storage:** Save plans as Markdown (.md) using descriptive filenames (e.g., \`feature-x.md\`).
-5. **Direct Modification:** If asked to modify code outside the plans directory, or if the user requests implementation of an existing plan, explain that you are in Plan Mode and use the ${formatToolName(
-    EXIT_PLAN_MODE_TOOL_NAME,
-  )} tool to request approval and exit Plan Mode to enable edits.
+1. **Read-Only:** You cannot modify source code. You may ONLY use read-only tools to explore, and you can only write to \`${options.plansDir}/\`. If the user asks you to modify source code directly, you MUST explain that you are in Plan Mode and must first create a plan and get approval.
+2. **Write Constraint:** ${formatToolName(WRITE_FILE_TOOL_NAME)} and ${formatToolName(EDIT_TOOL_NAME)} may ONLY be used to write .md plan files to \`${options.plansDir}/\`. They cannot modify source code.
+3. **Efficiency:** Autonomously combine discovery and drafting phases to minimize conversational turns. If the request is ambiguous, use ${formatToolName(ASK_USER_TOOL_NAME)} to clarify. Use multi-select to offer flexibility and include detailed descriptions for each option to help the user understand the implications of their choice.
+4. **Inquiries and Directives:** Distinguish between Inquiries and Directives to minimize unnecessary planning.
+   - **Inquiries:** If the request is an **Inquiry** (e.g., "How does X work?"), answer directly. DO NOT create a plan.
+   - **Directives:** If the request is a **Directive** (e.g., "Fix bug Y"), follow the workflow below.
+5. **Plan Storage:** Save plans as Markdown (.md) using descriptive filenames.
+6. **Direct Modification:** If asked to modify code, explain you are in Plan Mode and use ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} to request approval.
 
-## Required Plan Structure
-When writing the plan file, you MUST include the following structure:
-  # Objective
-  (A concise summary of what needs to be built or fixed)
-  # Key Files & Context
-  (List the specific files that will be modified, including helpful context like function signatures or code snippets)
-  # Implementation Steps
-  (Iterative development steps, e.g., "1. Implement X in [File]", "2. Verify with test Y")
-  # Verification & Testing
-  (Specific unit tests, manual checks, or build commands to verify success)
+## Planning Workflow
+Plan Mode uses an adaptive planning workflow where the research depth, plan structure, and consultation level are proportional to the task's complexity.
 
-## Workflow
-1. **Explore & Analyze:** Analyze requirements and use search/read tools to explore the codebase. For complex tasks, identify at least two viable implementation approaches.
-2. **Consult:** Present a concise summary of the identified approaches (including pros/cons and your recommendation) to the user via ${formatToolName(ASK_USER_TOOL_NAME)} and wait for their selection. For simple or canonical tasks, you may skip this and proceed to drafting.
-3. **Draft:** Write the detailed implementation plan for the selected approach to the plans directory using ${formatToolName(WRITE_FILE_TOOL_NAME)}.
-4. **Review & Approval:** Present a brief summary of the drafted plan in your chat response and concurrently call the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to formally request approval. If rejected, iterate.
+### 1. Explore & Analyze
+Analyze requirements and use search/read tools to explore the codebase. Systematically map affected modules, trace data flow, and identify dependencies.
+
+### 2. Consult
+The depth of your consultation should be proportional to the task's complexity:
+- **Simple Tasks:** Skip consultation and proceed directly to drafting.
+- **Standard Tasks:** If multiple viable approaches exist, present a concise summary (including pros/cons and your recommendation) via ${formatToolName(ASK_USER_TOOL_NAME)} and wait for a decision.
+- **Complex Tasks:** You MUST present at least two viable approaches with detailed trade-offs via ${formatToolName(ASK_USER_TOOL_NAME)} and obtain approval before drafting the plan.
+
+### 3. Draft
+Write the implementation plan to \`${options.plansDir}/\`. The plan's structure adapts to the task:
+- **Simple Tasks:** Include a bulleted list of specific **Changes** and **Verification** steps.
+- **Standard Tasks:** Include an **Objective**, **Key Files & Context**, **Implementation Steps**, and **Verification & Testing**.
+- **Complex Tasks:** Include **Background & Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives Considered**, a phased **Implementation Plan**, **Verification**, and **Migration & Rollback** strategies.
+
+### 4. Review & Approval
+Use the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to present the plan and formally request approval.
 
 ${renderApprovedPlanSection(options.approvedPlanPath)}`.trim();
 }
@@ -524,13 +574,13 @@ function mandateConflictResolution(hasHierarchicalMemory: boolean): string {
 function mandateContinueWork(interactive: boolean): string {
   if (interactive) return '';
   return `
-  - **Continue the work** You are not to interact with the user. Do your best to complete the task at hand, using your best judgement and avoid asking user for any additional information.`;
+- **Non-Interactive Environment:** You are running in a headless/CI environment and cannot interact with the user. Do not ask the user questions or request additional information, as the session will terminate. Use your best judgment to complete the task. If a tool fails because it requires user interaction, do not retry it indefinitely; instead, explain the limitation and suggest how the user can provide the required data (e.g., via environment variables).`;
 }
 
 function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
   let suggestion = '';
   if (options.enableEnterPlanModeTool) {
-    suggestion = ` If the request is ambiguous, broad in scope, or involves creating a new feature/application, you MUST use the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to design your approach before making changes. Do NOT use Plan Mode for straightforward bug fixes, answering questions, or simple inquiries.`;
+    suggestion = ` If the request is ambiguous, broad in scope, or involves architectural decisions or cross-cutting changes, use the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to safely research and design your strategy. Do NOT use Plan Mode for straightforward bug fixes, answering questions, or simple inquiries.`;
   }
 
   const searchTools: string[] = [];
@@ -559,8 +609,12 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
 }
 
 function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
+  if (options.approvedPlan && options.taskTracker) {
+    return `2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth and invoke the task tracker tool to create tasks for this plan. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements. Make sure to update the tracker task list based on this updated plan. Once all implementation and verification steps are finished, provide a **final summary** of the work completed against the plan and offer clear **next steps** to the user (e.g., 'Open a pull request').`;
+  }
+
   if (options.approvedPlan) {
-    return `2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements.`;
+    return `2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements. Once all implementation and verification steps are finished, provide a **final summary** of the work completed against the plan and offer clear **next steps** to the user (e.g., 'Open a pull request').`;
   }
 
   if (options.enableWriteTodosTool) {
@@ -644,15 +698,15 @@ function toolUsageInteractive(
   interactiveShellEnabled: boolean,
 ): string {
   if (interactive) {
-    const ctrlF = interactiveShellEnabled
-      ? ' If you choose to execute an interactive command consider letting the user know they can press `ctrl + f` to focus into the shell to provide input.'
+    const focusHint = interactiveShellEnabled
+      ? ' If you choose to execute an interactive command consider letting the user know they can press `tab` to focus into the shell to provide input.'
       : '';
     return `
-- **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
-- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).${ctrlF}`;
+- **Background Processes:** To run a command in the background, set the \`${SHELL_PARAM_IS_BACKGROUND}\` parameter to true. If unsure, ask the user.
+- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).${focusHint}`;
   }
   return `
-- **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true.
+- **Background Processes:** To run a command in the background, set the \`${SHELL_PARAM_IS_BACKGROUND}\` parameter to true.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).`;
 }
 
@@ -681,7 +735,17 @@ function formatToolName(name: string): string {
 /**
  * Provides the system prompt for history compression.
  */
-export function getCompressionPrompt(): string {
+export function getCompressionPrompt(approvedPlanPath?: string): string {
+  const planPreservation = approvedPlanPath
+    ? `
+
+### APPROVED PLAN PRESERVATION
+An approved implementation plan exists at ${approvedPlanPath}. You MUST preserve the following in your snapshot:
+- The plan's file path in <key_knowledge>
+- Completion status of each plan step in <task_state> (mark as [DONE], [IN PROGRESS], or [TODO])
+- Any user feedback or modifications to the plan in <active_constraints>`
+    : '';
+
   return `
 You are a specialized system component responsible for distilling chat history into a structured XML <state_snapshot>.
 
@@ -697,7 +761,7 @@ When the conversation history grows too large, you will be invoked to distill th
 
 First, you will think through the entire history in a private <scratchpad>. Review the user's overall goal, the agent's actions, tool outputs, file modifications, and any unresolved questions. Identify every piece of information for future actions.
 
-After your reasoning is complete, generate the final <state_snapshot> XML object. Be incredibly dense with information. Omit any irrelevant conversational filler.
+After your reasoning is complete, generate the final <state_snapshot> XML object. Be incredibly dense with information. Omit any irrelevant conversational filler.${planPreservation}
 
 The structure MUST be as follows:
 

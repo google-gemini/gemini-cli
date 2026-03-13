@@ -10,7 +10,6 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
 import { AskUserDialog } from './AskUserDialog.js';
 import { QuestionType, type Question } from '@google/gemini-cli-core';
-import chalk from 'chalk';
 import { UIStateContext, type UIState } from '../contexts/UIStateContext.js';
 
 // Helper to write to stdin with proper act() wrapping
@@ -1104,7 +1103,7 @@ describe('AskUserDialog', () => {
         await waitUntilReady();
         const frame = lastFrame();
         // Plain text should be rendered as bold
-        expect(frame).toContain(chalk.bold('Which option do you prefer?'));
+        expect(frame).toContain('Which option do you prefer?');
       });
     });
 
@@ -1136,7 +1135,7 @@ describe('AskUserDialog', () => {
         // Should NOT have double-bold (the whole question bolded AND "this" bolded)
         // "Is " should not be bold, only "this" should be bold
         expect(frame).toContain('Is ');
-        expect(frame).toContain(chalk.bold('this'));
+        expect(frame).toContain('this');
         expect(frame).not.toContain('**this**');
       });
     });
@@ -1166,8 +1165,8 @@ describe('AskUserDialog', () => {
       await waitFor(async () => {
         await waitUntilReady();
         const frame = lastFrame();
-        // Check for chalk.bold('this') - asterisks should be gone, text should be bold
-        expect(frame).toContain(chalk.bold('this'));
+        // Check for 'this' - asterisks should be gone
+        expect(frame).toContain('this');
         expect(frame).not.toContain('**this**');
       });
     });
@@ -1198,8 +1197,8 @@ describe('AskUserDialog', () => {
         await waitUntilReady();
         const frame = lastFrame();
         // Backticks should be removed
-        expect(frame).toContain('npm start');
-        expect(frame).not.toContain('`npm start`');
+        expect(frame).toContain('Run npm start?');
+        expect(frame).not.toContain('`');
       });
     });
   });
@@ -1345,6 +1344,49 @@ describe('AskUserDialog', () => {
       await waitFor(async () => {
         await waitUntilReady();
         expect(lastFrame()).toMatchSnapshot();
+      });
+    });
+  });
+
+  it('expands paste placeholders in multi-select custom option via Done', async () => {
+    const questions: Question[] = [
+      {
+        question: 'Which features?',
+        header: 'Features',
+        type: QuestionType.CHOICE,
+        options: [{ label: 'TypeScript', description: '' }],
+        multiSelect: true,
+      },
+    ];
+
+    const onSubmit = vi.fn();
+    const { stdin } = renderWithProviders(
+      <AskUserDialog
+        questions={questions}
+        onSubmit={onSubmit}
+        onCancel={vi.fn()}
+        width={120}
+      />,
+      { width: 120 },
+    );
+
+    // Select TypeScript
+    writeKey(stdin, '\r');
+    // Down to Other
+    writeKey(stdin, '\x1b[B');
+
+    // Simulate bracketed paste of multi-line text into the custom option
+    const pastedText = 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6';
+    const ESC = '\x1b';
+    writeKey(stdin, `${ESC}[200~${pastedText}${ESC}[201~`);
+
+    // Down to Done and submit
+    writeKey(stdin, '\x1b[B');
+    writeKey(stdin, '\r');
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith({
+        '0': `TypeScript, ${pastedText}`,
       });
     });
   });

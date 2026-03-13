@@ -9,9 +9,9 @@ import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { formatResetTime } from '../utils/formatters.js';
 import {
-  getStatusColor,
-  QUOTA_THRESHOLD_HIGH,
-  QUOTA_THRESHOLD_MEDIUM,
+  getUsedStatusColor,
+  QUOTA_USED_WARNING_THRESHOLD,
+  QUOTA_USED_CRITICAL_THRESHOLD,
 } from '../utils/displayUtils.js';
 
 interface QuotaStatsInfoProps {

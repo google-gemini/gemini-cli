@@ -5,8 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { ReadFileToolParams } from './read-file.js';
-import { ReadFileTool } from './read-file.js';
+import { ReadFileTool, type ReadFileToolParams } from './read-file.js';
 import { ToolErrorType } from './tool-error.js';
 import path from 'node:path';
 import { isSubpath } from '../utils/paths.js';
@@ -23,6 +22,14 @@ import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 
 vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
+}));
+
+vi.mock('./jit-context.js', () => ({
+  discoverJitContext: vi.fn().mockResolvedValue(''),
+  appendJitContext: vi.fn().mockImplementation((content, context) => {
+    if (!context) return content;
+    return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
+  }),
 }));
 
 describe('ReadFileTool', () => {
@@ -587,6 +594,48 @@ describe('ReadFileTool', () => {
       const schema = tool.getSchema(modelId);
       expect(schema.name).toBe(ReadFileTool.Name);
       expect(schema.description).toMatchSnapshot();
+    });
+
+    it('should return the Gemini 3 schema when a Gemini 3 modelId is provided', () => {
+      const modelId = 'gemini-3-pro-preview';
+      const schema = tool.getSchema(modelId);
+      expect(schema.name).toBe(ReadFileTool.Name);
+      expect(schema.description).toMatchSnapshot();
+      expect(schema.description).toContain('surgical reads');
+    });
+  });
+
+  describe('JIT context discovery', () => {
+    it('should append JIT context to output when enabled and context is found', async () => {
+      const { discoverJitContext } = await import('./jit-context.js');
+      vi.mocked(discoverJitContext).mockResolvedValue('Use the useAuth hook.');
+
+      const filePath = path.join(tempRootDir, 'jit-test.txt');
+      const fileContent = 'JIT test content.';
+      await fsp.writeFile(filePath, fileContent, 'utf-8');
+
+      const invocation = tool.build({ file_path: filePath });
+      const result = await invocation.execute(abortSignal);
+
+      expect(discoverJitContext).toHaveBeenCalled();
+      expect(result.llmContent).toContain('Newly Discovered Project Context');
+      expect(result.llmContent).toContain('Use the useAuth hook.');
+    });
+
+    it('should not append JIT context when disabled', async () => {
+      const { discoverJitContext } = await import('./jit-context.js');
+      vi.mocked(discoverJitContext).mockResolvedValue('');
+
+      const filePath = path.join(tempRootDir, 'jit-disabled-test.txt');
+      const fileContent = 'No JIT content.';
+      await fsp.writeFile(filePath, fileContent, 'utf-8');
+
+      const invocation = tool.build({ file_path: filePath });
+      const result = await invocation.execute(abortSignal);
+
+      expect(result.llmContent).not.toContain(
+        'Newly Discovered Project Context',
+      );
     });
   });
 });
