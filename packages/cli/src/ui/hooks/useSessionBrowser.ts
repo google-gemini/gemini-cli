@@ -8,14 +8,18 @@ import { useState, useCallback } from 'react';
 import type { HistoryItemWithoutId } from '../types.js';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
-import type {
-  Config,
-  ConversationRecord,
-  ResumedSessionData,
+import {
+  coreEvents,
+  convertSessionToClientHistory,
+  uiTelemetryService,
+  type Config,
+  type ConversationRecord,
+  type ResumedSessionData,
 } from '@google/gemini-cli-core';
-import { coreEvents } from '@google/gemini-cli-core';
-import type { SessionInfo } from '../../utils/sessionUtils.js';
-import { convertSessionToHistoryFormats } from '../../utils/sessionUtils.js';
+import {
+  convertSessionToHistoryFormats,
+  type SessionInfo,
+} from '../../utils/sessionUtils.js';
 import type { Part } from '@google/genai';
 
 export { convertSessionToHistoryFormats };
@@ -65,6 +69,7 @@ export const useSessionBrowser = (
           // Use the old session's ID to continue it.
           const existingSessionId = conversation.sessionId;
           config.setSessionId(existingSessionId);
+          uiTelemetryService.hydrate(conversation);
 
           const resumedSessionData = {
             conversation,
@@ -78,7 +83,7 @@ export const useSessionBrowser = (
           );
           await onLoadHistory(
             historyData.uiHistory,
-            historyData.clientHistory,
+            convertSessionToClientHistory(conversation.messages),
             resumedSessionData,
           );
         } catch (error) {

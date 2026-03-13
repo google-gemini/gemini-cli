@@ -92,6 +92,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `[]`
   - **Requires restart:** Yes
 
+#### `adminPolicyPaths`
+
+- **`adminPolicyPaths`** (array):
+  - **Description:** Additional admin policy files or directories to load.
+  - **Default:** `[]`
+  - **Requires restart:** Yes
+
 #### `general`
 
 - **`general.preferredEditor`** (string):
@@ -105,7 +112,8 @@ their corresponding top-level category object in your `settings.json` file.
 - **`general.defaultApprovalMode`** (enum):
   - **Description:** The default approval mode for tool execution. 'default'
     prompts for approval, 'auto_edit' auto-approves edit tools, and 'plan' is
-    read-only mode. 'yolo' is not supported yet.
+    read-only mode. YOLO mode (auto-approve all actions) can only be enabled via
+    command line (--yolo or --approval-mode=yolo).
   - **Default:** `"default"`
   - **Values:** `"default"`, `"auto_edit"`, `"plan"`
 
@@ -137,16 +145,21 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
-- **`general.enablePromptCompletion`** (boolean):
-  - **Description:** Enable AI-powered prompt completion suggestions while
-    typing.
-  - **Default:** `false`
-  - **Requires restart:** Yes
+- **`general.plan.modelRouting`** (boolean):
+  - **Description:** Automatically switch between Pro and Flash models based on
+    Plan Mode status. Uses Pro for the planning phase and Flash for the
+    implementation phase.
+  - **Default:** `true`
 
 - **`general.retryFetchErrors`** (boolean):
   - **Description:** Retry on "exception TypeError: fetch failed sending
     request" errors.
-  - **Default:** `false`
+  - **Default:** `true`
+
+- **`general.maxAttempts`** (number):
+  - **Description:** Maximum number of attempts for requests to the main chat
+    model. Cannot exceed 10.
+  - **Default:** `10`
 
 - **`general.debugKeystrokeLogging`** (boolean):
   - **Description:** Enable debug logging of keystrokes to the console.
@@ -154,12 +167,12 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`general.sessionRetention.enabled`** (boolean):
   - **Description:** Enable automatic session cleanup
-  - **Default:** `false`
+  - **Default:** `true`
 
 - **`general.sessionRetention.maxAge`** (string):
   - **Description:** Automatically delete chats older than this time period
     (e.g., "30d", "7d", "24h", "1w")
-  - **Default:** `undefined`
+  - **Default:** `"30d"`
 
 - **`general.sessionRetention.maxCount`** (number):
   - **Description:** Alternative: Maximum number of sessions to keep (most
@@ -169,11 +182,6 @@ their corresponding top-level category object in your `settings.json` file.
 - **`general.sessionRetention.minRetention`** (string):
   - **Description:** Minimum retention period (safety limit, defaults to "1d")
   - **Default:** `"1d"`
-
-- **`general.sessionRetention.warningAcknowledged`** (boolean):
-  - **Description:** INTERNAL: Whether the user has acknowledged the session
-    retention warning
-  - **Default:** `false`
 
 #### `output`
 
@@ -237,6 +245,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Hide helpful tips in the UI
   - **Default:** `false`
 
+- **`ui.escapePastedAtSymbols`** (boolean):
+  - **Description:** When enabled, @ symbols in pasted text are escaped to
+    prevent unintended @path expansion.
+  - **Default:** `false`
+
 - **`ui.showShortcutsHint`** (boolean):
   - **Description:** Show the "? for shortcuts" hint above the input.
   - **Default:** `true`
@@ -250,8 +263,18 @@ their corresponding top-level category object in your `settings.json` file.
     input.
   - **Default:** `false`
 
+- **`ui.footer.items`** (array):
+  - **Description:** List of item IDs to display in the footer. Rendered in
+    order
+  - **Default:** `undefined`
+
+- **`ui.footer.showLabels`** (boolean):
+  - **Description:** Display a second line above the footer items with
+    descriptive headers (e.g., /model).
+  - **Default:** `true`
+
 - **`ui.footer.hideCWD`** (boolean):
-  - **Description:** Hide the current working directory path in the footer.
+  - **Description:** Hide the current working directory in the footer.
   - **Default:** `false`
 
 - **`ui.footer.hideSandboxStatus`** (boolean):
@@ -263,7 +286,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`ui.footer.hideContextPercentage`** (boolean):
-  - **Description:** Hides the context window remaining percentage.
+  - **Description:** Hides the context window usage percentage.
   - **Default:** `true`
 
 - **`ui.hideFooter`** (boolean):
@@ -287,7 +310,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`ui.showUserIdentity`** (boolean):
-  - **Description:** Show the logged-in user's identity (e.g. email) in the UI.
+  - **Description:** Show the signed-in user's identity (e.g. email) in the UI.
   - **Default:** `true`
 
 - **`ui.useAlternateBuffer`** (boolean):
@@ -316,6 +339,12 @@ their corresponding top-level category object in your `settings.json` file.
     comments, both, or nothing.
   - **Default:** `"tips"`
   - **Values:** `"tips"`, `"witty"`, `"all"`, `"off"`
+
+- **`ui.errorVerbosity`** (enum):
+  - **Description:** Controls whether recoverable errors are hidden (low) or
+    fully shown (full).
+  - **Default:** `"low"`
+  - **Values:** `"low"`, `"full"`
 
 - **`ui.customWittyPhrases`** (array):
   - **Description:** Custom witty phrases to display during loading. When
@@ -351,6 +380,15 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable collection of usage statistics
   - **Default:** `true`
   - **Requires restart:** Yes
+
+#### `billing`
+
+- **`billing.overageStrategy`** (enum):
+  - **Description:** How to handle quota exhaustion when AI credits are
+    available. 'ask' prompts each time, 'always' automatically uses credits,
+    'never' disables credit usage.
+  - **Default:** `"ask"`
+  - **Values:** `"ask"`, `"always"`, `"never"`
 
 #### `model`
 
@@ -647,6 +685,31 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `{}`
   - **Requires restart:** Yes
 
+- **`agents.browser.sessionMode`** (enum):
+  - **Description:** Session mode: 'persistent', 'isolated', or 'existing'.
+  - **Default:** `"persistent"`
+  - **Values:** `"persistent"`, `"isolated"`, `"existing"`
+  - **Requires restart:** Yes
+
+- **`agents.browser.headless`** (boolean):
+  - **Description:** Run browser in headless mode.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`agents.browser.profilePath`** (string):
+  - **Description:** Path to browser profile directory for session persistence.
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
+- **`agents.browser.visualModel`** (string):
+  - **Description:** Model override for the visual agent.
+  - **Default:** `undefined`
+  - **Requires restart:** Yes
+
+- **`agents.browser.disableUserInput`** (boolean):
+  - **Description:** Disable user input on browser window during automation.
+  - **Default:** `true`
+
 #### `context`
 
 - **`context.fileName`** (string | string[]):
@@ -673,7 +736,7 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `[]`
 
 - **`context.loadMemoryFromIncludeDirectories`** (boolean):
-  - **Description:** Controls how /memory refresh loads GEMINI.md files. When
+  - **Description:** Controls how /memory reload loads GEMINI.md files. When
     true, include directories are scanned; when false, only the current
     directory is used.
   - **Default:** `false`
@@ -709,9 +772,10 @@ their corresponding top-level category object in your `settings.json` file.
 
 #### `tools`
 
-- **`tools.sandbox`** (boolean | string):
+- **`tools.sandbox`** (string):
   - **Description:** Sandbox execution environment. Set to a boolean to enable
-    or disable the sandbox, or provide a string path to a sandbox profile.
+    or disable the sandbox, provide a string path to a sandbox profile, or
+    specify an explicit sandbox command (e.g., "docker", "podman", "lxc").
   - **Default:** `undefined`
   - **Requires restart:** Yes
 
@@ -825,6 +889,11 @@ their corresponding top-level category object in your `settings.json` file.
     confirmation dialogs.
   - **Default:** `false`
 
+- **`security.autoAddToPolicyByDefault`** (boolean):
+  - **Description:** When enabled, the "Allow for all future sessions" option
+    becomes the default choice for low-risk tools in trusted workspaces.
+  - **Default:** `false`
+
 - **`security.blockGitExtensions`** (boolean):
   - **Description:** Blocks installing and loading extensions from Git.
   - **Default:** `false`
@@ -872,6 +941,14 @@ their corresponding top-level category object in your `settings.json` file.
 - **`security.auth.useExternal`** (boolean):
   - **Description:** Whether to use an external authentication flow.
   - **Default:** `undefined`
+  - **Requires restart:** Yes
+
+- **`security.enableConseca`** (boolean):
+  - **Description:** Enable the context-aware security checker. This feature
+    uses an LLM to dynamically generate and enforce security policies for tool
+    use based on your prompt, providing an additional layer of protection
+    against unintended actions.
+  - **Default:** `false`
   - **Requires restart:** Yes
 
 #### `advanced`
@@ -943,6 +1020,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.extensionRegistryURI`** (string):
+  - **Description:** The URI (web URL or local file path) of the extension
+    registry.
+  - **Default:** `"https://geminicli.com/extensions.json"`
+  - **Requires restart:** Yes
+
 - **`experimental.extensionReloading`** (boolean):
   - **Description:** Enables extension loading/unloading within the CLI session.
   - **Default:** `false`
@@ -966,7 +1049,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
 
 - **`experimental.plan`** (boolean):
-  - **Description:** Enable planning features (Plan Mode and tools).
+  - **Description:** Enable Plan Mode.
+  - **Default:** `true`
+  - **Requires restart:** Yes
+
+- **`experimental.taskTracker`** (boolean):
+  - **Description:** Enable task tracker tools.
   - **Default:** `false`
   - **Requires restart:** Yes
 
@@ -974,6 +1062,28 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Enable model steering (user hints) to guide the model
     during tool execution.
   - **Default:** `false`
+
+- **`experimental.directWebFetch`** (boolean):
+  - **Description:** Enable web fetch behavior that bypasses LLM summarization.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.gemmaModelRouter.enabled`** (boolean):
+  - **Description:** Enable the Gemma Model Router (experimental). Requires a
+    local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`experimental.gemmaModelRouter.classifier.host`** (string):
+  - **Description:** The host of the classifier.
+  - **Default:** `"http://localhost:9379"`
+  - **Requires restart:** Yes
+
+- **`experimental.gemmaModelRouter.classifier.model`** (string):
+  - **Description:** The model to use for the classifier. Only tested on
+    `gemma3-1b-gpu-custom`.
+  - **Default:** `"gemma3-1b-gpu-custom"`
+  - **Requires restart:** Yes
 
 #### `skills`
 
@@ -1089,13 +1199,20 @@ their corresponding top-level category object in your `settings.json` file.
 
 Configures connections to one or more Model-Context Protocol (MCP) servers for
 discovering and using custom tools. Gemini CLI attempts to connect to each
-configured MCP server to discover available tools. If multiple MCP servers
-expose a tool with the same name, the tool names will be prefixed with the
-server alias you defined in the configuration (e.g.,
-`serverAlias__actualToolName`) to avoid conflicts. Note that the system might
-strip certain schema properties from MCP tool definitions for compatibility. At
-least one of `command`, `url`, or `httpUrl` must be provided. If multiple are
-specified, the order of precedence is `httpUrl`, then `url`, then `command`.
+configured MCP server to discover available tools. Every discovered tool is
+prepended with the `mcp_` prefix and its server alias to form a fully qualified
+name (FQN) (e.g., `mcp_serverAlias_actualToolName`) to avoid conflicts. Note
+that the system might strip certain schema properties from MCP tool definitions
+for compatibility. At least one of `command`, `url`, or `httpUrl` must be
+provided. If multiple are specified, the order of precedence is `httpUrl`, then
+`url`, then `command`.
+
+> **Warning:** Avoid using underscores (`_`) in your server aliases (e.g., use
+> `my-server` instead of `my_server`). The underlying policy engine parses Fully
+> Qualified Names (`mcp_server_tool`) using the first underscore after the
+> `mcp_` prefix. An underscore in your server alias will cause the parser to
+> misidentify the server name, which can cause security policies to fail
+> silently.
 
 - **`mcpServers.<SERVER_NAME>`** (object): The server parameters for the named
   server.
@@ -1261,19 +1378,34 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 - **`GEMINI_MODEL`**:
   - Specifies the default Gemini model to use.
   - Overrides the hardcoded default
-  - Example: `export GEMINI_MODEL="gemini-3-flash-preview"`
+  - Example: `export GEMINI_MODEL="gemini-3-flash-preview"` (Windows PowerShell:
+    `$env:GEMINI_MODEL="gemini-3-flash-preview"`)
+- **`GEMINI_CLI_IDE_PID`**:
+  - Manually specifies the PID of the IDE process to use for integration. This
+    is useful when running Gemini CLI in a standalone terminal while still
+    wanting to associate it with a specific IDE instance.
+  - Overrides the automatic IDE detection logic.
 - **`GEMINI_CLI_HOME`**:
   - Specifies the root directory for Gemini CLI's user-level configuration and
     storage.
   - By default, this is the user's system home directory. The CLI will create a
     `.gemini` folder inside this directory.
   - Useful for shared compute environments or keeping CLI state isolated.
-  - Example: `export GEMINI_CLI_HOME="/path/to/user/config"`
+  - Example: `export GEMINI_CLI_HOME="/path/to/user/config"` (Windows
+    PowerShell: `$env:GEMINI_CLI_HOME="C:\path\to\user\config"`)
+- **`GEMINI_CLI_SURFACE`**:
+  - Specifies a custom label to include in the `User-Agent` header for API
+    traffic reporting.
+  - This is useful for tracking specific internal tools or distribution
+    channels.
+  - Example: `export GEMINI_CLI_SURFACE="my-custom-tool"` (Windows PowerShell:
+    `$env:GEMINI_CLI_SURFACE="my-custom-tool"`)
 - **`GOOGLE_API_KEY`**:
   - Your Google Cloud API key.
   - Required for using Vertex AI in express mode.
   - Ensure you have the necessary permissions.
-  - Example: `export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"`.
+  - Example: `export GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"` (Windows PowerShell:
+    `$env:GOOGLE_API_KEY="YOUR_GOOGLE_API_KEY"`).
 - **`GOOGLE_CLOUD_PROJECT`**:
   - Your Google Cloud Project ID.
   - Required for using Code Assist or Vertex AI.
@@ -1284,18 +1416,23 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
     you have `GOOGLE_CLOUD_PROJECT` set in your global environment in Cloud
     Shell, it will be overridden by this default. To use a different project in
     Cloud Shell, you must define `GOOGLE_CLOUD_PROJECT` in a `.env` file.
-  - Example: `export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`.
+  - Example: `export GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"` (Windows
+    PowerShell: `$env:GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`).
 - **`GOOGLE_APPLICATION_CREDENTIALS`** (string):
   - **Description:** The path to your Google Application Credentials JSON file.
   - **Example:**
     `export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/credentials.json"`
+    (Windows PowerShell:
+    `$env:GOOGLE_APPLICATION_CREDENTIALS="C:\path\to\your\credentials.json"`)
 - **`GOOGLE_GENAI_API_VERSION`**:
   - Specifies the API version to use for Gemini API requests.
   - When set, overrides the default API version used by the SDK.
-  - Example: `export GOOGLE_GENAI_API_VERSION="v1"`
+  - Example: `export GOOGLE_GENAI_API_VERSION="v1"` (Windows PowerShell:
+    `$env:GOOGLE_GENAI_API_VERSION="v1"`)
 - **`OTLP_GOOGLE_CLOUD_PROJECT`**:
   - Your Google Cloud Project ID for Telemetry in Google Cloud
-  - Example: `export OTLP_GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`.
+  - Example: `export OTLP_GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"` (Windows
+    PowerShell: `$env:OTLP_GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID"`).
 - **`GEMINI_TELEMETRY_ENABLED`**:
   - Set to `true` or `1` to enable telemetry. Any other value is treated as
     disabling it.
@@ -1323,7 +1460,8 @@ the `advanced.excludedEnvVars` setting in your `settings.json` file.
 - **`GOOGLE_CLOUD_LOCATION`**:
   - Your Google Cloud Project Location (e.g., us-central1).
   - Required for using Vertex AI in non-express mode.
-  - Example: `export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"`.
+  - Example: `export GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"` (Windows
+    PowerShell: `$env:GOOGLE_CLOUD_LOCATION="YOUR_PROJECT_LOCATION"`).
 - **`GEMINI_SANDBOX`**:
   - Alternative to the `sandbox` setting in `settings.json`.
   - Accepts `true`, `false`, `docker`, `podman`, or a custom command string.
@@ -1609,7 +1747,7 @@ conventions and context.
     loaded, allowing you to verify the hierarchy and content being used by the
     AI.
   - See the [Commands documentation](./commands.md#memory) for full details on
-    the `/memory` command and its sub-commands (`show` and `refresh`).
+    the `/memory` command and its sub-commands (`show` and `reload`).
 
 By understanding and utilizing these configuration layers and the hierarchical
 nature of context files, you can effectively manage the AI's memory and tailor

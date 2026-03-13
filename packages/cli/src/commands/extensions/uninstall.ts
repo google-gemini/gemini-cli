@@ -29,21 +29,24 @@ export async function handleUninstall(args: UninstallArgs) {
     });
     await extensionManager.loadExtensions();
 
-    // Get list of extensions to uninstall
-    let namesToUninstall: string[];
+    let namesToUninstall: string[] = [];
     if (args.all) {
-      const allExtensions = extensionManager.getExtensions();
-      if (allExtensions.length === 0) {
-        debugLogger.log('No extensions installed.');
-        return;
+      namesToUninstall = extensionManager
+        .getExtensions()
+        .map((ext) => ext.name);
+    } else if (args.names) {
+      namesToUninstall = [...new Set(args.names)];
+    }
+
+    if (namesToUninstall.length === 0) {
+      if (args.all) {
+        debugLogger.log('No extensions currently installed.');
       }
-      namesToUninstall = allExtensions.map((ext) => ext.name);
-    } else {
-      namesToUninstall = args.names ?? [];
+      return;
     }
 
     const errors: Array<{ name: string; error: string }> = [];
-    for (const name of [...new Set(namesToUninstall)]) {
+    for (const name of namesToUninstall) {
       try {
         await extensionManager.uninstallExtension(name, false);
         debugLogger.log(`Extension "${name}" successfully uninstalled.`);
@@ -65,7 +68,7 @@ export async function handleUninstall(args: UninstallArgs) {
 }
 
 export const uninstallCommand: CommandModule = {
-  command: 'uninstall [<names..>] [--all]',
+  command: 'uninstall [names..]',
   describe: 'Uninstalls one or more extensions.',
   builder: (yargs) =>
     yargs
@@ -76,14 +79,14 @@ export const uninstallCommand: CommandModule = {
         array: true,
       })
       .option('all', {
-        describe: 'Uninstall all extensions.',
         type: 'boolean',
+        describe: 'Uninstall all installed extensions.',
+        default: false,
       })
-      .conflicts('names', 'all')
       .check((argv) => {
         if (!argv.all && (!argv.names || argv.names.length === 0)) {
           throw new Error(
-            'Either extension name(s) or --all must be provided.',
+            'Please include at least one extension name to uninstall as a positional argument, or use the --all flag.',
           );
         }
         return true;
@@ -93,7 +96,7 @@ export const uninstallCommand: CommandModule = {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       names: argv['names'] as string[] | undefined,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      all: argv['all'] as boolean | undefined,
+      all: argv['all'] as boolean,
     });
     await exitCli();
   },

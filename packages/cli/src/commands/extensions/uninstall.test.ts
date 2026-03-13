@@ -148,6 +148,41 @@ describe('extensions uninstall command', () => {
       mockCwd.mockRestore();
     });
 
+    it('should uninstall all extensions when --all flag is used', async () => {
+      mockLoadExtensions.mockResolvedValue(undefined);
+      mockUninstallExtension.mockResolvedValue(undefined);
+      mockGetExtensions.mockReturnValue([{ name: 'ext1' }, { name: 'ext2' }]);
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      await handleUninstall({ all: true });
+
+      expect(mockUninstallExtension).toHaveBeenCalledTimes(2);
+      expect(mockUninstallExtension).toHaveBeenCalledWith('ext1', false);
+      expect(mockUninstallExtension).toHaveBeenCalledWith('ext2', false);
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'Extension "ext1" successfully uninstalled.',
+      );
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'Extension "ext2" successfully uninstalled.',
+      );
+      mockCwd.mockRestore();
+    });
+
+    it('should log a message if no extensions are installed and --all flag is used', async () => {
+      mockLoadExtensions.mockResolvedValue(undefined);
+      mockGetExtensions.mockReturnValue([]);
+      const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
+      await handleUninstall({ all: true });
+
+      expect(mockUninstallExtension).not.toHaveBeenCalled();
+      expect(emitConsoleLog).toHaveBeenCalledWith(
+        'log',
+        'No extensions currently installed.',
+      );
+      mockCwd.mockRestore();
+    });
+
     it('should report errors for failed uninstalls but continue with others', async () => {
       mockLoadExtensions.mockResolvedValue(undefined);
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
@@ -402,10 +437,17 @@ describe('extensions uninstall command', () => {
       mockUninstallExtension.mockResolvedValue(undefined);
       const mockCwd = vi.spyOn(process, 'cwd').mockReturnValue('/test/dir');
       interface TestArgv {
-        names: string[];
-        [key: string]: unknown;
+        names?: string[];
+        all?: boolean;
+        _: string[];
+        $0: string;
       }
-      const argv: TestArgv = { names: ['my-extension'], _: [], $0: '' };
+      const argv: TestArgv = {
+        names: ['my-extension'],
+        all: false,
+        _: [],
+        $0: '',
+      };
       await (command.handler as unknown as (args: TestArgv) => Promise<void>)(
         argv,
       );
