@@ -110,6 +110,10 @@ export class KeychainService {
 
   // Low-level dynamic loading and structural validation.
   private async loadKeychainModule(): Promise<Keychain | null> {
+    // keytar is a Node.js native addon and cannot be loaded in Bun.
+    if ('bun' in process.versions) {
+      return null;
+    }
     const moduleName = 'keytar';
     const module: unknown = await import(moduleName);
     const potential = (isRecord(module) && module['default']) || module;

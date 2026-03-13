@@ -21,6 +21,10 @@ export const getPty = async (): Promise<PtyImplementation> => {
   if (process.env['GEMINI_PTY_INFO'] === 'child_process') {
     return null;
   }
+  // node-pty native addons are built for Node.js and cannot be loaded in Bun.
+  if ('bun' in process.versions) {
+    return null;
+  }
   try {
     const lydell = '@lydell/node-pty';
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
