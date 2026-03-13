@@ -4,7 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { AgentEvent, AgentSend, AgentSession } from './types.js';
+import type {
+  AgentEvent,
+  AgentEventCommon,
+  AgentEventData,
+  AgentSend,
+  AgentSession,
+} from './types.js';
+
+export type MockAgentEvent = Partial<AgentEventCommon> & AgentEventData;
 
 /**
  * A mock implementation of AgentSession for testing.
@@ -12,7 +20,7 @@ import type { AgentEvent, AgentSend, AgentSession } from './types.js';
  */
 export class MockAgentSession implements AgentSession {
   private _events: AgentEvent[] = [];
-  private _responses: Array<Array<Partial<AgentEvent> & { type: string }>> = [];
+  private _responses: MockAgentEvent[][] = [];
   private _streams = new Map<string, AgentEvent[]>();
   private _activeStreamIds = new Set<string>();
   private _lastStreamId?: string;
@@ -37,8 +45,8 @@ export class MockAgentSession implements AgentSession {
    * Queues a sequence of events to be "emitted" by the agent in response to the
    * next send() call.
    */
-  pushResponse(events: Array<Partial<AgentEvent> & { type: string }>) {
-    // We store them as partials and normalize them when send() is called
+  pushResponse(events: MockAgentEvent[]) {
+    // We store them as data and normalize them when send() is called
     this._responses.push(events);
   }
 
@@ -49,14 +57,16 @@ export class MockAgentSession implements AgentSession {
 
     const now = new Date().toISOString();
 
-    if (!response.some((e) => e.type === 'stream_start')) {
+    if (!response.some((eventData) => eventData.type === 'stream_start')) {
       response.unshift({
         type: 'stream_start',
         streamId,
       });
     }
 
-    const startIndex = response.findIndex((e) => e.type === 'stream_start');
+    const startIndex = response.findIndex(
+      (eventData) => eventData.type === 'stream_start',
+    );
 
     if ('message' in payload && payload.message) {
       response.splice(startIndex + 1, 0, {
@@ -90,7 +100,7 @@ export class MockAgentSession implements AgentSession {
       );
     }
 
-    if (!response.some((e) => e.type === 'stream_end')) {
+    if (!response.some((eventData) => eventData.type === 'stream_end')) {
       response.push({
         type: 'stream_end',
         reason: 'completed',
@@ -98,17 +108,18 @@ export class MockAgentSession implements AgentSession {
       });
     }
 
-    const normalizedResponse = response.map((e) => {
-      const event = {
-        ...e,
-        id: e.id ?? `e-${this._nextEventId++}`,
-        timestamp: e.timestamp ?? now,
-        streamId: e.streamId ?? streamId,
-      };
-      return event as AgentEvent;
-    });
+    const normalizedResponse: AgentEvent[] = [];
+    for (const eventData of response) {
+      const event: AgentEvent = {
+        ...eventData,
+        id: eventData.id ?? `e-${this._nextEventId++}`,
+        timestamp: eventData.timestamp ?? now,
+        streamId: eventData.streamId ?? streamId,
+      } as AgentEvent;
+      normalizedResponse.push(event);
+    }
 
-    this._streams.set(streamId, normalizedResponse);
+    this._streams.set(streamId, [...normalizedResponse]);
     this._activeStreamIds.add(streamId);
     this._lastStreamId = streamId;
 
@@ -122,7 +133,9 @@ export class MockAgentSession implements AgentSession {
     let streamId = options?.streamId;
 
     if (options?.eventId) {
-      const event = this._events.find((e) => e.id === options.eventId);
+      const event = this._events.find(
+        (eventData) => eventData.id === options.eventId,
+      );
       if (!event) {
         throw new Error(`Event not found: ${options.eventId}`);
       }
@@ -142,7 +155,9 @@ export class MockAgentSession implements AgentSession {
 
     let startAt = 0;
     if (options?.eventId) {
-      const idx = events.findIndex((e) => e.id === options.eventId);
+      const idx = events.findIndex(
+        (eventData) => eventData.id === options.eventId,
+      );
       if (idx !== -1) {
         startAt = idx + 1;
       } else {
@@ -161,7 +176,7 @@ export class MockAgentSession implements AgentSession {
 
       const event = events[i];
       // Add to session trajectory if not already present
-      if (!this._events.some((e) => e.id === event.id)) {
+      if (!this._events.some((eventData) => eventData.id === event.id)) {
         this._events.push(event);
       }
       yield event;

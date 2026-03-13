@@ -84,9 +84,13 @@ export interface AgentEventCommon {
   };
 }
 
+export type AgentEventData<
+  EventType extends keyof AgentEvents = keyof AgentEvents,
+> = AgentEvents[EventType] & { type: EventType };
+
 export type AgentEvent<
   EventType extends keyof AgentEvents = keyof AgentEvents,
-> = AgentEventCommon & AgentEvents[EventType] & { type: EventType };
+> = AgentEventCommon & AgentEventData<EventType>;
 
 export interface AgentEvents {
   /** MUST be the first event emitted in a session. */
