@@ -199,6 +199,18 @@ describe('Storage – additional helpers', () => {
     expect(storageWithSession.getProjectTempTrackerDir()).toBe(expected);
   });
 
+  it('getProjectTempTrackerDir throws on path traversal in sessionId', async () => {
+    const maliciousSessionId = '../../etc';
+    const storageWithBadSession = new Storage(projectRoot, maliciousSessionId);
+    ProjectRegistry.prototype.getShortId = vi
+      .fn()
+      .mockReturnValue(PROJECT_SLUG);
+    await storageWithBadSession.initialize();
+    expect(() => storageWithBadSession.getProjectTempTrackerDir()).toThrow(
+      'Invalid sessionId',
+    );
+  });
+
   describe('Session and JSON Loading', () => {
     beforeEach(async () => {
       await storage.initialize();
