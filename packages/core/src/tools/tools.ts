@@ -19,8 +19,13 @@ import {
   type ToolConfirmationResponse,
   type Question,
 } from '../confirmation-bus/types.js';
-import { type ApprovalMode } from '../policy/types.js';
+import { ApprovalMode } from '../policy/types.js';
 import type { SubagentProgress } from '../agents/types.js';
+
+/**
+ * Supported decisions for forcing tool execution behavior.
+ */
+export type ForcedToolDecision = 'allow' | 'deny' | 'ask_user';
 
 /**
  * Represents a validated and ready-to-execute tool call.
@@ -56,6 +61,7 @@ export interface ToolInvocation<
    */
   shouldConfirmExecute(
     abortSignal: AbortSignal,
+    forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false>;
 
   /**
@@ -140,6 +146,8 @@ export abstract class BaseToolInvocation<
     readonly _toolDisplayName?: string,
     readonly _serverName?: string,
     readonly _toolAnnotations?: Record<string, unknown>,
+    readonly respectsAutoEdit: boolean = false,
+    readonly getApprovalMode: () => ApprovalMode = () => ApprovalMode.DEFAULT,
   ) {}
 
   abstract getDescription(): string;
@@ -150,13 +158,23 @@ export abstract class BaseToolInvocation<
 
   async shouldConfirmExecute(
     abortSignal: AbortSignal,
+    forcedDecision?: ForcedToolDecision,
   ): Promise<ToolCallConfirmationDetails | false> {
-    const decision = await this.getMessageBusDecision(abortSignal);
-    if (decision === 'ALLOW') {
+    if (
+      this.respectsAutoEdit &&
+      this.getApprovalMode() === ApprovalMode.AUTO_EDIT &&
+      forcedDecision !== 'ask_user'
+    ) {
       return false;
     }
 
-    if (decision === 'DENY') {
+    const decision =
+      forcedDecision ?? (await this.getMessageBusDecision(abortSignal));
+    if (decision === 'allow') {
+      return false;
+    }
+
+    if (decision === 'deny') {
       throw new Error(
         `Tool execution for "${
           this._toolDisplayName || this._toolName
@@ -164,7 +182,7 @@ export abstract class BaseToolInvocation<
       );
     }
 
-    if (decision === 'ASK_USER') {
+    if (decision === 'ask_user') {
       return this.getConfirmationDetails(abortSignal);
     }
 
@@ -208,7 +226,7 @@ export abstract class BaseToolInvocation<
 
   /**
    * Subclasses should override this method to provide custom confirmation UI
-   * when the policy engine's decision is 'ASK_USER'.
+   * when the policy engine's decision is 'ask_user'.
    * The base implementation provides a generic confirmation prompt.
    */
   protected async getConfirmationDetails(
@@ -231,11 +249,12 @@ export abstract class BaseToolInvocation<
 
   protected getMessageBusDecision(
     abortSignal: AbortSignal,
-  ): Promise<'ALLOW' | 'DENY' | 'ASK_USER'> {
+    forcedDecision?: ForcedToolDecision,
+  ): Promise<ForcedToolDecision> {
     if (!this.messageBus || !this._toolName) {
       // If there's no message bus, we can't make a decision, so we allow.
       // The legacy confirmation flow will still apply if the tool needs it.
-      return Promise.resolve('ALLOW');
+      return Promise.resolve('allow');
     }
 
     const correlationId = randomUUID();
@@ -249,11 +268,12 @@ export abstract class BaseToolInvocation<
       },
       serverName: this._serverName,
       toolAnnotations: this._toolAnnotations,
+      forcedDecision,
     };
 
-    return new Promise<'ALLOW' | 'DENY' | 'ASK_USER'>((resolve) => {
+    return new Promise<ForcedToolDecision>((resolve) => {
       if (!this.messageBus) {
-        resolve('ALLOW');
+        resolve('allow');
         return;
       }
 
@@ -274,11 +294,11 @@ export abstract class BaseToolInvocation<
 
       const abortHandler = () => {
         cleanup();
-        resolve('DENY');
+        resolve('deny');
       };
 
       if (abortSignal.aborted) {
-        resolve('DENY');
+        resolve('deny');
         return;
       }
 
@@ -286,11 +306,11 @@ export abstract class BaseToolInvocation<
         if (response.correlationId === correlationId) {
           cleanup();
           if (response.requiresUserConfirmation) {
-            resolve('ASK_USER');
+            resolve('ask_user');
           } else if (response.confirmed) {
-            resolve('ALLOW');
+            resolve('allow');
           } else {
-            resolve('DENY');
+            resolve('deny');
           }
         }
       };
@@ -299,7 +319,7 @@ export abstract class BaseToolInvocation<
 
       timeoutId = setTimeout(() => {
         cleanup();
-        resolve('ASK_USER'); // Default to ASK_USER on timeout
+        resolve('ask_user'); // Default to ask_user on timeout
       }, 30000);
 
       this.messageBus.subscribe(
@@ -317,7 +337,7 @@ export abstract class BaseToolInvocation<
         void this.messageBus.publish(request);
       } catch (_error) {
         cleanup();
-        resolve('ALLOW');
+        resolve('allow');
       }
     });
   }
@@ -827,6 +847,7 @@ export interface DiffStat {
 export interface ToolEditConfirmationDetails {
   type: 'edit';
   title: string;
+  systemMessage?: string;
   onConfirm: (
     outcome: ToolConfirmationOutcome,
     payload?: ToolConfirmationPayload,
@@ -865,6 +886,7 @@ export type ToolConfirmationPayload =
 export interface ToolExecuteConfirmationDetails {
   type: 'exec';
   title: string;
+  systemMessage?: string;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
   command: string;
   rootCommand: string;
@@ -875,6 +897,7 @@ export interface ToolExecuteConfirmationDetails {
 export interface ToolMcpConfirmationDetails {
   type: 'mcp';
   title: string;
+  systemMessage?: string;
   serverName: string;
   toolName: string;
   toolDisplayName: string;
@@ -887,6 +910,7 @@ export interface ToolMcpConfirmationDetails {
 export interface ToolInfoConfirmationDetails {
   type: 'info';
   title: string;
+  systemMessage?: string;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
   prompt: string;
   urls?: string[];
@@ -895,6 +919,7 @@ export interface ToolInfoConfirmationDetails {
 export interface ToolAskUserConfirmationDetails {
   type: 'ask_user';
   title: string;
+  systemMessage?: string;
   questions: Question[];
   onConfirm: (
     outcome: ToolConfirmationOutcome,
@@ -905,6 +930,7 @@ export interface ToolAskUserConfirmationDetails {
 export interface ToolExitPlanModeConfirmationDetails {
   type: 'exit_plan_mode';
   title: string;
+  systemMessage?: string;
   planPath: string;
   onConfirm: (
     outcome: ToolConfirmationOutcome,

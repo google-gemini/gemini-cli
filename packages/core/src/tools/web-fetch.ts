@@ -18,7 +18,6 @@ import { buildParamArgsPattern } from '../policy/utils.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { ToolErrorType } from './tool-error.js';
 import { getErrorMessage } from '../utils/errors.js';
-import { ApprovalMode } from '../policy/types.js';
 import { getResponseText } from '../utils/partUtils.js';
 import { fetchWithTimeout, isPrivateIp } from '../utils/fetch.js';
 import { truncateString } from '../utils/textUtils.js';
@@ -219,7 +218,16 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
-    super(params, messageBus, _toolName, _toolDisplayName);
+    super(
+      params,
+      messageBus,
+      _toolName,
+      _toolDisplayName,
+      undefined,
+      undefined,
+      true,
+      () => this.context.config.getApprovalMode(),
+    );
   }
 
   private handleRetry(attempt: number, error: unknown, delayMs: number): void {
@@ -456,12 +464,6 @@ ${aggregatedContent}
   protected override async getConfirmationDetails(
     _abortSignal: AbortSignal,
   ): Promise<ToolCallConfirmationDetails | false> {
-    // Check for AUTO_EDIT approval mode. This tool has a specific behavior
-    // where ProceedAlways switches the entire session to AUTO_EDIT.
-    if (this.context.config.getApprovalMode() === ApprovalMode.AUTO_EDIT) {
-      return false;
-    }
-
     let urls: string[] = [];
     let prompt = this.params.prompt || '';
 
@@ -870,7 +872,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
     _toolDisplayName?: string,
   ): ToolInvocation<WebFetchToolParams, ToolResult> {
     return new WebFetchToolInvocation(
-      this.context.config,
+      this.context,
       params,
       messageBus,
       _toolName,

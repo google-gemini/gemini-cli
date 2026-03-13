@@ -14,10 +14,12 @@ import {
   Kind,
   type ToolCallConfirmationDetails,
   type ToolInvocation,
+  type ToolLiveOutput,
   type ToolResult,
 } from '../tools/tools.js';
 import { createMockMessageBus } from './mock-message-bus.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { ShellExecutionConfig } from '../services/shellExecutionService.js';
 
 interface MockToolOptions {
   name: string;
@@ -33,6 +35,7 @@ interface MockToolOptions {
     params: { [key: string]: unknown },
     signal?: AbortSignal,
     updateOutput?: (output: string) => void,
+    shellExecutionConfig?: ShellExecutionConfig,
   ) => Promise<ToolResult>;
   params?: object;
   messageBus?: MessageBus;
@@ -52,13 +55,15 @@ class MockToolInvocation extends BaseToolInvocation<
 
   execute(
     signal: AbortSignal,
-    updateOutput?: (output: string) => void,
+    updateOutput?: (output: ToolLiveOutput) => void,
+    shellExecutionConfig?: ShellExecutionConfig,
   ): Promise<ToolResult> {
-    if (updateOutput) {
-      return this.tool.execute(this.params, signal, updateOutput);
-    } else {
-      return this.tool.execute(this.params);
-    }
+    return this.tool.execute(
+      this.params,
+      signal,
+      updateOutput as ((output: string) => void) | undefined,
+      shellExecutionConfig,
+    );
   }
 
   override shouldConfirmExecute(
@@ -79,14 +84,16 @@ export class MockTool extends BaseDeclarativeTool<
   { [key: string]: unknown },
   ToolResult
 > {
-  shouldConfirmExecute: (
+  readonly shouldConfirmExecute: (
     params: { [key: string]: unknown },
     signal: AbortSignal,
   ) => Promise<ToolCallConfirmationDetails | false>;
-  execute: (
+
+  readonly execute: (
     params: { [key: string]: unknown },
     signal?: AbortSignal,
     updateOutput?: (output: string) => void,
+    shellExecutionConfig?: ShellExecutionConfig,
   ) => Promise<ToolResult>;
 
   constructor(options: MockToolOptions) {
