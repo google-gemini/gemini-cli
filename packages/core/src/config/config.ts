@@ -606,6 +606,7 @@ export interface ConfigParameters {
   recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
+  disableAlwaysAllow?: boolean;
   rawOutput?: boolean;
   acceptRawOutputRisk?: boolean;
   modelConfigServiceConfig?: ModelConfigServiceConfig;
@@ -805,6 +806,7 @@ export class Config implements McpContext, AgentLoopContext {
   readonly fakeResponses?: string;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
+  private readonly disableAlwaysAllow: boolean;
   private readonly rawOutput: boolean;
   private readonly acceptRawOutputRisk: boolean;
   private pendingIncludeDirectories: string[];
@@ -1045,11 +1047,13 @@ export class Config implements McpContext, AgentLoopContext {
     this.policyUpdateConfirmationRequest =
       params.policyUpdateConfirmationRequest;
 
+    this.disableAlwaysAllow = params.disableAlwaysAllow ?? false;
     this.policyEngine = new PolicyEngine(
       {
         ...params.policyEngineConfig,
         approvalMode:
           params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+        disableAlwaysAllow: this.disableAlwaysAllow,
       },
       checkerRunner,
     );
@@ -2201,6 +2205,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   isYoloModeDisabled(): boolean {
     return this.disableYoloMode || !this.isTrustedFolder();
+  }
+
+  getDisableAlwaysAllow(): boolean {
+    return this.disableAlwaysAllow;
   }
 
   getRawOutput(): boolean {

@@ -901,6 +901,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`security.disableAlwaysAllow`** (boolean):
+  - **Description:** Disable "Always allow" options in tool confirmation
+    dialogs.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`security.enablePermanentToolApproval`** (boolean):
   - **Description:** Enable the "Allow for all future sessions" option in tool
     confirmation dialogs.
@@ -1191,7 +1197,8 @@ their corresponding top-level category object in your `settings.json` file.
 #### `admin`
 
 - **`admin.secureModeEnabled`** (boolean):
-  - **Description:** If true, disallows yolo mode from being used.
+  - **Description:** If true, disallows YOLO mode and "Always allow" options
+    from being used.
   - **Default:** `false`
 
 - **`admin.extensions.enabled`** (boolean):

@@ -37,6 +37,7 @@ describe('ToolConfirmationMessage', () => {
   const mockConfig = {
     isTrustedFolder: () => true,
     getIdeMode: () => false,
+    getDisableAlwaysAllow: () => false,
   } as unknown as Config;
 
   it('should not display urls if prompt and url are the same', async () => {
@@ -331,8 +332,8 @@ describe('ToolConfirmationMessage', () => {
         const mockConfig = {
           isTrustedFolder: () => true,
           getIdeMode: () => false,
+          getDisableAlwaysAllow: () => false,
         } as unknown as Config;
-
         const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
           <ToolConfirmationMessage
             callId="test-call-id"
@@ -353,6 +354,7 @@ describe('ToolConfirmationMessage', () => {
         const mockConfig = {
           isTrustedFolder: () => false,
           getIdeMode: () => false,
+          getDisableAlwaysAllow: () => false,
         } as unknown as Config;
 
         const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
@@ -388,8 +390,8 @@ describe('ToolConfirmationMessage', () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
+        getDisableAlwaysAllow: () => false,
       } as unknown as Config;
-
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <ToolConfirmationMessage
           callId="test-call-id"
@@ -415,8 +417,8 @@ describe('ToolConfirmationMessage', () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
+        getDisableAlwaysAllow: () => false,
       } as unknown as Config;
-
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <ToolConfirmationMessage
           callId="test-call-id"
@@ -457,8 +459,8 @@ describe('ToolConfirmationMessage', () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
+        getDisableAlwaysAllow: () => false,
       } as unknown as Config;
-
       vi.mocked(useToolActions).mockReturnValue({
         confirm: vi.fn(),
         cancel: vi.fn(),
@@ -485,8 +487,8 @@ describe('ToolConfirmationMessage', () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => true,
+        getDisableAlwaysAllow: () => false,
       } as unknown as Config;
-
       vi.mocked(useToolActions).mockReturnValue({
         confirm: vi.fn(),
         cancel: vi.fn(),
@@ -513,8 +515,8 @@ describe('ToolConfirmationMessage', () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => true,
+        getDisableAlwaysAllow: () => false,
       } as unknown as Config;
-
       vi.mocked(useToolActions).mockReturnValue({
         confirm: vi.fn(),
         cancel: vi.fn(),
