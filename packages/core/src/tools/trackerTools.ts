@@ -30,7 +30,7 @@ import type { TrackerTask, TaskType } from '../services/trackerTypes.js';
 import { TaskStatus, TASK_TYPE_LABELS } from '../services/trackerTypes.js';
 import type { TrackerService } from '../services/trackerService.js';
 
-async function buildTodosReturnDisplay(
+export async function buildTodosReturnDisplay(
   service: TrackerService,
 ): Promise<TodoList> {
   const tasks = await service.listTasks();
