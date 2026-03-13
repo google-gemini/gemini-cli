@@ -2594,7 +2594,7 @@ describe('Settings Loading and Merging', () => {
 
       expect(mockCoreEvents.emitFeedback).toHaveBeenCalledWith(
         'error',
-        'There was an error saving your latest settings changes.',
+        'Failed to save settings: Write failed',
         error,
       );
     });

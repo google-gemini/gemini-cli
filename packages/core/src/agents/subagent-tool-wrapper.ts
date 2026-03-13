@@ -10,7 +10,7 @@ import {
   type ToolInvocation,
   type ToolResult,
 } from '../tools/tools.js';
-import type { Config } from '../config/config.js';
+
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import type { AgentDefinition, AgentInputs } from './types.js';
 import { LocalSubagentInvocation } from './local-invocation.js';
@@ -54,10 +54,6 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
     );
   }
 
-  private get config(): Config {
-    return this.context.config;
-  }
-
   /**
    * Creates an invocation instance for executing the subagent.
    *
@@ -89,7 +85,7 @@ export class SubagentToolWrapper extends BaseDeclarativeTool<
     // Special handling for browser agent - needs async MCP setup
     if (definition.name === BROWSER_AGENT_NAME) {
       return new BrowserAgentInvocation(
-        this.config,
+        this.context,
         params,
         effectiveMessageBus,
         _toolName,
