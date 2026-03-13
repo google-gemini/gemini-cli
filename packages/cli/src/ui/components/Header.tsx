@@ -51,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
       <ThemedGradient>{title}</ThemedGradient>
       {nightly && (
         <Box width="100%" flexDirection="row" justifyContent="flex-end">
-          <ThemedGradient>v{version}</ThemedGradient>
+          <ThemedGradient>{version}</ThemedGradient>
         </Box>
       )}
     </Box>
