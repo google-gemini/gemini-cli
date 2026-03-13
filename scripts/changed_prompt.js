@@ -14,18 +14,17 @@ const EVALS_FILE_PREFIXES = [
 function main() {
   const targetBranch = process.env.GITHUB_BASE_REF || 'main';
   try {
-    // Fetch target branch from origin.
-    execSync(`git fetch origin ${targetBranch}`, {
+    const remoteUrl = process.env.GITHUB_REPOSITORY
+      ? `https://github.com/${process.env.GITHUB_REPOSITORY}.git`
+      : 'origin';
+
+    // Fetch target branch from the remote.
+    execSync(`git fetch ${remoteUrl} ${targetBranch}`, {
       stdio: 'ignore',
     });
 
-    // Find the merge base with the target branch.
-    const mergeBase = execSync('git merge-base HEAD FETCH_HEAD', {
-      encoding: 'utf-8',
-    }).trim();
-
-    // Get changed files
-    const changedFiles = execSync(`git diff --name-only ${mergeBase} HEAD`, {
+    // Get changed files using the triple-dot syntax which correctly handles merge commits
+    const changedFiles = execSync(`git diff --name-only FETCH_HEAD...HEAD`, {
       encoding: 'utf-8',
     })
       .split('\n')
