@@ -228,7 +228,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     if (
       settings.merged.ui.showShortcutsHint &&
       !hideUiDetailsForSuggestions &&
-      !hasPendingActionRequired
+      !hasPendingActionRequired &&
+      uiState.buffer.text.length === 0
     ) {
       return showUiDetails ? '? for shortcuts' : 'press tab twice for more';
     }

@@ -390,7 +390,7 @@ describe('Composer', () => {
       expect(output).toContain('LoadingIndicator: Thinking about code');
     });
 
-    it('hides shortcuts hint while loading', async () => {
+    it('shows shortcuts hint while loading', async () => {
       const uiState = createMockUIState({
         streamingState: StreamingState.Responding,
         elapsedTime: 1,
@@ -401,7 +401,8 @@ describe('Composer', () => {
 
       const output = lastFrame();
       expect(output).toContain('LoadingIndicator');
-      expect(output).not.toContain('ShortcutsHint');
+      expect(output).toContain('press tab twice for more');
+      expect(output).not.toContain('? for shortcuts');
     });
 
     it('renders LoadingIndicator with thought when loadingPhrases is off', async () => {
@@ -596,7 +597,8 @@ describe('Composer', () => {
       const { lastFrame } = await renderComposer(uiState, settings);
 
       const output = lastFrame();
-      expect(output).not.toContain('ShortcutsHint');
+      expect(output).not.toContain('press tab twice for more');
+      expect(output).not.toContain('? for shortcuts');
       expect(output).toContain('InputPrompt');
       expect(output).not.toContain('Footer');
     });
@@ -702,7 +704,8 @@ describe('Composer', () => {
       const output = lastFrame();
       expect(output).toContain('LoadingIndicator');
       expect(output).not.toContain('plan');
-      expect(output).not.toContain('ShortcutsHint');
+      expect(output).toContain('press tab twice for more');
+      expect(output).not.toContain('? for shortcuts');
     });
 
     it('hides minimal mode badge while action-required state is active', async () => {
@@ -856,7 +859,8 @@ describe('Composer', () => {
 
       const { lastFrame } = await renderComposer(uiState);
 
-      expect(lastFrame()).not.toContain('ShortcutsHint');
+      expect(lastFrame()).not.toContain('press tab twice for more');
+      expect(lastFrame()).not.toContain('? for shortcuts');
     });
 
     it('hides shortcuts hint when showShortcutsHint setting is false', async () => {
@@ -869,7 +873,7 @@ describe('Composer', () => {
 
       const { lastFrame } = await renderComposer(uiState, settings);
 
-      expect(lastFrame()).not.toContain('ShortcutsHint');
+      expect(lastFrame()).not.toContain('? for shortcuts');
     });
 
     it('hides shortcuts hint when a action is required (e.g. dialog is open)', async () => {
@@ -917,7 +921,7 @@ describe('Composer', () => {
       expect(lastFrame()).toContain('? for shortcuts');
     });
 
-    it('hides shortcuts hint while loading when full UI details are visible', async () => {
+    it('shows shortcuts hint while loading when full UI details are visible', async () => {
       const uiState = createMockUIState({
         cleanUiDetailsVisible: true,
         streamingState: StreamingState.Responding,
@@ -931,10 +935,11 @@ describe('Composer', () => {
 
       // In experimental layout, status row is visible during loading
       expect(lastFrame()).toContain('LoadingIndicator');
-      expect(lastFrame()).not.toContain('ShortcutsHint');
+      expect(lastFrame()).toContain('? for shortcuts');
+      expect(lastFrame()).not.toContain('press tab twice for more');
     });
 
-    it('hides shortcuts hint while loading in minimal mode', async () => {
+    it('shows shortcuts hint while loading in minimal mode', async () => {
       const uiState = createMockUIState({
         cleanUiDetailsVisible: false,
         streamingState: StreamingState.Responding,
@@ -949,7 +954,8 @@ describe('Composer', () => {
 
       // In experimental layout, status row is visible in clean mode while busy
       expect(lastFrame()).toContain('LoadingIndicator');
-      expect(lastFrame()).not.toContain('ShortcutsHint');
+      expect(lastFrame()).toContain('press tab twice for more');
+      expect(lastFrame()).not.toContain('? for shortcuts');
     });
 
     it('shows shortcuts help in minimal mode when toggled on', async () => {
@@ -974,7 +980,8 @@ describe('Composer', () => {
 
       const { lastFrame } = await renderComposer(uiState);
 
-      expect(lastFrame()).not.toContain('ShortcutsHint');
+      expect(lastFrame()).not.toContain('press tab twice for more');
+      expect(lastFrame()).not.toContain('? for shortcuts');
       expect(lastFrame()).not.toContain('plan');
     });
 
