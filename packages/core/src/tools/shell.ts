@@ -32,6 +32,7 @@ import {
   type ShellOutputEvent,
 } from '../services/shellExecutionService.js';
 import { formatBytes } from '../utils/formatters.js';
+import { escapeShellArg } from '../utils/shell-utils.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
   getCommandRoots,
@@ -185,7 +186,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             // wrap command to append subprocess pids (via pgrep) to temporary file
             let command = strippedCommand.trim();
             if (!command.endsWith('&')) command += ';';
-            return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
+            return `{ ${command} }; __code=$?; pgrep -g 0 >${escapeShellArg(tempFilePath, 'bash')} 2>&1; exit $__code;`;
           })();
 
       const cwd = this.params.dir_path
@@ -308,10 +309,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
         if (tempFileExists) {
           const pgrepContent = await fsPromises.readFile(tempFilePath, 'utf8');
-          const pgrepLines = pgrepContent.split(os.EOL).filter(Boolean);
+          const pgrepLines = pgrepContent.split('\n').filter(Boolean);
           for (const line of pgrepLines) {
             if (!/^\d+$/.test(line)) {
               debugLogger.error(`pgrep: ${line}`);
+              continue;
             }
             const pid = Number(line);
             if (pid !== result.pid) {

@@ -41,7 +41,7 @@ vi.mock('node:os', async (importOriginal) => {
 vi.mock('crypto');
 vi.mock('../utils/summarizer.js');
 
-import { initializeShellParsers } from '../utils/shell-utils.js';
+import { escapeShellArg, initializeShellParsers } from '../utils/shell-utils.js';
 import { ShellTool, OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
 import { debugLogger } from '../index.js';
 import { type Config } from '../config/config.js';
@@ -270,11 +270,11 @@ describe('ShellTool', () => {
 
       // Simulate pgrep output file creation by the shell command
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      fs.writeFileSync(tmpFile, `54321${os.EOL}54322${os.EOL}`);
+      fs.writeFileSync(tmpFile, '54321\n54322\n');
 
       const result = await promise;
 
-      const wrappedCommand = `{ my-command & }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const wrappedCommand = `{ my-command & }; __code=$?; pgrep -g 0 >${escapeShellArg(tmpFile, 'bash')} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         tempRootDir,
@@ -288,6 +288,21 @@ describe('ShellTool', () => {
       expect(fs.existsSync(tmpFile)).toBe(false);
     });
 
+    it('should skip non-numeric lines in pgrep output', async () => {
+      const invocation = shellTool.build({ command: 'my-command &' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ pid: 54321 });
+
+      // Simulate pgrep output with stderr error mixed in (via 2>&1)
+      const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
+      fs.writeFileSync(tmpFile, '54321\n54322\npgrep: error reading proc\n54323\n');
+
+      const result = await promise;
+
+      expect(result.llmContent).toContain('Background PIDs: 54322, 54323');
+      expect(result.llmContent).not.toContain('NaN');
+    });
+
     it('should use the provided absolute directory as cwd', async () => {
       const subdir = path.join(tempRootDir, 'subdir');
       const invocation = shellTool.build({
@@ -299,7 +314,7 @@ describe('ShellTool', () => {
       await promise;
 
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `{ ls; }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const wrappedCommand = `{ ls; }; __code=$?; pgrep -g 0 >${escapeShellArg(tmpFile, 'bash')} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         subdir,
@@ -320,7 +335,7 @@ describe('ShellTool', () => {
       await promise;
 
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      const wrappedCommand = `{ ls; }; __code=$?; pgrep -g 0 >${tmpFile} 2>&1; exit $__code;`;
+      const wrappedCommand = `{ ls; }; __code=$?; pgrep -g 0 >${escapeShellArg(tmpFile, 'bash')} 2>&1; exit $__code;`;
       expect(mockShellExecutionService).toHaveBeenCalledWith(
         wrappedCommand,
         path.join(tempRootDir, 'subdir'),
