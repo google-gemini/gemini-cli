@@ -81,8 +81,7 @@ export async function executeToolWithHooks(
   const mcpContext = config ? extractMcpContext(invocation, config) : undefined;
   const hookSystem = config?.getHookSystem();
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const toolInput = (invocation.params || {}) as Record<string, unknown>;
+  const toolInput: Record<string, unknown> = { ...invocation.params };
 
   // Execute the actual tool
   let toolResult: ToolResult;
