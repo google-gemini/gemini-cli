@@ -1,5 +1,7 @@
 /**
- * Universal Deep Review Cleanup (Local)
+ * Universal Offload Cleanup (Local)
+ * 
+ * Cleans up tmux sessions and workspace on the GCE worker.
  */
 import { spawnSync } from 'child_process';
 import path from 'path';
@@ -23,7 +25,7 @@ async function confirm(question: string): Promise<boolean> {
 export async function runCleanup() {
   const settingsPath = path.join(REPO_ROOT, '.gemini/settings.json');
   if (!fs.existsSync(settingsPath)) {
-    console.error('❌ Settings not found. Run "npm run review:setup" first.');
+    console.error('❌ Settings not found. Run "npm run offload:setup" first.');
     return 1;
   }
 
@@ -31,33 +33,32 @@ export async function runCleanup() {
   const config = settings.maintainer?.deepReview;
 
   if (!config) {
-    console.error('❌ Deep Review configuration not found.');
+    console.error('❌ Offload configuration not found.');
     return 1;
   }
 
-  const { remoteHost, remoteWorkDir } = config;
+  const { projectId, zone } = config;
+  const targetVM = `gcli-offload-${process.env.USER || 'mattkorwel'}`;
 
-  console.log(`🧹 Starting cleanup for ${remoteHost}:${remoteWorkDir}...`);
+  console.log(`🧹 Starting cleanup for ${targetVM}...`);
 
   // 1. Standard Cleanup
   console.log('   - Killing remote tmux sessions...');
-  spawnSync('ssh', [remoteHost, 'tmux kill-server'], { shell: true });
+  spawnSync(`ssh ${remoteHost} "tmux kill-server"`, { shell: true });
 
-  console.log('   - Removing PR directories...');
-  // Find all directories in the work dir that aren't .gemini and delete them
-  const dirCleanup = `find ${remoteWorkDir} -mindepth 1 -maxdepth 1 -type d ! -name ".gemini" -exec rm -rf {} +`;
-  spawnSync('ssh', [remoteHost, dirCleanup], { shell: true });
+  console.log('   - Cleaning up Git Worktrees...');
+  spawnSync(`ssh ${remoteHost} "cd ~/dev/main && git worktree prune"`, { shell: true });
+  spawnSync(`ssh ${remoteHost} "rm -rf ~/dev/worktrees/*"`, { shell: true });
 
-  console.log('✅ Standard cleanup complete.');
+  console.log('✅ Remote environment cleared.');
 
   // 2. Full Wipe Option
-  const shouldWipe = await confirm('\nWould you like to COMPLETELY remove the work directory from the remote machine?');
+  const shouldWipe = await confirm('\nWould you like to COMPLETELY wipe the remote workspace directory?');
   
   if (shouldWipe) {
-    console.log(`🔥 Wiping ${remoteWorkDir}...`);
-    const wipeCmd = `rm -rf ${remoteWorkDir}`;
-    spawnSync('ssh', [remoteHost, wipeCmd], { stdio: 'inherit', shell: true });
-    console.log('✅ Remote directory wiped.');
+    console.log(`🔥 Wiping ~/.offload/workspace...`);
+    spawnSync(`gcloud compute ssh ${targetVM} --project ${projectId} --zone ${zone} --command "rm -rf ~/.offload/workspace && mkdir -p ~/.offload/workspace"`, { stdio: 'inherit', shell: true });
+    console.log('✅ Remote workspace wiped.');
   }
   return 0;
 }

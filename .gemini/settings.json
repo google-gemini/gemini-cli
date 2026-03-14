@@ -11,12 +11,10 @@
     "deepReview": {
       "projectId": "gemini-cli-team-quota",
       "zone": "us-west1-a",
-      "machineType": "n2-standard-8",
-      "terminalType": "iterm2",
-      "syncAuth": true,
-      "setupType": "isolated",
-      "geminiSetup": "isolated",
-      "ghSetup": "isolated"
+      "remoteHost": "gcli-worker",
+      "remoteHome": "/home/mattkorwel_google_com",
+      "remoteWorkDir": "/home/mattkorwel_google_com/dev/main",
+      "terminalType": "iterm2"
     }
   }
 }

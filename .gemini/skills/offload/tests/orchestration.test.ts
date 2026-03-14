@@ -38,8 +38,11 @@ describe('Offload Orchestration (GCE)', () => {
     // Default mock for gcloud instance info and describe
     vi.mocked(spawnSync).mockImplementation((cmd: any, args: any) => {
       const callInfo = JSON.stringify({ cmd, args });
-      if (callInfo.includes('gcloud') && callInfo.includes('ssh') && callInfo.includes('echo $HOME')) {
-        return { status: 0, stdout: Buffer.from('/home/testuser\nRUNNING\n'), stderr: Buffer.from('') } as any;
+      if (callInfo.includes('compute') && callInfo.includes('describe')) {
+        return { status: 0, stdout: Buffer.from('RUNNING\n'), stderr: Buffer.from('') } as any;
+      }
+      if (callInfo.includes('gcloud') && callInfo.includes('ssh') && callInfo.includes('pwd')) {
+        return { status: 0, stdout: Buffer.from('/home/testuser\n'), stderr: Buffer.from('') } as any;
       }
       if (callInfo.includes('gh') && callInfo.includes('view')) {
           return { status: 0, stdout: Buffer.from('test-meta\n'), stderr: Buffer.from('') } as any;
