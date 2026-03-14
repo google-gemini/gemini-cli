@@ -20,6 +20,7 @@ import {
   BWRAP_OPTIONAL_LIB_PATHS,
   BWRAP_ESSENTIAL_ETC_FILES,
 } from './bwrapUtils.js';
+import { GEMINI_DIR } from '../utils/paths.js';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -70,7 +71,6 @@ export class BwrapSandboxManager implements SandboxManager {
     bindNodeBinary(bwrapArgs, homeDir);
 
     // Mount workspace and Gemini settings
-    const GEMINI_DIR = '.gemini';
     bwrapArgs.push('--bind', workdir, workdir);
     const geminiSettingsDir = path.join(homeDir, GEMINI_DIR);
     if (fs.existsSync(geminiSettingsDir)) {
