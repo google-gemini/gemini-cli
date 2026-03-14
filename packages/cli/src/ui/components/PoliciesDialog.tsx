@@ -309,7 +309,6 @@ export function PoliciesDialog({
       if (keyMatchers[Command.ESCAPE](key)) {
         if (searchQuery) {
           searchBuffer.setText('');
-          setSearchQuery('');
         } else {
           onClose();
         }
