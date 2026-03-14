@@ -822,6 +822,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
       if (
         key.sequence === '!' &&
         buffer.text === '' &&
+        recentUnsafePasteTime === null &&
         !(completion.showSuggestions && isShellSuggestionsVisible)
       ) {
         setShellModeActive(!shellModeActive);
