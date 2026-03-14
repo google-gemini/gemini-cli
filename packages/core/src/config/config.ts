@@ -574,6 +574,8 @@ export interface ConfigParameters {
   ideMode?: boolean;
   loadMemoryFromIncludeDirectories?: boolean;
   includeDirectoryTree?: boolean;
+  includeEnvironmentContext?: boolean;
+  includeSystemPrompt?: boolean;
   importFormat?: 'tree' | 'flat';
   discoveryMaxDirs?: number;
   compressionThreshold?: number;
@@ -764,6 +766,8 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly acpMode: boolean = false;
   private readonly loadMemoryFromIncludeDirectories: boolean = false;
   private readonly includeDirectoryTree: boolean = true;
+  private readonly includeEnvironmentContext: boolean = true;
+  private readonly includeSystemPrompt: boolean = true;
   private readonly importFormat: 'tree' | 'flat';
   private readonly discoveryMaxDirs: number;
   private readonly compressionThreshold: number | undefined;
@@ -988,6 +992,8 @@ export class Config implements McpContext, AgentLoopContext {
     this.folderTrust = params.folderTrust ?? false;
     this.ideMode = params.ideMode ?? false;
     this.includeDirectoryTree = params.includeDirectoryTree ?? true;
+    this.includeEnvironmentContext = params.includeEnvironmentContext ?? true;
+    this.includeSystemPrompt = params.includeSystemPrompt ?? true;
     this.loadMemoryFromIncludeDirectories =
       params.loadMemoryFromIncludeDirectories ?? false;
     this.importFormat = params.importFormat ?? 'tree';
@@ -1497,6 +1503,14 @@ export class Config implements McpContext, AgentLoopContext {
 
   getIncludeDirectoryTree(): boolean {
     return this.includeDirectoryTree;
+  }
+
+  getIncludeEnvironmentContext(): boolean {
+    return this.includeEnvironmentContext;
+  }
+
+  getIncludeSystemPrompt(): boolean {
+    return this.includeSystemPrompt;
   }
 
   getImportFormat(): 'tree' | 'flat' {
