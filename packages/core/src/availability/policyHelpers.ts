@@ -54,19 +54,21 @@ export function resolvePolicyChain(
     useCustomToolModel,
     hasAccessToPreview,
   );
-  const isAutoPreferred = preferredModel ? isAutoModel(preferredModel) : false;
-  const isAutoConfigured = isAutoModel(configuredModel);
+  const isAutoPreferred = preferredModel
+    ? isAutoModel(preferredModel, config)
+    : false;
+  const isAutoConfigured = isAutoModel(configuredModel, config);
 
   if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
     chain = getFlashLitePolicyChain();
   } else if (
-    isGemini3Model(resolvedModel) ||
+    isGemini3Model(resolvedModel, config) ||
     isAutoPreferred ||
     isAutoConfigured
   ) {
     if (hasAccessToPreview) {
       const previewEnabled =
-        isGemini3Model(resolvedModel) ||
+        isGemini3Model(resolvedModel, config) ||
         preferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
         configuredModel === PREVIEW_GEMINI_MODEL_AUTO;
       chain = getModelPolicyChain({

@@ -1004,6 +1004,7 @@ export class Session {
               callId,
               toolResult.llmContent,
               this.config.getActiveModel(),
+              this.config,
             ),
             resultDisplay: toolResult.returnDisplay,
             error: undefined,
@@ -1017,6 +1018,7 @@ export class Session {
         callId,
         toolResult.llmContent,
         this.config.getActiveModel(),
+        this.config,
       );
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
