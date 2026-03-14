@@ -415,7 +415,7 @@ describe('McpClientManager', () => {
       expect(manager.getMcpServers()).not.toHaveProperty('test-server');
     });
 
-    it('should ignore an extension attempting to register a server with an existing name', async () => {
+    it('should merge extension configuration with an existing user-configured server', async () => {
       const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
       const userConfig = { command: 'node', args: ['user-server.js'] };
 
@@ -441,8 +441,63 @@ describe('McpClientManager', () => {
 
       await manager.startExtension(extension);
 
-      expect(mockedMcpClient.disconnect).not.toHaveBeenCalled();
-      expect(mockedMcpClient.connect).toHaveBeenCalledTimes(1);
+      // It should disconnect the user-only version and reconnect with the merged version
+      expect(mockedMcpClient.disconnect).toHaveBeenCalledTimes(1);
+      expect(mockedMcpClient.connect).toHaveBeenCalledTimes(2);
+
+      // Verify user settings (command/args) still win in the merged config
+      const lastCall = vi.mocked(McpClient).mock.calls[1];
+      expect(lastCall[1].command).toBe('node');
+      expect(lastCall[1].args).toEqual(['user-server.js']);
+      expect(lastCall[1].extension).toEqual(extension);
+    });
+
+    it('should union tool lists and merge env variables between extension and user config', async () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      const userConfig = {
+        excludeTools: ['user-tool'],
+        includeTools: ['user-inc'],
+        env: { USER_VAR: 'user-val', OVERRIDE_VAR: 'user-override' },
+      };
+
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': userConfig,
+      });
+
+      const extension: GeminiCLIExtension = {
+        name: 'test-extension',
+        mcpServers: {
+          'test-server': {
+            command: 'node',
+            args: ['ext.js'],
+            excludeTools: ['ext-tool'],
+            includeTools: ['ext-inc'],
+            env: { EXT_VAR: 'ext-val', OVERRIDE_VAR: 'ext-override' },
+          },
+        },
+        isActive: true,
+        version: '1.0.0',
+        path: '/some-path',
+        contextFiles: [],
+        id: '123',
+      };
+
+      await manager.startExtension(extension);
+
+      const lastCall = vi.mocked(McpClient).mock.calls[0];
+      const mergedConfig = lastCall[1];
+
+      // Arrays should be unioned
+      expect(mergedConfig.excludeTools).toContain('ext-tool');
+      expect(mergedConfig.excludeTools).toContain('user-tool');
+      expect(mergedConfig.includeTools).toContain('ext-inc');
+      expect(mergedConfig.includeTools).toContain('user-inc');
+
+      // Env should be merged
+      const env = mergedConfig.env!;
+      expect(env['EXT_VAR']).toBe('ext-val');
+      expect(env['USER_VAR']).toBe('user-val');
+      expect(env['OVERRIDE_VAR']).toBe('user-override'); // User wins on collisions
     });
 
     it('should remove servers from blockedMcpServers when stopExtension is called', async () => {
