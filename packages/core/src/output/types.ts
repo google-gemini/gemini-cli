@@ -29,6 +29,7 @@ export interface JsonOutput {
 export enum JsonStreamEventType {
   INIT = 'init',
   MESSAGE = 'message',
+  THINKING = 'thinking',
   TOOL_USE = 'tool_use',
   TOOL_RESULT = 'tool_result',
   ERROR = 'error',
@@ -51,6 +52,12 @@ export interface MessageEvent extends BaseJsonStreamEvent {
   role: 'user' | 'assistant';
   content: string;
   delta?: boolean;
+}
+
+export interface ThinkingEvent extends BaseJsonStreamEvent {
+  type: JsonStreamEventType.THINKING;
+  description: string;
+  subject?: string;
 }
 
 export interface ToolUseEvent extends BaseJsonStreamEvent {
@@ -110,6 +117,7 @@ export interface ResultEvent extends BaseJsonStreamEvent {
 export type JsonStreamEvent =
   | InitEvent
   | MessageEvent
+  | ThinkingEvent
   | ToolUseEvent
   | ToolResultEvent
   | ErrorEvent
