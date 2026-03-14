@@ -293,4 +293,185 @@ describe('mcpToolWrapper', () => {
       expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(3);
     });
   });
+
+  describe('Cursor animations', () => {
+    it('should register pre-click listener then inject ripple for click_at', async () => {
+      // Add click_at to the discovered tools.
+      const extendedMcpTools = [
+        ...mockMcpTools,
+        {
+          name: 'click_at',
+          description: 'Click at coordinates',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              x: { type: 'number' },
+              y: { type: 'number' },
+            },
+            required: ['x', 'y'],
+          },
+        },
+      ];
+      vi.mocked(mockBrowserManager.getDiscoveredTools).mockResolvedValueOnce(
+        extendedMcpTools as typeof mockMcpTools,
+      );
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        false,
+        true, // showCursorAnimations
+      );
+
+      const clickAtTool = tools.find((t) => t.name === 'click_at')!;
+      expect(clickAtTool).toBeDefined();
+
+      const invocation = clickAtTool.build({ x: 100, y: 200 });
+      await invocation.execute(new AbortController().signal);
+
+      // Wait for fire-and-forget post-click animation microtask.
+      await Promise.resolve();
+
+      // click_at has no pre-click listener; ripple is injected post-click.
+      // Calls: click_at + evaluate_script (ripple at x=100, y=200)
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(2);
+      expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
+        1,
+        'click_at',
+        { x: 100, y: 200 },
+        expect.any(AbortSignal),
+      );
+      expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
+        2,
+        'evaluate_script',
+        expect.objectContaining({
+          function: expect.stringContaining('__gemini_click'),
+        }),
+        expect.any(AbortSignal),
+      );
+    });
+
+    it('should register pre-click listener BEFORE click(uid) executes', async () => {
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        false,
+        true, // showCursorAnimations
+      );
+
+      const clickTool = tools.find((t) => t.name === 'click')!;
+      const invocation = clickTool.build({ uid: 'elem-99' });
+      await invocation.execute(new AbortController().signal);
+
+      // Calls: evaluate_script (pre-click listener) + click
+      // The listener is injected first so it captures the CDP mousedown event.
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(2);
+      expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
+        1,
+        'evaluate_script',
+        expect.objectContaining({
+          function: expect.stringContaining('__gemini_click_listener'),
+        }),
+        expect.any(AbortSignal),
+      );
+      expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
+        2,
+        'click',
+        { uid: 'elem-99' },
+        expect.any(AbortSignal),
+      );
+    });
+
+    it('should inject scroll animation for ArrowDown press_key', async () => {
+      const extendedMcpTools = [
+        ...mockMcpTools,
+        {
+          name: 'press_key',
+          description: 'Press a key',
+          inputSchema: {
+            type: 'object',
+            properties: { key: { type: 'string' } },
+            required: ['key'],
+          },
+        },
+      ];
+      vi.mocked(mockBrowserManager.getDiscoveredTools).mockResolvedValueOnce(
+        extendedMcpTools as typeof mockMcpTools,
+      );
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        false,
+        true, // showCursorAnimations
+      );
+
+      const pressKeyTool = tools.find((t) => t.name === 'press_key')!;
+      const invocation = pressKeyTool.build({ key: 'ArrowDown' });
+      await invocation.execute(new AbortController().signal);
+
+      await Promise.resolve();
+
+      // Calls: press_key + evaluate_script (scroll animation)
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(2);
+      expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
+        1,
+        'press_key',
+        { key: 'ArrowDown' },
+        expect.any(AbortSignal),
+      );
+      expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
+        2,
+        'evaluate_script',
+        expect.objectContaining({
+          function: expect.stringContaining('__gemini_scroll_arrow_down'),
+        }),
+        expect.any(AbortSignal),
+      );
+    });
+
+    it('should NOT inject any animation when showCursorAnimations is false', async () => {
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        false,
+        false, // showCursorAnimations disabled
+      );
+
+      const clickTool = tools.find((t) => t.name === 'click')!;
+      const invocation = clickTool.build({ uid: 'elem-42' });
+      await invocation.execute(new AbortController().signal);
+
+      await Promise.resolve();
+
+      // Only the click itself — no pre-click listener, no post-click animation
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(1);
+      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
+        'click',
+        { uid: 'elem-42' },
+        expect.any(AbortSignal),
+      );
+    });
+
+    it('should swallow pre-click listener errors and still execute the click', async () => {
+      vi.mocked(mockBrowserManager.callTool)
+        .mockRejectedValueOnce(new Error('CSP blocked evaluate_script')) // listener injection fails
+        .mockResolvedValueOnce({
+          content: [{ type: 'text', text: 'clicked' }],
+        }); // click itself succeeds
+
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        false,
+        true, // showCursorAnimations
+      );
+
+      const clickTool = tools.find((t) => t.name === 'click')!;
+      const invocation = clickTool.build({ uid: 'elem-77' });
+      const result = await invocation.execute(new AbortController().signal);
+
+      // The tool result should be success despite listener injection failure
+      expect(result.error).toBeUndefined();
+      expect(result.llmContent).toBe('clicked');
+    });
+  });
 });
