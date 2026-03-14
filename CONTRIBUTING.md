@@ -579,3 +579,23 @@ If you have questions about contributing documentation:
 - Reach out to the maintainers.
 
 We appreciate your contributions to making Gemini CLI documentation better!
+
+## Docker-based development
+
+For an isolated environment without installing Node locally, you can use Docker:
+
+\\\ash
+docker build -t gemini-cli-dev -f Dockerfile .
+docker run -it -v $PWD:/app -w /app gemini-cli-dev bash
+\\\
+
+Inside the container, run:
+\\\ash
+npm run preflight
+\\\
+
+Make sure to pass \GEMINI_API_KEY\ for integration tests:
+\\\ash
+docker run -it -v $PWD:/app -w /app -e GEMINI_API_KEY=$GEMINI_API_KEY gemini-cli-dev bash
+\\\
+
