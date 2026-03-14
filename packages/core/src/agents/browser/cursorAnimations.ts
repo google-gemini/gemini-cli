@@ -53,12 +53,11 @@ const CLICK_LISTENER_SENTINEL_ID = '__gemini_click_listener';
  * CSS @keyframes block for the click ripple (injected once per page).
  * Shared between pre-click-listener and direct injection scripts.
  */
-const CLICK_KEYFRAMES =
-  '@keyframes __gemini_click { ' +
-  '0%   { transform: scale(0.3); opacity: 1; } ' +
-  '60%  { transform: scale(1);   opacity: 0.6; } ' +
-  '100% { transform: scale(1.4); opacity: 0; } ' +
-  '}';
+const CLICK_KEYFRAMES = `@keyframes __gemini_click {
+  0%   { transform: scale(0.3); opacity: 1; }
+  60%  { transform: scale(1);   opacity: 0.6; }
+  100% { transform: scale(1.4); opacity: 0; }
+}`;
 
 /**
  * Builds a JavaScript function string that registers a **one-shot** mousedown
