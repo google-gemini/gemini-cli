@@ -10,6 +10,7 @@ import {
   type ToolResultDisplay,
   debugLogger,
   CoreToolCallStatus,
+  type ToolErrorType,
 } from '@google/gemini-cli-core';
 import {
   type HistoryItemToolGroup,
@@ -63,6 +64,7 @@ export function mapToDisplay(
     let progressMessage: string | undefined = undefined;
     let progress: number | undefined = undefined;
     let progressTotal: number | undefined = undefined;
+    let errorType: ToolErrorType | undefined = undefined;
 
     switch (call.status) {
       case CoreToolCallStatus.Success:
@@ -72,6 +74,7 @@ export function mapToDisplay(
       case CoreToolCallStatus.Error:
       case CoreToolCallStatus.Cancelled:
         resultDisplay = call.response.resultDisplay;
+        errorType = call.response.errorType;
         break;
       case CoreToolCallStatus.AwaitingApproval:
         correlationId = call.correlationId;
@@ -114,6 +117,7 @@ export function mapToDisplay(
       progressTotal,
       approvalMode: call.approvalMode,
       originalRequestName: call.request.originalRequestName,
+      errorType,
     };
   });
 
