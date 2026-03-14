@@ -13,6 +13,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { getErrorMessage } from '../utils/errors.js';
 import type { FallbackIntent, FallbackRecommendation } from './types.js';
 import { classifyFailureKind } from '../availability/errorClassification.js';
+import { isAutoModel } from '../config/models.js';
 import {
   buildFallbackPolicyContext,
   resolvePolicyChain,
@@ -40,6 +41,8 @@ export async function handleFallback(
     if (!failedPolicy) return undefined;
     return { service: availability, policy: failedPolicy };
   };
+
+  const isAutoMode = isAutoModel(config.getModel());
 
   let fallbackModel: string;
   if (!candidates.length) {
@@ -70,7 +73,11 @@ export async function handleFallback(
     const action = resolvePolicyAction(failureKind, selectedPolicy);
 
     if (action === 'silent') {
-      applyAvailabilityTransition(getAvailabilityContext, failureKind);
+      applyAvailabilityTransition(
+        getAvailabilityContext,
+        failureKind,
+        isAutoMode,
+      );
       return processIntent(config, 'retry_always', fallbackModel);
     }
 
@@ -99,7 +106,11 @@ export async function handleFallback(
     // We DO NOT apply it if the user chose 'stop' or 'retry_later', allowing
     // them to try again later with the same model state.
     if (intent === 'retry_always' || intent === 'retry_once') {
-      applyAvailabilityTransition(getAvailabilityContext, failureKind);
+      applyAvailabilityTransition(
+        getAvailabilityContext,
+        failureKind,
+        isAutoMode,
+      );
     }
 
     return await processIntent(config, intent, fallbackModel);

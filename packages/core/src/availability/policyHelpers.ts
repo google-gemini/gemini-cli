@@ -29,6 +29,7 @@ import {
 } from '../config/models.js';
 import type { ModelSelectionResult } from './modelAvailabilityService.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
+import { coreEvents } from '../utils/events.js';
 
 /**
  * Resolves the active policy chain for the given config, ensuring the
@@ -230,6 +231,7 @@ export function applyModelSelection(
 export function applyAvailabilityTransition(
   getContext: (() => RetryAvailabilityContext | undefined) | undefined,
   failureKind: FailureKind,
+  isAutoMode: boolean = false,
 ): void {
   const context = getContext?.();
   if (!context) return;
@@ -238,10 +240,15 @@ export function applyAvailabilityTransition(
   if (!transition) return;
 
   if (transition === 'terminal') {
-    context.service.markTerminal(
-      context.policy.model,
-      failureKind === 'terminal' ? 'quota' : 'capacity',
-    );
+    const reason = failureKind === 'terminal' ? 'quota' : 'capacity';
+    context.service.markTerminal(context.policy.model, reason);
+
+    if (isAutoMode && reason === 'quota') {
+      coreEvents.emitFeedback(
+        'warning',
+        `Quota exhausted for ${context.policy.model}. Switching to a fallback model.`,
+      );
+    }
   } else if (transition === 'sticky_retry') {
     context.service.markRetryOncePerTurn(context.policy.model);
   }

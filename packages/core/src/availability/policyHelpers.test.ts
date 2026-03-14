@@ -4,11 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   resolvePolicyChain,
   buildFallbackPolicyContext,
   applyModelSelection,
+  applyAvailabilityTransition,
 } from './policyHelpers.js';
 import { createDefaultPolicy } from './policyCatalog.js';
 import type { Config } from '../config/config.js';
@@ -19,6 +20,18 @@ import {
   PREVIEW_GEMINI_3_1_MODEL,
 } from '../config/models.js';
 import { AuthType } from '../core/contentGenerator.js';
+import { coreEvents } from '../utils/events.js';
+
+vi.mock('../utils/events.js', async (importActual) => {
+  const actual = await importActual<typeof import('../utils/events.js')>();
+  return {
+    ...actual,
+    coreEvents: {
+      ...actual.coreEvents,
+      emitFeedback: vi.fn(),
+    },
+  };
+});
 
 const createMockConfig = (overrides: Partial<Config> = {}): Config => {
   const config = {
@@ -37,6 +50,10 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config => {
 };
 
 describe('policyHelpers', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('resolvePolicyChain', () => {
     it('returns a single-model chain for a custom model', () => {
       const config = createMockConfig({
@@ -359,6 +376,85 @@ describe('policyHelpers', () => {
       ).not.toHaveBeenCalled();
       expect(config.setActiveModel).toHaveBeenCalledWith('gemini-pro');
       expect(result.maxAttempts).toBe(1);
+    });
+  });
+
+  describe('applyAvailabilityTransition', () => {
+    it('emits feedback when transition is terminal, reason is quota and isAutoMode is true', () => {
+      const mockService = {
+        markTerminal: vi.fn(),
+      };
+      const context = {
+        service:
+          mockService as unknown as import('./modelAvailabilityService.js').ModelAvailabilityService,
+        policy: {
+          model: 'test-model',
+          stateTransitions: {
+            terminal: 'terminal',
+          },
+        } as unknown as import('./modelPolicy.js').ModelPolicy,
+      };
+
+      applyAvailabilityTransition(() => context, 'terminal', true);
+
+      expect(mockService.markTerminal).toHaveBeenCalledWith(
+        'test-model',
+        'quota',
+      );
+      expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+        'warning',
+        'Quota exhausted for test-model. Switching to a fallback model.',
+      );
+    });
+
+    it('does NOT emit feedback when isAutoMode is false', () => {
+      const mockService = {
+        markTerminal: vi.fn(),
+      };
+      const context = {
+        service:
+          mockService as unknown as import('./modelAvailabilityService.js').ModelAvailabilityService,
+        policy: {
+          model: 'test-model',
+          stateTransitions: {
+            terminal: 'terminal',
+          },
+        } as unknown as import('./modelPolicy.js').ModelPolicy,
+      };
+
+      vi.mocked(coreEvents.emitFeedback).mockClear();
+      applyAvailabilityTransition(() => context, 'terminal', false);
+
+      expect(mockService.markTerminal).toHaveBeenCalledWith(
+        'test-model',
+        'quota',
+      );
+      expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
+    });
+
+    it('does NOT emit feedback when reason is capacity', () => {
+      const mockService = {
+        markTerminal: vi.fn(),
+      };
+      const context = {
+        service:
+          mockService as unknown as import('./modelAvailabilityService.js').ModelAvailabilityService,
+        policy: {
+          model: 'test-model',
+          stateTransitions: {
+            unknown: 'terminal',
+          },
+        } as unknown as import('./modelPolicy.js').ModelPolicy,
+      };
+
+      vi.mocked(coreEvents.emitFeedback).mockClear();
+      applyAvailabilityTransition(() => context, 'unknown', true);
+
+      expect(mockService.markTerminal).toHaveBeenCalledWith(
+        'test-model',
+        'capacity',
+      );
+      expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
     });
   });
 });
