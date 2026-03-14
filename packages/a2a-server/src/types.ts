@@ -46,6 +46,7 @@ export enum CoderAgentEvent {
 export interface AgentSettings {
   kind: CoderAgentEvent.StateAgentSettingsEvent;
   workspacePath: string;
+  workspacePaths?: string[];
   autoExecute?: boolean;
 }
 
@@ -129,7 +130,10 @@ function isAgentSettings(value: unknown): value is AgentSettings {
     'kind' in value &&
     value.kind === CoderAgentEvent.StateAgentSettingsEvent &&
     'workspacePath' in value &&
-    typeof value.workspacePath === 'string'
+    typeof value.workspacePath === 'string' &&
+    (!('workspacePaths' in value) ||
+      (Array.isArray(value.workspacePaths) &&
+        value.workspacePaths.every((p) => typeof p === 'string')))
   );
 }
 

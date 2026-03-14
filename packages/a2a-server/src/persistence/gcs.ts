@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import type { Task as SDKTask } from '@a2a-js/sdk';
 import type { TaskStore } from '@a2a-js/sdk/server';
 import { logger } from '../utils/logger.js';
-import { setTargetDir } from '../config/config.js';
+import { getWorkspaceDirs } from '../config/config.js';
 import { getPersistedState, type PersistedTaskMetadata } from '../types.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -258,7 +258,7 @@ export class GCSTaskStore implements TaskStore {
       }
       const agentSettings = persistedState._agentSettings;
 
-      const workDir = setTargetDir(agentSettings);
+      const workDir = getWorkspaceDirs(agentSettings)[0];
       await fse.ensureDir(workDir);
       const workspaceFile = this.storage
         .bucket(this.bucketName)
