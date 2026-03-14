@@ -213,7 +213,7 @@ class McpToolInvocation extends BaseToolInvocation<
    *   params are available and the position is deterministic).
    * - press_key with scroll keys: inject scroll bar indicator.
    *
-   * click(uid) and hover animations are handled via the pre-click listener
+   * click(uid) animations are handled via the pre-click listener
    * registered in execute() before the tool call.
    *
    * Errors are silently swallowed — animations are a UX enhancement only.
