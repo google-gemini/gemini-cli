@@ -167,10 +167,10 @@ export interface SummarizeToolOutputSettings {
   tokenBudget?: number;
 }
 
-export type LoadingPhrasesMode = 'tips' | 'witty' | 'all' | 'off';
+export type StatusHintsMode = 'tips' | 'witty' | 'all' | 'off';
 
 export interface AccessibilitySettings {
-  /** @deprecated Use ui.loadingPhrases instead. */
+  /** @deprecated Use ui.statusHints instead. */
   enableLoadingPhrases?: boolean;
   screenReader?: boolean;
 }
@@ -847,11 +847,11 @@ export function migrateDeprecatedSettings(
     const oldValue = settings[oldKey];
     const newValue = settings[newKey];
 
-    if (typeof oldValue === 'boolean') {
+    if (oldValue === true || oldValue === false) {
       if (foundDeprecated) {
         foundDeprecated.push(prefix ? `${prefix}.${oldKey}` : oldKey);
       }
-      if (typeof newValue === 'boolean') {
+      if (newValue === true || newValue === false) {
         // Both exist, trust the new one
         if (removeDeprecated) {
           delete settings[oldKey];
@@ -911,6 +911,91 @@ export function migrateDeprecatedSettings(
     const uiSettings = settings.ui as Record<string, unknown> | undefined;
     if (uiSettings) {
       const newUi = { ...uiSettings };
+      let uiModified = false;
+
+      // Migrate hideIntroTips → hideTips (backward compatibility)
+      if (newUi['hideIntroTips'] === true || newUi['hideIntroTips'] === false) {
+        foundDeprecated.push('ui.hideIntroTips');
+        if (newUi['hideTips'] === undefined) {
+          newUi['hideTips'] = newUi['hideIntroTips'];
+          uiModified = true;
+        }
+        if (removeDeprecated) {
+          delete newUi['hideIntroTips'];
+          uiModified = true;
+        }
+      }
+
+      // Migrate loadingPhrases/statusHints (enums) → hideStatusTips/hideStatusWit (booleans)
+      const oldHintSetting = newUi['statusHints'] ?? newUi['loadingPhrases'];
+      if (oldHintSetting !== undefined) {
+        if (newUi['loadingPhrases'] !== undefined) {
+          foundDeprecated.push('ui.loadingPhrases');
+        }
+        if (newUi['statusHints'] !== undefined) {
+          foundDeprecated.push('ui.statusHints');
+        }
+
+        if (
+          newUi['hideStatusTips'] === undefined &&
+          newUi['hideStatusWit'] === undefined
+        ) {
+          switch (oldHintSetting) {
+            case 'all':
+              newUi['hideStatusTips'] = false;
+              newUi['hideStatusWit'] = false;
+              uiModified = true;
+              break;
+            case 'tips':
+              newUi['hideStatusTips'] = false;
+              newUi['hideStatusWit'] = true;
+              uiModified = true;
+              break;
+            case 'witty':
+              newUi['hideStatusTips'] = true;
+              newUi['hideStatusWit'] = false;
+              uiModified = true;
+              break;
+            case 'off':
+              newUi['hideStatusTips'] = true;
+              newUi['hideStatusWit'] = true;
+              uiModified = true;
+              break;
+            default:
+              break;
+          }
+        }
+
+        if (removeDeprecated) {
+          if (newUi['loadingPhrases'] !== undefined) {
+            delete newUi['loadingPhrases'];
+            uiModified = true;
+          }
+          if (newUi['statusHints'] !== undefined) {
+            delete newUi['statusHints'];
+            uiModified = true;
+          }
+        }
+      }
+
+      // Handle the recently added (now deprecated) showStatusTips and showStatusWit
+      uiModified =
+        migrateBoolean(
+          newUi,
+          'showStatusTips',
+          'hideStatusTips',
+          'ui',
+          foundDeprecated,
+        ) || uiModified;
+      uiModified =
+        migrateBoolean(
+          newUi,
+          'showStatusWit',
+          'hideStatusWit',
+          'ui',
+          foundDeprecated,
+        ) || uiModified;
+
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const accessibilitySettings = newUi['accessibility'] as
         | Record<string, unknown>
@@ -928,26 +1013,34 @@ export function migrateDeprecatedSettings(
           )
         ) {
           newUi['accessibility'] = newAccessibility;
-          loadedSettings.setValue(scope, 'ui', newUi);
-          if (!settingsFile.readOnly) {
-            anyModified = true;
-          }
+          uiModified = true;
         }
 
-        // Migrate enableLoadingPhrases: false → loadingPhrases: 'off'
+        // Migrate enableLoadingPhrases: false → hideStatusTips/hideStatusWit: true
         const enableLP = newAccessibility['enableLoadingPhrases'];
-        if (
-          typeof enableLP === 'boolean' &&
-          newUi['loadingPhrases'] === undefined
-        ) {
-          if (!enableLP) {
-            newUi['loadingPhrases'] = 'off';
-            loadedSettings.setValue(scope, 'ui', newUi);
-            if (!settingsFile.readOnly) {
-              anyModified = true;
-            }
-          }
+        if (enableLP === true || enableLP === false) {
           foundDeprecated.push('ui.accessibility.enableLoadingPhrases');
+          if (
+            !enableLP &&
+            newUi['hideStatusTips'] === undefined &&
+            newUi['hideStatusWit'] === undefined
+          ) {
+            newUi['hideStatusTips'] = true;
+            newUi['hideStatusWit'] = true;
+            uiModified = true;
+          }
+          if (removeDeprecated) {
+            delete newAccessibility['enableLoadingPhrases'];
+            newUi['accessibility'] = newAccessibility;
+            uiModified = true;
+          }
+        }
+      }
+
+      if (uiModified) {
+        loadedSettings.setValue(scope, 'ui', newUi);
+        if (!settingsFile.readOnly) {
+          anyModified = true;
         }
       }
     }

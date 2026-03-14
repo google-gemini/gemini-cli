@@ -7,7 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { ToolCallStatus, mapCoreStatusToDisplayStatus } from '../../types.js';
-import { CliSpinner } from '../CliSpinner.js';
+import { GeminiRespondingSpinner } from '../GeminiRespondingSpinner.js';
 import {
   SHELL_COMMAND_NAME,
   SHELL_NAME,
@@ -123,7 +123,7 @@ export const FocusHint: React.FC<{
 
   return (
     <Box marginLeft={1} flexShrink={0}>
-      <Text color={isThisShellFocused ? theme.ui.focus : theme.ui.active}>
+      <Text color={theme.status.warning}>
         {isThisShellFocused
           ? `(${formatCommand(Command.UNFOCUS_SHELL_INPUT)} to unfocus)`
           : `(${formatCommand(Command.FOCUS_SHELL_INPUT)} to focus)`}
@@ -150,7 +150,7 @@ export const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
   const statusColor = isFocused
     ? theme.ui.focus
     : isShell
-      ? theme.ui.active
+      ? theme.ui.symbol
       : theme.status.warning;
 
   return (
@@ -159,9 +159,11 @@ export const ToolStatusIndicator: React.FC<ToolStatusIndicatorProps> = ({
         <Text color={theme.status.success}>{TOOL_STATUS.PENDING}</Text>
       )}
       {status === ToolCallStatus.Executing && (
-        <Text color={statusColor}>
-          <CliSpinner type="toggle" />
-        </Text>
+        <GeminiRespondingSpinner
+          spinnerType="toggle"
+          nonRespondingDisplay={TOOL_STATUS.EXECUTING}
+          color={isFocused ? theme.ui.focus : undefined}
+        />
       )}
       {status === ToolCallStatus.Success && (
         <Text color={theme.status.success} aria-label={'Success:'}>

@@ -64,4 +64,30 @@ describe('<HookStatusDisplay />', () => {
     expect(lastFrame({ allowEmpty: true })).toBe('');
     unmount();
   });
+
+  it('should show generic message when only system/extension hooks are active', async () => {
+    const props = {
+      activeHooks: [
+        { name: 'ext-hook', eventName: 'BeforeAgent', source: 'extensions' },
+      ],
+    };
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <HookStatusDisplay {...props} />,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toContain('Working...');
+    unmount();
+  });
+
+  it('matches SVG snapshot for single hook', async () => {
+    const props = {
+      activeHooks: [
+        { name: 'test-hook', eventName: 'BeforeAgent', source: 'user' },
+      ],
+    };
+    const renderResult = render(<HookStatusDisplay {...props} />);
+    await renderResult.waitUntilReady();
+    await expect(renderResult).toMatchSvgSnapshot();
+    renderResult.unmount();
+  });
 });

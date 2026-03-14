@@ -15,6 +15,8 @@ exports[`ToolConfirmationQueue > calculates availableContentHeight based on avai
 │   3. Modify with external editor                                             │
 │   4. No, suggest changes (esc)                                               │
 │                                                                              │
+│ Enter to select · ↑/↓ to navigate · Esc to cancel                            │
+│                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
  Press Ctrl+O to show more lines
 "
@@ -37,6 +39,8 @@ exports[`ToolConfirmationQueue > does not render expansion hint when constrainHe
 │   2. Allow for this session                                                  │
 │   3. Modify with external editor                                             │
 │   4. No, suggest changes (esc)                                               │
+│                                                                              │
+│ Enter to select · ↑/↓ to navigate · Esc to cancel                            │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 "
@@ -106,6 +110,8 @@ exports[`ToolConfirmationQueue > renders expansion hint when content is long and
 │   3. Modify with external editor                                             │
 │   4. No, suggest changes (esc)                                               │
 │                                                                              │
+│ Enter to select · ↑/↓ to navigate · Esc to cancel                            │
+│                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
  Press Ctrl+O to show more lines
 "
@@ -123,6 +129,8 @@ exports[`ToolConfirmationQueue > renders the confirming tool with progress indic
 │ ● 1. Allow once                                                              │
 │   2. Allow for this session                                                  │
 │   3. No, suggest changes (esc)                                               │
+│                                                                              │
+│ Enter to select · ↑/↓ to navigate · Esc to cancel                            │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 "

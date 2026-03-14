@@ -533,12 +533,23 @@ const SETTINGS_SCHEMA = {
       },
       hideTips: {
         type: 'boolean',
-        label: 'Hide Tips',
+        label: 'Hide Startup Tips',
         category: 'UI',
         requiresRestart: false,
         default: false,
-        description: 'Hide helpful tips in the UI',
+        description:
+          'Hide the introductory tips shown at the top of the screen.',
         showInDialog: true,
+      },
+      hideIntroTips: {
+        type: 'boolean',
+        label: 'Hide Intro Tips',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          '@deprecated Use ui.hideTips instead. Hide the intro tips in the header.',
+        showInDialog: false,
       },
       escapePastedAtSymbols: {
         type: 'boolean',
@@ -556,7 +567,8 @@ const SETTINGS_SCHEMA = {
         category: 'UI',
         requiresRestart: false,
         default: true,
-        description: 'Show the "? for shortcuts" hint above the input.',
+        description:
+          "Show basic shortcut help ('?') when the status line is idle.",
         showInDialog: true,
       },
       hideBanner: {
@@ -739,6 +751,42 @@ const SETTINGS_SCHEMA = {
         description: 'Show the spinner during operations.',
         showInDialog: true,
       },
+      hideStatusTips: {
+        type: 'boolean',
+        label: 'Hide Footer Tips',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Hide helpful tips in the footer while the model is working.',
+        showInDialog: true,
+      },
+      hideStatusWit: {
+        type: 'boolean',
+        label: 'Hide Footer Wit',
+        category: 'UI',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Hide witty loading phrases in the footer while the model is working.',
+        showInDialog: true,
+      },
+      statusHints: {
+        type: 'enum',
+        label: 'Status Line Hints',
+        category: 'UI',
+        requiresRestart: false,
+        default: 'tips',
+        description:
+          '@deprecated Use ui.hideStatusTips and ui.hideStatusWit instead. What to show in the status line: tips, witty comments, both, or off (fallback to shortcuts help).',
+        showInDialog: false,
+        options: [
+          { value: 'tips', label: 'Tips' },
+          { value: 'witty', label: 'Witty' },
+          { value: 'all', label: 'All' },
+          { value: 'off', label: 'Off' },
+        ],
+      },
       loadingPhrases: {
         type: 'enum',
         label: 'Loading Phrases',
@@ -746,8 +794,8 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: 'tips',
         description:
-          'What to show while the model is working: tips, witty comments, both, or nothing.',
-        showInDialog: true,
+          '@deprecated Use ui.hideStatusTips and ui.hideStatusWit instead. What to show in the status line: tips, witty comments, both, or off (fallback to shortcuts help).',
+        showInDialog: false,
         options: [
           { value: 'tips', label: 'Tips' },
           { value: 'witty', label: 'Witty' },

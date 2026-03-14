@@ -168,6 +168,8 @@ export interface UIState {
   cleanUiDetailsVisible: boolean;
   elapsedTime: number;
   currentLoadingPhrase: string | undefined;
+  currentTip: string | undefined;
+  currentWittyPhrase: string | undefined;
   historyRemountKey: number;
   activeHooks: ActiveHook[];
   messageQueue: string[];

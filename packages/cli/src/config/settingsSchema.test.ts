@@ -83,19 +83,6 @@ describe('SettingsSchema', () => {
       ).toBe('boolean');
     });
 
-    it('should have loadingPhrases enum property', () => {
-      const definition = getSettingsSchema().ui?.properties?.loadingPhrases;
-      expect(definition).toBeDefined();
-      expect(definition?.type).toBe('enum');
-      expect(definition?.default).toBe('tips');
-      expect(definition?.options?.map((o) => o.value)).toEqual([
-        'tips',
-        'witty',
-        'all',
-        'off',
-      ]);
-    });
-
     it('should have errorVerbosity enum property', () => {
       const definition = getSettingsSchema().ui?.properties?.errorVerbosity;
       expect(definition).toBeDefined();
@@ -381,7 +368,7 @@ describe('SettingsSchema', () => {
       ).toBe(true);
       expect(
         getSettingsSchema().ui.properties.showShortcutsHint.description,
-      ).toBe('Show the "? for shortcuts" hint above the input.');
+      ).toBe("Show basic shortcut help ('?') when the status line is idle.");
     });
 
     it('should have enableNotifications setting in schema', () => {

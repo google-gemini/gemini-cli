@@ -2196,23 +2196,88 @@ describe('Settings Loading and Merging', () => {
         SettingScope.User,
         'ui',
         expect.objectContaining({
-          accessibility: expect.objectContaining({
-            enableLoadingPhrases: false,
-          }),
-        }),
-      );
-
-      // Check that enableLoadingPhrases: false was further migrated to loadingPhrases: 'off'
-      expect(setValueSpy).toHaveBeenCalledWith(
-        SettingScope.User,
-        'ui',
-        expect.objectContaining({
-          loadingPhrases: 'off',
+          accessibility: {},
+          hideStatusTips: true,
+          hideStatusWit: true,
         }),
       );
     });
 
-    it('should migrate enableLoadingPhrases: false to loadingPhrases: off', () => {
+    it('should migrate hideIntroTips to hideTips', () => {
+      const userSettingsContent = {
+        ui: {
+          hideIntroTips: true,
+        },
+      };
+
+      const loadedSettings = createMockSettings(userSettingsContent);
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+
+      migrateDeprecatedSettings(loadedSettings);
+
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'ui',
+        expect.objectContaining({
+          hideTips: true,
+        }),
+      );
+    });
+
+    it.each([
+      { input: 'all', expectedHideTips: false, expectedHideWit: false },
+      { input: 'tips', expectedHideTips: false, expectedHideWit: true },
+      { input: 'witty', expectedHideTips: true, expectedHideWit: false },
+      { input: 'off', expectedHideTips: true, expectedHideWit: true },
+    ])(
+      'should migrate statusHints $input to hideStatusTips: $expectedHideTips, hideStatusWit: $expectedHideWit',
+      ({ input, expectedHideTips, expectedHideWit }) => {
+        const userSettingsContent = {
+          ui: {
+            statusHints: input,
+          },
+        };
+
+        const loadedSettings = createMockSettings(userSettingsContent);
+        const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+
+        migrateDeprecatedSettings(loadedSettings);
+
+        expect(setValueSpy).toHaveBeenCalledWith(
+          SettingScope.User,
+          'ui',
+          expect.objectContaining({
+            hideStatusTips: expectedHideTips,
+            hideStatusWit: expectedHideWit,
+          }),
+        );
+      },
+    );
+
+    it('should migrate showStatusTips/showStatusWit to hideStatusTips/hideStatusWit', () => {
+      const userSettingsContent = {
+        ui: {
+          showStatusTips: true,
+          showStatusWit: false,
+        },
+      };
+
+      const loadedSettings = createMockSettings(userSettingsContent);
+      const setValueSpy = vi.spyOn(loadedSettings, 'setValue');
+
+      migrateDeprecatedSettings(loadedSettings);
+
+      expect(setValueSpy).toHaveBeenCalledWith(
+        SettingScope.User,
+        'ui',
+        expect.objectContaining({
+          hideStatusTips: false,
+          hideStatusWit: true,
+        }),
+      );
+    });
+
+    it('should migrate enableLoadingPhrases: false to hideStatusTips/hideStatusWit: true', () => {
       const userSettingsContent = {
         ui: {
           accessibility: {
@@ -2230,12 +2295,13 @@ describe('Settings Loading and Merging', () => {
         SettingScope.User,
         'ui',
         expect.objectContaining({
-          loadingPhrases: 'off',
+          hideStatusTips: true,
+          hideStatusWit: true,
         }),
       );
     });
 
-    it('should not migrate enableLoadingPhrases: true to loadingPhrases', () => {
+    it('should not migrate enableLoadingPhrases: true to hideStatusTips/hideStatusWit', () => {
       const userSettingsContent = {
         ui: {
           accessibility: {
@@ -2249,18 +2315,20 @@ describe('Settings Loading and Merging', () => {
 
       migrateDeprecatedSettings(loadedSettings);
 
-      // Should not set loadingPhrases when enableLoadingPhrases is true
+      // Should not set hideStatusTips/hideStatusWit when enableLoadingPhrases is true
       const uiCalls = setValueSpy.mock.calls.filter((call) => call[1] === 'ui');
       for (const call of uiCalls) {
         const uiValue = call[2] as Record<string, unknown>;
-        expect(uiValue).not.toHaveProperty('loadingPhrases');
+        expect(uiValue).not.toHaveProperty('hideStatusTips');
+        expect(uiValue).not.toHaveProperty('hideStatusWit');
       }
     });
 
-    it('should not overwrite existing loadingPhrases during migration', () => {
+    it('should not overwrite existing hideStatusTips/hideStatusWit during migration', () => {
       const userSettingsContent = {
         ui: {
-          loadingPhrases: 'witty',
+          hideStatusTips: false,
+          hideStatusWit: false,
           accessibility: {
             enableLoadingPhrases: false,
           },
@@ -2272,12 +2340,15 @@ describe('Settings Loading and Merging', () => {
 
       migrateDeprecatedSettings(loadedSettings);
 
-      // Should not overwrite existing loadingPhrases
+      // Should not overwrite existing hideStatusTips/hideStatusWit
       const uiCalls = setValueSpy.mock.calls.filter((call) => call[1] === 'ui');
       for (const call of uiCalls) {
         const uiValue = call[2] as Record<string, unknown>;
-        if (uiValue['loadingPhrases'] !== undefined) {
-          expect(uiValue['loadingPhrases']).toBe('witty');
+        if (uiValue['hideStatusTips'] !== undefined) {
+          expect(uiValue['hideStatusTips']).toBe(false);
+        }
+        if (uiValue['hideStatusWit'] !== undefined) {
+          expect(uiValue['hideStatusWit']).toBe(false);
         }
       }
     });

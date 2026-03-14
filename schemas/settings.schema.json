@@ -297,9 +297,16 @@
           "type": "boolean"
         },
         "hideTips": {
-          "title": "Hide Tips",
-          "description": "Hide helpful tips in the UI",
-          "markdownDescription": "Hide helpful tips in the UI\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "title": "Hide Startup Tips",
+          "description": "Hide the introductory tips shown at the top of the screen.",
+          "markdownDescription": "Hide the introductory tips shown at the top of the screen.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "hideIntroTips": {
+          "title": "Hide Intro Tips",
+          "description": "@deprecated Use ui.hideTips instead. Hide the intro tips in the header.",
+          "markdownDescription": "@deprecated Use ui.hideTips instead. Hide the intro tips in the header.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -312,8 +319,8 @@
         },
         "showShortcutsHint": {
           "title": "Show Shortcuts Hint",
-          "description": "Show the \"? for shortcuts\" hint above the input.",
-          "markdownDescription": "Show the \"? for shortcuts\" hint above the input.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "description": "Show basic shortcut help ('?') when the status line is idle.",
+          "markdownDescription": "Show basic shortcut help ('?') when the status line is idle.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
           "default": true,
           "type": "boolean"
         },
@@ -455,10 +462,32 @@
           "default": true,
           "type": "boolean"
         },
+        "hideStatusTips": {
+          "title": "Hide Footer Tips",
+          "description": "Hide helpful tips in the footer while the model is working.",
+          "markdownDescription": "Hide helpful tips in the footer while the model is working.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "hideStatusWit": {
+          "title": "Hide Footer Wit",
+          "description": "Hide witty loading phrases in the footer while the model is working.",
+          "markdownDescription": "Hide witty loading phrases in the footer while the model is working.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `true`",
+          "default": true,
+          "type": "boolean"
+        },
+        "statusHints": {
+          "title": "Status Line Hints",
+          "description": "@deprecated Use ui.hideStatusTips and ui.hideStatusWit instead. What to show in the status line: tips, witty comments, both, or off (fallback to shortcuts help).",
+          "markdownDescription": "@deprecated Use ui.hideStatusTips and ui.hideStatusWit instead. What to show in the status line: tips, witty comments, both, or off (fallback to shortcuts help).\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `tips`",
+          "default": "tips",
+          "type": "string",
+          "enum": ["tips", "witty", "all", "off"]
+        },
         "loadingPhrases": {
           "title": "Loading Phrases",
-          "description": "What to show while the model is working: tips, witty comments, both, or nothing.",
-          "markdownDescription": "What to show while the model is working: tips, witty comments, both, or nothing.\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `tips`",
+          "description": "@deprecated Use ui.hideStatusTips and ui.hideStatusWit instead. What to show in the status line: tips, witty comments, both, or off (fallback to shortcuts help).",
+          "markdownDescription": "@deprecated Use ui.hideStatusTips and ui.hideStatusWit instead. What to show in the status line: tips, witty comments, both, or off (fallback to shortcuts help).\n\n- Category: `UI`\n- Requires restart: `no`\n- Default: `tips`",
           "default": "tips",
           "type": "string",
           "enum": ["tips", "witty", "all", "off"]
