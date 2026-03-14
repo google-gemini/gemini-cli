@@ -11,6 +11,7 @@ import {
   NEVER_ALLOWED_NAME_PATTERNS,
   NEVER_ALLOWED_VALUE_PATTERNS,
   sanitizeEnvironment,
+  redactSensitiveContent,
 } from './environmentSanitization.js';
 
 const EMPTY_OPTIONS = {
@@ -370,5 +371,94 @@ describe('sanitizeEnvironment', () => {
     };
     const sanitized = sanitizeEnvironment(env, options);
     expect(sanitized).toEqual(env);
+  });
+});
+
+describe('redactSensitiveContent', () => {
+  it('should return empty string unchanged', () => {
+    expect(redactSensitiveContent('')).toBe('');
+  });
+
+  it('should leave benign text unchanged', () => {
+    const text = 'Hello, world!\nPATH=/usr/bin:/usr/local/bin\nHOME=/home/user';
+    expect(redactSensitiveContent(text)).toBe(text);
+  });
+
+  it('should redact GitHub personal access tokens', () => {
+    const text = 'Token: ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789';
+    expect(redactSensitiveContent(text)).toContain('[REDACTED]');
+    expect(redactSensitiveContent(text)).not.toContain('ghp_');
+  });
+
+  it('should redact Google API keys', () => {
+    const text = 'key=AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ1234567';
+    expect(redactSensitiveContent(text)).toContain('[REDACTED]');
+    expect(redactSensitiveContent(text)).not.toContain('AIzaSy');
+  });
+
+  it('should redact AWS access key IDs', () => {
+    const text = 'AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE';
+    expect(redactSensitiveContent(text)).toContain('[REDACTED]');
+    expect(redactSensitiveContent(text)).not.toContain('AKIAIOSFODNN7EXAMPLE');
+  });
+
+  it('should redact JWT tokens', () => {
+    const text =
+      'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.abc123';
+    expect(redactSensitiveContent(text)).toContain('[REDACTED]');
+  });
+
+  it('should redact OpenAI API keys', () => {
+    const text = 'OPENAI_API_KEY=sk-abcdefghijklmnopqrstuvwxyz123456789012';
+    expect(redactSensitiveContent(text)).toContain('[REDACTED]');
+    expect(redactSensitiveContent(text)).not.toContain('sk-abcdef');
+  });
+
+  it('should redact Anthropic API keys', () => {
+    const text = `ANTHROPIC_API_KEY=sk-ant-${'a'.repeat(90)}`;
+    expect(redactSensitiveContent(text)).toContain('[REDACTED]');
+  });
+
+  it('should redact sensitive env var assignments (printenv output)', () => {
+    const text = [
+      'HOME=/home/user',
+      'MISTRAL_API_KEY=abc123secretvalue',
+      'PATH=/usr/bin',
+      'OPENAI_KEY=sk-toolongtoshow12345678',
+    ].join('\n');
+    const redacted = redactSensitiveContent(text);
+    expect(redacted).toContain('HOME=/home/user');
+    expect(redacted).toContain('PATH=/usr/bin');
+    expect(redacted).toContain('[REDACTED]');
+    expect(redacted).not.toContain('abc123secretvalue');
+    expect(redacted).not.toContain('sk-toolongtoshow');
+  });
+
+  it('should redact sensitive values from systemd service file output', () => {
+    const text = `[Service]\nEnvironment="OPENAI_API_KEY=sk-myverylongapikey12345"\nExecStart=/usr/bin/myapp`;
+    const redacted = redactSensitiveContent(text);
+    expect(redacted).toContain('[REDACTED]');
+    expect(redacted).not.toContain('sk-myverylongapikey');
+  });
+
+  it('should redact PEM private keys', () => {
+    const text = '-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAK...';
+    expect(redactSensitiveContent(text)).toContain('[REDACTED]');
+  });
+
+  it('should redact credentials embedded in URLs', () => {
+    const text =
+      'Connecting to https://user:supersecretpassword@db.example.com/mydb';
+    expect(redactSensitiveContent(text)).toContain('[REDACTED]');
+    expect(redactSensitiveContent(text)).not.toContain('supersecretpassword');
+  });
+
+  it('should not redact short values that could be false positives', () => {
+    // Values shorter than 6 chars should not be caught by assignment strategy
+    const text = 'KEY=yes\nTOKEN=no';
+    const redacted = redactSensitiveContent(text);
+    // Short values ("yes", "no") should pass through
+    expect(redacted).toContain('KEY=yes');
+    expect(redacted).toContain('TOKEN=no');
   });
 });
