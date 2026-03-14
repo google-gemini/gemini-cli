@@ -30,7 +30,7 @@ exports[`PoliciesDialog > renders with Allow tab active by default 1`] = `
 │                                                                              │
 │                                                                              │
 │  3 Allow policies                                                            │
-│  (↑↓ navigate, type to search, Tab to cycle tabs, Esc close)                 │
+│  (Use ↑↓ to navigate, ←/→ or Tab to cycle, Esc to close)                     │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 "

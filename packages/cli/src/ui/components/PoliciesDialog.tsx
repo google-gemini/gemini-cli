@@ -7,14 +7,15 @@
 import type React from 'react';
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Box, Text } from 'ink';
-import { AsyncFzf } from 'fzf';
+import { AsyncFzf, type FzfResultItem } from 'fzf';
 import { PolicyDecision, type PolicyRule } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
 import { useKeypress, type Key } from '../hooks/useKeypress.js';
 import { useSearchBuffer } from '../hooks/useSearchBuffer.js';
 import { TextInput } from './shared/TextInput.js';
 import { TabHeader, type Tab } from './shared/TabHeader.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
+import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 import {
   buildPolicyListItems,
   type PolicyListItem,
@@ -46,15 +47,12 @@ const TABS = [
   },
 ] as const;
 
-interface FzfResult {
-  item: PolicyListItem;
-}
-
 export function PoliciesDialog({
   rules,
   toolDisplayNames,
   onClose,
 }: PoliciesDialogProps): React.JSX.Element {
+  const keyMatchers = useKeyMatchers();
   const { terminalHeight, terminalWidth, staticExtraHeight, constrainHeight } =
     useUIState();
 
@@ -172,7 +170,11 @@ export function PoliciesDialog({
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const results = await fzf.find(searchQuery);
       if (!active) return;
-      setFilteredItems(results.map((r: FzfResult) => r.item));
+      const matched: PolicyListItem[] = [];
+      results.forEach((r: FzfResultItem<PolicyListItem>) => {
+        matched.push(r.item);
+      });
+      setFilteredItems(matched);
     };
 
     void doSearch();
