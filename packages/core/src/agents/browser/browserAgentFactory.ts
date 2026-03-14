@@ -30,6 +30,11 @@ import { createAnalyzeScreenshotTool } from './analyzeScreenshot.js';
 import { injectAutomationOverlay } from './automationOverlay.js';
 import { injectInputBlocker } from './inputBlocker.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import {
+  recordBrowserAgentToolDiscovery,
+  recordBrowserAgentVisionStatus,
+  recordBrowserAgentCleanup,
+} from '../../telemetry/metrics.js';
 
 /**
  * Creates a browser agent definition with MCP tools configured.
@@ -50,6 +55,8 @@ export async function createBrowserAgentDefinition(
 ): Promise<{
   definition: LocalAgentDefinition<typeof BrowserTaskResultSchema>;
   browserManager: BrowserManager;
+  visionEnabled: boolean;
+  sessionMode: 'persistent' | 'isolated' | 'existing';
 }> {
   debugLogger.log(
     'Creating browser agent definition with isolated MCP tools...',
@@ -99,6 +106,20 @@ export async function createBrowserAgentDefinition(
   const missingSemanticTools = requiredSemanticTools.filter(
     (t) => !availableToolNames.includes(t),
   );
+
+  const rawSessionMode = browserConfig?.customConfig?.sessionMode;
+  const sessionMode =
+    rawSessionMode === 'isolated' || rawSessionMode === 'existing'
+      ? rawSessionMode
+      : 'persistent';
+
+  recordBrowserAgentToolDiscovery(
+    config,
+    mcpTools.length,
+    missingSemanticTools,
+    sessionMode,
+  );
+
   if (missingSemanticTools.length > 0) {
     debugLogger.warn(
       `Semantic tools missing (${missingSemanticTools.join(', ')}). ` +
@@ -139,6 +160,26 @@ export async function createBrowserAgentDefinition(
   const allTools: AnyDeclarativeTool[] = [...mcpTools];
   const visionDisabledReason = getVisionDisabledReason();
 
+  let disabled_reason:
+    | 'no_visual_model'
+    | 'missing_visual_tools'
+    | 'blocked_auth_type'
+    | undefined;
+  if (visionDisabledReason) {
+    if (visionDisabledReason.includes('visualModel')) {
+      disabled_reason = 'no_visual_model';
+    } else if (visionDisabledReason.includes('Visual tools missing')) {
+      disabled_reason = 'missing_visual_tools';
+    } else if (visionDisabledReason.includes('auth type')) {
+      disabled_reason = 'blocked_auth_type';
+    }
+  }
+
+  recordBrowserAgentVisionStatus(config, {
+    enabled: !visionDisabledReason,
+    disabled_reason,
+  });
+
   if (visionDisabledReason) {
     debugLogger.log(`Vision disabled: ${visionDisabledReason}`);
   } else {
@@ -162,21 +203,39 @@ export async function createBrowserAgentDefinition(
     },
   };
 
-  return { definition, browserManager };
+  return {
+    definition,
+    browserManager,
+    visionEnabled: !visionDisabledReason,
+    sessionMode,
+  };
 }
 
 /**
  * Cleans up browser resources after agent execution.
  *
  * @param browserManager The browser manager to clean up
+ * @param config Runtime configuration
+ * @param sessionMode The browser session mode
  */
 export async function cleanupBrowserAgent(
   browserManager: BrowserManager,
+  config: Config,
+  sessionMode: 'persistent' | 'isolated' | 'existing',
 ): Promise<void> {
+  const startMs = Date.now();
   try {
     await browserManager.close();
+    recordBrowserAgentCleanup(config, Date.now() - startMs, {
+      session_mode: sessionMode,
+      success: true,
+    });
     debugLogger.log('Browser agent cleanup complete');
   } catch (error) {
+    recordBrowserAgentCleanup(config, Date.now() - startMs, {
+      session_mode: sessionMode,
+      success: false,
+    });
     debugLogger.error(
       `Error during browser cleanup: ${error instanceof Error ? error.message : String(error)}`,
     );

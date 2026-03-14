@@ -26,6 +26,7 @@ import { Storage } from '../../config/storage.js';
 import { injectInputBlocker } from './inputBlocker.js';
 import * as path from 'node:path';
 import { injectAutomationOverlay } from './automationOverlay.js';
+import { recordBrowserAgentConnection } from '../../telemetry/metrics.js';
 
 // Pin chrome-devtools-mcp version for reproducibility.
 const CHROME_DEVTOOLS_MCP_VERSION = '0.17.1';
@@ -414,6 +415,7 @@ export class BrowserManager {
       sessionMode === 'existing' ? 15_000 : MCP_TIMEOUT_MS;
 
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const connectStartMs = Date.now();
     try {
       await Promise.race([
         (async () => {
@@ -421,6 +423,18 @@ export class BrowserManager {
           debugLogger.log('MCP client connected to chrome-devtools-mcp');
           await this.discoverTools();
           this.registerInputBlockerHandler();
+          recordBrowserAgentConnection(
+            this.config,
+            Date.now() - connectStartMs,
+            {
+              session_mode: sessionMode as
+                | 'persistent'
+                | 'isolated'
+                | 'existing',
+              headless: !!browserConfig.customConfig.headless,
+              success: true,
+            },
+          );
         })(),
         new Promise<never>((_, reject) => {
           timeoutId = setTimeout(
@@ -437,11 +451,32 @@ export class BrowserManager {
     } catch (error) {
       await this.close();
 
+      const rawErrorMessage =
+        error instanceof Error ? error.message : String(error);
+      const lowerMessage = rawErrorMessage.toLowerCase();
+      let errorType:
+        | 'profile_locked'
+        | 'timeout'
+        | 'connection_refused'
+        | 'unknown' = 'unknown';
+
+      if (lowerMessage.includes('already running')) {
+        errorType = 'profile_locked';
+      } else if (lowerMessage.includes('timed out')) {
+        errorType = 'timeout';
+      } else if (sessionMode === 'existing') {
+        errorType = 'connection_refused';
+      }
+
+      recordBrowserAgentConnection(this.config, Date.now() - connectStartMs, {
+        session_mode: sessionMode as 'persistent' | 'isolated' | 'existing',
+        headless: !!browserConfig.customConfig.headless,
+        success: false,
+        error_type: errorType,
+      });
+
       // Provide error-specific, session-mode-aware remediation
-      throw this.createConnectionError(
-        error instanceof Error ? error.message : String(error),
-        sessionMode,
-      );
+      throw this.createConnectionError(rawErrorMessage, sessionMode);
     } finally {
       if (timeoutId !== undefined) {
         clearTimeout(timeoutId);
