@@ -131,7 +131,8 @@ async function processIntent(
   intent: FallbackIntent | null,
   fallbackModel: string,
 ): Promise<boolean> {
-  switch (intent) {
+  const effectiveIntent = intent ?? 'stop';
+  switch (effectiveIntent) {
     case 'retry_always':
       // TODO(telemetry): Implement generic fallback event logging. Existing
       // logFlashFallback is specific to a single Model.
@@ -159,8 +160,9 @@ async function processIntent(
       return false;
 
     default:
-      throw new Error(
-        `Unexpected fallback intent received from fallbackModelHandler: "${intent}"`,
+      debugLogger.warn(
+        `Unexpected fallback intent received from fallbackModelHandler: "${intent}". Defaulting to "stop".`,
       );
+      return false;
   }
 }

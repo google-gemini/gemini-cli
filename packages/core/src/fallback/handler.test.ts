@@ -411,5 +411,33 @@ describe('handleFallback', () => {
       expect(result).toBe(true);
       expect(policyConfig.activateFallbackMode).not.toHaveBeenCalled();
     });
+
+    it('defaults to "stop" when handler returns null (Deterministic Default Intent)', async () => {
+      policyHandler.mockResolvedValue(null);
+
+      const result = await handleFallback(
+        policyConfig,
+        MOCK_PRO_MODEL,
+        AUTH_OAUTH,
+      );
+
+      expect(result).toBe(false);
+      expect(policyConfig.activateFallbackMode).not.toHaveBeenCalled();
+    });
+
+    it('defaults to "stop" when handler returns an unknown intent (Deterministic Default Intent)', async () => {
+      policyHandler.mockResolvedValue(
+        'invalid-intent' as unknown as FallbackIntent,
+      );
+
+      const result = await handleFallback(
+        policyConfig,
+        MOCK_PRO_MODEL,
+        AUTH_OAUTH,
+      );
+
+      expect(result).toBe(false);
+      expect(policyConfig.activateFallbackMode).not.toHaveBeenCalled();
+    });
   });
 });
