@@ -1141,18 +1141,21 @@ export class Config implements McpContext, AgentLoopContext {
     // remove this hack.
     let modelConfigServiceConfig = params.modelConfigServiceConfig;
     if (modelConfigServiceConfig) {
-      if (!modelConfigServiceConfig.aliases) {
-        modelConfigServiceConfig = {
-          ...modelConfigServiceConfig,
-          aliases: DEFAULT_MODEL_CONFIGS.aliases,
-        };
-      }
-      if (!modelConfigServiceConfig.overrides) {
-        modelConfigServiceConfig = {
-          ...modelConfigServiceConfig,
-          overrides: DEFAULT_MODEL_CONFIGS.overrides,
-        };
-      }
+      // Deep merge user config with defaults so that partial configs
+      // (e.g. only providing some aliases) preserve all default values
+      // instead of silently dropping them.
+      modelConfigServiceConfig = {
+        ...DEFAULT_MODEL_CONFIGS,
+        ...modelConfigServiceConfig,
+        aliases: {
+          ...(DEFAULT_MODEL_CONFIGS.aliases ?? {}),
+          ...(modelConfigServiceConfig.aliases ?? {}),
+        },
+        overrides: [
+          ...(DEFAULT_MODEL_CONFIGS.overrides ?? []),
+          ...(modelConfigServiceConfig.overrides ?? []),
+        ],
+      };
     }
 
     this.modelConfigService = new ModelConfigService(
