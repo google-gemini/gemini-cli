@@ -1256,14 +1256,16 @@ export class ShellExecutionService {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         const err = e as { code?: string; message?: string };
         const isEsrch = err.code === 'ESRCH';
+        const isEbadf = err.code === 'EBADF';
         const isWindowsPtyError = err.message?.includes(
           'Cannot resize a pty that has already exited',
         );
 
-        if (isEsrch || isWindowsPtyError) {
-          // On Unix, we get an ESRCH error.
+        if (isEsrch || isEbadf || isWindowsPtyError) {
+          // On Unix, we get an ESRCH error when the process has already exited,
+          // or an EBADF error when the PTY fd is stale (race between exit and resize).
           // On Windows, we get a message-based error.
-          // In both cases, it's safe to ignore.
+          // In all cases, it's safe to ignore as the PTY is no longer active.
         } else {
           throw e;
         }
