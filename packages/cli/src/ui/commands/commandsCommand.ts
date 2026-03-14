@@ -49,16 +49,16 @@ async function listSubcommandAction(
 
     const results: string[] = [];
     for (const dir of directories) {
+      const displayName =
+        dir.kind === CommandKind.USER_FILE
+          ? 'User'
+          : dir.kind === CommandKind.WORKSPACE_FILE
+            ? 'Project'
+            : `Extension: ${dir.extensionName}`;
+
       try {
         const files = await glob('**/*.toml', { cwd: dir.path });
         if (files.length > 0) {
-          const displayName =
-            dir.kind === CommandKind.USER_FILE
-              ? 'User'
-              : dir.kind === CommandKind.WORKSPACE_FILE
-                ? 'Project'
-                : `Extension: ${dir.extensionName}`;
-
           results.push(`### ${displayName} Commands (${dir.path})`);
           files.forEach((file) => results.push(`- ${file}`));
         }
@@ -71,13 +71,6 @@ async function listSubcommandAction(
           `[commands list] Error reading directory ${dir.path}:`,
           e,
         );
-
-        const displayName =
-          dir.kind === CommandKind.USER_FILE
-            ? 'User'
-            : dir.kind === CommandKind.WORKSPACE_FILE
-              ? 'Project'
-              : `Extension: ${dir.extensionName}`;
 
         results.push(`### ${displayName} Commands (${dir.path})`);
         results.push(
