@@ -279,7 +279,7 @@ const deleteCommand: SlashCommand = {
 const shareCommand: SlashCommand = {
   name: 'share',
   description:
-    'Share the current conversation to a markdown or json file. Usage: /chat share <file>'
+    'Share the current conversation to a markdown or json file. Usage: /chat share <file>',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: async (context, args): Promise<MessageActionReturn> => {
