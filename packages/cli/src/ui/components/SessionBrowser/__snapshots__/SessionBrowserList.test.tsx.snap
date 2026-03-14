@@ -1,0 +1,29 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SessionBrowser List Components > MatchSnippetDisplay renders correctly with snippets 1`] = `
+"You:    hello world !
+"
+`;
+
+exports[`SessionBrowser List Components > SessionItem renders correctly 1`] = `
+"❯ #1    │ 5    │ 10m  │ Test Session                                                                
+                 ago                                                                                
+"
+`;
+
+exports[`SessionBrowser List Components > SessionList renders correctly 1`] = `
+"Navigate: ↑/↓   Resume: Enter   Search: /   Delete: x   Quit: q
+Sort: s         Reverse: r      First/Last: g/G
+
+  Index │ Msgs │ Age  │ Name
+❯ #1    │ 5    │ 10m  │ Test Session                                                                
+                 ago                                                                                
+▼
+"
+`;
+
+exports[`SessionBrowser List Components > SessionTableHeader renders correctly 1`] = `
+"
+  Index │ Msgs │ Age  │ Name
+"
+`;
