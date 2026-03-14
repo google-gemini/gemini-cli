@@ -22,13 +22,10 @@ for SKILL in "${CUSTOM_SKILLS[@]}"; do
 
         # Create Slash Command
         COMMAND_FILE="$COMMANDS_DIR/$SKILL.toml"
+        # Use valid .toml format with description and prompt
         cat <<EOF > "$COMMAND_FILE"
-name = "$SKILL"
 description = "Invoke the $SKILL skill"
-
-[[steps]]
-type = "skill"
-name = "$SKILL"
+prompt = "Activate the $SKILL skill and follow its instructions to: {{args}}"
 EOF
         echo "✅ Created Command: /$SKILL"
     else
