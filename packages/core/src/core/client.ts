@@ -1178,6 +1178,11 @@ export class GeminiClient {
         const conversation = currentRecordingService.getConversation();
         const filePath = currentRecordingService.getConversationFilePath();
 
+        // Record compression marker to the session file so that resume
+        // can reconstruct the compressed state instead of replaying the
+        // full uncompressed history.
+        currentRecordingService.recordCompressionMarker(newHistory);
+
         let resumedData: ResumedSessionData | undefined;
 
         if (conversation && filePath) {
