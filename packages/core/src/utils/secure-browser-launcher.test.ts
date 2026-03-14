@@ -27,7 +27,7 @@ describe('secure-browser-launcher', () => {
     mockExecFile.mockResolvedValue({ stdout: '', stderr: '' });
   });
 
-  function setPlatform(platformName: string) {
+  function setPlatform(platformName: NodeJS.Platform) {
     vi.mocked(platform).mockReturnValue(platformName);
   }
 
