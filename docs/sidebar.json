@@ -178,8 +178,7 @@
             "slug": "docs/issue-and-pr-automation"
           },
           { "label": "Local development", "slug": "docs/local-development" },
-          { "label": "NPM package structure", "slug": "docs/npm" },
-          { "label": "Deep PR review", "slug": "docs/cli/deep-review" }
+          { "label": "NPM package structure", "slug": "docs/npm" }
         ]
       }
     ]

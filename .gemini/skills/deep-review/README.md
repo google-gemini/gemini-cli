@@ -100,9 +100,21 @@ Adhere to these best practices when using the deep review skill.
 - **Use isolated profiles**: The skill uses `~/.gemini-deep-review` on the
   remote host to avoid interfering with your primary Gemini CLI configuration.
 
-## Next steps
+## Technical details
 
-- [Skills](skills.md): Learn more about how Gemini CLI uses skills to expand
-  capabilities.
-- [Session management](session-management.md): Understand how to manage your
-  local and remote Gemini sessions.
+This skill uses an isolated Gemini profile on the remote host (`~/.gemini-deep-review`) to ensure that verification tasks do not interfere with your primary configuration.
+
+### Directory structure
+- `scripts/review.ts`: Local orchestrator (syncs scripts and pops terminal).
+- `scripts/worker.ts`: Remote engine (provisions worktree and runs parallel tasks).
+- `scripts/check.ts`: Local status poller.
+- `scripts/clean.ts`: Remote cleanup utility.
+- `SKILL.md`: Instructional body used by the Gemini CLI agent.
+
+## Contributing
+
+If you want to improve this skill:
+1. Modify the TypeScript scripts in `scripts/`.
+2. Update `SKILL.md` if the agent's instructions need to change.
+3. Test your changes locally using `npm run review <PR>`.
+
