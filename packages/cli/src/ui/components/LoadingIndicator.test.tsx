@@ -448,4 +448,20 @@ describe('<LoadingIndicator />', () => {
       unmount();
     });
   });
+
+  it('should use spinnerIcon when provided', async () => {
+    const props = {
+      currentLoadingPhrase: 'Confirm action',
+      elapsedTime: 10,
+      spinnerIcon: '?',
+    };
+    const { lastFrame, waitUntilReady } = renderWithContext(
+      <LoadingIndicator {...props} />,
+      StreamingState.WaitingForConfirmation,
+    );
+    await waitUntilReady();
+    const output = lastFrame();
+    expect(output).toContain('?');
+    expect(output).not.toContain('⠏');
+  });
 });

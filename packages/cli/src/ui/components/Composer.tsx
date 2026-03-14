@@ -37,8 +37,6 @@ import { Footer } from './Footer.js';
 import { ShowMoreLines } from './ShowMoreLines.js';
 import { QueuedMessageDisplay } from './QueuedMessageDisplay.js';
 import { OverflowProvider } from '../contexts/OverflowContext.js';
-import { GeminiRespondingSpinner } from './GeminiRespondingSpinner.js';
-import { HookStatusDisplay } from './HookStatusDisplay.js';
 import { ConfigInitDisplay } from './ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
 
@@ -279,7 +277,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const showRow1 = showUiDetails || showRow1_MiniMode;
   const showRow2 = showUiDetails || showRow2_MiniMode;
 
-  const showMinimalInlineLoading = !showUiDetails && showLoadingIndicator;
   const showMinimalBleedThroughRow = !showUiDetails && showRow2_MiniMode;
 
   const renderAmbientNode = () => {
@@ -311,41 +308,47 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   };
 
   const renderStatusNode = () => {
+    if (!hasUserHooks && !showLoadingIndicator) return null;
+
     if (hasUserHooks) {
       const activeHook = userHooks[0];
       const hookIcon = activeHook?.eventName?.startsWith('After') ? '↩' : '↪';
+      const label = userHooks.length > 1 ? 'Executing Hooks' : 'Executing Hook';
+      const displayNames = userHooks.map((h) => {
+        let name = h.name;
+        if (h.index && h.total && h.total > 1) name += ` (${h.index}/${h.total})`;
+        return name;
+      });
+      const hookText = `${label}: ${displayNames.join(', ')}`;
 
-      return (
-        <Box flexDirection="row" alignItems="center" columnGap={1}>
-          <GeminiRespondingSpinner
-            nonRespondingDisplay={hookIcon}
-            isHookActive={true}
-          />
-          <HookStatusDisplay activeHooks={userHooks} />
-          {showWit && uiState.currentWittyPhrase && (
-            <Text color={theme.text.secondary} dimColor italic>
-              {uiState.currentWittyPhrase}
-            </Text>
-          )}
-        </Box>
-      );
-    }
-
-    if (showLoadingIndicator) {
       return (
         <LoadingIndicator
           inline
           showTips={showTips}
           showWit={showWit}
           errorVerbosity={settings.merged.ui.errorVerbosity}
-          thought={uiState.thought}
+          currentLoadingPhrase={hookText}
+          spinnerIcon={hookIcon}
+          isHookActive={true}
           elapsedTime={uiState.elapsedTime}
           forceRealStatusOnly={false}
           wittyPhrase={uiState.currentWittyPhrase}
         />
       );
     }
-    return null;
+
+    return (
+      <LoadingIndicator
+        inline
+        showTips={showTips}
+        showWit={showWit}
+        errorVerbosity={settings.merged.ui.errorVerbosity}
+        thought={uiState.thought}
+        elapsedTime={uiState.elapsedTime}
+        forceRealStatusOnly={false}
+        wittyPhrase={uiState.currentWittyPhrase}
+      />
+    );
   };
 
   const statusNode = renderStatusNode();
@@ -355,22 +358,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
    */
   const renderMinimalMetaRowContent = () => (
     <Box flexDirection="row" columnGap={1}>
-      {showMinimalInlineLoading && (
-        <LoadingIndicator
-          inline
-          showTips={showTips}
-          showWit={showWit}
-          errorVerbosity={settings.merged.ui.errorVerbosity}
-          elapsedTime={uiState.elapsedTime}
-          forceRealStatusOnly={true}
-        />
-      )}
-      {hasUserHooks && (
-        <Box flexDirection="row" columnGap={1}>
-          <GeminiRespondingSpinner isHookActive={true} />
-          <HookStatusDisplay activeHooks={userHooks} />
-        </Box>
-      )}
+      {renderStatusNode()}
       {showMinimalBleedThroughRow && (
         <Box>
           {miniMode_ShowApprovalMode && modeContentObj && (
