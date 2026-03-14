@@ -14,6 +14,31 @@ Slash commands provide meta-level control over the CLI itself.
 
 - **Description:** Show version info. Share this information when filing issues.
 
+### `/agents`
+
+- **Description:** Manage local and remote subagents.
+- **Note:** This command is experimental and requires
+  `experimental.enableAgents: true` in your `settings.json`.
+- **Sub-commands:**
+  - **`list`**:
+    - **Description:** Lists all discovered agents, including built-in, local,
+      and remote agents.
+    - **Usage:** `/agents list`
+  - **`reload`** (alias: `refresh`):
+    - **Description:** Rescans agent directories (`~/.gemini/agents` and
+      `.gemini/agents`) and reloads the registry.
+    - **Usage:** `/agents reload`
+  - **`enable`**:
+    - **Description:** Enables a specific subagent.
+    - **Usage:** `/agents enable <agent-name>`
+  - **`disable`**:
+    - **Description:** Disables a specific subagent.
+    - **Usage:** `/agents disable <agent-name>`
+  - **`config`**:
+    - **Description:** Opens a configuration dialog for the specified agent to
+      adjust its model, temperature, or execution limits.
+    - **Usage:** `/agents config <agent-name>`
+
 ### `/auth`
 
 - **Description:** Open a dialog that lets you change the authentication method.
@@ -71,9 +96,9 @@ Slash commands provide meta-level control over the CLI itself.
         [Checkpointing documentation](../cli/checkpointing.md).
       - **Equivalent:** `/resume save <tag>`
   - **`share [filename]`**
-    - **Description** Writes the current conversation to a provided Markdown or
+    - **Description:** Writes the current conversation to a provided Markdown or
       JSON file. If no filename is provided, then the CLI will generate one.
-    - **Usage** `/chat share file.md` or `/chat share file.json`.
+    - **Usage:** `/chat share file.md` or `/chat share file.json`.
     - **Equivalent:** `/resume share [filename]`
 
 ### `/clear`
@@ -279,8 +304,8 @@ Slash commands provide meta-level control over the CLI itself.
 
 - **Description:** Switch to Plan Mode (read-only) and view the current plan if
   one has been generated.
-  - **Note:** This feature requires the `experimental.plan` setting to be
-    enabled in your configuration.
+  - **Note:** This feature is enabled by default. It can be disabled via the
+    `experimental.plan` setting in your configuration.
 - **Sub-commands:**
   - **`copy`**:
     - **Description:** Copy the currently approved plan to your clipboard.
@@ -438,6 +463,12 @@ Slash commands provide meta-level control over the CLI itself.
       tool's name with its full description as provided to the model.
   - **`nodesc`** or **`nodescriptions`**:
     - **Description:** Hide tool descriptions, showing only the tool names.
+
+### `/upgrade`
+
+- **Description:** Open the Gemini Code Assist upgrade page in your browser.
+  This lets you upgrade your tier for higher usage limits.
+- **Note:** This command is only available when logged in with Google.
 
 ### `/vim`
 
