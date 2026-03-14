@@ -13,41 +13,38 @@ vi.mock('./package.js', () => ({
 }));
 
 describe('version', () => {
-  const originalEnv = process.env;
-
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
     resetVersionCache();
-    process.env = { ...originalEnv };
     vi.mocked(getPackageJson).mockResolvedValue({ version: '1.0.0' });
   });
 
   afterEach(() => {
-    process.env = originalEnv;
+    vi.unstubAllEnvs();
   });
 
   it('should return CLI_VERSION from env if set', async () => {
-    process.env['CLI_VERSION'] = '2.0.0';
+    vi.stubEnv('CLI_VERSION', '2.0.0');
     const version = await getVersion();
     expect(version).toBe('2.0.0');
   });
 
   it('should return version from package.json if CLI_VERSION is not set', async () => {
-    delete process.env['CLI_VERSION'];
+    vi.stubEnv('CLI_VERSION', '');
     const version = await getVersion();
     expect(version).toBe('1.0.0');
   });
 
   it('should return "unknown" if package.json is not found and CLI_VERSION is not set', async () => {
-    delete process.env['CLI_VERSION'];
+    vi.stubEnv('CLI_VERSION', '');
     vi.mocked(getPackageJson).mockResolvedValue(undefined);
     const version = await getVersion();
     expect(version).toBe('unknown');
   });
 
   it('should cache the version and only call getPackageJson once', async () => {
-    delete process.env['CLI_VERSION'];
+    vi.stubEnv('CLI_VERSION', '');
     vi.mocked(getPackageJson).mockResolvedValue({ version: '1.2.3' });
 
     const version1 = await getVersion();

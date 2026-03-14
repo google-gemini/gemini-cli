@@ -19,7 +19,7 @@ describe('experiments', () => {
   beforeEach(() => {
     // Reset modules to clear the cached `experimentsPromise`
     vi.resetModules();
-    delete process.env['GEMINI_EXP'];
+    vi.stubEnv('GEMINI_EXP', '');
 
     // Mock the dependencies that `getExperiments` relies on
     vi.mocked(getClientMetadata).mockResolvedValue({
@@ -37,6 +37,7 @@ describe('experiments', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('should fetch and parse experiments from the server', async () => {

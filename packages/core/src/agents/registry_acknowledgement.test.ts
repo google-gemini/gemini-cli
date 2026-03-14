@@ -42,7 +42,6 @@ describe('AgentRegistry Acknowledgement', () => {
   let registry: AgentRegistry;
   let config: Config;
   let tempDir: string;
-  let originalGeminiCliHome: string | undefined;
   let ackService: AcknowledgedAgentsService;
 
   beforeEach(async () => {
@@ -50,8 +49,7 @@ describe('AgentRegistry Acknowledgement', () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'gemini-cli-test-'));
 
     // Override GEMINI_CLI_HOME to point to the temp directory
-    originalGeminiCliHome = process.env['GEMINI_CLI_HOME'];
-    process.env['GEMINI_CLI_HOME'] = tempDir;
+    vi.stubEnv('GEMINI_CLI_HOME', tempDir);
 
     ackService = new AcknowledgedAgentsService();
 
@@ -91,13 +89,7 @@ describe('AgentRegistry Acknowledgement', () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
-
-    // Restore environment variable
-    if (originalGeminiCliHome) {
-      process.env['GEMINI_CLI_HOME'] = originalGeminiCliHome;
-    } else {
-      delete process.env['GEMINI_CLI_HOME'];
-    }
+    vi.unstubAllEnvs();
 
     // Clean up temp directory
     await fs.rm(tempDir, { recursive: true, force: true });
