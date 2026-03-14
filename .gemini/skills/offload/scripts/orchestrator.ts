@@ -79,8 +79,7 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
 
   // 3. Construct Clean Command
   const envLoader = 'export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh"';
-  // Set FORCE_LOCAL_OPEN=1 to signal the worker to use OSC 1337 for links
-  const remoteWorker = `export FORCE_LOCAL_OPEN=1 && export GEMINI_CLI_HOME=${ISOLATED_GEMINI} && export GH_CONFIG_DIR=${ISOLATED_GH} && ./node_modules/.bin/tsx .gemini/skills/offload/scripts/entrypoint.ts ${prNumber} ${branchName} ${remotePolicyPath} ${action}`;
+  const remoteWorker = `export GEMINI_CLI_HOME=${ISOLATED_GEMINI} && export GH_CONFIG_DIR=${ISOLATED_GH} && ./node_modules/.bin/tsx .gemini/skills/offload/scripts/entrypoint.ts ${prNumber} ${branchName} ${remotePolicyPath} ${action}`;
   
   const tmuxCmd = `cd ${remoteWorkDir} && ${envLoader} && ${remoteWorker}; exec $SHELL`;
   const sshInternal = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n ${q(branchName)} ${q(tmuxCmd)}`;

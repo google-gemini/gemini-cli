@@ -33,10 +33,11 @@ async function confirm(question: string): Promise<boolean> {
 }
 
 export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
-  console.log('\n🌟 Initializing Deep Review Skill Settings...');
-  
+  console.log('\n🌟 Initializing Offload Skill Settings...');
+
+  const OFFLOAD_BASE = '~/.offload';
   const remoteHost = await prompt('Remote SSH Host', 'cli');
-  const remoteWorkDir = await prompt('Remote Work Directory', '~/gcli/deepreview');
+  const remoteWorkDir = await prompt('Remote Work Directory', `${OFFLOAD_BASE}/workspace`);
 
   console.log(`🔍 Checking state of ${remoteHost}...`);
 
@@ -48,8 +49,8 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   const ghChoice = await prompt('GitHub CLI Setup: Use [p]re-existing instance or [i]solated sandbox instance? (Isolated is recommended)', 'i');
   const ghSetup = ghChoice.toLowerCase() === 'p' ? 'preexisting' : 'isolated';
 
-  const ISOLATED_GEMINI_CONFIG = '~/.offload/gemini-cli-config';
-  const ISOLATED_GH_CONFIG = '~/.offload/gh-cli-config';
+  const ISOLATED_GEMINI_CONFIG = `${OFFLOAD_BASE}/gemini-cli-config`;
+  const ISOLATED_GH_CONFIG = `${OFFLOAD_BASE}/gh-cli-config`;
 
   console.log(`🔍 Checking state of ${remoteHost}...`);
   // Use a login shell to ensure the same PATH as the interactive user
@@ -102,12 +103,16 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
         const globalGHAuth = spawnSync('ssh', [remoteHost, 'sh -lc "gh auth status"'], { stdio: 'pipe' });
         if (globalGHAuth.status === 0) {
             if (await confirm('     Global GH auth found. Sync it to isolated instance?')) {
-                spawnSync('ssh', [remoteHost, `cp -r ~/.config/gh/* ${ISOLATED_GH_CONFIG}/`]);
-                console.log('     ✅ GH Auth synced.');
+                spawnSync('ssh', [remoteHost, `mkdir -p ${ISOLATED_GH_CONFIG} && cp -r ~/.config/gh/* ${ISOLATED_GH_CONFIG}/`]);
+                const verifySync = spawnSync('ssh', [remoteHost, `sh -lc "export GH_CONFIG_DIR=${ISOLATED_GH_CONFIG} && gh auth status"`], { stdio: 'pipe' });
+                if (verifySync.status === 0) {
+                    console.log('     ✅ GitHub CLI successfully authenticated via sync.');
+                    return; // Skip the "may need to login" message
+                }
             }
         }
     }
-    if (!isGHAuthRemote) console.log('     You may need to run "gh auth login" on the remote machine later.');
+    console.log('     ⚠️  GitHub CLI is not yet authenticated. You may need to run "gh auth login" on the remote machine later.');
   }
 
   // Gemini Auth Check

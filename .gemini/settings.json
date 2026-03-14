@@ -6,5 +6,15 @@
   },
   "general": {
     "devtools": true
+  },
+  "maintainer": {
+    "deepReview": {
+      "remoteHost": "cli",
+      "remoteWorkDir": "~/.offload/workspace",
+      "terminalType": "iterm2",
+      "syncAuth": true,
+      "geminiSetup": "isolated",
+      "ghSetup": "isolated"
+    }
   }
 }

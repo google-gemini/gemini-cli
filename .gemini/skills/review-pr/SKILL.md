@@ -46,12 +46,20 @@ The agent must follow these steps to conduct the review:
 
 ## Final Assessment
 
-Provide a final recommendation with three sections:
+Provide a final recommendation with four sections:
 
 1.  **Summary**: High-level verdict (Approve / Needs Work / Reject).
 2.  **Verified Behavior**: Describe the scripts/commands you ran to prove the
     feature works.
 3.  **Findings**: List Critical issues, Improvements, and Nitpicks.
+4.  **Actionable URL**: Explicitly print the PR URL: `gh pr view --web`.
+
+### Approval Protocol
+
+After presenting the synthesis, the agent MUST determine the all-up recommendation and ask the user for confirmation:
+
+*   "Based on the verification, I recommend **[APPROVE / COMMENT / REJECT]**. Would you like me to post this review to GitHub?"
+*   If the user agrees, execute the appropriate `gh pr review` command (e.g., `gh pr review <PR_NUMBER> --approve --body "<Summary>"`).
 
 ## Best Practices
 - **Be Skeptical**: Just because CI is green doesn't mean the feature is complete. Look for missing edge cases.

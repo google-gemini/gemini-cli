@@ -58,6 +58,7 @@ name = "pr-address-comments"
 toolName = "run_shell_command"
 commandPrefix = [
   "git checkout",
+  "git merge",
   "git blame",
   "git show",
   "git grep",
@@ -82,10 +83,12 @@ commandPrefix = [
 decision = "allow"
 priority = 100
 
-# GitHub CLI (Read-only)
+# GitHub CLI (State Changing & Read-only)
 [[rule]]
 toolName = "run_shell_command"
 commandPrefix = [
+  "gh pr review",
+  "gh pr comment",
   "gh workflow list",
   "gh auth status",
   "gh checkout view",
