@@ -10,7 +10,6 @@ import type { RoutingContext } from '../routingStrategy.js';
 import type { BaseLlmClient } from '../../core/baseLlmClient.js';
 import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 import {
-  DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL_AUTO,
@@ -37,11 +36,11 @@ describe('DefaultStrategy', () => {
     );
 
     expect(decision).toEqual({
-      model: DEFAULT_GEMINI_MODEL,
+      model: PREVIEW_GEMINI_MODEL,
       metadata: {
         source: 'default',
         latencyMs: 0,
-        reasoning: `Routing to default model: ${DEFAULT_GEMINI_MODEL}`,
+        reasoning: `Routing to default model: ${PREVIEW_GEMINI_MODEL}`,
       },
     });
   });

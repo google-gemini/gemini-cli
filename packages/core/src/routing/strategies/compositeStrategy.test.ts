@@ -18,12 +18,6 @@ import { debugLogger } from '../../utils/debugLogger.js';
 import { coreEvents } from '../../utils/events.js';
 import type { LocalLiteRtLmClient } from '../../core/localLiteRtLmClient.js';
 
-vi.mock('../../utils/debugLogger.js', () => ({
-  debugLogger: {
-    warn: vi.fn(),
-  },
-}));
-
 describe('CompositeStrategy', () => {
   let mockContext: RoutingContext;
   let mockConfig: Config;
@@ -36,6 +30,7 @@ describe('CompositeStrategy', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(debugLogger, 'warn').mockImplementation(() => {});
 
     mockContext = {} as RoutingContext;
     mockConfig = {} as Config;

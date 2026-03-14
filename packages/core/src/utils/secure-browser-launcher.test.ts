@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { openBrowserSecurely } from './secure-browser-launcher.js';
 
 // Create mock function using vi.hoisted
@@ -15,27 +15,20 @@ vi.mock('node:child_process');
 vi.mock('node:util', () => ({
   promisify: () => mockExecFile,
 }));
+vi.mock('node:os', () => ({
+  platform: vi.fn(),
+}));
+
+import { platform } from 'node:os';
 
 describe('secure-browser-launcher', () => {
-  let originalPlatform: PropertyDescriptor | undefined;
-
   beforeEach(() => {
     vi.clearAllMocks();
     mockExecFile.mockResolvedValue({ stdout: '', stderr: '' });
-    originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform');
   });
 
-  afterEach(() => {
-    if (originalPlatform) {
-      Object.defineProperty(process, 'platform', originalPlatform);
-    }
-  });
-
-  function setPlatform(platform: string) {
-    Object.defineProperty(process, 'platform', {
-      value: platform,
-      configurable: true,
-    });
+  function setPlatform(platformName: string) {
+    vi.mocked(platform).mockReturnValue(platformName);
   }
 
   describe('URL validation', () => {

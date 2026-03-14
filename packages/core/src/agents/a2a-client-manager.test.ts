@@ -5,6 +5,21 @@
  */
 
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
+
+vi.mock('@a2a-js/sdk/client', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...(actual as Record<string, unknown>),
+    createAuthenticatingFetchWithRetry: vi.fn(),
+    ClientFactory: vi.fn(),
+    DefaultAgentCardResolver: vi.fn(),
+    ClientFactoryOptions: {
+      createFrom: vi.fn(),
+      default: {},
+    },
+  };
+});
+
 import { A2AClientManager } from './a2a-client-manager.js';
 import type { AgentCard } from '@a2a-js/sdk';
 import {
@@ -24,26 +39,6 @@ interface MockClient {
   getTask: ReturnType<typeof vi.fn>;
   cancelTask: ReturnType<typeof vi.fn>;
 }
-
-vi.mock('@a2a-js/sdk/client', async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...(actual as Record<string, unknown>),
-    createAuthenticatingFetchWithRetry: vi.fn(),
-    ClientFactory: vi.fn(),
-    DefaultAgentCardResolver: vi.fn(),
-    ClientFactoryOptions: {
-      createFrom: vi.fn(),
-      default: {},
-    },
-  };
-});
-
-vi.mock('../utils/debugLogger.js', () => ({
-  debugLogger: {
-    debug: vi.fn(),
-  },
-}));
 
 describe('A2AClientManager', () => {
   let manager: A2AClientManager;
@@ -69,6 +64,7 @@ describe('A2AClientManager', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(debugLogger, 'debug').mockImplementation(() => {});
     A2AClientManager.resetInstanceForTesting();
     manager = A2AClientManager.getInstance();
 
