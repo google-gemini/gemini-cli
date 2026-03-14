@@ -7,6 +7,7 @@
 import type { MCPOAuthConfig } from './oauth-provider.js';
 import { getErrorMessage } from '../utils/errors.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { safeFetch } from '../utils/fetch.js';
 
 /**
  * Error thrown when the discovered resource metadata does not match the expected resource.
@@ -97,7 +98,11 @@ export class OAuthUtils {
     resourceMetadataUrl: string,
   ): Promise<OAuthProtectedResourceMetadata | null> {
     try {
+<<<<<<< Updated upstream
       const response = await fetch(resourceMetadataUrl);
+=======
+      const response = await safeFetch(resourceMetadataUrl);
+>>>>>>> Stashed changes
       if (!response.ok) {
         return null;
       }
@@ -121,7 +126,11 @@ export class OAuthUtils {
     authServerMetadataUrl: string,
   ): Promise<OAuthAuthorizationServerMetadata | null> {
     try {
+<<<<<<< Updated upstream
       const response = await fetch(authServerMetadataUrl);
+=======
+      const response = await safeFetch(authServerMetadataUrl);
+>>>>>>> Stashed changes
       if (!response.ok) {
         return null;
       }

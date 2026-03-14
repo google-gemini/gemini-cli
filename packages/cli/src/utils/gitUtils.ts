@@ -4,9 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { debugLogger } from '@google/gemini-cli-core';
+import { debugLogger, safeFetch, createSafeProxyAgent } from '@google/gemini-cli-core';
 import { execSync } from 'node:child_process';
-import { ProxyAgent } from 'undici';
 
 /**
  * Checks if a directory is within a git repository hosted on GitHub.
@@ -61,16 +60,25 @@ export const getLatestGitHubRelease = async (
 
     const endpoint = `https://api.github.com/repos/google-github-actions/run-gemini-cli/releases/latest`;
 
+<<<<<<< Updated upstream
     const response = await fetch(endpoint, {
+=======
+    const init: RequestInit = {
+>>>>>>> Stashed changes
       method: 'GET',
       headers: {
         Accept: 'application/vnd.github+json',
         'Content-Type': 'application/json',
         'X-GitHub-Api-Version': '2022-11-28',
       },
-      dispatcher: proxy ? new ProxyAgent(proxy) : undefined,
       signal: AbortSignal.any([AbortSignal.timeout(30_000), controller.signal]),
-    } as RequestInit);
+    };
+
+    if (proxy) {
+      init.dispatcher = createSafeProxyAgent(proxy);
+    }
+
+    const response = await safeFetch(endpoint, init);
 
     if (!response.ok) {
       throw new Error(

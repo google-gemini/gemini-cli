@@ -68,6 +68,7 @@ import type {
 import { getToolCallContext } from '../utils/toolCallContext.js';
 import type { ToolRegistry } from './tool-registry.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { safeFetch } from '../utils/fetch.js';
 import { type MessageBus } from '../confirmation-bus/message-bus.js';
 import { coreEvents } from '../utils/events.js';
 import {
@@ -1903,7 +1904,11 @@ export async function connectToMcpServer(
             acceptHeader = 'application/json';
           }
 
+<<<<<<< Updated upstream
           const response = await fetch(urlToFetch, {
+=======
+          const response = await safeFetch(urlToFetch, {
+>>>>>>> Stashed changes
             method: 'HEAD',
             headers: {
               Accept: acceptHeader,
