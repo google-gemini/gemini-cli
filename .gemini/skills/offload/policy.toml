@@ -29,12 +29,35 @@ toolName = "codebase_investigator"
 decision = "allow"
 priority = 100
 
+# --- SKILLS ---
+[[rule]]
+toolName = "activate_skill"
+decision = "allow"
+priority = 100
+[rule.toolParameters]
+name = "review-pr"
+
+[[rule]]
+toolName = "activate_skill"
+decision = "allow"
+priority = 100
+[rule.toolParameters]
+name = "fix-pr"
+
+[[rule]]
+toolName = "activate_skill"
+decision = "allow"
+priority = 100
+[rule.toolParameters]
+name = "pr-address-comments"
+
 # --- SHELL COMMANDS ---
 
-# Git (Safe/Read-only)
+# Git (Safe/Read-only + Local State)
 [[rule]]
 toolName = "run_shell_command"
 commandPrefix = [
+  "git checkout",
   "git blame",
   "git show",
   "git grep",

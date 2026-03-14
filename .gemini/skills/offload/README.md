@@ -74,3 +74,16 @@ The orchestration logic for this skill is fully tested. To run the tests:
 npx vitest .gemini/skills/offload/tests/orchestration.test.ts
 ```
 These tests mock the external environment (SSH, GitHub CLI, and the file system) to ensure that the orchestration scripts generate the correct commands and handle environment isolation accurately.
+
+## Future roadmap: Offload V2 (Fleet)
+
+The current version of `offload` focuses on a persistent SSH workstation. The long-term vision for this tool includes:
+
+-   **Elastic compute**: Moving from a single machine to a fleet of ephemeral 
+    remote containers (for example, using Cloud Run Jobs or GKE Pods).
+-   **Immutable base images**: Building a Docker container for every commit to
+    `main` to ensure a guaranteed, pristine verification environment.
+-   **Stateless execution**: Eliminating the need for manual cleanup by using
+    on-demand, disposable compute nodes for every offload task.
+-   **Massive parallelism**: Enabling dozens of simultaneous PR reviews and 
+    implementations across the elastic fleet.
