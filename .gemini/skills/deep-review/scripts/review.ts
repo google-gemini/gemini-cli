@@ -76,21 +76,24 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
     const localEnv = path.join(REPO_ROOT, '.env');
     if (fs.existsSync(localEnv)) spawnSync('rsync', ['-avz', localEnv, `${remoteHost}:${remoteWorkDir}/.env`]);
   }
+// 4. Construct Clean Command
+const envLoader = 'export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh"';
+// Set FORCE_LOCAL_OPEN=1 to signal the worker to use OSC 1337 for links
+const remoteWorker = `export FORCE_LOCAL_OPEN=1 && export GEMINI_CLI_HOME=${ISOLATED_GEMINI} && export GH_CONFIG_DIR=${ISOLATED_GH} && ./node_modules/.bin/tsx .gemini/skills/deep-review/scripts/entrypoint.ts ${prNumber} ${branchName} ${remotePolicyPath}`;
 
-  // 3. Construct Clean Command
-  const envLoader = 'export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh"';
-  const entryCmd = `cd ${remoteWorkDir} && ${envLoader} && export GEMINI_CLI_HOME=${ISOLATED_GEMINI} && export GH_CONFIG_DIR=${ISOLATED_GH} && ./node_modules/.bin/tsx .gemini/skills/deep-review/scripts/entrypoint.ts ${prNumber} ${branchName} ${remotePolicyPath}`;
-  
-  const tmuxCmd = `$SHELL -ic ${q(entryCmd)}; exec $SHELL`;
-  const sshInternal = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n ${q(branchName)} ${q(tmuxCmd)}`;
-  const sshCmd = `ssh -t ${remoteHost} ${q(sshInternal)}`;
+const tmuxCmd = `cd ${remoteWorkDir} && ${envLoader} && ${remoteWorker}; exec $SHELL`;
+const sshInternal = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n ${q(branchName)} ${q(tmuxCmd)}`;
+const sshCmd = `ssh -t ${remoteHost} ${q(sshInternal)}`;
 
-  // 4. Smart Context Execution
-  const isWithinGemini = !!env.GEMINI_SESSION_ID || !!env.GCLI_SESSION_ID;
+// 5. Smart Context Execution
+// Check if we are running inside a Gemini CLI session or a plain shell
+const isWithinGemini = !!env.GEMINI_SESSION_ID || !!env.GCLI_SESSION_ID;
+const forceBackground = args.includes('--background');
 
-  if (isWithinGemini) {
-    if (process.platform === 'darwin' && terminalType !== 'none') {
-      // macOS: Use Window Automation
+if (isWithinGemini || forceBackground) {
+  if (process.platform === 'darwin' && terminalType !== 'none' && !forceBackground) {
+    // macOS: Use Window Automation (Interactive Mode)
+
       let appleScript = '';
       if (terminalType === 'iterm2') {
         appleScript = `on run argv\n set theCommand to item 1 of argv\n tell application "iTerm"\n set newWindow to (create window with default profile)\n tell current session of newWindow\n write text theCommand\n end tell\n activate\n end tell\n end run`;
@@ -110,7 +113,8 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
     const logFile = path.join(REPO_ROOT, `.gemini/logs/review-${prNumber}/background.log`);
     fs.mkdirSync(path.dirname(logFile), { recursive: true });
     
-    const backgroundCmd = `ssh ${remoteHost} ${q(entryCmd)} > ${q(logFile)} 2>&1 &`;
+    // Use tmuxCmd for background mode to ensure persistence even in background
+    const backgroundCmd = `ssh ${remoteHost} ${q(tmuxCmd)} > ${q(logFile)} 2>&1 &`;
     spawnSync(backgroundCmd, { shell: true });
     
     console.log(`⏳ Remote worker started in background.`);

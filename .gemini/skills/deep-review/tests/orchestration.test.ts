@@ -104,11 +104,14 @@ describe('Deep Review Orchestration', () => {
       await runOrchestrator(['123'], {}); // No session IDs in env
       
       const spawnCalls = vi.mocked(spawnSync).mock.calls;
-      // console.log('Terminal Calls:', spawnCalls.map(c => c[0]));
       const terminalCall = spawnCalls.find(call => {
-        const cmdStr = typeof call[0] === 'string' ? call[0] : (Array.isArray(call[1]) ? call[1].join(' ') : '');
-        // The orchestrator constructs a complex command string for shell:true
-        return cmdStr.includes('ssh -t') && call[2]?.stdio === 'inherit';
+        const cmdStr = typeof call[0] === 'string' ? call[0] : '';
+        // In Direct Shell Mode, spawnSync(sshCmd, { stdio: 'inherit', ... })
+        // Options are in the second argument (index 1)
+        const options = call[1] as any;
+        return cmdStr.includes('ssh -t test-host') && 
+               cmdStr.includes('tmux attach-session') &&
+               options?.stdio === 'inherit';
       });
       expect(terminalCall).toBeDefined();
     });

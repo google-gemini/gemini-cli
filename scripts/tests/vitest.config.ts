@@ -10,7 +10,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['scripts/tests/**/*.test.{js,ts}'],
+    include: [
+      'scripts/tests/**/*.test.{js,ts}',
+      '.gemini/skills/**/tests/*.test.ts',
+    ],
     setupFiles: ['scripts/tests/test-setup.ts'],
     coverage: {
       provider: 'v8',
