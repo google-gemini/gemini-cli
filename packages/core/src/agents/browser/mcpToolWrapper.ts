@@ -114,7 +114,7 @@ class McpToolInvocation extends BaseToolInvocation<
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
     try {
-      // For click/hover tools: register a one-shot mousedown capture listener
+      // For click tools: register a one-shot mousedown capture listener
       // BEFORE the tool executes.  CDP-dispatched clicks fire real DOM events,
       // so the listener captures exact clientX/clientY for any element type
       // (including non-focusable elements like <div>, <span>, <li>).
