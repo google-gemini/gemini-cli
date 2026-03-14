@@ -150,26 +150,108 @@ export function layoutDiagram(
       cursorX += maxWidth + NODE_GAP_H;
     }
   } else {
-    // TB / BT
+    // TB / BT: place bottom-up so we can center parents over children
+
+    // Build parent->children map from edges
+    const childrenOf = new Map<string, string[]>();
+    for (const edge of edges) {
+      if (!childrenOf.has(edge.source)) childrenOf.set(edge.source, []);
+      childrenOf.get(edge.source)!.push(edge.target);
+    }
+
+    // First pass: place leaf ranks (bottom-up) to compute widths
+    // We process ranks in reverse so children are placed before parents
+    const rankYPositions: number[] = [];
     let cursorY = 1;
+
+    // Compute Y for each rank (top-down, we'll use this later)
     for (const rank of ranks) {
-      let cursorX = 1;
       let maxHeight = 0;
       for (const ni of rank) {
         const dims = computeNodeDimensions(ni.input.label);
-        placedNodes.set(ni.input.id, {
-          id: ni.input.id,
-          label: ni.input.label,
-          shape: ni.input.shape,
-          x: cursorX,
-          y: cursorY,
-          width: dims.width,
-          height: dims.height,
-        });
-        cursorX += dims.width + NODE_GAP_H;
         maxHeight = Math.max(maxHeight, dims.height);
       }
+      rankYPositions.push(cursorY);
       cursorY += maxHeight + NODE_GAP_V;
+    }
+
+    // Place ranks bottom-up: leaves first, then center parents
+    for (let ri = ranks.length - 1; ri >= 0; ri--) {
+      const rank = ranks[ri];
+      const y = rankYPositions[ri];
+
+      // Check if any node in this rank has children already placed
+      const hasPlacedChildren = rank.some((ni) => {
+        const kids = childrenOf.get(ni.input.id);
+        return kids?.some((kid) => placedNodes.has(kid));
+      });
+
+      if (!hasPlacedChildren) {
+        // Leaf rank: place left-to-right
+        let cursorX = 1;
+        for (const ni of rank) {
+          const dims = computeNodeDimensions(ni.input.label);
+          placedNodes.set(ni.input.id, {
+            id: ni.input.id,
+            label: ni.input.label,
+            shape: ni.input.shape,
+            x: cursorX,
+            y,
+            width: dims.width,
+            height: dims.height,
+          });
+          cursorX += dims.width + NODE_GAP_H;
+        }
+      } else {
+        // Parent rank: center each node over its children
+        for (const ni of rank) {
+          const dims = computeNodeDimensions(ni.input.label);
+          const kids = childrenOf.get(ni.input.id);
+          const placedKids = kids
+            ?.map((kid) => placedNodes.get(kid))
+            .filter((n): n is DiagramNode => n !== undefined);
+
+          if (placedKids && placedKids.length > 0) {
+            // Center over children span
+            const minX = Math.min(...placedKids.map((k) => k.x));
+            const maxChildRight = Math.max(
+              ...placedKids.map((k) => k.x + k.width),
+            );
+            const centerX = Math.round((minX + maxChildRight) / 2);
+            const nodeX = centerX - Math.floor(dims.width / 2);
+            placedNodes.set(ni.input.id, {
+              id: ni.input.id,
+              label: ni.input.label,
+              shape: ni.input.shape,
+              x: Math.max(1, nodeX),
+              y,
+              width: dims.width,
+              height: dims.height,
+            });
+          } else {
+            // No placed children, place normally
+            // Find a free X position
+            let cursorX = 1;
+            for (const placed of placedNodes.values()) {
+              if (placed.y === y) {
+                cursorX = Math.max(
+                  cursorX,
+                  placed.x + placed.width + NODE_GAP_H,
+                );
+              }
+            }
+            placedNodes.set(ni.input.id, {
+              id: ni.input.id,
+              label: ni.input.label,
+              shape: ni.input.shape,
+              x: cursorX,
+              y,
+              width: dims.width,
+              height: dims.height,
+            });
+          }
+        }
+      }
     }
   }
 
