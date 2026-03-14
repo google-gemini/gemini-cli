@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
 import type { Config, PolicyRule } from '@google/gemini-cli-core';
 import { CommandKind, type SlashCommand } from './types.js';
 import { MessageType } from '../types.js';
@@ -66,11 +65,13 @@ const policiesDialogAction: NonNullable<SlashCommand['action']> = async (
 
   return {
     type: 'custom_dialog' as const,
-    component: React.createElement(PoliciesDialog, {
-      rules,
-      toolDisplayNames,
-      onClose: () => context.ui.removeComponent(),
-    }),
+    component: (
+      <PoliciesDialog
+        rules={rules}
+        toolDisplayNames={toolDisplayNames}
+        onClose={() => context.ui.removeComponent()}
+      />
+    ),
   };
 };
 

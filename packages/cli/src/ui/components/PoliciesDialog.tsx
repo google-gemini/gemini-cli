@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useReducer } from 'react';
 import { Box, Text } from 'ink';
 import { AsyncFzf, type FzfResultItem } from 'fzf';
 import { PolicyDecision, type PolicyRule } from '@google/gemini-cli-core';
@@ -24,6 +24,67 @@ import { useUIState } from '../contexts/UIStateContext.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
 
 const ITEM_HEIGHT = 2;
+
+interface NavigationState {
+  activeTabIndex: number;
+  activeIndex: number;
+  scrollOffset: number;
+}
+
+type NavigationAction =
+  | { type: 'MOVE_UP'; maxItemsToShow: number }
+  | { type: 'MOVE_DOWN'; maxItemsToShow: number; totalItems: number }
+  | { type: 'CYCLE_TAB'; direction: number; numTabs: number }
+  | { type: 'RESET_SCROLL' };
+
+function navigationReducer(
+  state: NavigationState,
+  action: NavigationAction,
+): NavigationState {
+  switch (action.type) {
+    case 'MOVE_UP': {
+      if (state.activeIndex <= 0) return state;
+      const nextIndex = state.activeIndex - 1;
+      return {
+        ...state,
+        activeIndex: nextIndex,
+        scrollOffset:
+          nextIndex < state.scrollOffset ? nextIndex : state.scrollOffset,
+      };
+    }
+    case 'MOVE_DOWN': {
+      if (state.activeIndex >= action.totalItems - 1) return state;
+      const nextIndex = state.activeIndex + 1;
+      return {
+        ...state,
+        activeIndex: nextIndex,
+        scrollOffset:
+          nextIndex >= state.scrollOffset + action.maxItemsToShow
+            ? nextIndex - action.maxItemsToShow + 1
+            : state.scrollOffset,
+      };
+    }
+    case 'CYCLE_TAB': {
+      return {
+        ...state,
+        activeTabIndex:
+          (state.activeTabIndex + action.direction + action.numTabs) %
+          action.numTabs,
+        activeIndex: 0,
+        scrollOffset: 0,
+      };
+    }
+    case 'RESET_SCROLL': {
+      return {
+        ...state,
+        activeIndex: 0,
+        scrollOffset: 0,
+      };
+    }
+    default:
+      return state;
+  }
+}
 
 interface PoliciesDialogProps {
   rules: readonly PolicyRule[];
@@ -58,9 +119,10 @@ export function PoliciesDialog({
   const { terminalHeight, terminalWidth, staticExtraHeight, constrainHeight } =
     useUIState();
 
-  const [activeTabIndex, setActiveTabIndex] = useState(0);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [scrollOffset, setScrollOffset] = useState(0);
+  const [{ activeTabIndex, activeIndex, scrollOffset }, dispatch] = useReducer(
+    navigationReducer,
+    { activeTabIndex: 0, activeIndex: 0, scrollOffset: 0 },
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredItems, setFilteredItems] = useState<PolicyListItem[] | null>(
     null,
@@ -187,16 +249,9 @@ export function PoliciesDialog({
   // Items to display (filtered or all)
   const displayItems = filteredItems ?? allTabItems;
 
-  // Reset scroll when tab changes
-  useEffect(() => {
-    setActiveIndex(0);
-    setScrollOffset(0);
-  }, [activeTabIndex]);
-
   // Reset scroll when filtered items change
   useEffect(() => {
-    setActiveIndex(0);
-    setScrollOffset(0);
+    dispatch({ type: 'RESET_SCROLL' });
   }, [filteredItems]);
 
   // Search buffer
@@ -232,31 +287,21 @@ export function PoliciesDialog({
           (key.name === 'tab' && key.shift)
             ? -1
             : 1;
-        setActiveTabIndex(
-          (prev) => (prev + direction + TABS.length) % TABS.length,
-        );
+        dispatch({ type: 'CYCLE_TAB', direction, numTabs: TABS.length });
         return;
       }
 
       // Up/Down navigation (no wrap-around)
       if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
-        if (activeIndex > 0) {
-          const newIndex = activeIndex - 1;
-          setActiveIndex(newIndex);
-          if (newIndex < scrollOffset) {
-            setScrollOffset(newIndex);
-          }
-        }
+        dispatch({ type: 'MOVE_UP', maxItemsToShow: effectiveMaxItemsToShow });
         return;
       }
       if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
-        if (activeIndex < displayItems.length - 1) {
-          const newIndex = activeIndex + 1;
-          setActiveIndex(newIndex);
-          if (newIndex >= scrollOffset + effectiveMaxItemsToShow) {
-            setScrollOffset(newIndex - effectiveMaxItemsToShow + 1);
-          }
-        }
+        dispatch({
+          type: 'MOVE_DOWN',
+          maxItemsToShow: effectiveMaxItemsToShow,
+          totalItems: displayItems.length,
+        });
         return;
       }
 
