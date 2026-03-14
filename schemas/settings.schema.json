@@ -2489,8 +2489,15 @@
             },
             "command": {
               "type": "string",
-              "description": "The sandbox command to use (docker, podman, sandbox-exec, runsc, lxc).",
-              "enum": ["docker", "podman", "sandbox-exec", "runsc", "lxc"]
+              "description": "The sandbox command to use (docker, podman, sandbox-exec, runsc, lxc, bwrap).",
+              "enum": [
+                "docker",
+                "podman",
+                "sandbox-exec",
+                "runsc",
+                "lxc",
+                "bwrap"
+              ]
             },
             "image": {
               "type": "string",
