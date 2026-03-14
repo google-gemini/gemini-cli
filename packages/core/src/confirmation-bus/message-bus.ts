@@ -40,6 +40,23 @@ export class MessageBus extends EventEmitter {
     this.emit(message.type, message);
   }
 
+  /**
+   * Derives a child message bus scoped to a specific subagent.
+   */
+  derive(subagentName: string): MessageBus {
+    const bus = new MessageBus(this.policyEngine, this.debug);
+    bus.publish = async (message: Message) => {
+      if (message.type === MessageBusType.TOOL_CONFIRMATION_REQUEST) {
+        return this.publish({
+          ...message,
+          subagent: subagentName,
+        });
+      }
+      return this.publish(message);
+    };
+    return bus;
+  }
+
   async publish(message: Message): Promise<void> {
     if (this.debug) {
       debugLogger.debug(`[MESSAGE_BUS] publish: ${safeJsonStringify(message)}`);
