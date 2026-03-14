@@ -266,6 +266,22 @@ describe('chatCommand', () => {
       });
     });
 
+    it('should show /chat in usage string when invoked with /chat', async () => {
+      mockContext.invocation = {
+        raw: '/chat resume',
+        name: 'chat',
+        args: '',
+      };
+
+      const result = await resumeCommand?.action?.(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Missing tag. Usage: /chat resume <tag>',
+      });
+    });
+
     it('should inform if checkpoint is not found', async () => {
       mockLoadCheckpoint.mockResolvedValue({ history: [] });
 
@@ -397,6 +413,22 @@ describe('chatCommand', () => {
         type: 'message',
         messageType: 'error',
         content: 'Missing tag. Usage: /resume delete <tag>',
+      });
+    });
+
+    it('should show /chat in usage string when invoked with /chat', async () => {
+      mockContext.invocation = {
+        raw: '/chat delete',
+        name: 'chat',
+        args: '',
+      };
+
+      const result = await deleteCommand?.action?.(mockContext, '  ');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Missing tag. Usage: /chat delete <tag>',
       });
     });
 
