@@ -1270,6 +1270,14 @@ async function start_bwrap_sandbox(
     }
   }
 
+  // Mount ADC file if GOOGLE_APPLICATION_CREDENTIALS is set
+  if (process.env['GOOGLE_APPLICATION_CREDENTIALS']) {
+    const adcFile = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
+    if (fs.existsSync(adcFile)) {
+      bwrapArgs.push('--ro-bind', adcFile, adcFile);
+    }
+  }
+
   // Allow writes ONLY to specific permitted paths
   const writablePaths = new Set<string>();
   writablePaths.add(workdir);
@@ -1343,6 +1351,16 @@ async function start_bwrap_sandbox(
     'https_proxy',
     'no_proxy',
     'NO_BROWSER',
+    'GEMINI_API_KEY',
+    'GOOGLE_API_KEY',
+    'GOOGLE_APPLICATION_CREDENTIALS',
+    'GOOGLE_GEMINI_BASE_URL',
+    'GOOGLE_VERTEX_BASE_URL',
+    'GOOGLE_GENAI_USE_VERTEXAI',
+    'GOOGLE_GENAI_USE_GCA',
+    'GOOGLE_CLOUD_PROJECT',
+    'GOOGLE_CLOUD_LOCATION',
+    'GEMINI_MODEL',
   ];
 
   const sandboxEnv: NodeJS.ProcessEnv = {};
