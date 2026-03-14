@@ -96,7 +96,7 @@ describe('getToolGroupBorderAppearance', () => {
   });
 
   it('inspects only the last pending tool_group item if current has no tools', () => {
-    const item = { type: 'tool_group' as const, tools: [], id: 1 };
+    const item = { type: 'tool_group' as const, tools: [], id: -1 };
     const pendingItems = [
       {
         type: 'tool_group' as const,
@@ -157,7 +157,7 @@ describe('getToolGroupBorderAppearance', () => {
           confirmationDetails: undefined,
         } as IndividualToolCallDisplay,
       ],
-      id: 1,
+      id: -1,
     };
     const result = getToolGroupBorderAppearance(
       item,
@@ -186,7 +186,7 @@ describe('getToolGroupBorderAppearance', () => {
           confirmationDetails: undefined,
         } as IndividualToolCallDisplay,
       ],
-      id: 1,
+      id: -1,
     };
     const result = getToolGroupBorderAppearance(
       item,
@@ -275,7 +275,7 @@ describe('getToolGroupBorderAppearance', () => {
           confirmationDetails: undefined,
         } as IndividualToolCallDisplay,
       ],
-      id: 1,
+      id: -1,
     };
     const result = getToolGroupBorderAppearance(
       item,
@@ -291,7 +291,7 @@ describe('getToolGroupBorderAppearance', () => {
   });
 
   it('handles empty tools with active shell turn (isCurrentlyInShellTurn)', () => {
-    const item = { type: 'tool_group' as const, tools: [], id: 1 };
+    const item = { type: 'tool_group' as const, tools: [], id: -1 };
 
     // active shell turn
     const result = getToolGroupBorderAppearance(
@@ -690,7 +690,7 @@ describe('MainContent', () => {
           pendingHistoryItems: [
             {
               type: 'tool_group',
-              id: 1,
+              id: -1,
               tools: [
                 {
                   callId: 'call_1',

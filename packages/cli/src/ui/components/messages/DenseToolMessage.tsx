@@ -519,12 +519,12 @@ export const DenseToolMessage: React.FC<DenseToolMessageProps> = (props) => {
           {description}
         </Box>
         {summary && (
-          <Box marginLeft={1} flexGrow={0}>
+          <Box key="tool-summary" marginLeft={1} flexGrow={0}>
             {summary}
           </Box>
         )}
         {isAlternateBuffer && diff && (
-          <Box ref={toggleRef} marginLeft={1} flexGrow={1}>
+          <Box key="tool-toggle" ref={toggleRef} marginLeft={1} flexGrow={1}>
             <Text color={theme.text.link} dimColor>
               [{isExpanded ? 'Hide Diff' : 'Show Diff'}]
             </Text>
