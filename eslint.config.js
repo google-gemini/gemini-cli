@@ -47,6 +47,7 @@ export default tseslint.config(
       'bundle/**',
       'package/bundle/**',
       '.integration-tests/**',
+      '**/.vscode-test/**',
       'dist/**',
       'evals/**',
       'packages/test-utils/**',

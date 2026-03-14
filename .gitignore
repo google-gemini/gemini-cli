@@ -50,6 +50,7 @@ packages/devtools/src/_client-assets.ts
 .integration-tests/
 packages/vscode-ide-companion/*.vsix
 packages/cli/download-ripgrep*/
+.vscode-test/
 
 # GHA credentials
 gha-creds-*.json
