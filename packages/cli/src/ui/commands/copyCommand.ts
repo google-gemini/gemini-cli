@@ -6,6 +6,7 @@
 
 import { debugLogger } from '@google/gemini-cli-core';
 import { copyToClipboard } from '../utils/commandUtils.js';
+ Fix/copy-to-Capture-Slash-Command-Output
 import type {
   SlashCommand,
   SlashCommandActionReturn,
@@ -13,6 +14,13 @@ import type {
   LastOutput,
 } from './types.js';
 import { CommandKind } from './types.js';
+
+import {
+  CommandKind,
+  type SlashCommand,
+  type SlashCommandActionReturn,
+} from './types.js';
+ main
 
 export const copyCommand: SlashCommand = {
   name: 'copy',

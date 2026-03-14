@@ -6,13 +6,12 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
-import { type HistoryItem } from '../types.js';
-import { MessageType } from '../types.js';
+import { MessageType, type HistoryItem } from '../types.js';
 import { SessionStatsProvider } from '../contexts/SessionContext.js';
 import {
+  CoreToolCallStatus,
   type Config,
   type ToolExecuteConfirmationDetails,
-  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 import { renderWithProviders } from '../../test-utils/render.js';

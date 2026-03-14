@@ -93,39 +93,6 @@ const ClassifierResponseSchema = z.object({
   complexity_score: z.number().min(1).max(100),
 });
 
-/**
- * Deterministically calculates the routing threshold based on the session ID.
- * This ensures a consistent experience for the user within a session.
- *
- * This implementation uses the FNV-1a hash algorithm (32-bit).
- * @see https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
- *
- * @param sessionId The unique session identifier.
- * @returns The threshold (50 or 80).
- */
-function getComplexityThreshold(sessionId: string): number {
-  const FNV_OFFSET_BASIS_32 = 0x811c9dc5;
-  const FNV_PRIME_32 = 0x01000193;
-
-  let hash = FNV_OFFSET_BASIS_32;
-
-  for (let i = 0; i < sessionId.length; i++) {
-    hash ^= sessionId.charCodeAt(i);
-    // Multiply by prime (simulate 32-bit overflow with bitwise shift)
-    hash = Math.imul(hash, FNV_PRIME_32);
-  }
-
-  // Ensure positive integer
-  hash = hash >>> 0;
-
-  // Normalize to 0-99
-  const normalized = hash % 100;
-  // 50% split:
-  // 0-49: Strict (80)
-  // 50-99: Control (50)
-  return normalized < 50 ? 80 : 50;
-}
-
 export class NumericalClassifierStrategy implements RoutingStrategy {
   readonly name = 'numerical_classifier';
 
@@ -179,11 +146,7 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
       const score = routerResponse.complexity_score;
 
       const { threshold, groupLabel, modelAlias } =
-        await this.getRoutingDecision(
-          score,
-          config,
-          config.getSessionId() || 'unknown-session',
-        );
+        await this.getRoutingDecision(score, config);
       const [useGemini3_1, useCustomToolModel] = await Promise.all([
         config.getGemini31Launched(),
         config.getUseCustomToolModel(),
@@ -214,29 +177,19 @@ export class NumericalClassifierStrategy implements RoutingStrategy {
   private async getRoutingDecision(
     score: number,
     config: Config,
-    sessionId: string,
   ): Promise<{
     threshold: number;
     groupLabel: string;
     modelAlias: typeof FLASH_MODEL | typeof PRO_MODEL;
   }> {
-    let threshold: number;
-    let groupLabel: string;
-
+    const threshold = await config.getResolvedClassifierThreshold();
     const remoteThresholdValue = await config.getClassifierThreshold();
 
-    if (
-      remoteThresholdValue !== undefined &&
-      !isNaN(remoteThresholdValue) &&
-      remoteThresholdValue >= 0 &&
-      remoteThresholdValue <= 100
-    ) {
-      threshold = remoteThresholdValue;
+    let groupLabel: string;
+    if (threshold === remoteThresholdValue) {
       groupLabel = 'Remote';
     } else {
-      // Fallback to deterministic A/B test
-      threshold = getComplexityThreshold(sessionId);
-      groupLabel = threshold === 80 ? 'Strict' : 'Control';
+      groupLabel = 'Default';
     }
 
     const modelAlias = score >= threshold ? PRO_MODEL : FLASH_MODEL;

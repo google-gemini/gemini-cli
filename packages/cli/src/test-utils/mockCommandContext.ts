@@ -5,9 +5,14 @@
  */
 
 import { vi } from 'vitest';
+ Fix/copy-to-Capture-Slash-Command-Output
 import { type CommandContext, type LastOutput } from '../ui/commands/types.js';
 import type { LoadedSettings } from '../config/settings.js';
 import { mergeSettings } from '../config/settings.js';
+
+import type { CommandContext } from '../ui/commands/types.js';
+import { mergeSettings, type LoadedSettings } from '../config/settings.js';
+ main
 import type { GitService } from '@google/gemini-cli-core';
 import type { SessionStatsState } from '../ui/contexts/SessionContext.js';
 

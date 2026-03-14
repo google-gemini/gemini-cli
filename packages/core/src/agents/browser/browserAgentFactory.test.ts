@@ -9,6 +9,7 @@ import {
   createBrowserAgentDefinition,
   cleanupBrowserAgent,
 } from './browserAgentFactory.js';
+import { injectAutomationOverlay } from './automationOverlay.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import type { Config } from '../../config/config.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
@@ -35,6 +36,10 @@ vi.mock('./browserManager.js', () => ({
   BrowserManager: vi.fn(() => mockBrowserManager),
 }));
 
+vi.mock('./automationOverlay.js', () => ({
+  injectAutomationOverlay: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('../../utils/debugLogger.js', () => ({
   debugLogger: {
     log: vi.fn(),
@@ -54,6 +59,8 @@ describe('browserAgentFactory', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    vi.mocked(injectAutomationOverlay).mockClear();
 
     // Reset mock implementations
     mockBrowserManager.ensureConnection.mockResolvedValue(undefined);
@@ -97,6 +104,28 @@ describe('browserAgentFactory', () => {
       await createBrowserAgentDefinition(mockConfig, mockMessageBus);
 
       expect(mockBrowserManager.ensureConnection).toHaveBeenCalled();
+    });
+
+    it('should inject automation overlay when not in headless mode', async () => {
+      await createBrowserAgentDefinition(mockConfig, mockMessageBus);
+      expect(injectAutomationOverlay).toHaveBeenCalledWith(mockBrowserManager);
+    });
+
+    it('should not inject automation overlay when in headless mode', async () => {
+      const headlessConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: true,
+          },
+        },
+      });
+      await createBrowserAgentDefinition(headlessConfig, mockMessageBus);
+      expect(injectAutomationOverlay).not.toHaveBeenCalled();
     });
 
     it('should return agent definition with discovered tools', async () => {
@@ -210,6 +239,25 @@ describe('browserAgentFactory', () => {
       expect(toolNames).toContain('analyze_screenshot');
     });
 
+    it('should include domain restrictions in system prompt when configured', async () => {
+      const configWithDomains = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['restricted.com'],
+          },
+        },
+      });
+
+      const { definition } = await createBrowserAgentDefinition(
+        configWithDomains,
+        mockMessageBus,
+      );
+
+      const systemPrompt = definition.promptConfig?.systemPrompt ?? '';
+      expect(systemPrompt).toContain('SECURITY DOMAIN RESTRICTION - CRITICAL:');
+      expect(systemPrompt).toContain('- restricted.com');
+    });
+
     it('should include all MCP navigation tools (new_page, navigate_page) in definition', async () => {
       mockBrowserManager.getDiscoveredTools.mockResolvedValue([
         { name: 'take_snapshot', description: 'Take snapshot' },
@@ -293,5 +341,23 @@ describe('buildBrowserSystemPrompt', () => {
       expect(prompt).toContain('TERMINAL FAILURES');
       expect(prompt).toContain('complete_task');
     }
+  });
+
+  it('should include allowed domains restriction when provided', () => {
+    const prompt = buildBrowserSystemPrompt(false, [
+      'github.com',
+      '*.google.com',
+    ]);
+    expect(prompt).toContain('SECURITY DOMAIN RESTRICTION - CRITICAL:');
+    expect(prompt).toContain('- github.com');
+    expect(prompt).toContain('- *.google.com');
+  });
+
+  it('should exclude allowed domains restriction when not provided or empty', () => {
+    let prompt = buildBrowserSystemPrompt(false);
+    expect(prompt).not.toContain('SECURITY DOMAIN RESTRICTION - CRITICAL:');
+
+    prompt = buildBrowserSystemPrompt(false, []);
+    expect(prompt).not.toContain('SECURITY DOMAIN RESTRICTION - CRITICAL:');
   });
 });

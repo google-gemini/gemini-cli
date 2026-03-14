@@ -98,6 +98,10 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'policies');
   }
 
+  static getUserKeybindingsPath(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'keybindings.json');
+  }
+
   static getUserAgentsDir(): string {
     return path.join(Storage.getGlobalGeminiDir(), 'agents');
   }
@@ -170,6 +174,13 @@ export class Storage {
 
   getWorkspacePoliciesDir(): string {
     return path.join(this.getGeminiDir(), 'policies');
+  }
+
+  getWorkspaceAutoSavedPolicyPath(): string {
+    return path.join(
+      this.getWorkspacePoliciesDir(),
+      AUTO_SAVED_POLICY_FILENAME,
+    );
   }
 
   getAutoSavedPolicyPath(): string {
@@ -291,6 +302,9 @@ export class Storage {
   }
 
   getProjectTempTrackerDir(): string {
+    if (this.sessionId) {
+      return path.join(this.getProjectTempDir(), this.sessionId, 'tracker');
+    }
     return path.join(this.getProjectTempDir(), 'tracker');
   }
 
