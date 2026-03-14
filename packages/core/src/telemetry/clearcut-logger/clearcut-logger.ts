@@ -1604,6 +1604,13 @@ export class ClearcutLogger {
       },
     ];
 
+    if (event.recovered_from) {
+      data.push({
+        gemini_cli_key: EventMetadataKey.GEMINI_CLI_AGENT_RECOVERED_FROM,
+        value: event.recovered_from,
+      });
+    }
+
     this.enqueueLogEvent(this.createLogEvent(EventNames.AGENT_FINISH, data));
     this.flushIfNeeded();
   }

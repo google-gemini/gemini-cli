@@ -27,12 +27,18 @@ export enum AgentTerminateMode {
   ERROR_NO_COMPLETE_TASK_CALL = 'ERROR_NO_COMPLETE_TASK_CALL',
 }
 
+export type RecoverableAgentTerminateMode =
+  | AgentTerminateMode.TIMEOUT
+  | AgentTerminateMode.MAX_TURNS
+  | AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL;
+
 /**
  * Represents the output structure of an agent's execution.
  */
 export interface OutputObject {
   result: string;
   terminate_reason: AgentTerminateMode;
+  recovered_from?: RecoverableAgentTerminateMode;
 }
 
 /**
