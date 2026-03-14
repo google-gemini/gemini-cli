@@ -11,9 +11,6 @@ import type {
   ModelPolicyStateMap,
 } from './modelPolicy.js';
 import {
-  DEFAULT_GEMINI_FLASH_LITE_MODEL,
-  DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
@@ -55,62 +52,47 @@ const DEFAULT_STATE: ModelPolicyStateMap = {
   unknown: 'terminal',
 };
 
-const DEFAULT_CHAIN: ModelPolicyChain = [
-  definePolicy({ model: DEFAULT_GEMINI_MODEL }),
-  definePolicy({ model: DEFAULT_GEMINI_FLASH_MODEL, isLastResort: true }),
-];
-
-const FLASH_LITE_CHAIN: ModelPolicyChain = [
-  definePolicy({
-    model: DEFAULT_GEMINI_FLASH_LITE_MODEL,
-    actions: SILENT_ACTIONS,
-  }),
-  definePolicy({
-    model: DEFAULT_GEMINI_FLASH_MODEL,
-    actions: SILENT_ACTIONS,
-  }),
-  definePolicy({
-    model: DEFAULT_GEMINI_MODEL,
-    isLastResort: true,
-    actions: SILENT_ACTIONS,
-  }),
-];
-
 /**
- * Returns the default ordered model policy chain for the user.
+ * Returns the Gemini 3 model policy chain.
+ * Falls through from smartest pro → flash as last resort.
  */
 export function getModelPolicyChain(
   options: ModelPolicyOptions,
 ): ModelPolicyChain {
-  if (options.previewEnabled) {
-    const chain: ModelPolicyChain = [];
+  const chain: ModelPolicyChain = [];
 
-    if (options.useGemini31) {
-      if (options.useCustomToolModel) {
-        chain.push(
-          definePolicy({ model: PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL }),
-        );
-      }
-      chain.push(definePolicy({ model: PREVIEW_GEMINI_3_1_MODEL }));
+  if (options.useGemini31) {
+    if (options.useCustomToolModel) {
+      chain.push(
+        definePolicy({ model: PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL }),
+      );
     }
-
-    chain.push(definePolicy({ model: PREVIEW_GEMINI_MODEL }));
-    chain.push(
-      definePolicy({ model: PREVIEW_GEMINI_FLASH_MODEL, isLastResort: true }),
-    );
-
-    return chain;
+    chain.push(definePolicy({ model: PREVIEW_GEMINI_3_1_MODEL }));
   }
 
-  return cloneChain(DEFAULT_CHAIN);
+  chain.push(definePolicy({ model: PREVIEW_GEMINI_MODEL }));
+  chain.push(
+    definePolicy({ model: PREVIEW_GEMINI_FLASH_MODEL, isLastResort: true }),
+  );
+
+  return chain;
 }
 
 export function createSingleModelChain(model: string): ModelPolicyChain {
   return [definePolicy({ model, isLastResort: true })];
 }
 
+/**
+ * Flash-lite no longer exists in Gemini 3. Return a Gemini 3 flash chain.
+ */
 export function getFlashLitePolicyChain(): ModelPolicyChain {
-  return cloneChain(FLASH_LITE_CHAIN);
+  return [
+    definePolicy({
+      model: PREVIEW_GEMINI_FLASH_MODEL,
+      isLastResort: true,
+      actions: SILENT_ACTIONS,
+    }),
+  ];
 }
 
 /**
@@ -138,7 +120,6 @@ export function validateModelPolicyChain(chain: ModelPolicyChain): void {
 
 /**
  * Helper to define a ModelPolicy with default actions and state transitions.
- * Ensures every policy is a fresh instance to avoid shared state.
  */
 function definePolicy(config: PolicyConfig): ModelPolicy {
   return {
@@ -150,16 +131,4 @@ function definePolicy(config: PolicyConfig): ModelPolicy {
       ...(config.stateTransitions ?? {}),
     },
   };
-}
-
-function clonePolicy(policy: ModelPolicy): ModelPolicy {
-  return {
-    ...policy,
-    actions: { ...policy.actions },
-    stateTransitions: { ...policy.stateTransitions },
-  };
-}
-
-function cloneChain(chain: ModelPolicyChain): ModelPolicyChain {
-  return chain.map(clonePolicy);
 }

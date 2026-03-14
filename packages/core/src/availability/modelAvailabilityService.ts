@@ -17,7 +17,11 @@ export type UnavailabilityReason =
 export type ModelHealthStatus = 'terminal' | 'sticky_retry';
 
 type HealthState =
-  | { status: 'terminal'; reason: TerminalUnavailabilityReason }
+  | {
+      status: 'terminal';
+      reason: TerminalUnavailabilityReason;
+      markedAt: number;
+    }
   | {
       status: 'sticky_retry';
       reason: TurnUnavailabilityReason;
@@ -38,6 +42,13 @@ export interface ModelSelectionResult {
   }>;
 }
 
+/**
+ * Cooldown period (ms) after which a terminal model is probed again.
+ * This enables automatic recovery to higher-tier models once their
+ * rate-limit / quota window refreshes.
+ */
+const TERMINAL_COOLDOWN_MS = 60_000; // 60 seconds
+
 export class ModelAvailabilityService {
   private readonly health = new Map<ModelId, HealthState>();
 
@@ -45,6 +56,7 @@ export class ModelAvailabilityService {
     this.setState(model, {
       status: 'terminal',
       reason,
+      markedAt: Date.now(),
     });
   }
 
@@ -59,8 +71,6 @@ export class ModelAvailabilityService {
       return;
     }
 
-    // Only reset consumption if we are not already in the sticky_retry state.
-    // This prevents infinite loops if the model fails repeatedly in the same turn.
     let consumed = false;
     if (currentState?.status === 'sticky_retry') {
       consumed = currentState.consumed;
@@ -88,6 +98,12 @@ export class ModelAvailabilityService {
     }
 
     if (state.status === 'terminal') {
+      // If the cooldown has elapsed, consider the model available again
+      // so we probe it. If it fails again it'll be re-marked terminal.
+      if (Date.now() - state.markedAt >= TERMINAL_COOLDOWN_MS) {
+        this.clearState(model);
+        return { available: true };
+      }
       return { available: false, reason: state.reason };
     }
 
@@ -105,7 +121,6 @@ export class ModelAvailabilityService {
       const snapshot = this.snapshot(model);
       if (snapshot.available) {
         const state = this.health.get(model);
-        // A sticky model is being attempted, so note that.
         const attempts = state?.status === 'sticky_retry' ? 1 : undefined;
         return { selectedModel: model, skipped, attempts };
       } else {

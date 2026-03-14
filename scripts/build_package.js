@@ -20,7 +20,6 @@
 import { execSync } from 'node:child_process';
 import { writeFileSync, existsSync, cpSync } from 'node:fs';
 import { join, basename } from 'node:path';
-
 if (!process.cwd().includes('packages')) {
   console.error('must be invoked from a package directory');
   process.exit(1);
