@@ -724,6 +724,8 @@ export class Scheduler {
         name: tailRequest.name,
         args: tailRequest.args,
         originalRequestName,
+        originalRequestArgs:
+          result.request.originalRequestArgs ?? result.request.args,
         isClientInitiated: result.request.isClientInitiated,
         prompt_id: result.request.prompt_id,
         schedulerId: this.schedulerId,
