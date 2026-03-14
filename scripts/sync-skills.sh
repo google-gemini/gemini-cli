@@ -12,22 +12,26 @@ mkdir -p "$COMMANDS_DIR"
 echo "Syncing skills and commands..."
 
 # List of skills to sync
-CUSTOM_SKILLS=("_ux_git-worktree" "_ux_finish-pr")
+# Format: "skill_name:command_name"
+CUSTOM_SKILLS=("_ux_git-worktree:ux_git-worktree" "_ux_finish-pr:ux_finish-pr")
 
-for SKILL in "${CUSTOM_SKILLS[@]}"; do
+for ENTRY in "${CUSTOM_SKILLS[@]}"; do
+    SKILL="${ENTRY%%:*}"
+    COMMAND="${ENTRY##*:}"
+    
     if [ -d "$REPO_SKILLS_PATH/$SKILL" ]; then
         # Sync Skill
         cp -r "$REPO_SKILLS_PATH/$SKILL" "$SKILLS_DIR/"
         echo "✅ Synced Skill: $SKILL"
 
-        # Create Slash Command
-        COMMAND_FILE="$COMMANDS_DIR/$SKILL.toml"
-        # Use valid .toml format with description and prompt
+        # Create Slash Command with a slightly different name to avoid conflict with the skill name
+        # We remove the leading underscore for the command name to avoid collision with the skill itself
+        COMMAND_FILE="$COMMANDS_DIR/$COMMAND.toml"
         cat <<EOF > "$COMMAND_FILE"
 description = "Invoke the $SKILL skill"
 prompt = "Activate the $SKILL skill and follow its instructions to: {{args}}"
 EOF
-        echo "✅ Created Command: /$SKILL"
+        echo "✅ Created Command: /$COMMAND"
     else
         echo "❌ Error: Skill $SKILL not found in $REPO_SKILLS_PATH"
     fi
