@@ -221,9 +221,9 @@ class McpToolInvocation extends BaseToolInvocation<
   private async injectPostClickAnimation(signal: AbortSignal): Promise<void> {
     try {
       if (this.toolName === 'click_at') {
-        const x = Number(this.params['x'] ?? 0);
-        const y = Number(this.params['y'] ?? 0);
-        if (x || y) {
+        const x = this.params['x'];
+        const y = this.params['y'];
+        if (typeof x === 'number' && typeof y === 'number') {
           await this.browserManager.callTool(
             'evaluate_script',
             { function: buildClickAnimationScript(x, y) },
