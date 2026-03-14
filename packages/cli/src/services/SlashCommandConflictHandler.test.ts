@@ -172,4 +172,23 @@ describe('SlashCommandConflictHandler', () => {
     vi.advanceTimersByTime(600);
     expect(coreEvents.emitFeedback).not.toHaveBeenCalled();
   });
+
+  it('should display a descriptive message for a skill conflict', () => {
+    simulateEvent([
+      {
+        name: 'chat',
+        renamedTo: 'google-workspace.chat',
+        loserExtensionName: 'google-workspace',
+        loserKind: CommandKind.SKILL,
+        winnerKind: CommandKind.BUILT_IN,
+      },
+    ]);
+
+    vi.advanceTimersByTime(600);
+
+    expect(coreEvents.emitFeedback).toHaveBeenCalledWith(
+      'info',
+      "Extension 'google-workspace' skill '/chat' was renamed to '/google-workspace.chat' because it conflicts with built-in command.",
+    );
+  });
 });
