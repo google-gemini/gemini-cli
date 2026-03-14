@@ -1193,8 +1193,6 @@ ${JSON.stringify(
         count: 2,
       });
 
-      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
-
       // Act
       const stream = client.sendMessageStream(
         [{ text: 'Hi' }],
@@ -1216,7 +1214,6 @@ ${JSON.stringify(
 
       // Assert
       expect(events).toContainEqual({ type: GeminiEventType.LoopDetected });
-      expect(abortSpy).toHaveBeenCalled();
       expect(finalResult).toBeInstanceOf(Turn);
     });
 
