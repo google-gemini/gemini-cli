@@ -122,7 +122,7 @@ export const BrowserAgentDefinition = (
 ): LocalAgentDefinition<typeof BrowserTaskResultSchema> => {
   // Use Preview Flash model if the main model is any of the preview models.
   // If the main model is not a preview model, use the default flash model.
-  const model = isPreviewModel(config.getModel())
+  const model = isPreviewModel(config.getModel(), config)
     ? PREVIEW_GEMINI_FLASH_MODEL
     : DEFAULT_GEMINI_FLASH_MODEL;
 

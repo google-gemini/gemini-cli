@@ -249,4 +249,94 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       },
     },
   ],
+  modelDefinitions: {
+    // Concrete Models
+    'gemini-3.1-pro-preview': {
+      tier: 'pro',
+      family: 'gemini-3',
+      isPreview: true,
+      dialogLocation: 'manual',
+      features: { thinking: true, multimodalToolUse: true },
+    },
+    'gemini-3.1-pro-preview-customtools': {
+      tier: 'pro',
+      family: 'gemini-3',
+      isPreview: true,
+      features: { thinking: true, multimodalToolUse: true },
+    },
+    'gemini-3-pro-preview': {
+      tier: 'pro',
+      family: 'gemini-3',
+      isPreview: true,
+      dialogLocation: 'manual',
+      features: { thinking: true, multimodalToolUse: true },
+    },
+    'gemini-3-flash-preview': {
+      tier: 'flash',
+      family: 'gemini-3',
+      isPreview: true,
+      dialogLocation: 'manual',
+      features: { thinking: false, multimodalToolUse: true },
+    },
+    'gemini-2.5-pro': {
+      tier: 'pro',
+      family: 'gemini-2.5',
+      isPreview: false,
+      dialogLocation: 'manual',
+      features: { thinking: false, multimodalToolUse: false },
+    },
+    'gemini-2.5-flash': {
+      tier: 'flash',
+      family: 'gemini-2.5',
+      isPreview: false,
+      dialogLocation: 'manual',
+      features: { thinking: false, multimodalToolUse: false },
+    },
+    'gemini-2.5-flash-lite': {
+      tier: 'flash-lite',
+      family: 'gemini-2.5',
+      isPreview: false,
+      dialogLocation: 'manual',
+      features: { thinking: false, multimodalToolUse: false },
+    },
+    // Aliases
+    auto: {
+      tier: 'auto',
+      isPreview: true,
+      features: { thinking: true, multimodalToolUse: false },
+    },
+    pro: {
+      tier: 'pro',
+      isPreview: false,
+      features: { thinking: true, multimodalToolUse: false },
+    },
+    flash: {
+      tier: 'flash',
+      isPreview: false,
+      features: { thinking: false, multimodalToolUse: false },
+    },
+    'flash-lite': {
+      tier: 'flash-lite',
+      isPreview: false,
+      features: { thinking: false, multimodalToolUse: false },
+    },
+    'auto-gemini-3': {
+      displayName: 'Auto (Gemini 3)',
+      tier: 'auto',
+      isPreview: true,
+      dialogLocation: 'main',
+      dialogDescription:
+        'Let Gemini CLI decide the best model for the task: gemini-3.1-pro, gemini-3-flash',
+      features: { thinking: true, multimodalToolUse: false },
+    },
+    'auto-gemini-2.5': {
+      displayName: 'Auto (Gemini 2.5)',
+      tier: 'auto',
+      isPreview: false,
+      dialogLocation: 'main',
+      dialogDescription:
+        'Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash',
+      features: { thinking: false, multimodalToolUse: false },
+    },
+  },
 };
