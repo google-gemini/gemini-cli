@@ -2927,8 +2927,9 @@ export class Config implements McpContext, AgentLoopContext {
       }
 
       if (isEnabled) {
+        const resolved = new URL(importPath, import.meta.url).href;
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        const module = await import(importPath);
+        const module = await import(resolved);
         registerFn(module);
       }
     };

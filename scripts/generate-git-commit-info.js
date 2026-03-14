@@ -49,7 +49,8 @@ try {
   }
 
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  cliVersion = `v.${dateStr}.${gitCommitInfo}-euxaristia`;
+  // Use valid semver with build metadata so update checks don't crash
+  cliVersion = `0.0.0-${dateStr}.${gitCommitInfo}.euxaristia`;
 } catch {
   // ignore
 }
