@@ -11,10 +11,14 @@ const prNumber = process.argv[2];
 const branchName = process.argv[3];
 const policyPath = process.argv[4];
 
-async function main() {
+export async function runWorker(args: string[]) {
+  const prNumber = args[0];
+  const branchName = args[1];
+  const policyPath = args[2];
+
   if (!prNumber || !branchName || !policyPath) {
     console.error('Usage: tsx worker.ts <PR_NUMBER> <BRANCH_NAME> <POLICY_PATH>');
-    process.exit(1);
+    return 1;
   }
 
   const workDir = process.cwd(); // This is remoteWorkDir
@@ -48,49 +52,61 @@ async function main() {
   const state: Record<string, any> = {};
   tasks.forEach(t => state[t.id] = { status: 'PENDING' });
 
-  function runTask(task: any) {
-    if (task.dep && state[task.dep].status !== 'SUCCESS') {
-      setTimeout(() => runTask(task), 1000);
-      return;
+  return new Promise((resolve) => {
+    function runTask(task: any) {
+      if (task.dep && state[task.dep].status !== 'SUCCESS') {
+        setTimeout(() => runTask(task), 1000);
+        return;
+      }
+
+      state[task.id].status = 'RUNNING';
+      const proc = spawn(task.cmd, { shell: true, env: { ...process.env, FORCE_COLOR: '1' } });
+      const logStream = fs.createWriteStream(path.join(logDir, `${task.id}.log`));
+      proc.stdout.pipe(logStream);
+      proc.stderr.pipe(logStream);
+
+      proc.on('close', (code) => {
+        const exitCode = code ?? 0;
+        state[task.id].status = exitCode === 0 ? 'SUCCESS' : 'FAILED';
+        fs.writeFileSync(path.join(logDir, `${task.id}.exit`), exitCode.toString());
+        render();
+      });
     }
 
-    state[task.id].status = 'RUNNING';
-    const proc = spawn(task.cmd, { shell: true, env: { ...process.env, FORCE_COLOR: '1' } });
-    const logStream = fs.createWriteStream(path.join(logDir, `${task.id}.log`));
-    proc.stdout.pipe(logStream);
-    proc.stderr.pipe(logStream);
+    function render() {
+      console.clear();
+      console.log(`==================================================`);
+      console.log(`🚀 Deep Review | PR #${prNumber} | ${branchName}`);
+      console.log(`📂 PR Target:  ${targetDir}`);
+      console.log(`==================================================\n`);
+      
+      tasks.forEach(t => {
+        const s = state[t.id];
+        const icon = s.status === 'SUCCESS' ? '✅' : s.status === 'FAILED' ? '❌' : s.status === 'RUNNING' ? '⏳' : '💤';
+        console.log(`  ${icon} ${t.name.padEnd(20)}: ${s.status}`);
+      });
 
-    proc.on('close', (code) => {
-      const exitCode = code ?? 0;
-      state[task.id].status = exitCode === 0 ? 'SUCCESS' : 'FAILED';
-      fs.writeFileSync(path.join(logDir, `${task.id}.exit`), exitCode.toString());
-      render();
-    });
-  }
+      const allDone = tasks.every(t => ['SUCCESS', 'FAILED'].includes(state[t.id].status));
+      if (allDone) {
+        console.log(`\n✨ Verification complete. Launching interactive session...`);
+        resolve(0);
+      }
+    }
 
-  function render() {
-    console.clear();
-    console.log(`==================================================`);
-    console.log(`🚀 Deep Review | PR #${prNumber} | ${branchName}`);
-    console.log(`📂 PR Target:  ${targetDir}`);
-    console.log(`==================================================\n`);
+    tasks.filter(t => !t.dep).forEach(runTask);
+    tasks.filter(t => t.dep).forEach(runTask);
+    const intervalId = setInterval(render, 1500);
     
-    tasks.forEach(t => {
-      const s = state[t.id];
-      const icon = s.status === 'SUCCESS' ? '✅' : s.status === 'FAILED' ? '❌' : s.status === 'RUNNING' ? '⏳' : '💤';
-      console.log(`  ${icon} ${t.name.padEnd(20)}: ${s.status}`);
-    });
-
-    const allDone = tasks.every(t => ['SUCCESS', 'FAILED'].includes(state[t.id].status));
-    if (allDone) {
-      console.log(`\n✨ Verification complete. Launching interactive session...`);
-      process.exit(0);
-    }
-  }
-
-  tasks.filter(t => !t.dep).forEach(runTask);
-  tasks.filter(t => t.dep).forEach(runTask);
-  setInterval(render, 1500);
+    // Ensure the promise resolves and the interval is cleared when all done
+    const checkAllDone = setInterval(() => {
+        if (tasks.every(t => ['SUCCESS', 'FAILED'].includes(state[t.id].status))) {
+            clearInterval(intervalId);
+            clearInterval(checkAllDone);
+        }
+    }, 1000);
+  });
 }
 
-main().catch(console.error);
+if (import.meta.url === `file://${process.argv[1]}`) {
+  runWorker(process.argv.slice(2)).catch(console.error);
+}

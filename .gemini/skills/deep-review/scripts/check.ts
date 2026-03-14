@@ -11,16 +11,25 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
-async function main() {
-  const prNumber = process.argv[2];
+export async function runChecker(args: string[]) {
+  const prNumber = args[0];
   if (!prNumber) {
     console.error('Usage: npm run review:check <PR_NUMBER>');
-    process.exit(1);
+    return 1;
   }
 
   const settingsPath = path.join(REPO_ROOT, '.gemini/settings.json');
+  if (!fs.existsSync(settingsPath)) {
+    console.error('❌ Settings not found. Run "npm run review:setup" first.');
+    return 1;
+  }
   const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-  const { remoteHost, remoteWorkDir } = settings.maintainer.deepReview;
+  const config = settings.maintainer?.deepReview;
+  if (!config) {
+    console.error('❌ Deep Review configuration not found.');
+    return 1;
+  }
+  const { remoteHost, remoteWorkDir } = config;
 
   console.log(`🔍 Checking remote status for PR #${prNumber} on ${remoteHost}...`);
 
@@ -53,6 +62,9 @@ async function main() {
   } else {
     console.log('\n⏳ Some tasks are still in progress. Check again in a few minutes.');
   }
+  return 0;
 }
 
-main().catch(console.error);
+if (import.meta.url === `file://${process.argv[1]}`) {
+  runChecker(process.argv.slice(2)).catch(console.error);
+}

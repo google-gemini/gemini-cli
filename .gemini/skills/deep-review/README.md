@@ -140,3 +140,11 @@ If you want to improve this skill:
 2. Update `SKILL.md` if the agent's instructions need to change.
 3. Test your changes locally using `npm run review <PR>`.
 
+## Testing
+
+The orchestration logic for this skill is fully tested. To run the tests:
+```bash
+npx vitest .gemini/skills/deep-review/tests/orchestration.test.ts
+```
+These tests mock the external environment (SSH, GitHub CLI, and the file system) to ensure that the orchestration scripts generate the correct commands and handle environment isolation accurately.
+

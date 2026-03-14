@@ -32,7 +32,7 @@ async function confirm(question: string): Promise<boolean> {
   });
 }
 
-async function main() {
+export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   console.log('\n🌟 Initializing Deep Review Skill Settings...');
   
   const remoteHost = await prompt('Remote SSH Host', 'cli');
@@ -68,7 +68,7 @@ async function main() {
       }
     } else {
       console.log('⚠️  Please ensure gh is installed before running again.');
-      process.exit(1);
+      return 1;
     }
   }
 
@@ -111,7 +111,7 @@ async function main() {
   if (isGeminiAuthRemote) {
     console.log(`  ✅ Gemini CLI is already authenticated on remote (${geminiSetup}).`);
   } else {
-    const homeDir = process.env.HOME || '';
+    const homeDir = env.HOME || '';
     const localAuth = path.join(homeDir, '.gemini/google_accounts.json');
     const localEnv = path.join(REPO_ROOT, '.env');
     const hasAuth = fs.existsSync(localAuth);
@@ -151,6 +151,9 @@ async function main() {
   fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
   console.log('\n✅ Onboarding complete! Settings saved to .gemini/settings.json');
+  return 0;
 }
 
-main().catch(console.error);
+if (import.meta.url === `file://${process.argv[1]}`) {
+  runSetup().catch(console.error);
+}

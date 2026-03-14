@@ -20,11 +20,11 @@ async function confirm(question: string): Promise<boolean> {
   });
 }
 
-async function main() {
+export async function runCleanup() {
   const settingsPath = path.join(REPO_ROOT, '.gemini/settings.json');
   if (!fs.existsSync(settingsPath)) {
     console.error('❌ Settings not found. Run "npm run review:setup" first.');
-    process.exit(1);
+    return 1;
   }
 
   const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
@@ -32,7 +32,7 @@ async function main() {
 
   if (!config) {
     console.error('❌ Deep Review configuration not found.');
-    process.exit(1);
+    return 1;
   }
 
   const { remoteHost, remoteWorkDir } = config;
@@ -59,6 +59,9 @@ async function main() {
     spawnSync('ssh', [remoteHost, wipeCmd], { stdio: 'inherit', shell: true });
     console.log('✅ Remote directory wiped.');
   }
+  return 0;
 }
 
-main().catch(console.error);
+if (import.meta.url === `file://${process.argv[1]}`) {
+  runCleanup().catch(console.error);
+}

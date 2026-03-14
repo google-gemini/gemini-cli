@@ -11,11 +11,11 @@ const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
 const q = (str: string) => `'${str.replace(/'/g, "'\\''")}'`;
 
-async function main() {
-  const prNumber = process.argv[2];
+export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = process.env) {
+  const prNumber = args[0];
   if (!prNumber) {
     console.error('Usage: npm run review <PR_NUMBER>');
-    process.exit(1);
+    return 1;
   }
 
   // Load Settings
@@ -31,7 +31,7 @@ async function main() {
     const setupResult = spawnSync('npm', ['run', 'review:setup'], { stdio: 'inherit' });
     if (setupResult.status !== 0) {
       console.error('❌ Setup failed. Please run "npm run review:setup" manually.');
-      process.exit(1);
+      return 1;
     }
     // Reload settings after setup
     settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
@@ -45,7 +45,7 @@ async function main() {
   const branchName = ghView.stdout.toString().trim();
   if (!branchName) {
     console.error('❌ Failed to resolve PR branch.');
-    process.exit(1);
+    return 1;
   }
 
   const sessionName = `${prNumber}-${branchName.replace(/[^a-zA-Z0-9]/g, '_')}`;
@@ -64,7 +64,7 @@ async function main() {
   spawnSync('rsync', ['-avz', '--delete', path.join(REPO_ROOT, '.gemini/skills/deep-review/scripts/'), `${remoteHost}:${remoteWorkDir}/.gemini/skills/deep-review/scripts/`]);
 
   if (syncAuth) {
-    const homeDir = process.env.HOME || '';
+    const homeDir = env.HOME || '';
     const localGeminiDir = path.join(homeDir, '.gemini');
     const syncFiles = ['google_accounts.json', 'settings.json'];
     for (const f of syncFiles) {
@@ -86,9 +86,7 @@ async function main() {
   const sshCmd = `ssh -t ${remoteHost} ${q(sshInternal)}`;
 
   // 4. Smart Context Execution
-  // If run from within a Gemini CLI session, we pop a new window.
-  // Otherwise (running directly in shell), we execute in-place.
-  const isWithinGemini = !!process.env.GEMINI_SESSION_ID || !!process.env.GCLI_SESSION_ID;
+  const isWithinGemini = !!env.GEMINI_SESSION_ID || !!env.GCLI_SESSION_ID;
 
   if (isWithinGemini) {
     if (process.platform === 'darwin' && terminalType !== 'none') {
@@ -103,13 +101,12 @@ async function main() {
       if (appleScript) {
         spawnSync('osascript', ['-', sshCmd], { input: appleScript });
         console.log(`✅ ${terminalType.toUpperCase()} window opened for verification.`);
-        return;
+        return 0;
       }
     }
 
     // Cross-Platform Background Mode (within Gemini session)
     console.log(`📡 Launching remote verification in background mode...`);
-    // Run SSH in background, redirecting output to a session log
     const logFile = path.join(REPO_ROOT, `.gemini/logs/review-${prNumber}/background.log`);
     fs.mkdirSync(path.dirname(logFile), { recursive: true });
     
@@ -118,13 +115,15 @@ async function main() {
     
     console.log(`⏳ Remote worker started in background.`);
     console.log(`📄 Tailing logs to: .gemini/logs/review-${prNumber}/background.log`);
-    return;
+    return 0;
   }
 
   // Direct Shell Mode: Execute SSH in-place
   console.log(`🚀 Launching review session in current terminal...`);
   const result = spawnSync(sshCmd, { stdio: 'inherit', shell: true });
-  process.exit(result.status || 0);
+  return result.status || 0;
 }
 
-main().catch(console.error);
+if (import.meta.url === `file://${process.argv[1]}`) {
+  runOrchestrator(process.argv.slice(2)).catch(console.error);
+}
