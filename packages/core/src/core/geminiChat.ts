@@ -249,6 +249,7 @@ export class GeminiChat {
   private sendPromise: Promise<void> = Promise.resolve();
   private readonly chatRecordingService: ChatRecordingService;
   private lastPromptTokenCount: number;
+  private lastCandidatesTokenCount: number = 0;
 
   constructor(
     private readonly context: AgentLoopContext,
@@ -885,6 +886,10 @@ export class GeminiChat {
         if (chunk.usageMetadata.promptTokenCount !== undefined) {
           this.lastPromptTokenCount = chunk.usageMetadata.promptTokenCount;
         }
+        if (chunk.usageMetadata.candidatesTokenCount !== undefined) {
+          this.lastCandidatesTokenCount =
+            chunk.usageMetadata.candidatesTokenCount;
+        }
       }
 
       const hookSystem = this.context.config.getHookSystem();
@@ -985,6 +990,10 @@ export class GeminiChat {
 
   getLastPromptTokenCount(): number {
     return this.lastPromptTokenCount;
+  }
+
+  getLastCandidatesTokenCount(): number {
+    return this.lastCandidatesTokenCount;
   }
 
   /**
