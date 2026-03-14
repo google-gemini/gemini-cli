@@ -1108,6 +1108,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"gemma3-1b-gpu-custom"`
   - **Requires restart:** Yes
 
+- **`experimental.topicUpdateNarration`** (boolean):
+  - **Description:** Enable the experimental Topic & Update communication model
+    for reduced chattiness and structured progress reporting.
+  - **Default:** `false`
+
 #### `skills`
 
 - **`skills.enabled`** (boolean):
