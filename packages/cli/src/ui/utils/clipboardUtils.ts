@@ -45,17 +45,29 @@ function getUserLinuxClipboardTool(): typeof linuxClipboardTool {
 
   if (displayServer === 'wayland') toolName = 'wl-paste';
   else if (displayServer === 'x11') toolName = 'xclip';
-  else return null;
 
-  try {
-    // output is piped to stdio: 'ignore' to suppress the path printing to console
-    execSync(`command -v ${toolName}`, { stdio: 'ignore' });
-    linuxClipboardTool = toolName;
-    return toolName;
-  } catch (e) {
-    debugLogger.warn(`${toolName} not found. Please install it: ${e}`);
-    return null;
+  const checkTool = (name: 'wl-paste' | 'xclip') => {
+    try {
+      execSync(`command -v ${name}`, { stdio: 'ignore' });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  if (toolName) {
+    if (!checkTool(toolName)) {
+      debugLogger.warn(`${toolName} not found. Please install it.`);
+      return null;
+    }
+  } else {
+    if (checkTool('wl-paste')) toolName = 'wl-paste';
+    else if (checkTool('xclip')) toolName = 'xclip';
+    else return null;
   }
+
+  linuxClipboardTool = toolName;
+  return toolName;
 }
 
 /**
