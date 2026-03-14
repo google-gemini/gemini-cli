@@ -61,6 +61,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   isAutoModel,
   isPreviewModel,
+  isGemini3Model,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
@@ -1013,9 +1014,12 @@ export class Config implements McpContext, AgentLoopContext {
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
-    this.useWriteTodos = isPreviewModel(this.model)
+    const isGemini3 = isGemini3Model(this.model);
+    this.useWriteTodos = isGemini3
       ? false
-      : (params.useWriteTodos ?? true);
+      : this.trackerEnabled
+        ? false
+        : (params.useWriteTodos ?? true);
     this.workspacePoliciesDir = params.workspacePoliciesDir;
     this.enableHooksUI = params.enableHooksUI ?? true;
     this.enableHooks = params.enableHooks ?? true;
