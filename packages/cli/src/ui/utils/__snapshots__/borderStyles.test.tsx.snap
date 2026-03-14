@@ -2,10 +2,12 @@
 
 exports[`MainContent tool group border SVG snapshots > should render SVG snapshot for a pending search dialog (google_web_search) 1`] = `
 "
-  ▝▜▄     Gemini CLI v1.2.3
-    ▝▜▄
-   ▗▟▀ 
-  ▝▀    
+  ▝▜▄    ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛   ▗█▀▀▜▙ ▝█▛    ▜█▘
+    ▝▜▄  █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌   █▌     █▌     ▐█ 
+   ▗▟▀   ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█▝██▌ █▌   ▜▙     █▌  ▗  ▐█ 
+  ▝▀      ▀▀▀▀▘ ▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀    ▀▀▀▀▘ ▀▀▀▀▘ ▀▀▘
+
+  Gemini CLI v1.2.3
 
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  google_web_search                                                                         │
@@ -16,10 +18,12 @@ exports[`MainContent tool group border SVG snapshots > should render SVG snapsho
 
 exports[`MainContent tool group border SVG snapshots > should render SVG snapshot for a shell tool 1`] = `
 "
-  ▝▜▄     Gemini CLI v1.2.3
-    ▝▜▄
-   ▗▟▀ 
-  ▝▀    
+  ▝▜▄    ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛   ▗█▀▀▜▙ ▝█▛    ▜█▘
+    ▝▜▄  █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌   █▌     █▌     ▐█ 
+   ▗▟▀   ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█▝██▌ █▌   ▜▙     █▌  ▗  ▐█ 
+  ▝▀      ▀▀▀▀▘ ▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀    ▀▀▀▀▘ ▀▀▀▀▘ ▀▀▘
+
+  Gemini CLI v1.2.3
 
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  run_shell_command                                                                         │
@@ -30,10 +34,12 @@ exports[`MainContent tool group border SVG snapshots > should render SVG snapsho
 
 exports[`MainContent tool group border SVG snapshots > should render SVG snapshot for an empty slice following a search tool 1`] = `
 "
-  ▝▜▄     Gemini CLI v1.2.3
-    ▝▜▄
-   ▗▟▀ 
-  ▝▀    
+  ▝▜▄    ▗█▀▀▜▙▝█▛▀▀▌▜██▖▟██▘▜█▘▜██▖▝█▛▝█▛   ▗█▀▀▜▙ ▝█▛    ▜█▘
+    ▝▜▄  █▌     █▙▟  ▐█▝█▛▐█ ▐█ ▐█▝█▖█▌ █▌   █▌     █▌     ▐█ 
+   ▗▟▀   ▜▙ ▝█▛ █▌▝ ▖▐█   ▐█ ▐█ ▐█▝██▌ █▌   ▜▙     █▌  ▗  ▐█ 
+  ▝▀      ▀▀▀▀▘ ▀▀▀▀▘▀▀▘  ▀▀▘▀▀▘▀▀▘ ▝▀▀▝▀▀    ▀▀▀▀▘ ▀▀▀▀▘ ▀▀▘
+
+  Gemini CLI v1.2.3
 
 ╭──────────────────────────────────────────────────────────────────────────────────────────────╮
 │ ⊶  google_web_search                                                                         │

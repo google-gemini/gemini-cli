@@ -268,4 +268,27 @@ describe('<AppHeader />', () => {
     expect(session2.lastFrame()).not.toContain('Tips');
     session2.unmount();
   });
+
+  it('should render the full logo when logged out', async () => {
+    const mockConfig = makeFakeConfig();
+    vi.spyOn(mockConfig, 'getContentGeneratorConfig').mockReturnValue({
+      authType: undefined,
+    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <AppHeader version="1.0.0" />,
+      {
+        config: mockConfig,
+        uiState: {
+          terminalWidth: 120,
+        },
+      },
+    );
+    await waitUntilReady();
+
+    // Check for block characters from the logo
+    expect(lastFrame()).toContain('▗█▀▀▜▙');
+    expect(lastFrame()).toMatchSnapshot();
+    unmount();
+  });
 });

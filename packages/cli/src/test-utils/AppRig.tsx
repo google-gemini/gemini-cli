@@ -164,6 +164,7 @@ export class AppRig {
   awaitingResponse = false;
 
   constructor(private options: AppRigOptions = {}) {
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
     const uniqueId = randomUUID();
     this.testDir = fs.mkdtempSync(
       path.join(os.tmpdir(), `gemini-app-rig-${uniqueId.slice(0, 8)}-`),

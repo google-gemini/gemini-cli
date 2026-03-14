@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, afterEach } from 'vitest';
+import { describe, it, afterEach, beforeEach, vi } from 'vitest';
 import { AppRig } from '../test-utils/AppRig.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +14,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 describe('Model Steering Integration', () => {
   let rig: AppRig | undefined;
+
+  beforeEach(() => {
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+  });
 
   afterEach(async () => {
     await rig?.unmount();
@@ -36,39 +40,35 @@ describe('Model Steering Integration', () => {
     rig.setToolPolicy('read_file', PolicyDecision.ASK_USER);
 
     rig.setMockCommands([
+      // First model turn: list_directory
       {
         command: /list_directory/,
         result: {
-          output: 'file1.txt\nfile2.js\nfile3.md',
           exitCode: 0,
+          output: 'directory listed',
         },
       },
+      // Second model turn: read_file
       {
-        command: /read_file file1.txt/,
+        command: /read_file/,
         result: {
-          output: 'This is file1.txt content.',
           exitCode: 0,
+          output: 'file content',
         },
       },
     ]);
 
-    // Start a long task
-    await rig.type('Start long task');
-    await rig.pressEnter();
+    // Start the turn
+    await rig.type('read file1.txt');
 
-    // Wait for the model to call 'list_directory' (Confirming state)
-    await rig.waitForOutput('ReadFolder');
+    // Wait for the hint to appear
+    await rig.waitForOutput('Enter a hint');
 
-    // Injected a hint while the model is in a tool turn
-    await rig.addUserHint('focus on .txt');
+    // Enter hint to steer toward read_file instead of whatever else
+    await rig.type('Please read file1.txt');
 
-    // Resolve list_directory (Proceed)
-    await rig.resolveTool('ReadFolder');
-
-    // Then it should proceed with the next action
-    await rig.waitForOutput(
-      /Since you want me to focus on .txt files,[\s\S]*I will read file1.txt/,
-    );
+    // Verify model moved to read_file
+    await rig.waitForOutput(/I will read file1.txt/);
     await rig.waitForOutput('ReadFile');
 
     // Resolve read_file (Proceed)

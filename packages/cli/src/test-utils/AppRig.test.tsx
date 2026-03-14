@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, afterEach, expect } from 'vitest';
+import { describe, it, afterEach, expect, beforeEach, vi } from 'vitest';
 import { act } from 'react';
 import { AppRig } from './AppRig.js';
 import path from 'node:path';
@@ -15,6 +15,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 describe('AppRig', () => {
   let rig: AppRig | undefined;
+
+  beforeEach(() => {
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+  });
 
   afterEach(async () => {
     await rig?.unmount();
