@@ -5,9 +5,23 @@ reviewing pull requests on a remote workstation. It leverages a Node.js
 orchestrator to offload intensive builds and automated testing to parallel
 background processes, showing progress in a dedicated terminal window.
 
-This workflow follows a "Verify then Synthesize" pattern, allowing you to
-monitor infrastructure validation and behavioral proofs in real-time before
-conducting the final interactive review with Gemini CLI.
+## Why use deep review?
+
+Standard code reviews are often constrained by the serial nature of human-AI
+interaction and local machine performance. This skill addresses those bottlenecks
+by implementing a "Remote Offloading" and "Parallel Verification" strategy.
+
+-   **Protect local resources**: Heavy build and lint suites are offloaded to a
+    beefy remote workstation, keeping your local machine responsive for multi-tasking.
+-   **Context efficiency**: The main Gemini session remains interactive and focused
+    on high-level reasoning. You don't have to wait for a build to finish before
+    asking your next question.
+-   **True parallelism**: Infrastructure validation (build), CI checks, static 
+    analysis, and behavioral proofs run simultaneously in an external window. 
+    This compresses a 15-minute sequential process into a 3-minute parallel one.
+-   **Behavioral verification**: Instead of just reading code, the remote worker
+    physically exercises the new features in a live environment, providing 
+    empirical proof that the code actually works before you approve it.
 
 ## Scenarios and workflows
 
