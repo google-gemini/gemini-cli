@@ -1,0 +1,37 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`PoliciesDialog > renders with Allow tab active by default 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│  Policies: ← Allow (3) │ Ask (2) │ Deny (1) →                                │
+│                                                                              │
+│  Tools that run automatically without confirmation.                          │
+│ ╭──────────────────────────────────────────────────────────────────────────╮ │
+│ │ Search to filter...                                                      │ │
+│ ╰──────────────────────────────────────────────────────────────────────────╯ │
+│                                                                              │
+│                                                                              │
+│  ● Shell(git show*)                                                          │
+│    User: allowed-tools.toml                                                  │
+│    Shell(git diff*)                                                          │
+│    User: allowed-tools.toml                                                  │
+│    Shell(npm test*)                                                          │
+│    Workspace: .gemini/settings.json                                          │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│  3 Allow policies                                                            │
+│  (Use ↑↓ to navigate, ←/→ or Tab to cycle, Esc to close)                     │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+"
+`;
