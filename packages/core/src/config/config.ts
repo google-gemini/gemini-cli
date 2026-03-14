@@ -86,6 +86,15 @@ import {
   TrackerVisualizeTool,
 } from '../tools/trackerTools.js';
 import {
+  DebugLaunchTool,
+  DebugSetBreakpointTool,
+  DebugGetStackTraceTool,
+  DebugGetVariablesTool,
+  DebugStepTool,
+  DebugEvaluateTool,
+  DebugDisconnectTool,
+} from '../tools/debugTools.js';
+import {
   logRipgrepFallback,
   logFlashFallback,
   logApprovalModeSwitch,
@@ -460,7 +469,7 @@ export class MCPServerConfig {
     readonly targetAudience?: string,
     /* targetServiceAccount format: <service-account-name>@<project-num>.iam.gserviceaccount.com */
     readonly targetServiceAccount?: string,
-  ) {}
+  ) { }
 }
 
 export enum AuthProviderType {
@@ -863,10 +872,10 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly onModelChange: ((model: string) => void) | undefined;
   private readonly onReload:
     | (() => Promise<{
-        disabledSkills?: string[];
-        adminSkillsEnabled?: boolean;
-        agents?: AgentSettings;
-      }>)
+      disabledSkills?: string[];
+      adminSkillsEnabled?: boolean;
+      agents?: AgentSettings;
+    }>)
     | undefined;
 
   private readonly billing: {
@@ -1965,10 +1974,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getRemainingQuotaForModel(modelId: string):
     | {
-        remainingAmount?: number;
-        remainingFraction?: number;
-        resetTime?: string;
-      }
+      remainingAmount?: number;
+      remainingFraction?: number;
+      resetTime?: string;
+    }
     | undefined {
     const bucket = this.lastRetrievedQuota?.buckets?.find(
       (b) => b.modelId === modelId,
@@ -3053,7 +3062,7 @@ export class Config implements McpContext, AgentLoopContext {
     return Math.min(
       // Estimate remaining context window in characters (1 token ~= 4 chars).
       4 *
-        (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
+      (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
       this.truncateToolOutputThreshold,
     );
   }
@@ -3287,6 +3296,29 @@ export class Config implements McpContext, AgentLoopContext {
         registry.registerTool(new TrackerVisualizeTool(this, this.messageBus)),
       );
     }
+
+    // Register Debug Tools
+    maybeRegister(DebugLaunchTool, () =>
+      registry.registerTool(new DebugLaunchTool(this.messageBus)),
+    );
+    maybeRegister(DebugSetBreakpointTool, () =>
+      registry.registerTool(new DebugSetBreakpointTool(this.messageBus)),
+    );
+    maybeRegister(DebugGetStackTraceTool, () =>
+      registry.registerTool(new DebugGetStackTraceTool(this.messageBus)),
+    );
+    maybeRegister(DebugGetVariablesTool, () =>
+      registry.registerTool(new DebugGetVariablesTool(this.messageBus)),
+    );
+    maybeRegister(DebugStepTool, () =>
+      registry.registerTool(new DebugStepTool(this.messageBus)),
+    );
+    maybeRegister(DebugEvaluateTool, () =>
+      registry.registerTool(new DebugEvaluateTool(this.messageBus)),
+    );
+    maybeRegister(DebugDisconnectTool, () =>
+      registry.registerTool(new DebugDisconnectTool(this.messageBus)),
+    );
 
     // Register Subagents as Tools
     this.registerSubAgentTools(registry);
