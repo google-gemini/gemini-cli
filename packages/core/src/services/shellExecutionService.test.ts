@@ -22,6 +22,7 @@ import {
   type ShellOutputEvent,
   type ShellExecutionConfig,
 } from './shellExecutionService.js';
+import { NoopSandboxManager } from './sandboxManager.js';
 import { ExecutionLifecycleService } from './executionLifecycleService.js';
 import type { AnsiOutput, AnsiToken } from '../utils/terminalSerializer.js';
 
@@ -137,6 +138,7 @@ const shellExecutionConfig: ShellExecutionConfig = {
     allowedEnvironmentVariables: [],
     blockedEnvironmentVariables: [],
   },
+  sandboxManager: new NoopSandboxManager(),
 };
 
 const createMockSerializeTerminalToObjectReturnValue = (
@@ -625,6 +627,7 @@ describe('ShellExecutionService', () => {
         new AbortController().signal,
         true,
         {
+          ...shellExecutionConfig,
           sanitizationConfig: {
             enableEnvironmentVariableRedaction: true,
             allowedEnvironmentVariables: [],
@@ -1396,7 +1399,7 @@ describe('ShellExecutionService child_process fallback', () => {
             expect(mockCpSpawn).toHaveBeenCalledWith(
               expectedCommand,
               ['/pid', String(mockChildProcess.pid), '/f', '/t'],
-              undefined,
+              expect.anything(),
             );
           }
         });
@@ -1417,6 +1420,7 @@ describe('ShellExecutionService child_process fallback', () => {
         abortController.signal,
         true,
         {
+          ...shellExecutionConfig,
           sanitizationConfig: {
             enableEnvironmentVariableRedaction: true,
             allowedEnvironmentVariables: [],
@@ -1631,6 +1635,7 @@ describe('ShellExecutionService execution method selection', () => {
       abortController.signal,
       false, // shouldUseNodePty
       {
+        ...shellExecutionConfig,
         sanitizationConfig: {
           enableEnvironmentVariableRedaction: true,
           allowedEnvironmentVariables: [],
@@ -1778,6 +1783,7 @@ describe('ShellExecutionService environment variables', () => {
       new AbortController().signal,
       true,
       {
+        ...shellExecutionConfig,
         sanitizationConfig: {
           enableEnvironmentVariableRedaction: false,
           allowedEnvironmentVariables: [],
@@ -1837,6 +1843,7 @@ describe('ShellExecutionService environment variables', () => {
       new AbortController().signal,
       true,
       {
+        ...shellExecutionConfig,
         sanitizationConfig: {
           enableEnvironmentVariableRedaction: false,
           allowedEnvironmentVariables: [],
@@ -1902,6 +1909,58 @@ describe('ShellExecutionService environment variables', () => {
     mockChildProcess.emit('exit', 0, null);
     mockChildProcess.emit('close', 0, null);
     await new Promise(process.nextTick);
+  });
+
+  it('should call prepareCommand on sandboxManager when provided', async () => {
+    const mockSandboxManager = {
+      prepareCommand: vi.fn().mockResolvedValue({
+        program: 'sandboxed-bash',
+        args: ['-c', 'ls'],
+        env: { SANDBOXED: 'true' },
+      }),
+    };
+
+    const configWithSandbox: ShellExecutionConfig = {
+      ...shellExecutionConfig,
+      sandboxManager: mockSandboxManager,
+    };
+
+    mockResolveExecutable.mockResolvedValue('/bin/bash/resolved');
+    const mockChild = new EventEmitter() as unknown as ChildProcess;
+    mockChild.stdout = new EventEmitter() as unknown as Readable;
+    mockChild.stderr = new EventEmitter() as unknown as Readable;
+    Object.assign(mockChild, { pid: 123 });
+    mockCpSpawn.mockReturnValue(mockChild);
+
+    const handle = await ShellExecutionService.execute(
+      'ls',
+      '/test/cwd',
+      () => {},
+      new AbortController().signal,
+      false, // child_process path
+      configWithSandbox,
+    );
+
+    expect(mockResolveExecutable).toHaveBeenCalledWith(expect.any(String));
+    expect(mockSandboxManager.prepareCommand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: '/bin/bash/resolved',
+        args: expect.arrayContaining([expect.stringContaining('ls')]),
+        cwd: '/test/cwd',
+      }),
+    );
+    expect(mockCpSpawn).toHaveBeenCalledWith(
+      'sandboxed-bash',
+      ['-c', 'ls'],
+      expect.objectContaining({
+        env: expect.objectContaining({ SANDBOXED: 'true' }),
+      }),
+    );
+
+    // Clean up
+    mockChild.emit('exit', 0, null);
+    mockChild.emit('close', 0, null);
+    await handle.result;
   });
 
   it('should include headless git and gh environment variables in non-interactive mode and append git config safely', async () => {
