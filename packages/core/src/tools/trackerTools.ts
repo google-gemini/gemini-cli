@@ -81,8 +81,6 @@ export async function buildTodosReturnDisplay(
       status = 'in_progress';
     } else if (task.status === TaskStatus.CLOSED) {
       status = 'completed';
-    } else if (task.status === TaskStatus.BLOCKED) {
-      status = 'blocked';
     }
 
     const indent = '  '.repeat(depth);
