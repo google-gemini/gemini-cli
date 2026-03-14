@@ -50,7 +50,4 @@ npm -v
 echo "Installing Gemini CLI..."
 npm install -g @google/gemini-cli@nightly
 
-# 5. Self-Deletion Cron (Safety)
-(crontab -u $USER -l 2>/dev/null; echo "0 0 * * * gcloud compute instances delete $(hostname) --zone $(curl -H Metadata-Flavor:Google http://metadata.google.internal/computeMetadata/v1/instance/zone | cut -d/ -f4) --quiet") | crontab -u $USER -
-
 echo "✅ Provisioning Complete!"

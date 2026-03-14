@@ -25,17 +25,23 @@ async function listWorkers() {
 }
 
 async function provisionWorker() {
-  const instanceId = Math.floor(Date.now() / 1000);
-  const name = `${INSTANCE_PREFIX}-${instanceId}`;
+  const name = INSTANCE_PREFIX;
   const zone = 'us-west1-a';
   
+  console.log(`🔍 Checking if worker ${name} already exists...`);
+  const existCheck = spawnSync('gcloud', [
+    'compute', 'instances', 'describe', name,
+    '--project', PROJECT_ID,
+    '--zone', zone
+  ], { stdio: 'pipe' });
+
+  if (existCheck.status === 0) {
+    console.log(`✅ Worker ${name} already exists and is ready for use.`);
+    return;
+  }
+
   console.log(`🚀 Provisioning secure offload worker: ${name}...`);
   
-  // Hardened Metadata: Enable OS Login and 72h Self-Deletion
-  const startupScript = `#!/bin/bash
-    echo "gcloud compute instances delete ${name} --zone ${zone} --project ${PROJECT_ID} --quiet" | at now + 72 hours
-  `;
-
   const result = spawnSync('gcloud', [
     'compute', 'instances', 'create', name,
     '--project', PROJECT_ID,
@@ -43,7 +49,7 @@ async function provisionWorker() {
     '--machine-type', 'n2-standard-8',
     '--image-family', 'gcli-maintainer-worker',
     '--image-project', PROJECT_ID,
-    '--metadata', `enable-oslogin=TRUE,startup-script=${startupScript}`,
+    '--metadata', `enable-oslogin=TRUE`,
     '--labels', `owner=${USER.replace(/[^a-z0-9_-]/g, '_')},type=offload-worker`,
     '--tags', `gcli-offload-${USER}`,
     '--scopes', 'https://www.googleapis.com/auth/cloud-platform'

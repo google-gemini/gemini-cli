@@ -31,15 +31,16 @@ describe('Offload Orchestration (GCE)', () => {
     vi.mocked(fs.mkdirSync).mockReturnValue(undefined as any);
     vi.mocked(fs.writeFileSync).mockReturnValue(undefined as any);
     vi.mocked(fs.createWriteStream).mockReturnValue({ pipe: vi.fn() } as any);
-    vi.spyOn(process, 'chdir').mockImplementation(() => {});
 
+    vi.spyOn(process, 'chdir').mockImplementation(() => {});
+    vi.spyOn(process, 'cwd').mockReturnValue('/test-cwd');
+    
+    // Default mock for gcloud instance describe
     vi.mocked(spawnSync).mockImplementation((cmd: any, args: any) => {
       const callInfo = JSON.stringify({ cmd, args });
-      // 1. Mock GCloud Instance List
-      if (callInfo.includes('gcloud') && callInfo.includes('instances') && callInfo.includes('list')) {
-        return { status: 0, stdout: Buffer.from(JSON.stringify([{ name: 'gcli-offload-test-worker' }])), stderr: Buffer.from('') } as any;
+      if (callInfo.includes('compute') && callInfo.includes('describe')) {
+        return { status: 0, stdout: Buffer.from('RUNNING\n'), stderr: Buffer.from('') } as any;
       }
-      // 2. Mock GH Metadata Fetching (local or remote)
       if (callInfo.includes('gh') && callInfo.includes('view')) {
           return { status: 0, stdout: Buffer.from('test-meta\n'), stderr: Buffer.from('') } as any;
       }
@@ -57,8 +58,8 @@ describe('Offload Orchestration (GCE)', () => {
   });
 
   describe('orchestrator.ts', () => {
-    it('should discover active workers and use gcloud compute ssh', async () => {
-      await runOrchestrator(['123'], {});
+    it('should connect to the deterministic worker and use gcloud compute ssh', async () => {
+      await runOrchestrator(['123'], { USER: 'testuser' });
       
       const spawnCalls = vi.mocked(spawnSync).mock.calls;
       const sshCall = spawnCalls.find(call => 
@@ -66,7 +67,8 @@ describe('Offload Orchestration (GCE)', () => {
       );
 
       expect(sshCall).toBeDefined();
-      expect(JSON.stringify(sshCall)).toContain('gcli-offload-test-worker');
+      // Match the new deterministic name: gcli-offload-<USER>
+      expect(JSON.stringify(sshCall)).toContain('gcli-offload-testuser');
       expect(JSON.stringify(sshCall)).toContain('test-project');
     });
 

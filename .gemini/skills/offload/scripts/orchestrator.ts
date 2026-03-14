@@ -36,29 +36,30 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   }
 
   const { projectId, zone, terminalType, syncAuth } = config;
-  const userPrefix = `gcli-offload-${env.USER || 'mattkorwel'}`;
+  const targetVM = `gcli-offload-${env.USER || 'mattkorwel'}`;
 
-  console.log(`🔍 Finding active fleet workers for ${userPrefix}...`);
+  console.log(`🔍 Connecting to offload worker: ${targetVM}...`);
 
-  // 2. Discover Worker VM
-  const gcloudList = spawnSync(`gcloud compute instances list --project ${projectId} --filter="name~^${userPrefix} AND status=RUNNING" --format="json"`, { shell: true });
+  // 2. Verify Worker is RUNNING
+  const statusCheck = spawnSync('gcloud', [
+    'compute', 'instances', 'describe', targetVM,
+    '--project', projectId,
+    '--zone', zone,
+    '--format', 'get(status)'
+  ], { stdio: 'pipe' });
 
-  let instances = [];
-  try {
-      instances = JSON.parse(gcloudList.stdout.toString());
-  } catch (e) {
-      console.error('❌ Failed to parse gcloud output. Ensure you are logged in.');
-      return 1;
+  const status = statusCheck.stdout.toString().trim();
+  if (status !== 'RUNNING') {
+    if (status === '') {
+        console.log(`⚠️ Worker ${targetVM} does not exist. Please run "npm run offload:fleet provision" first.`);
+    } else {
+        console.log(`⚠️ Worker ${targetVM} is ${status}. Starting it now...`);
+        spawnSync('gcloud', ['compute', 'instances', 'start', targetVM, '--project', projectId, '--zone', zone], { stdio: 'inherit' });
+    }
   }
 
-  if (instances.length === 0) {
-    console.log('⚠️ No active workers found. Please run "npm run offload:fleet provision" first.');
-    return 1;
-  }
-
-  // Default to the first found worker
-  const targetVM = instances[0].name;
   const remoteWorkDir = '/home/ubuntu/.offload/workspace';
+
   const sessionName = `offload-${prNumber}-${action}`;
 
   // Fetch Metadata (local)
