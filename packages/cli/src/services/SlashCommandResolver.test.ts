@@ -173,5 +173,30 @@ describe('SlashCommandResolver', () => {
 
       expect(finalCommands.find((c) => c.name === 'gcp.deploy1')).toBeDefined();
     });
+
+    it('should prefix skills with extension name when they conflict with built-in', () => {
+      const builtin = createMockCommand('chat', CommandKind.BUILT_IN);
+      const skill = {
+        ...createMockCommand('chat', CommandKind.SKILL),
+        extensionName: 'google-workspace',
+      };
+
+      const { finalCommands } = SlashCommandResolver.resolve([builtin, skill]);
+
+      const names = finalCommands.map((c) => c.name);
+      expect(names).toContain('chat');
+      expect(names).toContain('google-workspace.chat');
+    });
+
+    it('should NOT prefix skills with "skill" when extension name is missing', () => {
+      const builtin = createMockCommand('chat', CommandKind.BUILT_IN);
+      const skill = createMockCommand('chat', CommandKind.SKILL);
+
+      const { finalCommands } = SlashCommandResolver.resolve([builtin, skill]);
+
+      const names = finalCommands.map((c) => c.name);
+      expect(names).toContain('chat');
+      expect(names).toContain('chat1');
+    });
   });
 });

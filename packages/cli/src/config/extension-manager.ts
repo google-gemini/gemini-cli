@@ -898,9 +898,10 @@ Would you like to attempt to install via "git clone" instead?`,
       let skills = await loadSkillsFromDir(
         path.join(effectiveExtensionPath, 'skills'),
       );
-      skills = skills.map((skill) =>
-        recursivelyHydrateStrings(skill, hydrationContext),
-      );
+      skills = skills.map((skill) => ({
+        ...recursivelyHydrateStrings(skill, hydrationContext),
+        extensionName: config.name,
+      }));
 
       let rules: PolicyRule[] | undefined;
       let checkers: SafetyCheckerRule[] | undefined;
@@ -923,9 +924,10 @@ Would you like to attempt to install via "git clone" instead?`,
       const agentLoadResult = await loadAgentsFromDirectory(
         path.join(effectiveExtensionPath, 'agents'),
       );
-      agentLoadResult.agents = agentLoadResult.agents.map((agent) =>
-        recursivelyHydrateStrings(agent, hydrationContext),
-      );
+      agentLoadResult.agents = agentLoadResult.agents.map((agent) => ({
+        ...recursivelyHydrateStrings(agent, hydrationContext),
+        extensionName: config.name,
+      }));
 
       // Log errors but don't fail the entire extension load
       for (const error of agentLoadResult.errors) {
