@@ -176,6 +176,16 @@ export const TRACKER_LIST_TASKS_TOOL_NAME = 'tracker_list_tasks';
 export const TRACKER_ADD_DEPENDENCY_TOOL_NAME = 'tracker_add_dependency';
 export const TRACKER_VISUALIZE_TOOL_NAME = 'tracker_visualize';
 
+export const DEBUG_LAUNCH_TOOL_NAME = 'debug_launch';
+export const DEBUG_SET_BREAKPOINT_TOOL_NAME = 'debug_set_breakpoint';
+export const DEBUG_GET_STACKTRACE_TOOL_NAME = 'debug_get_stacktrace';
+export const DEBUG_GET_VARIABLES_TOOL_NAME = 'debug_get_variables';
+export const DEBUG_STEP_TOOL_NAME = 'debug_step';
+export const DEBUG_EVALUATE_TOOL_NAME = 'debug_evaluate';
+export const DEBUG_DISCONNECT_TOOL_NAME = 'debug_disconnect';
+export const DEBUG_ATTACH_TOOL_NAME = 'debug_attach';
+export const DEBUG_SET_FUNCTION_BREAKPOINT_TOOL_NAME = 'debug_set_function_breakpoint';
+
 // Tool Display Names
 export const WRITE_FILE_DISPLAY_NAME = 'WriteFile';
 export const EDIT_DISPLAY_NAME = 'Edit';
@@ -250,6 +260,15 @@ export const ALL_BUILTIN_TOOL_NAMES = [
   GET_INTERNAL_DOCS_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
+  DEBUG_LAUNCH_TOOL_NAME,
+  DEBUG_SET_BREAKPOINT_TOOL_NAME,
+  DEBUG_GET_STACKTRACE_TOOL_NAME,
+  DEBUG_GET_VARIABLES_TOOL_NAME,
+  DEBUG_STEP_TOOL_NAME,
+  DEBUG_EVALUATE_TOOL_NAME,
+  DEBUG_DISCONNECT_TOOL_NAME,
+  DEBUG_ATTACH_TOOL_NAME,
+  DEBUG_SET_FUNCTION_BREAKPOINT_TOOL_NAME,
 ] as const;
 
 /**
