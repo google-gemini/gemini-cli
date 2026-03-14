@@ -101,4 +101,60 @@ describe('skill-creator scripts e2e', () => {
     expect(zipList).toContain('SKILL.md');
     expect(zipList).not.toContain(`${skillName}/SKILL.md`);
   });
+
+  it('should initialize skill in .gemini/skills/ with --local flag', async () => {
+    await rig.setup('skill-creator local flag e2e');
+    const skillName = 'local-test-skill';
+    const tempDir = rig.testDir!;
+
+    // Change to temp directory to simulate user's workspace
+    const originalCwd = process.cwd();
+    process.chdir(tempDir);
+
+    try {
+      // Initialize with --local flag
+      execSync(`node "${initScript}" ${skillName} --local`, {
+        stdio: 'inherit',
+      });
+
+      // Verify skill was created in .gemini/skills/
+      const localSkillsDir = path.join(tempDir, '.gemini', 'skills');
+      const skillDir = path.join(localSkillsDir, skillName);
+
+      expect(fs.existsSync(localSkillsDir)).toBe(true);
+      expect(fs.existsSync(skillDir)).toBe(true);
+      expect(fs.existsSync(path.join(skillDir, 'SKILL.md'))).toBe(true);
+      expect(
+        fs.existsSync(path.join(skillDir, 'scripts/example_script.cjs')),
+      ).toBe(true);
+      expect(
+        fs.existsSync(path.join(skillDir, 'references/example_reference.md')),
+      ).toBe(true);
+      expect(
+        fs.existsSync(path.join(skillDir, 'assets/example_asset.txt')),
+      ).toBe(true);
+
+      // Verify SKILL.md has correct name
+      const skillMd = fs.readFileSync(path.join(skillDir, 'SKILL.md'), 'utf8');
+      expect(skillMd).toContain(`name: ${skillName}`);
+    } finally {
+      process.chdir(originalCwd);
+    }
+  });
+
+  it('should fail with helpful error when --path is missing directory argument', async () => {
+    await rig.setup('skill-creator missing path arg');
+    const skillName = 'test-skill';
+
+    try {
+      execSync(`node "${initScript}" ${skillName} --path`, {
+        stdio: 'pipe',
+      });
+      throw new Error('Should have failed with missing path argument');
+    } catch (err: unknown) {
+      const error = err as { stderr?: Buffer };
+      const stderr = error.stderr?.toString() || '';
+      expect(stderr).toContain('--path requires a directory argument');
+    }
+  });
 });
