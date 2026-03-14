@@ -87,7 +87,6 @@ priority = 100
 [[rule]]
 toolName = "run_shell_command"
 commandPrefix = [
-  "gh pr review",
   "gh pr comment",
   "gh workflow list",
   "gh auth status",
