@@ -816,6 +816,81 @@ describe('CoreToolScheduler with payload', () => {
       newContent: 'final version',
     });
   });
+
+  it('should forward ask_user payload through wrapped onConfirm', async () => {
+    const originalOnConfirm = vi.fn().mockResolvedValue(undefined);
+    const mockTool = new MockTool({
+      name: 'mockTool',
+      shouldConfirmExecute: async () => ({
+        type: 'ask_user',
+        title: 'Ask User',
+        questions: [],
+        onConfirm: originalOnConfirm,
+      }),
+    });
+
+    const mockToolRegistry = {
+      getTool: () => mockTool,
+      getFunctionDeclarations: () => [],
+      tools: new Map(),
+      discovery: {},
+      registerTool: () => {},
+      getToolByName: () => mockTool,
+      getToolByDisplayName: () => mockTool,
+      getTools: () => [],
+      discoverTools: async () => {},
+      getAllTools: () => [],
+      getToolsByServer: () => [],
+    } as unknown as ToolRegistry;
+
+    const onToolCallsUpdate = vi.fn();
+    const mockConfig = createMockConfig({
+      getToolRegistry: () => mockToolRegistry,
+    });
+    const mockMessageBus = createMockMessageBus();
+    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
+    mockConfig.getHookSystem = vi
+      .fn()
+      .mockReturnValue(new HookSystem(mockConfig));
+
+    const scheduler = new CoreToolScheduler({
+      config: mockConfig,
+      onToolCallsUpdate,
+      getPreferredEditor: () => 'vscode',
+    });
+
+    await scheduler.schedule(
+      [
+        {
+          callId: 'ask-user-call',
+          name: 'mockTool',
+          args: {},
+          isClientInitiated: false,
+          prompt_id: 'prompt-id-1',
+        },
+      ],
+      new AbortController().signal,
+    );
+
+    const waitingCall = (await waitForStatus(
+      onToolCallsUpdate,
+      CoreToolCallStatus.AwaitingApproval,
+    )) as WaitingToolCall;
+
+    const payload: ToolConfirmationPayload = {
+      answers: { '0': 'Test answer from user' },
+    };
+
+    await (
+      waitingCall.confirmationDetails as ToolCallConfirmationDetails
+    ).onConfirm(ToolConfirmationOutcome.ProceedOnce, payload);
+
+    expect(originalOnConfirm).toHaveBeenCalledWith(
+      ToolConfirmationOutcome.ProceedOnce,
+      payload,
+    );
+  });
 });
 
 class MockEditToolInvocation extends BaseToolInvocation<
