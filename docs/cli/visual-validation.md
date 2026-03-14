@@ -124,10 +124,11 @@ Existing testing layers often miss critical user experience regressions:
   that the resulting state (like a policy violation) is actually visible to the
   user.
 
-The new validation tools bridge these gaps. For example, the Policy Engine was
-previously "broken" not because of logic errors, but because visual feedback was
-suppressed in certain modes and the scheduler was prone to TTY-based race
-conditions. These tools caught both.
+The new validation tools bridge these gaps. For example, they were used to
+expose critical issues where visual feedback for the Policy Engine was
+suppressed in certain modes and the core scheduler was prone to TTY-based race
+conditions. The high-fidelity validation provided by these tools was essential
+for identifying and verifying the fixes for these issues.
 
 ## Next steps
 
