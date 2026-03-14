@@ -683,11 +683,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
         return true;
       }
 
-      if (
-        key.name === 'escape' &&
-        (streamingState === StreamingState.Responding ||
-          streamingState === StreamingState.WaitingForConfirmation)
-      ) {
+      const isGenerating =
+        streamingState === StreamingState.Responding ||
+        streamingState === StreamingState.WaitingForConfirmation;
+
+      // Check if any interactive overlay is active that the user might want
+      // to dismiss with Escape. If so, let the keypress be handled locally
+      // instead of falling through to the global cancellation handler.
+      const isOverlayActive =
+        shellModeActive ||
+        reverseSearchActive ||
+        commandSearchActive ||
+        (completion.showSuggestions && isShellSuggestionsVisible);
+
+      if (key.name === 'escape' && isGenerating && !isOverlayActive) {
         return false;
       }
 
