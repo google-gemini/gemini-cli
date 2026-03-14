@@ -413,7 +413,7 @@ export function PoliciesDialog({
       {showHelpText && (
         <Box marginX={1}>
           <Text color={theme.text.secondary}>
-            (↑↓ navigate, type to search, Tab to cycle tabs, Esc close)
+            (Use ↑↓ to navigate, ←/→ or Tab to cycle, Esc to close)
           </Text>
         </Box>
       )}
