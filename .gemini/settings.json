@@ -9,10 +9,12 @@
   },
   "maintainer": {
     "deepReview": {
-      "remoteHost": "bg1",
-      "remoteWorkDir": "~/.offload/workspace",
+      "projectId": "gemini-cli-team-quota",
+      "zone": "us-west1-a",
+      "machineType": "n2-standard-8",
       "terminalType": "iterm2",
       "syncAuth": true,
+      "setupType": "isolated",
       "geminiSetup": "isolated",
       "ghSetup": "isolated"
     }
