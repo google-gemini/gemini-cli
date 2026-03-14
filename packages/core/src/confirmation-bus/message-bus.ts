@@ -45,15 +45,29 @@ export class MessageBus extends EventEmitter {
    */
   derive(subagentName: string): MessageBus {
     const bus = new MessageBus(this.policyEngine, this.debug);
+
     bus.publish = async (message: Message) => {
       if (message.type === MessageBusType.TOOL_CONFIRMATION_REQUEST) {
         return this.publish({
           ...message,
-          subagent: subagentName,
+          subagent: message.subagent
+            ? `${subagentName}/${message.subagent}`
+            : subagentName,
         });
       }
       return this.publish(message);
     };
+
+    // Delegate subscription methods to the parent bus
+    bus.subscribe = this.subscribe.bind(this);
+    bus.unsubscribe = this.unsubscribe.bind(this);
+    bus.on = this.on.bind(this);
+    bus.off = this.off.bind(this);
+    bus.emit = this.emit.bind(this);
+    bus.once = this.once.bind(this);
+    bus.removeListener = this.removeListener.bind(this);
+    bus.listenerCount = this.listenerCount.bind(this);
+
     return bus;
   }
 
