@@ -166,6 +166,10 @@ import { parseSlashCommand } from '../utils/commands.js';
 import { useTerminalTheme } from './hooks/useTerminalTheme.js';
 import { useTimedMessage } from './hooks/useTimedMessage.js';
 import { useIsHelpDismissKey } from './utils/shortcutsHelp.js';
+import {
+  getContextUsagePercentage,
+  TOKEN_BUDGET_WARNING_THRESHOLD,
+} from './utils/contextUsage.js';
 import { useSuspend } from './hooks/useSuspend.js';
 import { useRunEventNotifications } from './hooks/useRunEventNotifications.js';
 import { isNotificationsEnabled } from '../utils/terminalNotifications.js';
@@ -303,6 +307,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const [defaultBannerText, setDefaultBannerText] = useState('');
   const [warningBannerText, setWarningBannerText] = useState('');
   const [bannerVisible, setBannerVisible] = useState(true);
+  const [hasWarnedTokenBudget, setHasWarnedTokenBudget] = useState(false);
 
   const bannerData = useMemo(
     () => ({
@@ -415,6 +420,41 @@ export const AppContainer = (props: AppContainerProps) => {
   // Additional hooks moved from App.tsx
   const { stats: sessionStats } = useSessionStats();
   const branchName = useGitBranchName(config.getTargetDir());
+
+  useEffect(() => {
+    const usagePercentage = getContextUsagePercentage(
+      sessionStats.lastPromptTokenCount,
+      typeof currentModel === 'string' ? currentModel : undefined,
+    );
+
+    const warningMessage = `Token budget exceeds ${
+      TOKEN_BUDGET_WARNING_THRESHOLD * 100
+    }%. Context will be truncated soon.`;
+
+    if (usagePercentage >= TOKEN_BUDGET_WARNING_THRESHOLD) {
+      if (!hasWarnedTokenBudget) {
+        setWarningBannerText(warningMessage);
+        setBannerVisible(true);
+        setHasWarnedTokenBudget(true); // Only warn once per crossing
+      }
+    } else {
+      // If it drops back below, reset so we can warn again if it climbs
+      if (hasWarnedTokenBudget) {
+        setHasWarnedTokenBudget(false);
+        // Clear the warning banner if it's the one we set to avoid showing a stale message.
+        if (warningBannerText === warningMessage) {
+          setWarningBannerText('');
+        }
+      }
+    }
+  }, [
+    sessionStats.lastPromptTokenCount,
+    currentModel,
+    hasWarnedTokenBudget,
+    warningBannerText,
+    setWarningBannerText,
+    setBannerVisible,
+  ]);
 
   // Layout measurements
   const mainControlsRef = useRef<DOMElement>(null);
