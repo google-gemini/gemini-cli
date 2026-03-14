@@ -54,7 +54,7 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   const setupCmd = `
     mkdir -p ${remoteHome}/dev/worktrees && \
     cd ${remoteWorkDir} && \
-    git fetch origin pull/${prNumber}/head && \
+    git fetch upstream pull/${prNumber}/head && \
     git worktree add -f ${remoteWorktreeDir} FETCH_HEAD
   `;
 

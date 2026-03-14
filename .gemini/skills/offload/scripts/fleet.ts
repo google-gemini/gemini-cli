@@ -108,6 +108,14 @@ async function stopWorker() {
   }
 }
 
+async function remoteStatus() {
+  const name = INSTANCE_PREFIX;
+  const zone = 'us-west1-a';
+  
+  console.log(`📡 Fetching remote status from ${name}...`);
+  spawnSync('ssh', ['gcli-worker', 'tsx .offload/scripts/status.ts'], { stdio: 'inherit', shell: true });
+}
+
 async function main() {
   const action = process.argv[2] || 'list';
 
@@ -120,6 +128,9 @@ async function main() {
       break;
     case 'stop':
       await stopWorker();
+      break;
+    case 'status':
+      await remoteStatus();
       break;
     case 'create-image':
       await createImage();

@@ -85,6 +85,34 @@ Host ${sshAlias}
   // 1. Configure Fast-Path SSH Alias
   // ... (unchanged)
 
+  // 1b. Security Fork Management
+  console.log('\n🍴 Configuring Security Fork...');
+  const upstreamRepo = 'google-gemini/gemini-cli';
+  
+  const forkCheck = spawnSync('gh', ['repo', 'view', '--json', 'parent,nameWithOwner'], { stdio: 'pipe' });
+  let currentRepo = '';
+  try {
+    const repoInfo = JSON.parse(forkCheck.stdout.toString());
+    currentRepo = repoInfo.nameWithOwner;
+  } catch (e) {}
+
+  let userFork = '';
+  if (currentRepo.includes(`${env.USER}/`) || currentRepo.includes('mattkorwel/')) {
+      userFork = currentRepo;
+      console.log(`   ✅ Using existing fork: ${userFork}`);
+  } else {
+      console.log(`   🔍 No personal fork detected for ${upstreamRepo}.`);
+      if (await confirm('   Would you like to create a personal fork for autonomous work?')) {
+          const forkResult = spawnSync('gh', ['repo', 'fork', upstreamRepo, '--clone=false'], { stdio: 'inherit' });
+          if (forkResult.status === 0) {
+              // Get the fork name (usually <user>/gemini-cli)
+              const user = spawnSync('gh', ['api', 'user', '-q', '.login'], { stdio: 'pipe' }).stdout.toString().trim();
+              userFork = `${user}/gemini-cli`;
+              console.log(`   ✅ Created fork: ${userFork}`);
+          }
+      }
+  }
+
   // Use the alias for remaining setup steps
   const remoteHost = sshAlias;
   const remoteHome = spawnSync(`ssh ${remoteHost} "pwd"`, { shell: true }).stdout.toString().trim();
@@ -109,25 +137,36 @@ Host ${sshAlias}
     }
   }
 
-  // 4. Remote GitHub Login
-  if (await confirm('Authenticate GitHub CLI on the worker?')) {
-    console.log('\n🔐 Performing non-interactive GitHub CLI authentication on worker...');
-    const localToken = spawnSync('gh', ['auth', 'token'], { stdio: 'pipe' }).stdout.toString().trim();
-    if (!localToken) {
-      console.error('❌ Could not find local GitHub token. Please log in locally first with "gh auth login".');
-      return 1;
-    }
-
-    // Pipe the local token to the remote worker's gh auth login
-    const loginCmd = `gh auth login --with-token --insecure-storage`;
-    const result = spawnSync(`echo ${localToken} | ssh ${remoteHost} ${JSON.stringify(loginCmd)}`, { shell: true, stdio: 'inherit' });
+  // 4. Scoped Token Onboarding (Security Hardening)
+  if (await confirm('Generate a scoped, secure token for the autonomous agent? (Recommended)')) {
+    const user = spawnSync('gh', ['api', 'user', '-q', '.login'], { stdio: 'pipe' }).stdout.toString().trim();
     
-    if (result.status === 0) {
-      console.log('✅ GitHub CLI authenticated successfully on worker.');
-      // Set git protocol to https by default for simplicity
-      spawnSync(`ssh ${remoteHost} "gh config set git_protocol https"`, { shell: true });
-    } else {
-      console.error('❌ GitHub CLI authentication failed on worker.');
+    // Construct the Pre-Filled Magic Link for Fine-Grained PAT
+    const scopes = 'contents:write,pull_requests:write,metadata:read';
+    const description = `Gemini CLI Offload - ${env.USER || 'maintainer'}`;
+    const magicLink = `https://github.com/settings/tokens/beta/new?description=${encodeURIComponent(description)}&repositories[]=${encodeURIComponent(upstreamRepo)}&repositories[]=${encodeURIComponent(userFork)}&permissions[contents]=write&permissions[pull_requests]=write&permissions[metadata]=read`;
+
+    console.log('\n🔐 SECURITY HARDENING:');
+    console.log('1. Open this Magic Link in your browser to create a scoped token:');
+    console.log(`   \x1b[34m${magicLink}\x1b[0m`);
+    console.log('2. Click "Generate token" at the bottom of the page.');
+    console.log('3. Copy the token and paste it here.');
+    
+    const scopedToken = await prompt('\nPaste Scoped Token', '');
+    
+    if (scopedToken) {
+      console.log(`   - Mirroring scoped token to worker...`);
+      // Save it to a persistent file on the worker that entrypoint.ts will prioritize
+      spawnSync(`ssh ${remoteHost} "mkdir -p ~/.offload && echo ${scopedToken} > ~/.offload/.gh_token && chmod 600 ~/.offload/.gh_token"`, { shell: true });
+      console.log('   ✅ Scoped token saved on worker.');
+    }
+  } else {
+    // Fallback: Standard gh auth login if they skip scoped token
+    if (await confirm('Fallback: Authenticate via standard GitHub CLI login?')) {
+        console.log('\n🔐 Starting GitHub CLI authentication on worker...');
+        const localToken = spawnSync('gh', ['auth', 'token'], { stdio: 'pipe' }).stdout.toString().trim();
+        const loginCmd = `gh auth login --with-token --insecure-storage`;
+        spawnSync(`echo ${localToken} | ssh ${remoteHost} ${JSON.stringify(loginCmd)}`, { shell: true });
     }
   }
 
@@ -136,9 +175,9 @@ Host ${sshAlias}
     console.log('🚀 Installing global developer tools...');
     spawnSync(`ssh ${remoteHost} "sudo npm install -g tsx vitest"`, { shell: true, stdio: 'inherit' });
 
-    console.log('🚀 Cloning repository (blob-less) on worker...');
-    const repoUrl = 'https://github.com/google-gemini/gemini-cli.git';
-    const cloneCmd = `[ -d ${remoteWorkDir}/.git ] || git clone --filter=blob:none ${repoUrl} ${remoteWorkDir}`;
+    console.log(`🚀 Cloning fork ${userFork} on worker...`);
+    const repoUrl = `https://github.com/${userFork}.git`;
+    const cloneCmd = `[ -d ${remoteWorkDir}/.git ] || (git clone --filter=blob:none ${repoUrl} ${remoteWorkDir} && cd ${remoteWorkDir} && git remote add upstream https://github.com/${upstreamRepo}.git && git fetch upstream)`;
     spawnSync(`ssh ${remoteHost} ${JSON.stringify(cloneCmd)}`, { shell: true, stdio: 'inherit' });
     
     // We skip the full npm install here as requested; per-worktree builds will handle it if needed.
@@ -157,6 +196,8 @@ Host ${sshAlias}
     remoteHost,
     remoteHome,
     remoteWorkDir,
+    userFork,
+    upstreamRepo,
     terminalType: 'iterm2'
   };
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
