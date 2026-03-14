@@ -99,6 +99,30 @@ describe('Deep Review Orchestration', () => {
 
       expect(sshCall).toBeDefined();
     });
+
+    it('should launch in current terminal when NOT within a Gemini session', async () => {
+      await runOrchestrator(['123'], {}); // No session IDs in env
+      
+      const spawnCalls = vi.mocked(spawnSync).mock.calls;
+      // console.log('Terminal Calls:', spawnCalls.map(c => c[0]));
+      const terminalCall = spawnCalls.find(call => {
+        const cmdStr = typeof call[0] === 'string' ? call[0] : (Array.isArray(call[1]) ? call[1].join(' ') : '');
+        // The orchestrator constructs a complex command string for shell:true
+        return cmdStr.includes('ssh -t') && call[2]?.stdio === 'inherit';
+      });
+      expect(terminalCall).toBeDefined();
+    });
+
+    it('should launch in background mode when --background flag is provided', async () => {
+      await runOrchestrator(['123', '--background'], {});
+      
+      const spawnCalls = vi.mocked(spawnSync).mock.calls;
+      const backgroundCall = spawnCalls.find(call => {
+        const cmdStr = typeof call[0] === 'string' ? call[0] : (Array.isArray(call[1]) ? call[1].join(' ') : '');
+        return cmdStr.includes('>') && cmdStr.includes('background.log');
+      });
+      expect(backgroundCall).toBeDefined();
+    });
   });
 
   describe('setup.ts', () => {
@@ -111,13 +135,17 @@ describe('Deep Review Orchestration', () => {
       vi.mocked(readline.createInterface).mockReturnValue(mockInterface as any);
     });
 
-    it('should correctly detect pre-existing setup when .git directory exists on remote', async () => {
+    it('should correctly detect pre-existing setup when everything is present on remote', async () => {
       vi.mocked(spawnSync).mockImplementation((cmd: any, args: any) => {
         if (cmd === 'ssh') {
           const remoteCmd = args[1];
+          // Mock .git folder existence check
           if (remoteCmd.includes('[ -d ~/test-dir/.git ]')) return { status: 0 } as any;
-          if (remoteCmd.includes('sh -lc "command -v gh"')) return { status: 0 } as any;
+          // Mock successful dependency checks (gh, tmux)
+          if (remoteCmd.includes('command -v')) return { status: 0 } as any;
+          // Mock successful gh auth check
           if (remoteCmd.includes('gh auth status')) return { status: 0 } as any;
+          // Mock gemini auth presence
           if (remoteCmd.includes('google_accounts.json')) return { status: 0 } as any;
         }
         return { status: 0, stdout: Buffer.from(''), stderr: Buffer.from('') } as any;
@@ -126,8 +154,8 @@ describe('Deep Review Orchestration', () => {
       mockInterface.question
         .mockImplementationOnce((q, cb) => cb('test-host'))
         .mockImplementationOnce((q, cb) => cb('~/test-dir'))
-        .mockImplementationOnce((q, cb) => cb('p'))
-        .mockImplementationOnce((q, cb) => cb('p'))
+        .mockImplementationOnce((q, cb) => cb('p')) // gemini preexisting
+        .mockImplementationOnce((q, cb) => cb('p')) // gh preexisting
         .mockImplementationOnce((q, cb) => cb('none'));
 
       await runSetup({ HOME: '/test-home' });
@@ -138,6 +166,71 @@ describe('Deep Review Orchestration', () => {
       expect(writeCall).toBeDefined();
       const savedSettings = JSON.parse(writeCall![1] as string);
       expect(savedSettings.maintainer.deepReview.geminiSetup).toBe('preexisting');
+      expect(savedSettings.maintainer.deepReview.ghSetup).toBe('preexisting');
+    });
+
+    it('should offer to provision missing requirements (gh, tmux) on a net-new machine', async () => {
+      vi.mocked(spawnSync).mockImplementation((cmd: any, args: any) => {
+        if (cmd === 'ssh') {
+          const remoteCmd = Array.isArray(args) ? args[args.length - 1] : args;
+          // Mock missing dependencies
+          if (remoteCmd.includes('command -v gh')) return { status: 1 } as any;
+          if (remoteCmd.includes('command -v tmux')) return { status: 1 } as any;
+          if (remoteCmd.includes('[ -d ~/test-dir/.git ]')) return { status: 1 } as any;
+          if (remoteCmd.includes('uname -s')) return { status: 0, stdout: Buffer.from('Linux\n') } as any;
+        }
+        return { status: 0, stdout: Buffer.from(''), stderr: Buffer.from('') } as any;
+      });
+
+      mockInterface.question
+        .mockImplementationOnce((q, cb) => cb('test-host'))
+        .mockImplementationOnce((q, cb) => cb('~/test-dir'))
+        .mockImplementationOnce((q, cb) => cb('i')) // gemini isolated
+        .mockImplementationOnce((q, cb) => cb('i')) // gh isolated
+        .mockImplementationOnce((q, cb) => cb('y')) // provision requirements
+        .mockImplementationOnce((q, cb) => cb('none'));
+
+      await runSetup({ HOME: '/test-home' });
+
+      const spawnCalls = vi.mocked(spawnSync).mock.calls;
+      const installCall = spawnCalls.find(call => {
+        const cmdStr = JSON.stringify(call);
+        return cmdStr.includes('apt install -y gh tmux');
+      });
+      expect(installCall).toBeDefined();
+    });
+
+    it('should handle preexisting repo but missing tool auth', async () => {
+      vi.mocked(spawnSync).mockImplementation((cmd: any, args: any) => {
+        if (cmd === 'ssh') {
+          const remoteCmd = args[1];
+          if (remoteCmd.includes('[ -d ~/test-dir/.git ]')) return { status: 0 } as any;
+          if (remoteCmd.includes('gh auth status')) return { status: 1 } as any; // GH not auth'd
+          if (remoteCmd.includes('google_accounts.json')) return { status: 1 } as any; // Gemini not auth'd
+          if (remoteCmd.includes('command -v')) return { status: 0 } as any; // dependencies present
+        }
+        return { status: 0, stdout: Buffer.from(''), stderr: Buffer.from('') } as any;
+      });
+
+      vi.mocked(fs.existsSync).mockImplementation((p) => p.toString().includes('google_accounts.json'));
+
+      mockInterface.question
+        .mockImplementationOnce((q, cb) => cb('test-host'))
+        .mockImplementationOnce((q, cb) => cb('~/test-dir'))
+        .mockImplementationOnce((q, cb) => cb('i')) // user chooses isolated gemini despite existing repo
+        .mockImplementationOnce((q, cb) => cb('p')) // user chooses preexisting gh
+        .mockImplementationOnce((q, cb) => cb('y')) // sync gemini auth
+        .mockImplementationOnce((q, cb) => cb('none'));
+
+      await runSetup({ HOME: '/test-home' });
+
+      const writeCall = vi.mocked(fs.writeFileSync).mock.calls.find(call => 
+        call[0].toString().includes('.gemini/settings.json')
+      );
+      const savedSettings = JSON.parse(writeCall![1] as string);
+      expect(savedSettings.maintainer.deepReview.geminiSetup).toBe('isolated');
+      expect(savedSettings.maintainer.deepReview.ghSetup).toBe('preexisting');
+      expect(savedSettings.maintainer.deepReview.syncAuth).toBe(true);
     });
   });
 

@@ -51,30 +51,40 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   const ISOLATED_GEMINI_CONFIG = '~/.gemini-deep-review';
   const ISOLATED_GH_CONFIG = '~/.gh-deep-review';
 
-  // System Requirements Check
+  console.log(`🔍 Checking state of ${remoteHost}...`);
+  // Use a login shell to ensure the same PATH as the interactive user
   const ghCheck = spawnSync('ssh', [remoteHost, 'sh -lc "command -v gh"'], { stdio: 'pipe' });
-  if (ghCheck.status !== 0) {
+  const tmuxCheck = spawnSync('ssh', [remoteHost, 'sh -lc "command -v tmux"'], { stdio: 'pipe' });
+
+  if (ghCheck.status !== 0 || tmuxCheck.status !== 0) {
     console.log('\n📥 System Requirements Check:');
-    console.log('  ❌ GitHub CLI (gh) is not installed on remote.');
-    
-    const shouldProvision = await confirm('\nWould you like Gemini to automatically provision gh?');
+    if (ghCheck.status !== 0) console.log('  ❌ GitHub CLI (gh) is not installed on remote.');
+    if (tmuxCheck.status !== 0) console.log('  ❌ tmux is not installed on remote.');
+
+    const shouldProvision = await confirm('\nWould you like Gemini to automatically provision missing requirements?');
     if (shouldProvision) {
-      console.log(`🚀 Attempting to install gh on ${remoteHost}...`);
+      console.log(`🚀 Attempting to provision dependencies on ${remoteHost}...`);
       const osCheck = spawnSync('ssh', [remoteHost, 'uname -s'], { stdio: 'pipe' });
       const os = osCheck.stdout.toString().trim();
-      let installCmd = os === 'Linux' ? 'sudo apt update && sudo apt install -y gh' : (os === 'Darwin' ? 'brew install gh' : '');
+
+      let installCmd = '';
+      if (os === 'Linux') {
+        installCmd = 'sudo apt update && sudo apt install -y ' + [ghCheck.status !== 0 ? 'gh' : '', tmuxCheck.status !== 0 ? 'tmux' : ''].filter(Boolean).join(' ');
+      } else if (os === 'Darwin') {
+        installCmd = 'brew install ' + [ghCheck.status !== 0 ? 'gh' : '', tmuxCheck.status !== 0 ? 'tmux' : ''].filter(Boolean).join(' ');
+      }
+
       if (installCmd) {
         spawnSync('ssh', ['-t', remoteHost, installCmd], { stdio: 'inherit' });
       }
     } else {
-      console.log('⚠️  Please ensure gh is installed before running again.');
+      console.log('⚠️  Please ensure gh and tmux are installed before running again.');
       return 1;
     }
   }
 
   // Ensure remote work dir and isolated config dirs exist
   spawnSync('ssh', [remoteHost, `mkdir -p ${remoteWorkDir} ${ISOLATED_GEMINI_CONFIG}/policies/ ${ISOLATED_GH_CONFIG}`], { stdio: 'pipe' });
-
   // Identity Synchronization Onboarding
   console.log('\n🔐 Identity & Authentication:');
   
