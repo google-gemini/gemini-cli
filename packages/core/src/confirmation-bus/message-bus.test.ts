@@ -8,6 +8,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MessageBus } from './message-bus.js';
 import { PolicyEngine } from '../policy/policy-engine.js';
 import { PolicyDecision } from '../policy/types.js';
+import { coreEvents } from '../utils/events.js';
 import {
   MessageBusType,
   type ToolConfirmationRequest,
@@ -23,6 +24,7 @@ describe('MessageBus', () => {
   beforeEach(() => {
     policyEngine = new PolicyEngine();
     messageBus = new MessageBus(policyEngine);
+    vi.restoreAllMocks();
   });
 
   describe('publish', () => {
@@ -80,11 +82,14 @@ describe('MessageBus', () => {
       expect(responseHandler).toHaveBeenCalledWith(expectedResponse);
     });
 
-    it('should emit rejection and response when policy denies', async () => {
+    it('should emit rejection, response, and user feedback when policy denies', async () => {
       vi.spyOn(policyEngine, 'check').mockResolvedValue({
         decision: PolicyDecision.DENY,
       });
 
+      const feedbackSpy = vi
+        .spyOn(coreEvents, 'emitFeedback')
+        .mockImplementation(() => {});
       const responseHandler = vi.fn();
       const rejectionHandler = vi.fn();
       messageBus.subscribe(
@@ -103,6 +108,11 @@ describe('MessageBus', () => {
       };
 
       await messageBus.publish(request);
+
+      expect(feedbackSpy).toHaveBeenCalledWith(
+        'error',
+        expect.stringContaining('test-tool'),
+      );
 
       const expectedRejection: ToolPolicyRejection = {
         type: MessageBusType.TOOL_POLICY_REJECTION,
