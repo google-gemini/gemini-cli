@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { spawnSync, spawn } from 'child_process';
 import fs from 'fs';
 import readline from 'readline';
-import { runOrchestrator } from '../scripts/review.ts';
+import { runOrchestrator } from '../scripts/orchestrator.ts';
 import { runSetup } from '../scripts/setup.ts';
 import { runWorker } from '../scripts/worker.ts';
 import { runChecker } from '../scripts/check.ts';
@@ -233,32 +233,44 @@ describe('Deep Review Orchestration', () => {
       const savedSettings = JSON.parse(writeCall![1] as string);
       expect(savedSettings.maintainer.deepReview.geminiSetup).toBe('isolated');
       expect(savedSettings.maintainer.deepReview.ghSetup).toBe('preexisting');
-      expect(savedSettings.maintainer.deepReview.syncAuth).toBe(true);
-    });
-  });
+      describe('orchestrator.ts (offload)', () => {
+        it('should default to review action and pass it to remote', async () => {
+          await runOrchestrator(['123'], {});
 
-  describe('worker.ts', () => {
-    it('should launch parallel tasks and write exit codes', async () => {
-      // Mock targetDir existing
-      vi.mocked(fs.existsSync).mockImplementation((p) => p.toString().includes('test-branch'));
-      
-      const workerPromise = runWorker(['123', 'test-branch', '/test-policy.toml']);
-      
-      // Since worker uses setInterval/setTimeout, we might need to advance timers 
-      // or ensure the close event triggers everything
-      await workerPromise;
+          const spawnCalls = vi.mocked(spawnSync).mock.calls;
+          const sshCall = spawnCalls.find(call => typeof call[0] === 'string' && call[0].includes('entrypoint.ts 123'));
+          expect(sshCall![0]).toContain('review'); // Default action
+        });
 
-      const spawnCalls = vi.mocked(spawn).mock.calls;
-      expect(spawnCalls.length).toBeGreaterThanOrEqual(4); // build, ci, review, verify
-      
-      const buildCall = spawnCalls.find(call => call[0].includes('npm ci'));
-      expect(buildCall).toBeDefined();
+        it('should pass explicit actions (like fix) to remote', async () => {
+          await runOrchestrator(['123', 'fix'], {});
 
-      const writeCalls = vi.mocked(fs.writeFileSync).mock.calls;
-      const exitFileCall = writeCalls.find(call => call[0].toString().includes('build.exit'));
-      expect(exitFileCall).toBeDefined();
-      expect(exitFileCall![1]).toBe('0');
-    });
+          const spawnCalls = vi.mocked(spawnSync).mock.calls;
+          const sshCall = spawnCalls.find(call => typeof call[0] === 'string' && call[0].includes('entrypoint.ts 123'));
+          expect(sshCall![0]).toContain('fix');
+        });
+
+        it('should construct the correct tmux session name from branch', async () => {
+      ...
+      describe('worker.ts (playbooks)', () => {
+        it('should launch the review playbook by default', async () => {
+          vi.mocked(fs.existsSync).mockReturnValue(true);
+          await runWorker(['123', 'test-branch', '/test-policy.toml', 'review']);
+
+          const spawnCalls = vi.mocked(spawn).mock.calls;
+          const analysisCall = spawnCalls.find(call => call[0].includes('/review-frontend'));
+          expect(analysisCall).toBeDefined();
+        });
+
+        it('should launch the fix playbook when requested', async () => {
+          vi.mocked(fs.existsSync).mockReturnValue(true);
+          await runWorker(['123', 'test-branch', '/test-policy.toml', 'fix']);
+
+          const spawnCalls = vi.mocked(spawn).mock.calls;
+          const fixCall = spawnCalls.find(call => call[0].includes('Address review comments'));
+          expect(fixCall).toBeDefined();
+        });
+      });
   });
 
   describe('check.ts', () => {

@@ -63,10 +63,10 @@
     "telemetry": "node scripts/telemetry.js",
     "check:lockfile": "node scripts/check-lockfile.js",
     "clean": "node scripts/clean.js",
-    "review": "tsx .gemini/skills/deep-review/scripts/review.ts",
-    "review:setup": "tsx .gemini/skills/deep-review/scripts/setup.ts",
-    "review:check": "tsx .gemini/skills/deep-review/scripts/check.ts",
-    "review:clean": "tsx .gemini/skills/deep-review/scripts/clean.ts",
+    "offload": "tsx .gemini/skills/offload/scripts/orchestrator.ts",
+    "offload:setup": "tsx .gemini/skills/offload/scripts/setup.ts",
+    "offload:check": "tsx .gemini/skills/offload/scripts/check.ts",
+    "offload:clean": "tsx .gemini/skills/offload/scripts/clean.ts",
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {

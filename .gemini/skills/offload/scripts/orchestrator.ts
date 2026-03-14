@@ -1,5 +1,5 @@
 /**
- * Universal Deep Review Orchestrator (Local)
+ * Universal Offload Orchestrator (Local)
  */
 import { spawnSync } from 'child_process';
 import path from 'path';
@@ -13,8 +13,10 @@ const q = (str: string) => `'${str.replace(/'/g, "'\\''")}'`;
 
 export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = process.env) {
   const prNumber = args[0];
+  const action = args[1] || 'review'; // Default action is review
+  
   if (!prNumber) {
-    console.error('Usage: npm run review <PR_NUMBER>');
+    console.error('Usage: npm run offload <PR_NUMBER> [action]');
     return 1;
   }
 
@@ -27,10 +29,10 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
 
   let config = settings.maintainer?.deepReview;
   if (!config) {
-    console.log('⚠️  Deep Review configuration not found. Launching setup...');
-    const setupResult = spawnSync('npm', ['run', 'review:setup'], { stdio: 'inherit' });
+    console.log('⚠️  Offload configuration not found. Launching setup...');
+    const setupResult = spawnSync('npm', ['run', 'offload:setup'], { stdio: 'inherit' });
     if (setupResult.status !== 0) {
-      console.error('❌ Setup failed. Please run "npm run review:setup" manually.');
+      console.error('❌ Setup failed. Please run "npm run offload:setup" manually.');
       return 1;
     }
     // Reload settings after setup
@@ -56,12 +58,12 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   const remotePolicyPath = `${ISOLATED_GEMINI}/policies/deep-review-policy.toml`;
   
   console.log(`📡 Mirroring environment to ${remoteHost}...`);
-  spawnSync('ssh', [remoteHost, `mkdir -p ${remoteWorkDir}/.gemini/skills/deep-review/scripts/ ${ISOLATED_GEMINI}/policies/`]);
+  spawnSync('ssh', [remoteHost, `mkdir -p ${remoteWorkDir}/.gemini/skills/offload/scripts/ ${ISOLATED_GEMINI}/policies/`]);
   
   // Sync the policy file specifically
-  spawnSync('rsync', ['-avz', path.join(REPO_ROOT, '.gemini/skills/deep-review/policy.toml'), `${remoteHost}:${remotePolicyPath}`]);
+  spawnSync('rsync', ['-avz', path.join(REPO_ROOT, '.gemini/skills/offload/policy.toml'), `${remoteHost}:${remotePolicyPath}`]);
 
-  spawnSync('rsync', ['-avz', '--delete', path.join(REPO_ROOT, '.gemini/skills/deep-review/scripts/'), `${remoteHost}:${remoteWorkDir}/.gemini/skills/deep-review/scripts/`]);
+  spawnSync('rsync', ['-avz', '--delete', path.join(REPO_ROOT, '.gemini/skills/offload/scripts/'), `${remoteHost}:${remoteWorkDir}/.gemini/skills/offload/scripts/`]);
 
   if (syncAuth) {
     const homeDir = env.HOME || '';
@@ -76,54 +78,48 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
     const localEnv = path.join(REPO_ROOT, '.env');
     if (fs.existsSync(localEnv)) spawnSync('rsync', ['-avz', localEnv, `${remoteHost}:${remoteWorkDir}/.env`]);
   }
-// 4. Construct Clean Command
-const envLoader = 'export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh"';
-// Set FORCE_LOCAL_OPEN=1 to signal the worker to use OSC 1337 for links
-const remoteWorker = `export FORCE_LOCAL_OPEN=1 && export GEMINI_CLI_HOME=${ISOLATED_GEMINI} && export GH_CONFIG_DIR=${ISOLATED_GH} && ./node_modules/.bin/tsx .gemini/skills/deep-review/scripts/entrypoint.ts ${prNumber} ${branchName} ${remotePolicyPath}`;
 
-const tmuxCmd = `cd ${remoteWorkDir} && ${envLoader} && ${remoteWorker}; exec $SHELL`;
-const sshInternal = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n ${q(branchName)} ${q(tmuxCmd)}`;
-const sshCmd = `ssh -t ${remoteHost} ${q(sshInternal)}`;
+  // 3. Construct Clean Command
+  const envLoader = 'export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh"';
+  // Set FORCE_LOCAL_OPEN=1 to signal the worker to use OSC 1337 for links
+  const remoteWorker = `export FORCE_LOCAL_OPEN=1 && export GEMINI_CLI_HOME=${ISOLATED_GEMINI} && export GH_CONFIG_DIR=${ISOLATED_GH} && ./node_modules/.bin/tsx .gemini/skills/offload/scripts/entrypoint.ts ${prNumber} ${branchName} ${remotePolicyPath} ${action}`;
+  
+  const tmuxCmd = `cd ${remoteWorkDir} && ${envLoader} && ${remoteWorker}; exec $SHELL`;
+  const sshInternal = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n ${q(branchName)} ${q(tmuxCmd)}`;
+  const sshCmd = `ssh -t ${remoteHost} ${q(sshInternal)}`;
 
-// 5. Smart Context Execution
-// Check if we are running inside a Gemini CLI session or a plain shell
-const isWithinGemini = !!env.GEMINI_SESSION_ID || !!env.GCLI_SESSION_ID;
-const forceBackground = args.includes('--background');
+  // 4. Smart Context Execution
+  const isWithinGemini = !!env.GEMINI_SESSION_ID || !!env.GCLI_SESSION_ID;
+  const forceBackground = args.includes('--background');
 
-if (isWithinGemini || forceBackground) {
-  if (process.platform === 'darwin' && terminalType !== 'none' && !forceBackground) {
-    // macOS: Use Window Automation (Interactive Mode)
-
-      let appleScript = '';
-      if (terminalType === 'iterm2') {
-        appleScript = `on run argv\n set theCommand to item 1 of argv\n tell application "iTerm"\n set newWindow to (create window with default profile)\n tell current session of newWindow\n write text theCommand\n end tell\n activate\n end tell\n end run`;
-      } else if (terminalType === 'terminal') {
+  if (isWithinGemini || forceBackground) {
+    if (process.platform === 'darwin' && terminalType !== 'none' && !forceBackground) {
+      // macOS: Use Window Automation
+      let appleScript = `on run argv\n set theCommand to item 1 of argv\n tell application "iTerm"\n set newWindow to (create window with default profile)\n tell current session of newWindow\n write text theCommand\n end tell\n activate\n end tell\n end run`;
+      if (terminalType === 'terminal') {
         appleScript = `on run argv\n set theCommand to item 1 of argv\n tell application "Terminal"\n do script theCommand\n activate\n end tell\n end run`;
       }
 
-      if (appleScript) {
-        spawnSync('osascript', ['-', sshCmd], { input: appleScript });
-        console.log(`✅ ${terminalType.toUpperCase()} window opened for verification.`);
-        return 0;
-      }
+      spawnSync('osascript', ['-', sshCmd], { input: appleScript });
+      console.log(`✅ ${terminalType.toUpperCase()} window opened for verification.`);
+      return 0;
     }
 
-    // Cross-Platform Background Mode (within Gemini session)
+    // Cross-Platform Background Mode
     console.log(`📡 Launching remote verification in background mode...`);
-    const logFile = path.join(REPO_ROOT, `.gemini/logs/review-${prNumber}/background.log`);
+    const logFile = path.join(REPO_ROOT, `.gemini/logs/offload-${prNumber}/background.log`);
     fs.mkdirSync(path.dirname(logFile), { recursive: true });
     
-    // Use tmuxCmd for background mode to ensure persistence even in background
     const backgroundCmd = `ssh ${remoteHost} ${q(tmuxCmd)} > ${q(logFile)} 2>&1 &`;
     spawnSync(backgroundCmd, { shell: true });
     
     console.log(`⏳ Remote worker started in background.`);
-    console.log(`📄 Tailing logs to: .gemini/logs/review-${prNumber}/background.log`);
+    console.log(`📄 Tailing logs to: .gemini/logs/offload-${prNumber}/background.log`);
     return 0;
   }
 
   // Direct Shell Mode: Execute SSH in-place
-  console.log(`🚀 Launching review session in current terminal...`);
+  console.log(`🚀 Launching offload session in current terminal...`);
   const result = spawnSync(sshCmd, { stdio: 'inherit', shell: true });
   return result.status || 0;
 }

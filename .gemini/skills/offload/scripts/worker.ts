@@ -1,7 +1,7 @@
 /**
- * Universal Deep Review Worker (Remote)
+ * Universal Offload Worker (Remote)
  * 
- * Handles worktree provisioning and parallel task execution.
+ * Handles worktree provisioning and parallel task execution based on 'playbooks'.
  */
 import { spawn, spawnSync } from 'child_process';
 import path from 'path';
@@ -10,21 +10,18 @@ import fs from 'fs';
 const prNumber = process.argv[2];
 const branchName = process.argv[3];
 const policyPath = process.argv[4];
+const action = process.argv[5] || 'review';
 
-export async function runWorker(args: string[]) {
-  const prNumber = args[0];
-  const branchName = args[1];
-  const policyPath = args[2];
-
+async function main() {
   if (!prNumber || !branchName || !policyPath) {
-    console.error('Usage: tsx worker.ts <PR_NUMBER> <BRANCH_NAME> <POLICY_PATH>');
+    console.error('Usage: tsx worker.ts <PR_NUMBER> <BRANCH_NAME> <POLICY_PATH> [action]');
     return 1;
   }
 
   const workDir = process.cwd(); // This is remoteWorkDir
   const targetDir = path.join(workDir, branchName);
 
-  // 1. Provision PR Directory (Fast Blobless Clone)
+  // 1. Provision PR Directory
   if (!fs.existsSync(targetDir)) {
     console.log(`🌿 Provisioning PR #${prNumber} into ${branchName}...`);
     const cloneCmd = `git clone --filter=blob:none https://github.com/google-gemini/gemini-cli.git ${targetDir}`;
@@ -36,18 +33,37 @@ export async function runWorker(args: string[]) {
     process.chdir(targetDir);
   }
 
-  const logDir = path.join(targetDir, `.gemini/logs/review-${prNumber}`);
+  const logDir = path.join(targetDir, `.gemini/logs/offload-${prNumber}`);
   fs.mkdirSync(logDir, { recursive: true });
 
   const geminiBin = path.join(workDir, 'node_modules/.bin/gemini');
 
-  // 2. Define Parallel Tasks
-  const tasks = [
-    { id: 'build', name: 'Fast Build', cmd: `cd ${targetDir} && npm ci && npm run build` },
-    { id: 'ci', name: 'CI Checks', cmd: `gh pr checks ${prNumber}` },
-    { id: 'review', name: 'Gemini Analysis', cmd: `${geminiBin} --policy ${policyPath} --cwd ${targetDir} -p "/review-frontend ${prNumber}"` },
-    { id: 'verify', name: 'Behavioral Proof', cmd: `${geminiBin} --policy ${policyPath} --cwd ${targetDir} -p "Analyze the code in ${targetDir} and exercise it to prove it works."`, dep: 'build' }
-  ];
+  // 2. Define Playbooks
+  let tasks: any[] = [];
+
+  if (action === 'review') {
+    tasks = [
+      { id: 'build', name: 'Fast Build', cmd: `cd ${targetDir} && npm ci && npm run build` },
+      { id: 'ci', name: 'CI Checks', cmd: `gh pr checks ${prNumber}` },
+      { id: 'review', name: 'Gemini Analysis', cmd: `${geminiBin} --policy ${policyPath} --cwd ${targetDir} -p "/review-frontend ${prNumber}"` },
+      { id: 'verify', name: 'Behavioral Proof', cmd: `${geminiBin} --policy ${policyPath} --cwd ${targetDir} -p "Analyze the code in ${targetDir} and exercise it to prove it works."`, dep: 'build' }
+    ];
+  } else if (action === 'fix') {
+    tasks = [
+      { id: 'build', name: 'Fast Build', cmd: `cd ${targetDir} && npm ci && npm run build` },
+      { id: 'failures', name: 'Find Failures', cmd: `gh run view --log-failed` },
+      { id: 'fix', name: 'Iterative Fix', cmd: `${geminiBin} --policy ${policyPath} --cwd ${targetDir} -p "Address review comments and fix failing tests for PR ${prNumber}. Repeat until CI is green."`, dep: 'build' }
+    ];
+  } else if (action === 'ready') {
+    tasks = [
+      { id: 'clean', name: 'Clean Install', cmd: `npm run clean && npm ci` },
+      { id: 'preflight', name: 'Full Preflight', cmd: `npm run preflight`, dep: 'clean' },
+      { id: 'conflicts', name: 'Conflict Check', cmd: `git fetch origin main && git merge-base --is-ancestor origin/main HEAD || echo "CONFLICT"` }
+    ];
+  } else if (action === 'open') {
+    console.log(`🚀 Dropping into manual session for ${branchName}...`);
+    process.exit(0);
+  }
 
   const state: Record<string, any> = {};
   tasks.forEach(t => state[t.id] = { status: 'PENDING' });
@@ -76,8 +92,8 @@ export async function runWorker(args: string[]) {
     function render() {
       console.clear();
       console.log(`==================================================`);
-      console.log(`🚀 Deep Review | PR #${prNumber} | ${branchName}`);
-      console.log(`📂 PR Target:  ${targetDir}`);
+      console.log(`🚀 Offload | ${action.toUpperCase()} | PR #${prNumber}`);
+      console.log(`📂 Worktree: ${targetDir}`);
       console.log(`==================================================\n`);
       
       tasks.forEach(t => {
@@ -88,7 +104,7 @@ export async function runWorker(args: string[]) {
 
       const allDone = tasks.every(t => ['SUCCESS', 'FAILED'].includes(state[t.id].status));
       if (allDone) {
-        console.log(`\n✨ Verification complete. Launching interactive session...`);
+        console.log(`\n✨ Playbook complete. Launching interactive session...`);
         resolve(0);
       }
     }
@@ -97,7 +113,6 @@ export async function runWorker(args: string[]) {
     tasks.filter(t => t.dep).forEach(runTask);
     const intervalId = setInterval(render, 1500);
     
-    // Ensure the promise resolves and the interval is cleared when all done
     const checkAllDone = setInterval(() => {
         if (tasks.every(t => ['SUCCESS', 'FAILED'].includes(state[t.id].status))) {
             clearInterval(intervalId);
