@@ -116,38 +116,9 @@ const Kbd = ({ name, shortcut }: { name: string; shortcut: string }) => (
   </>
 );
 
-/**
- * Loading state component displayed while sessions are being loaded.
- */
-const SessionBrowserLoading = (): React.JSX.Element => (
-  <Box flexDirection="column" paddingX={1}>
-    <Text color={Colors.Gray}>Loading sessions…</Text>
-  </Box>
-);
-
-/**
- * Error state component displayed when session loading fails.
- */
-const SessionBrowserError = ({
-  state,
-}: {
-  state: SessionBrowserState;
-}): React.JSX.Element => (
-  <Box flexDirection="column" paddingX={1}>
-    <Text color={Colors.AccentRed}>Error: {state.error}</Text>
-    <Text color={Colors.Gray}>Press q to exit</Text>
-  </Box>
-);
-
-/**
- * Empty state component displayed when no sessions are found.
- */
-const SessionBrowserEmpty = (): React.JSX.Element => (
-  <Box flexDirection="column" paddingX={1}>
-    <Text color={Colors.Gray}>No auto-saved conversations found.</Text>
-    <Text color={Colors.Gray}>Press q to exit</Text>
-  </Box>
-);
+import { SessionBrowserLoading } from './SessionBrowser/SessionBrowserLoading.js';
+import { SessionBrowserError } from './SessionBrowser/SessionBrowserError.js';
+import { SessionBrowserEmpty } from './SessionBrowser/SessionBrowserEmpty.js';
 
 import { sortSessions, filterSessions } from './SessionBrowser/utils.js';
 
