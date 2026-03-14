@@ -67,8 +67,17 @@ export async function scheduleAgentTools(
     configurable: true,
   });
 
+  const schedulerContext = {
+    config: agentConfig,
+    promptId: config.promptId,
+    toolRegistry,
+    messageBus: toolRegistry.messageBus,
+    geminiClient: config.geminiClient,
+    sandboxManager: config.sandboxManager,
+  };
+
   const scheduler = new Scheduler({
-    context: agentConfig,
+    context: schedulerContext,
     messageBus: toolRegistry.messageBus,
     getPreferredEditor: getPreferredEditor ?? (() => undefined),
     schedulerId,
