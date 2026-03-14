@@ -44,8 +44,16 @@ workstation.
     - **Terminal Automation**: Your preferred terminal emulator (for example,
       `iterm2` or `terminal`).
 
-The setup script automatically installs `tsx` and the nightly version of Gemini
-CLI on the remote host in an isolated directory.
+**Pre-existing environments**: If your remote host is already set up for Gemini
+CLI development, you can point the **Remote Work Directory** to your existing
+repository instance. The skill will detect your existing GitHub CLI and Gemini
+CLI installations and use them directly without redundant setup.
+
+**Isolation and safety**: By default, the skill attempts to isolate its 
+configuration using a dedicated profile (`~/.gemini-deep-review`) on the remote 
+host. This ensures that the automated verification tasks do not impact your 
+primary Gemini CLI environment or machine state, following development best 
+practices.
 
 ### Launching a review
 

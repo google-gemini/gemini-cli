@@ -81,11 +81,19 @@ async function main() {
   const terminalType = await prompt('\nTerminal Automation (iterm2 / terminal / none)', 'iterm2');
 
   // Local Dependencies Install (Isolated)
-  console.log(`\n📦 Installing isolated dependencies (nightly CLI & tsx) in ${remoteWorkDir}...`);
   const envLoader = 'export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh"; [ -s "$NVM_DIR/bash_completion" ] && \\. "$NVM_DIR/bash_completion"';
-  // Note: we create a package.json first to prevent npm from walking up the tree looking for one
-  const installCmd = `${envLoader} && cd ${remoteWorkDir} && npm init -y > /dev/null && npm install tsx @google/gemini-cli@nightly`;
-  spawnSync('ssh', [remoteHost, q(installCmd)], { stdio: 'inherit', shell: true });
+  
+  console.log(`\n📦 Checking isolated dependencies in ${remoteWorkDir}...`);
+  const depCheck = spawnSync('ssh', [remoteHost, `${envLoader} && [ -f ${remoteWorkDir}/node_modules/.bin/tsx ] && [ -f ${remoteWorkDir}/node_modules/.bin/gemini ]`], { shell: true });
+
+  if (depCheck.status !== 0) {
+    console.log(`📦 Installing isolated dependencies (nightly CLI & tsx) in ${remoteWorkDir}...`);
+    // Note: we create a package.json first to prevent npm from walking up the tree looking for one if it doesn't exist
+    const installCmd = `${envLoader} && mkdir -p ${remoteWorkDir} && cd ${remoteWorkDir} && [ -f package.json ] || npm init -y > /dev/null && npm install tsx @google/gemini-cli@nightly`;
+    spawnSync('ssh', [remoteHost, q(installCmd)], { stdio: 'inherit', shell: true });
+  } else {
+    console.log('✅ Isolated dependencies already present.');
+  }
 
   // Save Settings
   const settingsPath = path.join(REPO_ROOT, '.gemini/settings.json');
