@@ -1321,8 +1321,8 @@
       "properties": {
         "sandbox": {
           "title": "Sandbox",
-          "description": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\").",
-          "markdownDescription": "Sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\").\n\n- Category: `Tools`\n- Requires restart: `yes`",
+          "description": "Legacy full-process sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\").",
+          "markdownDescription": "Legacy full-process sandbox execution environment. Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile, or specify an explicit sandbox command (e.g., \"docker\", \"podman\", \"lxc\").\n\n- Category: `Tools`\n- Requires restart: `yes`",
           "$ref": "#/$defs/BooleanOrStringOrObject"
         },
         "shell": {
@@ -1481,10 +1481,24 @@
       "default": {},
       "type": "object",
       "properties": {
+        "toolSandboxing": {
+          "title": "Tool Sandboxing",
+          "description": "Experimental tool-level sandboxing (implementation in progress).",
+          "markdownDescription": "Experimental tool-level sandboxing (implementation in progress).\n\n- Category: `Security`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "disableYoloMode": {
           "title": "Disable YOLO Mode",
           "description": "Disable YOLO mode, even if enabled by a flag.",
           "markdownDescription": "Disable YOLO mode, even if enabled by a flag.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "disableAlwaysAllow": {
+          "title": "Disable Always Allow",
+          "description": "Disable \"Always allow\" options in tool confirmation dialogs.",
+          "markdownDescription": "Disable \"Always allow\" options in tool confirmation dialogs.\n\n- Category: `Security`\n- Requires restart: `yes`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
@@ -1826,6 +1840,13 @@
             }
           },
           "additionalProperties": false
+        },
+        "topicUpdateNarration": {
+          "title": "Topic & Update Narration",
+          "description": "Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.",
+          "markdownDescription": "Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -2020,8 +2041,8 @@
       "properties": {
         "secureModeEnabled": {
           "title": "Secure Mode Enabled",
-          "description": "If true, disallows yolo mode from being used.",
-          "markdownDescription": "If true, disallows yolo mode from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `false`",
+          "description": "If true, disallows YOLO mode and \"Always allow\" options from being used.",
+          "markdownDescription": "If true, disallows YOLO mode and \"Always allow\" options from being used.\n\n- Category: `Admin`\n- Requires restart: `no`\n- Default: `false`",
           "default": false,
           "type": "boolean"
         },
