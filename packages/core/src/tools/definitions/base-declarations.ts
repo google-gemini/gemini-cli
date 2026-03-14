@@ -122,3 +122,8 @@ export const EXIT_PLAN_PARAM_PLAN_PATH = 'plan_path';
 // -- enter_plan_mode --
 export const ENTER_PLAN_MODE_TOOL_NAME = 'enter_plan_mode';
 export const PLAN_MODE_PARAM_REASON = 'reason';
+
+// -- show_image --
+export const SHOW_IMAGE_TOOL_NAME = 'show_image';
+export const SHOW_IMAGE_PARAM_QUERY = 'query';
+export const SHOW_IMAGE_PARAM_URL = 'url';

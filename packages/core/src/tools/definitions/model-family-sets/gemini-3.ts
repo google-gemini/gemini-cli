@@ -73,6 +73,9 @@ import {
   ASK_USER_OPTION_PARAM_LABEL,
   ASK_USER_OPTION_PARAM_DESCRIPTION,
   PLAN_MODE_PARAM_REASON,
+  SHOW_IMAGE_TOOL_NAME,
+  SHOW_IMAGE_PARAM_QUERY,
+  SHOW_IMAGE_PARAM_URL,
 } from '../base-declarations.js';
 import {
   getShellDeclaration,
@@ -709,4 +712,26 @@ The agent did not use the todo list because this task could be completed by a ti
 
   exit_plan_mode: (plansDir) => getExitPlanModeDeclaration(plansDir),
   activate_skill: (skillNames) => getActivateSkillDeclaration(skillNames),
+
+  show_image: {
+    name: SHOW_IMAGE_TOOL_NAME,
+    description:
+      'Fetches an image from the internet or displays a local image file inline in the terminal using Sixel encoding. Use this when the user asks to see, show, or display an image. Supports local file paths (e.g., /path/to/image.png), direct image URLs, or search queries to find a relevant image.',
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        [SHOW_IMAGE_PARAM_QUERY]: {
+          type: 'string',
+          description:
+            'A search query describing the image to find (e.g., "sunset over ocean"), OR a local file path to an image (e.g., "/path/to/image.png", "~/photos/cat.jpg"). Used when no direct URL is provided.',
+        },
+        [SHOW_IMAGE_PARAM_URL]: {
+          type: 'string',
+          description:
+            'Optional: A direct URL to an image file to fetch and display, or a local file path. If provided, this takes priority over the query parameter.',
+        },
+      },
+      required: [SHOW_IMAGE_PARAM_QUERY],
+    },
+  },
 };

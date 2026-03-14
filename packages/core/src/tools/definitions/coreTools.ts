@@ -91,6 +91,9 @@ export {
   PLAN_MODE_PARAM_REASON,
   EXIT_PLAN_PARAM_PLAN_PATH,
   SKILL_PARAM_NAME,
+  SHOW_IMAGE_TOOL_NAME,
+  SHOW_IMAGE_PARAM_QUERY,
+  SHOW_IMAGE_PARAM_URL,
 } from './base-declarations.js';
 
 // Re-export sets for compatibility
@@ -259,3 +262,10 @@ export function getActivateSkillDefinition(
     overrides: (modelId) => getToolSet(modelId).activate_skill(skillNames),
   };
 }
+
+export const SHOW_IMAGE_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.show_image;
+  },
+  overrides: (modelId) => getToolSet(modelId).show_image,
+};

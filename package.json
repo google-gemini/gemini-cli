@@ -139,7 +139,9 @@
     "node-fetch-native": "^1.6.7",
     "proper-lockfile": "^4.1.2",
     "punycode": "^2.3.1",
-    "simple-git": "^3.28.0"
+    "sharp": "^0.34.5",
+    "simple-git": "^3.28.0",
+    "sixel": "^0.16.0"
   },
   "optionalDependencies": {
     "@lydell/node-pty": "1.1.0",
