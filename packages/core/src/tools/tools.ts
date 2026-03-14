@@ -21,6 +21,7 @@ import {
 } from '../confirmation-bus/types.js';
 import { type ApprovalMode } from '../policy/types.js';
 import type { SubagentProgress } from '../agents/types.js';
+import type { DiagramData, BrowserPreview } from './visualize/types.js';
 
 /**
  * Represents a validated and ready-to-execute tool call.
@@ -794,7 +795,11 @@ export type ToolResultDisplay =
   | FileDiff
   | AnsiOutput
   | TodoList
-  | SubagentProgress;
+  | SubagentProgress
+  | DiagramData
+  | BrowserPreview;
+
+export type { DiagramData, BrowserPreview };
 
 export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 
