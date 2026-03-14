@@ -25,6 +25,11 @@ import {
   FatalSandboxError,
   GEMINI_DIR,
   homedir,
+  buildBaseBwrapArgs,
+  bindExistingPaths,
+  bindNodeBinary,
+  BWRAP_OPTIONAL_LIB_PATHS,
+  BWRAP_ESSENTIAL_ETC_FILES,
 } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 import { randomBytes } from 'node:crypto';
@@ -1178,97 +1183,30 @@ async function start_bwrap_sandbox(
     ...nodeArgs,
   ].join(' ');
 
-  const bwrapArgs: string[] = [
-    '--new-session',
-    '--die-with-parent',
-    '--unshare-pid',
-    '--unshare-user',
-    '--unshare-ipc',
-    '--unshare-uts',
-    '--unshare-cgroup',
-    '--hostname',
-    'gemini-sandbox',
-    '--proc',
-    '/proc',
-    '--dev',
-    '/dev',
-    '--tmpfs',
-    '/dev/shm',
-    // Private system paths to block escapes (X11, D-Bus, etc.)
-    '--tmpfs',
-    '/tmp',
-    '--tmpfs',
-    '/run/user',
-    // --- STRICT ALLOW LIST ---
-    // Only mount essential system paths for binaries and libraries
-    '--ro-bind',
-    '/usr',
-    '/usr',
-    '--ro-bind',
-    '/bin',
-    '/bin',
-    '--ro-bind',
-    '/sbin',
-    '/sbin',
-  ];
+  const bwrapArgs = buildBaseBwrapArgs('gemini-sandbox');
+  // Private system paths to block escapes (X11, D-Bus, etc.)
+  bwrapArgs.push('--tmpfs', '/tmp', '--tmpfs', '/run/user');
 
-  // Optional system paths (might be symlinks or missing on some distros)
-  const optionalPaths = ['/lib', '/lib64', '/etc/alternatives'];
-  for (const p of optionalPaths) {
-    if (fs.existsSync(p)) {
-      bwrapArgs.push('--ro-bind', p, p);
-    }
-  }
-
-  // Essential /etc files for tool compatibility (passwd, hosts, etc.)
-  const etcFiles = [
-    '/etc/passwd',
-    '/etc/group',
-    '/etc/hosts',
-    '/etc/nsswitch.conf',
-  ];
-  for (const p of etcFiles) {
-    if (fs.existsSync(p)) {
-      bwrapArgs.push('--ro-bind', p, p);
-    }
-  }
-
-  // Allow the current node binary (essential for relaunching)
-  // This is especially important for NVM/Asdf users where node is in $HOME
-  const nodePath = process.execPath;
-  if (nodePath.startsWith(homeDir)) {
-    bwrapArgs.push('--ro-bind', nodePath, nodePath);
-    // Also bind the directory containing node to ensure shared libs are found
-    const nodeDir = path.dirname(nodePath);
-    bwrapArgs.push('--ro-bind', nodeDir, nodeDir);
-  }
+  bindExistingPaths(bwrapArgs, BWRAP_OPTIONAL_LIB_PATHS);
+  bindExistingPaths(bwrapArgs, BWRAP_ESSENTIAL_ETC_FILES);
+  bindNodeBinary(bwrapArgs, homeDir);
 
   // Ensure we have a valid resolv.conf for DNS if network is enabled
   if (config.networkAccess !== false) {
-    const resolvPaths = [
+    bindExistingPaths(bwrapArgs, [
       '/etc/resolv.conf',
       '/run/systemd/resolve/stub-resolv.conf',
       '/run/systemd/resolve/resolv.conf',
-    ];
-    for (const p of resolvPaths) {
-      if (fs.existsSync(p)) {
-        bwrapArgs.push('--ro-bind', p, p);
-      }
-    }
+    ]);
   }
 
   // Bind SSL certificates for HTTPS access
-  const sslPaths = [
+  bindExistingPaths(bwrapArgs, [
     '/etc/ssl',
     '/etc/pki',
     '/usr/share/ca-certificates',
     '/usr/local/share/ca-certificates',
-  ];
-  for (const p of sslPaths) {
-    if (fs.existsSync(p)) {
-      bwrapArgs.push('--ro-bind', p, p);
-    }
-  }
+  ]);
 
   // Mount ADC file if GOOGLE_APPLICATION_CREDENTIALS is set
   if (process.env['GOOGLE_APPLICATION_CREDENTIALS']) {

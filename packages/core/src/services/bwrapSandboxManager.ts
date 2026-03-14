@@ -13,6 +13,13 @@ import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
+import {
+  buildBaseBwrapArgs,
+  bindExistingPaths,
+  bindNodeBinary,
+  BWRAP_OPTIONAL_LIB_PATHS,
+  BWRAP_ESSENTIAL_ETC_FILES,
+} from './bwrapUtils.js';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
@@ -50,70 +57,17 @@ export class BwrapSandboxManager implements SandboxManager {
     const homeDir = os.homedir();
     const workdir = path.resolve(req.cwd);
 
-    const bwrapArgs: string[] = [
-      '--new-session',
-      '--die-with-parent',
-      '--unshare-pid',
-      '--unshare-user',
-      '--unshare-ipc',
-      '--unshare-uts',
-      '--unshare-cgroup',
-      // Tools should not have network access — the CLI process handles API calls
-      '--unshare-net',
-      '--hostname',
-      'gemini-tool-sandbox',
-      '--proc',
-      '/proc',
-      '--dev',
-      '/dev',
-      '--tmpfs',
-      '/dev/shm',
-      // Strict allow-list for nested sandbox
-      '--ro-bind',
-      '/usr',
-      '/usr',
-      '--ro-bind',
-      '/bin',
-      '/bin',
-      '--ro-bind',
-      '/sbin',
-      '/sbin',
-    ];
+    const bwrapArgs = buildBaseBwrapArgs('gemini-tool-sandbox');
+    // Tools should not have network access — the CLI process handles API calls
+    bwrapArgs.push('--unshare-net');
 
-    // Optional system paths
-    const optionalPaths = [
-      '/lib',
-      '/lib64',
-      '/etc/alternatives',
+    bindExistingPaths(bwrapArgs, [
+      ...BWRAP_OPTIONAL_LIB_PATHS,
       '/etc/ssl',
       '/etc/pki',
-    ];
-    for (const p of optionalPaths) {
-      if (fs.existsSync(p)) {
-        bwrapArgs.push('--ro-bind', p, p);
-      }
-    }
-
-    // Essential /etc files for tool compatibility
-    const etcFiles = [
-      '/etc/passwd',
-      '/etc/group',
-      '/etc/hosts',
-      '/etc/nsswitch.conf',
-    ];
-    for (const p of etcFiles) {
-      if (fs.existsSync(p)) {
-        bwrapArgs.push('--ro-bind', p, p);
-      }
-    }
-
-    // Allow current node binary (important if tool is a node script)
-    const nodePath = process.execPath;
-    if (nodePath.startsWith(homeDir)) {
-      bwrapArgs.push('--ro-bind', nodePath, nodePath);
-      const nodeDir = path.dirname(nodePath);
-      bwrapArgs.push('--ro-bind', nodeDir, nodeDir);
-    }
+    ]);
+    bindExistingPaths(bwrapArgs, BWRAP_ESSENTIAL_ETC_FILES);
+    bindNodeBinary(bwrapArgs, homeDir);
 
     // Mount workspace and Gemini settings
     const GEMINI_DIR = '.gemini';
