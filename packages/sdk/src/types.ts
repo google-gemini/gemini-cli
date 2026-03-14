@@ -9,6 +9,7 @@ import type { Tool } from './tool.js';
 import type { SkillReference } from './skills.js';
 import type { GeminiCliAgent } from './agent.js';
 import type { GeminiCliSession } from './session.js';
+import type { Logger } from './logger.js';
 
 export type SystemInstructions =
   | string
@@ -24,6 +25,12 @@ export interface GeminiCliAgentOptions {
   debug?: boolean;
   recordResponses?: string;
   fakeResponses?: string;
+  /**
+   * Optional logger instance for structured logging.
+   * If not provided, a ConsoleLogger with INFO level is used by default.
+   * Pass a NoopLogger to suppress all logging output (useful for testing).
+   */
+  logger?: Logger;
 }
 
 export interface AgentFilesystem {
