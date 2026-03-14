@@ -21,7 +21,6 @@ import { isShellTool } from './ToolShared.js';
 import {
   shouldHideToolCall,
   CoreToolCallStatus,
-  ToolErrorType,
 } from '@google/gemini-cli-core';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import { getToolGroupBorderAppearance } from '../../utils/borderStyles.js';
@@ -60,8 +59,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
         if (
           isLowErrorVerbosity &&
           t.status === CoreToolCallStatus.Error &&
-          !t.isClientInitiated &&
-          t.errorType !== ToolErrorType.POLICY_VIOLATION
+          !t.isClientInitiated
         ) {
           return false;
         }

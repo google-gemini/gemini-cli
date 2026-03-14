@@ -35,7 +35,11 @@ import { runInDevTraceSpan } from '../telemetry/trace.js';
 import { logToolCall } from '../telemetry/loggers.js';
 import { ToolCallEvent } from '../telemetry/types.js';
 import type { EditorType } from '../utils/editor.js';
-import { type SerializableConfirmationDetails } from '../confirmation-bus/types.js';
+import {
+  MessageBusType,
+  type SerializableConfirmationDetails,
+  type ToolConfirmationRequest,
+} from '../confirmation-bus/types.js';
 import { runWithToolCallContext } from '../utils/toolCallContext.js';
 import {
   coreEvents,
@@ -87,6 +91,9 @@ const createErrorResponse = (
  * Coordinates execution via state updates and event listening.
  */
 export class Scheduler {
+  // Tracks which MessageBus instances have the legacy listener attached to prevent duplicates.
+  private static subscribedMessageBuses = new WeakSet<MessageBus>();
+
   private readonly state: SchedulerStateManager;
   private readonly executor: ToolExecutor;
   private readonly modifier: ToolModificationHandler;
@@ -120,6 +127,8 @@ export class Scheduler {
     this.executor = new ToolExecutor(this.context);
     this.modifier = new ToolModificationHandler();
 
+    this.setupMessageBusListener(this.messageBus);
+
     coreEvents.on(CoreEvent.McpProgress, this.handleMcpProgress);
   }
 
@@ -151,6 +160,28 @@ export class Scheduler {
       progressTotal: validTotal,
     });
   };
+
+  private setupMessageBusListener(messageBus: MessageBus): void {
+    if (Scheduler.subscribedMessageBuses.has(messageBus)) {
+      return;
+    }
+
+    // TODO: Optimize policy checks. Currently, tools check policy via
+    // MessageBus even though the Scheduler already checked it.
+    messageBus.subscribe(
+      MessageBusType.TOOL_CONFIRMATION_REQUEST,
+      async (request: ToolConfirmationRequest) => {
+        await messageBus.publish({
+          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          correlationId: request.correlationId,
+          confirmed: false,
+          requiresUserConfirmation: true,
+        });
+      },
+    );
+
+    Scheduler.subscribedMessageBuses.add(messageBus);
+  }
 
   /**
    * Schedules a batch of tool calls.

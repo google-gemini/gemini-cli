@@ -11,7 +11,6 @@ import { PolicyDecision } from '../policy/types.js';
 import { MessageBusType, type Message } from './types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import { coreEvents } from '../utils/events.js';
 
 export class MessageBus extends EventEmitter {
   constructor(
@@ -71,10 +70,6 @@ export class MessageBus extends EventEmitter {
             break;
           case PolicyDecision.DENY:
             // Emit both rejection and response messages
-            coreEvents.emitFeedback(
-              'error',
-              `Tool call "${message.toolCall.name}" was blocked by policy.`,
-            );
             this.emitMessage({
               type: MessageBusType.TOOL_POLICY_REJECTION,
               toolCall: message.toolCall,
