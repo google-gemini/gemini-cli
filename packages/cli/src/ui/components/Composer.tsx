@@ -399,7 +399,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             minHeight={1}
           >
             <Box flexDirection="row" flexGrow={1} flexShrink={1}>
-              {!showUiDetails && miniMode_ShowStatus ? (
+              {!showUiDetails && showRow1_MiniMode ? (
                 renderMinimalMetaRowContent()
               ) : isInteractiveShellWaiting ? (
                 <Box width="100%" marginLeft={1}>
