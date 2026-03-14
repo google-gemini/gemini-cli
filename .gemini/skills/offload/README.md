@@ -7,14 +7,39 @@ dedicated terminal window.
 
 ## Why use offload?
 
--   **Protect local resources**: Heavy build and lint suites are offloaded to a
-    beefy remote workstation.
--   **Context efficiency**: The main Gemini session remains interactive while
-    background tasks provide high-fidelity feedback.
+As a maintainer, you eventually reach the limits of how much work you can manage
+at once on a single local machine. Heavy builds, concurrent test suites, and
+multiple PRs in flight can quickly overload local resources, leading to 
+performance degradation and developer friction.
+
+While manual remote management is a common workaround, it is often cumbersome
+and context-heavy. The `offload` skill addresses these challenges by providing:
+
+-   **Elastic compute**: Offload resource-intensive build and lint suites to a
+    beefy remote workstation, keeping your local machine responsive.
+-   **Context preservation**: The main Gemini session remains interactive and
+    focused on high-level reasoning while automated tasks provide real-time
+    feedback in a separate window.
+-   **Automated orchestration**: The skill handles worktree provisioning, 
+    script synchronization, and environment isolation automatically.
 -   **True parallelism**: Infrastructure validation, CI checks, and behavioral 
     proofs run simultaneously, compressing a 15-minute process into 3 minutes.
--   **Behavioral verification**: The worker physically exercises the new code 
-    to provide empirical proof that it works.
+
+## Agentic skills: Sync or Offload
+
+The `offload` system is designed to work in synergy with specialized agentic 
+skills. These skills can be run **synchronously** in your current terminal for
+quick tasks, or **offloaded** to a remote session for complex, iterative loops.
+
+-   **`review-pr`**: Conducts high-fidelity, behavioral code reviews. It assumes 
+    the infrastructure is already validated and focuses on physical proof of 
+    functionality.
+-   **`fix-pr`**: An autonomous "Fix-to-Green" loop. It iteratively addresses 
+    CI failures, merge conflicts, and review comments until the PR is mergeable.
+
+When you run `npm run offload <PR> fix`, the orchestrator provisions the remote 
+environment and then launches a Gemini CLI session specifically powered by the
+`fix-pr` skill.
 
 ## Playbooks
 
