@@ -32,7 +32,15 @@ export const VISUALIZE_DEFINITION: ToolDefinition = {
           enum: ['mermaid', 'dependency_graph', 'git_history', 'html_preview'],
         },
         content: {
-          description: 'Mermaid diagram code. Required when type is "mermaid".',
+          description:
+            'Mermaid diagram code (flowchart syntax). Required when type is "mermaid". ' +
+            'IMPORTANT: Use only simple flowchart syntax. Start with "graph TD" (top-down) or "graph LR" (left-right). ' +
+            'Each edge must be on its own line. Use --> for arrows, --- for links. ' +
+            'Node syntax: A[label] for rectangles, A{label} for diamonds, A(label) for rounded. ' +
+            'Example BST:\ngraph TD\n  A[15] --> B[10]\n  A --> C[20]\n  B --> D[5]\n  B --> E[12]\n' +
+            'Example pipeline:\ngraph LR\n  A[Build] --> B[Test]\n  B --> C[Deploy]\n' +
+            'Example linked list:\ngraph LR\n  A[10 | ptr] --> B[20 | ptr] --> C[30 | null]\n' +
+            'DO NOT use subgraph, gitGraph, classDiagram, or other advanced syntax. Only flowchart/graph.',
           type: 'string',
         },
         file_path: {

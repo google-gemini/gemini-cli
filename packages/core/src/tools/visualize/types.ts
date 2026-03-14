@@ -29,6 +29,7 @@ export interface DiagramEdge {
 export interface DiagramData {
   isDiagram: true;
   diagramType: 'flowchart' | 'sequence' | 'class' | 'er' | 'gantt' | 'git';
+  direction?: 'TD' | 'LR' | 'RL' | 'BT';
   nodes: DiagramNode[];
   edges: DiagramEdge[];
   title?: string;

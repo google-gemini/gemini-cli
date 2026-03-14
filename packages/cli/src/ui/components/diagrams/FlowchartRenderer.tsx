@@ -33,13 +33,9 @@ export const FlowchartRenderer: React.FC<FlowchartRendererProps> = ({
 
     const canvas = new GridCanvas(width, height);
 
-    // Detect layout direction from edge orientations
+    // Use direction from diagram data
     const isHorizontal =
-      diagram.edges.length > 0 &&
-      diagram.edges.every(
-        (e) =>
-          Math.abs(e.targetX - e.sourceX) >= Math.abs(e.targetY - e.sourceY),
-      );
+      diagram.direction === 'LR' || diagram.direction === 'RL';
 
     // Group edges by source for fork drawing
     const edgesBySource = new Map<string, typeof diagram.edges>();

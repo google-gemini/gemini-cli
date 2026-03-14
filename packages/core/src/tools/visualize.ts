@@ -262,6 +262,7 @@ class VisualizeToolInvocation extends BaseToolInvocation<
     const diagram: DiagramData = {
       isDiagram: true,
       diagramType: parsed.diagramType,
+      direction,
       nodes: layoutResult.nodes,
       edges: layoutResult.edges,
       title: this.params.title,
