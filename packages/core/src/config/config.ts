@@ -70,18 +70,8 @@ import { shouldAttemptBrowserLaunch } from '../utils/browser.js';
 import type { MCPOAuthConfig } from '../mcp/oauth-provider.js';
 import { ideContextStore } from '../ide/ideContext.js';
 import { WriteTodosTool } from '../tools/write-todos.js';
-import {
-  StandardFileSystemService,
-  type FileSystemService,
-} from '../services/fileSystemService.js';
-import {
-  TrackerCreateTaskTool,
-  TrackerUpdateTaskTool,
-  TrackerGetTaskTool,
-  TrackerListTasksTool,
-  TrackerAddDependencyTool,
-  TrackerVisualizeTool,
-} from '../tools/trackerTools.js';
+import type { FileSystemService } from '../services/fileSystemService.js';
+import { StandardFileSystemService } from '../services/fileSystemService.js';
 import {
   logRipgrepFallback,
   logFlashFallback,
@@ -130,7 +120,6 @@ import {
 import { HookSystem } from '../hooks/index.js';
 import type {
   UserTierId,
-  GeminiUserTier,
   RetrieveUserQuotaResponse,
   AdminControlsSettings,
 } from '../code_assist/types.js';
@@ -643,8 +632,15 @@ export interface ConfigParameters {
   };
 }
 
-export class Config implements McpContext, AgentLoopContext {
-  private _toolRegistry!: ToolRegistry;
+export interface ModelQuota {
+  remaining?: number;
+  limit?: number;
+  remainingFraction?: number;
+  resetTime?: string;
+}
+
+export class Config {
+  private toolRegistry!: ToolRegistry;
   private mcpClientManager?: McpClientManager;
   private allowedMcpServers: string[];
   private blockedMcpServers: string[];
@@ -731,11 +727,7 @@ export class Config implements McpContext, AgentLoopContext {
   fallbackModelHandler?: FallbackModelHandler;
   validationHandler?: ValidationHandler;
   private quotaErrorOccurred: boolean = false;
-  private creditsNotificationShown: boolean = false;
-  private modelQuotas: Map<
-    string,
-    { remaining: number; limit: number; resetTime?: string }
-  > = new Map();
+  private modelQuotas: Map<string, ModelQuota> = new Map();
   private lastRetrievedQuota?: RetrieveUserQuotaResponse;
   private lastQuotaFetchTime = 0;
   private lastEmittedQuotaRemaining: number | undefined;
@@ -1615,6 +1607,7 @@ export class Config implements McpContext, AgentLoopContext {
   private getPooledQuota(): {
     remaining?: number;
     limit?: number;
+    remainingFraction?: number;
     resetTime?: string;
   } {
     const model = this.getModel();
@@ -1629,25 +1622,29 @@ export class Config implements McpContext, AgentLoopContext {
     const flashModel = isPreview
       ? PREVIEW_GEMINI_FLASH_MODEL
       : DEFAULT_GEMINI_FLASH_MODEL;
-
     const proQuota = this.modelQuotas.get(proModel);
     const flashQuota = this.modelQuotas.get(flashModel);
 
-    if (proQuota || flashQuota) {
-      // For reset time, take the one that is furthest in the future (most conservative)
-      const resetTime = [proQuota?.resetTime, flashQuota?.resetTime]
-        .filter((t): t is string => !!t)
-        .sort()
-        .reverse()[0];
-
-      return {
-        remaining: (proQuota?.remaining ?? 0) + (flashQuota?.remaining ?? 0),
-        limit: (proQuota?.limit ?? 0) + (flashQuota?.limit ?? 0),
-        resetTime,
-      };
+    let pooledFraction: number | undefined;
+    if (
+      proQuota?.remainingFraction !== undefined &&
+      flashQuota?.remainingFraction !== undefined
+    ) {
+      pooledFraction = Math.min(
+        proQuota.remainingFraction,
+        flashQuota.remainingFraction,
+      );
+    } else {
+      pooledFraction =
+        proQuota?.remainingFraction ?? flashQuota?.remainingFraction;
     }
 
-    return {};
+    return {
+      remaining: (proQuota?.remaining ?? 0) + (flashQuota?.remaining ?? 0),
+      limit: (proQuota?.limit ?? 0) + (flashQuota?.limit ?? 0),
+      remainingFraction: pooledFraction,
+      resetTime: proQuota?.resetTime ?? flashQuota?.resetTime,
+    };
   }
 
   getQuotaRemaining(): number | undefined {
@@ -1655,11 +1652,9 @@ export class Config implements McpContext, AgentLoopContext {
     if (pooled.remaining !== undefined) {
       return pooled.remaining;
     }
-    const primaryModel = resolveModel(
-      this.getModel(),
-      this.getGemini31LaunchedSync(),
-    );
-    return this.modelQuotas.get(primaryModel)?.remaining;
+
+    const quota = this.modelQuotas.get(this.getActiveModel());
+    return quota?.remaining;
   }
 
   getQuotaLimit(): number | undefined {
@@ -1667,6 +1662,7 @@ export class Config implements McpContext, AgentLoopContext {
     if (pooled.limit !== undefined) {
       return pooled.limit;
     }
+
     const primaryModel = resolveModel(
       this.getModel(),
       this.getGemini31LaunchedSync(),
@@ -1798,21 +1794,28 @@ export class Config implements McpContext, AgentLoopContext {
         this.lastQuotaFetchTime = Date.now();
 
         for (const bucket of quota.buckets) {
-          if (
-            bucket.modelId &&
-            bucket.remainingAmount &&
-            bucket.remainingFraction != null
-          ) {
-            const remaining = parseInt(bucket.remainingAmount, 10);
-            const limit =
-              bucket.remainingFraction > 0
-                ? Math.round(remaining / bucket.remainingFraction)
-                : (this.modelQuotas.get(bucket.modelId)?.limit ?? 0);
+          if (bucket.modelId && bucket.remainingFraction != null) {
+            let remaining: number | undefined;
+            let limit: number | undefined;
 
-            if (!isNaN(remaining) && Number.isFinite(limit) && limit > 0) {
+            if (bucket.remainingAmount) {
+              remaining = parseInt(bucket.remainingAmount, 10);
+              limit =
+                bucket.remainingFraction > 0
+                  ? Math.round(remaining / bucket.remainingFraction)
+                  : (this.modelQuotas.get(bucket.modelId)?.limit ?? 0);
+            }
+
+            if (remaining !== undefined && limit !== undefined && limit > 0) {
               this.modelQuotas.set(bucket.modelId, {
                 remaining,
                 limit,
+                remainingFraction: bucket.remainingFraction,
+                resetTime: bucket.resetTime,
+              });
+            } else if (bucket.remainingFraction !== undefined) {
+              this.modelQuotas.set(bucket.modelId, {
+                remainingFraction: bucket.remainingFraction,
                 resetTime: bucket.resetTime,
               });
             }

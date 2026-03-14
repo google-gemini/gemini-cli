@@ -27,40 +27,35 @@ export const QuotaStatsInfo: React.FC<QuotaStatsInfoProps> = ({
   resetTime,
   showDetails = true,
 }) => {
-  if (remaining === undefined || limit === undefined || limit === 0) {
+  if (remaining === undefined || limit === undefined) {
     return null;
   }
 
-  const usedPercentage = 100 - (remaining / limit) * 100;
-  const color = getUsedStatusColor(usedPercentage, {
-    warning: QUOTA_USED_WARNING_THRESHOLD,
-    critical: QUOTA_USED_CRITICAL_THRESHOLD,
+  const percentage = limit > 0 ? (remaining / limit) * 100 : 0;
+  const color = getStatusColor(percentage, {
+    green: QUOTA_THRESHOLD_HIGH,
+    yellow: QUOTA_THRESHOLD_MEDIUM,
   });
 
   return (
     <Box flexDirection="column" marginTop={0} marginBottom={0}>
       <Text color={color}>
-        {remaining === 0
-          ? `Limit reached${
-              resetTime
-                ? `, resets in ${formatResetTime(resetTime, 'terse')}`
-                : ''
-            }`
-          : `${usedPercentage.toFixed(0)}% used${
-              resetTime
-                ? ` (Limit resets in ${formatResetTime(resetTime, 'terse')})`
-                : ''
-            }`}
+        {percentage <= 0
+          ? `Limit reached`
+          : `${percentage.toFixed(0)}% usage remaining`}
+        {resetTime && `, ${formatResetTime(resetTime)}`}
       </Text>
       {showDetails && (
         <>
-          <Text color={theme.text.primary}>
-            Usage limit: {limit.toLocaleString()}
-          </Text>
+          {limit > 0 && (
+            <Text color={theme.text.primary}>
+              Usage limit: {limit.toLocaleString()}
+            </Text>
+          )}
           <Text color={theme.text.primary}>
             Usage limits span all sessions and reset daily.
           </Text>
-          {remaining === 0 && (
+          {percentage <= 0 && (
             <Text color={theme.text.primary}>
               Please /auth to upgrade or switch to an API key to continue.
             </Text>

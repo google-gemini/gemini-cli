@@ -56,6 +56,9 @@ describe('<ModelDialog />', () => {
     getHasAccessToPreviewModel: () => boolean;
     getIdeMode: () => boolean;
     getGemini31LaunchedSync: () => boolean;
+    getQuotaRemaining?: () => number | undefined;
+    getQuotaLimit?: () => number | undefined;
+    getQuotaResetTime?: () => string | undefined;
   }
 
   const mockConfig: MockConfig = {
@@ -64,6 +67,9 @@ describe('<ModelDialog />', () => {
     getHasAccessToPreviewModel: mockGetHasAccessToPreviewModel,
     getIdeMode: () => false,
     getGemini31LaunchedSync: mockGetGemini31LaunchedSync,
+    getQuotaRemaining: () => undefined,
+    getQuotaLimit: () => undefined,
+    getQuotaResetTime: () => undefined,
   };
 
   beforeEach(() => {
@@ -282,6 +288,18 @@ describe('<ModelDialog />', () => {
     const { lastFrame, unmount } = await renderComponent();
 
     expect(lastFrame()).toContain('Manual (My Custom Model Display)');
+    unmount();
+  });
+
+  it('displays quota remaining if provided by config', async () => {
+    mockConfig.getQuotaRemaining = () => 500;
+    mockConfig.getQuotaLimit = () => 1500;
+    mockConfig.getQuotaResetTime = () => new Date().toISOString();
+
+    const { lastFrame, unmount } = await renderComponent();
+
+    expect(lastFrame()).toContain('33% usage remaining');
+    expect(lastFrame()).toContain('Usage limit: 1,500');
     unmount();
   });
 
