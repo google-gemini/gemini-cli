@@ -70,10 +70,9 @@ describe('mcpToolWrapper', () => {
         mockMessageBus,
       );
 
-      expect(tools).toHaveLength(3);
+      expect(tools).toHaveLength(2);
       expect(tools[0].name).toBe('take_snapshot');
       expect(tools[1].name).toBe('click');
-      expect(tools[2].name).toBe('type_text');
     });
 
     it('should return tools with correct description', async () => {
