@@ -427,11 +427,13 @@ export const AppContainer = (props: AppContainerProps) => {
       typeof currentModel === 'string' ? currentModel : undefined,
     );
 
+    const warningMessage = `Token budget exceeds ${
+      TOKEN_BUDGET_WARNING_THRESHOLD * 100
+    }%. Context will be truncated soon.`;
+
     if (usagePercentage >= TOKEN_BUDGET_WARNING_THRESHOLD) {
       if (!hasWarnedTokenBudget) {
-        setWarningBannerText(
-          'Token budget exceeds 80%. Context will be truncated soon.',
-        );
+        setWarningBannerText(warningMessage);
         setBannerVisible(true);
         setHasWarnedTokenBudget(true); // Only warn once per crossing
       }
@@ -439,12 +441,17 @@ export const AppContainer = (props: AppContainerProps) => {
       // If it drops back below, reset so we can warn again if it climbs
       if (hasWarnedTokenBudget) {
         setHasWarnedTokenBudget(false);
+        // Clear the warning banner if it's the one we set to avoid showing a stale message.
+        if (warningBannerText === warningMessage) {
+          setWarningBannerText('');
+        }
       }
     }
   }, [
     sessionStats.lastPromptTokenCount,
     currentModel,
     hasWarnedTokenBudget,
+    warningBannerText,
     setWarningBannerText,
     setBannerVisible,
   ]);
