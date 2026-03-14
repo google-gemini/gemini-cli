@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { Box } from 'ink';
+import { Box, Text } from 'ink';
 import { Notifications } from '../components/Notifications.js';
 import { MainContent } from '../components/MainContent.js';
 import { DialogManager } from '../components/DialogManager.js';
@@ -17,6 +17,10 @@ import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { CopyModeWarning } from '../components/CopyModeWarning.js';
 import { BackgroundShellDisplay } from '../components/BackgroundShellDisplay.js';
 import { StreamingState } from '../types.js';
+import { theme } from '../semantic-colors.js';
+import { useActiveToolCalls } from '../hooks/useActiveToolCalls.js';
+import { useTaskTree } from '../hooks/useTaskTree.js';
+import { TaskTreeView } from '../components/TaskTreeView.js';
 
 export const DefaultAppLayout: React.FC = () => {
   const uiState = useUIState();
@@ -24,6 +28,12 @@ export const DefaultAppLayout: React.FC = () => {
 
   const { rootUiRef, terminalHeight } = uiState;
   useFlickerDetector(rootUiRef, terminalHeight);
+
+  // Task Tree Visualization (GSoC 2026 Idea #6 prototype)
+  // Always enabled on this prototype branch.
+  const showTaskTree = true;
+  const activeToolCalls = useActiveToolCalls();
+  const taskTreeNodes = useTaskTree(activeToolCalls);
   // If in alternate buffer mode, need to leave room to draw the scrollbar on
   // the right side of the terminal.
   return (
@@ -66,6 +76,30 @@ export const DefaultAppLayout: React.FC = () => {
         flexGrow={0}
         width={uiState.terminalWidth}
       >
+        {/* Task Tree Panel (GSoC 2026 Idea #6 prototype)
+         * Positioned inside mainControlsRef (flexShrink=0) so it is
+         * never clipped by the root Box's overflow="hidden". */}
+        {showTaskTree && taskTreeNodes.length > 0 && (
+          <Box
+            flexDirection="column"
+            paddingLeft={1}
+            borderStyle="single"
+            borderColor={theme.border.default}
+            flexShrink={0}
+            flexGrow={0}
+            maxHeight={Math.max(10, Math.floor(uiState.terminalHeight * 0.4))}
+            overflow="hidden"
+          >
+            <Text color={theme.text.accent} bold>
+              ⧫ Task Tree
+            </Text>
+            <TaskTreeView
+              nodes={taskTreeNodes}
+              terminalWidth={uiState.terminalWidth}
+            />
+          </Box>
+        )}
+
         <Notifications />
         <CopyModeWarning />
 
