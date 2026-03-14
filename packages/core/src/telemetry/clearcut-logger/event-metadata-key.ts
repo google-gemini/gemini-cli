@@ -7,7 +7,7 @@
 // Defines valid event metadata keys for Clearcut logging.
 export enum EventMetadataKey {
   // Deleted enums: 24
-  // Next ID: 191
+  // Next ID: 194
 
   GEMINI_CLI_KEY_UNKNOWN = 0,
 
@@ -709,4 +709,17 @@ export enum EventMetadataKey {
 
   // Logs the source of a credit purchase click (e.g. overage_menu, empty_wallet_menu, manage).
   GEMINI_CLI_BILLING_PURCHASE_SOURCE = 190,
+
+  // ==========================================================================
+  // Policy Suggestion Events (Smart Policy Scoping)
+  // ==========================================================================
+
+  // Logs the tool context used for generating a policy suggestion.
+  POLICY_SUGGESTION_TOOL_CONTEXT = 191,
+
+  // Logs the generated policy suggestion.
+  POLICY_SUGGESTION_RESULT = 192,
+
+  // Logs the error message for policy suggestion events.
+  POLICY_SUGGESTION_ERROR = 193,
 }

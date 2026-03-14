@@ -639,6 +639,7 @@ export interface ConfigParameters {
     agents?: AgentSettings;
   }>;
   enableConseca?: boolean;
+  enableSmartPolicyScoping?: boolean;
   billing?: {
     overageStrategy?: OverageStrategy;
   };
@@ -672,6 +673,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
   readonly enableConseca: boolean;
+  readonly enableSmartPolicyScoping: boolean;
 
   private readonly coreTools: string[] | undefined;
   /** @deprecated Use Policy Engine instead */
@@ -1037,6 +1039,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
     this.enableConseca = params.enableConseca ?? false;
+    this.enableSmartPolicyScoping = params.enableSmartPolicyScoping ?? false;
 
     // Initialize Safety Infrastructure
     const contextBuilder = new ContextBuilder(this);
