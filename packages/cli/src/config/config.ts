@@ -146,16 +146,30 @@ export async function parseArguments(
         .option('prompt', {
           alias: 'p',
           type: 'string',
-          nargs: 1,
+          requiresArg: false,
           description:
             'Run in non-interactive (headless) mode with the given prompt. Appended to input on stdin (if any).',
+          coerce: (value: string | boolean): string => {
+            if (value === true) {
+              return '';
+            }
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            return value as string;
+          },
         })
         .option('prompt-interactive', {
           alias: 'i',
           type: 'string',
-          nargs: 1,
+          requiresArg: false,
           description:
             'Execute the provided prompt and continue in interactive mode',
+          coerce: (value: string | boolean): string => {
+            if (value === true) {
+              return '';
+            }
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            return value as string;
+          },
         })
         .option('sandbox', {
           alias: 's',
@@ -383,8 +397,13 @@ export async function parseArguments(
     : queryArg;
 
   // -p/--prompt forces non-interactive mode; positional args default to interactive in TTY
-  if (q && !result['prompt']) {
-    if (!isHeadlessMode()) {
+  if (q && result['prompt'] === undefined) {
+    if (
+      !isHeadlessMode({
+        prompt: result['prompt'] as string | undefined,
+        query: q,
+      })
+    ) {
       startupMessages.push(
         'Positional arguments now default to interactive mode. To run in non-interactive mode, use the --prompt (-p) flag.',
       );

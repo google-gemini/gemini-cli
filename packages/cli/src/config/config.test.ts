@@ -279,9 +279,26 @@ describe('parseArguments', () => {
 
   it.each([
     {
-      description: 'should allow --prompt without --prompt-interactive',
-      argv: ['node', 'script.js', '--prompt', 'test prompt'],
-      expected: { prompt: 'test prompt', promptInteractive: undefined },
+      description: 'should allow --prompt without value',
+      argv: ['node', 'script.js', '--prompt'],
+      expected: { prompt: '', promptInteractive: undefined },
+    },
+    {
+      description: 'should allow -p without value',
+      argv: ['node', 'script.js', '-p'],
+      expected: { prompt: '', promptInteractive: undefined },
+    },
+    {
+      description: 'should allow -i without value',
+      argv: ['node', 'script.js', '-i'],
+      expected: { prompt: undefined, promptInteractive: '' },
+    },
+    {
+      description:
+        'should throw error when using -p without value and a positional prompt',
+      argv: ['node', 'script.js', '-p', '--', 'my query'],
+      shouldThrow:
+        'Cannot use both a positional prompt and the --prompt (-p) flag together',
     },
     {
       description: 'should allow --prompt-interactive without --prompt',
@@ -293,11 +310,36 @@ describe('parseArguments', () => {
       argv: ['node', 'script.js', '-i', 'interactive prompt'],
       expected: { prompt: undefined, promptInteractive: 'interactive prompt' },
     },
-  ])('$description', async ({ argv, expected }) => {
+  ])('$description', async ({ argv, expected, shouldThrow }) => {
     process.argv = argv;
+
+    if (shouldThrow) {
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+      const mockConsoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      await expect(parseArguments(createTestMergedSettings())).rejects.toThrow(
+        'process.exit called',
+      );
+
+      expect(mockConsoleError).toHaveBeenCalledWith(
+        expect.stringContaining(shouldThrow),
+      );
+
+      mockExit.mockRestore();
+      mockConsoleError.mockRestore();
+      return;
+    }
+
     const parsedArgs = await parseArguments(createTestMergedSettings());
-    expect(parsedArgs.prompt).toBe(expected.prompt);
-    expect(parsedArgs.promptInteractive).toBe(expected.promptInteractive);
+    expect(parsedArgs.prompt).toBe(expected!.prompt);
+    expect(parsedArgs.promptInteractive).toBe(expected!.promptInteractive);
+    if ('query' in expected!) {
+      expect(parsedArgs.query).toBe(expected.query);
+    }
   });
 
   describe('positional arguments and @commands', () => {
