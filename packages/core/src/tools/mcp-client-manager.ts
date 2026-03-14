@@ -185,13 +185,38 @@ export class McpClientManager {
    */
   async startExtension(extension: GeminiCLIExtension) {
     debugLogger.log(`Loading extension: ${extension.name}`);
+    const localMcpServers = this.cliConfig.getMcpServers() ?? {};
     await Promise.all(
-      Object.entries(extension.mcpServers ?? {}).map(([name, config]) =>
-        this.maybeDiscoverMcpServer(name, {
+      Object.entries(extension.mcpServers ?? {}).map(([name, config]) => {
+        const userConfig = localMcpServers[name] ?? {};
+
+        // Merge arrays (union) so user overrides don't accidentally re-enable
+        // tools excluded by the extension for security/compatibility reasons.
+        const includeTools = [
+          ...new Set([
+            ...(config.includeTools ?? []),
+            ...(userConfig.includeTools ?? []),
+          ]),
+        ];
+        const excludeTools = [
+          ...new Set([
+            ...(config.excludeTools ?? []),
+            ...(userConfig.excludeTools ?? []),
+          ]),
+        ];
+
+        // Merge env objects instead of replacing them entirely.
+        const env = { ...(config.env ?? {}), ...(userConfig.env ?? {}) };
+
+        return this.maybeDiscoverMcpServer(name, {
           ...config,
+          ...userConfig,
+          includeTools: includeTools.length > 0 ? includeTools : undefined,
+          excludeTools: excludeTools.length > 0 ? excludeTools : undefined,
+          env: Object.keys(env).length > 0 ? env : undefined,
           extension,
-        }),
-      ),
+        });
+      }),
     );
     await this.scheduleMcpContextRefresh();
   }
@@ -264,6 +289,8 @@ export class McpClientManager {
     const existing = this.clients.get(name);
     if (
       existing &&
+      existing.getServerConfig().extension?.id &&
+      config.extension?.id &&
       existing.getServerConfig().extension?.id !== config.extension?.id
     ) {
       const extensionText = config.extension

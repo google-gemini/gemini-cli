@@ -729,6 +729,35 @@ tools. The model will automatically:
 
 The MCP integration tracks several states:
 
+#### Overriding extension configurations
+
+If an MCP server is provided by an extension (for example, the
+`google-workspace` extension), you can still override its settings in your local
+`settings.json`. Gemini CLI merges your local configuration with the extension's
+defaults:
+
+- **Tool lists:** The `includeTools` and `excludeTools` arrays from both sources
+  are combined (unioned). Because `excludeTools` always takes precedence over
+  `includeTools`, if either the extension or you exclude a tool, it remains
+  disabled, even if the other source includes it. This ensures you always have
+  veto power over any tools provided by an extension.
+- **Environment variables:** The `env` objects are merged. If the same variable
+  is defined in both places, your local value takes precedence.
+- **Scalar properties:** Properties like `command`, `url`, and `timeout` are
+  replaced by your local values if provided.
+
+**Example override:**
+
+```json
+{
+  "mcpServers": {
+    "google-workspace": {
+      "excludeTools": ["gmail.send"]
+    }
+  }
+}
+```
+
 #### Server status (`MCPServerStatus`)
 
 - **`DISCONNECTED`:** Server is not connected or has errors
