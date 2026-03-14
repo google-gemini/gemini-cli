@@ -16,10 +16,10 @@ interface BrowserPreviewDisplayProps {
 export const BrowserPreviewDisplay: React.FC<BrowserPreviewDisplayProps> = ({
   preview,
 }) => (
-    <Box flexDirection="column" paddingX={1}>
-      <Text color={theme.status.success}>
-        Preview opened in browser: {preview.title || 'Untitled'}
-      </Text>
-      <Text dimColor>File: {preview.imagePath}</Text>
-    </Box>
-  );
+  <Box flexDirection="column" paddingX={1}>
+    <Text color={theme.status.success}>
+      Preview opened in browser: {preview.title || 'Untitled'}
+    </Text>
+    <Text dimColor>File: {preview.imagePath}</Text>
+  </Box>
+);

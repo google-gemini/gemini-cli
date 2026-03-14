@@ -91,10 +91,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   if (isDiagramData(resultDisplay)) {
     return (
       <Box width={childWidth} flexDirection="column">
-        <DiagramRenderer
-          diagram={resultDisplay}
-          terminalWidth={childWidth}
-        />
+        <DiagramRenderer diagram={resultDisplay} terminalWidth={childWidth} />
       </Box>
     );
   }

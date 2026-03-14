@@ -40,9 +40,7 @@ function detectDiagramType(code: string): ParsedDiagram['diagramType'] {
 /**
  * Detect node shape from bracket syntax.
  */
-function parseNodeDeclaration(
-  raw: string,
-): {
+function parseNodeDeclaration(raw: string): {
   id: string;
   label: string;
   shape: ParsedDiagram['nodes'][0]['shape'];
