@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { glob } from 'glob';
-import { isNodeError, debugLogger } from '@google/gemini-cli-core';
 import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import {
   type CommandContext,
@@ -45,37 +43,15 @@ async function listSubcommandAction(
   try {
     const config = context.services.config;
     const loader = new FileCommandLoader(config);
-    const directories = loader.getCommandDirectories();
+    const groups = await loader.listAvailableFiles();
 
     const results: string[] = [];
-    for (const dir of directories) {
-      const displayName =
-        dir.kind === CommandKind.USER_FILE
-          ? 'User'
-          : dir.kind === CommandKind.WORKSPACE_FILE
-            ? 'Project'
-            : `Extension: ${dir.extensionName}`;
-
-      try {
-        const files = await glob('**/*.toml', { cwd: dir.path });
-        if (files.length > 0) {
-          results.push(`### ${displayName} Commands (${dir.path})`);
-          files.forEach((file) => results.push(`- ${file}`));
-        }
-      } catch (e) {
-        if (isNodeError(e) && e.code === 'ENOENT') {
-          continue;
-        }
-
-        debugLogger.error(
-          `[commands list] Error reading directory ${dir.path}:`,
-          e,
-        );
-
-        results.push(`### ${displayName} Commands (${dir.path})`);
-        results.push(
-          `- (Error reading directory: ${e instanceof Error ? e.message : String(e)})`,
-        );
+    for (const group of groups) {
+      results.push(`### ${group.displayName} Commands (${group.path})`);
+      if (group.error) {
+        results.push(`- (Error reading directory: ${group.error})`);
+      } else {
+        group.files.forEach((file) => results.push(`- ${file}`));
       }
     }
 
