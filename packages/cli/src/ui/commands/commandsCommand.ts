@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import path from 'node:path';
 import { glob } from 'glob';
-import { Storage } from '@google/gemini-cli-core';
+import { isNodeError, debugLogger } from '@google/gemini-cli-core';
+import { FileCommandLoader } from '../../services/FileCommandLoader.js';
 import {
   type CommandContext,
   type SlashCommand,
@@ -44,39 +44,42 @@ async function listSubcommandAction(
 ): Promise<void | SlashCommandActionReturn> {
   try {
     const config = context.services.config;
-    const projectRoot = config?.getProjectRoot() || process.cwd();
-    const storage = config?.storage ?? new Storage(projectRoot);
-
-    const directories = [
-      { name: 'User', path: Storage.getUserCommandsDir() },
-      { name: 'Project', path: storage.getProjectCommandsDir() },
-    ];
-
-    if (config) {
-      const activeExtensions = config
-        .getExtensions()
-        .filter((ext) => ext.isActive);
-      for (const ext of activeExtensions) {
-        directories.push({
-          name: `Extension: ${ext.name}`,
-          path: path.join(ext.path, 'commands'),
-        });
-      }
-    }
+    const loader = new FileCommandLoader(config);
+    const directories = loader.getCommandDirectories();
 
     const results: string[] = [];
     for (const dir of directories) {
       try {
         const files = await glob('**/*.toml', { cwd: dir.path });
         if (files.length > 0) {
-          results.push(`### ${dir.name} Commands (${dir.path})`);
+          const displayName =
+            dir.kind === CommandKind.USER_FILE
+              ? 'User'
+              : dir.kind === CommandKind.WORKSPACE_FILE
+                ? 'Project'
+                : `Extension: ${dir.extensionName}`;
+
+          results.push(`### ${displayName} Commands (${dir.path})`);
           files.forEach((file) => results.push(`- ${file}`));
         }
       } catch (e) {
-        if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
+        if (isNodeError(e) && e.code === 'ENOENT') {
           continue;
         }
-        results.push(`### ${dir.name} Commands (${dir.path})`);
+
+        debugLogger.error(
+          `[commands list] Error reading directory ${dir.path}:`,
+          e,
+        );
+
+        const displayName =
+          dir.kind === CommandKind.USER_FILE
+            ? 'User'
+            : dir.kind === CommandKind.WORKSPACE_FILE
+              ? 'Project'
+              : `Extension: ${dir.extensionName}`;
+
+        results.push(`### ${displayName} Commands (${dir.path})`);
         results.push(
           `- (Error reading directory: ${e instanceof Error ? e.message : String(e)})`,
         );

@@ -34,7 +34,7 @@ import {
 import { AtFileProcessor } from './prompt-processors/atFileProcessor.js';
 import { sanitizeForDisplay } from '../ui/utils/textUtils.js';
 
-interface CommandDirectory {
+export interface CommandDirectory {
   path: string;
   kind: CommandKind;
   extensionName?: string;
@@ -146,7 +146,7 @@ export class FileCommandLoader implements ICommandLoader {
    * User commands → Project commands → Extension commands
    * This order ensures extension commands can detect all conflicts.
    */
-  private getCommandDirectories(): CommandDirectory[] {
+  getCommandDirectories(): CommandDirectory[] {
     const dirs: CommandDirectory[] = [];
 
     const storage = this.config?.storage ?? new Storage(this.projectRoot);

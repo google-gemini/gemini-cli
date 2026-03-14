@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { glob } from 'glob';
-import { Storage } from '@google/gemini-cli-core';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { glob, type GlobOptions } from 'glob';
+import { Storage, type Config } from '@google/gemini-cli-core';
 import { commandsCommand } from './commandsCommand.js';
 import { MessageType } from '../types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
@@ -23,12 +23,12 @@ vi.mock('@google/gemini-cli-core', async () => {
   return {
     ...actual,
     Storage: class extends actual.Storage {
-      static override getUserCommandsDir = vi
-        .fn()
-        .mockReturnValue('/mock/user/commands');
-      override getProjectCommandsDir = vi
-        .fn()
-        .mockReturnValue('/mock/project/commands');
+      static override getUserCommandsDir() {
+        return '/mock/user/commands';
+      }
+      override getProjectCommandsDir() {
+        return '/mock/project/commands';
+      }
     },
   };
 });
@@ -46,15 +46,20 @@ describe('commandsCommand', () => {
       services: {
         config: {
           getProjectRoot: vi.fn().mockReturnValue('/mock/project'),
+          getFolderTrust: vi.fn().mockReturnValue(false),
+          isTrustedFolder: vi.fn().mockReturnValue(false),
           getExtensions: vi.fn().mockReturnValue([
             { name: 'ext1', path: '/mock/ext1', isActive: true },
             { name: 'ext2', path: '/mock/ext2', isActive: false },
           ]),
           storage: new Storage('/mock/project'),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any,
+        } as unknown as Config,
       },
     });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('default action', () => {
@@ -72,13 +77,14 @@ describe('commandsCommand', () => {
 
   describe('list', () => {
     it('should list .toml files from available sources', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.mocked(glob).mockImplementation(async (pattern, options: any) => {
-        if (options?.cwd === '/mock/user/commands') return ['user1.toml'];
-        if (options?.cwd === '/mock/project/commands') return ['proj1.toml'];
-        if (options?.cwd === '/mock/ext1/commands') return ['ext1.toml'];
-        return [];
-      });
+      vi.mocked(glob).mockImplementation(
+        async (pattern, options?: GlobOptions) => {
+          if (options?.cwd === '/mock/user/commands') return ['user1.toml'];
+          if (options?.cwd === '/mock/project/commands') return ['proj1.toml'];
+          if (options?.cwd === '/mock/ext1/commands') return ['ext1.toml'];
+          return [];
+        },
+      );
 
       const listCmd = commandsCommand.subCommands!.find(
         (s) => s.name === 'list',
