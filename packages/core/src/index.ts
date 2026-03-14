@@ -68,6 +68,7 @@ export * from './utils/checks.js';
 export * from './utils/headless.js';
 export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
+export * from './utils/fsErrorMessages.js';
 export * from './utils/exitCodes.js';
 export * from './utils/getFolderStructure.js';
 export * from './utils/memoryDiscovery.js';
@@ -145,6 +146,7 @@ export * from './ide/types.js';
 
 // Export Shell Execution Service
 export * from './services/shellExecutionService.js';
+export * from './services/sandboxManager.js';
 
 // Export base tool definitions
 export * from './tools/tools.js';
