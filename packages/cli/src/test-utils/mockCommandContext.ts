@@ -72,6 +72,8 @@ export const createMockCommandContext = (
     } as any,
     session: {
       sessionShellAllowlist: new Set<string>(),
+      activeCheckpointTag: null,
+      setActiveCheckpointTag: vi.fn(),
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       stats: {
         sessionStartTime: new Date(),

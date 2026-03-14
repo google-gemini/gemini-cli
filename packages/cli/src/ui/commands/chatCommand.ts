@@ -90,16 +90,17 @@ const listCommand: SlashCommand = {
 const saveCommand: SlashCommand = {
   name: 'save',
   description:
-    'Save the current conversation as a checkpoint. Usage: /resume save <tag>',
+    'Save the current conversation as a checkpoint. Usage: /resume save [tag]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: async (context, args): Promise<SlashCommandActionReturn | void> => {
-    const tag = args.trim();
+    const inputTag = args.trim();
+    const tag = inputTag || context.session.activeCheckpointTag;
     if (!tag) {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /resume save <tag>',
+        content: 'No active checkpoint tag. Usage: /resume save <tag>',
       };
     }
 
@@ -138,6 +139,7 @@ const saveCommand: SlashCommand = {
     if (history.length > INITIAL_HISTORY_LENGTH) {
       const authType = config?.getContentGeneratorConfig()?.authType;
       await logger.saveCheckpoint({ history, authType }, tag);
+      context.session.setActiveCheckpointTag(tag);
       return {
         type: 'message',
         messageType: 'info',
@@ -221,6 +223,7 @@ const resumeCheckpointCommand: SlashCommand = {
         text,
       } as HistoryItemWithoutId);
     }
+    context.session.setActiveCheckpointTag(tag);
     return {
       type: 'load_history',
       history: uiHistory,
@@ -255,6 +258,9 @@ const deleteCommand: SlashCommand = {
     const deleted = await logger.deleteCheckpoint(tag);
 
     if (deleted) {
+      if (context.session.activeCheckpointTag === tag) {
+        context.session.setActiveCheckpointTag(null);
+      }
       return {
         type: 'message',
         messageType: 'info',

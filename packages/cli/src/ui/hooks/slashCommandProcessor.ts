@@ -8,6 +8,7 @@ import {
   useCallback,
   useMemo,
   useEffect,
+  useRef,
   useState,
   createElement,
 } from 'react';
@@ -121,9 +122,14 @@ export const useSlashCommandProcessor = (
     onConfirm: (confirmed: boolean) => void;
   }>(null);
 
+  const [activeCheckpointTag, setActiveCheckpointTag] = useState<string | null>(
+    null,
+  );
   const [sessionShellAllowlist, setSessionShellAllowlist] = useState(
     new Set<string>(),
   );
+  const sessionId = config?.getSessionId();
+  const sessionIdRef = useRef(config?.getSessionId());
   const gitService = useMemo(() => {
     if (!config?.getProjectRoot()) {
       return;
@@ -248,6 +254,8 @@ export const useSlashCommandProcessor = (
       session: {
         stats: session.stats,
         sessionShellAllowlist,
+        activeCheckpointTag,
+        setActiveCheckpointTag,
       },
     }),
     [
@@ -265,6 +273,8 @@ export const useSlashCommandProcessor = (
       setPendingItem,
       setConfirmationRequest,
       toggleVimEnabled,
+      activeCheckpointTag,
+      setActiveCheckpointTag,
       sessionShellAllowlist,
       reloadCommands,
       extensionsUpdateState,
@@ -272,6 +282,13 @@ export const useSlashCommandProcessor = (
       setCustomDialog,
     ],
   );
+
+  useEffect(() => {
+    if (sessionIdRef.current !== sessionId) {
+      sessionIdRef.current = sessionId;
+      setActiveCheckpointTag(null);
+    }
+  }, [sessionId]);
 
   useEffect(() => {
     if (!config) {
