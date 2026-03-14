@@ -63,6 +63,10 @@
     "telemetry": "node scripts/telemetry.js",
     "check:lockfile": "node scripts/check-lockfile.js",
     "clean": "node scripts/clean.js",
+    "review": "tsx .gemini/skills/deep-review/scripts/review.ts",
+    "review:setup": "tsx .gemini/skills/deep-review/scripts/setup.ts",
+    "review:check": "tsx .gemini/skills/deep-review/scripts/check.ts",
+    "review:clean": "tsx .gemini/skills/deep-review/scripts/clean.ts",
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {
