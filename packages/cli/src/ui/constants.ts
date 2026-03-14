@@ -50,6 +50,7 @@ export const ACTIVE_SHELL_MAX_LINES = 15;
 // Max lines to preserve in history for completed shell commands
 export const COMPLETED_SHELL_MAX_LINES = 15;
 
+export const MAX_SHELL_OUTPUT_SIZE = 10_000_000;
 // Max lines to show for subagent results before collapsing
 export const SUBAGENT_MAX_LINES = 15;
 
