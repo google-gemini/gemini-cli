@@ -4,7 +4,32 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from './config.js';
+/**
+ * Interface for the ModelConfigService to break circular dependencies.
+ */
+export interface IModelConfigService {
+  getModelDefinition(modelId: string):
+    | {
+        tier?: string;
+        family?: string;
+        isPreview?: boolean;
+        displayName?: string;
+        features?: {
+          thinking?: boolean;
+          multimodalToolUse?: boolean;
+        };
+      }
+    | undefined;
+}
+
+/**
+ * Interface defining the minimal configuration required for model capability checks.
+ * This helps break circular dependencies between Config and models.ts.
+ */
+export interface ModelCapabilityContext {
+  readonly modelConfigService: IModelConfigService;
+  getExperimentalDynamicModelConfiguration(): boolean;
+}
 
 export const PREVIEW_GEMINI_MODEL = 'gemini-3-pro-preview';
 export const PREVIEW_GEMINI_3_1_MODEL = 'gemini-3.1-pro-preview';
@@ -150,7 +175,10 @@ export function resolveClassifierModel(
   }
   return resolveModel(requestedModel, useGemini3_1, useCustomToolModel);
 }
-export function getDisplayString(model: string, config?: Config) {
+export function getDisplayString(
+  model: string,
+  config?: ModelCapabilityContext,
+) {
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     const definition = config.modelConfigService.getModelDefinition(model);
     if (definition?.displayName) {
@@ -181,7 +209,10 @@ export function getDisplayString(model: string, config?: Config) {
  * @param config Optional config object for dynamic model configuration.
  * @returns True if the model is a preview model.
  */
-export function isPreviewModel(model: string, config?: Config): boolean {
+export function isPreviewModel(
+  model: string,
+  config?: ModelCapabilityContext,
+): boolean {
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     return (
       config.modelConfigService.getModelDefinition(model)?.isPreview === true
@@ -205,7 +236,10 @@ export function isPreviewModel(model: string, config?: Config): boolean {
  * @param config Optional config object for dynamic model configuration.
  * @returns True if the model is a Pro model.
  */
-export function isProModel(model: string, config?: Config): boolean {
+export function isProModel(
+  model: string,
+  config?: ModelCapabilityContext,
+): boolean {
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     return config.modelConfigService.getModelDefinition(model)?.tier === 'pro';
   }
@@ -219,7 +253,10 @@ export function isProModel(model: string, config?: Config): boolean {
  * @param config Optional config object for dynamic model configuration.
  * @returns True if the model is a Gemini 3 model.
  */
-export function isGemini3Model(model: string, config?: Config): boolean {
+export function isGemini3Model(
+  model: string,
+  config?: ModelCapabilityContext,
+): boolean {
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     // Legacy behavior resolves the model first.
     const resolved = resolveModel(model);
@@ -237,17 +274,11 @@ export function isGemini3Model(model: string, config?: Config): boolean {
  * Checks if the model is a Gemini 2.x model.
  *
  * @param model The model name to check.
- * @param config Optional config object for dynamic model configuration.
  * @returns True if the model is a Gemini-2.x model.
  */
-export function isGemini2Model(model: string, config?: Config): boolean {
-  if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
-    // Legacy behavior does NOT resolve the model first for Gemini 2 check.
-    return (
-      config.modelConfigService.getModelDefinition(model)?.family ===
-      'gemini-2.5'
-    );
-  }
+export function isGemini2Model(model: string): boolean {
+  // This is legacy behavior, will remove this when gemini 2 models are no
+  // longer needed.
   return /^gemini-2(\.|$)/.test(model);
 }
 
@@ -258,7 +289,10 @@ export function isGemini2Model(model: string, config?: Config): boolean {
  * @param config Optional config object for dynamic model configuration.
  * @returns True if the model is not a Gemini branded model.
  */
-export function isCustomModel(model: string, config?: Config): boolean {
+export function isCustomModel(
+  model: string,
+  config?: ModelCapabilityContext,
+): boolean {
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     const resolved = resolveModel(model);
     return (
@@ -275,15 +309,11 @@ export function isCustomModel(model: string, config?: Config): boolean {
  * This includes Gemini 3 models and any custom models.
  *
  * @param model The model name to check.
- * @param config Optional config object for dynamic model configuration.
  * @returns True if the model supports modern features like thoughts.
  */
-export function supportsModernFeatures(
-  model: string,
-  config?: Config,
-): boolean {
-  if (isGemini3Model(model, config)) return true;
-  return isCustomModel(model, config);
+export function supportsModernFeatures(model: string): boolean {
+  if (isGemini3Model(model)) return true;
+  return isCustomModel(model);
 }
 
 /**
@@ -293,7 +323,10 @@ export function supportsModernFeatures(
  * @param config Optional config object for dynamic model configuration.
  * @returns True if the model is an auto model.
  */
-export function isAutoModel(model: string, config?: Config): boolean {
+export function isAutoModel(
+  model: string,
+  config?: ModelCapabilityContext,
+): boolean {
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
     return config.modelConfigService.getModelDefinition(model)?.tier === 'auto';
   }
@@ -311,7 +344,16 @@ export function isAutoModel(model: string, config?: Config): boolean {
  * @param model The model name to check.
  * @returns True if the model supports multimodal function responses.
  */
-export function supportsMultimodalFunctionResponse(model: string): boolean {
+export function supportsMultimodalFunctionResponse(
+  model: string,
+  config?: ModelCapabilityContext,
+): boolean {
+  if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
+    return (
+      config.modelConfigService.getModelDefinition(model)?.features
+        ?.multimodalToolUse === true
+    );
+  }
   return model.startsWith('gemini-3-');
 }
 

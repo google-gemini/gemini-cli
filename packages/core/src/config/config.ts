@@ -935,6 +935,40 @@ export class Config implements McpContext, AgentLoopContext {
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
     this.modelAvailabilityService = new ModelAvailabilityService();
+    this.dynamicModelConfiguration = params.dynamicModelConfiguration ?? false;
+
+    // HACK: The settings loading logic doesn't currently merge the default
+    // generation config with the user's settings. This means if a user provides
+    // any `generation` settings (e.g., just `overrides`), the default `aliases`
+    // are lost. This hack manually merges the default aliases back in if they
+    // are missing from the user's config.
+    // TODO(12593): Fix the settings loading logic to properly merge defaults and
+    // remove this hack.
+    let modelConfigServiceConfig = params.modelConfigServiceConfig;
+    if (modelConfigServiceConfig) {
+      // Ensure user-defined model definitions augment, not replace, the defaults.
+      const mergedModelDefinitions = {
+        ...DEFAULT_MODEL_CONFIGS.modelDefinitions,
+        ...modelConfigServiceConfig.modelDefinitions,
+      };
+
+      modelConfigServiceConfig = {
+        // Preserve other user settings like customAliases
+        ...modelConfigServiceConfig,
+        // Apply defaults for aliases and overrides if they are not provided
+        aliases:
+          modelConfigServiceConfig.aliases ?? DEFAULT_MODEL_CONFIGS.aliases,
+        overrides:
+          modelConfigServiceConfig.overrides ?? DEFAULT_MODEL_CONFIGS.overrides,
+        // Use the merged model definitions
+        modelDefinitions: mergedModelDefinitions,
+      };
+    }
+
+    this.modelConfigService = new ModelConfigService(
+      modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
+    );
+
     this.experimentalJitContext = params.experimentalJitContext ?? false;
     this.modelSteering = params.modelSteering ?? false;
     this.userHintService = new UserHintService(() =>
@@ -1064,7 +1098,6 @@ export class Config implements McpContext, AgentLoopContext {
     this.disableYoloMode = params.disableYoloMode ?? false;
     this.rawOutput = params.rawOutput ?? false;
     this.acceptRawOutputRisk = params.acceptRawOutputRisk ?? false;
-    this.dynamicModelConfiguration = params.dynamicModelConfiguration ?? false;
 
     if (params.hooks) {
       this.hooks = params.hooks;
@@ -1104,38 +1137,6 @@ export class Config implements McpContext, AgentLoopContext {
     }
     this._geminiClient = new GeminiClient(this);
     this.modelRouterService = new ModelRouterService(this);
-
-    // HACK: The settings loading logic doesn't currently merge the default
-    // generation config with the user's settings. This means if a user provides
-    // any `generation` settings (e.g., just `overrides`), the default `aliases`
-    // are lost. This hack manually merges the default aliases back in if they
-    // are missing from the user's config.
-    // TODO(12593): Fix the settings loading logic to properly merge defaults and
-    // remove this hack.
-    let modelConfigServiceConfig = params.modelConfigServiceConfig;
-    if (modelConfigServiceConfig) {
-      // Ensure user-defined model definitions augment, not replace, the defaults.
-      const mergedModelDefinitions = {
-        ...DEFAULT_MODEL_CONFIGS.modelDefinitions,
-        ...modelConfigServiceConfig.modelDefinitions,
-      };
-
-      modelConfigServiceConfig = {
-        // Preserve other user settings like customAliases
-        ...modelConfigServiceConfig,
-        // Apply defaults for aliases and overrides if they are not provided
-        aliases:
-          modelConfigServiceConfig.aliases ?? DEFAULT_MODEL_CONFIGS.aliases,
-        overrides:
-          modelConfigServiceConfig.overrides ?? DEFAULT_MODEL_CONFIGS.overrides,
-        // Use the merged model definitions
-        modelDefinitions: mergedModelDefinitions,
-      };
-    }
-
-    this.modelConfigService = new ModelConfigService(
-      modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
-    );
   }
 
   get config(): Config {

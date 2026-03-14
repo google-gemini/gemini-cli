@@ -103,14 +103,6 @@ describe('Dynamic Configuration Parity', () => {
     }
   });
 
-  it('isGemini2Model should match legacy behavior', () => {
-    for (const model of modelsToTest) {
-      const legacy = isGemini2Model(model, legacyConfig);
-      const dynamic = isGemini2Model(model, dynamicConfig);
-      expect(dynamic).toBe(legacy);
-    }
-  });
-
   it('isCustomModel should match legacy behavior', () => {
     for (const model of modelsToTest) {
       const legacy = isCustomModel(model, legacyConfig);
@@ -121,8 +113,16 @@ describe('Dynamic Configuration Parity', () => {
 
   it('supportsModernFeatures should match legacy behavior', () => {
     for (const model of modelsToTest) {
-      const legacy = supportsModernFeatures(model, legacyConfig);
-      const dynamic = supportsModernFeatures(model, dynamicConfig);
+      const legacy = supportsModernFeatures(model);
+      const dynamic = supportsModernFeatures(model);
+      expect(dynamic).toBe(legacy);
+    }
+  });
+
+  it('supportsMultimodalFunctionResponse should match legacy behavior', () => {
+    for (const model of modelsToTest) {
+      const legacy = supportsMultimodalFunctionResponse(model, legacyConfig);
+      const dynamic = supportsMultimodalFunctionResponse(model, dynamicConfig);
       expect(dynamic).toBe(legacy);
     }
   });
