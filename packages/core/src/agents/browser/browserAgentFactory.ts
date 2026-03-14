@@ -107,11 +107,11 @@ export async function createBrowserAgentDefinition(
     (t) => !availableToolNames.includes(t),
   );
 
+  const rawSessionMode = browserConfig?.customConfig?.sessionMode;
   const sessionMode =
-    (browserConfig?.customConfig?.sessionMode as
-      | 'persistent'
-      | 'isolated'
-      | 'existing') ?? 'persistent';
+    rawSessionMode === 'isolated' || rawSessionMode === 'existing'
+      ? rawSessionMode
+      : 'persistent';
 
   recordBrowserAgentToolDiscovery(
     config,
@@ -160,15 +160,24 @@ export async function createBrowserAgentDefinition(
   const allTools: AnyDeclarativeTool[] = [...mcpTools];
   const visionDisabledReason = getVisionDisabledReason();
 
+  let disabled_reason:
+    | 'no_visual_model'
+    | 'missing_visual_tools'
+    | 'blocked_auth_type'
+    | undefined;
+  if (visionDisabledReason) {
+    if (visionDisabledReason.includes('visualModel')) {
+      disabled_reason = 'no_visual_model';
+    } else if (visionDisabledReason.includes('Visual tools missing')) {
+      disabled_reason = 'missing_visual_tools';
+    } else if (visionDisabledReason.includes('auth type')) {
+      disabled_reason = 'blocked_auth_type';
+    }
+  }
+
   recordBrowserAgentVisionStatus(config, {
     enabled: !visionDisabledReason,
-    disabled_reason: visionDisabledReason
-      ? visionDisabledReason.includes('visualModel')
-        ? 'no_visual_model'
-        : visionDisabledReason.includes('Visual tools missing')
-          ? 'missing_visual_tools'
-          : 'blocked_auth_type'
-      : undefined,
+    disabled_reason,
   });
 
   if (visionDisabledReason) {
