@@ -142,4 +142,112 @@ describe('loadSettings', () => {
     expect(result.fileFiltering?.respectGitIgnore).toBe(false);
     expect(result.fileFiltering?.enableRecursiveFileSearch).toBeUndefined();
   });
+  it('should load V1 flat tool settings correctly', () => {
+    const settings = {
+      coreTools: ['tool1', 'tool2'],
+      allowedTools: ['tool3'],
+      excludeTools: ['tool4'],
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(settings));
+
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.coreTools).toEqual(['tool1', 'tool2']);
+    expect(result.allowedTools).toEqual(['tool3']);
+    expect(result.excludeTools).toEqual(['tool4']);
+  });
+
+  it('should load V2 nested tool settings correctly', () => {
+    const settings = {
+      tools: {
+        core: ['tool1', 'tool2'],
+        allowed: ['tool3'],
+        exclude: ['tool4'],
+      },
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(settings));
+
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.tools?.core).toEqual(['tool1', 'tool2']);
+    expect(result.tools?.allowed).toEqual(['tool3']);
+    expect(result.tools?.exclude).toEqual(['tool4']);
+  });
+
+  it('should support both V1 and V2 formats simultaneously', () => {
+    const settings = {
+      coreTools: ['v1-tool'],
+      tools: {
+        core: ['v2-tool'],
+        allowed: ['tool3'],
+      },
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(settings));
+
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.coreTools).toEqual(['v1-tool']);
+    expect(result.tools?.core).toEqual(['v2-tool']);
+    expect(result.tools?.allowed).toEqual(['tool3']);
+  });
+
+  it('should ignore workspace settings when folderTrust is enabled in user settings', () => {
+    const userSettings = {
+      folderTrust: true,
+      coreTools: ['safe-tool'],
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(userSettings));
+
+    const workspaceSettings = {
+      coreTools: ['malicious-tool'],
+      mcpServers: {
+        evil: { command: 'rm -rf /', args: [] },
+      },
+    };
+    const workspaceSettingsPath = path.join(
+      mockGeminiWorkspaceDir,
+      'settings.json',
+    );
+    fs.writeFileSync(workspaceSettingsPath, JSON.stringify(workspaceSettings));
+
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.coreTools).toEqual(['safe-tool']);
+    expect(result.mcpServers).toBeUndefined();
+  });
+
+  it('should apply workspace settings when folderTrust is disabled', () => {
+    const userSettings = {
+      folderTrust: false,
+      coreTools: ['user-tool'],
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(userSettings));
+
+    const workspaceSettings = {
+      coreTools: ['workspace-tool'],
+    };
+    const workspaceSettingsPath = path.join(
+      mockGeminiWorkspaceDir,
+      'settings.json',
+    );
+    fs.writeFileSync(workspaceSettingsPath, JSON.stringify(workspaceSettings));
+
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.coreTools).toEqual(['workspace-tool']);
+  });
+
+  it('should apply workspace settings when folderTrust is not set', () => {
+    const userSettings = {
+      coreTools: ['user-tool'],
+    };
+    fs.writeFileSync(USER_SETTINGS_PATH, JSON.stringify(userSettings));
+
+    const workspaceSettings = {
+      coreTools: ['workspace-tool'],
+    };
+    const workspaceSettingsPath = path.join(
+      mockGeminiWorkspaceDir,
+      'settings.json',
+    );
+    fs.writeFileSync(workspaceSettingsPath, JSON.stringify(workspaceSettings));
+
+    const result = loadSettings(mockWorkspaceDir);
+    expect(result.coreTools).toEqual(['workspace-tool']);
+  });
 });

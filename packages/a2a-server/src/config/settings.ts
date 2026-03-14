@@ -20,14 +20,25 @@ import stripJsonComments from 'strip-json-comments';
 export const USER_SETTINGS_DIR = path.join(homedir(), GEMINI_DIR);
 export const USER_SETTINGS_PATH = path.join(USER_SETTINGS_DIR, 'settings.json');
 
-// TODO: Ensure full compatibility with V2 nested settings structure (settings.schema.json).
-// This involves updating the interface and implementing migration logic to support legacy V1 (flat) settings,
-// similar to how packages/cli/src/config/settings.ts handles it.
+/**
+ * A2A Settings interface supporting both V1 (flat) and V2 (nested) formats.
+ *
+ * V1 (flat/legacy) format:
+ * { "coreTools": ["tool1"], "allowedTools": ["tool2"], "excludeTools": ["tool3"] }
+ *
+ * V2 (nested) format:
+ * { "tools": { "core": ["tool1"], "allowed": ["tool2"], "exclude": ["tool3"] } }
+ *
+ * Both formats are supported for backward compatibility. V1 flat fields take
+ * precedence over V2 nested fields when both are present.
+ */
 export interface Settings {
   mcpServers?: Record<string, MCPServerConfig>;
+  // V1 flat format (legacy) - kept for backward compatibility
   coreTools?: string[];
   excludeTools?: string[];
   allowedTools?: string[];
+  // V2 nested format
   tools?: {
     allowed?: string[];
     exclude?: string[];
@@ -120,11 +131,18 @@ export function loadSettings(workspaceDir: string): Settings {
     }
   }
 
+  // If folderTrust is enabled in user settings, workspace settings are
+  // not trusted and should be ignored to prevent security bypass via
+  // malicious workspace settings (e.g. arbitrary command execution).
+  // This mirrors the trust check in the CLI's mergeSettings() function.
+  const isTrusted = !userSettings.folderTrust;
+  const safeWorkspaceSettings = isTrusted ? workspaceSettings : {};
+
   // If there are overlapping keys, the values of workspaceSettings will
   // override values from userSettings
   return {
     ...userSettings,
-    ...workspaceSettings,
+    ...safeWorkspaceSettings,
   };
 }
 
