@@ -85,6 +85,140 @@ export class GridCanvas {
     }
   }
 
+  /**
+   * Draw a tree fork: one parent to multiple children (TD layout).
+   * Pattern:
+   *     │          (vertical from parent)
+   *  ┌──┴──┐       (horizontal bar with junction)
+   *  │     │       (verticals down to each child)
+   */
+  drawTreeFork(
+    parentCenterX: number,
+    parentBottomY: number,
+    childCenters: Array<{ x: number; topY: number }>,
+  ): void {
+    if (childCenters.length === 0) return;
+
+    if (childCenters.length === 1) {
+      // Single child: straight vertical line
+      const child = childCenters[0];
+      for (let y = parentBottomY; y <= child.topY; y++) {
+        this.setCellIfEmpty(parentCenterX, y, '│');
+      }
+      return;
+    }
+
+    // Multiple children: fork pattern
+    const sortedChildren = [...childCenters].sort((a, b) => a.x - b.x);
+    const leftX = sortedChildren[0].x;
+    const rightX = sortedChildren[sortedChildren.length - 1].x;
+
+    // Y position for the horizontal bar (midpoint between parent and children)
+    const barY =
+      parentBottomY + Math.floor((sortedChildren[0].topY - parentBottomY) / 2);
+
+    // Vertical from parent down to bar
+    for (let y = parentBottomY; y < barY; y++) {
+      this.setCellIfEmpty(parentCenterX, y, '│');
+    }
+
+    // Horizontal bar
+    for (let x = leftX; x <= rightX; x++) {
+      this.setCellIfEmpty(x, barY, '─');
+    }
+
+    // Junction where parent meets the bar
+    if (parentCenterX >= leftX && parentCenterX <= rightX) {
+      this.setCell(parentCenterX, barY, '┬');
+    }
+
+    // Left end
+    this.setCell(leftX, barY, '├');
+    // Right end
+    this.setCell(rightX, barY, '┤');
+
+    // Corners: if parent center is at left or right edge
+    if (parentCenterX === leftX) {
+      this.setCell(leftX, barY, '┬');
+    }
+    if (parentCenterX === rightX) {
+      this.setCell(rightX, barY, '┬');
+    }
+
+    // Verticals from bar down to each child
+    for (const child of sortedChildren) {
+      // Junction on the bar where child drops
+      const current = this.grid[barY]?.[child.x]?.char;
+      if (current === '─') {
+        this.setCell(child.x, barY, '┬');
+      } else if (current === '├') {
+        this.setCell(child.x, barY, '┌');
+      } else if (current === '┤') {
+        this.setCell(child.x, barY, '┐');
+      }
+
+      for (let y = barY + 1; y <= child.topY; y++) {
+        this.setCellIfEmpty(child.x, y, '│');
+      }
+    }
+  }
+
+  /**
+   * Draw a horizontal fan-out: one parent to multiple children (LR layout).
+   * Pattern:
+   *  ──┬── child1
+   *    ├── child2
+   *    └── child3
+   */
+  drawHorizontalFork(
+    parentRightX: number,
+    parentCenterY: number,
+    childEntries: Array<{ leftX: number; y: number }>,
+  ): void {
+    if (childEntries.length === 0) return;
+
+    if (childEntries.length === 1) {
+      // Single child: straight horizontal line
+      const child = childEntries[0];
+      for (let x = parentRightX; x <= child.leftX; x++) {
+        this.setCellIfEmpty(x, parentCenterY, '─');
+      }
+      this.setCellIfEmpty(child.leftX, child.y, '→');
+      return;
+    }
+
+    const sorted = [...childEntries].sort((a, b) => a.y - b.y);
+    const topY = sorted[0].y;
+    const bottomY = sorted[sorted.length - 1].y;
+
+    // Horizontal from parent to trunk
+    const trunkX = parentRightX + 1;
+    this.setCellIfEmpty(parentRightX, parentCenterY, '─');
+
+    // Vertical trunk
+    for (let y = topY; y <= bottomY; y++) {
+      this.setCellIfEmpty(trunkX, y, '│');
+    }
+
+    // Branches to each child
+    for (let i = 0; i < sorted.length; i++) {
+      const child = sorted[i];
+      // Junction on trunk
+      if (i === 0) {
+        this.setCell(trunkX, child.y, '┌');
+      } else if (i === sorted.length - 1) {
+        this.setCell(trunkX, child.y, '└');
+      } else {
+        this.setCell(trunkX, child.y, '├');
+      }
+
+      // Horizontal from trunk to child
+      for (let x = trunkX + 1; x <= child.leftX; x++) {
+        this.setCellIfEmpty(x, child.y, '─');
+      }
+    }
+  }
+
   drawEdge(edge: DiagramEdge): void {
     const { sourceX, sourceY, targetX, targetY, label, style } = edge;
     const hChar = style === 'dotted' ? '┄' : '─';
@@ -94,7 +228,6 @@ export class GridCanvas {
     const dy = targetY - sourceY;
 
     if (dx === 0 && dy === 0) {
-      // Same point, nothing to draw
       return;
     } else if (dy === 0) {
       // Horizontal edge
@@ -109,30 +242,17 @@ export class GridCanvas {
       for (let y = sourceY; dir > 0 ? y < targetY : y > targetY; y += dir) {
         this.setCellIfEmpty(sourceX, y, vChar);
       }
-      this.setCellIfEmpty(targetX, targetY, dy > 0 ? '↓' : '↑');
+      this.setCellIfEmpty(targetX, targetY, vChar);
     } else if (Math.abs(dy) > Math.abs(dx)) {
-      // Primarily vertical: go down from source, then horizontal jog at midpoint, then down to target
+      // Primarily vertical: Z-shape
       const vDir = dy > 0 ? 1 : -1;
       const hDir = dx > 0 ? 1 : -1;
       const midY = Math.round((sourceY + targetY) / 2);
 
-      // Vertical from source to midY
       for (let y = sourceY; vDir > 0 ? y < midY : y > midY; y += vDir) {
         this.setCellIfEmpty(sourceX, y, vChar);
       }
-      // Corner at (sourceX, midY)
-      this.setCellIfEmpty(
-        sourceX,
-        midY,
-        hDir > 0 && vDir > 0
-          ? '└'
-          : hDir < 0 && vDir > 0
-            ? '┘'
-            : hDir > 0 && vDir < 0
-              ? '┌'
-              : '┐',
-      );
-      // Horizontal from sourceX to targetX at midY
+      this.setCellIfEmpty(sourceX, midY, hDir > 0 ? '└' : '┘');
       for (
         let x = sourceX + hDir;
         hDir > 0 ? x < targetX : x > targetX;
@@ -140,19 +260,7 @@ export class GridCanvas {
       ) {
         this.setCellIfEmpty(x, midY, hChar);
       }
-      // Corner at (targetX, midY)
-      this.setCellIfEmpty(
-        targetX,
-        midY,
-        hDir > 0 && vDir > 0
-          ? '┐'
-          : hDir < 0 && vDir > 0
-            ? '┌'
-            : hDir > 0 && vDir < 0
-              ? '┘'
-              : '└',
-      );
-      // Vertical from midY to target
+      this.setCellIfEmpty(targetX, midY, hDir > 0 ? '┐' : '┌');
       for (
         let y = midY + vDir;
         vDir > 0 ? y < targetY : y > targetY;
@@ -160,17 +268,15 @@ export class GridCanvas {
       ) {
         this.setCellIfEmpty(targetX, y, vChar);
       }
-      this.setCellIfEmpty(targetX, targetY, vDir > 0 ? '↓' : '↑');
+      this.setCellIfEmpty(targetX, targetY, vChar);
     } else {
-      // Primarily horizontal: vertical first, then horizontal
+      // Primarily horizontal: L-shape
       const hDir = dx > 0 ? 1 : -1;
       const vDir = dy > 0 ? 1 : -1;
 
-      // Vertical segment from source to target's row
       for (let y = sourceY; vDir > 0 ? y < targetY : y > targetY; y += vDir) {
         this.setCellIfEmpty(sourceX, y, vChar);
       }
-      // Corner
       this.setCellIfEmpty(
         sourceX,
         targetY,
@@ -182,7 +288,6 @@ export class GridCanvas {
               ? '┌'
               : '┐',
       );
-      // Horizontal to target
       for (
         let x = sourceX + hDir;
         hDir > 0 ? x < targetX : x > targetX;
@@ -193,7 +298,7 @@ export class GridCanvas {
       this.setCellIfEmpty(targetX, targetY, hDir > 0 ? '→' : '←');
     }
 
-    // Place edge label at midpoint (overwrites edge chars but not node chars)
+    // Place edge label at midpoint
     if (label) {
       const midX = Math.round((sourceX + targetX) / 2);
       const midY = Math.round((sourceY + targetY) / 2);

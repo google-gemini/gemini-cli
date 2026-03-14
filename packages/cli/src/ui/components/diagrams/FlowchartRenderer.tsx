@@ -33,9 +33,74 @@ export const FlowchartRenderer: React.FC<FlowchartRendererProps> = ({
 
     const canvas = new GridCanvas(width, height);
 
-    // Draw edges first (behind nodes)
+    // Detect layout direction from edge orientations
+    const isHorizontal =
+      diagram.edges.length > 0 &&
+      diagram.edges.every(
+        (e) =>
+          Math.abs(e.targetX - e.sourceX) >= Math.abs(e.targetY - e.sourceY),
+      );
+
+    // Group edges by source for fork drawing
+    const edgesBySource = new Map<string, typeof diagram.edges>();
     for (const edge of diagram.edges) {
-      canvas.drawEdge(edge);
+      if (!edgesBySource.has(edge.source)) {
+        edgesBySource.set(edge.source, []);
+      }
+      edgesBySource.get(edge.source)!.push(edge);
+    }
+
+    // Build node lookup
+    const nodeById = new Map(diagram.nodes.map((n) => [n.id, n]));
+
+    // Draw edges - use fork for multi-child, single edge otherwise
+    for (const [sourceId, sourceEdges] of edgesBySource) {
+      const srcNode = nodeById.get(sourceId);
+      if (!srcNode) {
+        for (const edge of sourceEdges) canvas.drawEdge(edge);
+        continue;
+      }
+
+      if (sourceEdges.length > 1 && !isHorizontal) {
+        // TD fork: parent center -> multiple children
+        const parentCenterX = srcNode.x + Math.floor(srcNode.width / 2);
+        const parentBottomY = srcNode.y + srcNode.height;
+
+        const childCenters = sourceEdges.map((e) => {
+          const tgt = nodeById.get(e.target);
+          if (tgt) {
+            return {
+              x: tgt.x + Math.floor(tgt.width / 2),
+              topY: tgt.y - 1,
+            };
+          }
+          return { x: e.targetX, topY: e.targetY };
+        });
+
+        canvas.drawTreeFork(parentCenterX, parentBottomY, childCenters);
+      } else if (sourceEdges.length > 1 && isHorizontal) {
+        // LR fork: parent right -> multiple children
+        const parentRightX = srcNode.x + srcNode.width;
+        const parentCenterY = srcNode.y + Math.floor(srcNode.height / 2);
+
+        const childEntries = sourceEdges.map((e) => {
+          const tgt = nodeById.get(e.target);
+          if (tgt) {
+            return {
+              leftX: tgt.x - 1,
+              y: tgt.y + Math.floor(tgt.height / 2),
+            };
+          }
+          return { leftX: e.targetX, y: e.targetY };
+        });
+
+        canvas.drawHorizontalFork(parentRightX, parentCenterY, childEntries);
+      } else {
+        // Single edge
+        for (const edge of sourceEdges) {
+          canvas.drawEdge(edge);
+        }
+      }
     }
 
     // Draw nodes on top
