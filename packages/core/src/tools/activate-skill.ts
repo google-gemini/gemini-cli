@@ -86,6 +86,11 @@ class ActivateSkillToolInvocation extends BaseToolInvocation<
       return false;
     }
 
+    const trustedSkills = this.config.getTrustedSkills();
+    if (this.config.isTrustedFolder() && trustedSkills.includes(skillName)) {
+      return false;
+    }
+
     const folderStructure = await this.getOrFetchFolderStructure(
       skill.location,
     );

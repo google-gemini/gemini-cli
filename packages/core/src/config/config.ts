@@ -620,6 +620,7 @@ export interface ConfigParameters {
   enableEventDrivenScheduler?: boolean;
   skillsSupport?: boolean;
   disabledSkills?: string[];
+  trustedSkills?: string[];
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
@@ -839,6 +840,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly enableEventDrivenScheduler: boolean;
   private readonly skillsSupport: boolean;
   private disabledSkills: string[];
+  private trustedSkills: string[];
   private readonly adminSkillsEnabled: boolean;
 
   private readonly experimentalJitContext: boolean;
@@ -953,6 +955,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.enableEventDrivenScheduler = params.enableEventDrivenScheduler ?? true;
     this.skillsSupport = params.skillsSupport ?? true;
     this.disabledSkills = params.disabledSkills ?? [];
+    this.trustedSkills = params.trustedSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.experimentalJitContext = params.experimentalJitContext ?? false;
@@ -2728,6 +2731,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   isSkillsSupportEnabled(): boolean {
     return this.skillsSupport;
+  }
+
+  getTrustedSkills(): string[] {
+    return this.trustedSkills;
   }
 
   /**
