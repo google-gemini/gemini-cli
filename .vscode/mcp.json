@@ -1,0 +1,80 @@
+{
+  "servers": {
+    "github": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "ghcr.io/github/github-mcp-server"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${input:github_token}"
+      },
+      "type": "stdio"
+    },
+    "io.github.ChromeDevTools/chrome-devtools-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "--registry",
+        "https://registry.npmjs.org",
+        "chrome-devtools-mcp@0.19.0"
+      ],
+      "gallery": "https://api.mcp.github.com",
+      "version": "0.19.0"
+    },
+    "io.github.github/github-mcp-server": {
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN=${input:token}",
+        "ghcr.io/github/github-mcp-server:0.31.0"
+      ],
+      "gallery": "https://api.mcp.github.com",
+      "version": "0.31.0"
+    },
+    "io.github.upstash/context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["@upstash/context7-mcp@1.0.31"],
+      "env": {
+        "CONTEXT7_API_KEY": "${input:CONTEXT7_API_KEY}"
+      },
+      "gallery": "https://api.mcp.github.com",
+      "version": "1.0.31"
+    }
+  },
+  "inputs": [
+    {
+      "id": "github_token",
+      "type": "promptString",
+      "description": "GitHub Personal Access Token",
+      "password": true
+    },
+    {
+      "id": "google_api_key",
+      "type": "promptString",
+      "description": "Google API Key",
+      "password": true
+    },
+    {
+      "id": "token",
+      "type": "promptString",
+      "description": "",
+      "password": true
+    },
+    {
+      "id": "CONTEXT7_API_KEY",
+      "type": "promptString",
+      "description": "API key for authentication",
+      "password": true
+    }
+  ]
+}
