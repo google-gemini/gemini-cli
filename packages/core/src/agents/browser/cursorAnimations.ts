@@ -83,15 +83,7 @@ export function buildPreClickListenerScript(): string {
     sentinel.setAttribute('aria-hidden', 'true');
     (document.head || document.documentElement).appendChild(sentinel);
 
-    // Ensure @keyframes are injected once per page.
-    if (!document.getElementById('${CLICK_STYLE_ID}')) {
-      var s = document.createElement('style');
-      s.id = '${CLICK_STYLE_ID}';
-      s.textContent = '${CLICK_KEYFRAMES}';
-      (document.head || document.documentElement).appendChild(s);
-    }
-
-    function onMousedown(e) {
+      function onMousedown(e) {
       // Remove sentinel and listener immediately.
       var sen = document.getElementById('${CLICK_LISTENER_SENTINEL_ID}');
       if (sen) sen.remove();
@@ -114,11 +106,25 @@ export function buildPreClickListenerScript(): string {
         'border: 2px solid rgba(66, 133, 244, 0.8)',
         'pointer-events: none',
         'z-index: 2147483647',
-        'animation: __gemini_click 0.6s ease-out forwards',
       ].join('; ');
 
       (document.body || document.documentElement).appendChild(dot);
-      dot.addEventListener('animationend', function() { dot.remove(); }, { once: true });
+      
+      try {
+        var animation = dot.animate([
+          { transform: 'scale(0.3)', opacity: 1, offset: 0 },
+          { transform: 'scale(1)', opacity: 0.6, offset: 0.6 },
+          { transform: 'scale(1.4)', opacity: 0, offset: 1 }
+        ], {
+          duration: 600,
+          easing: 'ease-out',
+          fill: 'forwards'
+        });
+        animation.finished.then(function() { dot.remove(); });
+      } catch (err) {
+        // Fallback for environments where .animate is not supported, though unlikely.
+        dot.remove();
+      }
     }
 
     // capture: true ensures we receive the event even when elements call
