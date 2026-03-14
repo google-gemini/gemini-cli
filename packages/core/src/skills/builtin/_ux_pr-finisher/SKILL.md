@@ -1,5 +1,5 @@
 ---
-name: ux-pr-finisher
+name: _ux_pr-finisher
 description: Expert PR maintenance with a focus on UX and functional polish. Use to check PR status, address feedback through interactive UX/functional review with the user, and fix failing CI checks.
 ---
 

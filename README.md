@@ -117,9 +117,10 @@ npm install -g @google/gemini-cli@nightly
 
 - **Custom Development Skills**: This branch introduces specialized skills for
   the AI DevTools UX team:
-  - **Git Worktree**: Manage Git Worktrees using the "Base Folder Strategy".
-  - **UX PR Finisher**: Co-author assistant for authors to cross the finish line
-    with UX polish and CI fixes.
+  - **\_ux_git-worktree**: Manage Git Worktrees using the "Base Folder
+    Strategy".
+  - **\_ux_pr-finisher**: Co-author assistant for authors to cross the finish
+    line with UX polish and CI fixes.
 - Automate operational tasks like querying pull requests or handling complex
   rebases
 - Use MCP servers to connect new capabilities, including

@@ -1,5 +1,5 @@
 ---
-name: git-worktree
+name: _ux_git-worktree
 description: Manage Git Worktrees according to the "Base Folder Strategy". Use when the user wants to create branches, switch tasks, check out PRs, or manage parallel development environments.
 ---
 

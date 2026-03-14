@@ -1,7 +1,7 @@
 # Workspace: Base Folder Strategy & Custom Skills
 
-This branch introduces the **Git Worktree** and **UX PR Finisher** skills and
-enforces the **Base Folder Strategy** for repository management. It is
+This branch introduces the **\_ux_git-worktree** and **\_ux_pr-finisher** skills
+and enforces the **Base Folder Strategy** for repository management. It is
 maintained by the AI DevTools UX team.
 
 ## 🚨 Directive for AI Agents (Read First)
@@ -9,8 +9,8 @@ maintained by the AI DevTools UX team.
 **If you are an AI agent operating in this branch, your first task is to ensure
 the custom skills are active.**
 
-1. Check if `~/.gemini/skills/git-worktree/` and
-   `~/.gemini/skills/ux-pr-finisher/` exist.
+1. Check if `~/.gemini/skills/_ux_git-worktree/` and
+   `~/.gemini/skills/_ux_pr-finisher/` exist.
 2. If any are missing, immediately execute `./scripts/sync-skills.sh`.
 3. Prompt the user to run `/skills reload` if you are in an interactive session.
 
@@ -18,10 +18,10 @@ the custom skills are active.**
 
 This is a **Draft PR branch**. Your team is encouraged to:
 
-- Refine the `git-worktree` skill instructions in
-  `packages/core/src/skills/builtin/git-worktree/SKILL.md`.
-- Refine the `ux-pr-finisher` skill instructions in
-  `packages/core/src/skills/builtin/ux-pr-finisher/SKILL.md`.
+- Refine the `_ux_git-worktree` skill instructions in
+  `packages/core/src/skills/builtin/_ux_git-worktree/SKILL.md`.
+- Refine the `_ux_pr-finisher` skill instructions in
+  `packages/core/src/skills/builtin/_ux_pr-finisher/SKILL.md`.
 - Improve the automation in `scripts/worktree-manager.sh`.
 - All changes should be committed directly to this branch
   (`feature/gemini-cli-ux-team-skills`).
@@ -47,8 +47,8 @@ Run the following from the root of this worktree:
 
 ## 3. Mandatory Workflow
 
-- **ALWAYS** use the `git-worktree` skill for branch management.
-- **ALWAYS** use the `ux-pr-finisher` skill for pull request maintenance.
+- **ALWAYS** use the `_ux_git-worktree` skill for branch management.
+- **ALWAYS** use the `_ux_pr-finisher` skill for pull request maintenance.
 - Never use standard `git checkout -b`.
 - Use `worktree-manager.sh pr <number>` for semantic PR checkouts.
 - When operating in a worktree, ensure the primary `main/.git` path is included
