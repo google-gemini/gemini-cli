@@ -19,6 +19,12 @@ describe('formatArgsPattern', () => {
     expect(formatArgsPattern(pattern)).toBe('git diff*');
   });
 
+  it('should parse commandPrefix with escaped quotes (git show)', () => {
+    // buildArgsPatterns uses escapeRegex() which escapes quotes to \"
+    const pattern = new RegExp('\\"command\\":\\"git\\ show(?:[\\s"]|\\\\")');
+    expect(formatArgsPattern(pattern)).toBe('git show*');
+  });
+
   it('should parse commandPrefix with special chars (npm run test:ci)', () => {
     // escapeRegex escapes the colon
     const pattern = new RegExp(
@@ -34,6 +40,11 @@ describe('formatArgsPattern', () => {
 
   it('should parse commandRegex pattern', () => {
     const pattern = new RegExp('"command":"npm run .*');
+    expect(formatArgsPattern(pattern)).toBe('npm run .*');
+  });
+
+  it('should parse commandRegex with escaped quotes', () => {
+    const pattern = new RegExp('\\"command\\":\\"npm run .*');
     expect(formatArgsPattern(pattern)).toBe('npm run .*');
   });
 

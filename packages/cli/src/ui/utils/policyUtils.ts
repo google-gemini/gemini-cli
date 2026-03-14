@@ -65,16 +65,23 @@ export function formatArgsPattern(
 
   const source = argsPattern.source;
 
-  // 1. commandPrefix: "command":"<escaped-prefix>(?:[\s"]|\\")"
+  // buildArgsPatterns uses escapeRegex() which escapes quotes to \", so the
+  // regex source contains escaped quotes. We support both escaped (\") and
+  // unescaped (") formats for robustness.
+  const cmdPrefix = /^\\?"command\\?":\\?"(.+?)\(\?:\[\\s"]\|\\\\"?\)$/;
+
+  // 1. commandPrefix: \"command\":\"<escaped-prefix>(?:[\s"]|\\")"
   //    The lookahead ensures the prefix is word-bounded in JSON.
-  const prefixMatch = source.match(/^"command":"(.+?)\(\?:\[\\s"\]\|\\\\"?\)$/);
+  const prefixMatch = source.match(cmdPrefix);
   if (prefixMatch) {
     return unescapeRegex(prefixMatch[1]) + '*';
   }
 
-  // 2. commandRegex: starts with "command":"
-  if (source.startsWith('"command":"')) {
-    const regex = source.slice('"command":"'.length);
+  // 2. commandRegex: starts with "command":" or \"command\":\"
+  const cmdRegexPrefix = /^\\?"command\\?":\\?"/;
+  const cmdRegexMatch = source.match(cmdRegexPrefix);
+  if (cmdRegexMatch) {
+    const regex = source.slice(cmdRegexMatch[0].length);
     return regex;
   }
 
