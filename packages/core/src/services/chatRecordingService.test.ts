@@ -43,6 +43,13 @@ describe('ChatRecordingService', () => {
     );
 
     mockConfig = {
+      get config() {
+        return this;
+      },
+      toolRegistry: {
+        getTool: vi.fn(),
+      },
+      promptId: 'test-session-id',
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),
       storage: {

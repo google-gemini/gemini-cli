@@ -125,7 +125,7 @@ export const NEVER_ALLOWED_VALUE_PATTERNS = [
   /-----BEGIN (RSA|OPENSSH|EC|PGP) PRIVATE KEY-----/i,
   /-----BEGIN CERTIFICATE-----/i,
   // Credentials in URL
-  /(https?|ftp|smtp):\/\/[^:]+:[^@]+@/i,
+  /(https?|ftp|smtp):\/\/[^:\s]{1,1024}:[^@\s]{1,1024}@/i,
   // GitHub tokens (classic, fine-grained, OAuth, etc.)
   /(ghp|gho|ghu|ghs|ghr|github_pat)_[a-zA-Z0-9_]{36,}/i,
   // Google API keys
@@ -133,7 +133,7 @@ export const NEVER_ALLOWED_VALUE_PATTERNS = [
   // Amazon AWS Access Key ID
   /AKIA[A-Z0-9]{16}/i,
   // Generic OAuth/JWT tokens
-  /eyJ[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*\.[a-zA-Z0-9_-]*/i,
+  /eyJ[a-zA-Z0-9_-]{0,10240}\.[a-zA-Z0-9_-]{0,10240}\.[a-zA-Z0-9_-]{0,10240}/i,
   // Stripe API keys
   /(s|r)k_(live|test)_[0-9a-zA-Z]{24}/i,
   // Slack tokens (bot, user, etc.)
