@@ -23,6 +23,7 @@ import type { AnyDeclarativeTool } from '../../tools/tools.js';
 import { BrowserManager } from './browserManager.js';
 import {
   BrowserAgentDefinition,
+  BROWSER_AGENT_NAME,
   type BrowserTaskResultSchema,
 } from './browserAgentDefinition.js';
 import { createMcpDeclarativeTools } from './mcpToolWrapper.js';
@@ -153,8 +154,28 @@ export async function createBrowserAgentDefinition(
   );
 
   // Create configured definition with tools
-  // BrowserAgentDefinition is a factory function - call it with config
-  const baseDefinition = BrowserAgentDefinition(config, !visionDisabledReason);
+  // Attempt to use the existing definition from the registry to preserve overrides
+  let baseDefinition:
+    | LocalAgentDefinition<typeof BrowserTaskResultSchema>
+    | undefined = undefined;
+
+  const registryDef = config
+    .getAgentRegistry()
+    ?.getDefinition(BROWSER_AGENT_NAME);
+
+  if (registryDef && registryDef.kind === 'local') {
+    // We know it's a LocalAgentDefinition, we can safely assume it has the right schema
+    // since we registered it as such.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    baseDefinition = registryDef as unknown as LocalAgentDefinition<
+      typeof BrowserTaskResultSchema
+    >;
+  }
+
+  if (!baseDefinition) {
+    baseDefinition = BrowserAgentDefinition(config, !visionDisabledReason);
+  }
+
   const definition: LocalAgentDefinition<typeof BrowserTaskResultSchema> = {
     ...baseDefinition,
     toolConfig: {
