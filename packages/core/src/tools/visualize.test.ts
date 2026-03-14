@@ -52,7 +52,6 @@ describe('VisualizeTool', () => {
         "The 'html' parameter is required when type is 'html_preview'.",
       );
     });
-
   });
 
   describe('execute mermaid', () => {
