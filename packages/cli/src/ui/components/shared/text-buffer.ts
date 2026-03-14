@@ -13,6 +13,7 @@ import { LRUCache } from 'mnemonist';
 import {
   coreEvents,
   debugLogger,
+  getErrorMessage,
   unescapePath,
   type EditorType,
 } from '@google/gemini-cli-core';
@@ -30,6 +31,7 @@ import type { VimAction } from './vim-buffer-actions.js';
 import { handleVimAction } from './vim-buffer-actions.js';
 import { LRU_BUFFER_PERF_CACHE_LIMIT } from '../../constants.js';
 import { openFileInEditor } from '../../utils/editorUtils.js';
+import { useSettings } from '../../contexts/SettingsContext.js';
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 export const LARGE_PASTE_LINE_THRESHOLD = 5;
@@ -2752,6 +2754,7 @@ export function useTextBuffer({
   singleLine = false,
   getPreferredEditor,
 }: UseTextBufferProps): TextBuffer {
+  const settings = useSettings();
   const keyMatchers = useKeyMatchers();
   const initialState = useMemo((): TextBufferState => {
     const lines = initialText.split('\n');
@@ -3238,6 +3241,7 @@ export function useTextBuffer({
         stdin,
         setRawMode,
         getPreferredEditor?.(),
+        settings.merged.general.openEditorInNewWindow,
       );
 
       let newText = fs.readFileSync(filePath, 'utf8');
@@ -3255,11 +3259,7 @@ export function useTextBuffer({
 
       dispatch({ type: 'set_text', payload: newText, pushToUndo: false });
     } catch (err) {
-      coreEvents.emitFeedback(
-        'error',
-        '[useTextBuffer] external editor error',
-        err,
-      );
+      coreEvents.emitFeedback('error', getErrorMessage(err), err);
     } finally {
       try {
         fs.unlinkSync(filePath);
@@ -3272,7 +3272,14 @@ export function useTextBuffer({
         /* ignore */
       }
     }
-  }, [text, pastedContent, stdin, setRawMode, getPreferredEditor]);
+  }, [
+    text,
+    pastedContent,
+    stdin,
+    setRawMode,
+    getPreferredEditor,
+    settings.merged.general.openEditorInNewWindow,
+  ]);
 
   const handleInput = useCallback(
     (key: Key): boolean => {
