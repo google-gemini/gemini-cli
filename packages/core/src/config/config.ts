@@ -42,6 +42,10 @@ import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
 import {
+  createSandboxManager,
+  type SandboxManager,
+} from '../services/sandboxManager.js';
+import {
   initializeTelemetry,
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
@@ -316,6 +320,10 @@ export interface BrowserAgentCustomConfig {
   profilePath?: string;
   /** Model override for the visual agent. */
   visualModel?: string;
+  /** List of allowed domains for the browser agent (e.g., ["github.com", "*.google.com"]). */
+  allowedDomains?: string[];
+  /** Disable user input on the browser window during automation. Default: true in non-headless mode */
+  disableUserInput?: boolean;
 }
 
 /**
@@ -506,6 +514,7 @@ export interface ConfigParameters {
   clientVersion?: string;
   embeddingModel?: string;
   sandbox?: SandboxConfig;
+  toolSandboxing?: boolean;
   targetDir: string;
   debugMode: boolean;
   question?: string;
@@ -597,6 +606,7 @@ export interface ConfigParameters {
   recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
+  disableAlwaysAllow?: boolean;
   rawOutput?: boolean;
   acceptRawOutputRisk?: boolean;
   modelConfigServiceConfig?: ModelConfigServiceConfig;
@@ -612,6 +622,7 @@ export interface ConfigParameters {
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
+  topicUpdateNarration?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
   plan?: boolean;
@@ -682,6 +693,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly telemetrySettings: TelemetrySettings;
   private readonly usageStatisticsEnabled: boolean;
   private _geminiClient!: GeminiClient;
+  private readonly _sandboxManager: SandboxManager;
   private baseLlmClient!: BaseLlmClient;
   private localLiteRtLmClient?: LocalLiteRtLmClient;
   private modelRouterService: ModelRouterService;
@@ -795,6 +807,7 @@ export class Config implements McpContext, AgentLoopContext {
   readonly fakeResponses?: string;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
+  private readonly disableAlwaysAllow: boolean;
   private readonly rawOutput: boolean;
   private readonly acceptRawOutputRisk: boolean;
   private pendingIncludeDirectories: string[];
@@ -830,6 +843,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly adminSkillsEnabled: boolean;
 
   private readonly experimentalJitContext: boolean;
+  private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
   private readonly trackerEnabled: boolean;
@@ -851,7 +865,19 @@ export class Config implements McpContext, AgentLoopContext {
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.fileSystemService = new StandardFileSystemService();
-    this.sandbox = params.sandbox;
+    this.sandbox = params.sandbox
+      ? {
+          enabled: params.sandbox.enabled ?? false,
+          allowedPaths: params.sandbox.allowedPaths ?? [],
+          networkAccess: params.sandbox.networkAccess ?? false,
+          command: params.sandbox.command,
+          image: params.sandbox.image,
+        }
+      : {
+          enabled: false,
+          allowedPaths: [],
+          networkAccess: false,
+        };
     this.targetDir = path.resolve(params.targetDir);
     this.folderTrust = params.folderTrust ?? false;
     this.workspaceContext = new WorkspaceContext(this.targetDir, []);
@@ -932,6 +958,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.experimentalJitContext = params.experimentalJitContext ?? false;
+    this.topicUpdateNarration = params.topicUpdateNarration ?? false;
     this.modelSteering = params.modelSteering ?? false;
     this.userHintService = new UserHintService(() =>
       this.isModelSteeringEnabled(),
@@ -981,6 +1008,7 @@ export class Config implements McpContext, AgentLoopContext {
       showColor: params.shellExecutionConfig?.showColor ?? false,
       pager: params.shellExecutionConfig?.pager ?? 'cat',
       sanitizationConfig: this.sanitizationConfig,
+      sandboxManager: this.sandboxManager,
     };
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
@@ -1022,11 +1050,13 @@ export class Config implements McpContext, AgentLoopContext {
     this.policyUpdateConfirmationRequest =
       params.policyUpdateConfirmationRequest;
 
+    this.disableAlwaysAllow = params.disableAlwaysAllow ?? false;
     this.policyEngine = new PolicyEngine(
       {
         ...params.policyEngineConfig,
         approvalMode:
           params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+        disableAlwaysAllow: this.disableAlwaysAllow,
       },
       checkerRunner,
     );
@@ -1034,7 +1064,7 @@ export class Config implements McpContext, AgentLoopContext {
     // Register Conseca if enabled
     if (this.enableConseca) {
       debugLogger.log('[SAFETY] Registering Conseca Safety Checker');
-      ConsecaSafetyChecker.getInstance().setConfig(this);
+      ConsecaSafetyChecker.getInstance().setContext(this);
     }
 
     this._messageBus = new MessageBus(this.policyEngine, this.debugMode);
@@ -1098,6 +1128,8 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
     this._geminiClient = new GeminiClient(this);
+    this._sandboxManager = createSandboxManager(params.toolSandboxing ?? false);
+    this.shellExecutionConfig.sandboxManager = this._sandboxManager;
     this.modelRouterService = new ModelRouterService(this);
 
     // HACK: The settings loading logic doesn't currently merge the default
@@ -1223,8 +1255,8 @@ export class Config implements McpContext, AgentLoopContext {
 
         // Re-register ActivateSkillTool to update its schema with the discovered enabled skill enums
         if (this.getSkillManager().getSkills().length > 0) {
-          this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
-          this.getToolRegistry().registerTool(
+          this.toolRegistry.unregisterTool(ActivateSkillTool.Name);
+          this.toolRegistry.registerTool(
             new ActivateSkillTool(this, this.messageBus),
           );
         }
@@ -1395,16 +1427,32 @@ export class Config implements McpContext, AgentLoopContext {
     return this._sessionId;
   }
 
+  /**
+   * @deprecated Do not access directly on Config.
+   * Use the injected AgentLoopContext instead.
+   */
   get toolRegistry(): ToolRegistry {
     return this._toolRegistry;
   }
 
+  /**
+   * @deprecated Do not access directly on Config.
+   * Use the injected AgentLoopContext instead.
+   */
   get messageBus(): MessageBus {
     return this._messageBus;
   }
 
+  /**
+   * @deprecated Do not access directly on Config.
+   * Use the injected AgentLoopContext instead.
+   */
   get geminiClient(): GeminiClient {
     return this._geminiClient;
+  }
+
+  get sandboxManager(): SandboxManager {
+    return this._sandboxManager;
   }
 
   getSessionId(): string {
@@ -2000,6 +2048,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.experimentalJitContext;
   }
 
+  isTopicUpdateNarrationEnabled(): boolean {
+    return this.topicUpdateNarration;
+  }
+
   isModelSteeringEnabled(): boolean {
     return this.modelSteering;
   }
@@ -2162,6 +2214,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.disableYoloMode || !this.isTrustedFolder();
   }
 
+  getDisableAlwaysAllow(): boolean {
+    return this.disableAlwaysAllow;
+  }
+
   getRawOutput(): boolean {
     return this.rawOutput;
   }
@@ -2241,7 +2297,7 @@ export class Config implements McpContext, AgentLoopContext {
    * Whenever the user memory (GEMINI.md files) is updated.
    */
   updateSystemInstructionIfInitialized(): void {
-    const geminiClient = this.getGeminiClient();
+    const geminiClient = this.geminiClient;
     if (geminiClient?.isInitialized()) {
       geminiClient.updateSystemInstruction();
     }
@@ -2707,16 +2763,16 @@ export class Config implements McpContext, AgentLoopContext {
 
       // Re-register ActivateSkillTool to update its schema with the newly discovered skills
       if (this.getSkillManager().getSkills().length > 0) {
-        this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
-        this.getToolRegistry().registerTool(
+        this.toolRegistry.unregisterTool(ActivateSkillTool.Name);
+        this.toolRegistry.registerTool(
           new ActivateSkillTool(this, this.messageBus),
         );
       } else {
-        this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
+        this.toolRegistry.unregisterTool(ActivateSkillTool.Name);
       }
     } else {
       this.getSkillManager().clearSkills();
-      this.getToolRegistry().unregisterTool(ActivateSkillTool.Name);
+      this.toolRegistry.unregisterTool(ActivateSkillTool.Name);
     }
 
     // Notify the client that system instructions might need updating
@@ -2794,6 +2850,8 @@ export class Config implements McpContext, AgentLoopContext {
       sanitizationConfig:
         config.sanitizationConfig ??
         this.shellExecutionConfig.sanitizationConfig,
+      sandboxManager:
+        config.sandboxManager ?? this.shellExecutionConfig.sandboxManager,
     };
   }
   getScreenReader(): boolean {
@@ -2888,8 +2946,22 @@ export class Config implements McpContext, AgentLoopContext {
         headless: customConfig.headless ?? false,
         profilePath: customConfig.profilePath,
         visualModel: customConfig.visualModel,
+        allowedDomains: customConfig.allowedDomains,
+        disableUserInput: customConfig.disableUserInput,
       },
     };
+  }
+
+  /**
+   * Determines if user input should be disabled during browser automation.
+   * Based on the `disableUserInput` setting and `headless` mode.
+   */
+  shouldDisableBrowserUserInput(): boolean {
+    const browserConfig = this.getBrowserAgentConfig();
+    return (
+      browserConfig.customConfig?.disableUserInput !== false &&
+      !browserConfig.customConfig?.headless
+    );
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
@@ -3039,7 +3111,7 @@ export class Config implements McpContext, AgentLoopContext {
 
       for (const definition of definitions) {
         try {
-          const tool = new SubagentTool(definition, this, this.getMessageBus());
+          const tool = new SubagentTool(definition, this, this.messageBus);
           registry.registerTool(tool);
         } catch (e: unknown) {
           debugLogger.warn(
@@ -3144,7 +3216,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.registerSubAgentTools(this._toolRegistry);
     }
     // Propagate updates to the active chat session
-    const client = this.getGeminiClient();
+    const client = this.geminiClient;
     if (client?.isInitialized()) {
       await client.setTools();
       client.updateSystemInstruction();

@@ -730,6 +730,7 @@ export async function loadCliConfig(
     clientVersion: await getVersion(),
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
+    toolSandboxing: settings.security?.toolSandboxing ?? false,
     targetDir: cwd,
     includeDirectoryTree,
     includeDirectories,
@@ -770,6 +771,9 @@ export async function loadCliConfig(
     approvalMode,
     disableYoloMode:
       settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,
+    disableAlwaysAllow:
+      settings.security?.disableAlwaysAllow ||
+      settings.admin?.secureModeEnabled,
     showMemoryUsage: settings.ui?.showMemoryUsage || false,
     accessibility: {
       ...settings.ui?.accessibility,
@@ -809,6 +813,7 @@ export async function loadCliConfig(
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     modelSteering: settings.experimental?.modelSteering,
+    topicUpdateNarration: settings.experimental?.topicUpdateNarration,
     toolOutputMasking: settings.experimental?.toolOutputMasking,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,

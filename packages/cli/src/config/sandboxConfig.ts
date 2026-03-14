@@ -34,7 +34,9 @@ const VALID_SANDBOX_COMMANDS = [
 function isSandboxCommand(
   value: string,
 ): value is Exclude<SandboxConfig['command'], undefined> {
-  return VALID_SANDBOX_COMMANDS.includes(value);
+  return (VALID_SANDBOX_COMMANDS as ReadonlyArray<string | undefined>).includes(
+    value,
+  );
 }
 
 function getSandboxCommand(
