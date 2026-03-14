@@ -15,6 +15,26 @@ import { debugLogger } from '@google/gemini-cli-core';
 
 let _updateInProgress = false;
 
+/**
+ * Builds a PowerShell command that waits for the given process to exit
+ * before running the update command. This avoids file-locking errors on
+ * Windows where the running CLI executable cannot be overwritten.
+ */
+export function buildWindowsDeferredUpdateCommand(
+  updateCommand: string,
+  parentPid: number,
+): string {
+  // Use PowerShell's -EncodedCommand to pass the script as a Base64 string.
+  // This avoids all quoting and special character issues that could arise
+  // from embedding the update command directly in a -Command string.
+  const psScript =
+    `Start-Sleep -Seconds 2; ` +
+    `try { Wait-Process -Id ${parentPid} -Timeout 60 -ErrorAction SilentlyContinue } catch {}; ` +
+    updateCommand;
+  const encodedScript = Buffer.from(psScript, 'utf16le').toString('base64');
+  return `powershell.exe -NoProfile -WindowStyle Hidden -EncodedCommand ${encodedScript}`;
+}
+
 /** @internal */
 export function _setUpdateStateForTesting(value: boolean) {
   _updateInProgress = value;
@@ -120,6 +140,33 @@ export function handleAutoUpdate(
     '@latest',
     isNightly ? '@nightly' : `@${info.update.latest}`,
   );
+
+  if (process.platform === 'win32') {
+    // On Windows, the CLI executable is locked while the process is running.
+    // Running npm install -g in the background will fail because it cannot
+    // overwrite the locked files. Instead, spawn a detached PowerShell
+    // process that waits for this process to exit before running the update.
+    const deferredCommand = buildWindowsDeferredUpdateCommand(
+      updateCommand,
+      process.pid,
+    );
+    const updateProcess = spawnFn(deferredCommand, {
+      stdio: 'ignore',
+      shell: true,
+      detached: true,
+      windowsHide: true,
+    });
+    updateProcess.unref();
+
+    // The actual update happens after exit, so we cannot track its progress.
+    // Notify the user that the update will be applied on next launch.
+    updateEventEmitter.emit('update-info', {
+      message:
+        'Update will be applied after you exit the CLI (deferred to avoid Windows file locking).',
+    });
+    return updateProcess;
+  }
+
   const updateProcess = spawnFn(updateCommand, {
     stdio: 'ignore',
     shell: true,
