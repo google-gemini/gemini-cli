@@ -29,6 +29,7 @@ const VALID_SANDBOX_COMMANDS = [
   'sandbox-exec',
   'runsc',
   'lxc',
+  'bwrap',
 ];
 
 function isSandboxCommand(
@@ -90,11 +91,17 @@ function getSandboxCommand(
     return sandbox;
   }
 
-  // look for seatbelt, docker, or podman, in that order
+  // look for seatbelt, bwrap, docker, or podman, in that order
   // for container-based sandboxing, require sandbox to be enabled explicitly
   // note: runsc is NOT auto-detected, it must be explicitly specified
   if (os.platform() === 'darwin' && commandExists.sync('sandbox-exec')) {
     return 'sandbox-exec';
+  } else if (
+    os.platform() === 'linux' &&
+    commandExists.sync('bwrap') &&
+    sandbox === true
+  ) {
+    return 'bwrap';
   } else if (commandExists.sync('docker') && sandbox === true) {
     return 'docker';
   } else if (commandExists.sync('podman') && sandbox === true) {
@@ -105,7 +112,7 @@ function getSandboxCommand(
   if (sandbox === true) {
     throw new FatalSandboxError(
       'GEMINI_SANDBOX is true but failed to determine command for sandbox; ' +
-        'install docker or podman or specify command in GEMINI_SANDBOX',
+        'install bwrap, docker or podman or specify command in GEMINI_SANDBOX',
     );
   }
 
@@ -141,6 +148,17 @@ export async function loadSandboxConfig(
   }
 
   const command = getSandboxCommand(sandboxValue);
+
+  // Default networkAccess to true for non-container providers (bwrap, seatbelt)
+  // because they need to talk to the Gemini API directly.
+  if (
+    (command === 'bwrap' || command === 'sandbox-exec') &&
+    (typeof sandboxOption !== 'object' ||
+      sandboxOption === null ||
+      sandboxOption.networkAccess === undefined)
+  ) {
+    networkAccess = true;
+  }
 
   const packageJson = await getPackageJson(__dirname);
   const image =

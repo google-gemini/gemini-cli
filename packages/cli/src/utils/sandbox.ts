@@ -25,6 +25,11 @@ import {
   FatalSandboxError,
   GEMINI_DIR,
   homedir,
+  buildBaseBwrapArgs,
+  bindExistingPaths,
+  bindNodeBinary,
+  BWRAP_OPTIONAL_LIB_PATHS,
+  BWRAP_ESSENTIAL_ETC_FILES,
 } from '@google/gemini-cli-core';
 import { ConsolePatcher } from '../ui/utils/ConsolePatcher.js';
 import { randomBytes } from 'node:crypto';
@@ -225,6 +230,10 @@ export async function start_sandbox(
           resolve(code ?? 1);
         });
       });
+    }
+
+    if (config.command === 'bwrap') {
+      return await start_bwrap_sandbox(config, nodeArgs, cliConfig, cliArgs);
     }
 
     if (config.command === 'lxc') {
@@ -1150,6 +1159,169 @@ async function pullImage(
     }
     pullProcess.on('error', onError);
     pullProcess.on('close', onClose);
+  });
+}
+
+async function start_bwrap_sandbox(
+  config: SandboxConfig,
+  nodeArgs: string[] = [],
+  cliConfig?: Config,
+  cliArgs: string[] = [],
+): Promise<number> {
+  if (os.platform() !== 'linux') {
+    throw new FatalSandboxError(
+      'bubblewrap sandboxing is only supported on Linux',
+    );
+  }
+
+  debugLogger.log('hopping into bubblewrap sandbox ...');
+
+  const workdir = path.resolve(process.cwd());
+  const homeDir = homedir();
+  const nodeOptions = [
+    ...(process.env['DEBUG'] ? ['--inspect-brk'] : []),
+    ...nodeArgs,
+  ].join(' ');
+
+  const bwrapArgs = buildBaseBwrapArgs('gemini-sandbox');
+  // Private system paths to block escapes (X11, D-Bus, etc.)
+  bwrapArgs.push('--tmpfs', '/tmp', '--tmpfs', '/run/user');
+
+  bindExistingPaths(bwrapArgs, BWRAP_OPTIONAL_LIB_PATHS);
+  bindExistingPaths(bwrapArgs, BWRAP_ESSENTIAL_ETC_FILES);
+  bindNodeBinary(bwrapArgs, homeDir);
+
+  // Ensure we have a valid resolv.conf for DNS if network is enabled
+  if (config.networkAccess !== false) {
+    bindExistingPaths(bwrapArgs, [
+      '/etc/resolv.conf',
+      '/run/systemd/resolve/stub-resolv.conf',
+      '/run/systemd/resolve/resolv.conf',
+    ]);
+  }
+
+  // Bind SSL certificates for HTTPS access
+  bindExistingPaths(bwrapArgs, [
+    '/etc/ssl',
+    '/etc/pki',
+    '/usr/share/ca-certificates',
+    '/usr/local/share/ca-certificates',
+  ]);
+
+  // Mount ADC file if GOOGLE_APPLICATION_CREDENTIALS is set
+  if (process.env['GOOGLE_APPLICATION_CREDENTIALS']) {
+    const adcFile = process.env['GOOGLE_APPLICATION_CREDENTIALS'];
+    if (fs.existsSync(adcFile)) {
+      bwrapArgs.push('--ro-bind', adcFile, adcFile);
+    }
+  }
+
+  // Allow writes ONLY to specific permitted paths
+  const writablePaths = new Set<string>();
+  writablePaths.add(workdir);
+  writablePaths.add(path.join(homeDir, GEMINI_DIR));
+  writablePaths.add(os.tmpdir());
+
+  if (config.allowedPaths) {
+    for (const p of config.allowedPaths) {
+      if (p && path.isAbsolute(p) && fs.existsSync(p)) {
+        writablePaths.add(fs.realpathSync(p));
+      }
+    }
+  }
+
+  for (const p of writablePaths) {
+    if (fs.existsSync(p)) {
+      bwrapArgs.push('--bind', p, p);
+    }
+  }
+
+  // Handle network access
+  if (config.networkAccess === false) {
+    bwrapArgs.push('--unshare-net');
+  }
+
+  // Set environment variables via bwrap flags instead of shell interpolation
+  bwrapArgs.push('--setenv', 'SANDBOX', 'bwrap');
+  if (nodeOptions) {
+    bwrapArgs.push('--setenv', 'NODE_OPTIONS', nodeOptions);
+  }
+
+  // Use current shell or bash
+  const shell = process.env['SHELL'] || '/bin/bash';
+
+  const finalArgv = cliArgs;
+  const innerCmd = finalArgv.map((arg) => quote([arg])).join(' ');
+
+  const args = [...bwrapArgs, '--', shell, '-c', innerCmd];
+
+  // Filter environment variables to prevent leakage of host credentials
+  const safeEnvKeys = [
+    'PATH',
+    'TERM',
+    'COLORTERM',
+    'LANG',
+    'LC_ALL',
+    'HOME',
+    'USER',
+    'LOGNAME',
+    'SHELL',
+    'PWD',
+    'EDITOR',
+    'VISUAL',
+    'DEBUG',
+    'DEBUG_PORT',
+    'NODE_ENV',
+    'NODE_OPTIONS',
+    'GEMINI_SANDBOX',
+    'GEMINI_SANDBOX_IMAGE',
+    'GEMINI_SANDBOX_IMAGE_DEFAULT',
+    'GEMINI_DIR',
+    'GEMINI_CLI_HOME',
+    'GEMINI_CLI_NO_RELAUNCH',
+    'SANDBOX_PORTS',
+    'SANDBOX_SET_UID_GID',
+    'SANDBOX_MOUNTS',
+    'SANDBOX_FLAGS',
+    'SEATBELT_PROFILE',
+    'HTTP_PROXY',
+    'HTTPS_PROXY',
+    'NO_PROXY',
+    'http_proxy',
+    'https_proxy',
+    'no_proxy',
+    'NO_BROWSER',
+    'GEMINI_API_KEY',
+    'GOOGLE_API_KEY',
+    'GOOGLE_APPLICATION_CREDENTIALS',
+    'GOOGLE_GEMINI_BASE_URL',
+    'GOOGLE_VERTEX_BASE_URL',
+    'GOOGLE_GENAI_USE_VERTEXAI',
+    'GOOGLE_GENAI_USE_GCA',
+    'GOOGLE_CLOUD_PROJECT',
+    'GOOGLE_CLOUD_LOCATION',
+    'GEMINI_MODEL',
+  ];
+
+  const sandboxEnv: NodeJS.ProcessEnv = {};
+  for (const key of safeEnvKeys) {
+    if (process.env[key] !== undefined) {
+      sandboxEnv[key] = process.env[key];
+    }
+  }
+
+  process.stdin.pause();
+  const sandboxProcess = spawn('bwrap', args, {
+    stdio: 'inherit',
+    env: sandboxEnv,
+  });
+
+  return new Promise((resolve, reject) => {
+    sandboxProcess.on('error', reject);
+    sandboxProcess.on('close', (code) => {
+      process.stdin.resume();
+      resolve(code ?? 1);
+    });
   });
 }
 

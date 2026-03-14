@@ -8,6 +8,7 @@ import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
+import { BwrapSandboxManager } from './bwrapSandboxManager.js';
 
 /**
  * Request for preparing a command to run in a sandbox.
@@ -92,10 +93,17 @@ export class LocalSandboxManager implements SandboxManager {
 
 /**
  * Creates a sandbox manager based on the provided settings.
+ *
+ * When running inside a bwrap outer sandbox (SANDBOX=bwrap), returns a
+ * BwrapSandboxManager that wraps tool commands in nested bwrap for
+ * per-tool isolation (e.g., network disabled for tools).
  */
 export function createSandboxManager(
   sandboxingEnabled: boolean,
 ): SandboxManager {
+  if (process.env['SANDBOX'] === 'bwrap') {
+    return new BwrapSandboxManager();
+  }
   if (sandboxingEnabled) {
     return new LocalSandboxManager();
   }
