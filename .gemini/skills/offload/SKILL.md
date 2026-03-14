@@ -32,6 +32,6 @@ Provide a structured assessment based on the physical proof and logs:
 *   **Conclusion**: A clear next step for the maintainer.
 
 ## Best Practices
-*   **Isolation First**: Always respect the user's isolation choices (`~/.gemini-deep-review`).
+*   **Isolation First**: Always respect the user's isolation choices (`~/.offload/gemini-cli-config`).
 *   **Be Behavioral**: Prioritize results from live execution (behavioral proofs) over static reading.
 *   **Multi-tasking**: Remind the user they can continue chatting in the main window while the heavy offloaded task runs in the separate window.

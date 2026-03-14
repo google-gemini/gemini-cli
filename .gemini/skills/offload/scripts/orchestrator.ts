@@ -51,9 +51,9 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   const sessionName = `offload-${prNumber}-${branchName.replace(/[^a-zA-Z0-9]/g, '-')}`;
   
   // 2. Sync Configuration Mirror (Isolated Profiles)
-  const ISOLATED_GEMINI = geminiSetup === 'isolated' ? '~/.gemini-deep-review' : '~/.gemini';
-  const ISOLATED_GH = ghSetup === 'isolated' ? '~/.gh-deep-review' : '~/.config/gh';
-  const remotePolicyPath = `${ISOLATED_GEMINI}/policies/deep-review-policy.toml`;
+  const ISOLATED_GEMINI = geminiSetup === 'isolated' ? '~/.offload/gemini-cli-config' : '~/.gemini';
+  const ISOLATED_GH = ghSetup === 'isolated' ? '~/.offload/gh-cli-config' : '~/.config/gh';
+  const remotePolicyPath = `${ISOLATED_GEMINI}/policies/offload-policy.toml`;
   
   console.log(`📡 Mirroring environment to ${remoteHost}...`);
   spawnSync('ssh', [remoteHost, `mkdir -p ${remoteWorkDir}/.gemini/skills/offload/scripts/ ${ISOLATED_GEMINI}/policies/`]);

@@ -65,37 +65,17 @@ describe('Offload Tooling Matrix', () => {
     });
   });
 
-  describe('Fix Loop', () => {
-    it('should iterate until CI passes', async () => {
-      let checkAttempts = 0;
-      vi.mocked(spawnSync).mockImplementation((cmd: any, args: any) => {
-        // Correctly check command AND args
-        const isCheck = (typeof cmd === 'string' && cmd.includes('pr checks')) || 
-                        (Array.isArray(args) && args.includes('checks'));
-        
-        if (isCheck) {
-          checkAttempts++;
-          return { status: 0, stdout: Buffer.from(checkAttempts === 1 ? 'fail' : 'success') } as any;
-        }
-        return { status: 0, stdout: Buffer.from('test-branch\n') } as any;
-      });
-
-      vi.useFakeTimers();
+  describe('Fix Playbook', () => {
+    it('should launch the agentic fix-pr skill', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
       
-      const workerPromise = runWorker(['123', 'test-branch', '/path/policy', 'fix']);
+      await runWorker(['123', 'test-branch', '/path/policy', 'fix']);
       
-      // Multi-stage timer flush to get through TaskRunner cycles and the polling loop
-      for(let i=0; i<10; i++) {
-          await vi.advanceTimersByTimeAsync(2000);
-      }
-      
-      await vi.advanceTimersByTimeAsync(40000); // 1st fail
-      for(let i=0; i<10; i++) { await vi.advanceTimersByTimeAsync(2000); }
-      await vi.advanceTimersByTimeAsync(40000); // 2nd pass
-      
-      await workerPromise;
-      expect(checkAttempts).toBe(2);
-      vi.useRealTimers();
+      const spawnSyncCalls = vi.mocked(spawnSync).mock.calls;
+      const fixCall = spawnSyncCalls.find(call => 
+          JSON.stringify(call).includes("activate the 'fix-pr' skill")
+      );
+      expect(fixCall).toBeDefined();
     });
   });
 });

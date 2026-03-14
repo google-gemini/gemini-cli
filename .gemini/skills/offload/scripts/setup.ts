@@ -48,8 +48,8 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   const ghChoice = await prompt('GitHub CLI Setup: Use [p]re-existing instance or [i]solated sandbox instance? (Isolated is recommended)', 'i');
   const ghSetup = ghChoice.toLowerCase() === 'p' ? 'preexisting' : 'isolated';
 
-  const ISOLATED_GEMINI_CONFIG = '~/.gemini-deep-review';
-  const ISOLATED_GH_CONFIG = '~/.gh-deep-review';
+  const ISOLATED_GEMINI_CONFIG = '~/.offload/gemini-cli-config';
+  const ISOLATED_GH_CONFIG = '~/.offload/gh-cli-config';
 
   console.log(`🔍 Checking state of ${remoteHost}...`);
   // Use a login shell to ensure the same PATH as the interactive user

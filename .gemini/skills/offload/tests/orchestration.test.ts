@@ -78,8 +78,31 @@ describe('Offload Orchestration', () => {
       await runOrchestrator(['123'], {});
       const spawnCalls = vi.mocked(spawnSync).mock.calls;
       const sshCall = spawnCalls.find(call => typeof call[0] === 'string' && call[0].includes('tmux new-session'));
-      // Match the new 'offload-123-test-branch' format
       expect(sshCall![0]).toContain('offload-123-test-branch');
+    });
+
+    it('should use isolated config path when geminiSetup is isolated', async () => {
+      const isolatedSettings = {
+        ...mockSettings,
+        maintainer: {
+          ...mockSettings.maintainer,
+          deepReview: {
+            ...mockSettings.maintainer.deepReview,
+            geminiSetup: 'isolated'
+          }
+        }
+      };
+      vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(isolatedSettings));
+
+      await runOrchestrator(['123'], {});
+
+      const spawnCalls = vi.mocked(spawnSync).mock.calls;
+      const sshCall = spawnCalls.find(call => {
+        const cmdStr = typeof call[0] === 'string' ? call[0] : '';
+        return cmdStr.includes('GEMINI_CLI_HOME=~/.offload/gemini-cli-config');
+      });
+
+      expect(sshCall).toBeDefined();
     });
   });
 
@@ -99,6 +122,8 @@ describe('Offload Orchestration', () => {
           const remoteCmd = args[1];
           if (remoteCmd.includes('[ -d ~/test-dir/.git ]')) return { status: 0 } as any;
           if (remoteCmd.includes('command -v')) return { status: 0 } as any;
+          if (remoteCmd.includes('gh auth status')) return { status: 0 } as any;
+          if (remoteCmd.includes('google_accounts.json')) return { status: 0 } as any;
         }
         return { status: 0, stdout: Buffer.from(''), stderr: Buffer.from('') } as any;
       });
@@ -122,15 +147,15 @@ describe('Offload Orchestration', () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
       await runWorker(['123', 'test-branch', '/test-policy.toml', 'review']);
       const spawnCalls = vi.mocked(spawn).mock.calls;
-      expect(spawnCalls.some(c => c[0].includes('/review-frontend'))).toBe(true);
+      expect(spawnCalls.some(c => c[0].includes("activate the 'review-pr' skill"))).toBe(true);
     });
 
     it('should launch the fix playbook when requested', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
       await runWorker(['123', 'test-branch', '/test-policy.toml', 'fix']);
-      const spawnCalls = vi.mocked(spawn).mock.calls;
-      // Match the updated prompt string in fix.ts
-      expect(spawnCalls.some(c => c[0].toLowerCase().includes('analyze current failures'))).toBe(true);
+      // runFixPlaybook uses spawnSync
+      const spawnSyncCalls = vi.mocked(spawnSync).mock.calls;
+      expect(spawnSyncCalls.some(c => JSON.stringify(c).includes("activate the 'fix-pr' skill"))).toBe(true);
     });
   });
 

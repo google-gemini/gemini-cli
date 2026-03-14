@@ -51,7 +51,7 @@ npm run offload:clean
 
 ## Technical details
 
-This skill uses an isolated Gemini profile on the remote host (`~/.gemini-deep-review`) to ensure that verification tasks do not interfere with your primary configuration.
+This skill uses an isolated Gemini profile on the remote host (`~/.offload/gemini-cli-config`) to ensure that verification tasks do not interfere with your primary configuration.
 
 ### Directory structure
 - `scripts/orchestrator.ts`: Local orchestrator (syncs scripts and pops terminal).
