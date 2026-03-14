@@ -1002,7 +1002,9 @@ describe('runNonInteractive', () => {
       nonInteractiveCliCommands,
       'handleSlashCommand',
     );
-    handleSlashCommandSpy.mockResolvedValue([{ text: 'Slash command output' }]);
+    handleSlashCommandSpy.mockResolvedValue({
+      content: [{ text: 'Slash command output' }],
+    });
 
     const events: ServerGeminiStreamEvent[] = [
       { type: GeminiEventType.Content, value: 'Response to slash command' },
