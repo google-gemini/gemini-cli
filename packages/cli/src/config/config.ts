@@ -496,9 +496,10 @@ export async function loadCliConfig(
 
   const experimentalJitContext = settings.experimental?.jitContext ?? false;
 
-  let extensionRegistryURI: string | undefined = trustedFolder
-    ? settings.experimental?.extensionRegistryURI
-    : undefined;
+  let extensionRegistryURI =
+    process.env['GEMINI_CLI_EXTENSION_REGISTRY_URI'] ??
+    (trustedFolder ? settings.experimental?.extensionRegistryURI : undefined);
+
   if (extensionRegistryURI && !extensionRegistryURI.startsWith('http')) {
     extensionRegistryURI = resolveToRealPath(
       path.resolve(cwd, resolvePath(extensionRegistryURI)),
