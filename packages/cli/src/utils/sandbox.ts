@@ -1303,15 +1303,17 @@ async function start_bwrap_sandbox(
     bwrapArgs.push('--unshare-net');
   }
 
+  // Set environment variables via bwrap flags instead of shell interpolation
+  bwrapArgs.push('--setenv', 'SANDBOX', 'bwrap');
+  if (nodeOptions) {
+    bwrapArgs.push('--setenv', 'NODE_OPTIONS', nodeOptions);
+  }
+
   // Use current shell or bash
   const shell = process.env['SHELL'] || '/bin/bash';
 
   const finalArgv = cliArgs;
-  const innerCmd = [
-    'SANDBOX=bwrap',
-    `NODE_OPTIONS="${nodeOptions}"`,
-    ...finalArgv.map((arg) => quote([arg])),
-  ].join(' ');
+  const innerCmd = finalArgv.map((arg) => quote([arg])).join(' ');
 
   const args = [...bwrapArgs, '--', shell, '-c', innerCmd];
 
