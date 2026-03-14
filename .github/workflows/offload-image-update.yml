@@ -1,0 +1,41 @@
+name: Offload Golden Image Update
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.gemini/skills/offload/scripts/provision-worker.sh'
+      - '.gemini/skills/offload/scripts/fleet.ts'
+  workflow_dispatch:
+
+jobs:
+  update-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIP }}
+          service_account: ${{ secrets.GCP_SA }}
+
+      - name: Setup GCloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build New Golden Image
+        run: npm run offload:fleet create-image

@@ -6,11 +6,10 @@ export USER=${USER:-ubuntu}
 export HOME=/home/$USER
 export DEBIAN_FRONTEND=noninteractive
 
-echo "🛠️ Provisioning Gemini CLI Maintainer Worker for user: $USER"
+echo "🛠️ Provisioning High-Performance Gemini CLI Maintainer Worker..."
 
 # Wait for apt lock
 wait_for_apt() {
-  echo "Waiting for apt lock..."
   while sudo fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock >/dev/null 2>&1 ; do
     sleep 2
   done
@@ -18,9 +17,10 @@ wait_for_apt() {
 
 wait_for_apt
 
-# 1. System Essentials
+# 1. System Essentials (Inc. libraries for native node modules)
 apt-get update && apt-get install -y \
-    curl git git-lfs tmux build-essential unzip jq gnupg cron
+    curl git git-lfs tmux build-essential unzip jq gnupg cron \
+    libsecret-1-dev libkrb5-dev
 
 # 2. GitHub CLI
 if ! command -v gh &> /dev/null; then
@@ -32,22 +32,28 @@ if ! command -v gh &> /dev/null; then
 fi
 
 # 3. Direct Node.js 20 Installation (NodeSource)
-echo "Removing any existing nodejs/npm..."
-wait_for_apt
-apt-get purge -y nodejs npm || true
-apt-get autoremove -y
+if ! command -v node &> /dev/null; then
+    echo "Installing Node.js 20..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+    wait_for_apt
+    apt-get install -y nodejs
+fi
 
-echo "Installing Node.js 20 via NodeSource..."
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-wait_for_apt
-apt-get install -y nodejs
+# 4. Global Maintenance Tooling
+echo "Installing global developer tools..."
+npm install -g tsx vitest @google/gemini-cli@nightly
 
-# Verify installations
-node -v
-npm -v
+# 5. Pre-warm Repository (Main Hub)
+# We clone and build the main repo in the image so that new worktrees start with a warm cache
+REMOTE_WORK_DIR="$HOME/dev/main"
+mkdir -p "$HOME/dev"
+if [ ! -d "$REMOTE_WORK_DIR" ]; then
+    echo "Pre-cloning and building repository..."
+    git clone --filter=blob:none https://github.com/google-gemini/gemini-cli.git "$REMOTE_WORK_DIR"
+    cd "$REMOTE_WORK_DIR"
+    npm install --no-audit --no-fund
+    npm run build
+fi
 
-# 4. Install Gemini CLI (Nightly)
-echo "Installing Gemini CLI..."
-npm install -g @google/gemini-cli@nightly
-
+chown -R $USER:$USER $HOME/dev
 echo "✅ Provisioning Complete!"

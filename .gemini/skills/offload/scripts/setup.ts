@@ -89,29 +89,39 @@ Host ${sshAlias}
   console.log('\n🍴 Configuring Security Fork...');
   const upstreamRepo = 'google-gemini/gemini-cli';
   
-  const forkCheck = spawnSync('gh', ['repo', 'view', '--json', 'parent,nameWithOwner'], { stdio: 'pipe' });
-  let currentRepo = '';
-  try {
-    const repoInfo = JSON.parse(forkCheck.stdout.toString());
-    currentRepo = repoInfo.nameWithOwner;
-  } catch (e) {}
+  // Use API to find all forks owned by the user
+  const forksQuery = spawnSync('gh', ['api', 'user/repos', '--paginate', '-q', `.[] | select(.fork == true and .parent.full_name == "${upstreamRepo}") | .full_name`], { stdio: 'pipe' });
+  const existingForks = forksQuery.stdout.toString().trim().split('\n').filter(Boolean);
 
   let userFork = '';
-  if (currentRepo.includes(`${env.USER}/`) || currentRepo.includes('mattkorwel/')) {
-      userFork = currentRepo;
-      console.log(`   ✅ Using existing fork: ${userFork}`);
-  } else {
-      console.log(`   🔍 No personal fork detected for ${upstreamRepo}.`);
-      if (await confirm('   Would you like to create a personal fork for autonomous work?')) {
-          const forkResult = spawnSync('gh', ['repo', 'fork', upstreamRepo, '--clone=false'], { stdio: 'inherit' });
-          if (forkResult.status === 0) {
-              // Get the fork name (usually <user>/gemini-cli)
-              const user = spawnSync('gh', ['api', 'user', '-q', '.login'], { stdio: 'pipe' }).stdout.toString().trim();
-              userFork = `${user}/gemini-cli`;
-              console.log(`   ✅ Created fork: ${userFork}`);
+  if (existingForks.length > 0) {
+      console.log(`   🔍 Found existing fork(s):`);
+      existingForks.forEach((f, i) => console.log(`      ${i + 1}. ${f}`));
+      
+      if (existingForks.length === 1) {
+          if (await confirm(`   Use existing fork ${existingForks[0]}?`)) {
+              userFork = existingForks[0];
           }
+      } else {
+          const choice = await prompt(`   Select fork (1-${existingForks.length}) or type 'new'`, '1');
+          if (choice !== 'new') userFork = existingForks[parseInt(choice) - 1];
       }
   }
+
+  if (!userFork) {
+      console.log(`   🔍 No fork selected or detected.`);
+      if (await confirm('   Create a fresh personal fork?')) {
+          spawnSync('gh', ['repo', 'fork', upstreamRepo, '--clone=false'], { stdio: 'inherit' });
+          const user = spawnSync('gh', ['api', 'user', '-q', '.login'], { stdio: 'pipe' }).stdout.toString().trim();
+          userFork = `${user}/gemini-cli`;
+      }
+  }
+  
+  if (!userFork) {
+      console.error('❌ A personal fork is required for autonomous offload tasks.');
+      return 1;
+  }
+  console.log(`   ✅ Using fork: ${userFork}`);
 
   // Use the alias for remaining setup steps
   const remoteHost = sshAlias;
