@@ -23,15 +23,17 @@ describe('policiesCommand', () => {
     expect(policiesCommand.description).toBe('Manage policies');
     expect(policiesCommand.kind).toBe(CommandKind.BUILT_IN);
     expect(policiesCommand.subCommands).toHaveLength(1);
-    expect(policiesCommand.subCommands![0].name).toBe('list');
+    expect(policiesCommand.subCommands?.[0].name).toBe('list');
   });
 
   describe('list subcommand', () => {
     it('should show error if config is missing', async () => {
       mockContext.services.config = null;
-      const listCommand = policiesCommand.subCommands![0];
+      const listCommand = policiesCommand.subCommands?.[0];
+      if (!listCommand?.action)
+        throw new Error('list subcommand action missing');
 
-      await listCommand.action!(mockContext, '');
+      await listCommand.action(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -50,8 +52,11 @@ describe('policiesCommand', () => {
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
       } as unknown as Config;
 
-      const listCommand = policiesCommand.subCommands![0];
-      await listCommand.action!(mockContext, '');
+      const listCommand = policiesCommand.subCommands?.[0];
+      if (!listCommand?.action)
+        throw new Error('list subcommand action missing');
+
+      await listCommand.action(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -84,8 +89,11 @@ describe('policiesCommand', () => {
         getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
       } as unknown as Config;
 
-      const listCommand = policiesCommand.subCommands![0];
-      await listCommand.action!(mockContext, '');
+      const listCommand = policiesCommand.subCommands?.[0];
+      if (!listCommand?.action)
+        throw new Error('list subcommand action missing');
+
+      await listCommand.action(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -123,8 +131,11 @@ describe('policiesCommand', () => {
         getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       } as unknown as Config;
 
-      const listCommand = policiesCommand.subCommands![0];
-      const result = await listCommand.action!(mockContext, '');
+      const listCommand = policiesCommand.subCommands?.[0];
+      if (!listCommand?.action)
+        throw new Error('list subcommand action missing');
+
+      const result = await listCommand.action(mockContext, '');
 
       expect(result).toMatchObject({
         type: 'custom_dialog',
@@ -165,8 +176,11 @@ describe('policiesCommand', () => {
         getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       } as unknown as Config;
 
-      const listCommand = policiesCommand.subCommands![0];
-      const result = await listCommand.action!(mockContext, '');
+      const listCommand = policiesCommand.subCommands?.[0];
+      if (!listCommand?.action)
+        throw new Error('list subcommand action missing');
+
+      const result = await listCommand.action(mockContext, '');
 
       expect(result).toMatchObject({ type: 'custom_dialog' });
       // Verify getTool was called for each unique toolName
@@ -197,7 +211,9 @@ describe('policiesCommand', () => {
         getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       } as unknown as Config;
 
-      const result = await policiesCommand.action!(mockContext, '');
+      if (!policiesCommand.action)
+        throw new Error('policiesCommand action missing');
+      const result = await policiesCommand.action(mockContext, '');
 
       expect(result).toMatchObject({ type: 'custom_dialog' });
       expect(result).toHaveProperty('component');
@@ -206,7 +222,9 @@ describe('policiesCommand', () => {
     it('should show error if config is missing', async () => {
       mockContext.services.config = null;
 
-      await policiesCommand.action!(mockContext, '');
+      if (!policiesCommand.action)
+        throw new Error('policiesCommand action missing');
+      await policiesCommand.action(mockContext, '');
 
       expect(mockContext.ui.addItem).toHaveBeenCalledWith(
         expect.objectContaining({
