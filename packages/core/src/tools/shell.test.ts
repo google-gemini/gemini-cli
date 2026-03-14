@@ -136,6 +136,7 @@ describe('ShellTool', () => {
       getGeminiClient: vi.fn().mockReturnValue({}),
       getShellToolInactivityTimeout: vi.fn().mockReturnValue(1000),
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
+      isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       sanitizationConfig: {},
       sandboxManager: new NoopSandboxManager(),
@@ -292,6 +293,28 @@ describe('ShellTool', () => {
       expect(result.llmContent).toContain('Background PIDs: 54322');
       // The file should be deleted by the tool
       expect(fs.existsSync(tmpFile)).toBe(false);
+    });
+
+    it('should disable PTY execution when interactive shell is unavailable', async () => {
+      (mockConfig.getEnableInteractiveShell as Mock).mockReturnValue(true);
+      (mockConfig.isInteractiveShellEnabled as Mock).mockReturnValue(false);
+
+      const invocation = shellTool.build({ command: 'python --version' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({ pid: 54321 });
+
+      await promise;
+
+      expect(mockShellExecutionService).toHaveBeenCalledWith(
+        expect.any(String),
+        tempRootDir,
+        expect.any(Function),
+        expect.any(AbortSignal),
+        false,
+        expect.objectContaining({
+          pager: 'cat',
+        }),
+      );
     });
 
     it('should use the provided absolute directory as cwd', async () => {

@@ -271,7 +271,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
             }
           },
           combinedController.signal,
-          this.context.config.getEnableInteractiveShell(),
+          this.context.config.isInteractiveShellEnabled(),
           {
             ...shellExecutionConfig,
             pager: 'cat',
@@ -470,7 +470,7 @@ export class ShellTool extends BaseDeclarativeTool<
       // Errors are surfaced when parsing commands.
     });
     const definition = getShellDefinition(
-      context.config.getEnableInteractiveShell(),
+      context.config.isInteractiveShellEnabled(),
       context.config.getEnableShellOutputEfficiency(),
     );
     super(
@@ -519,7 +519,7 @@ export class ShellTool extends BaseDeclarativeTool<
 
   override getSchema(modelId?: string) {
     const definition = getShellDefinition(
-      this.context.config.getEnableInteractiveShell(),
+      this.context.config.isInteractiveShellEnabled(),
       this.context.config.getEnableShellOutputEfficiency(),
     );
     return resolveToolDeclaration(definition, modelId);
