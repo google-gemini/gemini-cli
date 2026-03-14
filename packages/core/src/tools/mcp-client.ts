@@ -2073,6 +2073,10 @@ function createUrlTransport(
 ): StreamableHTTPClientTransport | SSEClientTransport {
   // Priority 1: httpUrl (deprecated)
   if (mcpServerConfig.httpUrl) {
+    debugLogger.warn(
+      `MCP server '${mcpServerName}': 'httpUrl' is deprecated. ` +
+        `Please migrate to 'url' with 'type: "http"' in your MCP server config.`,
+    );
     if (mcpServerConfig.url) {
       debugLogger.warn(
         `MCP server '${mcpServerName}': Both 'httpUrl' and 'url' are configured. ` +
