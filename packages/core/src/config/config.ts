@@ -637,6 +637,8 @@ export interface ConfigParameters {
     disabledSkills?: string[];
     adminSkillsEnabled?: boolean;
     agents?: AgentSettings;
+    model?: string;
+    hooks?: { [K in HookEventName]?: HookDefinition[] };
   }>;
   enableConseca?: boolean;
   billing?: {
@@ -828,6 +830,8 @@ export class Config implements McpContext, AgentLoopContext {
         disabledSkills?: string[];
         adminSkillsEnabled?: boolean;
         agents?: AgentSettings;
+        model?: string;
+        hooks?: { [K in HookEventName]?: HookDefinition[] };
       }>)
     | undefined;
 
@@ -2751,6 +2755,7 @@ export class Config implements McpContext, AgentLoopContext {
       this.getSkillManager().setAdminSettings(
         refreshed.adminSkillsEnabled ?? this.adminSkillsEnabled,
       );
+      this.applyReloadedState(refreshed);
     }
 
     if (this.getSkillManager().isAdminEnabled()) {
@@ -2780,6 +2785,22 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
+   * Applies model and hooks state from a reload result.
+   * Shared by reloadSkills() and reloadAgents() for consistent hydration.
+   */
+  private applyReloadedState(refreshed: {
+    model?: string;
+    hooks?: { [K in HookEventName]?: HookDefinition[] };
+  }): void {
+    if (refreshed.model && this.model !== refreshed.model) {
+      this.setModel(refreshed.model, true);
+    }
+    if (refreshed.hooks && this.isTrustedFolder()) {
+      this.hooks = refreshed.hooks;
+    }
+  }
+
+  /**
    * Reloads agent settings.
    */
   async reloadAgents(): Promise<void> {
@@ -2788,6 +2809,7 @@ export class Config implements McpContext, AgentLoopContext {
       if (refreshed.agents) {
         this.agents = refreshed.agents;
       }
+      this.applyReloadedState(refreshed);
     }
   }
 
