@@ -42,15 +42,13 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
 
   const { remoteHost, remoteWorkDir, terminalType, syncAuth, geminiSetup, ghSetup } = config;
 
-  console.log(`🔍 Fetching metadata for PR #${prNumber}...`);
-  const ghView = spawnSync('gh', ['pr', 'view', prNumber, '--json', 'headRefName', '-q', '.headRefName'], { shell: true });
-  const branchName = ghView.stdout.toString().trim();
-  if (!branchName) {
-    console.error('❌ Failed to resolve PR branch.');
-    return 1;
-  }
-
-  const sessionName = `${prNumber}-${branchName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  console.log(`🔍 Fetching metadata for ${action === 'implement' ? 'Issue' : 'PR'} #${prNumber}...`);
+  const ghCmd = action === 'implement' ? ['issue', 'view', prNumber, '--json', 'title', '-q', '.title'] : ['pr', 'view', prNumber, '--json', 'headRefName', '-q', '.headRefName'];
+  const ghView = spawnSync('gh', ghCmd, { shell: true });
+  const metaName = ghView.stdout.toString().trim() || `task-${prNumber}`;
+  
+  const branchName = action === 'implement' ? `impl-${prNumber}` : metaName;
+  const sessionName = `offload-${prNumber}-${branchName.replace(/[^a-zA-Z0-9]/g, '-')}`;
   
   // 2. Sync Configuration Mirror (Isolated Profiles)
   const ISOLATED_GEMINI = geminiSetup === 'isolated' ? '~/.gemini-deep-review' : '~/.gemini';

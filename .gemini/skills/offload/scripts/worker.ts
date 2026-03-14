@@ -1,125 +1,71 @@
 /**
  * Universal Offload Worker (Remote)
  * 
- * Handles worktree provisioning and parallel task execution based on 'playbooks'.
+ * Stateful orchestrator for complex development loops.
  */
-import { spawn, spawnSync } from 'child_process';
+import { spawnSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import { runReviewPlaybook } from './playbooks/review.js';
+import { runFixPlaybook } from './playbooks/fix.js';
+import { runReadyPlaybook } from './playbooks/ready.js';
 
-const prNumber = process.argv[2];
-const branchName = process.argv[3];
-const policyPath = process.argv[4];
-const action = process.argv[5] || 'review';
+export async function runWorker(args: string[]) {
+  const prNumberOrIssue = args[0];
+  const branchName = args[1];
+  const policyPath = args[2];
+  const action = args[3] || 'review';
 
-async function main() {
-  if (!prNumber || !branchName || !policyPath) {
-    console.error('Usage: tsx worker.ts <PR_NUMBER> <BRANCH_NAME> <POLICY_PATH> [action]');
+  if (!prNumberOrIssue || !policyPath) {
+    console.error('Usage: tsx worker.ts <ID> <BRANCH_NAME> <POLICY_PATH> [action]');
     return 1;
   }
 
-  const workDir = process.cwd(); // This is remoteWorkDir
-  const targetDir = path.join(workDir, branchName);
+  const workDir = process.cwd();
+  
+  // For 'implement', the ID is an issue number and we might not have a branch yet
+  const isImplement = action === 'implement';
+  const targetDir = isImplement ? workDir : path.join(workDir, branchName);
 
-  // 1. Provision PR Directory
-  if (!fs.existsSync(targetDir)) {
-    console.log(`🌿 Provisioning PR #${prNumber} into ${branchName}...`);
+  // 1. Provision Environment
+  if (!isImplement && !fs.existsSync(targetDir)) {
+    console.log(`🌿 Provisioning PR #${prNumberOrIssue} into ${branchName}...`);
     const cloneCmd = `git clone --filter=blob:none https://github.com/google-gemini/gemini-cli.git ${targetDir}`;
     spawnSync(cloneCmd, { stdio: 'inherit', shell: true });
     
     process.chdir(targetDir);
-    spawnSync('gh', ['pr', 'checkout', prNumber], { stdio: 'inherit' });
-  } else {
+    spawnSync('gh', ['pr', 'checkout', prNumberOrIssue], { stdio: 'inherit' });
+  } else if (!isImplement) {
     process.chdir(targetDir);
   }
 
-  const logDir = path.join(targetDir, `.gemini/logs/offload-${prNumber}`);
-  fs.mkdirSync(logDir, { recursive: true });
-
   const geminiBin = path.join(workDir, 'node_modules/.bin/gemini');
 
-  // 2. Define Playbooks
-  let tasks: any[] = [];
-
-  if (action === 'review') {
-    tasks = [
-      { id: 'build', name: 'Fast Build', cmd: `cd ${targetDir} && npm ci && npm run build` },
-      { id: 'ci', name: 'CI Checks', cmd: `gh pr checks ${prNumber}` },
-      { id: 'review', name: 'Gemini Analysis', cmd: `${geminiBin} --policy ${policyPath} --cwd ${targetDir} -p "/review-frontend ${prNumber}"` },
-      { id: 'verify', name: 'Behavioral Proof', cmd: `${geminiBin} --policy ${policyPath} --cwd ${targetDir} -p "Analyze the code in ${targetDir} and exercise it to prove it works."`, dep: 'build' }
-    ];
-  } else if (action === 'fix') {
-    tasks = [
-      { id: 'build', name: 'Fast Build', cmd: `cd ${targetDir} && npm ci && npm run build` },
-      { id: 'failures', name: 'Find Failures', cmd: `gh run view --log-failed` },
-      { id: 'fix', name: 'Iterative Fix', cmd: `${geminiBin} --policy ${policyPath} --cwd ${targetDir} -p "Address review comments and fix failing tests for PR ${prNumber}. Repeat until CI is green."`, dep: 'build' }
-    ];
-  } else if (action === 'ready') {
-    tasks = [
-      { id: 'clean', name: 'Clean Install', cmd: `npm run clean && npm ci` },
-      { id: 'preflight', name: 'Full Preflight', cmd: `npm run preflight`, dep: 'clean' },
-      { id: 'conflicts', name: 'Conflict Check', cmd: `git fetch origin main && git merge-base --is-ancestor origin/main HEAD || echo "CONFLICT"` }
-    ];
-  } else if (action === 'open') {
-    console.log(`🚀 Dropping into manual session for ${branchName}...`);
-    process.exit(0);
-  }
-
-  const state: Record<string, any> = {};
-  tasks.forEach(t => state[t.id] = { status: 'PENDING' });
-
-  return new Promise((resolve) => {
-    function runTask(task: any) {
-      if (task.dep && state[task.dep].status !== 'SUCCESS') {
-        setTimeout(() => runTask(task), 1000);
-        return;
-      }
-
-      state[task.id].status = 'RUNNING';
-      const proc = spawn(task.cmd, { shell: true, env: { ...process.env, FORCE_COLOR: '1' } });
-      const logStream = fs.createWriteStream(path.join(logDir, `${task.id}.log`));
-      proc.stdout.pipe(logStream);
-      proc.stderr.pipe(logStream);
-
-      proc.on('close', (code) => {
-        const exitCode = code ?? 0;
-        state[task.id].status = exitCode === 0 ? 'SUCCESS' : 'FAILED';
-        fs.writeFileSync(path.join(logDir, `${task.id}.exit`), exitCode.toString());
-        render();
-      });
-    }
-
-    function render() {
-      console.clear();
-      console.log(`==================================================`);
-      console.log(`🚀 Offload | ${action.toUpperCase()} | PR #${prNumber}`);
-      console.log(`📂 Worktree: ${targetDir}`);
-      console.log(`==================================================\n`);
-      
-      tasks.forEach(t => {
-        const s = state[t.id];
-        const icon = s.status === 'SUCCESS' ? '✅' : s.status === 'FAILED' ? '❌' : s.status === 'RUNNING' ? '⏳' : '💤';
-        console.log(`  ${icon} ${t.name.padEnd(20)}: ${s.status}`);
-      });
-
-      const allDone = tasks.every(t => ['SUCCESS', 'FAILED'].includes(state[t.id].status));
-      if (allDone) {
-        console.log(`\n✨ Playbook complete. Launching interactive session...`);
-        resolve(0);
-      }
-    }
-
-    tasks.filter(t => !t.dep).forEach(runTask);
-    tasks.filter(t => t.dep).forEach(runTask);
-    const intervalId = setInterval(render, 1500);
+  // 2. Dispatch to Playbook
+  switch (action) {
+    case 'review':
+      return runReviewPlaybook(prNumberOrIssue, targetDir, policyPath, geminiBin);
     
-    const checkAllDone = setInterval(() => {
-        if (tasks.every(t => ['SUCCESS', 'FAILED'].includes(state[t.id].status))) {
-            clearInterval(intervalId);
-            clearInterval(checkAllDone);
-        }
-    }, 1000);
-  });
+    case 'fix':
+      // The 'fix' playbook now handles its own internal loop
+      return runFixPlaybook(prNumberOrIssue, targetDir, policyPath, geminiBin);
+    
+    case 'ready':
+      return runReadyPlaybook(prNumberOrIssue, targetDir, policyPath, geminiBin);
+    
+    case 'implement':
+      // Lazy-load implement playbook (to be created)
+      const { runImplementPlaybook } = await import('./playbooks/implement.js');
+      return runImplementPlaybook(prNumberOrIssue, workDir, policyPath, geminiBin);
+      
+    case 'open':
+      console.log(`🚀 Dropping into manual session...`);
+      return 0;
+      
+    default:
+      console.error(`❌ Unknown action: ${action}`);
+      return 1;
+  }
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
