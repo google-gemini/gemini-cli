@@ -25,6 +25,10 @@ import type {
   ExtensionUpdateStatus,
 } from '../state/extensions.js';
 
+export interface LastOutput {
+  content: string;
+}
+
 // Grouped dependencies for clarity and easier mocking
 export interface CommandContext {
   // Invocation properties for when commands are called.
@@ -92,6 +96,15 @@ export interface CommandContext {
     removeComponent: () => void;
     toggleBackgroundShell: () => void;
     toggleShortcutsHelp: () => void;
+    /**
+     * Returns the text content of the last visible output, if any.
+     * Used by `/copy` to capture outputs from either slash commands or AI responses.
+     */
+    getLastOutput: () => LastOutput | undefined;
+    /**
+     * Sets the text content of the last visible output.
+     */
+    setLastOutput: (output: LastOutput | undefined) => void;
   };
   // Session-specific data
   session: {
