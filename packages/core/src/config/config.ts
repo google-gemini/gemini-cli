@@ -42,6 +42,10 @@ import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
 import {
+  createSandboxManager,
+  type SandboxManager,
+} from '../services/sandboxManager.js';
+import {
   initializeTelemetry,
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
@@ -316,6 +320,8 @@ export interface BrowserAgentCustomConfig {
   profilePath?: string;
   /** Model override for the visual agent. */
   visualModel?: string;
+  /** List of allowed domains for the browser agent (e.g., ["github.com", "*.google.com"]). */
+  allowedDomains?: string[];
   /** Disable user input on the browser window during automation. Default: true in non-headless mode */
   disableUserInput?: boolean;
 }
@@ -508,6 +514,7 @@ export interface ConfigParameters {
   clientVersion?: string;
   embeddingModel?: string;
   sandbox?: SandboxConfig;
+  toolSandboxing?: boolean;
   targetDir: string;
   debugMode: boolean;
   question?: string;
@@ -599,6 +606,7 @@ export interface ConfigParameters {
   recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
+  disableAlwaysAllow?: boolean;
   rawOutput?: boolean;
   acceptRawOutputRisk?: boolean;
   modelConfigServiceConfig?: ModelConfigServiceConfig;
@@ -684,6 +692,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly telemetrySettings: TelemetrySettings;
   private readonly usageStatisticsEnabled: boolean;
   private _geminiClient!: GeminiClient;
+  private readonly _sandboxManager: SandboxManager;
   private baseLlmClient!: BaseLlmClient;
   private localLiteRtLmClient?: LocalLiteRtLmClient;
   private modelRouterService: ModelRouterService;
@@ -797,6 +806,7 @@ export class Config implements McpContext, AgentLoopContext {
   readonly fakeResponses?: string;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
+  private readonly disableAlwaysAllow: boolean;
   private readonly rawOutput: boolean;
   private readonly acceptRawOutputRisk: boolean;
   private pendingIncludeDirectories: string[];
@@ -853,7 +863,19 @@ export class Config implements McpContext, AgentLoopContext {
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.fileSystemService = new StandardFileSystemService();
-    this.sandbox = params.sandbox;
+    this.sandbox = params.sandbox
+      ? {
+          enabled: params.sandbox.enabled ?? false,
+          allowedPaths: params.sandbox.allowedPaths ?? [],
+          networkAccess: params.sandbox.networkAccess ?? false,
+          command: params.sandbox.command,
+          image: params.sandbox.image,
+        }
+      : {
+          enabled: false,
+          allowedPaths: [],
+          networkAccess: false,
+        };
     this.targetDir = path.resolve(params.targetDir);
     this.folderTrust = params.folderTrust ?? false;
     this.workspaceContext = new WorkspaceContext(this.targetDir, []);
@@ -983,6 +1005,7 @@ export class Config implements McpContext, AgentLoopContext {
       showColor: params.shellExecutionConfig?.showColor ?? false,
       pager: params.shellExecutionConfig?.pager ?? 'cat',
       sanitizationConfig: this.sanitizationConfig,
+      sandboxManager: this.sandboxManager,
     };
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
@@ -1024,11 +1047,13 @@ export class Config implements McpContext, AgentLoopContext {
     this.policyUpdateConfirmationRequest =
       params.policyUpdateConfirmationRequest;
 
+    this.disableAlwaysAllow = params.disableAlwaysAllow ?? false;
     this.policyEngine = new PolicyEngine(
       {
         ...params.policyEngineConfig,
         approvalMode:
           params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+        disableAlwaysAllow: this.disableAlwaysAllow,
       },
       checkerRunner,
     );
@@ -1100,6 +1125,8 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
     this._geminiClient = new GeminiClient(this);
+    this._sandboxManager = createSandboxManager(params.toolSandboxing ?? false);
+    this.shellExecutionConfig.sandboxManager = this._sandboxManager;
     this.modelRouterService = new ModelRouterService(this);
 
     // HACK: The settings loading logic doesn't currently merge the default
@@ -1419,6 +1446,10 @@ export class Config implements McpContext, AgentLoopContext {
    */
   get geminiClient(): GeminiClient {
     return this._geminiClient;
+  }
+
+  get sandboxManager(): SandboxManager {
+    return this._sandboxManager;
   }
 
   getSessionId(): string {
@@ -2176,6 +2207,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.disableYoloMode || !this.isTrustedFolder();
   }
 
+  getDisableAlwaysAllow(): boolean {
+    return this.disableAlwaysAllow;
+  }
+
   getRawOutput(): boolean {
     return this.rawOutput;
   }
@@ -2808,6 +2843,8 @@ export class Config implements McpContext, AgentLoopContext {
       sanitizationConfig:
         config.sanitizationConfig ??
         this.shellExecutionConfig.sanitizationConfig,
+      sandboxManager:
+        config.sandboxManager ?? this.shellExecutionConfig.sandboxManager,
     };
   }
   getScreenReader(): boolean {
@@ -2902,6 +2939,7 @@ export class Config implements McpContext, AgentLoopContext {
         headless: customConfig.headless ?? false,
         profilePath: customConfig.profilePath,
         visualModel: customConfig.visualModel,
+        allowedDomains: customConfig.allowedDomains,
         disableUserInput: customConfig.disableUserInput,
       },
     };
