@@ -2032,6 +2032,45 @@
         "items": {}
       }
     },
+    "voice": {
+      "title": "Voice Mode",
+      "description": "Settings for the Hands-Free Multimodal Voice Mode (GSoC 2026).",
+      "markdownDescription": "Settings for the Hands-Free Multimodal Voice Mode (GSoC 2026).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `{}`",
+      "default": {},
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "title": "Enable Voice Mode",
+          "description": "Enable the real-time, bidirectional voice interface.",
+          "markdownDescription": "Enable the real-time, bidirectional voice interface.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
+        "inputDevice": {
+          "title": "Microphone Device",
+          "description": "The name or ID of the microphone to use for voice input.",
+          "markdownDescription": "The name or ID of the microphone to use for voice input.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `default`",
+          "default": "default",
+          "type": "string"
+        },
+        "vadSensitivity": {
+          "title": "VAD Sensitivity",
+          "description": "Sensitivity for Voice Activity Detection (0.0 to 1.0).",
+          "markdownDescription": "Sensitivity for Voice Activity Detection (0.0 to 1.0).\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `0.5`",
+          "default": 0.5,
+          "type": "number"
+        },
+        "ttsVoice": {
+          "title": "Agent Voice",
+          "description": "The voice used by Gemini for audio responses.",
+          "markdownDescription": "The voice used by Gemini for audio responses.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `Puck`",
+          "default": "Puck",
+          "type": "string",
+          "enum": ["Puck", "Charon", "Kore", "Fenrir"]
+        }
+      },
+      "additionalProperties": false
+    },
     "admin": {
       "title": "Admin",
       "description": "Settings configured remotely by enterprise admins.",

@@ -2270,6 +2270,61 @@ const SETTINGS_SCHEMA = {
     },
   },
 
+  voice: {
+    type: 'object',
+    label: 'Voice Mode',
+    category: 'Experimental',
+    requiresRestart: false,
+    default: {},
+    description:
+      'Settings for the Hands-Free Multimodal Voice Mode (GSoC 2026).',
+    showInDialog: true,
+    properties: {
+      enabled: {
+        type: 'boolean',
+        label: 'Enable Voice Mode',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable the real-time, bidirectional voice interface.',
+        showInDialog: true,
+      },
+      inputDevice: {
+        type: 'string',
+        label: 'Microphone Device',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: 'default',
+        description: 'The name or ID of the microphone to use for voice input.',
+        showInDialog: true,
+      },
+      vadSensitivity: {
+        type: 'number',
+        label: 'VAD Sensitivity',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: 0.5,
+        description: 'Sensitivity for Voice Activity Detection (0.0 to 1.0).',
+        showInDialog: true,
+      },
+      ttsVoice: {
+        type: 'enum',
+        label: 'Agent Voice',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: 'Puck',
+        description: 'The voice used by Gemini for audio responses.',
+        showInDialog: true,
+        options: [
+          { value: 'Puck', label: 'Puck (Default)' },
+          { value: 'Charon', label: 'Charon' },
+          { value: 'Kore', label: 'Kore' },
+          { value: 'Fenrir', label: 'Fenrir' },
+        ],
+      },
+    },
+  },
+
   admin: {
     type: 'object',
     label: 'Admin',
