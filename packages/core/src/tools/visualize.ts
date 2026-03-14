@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import path from 'node:path';
-import fs from 'node:fs';
 import os from 'node:os';
+import fs from 'node:fs';
+import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import type { ToolInvocation, ToolResult } from './tools.js';
@@ -19,7 +19,7 @@ import type {
 } from './visualize/types.js';
 import { parseMermaid } from './visualize/parsers/mermaid-parser.js';
 import { layoutDiagram } from './visualize/layout/dagre-layout.js';
-import { generateDepGraphMermaid } from './visualize/analyzers/dep-graph.js';
+
 import {
   VISUALIZE_DEFINITION,
   VISUALIZE_TOOL_NAME,
@@ -32,7 +32,7 @@ class VisualizeToolInvocation extends BaseToolInvocation<
   ToolResult
 > {
   constructor(
-    private readonly config: Config,
+    _config: Config,
     params: VisualizeToolParams,
     messageBus: MessageBus,
     toolName?: string,
@@ -48,10 +48,6 @@ class VisualizeToolInvocation extends BaseToolInvocation<
     switch (this.params.type) {
       case 'mermaid':
         return 'Rendering Mermaid diagram';
-      case 'dependency_graph':
-        return `Visualizing dependencies from ${this.params.file_path ?? 'manifest'}`;
-      case 'git_history':
-        return 'Visualizing git history';
       case 'html_preview':
         return 'Opening HTML preview in browser';
       default:
@@ -63,10 +59,6 @@ class VisualizeToolInvocation extends BaseToolInvocation<
     switch (this.params.type) {
       case 'mermaid':
         return this.executeMermaid();
-      case 'dependency_graph':
-        return this.executeDependencyGraph();
-      case 'git_history':
-        return this.executeGitHistory();
       case 'html_preview':
         return this.executeHtmlPreview();
       default:
@@ -83,128 +75,6 @@ class VisualizeToolInvocation extends BaseToolInvocation<
   private async executeMermaid(): Promise<ToolResult> {
     const content = this.params.content!;
     return this.renderMermaidContent(content);
-  }
-
-  private async executeDependencyGraph(): Promise<ToolResult> {
-    const filePath = this.params.file_path!;
-    const resolvedPath = path.isAbsolute(filePath)
-      ? filePath
-      : path.resolve(this.config.getTargetDir(), filePath);
-
-    if (!fs.existsSync(resolvedPath)) {
-      return {
-        llmContent: `Error: File not found: ${resolvedPath}`,
-        returnDisplay: `File not found: ${resolvedPath}`,
-        error: { message: `File not found: ${resolvedPath}` },
-      };
-    }
-
-    const mermaidCode = generateDepGraphMermaid(resolvedPath);
-    return this.renderMermaidContent(mermaidCode);
-  }
-
-  private async executeGitHistory(): Promise<ToolResult> {
-    try {
-      // Get recent commits (no stash, no reflog noise)
-      const logOutput = execSync(
-        'git log --all --exclude=refs/stash --format="%h %p %s" -n 10',
-        {
-          cwd: this.config.getTargetDir(),
-          encoding: 'utf8',
-          timeout: 10000,
-        },
-      );
-
-      // Get branch tips for decoration
-      const branchOutput = execSync(
-        'git branch -a --format="%(objectname:short) %(refname:short)"',
-        {
-          cwd: this.config.getTargetDir(),
-          encoding: 'utf8',
-          timeout: 10000,
-        },
-      );
-
-      const branchMap = new Map<string, string[]>();
-      for (const line of branchOutput.trim().split('\n').filter(Boolean)) {
-        const [hash, ...nameParts] = line.split(' ');
-        const name = nameParts.join(' ');
-        if (!branchMap.has(hash)) branchMap.set(hash, []);
-        branchMap.get(hash)!.push(name);
-      }
-
-      const lines = logOutput.trim().split('\n').filter(Boolean);
-      if (lines.length === 0) {
-        return {
-          llmContent: 'No git history found.',
-          returnDisplay: 'No git history found.',
-        };
-      }
-
-      // Parse: format is "shorthash parent1 parent2... subject"
-      const commits: Array<{
-        hash: string;
-        parents: string[];
-        subject: string;
-      }> = [];
-      const allHashes = new Set<string>();
-
-      for (const line of lines) {
-        const parts = line.split(' ');
-        const hash = parts[0];
-        allHashes.add(hash);
-        const parents: string[] = [];
-        let msgStart = 1;
-
-        for (let i = 1; i < parts.length; i++) {
-          if (/^[0-9a-f]{6,}$/.test(parts[i])) {
-            parents.push(parts[i]);
-            msgStart = i + 1;
-          } else {
-            break;
-          }
-        }
-
-        const subject = parts.slice(msgStart).join(' ').slice(0, 25);
-        commits.push({ hash, parents, subject });
-      }
-
-      // Build compact flowchart
-      const mermaidLines = ['graph TD'];
-      const declared = new Set<string>();
-
-      for (const commit of commits) {
-        const id = 'c' + commit.hash;
-        if (!declared.has(id)) {
-          const branches = branchMap.get(commit.hash);
-          const label = branches
-            ? `${commit.hash} ${branches[0]}`
-            : `${commit.hash} ${commit.subject}`;
-          // Use safe chars only
-          const safeLabel = label.replace(/[^\w\s./\->,#]/g, '');
-          mermaidLines.push(`  ${id}[${safeLabel}]`);
-          declared.add(id);
-        }
-
-        for (const parent of commit.parents) {
-          const parentId = 'c' + parent;
-          if (allHashes.has(parent)) {
-            mermaidLines.push(`  ${id} --> ${parentId}`);
-          }
-        }
-      }
-
-      const mermaidCode = mermaidLines.join('\n');
-      return await this.renderMermaidContent(mermaidCode);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to get git history';
-      return {
-        llmContent: `Error: ${message}`,
-        returnDisplay: message,
-        error: { message },
-      };
-    }
   }
 
   private executeHtmlPreview(): ToolResult {
@@ -354,9 +224,6 @@ export class VisualizeTool extends BaseDeclarativeTool<
   ): string | null {
     if (params.type === 'mermaid' && !params.content) {
       return "The 'content' parameter is required when type is 'mermaid'.";
-    }
-    if (params.type === 'dependency_graph' && !params.file_path) {
-      return "The 'file_path' parameter is required when type is 'dependency_graph'.";
     }
     if (params.type === 'html_preview' && !params.html) {
       return "The 'html' parameter is required when type is 'html_preview'.";

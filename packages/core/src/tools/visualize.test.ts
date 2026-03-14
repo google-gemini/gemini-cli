@@ -44,15 +44,6 @@ describe('VisualizeTool', () => {
       );
     });
 
-    it('should reject dependency_graph without file_path', () => {
-      const params: VisualizeToolParams = {
-        type: 'dependency_graph',
-      };
-      expect(() => tool.build(params)).toThrow(
-        "The 'file_path' parameter is required when type is 'dependency_graph'.",
-      );
-    });
-
     it('should reject html_preview without html', () => {
       const params: VisualizeToolParams = {
         type: 'html_preview',
@@ -62,13 +53,6 @@ describe('VisualizeTool', () => {
       );
     });
 
-    it('should accept valid git_history params', () => {
-      const params: VisualizeToolParams = {
-        type: 'git_history',
-      };
-      const invocation = tool.build(params);
-      expect(invocation).toBeDefined();
-    });
   });
 
   describe('execute mermaid', () => {

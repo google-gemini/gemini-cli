@@ -14,10 +14,9 @@ export const VISUALIZE_DEFINITION: ToolDefinition = {
     name: VISUALIZE_TOOL_NAME,
     description:
       'Generates and renders visual diagrams and previews directly in the terminal. ' +
-      'Supports Mermaid diagrams (flowcharts, sequence diagrams, class diagrams, ER diagrams), ' +
-      'dependency graph visualization from package.json/requirements.txt, ' +
-      'git history visualization, and HTML/CSS component previews opened in the browser. ' +
-      'Use this tool when the user asks to explain architecture, visualize dependencies, ' +
+      'Supports Mermaid diagrams (flowcharts, sequence diagrams) ' +
+      'and HTML/CSS component previews opened in the browser. ' +
+      'Use this tool when the user asks to explain architecture, ' +
       'see data flows, or preview generated UI components.',
     parametersJsonSchema: {
       type: 'object',
@@ -25,11 +24,9 @@ export const VISUALIZE_DEFINITION: ToolDefinition = {
         type: {
           description:
             'The type of visualization. "mermaid": render a Mermaid diagram (pass mermaid code in content). ' +
-            '"dependency_graph": visualize dependencies from a manifest file (pass file_path). ' +
-            '"git_history": visualize git commit/branch history. ' +
             '"html_preview": open HTML content in browser (pass html).',
           type: 'string',
-          enum: ['mermaid', 'dependency_graph', 'git_history', 'html_preview'],
+          enum: ['mermaid', 'html_preview'],
         },
         content: {
           description:
@@ -41,11 +38,6 @@ export const VISUALIZE_DEFINITION: ToolDefinition = {
             'Example pipeline:\ngraph LR\n  A[Build] --> B[Test]\n  B --> C[Deploy]\n' +
             'Example linked list:\ngraph LR\n  A[10 | ptr] --> B[20 | ptr] --> C[30 | null]\n' +
             'DO NOT use subgraph, gitGraph, classDiagram, or other advanced syntax. Only flowchart/graph.',
-          type: 'string',
-        },
-        file_path: {
-          description:
-            'Path to dependency manifest file (package.json, requirements.txt, go.mod). Required when type is "dependency_graph".',
           type: 'string',
         },
         html: {

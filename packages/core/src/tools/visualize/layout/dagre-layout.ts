@@ -298,6 +298,10 @@ export function layoutDiagram(
       // Exit below source box, enter above target box
       sourceY = srcNode.y + srcNode.height;
       targetY = tgtNode.y - 1;
+      // If source center falls within target node, keep edge straight vertical
+      if (sCx >= tgtNode.x && sCx <= tgtNode.x + tgtNode.width) {
+        targetX = sourceX;
+      }
     }
 
     const result: DiagramEdge = {

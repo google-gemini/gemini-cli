@@ -67,9 +67,8 @@ export function isBrowserPreview(obj: unknown): obj is BrowserPreview {
 }
 
 export interface VisualizeToolParams {
-  type: 'mermaid' | 'dependency_graph' | 'git_history' | 'html_preview';
+  type: 'mermaid' | 'html_preview';
   content?: string;
-  file_path?: string;
   html?: string;
   title?: string;
   structure?: StructureType;
