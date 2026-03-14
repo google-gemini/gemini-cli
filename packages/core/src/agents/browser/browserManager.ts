@@ -30,6 +30,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { injectAutomationOverlay } from './automationOverlay.js';
+import { recordBrowserAgentConnection } from '../../telemetry/metrics.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -486,7 +487,11 @@ export class BrowserManager {
 
     // Build args for chrome-devtools-mcp
     const browserConfig = this.config.getBrowserAgentConfig();
-    let sessionMode = browserConfig.customConfig.sessionMode ?? 'persistent';
+    const rawSessionMode = browserConfig.customConfig.sessionMode;
+    let sessionMode: 'persistent' | 'isolated' | 'existing' =
+      rawSessionMode === 'isolated' || rawSessionMode === 'existing'
+        ? rawSessionMode
+        : 'persistent';
 
     // Detect sandbox environment.
     // SANDBOX env var is set to 'sandbox-exec' (seatbelt) or the container
@@ -652,6 +657,7 @@ export class BrowserManager {
       sessionMode === 'existing' ? 15_000 : MCP_TIMEOUT_MS;
 
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const connectStartMs = Date.now();
     try {
       await Promise.race([
         (async () => {
@@ -660,6 +666,16 @@ export class BrowserManager {
           await this.discoverTools();
           // clear the action counter for each connection
           this.actionCounter = 0;
+
+          recordBrowserAgentConnection(
+            this.config,
+            Date.now() - connectStartMs,
+            {
+              session_mode: sessionMode,
+              headless: !!browserConfig.customConfig.headless,
+              success: true,
+            },
+          );
         })(),
         new Promise<never>((_, reject) => {
           timeoutId = setTimeout(
@@ -676,11 +692,32 @@ export class BrowserManager {
     } catch (error) {
       await this.close();
 
+      const rawErrorMessage =
+        error instanceof Error ? error.message : String(error);
+      const lowerMessage = rawErrorMessage.toLowerCase();
+      let errorType:
+        | 'profile_locked'
+        | 'timeout'
+        | 'connection_refused'
+        | 'unknown' = 'unknown';
+
+      if (lowerMessage.includes('already running')) {
+        errorType = 'profile_locked';
+      } else if (lowerMessage.includes('timed out')) {
+        errorType = 'timeout';
+      } else if (lowerMessage.includes('connection refused')) {
+        errorType = 'connection_refused';
+      }
+
+      recordBrowserAgentConnection(this.config, Date.now() - connectStartMs, {
+        session_mode: sessionMode,
+        headless: !!browserConfig.customConfig.headless,
+        success: false,
+        error_type: errorType,
+      });
+
       // Provide error-specific, session-mode-aware remediation
-      throw this.createConnectionError(
-        error instanceof Error ? error.message : String(error),
-        sessionMode,
-      );
+      throw this.createConnectionError(rawErrorMessage, sessionMode);
     } finally {
       if (timeoutId !== undefined) {
         clearTimeout(timeoutId);
