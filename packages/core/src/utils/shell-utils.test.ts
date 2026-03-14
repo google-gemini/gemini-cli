@@ -17,6 +17,8 @@ import {
   escapeShellArg,
   getCommandRoots,
   getShellConfiguration,
+  setConfiguredShell,
+  getConfiguredShell,
   initializeShellParsers,
   parseCommandDetails,
   stripShellWrapper,
@@ -468,6 +470,126 @@ describe('getShellConfiguration', () => {
       expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
       expect(config.shell).toBe('powershell');
     });
+  });
+
+  describe('with configured shell override', () => {
+    afterEach(() => {
+      // Reset the configured shell after each test
+      setConfiguredShell(null);
+    });
+
+    it('should use configured bash shell instead of platform default on Windows', () => {
+      mockPlatform.mockReturnValue('win32');
+      setConfiguredShell({
+        executable: 'bash',
+        args: ['-c'],
+      });
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('bash');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash');
+    });
+
+    it('should use configured GitBash path on Windows', () => {
+      mockPlatform.mockReturnValue('win32');
+      setConfiguredShell({
+        executable: 'C:\\Program Files\\Git\\bin\\bash.exe',
+        args: ['-c'],
+      });
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('C:\\Program Files\\Git\\bin\\bash.exe');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash');
+    });
+
+    it('should use configured zsh shell on macOS', () => {
+      mockPlatform.mockReturnValue('darwin');
+      setConfiguredShell({
+        executable: '/bin/zsh',
+        args: ['-c'],
+      });
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('/bin/zsh');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash'); // zsh is treated as bash-like
+    });
+
+    it('should use configured pwsh on Linux', () => {
+      mockPlatform.mockReturnValue('linux');
+      setConfiguredShell({
+        executable: 'pwsh',
+        args: ['-NoProfile', '-Command'],
+      });
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('pwsh');
+      expect(config.argsPrefix).toEqual(['-NoProfile', '-Command']);
+      expect(config.shell).toBe('powershell');
+    });
+
+    it('should fall back to platform default when configured shell is cleared', () => {
+      mockPlatform.mockReturnValue('linux');
+      setConfiguredShell({
+        executable: 'zsh',
+        args: ['-c'],
+      });
+      expect(getShellConfiguration().executable).toBe('zsh');
+
+      setConfiguredShell(null);
+      const config = getShellConfiguration();
+      expect(config.executable).toBe('bash');
+      expect(config.argsPrefix).toEqual(['-c']);
+      expect(config.shell).toBe('bash');
+    });
+
+    it('should correctly infer powershell type from executable name', () => {
+      mockPlatform.mockReturnValue('linux');
+      setConfiguredShell({
+        executable: 'powershell',
+        args: ['-Command'],
+      });
+      expect(getShellConfiguration().shell).toBe('powershell');
+    });
+
+    it('should correctly infer bash type for unknown shells', () => {
+      mockPlatform.mockReturnValue('linux');
+      setConfiguredShell({
+        executable: 'fish',
+        args: ['-c'],
+      });
+      // Unknown shells default to bash type
+      expect(getShellConfiguration().shell).toBe('bash');
+    });
+  });
+});
+
+describe('setConfiguredShell and getConfiguredShell', () => {
+  afterEach(() => {
+    setConfiguredShell(null);
+  });
+
+  it('should return null when no shell is configured', () => {
+    setConfiguredShell(null);
+    expect(getConfiguredShell()).toBeNull();
+  });
+
+  it('should return the configured shell', () => {
+    const shellConfig = {
+      executable: 'bash',
+      args: ['-c'],
+    };
+    setConfiguredShell(shellConfig);
+    expect(getConfiguredShell()).toEqual(shellConfig);
+  });
+
+  it('should allow clearing the configured shell with undefined', () => {
+    setConfiguredShell({
+      executable: 'bash',
+      args: ['-c'],
+    });
+    expect(getConfiguredShell()).not.toBeNull();
+
+    setConfiguredShell(undefined);
+    expect(getConfiguredShell()).toBeNull();
   });
 });
 

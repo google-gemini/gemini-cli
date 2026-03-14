@@ -37,6 +37,7 @@ import {
   resolveToRealPath,
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
+  setConfiguredShell,
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
@@ -430,6 +431,19 @@ export async function loadCliConfig(
   const debugMode = isDebugMode(argv);
 
   const loadedSettings = loadSettings(cwd);
+
+  // Configure the shell based on user settings.
+  // This allows users (especially on Windows) to override the default shell.
+  const shellSettings = settings.tools?.shell;
+  if (shellSettings?.executable) {
+    setConfiguredShell({
+      executable: shellSettings.executable,
+      args: shellSettings.args,
+    });
+  } else {
+    // Clear any previously configured shell to use platform defaults
+    setConfiguredShell(null);
+  }
 
   if (argv.sandbox) {
     process.env['GEMINI_SANDBOX'] = 'true';
