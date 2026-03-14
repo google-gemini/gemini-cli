@@ -9,7 +9,7 @@ import { evalTest } from './test-helper.js';
 import {
   assertModelHasOutput,
   checkModelOutputContent,
-} from '../integration-tests/test-helper.js';
+} from '@google/gemini-cli-test-utils';
 
 describe('save_memory', () => {
   const TEST_PREFIX = 'Save memory test: ';

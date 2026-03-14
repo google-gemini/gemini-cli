@@ -6,7 +6,7 @@
 
 import { describe, expect } from 'vitest';
 import { evalTest } from './test-helper.js';
-import { assertModelHasOutput } from '../integration-tests/test-helper.js';
+import { assertModelHasOutput } from '@google/gemini-cli-test-utils';
 
 describe('Hierarchical Memory', () => {
   const conflictResolutionTest =
