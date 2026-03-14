@@ -57,7 +57,12 @@ export async function getEnvironmentContext(config: Config): Promise<Part[]> {
     ? await getDirectoryContextString(config)
     : '';
   const tempDir = config.storage.getProjectTempDir();
-  const environmentMemory = config.getEnvironmentMemory();
+  // When JIT context is enabled, project memory is already included in the
+  // system instruction via renderUserMemory(). Skip it here to avoid sending
+  // the same GEMINI.md content twice.
+  const environmentMemory = config.isJitContextEnabled?.()
+    ? ''
+    : config.getEnvironmentMemory();
 
   const context = `
 <session_context>
