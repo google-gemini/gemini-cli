@@ -49,7 +49,7 @@ export function computeNodeDimensions(label: string): {
 
 // Gap between nodes (in characters)
 const NODE_GAP_H = 3;
-const NODE_GAP_V = 1;
+const NODE_GAP_V = 2;
 
 /**
  * Use dagre for topological ordering, then compact placement in char coords.
@@ -68,7 +68,11 @@ export function layoutDiagram(
 
   for (const node of nodes) {
     const dims = computeNodeDimensions(node.label);
-    g.setNode(node.id, { label: node.label, width: dims.width, height: dims.height });
+    g.setNode(node.id, {
+      label: node.label,
+      width: dims.width,
+      height: dims.height,
+    });
   }
   for (const edge of edges) {
     g.setEdge(edge.source, edge.target, { label: edge.label ?? '' });
@@ -77,34 +81,48 @@ export function layoutDiagram(
   dagre.layout(g);
 
   // Group nodes by rank (dagre assigns y-rank for TB, x-rank for LR)
-  const nodeInfos = nodes.map((n) => {
-    const dn = g.node(n.id);
-    return { input: n, dagreX: dn.x, dagreY: dn.y };
+  interface NodeInfo {
+    input: LayoutInput;
+    dagreX: number;
+    dagreY: number;
+  }
+  const nodeInfos: NodeInfo[] = nodes.map((n) => {
+    const dn: unknown = g.node(n.id);
+    const dnObj =
+      typeof dn === 'object' && dn !== null && 'x' in dn && 'y' in dn
+        ? {
+            x: Number((dn as Record<string, unknown>).x),
+            y: Number((dn as Record<string, unknown>).y),
+          }
+        : { x: 0, y: 0 };
+    return { input: n, dagreX: dnObj.x, dagreY: dnObj.y };
   });
 
-  // Determine rank grouping axis
-  const rankKey = isHorizontal ? 'dagreX' : 'dagreY';
-  const crossKey = isHorizontal ? 'dagreY' : 'dagreX';
+  // Helper to get rank/cross axis values
+  const getRankVal = (ni: NodeInfo): number =>
+    isHorizontal ? ni.dagreX : ni.dagreY;
+  const getCrossVal = (ni: NodeInfo): number =>
+    isHorizontal ? ni.dagreY : ni.dagreX;
 
   // Quantize ranks: nodes with similar rank values belong to the same rank
-  const sorted = [...nodeInfos].sort((a, b) => a[rankKey] - b[rankKey]);
-  const ranks: typeof nodeInfos[] = [];
+  const sorted = [...nodeInfos].sort((a, b) => getRankVal(a) - getRankVal(b));
+  const ranks: Array<typeof nodeInfos> = [];
   let currentRank: typeof nodeInfos = [];
   let lastVal = -Infinity;
 
   for (const ni of sorted) {
-    if (ni[rankKey] - lastVal > 1) {
+    if (getRankVal(ni) - lastVal > 1) {
       if (currentRank.length > 0) ranks.push(currentRank);
       currentRank = [];
     }
     currentRank.push(ni);
-    lastVal = ni[rankKey];
+    lastVal = getRankVal(ni);
   }
   if (currentRank.length > 0) ranks.push(currentRank);
 
   // Sort nodes within each rank by cross-axis position
   for (const rank of ranks) {
-    rank.sort((a, b) => a[crossKey] - b[crossKey]);
+    rank.sort((a, b) => getCrossVal(a) - getCrossVal(b));
   }
 
   // Place nodes compactly in character coordinates
@@ -176,12 +194,10 @@ export function layoutDiagram(
       // Exit right side of source, enter left side of target
       sourceX = srcNode.x + srcNode.width;
       targetX = tgtNode.x - 1;
-      // Keep Y at center
     } else {
-      // Exit bottom of source, enter top of target
+      // Exit below source box, enter above target box
       sourceY = srcNode.y + srcNode.height;
       targetY = tgtNode.y - 1;
-      // Keep X at center
     }
 
     const result: DiagramEdge = {

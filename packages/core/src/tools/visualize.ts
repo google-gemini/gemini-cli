@@ -103,20 +103,99 @@ class VisualizeToolInvocation extends BaseToolInvocation<
     return this.renderMermaidContent(mermaidCode);
   }
 
-  private executeGitHistory(): ToolResult {
+  private async executeGitHistory(): Promise<ToolResult> {
     try {
-      const output = execSync(
-        'git log --oneline --graph --all --decorate -n 30',
+      // Get recent commits (no stash, no reflog noise)
+      const logOutput = execSync(
+        'git log --all --exclude=refs/stash --format="%h %p %s" -n 10',
         {
           cwd: this.config.getTargetDir(),
           encoding: 'utf8',
           timeout: 10000,
         },
       );
-      return {
-        llmContent: output,
-        returnDisplay: output,
-      };
+
+      // Get branch tips for decoration
+      const branchOutput = execSync(
+        'git branch -a --format="%(objectname:short) %(refname:short)"',
+        {
+          cwd: this.config.getTargetDir(),
+          encoding: 'utf8',
+          timeout: 10000,
+        },
+      );
+
+      const branchMap = new Map<string, string[]>();
+      for (const line of branchOutput.trim().split('\n').filter(Boolean)) {
+        const [hash, ...nameParts] = line.split(' ');
+        const name = nameParts.join(' ');
+        if (!branchMap.has(hash)) branchMap.set(hash, []);
+        branchMap.get(hash)!.push(name);
+      }
+
+      const lines = logOutput.trim().split('\n').filter(Boolean);
+      if (lines.length === 0) {
+        return {
+          llmContent: 'No git history found.',
+          returnDisplay: 'No git history found.',
+        };
+      }
+
+      // Parse: format is "shorthash parent1 parent2... subject"
+      const commits: Array<{
+        hash: string;
+        parents: string[];
+        subject: string;
+      }> = [];
+      const allHashes = new Set<string>();
+
+      for (const line of lines) {
+        const parts = line.split(' ');
+        const hash = parts[0];
+        allHashes.add(hash);
+        const parents: string[] = [];
+        let msgStart = 1;
+
+        for (let i = 1; i < parts.length; i++) {
+          if (/^[0-9a-f]{6,}$/.test(parts[i])) {
+            parents.push(parts[i]);
+            msgStart = i + 1;
+          } else {
+            break;
+          }
+        }
+
+        const subject = parts.slice(msgStart).join(' ').slice(0, 25);
+        commits.push({ hash, parents, subject });
+      }
+
+      // Build compact flowchart
+      const mermaidLines = ['graph TD'];
+      const declared = new Set<string>();
+
+      for (const commit of commits) {
+        const id = 'c' + commit.hash;
+        if (!declared.has(id)) {
+          const branches = branchMap.get(commit.hash);
+          const label = branches
+            ? `${commit.hash} ${branches[0]}`
+            : `${commit.hash} ${commit.subject}`;
+          // Use safe chars only
+          const safeLabel = label.replace(/[^\w\s./\->,#]/g, '');
+          mermaidLines.push(`  ${id}[${safeLabel}]`);
+          declared.add(id);
+        }
+
+        for (const parent of commit.parents) {
+          const parentId = 'c' + parent;
+          if (allHashes.has(parent)) {
+            mermaidLines.push(`  ${id} --> ${parentId}`);
+          }
+        }
+      }
+
+      const mermaidCode = mermaidLines.join('\n');
+      return await this.renderMermaidContent(mermaidCode);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Failed to get git history';

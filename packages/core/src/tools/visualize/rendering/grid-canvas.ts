@@ -93,7 +93,10 @@ export class GridCanvas {
     const dx = targetX - sourceX;
     const dy = targetY - sourceY;
 
-    if (dy === 0) {
+    if (dx === 0 && dy === 0) {
+      // Same point, nothing to draw
+      return;
+    } else if (dy === 0) {
       // Horizontal edge
       const dir = dx > 0 ? 1 : -1;
       for (let x = sourceX; dir > 0 ? x < targetX : x > targetX; x += dir) {
@@ -107,34 +110,79 @@ export class GridCanvas {
         this.setCellIfEmpty(sourceX, y, vChar);
       }
       this.setCellIfEmpty(targetX, targetY, dy > 0 ? '↓' : '↑');
-    } else {
-      // L-shaped: vertical first (from source), then horizontal (to target)
-      const hDir = dx > 0 ? 1 : -1;
+    } else if (Math.abs(dy) > Math.abs(dx)) {
+      // Primarily vertical: go down from source, then horizontal jog at midpoint, then down to target
       const vDir = dy > 0 ? 1 : -1;
+      const hDir = dx > 0 ? 1 : -1;
+      const midY = Math.round((sourceY + targetY) / 2);
 
-      // Vertical segment from source down/up to target's row
+      // Vertical from source to midY
+      for (let y = sourceY; vDir > 0 ? y < midY : y > midY; y += vDir) {
+        this.setCellIfEmpty(sourceX, y, vChar);
+      }
+      // Corner at (sourceX, midY)
+      this.setCellIfEmpty(
+        sourceX,
+        midY,
+        hDir > 0 && vDir > 0
+          ? '└'
+          : hDir < 0 && vDir > 0
+            ? '┘'
+            : hDir > 0 && vDir < 0
+              ? '┌'
+              : '┐',
+      );
+      // Horizontal from sourceX to targetX at midY
       for (
-        let y = sourceY;
+        let x = sourceX + hDir;
+        hDir > 0 ? x < targetX : x > targetX;
+        x += hDir
+      ) {
+        this.setCellIfEmpty(x, midY, hChar);
+      }
+      // Corner at (targetX, midY)
+      this.setCellIfEmpty(
+        targetX,
+        midY,
+        hDir > 0 && vDir > 0
+          ? '┐'
+          : hDir < 0 && vDir > 0
+            ? '┌'
+            : hDir > 0 && vDir < 0
+              ? '┘'
+              : '└',
+      );
+      // Vertical from midY to target
+      for (
+        let y = midY + vDir;
         vDir > 0 ? y < targetY : y > targetY;
         y += vDir
       ) {
+        this.setCellIfEmpty(targetX, y, vChar);
+      }
+      this.setCellIfEmpty(targetX, targetY, vDir > 0 ? '↓' : '↑');
+    } else {
+      // Primarily horizontal: vertical first, then horizontal
+      const hDir = dx > 0 ? 1 : -1;
+      const vDir = dy > 0 ? 1 : -1;
+
+      // Vertical segment from source to target's row
+      for (let y = sourceY; vDir > 0 ? y < targetY : y > targetY; y += vDir) {
         this.setCellIfEmpty(sourceX, y, vChar);
       }
-
-      // Corner at (sourceX, targetY)
-      let corner: string;
-      if (hDir > 0 && vDir > 0) {
-        corner = '└';
-      } else if (hDir < 0 && vDir > 0) {
-        corner = '┘';
-      } else if (hDir > 0 && vDir < 0) {
-        corner = '┌';
-      } else {
-        corner = '┐';
-      }
-      this.setCellIfEmpty(sourceX, targetY, corner);
-
-      // Horizontal segment from corner to target
+      // Corner
+      this.setCellIfEmpty(
+        sourceX,
+        targetY,
+        hDir > 0 && vDir > 0
+          ? '└'
+          : hDir < 0 && vDir > 0
+            ? '┘'
+            : hDir > 0 && vDir < 0
+              ? '┌'
+              : '┐',
+      );
+      // Horizontal to target
       for (
         let x = sourceX + hDir;
         hDir > 0 ? x < targetX : x > targetX;
@@ -142,8 +190,6 @@ export class GridCanvas {
       ) {
         this.setCellIfEmpty(x, targetY, hChar);
       }
-
-      // Arrow head
       this.setCellIfEmpty(targetX, targetY, hDir > 0 ? '→' : '←');
     }
 
@@ -159,7 +205,12 @@ export class GridCanvas {
 
   toString(): string {
     return this.grid
-      .map((row) => row.map((cell) => cell.char).join('').trimEnd())
+      .map((row) =>
+        row
+          .map((cell) => cell.char)
+          .join('')
+          .trimEnd(),
+      )
       .join('\n');
   }
 
