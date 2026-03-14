@@ -37,113 +37,175 @@ function detectDiagramType(code: string): ParsedDiagram['diagramType'] {
   return 'flowchart';
 }
 
+type NodeShape = ParsedDiagram['nodes'][0]['shape'];
+
 /**
- * Detect node shape from bracket syntax.
+ * Parse a single node token like: A, A[text], A["text"], A(text), A{text}, A((text)), A([text])
  */
-function parseNodeDeclaration(raw: string): {
+function parseNodeToken(raw: string): {
   id: string;
   label: string;
-  shape: ParsedDiagram['nodes'][0]['shape'];
+  shape: NodeShape;
 } | null {
-  // Order matters: check multi-char brackets before single-char ones.
+  const s = raw.trim();
+  if (!s) return null;
 
   // Stadium: A([text])
-  let m = raw.match(/^(\w+)\(\[(.+?)\]\)$/);
+  let m = s.match(/^(\w+)\(\[(.+?)\]\)$/);
   if (m) return { id: m[1], label: m[2], shape: 'stadium' };
 
   // Circle: A((text))
-  m = raw.match(/^(\w+)\(\((.+?)\)\)$/);
+  m = s.match(/^(\w+)\(\((.+?)\)\)$/);
   if (m) return { id: m[1], label: m[2], shape: 'circle' };
 
-  // Diamond: A{text}
-  m = raw.match(/^(\w+)\{(.+?)\}$/);
+  // Diamond: A{text} or A{"text"}
+  m = s.match(/^(\w+)\{"?(.+?)"?\}$/);
   if (m) return { id: m[1], label: m[2], shape: 'diamond' };
 
-  // Rounded: A(text)
-  m = raw.match(/^(\w+)\((.+?)\)$/);
+  // Rounded: A(text) or A("text")
+  m = s.match(/^(\w+)\("?(.+?)"?\)$/);
   if (m) return { id: m[1], label: m[2], shape: 'rounded' };
 
-  // Rect: A[text]
-  m = raw.match(/^(\w+)\[(.+?)\]$/);
+  // Rect: A[text] or A["text"]
+  m = s.match(/^(\w+)\["?(.+?)"?\]$/);
   if (m) return { id: m[1], label: m[2], shape: 'rect' };
 
   // Bare id (no brackets)
-  m = raw.match(/^(\w+)$/);
+  m = s.match(/^(\w+)$/);
   if (m) return { id: m[1], label: m[1], shape: 'rect' };
 
   return null;
+}
+
+interface EdgeToken {
+  arrow: string;
+  label?: string;
+}
+
+/**
+ * Determine edge style from arrow string.
+ */
+function arrowStyle(arrow: string): 'solid' | 'dotted' | 'thick' {
+  if (arrow.startsWith('-.') || arrow.startsWith('-..')) return 'dotted';
+  if (arrow.startsWith('==')) return 'thick';
+  return 'solid';
+}
+
+/**
+ * Split a line into alternating node-tokens and edge-tokens.
+ * Supports chained edges: A --> B --> C
+ * Returns array like [nodeStr, edgeToken, nodeStr, edgeToken, nodeStr, ...]
+ */
+function tokenizeLine(
+  line: string,
+): { nodes: string[]; edgeTokens: EdgeToken[] } | null {
+  const nodes: string[] = [];
+  const edgeTokens: EdgeToken[] = [];
+
+  let remaining = line;
+
+  while (remaining.length > 0) {
+    remaining = remaining.trimStart();
+    if (!remaining) break;
+
+    // Try to find next arrow
+    const arrowMatch = remaining.match(
+      /\s+(==>|===?>|-\.->|-\.\.->|-->|---|--)\s*(?:\|([^|]*)\|)?\s*/,
+    );
+
+    if (!arrowMatch || arrowMatch.index === undefined) {
+      // No more arrows - rest is the last node
+      nodes.push(remaining.trim());
+      break;
+    }
+
+    // Everything before the arrow is a node
+    const nodeStr = remaining.slice(0, arrowMatch.index).trim();
+    if (nodeStr) {
+      nodes.push(nodeStr);
+    }
+
+    edgeTokens.push({
+      arrow: arrowMatch[1],
+      label: arrowMatch[2]?.trim() || undefined,
+    });
+
+    remaining = remaining.slice(arrowMatch.index + arrowMatch[0].length);
+  }
+
+  if (nodes.length < 2 && edgeTokens.length > 0) return null;
+  if (edgeTokens.length === 0 && nodes.length === 1) {
+    return { nodes, edgeTokens: [] };
+  }
+  if (edgeTokens.length === 0) return null;
+
+  return { nodes, edgeTokens };
 }
 
 /**
  * Parse a flowchart from Mermaid text.
  */
 function parseFlowchart(code: string): ParsedDiagram {
-  const nodes = new Map<
+  const nodeMap = new Map<
     string,
-    { id: string; label: string; shape: ParsedDiagram['nodes'][0]['shape'] }
+    { id: string; label: string; shape: NodeShape }
   >();
   const edges: ParsedDiagram['edges'] = [];
+
+  function ensureNode(raw: string): string {
+    const parsed = parseNodeToken(raw);
+    if (parsed) {
+      if (!nodeMap.has(parsed.id)) nodeMap.set(parsed.id, parsed);
+      return parsed.id;
+    }
+    // Fallback: use raw as id
+    const fallbackId = raw.replace(/[^\w]/g, '_');
+    if (!nodeMap.has(fallbackId)) {
+      nodeMap.set(fallbackId, { id: fallbackId, label: raw, shape: 'rect' });
+    }
+    return fallbackId;
+  }
 
   const lines = code.split('\n');
 
   for (const rawLine of lines) {
     const line = rawLine.trim();
 
-    // Skip the header line (graph LR, graph TD, flowchart LR, etc.)
+    // Skip headers, empty lines, comments, directives
     if (/^(graph|flowchart)\s/i.test(line)) continue;
-    // Skip empty lines and comments
     if (!line || line.startsWith('%%')) continue;
-    // Skip style/class directives
-    if (/^(style|class|click|subgraph|end)\b/i.test(line)) continue;
+    if (/^(style|class|click|subgraph|end|linkStyle)\b/i.test(line)) continue;
 
-    // Try to parse as an edge line.
-    // Pattern: NodeA -->|label| NodeB  or  NodeA --> NodeB
-    // Edge types: --> (solid), -.-> (dotted), ==> (thick)
-    const edgeRegex = /^(.+?)\s+(==>|-->|-.->)\s*(?:\|([^|]*)\|)?\s*(.+)$/;
-    const edgeMatch = line.match(edgeRegex);
-
-    if (edgeMatch) {
-      const sourceRaw = edgeMatch[1].trim();
-      const edgeType = edgeMatch[2];
-      const label = edgeMatch[3]?.trim();
-      const targetRaw = edgeMatch[4].trim();
-
-      const sourceNode = parseNodeDeclaration(sourceRaw);
-      const targetNode = parseNodeDeclaration(targetRaw);
-
-      if (sourceNode) {
-        if (!nodes.has(sourceNode.id)) nodes.set(sourceNode.id, sourceNode);
+    const tokens = tokenizeLine(line);
+    if (!tokens || tokens.edgeTokens.length === 0) {
+      // Try as standalone node
+      const raw = tokens?.nodes[0] ?? line;
+      const node = parseNodeToken(raw);
+      if (node && !nodeMap.has(node.id)) {
+        nodeMap.set(node.id, node);
       }
-      if (targetNode) {
-        if (!nodes.has(targetNode.id)) nodes.set(targetNode.id, targetNode);
-      }
+      continue;
+    }
 
-      const sourceId = sourceNode?.id ?? sourceRaw;
-      const targetId = targetNode?.id ?? targetRaw;
-
-      let style: 'solid' | 'dotted' | 'thick' = 'solid';
-      if (edgeType === '-.->') style = 'dotted';
-      else if (edgeType === '==>') style = 'thick';
+    // Create edges for each consecutive pair
+    for (let i = 0; i < tokens.edgeTokens.length; i++) {
+      const sourceId = ensureNode(tokens.nodes[i]);
+      const targetId = ensureNode(tokens.nodes[i + 1]);
+      const et = tokens.edgeTokens[i];
 
       const edge: ParsedDiagram['edges'][0] = {
         source: sourceId,
         target: targetId,
-        style,
+        style: arrowStyle(et.arrow),
       };
-      if (label) edge.label = label;
+      if (et.label) edge.label = et.label;
       edges.push(edge);
-    } else {
-      // Try to parse as standalone node declaration
-      const node = parseNodeDeclaration(line);
-      if (node && !nodes.has(node.id)) {
-        nodes.set(node.id, node);
-      }
     }
   }
 
   return {
     diagramType: 'flowchart',
-    nodes: Array.from(nodes.values()),
+    nodes: Array.from(nodeMap.values()),
     edges,
   };
 }
@@ -154,7 +216,7 @@ function parseFlowchart(code: string): ParsedDiagram {
 function parseSequenceDiagram(code: string): ParsedDiagram {
   const participants = new Map<
     string,
-    { id: string; label: string; shape: ParsedDiagram['nodes'][0]['shape'] }
+    { id: string; label: string; shape: NodeShape }
   >();
   const edges: ParsedDiagram['edges'] = [];
 

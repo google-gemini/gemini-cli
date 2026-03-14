@@ -91,8 +91,8 @@ export function layoutDiagram(
     const dnObj =
       typeof dn === 'object' && dn !== null && 'x' in dn && 'y' in dn
         ? {
-            x: Number((dn as Record<string, unknown>).x),
-            y: Number((dn as Record<string, unknown>).y),
+            x: Number((dn as Record<string, unknown>)['x']),
+            y: Number((dn as Record<string, unknown>)['y']),
           }
         : { x: 0, y: 0 };
     return { input: n, dagreX: dnObj.x, dagreY: dnObj.y };
