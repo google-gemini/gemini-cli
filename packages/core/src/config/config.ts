@@ -318,6 +318,15 @@ export interface BrowserAgentCustomConfig {
   visualModel?: string;
   /** Disable user input on the browser window during automation. Default: true in non-headless mode */
   disableUserInput?: boolean;
+  /**
+   * Show visual cursor animations (click ripple, scroll indicator) in the browser
+   * viewport during automation. Skipped automatically in headless mode.
+   * Default: true in non-headless mode.
+   *
+   * IMPORTANT: Keep in sync with the browser settings schema in
+   * packages/cli/src/config/settingsSchema.ts (agents.browser.properties).
+   */
+  showCursorAnimations?: boolean;
 }
 
 /**
@@ -2903,6 +2912,7 @@ export class Config implements McpContext, AgentLoopContext {
         profilePath: customConfig.profilePath,
         visualModel: customConfig.visualModel,
         disableUserInput: customConfig.disableUserInput,
+        showCursorAnimations: customConfig.showCursorAnimations,
       },
     };
   }
