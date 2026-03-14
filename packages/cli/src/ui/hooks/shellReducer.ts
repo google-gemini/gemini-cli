@@ -5,6 +5,10 @@
  */
 
 import type { AnsiOutput } from '@google/gemini-cli-core';
+import {
+  MAX_SHELL_OUTPUT_SIZE,
+  SHELL_OUTPUT_TRUNCATION_BUFFER,
+} from '../constants.js';
 
 export interface BackgroundShell {
   pid: number;
@@ -94,11 +98,33 @@ export function shellReducer(
       // to avoid re-rendering if the drawer is not visible.
       // This is an intentional performance optimization for the CLI.
       let newOutput = shell.output;
-      if (typeof action.chunk === 'string') {
-        newOutput =
-          typeof shell.output === 'string'
-            ? shell.output + action.chunk
-            : action.chunk;
+      if (action.chunk) {
+        if (typeof action.chunk === 'string') {
+          // Check combined length BEFORE concatenation — the + operator itself
+          // can throw if the resulting string would exceed ~1 GB.
+          const currentOutput =
+            typeof shell.output === 'string' ? shell.output : '';
+          const combinedLength = currentOutput.length + action.chunk.length;
+
+          if (
+            combinedLength >
+            MAX_SHELL_OUTPUT_SIZE + SHELL_OUTPUT_TRUNCATION_BUFFER
+          ) {
+            // Truncate currentOutput so that after appending the chunk the
+            // result is exactly MAX_SHELL_OUTPUT_SIZE characters.
+            const keepCurrentLength = Math.max(
+              0,
+              MAX_SHELL_OUTPUT_SIZE - action.chunk.length,
+            );
+            newOutput =
+              currentOutput.slice(currentOutput.length - keepCurrentLength) +
+              action.chunk;
+          } else {
+            newOutput = currentOutput + action.chunk;
+          }
+        } else {
+          newOutput = action.chunk;
+        }
       } else {
         newOutput = action.chunk;
       }
