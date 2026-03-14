@@ -17,18 +17,12 @@ import { ToolMessage } from './ToolMessage.js';
 import { ShellToolMessage } from './ShellToolMessage.js';
 import { theme } from '../../semantic-colors.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
-import { isShellTool, isThisShellFocused } from './ToolShared.js';
+import { isShellTool } from './ToolShared.js';
 import {
   shouldHideToolCall,
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
-import { ShowMoreLines } from '../ShowMoreLines.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
-import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
-import {
-  calculateShellMaxLines,
-  calculateToolContentMaxLines,
-} from '../../utils/toolLayoutUtils.js';
 import { getToolGroupBorderAppearance } from '../../utils/borderStyles.js';
 import { useSettings } from '../../contexts/SettingsContext.js';
 
@@ -83,13 +77,11 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   const config = useConfig();
   const {
-    constrainHeight,
     activePtyId,
     embeddedShellFocused,
     backgroundShells,
     pendingHistoryItems,
   } = useUIState();
-  const isAlternateBuffer = useAlternateBuffer();
 
   const { borderColor, borderDimColor } = useMemo(
     () =>
@@ -118,10 +110,11 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     () =>
       toolCalls.filter((t) => {
         const displayStatus = mapCoreStatusToDisplayStatus(t.status);
-        return (
-          displayStatus !== ToolCallStatus.Pending &&
-          displayStatus !== ToolCallStatus.Confirming
-        );
+        // We used to filter out Pending and Confirming statuses here to avoid
+        // duplication with the Global Queue, but this causes tools to appear to
+        // "vanish" from the context after approval.
+        // We now allow them to be visible here as well.
+        return displayStatus !== ToolCallStatus.Canceled;
       }),
 
     [toolCalls],
@@ -149,77 +142,15 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
 
   const contentWidth = terminalWidth - TOOL_MESSAGE_HORIZONTAL_MARGIN;
 
-  /*
-   * ToolGroupMessage calculates its own overflow state locally and passes
-   * it as a prop to ShowMoreLines. This isolates it from global overflow
-   * reports in ASB mode, while allowing it to contribute to the global
-   * 'Toast' hint in Standard mode.
-   *
-   * Because of this prop-based isolation and the explicit mode-checks in
-   * AppContainer, we do not need to shadow the OverflowProvider here.
-   */
-  const hasOverflow = useMemo(() => {
-    if (!availableTerminalHeightPerToolMessage) return false;
-    return visibleToolCalls.some((tool) => {
-      const isShellToolCall = isShellTool(tool.name);
-      const isFocused = isThisShellFocused(
-        tool.name,
-        tool.status,
-        tool.ptyId,
-        activePtyId,
-        embeddedShellFocused,
-      );
-
-      let maxLines: number | undefined;
-
-      if (isShellToolCall) {
-        maxLines = calculateShellMaxLines({
-          status: tool.status,
-          isAlternateBuffer,
-          isThisShellFocused: isFocused,
-          availableTerminalHeight: availableTerminalHeightPerToolMessage,
-          constrainHeight,
-          isExpandable,
-        });
-      }
-
-      // Standard tools and Shell tools both eventually use ToolResultDisplay's logic.
-      // ToolResultDisplay uses calculateToolContentMaxLines to find the final line budget.
-      const contentMaxLines = calculateToolContentMaxLines({
-        availableTerminalHeight: availableTerminalHeightPerToolMessage,
-        isAlternateBuffer,
-        maxLinesLimit: maxLines,
-      });
-
-      if (!contentMaxLines) return false;
-
-      if (typeof tool.resultDisplay === 'string') {
-        const text = tool.resultDisplay;
-        const hasTrailingNewline = text.endsWith('\n');
-        const contentText = hasTrailingNewline ? text.slice(0, -1) : text;
-        const lineCount = contentText.split('\n').length;
-        return lineCount > contentMaxLines;
-      }
-      if (Array.isArray(tool.resultDisplay)) {
-        return tool.resultDisplay.length > contentMaxLines;
-      }
-      return false;
-    });
-  }, [
-    visibleToolCalls,
-    availableTerminalHeightPerToolMessage,
-    activePtyId,
-    embeddedShellFocused,
-    isAlternateBuffer,
-    constrainHeight,
-    isExpandable,
-  ]);
-
-  // If all tools are filtered out (e.g., in-progress AskUser tools, confirming tools),
-  // only render if we need to close a border from previous
-  // tool groups. borderBottomOverride=true means we must render the closing border;
-  // undefined or false means there's nothing to display.
-  if (visibleToolCalls.length === 0 && borderBottomOverride !== true) {
+  // If all tools are filtered out (e.g., in-progress AskUser tools, low-verbosity
+  // internal errors, plan-mode hidden write/edit), we should not emit standalone
+  // border fragments. The only case where an empty group should render is the
+  // explicit "closing slice" (tools: []) used to bridge static/pending sections.
+  const isExplicitClosingSlice = allToolCalls.length === 0;
+  if (
+    visibleToolCalls.length === 0 &&
+    (!isExplicitClosingSlice || borderBottomOverride !== true)
+  ) {
     return null;
   }
 
@@ -307,12 +238,6 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           />
         )
       }
-      {(borderBottomOverride ?? true) && visibleToolCalls.length > 0 && (
-        <ShowMoreLines
-          constrainHeight={constrainHeight && !!isExpandable}
-          isOverflowing={hasOverflow}
-        />
-      )}
     </Box>
   );
 

@@ -35,6 +35,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     ShellExecutionService: {
       resizePty: vi.fn(),
       subscribe: vi.fn(() => vi.fn()),
+      getLogFilePath: vi.fn(
+        (pid) => `~/.gemini/tmp/background-processes/background-${pid}.log`,
+      ),
+      getLogDir: vi.fn(() => '~/.gemini/tmp/background-processes'),
     },
   };
 });
@@ -222,7 +226,7 @@ describe('<BackgroundShellDisplay />', () => {
     expect(ShellExecutionService.resizePty).toHaveBeenCalledWith(
       shell1.pid,
       76,
-      21,
+      20,
     );
 
     rerender(
@@ -242,7 +246,7 @@ describe('<BackgroundShellDisplay />', () => {
     expect(ShellExecutionService.resizePty).toHaveBeenCalledWith(
       shell1.pid,
       96,
-      27,
+      26,
     );
     unmount();
   });

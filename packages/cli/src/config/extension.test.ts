@@ -31,6 +31,7 @@ import {
   loadSettings,
   createTestMergedSettings,
   SettingScope,
+  resetSettingsCacheForTesting,
 } from './settings.js';
 import {
   isWorkspaceTrusted,
@@ -161,6 +162,7 @@ describe('extension tests', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetSettingsCacheForTesting();
     keychainData = {};
     mockKeychainStorage = {
       getSecret: vi

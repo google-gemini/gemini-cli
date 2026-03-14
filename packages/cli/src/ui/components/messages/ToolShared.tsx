@@ -23,8 +23,8 @@ import {
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { useInactivityTimer } from '../../hooks/useInactivityTimer.js';
-import { formatCommand } from '../../utils/keybindingUtils.js';
-import { Command } from '../../../config/keyBindings.js';
+import { formatCommand } from '../../key/keybindingUtils.js';
+import { Command } from '../../key/keyBindings.js';
 
 export const STATUS_INDICATOR_WIDTH = 3;
 
@@ -192,6 +192,7 @@ type ToolInfoProps = {
   description: string;
   status: CoreToolCallStatus;
   emphasis: TextEmphasis;
+  progressMessage?: string;
   originalRequestName?: string;
 };
 
@@ -200,6 +201,7 @@ export const ToolInfo: React.FC<ToolInfoProps> = ({
   description,
   status: coreStatus,
   emphasis,
+  progressMessage: _progressMessage,
   originalRequestName,
 }) => {
   const status = mapCoreStatusToDisplayStatus(coreStatus);
