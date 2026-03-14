@@ -11,7 +11,7 @@ import { themeManager } from '../themes/theme-manager.js';
 import { Holiday } from '../themes/builtin/dark/holiday-dark.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { useTerminalSize } from './useTerminalSize.js';
-import { shortAsciiLogo } from '../components/AsciiArt.js';
+import { longAsciiLogoCompactText } from '../components/AsciiArt.js';
 
 interface Snowflake {
   x: number;
@@ -68,7 +68,7 @@ export const useSnowfall = (displayTitle: string): string => {
   const hasStartedChat = history.some(
     (item) => item.type === 'user' && item.text !== '/theme',
   );
-  const widthOfShortLogo = getAsciiArtWidth(shortAsciiLogo);
+  const widthOfShortLogo = getAsciiArtWidth(longAsciiLogoCompactText);
 
   const [showSnow, setShowSnow] = useState(true);
 

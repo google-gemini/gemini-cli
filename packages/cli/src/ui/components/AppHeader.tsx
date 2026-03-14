@@ -103,9 +103,11 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
           paddingLeft={2}
         >
           <Box flexDirection="row" flexShrink={0} marginBottom={1}>
-            <ThemedGradient>{compactLogoIcon}</ThemedGradient>
+            <ThemedGradient>{compactLogoIcon.trim()}</ThemedGradient>
             <Box marginLeft={2}>
-              <Text color={theme.text.primary}>{longAsciiLogoCompactText}</Text>
+              <Text color={theme.text.primary}>
+                {longAsciiLogoCompactText.trim()}
+              </Text>
             </Box>
           </Box>
           <Box flexDirection="column">

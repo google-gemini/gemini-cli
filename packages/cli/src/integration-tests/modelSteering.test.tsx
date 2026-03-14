@@ -42,22 +42,18 @@ describe('Model Steering Integration', () => {
     rig.setMockCommands([
       // First model turn: list_directory
       {
-        pattern: /list_directory/,
-        response: {
-          decide: {
-            toolName: 'list_directory',
-            decision: PolicyDecision.ACCEPT,
-          },
+        command: /list_directory/,
+        result: {
+          exitCode: 0,
+          output: 'directory listed',
         },
       },
       // Second model turn: read_file
       {
-        pattern: /read_file/,
-        response: {
-          decide: {
-            toolName: 'read_file',
-            decision: PolicyDecision.ACCEPT,
-          },
+        command: /read_file/,
+        result: {
+          exitCode: 0,
+          output: 'file content',
         },
       },
     ]);
