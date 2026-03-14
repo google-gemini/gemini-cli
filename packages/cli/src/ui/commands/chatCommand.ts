@@ -99,7 +99,7 @@ const saveCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /resume save <tag>',
+        content: `Missing tag. Usage: ${context.invocation?.raw || '/resume save'} <tag>`,
       };
     }
 
@@ -119,7 +119,7 @@ const saveCommand: SlashCommand = {
             ' already exists. Do you want to overwrite it?',
           ),
           originalInvocation: {
-            raw: context.invocation?.raw || `/resume save ${tag}`,
+            raw: context.invocation?.raw?.trim() ?? `/resume save ${tag}`,
           },
         };
       }
@@ -168,7 +168,7 @@ const resumeCheckpointCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /resume resume <tag>',
+        content: `Missing tag. Usage: ${context.invocation?.raw?.trim() ?? '/resume resume'} <tag>`,
       };
     }
 
@@ -246,7 +246,7 @@ const deleteCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /resume delete <tag>',
+        content: `Missing tag. Usage: ${context.invocation?.raw?.trim() ?? '/resume delete'} <tag>`,
       };
     }
 

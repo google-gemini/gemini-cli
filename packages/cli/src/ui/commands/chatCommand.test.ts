@@ -165,6 +165,22 @@ describe('chatCommand', () => {
       });
     });
 
+    it('should use invocation raw in missing tag usage message', async () => {
+      mockContext.invocation = {
+        raw: '/chat save',
+        name: 'save',
+        args: '',
+      };
+
+      const result = await saveCommand?.action?.(mockContext, '  ');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Missing tag. Usage: /chat save <tag>',
+      });
+    });
+
     it('should inform if conversation history is empty or only contains system context', async () => {
       mockGetHistory.mockReturnValue([]);
       let result = await saveCommand?.action?.(mockContext, tag);
@@ -256,6 +272,22 @@ describe('chatCommand', () => {
         type: 'message',
         messageType: 'error',
         content: 'Missing tag. Usage: /resume resume <tag>',
+      });
+    });
+
+    it('should use invocation raw in missing tag usage message', async () => {
+      mockContext.invocation = {
+        raw: '/chat resume',
+        name: 'resume',
+        args: '',
+      };
+
+      const result = await resumeCommand?.action?.(mockContext, '');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Missing tag. Usage: /chat resume <tag>',
       });
     });
 
@@ -390,6 +422,22 @@ describe('chatCommand', () => {
         type: 'message',
         messageType: 'error',
         content: 'Missing tag. Usage: /resume delete <tag>',
+      });
+    });
+
+    it('should use invocation raw in missing tag usage message', async () => {
+      mockContext.invocation = {
+        raw: '/chat delete',
+        name: 'delete',
+        args: '',
+      };
+
+      const result = await deleteCommand?.action?.(mockContext, '  ');
+
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Missing tag. Usage: /chat delete <tag>',
       });
     });
 
