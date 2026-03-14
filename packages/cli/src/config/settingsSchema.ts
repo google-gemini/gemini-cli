@@ -1117,6 +1117,19 @@ const SETTINGS_SCHEMA = {
             description: 'Model override for the visual agent.',
             showInDialog: false,
           },
+          allowedDomains: {
+            type: 'array',
+            label: 'Allowed Domains',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: ['github.com', '*.google.com', 'localhost'] as string[],
+            description: oneLine`
+              A list of allowed domains for the browser agent
+              (e.g., ["github.com", "*.google.com"]).
+            `,
+            showInDialog: false,
+            items: { type: 'string' },
+          },
           disableUserInput: {
             type: 'boolean',
             label: 'Disable User Input',
@@ -1297,7 +1310,7 @@ const SETTINGS_SCHEMA = {
         default: undefined as boolean | string | SandboxConfig | undefined,
         ref: 'BooleanOrStringOrObject',
         description: oneLine`
-          Sandbox execution environment.
+          Legacy full-process sandbox execution environment.
           Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile,
           or specify an explicit sandbox command (e.g., "docker", "podman", "lxc").
         `,
@@ -1519,6 +1532,16 @@ const SETTINGS_SCHEMA = {
     description: 'Security-related settings.',
     showInDialog: false,
     properties: {
+      toolSandboxing: {
+        type: 'boolean',
+        label: 'Tool Sandboxing',
+        category: 'Security',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Experimental tool-level sandboxing (implementation in progress).',
+        showInDialog: true,
+      },
       disableYoloMode: {
         type: 'boolean',
         label: 'Disable YOLO Mode',
@@ -1526,6 +1549,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Disable YOLO mode, even if enabled by a flag.',
+        showInDialog: true,
+      },
+      disableAlwaysAllow: {
+        type: 'boolean',
+        label: 'Disable Always Allow',
+        category: 'Security',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Disable "Always allow" options in tool confirmation dialogs.',
         showInDialog: true,
       },
       enablePermanentToolApproval: {
@@ -1971,9 +2004,18 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      topicUpdateNarration: {
+        type: 'boolean',
+        label: 'Topic & Update Narration',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.',
+        showInDialog: true,
+      },
     },
   },
-
   extensions: {
     type: 'object',
     label: 'Extensions',
@@ -2254,7 +2296,8 @@ const SETTINGS_SCHEMA = {
         category: 'Admin',
         requiresRestart: false,
         default: false,
-        description: 'If true, disallows yolo mode from being used.',
+        description:
+          'If true, disallows YOLO mode and "Always allow" options from being used.',
         showInDialog: false,
         mergeStrategy: MergeStrategy.REPLACE,
       },
