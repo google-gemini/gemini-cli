@@ -86,6 +86,8 @@ export interface SubagentProgress {
   agentName: string;
   recentActivity: SubagentActivityItem[];
   state?: 'running' | 'completed' | 'error' | 'cancelled';
+  result?: string;
+  terminateReason?: AgentTerminateMode;
 }
 
 export function isSubagentProgress(obj: unknown): obj is SubagentProgress {
