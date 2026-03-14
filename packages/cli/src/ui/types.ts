@@ -16,13 +16,20 @@ import {
   type AgentDefinition,
   type ApprovalMode,
   type Kind,
+  type AnsiOutput,
   CoreToolCallStatus,
   checkExhaustive,
 } from '@google/gemini-cli-core';
 import type { PartListUnion } from '@google/genai';
 import { type ReactNode } from 'react';
 
-export type { ThoughtSummary, SkillDefinition };
+export { CoreToolCallStatus };
+export type {
+  ThoughtSummary,
+  SkillDefinition,
+  SerializableConfirmationDetails,
+  ToolResultDisplay,
+};
 
 export enum AuthState {
   // Attempting to authenticate or re-authenticate
@@ -85,6 +92,88 @@ export function mapCoreStatusToDisplayStatus(
       return checkExhaustive(coreStatus);
   }
 }
+
+export interface DiffStat {
+  model_added_lines: number;
+  model_removed_lines: number;
+  model_added_chars: number;
+  model_removed_chars: number;
+  user_added_lines: number;
+  user_removed_lines: number;
+  user_added_chars: number;
+  user_removed_chars: number;
+}
+
+export interface FileDiff {
+  fileDiff: string;
+  fileName: string;
+  filePath: string;
+  originalContent: string | null;
+  newContent: string;
+  diffStat?: DiffStat;
+  isNewFile?: boolean;
+}
+
+export interface GrepMatch {
+  filePath: string;
+  lineNumber: number;
+  line: string;
+}
+
+export interface GrepResult {
+  summary: string;
+  matches?: GrepMatch[];
+  payload?: string;
+}
+
+export interface ListDirectoryResult {
+  summary: string;
+  files?: string[];
+  payload?: string;
+}
+
+export interface ReadManyFilesResult {
+  summary: string;
+  files?: string[];
+  skipped?: Array<{ path: string; reason: string }>;
+  include?: string[];
+  excludes?: string[];
+  targetDir?: string;
+  payload?: string;
+}
+
+/**
+ * --- TYPE GUARDS ---
+ */
+
+export const isFileDiff = (res: unknown): res is FileDiff =>
+  typeof res === 'object' && res !== null && 'fileDiff' in res;
+
+export const isGrepResult = (res: unknown): res is GrepResult =>
+  typeof res === 'object' &&
+  res !== null &&
+  'summary' in res &&
+  ('matches' in res || 'payload' in res);
+
+export const isListResult = (
+  res: unknown,
+): res is ListDirectoryResult | ReadManyFilesResult =>
+  typeof res === 'object' &&
+  res !== null &&
+  'summary' in res &&
+  ('files' in res || 'include' in res);
+
+export const isTodoList = (res: unknown): res is { todos: unknown[] } =>
+  typeof res === 'object' && res !== null && 'todos' in res;
+
+export const isAnsiOutput = (res: unknown): res is AnsiOutput =>
+  Array.isArray(res) && (res.length === 0 || Array.isArray(res[0]));
+
+export const hasSummary = (res: unknown): res is { summary: string } =>
+  typeof res === 'object' &&
+  res !== null &&
+  'summary' in res &&
+  typeof res.summary === 'string';
 
 export interface ToolCallEvent {
   type: 'tool_call';

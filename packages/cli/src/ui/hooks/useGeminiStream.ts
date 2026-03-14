@@ -75,6 +75,7 @@ import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { useLogger } from './useLogger.js';
 import { SHELL_COMMAND_NAME } from '../constants.js';
 import { mapToDisplay as mapTrackedToolCallsToDisplay } from './toolMapping.js';
+import { isCompactTool } from '../components/messages/ToolGroupMessage.js';
 import {
   useToolScheduler,
   type TrackedToolCall,
@@ -291,9 +292,32 @@ export const useGeminiStream = (
           (tc) => !pushedToolCallIdsRef.current.has(tc.request.callId),
         );
         if (toolsToPush.length > 0) {
+          const isCompactModeEnabled =
+            settings.merged.ui?.compactToolOutput === true;
+          const firstToolToPush = toolsToPush[0];
+          const tcIndex = toolCalls.indexOf(firstToolToPush);
+          const prevTool = tcIndex > 0 ? toolCalls[tcIndex - 1] : null;
+
+          let borderTop = isFirstToolInGroupRef.current;
+          if (!borderTop && prevTool) {
+            // If the first tool in this push is non-compact but follows a compact tool,
+            // we must start a new border group.
+            const currentIsCompact = isCompactTool(
+              mapTrackedToolCallsToDisplay(firstToolToPush).tools[0],
+              isCompactModeEnabled,
+            );
+            const prevWasCompact = isCompactTool(
+              mapTrackedToolCallsToDisplay(prevTool).tools[0],
+              isCompactModeEnabled,
+            );
+            if (!currentIsCompact && prevWasCompact) {
+              borderTop = true;
+            }
+          }
+
           addItem(
             mapTrackedToolCallsToDisplay(toolsToPush as TrackedToolCall[], {
-              borderTop: isFirstToolInGroupRef.current,
+              borderTop,
               borderBottom: true,
               borderColor: theme.border.default,
               borderDimColor: false,
@@ -328,9 +352,7 @@ export const useGeminiStream = (
         }
 
         // Handle tool response submission immediately when tools complete
-        await handleCompletedTools(
-          completedToolCallsFromScheduler as TrackedToolCall[],
-        );
+        await handleCompletedTools(completedToolCallsFromScheduler);
       }
     },
     config,
@@ -426,14 +448,18 @@ export const useGeminiStream = (
     if (toolsToPush.length > 0) {
       const newPushed = new Set(pushedToolCallIdsRef.current);
       let isFirst = isFirstToolInGroupRef.current;
+      const isCompactModeEnabled =
+        settings.merged.ui?.compactToolOutput === true;
 
       for (const tc of toolsToPush) {
         newPushed.add(tc.request.callId);
+        const tcIndex = toolCalls.indexOf(tc);
+        const prevTool = tcIndex > 0 ? toolCalls[tcIndex - 1] : null;
+        const nextTool =
+          tcIndex < toolCalls.length - 1 ? toolCalls[tcIndex + 1] : null;
         const isLastInBatch = tc === toolCalls[toolCalls.length - 1];
 
         const historyItem = mapTrackedToolCallsToDisplay(tc, {
-          borderTop: isFirst,
-          borderBottom: isLastInBatch,
           ...getToolGroupBorderAppearance(
             { type: 'tool_group', tools: toolCalls },
             activeShellPtyId,
@@ -442,6 +468,33 @@ export const useGeminiStream = (
             backgroundShells,
           ),
         });
+
+        const currentIsCompact = historyItem.tools[0]
+          ? isCompactTool(historyItem.tools[0], isCompactModeEnabled)
+          : false;
+
+        let nextIsCompact = false;
+        if (nextTool) {
+          const nextHistoryItem = mapTrackedToolCallsToDisplay(nextTool);
+          nextIsCompact = nextHistoryItem.tools[0]
+            ? isCompactTool(nextHistoryItem.tools[0], isCompactModeEnabled)
+            : false;
+        }
+
+        let prevWasCompact = false;
+        if (prevTool) {
+          const prevHistoryItem = mapTrackedToolCallsToDisplay(prevTool);
+          prevWasCompact = prevHistoryItem.tools[0]
+            ? isCompactTool(prevHistoryItem.tools[0], isCompactModeEnabled)
+            : false;
+        }
+
+        historyItem.borderTop =
+          isFirst || (!currentIsCompact && prevWasCompact);
+        historyItem.borderBottom = currentIsCompact
+          ? isLastInBatch && !nextIsCompact
+          : isLastInBatch || nextIsCompact;
+
         addItem(historyItem);
         isFirst = false;
       }
@@ -459,6 +512,7 @@ export const useGeminiStream = (
     activeShellPtyId,
     isShellFocused,
     backgroundShells,
+    settings.merged.ui?.compactToolOutput,
   ]);
 
   const pendingToolGroupItems = useMemo((): HistoryItemWithoutId[] => {
@@ -502,8 +556,7 @@ export const useGeminiStream = (
       toolCalls.length > 0 &&
       toolCalls.every((tc) => pushedToolCallIds.has(tc.request.callId));
 
-    const anyVisibleInHistory = pushedToolCallIds.size > 0;
-    const anyVisibleInPending = remainingTools.some((tc) => {
+    const isToolVisible = (tc: TrackedToolCall) => {
       // AskUser tools are rendered by AskUserDialog, not ToolGroupMessage
       const isInProgress =
         tc.status !== 'success' &&
@@ -517,12 +570,28 @@ export const useGeminiStream = (
         tc.status !== 'validating' &&
         tc.status !== 'awaiting_approval'
       );
-    });
+    };
+
+    const anyVisibleInHistory = pushedToolCallIds.size > 0;
+    const anyVisibleInPending = remainingTools.some(isToolVisible);
+
+    let lastVisibleIsCompact = false;
+    const isCompactModeEnabled = settings.merged.ui?.compactToolOutput === true;
+    for (let i = toolCalls.length - 1; i >= 0; i--) {
+      if (isToolVisible(toolCalls[i])) {
+        const mapped = mapTrackedToolCallsToDisplay(toolCalls[i]);
+        lastVisibleIsCompact = mapped.tools[0]
+          ? isCompactTool(mapped.tools[0], isCompactModeEnabled)
+          : false;
+        break;
+      }
+    }
 
     if (
       toolCalls.length > 0 &&
       !(allTerminal && allPushed) &&
-      (anyVisibleInHistory || anyVisibleInPending)
+      (anyVisibleInHistory || anyVisibleInPending) &&
+      !lastVisibleIsCompact
     ) {
       items.push({
         type: 'tool_group' as const,
@@ -540,6 +609,7 @@ export const useGeminiStream = (
     activeShellPtyId,
     isShellFocused,
     backgroundShells,
+    settings.merged.ui?.compactToolOutput,
   ]);
 
   const lastQueryRef = useRef<PartListUnion | null>(null);

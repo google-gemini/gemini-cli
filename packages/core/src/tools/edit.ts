@@ -896,11 +896,33 @@ class EditToolInvocation
           DEFAULT_DIFF_OPTIONS,
         );
 
+        // Determine the full content as originally proposed by the AI to ensure accurate diff stats.
+        let fullAiProposedContent = editData.newContent;
+        if (
+          this.params.modified_by_user &&
+          this.params.ai_proposed_content !== undefined
+        ) {
+          try {
+            const aiReplacement = await calculateReplacement(this.config, {
+              params: {
+                ...this.params,
+                new_string: this.params.ai_proposed_content,
+              },
+              currentContent: editData.currentContent ?? '',
+              abortSignal: signal,
+            });
+            fullAiProposedContent = aiReplacement.newContent;
+          } catch (_e) {
+            // Fallback to newContent if speculative calculation fails
+            fullAiProposedContent = editData.newContent;
+          }
+        }
+
         const diffStat = getDiffStat(
           fileName,
           editData.currentContent ?? '',
+          fullAiProposedContent,
           editData.newContent,
-          this.params.new_string,
         );
         displayResult = {
           fileDiff,

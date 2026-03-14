@@ -30,7 +30,7 @@ import {
   NetworkRetryAttemptEvent,
 } from '../telemetry/index.js';
 import { LlmRole } from '../telemetry/llmRole.js';
-import { WEB_FETCH_TOOL_NAME } from './tool-names.js';
+import { WEB_FETCH_TOOL_NAME, WEB_FETCH_DISPLAY_NAME } from './tool-names.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { coreEvents } from '../utils/events.js';
 import { retryWithBackoff, getRetryErrorType } from '../utils/retry.js';
@@ -821,7 +821,7 @@ export class WebFetchTool extends BaseDeclarativeTool<
   ) {
     super(
       WebFetchTool.Name,
-      'WebFetch',
+      WEB_FETCH_DISPLAY_NAME,
       WEB_FETCH_DEFINITION.base.description!,
       Kind.Fetch,
       WEB_FETCH_DEFINITION.base.parametersJsonSchema,
