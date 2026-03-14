@@ -29,7 +29,7 @@ export class OverrideStrategy implements RoutingStrategy {
     const overrideModel = context.requestedModel ?? config.getModel();
 
     // If the model is 'auto' we should pass to the next strategy.
-    if (isAutoModel(overrideModel)) {
+    if (isAutoModel(overrideModel, config)) {
       return null;
     }
 
