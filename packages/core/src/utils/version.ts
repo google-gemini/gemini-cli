@@ -19,7 +19,9 @@ export function getVersion(): Promise<string> {
   }
   versionPromise = (async () => {
     const pkgJson = await getPackageJson(__dirname);
-    return process.env['CLI_VERSION'] || pkgJson?.version || 'unknown';
+    const raw = process.env['CLI_VERSION'] || pkgJson?.version || 'unknown';
+    // Strip semver prefix (e.g. "0.0.0-") to show just the build identifier
+    return raw.replace(/^\d+\.\d+\.\d+-/, '');
   })();
   return versionPromise;
 }
