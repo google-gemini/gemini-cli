@@ -557,6 +557,16 @@ export class Session {
     if (!mode) {
       throw new Error(`Invalid or unavailable mode: ${modeId}`);
     }
+    // Do not allow the IDE companion to override an approval mode that was
+    // explicitly set via a CLI flag (e.g. --yolo, --approval-mode).
+    // The CLI flag represents explicit user intent that takes precedence
+    // over the IDE's stored default mode. See: github.com/google-gemini/gemini-cli/issues/18816
+    if (
+      this.config.isApprovalModeExplicit() ||
+      (mode.id === ApprovalMode.YOLO && this.config.isYoloModeDisabled())
+    ) {
+      return {};
+    }
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     this.config.setApprovalMode(mode.id as ApprovalMode);
     return {};
