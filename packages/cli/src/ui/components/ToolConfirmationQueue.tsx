@@ -53,11 +53,11 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
   // Safety check: ToolConfirmationMessage requires confirmationDetails
   if (!tool.confirmationDetails) return null;
 
-  // Render up to 100% of the available terminal height (minus 1 line for safety)
+  // Render up to 100% of the available terminal height
   // to maximize space for diffs and other content.
   const maxHeight =
     uiAvailableHeight !== undefined
-      ? Math.max(uiAvailableHeight - 1, 4)
+      ? Math.max(uiAvailableHeight, 4)
       : Math.floor(terminalHeight * 0.5);
 
   const isRoutine =
