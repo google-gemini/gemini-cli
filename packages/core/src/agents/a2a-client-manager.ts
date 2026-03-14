@@ -109,8 +109,9 @@ export class A2AClientManager {
     agentCardUrl: string,
     authHandler?: AuthenticationHandler,
   ): Promise<AgentCard> {
-    if (this.clients.has(name) && this.agentCards.has(name)) {
-      throw new Error(`Agent with name '${name}' is already loaded.`);
+    const existingCard = this.agentCards.get(name);
+    if (existingCard) {
+      return existingCard;
     }
 
     // Authenticated fetch for API calls (transports).

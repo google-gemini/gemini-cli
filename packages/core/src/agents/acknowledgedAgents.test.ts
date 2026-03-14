@@ -63,6 +63,19 @@ describe('AcknowledgedAgentsService', () => {
     );
   });
 
+  it('should return true for acknowledged agent via isAcknowledgedSync', async () => {
+    const service = new AcknowledgedAgentsService();
+
+    await service.acknowledge('/project', 'AgentA', 'hash1');
+
+    expect(service.isAcknowledgedSync('/project', 'AgentA', 'hash1')).toBe(
+      true,
+    );
+    expect(service.isAcknowledgedSync('/project', 'AgentA', 'hash2')).toBe(
+      false,
+    );
+  });
+
   it('should load acknowledged agents from disk', async () => {
     const ackPath = Storage.getAcknowledgedAgentsPath();
     const data = {

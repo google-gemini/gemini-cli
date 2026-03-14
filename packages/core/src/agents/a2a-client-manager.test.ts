@@ -190,11 +190,17 @@ describe('A2AClientManager', () => {
       expect(ClientFactoryOptions.createFrom).toHaveBeenCalled();
     });
 
-    it('should throw an error if an agent with the same name is already loaded', async () => {
-      await manager.loadAgent('TestAgent', 'http://test.agent/card');
-      await expect(
-        manager.loadAgent('TestAgent', 'http://test.agent/card'),
-      ).rejects.toThrow("Agent with name 'TestAgent' is already loaded.");
+    it('should return the cached card if an agent with the same name is already loaded (idempotent)', async () => {
+      const card1 = await manager.loadAgent(
+        'TestAgent',
+        'http://test.agent/card',
+      );
+      const card2 = await manager.loadAgent(
+        'TestAgent',
+        'http://test.agent/card',
+      );
+      expect(card1).toBe(card2);
+      expect(vi.mocked(DefaultAgentCardResolver)).toHaveBeenCalledTimes(1);
     });
 
     it('should use native fetch by default', async () => {

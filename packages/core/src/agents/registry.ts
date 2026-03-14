@@ -23,7 +23,11 @@ import {
   type ModelConfig,
   ModelConfigService,
 } from '../services/modelConfigService.js';
-import { PolicyDecision, PRIORITY_SUBAGENT_TOOL } from '../policy/types.js';
+import {
+  PolicyDecision,
+  PRIORITY_SUBAGENT_TOOL,
+  ApprovalMode,
+} from '../policy/types.js';
 import { A2AAgentError, AgentAuthConfigMissingError } from './a2a-errors.js';
 
 /**
@@ -176,9 +180,8 @@ export class AgentRegistry {
           agent.metadata.hash,
         );
 
-        if (isAcknowledged) {
-          agentsToRegister.push(agent);
-        } else {
+        agentsToRegister.push(agent);
+        if (!isAcknowledged) {
           unacknowledgedAgents.push(agent);
         }
       }
@@ -340,10 +343,23 @@ export class AgentRegistry {
     policyEngine.removeRulesForTool(definition.name, 'AgentRegistry (Dynamic)');
 
     // Add the new dynamic policy
+    const isYolo = this.config.getApprovalMode() === ApprovalMode.YOLO;
+    const isAcknowledged =
+      definition.kind === 'local' &&
+      (!definition.metadata?.hash ||
+        (this.config.getProjectRoot() &&
+          this.config
+            .getAcknowledgedAgentsService()
+            ?.isAcknowledgedSync?.(
+              this.config.getProjectRoot(),
+              definition.name,
+              definition.metadata.hash,
+            )));
+
     policyEngine.addRule({
       toolName: definition.name,
       decision:
-        definition.kind === 'local'
+        isAcknowledged || isYolo
           ? PolicyDecision.ALLOW
           : PolicyDecision.ASK_USER,
       priority: PRIORITY_SUBAGENT_TOOL,
