@@ -108,39 +108,43 @@ export class GridCanvas {
       }
       this.setCellIfEmpty(targetX, targetY, dy > 0 ? '↓' : '↑');
     } else {
-      // L-shaped: horizontal first, then vertical
+      // L-shaped: vertical first (from source), then horizontal (to target)
       const hDir = dx > 0 ? 1 : -1;
       const vDir = dy > 0 ? 1 : -1;
 
-      // Horizontal segment
-      for (let x = sourceX; hDir > 0 ? x < targetX : x > targetX; x += hDir) {
-        this.setCellIfEmpty(x, sourceY, hChar);
-      }
-
-      // Corner
-      let corner: string;
-      if (hDir > 0 && vDir > 0) {
-        corner = '┐';
-      } else if (hDir < 0 && vDir > 0) {
-        corner = '┌';
-      } else if (hDir > 0 && vDir < 0) {
-        corner = '┘';
-      } else {
-        corner = '└';
-      }
-      this.setCellIfEmpty(targetX, sourceY, corner);
-
-      // Vertical segment
+      // Vertical segment from source down/up to target's row
       for (
-        let y = sourceY + vDir;
+        let y = sourceY;
         vDir > 0 ? y < targetY : y > targetY;
         y += vDir
       ) {
-        this.setCellIfEmpty(targetX, y, vChar);
+        this.setCellIfEmpty(sourceX, y, vChar);
+      }
+
+      // Corner at (sourceX, targetY)
+      let corner: string;
+      if (hDir > 0 && vDir > 0) {
+        corner = '└';
+      } else if (hDir < 0 && vDir > 0) {
+        corner = '┘';
+      } else if (hDir > 0 && vDir < 0) {
+        corner = '┌';
+      } else {
+        corner = '┐';
+      }
+      this.setCellIfEmpty(sourceX, targetY, corner);
+
+      // Horizontal segment from corner to target
+      for (
+        let x = sourceX + hDir;
+        hDir > 0 ? x < targetX : x > targetX;
+        x += hDir
+      ) {
+        this.setCellIfEmpty(x, targetY, hChar);
       }
 
       // Arrow head
-      this.setCellIfEmpty(targetX, targetY, vDir > 0 ? '↓' : '↑');
+      this.setCellIfEmpty(targetX, targetY, hDir > 0 ? '→' : '←');
     }
 
     // Place edge label at midpoint (overwrites edge chars but not node chars)
@@ -155,7 +159,7 @@ export class GridCanvas {
 
   toString(): string {
     return this.grid
-      .map((row) => row.map((cell) => cell.char).join(''))
+      .map((row) => row.map((cell) => cell.char).join('').trimEnd())
       .join('\n');
   }
 

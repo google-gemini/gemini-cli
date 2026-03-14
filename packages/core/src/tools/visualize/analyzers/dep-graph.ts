@@ -69,19 +69,29 @@ function parsePackageJson(content: string, filename: string): string {
   const lines = ['graph LR'];
   const rootId = sanitizeId(projectName);
 
-  const deps = pkg.dependencies ?? {};
-  for (const dep of Object.keys(deps)) {
+  const MAX_DEPS = 12;
+
+  const deps = Object.keys(pkg.dependencies ?? {});
+  const shownDeps = deps.slice(0, MAX_DEPS);
+  for (const dep of shownDeps) {
     const depId = sanitizeId(dep);
     lines.push(`  ${rootId}[${projectName}] --> ${depId}[${dep}]`);
   }
+  if (deps.length > MAX_DEPS) {
+    lines.push(`  ${rootId}[${projectName}] --> more_deps[+${deps.length - MAX_DEPS} more]`);
+  }
 
-  const devDeps = pkg.devDependencies ?? {};
-  for (const dep of Object.keys(devDeps)) {
+  const devDeps = Object.keys(pkg.devDependencies ?? {});
+  const shownDevDeps = devDeps.slice(0, MAX_DEPS);
+  for (const dep of shownDevDeps) {
     const depId = sanitizeId(dep) + '_dev';
     lines.push(`  ${rootId}[${projectName}] -.-> ${depId}[${dep}]`);
   }
+  if (devDeps.length > MAX_DEPS) {
+    lines.push(`  ${rootId}[${projectName}] -.-> more_devdeps[+${devDeps.length - MAX_DEPS} more dev]`);
+  }
 
-  if (Object.keys(deps).length === 0 && Object.keys(devDeps).length === 0) {
+  if (deps.length === 0 && devDeps.length === 0) {
     lines.push(`  ${rootId}[${projectName}]`);
   }
 

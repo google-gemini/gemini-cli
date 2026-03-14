@@ -37,7 +37,7 @@ interface LayoutResult {
  * width = label.length + 4 (padding) + 2 (border) = label.length + 6
  * height = 3 (border + content + border)
  */
-function computeNodeDimensions(label: string): {
+export function computeNodeDimensions(label: string): {
   width: number;
   height: number;
 } {
@@ -47,8 +47,12 @@ function computeNodeDimensions(label: string): {
   };
 }
 
+// Gap between nodes (in characters)
+const NODE_GAP_H = 3;
+const NODE_GAP_V = 1;
+
 /**
- * Use dagre to compute a layout for the given nodes and edges.
+ * Use dagre for topological ordering, then compact placement in char coords.
  */
 export function layoutDiagram(
   nodes: LayoutInput[],
@@ -56,91 +60,159 @@ export function layoutDiagram(
   options: LayoutOptions,
 ): LayoutResult {
   const g = new dagre.graphlib.Graph();
-
-  // Map TD to TB for dagre (dagre uses TB, not TD)
   const rankdir = options.direction === 'TD' ? 'TB' : options.direction;
+  const isHorizontal = rankdir === 'LR' || rankdir === 'RL';
 
-  g.setGraph({
-    rankdir,
-    nodesep: 4,
-    ranksep: 3,
-  });
-
+  g.setGraph({ rankdir, nodesep: 1, ranksep: 1 });
   g.setDefaultEdgeLabel(() => ({}));
 
-  // Add nodes
   for (const node of nodes) {
     const dims = computeNodeDimensions(node.label);
-    g.setNode(node.id, {
-      label: node.label,
-      width: dims.width,
-      height: dims.height,
-    });
+    g.setNode(node.id, { label: node.label, width: dims.width, height: dims.height });
   }
-
-  // Add edges
   for (const edge of edges) {
-    g.setEdge(edge.source, edge.target, {
-      label: edge.label ?? '',
-    });
+    g.setEdge(edge.source, edge.target, { label: edge.label ?? '' });
   }
 
-  // Run layout
   dagre.layout(g);
 
-  // Extract results
-  const layoutNodes: DiagramNode[] = nodes.map((inputNode) => {
-    const dagreNode = g.node(inputNode.id);
-    const dims = computeNodeDimensions(inputNode.label);
-    return {
-      id: inputNode.id,
-      label: inputNode.label,
-      shape: inputNode.shape,
-      x: Math.round(dagreNode.x - dims.width / 2),
-      y: Math.round(dagreNode.y - dims.height / 2),
-      width: dims.width,
-      height: dims.height,
-    };
+  // Group nodes by rank (dagre assigns y-rank for TB, x-rank for LR)
+  const nodeInfos = nodes.map((n) => {
+    const dn = g.node(n.id);
+    return { input: n, dagreX: dn.x, dagreY: dn.y };
   });
 
+  // Determine rank grouping axis
+  const rankKey = isHorizontal ? 'dagreX' : 'dagreY';
+  const crossKey = isHorizontal ? 'dagreY' : 'dagreX';
+
+  // Quantize ranks: nodes with similar rank values belong to the same rank
+  const sorted = [...nodeInfos].sort((a, b) => a[rankKey] - b[rankKey]);
+  const ranks: typeof nodeInfos[] = [];
+  let currentRank: typeof nodeInfos = [];
+  let lastVal = -Infinity;
+
+  for (const ni of sorted) {
+    if (ni[rankKey] - lastVal > 1) {
+      if (currentRank.length > 0) ranks.push(currentRank);
+      currentRank = [];
+    }
+    currentRank.push(ni);
+    lastVal = ni[rankKey];
+  }
+  if (currentRank.length > 0) ranks.push(currentRank);
+
+  // Sort nodes within each rank by cross-axis position
+  for (const rank of ranks) {
+    rank.sort((a, b) => a[crossKey] - b[crossKey]);
+  }
+
+  // Place nodes compactly in character coordinates
+  const placedNodes: Map<string, DiagramNode> = new Map();
+
+  if (isHorizontal) {
+    let cursorX = 1;
+    for (const rank of ranks) {
+      let cursorY = 1;
+      let maxWidth = 0;
+      for (const ni of rank) {
+        const dims = computeNodeDimensions(ni.input.label);
+        placedNodes.set(ni.input.id, {
+          id: ni.input.id,
+          label: ni.input.label,
+          shape: ni.input.shape,
+          x: cursorX,
+          y: cursorY,
+          width: dims.width,
+          height: dims.height,
+        });
+        cursorY += dims.height + NODE_GAP_V;
+        maxWidth = Math.max(maxWidth, dims.width);
+      }
+      cursorX += maxWidth + NODE_GAP_H;
+    }
+  } else {
+    // TB / BT
+    let cursorY = 1;
+    for (const rank of ranks) {
+      let cursorX = 1;
+      let maxHeight = 0;
+      for (const ni of rank) {
+        const dims = computeNodeDimensions(ni.input.label);
+        placedNodes.set(ni.input.id, {
+          id: ni.input.id,
+          label: ni.input.label,
+          shape: ni.input.shape,
+          x: cursorX,
+          y: cursorY,
+          width: dims.width,
+          height: dims.height,
+        });
+        cursorX += dims.width + NODE_GAP_H;
+        maxHeight = Math.max(maxHeight, dims.height);
+      }
+      cursorY += maxHeight + NODE_GAP_V;
+    }
+  }
+
+  const layoutNodes = nodes.map((n) => placedNodes.get(n.id)!);
+
+  // Compute edges with endpoints at node borders
   const layoutEdges: DiagramEdge[] = edges.map((inputEdge) => {
-    const dagreEdge = g.edge(inputEdge.source, inputEdge.target);
-    const sourceNode = g.node(inputEdge.source);
-    const targetNode = g.node(inputEdge.target);
+    const srcNode = placedNodes.get(inputEdge.source)!;
+    const tgtNode = placedNodes.get(inputEdge.target)!;
+
+    const sCx = srcNode.x + Math.floor(srcNode.width / 2);
+    const sCy = srcNode.y + Math.floor(srcNode.height / 2);
+    const tCx = tgtNode.x + Math.floor(tgtNode.width / 2);
+    const tCy = tgtNode.y + Math.floor(tgtNode.height / 2);
+
+    let sourceX = sCx;
+    let sourceY = sCy;
+    let targetX = tCx;
+    let targetY = tCy;
+
+    if (isHorizontal) {
+      // Exit right side of source, enter left side of target
+      sourceX = srcNode.x + srcNode.width;
+      targetX = tgtNode.x - 1;
+      // Keep Y at center
+    } else {
+      // Exit bottom of source, enter top of target
+      sourceY = srcNode.y + srcNode.height;
+      targetY = tgtNode.y - 1;
+      // Keep X at center
+    }
 
     const result: DiagramEdge = {
       source: inputEdge.source,
       target: inputEdge.target,
       style: inputEdge.style,
-      sourceX: Math.round(sourceNode.x),
-      sourceY: Math.round(sourceNode.y),
-      targetX: Math.round(targetNode.x),
-      targetY: Math.round(targetNode.y),
+      sourceX,
+      sourceY,
+      targetX,
+      targetY,
     };
 
     if (inputEdge.label) {
       result.label = inputEdge.label;
     }
 
-    if (dagreEdge.points) {
-      result.points = dagreEdge.points.map((p: { x: number; y: number }) => ({
-        x: Math.round(p.x),
-        y: Math.round(p.y),
-      }));
-    }
-
     return result;
   });
 
   // Compute bounding box
-  const graphInfo = g.graph();
-  const width = Math.ceil(graphInfo.width ?? 0);
-  const height = Math.ceil(graphInfo.height ?? 0);
+  let maxX = 0;
+  let maxY = 0;
+  for (const n of layoutNodes) {
+    maxX = Math.max(maxX, n.x + n.width);
+    maxY = Math.max(maxY, n.y + n.height);
+  }
 
   return {
     nodes: layoutNodes,
     edges: layoutEdges,
-    width,
-    height,
+    width: maxX + 1,
+    height: maxY + 1,
   };
 }
