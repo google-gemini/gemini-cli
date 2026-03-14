@@ -110,21 +110,14 @@ export function buildPreClickListenerScript(): string {
 
       (document.body || document.documentElement).appendChild(dot);
       
-      try {
-        var animation = dot.animate([
-          { transform: 'scale(0.3)', opacity: 1, offset: 0 },
-          { transform: 'scale(1)', opacity: 0.6, offset: 0.6 },
-          { transform: 'scale(1.4)', opacity: 0, offset: 1 }
-        ], {
-          duration: 600,
-          easing: 'ease-out',
-          fill: 'forwards'
-        });
-        animation.finished.then(function() { dot.remove(); });
-      } catch (err) {
-        // Fallback for environments where .animate is not supported, though unlikely.
-        dot.remove();
+      if (!document.getElementById('${CLICK_STYLE_ID}')) {
+        var s = document.createElement('style');
+        s.id = '${CLICK_STYLE_ID}';
+        s.textContent = '${CLICK_KEYFRAMES}';
+        (document.head || document.documentElement).appendChild(s);
       }
+      dot.style.animation = '__gemini_click 0.6s ease-out forwards';
+      dot.addEventListener('animationend', function() { dot.remove(); }, { once: true });
     }
 
     // capture: true ensures we receive the event even when elements call
