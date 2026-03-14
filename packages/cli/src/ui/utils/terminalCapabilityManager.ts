@@ -138,9 +138,6 @@ export class TerminalCapabilityManager {
           process.stdin.setRawMode(false);
         }
         this.detectionComplete = true;
-
-        this.enableSupportedModes();
-
         resolve();
       };
 
@@ -246,9 +243,11 @@ export class TerminalCapabilityManager {
   enableSupportedModes() {
     try {
       if (this.kittySupported) {
+        debugLogger.log('Enabling Kitty keyboard protocol');
         enableKittyKeyboardProtocol();
         this.kittyEnabled = true;
       } else if (this.modifyOtherKeysSupported) {
+        debugLogger.log('Enabling modifyOtherKeys');
         enableModifyOtherKeys();
       }
       // Always enable bracketed paste since it'll be ignored if unsupported.
@@ -268,6 +267,32 @@ export class TerminalCapabilityManager {
 
   isKittyProtocolEnabled(): boolean {
     return this.kittyEnabled;
+  }
+
+  supportsOsc9Notifications(env: NodeJS.ProcessEnv = process.env): boolean {
+    if (env['WT_SESSION']) {
+      return false;
+    }
+
+    return (
+      this.hasOsc9TerminalSignature(this.getTerminalName()) ||
+      this.hasOsc9TerminalSignature(env['TERM_PROGRAM']) ||
+      this.hasOsc9TerminalSignature(env['TERM'])
+    );
+  }
+
+  private hasOsc9TerminalSignature(value: string | undefined): boolean {
+    if (!value) {
+      return false;
+    }
+
+    const normalized = value.toLowerCase();
+    return (
+      normalized.includes('wezterm') ||
+      normalized.includes('ghostty') ||
+      normalized.includes('iterm') ||
+      normalized.includes('kitty')
+    );
   }
 }
 

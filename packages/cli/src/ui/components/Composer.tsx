@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Box, Text, useIsScreenReaderEnabled } from 'ink';
 import {
   ApprovalMode,
-  tokenLimit,
+  checkExhaustive,
   CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { LoadingIndicator } from './LoadingIndicator.js';
@@ -38,6 +38,7 @@ import { StreamingState, type HistoryItemToolGroup } from '../types.js';
 import { ConfigInitDisplay } from '../components/ConfigInitDisplay.js';
 import { TodoTray } from './messages/Todo.js';
 import { getInlineThinkingMode } from '../utils/inlineThinkingMode.js';
+import { isContextUsageHigh } from '../utils/contextUsage.js';
 import { theme } from '../semantic-colors.js';
 
 export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
@@ -114,36 +115,66 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const showApprovalIndicator =
     !uiState.shellModeActive && !hideUiDetailsForSuggestions;
   const showRawMarkdownIndicator = !uiState.renderMarkdown;
-  const modeBleedThrough =
-    showApprovalModeIndicator === ApprovalMode.YOLO
-      ? { text: 'YOLO', color: theme.status.error }
-      : showApprovalModeIndicator === ApprovalMode.PLAN
-        ? { text: 'plan', color: theme.status.success }
-        : showApprovalModeIndicator === ApprovalMode.AUTO_EDIT
-          ? { text: 'auto edit', color: theme.status.warning }
-          : null;
+  let modeBleedThrough: { text: string; color: string } | null = null;
+  switch (showApprovalModeIndicator) {
+    case ApprovalMode.YOLO:
+      modeBleedThrough = { text: 'YOLO', color: theme.status.error };
+      break;
+    case ApprovalMode.PLAN:
+      modeBleedThrough = { text: 'plan', color: theme.status.success };
+      break;
+    case ApprovalMode.AUTO_EDIT:
+      modeBleedThrough = { text: 'auto edit', color: theme.status.warning };
+      break;
+    case ApprovalMode.DEFAULT:
+      modeBleedThrough = null;
+      break;
+    default:
+      checkExhaustive(showApprovalModeIndicator);
+      modeBleedThrough = null;
+      break;
+  }
+
   const hideMinimalModeHintWhileBusy =
     !showUiDetails && (showLoadingIndicator || hasPendingActionRequired);
   const minimalModeBleedThrough = hideMinimalModeHintWhileBusy
     ? null
     : modeBleedThrough;
   const hasMinimalStatusBleedThrough = shouldShowToast(uiState);
-  const contextTokenLimit =
-    typeof uiState.currentModel === 'string' && uiState.currentModel.length > 0
-      ? tokenLimit(uiState.currentModel)
-      : 0;
+
   const showMinimalContextBleedThrough =
     !settings.merged.ui.footer.hideContextPercentage &&
-    typeof uiState.currentModel === 'string' &&
-    uiState.currentModel.length > 0 &&
-    contextTokenLimit > 0 &&
-    uiState.sessionStats.lastPromptTokenCount / contextTokenLimit > 0.6;
+    isContextUsageHigh(
+      uiState.sessionStats.lastPromptTokenCount,
+      typeof uiState.currentModel === 'string'
+        ? uiState.currentModel
+        : undefined,
+    );
   const hideShortcutsHintForSuggestions = hideUiDetailsForSuggestions;
+  const isModelIdle = uiState.streamingState === StreamingState.Idle;
+  const isBufferEmpty = uiState.buffer.text.length === 0;
+  const canShowShortcutsHint =
+    isModelIdle && isBufferEmpty && !hasPendingActionRequired;
+  const [showShortcutsHintDebounced, setShowShortcutsHintDebounced] =
+    useState(canShowShortcutsHint);
+
+  useEffect(() => {
+    if (!canShowShortcutsHint) {
+      setShowShortcutsHintDebounced(false);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setShowShortcutsHintDebounced(true);
+    }, 200);
+
+    return () => clearTimeout(timeout);
+  }, [canShowShortcutsHint]);
+
+  const shouldReserveSpaceForShortcutsHint =
+    settings.merged.ui.showShortcutsHint && !hideShortcutsHintForSuggestions;
   const showShortcutsHint =
-    settings.merged.ui.showShortcutsHint &&
-    !hideShortcutsHintForSuggestions &&
-    !hideMinimalModeHintWhileBusy &&
-    !hasPendingActionRequired;
+    shouldReserveSpaceForShortcutsHint && showShortcutsHintDebounced;
   const showMinimalModeBleedThrough =
     !hideUiDetailsForSuggestions && Boolean(minimalModeBleedThrough);
   const showMinimalInlineLoading = !showUiDetails && showLoadingIndicator;
@@ -156,7 +187,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     !showUiDetails &&
     (showMinimalInlineLoading ||
       showMinimalBleedThroughRow ||
-      showShortcutsHint);
+      shouldReserveSpaceForShortcutsHint);
 
   return (
     <Box
@@ -179,7 +210,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
 
       {showUiDetails && <TodoTray />}
 
-      <Box marginTop={1} width="100%" flexDirection="column">
+      <Box width="100%" flexDirection="column">
         <Box
           width="100%"
           flexDirection={isNarrow ? 'column' : 'row'}
@@ -198,18 +229,17 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                 inline
                 thought={
                   uiState.streamingState ===
-                    StreamingState.WaitingForConfirmation ||
-                  config.getAccessibility()?.enableLoadingPhrases === false
+                  StreamingState.WaitingForConfirmation
                     ? undefined
                     : uiState.thought
                 }
                 currentLoadingPhrase={
-                  config.getAccessibility()?.enableLoadingPhrases === false
+                  settings.merged.ui.loadingPhrases === 'off'
                     ? undefined
                     : uiState.currentLoadingPhrase
                 }
                 thoughtLabel={
-                  inlineThinkingMode === 'full' ? 'Thinking ...' : undefined
+                  inlineThinkingMode === 'full' ? 'Thinking...' : undefined
                 }
                 elapsedTime={uiState.elapsedTime}
               />
@@ -219,6 +249,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             marginTop={isNarrow ? 1 : 0}
             flexDirection="column"
             alignItems={isNarrow ? 'flex-start' : 'flex-end'}
+            minHeight={
+              showUiDetails && shouldReserveSpaceForShortcutsHint ? 1 : 0
+            }
           >
             {showUiDetails && showShortcutsHint && <ShortcutsHint />}
           </Box>
@@ -242,18 +275,17 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                   inline
                   thought={
                     uiState.streamingState ===
-                      StreamingState.WaitingForConfirmation ||
-                    config.getAccessibility()?.enableLoadingPhrases === false
+                    StreamingState.WaitingForConfirmation
                       ? undefined
                       : uiState.thought
                   }
                   currentLoadingPhrase={
-                    config.getAccessibility()?.enableLoadingPhrases === false
+                    settings.merged.ui.loadingPhrases === 'off'
                       ? undefined
                       : uiState.currentLoadingPhrase
                   }
                   thoughtLabel={
-                    inlineThinkingMode === 'full' ? 'Thinking ...' : undefined
+                    inlineThinkingMode === 'full' ? 'Thinking...' : undefined
                   }
                   elapsedTime={uiState.elapsedTime}
                 />
@@ -275,11 +307,13 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                 </Box>
               )}
             </Box>
-            {(showMinimalContextBleedThrough || showShortcutsHint) && (
+            {(showMinimalContextBleedThrough ||
+              shouldReserveSpaceForShortcutsHint) && (
               <Box
                 marginTop={isNarrow && showMinimalBleedThroughRow ? 1 : 0}
                 flexDirection={isNarrow ? 'column' : 'row'}
                 alignItems={isNarrow ? 'flex-start' : 'flex-end'}
+                minHeight={1}
               >
                 {showMinimalContextBleedThrough && (
                   <ContextUsageDisplay
@@ -288,18 +322,14 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                     terminalWidth={uiState.terminalWidth}
                   />
                 )}
-                {showShortcutsHint && (
-                  <Box
-                    marginLeft={
-                      showMinimalContextBleedThrough && !isNarrow ? 1 : 0
-                    }
-                    marginTop={
-                      showMinimalContextBleedThrough && isNarrow ? 1 : 0
-                    }
-                  >
-                    <ShortcutsHint />
-                  </Box>
-                )}
+                <Box
+                  marginLeft={
+                    showMinimalContextBleedThrough && !isNarrow ? 1 : 0
+                  }
+                  marginTop={showMinimalContextBleedThrough && isNarrow ? 1 : 0}
+                >
+                  {showShortcutsHint && <ShortcutsHint />}
+                </Box>
               </Box>
             )}
           </Box>
@@ -334,7 +364,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                   {showApprovalIndicator && (
                     <ApprovalModeIndicator
                       approvalMode={showApprovalModeIndicator}
-                      isPlanEnabled={config.isPlanEnabled()}
+                      allowPlanMode={uiState.allowPlanMode}
                     />
                   )}
                   {!showLoadingIndicator && (
@@ -361,7 +391,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                           marginTop={
                             (showApprovalIndicator ||
                               uiState.shellModeActive) &&
-                            isNarrow
+                            !isNarrow
                               ? 1
                               : 0
                           }

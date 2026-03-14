@@ -6,38 +6,15 @@
 
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { ToolResultDisplay } from './ToolResultDisplay.js';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { AnsiOutput } from '@google/gemini-cli-core';
-
-// Mock UIStateContext partially
-const mockUseUIState = vi.fn();
-vi.mock('../../contexts/UIStateContext.js', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../../contexts/UIStateContext.js')>();
-  return {
-    ...actual,
-    useUIState: () => mockUseUIState(),
-  };
-});
-
-// Mock useAlternateBuffer
-const mockUseAlternateBuffer = vi.fn();
-vi.mock('../../hooks/useAlternateBuffer.js', () => ({
-  useAlternateBuffer: () => mockUseAlternateBuffer(),
-}));
 
 describe('ToolResultDisplay', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseUIState.mockReturnValue({ renderMarkdown: true });
-    mockUseAlternateBuffer.mockReturnValue(false);
   });
 
-  // Helper to use renderWithProviders
-  const render = (ui: React.ReactElement) => renderWithProviders(ui);
-
-  it('uses ScrollableList for ANSI output in alternate buffer mode', () => {
-    mockUseAlternateBuffer.mockReturnValue(true);
+  it('uses ScrollableList for ANSI output in alternate buffer mode', async () => {
     const content = 'ansi content';
     const ansiResult: AnsiOutput = [
       [
@@ -53,101 +30,126 @@ describe('ToolResultDisplay', () => {
         },
       ],
     ];
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolResultDisplay
         resultDisplay={ansiResult}
         terminalWidth={80}
         maxLines={10}
       />,
+      { useAlternateBuffer: true },
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toContain(content);
+    unmount();
   });
 
-  it('uses Scrollable for non-ANSI output in alternate buffer mode', () => {
-    mockUseAlternateBuffer.mockReturnValue(true);
-    const { lastFrame } = render(
+  it('uses Scrollable for non-ANSI output in alternate buffer mode', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolResultDisplay
         resultDisplay="**Markdown content**"
         terminalWidth={80}
         maxLines={10}
       />,
+      { useAlternateBuffer: true },
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     // With real components, we check for the content itself
     expect(output).toContain('Markdown content');
+    unmount();
   });
 
-  it('passes hasFocus prop to scrollable components', () => {
-    mockUseAlternateBuffer.mockReturnValue(true);
-    const { lastFrame } = render(
+  it('passes hasFocus prop to scrollable components', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolResultDisplay
         resultDisplay="Some result"
         terminalWidth={80}
         hasFocus={true}
       />,
+      { useAlternateBuffer: true },
     );
+    await waitUntilReady();
 
     expect(lastFrame()).toContain('Some result');
+    unmount();
   });
 
-  it('renders string result as markdown by default', () => {
-    const { lastFrame } = render(
+  it('renders string result as markdown by default', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolResultDisplay resultDisplay="**Some result**" terminalWidth={80} />,
+      { useAlternateBuffer: false },
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('renders string result as plain text when renderOutputAsMarkdown is false', () => {
-    const { lastFrame } = render(
+  it('renders string result as plain text when renderOutputAsMarkdown is false', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolResultDisplay
         resultDisplay="**Some result**"
         terminalWidth={80}
         availableTerminalHeight={20}
         renderOutputAsMarkdown={false}
       />,
+      {
+        useAlternateBuffer: false,
+        uiState: { constrainHeight: true },
+      },
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('truncates very long string results', { timeout: 20000 }, () => {
+  it('truncates very long string results', { timeout: 20000 }, async () => {
     const longString = 'a'.repeat(1000005);
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolResultDisplay
         resultDisplay={longString}
         terminalWidth={80}
         availableTerminalHeight={20}
       />,
+      {
+        useAlternateBuffer: false,
+        uiState: { constrainHeight: true },
+      },
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('renders file diff result', () => {
+  it('renders file diff result', async () => {
     const diffResult = {
       fileDiff: 'diff content',
       fileName: 'test.ts',
     };
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolResultDisplay
         resultDisplay={diffResult}
         terminalWidth={80}
         availableTerminalHeight={20}
       />,
+      { useAlternateBuffer: false },
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('renders ANSI output result', () => {
+  it('renders ANSI output result', async () => {
     const ansiResult: AnsiOutput = [
       [
         {
@@ -162,65 +164,78 @@ describe('ToolResultDisplay', () => {
         },
       ],
     ];
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolResultDisplay
         resultDisplay={ansiResult as unknown as AnsiOutput}
         terminalWidth={80}
         availableTerminalHeight={20}
       />,
+      { useAlternateBuffer: false },
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('renders nothing for todos result', () => {
+  it('renders nothing for todos result', async () => {
     const todoResult = {
       todos: [],
     };
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolResultDisplay
         resultDisplay={todoResult}
         terminalWidth={80}
         availableTerminalHeight={20}
       />,
+      { useAlternateBuffer: false },
     );
-    const output = lastFrame();
+    await waitUntilReady();
+    const output = lastFrame({ allowEmpty: true });
 
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('does not fall back to plain text if availableHeight is set and not in alternate buffer', () => {
-    mockUseAlternateBuffer.mockReturnValue(false);
+  it('does not fall back to plain text if availableHeight is set and not in alternate buffer', async () => {
     // availableHeight calculation: 20 - 1 - 5 = 14 > 3
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolResultDisplay
         resultDisplay="**Some result**"
         terminalWidth={80}
         availableTerminalHeight={20}
         renderOutputAsMarkdown={true}
       />,
+      {
+        useAlternateBuffer: false,
+        uiState: { constrainHeight: true },
+      },
     );
+    await waitUntilReady();
     const output = lastFrame();
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('keeps markdown if in alternate buffer even with availableHeight', () => {
-    mockUseAlternateBuffer.mockReturnValue(true);
-    const { lastFrame } = render(
+  it('keeps markdown if in alternate buffer even with availableHeight', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolResultDisplay
         resultDisplay="**Some result**"
         terminalWidth={80}
         availableTerminalHeight={20}
         renderOutputAsMarkdown={true}
       />,
+      { useAlternateBuffer: true },
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toMatchSnapshot();
+    unmount();
   });
 
-  it('truncates ANSI output when maxLines is provided', () => {
+  it('truncates ANSI output when maxLines is provided', async () => {
     const ansiResult: AnsiOutput = [
       [
         {
@@ -258,23 +273,55 @@ describe('ToolResultDisplay', () => {
           inverse: false,
         },
       ],
+      [
+        {
+          text: 'Line 4',
+          fg: '',
+          bg: '',
+          bold: false,
+          italic: false,
+          underline: false,
+          dim: false,
+          inverse: false,
+        },
+      ],
+      [
+        {
+          text: 'Line 5',
+          fg: '',
+          bg: '',
+          bold: false,
+          italic: false,
+          underline: false,
+          dim: false,
+          inverse: false,
+        },
+      ],
     ];
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolResultDisplay
         resultDisplay={ansiResult}
         terminalWidth={80}
         availableTerminalHeight={20}
-        maxLines={2}
+        maxLines={3}
       />,
+      {
+        useAlternateBuffer: false,
+        uiState: { constrainHeight: true },
+      },
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).not.toContain('Line 1');
-    expect(output).toContain('Line 2');
-    expect(output).toContain('Line 3');
+    expect(output).not.toContain('Line 2');
+    expect(output).not.toContain('Line 3');
+    expect(output).toContain('Line 4');
+    expect(output).toContain('Line 5');
+    unmount();
   });
 
-  it('truncates ANSI output when maxLines is provided, even if availableTerminalHeight is undefined', () => {
+  it('truncates ANSI output when maxLines is provided, even if availableTerminalHeight is undefined', async () => {
     const ansiResult: AnsiOutput = Array.from({ length: 50 }, (_, i) => [
       {
         text: `Line ${i + 1}`,
@@ -287,18 +334,24 @@ describe('ToolResultDisplay', () => {
         inverse: false,
       },
     ]);
-    const { lastFrame } = render(
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolResultDisplay
         resultDisplay={ansiResult}
         terminalWidth={80}
         maxLines={25}
         availableTerminalHeight={undefined}
       />,
+      {
+        useAlternateBuffer: false,
+        uiState: { constrainHeight: true },
+      },
     );
+    await waitUntilReady();
     const output = lastFrame();
 
     // It SHOULD truncate to 25 lines because maxLines is provided
     expect(output).not.toContain('Line 1');
     expect(output).toContain('Line 50');
+    unmount();
   });
 });

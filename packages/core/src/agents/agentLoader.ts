@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import yaml from 'js-yaml';
+import { load } from 'js-yaml';
 import * as fs from 'node:fs/promises';
 import { type Dirent } from 'node:fs';
 import * as path from 'node:path';
@@ -44,17 +44,23 @@ interface FrontmatterLocalAgentDefinition
  * Authentication configuration for remote agents in frontmatter format.
  */
 interface FrontmatterAuthConfig {
-  type: 'apiKey' | 'http';
-  agent_card_requires_auth?: boolean;
+  type: 'apiKey' | 'http' | 'google-credentials' | 'oauth2';
   // API Key
   key?: string;
-  in?: 'header' | 'query' | 'cookie';
   name?: string;
   // HTTP
-  scheme?: 'Bearer' | 'Basic';
+  scheme?: string;
   token?: string;
   username?: string;
   password?: string;
+  value?: string;
+  // Google Credentials
+  scopes?: string[];
+  // OAuth2
+  client_id?: string;
+  client_secret?: string;
+  authorization_url?: string;
+  token_url?: string;
 }
 
 interface FrontmatterRemoteAgentDefinition
@@ -102,9 +108,11 @@ const localAgentSchema = z
     display_name: z.string().optional(),
     tools: z
       .array(
-        z.string().refine((val) => isValidToolName(val), {
-          message: 'Invalid tool name',
-        }),
+        z
+          .string()
+          .refine((val) => isValidToolName(val, { allowWildcards: true }), {
+            message: 'Invalid tool name',
+          }),
       )
       .optional(),
     model: z.string().optional(),
@@ -117,9 +125,7 @@ const localAgentSchema = z
 /**
  * Base fields shared by all auth configs.
  */
-const baseAuthFields = {
-  agent_card_requires_auth: z.boolean().optional(),
-};
+const baseAuthFields = {};
 
 /**
  * API Key auth schema.
@@ -129,7 +135,6 @@ const apiKeyAuthSchema = z.object({
   ...baseAuthFields,
   type: z.literal('apiKey'),
   key: z.string().min(1, 'API key is required'),
-  in: z.enum(['header', 'query', 'cookie']).optional(),
   name: z.string().optional(),
 });
 
@@ -138,25 +143,52 @@ const apiKeyAuthSchema = z.object({
  * Note: Validation for scheme-specific fields is applied in authConfigSchema
  * since discriminatedUnion doesn't support refined schemas directly.
  */
-const httpAuthSchemaBase = z.object({
+const httpAuthSchema = z.object({
   ...baseAuthFields,
   type: z.literal('http'),
-  scheme: z.enum(['Bearer', 'Basic']),
-  token: z.string().optional(),
-  username: z.string().optional(),
-  password: z.string().optional(),
+  scheme: z.string().min(1),
+  token: z.string().min(1).optional(),
+  username: z.string().min(1).optional(),
+  password: z.string().min(1).optional(),
+  value: z.string().min(1).optional(),
 });
 
 /**
- * Combined auth schema - discriminated union of all auth types.
- * Note: We use the base schema for discriminatedUnion, then apply refinements
- * via superRefine since discriminatedUnion doesn't support refined schemas directly.
+ * Google Credentials auth schema.
  */
+const googleCredentialsAuthSchema = z.object({
+  ...baseAuthFields,
+  type: z.literal('google-credentials'),
+  scopes: z.array(z.string()).optional(),
+});
+
+/**
+ * OAuth2 auth schema.
+ * authorization_url and token_url can be discovered from the agent card if omitted.
+ */
+const oauth2AuthSchema = z.object({
+  ...baseAuthFields,
+  type: z.literal('oauth2'),
+  client_id: z.string().optional(),
+  client_secret: z.string().optional(),
+  scopes: z.array(z.string()).optional(),
+  authorization_url: z.string().url().optional(),
+  token_url: z.string().url().optional(),
+});
+
 const authConfigSchema = z
-  .discriminatedUnion('type', [apiKeyAuthSchema, httpAuthSchemaBase])
+  .discriminatedUnion('type', [
+    apiKeyAuthSchema,
+    httpAuthSchema,
+    googleCredentialsAuthSchema,
+    oauth2AuthSchema,
+  ])
   .superRefine((data, ctx) => {
-    // Apply HTTP auth validation after union parsing
     if (data.type === 'http') {
+      if (data.value) {
+        // Raw mode - only scheme and value are needed
+        return;
+      }
       if (data.scheme === 'Bearer' && !data.token) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -164,12 +196,21 @@ const authConfigSchema = z
           path: ['token'],
         });
       }
-      if (data.scheme === 'Basic' && (!data.username || !data.password)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Basic scheme requires "username" and "password"',
-          path: data.username ? ['password'] : ['username'],
-        });
+      if (data.scheme === 'Basic') {
+        if (!data.username) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Basic authentication requires "username"',
+            path: ['username'],
+          });
+        }
+        if (!data.password) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Basic authentication requires "password"',
+            path: ['password'],
+          });
+        }
       }
     }
   });
@@ -261,7 +302,7 @@ export async function parseAgentMarkdown(
 
   let rawFrontmatter: unknown;
   try {
-    rawFrontmatter = yaml.load(frontmatterStr);
+    rawFrontmatter = load(frontmatterStr);
   } catch (error) {
     throw new AgentLoadError(
       filePath,
@@ -325,9 +366,7 @@ export async function parseAgentMarkdown(
 function convertFrontmatterAuthToConfig(
   frontmatter: FrontmatterAuthConfig,
 ): A2AAuthConfig {
-  const base = {
-    agent_card_requires_auth: frontmatter.agent_card_requires_auth,
-  };
+  const base = {};
 
   switch (frontmatter.type) {
     case 'apiKey':
@@ -338,8 +377,14 @@ function convertFrontmatterAuthToConfig(
         ...base,
         type: 'apiKey',
         key: frontmatter.key,
-        location: frontmatter.in,
         name: frontmatter.name,
+      };
+
+    case 'google-credentials':
+      return {
+        ...base,
+        type: 'google-credentials',
+        scopes: frontmatter.scopes,
       };
 
     case 'http': {
@@ -347,6 +392,14 @@ function convertFrontmatterAuthToConfig(
         throw new Error(
           'Internal error: HTTP scheme missing after validation.',
         );
+      }
+      if (frontmatter.value) {
+        return {
+          ...base,
+          type: 'http',
+          scheme: frontmatter.scheme,
+          value: frontmatter.value,
+        };
       }
       switch (frontmatter.scheme) {
         case 'Bearer':
@@ -375,11 +428,22 @@ function convertFrontmatterAuthToConfig(
             password: frontmatter.password,
           };
         default: {
-          const exhaustive: never = frontmatter.scheme;
-          throw new Error(`Unknown HTTP scheme: ${exhaustive}`);
+          // Other IANA schemes without a value should not reach here after validation
+          throw new Error(`Unknown HTTP scheme: ${frontmatter.scheme}`);
         }
       }
     }
+
+    case 'oauth2':
+      return {
+        ...base,
+        type: 'oauth2',
+        client_id: frontmatter.client_id,
+        client_secret: frontmatter.client_secret,
+        scopes: frontmatter.scopes,
+        authorization_url: frontmatter.authorization_url,
+        token_url: frontmatter.token_url,
+      };
 
     default: {
       const exhaustive: never = frontmatter.type;
@@ -417,7 +481,7 @@ export function markdownToAgentDefinition(
     return {
       kind: 'remote',
       name: markdown.name,
-      description: markdown.description || '(Loading description...)',
+      description: markdown.description || '',
       displayName: markdown.display_name,
       agentCardUrl: markdown.agent_card_url,
       auth: markdown.auth

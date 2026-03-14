@@ -47,11 +47,7 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
 
       // Symlink node modules to reduce the amount of time needed to
       // bootstrap test projects.
-      const rootNodeModules = path.join(process.cwd(), 'node_modules');
-      const testNodeModules = path.join(rig.testDir || '', 'node_modules');
-      if (fs.existsSync(rootNodeModules) && !fs.existsSync(testNodeModules)) {
-        fs.symlinkSync(rootNodeModules, testNodeModules, 'dir');
-      }
+      symlinkNodeModules(rig.testDir || '');
 
       if (evalCase.files) {
         const acknowledgedAgents: Record<string, Record<string, string>> = {};
@@ -116,6 +112,7 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
         // commands.
         execSync('git config core.editor "true"', execOptions);
         execSync('git config core.pager "cat"', execOptions);
+        execSync('git config commit.gpgsign false', execOptions);
         execSync('git add .', execOptions);
         execSync('git commit --allow-empty -m "Initial commit"', execOptions);
       }
@@ -159,18 +156,45 @@ export function evalTest(policy: EvalPolicy, evalCase: EvalCase) {
     }
   };
 
+  runEval(policy, evalCase.name, fn, evalCase.timeout);
+}
+
+/**
+ * Wraps a test function with the appropriate Vitest 'it' or 'it.skip' based on policy.
+ */
+export function runEval(
+  policy: EvalPolicy,
+  name: string,
+  fn: () => Promise<void>,
+  timeout?: number,
+) {
   if (policy === 'USUALLY_PASSES' && !process.env['RUN_EVALS']) {
-    it.skip(evalCase.name, fn);
+    it.skip(name, fn);
   } else {
-    it(evalCase.name, fn, evalCase.timeout);
+    it(name, fn, timeout);
   }
 }
 
-async function prepareLogDir(name: string) {
+export async function prepareLogDir(name: string) {
   const logDir = path.resolve(process.cwd(), 'evals/logs');
   await fs.promises.mkdir(logDir, { recursive: true });
   const sanitizedName = name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
   return { logDir, sanitizedName };
+}
+
+/**
+ * Symlinks node_modules to the test directory to speed up tests that need to run tools.
+ */
+export function symlinkNodeModules(testDir: string) {
+  const rootNodeModules = path.join(process.cwd(), 'node_modules');
+  const testNodeModules = path.join(testDir, 'node_modules');
+  if (
+    testDir &&
+    fs.existsSync(rootNodeModules) &&
+    !fs.existsSync(testNodeModules)
+  ) {
+    fs.symlinkSync(rootNodeModules, testNodeModules, 'dir');
+  }
 }
 
 export interface EvalCase {

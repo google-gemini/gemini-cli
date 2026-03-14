@@ -17,6 +17,7 @@ import type { ContentGenerator } from './contentGenerator.js';
 import type { FakeResponse } from './fakeContentGenerator.js';
 import type { UserTierId } from '../code_assist/types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import type { LlmRole } from '../telemetry/types.js';
 
 // A ContentGenerator that wraps another content generator and records all the
 // responses, with the ability to write them out to a file. These files are
@@ -41,10 +42,12 @@ export class RecordingContentGenerator implements ContentGenerator {
   async generateContent(
     request: GenerateContentParameters,
     userPromptId: string,
+    role: LlmRole,
   ): Promise<GenerateContentResponse> {
     const response = await this.realGenerator.generateContent(
       request,
       userPromptId,
+      role,
     );
     const recordedResponse: FakeResponse = {
       method: 'generateContent',
@@ -61,6 +64,7 @@ export class RecordingContentGenerator implements ContentGenerator {
   async generateContentStream(
     request: GenerateContentParameters,
     userPromptId: string,
+    role: LlmRole,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const recordedResponse: FakeResponse = {
       method: 'generateContentStream',
@@ -70,6 +74,7 @@ export class RecordingContentGenerator implements ContentGenerator {
     const realResponses = await this.realGenerator.generateContentStream(
       request,
       userPromptId,
+      role,
     );
 
     async function* stream(filePath: string) {

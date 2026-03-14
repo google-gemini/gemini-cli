@@ -42,23 +42,22 @@ vi.mock('crypto');
 vi.mock('../utils/summarizer.js');
 
 import { initializeShellParsers } from '../utils/shell-utils.js';
-import { ShellTool } from './shell.js';
+import { ShellTool, OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
 import { debugLogger } from '../index.js';
 import { type Config } from '../config/config.js';
+import { NoopSandboxManager } from '../services/sandboxManager.js';
 import {
   type ShellExecutionResult,
   type ShellOutputEvent,
 } from '../services/shellExecutionService.js';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
-import { EOL } from 'node:os';
 import * as path from 'node:path';
 import { isSubpath } from '../utils/paths.js';
 import * as crypto from 'node:crypto';
 import * as summarizer from '../utils/summarizer.js';
 import { ToolErrorType } from './tool-error.js';
 import { ToolConfirmationOutcome } from './tools.js';
-import { OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import {
@@ -96,6 +95,13 @@ describe('ShellTool', () => {
     fs.mkdirSync(path.join(tempRootDir, 'subdir'));
 
     mockConfig = {
+      get config() {
+        return this;
+      },
+      geminiClient: {
+        stripThoughtsFromHistory: vi.fn(),
+      },
+
       getAllowedTools: vi.fn().mockReturnValue([]),
       getApprovalMode: vi.fn().mockReturnValue('strict'),
       getCoreTools: vi.fn().mockReturnValue([]),
@@ -132,6 +138,7 @@ describe('ShellTool', () => {
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       sanitizationConfig: {},
+      sandboxManager: new NoopSandboxManager(),
     } as unknown as Config;
 
     const bus = createMockMessageBus();
@@ -265,7 +272,7 @@ describe('ShellTool', () => {
 
       // Simulate pgrep output file creation by the shell command
       const tmpFile = path.join(os.tmpdir(), 'shell_pgrep_abcdef.tmp');
-      fs.writeFileSync(tmpFile, `54321${EOL}54322${EOL}`);
+      fs.writeFileSync(tmpFile, `54321${os.EOL}54322${os.EOL}`);
 
       const result = await promise;
 
@@ -276,7 +283,11 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat', sanitizationConfig: {} },
+        expect.objectContaining({
+          pager: 'cat',
+          sanitizationConfig: {},
+          sandboxManager: expect.any(Object),
+        }),
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
       // The file should be deleted by the tool
@@ -301,7 +312,11 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat', sanitizationConfig: {} },
+        expect.objectContaining({
+          pager: 'cat',
+          sanitizationConfig: {},
+          sandboxManager: expect.any(Object),
+        }),
       );
     });
 
@@ -322,7 +337,11 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat', sanitizationConfig: {} },
+        expect.objectContaining({
+          pager: 'cat',
+          sanitizationConfig: {},
+          sandboxManager: expect.any(Object),
+        }),
       );
     });
 
@@ -368,7 +387,11 @@ describe('ShellTool', () => {
           expect.any(Function),
           expect.any(AbortSignal),
           false,
-          { pager: 'cat', sanitizationConfig: {} },
+          {
+            pager: 'cat',
+            sanitizationConfig: {},
+            sandboxManager: new NoopSandboxManager(),
+          },
         );
       },
       20000,
@@ -443,7 +466,7 @@ describe('ShellTool', () => {
         mockConfig,
         { model: 'summarizer-shell' },
         expect.any(String),
-        mockConfig.getGeminiClient(),
+        mockConfig.geminiClient,
         mockAbortSignal,
       );
       expect(result.llmContent).toBe('summarized output');

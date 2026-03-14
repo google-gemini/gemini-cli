@@ -105,7 +105,7 @@ excellent for debugging why the agent might be ignoring a rule.
 If you edit a `GEMINI.md` file while a session is running, the agent won't know
 immediately. Force a reload with:
 
-**Command:** `/memory refresh`
+**Command:** `/memory reload`
 
 ## Best practices
 
@@ -121,6 +121,6 @@ immediately. Force a reload with:
 
 - Learn about [Session management](session-management.md) to see how short-term
   history works.
-- Explore the [Command reference](../../cli/commands.md) for more `/memory`
-  options.
+- Explore the [Command reference](../../reference/commands.md) for more
+  `/memory` options.
 - Read the technical spec for [Project context](../../cli/gemini-md.md).

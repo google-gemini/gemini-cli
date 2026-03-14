@@ -80,6 +80,8 @@ describe('DialogManager', () => {
       stats: undefined,
       proQuotaRequest: null,
       validationRequest: null,
+      overageMenuRequest: null,
+      emptyWalletRequest: null,
     },
     shouldShowIdePrompt: false,
     isFolderTrustDialogOpen: false,
@@ -101,12 +103,14 @@ describe('DialogManager', () => {
     selectedAgentDefinition: undefined,
   };
 
-  it('renders nothing by default', () => {
-    const { lastFrame } = renderWithProviders(
+  it('renders nothing by default', async () => {
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <DialogManager {...defaultProps} />,
       { uiState: baseUiState as Partial<UIState> as UIState },
     );
-    expect(lastFrame()).toBe('');
+    await waitUntilReady();
+    expect(lastFrame({ allowEmpty: true })).toBe('');
+    unmount();
   });
 
   const testCases: Array<[Partial<UIState>, string]> = [
@@ -130,6 +134,8 @@ describe('DialogManager', () => {
             resolve: vi.fn(),
           },
           validationRequest: null,
+          overageMenuRequest: null,
+          emptyWalletRequest: null,
         },
       },
       'ProQuotaDialog',
@@ -190,8 +196,8 @@ describe('DialogManager', () => {
 
   it.each(testCases)(
     'renders %s when state is %o',
-    (uiStateOverride, expectedComponent) => {
-      const { lastFrame } = renderWithProviders(
+    async (uiStateOverride, expectedComponent) => {
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <DialogManager {...defaultProps} />,
         {
           uiState: {
@@ -200,7 +206,9 @@ describe('DialogManager', () => {
           } as Partial<UIState> as UIState,
         },
       );
+      await waitUntilReady();
       expect(lastFrame()).toContain(expectedComponent);
+      unmount();
     },
   );
 });

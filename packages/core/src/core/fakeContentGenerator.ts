@@ -14,8 +14,9 @@ import {
 } from '@google/genai';
 import { promises } from 'node:fs';
 import type { ContentGenerator } from './contentGenerator.js';
-import type { UserTierId } from '../code_assist/types.js';
+import type { UserTierId, GeminiUserTier } from '../code_assist/types.js';
 import { safeJsonStringify } from '../utils/safeJsonStringify.js';
+import type { LlmRole } from '../telemetry/types.js';
 
 export type FakeResponse =
   | {
@@ -43,6 +44,7 @@ export class FakeContentGenerator implements ContentGenerator {
   private callCounter = 0;
   userTier?: UserTierId;
   userTierName?: string;
+  paidTier?: GeminiUserTier;
 
   constructor(private readonly responses: FakeResponse[]) {}
 
@@ -79,7 +81,10 @@ export class FakeContentGenerator implements ContentGenerator {
   async generateContent(
     request: GenerateContentParameters,
     _userPromptId: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    role: LlmRole,
   ): Promise<GenerateContentResponse> {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return Object.setPrototypeOf(
       this.getNextResponse('generateContent', request),
       GenerateContentResponse.prototype,
@@ -89,6 +94,8 @@ export class FakeContentGenerator implements ContentGenerator {
   async generateContentStream(
     request: GenerateContentParameters,
     _userPromptId: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    role: LlmRole,
   ): Promise<AsyncGenerator<GenerateContentResponse>> {
     const responses = this.getNextResponse('generateContentStream', request);
     async function* stream() {
@@ -111,6 +118,7 @@ export class FakeContentGenerator implements ContentGenerator {
   async embedContent(
     request: EmbedContentParameters,
   ): Promise<EmbedContentResponse> {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return Object.setPrototypeOf(
       this.getNextResponse('embedContent', request),
       EmbedContentResponse.prototype,

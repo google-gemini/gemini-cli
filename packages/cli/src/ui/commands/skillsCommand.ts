@@ -16,9 +16,8 @@ import {
   MessageType,
 } from '../types.js';
 import { disableSkill, enableSkill } from '../../utils/skillSettings.js';
-import { getErrorMessage } from '../../utils/errors.js';
 
-import { getAdminErrorMessage } from '@google/gemini-cli-core';
+import { getAdminErrorMessage, getErrorMessage } from '@google/gemini-cli-core';
 import {
   linkSkill,
   renderSkillActionFeedback,
@@ -396,6 +395,7 @@ export const skillsCommand: SlashCommand = {
     },
     {
       name: 'reload',
+      altNames: ['refresh'],
       description:
         'Reload the list of discovered skills. Usage: /skills reload',
       kind: CommandKind.BUILT_IN,

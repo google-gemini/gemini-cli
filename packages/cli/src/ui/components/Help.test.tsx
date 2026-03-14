@@ -7,8 +7,7 @@
 import { render } from '../../test-utils/render.js';
 import { describe, it, expect } from 'vitest';
 import { Help } from './Help.js';
-import type { SlashCommand } from '../commands/types.js';
-import { CommandKind } from '../commands/types.js';
+import { CommandKind, type SlashCommand } from '../commands/types.js';
 
 const mockCommands: readonly SlashCommand[] = [
   {
@@ -43,8 +42,11 @@ const mockCommands: readonly SlashCommand[] = [
 ];
 
 describe('Help Component', () => {
-  it('should not render hidden commands', () => {
-    const { lastFrame, unmount } = render(<Help commands={mockCommands} />);
+  it('should not render hidden commands', async () => {
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <Help commands={mockCommands} />,
+    );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toContain('/test');
@@ -52,8 +54,11 @@ describe('Help Component', () => {
     unmount();
   });
 
-  it('should not render hidden subcommands', () => {
-    const { lastFrame, unmount } = render(<Help commands={mockCommands} />);
+  it('should not render hidden subcommands', async () => {
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <Help commands={mockCommands} />,
+    );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toContain('visible-child');
@@ -61,14 +66,17 @@ describe('Help Component', () => {
     unmount();
   });
 
-  it('should render keyboard shortcuts', () => {
-    const { lastFrame, unmount } = render(<Help commands={mockCommands} />);
+  it('should render keyboard shortcuts', async () => {
+    const { lastFrame, waitUntilReady, unmount } = render(
+      <Help commands={mockCommands} />,
+    );
+    await waitUntilReady();
     const output = lastFrame();
 
     expect(output).toContain('Keyboard Shortcuts:');
     expect(output).toContain('Ctrl+C');
     expect(output).toContain('Ctrl+S');
-    expect(output).toContain('Page Up/Down');
+    expect(output).toContain('Page Up/Page Down');
     unmount();
   });
 });

@@ -6,12 +6,15 @@
 
 import { type McpToolContext, BeforeToolHookOutput } from '../hooks/types.js';
 import type { Config } from '../config/config.js';
-import type { ToolResult, AnyDeclarativeTool } from '../tools/tools.js';
+import type {
+  ToolResult,
+  AnyDeclarativeTool,
+  AnyToolInvocation,
+  ToolLiveOutput,
+} from '../tools/tools.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import type { AnsiOutput, ShellExecutionConfig } from '../index.js';
-import type { AnyToolInvocation } from '../tools/tools.js';
-import { ShellToolInvocation } from '../tools/shell.js';
+import type { ShellExecutionConfig } from '../index.js';
 import { DiscoveredMCPToolInvocation } from '../tools/mcp-tool.js';
 
 /**
@@ -22,7 +25,7 @@ import { DiscoveredMCPToolInvocation } from '../tools/mcp-tool.js';
  * @returns MCP context if this is an MCP tool, undefined otherwise
  */
 function extractMcpContext(
-  invocation: ShellToolInvocation | AnyToolInvocation,
+  invocation: AnyToolInvocation,
   config: Config,
 ): McpToolContext | undefined {
   if (!(invocation instanceof DiscoveredMCPToolInvocation)) {
@@ -59,19 +62,20 @@ function extractMcpContext(
  * @param signal Abort signal for cancellation
  * @param liveOutputCallback Optional callback for live output updates
  * @param shellExecutionConfig Optional shell execution config
- * @param setPidCallback Optional callback to set the PID for shell invocations
+ * @param setExecutionIdCallback Optional callback to set an execution ID for backgroundable invocations
  * @param config Config to look up MCP server details for hook context
  * @returns The tool result
  */
 export async function executeToolWithHooks(
-  invocation: ShellToolInvocation | AnyToolInvocation,
+  invocation: AnyToolInvocation,
   toolName: string,
   signal: AbortSignal,
   tool: AnyDeclarativeTool,
-  liveOutputCallback?: (outputChunk: string | AnsiOutput) => void,
+  liveOutputCallback?: (outputChunk: ToolLiveOutput) => void,
   shellExecutionConfig?: ShellExecutionConfig,
-  setPidCallback?: (pid: number) => void,
+  setExecutionIdCallback?: (executionId: number) => void,
   config?: Config,
+  originalRequestName?: string,
 ): Promise<ToolResult> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const toolInput = (invocation.params || {}) as Record<string, unknown>;
@@ -87,6 +91,7 @@ export async function executeToolWithHooks(
       toolName,
       toolInput,
       mcpContext,
+      originalRequestName,
     );
 
     // Check if hook requested to stop entire agent execution
@@ -148,22 +153,14 @@ export async function executeToolWithHooks(
     }
   }
 
-  // Execute the actual tool
-  let toolResult: ToolResult;
-  if (setPidCallback && invocation instanceof ShellToolInvocation) {
-    toolResult = await invocation.execute(
-      signal,
-      liveOutputCallback,
-      shellExecutionConfig,
-      setPidCallback,
-    );
-  } else {
-    toolResult = await invocation.execute(
-      signal,
-      liveOutputCallback,
-      shellExecutionConfig,
-    );
-  }
+  // Execute the actual tool. Tools that support backgrounding can optionally
+  // surface an execution ID via the callback.
+  const toolResult: ToolResult = await invocation.execute(
+    signal,
+    liveOutputCallback,
+    shellExecutionConfig,
+    setExecutionIdCallback,
+  );
 
   // Append notification if parameters were modified
   if (inputWasModified) {
@@ -193,6 +190,7 @@ export async function executeToolWithHooks(
         error: toolResult.error,
       },
       mcpContext,
+      originalRequestName,
     );
 
     // Check if hook requested to stop entire agent execution
@@ -238,6 +236,12 @@ export async function executeToolWithHooks(
       } else {
         toolResult.llmContent = wrappedContext;
       }
+    }
+
+    // Check if the hook requested a tail tool call
+    const tailToolCallRequest = afterOutput?.getTailToolCallRequest();
+    if (tailToolCallRequest) {
+      toolResult.tailToolCallRequest = tailToolCallRequest;
     }
   }
 

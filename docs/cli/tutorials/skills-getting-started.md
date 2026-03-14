@@ -14,8 +14,16 @@ responding correctly.
 
 1.  Run the following command to create the folders:
 
+    **macOS/Linux**
+
     ```bash
     mkdir -p .gemini/skills/api-auditor/scripts
+    ```
+
+    **Windows (PowerShell)**
+
+    ```powershell
+    New-Item -ItemType Directory -Force -Path ".gemini\skills\api-auditor\scripts"
     ```
 
 ### Create the definition
@@ -68,8 +76,9 @@ Skills can bundle resources like scripts.
 
 ## How to verify discovery
 
-Gemini CLI automatically discovers skills in the `.gemini/skills` directory.
-Check that it found your new skill.
+Gemini CLI automatically discovers skills in the `.gemini/skills` directory. You
+can also use `.agents/skills` as a more generic alternative. Check that it found
+your new skill.
 
 **Command:** `/skills list`
 

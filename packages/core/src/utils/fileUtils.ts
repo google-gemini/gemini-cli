@@ -8,13 +8,17 @@ import fs from 'node:fs';
 import fsPromises from 'node:fs/promises';
 import path from 'node:path';
 import type { PartUnion } from '@google/genai';
-// eslint-disable-next-line import/no-internal-modules
 import mime from 'mime/lite';
 import type { FileSystemService } from '../services/fileSystemService.js';
 import { ToolErrorType } from '../tools/tool-error.js';
 import { BINARY_EXTENSIONS } from './ignorePatterns.js';
 import { createRequire as createModuleRequire } from 'node:module';
 import { debugLogger } from './debugLogger.js';
+import {
+  DEFAULT_MAX_LINES_TEXT_FILE,
+  MAX_LINE_LENGTH_TEXT_FILE,
+  MAX_FILE_SIZE_MB,
+} from './constants.js';
 
 const requireModule = createModuleRequire(import.meta.url);
 
@@ -51,10 +55,6 @@ export async function loadWasmBinary(
     });
   }
 }
-
-// Constants for text file processing
-const DEFAULT_MAX_LINES_TEXT_FILE = 2000;
-const MAX_LINE_LENGTH_TEXT_FILE = 2000;
 
 // Default values for encoding and separator format
 export const DEFAULT_ENCODING: BufferEncoding = 'utf-8';
@@ -399,16 +399,17 @@ export interface ProcessedFileReadResult {
  * Reads and processes a single file, handling text, images, and PDFs.
  * @param filePath Absolute path to the file.
  * @param rootDirectory Absolute path to the project root for relative path display.
- * @param offset Optional offset for text files (0-based line number).
- * @param limit Optional limit for text files (number of lines to read).
+ * @param _fileSystemService Currently unused in this function; kept for signature stability.
+ * @param startLine Optional 1-based line number to start reading from.
+ * @param endLine Optional 1-based line number to end reading at (inclusive).
  * @returns ProcessedFileReadResult object.
  */
 export async function processSingleFileContent(
   filePath: string,
   rootDirectory: string,
-  fileSystemService: FileSystemService,
-  offset?: number,
-  limit?: number,
+  _fileSystemService: FileSystemService,
+  startLine?: number,
+  endLine?: number,
 ): Promise<ProcessedFileReadResult> {
   try {
     if (!fs.existsSync(filePath)) {
@@ -433,11 +434,11 @@ export async function processSingleFileContent(
     }
 
     const fileSizeInMB = stats.size / (1024 * 1024);
-    if (fileSizeInMB > 20) {
+    if (fileSizeInMB > MAX_FILE_SIZE_MB) {
       return {
-        llmContent: 'File size exceeds the 20MB limit.',
-        returnDisplay: 'File size exceeds the 20MB limit.',
-        error: `File size exceeds the 20MB limit: ${filePath} (${fileSizeInMB.toFixed(2)}MB)`,
+        llmContent: `File size exceeds the ${MAX_FILE_SIZE_MB}MB limit.`,
+        returnDisplay: `File size exceeds the ${MAX_FILE_SIZE_MB}MB limit.`,
+        error: `File size exceeds the ${MAX_FILE_SIZE_MB}MB limit: ${filePath} (${fileSizeInMB.toFixed(2)}MB)`,
         errorType: ToolErrorType.FILE_TOO_LARGE,
       };
     }
@@ -471,17 +472,27 @@ export async function processSingleFileContent(
       case 'text': {
         // Use BOM-aware reader to avoid leaving a BOM character in content and to support UTF-16/32 transparently
         const content = await readFileWithEncoding(filePath);
-        const lines = content.split('\n');
+        const lines = content.split(/\r?\n/);
         const originalLineCount = lines.length;
 
-        const startLine = offset || 0;
-        const effectiveLimit =
-          limit === undefined ? DEFAULT_MAX_LINES_TEXT_FILE : limit;
-        // Ensure endLine does not exceed originalLineCount
-        const endLine = Math.min(startLine + effectiveLimit, originalLineCount);
-        // Ensure selectedLines doesn't try to slice beyond array bounds if startLine is too high
-        const actualStartLine = Math.min(startLine, originalLineCount);
-        const selectedLines = lines.slice(actualStartLine, endLine);
+        let sliceStart = 0;
+        let sliceEnd = originalLineCount;
+
+        if (startLine !== undefined || endLine !== undefined) {
+          sliceStart = startLine ? startLine - 1 : 0;
+          sliceEnd = endLine
+            ? Math.min(endLine, originalLineCount)
+            : Math.min(
+                sliceStart + DEFAULT_MAX_LINES_TEXT_FILE,
+                originalLineCount,
+              );
+        } else {
+          sliceEnd = Math.min(DEFAULT_MAX_LINES_TEXT_FILE, originalLineCount);
+        }
+
+        // Ensure selectedLines doesn't try to slice beyond array bounds
+        const actualStart = Math.min(sliceStart, originalLineCount);
+        const selectedLines = lines.slice(actualStart, sliceEnd);
 
         let linesWereTruncatedInLength = false;
         const formattedLines = selectedLines.map((line) => {
@@ -494,17 +505,18 @@ export async function processSingleFileContent(
           return line;
         });
 
-        const contentRangeTruncated =
-          startLine > 0 || endLine < originalLineCount;
-        const isTruncated = contentRangeTruncated || linesWereTruncatedInLength;
+        const isTruncated =
+          actualStart > 0 ||
+          sliceEnd < originalLineCount ||
+          linesWereTruncatedInLength;
         const llmContent = formattedLines.join('\n');
 
         // By default, return nothing to streamline the common case of a successful read_file.
         let returnDisplay = '';
-        if (contentRangeTruncated) {
+        if (actualStart > 0 || sliceEnd < originalLineCount) {
           returnDisplay = `Read lines ${
-            actualStartLine + 1
-          }-${endLine} of ${originalLineCount} from ${relativePathForDisplay}`;
+            actualStart + 1
+          }-${sliceEnd} of ${originalLineCount} from ${relativePathForDisplay}`;
           if (linesWereTruncatedInLength) {
             returnDisplay += ' (some lines were shortened)';
           }
@@ -517,7 +529,7 @@ export async function processSingleFileContent(
           returnDisplay,
           isTruncated,
           originalLineCount,
-          linesShown: [actualStartLine + 1, endLine],
+          linesShown: [actualStart + 1, sliceEnd],
         };
       }
       case 'image':

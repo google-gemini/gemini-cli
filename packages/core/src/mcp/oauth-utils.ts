@@ -146,6 +146,7 @@ export class OAuthUtils {
   ): MCPOAuthConfig {
     return {
       authorizationUrl: metadata.authorization_endpoint,
+      issuer: metadata.issuer,
       tokenUrl: metadata.token_endpoint,
       scopes: metadata.scopes_supported || [],
       registrationUrl: metadata.registration_endpoint,
@@ -256,7 +257,12 @@ export class OAuthUtils {
         // it is using as the prefix for the metadata request exactly matches the value
         // of the resource metadata parameter in the protected resource metadata document.
         const expectedResource = this.buildResourceParameter(serverUrl);
-        if (resourceMetadata.resource !== expectedResource) {
+        if (
+          !this.isEquivalentResourceIdentifier(
+            resourceMetadata.resource,
+            expectedResource,
+          )
+        ) {
           throw new ResourceMismatchError(
             `Protected resource ${resourceMetadata.resource} does not match expected ${expectedResource}`,
           );
@@ -347,7 +353,12 @@ export class OAuthUtils {
     if (resourceMetadata && mcpServerUrl) {
       // Validate resource parameter per RFC 9728 Section 7.3
       const expectedResource = this.buildResourceParameter(mcpServerUrl);
-      if (resourceMetadata.resource !== expectedResource) {
+      if (
+        !this.isEquivalentResourceIdentifier(
+          resourceMetadata.resource,
+          expectedResource,
+        )
+      ) {
         throw new ResourceMismatchError(
           `Protected resource ${resourceMetadata.resource} does not match expected ${expectedResource}`,
         );
@@ -401,6 +412,21 @@ export class OAuthUtils {
     return `${url.protocol}//${url.host}${url.pathname}`;
   }
 
+  private static isEquivalentResourceIdentifier(
+    discoveredResource: string,
+    expectedResource: string,
+  ): boolean {
+    const normalize = (resource: string): string => {
+      try {
+        return this.buildResourceParameter(resource);
+      } catch {
+        return resource;
+      }
+    };
+
+    return normalize(discoveredResource) === normalize(expectedResource);
+  }
+
   /**
    * Parses a JWT string to extract its expiry time.
    * @param idToken The JWT ID token.
@@ -408,6 +434,7 @@ export class OAuthUtils {
    */
   static parseTokenExpiry(idToken: string): number | undefined {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const payload = JSON.parse(
         Buffer.from(idToken.split('.')[1], 'base64').toString(),
       );

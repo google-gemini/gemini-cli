@@ -18,43 +18,51 @@ describe('ExitWarning', () => {
     vi.clearAllMocks();
   });
 
-  it('renders nothing by default', () => {
+  it('renders nothing by default', async () => {
     mockUseUIState.mockReturnValue({
       dialogsVisible: false,
       ctrlCPressedOnce: false,
       ctrlDPressedOnce: false,
     } as unknown as UIState);
-    const { lastFrame } = render(<ExitWarning />);
-    expect(lastFrame()).toBe('');
+    const { lastFrame, waitUntilReady, unmount } = render(<ExitWarning />);
+    await waitUntilReady();
+    expect(lastFrame({ allowEmpty: true })).toBe('');
+    unmount();
   });
 
-  it('renders Ctrl+C warning when pressed once and dialogs visible', () => {
+  it('renders Ctrl+C warning when pressed once and dialogs visible', async () => {
     mockUseUIState.mockReturnValue({
       dialogsVisible: true,
       ctrlCPressedOnce: true,
       ctrlDPressedOnce: false,
     } as unknown as UIState);
-    const { lastFrame } = render(<ExitWarning />);
+    const { lastFrame, waitUntilReady, unmount } = render(<ExitWarning />);
+    await waitUntilReady();
     expect(lastFrame()).toContain('Press Ctrl+C again to exit');
+    unmount();
   });
 
-  it('renders Ctrl+D warning when pressed once and dialogs visible', () => {
+  it('renders Ctrl+D warning when pressed once and dialogs visible', async () => {
     mockUseUIState.mockReturnValue({
       dialogsVisible: true,
       ctrlCPressedOnce: false,
       ctrlDPressedOnce: true,
     } as unknown as UIState);
-    const { lastFrame } = render(<ExitWarning />);
+    const { lastFrame, waitUntilReady, unmount } = render(<ExitWarning />);
+    await waitUntilReady();
     expect(lastFrame()).toContain('Press Ctrl+D again to exit');
+    unmount();
   });
 
-  it('renders nothing if dialogs are not visible', () => {
+  it('renders nothing if dialogs are not visible', async () => {
     mockUseUIState.mockReturnValue({
       dialogsVisible: false,
       ctrlCPressedOnce: true,
       ctrlDPressedOnce: true,
     } as unknown as UIState);
-    const { lastFrame } = render(<ExitWarning />);
-    expect(lastFrame()).toBe('');
+    const { lastFrame, waitUntilReady, unmount } = render(<ExitWarning />);
+    await waitUntilReady();
+    expect(lastFrame({ allowEmpty: true })).toBe('');
+    unmount();
   });
 });

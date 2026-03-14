@@ -7,13 +7,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { UiTelemetryService } from './uiTelemetry.js';
 import { ToolCallDecision } from './tool-call-decision.js';
-import type { ApiErrorEvent, ApiResponseEvent } from './types.js';
-import { ToolCallEvent } from './types.js';
 import {
+  ToolCallEvent,
   EVENT_API_ERROR,
   EVENT_API_RESPONSE,
   EVENT_TOOL_CALL,
+  type ApiErrorEvent,
+  type ApiResponseEvent,
 } from './types.js';
+import { type ConversationRecord } from '../services/chatRecordingService.js';
 import type {
   CompletedToolCall,
   ErroredToolCall,
@@ -181,6 +183,7 @@ describe('UiTelemetryService', () => {
           thoughts: 2,
           tool: 3,
         },
+        roles: {},
       });
       expect(service.getLastPromptTokenCount()).toBe(0);
     });
@@ -236,6 +239,7 @@ describe('UiTelemetryService', () => {
           thoughts: 6,
           tool: 9,
         },
+        roles: {},
       });
       expect(service.getLastPromptTokenCount()).toBe(0);
     });
@@ -311,6 +315,7 @@ describe('UiTelemetryService', () => {
           thoughts: 0,
           tool: 0,
         },
+        roles: {},
       });
     });
 
@@ -355,6 +360,35 @@ describe('UiTelemetryService', () => {
           cached: 5,
           thoughts: 2,
           tool: 3,
+        },
+        roles: {},
+      });
+    });
+
+    it('should update role metrics when processing an ApiErrorEvent with a role', () => {
+      const event = {
+        'event.name': EVENT_API_ERROR,
+        model: 'gemini-2.5-pro',
+        duration_ms: 300,
+        error: 'Something went wrong',
+        role: 'utility_tool',
+      } as unknown as ApiErrorEvent & { 'event.name': typeof EVENT_API_ERROR };
+
+      service.addEvent(event);
+
+      const metrics = service.getMetrics();
+      expect(metrics.models['gemini-2.5-pro'].roles['utility_tool']).toEqual({
+        totalRequests: 1,
+        totalErrors: 1,
+        totalLatencyMs: 300,
+        tokens: {
+          input: 0,
+          prompt: 0,
+          candidates: 0,
+          total: 0,
+          cached: 0,
+          thoughts: 0,
+          tool: 0,
         },
       });
     });
@@ -662,6 +696,121 @@ describe('UiTelemetryService', () => {
       service.setLastPromptTokenCount(0);
       expect(service.getLastPromptTokenCount()).toBe(0);
       expect(spy).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('clear', () => {
+    it('should reset metrics and last prompt token count', () => {
+      // Set up initial state with some metrics
+      const event = {
+        'event.name': EVENT_API_RESPONSE,
+        model: 'gemini-2.5-pro',
+        duration_ms: 500,
+        usage: {
+          input_token_count: 100,
+          output_token_count: 200,
+          total_token_count: 300,
+          cached_content_token_count: 50,
+          thoughts_token_count: 20,
+          tool_token_count: 30,
+        },
+      } as ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE };
+
+      service.addEvent(event);
+      service.setLastPromptTokenCount(123);
+
+      expect(service.getMetrics().models['gemini-2.5-pro']).toBeDefined();
+      expect(service.getLastPromptTokenCount()).toBe(123);
+
+      service.clear();
+
+      expect(service.getMetrics().models).toEqual({});
+      expect(service.getLastPromptTokenCount()).toBe(0);
+    });
+
+    it('should emit clear and update events', () => {
+      const clearSpy = vi.fn();
+      const updateSpy = vi.fn();
+      service.on('clear', clearSpy);
+      service.on('update', updateSpy);
+
+      const newSessionId = 'new-session-id';
+      service.clear(newSessionId);
+
+      expect(clearSpy).toHaveBeenCalledWith(newSessionId);
+      expect(updateSpy).toHaveBeenCalledOnce();
+      const { metrics, lastPromptTokenCount } = updateSpy.mock.calls[0][0];
+      expect(metrics.models).toEqual({});
+      expect(lastPromptTokenCount).toBe(0);
+    });
+  });
+
+  describe('hydrate', () => {
+    it('should aggregate metrics from a ConversationRecord', () => {
+      const conversation = {
+        sessionId: 'resumed-session',
+        messages: [
+          {
+            type: 'user',
+            content: 'Hello',
+          },
+          {
+            type: 'gemini',
+            model: 'gemini-1.5-pro',
+            tokens: {
+              input: 10,
+              output: 20,
+              total: 30,
+              cached: 5,
+              thoughts: 2,
+              tool: 3,
+            },
+            toolCalls: [
+              { name: 'test_tool', status: 'success' },
+              { name: 'test_tool', status: 'error' },
+            ],
+          },
+          {
+            type: 'gemini',
+            model: 'gemini-1.5-pro',
+            tokens: {
+              input: 100,
+              output: 200,
+              total: 300,
+              cached: 50,
+              thoughts: 20,
+              tool: 30,
+            },
+          },
+        ],
+      } as unknown as ConversationRecord;
+
+      const clearSpy = vi.fn();
+      const updateSpy = vi.fn();
+      service.on('clear', clearSpy);
+      service.on('update', updateSpy);
+
+      service.hydrate(conversation);
+
+      expect(clearSpy).toHaveBeenCalledWith('resumed-session');
+      const metrics = service.getMetrics();
+      const modelMetrics = metrics.models['gemini-1.5-pro'];
+
+      expect(modelMetrics).toBeDefined();
+      expect(modelMetrics.tokens.prompt).toBe(110); // 10 + 100
+      expect(modelMetrics.tokens.candidates).toBe(220); // 20 + 200
+      expect(modelMetrics.tokens.cached).toBe(55); // 5 + 50
+      expect(modelMetrics.tokens.thoughts).toBe(22); // 2 + 20
+      expect(modelMetrics.tokens.tool).toBe(33); // 3 + 30
+      expect(modelMetrics.tokens.input).toBe(55); // 110 - 55
+
+      expect(metrics.tools.totalCalls).toBe(2);
+      expect(metrics.tools.totalSuccess).toBe(1);
+      expect(metrics.tools.totalFail).toBe(1);
+      expect(metrics.tools.byName['test_tool'].count).toBe(2);
+
+      expect(service.getLastPromptTokenCount()).toBe(300); // 100 (input) + 200 (output)
+      expect(updateSpy).toHaveBeenCalled();
     });
   });
 
