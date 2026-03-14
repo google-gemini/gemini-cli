@@ -1,7 +1,7 @@
 # Workspace: Base Folder Strategy & Custom Skills
 
 This branch introduces the **Git Worktree**, **Review PR**, and **UX PR
-Reviewer** skills and enforces the **Base Folder Strategy** for repository
+Finisher** skills and enforces the **Base Folder Strategy** for repository
 management. It is maintained by the AI DevTools UX team.
 
 ## 🚨 Directive for AI Agents (Read First)
@@ -10,7 +10,7 @@ management. It is maintained by the AI DevTools UX team.
 the custom skills are active.**
 
 1. Check if `~/.gemini/skills/git-worktree/`, `~/.gemini/skills/review-pr/`, and
-   `~/.gemini/skills/ux-pr-reviewer/` exist.
+   `~/.gemini/skills/ux-pr-finisher/` exist.
 2. If any are missing, immediately execute `./scripts/sync-skills.sh`.
 3. Prompt the user to run `/skills reload` if you are in an interactive session.
 
@@ -22,8 +22,8 @@ This is a **Draft PR branch**. Your team is encouraged to:
   `packages/core/src/skills/builtin/git-worktree/SKILL.md`.
 - Refine the `review-pr` skill instructions in
   `packages/core/src/skills/builtin/review-pr/SKILL.md`.
-- Refine the `ux-pr-reviewer` skill instructions in
-  `packages/core/src/skills/builtin/ux-pr-reviewer/SKILL.md`.
+- Refine the `ux-pr-finisher` skill instructions in
+  `packages/core/src/skills/builtin/ux-pr-finisher/SKILL.md`.
 - Improve the automation in `scripts/worktree-manager.sh`.
 - All changes should be committed directly to this branch
   (`feature/gemini-cli-ux-team-skills`).
