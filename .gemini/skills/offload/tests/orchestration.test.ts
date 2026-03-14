@@ -116,11 +116,11 @@ describe('Offload Orchestration', () => {
       vi.mocked(readline.createInterface).mockReturnValue(mockInterface as any);
     });
 
-    it('should correctly detect pre-existing setup', async () => {
+    it('should correctly detect pre-existing setup when everything is present', async () => {
       vi.mocked(spawnSync).mockImplementation((cmd: any, args: any) => {
         if (cmd === 'ssh') {
           const remoteCmd = args[1];
-          if (remoteCmd.includes('[ -d ~/test-dir/.git ]')) return { status: 0 } as any;
+          // Mock dependencies present (gh, tmux, gemini)
           if (remoteCmd.includes('command -v')) return { status: 0 } as any;
           if (remoteCmd.includes('gh auth status')) return { status: 0 } as any;
           if (remoteCmd.includes('google_accounts.json')) return { status: 0 } as any;
@@ -131,14 +131,43 @@ describe('Offload Orchestration', () => {
       mockInterface.question
         .mockImplementationOnce((q, cb) => cb('test-host'))
         .mockImplementationOnce((q, cb) => cb('~/test-dir'))
-        .mockImplementationOnce((q, cb) => cb('p'))
-        .mockImplementationOnce((q, cb) => cb('p'))
+        .mockImplementationOnce((q, cb) => cb('p')) // gemini preexisting
+        .mockImplementationOnce((q, cb) => cb('p')) // gh preexisting
         .mockImplementationOnce((q, cb) => cb('none'));
 
       await runSetup({ HOME: '/test-home' });
 
-      const writeCall = vi.mocked(fs.writeFileSync).mock.calls.find(call => call[0].toString().includes('.gemini/settings.json'));
+      const writeCall = vi.mocked(fs.writeFileSync).mock.calls.find(call => 
+        call[0].toString().includes('.gemini/settings.json')
+      );
       expect(writeCall).toBeDefined();
+    });
+
+    it('should default to isolated when dependencies are missing', async () => {
+        vi.mocked(spawnSync).mockImplementation((cmd: any, args: any) => {
+          if (cmd === 'ssh') {
+            const remoteCmd = args[1];
+            // Mock dependencies missing
+            if (remoteCmd.includes('command -v')) return { status: 1 } as any;
+          }
+          return { status: 0, stdout: Buffer.from(''), stderr: Buffer.from('') } as any;
+        });
+  
+        // Only 3 questions now: host, dir, terminal (gemini/gh choice skipped)
+        mockInterface.question
+          .mockImplementationOnce((q, cb) => cb('test-host'))
+          .mockImplementationOnce((q, cb) => cb('~/test-dir'))
+          .mockImplementationOnce((q, cb) => cb('y')) // provision requirements
+          .mockImplementationOnce((q, cb) => cb('none'));
+  
+        await runSetup({ HOME: '/test-home' });
+  
+        const writeCall = vi.mocked(fs.writeFileSync).mock.calls.find(call => 
+          call[0].toString().includes('.gemini/settings.json')
+        );
+        const savedSettings = JSON.parse(writeCall![1] as string);
+        expect(savedSettings.maintainer.deepReview.geminiSetup).toBe('isolated');
+        expect(savedSettings.maintainer.deepReview.ghSetup).toBe('isolated');
     });
   });
 

@@ -40,39 +40,54 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   const remoteWorkDir = await prompt('Remote Work Directory', `${OFFLOAD_BASE}/workspace`);
 
   console.log(`🔍 Checking state of ${remoteHost}...`);
+  const envLoader = 'export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh"';
+  
+  // Probe remote for existing installations
+  const ghCheck = spawnSync('ssh', [remoteHost, 'sh -lc "command -v gh"'], { stdio: 'pipe' });
+  const tmuxCheck = spawnSync('ssh', [remoteHost, 'sh -lc "command -v tmux"'], { stdio: 'pipe' });
+  const geminiCheck = spawnSync('ssh', [remoteHost, `sh -lc "${envLoader} && command -v gemini"`], { stdio: 'pipe' });
+
+  const hasGH = ghCheck.status === 0;
+  const hasTmux = tmuxCheck.status === 0;
+  const hasGemini = geminiCheck.status === 0;
 
   // 1. Gemini CLI Isolation Choice
-  const geminiChoice = await prompt('\nGemini CLI Setup: Use [p]re-existing instance or [i]solated sandbox instance? (Isolated is recommended)', 'i');
-  const geminiSetup = geminiChoice.toLowerCase() === 'p' ? 'preexisting' : 'isolated';
+  let geminiSetup = 'isolated';
+  if (hasGemini) {
+    const geminiChoice = await prompt(`\nGemini CLI found on remote. Use [p]re-existing instance or [i]solated sandbox instance? (Isolated is recommended)`, 'i');
+    geminiSetup = geminiChoice.toLowerCase() === 'p' ? 'preexisting' : 'isolated';
+  } else {
+    console.log('\n💡 Gemini CLI not found on remote. Defaulting to isolated sandbox instance.');
+  }
 
   // 2. GitHub CLI Isolation Choice
-  const ghChoice = await prompt('GitHub CLI Setup: Use [p]re-existing instance or [i]solated sandbox instance? (Isolated is recommended)', 'i');
-  const ghSetup = ghChoice.toLowerCase() === 'p' ? 'preexisting' : 'isolated';
+  let ghSetup = 'isolated';
+  if (hasGH) {
+    const ghChoice = await prompt(`GitHub CLI found on remote. Use [p]re-existing instance or [i]solated sandbox instance? (Isolated is recommended)`, 'i');
+    ghSetup = ghChoice.toLowerCase() === 'p' ? 'preexisting' : 'isolated';
+  } else {
+    console.log('💡 GitHub CLI not found on remote. Defaulting to isolated sandbox instance.');
+  }
 
   const ISOLATED_GEMINI_CONFIG = `${OFFLOAD_BASE}/gemini-cli-config`;
   const ISOLATED_GH_CONFIG = `${OFFLOAD_BASE}/gh-cli-config`;
 
-  console.log(`🔍 Checking state of ${remoteHost}...`);
-  // Use a login shell to ensure the same PATH as the interactive user
-  const ghCheck = spawnSync('ssh', [remoteHost, 'sh -lc "command -v gh"'], { stdio: 'pipe' });
-  const tmuxCheck = spawnSync('ssh', [remoteHost, 'sh -lc "command -v tmux"'], { stdio: 'pipe' });
-
-  if (ghCheck.status !== 0 || tmuxCheck.status !== 0) {
+  if (!hasGH || !hasTmux) {
     console.log('\n📥 System Requirements Check:');
-    if (ghCheck.status !== 0) console.log('  ❌ GitHub CLI (gh) is not installed on remote.');
-    if (tmuxCheck.status !== 0) console.log('  ❌ tmux is not installed on remote.');
-
+    if (!hasGH) console.log('  ❌ GitHub CLI (gh) is not installed on remote.');
+    if (!hasTmux) console.log('  ❌ tmux is not installed on remote.');
+    
     const shouldProvision = await confirm('\nWould you like Gemini to automatically provision missing requirements?');
     if (shouldProvision) {
       console.log(`🚀 Attempting to provision dependencies on ${remoteHost}...`);
       const osCheck = spawnSync('ssh', [remoteHost, 'uname -s'], { stdio: 'pipe' });
       const os = osCheck.stdout.toString().trim();
-
+      
       let installCmd = '';
       if (os === 'Linux') {
-        installCmd = 'sudo apt update && sudo apt install -y ' + [ghCheck.status !== 0 ? 'gh' : '', tmuxCheck.status !== 0 ? 'tmux' : ''].filter(Boolean).join(' ');
+        installCmd = 'sudo apt update && sudo apt install -y ' + [!hasGH ? 'gh' : '', !hasTmux ? 'tmux' : ''].filter(Boolean).join(' ');
       } else if (os === 'Darwin') {
-        installCmd = 'brew install ' + [ghCheck.status !== 0 ? 'gh' : '', tmuxCheck.status !== 0 ? 'tmux' : ''].filter(Boolean).join(' ');
+        installCmd = 'brew install ' + [!hasGH ? 'gh' : '', !hasTmux ? 'tmux' : ''].filter(Boolean).join(' ');
       }
 
       if (installCmd) {
@@ -141,8 +156,6 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   const terminalType = await prompt('\nTerminal Automation (iterm2 / terminal / none)', 'iterm2');
 
   // Local Dependencies Install (Isolated)
-  const envLoader = 'export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh"';
-  
   console.log(`\n📦 Checking isolated dependencies in ${remoteWorkDir}...`);
   const checkCmd = `ssh ${remoteHost} ${q(`${envLoader} && [ -x ${remoteWorkDir}/node_modules/.bin/tsx ] && [ -x ${remoteWorkDir}/node_modules/.bin/gemini ]`)}`;
   const depCheck = spawnSync(checkCmd, { shell: true });

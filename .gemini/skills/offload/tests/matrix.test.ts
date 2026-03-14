@@ -33,6 +33,7 @@ describe('Offload Tooling Matrix', () => {
     vi.spyOn(process, 'chdir').mockImplementation(() => {});
 
     vi.mocked(spawnSync).mockImplementation((cmd: any, args: any) => {
+      if (cmd === 'ssh' && args?.[1]?.includes('command -v')) return { status: 0 } as any;
       return { status: 0, stdout: Buffer.from('test-meta\n'), stderr: Buffer.from('') } as any;
     });
 
