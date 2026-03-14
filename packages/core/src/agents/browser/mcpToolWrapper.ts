@@ -119,10 +119,7 @@ class McpToolInvocation extends BaseToolInvocation<
       // so the listener captures exact clientX/clientY for any element type
       // (including non-focusable elements like <div>, <span>, <li>).
       // This must be awaited so the listener is in place before the CDP click.
-      if (
-        this.showCursorAnimations &&
-        (this.toolName === 'click' || this.toolName === 'hover')
-      ) {
+      if (this.showCursorAnimations && this.toolName === 'click') {
         try {
           await this.browserManager.callTool(
             'evaluate_script',
