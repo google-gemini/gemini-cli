@@ -29,80 +29,6 @@ export interface PolicyListItem {
 }
 
 /**
- * Un-escapes a regex string that was escaped by `escapeRegex()` from
- * packages/core/src/policy/utils.ts.
- *
- * escapeRegex escapes: [-[\]{}()*+?.,\\^$|#\s"]
- * by prefixing each with a backslash.
- */
-function unescapeRegex(escaped: string): string {
-  return escaped.replace(/\\(.)/g, '$1');
-}
-
-/**
- * Formats an argsPattern regex into a human-readable constraint string.
- *
- * The policy engine compiles TOML rule fields (commandPrefix, commandRegex,
- * argsPattern) into RegExp objects via buildArgsPatterns() in
- * packages/core/src/policy/utils.ts. This function reverses that compilation
- * back into readable text for display.
- *
- * Pattern formats (checked in order):
- *
- * 1. commandPrefix — `"command":"<escaped>(?:[\s"]|\\")` → `<prefix>*`
- * 2. commandRegex — starts with `"command":"` → raw regex after the prefix
- * 3. file_path — contains `"file_path":"<path>"` → `path: <path>`
- * 4. Fallback — truncated raw regex source
- *
- * Returns undefined if there is no constraint (tool-only or wildcard rules).
- */
-export function formatArgsPattern(
-  argsPattern: RegExp | undefined,
-): string | undefined {
-  if (!argsPattern) {
-    return undefined;
-  }
-
-  const source = argsPattern.source;
-
-  // buildArgsPatterns uses escapeRegex() which escapes quotes to \", so the
-  // regex source contains escaped quotes. We support both escaped (\") and
-  // unescaped (") formats for robustness.
-  const cmdPrefix = /^\\?"command\\?":\\?"(.+?)\(\?:\[\\s"]\|\\\\"?\)$/;
-
-  // 1. commandPrefix: \"command\":\"<escaped-prefix>(?:[\s"]|\\")"
-  //    The lookahead ensures the prefix is word-bounded in JSON.
-  const prefixMatch = source.match(cmdPrefix);
-  if (prefixMatch) {
-    return unescapeRegex(prefixMatch[1]) + '*';
-  }
-
-  // 2. commandRegex: starts with "command":" or \"command\":\"
-  const cmdRegexPrefix = /^\\?"command\\?":\\?"/;
-  const cmdRegexMatch = source.match(cmdRegexPrefix);
-  if (cmdRegexMatch) {
-    const regex = source.slice(cmdRegexMatch[0].length);
-    return regex;
-  }
-
-  // 3. file_path pattern
-  if (source.includes('"file_path"')) {
-    const pathMatch = source.match(/"file_path":"(.+?)"/);
-    if (pathMatch) {
-      return `path: ${pathMatch[1]}`;
-    }
-    return 'path: ...';
-  }
-
-  // 4. Fallback: truncated raw regex
-  const maxLen = 40;
-  if (source.length > maxLen) {
-    return source.substring(0, maxLen) + '...';
-  }
-  return source;
-}
-
-/**
  * Builds a list of PolicyListItems from rules, filtered by decision and sorted
  * by priority descending.
  */
@@ -119,7 +45,7 @@ export function buildPolicyListItems(
       const toolDisplayName = rule.toolName
         ? (toolDisplayNames.get(rule.toolName) ?? rule.toolName)
         : 'all tools';
-      const constraint = formatArgsPattern(rule.argsPattern);
+      const constraint = rule.constraintDisplay;
       const priority = String(rule.priority ?? 0);
       const source = rule.source ?? '';
 

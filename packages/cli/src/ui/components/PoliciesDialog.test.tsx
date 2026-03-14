@@ -20,6 +20,7 @@ function makeRule(
     priority: 0,
     source: undefined,
     argsPattern: undefined,
+    constraintDisplay: undefined,
     ...overrides,
   } as PolicyRule;
 }
@@ -32,21 +33,21 @@ const ALLOW_RULES: PolicyRule[] = [
     toolName: 'run_shell_command',
     priority: 4.1,
     source: 'User: allowed-tools.toml',
-    argsPattern: new RegExp('"command":"git\\ show(?:[\\s"]|\\\\")'),
+    constraintDisplay: 'git show*',
   }),
   makeRule({
     decision: PolicyDecision.ALLOW,
     toolName: 'run_shell_command',
     priority: 4.1,
     source: 'User: allowed-tools.toml',
-    argsPattern: new RegExp('"command":"git\\ diff(?:[\\s"]|\\\\")'),
+    constraintDisplay: 'git diff*',
   }),
   makeRule({
     decision: PolicyDecision.ALLOW,
     toolName: 'run_shell_command',
     priority: 4.0,
     source: 'Workspace: .gemini/settings.json',
-    argsPattern: new RegExp('"command":"npm\\ test(?:[\\s"]|\\\\")'),
+    constraintDisplay: 'npm test*',
   }),
 ];
 
@@ -71,7 +72,7 @@ const DENY_RULES: PolicyRule[] = [
     toolName: 'run_shell_command',
     priority: 10,
     source: 'Admin: admin-policies.toml',
-    argsPattern: new RegExp('"command":"rm\\ -rf(?:[\\s"]|\\\\")'),
+    constraintDisplay: 'rm -rf*',
   }),
 ];
 

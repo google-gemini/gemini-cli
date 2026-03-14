@@ -445,13 +445,14 @@ export async function createPolicyEngineConfig(
         // Treat args as a command prefix for shell tool
         if (toolName === SHELL_TOOL_NAME) {
           const patterns = buildArgsPatterns(undefined, args);
-          for (const pattern of patterns) {
+          for (const { pattern, display: constraintDisplay } of patterns) {
             if (pattern) {
               rules.push({
                 toolName,
                 decision: PolicyDecision.ALLOW,
                 priority: ALLOWED_TOOLS_FLAG_PRIORITY,
                 argsPattern: new RegExp(pattern),
+                constraintDisplay,
                 source: 'Settings (Tools Allowed)',
               });
             }
@@ -567,7 +568,7 @@ export function createPolicyUpdater(
           return;
         }
 
-        for (const pattern of patterns) {
+        for (const { pattern, display: constraintDisplay } of patterns) {
           if (pattern) {
             // Note: patterns from buildArgsPatterns are derived from escapeRegex,
             // which is safe and won't contain ReDoS patterns.
@@ -576,6 +577,7 @@ export function createPolicyUpdater(
               decision: PolicyDecision.ALLOW,
               priority,
               argsPattern: new RegExp(pattern),
+              constraintDisplay,
               source: 'Dynamic (Confirmed)',
             });
           }
