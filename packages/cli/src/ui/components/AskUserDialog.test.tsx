@@ -87,6 +87,31 @@ describe('AskUserDialog', () => {
         writeKey(stdin, '\r'); // Toggle TS
         writeKey(stdin, '\x1b[B'); // Down
         writeKey(stdin, '\r'); // Toggle ESLint
+        writeKey(stdin, '\x1b[B'); // Down to All the above
+        writeKey(stdin, '\x1b[B'); // Down to Other
+        writeKey(stdin, '\x1b[B'); // Down to Done
+        writeKey(stdin, '\r'); // Done
+      },
+      expectedSubmit: { '0': 'TypeScript, ESLint' },
+    },
+    {
+      name: 'All the above',
+      questions: [
+        {
+          question: 'Which features?',
+          header: 'Features',
+          type: QuestionType.CHOICE,
+          options: [
+            { label: 'TypeScript', description: '' },
+            { label: 'ESLint', description: '' },
+          ],
+          multiSelect: true,
+        },
+      ] as Question[],
+      actions: (stdin: { write: (data: string) => void }) => {
+        writeKey(stdin, '\x1b[B'); // Down to ESLint
+        writeKey(stdin, '\x1b[B'); // Down to All the above
+        writeKey(stdin, '\r'); // Toggle All the above
         writeKey(stdin, '\x1b[B'); // Down to Other
         writeKey(stdin, '\x1b[B'); // Down to Done
         writeKey(stdin, '\r'); // Done
