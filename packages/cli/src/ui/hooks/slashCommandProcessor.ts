@@ -325,9 +325,9 @@ export const useSlashCommandProcessor = (
     (async () => {
       const commandService = await CommandService.create(
         [
+          new BuiltinCommandLoader(config),
           new SkillCommandLoader(config),
           new McpPromptLoader(config),
-          new BuiltinCommandLoader(config),
           new FileCommandLoader(config),
         ],
         controller.signal,
