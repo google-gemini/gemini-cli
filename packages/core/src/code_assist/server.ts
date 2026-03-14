@@ -48,7 +48,6 @@ import {
   shouldAutoUseCredits,
 } from '../billing/billing.js';
 import { logBillingEvent, logInvalidChunk } from '../telemetry/loggers.js';
-import { coreEvents } from '../utils/events.js';
 import { CreditsUsedEvent } from '../telemetry/billingEvents.js';
 import {
   fromCountTokenResponse,
@@ -100,11 +99,6 @@ export class CodeAssistServer implements ContentGenerator {
       : false;
     const modelIsEligible = isOverageEligibleModel(req.model);
     const shouldEnableCredits = modelIsEligible && autoUse;
-
-    if (shouldEnableCredits && !this.config?.getCreditsNotificationShown()) {
-      this.config?.setCreditsNotificationShown(true);
-      coreEvents.emitFeedback('info', 'Using AI Credits for this request.');
-    }
 
     const enabledCreditTypes = shouldEnableCredits
       ? ([G1_CREDIT_TYPE] as string[])
@@ -307,9 +301,16 @@ export class CodeAssistServer implements ContentGenerator {
     );
   }
 
+  // FIX (issue #21851): Pass cloudaicompanionProject so the backend can scope
+  // the lookup to the correct user context, matching what setCodeAssistGlobalUserSetting
+  // sends in its POST body.
   async getCodeAssistGlobalUserSetting(): Promise<CodeAssistGlobalUserSettingResponse> {
+    const params = this.projectId
+      ? { cloudaicompanionProject: this.projectId }
+      : undefined;
     return this.requestGet<CodeAssistGlobalUserSettingResponse>(
       'getCodeAssistGlobalUserSetting',
+      params,
     );
   }
 
@@ -430,6 +431,7 @@ export class CodeAssistServer implements ContentGenerator {
 
   private async makeGetRequest<T>(
     url: string,
+    params?: Record<string, string>,
     signal?: AbortSignal,
   ): Promise<T> {
     const res = await this.client.request<T>({
@@ -439,18 +441,27 @@ export class CodeAssistServer implements ContentGenerator {
         'Content-Type': 'application/json',
         ...this.httpOptions.headers,
       },
+      params,
       responseType: 'json',
       signal,
     });
     return res.data;
   }
 
-  async requestGet<T>(method: string, signal?: AbortSignal): Promise<T> {
-    return this.makeGetRequest<T>(this.getMethodUrl(method), signal);
+  async requestGet<T>(
+    method: string,
+    params?: Record<string, string>,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    return this.makeGetRequest<T>(this.getMethodUrl(method), params, signal);
   }
 
   async requestGetOperation<T>(name: string, signal?: AbortSignal): Promise<T> {
-    return this.makeGetRequest<T>(this.getOperationUrl(name), signal);
+    return this.makeGetRequest<T>(
+      this.getOperationUrl(name),
+      undefined,
+      signal,
+    );
   }
 
   async requestStreamingPost<T>(

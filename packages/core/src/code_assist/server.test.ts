@@ -717,6 +717,7 @@ describe('CodeAssistServer', () => {
 
     expect(requestGetSpy).toHaveBeenCalledWith(
       'getCodeAssistGlobalUserSetting',
+      { cloudaicompanionProject: 'test-project' },
     );
     expect(response).toEqual(mockResponse);
   });

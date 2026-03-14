@@ -105,11 +105,16 @@ async function getRemoteDataCollectionOptIn(
   try {
     const resp = await server.getCodeAssistGlobalUserSetting();
     if (resp.freeTierDataCollectionOptin === undefined) {
-      debugLogger.warn(
-        'Warning: Code Assist API did not return freeTierDataCollectionOptin. Defaulting to true.',
+      // A successful response should always include this field. If it is
+      // missing, something is wrong server-side and we must NOT silently
+      // default to true — that would overwrite a saved "No" choice with the
+      // opt-in default without the user's knowledge.
+      throw new Error(
+        'Code Assist API returned a successful response but did not include ' +
+          "freeTierDataCollectionOptin. Cannot determine the user's saved preference.",
       );
     }
-    return resp.freeTierDataCollectionOptin ?? true;
+    return resp.freeTierDataCollectionOptin;
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'response' in error) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
@@ -119,6 +124,11 @@ async function getRemoteDataCollectionOptIn(
         };
       };
       if (gaxiosError.response?.status === 404) {
+        // 404 means the user has no saved preference yet (genuine new user).
+        // Defaulting to true (opt-in) is correct and safe here.
+        debugLogger.debug(
+          'No existing privacy setting found (404). Defaulting to opt-in for new user.',
+        );
         return true;
       }
     }
