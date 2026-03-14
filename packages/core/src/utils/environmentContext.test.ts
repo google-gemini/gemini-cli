@@ -165,6 +165,29 @@ describe('getEnvironmentContext', () => {
     expect(getFolderStructure).not.toHaveBeenCalled();
   });
 
+  it('should exclude environment memory when JIT context is enabled', async () => {
+    (mockConfig as Record<string, unknown>)['isJitContextEnabled'] = vi
+      .fn()
+      .mockReturnValue(true);
+
+    const parts = await getEnvironmentContext(mockConfig as Config);
+
+    const context = parts[0].text;
+    expect(context).not.toContain('Mock Environment Memory');
+    expect(mockConfig.getEnvironmentMemory).not.toHaveBeenCalled();
+  });
+
+  it('should include environment memory when JIT context is disabled', async () => {
+    (mockConfig as Record<string, unknown>)['isJitContextEnabled'] = vi
+      .fn()
+      .mockReturnValue(false);
+
+    const parts = await getEnvironmentContext(mockConfig as Config);
+
+    const context = parts[0].text;
+    expect(context).toContain('Mock Environment Memory');
+  });
+
   it('should handle read_many_files returning no content', async () => {
     const mockReadManyFilesTool = {
       build: vi.fn().mockReturnValue({

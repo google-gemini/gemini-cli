@@ -217,6 +217,7 @@ describe('Gemini Client (client.ts)', () => {
       getGlobalMemory: vi.fn().mockReturnValue(''),
       getEnvironmentMemory: vi.fn().mockReturnValue(''),
       isJitContextEnabled: vi.fn().mockReturnValue(false),
+      getContextManager: vi.fn().mockReturnValue(undefined),
       getToolOutputMaskingEnabled: vi.fn().mockReturnValue(false),
       getDisableLoopDetection: vi.fn().mockReturnValue(false),
 
@@ -373,6 +374,23 @@ describe('Gemini Client (client.ts)', () => {
       expect(newChat).not.toBe(initialChat);
       expect(newHistory.length).toBe(initialHistory.length);
       expect(JSON.stringify(newHistory)).not.toContain('some old message');
+    });
+
+    it('should refresh ContextManager to reset JIT loaded paths', async () => {
+      const mockRefresh = vi.fn().mockResolvedValue(undefined);
+      vi.mocked(mockConfig.getContextManager).mockReturnValue({
+        refresh: mockRefresh,
+      } as unknown as ReturnType<typeof mockConfig.getContextManager>);
+
+      await client.resetChat();
+
+      expect(mockRefresh).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not fail when ContextManager is undefined', async () => {
+      vi.mocked(mockConfig.getContextManager).mockReturnValue(undefined);
+
+      await expect(client.resetChat()).resolves.not.toThrow();
     });
   });
 
