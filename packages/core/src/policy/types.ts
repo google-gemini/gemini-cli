@@ -111,6 +111,12 @@ export interface PolicyRule {
   toolName?: string;
 
   /**
+   * The name of the subagent this rule applies to.
+   * If undefined, the rule applies regardless of whether it's the main agent or a subagent.
+   */
+  subagent?: string;
+
+  /**
    * Identifies the MCP server this rule applies to.
    * Enables precise rule matching against `serverName` metadata instead
    * of parsing composite string names.
@@ -280,6 +286,11 @@ export interface PolicyEngineConfig {
   nonInteractive?: boolean;
 
   /**
+   * Whether to ignore "Always Allow" rules.
+   */
+  disableAlwaysAllow?: boolean;
+
+  /**
    * Whether to allow hooks to execute.
    * When false, all hooks are denied.
    * Defaults to true.
@@ -305,7 +316,10 @@ export interface PolicySettings {
   mcpServers?: Record<string, { trust?: boolean }>;
   // User provided policies that will replace the USER level policies in ~/.gemini/policies
   policyPaths?: string[];
+  // Admin provided policies that will supplement the ADMIN level policies
+  adminPolicyPaths?: string[];
   workspacePoliciesDir?: string;
+  disableAlwaysAllow?: boolean;
 }
 
 export interface CheckResult {
@@ -318,3 +332,16 @@ export interface CheckResult {
  * Effective priority matching Tier 1 (Default) read-only tools.
  */
 export const PRIORITY_SUBAGENT_TOOL = 1.05;
+
+/**
+ * The fractional priority of "Always allow" rules (e.g., 950/1000).
+ * Higher fraction within a tier wins.
+ */
+export const ALWAYS_ALLOW_PRIORITY_FRACTION = 950;
+
+/**
+ * The fractional priority offset for "Always allow" rules (e.g., 0.95).
+ * This ensures consistency between in-memory rules and persisted rules.
+ */
+export const ALWAYS_ALLOW_PRIORITY_OFFSET =
+  ALWAYS_ALLOW_PRIORITY_FRACTION / 1000;

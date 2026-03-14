@@ -94,20 +94,20 @@
     <text x="0" y="444" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="444" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="461" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="461" fill="#ffffff" textLength="207" lengthAdjust="spacingAndGlyphs">Max Chat Model Attempts</text>
-    <text x="855" y="461" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">10</text>
+    <text x="45" y="461" fill="#ffffff" textLength="162" lengthAdjust="spacingAndGlyphs">Retry Fetch Errors</text>
+    <text x="837" y="461" fill="#afafaf" textLength="36" lengthAdjust="spacingAndGlyphs">true</text>
     <text x="891" y="461" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="478" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="478" fill="#afafaf" textLength="729" lengthAdjust="spacingAndGlyphs">Maximum number of attempts for requests to the main chat model. Cannot exceed 10.</text>
+    <text x="45" y="478" fill="#afafaf" textLength="612" lengthAdjust="spacingAndGlyphs">Retry on &quot;exception TypeError: fetch failed sending request&quot; errors.</text>
     <text x="891" y="478" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="495" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="495" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="512" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="512" fill="#ffffff" textLength="207" lengthAdjust="spacingAndGlyphs">Debug Keystroke Logging</text>
-    <text x="828" y="512" fill="#afafaf" textLength="45" lengthAdjust="spacingAndGlyphs">false</text>
+    <text x="45" y="512" fill="#ffffff" textLength="207" lengthAdjust="spacingAndGlyphs">Max Chat Model Attempts</text>
+    <text x="855" y="512" fill="#afafaf" textLength="18" lengthAdjust="spacingAndGlyphs">10</text>
     <text x="891" y="512" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="529" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
-    <text x="45" y="529" fill="#afafaf" textLength="450" lengthAdjust="spacingAndGlyphs">Enable debug logging of keystrokes to the console.</text>
+    <text x="45" y="529" fill="#afafaf" textLength="729" lengthAdjust="spacingAndGlyphs">Maximum number of attempts for requests to the main chat model. Cannot exceed 10.</text>
     <text x="891" y="529" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="0" y="546" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>
     <text x="891" y="546" fill="#878787" textLength="9" lengthAdjust="spacingAndGlyphs">│</text>

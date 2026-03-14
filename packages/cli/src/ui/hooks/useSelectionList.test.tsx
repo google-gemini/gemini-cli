@@ -81,6 +81,8 @@ describe('useSelectionList', () => {
     isFocused?: boolean;
     showNumbers?: boolean;
     wrapAround?: boolean;
+    focusKey?: string;
+    priority?: boolean;
   }) => {
     let hookResult: ReturnType<typeof useSelectionList>;
     function TestComponent(props: typeof initialProps) {
@@ -354,7 +356,7 @@ describe('useSelectionList', () => {
         initialIndex: 2,
         onSelect: mockOnSelect,
       });
-      pressKey('return');
+      pressKey('enter');
       await waitUntilReady();
       expect(mockOnSelect).toHaveBeenCalledTimes(1);
       expect(mockOnSelect).toHaveBeenCalledWith('C');
@@ -369,7 +371,7 @@ describe('useSelectionList', () => {
       act(() => result.current.setActiveIndex(1));
       await waitUntilReady();
 
-      pressKey('return');
+      pressKey('enter');
       await waitUntilReady();
       expect(mockOnSelect).not.toHaveBeenCalled();
     });
@@ -413,7 +415,7 @@ describe('useSelectionList', () => {
       await waitUntilReady();
       // 3. Press Enter. Should select D.
       act(() => {
-        press('return');
+        press('enter');
       });
       await waitUntilReady();
 
@@ -457,7 +459,7 @@ describe('useSelectionList', () => {
         // All presses happen in same render cycle - React batches the state updates
         press('down'); // Should move 0 (A) -> 2 (C)
         press('down'); // Should move 2 (C) -> 3 (D)
-        press('return'); // Should select D
+        press('enter'); // Should select D
       });
       await waitUntilReady();
 
@@ -757,7 +759,7 @@ describe('useSelectionList', () => {
       pressNumber('1');
       await waitUntilReady();
 
-      pressKey('return');
+      pressKey('enter');
       await waitUntilReady();
       expect(mockOnSelect).toHaveBeenCalledTimes(1);
 
@@ -768,6 +770,67 @@ describe('useSelectionList', () => {
       });
       await waitUntilReady();
       expect(mockOnSelect).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Programmatic Focus (focusKey)', () => {
+    it('should change the activeIndex when a valid focusKey is provided', async () => {
+      const { result, rerender, waitUntilReady } =
+        await renderSelectionListHook({
+          items,
+          onSelect: mockOnSelect,
+        });
+      expect(result.current.activeIndex).toBe(0);
+
+      await rerender({ focusKey: 'C' });
+      await waitUntilReady();
+      expect(result.current.activeIndex).toBe(2);
+    });
+
+    it('should ignore a focusKey that does not exist', async () => {
+      const { result, rerender, waitUntilReady } =
+        await renderSelectionListHook({
+          items,
+          onSelect: mockOnSelect,
+        });
+      expect(result.current.activeIndex).toBe(0);
+
+      await rerender({ focusKey: 'UNKNOWN' });
+      await waitUntilReady();
+      expect(result.current.activeIndex).toBe(0);
+    });
+
+    it('should ignore a focusKey that points to a disabled item', async () => {
+      const { result, rerender, waitUntilReady } =
+        await renderSelectionListHook({
+          items, // B is disabled
+          onSelect: mockOnSelect,
+        });
+      expect(result.current.activeIndex).toBe(0);
+
+      await rerender({ focusKey: 'B' });
+      await waitUntilReady();
+      expect(result.current.activeIndex).toBe(0);
+    });
+
+    it('should handle clearing the focusKey', async () => {
+      const { result, rerender, waitUntilReady } =
+        await renderSelectionListHook({
+          items,
+          onSelect: mockOnSelect,
+          focusKey: 'C',
+        });
+      expect(result.current.activeIndex).toBe(2);
+
+      await rerender({ focusKey: undefined });
+      await waitUntilReady();
+      // Should remain at 2
+      expect(result.current.activeIndex).toBe(2);
+
+      // We can then change it again to something else
+      await rerender({ focusKey: 'D' });
+      await waitUntilReady();
+      expect(result.current.activeIndex).toBe(3);
     });
   });
 

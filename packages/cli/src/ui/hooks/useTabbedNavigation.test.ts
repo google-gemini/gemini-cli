@@ -26,21 +26,6 @@ const createKey = (partial: Partial<Key>): Key => ({
   ...partial,
 });
 
-vi.mock('../keyMatchers.js', () => ({
-  keyMatchers: {
-    'cursor.left': vi.fn((key) => key.name === 'left'),
-    'cursor.right': vi.fn((key) => key.name === 'right'),
-    'dialog.next': vi.fn((key) => key.name === 'tab' && !key.shift),
-    'dialog.previous': vi.fn((key) => key.name === 'tab' && key.shift),
-  },
-  Command: {
-    MOVE_LEFT: 'cursor.left',
-    MOVE_RIGHT: 'cursor.right',
-    DIALOG_NEXT: 'dialog.next',
-    DIALOG_PREV: 'dialog.previous',
-  },
-}));
-
 describe('useTabbedNavigation', () => {
   let capturedHandler: KeypressHandler;
 

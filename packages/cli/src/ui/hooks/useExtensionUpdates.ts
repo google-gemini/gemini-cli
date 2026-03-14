@@ -4,8 +4,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { debugLogger, type GeminiCLIExtension } from '@google/gemini-cli-core';
-import { getErrorMessage } from '../../utils/errors.js';
+import {
+  debugLogger,
+  checkExhaustive,
+  getErrorMessage,
+  type GeminiCLIExtension,
+} from '@google/gemini-cli-core';
 import {
   ExtensionUpdateState,
   extensionUpdatesReducer,
@@ -19,7 +23,6 @@ import {
   updateExtension,
 } from '../../config/extensions/update.js';
 import { type ExtensionUpdateInfo } from '../../config/extension.js';
-import { checkExhaustive } from '@google/gemini-cli-core';
 import type { ExtensionManager } from '../../config/extension-manager.js';
 
 type ConfirmationRequestWrapper = {
