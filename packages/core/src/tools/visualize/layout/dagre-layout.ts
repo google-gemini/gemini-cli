@@ -23,6 +23,7 @@ interface EdgeInput {
 interface LayoutOptions {
   direction: 'LR' | 'TD' | 'RL' | 'BT';
   terminalWidth: number;
+  gapH?: number;
 }
 
 interface LayoutResult {
@@ -47,9 +48,10 @@ export function computeNodeDimensions(label: string): {
   };
 }
 
-// Gap between nodes (in characters)
-const NODE_GAP_H = 3;
-const NODE_GAP_V = 2;
+// Default gap between nodes (in characters)
+const DEFAULT_GAP_H = 3;
+const NODE_GAP_V_TD = 4; // Needs room for fork bar: stem + bar + drop + gap
+const NODE_GAP_V_LR = 2; // Cross-axis gap for horizontal layouts
 
 /**
  * Use dagre for topological ordering, then compact placement in char coords.
@@ -59,6 +61,7 @@ export function layoutDiagram(
   edges: EdgeInput[],
   options: LayoutOptions,
 ): LayoutResult {
+  const gapH = options.gapH ?? DEFAULT_GAP_H;
   const g = new dagre.graphlib.Graph();
   const rankdir = options.direction === 'TD' ? 'TB' : options.direction;
   const isHorizontal = rankdir === 'LR' || rankdir === 'RL';
@@ -144,10 +147,10 @@ export function layoutDiagram(
           width: dims.width,
           height: dims.height,
         });
-        cursorY += dims.height + NODE_GAP_V;
+        cursorY += dims.height + NODE_GAP_V_LR;
         maxWidth = Math.max(maxWidth, dims.width);
       }
-      cursorX += maxWidth + NODE_GAP_H;
+      cursorX += maxWidth + gapH;
     }
   } else {
     // TB / BT: place bottom-up so we can center parents over children
@@ -172,7 +175,7 @@ export function layoutDiagram(
         maxHeight = Math.max(maxHeight, dims.height);
       }
       rankYPositions.push(cursorY);
-      cursorY += maxHeight + NODE_GAP_V;
+      cursorY += maxHeight + NODE_GAP_V_TD;
     }
 
     // Place ranks bottom-up: leaves first, then center parents
@@ -200,10 +203,11 @@ export function layoutDiagram(
             width: dims.width,
             height: dims.height,
           });
-          cursorX += dims.width + NODE_GAP_H;
+          cursorX += dims.width + gapH;
         }
       } else {
         // Parent rank: center each node over its children
+        const rankNodes: DiagramNode[] = [];
         for (const ni of rank) {
           const dims = computeNodeDimensions(ni.input.label);
           const kids = childrenOf.get(ni.input.id);
@@ -211,45 +215,59 @@ export function layoutDiagram(
             ?.map((kid) => placedNodes.get(kid))
             .filter((n): n is DiagramNode => n !== undefined);
 
+          let nodeX: number;
           if (placedKids && placedKids.length > 0) {
-            // Center over children span
             const minX = Math.min(...placedKids.map((k) => k.x));
             const maxChildRight = Math.max(
               ...placedKids.map((k) => k.x + k.width),
             );
             const centerX = Math.round((minX + maxChildRight) / 2);
-            const nodeX = centerX - Math.floor(dims.width / 2);
-            placedNodes.set(ni.input.id, {
-              id: ni.input.id,
-              label: ni.input.label,
-              shape: ni.input.shape,
-              x: Math.max(1, nodeX),
-              y,
-              width: dims.width,
-              height: dims.height,
-            });
+            nodeX = Math.max(1, centerX - Math.floor(dims.width / 2));
           } else {
-            // No placed children, place normally
-            // Find a free X position
-            let cursorX = 1;
+            nodeX = 1;
             for (const placed of placedNodes.values()) {
               if (placed.y === y) {
-                cursorX = Math.max(
-                  cursorX,
-                  placed.x + placed.width + NODE_GAP_H,
-                );
+                nodeX = Math.max(nodeX, placed.x + placed.width + gapH);
               }
             }
-            placedNodes.set(ni.input.id, {
-              id: ni.input.id,
-              label: ni.input.label,
-              shape: ni.input.shape,
-              x: cursorX,
-              y,
-              width: dims.width,
-              height: dims.height,
-            });
           }
+
+          rankNodes.push({
+            id: ni.input.id,
+            label: ni.input.label,
+            shape: ni.input.shape,
+            x: nodeX,
+            y,
+            width: dims.width,
+            height: dims.height,
+          });
+        }
+
+        // Fix overlaps: sort by x, shift right if overlapping
+        rankNodes.sort((a, b) => a.x - b.x);
+        for (let i = 1; i < rankNodes.length; i++) {
+          const prev = rankNodes[i - 1];
+          const curr = rankNodes[i];
+          const minX = prev.x + prev.width + gapH;
+          if (curr.x < minX) {
+            const shift = minX - curr.x;
+            curr.x = minX;
+            // Also shift all children of this node
+            const kids = childrenOf.get(curr.id);
+            if (kids) {
+              const shiftSubtree = (nodeId: string, dx: number): void => {
+                const placed = placedNodes.get(nodeId);
+                if (placed) placed.x += dx;
+                const subKids = childrenOf.get(nodeId);
+                if (subKids) subKids.forEach((k) => shiftSubtree(k, dx));
+              };
+              kids.forEach((k) => shiftSubtree(k, shift));
+            }
+          }
+        }
+
+        for (const node of rankNodes) {
+          placedNodes.set(node.id, node);
         }
       }
     }

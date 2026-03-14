@@ -186,6 +186,7 @@ export * from './tools/ask-user.js';
 export * from './tools/visualize.js';
 export * from './tools/visualize/types.js';
 export * from './tools/visualize/rendering/grid-canvas.js';
+export * from './tools/visualize/rendering/dsa-renderer.js';
 
 // MCP OAuth
 export { MCPOAuthProvider } from './mcp/oauth-provider.js';

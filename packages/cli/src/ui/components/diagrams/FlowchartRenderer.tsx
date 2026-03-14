@@ -37,19 +37,75 @@ export const FlowchartRenderer: React.FC<FlowchartRendererProps> = ({
     const isHorizontal =
       diagram.direction === 'LR' || diagram.direction === 'RL';
 
-    // Group edges by source for fork drawing
-    const edgesBySource = new Map<string, typeof diagram.edges>();
+    // Build node lookup
+    const nodeById = new Map(diagram.nodes.map((n) => [n.id, n]));
+
+    // Detect bidirectional pairs (A→B and B→A)
+    const edgeSet = new Set(
+      diagram.edges.map((e) => `${e.source}->${e.target}`),
+    );
+    const bidiPairs = new Set<string>();
+    const bidiHandled = new Set<string>();
+    const bidiNodeIds = new Set<string>();
+
     for (const edge of diagram.edges) {
+      const reverse = `${edge.target}->${edge.source}`;
+      if (edgeSet.has(reverse)) {
+        const pairKey = [edge.source, edge.target].sort().join('<->');
+        bidiPairs.add(pairKey);
+        bidiNodeIds.add(edge.source);
+        bidiNodeIds.add(edge.target);
+      }
+    }
+
+    // Draw bidi pairs
+    for (const pairKey of bidiPairs) {
+      const [idA, idB] = pairKey.split('<->');
+      const nodeA = nodeById.get(idA);
+      const nodeB = nodeById.get(idB);
+      if (!nodeA || !nodeB) continue;
+
+      bidiHandled.add(`${idA}->${idB}`);
+      bidiHandled.add(`${idB}->${idA}`);
+
+      if (isHorizontal) {
+        const left = nodeA.x < nodeB.x ? nodeA : nodeB;
+        const right = nodeA.x < nodeB.x ? nodeB : nodeA;
+        const leftRight = left.x + left.width;
+        const rightLeft = right.x - 1;
+        const centerY = left.y + Math.floor(left.height / 2);
+
+        canvas.drawBidiHorizontal(
+          leftRight,
+          rightLeft,
+          centerY - 1,
+          centerY + 1,
+        );
+      } else {
+        const top = nodeA.y < nodeB.y ? nodeA : nodeB;
+        const bottom = nodeA.y < nodeB.y ? nodeB : nodeA;
+        const topBottom = top.y + top.height;
+        const bottomTop = bottom.y - 1;
+        const centerX = top.x + Math.floor(top.width / 2);
+        canvas.drawBidiVertical(topBottom, bottomTop, centerX - 1, centerX + 1);
+      }
+    }
+
+    // Remaining edges (excluding bidi-handled ones)
+    const remainingEdges = diagram.edges.filter(
+      (e) => !bidiHandled.has(`${e.source}->${e.target}`),
+    );
+
+    // Group remaining by source for fork drawing
+    const edgesBySource = new Map<string, typeof diagram.edges>();
+    for (const edge of remainingEdges) {
       if (!edgesBySource.has(edge.source)) {
         edgesBySource.set(edge.source, []);
       }
       edgesBySource.get(edge.source)!.push(edge);
     }
 
-    // Build node lookup
-    const nodeById = new Map(diagram.nodes.map((n) => [n.id, n]));
-
-    // Draw edges - use fork for multi-child, single edge otherwise
+    // Draw remaining edges
     for (const [sourceId, sourceEdges] of edgesBySource) {
       const srcNode = nodeById.get(sourceId);
       if (!srcNode) {
@@ -58,10 +114,8 @@ export const FlowchartRenderer: React.FC<FlowchartRendererProps> = ({
       }
 
       if (sourceEdges.length > 1 && !isHorizontal) {
-        // TD fork: parent center -> multiple children
         const parentCenterX = srcNode.x + Math.floor(srcNode.width / 2);
         const parentBottomY = srcNode.y + srcNode.height;
-
         const childCenters = sourceEdges.map((e) => {
           const tgt = nodeById.get(e.target);
           if (tgt) {
@@ -72,13 +126,10 @@ export const FlowchartRenderer: React.FC<FlowchartRendererProps> = ({
           }
           return { x: e.targetX, topY: e.targetY };
         });
-
         canvas.drawTreeFork(parentCenterX, parentBottomY, childCenters);
       } else if (sourceEdges.length > 1 && isHorizontal) {
-        // LR fork: parent right -> multiple children
         const parentRightX = srcNode.x + srcNode.width;
         const parentCenterY = srcNode.y + Math.floor(srcNode.height / 2);
-
         const childEntries = sourceEdges.map((e) => {
           const tgt = nodeById.get(e.target);
           if (tgt) {
@@ -89,10 +140,8 @@ export const FlowchartRenderer: React.FC<FlowchartRendererProps> = ({
           }
           return { leftX: e.targetX, y: e.targetY };
         });
-
         canvas.drawHorizontalFork(parentRightX, parentCenterY, childEntries);
       } else {
-        // Single edge
         for (const edge of sourceEdges) {
           canvas.drawEdge(edge);
         }

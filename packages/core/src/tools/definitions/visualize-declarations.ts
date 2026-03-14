@@ -57,6 +57,24 @@ export const VISUALIZE_DEFINITION: ToolDefinition = {
           description: 'Optional title displayed above the diagram.',
           type: 'string',
         },
+        structure: {
+          description:
+            'Rendering hint for data structure visualizations. When set, uses a dedicated ' +
+            'renderer optimized for that structure instead of the generic flowchart layout. ' +
+            'Use "linked-list" for singly linked lists, "doubly-linked-list" for doubly linked lists, ' +
+            '"binary-tree" for BST/AVL/heap trees, "stack" for LIFO stacks, "queue" for FIFO queues, ' +
+            '"graph" for generic graphs, "flowchart" for pipelines/state machines.',
+          type: 'string',
+          enum: [
+            'linked-list',
+            'doubly-linked-list',
+            'binary-tree',
+            'stack',
+            'queue',
+            'graph',
+            'flowchart',
+          ],
+        },
       },
       required: ['type'],
     },

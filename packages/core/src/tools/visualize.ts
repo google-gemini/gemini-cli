@@ -240,6 +240,7 @@ class VisualizeToolInvocation extends BaseToolInvocation<
   private async renderMermaidContent(content: string): Promise<ToolResult> {
     const parsed = await parseMermaid(content);
     const terminalWidth = process.stdout.columns || 80;
+    const structure = this.params.structure;
 
     // Detect direction from mermaid code
     let direction: 'LR' | 'TD' | 'RL' | 'BT' = 'TD';
@@ -254,15 +255,62 @@ class VisualizeToolInvocation extends BaseToolInvocation<
       }
     }
 
+    // For DSA structures, skip dagre layout - dedicated renderers handle it
+    const dsaTypes = [
+      'linked-list',
+      'doubly-linked-list',
+      'binary-tree',
+      'stack',
+      'queue',
+    ];
+    if (structure && dsaTypes.includes(structure)) {
+      const diagram: DiagramData = {
+        isDiagram: true,
+        diagramType: parsed.diagramType,
+        direction,
+        structure,
+        nodes: parsed.nodes.map((n) => ({
+          ...n,
+          x: 0,
+          y: 0,
+          width: 0,
+          height: 0,
+        })),
+        edges: parsed.edges.map((e) => ({
+          ...e,
+          sourceX: 0,
+          sourceY: 0,
+          targetX: 0,
+          targetY: 0,
+        })),
+        title: this.params.title,
+        raw: content,
+      };
+      return {
+        llmContent: `Diagram rendered successfully (${parsed.nodes.length} nodes, ${parsed.edges.length} edges)`,
+        returnDisplay: diagram,
+      };
+    }
+
+    // Detect bidirectional edges - use wider gap for parallel arrows
+    const edgeSet = new Set(
+      parsed.edges.map((e) => `${e.source}->${e.target}`),
+    );
+    const hasBidi = parsed.edges.some((e) =>
+      edgeSet.has(`${e.target}->${e.source}`),
+    );
+
     const layoutResult = layoutDiagram(parsed.nodes, parsed.edges, {
       direction,
       terminalWidth,
+      gapH: hasBidi ? 7 : undefined,
     });
 
     const diagram: DiagramData = {
       isDiagram: true,
       diagramType: parsed.diagramType,
       direction,
+      structure,
       nodes: layoutResult.nodes,
       edges: layoutResult.edges,
       title: this.params.title,

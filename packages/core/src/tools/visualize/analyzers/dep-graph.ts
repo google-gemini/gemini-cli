@@ -40,15 +40,24 @@ interface PackageJsonShape {
   devDependencies?: Record<string, string>;
 }
 
+function isString(val: unknown): val is string {
+  return Object.prototype.toString.call(val) === '[object String]';
+}
+
 function isRecord(val: unknown): val is Record<string, unknown> {
-  return typeof val === 'object' && val !== null && !Array.isArray(val);
+  return (
+    val !== null &&
+    val !== undefined &&
+    !Array.isArray(val) &&
+    val instanceof Object
+  );
 }
 
 function extractStringRecord(val: unknown): Record<string, string> | undefined {
   if (!isRecord(val)) return undefined;
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(val)) {
-    if (typeof value === 'string') {
+    if (isString(value)) {
       result[key] = value;
     }
   }
@@ -61,7 +70,7 @@ function parsePackageJson(content: string, filename: string): string {
     throw new Error('Invalid package.json: expected an object');
   }
   const pkg: PackageJsonShape = {
-    name: typeof raw['name'] === 'string' ? raw['name'] : undefined,
+    name: isString(raw['name']) ? raw['name'] : undefined,
     dependencies: extractStringRecord(raw['dependencies']),
     devDependencies: extractStringRecord(raw['devDependencies']),
   };
@@ -78,7 +87,9 @@ function parsePackageJson(content: string, filename: string): string {
     lines.push(`  ${rootId}[${projectName}] --> ${depId}[${dep}]`);
   }
   if (deps.length > MAX_DEPS) {
-    lines.push(`  ${rootId}[${projectName}] --> more_deps[+${deps.length - MAX_DEPS} more]`);
+    lines.push(
+      `  ${rootId}[${projectName}] --> more_deps[+${deps.length - MAX_DEPS} more]`,
+    );
   }
 
   const devDeps = Object.keys(pkg.devDependencies ?? {});
@@ -88,7 +99,9 @@ function parsePackageJson(content: string, filename: string): string {
     lines.push(`  ${rootId}[${projectName}] -.-> ${depId}[${dep}]`);
   }
   if (devDeps.length > MAX_DEPS) {
-    lines.push(`  ${rootId}[${projectName}] -.-> more_devdeps[+${devDeps.length - MAX_DEPS} more dev]`);
+    lines.push(
+      `  ${rootId}[${projectName}] -.-> more_devdeps[+${devDeps.length - MAX_DEPS} more dev]`,
+    );
   }
 
   if (deps.length === 0 && devDeps.length === 0) {

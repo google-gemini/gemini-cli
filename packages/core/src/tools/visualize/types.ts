@@ -26,10 +26,20 @@ export interface DiagramEdge {
   points?: Array<{ x: number; y: number }>;
 }
 
+export type StructureType =
+  | 'linked-list'
+  | 'doubly-linked-list'
+  | 'binary-tree'
+  | 'stack'
+  | 'queue'
+  | 'graph'
+  | 'flowchart';
+
 export interface DiagramData {
   isDiagram: true;
   diagramType: 'flowchart' | 'sequence' | 'class' | 'er' | 'gantt' | 'git';
   direction?: 'TD' | 'LR' | 'RL' | 'BT';
+  structure?: StructureType;
   nodes: DiagramNode[];
   edges: DiagramEdge[];
   title?: string;
@@ -62,4 +72,5 @@ export interface VisualizeToolParams {
   file_path?: string;
   html?: string;
   title?: string;
+  structure?: StructureType;
 }
