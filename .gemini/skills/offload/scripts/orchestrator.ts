@@ -58,7 +58,7 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
     }
   }
 
-  const remoteWorkDir = '/home/ubuntu/.offload/workspace';
+  const remoteWorkDir = '~/.offload/workspace';
 
   const sessionName = `offload-${prNumber}-${action}`;
 

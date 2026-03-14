@@ -92,6 +92,22 @@ async function createImage() {
   console.log(`   3. gcloud compute instances delete ${name} --project ${PROJECT_ID} --zone ${zone} --quiet`);
 }
 
+async function stopWorker() {
+  const name = INSTANCE_PREFIX;
+  const zone = 'us-west1-a';
+  
+  console.log(`🛑 Stopping offload worker: ${name}...`);
+  const result = spawnSync('gcloud', [
+    'compute', 'instances', 'stop', name,
+    '--project', PROJECT_ID,
+    '--zone', zone
+  ], { stdio: 'inherit' });
+
+  if (result.status === 0) {
+    console.log(`\n✅ Worker ${name} has been stopped.`);
+  }
+}
+
 async function main() {
   const action = process.argv[2] || 'list';
 
@@ -101,6 +117,9 @@ async function main() {
       break;
     case 'provision':
       await provisionWorker();
+      break;
+    case 'stop':
+      await stopWorker();
       break;
     case 'create-image':
       await createImage();
