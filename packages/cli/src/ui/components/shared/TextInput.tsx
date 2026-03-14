@@ -14,6 +14,7 @@ import { expandPastePlaceholders, type TextBuffer } from './text-buffer.js';
 import { cpSlice, cpIndexToOffset } from '../../utils/textUtils.js';
 import { Command } from '../../key/keyMatchers.js';
 import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
+import { useTerminalCursorVisibility } from '../../hooks/useTerminalCursorVisibility.js';
 
 export interface TextInputProps {
   buffer: TextBuffer;
@@ -31,6 +32,11 @@ export function TextInput({
   focus = true,
 }: TextInputProps): React.JSX.Element {
   const keyMatchers = useKeyMatchers();
+
+  // Show the terminal cursor when focused to enable IME composition overlays
+  // for CJK language input (Korean, Chinese, Japanese, etc.)
+  useTerminalCursorVisibility(focus);
+
   const {
     text,
     handleInput,

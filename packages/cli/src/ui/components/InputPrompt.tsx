@@ -80,6 +80,7 @@ import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { useIsHelpDismissKey } from '../utils/shortcutsHelp.js';
 import { useRepeatedKeyPress } from '../hooks/useRepeatedKeyPress.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
+import { useTerminalCursorVisibility } from '../hooks/useTerminalCursorVisibility.js';
 
 /**
  * Returns if the terminal can be trusted to handle paste events atomically
@@ -332,6 +333,12 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   } = completion;
 
   const showCursor = focus && isShellFocused && !isEmbeddedShellFocused;
+
+  // Show the terminal cursor when the input is focused to enable IME
+  // (Input Method Editor) composition overlays for CJK languages.
+  // Without this, users typing in Korean, Chinese, Japanese, etc. cannot
+  // see intermediate character composition steps.
+  useTerminalCursorVisibility(showCursor);
 
   // Notify parent component about escape prompt state changes
   useEffect(() => {
