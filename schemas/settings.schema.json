@@ -1840,6 +1840,13 @@
             }
           },
           "additionalProperties": false
+        },
+        "topicUpdateNarration": {
+          "title": "Topic & Update Narration",
+          "description": "Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.",
+          "markdownDescription": "Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.\n\n- Category: `Experimental`\n- Requires restart: `no`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false
