@@ -9,7 +9,7 @@
   },
   "maintainer": {
     "deepReview": {
-      "remoteHost": "cli",
+      "remoteHost": "bg1",
       "remoteWorkDir": "~/.offload/workspace",
       "terminalType": "iterm2",
       "syncAuth": true,

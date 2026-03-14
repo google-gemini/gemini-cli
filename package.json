@@ -67,6 +67,7 @@
     "offload:setup": "tsx .gemini/skills/offload/scripts/setup.ts",
     "offload:check": "tsx .gemini/skills/offload/scripts/check.ts",
     "offload:clean": "tsx .gemini/skills/offload/scripts/clean.ts",
+    "offload:fleet": "tsx .gemini/skills/offload/scripts/fleet.ts",
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {

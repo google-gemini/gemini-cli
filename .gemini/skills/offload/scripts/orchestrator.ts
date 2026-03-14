@@ -1,5 +1,7 @@
 /**
  * Universal Offload Orchestrator (Local)
+ * 
+ * Automatically detects and connects to your dynamic GCE fleet.
  */
 import { spawnSync } from 'child_process';
 import path from 'path';
@@ -13,55 +15,75 @@ const q = (str: string) => `'${str.replace(/'/g, "'\\''")}'`;
 
 export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = process.env) {
   const prNumber = args[0];
-  const action = args[1] || 'review'; // Default action is review
+  const action = args[1] || 'review';
   
   if (!prNumber) {
     console.error('Usage: npm run offload <PR_NUMBER> [action]');
     return 1;
   }
 
-  // Load Settings
+  // 1. Load GCP Settings
   const settingsPath = path.join(REPO_ROOT, '.gemini/settings.json');
-  let settings: any = {};
-  if (fs.existsSync(settingsPath)) {
-    try { settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8')); } catch (e) {}
-  }
-
-  let config = settings.maintainer?.deepReview;
-  if (!config) {
-    console.log('⚠️  Offload configuration not found. Launching setup...');
-    const setupResult = spawnSync('npm', ['run', 'offload:setup'], { stdio: 'inherit' });
-    if (setupResult.status !== 0) {
-      console.error('❌ Setup failed. Please run "npm run offload:setup" manually.');
+  if (!fs.existsSync(settingsPath)) {
+      console.error('❌ Settings not found. Run "npm run offload:setup" first.');
       return 1;
-    }
-    // Reload settings after setup
-    settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-    config = settings.maintainer.deepReview;
+  }
+  const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  const config = settings.maintainer?.deepReview;
+  if (!config) {
+    console.error('❌ Fleet settings not found. Run "npm run offload:setup" first.');
+    return 1;
   }
 
-  const { remoteHost, remoteWorkDir, terminalType, syncAuth, geminiSetup, ghSetup } = config;
+  const { projectId, zone, terminalType, syncAuth } = config;
+  const userPrefix = `gcli-offload-${env.USER || 'mattkorwel'}`;
 
+  console.log(`🔍 Finding active fleet workers for ${userPrefix}...`);
+
+  // 2. Discover Worker VM
+  const gcloudList = spawnSync(`gcloud compute instances list --project ${projectId} --filter="name~^${userPrefix} AND status=RUNNING" --format="json"`, { shell: true });
+
+  let instances = [];
+  try {
+      instances = JSON.parse(gcloudList.stdout.toString());
+  } catch (e) {
+      console.error('❌ Failed to parse gcloud output. Ensure you are logged in.');
+      return 1;
+  }
+
+  if (instances.length === 0) {
+    console.log('⚠️ No active workers found. Please run "npm run offload:fleet provision" first.');
+    return 1;
+  }
+
+  // Default to the first found worker
+  const targetVM = instances[0].name;
+  const remoteWorkDir = '/home/ubuntu/.offload/workspace';
+  const sessionName = `offload-${prNumber}-${action}`;
+
+  // Fetch Metadata (local)
   console.log(`🔍 Fetching metadata for ${action === 'implement' ? 'Issue' : 'PR'} #${prNumber}...`);
-  const ghCmd = action === 'implement' ? ['issue', 'view', prNumber, '--json', 'title', '-q', '.title'] : ['pr', 'view', prNumber, '--json', 'headRefName', '-q', '.headRefName'];
-  const ghView = spawnSync('gh', ghCmd, { shell: true });
+  const ghCmd = action === 'implement' 
+    ? `gh issue view ${prNumber} --json title -q .title` 
+    : `gh pr view ${prNumber} --json headRefName -q .headRefName`;
+  
+  const ghView = spawnSync(ghCmd, { shell: true });
   const metaName = ghView.stdout.toString().trim() || `task-${prNumber}`;
-  
   const branchName = action === 'implement' ? `impl-${prNumber}` : metaName;
-  const sessionName = `offload-${prNumber}-${branchName.replace(/[^a-zA-Z0-9]/g, '-')}`;
-  
-  // 2. Sync Configuration Mirror (Isolated Profiles)
-  const ISOLATED_GEMINI = geminiSetup === 'isolated' ? '~/.offload/gemini-cli-config' : '~/.gemini';
-  const ISOLATED_GH = ghSetup === 'isolated' ? '~/.offload/gh-cli-config' : '~/.config/gh';
-  const remotePolicyPath = `${ISOLATED_GEMINI}/policies/offload-policy.toml`;
-  
-  console.log(`📡 Mirroring environment to ${remoteHost}...`);
-  spawnSync('ssh', [remoteHost, `mkdir -p ${remoteWorkDir}/.gemini/skills/offload/scripts/ ${ISOLATED_GEMINI}/policies/`]);
-  
-  // Sync the policy file specifically
-  spawnSync('rsync', ['-avz', path.join(REPO_ROOT, '.gemini/skills/offload/policy.toml'), `${remoteHost}:${remotePolicyPath}`]);
 
-  spawnSync('rsync', ['-avz', '--delete', path.join(REPO_ROOT, '.gemini/skills/offload/scripts/'), `${remoteHost}:${remoteWorkDir}/.gemini/skills/offload/scripts/`]);
+  console.log(`📡 Using worker: ${targetVM}`);
+
+  // 3. Mirror logic
+  const ISOLATED_GEMINI = '~/.offload/gemini-cli-config';
+  const ISOLATED_GH = '~/.offload/gh-cli-config';
+  const remotePolicyPath = `${ISOLATED_GEMINI}/policies/offload-policy.toml`;
+
+  console.log(`📦 Synchronizing with ${targetVM}...`);
+  spawnSync(`gcloud compute ssh ${targetVM} --project ${projectId} --zone ${zone} --command "mkdir -p ${remoteWorkDir} ${ISOLATED_GEMINI}/policies/"`, { shell: true });
+
+  // Sync scripts and policy
+  spawnSync(`rsync -avz -e "gcloud compute ssh --project ${projectId} --zone ${zone}" .gemini/skills/offload/policy.toml ${targetVM}:${remotePolicyPath}`, { shell: true });
+  spawnSync(`rsync -avz --delete -e "gcloud compute ssh --project ${projectId} --zone ${zone}" .gemini/skills/offload/scripts/ ${targetVM}:${remoteWorkDir}/.gemini/skills/offload/scripts/`, { shell: true });
 
   if (syncAuth) {
     const homeDir = env.HOME || '';
@@ -69,56 +91,31 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
     const syncFiles = ['google_accounts.json', 'settings.json'];
     for (const f of syncFiles) {
       const lp = path.join(localGeminiDir, f);
-      if (fs.existsSync(lp)) spawnSync('rsync', ['-avz', lp, `${remoteHost}:${ISOLATED_GEMINI}/${f}`]);
+      if (fs.existsSync(lp)) {
+        spawnSync(`rsync -avz -e "gcloud compute ssh --project ${projectId} --zone ${zone}" ${lp} ${targetVM}:${ISOLATED_GEMINI}/${f}`, { shell: true });
+      }
     }
-    const localPolicies = path.join(localGeminiDir, 'policies/');
-    if (fs.existsSync(localPolicies)) spawnSync('rsync', ['-avz', '--delete', localPolicies, `${remoteHost}:${ISOLATED_GEMINI}/policies/`]);
-    const localEnv = path.join(REPO_ROOT, '.env');
-    if (fs.existsSync(localEnv)) spawnSync('rsync', ['-avz', localEnv, `${remoteHost}:${remoteWorkDir}/.env`]);
   }
 
-  // 3. Construct Clean Command
+  // 4. Construct Command
   const envLoader = 'export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh"';
-  const remoteWorker = `export GEMINI_CLI_HOME=${ISOLATED_GEMINI} && export GH_CONFIG_DIR=${ISOLATED_GH} && ./node_modules/.bin/tsx .gemini/skills/offload/scripts/entrypoint.ts ${prNumber} ${branchName} ${remotePolicyPath} ${action}`;
-  
+  const remoteWorker = `export GEMINI_CLI_HOME=${ISOLATED_GEMINI} && export GH_CONFIG_DIR=${ISOLATED_GH} && node_modules/.bin/tsx .gemini/skills/offload/scripts/entrypoint.ts ${prNumber} ${branchName} ${remotePolicyPath} ${action}`;
   const tmuxCmd = `cd ${remoteWorkDir} && ${envLoader} && ${remoteWorker}; exec $SHELL`;
-  const sshInternal = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n ${q(branchName)} ${q(tmuxCmd)}`;
-  const sshCmd = `ssh -t ${remoteHost} ${q(sshInternal)}`;
+  
+  const sshInternal = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'offload' ${q(tmuxCmd)}`;
+  const finalSSH = `gcloud compute ssh ${targetVM} --project ${projectId} --zone ${zone} -- -t ${q(sshInternal)}`;
 
-  // 4. Smart Context Execution
+  // 5. Terminal Automation
   const isWithinGemini = !!env.GEMINI_SESSION_ID || !!env.GCLI_SESSION_ID;
-  const forceBackground = args.includes('--background');
-
-  if (isWithinGemini || forceBackground) {
-    if (process.platform === 'darwin' && terminalType !== 'none' && !forceBackground) {
-      // macOS: Use Window Automation
-      let appleScript = `on run argv\n set theCommand to item 1 of argv\n tell application "iTerm"\n set newWindow to (create window with default profile)\n tell current session of newWindow\n write text theCommand\n end tell\n activate\n end tell\n end run`;
-      if (terminalType === 'terminal') {
-        appleScript = `on run argv\n set theCommand to item 1 of argv\n tell application "Terminal"\n do script theCommand\n activate\n end tell\n end run`;
-      }
-
-      spawnSync('osascript', ['-', sshCmd], { input: appleScript });
-      console.log(`✅ ${terminalType.toUpperCase()} window opened for verification.`);
-      return 0;
-    }
-
-    // Cross-Platform Background Mode
-    console.log(`📡 Launching remote verification in background mode...`);
-    const logFile = path.join(REPO_ROOT, `.gemini/logs/offload-${prNumber}/background.log`);
-    fs.mkdirSync(path.dirname(logFile), { recursive: true });
-    
-    const backgroundCmd = `ssh ${remoteHost} ${q(tmuxCmd)} > ${q(logFile)} 2>&1 &`;
-    spawnSync(backgroundCmd, { shell: true });
-    
-    console.log(`⏳ Remote worker started in background.`);
-    console.log(`📄 Tailing logs to: .gemini/logs/offload-${prNumber}/background.log`);
+  if (isWithinGemini) {
+    const appleScript = `on run argv\n tell application "iTerm"\n set newWindow to (create window with default profile)\n tell current session of newWindow\n write text (item 1 of argv)\n end tell\n activate\n end tell\n end run`;
+    spawnSync('osascript', ['-', finalSSH], { input: appleScript });
+    console.log(`✅ iTerm2 window opened on ${targetVM}.`);
     return 0;
   }
 
-  // Direct Shell Mode: Execute SSH in-place
-  console.log(`🚀 Launching offload session in current terminal...`);
-  const result = spawnSync(sshCmd, { stdio: 'inherit', shell: true });
-  return result.status || 0;
+  spawnSync(finalSSH, { stdio: 'inherit', shell: true });
+  return 0;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
