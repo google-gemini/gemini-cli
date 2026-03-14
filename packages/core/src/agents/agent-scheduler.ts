@@ -56,30 +56,18 @@ export async function scheduleAgentTools(
     onWaitingForConfirmation,
   } = options;
 
-  // Provide the agent-specific tool registry inside a scoped context literal
-  const agentContext = {
-    get config() {
-      return config;
-    },
-    get promptId() {
-      return config.promptId;
-    },
-    get toolRegistry() {
-      return toolRegistry;
-    },
-    get messageBus() {
-      return toolRegistry.messageBus;
-    },
-    get geminiClient() {
-      return config.geminiClient;
-    },
-    get sandboxManager() {
-      return config.sandboxManager;
-    },
+  // Create a proxy/override of the config to provide the agent-specific tool registry.
+  const schedulerContext = {
+    config,
+    promptId: config.promptId,
+    toolRegistry,
+    messageBus: toolRegistry.messageBus,
+    geminiClient: config.geminiClient,
+    sandboxManager: config.sandboxManager,
   };
 
   const scheduler = new Scheduler({
-    context: agentContext,
+    context: schedulerContext,
     messageBus: toolRegistry.messageBus,
     getPreferredEditor: getPreferredEditor ?? (() => undefined),
     schedulerId,
