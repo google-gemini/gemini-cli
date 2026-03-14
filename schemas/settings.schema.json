@@ -1786,6 +1786,13 @@
           "default": false,
           "type": "boolean"
         },
+        "imageGeneration": {
+          "title": "Image Generation",
+          "description": "Enable generating images with Nano Banana (experimental).",
+          "markdownDescription": "Enable generating images with Nano Banana (experimental).\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "modelSteering": {
           "title": "Model Steering",
           "description": "Enable model steering (user hints) to guide the model during tool execution.",

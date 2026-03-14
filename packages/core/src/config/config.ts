@@ -32,6 +32,7 @@ import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
+import { GenerateImageTool } from '../tools/generate-image.js';
 import { AskUserTool } from '../tools/ask-user.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
@@ -404,6 +405,7 @@ import { McpClientManager } from '../tools/mcp-client-manager.js';
 import { type McpContext } from '../tools/mcp-client.js';
 import type { EnvironmentSanitizationConfig } from '../services/environmentSanitization.js';
 import { getErrorMessage } from '../utils/errors.js';
+import { GENERATE_IMAGE_TOOL_NAME } from '../tools/tool-names.js';
 
 export type { FileFilteringOptions };
 export {
@@ -622,6 +624,7 @@ export interface ConfigParameters {
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
+  imageGeneration?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
   plan?: boolean;
@@ -842,6 +845,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly adminSkillsEnabled: boolean;
 
   private readonly experimentalJitContext: boolean;
+  private readonly imageGeneration: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
   private readonly trackerEnabled: boolean;
@@ -956,6 +960,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
     this.modelAvailabilityService = new ModelAvailabilityService();
     this.experimentalJitContext = params.experimentalJitContext ?? false;
+    this.imageGeneration = params.imageGeneration ?? false;
     this.modelSteering = params.modelSteering ?? false;
     this.userHintService = new UserHintService(() =>
       this.isModelSteeringEnabled(),
@@ -1371,6 +1376,36 @@ export class Config implements McpContext, AgentLoopContext {
       },
     );
     this.setRemoteAdminSettings(adminControls);
+
+    // Re-evaluate image generation tool registration after auth change
+    this.updateImageGenToolRegistration();
+  }
+
+  /**
+   * Registers or unregisters the GenerateImageTool based on current auth type.
+   * Called after auth completes or is refreshed.
+   */
+  private updateImageGenToolRegistration(): void {
+    if (!this.imageGeneration) {
+      this.toolRegistry?.unregisterTool(GENERATE_IMAGE_TOOL_NAME);
+      return;
+    }
+
+    const currentAuthType = this.getContentGeneratorConfig()?.authType;
+    const supportsImageGen =
+      currentAuthType === AuthType.USE_GEMINI ||
+      currentAuthType === AuthType.USE_VERTEX_AI;
+
+    if (
+      supportsImageGen &&
+      !this.toolRegistry?.getTool(GENERATE_IMAGE_TOOL_NAME)
+    ) {
+      this.toolRegistry?.registerTool(
+        new GenerateImageTool(this, this.messageBus),
+      );
+    } else if (!supportsImageGen) {
+      this.toolRegistry?.unregisterTool(GENERATE_IMAGE_TOOL_NAME);
+    }
   }
 
   async getExperimentsAsync(): Promise<Experiments | undefined> {
@@ -2399,6 +2434,10 @@ export class Config implements McpContext, AgentLoopContext {
     }
   }
 
+  isImageGenerationEnabled(): boolean {
+    return this.imageGeneration;
+  }
+
   getListExtensions(): boolean {
     return this.listExtensions;
   }
@@ -3057,6 +3096,19 @@ export class Config implements McpContext, AgentLoopContext {
       maybeRegister(EnterPlanModeTool, () =>
         registry.registerTool(new EnterPlanModeTool(this, this.messageBus)),
       );
+    }
+
+    // Register image generation tool if enabled and auth supports it
+    if (this.imageGeneration) {
+      const authType = this.getContentGeneratorConfig()?.authType;
+      if (
+        authType === AuthType.USE_GEMINI ||
+        authType === AuthType.USE_VERTEX_AI
+      ) {
+        maybeRegister(GenerateImageTool, () =>
+          registry.registerTool(new GenerateImageTool(this, this.messageBus)),
+        );
+      }
     }
 
     if (this.isTrackerEnabled()) {

@@ -183,6 +183,7 @@ export * from './tools/write-todos.js';
 export * from './tools/trackerTools.js';
 export * from './tools/activate-skill.js';
 export * from './tools/ask-user.js';
+export * from './tools/generate-image.js';
 
 // MCP OAuth
 export { MCPOAuthProvider } from './mcp/oauth-provider.js';

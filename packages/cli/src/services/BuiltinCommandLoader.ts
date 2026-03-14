@@ -60,6 +60,7 @@ import { shellsCommand } from '../ui/commands/shellsCommand.js';
 import { vimCommand } from '../ui/commands/vimCommand.js';
 import { setupGithubCommand } from '../ui/commands/setupGithubCommand.js';
 import { terminalSetupCommand } from '../ui/commands/terminalSetupCommand.js';
+import { imageCommand } from '../ui/commands/imageCommand.js';
 import { upgradeCommand } from '../ui/commands/upgradeCommand.js';
 
 /**
@@ -155,6 +156,7 @@ export class BuiltinCommandLoader implements ICommandLoader {
           ]
         : [extensionsCommand(this.config?.getEnableExtensionReloading())]),
       helpCommand,
+      imageCommand,
       footerCommand,
       shortcutsCommand,
       ...(this.config?.getEnableHooksUI() ? [hooksCommand] : []),

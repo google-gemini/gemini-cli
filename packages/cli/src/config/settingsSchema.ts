@@ -1914,6 +1914,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Plan Mode.',
         showInDialog: true,
       },
+      imageGeneration: {
+        type: 'boolean',
+        label: 'Image Generation',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable generating images with Nano Banana (experimental).',
+        showInDialog: true,
+      },
       taskTracker: {
         type: 'boolean',
         label: 'Task Tracker',
