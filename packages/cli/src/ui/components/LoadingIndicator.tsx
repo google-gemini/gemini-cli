@@ -52,15 +52,17 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   const primaryText =
     currentLoadingPhrase === INTERACTIVE_SHELL_WAITING_PHRASE
       ? currentLoadingPhrase
-      : thought?.subject
-        ? (thoughtLabel ?? thought.subject)
-        : currentLoadingPhrase;
+      : thought?.subject?.trim()
+        ? `Gemini is thinking about ${thoughtLabel ?? thought.subject.trim()}`
+        : (currentLoadingPhrase ?? 'Gemini is thinking...');
   const hasThoughtIndicator =
     currentLoadingPhrase !== INTERACTIVE_SHELL_WAITING_PHRASE &&
     Boolean(thought?.subject?.trim());
-  // Avoid "Thinking... Thinking..." duplication if primaryText already starts with "Thinking"
+  // Avoid "Thinking... Thinking..." duplication if primaryText already starts with "Thinking" or "Gemini"
   const thinkingIndicator =
-    hasThoughtIndicator && !primaryText?.startsWith('Thinking')
+    hasThoughtIndicator &&
+    !primaryText?.startsWith('Thinking') &&
+    !primaryText?.startsWith('Gemini')
       ? 'Thinking... '
       : '';
 

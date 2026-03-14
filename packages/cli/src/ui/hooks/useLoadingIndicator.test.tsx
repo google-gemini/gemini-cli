@@ -238,7 +238,7 @@ describe('useLoadingIndicator', () => {
       retryStatus,
     );
 
-    expect(result.current.currentLoadingPhrase).toContain('Trying to reach');
+    expect(result.current.currentLoadingPhrase).toContain('Retrying');
     expect(result.current.currentLoadingPhrase).toContain('Attempt 3/3');
   });
 
@@ -258,7 +258,7 @@ describe('useLoadingIndicator', () => {
     );
 
     expect(result.current.currentLoadingPhrase).not.toBe(
-      "This is taking a bit longer, we're still on it.",
+      'System busy. Retrying...',
     );
   });
 
@@ -278,7 +278,7 @@ describe('useLoadingIndicator', () => {
     );
 
     expect(result.current.currentLoadingPhrase).toBe(
-      "This is taking a bit longer, we're still on it.",
+      'System busy. Retrying...',
     );
   });
 
