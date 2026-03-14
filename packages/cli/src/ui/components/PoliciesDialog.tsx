@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -22,6 +22,8 @@ import {
 } from '../utils/policyUtils.js';
 import { useUIState } from '../contexts/UIStateContext.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
+
+const ITEM_HEIGHT = 2;
 
 interface PoliciesDialogProps {
   rules: readonly PolicyRule[];
@@ -98,7 +100,6 @@ export function PoliciesDialog({
       if (showDesc) staticHeight += 1;
       if (showHelp) staticHeight += 1;
 
-      const ITEM_HEIGHT = 2;
       const availableForItems = dialogAvailableHeight - staticHeight;
       const maxItems = Math.max(1, Math.floor(availableForItems / ITEM_HEIGHT));
 
@@ -215,7 +216,6 @@ export function PoliciesDialog({
 
   // Fixed height for the list area to prevent layout jumpiness in alternate
   // buffer mode. Each item is ITEM_HEIGHT lines, plus 2 for scroll arrows.
-  const ITEM_HEIGHT = 2;
   const listAreaHeight = effectiveMaxItemsToShow * ITEM_HEIGHT + 2;
 
   // Keyboard handling

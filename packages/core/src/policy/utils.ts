@@ -44,7 +44,7 @@ export function isSafeRegExp(pattern: string): boolean {
 
 export interface ArgsPatternResult {
   pattern: string | undefined;
-  display?: string;
+  display: string | undefined;
 }
 
 /**

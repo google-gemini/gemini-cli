@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -14,14 +14,10 @@ export interface PolicyListItem {
   key: string;
   /** The original policy rule */
   rule: PolicyRule;
-  /** Uppercased decision string */
-  decision: string;
   /** Resolved display name (e.g. "Shell") or fallback to internal name */
   toolDisplayName: string;
   /** Formatted constraint string for parenthetical display, or undefined */
   constraint: string | undefined;
-  /** Formatted priority string */
-  priority: string;
   /** rule.source ?? '' */
   source: string;
   /** Concatenated searchable fields */
@@ -46,7 +42,6 @@ export function buildPolicyListItems(
         ? (toolDisplayNames.get(rule.toolName) ?? rule.toolName)
         : 'all tools';
       const constraint = rule.constraintDisplay;
-      const priority = String(rule.priority ?? 0);
       const source = rule.source ?? '';
 
       const searchText = [toolDisplayName, rule.toolName, constraint, source]
@@ -56,10 +51,8 @@ export function buildPolicyListItems(
       return {
         key: `policy-${index}`,
         rule,
-        decision: rule.decision.toUpperCase(),
         toolDisplayName,
         constraint,
-        priority,
         source,
         searchText,
       };

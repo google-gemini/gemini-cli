@@ -5,18 +5,14 @@
  */
 
 import React from 'react';
-import type { PolicyRule } from '@google/gemini-cli-core';
+import type { Config, PolicyRule } from '@google/gemini-cli-core';
 import { CommandKind, type SlashCommand } from './types.js';
 import { MessageType } from '../types.js';
 import { PoliciesDialog } from '../components/PoliciesDialog.js';
 
 function buildToolDisplayNames(
   rules: readonly PolicyRule[],
-  config: {
-    getToolRegistry: () => {
-      getTool: (name: string) => { displayName: string } | undefined;
-    };
-  },
+  config: Config,
 ): Map<string, string> {
   const toolDisplayNames = new Map<string, string>();
   const toolRegistry = config.getToolRegistry();
