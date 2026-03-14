@@ -152,6 +152,7 @@ they appear in the UI.
 | Plan                       | `experimental.plan`                      | Enable Plan Mode.                                                                                                                                         | `true`  |
 | Model Steering             | `experimental.modelSteering`             | Enable model steering (user hints) to guide the model during tool execution.                                                                              | `false` |
 | Direct Web Fetch           | `experimental.directWebFetch`            | Enable web fetch behavior that bypasses LLM summarization.                                                                                                | `false` |
+| Topic & Update Narration   | `experimental.topicUpdateNarration`      | Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.                                      | `false` |
 
 ### Skills
 
