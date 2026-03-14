@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from '../config/config.js';
+import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { LocalAgentExecutor } from './local-executor.js';
 import { safeJsonToMarkdown } from '../utils/markdownUtils.js';
 import {
@@ -43,13 +43,13 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
 > {
   /**
    * @param definition The definition object that configures the agent.
-   * @param config The global runtime configuration.
+   * @param context The agent loop context.
    * @param params The validated input parameters for the agent.
    * @param messageBus Message bus for policy enforcement.
    */
   constructor(
     private readonly definition: LocalAgentDefinition,
-    private readonly config: Config,
+    private readonly context: AgentLoopContext,
     params: AgentInputs,
     messageBus: MessageBus,
     _toolName?: string,
@@ -223,7 +223,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
 
       const executor = await LocalAgentExecutor.create(
         this.definition,
-        this.config,
+        this.context,
         onActivity,
       );
 
@@ -253,12 +253,15 @@ Termination Reason: ${output.terminate_reason}
 Result:
 ${output.result}`;
 
-      const displayContent = `
-Subagent ${this.definition.name} Finished
+      const displayContent =
+        output.terminate_reason === AgentTerminateMode.GOAL
+          ? displayResult
+          : `
+### Subagent ${this.definition.name} Finished Early
 
-Termination Reason:\n ${output.terminate_reason}
+**Termination Reason:** ${output.terminate_reason}
 
-Result:
+**Result/Summary:**
 ${displayResult}
 `;
 

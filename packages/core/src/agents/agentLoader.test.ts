@@ -557,22 +557,136 @@ auth:
       });
     });
 
-    it('should parse auth with agent_card_requires_auth flag', async () => {
+    it('should parse remote agent with oauth2 auth', async () => {
       const filePath = await writeAgentMarkdown(`---
 kind: remote
-name: protected-card-agent
+name: oauth2-agent
 agent_card_url: https://example.com/card
 auth:
-  type: apiKey
-  key: $MY_API_KEY
-  agent_card_requires_auth: true
+  type: oauth2
+  client_id: $MY_OAUTH_CLIENT_ID
+  scopes:
+    - read
+    - write
 ---
 `);
       const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(1);
       expect(result[0]).toMatchObject({
+        kind: 'remote',
+        name: 'oauth2-agent',
         auth: {
-          type: 'apiKey',
-          agent_card_requires_auth: true,
+          type: 'oauth2',
+          client_id: '$MY_OAUTH_CLIENT_ID',
+          scopes: ['read', 'write'],
+        },
+      });
+    });
+
+    it('should parse remote agent with oauth2 auth including all fields', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: oauth2-full-agent
+agent_card_url: https://example.com/card
+auth:
+  type: oauth2
+  client_id: my-client-id
+  client_secret: my-client-secret
+  scopes:
+    - openid
+    - profile
+  authorization_url: https://auth.example.com/authorize
+  token_url: https://auth.example.com/token
+---
+`);
+      const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        kind: 'remote',
+        name: 'oauth2-full-agent',
+        auth: {
+          type: 'oauth2',
+          client_id: 'my-client-id',
+          client_secret: 'my-client-secret',
+          scopes: ['openid', 'profile'],
+          authorization_url: 'https://auth.example.com/authorize',
+          token_url: 'https://auth.example.com/token',
+        },
+      });
+    });
+
+    it('should parse remote agent with minimal oauth2 config (type only)', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: oauth2-minimal-agent
+agent_card_url: https://example.com/card
+auth:
+  type: oauth2
+---
+`);
+      const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        kind: 'remote',
+        name: 'oauth2-minimal-agent',
+        auth: {
+          type: 'oauth2',
+        },
+      });
+    });
+
+    it('should reject oauth2 auth with invalid authorization_url', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: invalid-oauth2-agent
+agent_card_url: https://example.com/card
+auth:
+  type: oauth2
+  client_id: my-client
+  authorization_url: not-a-valid-url
+---
+`);
+      await expect(parseAgentMarkdown(filePath)).rejects.toThrow(/Invalid url/);
+    });
+
+    it('should reject oauth2 auth with invalid token_url', async () => {
+      const filePath = await writeAgentMarkdown(`---
+kind: remote
+name: invalid-oauth2-agent
+agent_card_url: https://example.com/card
+auth:
+  type: oauth2
+  client_id: my-client
+  token_url: not-a-valid-url
+---
+`);
+      await expect(parseAgentMarkdown(filePath)).rejects.toThrow(/Invalid url/);
+    });
+
+    it('should convert oauth2 auth config in markdownToAgentDefinition', () => {
+      const markdown = {
+        kind: 'remote' as const,
+        name: 'oauth2-convert-agent',
+        agent_card_url: 'https://example.com/card',
+        auth: {
+          type: 'oauth2' as const,
+          client_id: '$MY_CLIENT_ID',
+          scopes: ['read'],
+          authorization_url: 'https://auth.example.com/authorize',
+          token_url: 'https://auth.example.com/token',
+        },
+      };
+
+      const result = markdownToAgentDefinition(markdown);
+      expect(result).toMatchObject({
+        kind: 'remote',
+        name: 'oauth2-convert-agent',
+        auth: {
+          type: 'oauth2',
+          client_id: '$MY_CLIENT_ID',
+          scopes: ['read'],
+          authorization_url: 'https://auth.example.com/authorize',
+          token_url: 'https://auth.example.com/token',
         },
       });
     });

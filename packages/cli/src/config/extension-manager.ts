@@ -157,6 +157,7 @@ export class ExtensionManager extends ExtensionLoader {
   async installOrUpdateExtension(
     installMetadata: ExtensionInstallMetadata,
     previousExtensionConfig?: ExtensionConfig,
+    requestConsentOverride?: (consent: string) => Promise<boolean>,
   ): Promise<GeminiCLIExtension> {
     if (
       this.settings.security?.allowedExtensions &&
@@ -247,7 +248,7 @@ export class ExtensionManager extends ExtensionLoader {
             (result.failureReason === 'no release data' &&
               installMetadata.type === 'git') ||
             // Otherwise ask the user if they would like to try a git clone.
-            (await this.requestConsent(
+            (await (requestConsentOverride ?? this.requestConsent)(
               `Error downloading github release for ${installMetadata.source} with the following error: ${result.errorMessage}.
 
 Would you like to attempt to install via "git clone" instead?`,
@@ -321,7 +322,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
         await maybeRequestConsentOrFail(
           newExtensionConfig,
-          this.requestConsent,
+          requestConsentOverride ?? this.requestConsent,
           newHasHooks,
           previousExtensionConfig,
           previousHasHooks,
@@ -563,7 +564,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
   protected override async startExtension(extension: GeminiCLIExtension) {
     await super.startExtension(extension);
-    if (extension.themes) {
+    if (extension.themes && !themeManager.hasExtensionThemes(extension.name)) {
       themeManager.registerExtensionThemes(extension.name, extension.themes);
     }
   }
@@ -622,6 +623,13 @@ Would you like to attempt to install via "git clone" instead?`,
         }
 
         this.loadedExtensions = builtExtensions;
+
+        // Register extension themes early so they're available at startup.
+        for (const ext of this.loadedExtensions) {
+          if (ext.isActive && ext.themes) {
+            themeManager.registerExtensionThemes(ext.name, ext.themes);
+          }
+        }
 
         await Promise.all(
           this.loadedExtensions.map((ext) => this.maybeStartExtension(ext)),
