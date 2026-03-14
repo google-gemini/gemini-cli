@@ -144,6 +144,7 @@ export class PromptProvider {
             })),
           skills.length > 0,
         ),
+        taskTracker: context.config.isTrackerEnabled(),
         hookContext: isSectionEnabled('hookContext') || undefined,
         primaryWorkflows: this.withSection(
           'primaryWorkflows',
@@ -175,7 +176,6 @@ export class PromptProvider {
           }),
           isPlanMode,
         ),
-        taskTracker: context.config.isTrackerEnabled(),
         operationalGuidelines: this.withSection(
           'operationalGuidelines',
           () => ({
