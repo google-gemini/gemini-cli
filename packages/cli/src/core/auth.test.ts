@@ -10,6 +10,7 @@ import {
   type Config,
   ValidationRequiredError,
   ProjectIdRequiredError,
+  IneligibleTierError,
   AuthType,
 } from '@google/gemini-cli-core';
 
@@ -131,6 +132,34 @@ describe('auth', () => {
       accountSuspensionInfo: null,
     });
     expect(result.authError).not.toContain('Failed to login');
+    expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
+      AuthType.LOGIN_WITH_GOOGLE,
+    );
+  });
+
+  it('should return helpful error message for IneligibleTierError', async () => {
+    const ineligibleTierError = new IneligibleTierError([
+      {
+        reasonMessage:
+          'Your current account is not eligible for Gemini Code Assist for individuals, the free version of Gemini Code Assist.',
+        tierId: 'free-tier',
+        tierName: 'free',
+      },
+    ]);
+    vi.mocked(mockConfig.refreshAuth).mockRejectedValue(ineligibleTierError);
+    const result = await performInitialAuth(
+      mockConfig,
+      AuthType.LOGIN_WITH_GOOGLE,
+    );
+    expect(result.authError).toContain(
+      'Your current account is not eligible for Gemini Code Assist for individuals',
+    );
+    expect(result.authError).toContain('Use a Gemini API Key');
+    expect(result.authError).toContain('Use Vertex AI');
+    expect(result.authError).toContain(
+      'https://goo.gle/gemini-cli-auth-docs',
+    );
+    expect(result.accountSuspensionInfo).toBeNull();
     expect(mockConfig.refreshAuth).toHaveBeenCalledWith(
       AuthType.LOGIN_WITH_GOOGLE,
     );

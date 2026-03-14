@@ -13,6 +13,7 @@ import {
   debugLogger,
   isAccountSuspendedError,
   ProjectIdRequiredError,
+  IneligibleTierError,
 } from '@google/gemini-cli-core';
 import { getErrorMessage } from '@google/gemini-cli-core';
 import { AuthState } from '../types.js';
@@ -148,6 +149,19 @@ export const useAuthCommand = (
           // OAuth succeeded but account setup requires project ID
           // Show the error message directly without "Failed to login" prefix
           onAuthError(getErrorMessage(e));
+        } else if (e instanceof IneligibleTierError) {
+          // Account is ineligible for the free individual tier
+          // Provide helpful guidance about alternative authentication options
+          const reasonMessage = getErrorMessage(e);
+          onAuthError(`Failed to login. ${reasonMessage}
+
+Your Google account is not eligible for the free version of Gemini Code Assist.
+To use the Gemini CLI, you can either:
+  1. Use a Gemini API Key (select this option in the auth menu)
+  2. Use Vertex AI with a Google Cloud project
+  3. Try a different Google account
+
+For more information, see: https://goo.gle/gemini-cli-auth-docs`);
         } else {
           onAuthError(`Failed to sign in. Message: ${getErrorMessage(e)}`);
         }
