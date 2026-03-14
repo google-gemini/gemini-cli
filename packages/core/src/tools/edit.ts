@@ -200,12 +200,17 @@ async function calculateFlexibleReplacement(
       const indentationMatch = firstLineInMatch.match(/^([ \t]*)/);
       const indentation = indentationMatch ? indentationMatch[1] : '';
       const newBlockWithIndent = applyIndentation(replaceLines, indentation);
-      sourceLines.splice(
-        i,
-        searchLinesStripped.length,
-        newBlockWithIndent.join('\n'),
-      );
-      i += replaceLines.length;
+      let replacementText = newBlockWithIndent.join('\n');
+      if (
+        window[window.length - 1].endsWith('\n') &&
+        !replacementText.endsWith('\n')
+      ) {
+        replacementText += '\n';
+      }
+      const replacementLines =
+        replacementText.match(/.*(?:\n|$)/g)?.slice(0, -1) ?? [];
+      sourceLines.splice(i, searchLinesStripped.length, ...replacementLines);
+      i += replacementLines.length;
     } else {
       i++;
     }
@@ -1278,7 +1283,9 @@ async function calculateFuzzyReplacement(
         replacementText += '\n';
       }
 
-      sourceLines.splice(match.index, N, replacementText);
+      const replacementLines =
+        replacementText.match(/.*(?:\n|$)/g)?.slice(0, -1) ?? [];
+      sourceLines.splice(match.index, N, ...replacementLines);
     }
 
     let modifiedCode = sourceLines.join('');
