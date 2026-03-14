@@ -16,6 +16,7 @@ import {
   type AgentDefinition,
   type ApprovalMode,
   type Kind,
+  type ToolErrorType,
   CoreToolCallStatus,
   checkExhaustive,
 } from '@google/gemini-cli-core';
@@ -117,6 +118,7 @@ export interface IndividualToolCallDisplay {
   originalRequestName?: string;
   progress?: number;
   progressTotal?: number;
+  errorType?: ToolErrorType;
 }
 
 export interface CompressionProps {
