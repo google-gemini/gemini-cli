@@ -64,6 +64,10 @@
       {
         "command": "gemini-cli.showNotices",
         "title": "Gemini CLI: View Third-Party Notices"
+      },
+      {
+        "command": "gemini-cli.runCustomCommand",
+        "title": "Gemini Commands"
       }
     ],
     "menus": {
@@ -87,6 +91,13 @@
           "command": "gemini.diff.cancel",
           "when": "gemini.diff.isVisible",
           "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "gemini-cli.runCustomCommand",
+          "when": "editorHasSelection",
+          "group": "gemini@1"
         }
       ]
     },
@@ -140,6 +151,7 @@
     "@modelcontextprotocol/sdk": "^1.23.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
+    "glob": "^13.0.6",
     "zod": "^3.25.76"
   }
 }
