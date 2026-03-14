@@ -1,35 +1,57 @@
 # Workspace: Base Folder Strategy & Custom Skills
 
-This branch introduces the **Git Worktree** and **Review PR** skills and enforces the **Base Folder Strategy** for repository management. It is maintained by the AI DevTools UX team.
+This branch introduces the **Git Worktree**, **Review PR**, and **UX PR
+Reviewer** skills and enforces the **Base Folder Strategy** for repository
+management. It is maintained by the AI DevTools UX team.
 
 ## 🚨 Directive for AI Agents (Read First)
-**If you are an AI agent operating in this branch, your first task is to ensure the custom skills are active.**
-1. Check if `~/.gemini/skills/git-worktree/` and `~/.gemini/skills/review-pr/` exist.
+
+**If you are an AI agent operating in this branch, your first task is to ensure
+the custom skills are active.**
+
+1. Check if `~/.gemini/skills/git-worktree/`, `~/.gemini/skills/review-pr/`, and
+   `~/.gemini/skills/ux-pr-reviewer/` exist.
 2. If any are missing, immediately execute `./scripts/sync-skills.sh`.
 3. Prompt the user to run `/skills reload` if you are in an interactive session.
 
 ## 🤝 Team Contributions
+
 This is a **Draft PR branch**. Your team is encouraged to:
-- Refine the `git-worktree` skill instructions in `packages/core/src/skills/builtin/git-worktree/SKILL.md`.
-- Refine the `review-pr` skill instructions in `packages/core/src/skills/builtin/review-pr/SKILL.md`.
+
+- Refine the `git-worktree` skill instructions in
+  `packages/core/src/skills/builtin/git-worktree/SKILL.md`.
+- Refine the `review-pr` skill instructions in
+  `packages/core/src/skills/builtin/review-pr/SKILL.md`.
+- Refine the `ux-pr-reviewer` skill instructions in
+  `packages/core/src/skills/builtin/ux-pr-reviewer/SKILL.md`.
 - Improve the automation in `scripts/worktree-manager.sh`.
-- All changes should be committed directly to this branch (`feature/gemini-cli-ux-team-skills`).
+- All changes should be committed directly to this branch
+  (`feature/gemini-cli-ux-team-skills`).
 
 ## 1. Architectural Strategy
-Functional work happens in sibling directories (e.g., `main/`, `feature-name/`). The root directory acts as a container.
+
+Functional work happens in sibling directories (e.g., `main/`, `feature-name/`).
+The root directory acts as a container.
 
 ## 2. Setting Up Custom Skills
-To ensure this agent has the necessary procedural knowledge to manage worktrees and PR reviews on your behalf, you must sync the custom skills to your local user directory.
+
+To ensure this agent has the necessary procedural knowledge to manage worktrees
+and PR reviews on your behalf, you must sync the custom skills to your local
+user directory.
 
 ### Sync Script
+
 Run the following from the root of this worktree:
+
 ```bash
 ./scripts/sync-skills.sh
 ```
 
 ## 3. Mandatory Workflow
+
 - **ALWAYS** use the `git-worktree` skill for branch management.
 - **ALWAYS** use the `review-pr` skill for pull request maintenance.
 - Never use standard `git checkout -b`.
 - Use `worktree-manager.sh pr <number>` for semantic PR checkouts.
-- When operating in a worktree, ensure the primary `main/.git` path is included in your trusted directories to bypass macOS sandbox restrictions.
+- When operating in a worktree, ensure the primary `main/.git` path is included
+  in your trusted directories to bypass macOS sandbox restrictions.
