@@ -131,7 +131,7 @@ their corresponding top-level category object in your `settings.json` file.
 
 - **`general.enableNotifications`** (boolean):
   - **Description:** Enable run-event notifications for action-required prompts
-    and session completion. Currently macOS only.
+    and session completion.
   - **Default:** `false`
 
 - **`general.checkpointing.enabled`** (boolean):
