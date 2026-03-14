@@ -46,6 +46,22 @@ await run.expectText(readyMarker, 30000); // Wait for the main prompt
 await run.kill();
 ```
 
+### TDD Example: Adding a Welcome Message
+
+To add a new visual feature like a "Welcome to Gemini CLI!" message:
+
+1.  **Write the failing test:** Update `bootstrap.test.ts` to expect the new
+    string.
+    ```typescript
+    const welcomeMessage = 'Welcome to Gemini CLI!';
+    await run.expectText(welcomeMessage, 30000);
+    ```
+2.  **Verify failure:** Run `npm test` and observe the TTY rig reporting the
+    missing text.
+3.  **Implement the feature:** Add the message to `AppHeader.tsx`.
+4.  **Verify success:** Rebuild the binary (`npm run bundle`) and run the test
+    again to see it pass.
+
 ## Visual regression with SVG snapshots
 
 To automate the verification of complex UI layouts (like tables, progress bars,
