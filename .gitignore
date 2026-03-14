@@ -37,6 +37,9 @@ dist
 # Docker folder to help skip auth refreshes
 .docker
 
+
+.idx 
+
 bundle
 
 # Test report files
