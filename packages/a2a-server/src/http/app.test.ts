@@ -943,6 +943,7 @@ describe('E2E Tests', () => {
 
     afterEach(() => {
       getExtensionsSpy.mockClear();
+      vi.unstubAllEnvs();
     });
 
     it('should return extensions for valid command', async () => {
@@ -1017,7 +1018,7 @@ describe('E2E Tests', () => {
       };
       vi.spyOn(commandRegistry, 'get').mockReturnValue(mockCommand);
 
-      delete process.env['CODER_AGENT_WORKSPACE_PATH'];
+      vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', '');
       const response = await request(app)
         .post('/executeCommand')
         .send({ command: 'test-command', args: [] });
@@ -1037,7 +1038,7 @@ describe('E2E Tests', () => {
       };
       vi.spyOn(commandRegistry, 'get').mockReturnValue(mockWorkspaceCommand);
 
-      delete process.env['CODER_AGENT_WORKSPACE_PATH'];
+      vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', '');
       const response = await request(app)
         .post('/executeCommand')
         .send({ command: 'workspace-command', args: [] });
@@ -1059,7 +1060,7 @@ describe('E2E Tests', () => {
       };
       vi.spyOn(commandRegistry, 'get').mockReturnValue(mockWorkspaceCommand);
 
-      process.env['CODER_AGENT_WORKSPACE_PATH'] = '/tmp/test-workspace';
+      vi.stubEnv('CODER_AGENT_WORKSPACE_PATH', '/tmp/test-workspace');
       const response = await request(app)
         .post('/executeCommand')
         .send({ command: 'workspace-command', args: [] });

@@ -75,7 +75,6 @@ describe('loadConfig', () => {
   const mockSettings = {} as Settings;
   const mockExtensionLoader = {} as ExtensionLoader;
   const taskId = 'test-task-id';
-
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('GEMINI_API_KEY', 'test-key');
