@@ -37,6 +37,7 @@ import {
   cleanupBrowserAgent,
 } from './browserAgentFactory.js';
 import { removeInputBlocker } from './inputBlocker.js';
+import { recordBrowserAgentTaskOutcome } from '../../telemetry/metrics.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -228,8 +229,10 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
   ): Promise<ToolResult> {
+    const invocationStartMs = Date.now();
     let browserManager;
     let recentActivity: SubagentActivityItem[] = [];
+    let sessionMode: 'persistent' | 'isolated' | 'existing' = 'persistent';
 
     try {
       if (updateOutput) {
@@ -271,8 +274,9 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
         this.messageBus,
         printOutput,
       );
-      const { definition } = result;
+      const { definition, visionEnabled } = result;
       browserManager = result.browserManager;
+      sessionMode = result.sessionMode;
 
       // Create activity callback for streaming output
       const onActivity = (activity: SubagentActivityEvent): void => {
@@ -421,6 +425,22 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
 
       const output = await executor.run(this.params, signal);
 
+      let taskSuccess = false;
+      try {
+        const parsed = JSON.parse(output.result) as { success?: boolean };
+        taskSuccess = parsed.success === true;
+      } catch {
+        // non-JSON result -> treat as unknown, default false
+      }
+
+      recordBrowserAgentTaskOutcome(this.config, {
+        success: taskSuccess,
+        session_mode: sessionMode,
+        vision_enabled: visionEnabled,
+        headless: !!this.config.getBrowserAgentConfig().customConfig.headless,
+        duration_ms: Date.now() - invocationStartMs,
+      });
+
       const displayResult = safeJsonToMarkdown(output.result);
 
       const resultContent = `Browser agent finished.
@@ -492,7 +512,7 @@ ${displayResult}
       // Always cleanup browser resources
       if (browserManager) {
         await removeInputBlocker(browserManager);
-        await cleanupBrowserAgent(browserManager);
+        await cleanupBrowserAgent(browserManager, this.config, sessionMode);
       }
     }
   }
