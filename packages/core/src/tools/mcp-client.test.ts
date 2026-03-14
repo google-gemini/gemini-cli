@@ -749,6 +749,7 @@ describe('mcp-client', () => {
       expect(registeredTool.schema.parametersJsonSchema).toEqual({
         type: 'object',
         properties: {
+          param1: {},
           param1: {
             $ref: '#/$defs/MyType',
           },
