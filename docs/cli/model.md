@@ -21,7 +21,7 @@ Running this command will open a dialog with your options:
 
 | Option            | Description                                                    | Models                                       |
 | ----------------- | -------------------------------------------------------------- | -------------------------------------------- |
-| Auto (Gemini 3)   | Let the system choose the best Gemini 3 model for your task.   | gemini-3-pro-preview, gemini-3-flash-preview |
+| Auto (Gemini 3)   | Let the system choose the best Gemini 3 model for your task.   | gemini-3.1-pro-preview, gemini-3-flash-preview |
 | Auto (Gemini 2.5) | Let the system choose the best Gemini 2.5 model for your task. | gemini-2.5-pro, gemini-2.5-flash             |
 | Manual            | Select a specific model.                                       | Any available model.                         |
 

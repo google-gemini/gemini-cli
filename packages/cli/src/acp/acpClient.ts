@@ -1617,7 +1617,7 @@ function buildAvailableModels(
       value: PREVIEW_GEMINI_MODEL_AUTO,
       title: getDisplayString(PREVIEW_GEMINI_MODEL_AUTO),
       description: useGemini31
-        ? 'Let Gemini CLI decide the best model for the task: gemini-3.1-pro, gemini-3-flash'
+        ? 'Let Gemini CLI decide the best model for the task: gemini-3.1-pro-preview, gemini-3-flash-preview'
         : 'Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-3-flash',
     });
   }
