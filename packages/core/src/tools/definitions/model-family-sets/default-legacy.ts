@@ -79,6 +79,7 @@ import {
   getExitPlanModeDeclaration,
   getActivateSkillDeclaration,
 } from '../dynamic-declaration-helpers.js';
+import { VISUALIZE_DEFINITION } from '../visualize-declarations.js';
 
 export const DEFAULT_LEGACY_SET: CoreToolSet = {
   read_file: {
@@ -734,4 +735,5 @@ The agent did not use the todo list because this task could be completed by a ti
 
   exit_plan_mode: (plansDir) => getExitPlanModeDeclaration(plansDir),
   activate_skill: (skillNames) => getActivateSkillDeclaration(skillNames),
+  visualize: VISUALIZE_DEFINITION.base,
 };

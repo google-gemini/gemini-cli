@@ -25,6 +25,9 @@ import { SCROLL_TO_ITEM_END } from '../shared/VirtualizedList.js';
 import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 import { calculateToolContentMaxLines } from '../../utils/toolLayoutUtils.js';
 import { SubagentProgressDisplay } from './SubagentProgressDisplay.js';
+import { isDiagramData, isBrowserPreview } from '@google/gemini-cli-core';
+import { DiagramRenderer } from '../diagrams/DiagramRenderer.js';
+import { BrowserPreviewDisplay } from '../diagrams/BrowserPreviewDisplay.js';
 
 export interface ToolResultDisplayProps {
   resultDisplay: string | object | undefined;
@@ -82,6 +85,27 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   if (typeof resultDisplay === 'object' && 'todos' in resultDisplay) {
     // display nothing, as the TodoTray will handle rendering todos
     return null;
+  }
+
+  // 1.5 Early return for diagram data
+  if (isDiagramData(resultDisplay)) {
+    return (
+      <Box width={childWidth} flexDirection="column">
+        <DiagramRenderer
+          diagram={resultDisplay}
+          terminalWidth={childWidth}
+        />
+      </Box>
+    );
+  }
+
+  // 1.6 Early return for browser preview
+  if (isBrowserPreview(resultDisplay)) {
+    return (
+      <Box width={childWidth} flexDirection="column">
+        <BrowserPreviewDisplay preview={resultDisplay} />
+      </Box>
+    );
   }
 
   const renderContent = (contentData: string | object | undefined) => {

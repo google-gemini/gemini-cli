@@ -84,6 +84,7 @@ import {
   MAX_LINE_LENGTH_TEXT_FILE,
   MAX_FILE_SIZE_MB,
 } from '../../../utils/constants.js';
+import { VISUALIZE_DEFINITION } from '../visualize-declarations.js';
 
 /**
  * Gemini 3 tool set. Initially a copy of the default legacy set.
@@ -709,4 +710,5 @@ The agent did not use the todo list because this task could be completed by a ti
 
   exit_plan_mode: (plansDir) => getExitPlanModeDeclaration(plansDir),
   activate_skill: (skillNames) => getActivateSkillDeclaration(skillNames),
+  visualize: VISUALIZE_DEFINITION.base,
 };
