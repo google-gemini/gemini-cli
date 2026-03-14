@@ -498,7 +498,10 @@ ${authUrl}
       scope: tokenResponse.scope,
     };
 
-    if (tokenResponse.expires_in) {
+    const jwtExpiry = OAuthUtils.parseTokenExpiry(tokenResponse.access_token);
+    if (jwtExpiry !== undefined) {
+      token.expiresAt = jwtExpiry;
+    } else if (tokenResponse.expires_in) {
       token.expiresAt = Date.now() + tokenResponse.expires_in * 1000;
     }
 
@@ -590,7 +593,12 @@ ${authUrl}
           scope: newTokenResponse.scope || token.scope,
         };
 
-        if (newTokenResponse.expires_in) {
+        const newJwtExpiry = OAuthUtils.parseTokenExpiry(
+          newTokenResponse.access_token,
+        );
+        if (newJwtExpiry !== undefined) {
+          newToken.expiresAt = newJwtExpiry;
+        } else if (newTokenResponse.expires_in) {
           newToken.expiresAt = Date.now() + newTokenResponse.expires_in * 1000;
         }
 
