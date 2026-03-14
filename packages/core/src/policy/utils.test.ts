@@ -72,15 +72,15 @@ describe('policy/utils', () => {
     it('should build pattern from a single commandPrefix', () => {
       const result = buildArgsPatterns(undefined, 'ls', undefined);
       expect(result).toEqual([
-        { pattern: '"command":"ls(?:[\\s"]|\\\\")', display: 'ls*' },
+        { pattern: '\\"command\\":\\"ls(?:[\\s"]|\\\\")', display: 'ls*' },
       ]);
     });
 
     it('should build patterns from an array of commandPrefixes', () => {
       const result = buildArgsPatterns(undefined, ['echo', 'ls'], undefined);
       expect(result).toEqual([
-        { pattern: '"command":"echo(?:[\\s"]|\\\\")', display: 'echo*' },
-        { pattern: '"command":"ls(?:[\\s"]|\\\\")', display: 'ls*' },
+        { pattern: '\\"command\\":\\"echo(?:[\\s"]|\\\\")', display: 'echo*' },
+        { pattern: '\\"command\\":\\"ls(?:[\\s"]|\\\\")', display: 'ls*' },
       ]);
     });
 
@@ -94,7 +94,10 @@ describe('policy/utils', () => {
     it('should prioritize commandPrefix over commandRegex and argsPattern', () => {
       const result = buildArgsPatterns('raw', 'prefix', 'regex');
       expect(result).toEqual([
-        { pattern: '"command":"prefix(?:[\\s"]|\\\\")', display: 'prefix*' },
+        {
+          pattern: '\\"command\\":\\"prefix(?:[\\s"]|\\\\")',
+          display: 'prefix*',
+        },
       ]);
     });
 
@@ -109,7 +112,7 @@ describe('policy/utils', () => {
       const result = buildArgsPatterns(undefined, 'git checkout -b', undefined);
       expect(result).toEqual([
         {
-          pattern: '"command":"git\\ checkout\\ \\-b(?:[\\s"]|\\\\")',
+          pattern: '\\"command\\":\\"git\\ checkout\\ \\-b(?:[\\s"]|\\\\")',
           display: 'git checkout -b*',
         },
       ]);
@@ -119,7 +122,7 @@ describe('policy/utils', () => {
       const result = buildArgsPatterns(undefined, 'git "fix"', undefined);
       expect(result).toEqual([
         {
-          pattern: '"command":"git\\ \\\\\\"fix\\\\\\"(?:[\\s"]|\\\\")',
+          pattern: '\\"command\\":\\"git\\ \\\\\\"fix\\\\\\"(?:[\\s"]|\\\\")',
           display: 'git "fix"*',
         },
       ]);
