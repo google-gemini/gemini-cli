@@ -27,6 +27,7 @@ import {
 import { type Tool, SdkTool } from './tool.js';
 import { SdkAgentFilesystem } from './fs.js';
 import { SdkAgentShell } from './shell.js';
+import { ConsoleLogger, type Logger } from './logger.js';
 import type {
   SessionContext,
   GeminiCliAgentOptions,
@@ -41,6 +42,7 @@ export class GeminiCliSession {
   private readonly tools: Array<Tool<any>>;
   private readonly skillRefs: SkillReference[];
   private readonly instructions: SystemInstructions | undefined;
+  private readonly logger: Logger;
   private client: GeminiClient | undefined;
   private initialized = false;
 
@@ -51,6 +53,7 @@ export class GeminiCliSession {
     private readonly resumedData?: ResumedSessionData,
   ) {
     this.instructions = options.instructions;
+    this.logger = options.logger ?? new ConsoleLogger();
     const cwd = options.cwd || process.cwd();
     this.tools = options.tools || [];
     this.skillRefs = options.skills || [];
@@ -108,9 +111,11 @@ export class GeminiCliSession {
             return await loadSkillsFromDir(ref.path);
           }
         } catch (e) {
-          // TODO: refactor this to use a proper logger interface
-          // eslint-disable-next-line no-console
-          console.error(`Failed to load skills from ${ref.path}:`, e);
+          this.logger.error(`Failed to load skills from ${ref.path}`, {
+            path: ref.path,
+            type: ref.type,
+            error: e instanceof Error ? e.message : String(e),
+          });
         }
         return [];
       });
