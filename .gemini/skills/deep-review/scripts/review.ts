@@ -38,7 +38,7 @@ async function main() {
     config = settings.maintainer.deepReview;
   }
 
-  const { remoteHost, remoteWorkDir, terminalType, syncAuth } = config;
+  const { remoteHost, remoteWorkDir, terminalType, syncAuth, geminiSetup, ghSetup } = config;
 
   console.log(`🔍 Fetching metadata for PR #${prNumber}...`);
   const ghView = spawnSync('gh', ['pr', 'view', prNumber, '--json', 'headRefName', '-q', '.headRefName'], { shell: true });
@@ -50,11 +50,17 @@ async function main() {
 
   const sessionName = `${prNumber}-${branchName.replace(/[^a-zA-Z0-9]/g, '_')}`;
   
-  // 2. Sync Configuration Mirror (Isolated Profile)
-  const ISOLATED_CONFIG = '~/.gemini-deep-review';
-  console.log(`📡 Mirroring environment to ${remoteHost}...`);
-  spawnSync('ssh', [remoteHost, `mkdir -p ${remoteWorkDir}/.gemini/skills/deep-review/scripts/ ${ISOLATED_CONFIG}/policies/`]);
+  // 2. Sync Configuration Mirror (Isolated Profiles)
+  const ISOLATED_GEMINI = geminiSetup === 'isolated' ? '~/.gemini-deep-review' : '~/.gemini';
+  const ISOLATED_GH = ghSetup === 'isolated' ? '~/.gh-deep-review' : '~/.config/gh';
+  const remotePolicyPath = `${ISOLATED_GEMINI}/policies/deep-review-policy.toml`;
   
+  console.log(`📡 Mirroring environment to ${remoteHost}...`);
+  spawnSync('ssh', [remoteHost, `mkdir -p ${remoteWorkDir}/.gemini/skills/deep-review/scripts/ ${ISOLATED_GEMINI}/policies/`]);
+  
+  // Sync the policy file specifically
+  spawnSync('rsync', ['-avz', path.join(REPO_ROOT, '.gemini/skills/deep-review/policy.toml'), `${remoteHost}:${remotePolicyPath}`]);
+
   spawnSync('rsync', ['-avz', '--delete', path.join(REPO_ROOT, '.gemini/skills/deep-review/scripts/'), `${remoteHost}:${remoteWorkDir}/.gemini/skills/deep-review/scripts/`]);
 
   if (syncAuth) {
@@ -63,19 +69,17 @@ async function main() {
     const syncFiles = ['google_accounts.json', 'settings.json'];
     for (const f of syncFiles) {
       const lp = path.join(localGeminiDir, f);
-      if (fs.existsSync(lp)) spawnSync('rsync', ['-avz', lp, `${remoteHost}:${ISOLATED_CONFIG}/${f}`]);
+      if (fs.existsSync(lp)) spawnSync('rsync', ['-avz', lp, `${remoteHost}:${ISOLATED_GEMINI}/${f}`]);
     }
     const localPolicies = path.join(localGeminiDir, 'policies/');
-    if (fs.existsSync(localPolicies)) spawnSync('rsync', ['-avz', '--delete', localPolicies, `${remoteHost}:${ISOLATED_CONFIG}/policies/`]);
+    if (fs.existsSync(localPolicies)) spawnSync('rsync', ['-avz', '--delete', localPolicies, `${remoteHost}:${ISOLATED_GEMINI}/policies/`]);
     const localEnv = path.join(REPO_ROOT, '.env');
     if (fs.existsSync(localEnv)) spawnSync('rsync', ['-avz', localEnv, `${remoteHost}:${remoteWorkDir}/.env`]);
   }
 
   // 3. Construct Clean Command
-  // We use a single entrypoint script to avoid quoting nightmares
   const envLoader = 'export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh"';
-  // Use the locally installed tsx binary
-  const entryCmd = `cd ${remoteWorkDir} && ${envLoader} && export GEMINI_CLI_HOME=${ISOLATED_CONFIG} && ./node_modules/.bin/tsx .gemini/skills/deep-review/scripts/entrypoint.ts ${prNumber} ${branchName}`;
+  const entryCmd = `cd ${remoteWorkDir} && ${envLoader} && export GEMINI_CLI_HOME=${ISOLATED_GEMINI} && export GH_CONFIG_DIR=${ISOLATED_GH} && ./node_modules/.bin/tsx .gemini/skills/deep-review/scripts/entrypoint.ts ${prNumber} ${branchName} ${remotePolicyPath}`;
   
   const tmuxCmd = `$SHELL -ic ${q(entryCmd)}; exec $SHELL`;
   const sshInternal = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n ${q(branchName)} ${q(tmuxCmd)}`;

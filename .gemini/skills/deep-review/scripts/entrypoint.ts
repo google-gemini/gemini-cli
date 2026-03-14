@@ -12,11 +12,12 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const prNumber = process.argv[2];
 const branchName = process.argv[3];
+const policyPath = process.argv[4];
 const ISOLATED_CONFIG = process.env.GEMINI_CLI_HOME || path.join(process.env.HOME || '', '.gemini-deep-review');
 
 async function main() {
-  if (!prNumber || !branchName) {
-    console.error('Usage: tsx entrypoint.ts <PR_NUMBER> <BRANCH_NAME>');
+  if (!prNumber || !branchName || !policyPath) {
+    console.error('Usage: tsx entrypoint.ts <PR_NUMBER> <BRANCH_NAME> <POLICY_PATH>');
     process.exit(1);
   }
 
@@ -27,9 +28,9 @@ async function main() {
   const tsxBin = path.join(workDir, 'node_modules/.bin/tsx');
   const geminiBin = path.join(workDir, 'node_modules/.bin/gemini');
 
-  // 1. Run the Parallel Worker
+  // 1. Run the Parallel Reviewer
   console.log('🚀 Launching Parallel Review Worker...');
-  const workerResult = spawnSync(tsxBin, [path.join(__dirname, 'worker.ts'), prNumber, branchName], {
+  const workerResult = spawnSync(tsxBin, [path.join(__dirname, 'worker.ts'), prNumber, branchName, policyPath], {
     stdio: 'inherit',
     env: { ...process.env, GEMINI_CLI_HOME: ISOLATED_CONFIG }
   });
@@ -41,12 +42,7 @@ async function main() {
   // 2. Launch the Interactive Gemini Session (Local Nightly)
   console.log('\n✨ Verification complete. Joining interactive session...');
   
-  // Use the mirrored policy if available
-  const policyFile = path.join(ISOLATED_CONFIG, 'policies/policy.toml');
-  const geminiArgs = [];
-  if (fs.existsSync(policyFile)) {
-    geminiArgs.push('--policy', policyFile);
-  }
+  const geminiArgs = ['--policy', policyPath];
   geminiArgs.push('-p', `Review for PR #${prNumber} is complete. Read the logs in .gemini/logs/review-${prNumber}/ and synthesize your findings.`);
 
   process.chdir(targetDir);
