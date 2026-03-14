@@ -33,6 +33,12 @@ vi.mock('../hooks/useKeypress.js', () => ({
   },
 }));
 
+import {
+  useSessionBrowserState,
+  useMoveSelection,
+  useCycleSortOrder,
+} from './SessionBrowser/useSessionBrowserState.js';
+
 // Mock the component itself to bypass async loading
 vi.mock('./SessionBrowser.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('./SessionBrowser.js')>();
@@ -44,13 +50,13 @@ vi.mock('./SessionBrowser.js', async (importOriginal) => {
       testError?: string | null;
     },
   ) => {
-    const state = original.useSessionBrowserState(
+    const state = useSessionBrowserState(
       props.testSessions || [],
       false, // Not loading
       props.testError || null,
     );
-    const moveSelection = original.useMoveSelection(state);
-    const cycleSortOrder = original.useCycleSortOrder(state);
+    const moveSelection = useMoveSelection(state);
+    const cycleSortOrder = useCycleSortOrder(state);
     original.useSessionBrowserInput(
       state,
       moveSelection,
