@@ -99,7 +99,7 @@ const saveCommand: SlashCommand = {
       return {
         type: 'message',
         messageType: 'error',
-        content: 'Missing tag. Usage: /chat save <tag>',
+        content: `Missing tag. Usage: /${context.invocation?.name ?? 'chat'} save <tag>`,
       };
     }
 
@@ -279,16 +279,7 @@ const deleteCommand: SlashCommand = {
 const shareCommand: SlashCommand = {
   name: 'share',
   description:
-    'Share the current conversation to a markdown or json file. Usage: /chat share <file>',
-```
-
----
-
-## How To Edit The File
-
-Open the file in Notepad. In your terminal type:
-```
-notepad chatCommand.ts
+    'Share the current conversation to a markdown or json file. Usage: /chat share <file>'
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: async (context, args): Promise<MessageActionReturn> => {
