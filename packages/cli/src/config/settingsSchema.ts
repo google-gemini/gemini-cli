@@ -2637,6 +2637,68 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
       },
     },
   },
+
+  remoteControl: {
+    type: 'object',
+    label: 'Remote Control',
+    category: 'Remote Control',
+    requiresRestart: false,
+    default: {},
+    description:
+      'Settings for the remote control feature, which lets you interact with a local Gemini CLI session from another device.',
+    showInDialog: false,
+    properties: {
+      enabled: {
+        type: 'boolean',
+        label: 'Enable Remote Control',
+        category: 'Remote Control',
+        requiresRestart: false,
+        default: true,
+        description:
+          'Allow starting a remote control session with /remote-control.',
+        showInDialog: true,
+      },
+      autoStart: {
+        type: 'boolean',
+        label: 'Auto-start on Launch',
+        category: 'Remote Control',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Automatically start a remote control session when Gemini CLI starts.',
+        showInDialog: false,
+      },
+      port: {
+        type: 'number',
+        label: 'WebSocket Port',
+        category: 'Remote Control',
+        requiresRestart: false,
+        default: 0,
+        description:
+          'Port for the local WebSocket relay server. 0 means the OS will assign an available port.',
+        showInDialog: false,
+      },
+      timeout: {
+        type: 'number',
+        label: 'Session Timeout (ms)',
+        category: 'Remote Control',
+        requiresRestart: false,
+        default: 600000,
+        description:
+          'Idle timeout in milliseconds after which an inactive remote session is closed (default: 10 minutes).',
+        showInDialog: false,
+      },
+      maxSessions: {
+        type: 'number',
+        label: 'Max Concurrent Sessions',
+        category: 'Remote Control',
+        requiresRestart: false,
+        default: 1,
+        description: 'Maximum number of concurrent remote control sessions.',
+        showInDialog: false,
+      },
+    },
+  },
 };
 
 export function getSettingsSchema(): SettingsSchemaType {
