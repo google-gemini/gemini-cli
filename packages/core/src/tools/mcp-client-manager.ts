@@ -260,18 +260,29 @@ export class McpClientManager {
   /**
    * Merges two MCP configurations. The second configuration (override)
    * takes precedence for scalar properties, but array properties are
-   * unioned and environment objects are merged.
+   * merged securely (exclude = union, include = intersection) and
+   * environment objects are merged.
    */
   private mergeMcpConfigs(
     base: MCPServerConfig,
     override: MCPServerConfig,
   ): MCPServerConfig {
-    const includeTools = [
-      ...new Set([
-        ...(base.includeTools ?? []),
-        ...(override.includeTools ?? []),
-      ]),
-    ];
+    // For allowlists (includeTools), use intersection to ensure the most
+    // restrictive policy wins. A tool must be allowed by BOTH parties.
+    let includeTools: string[] | undefined;
+    if (base.includeTools && override.includeTools) {
+      includeTools = base.includeTools.filter((t) =>
+        override.includeTools!.includes(t),
+      );
+      // If the intersection is empty, we must keep an empty array to indicate
+      // that NO tools are allowed (undefined would allow everything).
+    } else {
+      // If only one provides an allowlist, use that.
+      includeTools = override.includeTools ?? base.includeTools;
+    }
+
+    // For blocklists (excludeTools), use union so if ANY party blocks it,
+    // it stays blocked.
     const excludeTools = [
       ...new Set([
         ...(base.excludeTools ?? []),
@@ -292,7 +303,7 @@ export class McpClientManager {
       args: hasConnection ? override.args : base.args,
       url: hasConnection ? override.url : base.url,
       httpUrl: hasConnection ? override.httpUrl : base.httpUrl,
-      includeTools: includeTools.length > 0 ? includeTools : undefined,
+      includeTools,
       excludeTools: excludeTools.length > 0 ? excludeTools : undefined,
       env: Object.keys(env).length > 0 ? env : undefined,
       extension: override.extension ?? base.extension,

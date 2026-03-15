@@ -736,11 +736,19 @@ If an MCP server is provided by an extension (for example, the
 `settings.json`. Gemini CLI merges your local configuration with the extension's
 defaults:
 
-- **Tool lists:** The `includeTools` and `excludeTools` arrays from both sources
-  are combined (unioned). Because `excludeTools` always takes precedence over
-  `includeTools`, if either the extension or you exclude a tool, it remains
-  disabled, even if the other source includes it. This ensures you always have
-  veto power over any tools provided by an extension.
+- **Tool lists:** Tool lists are merged securely to ensure the most restrictive
+  policy wins:
+  - **Exclusions (`excludeTools`):** Arrays are combined (unioned). If either
+    source blocks a tool, it remains disabled.
+  - **Inclusions (`includeTools`):** Arrays are intersected. If both sources
+    provide an allowlist, only tools present in **both** lists are enabled. If
+    only one source provides an allowlist, that list is respected.
+  - **Precedence:** `excludeTools` always takes precedence over `includeTools`.
+
+  This ensures you always have veto power over tools provided by an extension
+  and that an extension cannot re-enable tools you have omitted from your
+  personal allowlist.
+
 - **Environment variables:** The `env` objects are merged. If the same variable
   is defined in both places, your local value takes precedence.
 - **Scalar properties:** Properties like `command`, `url`, and `timeout` are

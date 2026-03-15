@@ -452,12 +452,12 @@ describe('McpClientManager', () => {
       expect(lastCall[1].extension).toEqual(extension);
     });
 
-    it('should union tool lists and merge env variables regardless of load order', async () => {
+    it('should securely merge tool lists and env variables regardless of load order', async () => {
       const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
 
       const userConfig = {
         excludeTools: ['user-tool'],
-        includeTools: ['user-inc'],
+        includeTools: ['shared-inc', 'user-only-inc'],
         env: { USER_VAR: 'user-val', OVERRIDE_VAR: 'user-override' },
       };
 
@@ -468,7 +468,7 @@ describe('McpClientManager', () => {
             command: 'node',
             args: ['ext.js'],
             excludeTools: ['ext-tool'],
-            includeTools: ['ext-inc'],
+            includeTools: ['shared-inc', 'ext-only-inc'],
             env: { EXT_VAR: 'ext-val', OVERRIDE_VAR: 'ext-override' },
           },
         },
@@ -480,11 +480,8 @@ describe('McpClientManager', () => {
       };
 
       // Case 1: Extension loads first, then User config (e.g. from startConfiguredMcpServers)
-      // startExtension and maybeDiscoverMcpServer return promises that resolve when discovery for that call is done.
       await manager.startExtension(extension);
 
-      // In Case 1, we simulate that the existing client returns the extension's config
-      // But we must include the 'extension' metadata which is added during startExtension
       mockedMcpClient.getServerConfig.mockReturnValue({
         ...extension.mcpServers!['test-server'],
         extension,
@@ -495,10 +492,15 @@ describe('McpClientManager', () => {
       let lastCall = vi.mocked(McpClient).mock.calls[1]; // Second call due to re-discovery
       let mergedConfig = lastCall[1];
 
+      // Exclude list should be unioned (most restrictive)
       expect(mergedConfig.excludeTools).toContain('ext-tool');
       expect(mergedConfig.excludeTools).toContain('user-tool');
-      expect(mergedConfig.includeTools).toContain('ext-inc');
-      expect(mergedConfig.includeTools).toContain('user-inc');
+
+      // Include list should be intersected (most restrictive)
+      expect(mergedConfig.includeTools).toContain('shared-inc');
+      expect(mergedConfig.includeTools).not.toContain('user-only-inc');
+      expect(mergedConfig.includeTools).not.toContain('ext-only-inc');
+
       expect(mergedConfig.env!['EXT_VAR']).toBe('ext-val');
       expect(mergedConfig.env!['USER_VAR']).toBe('user-val');
       expect(mergedConfig.env!['OVERRIDE_VAR']).toBe('user-override');
@@ -510,8 +512,6 @@ describe('McpClientManager', () => {
 
       // Case 2: User config loads first, then Extension loads
       await manager2.maybeDiscoverMcpServer('test-server', userConfig);
-
-      // In Case 2, the existing client returns the user config (no extension metadata yet)
       mockedMcpClient.getServerConfig.mockReturnValue(userConfig);
 
       await manager2.startExtension(extension);
@@ -521,12 +521,44 @@ describe('McpClientManager', () => {
 
       expect(mergedConfig.excludeTools).toContain('ext-tool');
       expect(mergedConfig.excludeTools).toContain('user-tool');
-      expect(mergedConfig.includeTools).toContain('ext-inc');
-      expect(mergedConfig.includeTools).toContain('user-inc');
+      expect(mergedConfig.includeTools).toContain('shared-inc');
+      expect(mergedConfig.includeTools).not.toContain('user-only-inc');
+      expect(mergedConfig.includeTools).not.toContain('ext-only-inc');
+
       expect(mergedConfig.env!['EXT_VAR']).toBe('ext-val');
       expect(mergedConfig.env!['USER_VAR']).toBe('user-val');
       expect(mergedConfig.env!['OVERRIDE_VAR']).toBe('user-override');
       expect(mergedConfig.extension).toBe(extension); // Extension ID preserved!
+    });
+
+    it('should result in empty includeTools if intersection is empty', async () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      const userConfig = { includeTools: ['user-tool'] };
+      const extConfig = {
+        command: 'node',
+        args: ['ext.js'],
+        includeTools: ['ext-tool'],
+      };
+
+      await manager.maybeDiscoverMcpServer('test-server', userConfig);
+      mockedMcpClient.getServerConfig.mockReturnValue(userConfig);
+      await manager.maybeDiscoverMcpServer('test-server', extConfig);
+
+      const lastCall = vi.mocked(McpClient).mock.calls[1];
+      expect(lastCall[1].includeTools).toEqual([]); // Empty array = no tools allowed
+    });
+
+    it('should respect a single allowlist if only one is provided', async () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      const userConfig = { includeTools: ['user-tool'] };
+      const extConfig = { command: 'node', args: ['ext.js'] };
+
+      await manager.maybeDiscoverMcpServer('test-server', userConfig);
+      mockedMcpClient.getServerConfig.mockReturnValue(userConfig);
+      await manager.maybeDiscoverMcpServer('test-server', extConfig);
+
+      const lastCall = vi.mocked(McpClient).mock.calls[1];
+      expect(lastCall[1].includeTools).toEqual(['user-tool']);
     });
 
     it('should remove servers from blockedMcpServers when stopExtension is called', async () => {
