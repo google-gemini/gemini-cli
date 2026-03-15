@@ -223,6 +223,11 @@ export * from './utils/terminal.js';
 
 // Export voice utilities
 export * from './voice/responseFormatter.js';
+export * from './voice/voiceSession.js';
+export * from './voice/voiceMode.js';
+export * from './voice/vadDetector.js';
+export * from './voice/audioCapture.js';
+export * from './voice/ttsPlayer.js';
 
 // Export types from @google/genai
 export type { Content, Part, FunctionCall } from '@google/genai';
