@@ -48,7 +48,7 @@ const SOURCE_DIR = 'examples/workflows';
 
 // Verifies if github name is command-execution safe
 export function isValidGitHubOwner(name: string): boolean {
-  return /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i.test(name);
+  return /^(?![0-9]+$)[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i.test(name);
 }
 
 // does the same for repo name
