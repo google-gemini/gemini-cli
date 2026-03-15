@@ -306,7 +306,6 @@ export class McpClientManager {
     name: string,
     config: MCPServerConfig,
   ): Promise<void> {
-    const existing = this.clients.get(name);
     const existingConfig = this.allServerConfigs.get(name);
     if (
       existingConfig?.extension?.id &&
@@ -337,6 +336,12 @@ export class McpClientManager {
 
     // Always track server config for UI display
     this.allServerConfigs.set(name, finalConfig);
+
+    // Capture the existing client synchronously here before any asynchronous
+    // operations. This ensures that if multiple discovery turns happen
+    // concurrently, this turn only replaces/disconnects the client that was
+    // present when this specific configuration update request began.
+    const existing = this.clients.get(name);
 
     // If no connection details are provided, we can't discover this server.
     // This often happens when a user provides only overrides (like excludeTools)
