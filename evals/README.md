@@ -57,7 +57,7 @@ real-world usage while remaining small and maintainable.
 - **Unambiguous and Reliable Assertions**: Assertions must be clear and specific
   to ensure the test passes for the right reason.
   - _Good_: Checking that a modified file contains a specific AST node or exact
-    string, or verifying that a tool was called with with the right parameters.
+    string, or verifying that a tool was called with the right parameters.
   - _Bad_: Only checking for a tool call, which could happen for an unrelated
     reason. Expecting specific LLM output.
 - **Fail First**: Have tests that failed before your prompt or tool change. We
