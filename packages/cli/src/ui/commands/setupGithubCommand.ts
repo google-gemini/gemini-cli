@@ -72,6 +72,14 @@ export function getOpenUrlsCommands(readmeUrl: string): string[] {
     debugLogger.debug('Could not determine repository info:', e);
   }
 
+  // Validate the README URL
+  const SAFE_URL_REGEX =
+    /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/tree\/[A-Za-z0-9_.-]+\/README\.md$/;
+
+  if (!SAFE_URL_REGEX.test(readmeUrl)) {
+    throw new Error('Invalid README URL generated for setup-github command.');
+  }
+
   if (!repoInfo) {
     return [
       `${openCmd} "${readmeUrl}"`,
