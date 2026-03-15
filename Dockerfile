@@ -1,26 +1,21 @@
-# --- STAGE 1: Base Runtime ---
-FROM docker.io/library/node:20-slim AS base
+FROM docker.io/library/node:20-slim
 
+ARG SANDBOX_NAME="gemini-cli-sandbox"
 ARG CLI_VERSION_ARG
+ENV SANDBOX="$SANDBOX_NAME"
 ENV CLI_VERSION=$CLI_VERSION_ARG
 
+# install minimal set of packages, then clean up
 RUN apt-get update && apt-get install -y --no-install-recommends \
   python3 \
+  make \
+  g++ \
+  man-db \
   curl \
   dnsutils \
   less \
   jq \
-  ca-certificates \
-  && apt-get clean \
-  && rm -rf /var/lib/apt/lists/*
-
-# --- STAGE 2: Maintainer (Parent of Sandbox) ---
-FROM base AS maintainer
-
-# Install "Maintainer Bloat" - tools needed for development and offloading
-RUN apt-get update && apt-get install -y --no-install-recommends \
-  make \
-  g++ \
+  bc \
   gh \
   git \
   unzip \
@@ -30,31 +25,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   psmisc \
   lsof \
   socat \
-  build-essential \
-  libsecret-1-dev \
-  libkrb5-dev \
+  ca-certificates \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 
-# Install global dev tools
-RUN npm install -g tsx vitest
-
-# Set up npm global package folder
+# set up npm global package folder under /usr/local/share
+# give it to non-root user node, already set up in base image
 RUN mkdir -p /usr/local/share/npm-global \
   && chown -R node:node /usr/local/share/npm-global
 ENV NPM_CONFIG_PREFIX=/usr/local/share/npm-global
 ENV PATH=$PATH:/usr/local/share/npm-global/bin
 
-# --- STAGE 3: Sandbox (Final CLI Image) ---
-FROM maintainer AS sandbox
-
-ARG SANDBOX_NAME="gemini-cli-sandbox"
-ENV SANDBOX="$SANDBOX_NAME"
-
-# Switch to non-root user node
+# switch to non-root user node
 USER node
 
-# Install gemini-cli and clean up
+# install gemini-cli and clean up
 COPY packages/cli/dist/google-gemini-cli-*.tgz /tmp/gemini-cli.tgz
 COPY packages/core/dist/google-gemini-cli-core-*.tgz /tmp/gemini-core.tgz
 RUN npm install -g /tmp/gemini-core.tgz \
@@ -64,5 +49,5 @@ RUN npm install -g /tmp/gemini-core.tgz \
   && npm cache clean --force \
   && rm -f /tmp/gemini-{cli,core}.tgz
 
-# Default entrypoint
+# default entrypoint when none specified
 CMD ["gemini"]

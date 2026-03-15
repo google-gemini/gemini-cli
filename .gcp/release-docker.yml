@@ -47,7 +47,7 @@ steps:
     env:
       - 'GEMINI_SANDBOX=$_CONTAINER_TOOL'
 
-  # Step 6: Build maintainer container image (Maintainer stage)
+  # Step 6: Build maintainer container image (Dedicated Maintainer Dockerfile)
   - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
     id: 'Build maintainer Docker image'
     entrypoint: 'bash'
@@ -56,7 +56,7 @@ steps:
       - |-
         export TAG=$$(cat /workspace/image_tag.txt)
         IMAGE_BASE="us-docker.pkg.dev/gemini-code-dev/gemini-cli/maintainer"
-        docker build --target maintainer -t "$${IMAGE_BASE}:$${TAG}" .
+        docker build -f .gcp/Dockerfile.maintainer -t "$${IMAGE_BASE}:$${TAG}" .
         docker push "$${IMAGE_BASE}:$${TAG}"
     env:
       - 'GEMINI_SANDBOX=$_CONTAINER_TOOL'
