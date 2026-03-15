@@ -9,8 +9,9 @@
 Shift from a "Manual VM" to an "Invisible VM" (Container-Optimized OS) that runs our Sandbox Docker image directly.
 
 ## Planned Changes
-1. **Multi-Stage Dockerfile**: 
+1. **Multi-Stage Dockerfile**: ✅ VERIFIED
    - Optimize `.gcp/Dockerfile.maintainer` to include `tsx`, `vitest`, `gh`, and system dependencies (`libsecret`, `build-essential`).
+   - *Verified locally: Node v20, GH CLI, Git, TSX, and Vitest are functional with required headers.*
 2. **Dedicated Pipeline**:
    - Use `.gcp/maintainer-worker.yml` for isolated PR builds.
    - **Tagging Strategy**: Dual-tag images with `${SHORT_SHA}` (immutable) and `${CLEAN_BRANCH}` (latest-on-branch).
