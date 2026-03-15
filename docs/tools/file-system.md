@@ -27,8 +27,16 @@ and PDF.
 - **Tool name:** `read_file`
 - **Arguments:**
   - `file_path` (string, required): Path to the file.
-  - `offset` (number, optional): Start line for text files (0-based).
-  - `limit` (number, optional): Maximum lines to read.
+  - `start_line` (number, optional): The 1-based line number to start reading
+    from.
+  - `end_line` (number, optional): The 1-based line number to end reading at
+    (inclusive).
+  - `max_bytes` (number, optional): Maximum bytes of content to allow. Only set
+    this after a read is rejected for exceeding the size threshold.
+- **Text file read threshold:** Text file reads producing content larger than 80
+  KiB are rejected with guidance. The model can override by setting `max_bytes`.
+  This threshold can be customized via the `textFileReadSizeThreshold` setting
+  (set to `-1` to disable).
 
 ### `write_file` (WriteFile)
 

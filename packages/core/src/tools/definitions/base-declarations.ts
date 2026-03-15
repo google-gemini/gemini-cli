@@ -51,6 +51,7 @@ export const LS_PARAM_IGNORE = 'ignore';
 export const READ_FILE_TOOL_NAME = 'read_file';
 export const READ_FILE_PARAM_START_LINE = 'start_line';
 export const READ_FILE_PARAM_END_LINE = 'end_line';
+export const READ_FILE_PARAM_MAX_BYTES = 'max_bytes';
 
 // -- run_shell_command --
 export const SHELL_TOOL_NAME = 'run_shell_command';

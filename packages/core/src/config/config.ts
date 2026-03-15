@@ -385,6 +385,7 @@ export interface ExtensionInstallMetadata {
 }
 
 import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
+import { DEFAULT_TEXT_FILE_READ_THRESHOLD_BYTES } from '../utils/constants.js';
 import {
   DEFAULT_FILE_FILTERING_OPTIONS,
   DEFAULT_MEMORY_FILE_FILTERING_OPTIONS,
@@ -588,6 +589,7 @@ export interface ConfigParameters {
   extensionManagement?: boolean;
   extensionRegistryURI?: string;
   truncateToolOutputThreshold?: number;
+  textFileReadSizeThreshold?: number;
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
   workspacePoliciesDir?: string;
@@ -782,6 +784,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly extensionManagement: boolean = true;
   private readonly extensionRegistryURI: string | undefined;
   private readonly truncateToolOutputThreshold: number;
+  private readonly textFileReadSizeThreshold: number;
   private compressionTruncationCounter = 0;
   private initialized = false;
   private initPromise: Promise<void> | undefined;
@@ -1049,6 +1052,9 @@ export class Config implements McpContext, AgentLoopContext {
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
+    this.textFileReadSizeThreshold =
+      params.textFileReadSizeThreshold ??
+      DEFAULT_TEXT_FILE_READ_THRESHOLD_BYTES;
     this.useWriteTodos = isPreviewModel(this.model, this)
       ? false
       : (params.useWriteTodos ?? true);
@@ -2882,6 +2888,10 @@ export class Config implements McpContext, AgentLoopContext {
         (tokenLimit(this.model) - uiTelemetryService.getLastPromptTokenCount()),
       this.truncateToolOutputThreshold,
     );
+  }
+
+  getTextFileReadSizeThreshold(): number {
+    return this.textFileReadSizeThreshold;
   }
 
   getNextCompressionTruncationId(): number {

@@ -38,6 +38,8 @@ import {
   isEmpty,
 } from './fileUtils.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
+import { ToolErrorType } from '../tools/tool-error.js';
+import { DEFAULT_TEXT_FILE_READ_THRESHOLD_BYTES } from './constants.js';
 
 vi.mock('mime/lite', () => ({
   default: { getType: vi.fn() },
@@ -945,7 +947,7 @@ describe('fileUtils', () => {
 
       expect(result.llmContent).toBe(expectedContent);
       expect(result.returnDisplay).toBe('Read lines 6-10 of 20 from test.txt');
-      expect(result.isTruncated).toBe(true);
+      expect(result.isPartialRead).toBe(true);
       expect(result.originalLineCount).toBe(20);
       expect(result.linesShown).toEqual([6, 10]);
     });
@@ -966,7 +968,7 @@ describe('fileUtils', () => {
 
       expect(result.llmContent).toContain(expectedContent);
       expect(result.returnDisplay).toBe('Read lines 11-20 of 20 from test.txt');
-      expect(result.isTruncated).toBe(true); // This is the key check for the bug
+      expect(result.isPartialRead).toBe(true); // This is the key check for the bug
       expect(result.originalLineCount).toBe(20);
       expect(result.linesShown).toEqual([11, 20]);
     });
@@ -986,12 +988,12 @@ describe('fileUtils', () => {
 
       expect(result.llmContent).toBe(expectedContent);
       expect(result.returnDisplay).toBe('');
-      expect(result.isTruncated).toBe(false);
+      expect(result.isPartialRead).toBe(false);
       expect(result.originalLineCount).toBe(2);
       expect(result.linesShown).toEqual([1, 2]);
     });
 
-    it('should truncate long lines in text files', async () => {
+    it('should return full content for long lines without truncation', async () => {
       const longLine = 'a'.repeat(2500);
       actualNodeFs.writeFileSync(
         testTextFilePath,
@@ -1005,35 +1007,28 @@ describe('fileUtils', () => {
       );
 
       expect(result.llmContent).toContain('Short line');
-      expect(result.llmContent).toContain(
-        longLine.substring(0, 2000) + '... [truncated]',
-      );
+      expect(result.llmContent).toContain(longLine);
       expect(result.llmContent).toContain('Another short line');
-      expect(result.returnDisplay).toBe(
-        'Read all 3 lines from test.txt (some lines were shortened)',
-      );
-      expect(result.isTruncated).toBe(true);
+      expect(result.returnDisplay).toBe('');
+      expect(result.isPartialRead).toBe(false);
     });
 
-    it('should truncate when line count exceeds the default limit', async () => {
+    it('should read all lines when no range is specified', async () => {
       const lines = Array.from({ length: 2500 }, (_, i) => `Line ${i + 1}`);
       actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
 
-      // No ranges provided, should use default limit (2000)
       const result = await processSingleFileContent(
         testTextFilePath,
         tempRootDir,
         new StandardFileSystemService(),
       );
 
-      expect(result.isTruncated).toBe(true);
-      expect(result.returnDisplay).toBe(
-        'Read lines 1-2000 of 2500 from test.txt',
-      );
-      expect(result.linesShown).toEqual([1, 2000]);
+      expect(result.isPartialRead).toBe(false);
+      expect(result.returnDisplay).toBe('');
+      expect(result.linesShown).toEqual([1, 2500]);
     });
 
-    it('should truncate when a line length exceeds the character limit', async () => {
+    it('should return full content including long lines when range covers all', async () => {
       const longLine = 'b'.repeat(2500);
       const lines = Array.from({ length: 10 }, (_, i) => `Line ${i + 1}`);
       lines.push(longLine); // Total 11 lines
@@ -1048,13 +1043,12 @@ describe('fileUtils', () => {
         11,
       );
 
-      expect(result.isTruncated).toBe(true);
-      expect(result.returnDisplay).toBe(
-        'Read all 11 lines from test.txt (some lines were shortened)',
-      );
+      expect(result.isPartialRead).toBe(false);
+      expect(result.returnDisplay).toBe('');
+      expect(result.llmContent).toContain(longLine);
     });
 
-    it('should truncate both line count and line length when both exceed limits', async () => {
+    it('should return partial read with long lines intact when range is specified', async () => {
       const linesWithLongInMiddle = Array.from(
         { length: 20 },
         (_, i) => `Line ${i + 1}`,
@@ -1073,10 +1067,9 @@ describe('fileUtils', () => {
         1,
         10,
       );
-      expect(result.isTruncated).toBe(true);
-      expect(result.returnDisplay).toBe(
-        'Read lines 1-10 of 20 from test.txt (some lines were shortened)',
-      );
+      expect(result.isPartialRead).toBe(true);
+      expect(result.returnDisplay).toBe('Read lines 1-10 of 20 from test.txt');
+      expect(result.llmContent).toContain('c'.repeat(2500));
     });
 
     it('should return an error if the file size exceeds 20MB', async () => {
@@ -1104,6 +1097,146 @@ describe('fileUtils', () => {
       } finally {
         statSpy.mockRestore();
       }
+    });
+  });
+
+  describe('text file read threshold', () => {
+    it('should read a file under the threshold normally', async () => {
+      const content = 'Hello world';
+      actualNodeFs.writeFileSync(testTextFilePath, content);
+      const result = await processSingleFileContent(
+        testTextFilePath,
+        tempRootDir,
+        new StandardFileSystemService(),
+      );
+      expect(result.llmContent).toBe(content);
+      expect(result.error).toBeUndefined();
+    });
+
+    it('should reject a file over the threshold without start_line/end_line', async () => {
+      const largeContent = 'x'.repeat(
+        DEFAULT_TEXT_FILE_READ_THRESHOLD_BYTES + 1,
+      );
+      actualNodeFs.writeFileSync(testTextFilePath, largeContent);
+      const result = await processSingleFileContent(
+        testTextFilePath,
+        tempRootDir,
+        new StandardFileSystemService(),
+      );
+      expect(result.errorType).toBe(ToolErrorType.TEXT_FILE_READ_TOO_BROAD);
+      expect(result.llmContent).toContain('threshold');
+      expect(result.returnDisplay).toContain('File read too broad');
+    });
+
+    it('should reject large file even with startLine provided', async () => {
+      const largeContent = 'x'.repeat(
+        DEFAULT_TEXT_FILE_READ_THRESHOLD_BYTES + 1,
+      );
+      actualNodeFs.writeFileSync(testTextFilePath, largeContent);
+      const result = await processSingleFileContent(
+        testTextFilePath,
+        tempRootDir,
+        new StandardFileSystemService(),
+        1, // startLine alone does not bypass
+      );
+      expect(result.errorType).toBe(ToolErrorType.TEXT_FILE_READ_TOO_BROAD);
+    });
+
+    it('should allow large file with line range producing small content', async () => {
+      // Large file but reading only a few lines
+      const lines = Array.from({ length: 10000 }, (_, i) => `line ${i + 1}`);
+      actualNodeFs.writeFileSync(testTextFilePath, lines.join('\n'));
+      const result = await processSingleFileContent(
+        testTextFilePath,
+        tempRootDir,
+        new StandardFileSystemService(),
+        1,
+        5, // small range producing content under threshold
+        100, // low threshold
+      );
+      expect(result.errorType).toBeUndefined();
+      expect(typeof result.llmContent).toBe('string');
+    });
+
+    it('should reject line range producing content exceeding threshold', async () => {
+      const largeContent = Array.from(
+        { length: 10000 },
+        (_, i) => `line ${i + 1}: ${'x'.repeat(100)}`,
+      ).join('\n');
+      actualNodeFs.writeFileSync(testTextFilePath, largeContent);
+      const result = await processSingleFileContent(
+        testTextFilePath,
+        tempRootDir,
+        new StandardFileSystemService(),
+        1,
+        9999,
+        100, // low threshold
+      );
+      expect(result.errorType).toBe(ToolErrorType.TEXT_FILE_READ_TOO_BROAD);
+    });
+
+    it('should allow read when max_bytes is set above content size', async () => {
+      const largeContent = 'x'.repeat(
+        DEFAULT_TEXT_FILE_READ_THRESHOLD_BYTES + 1,
+      );
+      actualNodeFs.writeFileSync(testTextFilePath, largeContent);
+      const result = await processSingleFileContent(
+        testTextFilePath,
+        tempRootDir,
+        new StandardFileSystemService(),
+        undefined,
+        undefined,
+        undefined,
+        DEFAULT_TEXT_FILE_READ_THRESHOLD_BYTES + 100, // max_bytes above content
+      );
+      expect(result.errorType).toBeUndefined();
+      expect(typeof result.llmContent).toBe('string');
+    });
+
+    it('should reject read when max_bytes is set below content size', async () => {
+      const content = 'x'.repeat(500);
+      actualNodeFs.writeFileSync(testTextFilePath, content);
+      const result = await processSingleFileContent(
+        testTextFilePath,
+        tempRootDir,
+        new StandardFileSystemService(),
+        undefined,
+        undefined,
+        undefined,
+        100, // max_bytes below content size
+      );
+      expect(result.errorType).toBe(ToolErrorType.TEXT_FILE_READ_TOO_BROAD);
+    });
+
+    it('should respect a custom threshold passed as parameter', async () => {
+      const content = 'x'.repeat(101);
+      actualNodeFs.writeFileSync(testTextFilePath, content);
+      const result = await processSingleFileContent(
+        testTextFilePath,
+        tempRootDir,
+        new StandardFileSystemService(),
+        undefined,
+        undefined,
+        100, // custom threshold
+      );
+      expect(result.errorType).toBe(ToolErrorType.TEXT_FILE_READ_TOO_BROAD);
+    });
+
+    it('should disable threshold when set to -1', async () => {
+      const largeContent = 'x'.repeat(
+        DEFAULT_TEXT_FILE_READ_THRESHOLD_BYTES + 1,
+      );
+      actualNodeFs.writeFileSync(testTextFilePath, largeContent);
+      const result = await processSingleFileContent(
+        testTextFilePath,
+        tempRootDir,
+        new StandardFileSystemService(),
+        undefined,
+        undefined,
+        -1, // disabled
+      );
+      expect(result.errorType).toBeUndefined();
+      expect(typeof result.llmContent).toBe('string');
     });
   });
 

@@ -54,6 +54,12 @@ export interface ReadFileToolParams {
    * The line number to end reading at (optional, 1-based, inclusive)
    */
   end_line?: number;
+
+  /**
+   * Maximum bytes of content to allow (optional).
+   * If the read produces content exceeding this, the read is rejected.
+   */
+  max_bytes?: number;
 }
 
 class ReadFileToolInvocation extends BaseToolInvocation<
@@ -122,6 +128,8 @@ class ReadFileToolInvocation extends BaseToolInvocation<
       this.config.getFileSystemService(),
       this.params.start_line,
       this.params.end_line,
+      this.config.getTextFileReadSizeThreshold(),
+      this.params.max_bytes,
     );
 
     if (result.error) {
@@ -136,7 +144,7 @@ class ReadFileToolInvocation extends BaseToolInvocation<
     }
 
     let llmContent: PartUnion;
-    if (result.isTruncated) {
+    if (result.isPartialRead) {
       const [start, end] = result.linesShown!;
       const total = result.originalLineCount!;
 
@@ -246,6 +254,9 @@ export class ReadFileTool extends BaseDeclarativeTool<
       params.start_line > params.end_line
     ) {
       return 'start_line cannot be greater than end_line';
+    }
+    if (params.max_bytes !== undefined && params.max_bytes < 1) {
+      return 'max_bytes must be a positive integer';
     }
 
     const fileFilteringOptions = this.config.getFileFilteringOptions();

@@ -36,6 +36,7 @@ import {
   // Tool-specific parameter names
   READ_FILE_PARAM_START_LINE,
   READ_FILE_PARAM_END_LINE,
+  READ_FILE_PARAM_MAX_BYTES,
   WRITE_FILE_PARAM_CONTENT,
   GREP_PARAM_INCLUDE_PATTERN,
   GREP_PARAM_EXCLUDE_PATTERN,
@@ -79,11 +80,7 @@ import {
   getExitPlanModeDeclaration,
   getActivateSkillDeclaration,
 } from '../dynamic-declaration-helpers.js';
-import {
-  DEFAULT_MAX_LINES_TEXT_FILE,
-  MAX_LINE_LENGTH_TEXT_FILE,
-  MAX_FILE_SIZE_MB,
-} from '../../../utils/constants.js';
+import { MAX_FILE_SIZE_MB } from '../../../utils/constants.js';
 
 /**
  * Gemini 3 tool set. Initially a copy of the default legacy set.
@@ -91,7 +88,7 @@ import {
 export const GEMINI_3_SET: CoreToolSet = {
   read_file: {
     name: READ_FILE_TOOL_NAME,
-    description: `Reads and returns the content of a specified file. To maintain context efficiency, you MUST use 'start_line' and 'end_line' for targeted, surgical reads of specific sections. For your safety, the tool will automatically truncate output exceeding ${DEFAULT_MAX_LINES_TEXT_FILE} lines, ${MAX_LINE_LENGTH_TEXT_FILE} characters per line, or ${MAX_FILE_SIZE_MB}MB in size; however, triggering these limits is considered token-inefficient. Always retrieve only the minimum content necessary for your next step. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files.`,
+    description: `Reads and returns the content of a specified file. To maintain context efficiency, you MUST use 'start_line' and 'end_line' for targeted, surgical reads of specific sections. Large text file reads may be rejected if the content exceeds the configured size threshold, and any file over ${MAX_FILE_SIZE_MB}MB will be rejected. Always retrieve only the minimum content necessary for your next step. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files.`,
     parametersJsonSchema: {
       type: 'object',
       properties: {
@@ -107,6 +104,11 @@ export const GEMINI_3_SET: CoreToolSet = {
         [READ_FILE_PARAM_END_LINE]: {
           description:
             'Optional: The 1-based line number to end reading at (inclusive).',
+          type: 'number',
+        },
+        [READ_FILE_PARAM_MAX_BYTES]: {
+          description:
+            'Only set this after a read is rejected for exceeding the size threshold.',
           type: 'number',
         },
       },

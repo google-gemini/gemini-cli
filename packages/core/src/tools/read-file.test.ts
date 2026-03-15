@@ -19,6 +19,7 @@ import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.j
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
+import { DEFAULT_TEXT_FILE_READ_THRESHOLD_BYTES } from '../utils/constants.js';
 
 vi.mock('../telemetry/loggers.js', () => ({
   logFileOperation: vi.fn(),
@@ -55,6 +56,7 @@ describe('ReadFileTool', () => {
         getProjectTempDir: () => path.join(tempRootDir, '.temp'),
       },
       isInteractive: () => false,
+      getTextFileReadSizeThreshold: () => undefined,
       isPathAllowed(this: Config, absolutePath: string): boolean {
         const workspaceContext = this.getWorkspaceContext();
         if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
@@ -298,22 +300,6 @@ describe('ReadFileTool', () => {
       );
     });
 
-    it('should handle text file with lines exceeding maximum length', async () => {
-      const filePath = path.join(tempRootDir, 'longlines.txt');
-      const longLine = 'a'.repeat(2500); // Exceeds MAX_LINE_LENGTH_TEXT_FILE (2000)
-      const fileContent = `Short line\n${longLine}\nAnother short line`;
-      await fsp.writeFile(filePath, fileContent, 'utf-8');
-      const params: ReadFileToolParams = { file_path: filePath };
-      const invocation = tool.build(params);
-
-      const result = await invocation.execute(abortSignal);
-      expect(result.llmContent).toContain(
-        'IMPORTANT: The file content has been truncated',
-      );
-      expect(result.llmContent).toContain('--- FILE CONTENT (truncated) ---');
-      expect(result.returnDisplay).toContain('some lines were shortened');
-    });
-
     it('should handle image file and return appropriate content', async () => {
       const imagePath = path.join(tempRootDir, 'image.png');
       // Minimal PNG header
@@ -450,6 +436,41 @@ describe('ReadFileTool', () => {
       expect(result.returnDisplay).toBe('');
     });
 
+    it('should reject a large text file exceeding threshold without line params', async () => {
+      const filePath = path.join(tempRootDir, 'large.txt');
+      const largeContent = 'x'.repeat(
+        DEFAULT_TEXT_FILE_READ_THRESHOLD_BYTES + 1,
+      );
+      await fsp.writeFile(filePath, largeContent, 'utf-8');
+      const params: ReadFileToolParams = { file_path: filePath };
+      const invocation = tool.build(params);
+
+      const result = await invocation.execute(abortSignal);
+      expect(result.error).toBeDefined();
+      expect((result.error as { type: string }).type).toBe(
+        ToolErrorType.TEXT_FILE_READ_TOO_BROAD,
+      );
+    });
+
+    it('should reject a large text file even when start_line is provided', async () => {
+      const filePath = path.join(tempRootDir, 'large.txt');
+      const largeContent = 'x'.repeat(
+        DEFAULT_TEXT_FILE_READ_THRESHOLD_BYTES + 1,
+      );
+      await fsp.writeFile(filePath, largeContent, 'utf-8');
+      const params: ReadFileToolParams = {
+        file_path: filePath,
+        start_line: 1,
+      };
+      const invocation = tool.build(params);
+
+      const result = await invocation.execute(abortSignal);
+      expect(result.error).toBeDefined();
+      expect((result.error as { type: string }).type).toBe(
+        ToolErrorType.TEXT_FILE_READ_TOO_BROAD,
+      );
+    });
+
     describe('with .geminiignore', () => {
       beforeEach(async () => {
         await fsp.writeFile(
@@ -468,6 +489,7 @@ describe('ReadFileTool', () => {
           storage: {
             getProjectTempDir: () => path.join(tempRootDir, '.temp'),
           },
+          getTextFileReadSizeThreshold: () => undefined,
           isPathAllowed(this: Config, absolutePath: string): boolean {
             const workspaceContext = this.getWorkspaceContext();
             if (workspaceContext.isPathWithinWorkspace(absolutePath)) {
@@ -542,6 +564,7 @@ describe('ReadFileTool', () => {
             getProjectTempDir: () => path.join(tempRootDir, '.temp'),
           },
           isInteractive: () => false,
+          getTextFileReadSizeThreshold: () => undefined,
           isPathAllowed(this: Config, absolutePath: string): boolean {
             const workspaceContext = this.getWorkspaceContext();
             if (workspaceContext.isPathWithinWorkspace(absolutePath)) {

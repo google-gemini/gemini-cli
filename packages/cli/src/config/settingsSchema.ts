@@ -1462,6 +1462,16 @@ const SETTINGS_SCHEMA = {
           'Maximum characters to show when truncating large tool outputs. Set to 0 or negative to disable truncation.',
         showInDialog: true,
       },
+      textFileReadSizeThreshold: {
+        type: 'number',
+        label: 'Text File Read Size Threshold',
+        category: 'Tools',
+        requiresRestart: false,
+        default: 81920,
+        description:
+          'Max content size in bytes for text file reads. Reads returning content exceeding this are rejected with guidance to narrow the scope. Set to -1 to disable.',
+        showInDialog: true,
+      },
       disableLLMCorrection: {
         type: 'boolean',
         label: 'Disable LLM Correction',

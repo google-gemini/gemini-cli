@@ -410,7 +410,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
 
 exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snapshot for tool: read_file 1`] = `
 {
-  "description": "Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'start_line' and 'end_line' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges.",
+  "description": "Reads and returns the content of a specified file. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files. For text files, it can read specific line ranges using 'start_line' and 'end_line' parameters. Large text file reads may be rejected with guidance if the content exceeds the configured size threshold.",
   "name": "read_file",
   "parametersJsonSchema": {
     "properties": {
@@ -421,6 +421,10 @@ exports[`coreTools snapshots for specific models > Model: gemini-2.5-pro > snaps
       "file_path": {
         "description": "The path to the file to read.",
         "type": "string",
+      },
+      "max_bytes": {
+        "description": "Only set this after a read is rejected for exceeding the size threshold.",
+        "type": "number",
       },
       "start_line": {
         "description": "Optional: The 1-based line number to start reading from.",
@@ -1197,7 +1201,7 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
 
 exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview > snapshot for tool: read_file 1`] = `
 {
-  "description": "Reads and returns the content of a specified file. To maintain context efficiency, you MUST use 'start_line' and 'end_line' for targeted, surgical reads of specific sections. For your safety, the tool will automatically truncate output exceeding 2000 lines, 2000 characters per line, or 20MB in size; however, triggering these limits is considered token-inefficient. Always retrieve only the minimum content necessary for your next step. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files.",
+  "description": "Reads and returns the content of a specified file. To maintain context efficiency, you MUST use 'start_line' and 'end_line' for targeted, surgical reads of specific sections. Large text file reads may be rejected if the content exceeds the configured size threshold, and any file over 20MB will be rejected. Always retrieve only the minimum content necessary for your next step. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files.",
   "name": "read_file",
   "parametersJsonSchema": {
     "properties": {
@@ -1208,6 +1212,10 @@ exports[`coreTools snapshots for specific models > Model: gemini-3-pro-preview >
       "file_path": {
         "description": "The path to the file to read.",
         "type": "string",
+      },
+      "max_bytes": {
+        "description": "Only set this after a read is rejected for exceeding the size threshold.",
+        "type": "number",
       },
       "start_line": {
         "description": "Optional: The 1-based line number to start reading from.",

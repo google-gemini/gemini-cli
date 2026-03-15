@@ -32,6 +32,7 @@ export enum ToolErrorType {
   PERMISSION_DENIED = 'permission_denied',
   NO_SPACE_LEFT = 'no_space_left',
   TARGET_IS_DIRECTORY = 'target_is_directory',
+  TEXT_FILE_READ_TOO_BROAD = 'text_file_read_too_broad',
   PATH_NOT_IN_WORKSPACE = 'path_not_in_workspace',
   SEARCH_PATH_NOT_FOUND = 'search_path_not_found',
   SEARCH_PATH_NOT_A_DIRECTORY = 'search_path_not_a_directory',

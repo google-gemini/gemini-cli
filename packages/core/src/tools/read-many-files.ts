@@ -25,7 +25,9 @@ import {
   DEFAULT_ENCODING,
   getSpecificMimeType,
   type ProcessedFileReadResult,
+  THRESHOLD_EXCEEDED_GUIDANCE_LINES,
 } from '../utils/fileUtils.js';
+import { formatBytes } from '../utils/formatters.js';
 import type { PartListUnion } from '@google/genai';
 import {
   type Config,
@@ -103,6 +105,8 @@ type FileProcessingResult =
       relativePathForDisplay: string;
       fileReadResult?: undefined;
       reason: string;
+      errorType?: ToolErrorType;
+      fileSize?: number;
     };
 
 /**
@@ -320,6 +324,9 @@ ${finalExclusionPatternsForDescription
             filePath,
             this.config.getTargetDir(),
             this.config.getFileSystemService(),
+            undefined,
+            undefined,
+            this.config.getTextFileReadSizeThreshold(),
           );
 
           if (fileReadResult.error) {
@@ -328,6 +335,8 @@ ${finalExclusionPatternsForDescription
               filePath,
               relativePathForDisplay,
               reason: `Read error: ${fileReadResult.error}`,
+              errorType: fileReadResult.errorType,
+              fileSize: fileReadResult.fileSize,
             };
           }
 
@@ -375,8 +384,8 @@ ${finalExclusionPatternsForDescription
               filePath,
             );
             let fileContentForLlm = '';
-            if (fileReadResult.isTruncated) {
-              fileContentForLlm += `[WARNING: This file was truncated. To view the full content, use the 'read_file' tool on this specific file.]\n\n`;
+            if (fileReadResult.isPartialRead) {
+              fileContentForLlm += `[WARNING: This file was a partial read. To view the full content, use the 'read_file' tool on this specific file.]\n\n`;
             }
             fileContentForLlm += fileReadResult.llmContent;
             contentParts.push(`${separator}\n\n${fileContentForLlm}\n\n`);
@@ -428,6 +437,31 @@ ${finalExclusionPatternsForDescription
       contentParts.push(
         `${JIT_CONTEXT_PREFIX}${jitParts.join('\n')}${JIT_CONTEXT_SUFFIX}`,
       );
+    }
+
+    const thresholdExceeded = results
+      .filter(
+        (
+          r,
+        ): r is PromiseFulfilledResult<
+          Extract<FileProcessingResult, { success: false }>
+        > =>
+          r.status === 'fulfilled' &&
+          !r.value.success &&
+          r.value.errorType === ToolErrorType.TEXT_FILE_READ_TOO_BROAD,
+      )
+      .map((r) => r.value);
+
+    if (thresholdExceeded.length > 0) {
+      let guidance = `--- FILES EXCEEDING READ THRESHOLD ---\n`;
+      guidance += `The following ${thresholdExceeded.length} file(s) exceeded the size threshold and were not read:\n`;
+      for (const f of thresholdExceeded) {
+        guidance += `  - ${f.relativePathForDisplay} (${formatBytes(f.fileSize ?? 0)})\n`;
+      }
+      guidance += `To read these files, choose an approach:\n`;
+      guidance += THRESHOLD_EXCEEDED_GUIDANCE_LINES.join('\n') + '\n';
+      guidance += `  - Use read_file individually with max_bytes to override the threshold\n`;
+      contentParts.push(guidance);
     }
 
     let displayMessage = `### ReadManyFiles Result (Target Dir: \`${this.config.getTargetDir()}\`)\n\n`;
