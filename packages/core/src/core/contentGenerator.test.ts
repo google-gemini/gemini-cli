@@ -10,6 +10,7 @@ import {
   AuthType,
   createContentGeneratorConfig,
   type ContentGenerator,
+  validateBaseUrl,
 } from './contentGenerator.js';
 import { createCodeAssistContentGenerator } from '../code_assist/codeAssist.js';
 import { GoogleGenAI } from '@google/genai';
@@ -32,6 +33,7 @@ const mockConfig = {
   getModel: vi.fn().mockReturnValue('gemini-pro'),
   getProxy: vi.fn().mockReturnValue(undefined),
   getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
+  getClientName: vi.fn().mockReturnValue(undefined),
 } as unknown as Config;
 
 describe('createContentGenerator', () => {
@@ -52,6 +54,7 @@ describe('createContentGenerator', () => {
     const fakeResponsesFile = 'fake/responses.yaml';
     const mockConfigWithFake = {
       fakeResponses: fakeResponsesFile,
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
     const generator = await createContentGenerator(
       {
@@ -73,6 +76,7 @@ describe('createContentGenerator', () => {
     const mockConfigWithRecordResponses = {
       fakeResponses: fakeResponsesFile,
       recordResponses: recordResponsesFile,
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
     const generator = await createContentGenerator(
       {
@@ -122,6 +126,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => true,
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     // Set a fixed version for testing
@@ -143,12 +148,48 @@ describe('createContentGenerator', () => {
       vertexai: undefined,
       httpOptions: expect.objectContaining({
         headers: expect.objectContaining({
-          'User-Agent': expect.stringContaining('GeminiCLI/1.2.3/gemini-pro'),
+          'User-Agent': expect.stringMatching(
+            /GeminiCLI\/1\.2\.3\/gemini-pro \(.*; .*; .*\)/,
+          ),
         }),
       }),
     });
     expect(generator).toEqual(
       new LoggingContentGenerator(mockGenerator.models, mockConfig),
+    );
+  });
+
+  it('should include clientName prefix in User-Agent when specified', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => true,
+      getClientName: vi.fn().mockReturnValue('a2a-server'),
+    } as unknown as Config;
+
+    // Set a fixed version for testing
+    vi.stubEnv('CLI_VERSION', '1.2.3');
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    await createContentGenerator(
+      { apiKey: 'test-api-key', authType: AuthType.USE_GEMINI },
+      mockConfig,
+      undefined,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        httpOptions: expect.objectContaining({
+          headers: expect.objectContaining({
+            'User-Agent': expect.stringMatching(
+              /GeminiCLI-a2a-server\/.*\/gemini-pro \(.*; .*; .*\)/,
+            ),
+          }),
+        }),
+      }),
     );
   });
 
@@ -188,6 +229,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -234,6 +276,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -267,6 +310,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -308,6 +352,7 @@ describe('createContentGenerator', () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
     const mockGenerator = {
       models: {},
@@ -339,6 +384,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -372,6 +418,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -409,6 +456,7 @@ describe('createContentGenerator', () => {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -442,11 +490,128 @@ describe('createContentGenerator', () => {
     );
   });
 
+  it('should pass GOOGLE_GEMINI_BASE_URL as httpOptions.baseUrl for Gemini API', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', 'https://my-gemini-proxy.example.com');
+
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        httpOptions: expect.objectContaining({
+          baseUrl: 'https://my-gemini-proxy.example.com',
+        }),
+      }),
+    );
+  });
+
+  it('should pass GOOGLE_VERTEX_BASE_URL as httpOptions.baseUrl for Vertex AI', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+    vi.stubEnv('GOOGLE_VERTEX_BASE_URL', 'https://my-vertex-proxy.example.com');
+
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        vertexai: true,
+        authType: AuthType.USE_VERTEX_AI,
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        httpOptions: expect.objectContaining({
+          baseUrl: 'https://my-vertex-proxy.example.com',
+        }),
+      }),
+    );
+  });
+
+  it('should not include baseUrl in httpOptions when GOOGLE_GEMINI_BASE_URL is not set', async () => {
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', '');
+
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
+    } as unknown as Config;
+
+    const mockGenerator = {
+      models: {},
+    } as unknown as GoogleGenAI;
+    vi.mocked(GoogleGenAI).mockImplementation(() => mockGenerator as never);
+
+    await createContentGenerator(
+      {
+        apiKey: 'test-api-key',
+        authType: AuthType.USE_GEMINI,
+      },
+      mockConfig,
+    );
+
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        httpOptions: expect.objectContaining({
+          baseUrl: expect.any(String),
+        }),
+      }),
+    );
+  });
+
+  it('should reject an insecure GOOGLE_GEMINI_BASE_URL for non-local hosts', async () => {
+    const mockConfig = {
+      getModel: vi.fn().mockReturnValue('gemini-pro'),
+      getProxy: vi.fn().mockReturnValue(undefined),
+      getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
+    } as unknown as Config;
+
+    vi.stubEnv('GOOGLE_GEMINI_BASE_URL', 'http://evil-proxy.example.com');
+
+    await expect(
+      createContentGenerator(
+        {
+          apiKey: 'test-api-key',
+          authType: AuthType.USE_GEMINI,
+        },
+        mockConfig,
+      ),
+    ).rejects.toThrow('Custom base URL must use HTTPS unless it is localhost.');
+  });
+
   it('should pass apiVersion for Vertex AI when GOOGLE_GENAI_API_VERSION is set', async () => {
     const mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getProxy: vi.fn().mockReturnValue(undefined),
       getUsageStatisticsEnabled: () => false,
+      getClientName: vi.fn().mockReturnValue(undefined),
     } as unknown as Config;
 
     const mockGenerator = {
@@ -483,6 +648,7 @@ describe('createContentGeneratorConfig', () => {
     setModel: vi.fn(),
     flashFallbackHandler: vi.fn(),
     getProxy: vi.fn(),
+    getClientName: vi.fn().mockReturnValue(undefined),
   } as unknown as Config;
 
   beforeEach(() => {
@@ -558,5 +724,35 @@ describe('createContentGeneratorConfig', () => {
     );
     expect(config.apiKey).toBeUndefined();
     expect(config.vertexai).toBeUndefined();
+  });
+});
+
+describe('validateBaseUrl', () => {
+  it('should accept a valid HTTPS URL', () => {
+    expect(() => validateBaseUrl('https://my-proxy.example.com')).not.toThrow();
+  });
+
+  it('should accept HTTP for localhost', () => {
+    expect(() => validateBaseUrl('http://localhost:8080')).not.toThrow();
+  });
+
+  it('should accept HTTP for 127.0.0.1', () => {
+    expect(() => validateBaseUrl('http://127.0.0.1:3000')).not.toThrow();
+  });
+
+  it('should accept HTTP for ::1', () => {
+    expect(() => validateBaseUrl('http://[::1]:8080')).not.toThrow();
+  });
+
+  it('should reject HTTP for non-local hosts', () => {
+    expect(() => validateBaseUrl('http://my-proxy.example.com')).toThrow(
+      'Custom base URL must use HTTPS unless it is localhost.',
+    );
+  });
+
+  it('should reject an invalid URL', () => {
+    expect(() => validateBaseUrl('not-a-url')).toThrow(
+      'Invalid custom base URL: not-a-url',
+    );
   });
 });
