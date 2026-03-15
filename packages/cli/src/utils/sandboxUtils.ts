@@ -49,14 +49,12 @@ export async function shouldUseCurrentUserInSandbox(): Promise<boolean> {
   if (os.platform() === 'linux') {
     try {
       const osReleaseContent = await readFile('/etc/os-release', 'utf8');
-      if (
-        osReleaseContent.includes('ID=debian') ||
-        osReleaseContent.includes('ID=ubuntu') ||
-        osReleaseContent.includes('ID=fedora') ||
-        osReleaseContent.match(/^ID_LIKE=.*debian.*/m) || // Covers derivatives
-        osReleaseContent.match(/^ID_LIKE=.*ubuntu.*/m) || // Covers derivatives
-        osReleaseContent.match(/^ID_LIKE=.*fedora.*/m) // Covers derivatives
-      ) {
+      const idMatch = osReleaseContent.match(/^ID=(.*)$/m);
+      const id = idMatch?.[1]?.replace(/"/g, '').trim();
+      const idLikeMatch = osReleaseContent.match(/^ID_LIKE=(.*)$/m);
+      const idLike = idLikeMatch?.[1]?.replace(/"/g, '').split(/\s+/) ?? [];
+      const supported = new Set(['debian', 'ubuntu', 'fedora']);
+      if (supported.has(id ?? '') || idLike.some((t) => supported.has(t))) {
         debugLogger.log(
           'Defaulting to use current user UID/GID for Debian/Ubuntu/Fedora-based Linux.',
         );
