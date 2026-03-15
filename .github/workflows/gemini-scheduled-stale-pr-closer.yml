@@ -68,7 +68,7 @@ jobs:
               // and organization membership (if available).
               const isTeamMember = maintainerLogins.has(login.toLowerCase());
               const isRepoMaintainer = ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(assoc);
-              
+
               if (isTeamMember || isRepoMaintainer) return true;
 
               // Fallback: Check if user belongs to the 'google' or 'googlers' orgs (requires permission)
@@ -156,10 +156,10 @@ jobs:
 
               // 3. Enforcement Logic
               const prLabels = pr.labels.map(l => l.name.toLowerCase());
-              const hasHelpWanted = prLabels.includes('help wanted') || 
+              const hasHelpWanted = prLabels.includes('help wanted') ||
                                     linkedIssues.some(issue => issue.labels.nodes.some(l => l.name.toLowerCase() === 'help wanted'));
-              
-              const hasMaintainerOnly = prLabels.includes('🔒 maintainer only') || 
+
+              const hasMaintainerOnly = prLabels.includes('🔒 maintainer only') ||
                                         linkedIssues.some(issue => issue.labels.nodes.some(l => l.name.toLowerCase() === '🔒 maintainer only'));
 
               const hasLinkedIssue = linkedIssues.length > 0;
@@ -167,7 +167,7 @@ jobs:
               // Closure Policy: No help-wanted label = Close after 14 days
               if (pr.state === 'open' && !hasHelpWanted && !hasMaintainerOnly) {
                 const prCreatedAt = new Date(pr.created_at);
-                
+
                 // We give a 14-day grace period for non-help-wanted PRs to be manually reviewed/labeled by an EM
                 if (prCreatedAt > fourteenDaysAgo) {
                   core.info(`PR #${pr.number} is new and lacks 'help wanted'. Giving 14-day grace period for EM review.`);
@@ -200,9 +200,9 @@ jobs:
 
               // 4. Staleness Check (Scheduled only)
               if (pr.state === 'open' && context.eventName !== 'pull_request') {
-                // PRs with help wanted/maintainer only labels are still checked for staleness 
+                // PRs with help wanted/maintainer only labels are still checked for staleness
                 // but usually given more leeway. Here we stick to 30 days of no maintainer activity.
-                
+
                 const prCreatedAt = new Date(pr.created_at);
                 if (prCreatedAt > thirtyDaysAgo) continue;
 
