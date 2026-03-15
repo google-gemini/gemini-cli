@@ -296,7 +296,7 @@ describe('McpClientManager', () => {
 
       // A NEW McpClient should have been constructed with the updated config
       expect(constructorCalls).toHaveLength(2);
-      expect(constructorCalls[1][1]).toBe(updatedConfig);
+      expect(constructorCalls[1][1]).toMatchObject(updatedConfig);
     });
   });
 
@@ -452,17 +452,14 @@ describe('McpClientManager', () => {
       expect(lastCall[1].extension).toEqual(extension);
     });
 
-    it('should union tool lists and merge env variables between extension and user config', async () => {
+    it('should union tool lists and merge env variables regardless of load order', async () => {
       const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+
       const userConfig = {
         excludeTools: ['user-tool'],
         includeTools: ['user-inc'],
         env: { USER_VAR: 'user-val', OVERRIDE_VAR: 'user-override' },
       };
-
-      mockConfig.getMcpServers.mockReturnValue({
-        'test-server': userConfig,
-      });
 
       const extension: GeminiCLIExtension = {
         name: 'test-extension',
@@ -482,22 +479,54 @@ describe('McpClientManager', () => {
         id: '123',
       };
 
+      // Case 1: Extension loads first, then User config (e.g. from startConfiguredMcpServers)
+      // startExtension and maybeDiscoverMcpServer return promises that resolve when discovery for that call is done.
       await manager.startExtension(extension);
 
-      const lastCall = vi.mocked(McpClient).mock.calls[0];
-      const mergedConfig = lastCall[1];
+      // In Case 1, we simulate that the existing client returns the extension's config
+      // But we must include the 'extension' metadata which is added during startExtension
+      mockedMcpClient.getServerConfig.mockReturnValue({
+        ...extension.mcpServers!['test-server'],
+        extension,
+      });
 
-      // Arrays should be unioned
+      await manager.maybeDiscoverMcpServer('test-server', userConfig);
+
+      let lastCall = vi.mocked(McpClient).mock.calls[1]; // Second call due to re-discovery
+      let mergedConfig = lastCall[1];
+
       expect(mergedConfig.excludeTools).toContain('ext-tool');
       expect(mergedConfig.excludeTools).toContain('user-tool');
       expect(mergedConfig.includeTools).toContain('ext-inc');
       expect(mergedConfig.includeTools).toContain('user-inc');
+      expect(mergedConfig.env!['EXT_VAR']).toBe('ext-val');
+      expect(mergedConfig.env!['USER_VAR']).toBe('user-val');
+      expect(mergedConfig.env!['OVERRIDE_VAR']).toBe('user-override');
+      expect(mergedConfig.extension).toBe(extension); // Extension ID preserved!
 
-      // Env should be merged
-      const env = mergedConfig.env!;
-      expect(env['EXT_VAR']).toBe('ext-val');
-      expect(env['USER_VAR']).toBe('user-val');
-      expect(env['OVERRIDE_VAR']).toBe('user-override'); // User wins on collisions
+      // Reset for Case 2
+      vi.mocked(McpClient).mockClear();
+      const manager2 = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+
+      // Case 2: User config loads first, then Extension loads
+      await manager2.maybeDiscoverMcpServer('test-server', userConfig);
+
+      // In Case 2, the existing client returns the user config (no extension metadata yet)
+      mockedMcpClient.getServerConfig.mockReturnValue(userConfig);
+
+      await manager2.startExtension(extension);
+
+      lastCall = vi.mocked(McpClient).mock.calls[1];
+      mergedConfig = lastCall[1];
+
+      expect(mergedConfig.excludeTools).toContain('ext-tool');
+      expect(mergedConfig.excludeTools).toContain('user-tool');
+      expect(mergedConfig.includeTools).toContain('ext-inc');
+      expect(mergedConfig.includeTools).toContain('user-inc');
+      expect(mergedConfig.env!['EXT_VAR']).toBe('ext-val');
+      expect(mergedConfig.env!['USER_VAR']).toBe('user-val');
+      expect(mergedConfig.env!['OVERRIDE_VAR']).toBe('user-override');
+      expect(mergedConfig.extension).toBe(extension); // Extension ID preserved!
     });
 
     it('should remove servers from blockedMcpServers when stopExtension is called', async () => {

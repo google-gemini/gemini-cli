@@ -185,38 +185,13 @@ export class McpClientManager {
    */
   async startExtension(extension: GeminiCLIExtension) {
     debugLogger.log(`Loading extension: ${extension.name}`);
-    const localMcpServers = this.cliConfig.getMcpServers() ?? {};
     await Promise.all(
-      Object.entries(extension.mcpServers ?? {}).map(([name, config]) => {
-        const userConfig = localMcpServers[name] ?? {};
-
-        // Merge arrays (union) so user overrides don't accidentally re-enable
-        // tools excluded by the extension for security/compatibility reasons.
-        const includeTools = [
-          ...new Set([
-            ...(config.includeTools ?? []),
-            ...(userConfig.includeTools ?? []),
-          ]),
-        ];
-        const excludeTools = [
-          ...new Set([
-            ...(config.excludeTools ?? []),
-            ...(userConfig.excludeTools ?? []),
-          ]),
-        ];
-
-        // Merge env objects instead of replacing them entirely.
-        const env = { ...(config.env ?? {}), ...(userConfig.env ?? {}) };
-
-        return this.maybeDiscoverMcpServer(name, {
+      Object.entries(extension.mcpServers ?? {}).map(([name, config]) =>
+        this.maybeDiscoverMcpServer(name, {
           ...config,
-          ...userConfig,
-          includeTools: includeTools.length > 0 ? includeTools : undefined,
-          excludeTools: excludeTools.length > 0 ? excludeTools : undefined,
-          env: Object.keys(env).length > 0 ? env : undefined,
           extension,
-        });
-      }),
+        }),
+      ),
     );
     await this.scheduleMcpContextRefresh();
   }
@@ -282,16 +257,59 @@ export class McpClientManager {
     }
   }
 
+  /**
+   * Merges two MCP configurations. The second configuration (override)
+   * takes precedence for scalar properties, but array properties are
+   * unioned and environment objects are merged.
+   */
+  private mergeMcpConfigs(
+    base: MCPServerConfig,
+    override: MCPServerConfig,
+  ): MCPServerConfig {
+    const includeTools = [
+      ...new Set([
+        ...(base.includeTools ?? []),
+        ...(override.includeTools ?? []),
+      ]),
+    ];
+    const excludeTools = [
+      ...new Set([
+        ...(base.excludeTools ?? []),
+        ...(override.excludeTools ?? []),
+      ]),
+    ];
+
+    const env = { ...(base.env ?? {}), ...(override.env ?? {}) };
+
+    // If override doesn't provide connection details, keep the base ones.
+    const hasConnection =
+      !!override.command || !!override.url || !!override.httpUrl;
+
+    return {
+      ...base,
+      ...override,
+      command: hasConnection ? override.command : base.command,
+      args: hasConnection ? override.args : base.args,
+      url: hasConnection ? override.url : base.url,
+      httpUrl: hasConnection ? override.httpUrl : base.httpUrl,
+      includeTools: includeTools.length > 0 ? includeTools : undefined,
+      excludeTools: excludeTools.length > 0 ? excludeTools : undefined,
+      env: Object.keys(env).length > 0 ? env : undefined,
+      extension: override.extension ?? base.extension,
+    };
+  }
+
   async maybeDiscoverMcpServer(
     name: string,
     config: MCPServerConfig,
   ): Promise<void> {
     const existing = this.clients.get(name);
+    const existingConfig = existing?.getServerConfig();
     if (
       existing &&
-      existing.getServerConfig().extension?.id &&
+      existingConfig?.extension?.id &&
       config.extension?.id &&
-      existing.getServerConfig().extension?.id !== config.extension?.id
+      existingConfig.extension.id !== config.extension.id
     ) {
       const extensionText = config.extension
         ? ` from extension "${config.extension.name}"`
@@ -302,15 +320,28 @@ export class McpClientManager {
       return;
     }
 
+    let finalConfig = config;
+    if (existing && existingConfig) {
+      // If we're merging an extension config into a user config,
+      // the user config should be the override.
+      if (config.extension && !existingConfig.extension) {
+        finalConfig = this.mergeMcpConfigs(config, existingConfig);
+      } else {
+        // Otherwise (User over Extension, or User over User),
+        // the incoming config is the override.
+        finalConfig = this.mergeMcpConfigs(existingConfig, config);
+      }
+    }
+
     // Always track server config for UI display
-    this.allServerConfigs.set(name, config);
+    this.allServerConfigs.set(name, finalConfig);
 
     // Check if blocked by admin settings (allowlist/excludelist)
     if (this.isBlockedBySettings(name)) {
       if (!this.blockedMcpServers.find((s) => s.name === name)) {
         this.blockedMcpServers?.push({
           name,
-          extensionName: config.extension?.name ?? '',
+          extensionName: finalConfig.extension?.name ?? '',
         });
       }
       return;
@@ -325,7 +356,7 @@ export class McpClientManager {
     if (!this.cliConfig.isTrustedFolder()) {
       return;
     }
-    if (config.extension && !config.extension.isActive) {
+    if (finalConfig.extension && !finalConfig.extension.isActive) {
       return;
     }
 
@@ -339,7 +370,7 @@ export class McpClientManager {
 
           const client = new McpClient(
             name,
-            config,
+            finalConfig,
             this.toolRegistry,
             this.cliConfig.getPromptRegistry(),
             this.cliConfig.getResourceRegistry(),
