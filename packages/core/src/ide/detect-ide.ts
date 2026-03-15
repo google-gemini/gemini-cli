@@ -37,11 +37,17 @@ export interface IdeInfo {
 }
 
 function normalizeIdeInfoFromFile(ideInfoFromFile?: {
-  name?: string;
-  displayName?: string;
+  name?: unknown;
+  displayName?: unknown;
 }): IdeInfo | undefined {
-  const name = ideInfoFromFile?.name?.trim();
-  const displayName = ideInfoFromFile?.displayName?.trim();
+  const rawName = ideInfoFromFile?.name;
+  const rawDisplayName = ideInfoFromFile?.displayName;
+  if (typeof rawName !== 'string' || typeof rawDisplayName !== 'string') {
+    return undefined;
+  }
+
+  const name = rawName.trim();
+  const displayName = rawDisplayName.trim();
 
   if (!name || !displayName) {
     return undefined;
@@ -160,7 +166,7 @@ export function detectIde(
     pid: number;
     command: string;
   },
-  ideInfoFromFile?: { name?: string; displayName?: string },
+  ideInfoFromFile?: { name?: unknown; displayName?: unknown },
 ): IdeInfo | undefined {
   const normalizedIdeInfoFromFile = normalizeIdeInfoFromFile(ideInfoFromFile);
   if (normalizedIdeInfoFromFile) {

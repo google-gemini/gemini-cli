@@ -286,4 +286,43 @@ describe('detectIde with ideInfoFromFile', () => {
       IDE_DEFINITIONS.vscode,
     );
   });
+
+  it.each([
+    [
+      'VS Code',
+      () => {
+        vi.stubEnv('TERM_PROGRAM', 'vscode');
+        vi.stubEnv('CURSOR_TRACE_ID', '');
+        vi.stubEnv('POSITRON', '');
+      },
+      IDE_DEFINITIONS.vscode,
+    ],
+    [
+      'JetBrains',
+      () => {
+        vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
+      },
+      IDE_DEFINITIONS.jetbrains,
+    ],
+    [
+      'Zed',
+      () => {
+        vi.stubEnv('TERM_PROGRAM', 'Zed');
+      },
+      IDE_DEFINITIONS.zed,
+    ],
+  ])(
+    'should fall back to %s env detection when ideInfoFromFile is malformed',
+    (_ideName, setupEnv, expected) => {
+      setupEnv();
+      const ideInfoFromFile = {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        name: 123 as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        displayName: { text: 'Custom IDE' } as any,
+      };
+
+      expect(detectIde(ideProcessInfo, ideInfoFromFile)).toBe(expected);
+    },
+  );
 });
