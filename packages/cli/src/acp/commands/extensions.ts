@@ -4,13 +4,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { listExtensions } from '@google/gemini-cli-core';
+import {
+  listExtensions,
+  type Config,
+  getErrorMessage,
+} from '@google/gemini-cli-core';
 import { SettingScope } from '../../config/settings.js';
 import {
   ExtensionManager,
   inferInstallMetadata,
 } from '../../config/extension-manager.js';
-import { getErrorMessage } from '../../utils/errors.js';
 import { McpServerEnablementManager } from '../../config/mcp/mcpServerEnablement.js';
 import { stat } from 'node:fs/promises';
 import type {
@@ -18,7 +21,6 @@ import type {
   CommandContext,
   CommandExecutionResponse,
 } from './types.js';
-import type { Config } from '@google/gemini-cli-core';
 
 export class ExtensionsCommand implements Command {
   readonly name = 'extensions';
