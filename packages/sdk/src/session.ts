@@ -56,7 +56,7 @@ export class GeminiCliSession {
       info: console.log,
       warn: console.warn,
       error: console.error,
-      debug: console.debug,
+      debug: (options.debug ?? false) ? console.debug : () => {},
       /* eslint-enable no-console */
     };
     this.instructions = options.instructions;
