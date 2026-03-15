@@ -114,6 +114,13 @@ class McpToolInvocation extends BaseToolInvocation<
   }
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
+    // Suspend the input blocker for interactive tools so
+    // chrome-devtools-mcp's interactability checks pass.
+    // Only toggles pointer-events CSS — no DOM change, no flicker.
+    if (this.needsBlockerSuspend) {
+      await suspendInputBlocker(this.browserManager);
+    }
+
     try {
       // Hard block for file uploads if configured
       if (this.blockFileUploads && this.toolName === 'upload_file') {
@@ -124,14 +131,6 @@ class McpToolInvocation extends BaseToolInvocation<
           error: { message: errorMsg },
         };
       }
-
-      // Suspend the input blocker for interactive tools so
-      // chrome-devtools-mcp's interactability checks pass.
-      // Only toggles pointer-events CSS — no DOM change, no flicker.
-      if (this.needsBlockerSuspend) {
-        await suspendInputBlocker(this.browserManager);
-      }
-
       const result: McpToolCallResult = await this.browserManager.callTool(
         this.toolName,
         this.params,
@@ -152,11 +151,6 @@ class McpToolInvocation extends BaseToolInvocation<
         this.toolName,
         textContent,
       );
-
-      // Resume input blocker after interactive tool completes.
-      if (this.needsBlockerSuspend) {
-        await resumeInputBlocker(this.browserManager);
-      }
 
       if (result.isError) {
         return {
@@ -179,17 +173,20 @@ class McpToolInvocation extends BaseToolInvocation<
         throw error;
       }
 
-      // Resume on error path too so the blocker is always restored
-      if (this.needsBlockerSuspend) {
-        await resumeInputBlocker(this.browserManager).catch(() => {});
-      }
-
       debugLogger.error(`MCP tool ${this.toolName} failed: ${errorMsg}`);
       return {
         llmContent: `Error: ${errorMsg}`,
         returnDisplay: `Error: ${errorMsg}`,
         error: { message: errorMsg },
       };
+    } finally {
+      // ALWAYS resume the input blocker — whether the tool succeeded,
+      // returned an error result, or threw a fatal Chrome connection
+      // error. Without this, a mid-execution throw leaves the overlay
+      // with pointer-events: none and the tab stays frozen for the user.
+      if (this.needsBlockerSuspend) {
+        await resumeInputBlocker(this.browserManager).catch(() => {});
+      }
     }
   }
 }
