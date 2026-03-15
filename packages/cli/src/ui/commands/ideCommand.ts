@@ -27,6 +27,10 @@ import type {
 import { CommandKind } from './types.js';
 import { SettingScope } from '../../config/settings.js';
 
+function getIdeDisplayNameForStatus(ideClient: IdeClient): string {
+  return ideClient.getDetectedIdeDisplayName() ?? 'IDE companion';
+}
+
 function getIdeStatusMessage(ideClient: IdeClient): {
   messageType: 'info' | 'error';
   content: string;
@@ -36,7 +40,7 @@ function getIdeStatusMessage(ideClient: IdeClient): {
     case IDEConnectionStatus.Connected:
       return {
         messageType: 'info',
-        content: `🟢 Connected to ${ideClient.getDetectedIdeDisplayName()}`,
+        content: `🟢 Connected to ${getIdeDisplayNameForStatus(ideClient)}`,
       };
     case IDEConnectionStatus.Connecting:
       return {
@@ -89,7 +93,7 @@ async function getIdeStatusMessageWithFiles(ideClient: IdeClient): Promise<{
   const connection = ideClient.getConnectionStatus();
   switch (connection.status) {
     case IDEConnectionStatus.Connected: {
-      let content = `🟢 Connected to ${ideClient.getDetectedIdeDisplayName()}`;
+      let content = `🟢 Connected to ${getIdeDisplayNameForStatus(ideClient)}`;
       const context = ideContextStore.get();
       const openFiles = context?.workspaceState?.openFiles;
       if (openFiles && openFiles.length > 0) {
@@ -177,7 +181,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
 
   const installCommand: SlashCommand = {
     name: 'install',
-    description: `Install required IDE companion for ${ideClient.getDetectedIdeDisplayName()}`,
+    description: `Install required IDE companion for ${getIdeDisplayNameForStatus(ideClient)}`,
     kind: CommandKind.BUILT_IN,
     autoExecute: true,
     action: async (context) => {
@@ -186,7 +190,7 @@ export const ideCommand = async (): Promise<SlashCommand> => {
         context.ui.addItem(
           {
             type: 'error',
-            text: `No installer is available for ${ideClient.getDetectedIdeDisplayName()}. Please install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' extension manually from the marketplace.`,
+            text: `No installer is available for ${getIdeDisplayNameForStatus(ideClient)}. Please install the '${GEMINI_CLI_COMPANION_EXTENSION_NAME}' extension manually from the marketplace.`,
           },
           Date.now(),
         );
@@ -231,10 +235,14 @@ export const ideCommand = async (): Promise<SlashCommand> => {
 
         const { messageType, content } = getIdeStatusMessage(ideClient);
         if (messageType === 'error') {
+          const details = ideClient.getConnectionStatus().details;
+          const errorText = details
+            ? `Failed to automatically enable IDE integration. ${details}`
+            : `Failed to automatically enable IDE integration. To fix this, run the CLI in a new terminal window.`;
           context.ui.addItem(
             {
               type: messageType,
-              text: `Failed to automatically enable IDE integration. To fix this, run the CLI in a new terminal window.`,
+              text: errorText,
             },
             Date.now(),
           );

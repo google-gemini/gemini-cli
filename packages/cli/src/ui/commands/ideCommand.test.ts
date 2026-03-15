@@ -128,6 +128,28 @@ describe('ideCommand', () => {
       });
     });
 
+    it('should show connected status with fallback name when IDE display name is unavailable', async () => {
+      vi.mocked(mockIdeClient.getDetectedIdeDisplayName).mockReturnValue(
+        undefined,
+      );
+      vi.mocked(mockIdeClient.getConnectionStatus).mockReturnValue({
+        status: core.IDEConnectionStatus.Connected,
+      });
+
+      const command = await ideCommand();
+      const result = await command.subCommands!.find(
+        (c) => c.name === 'status',
+      )!.action!(mockContext, '');
+
+      expect(result).toMatchObject({
+        type: 'message',
+        messageType: 'info',
+      });
+      if (result.type !== 'message') {
+        throw new Error('expected message result');
+      }
+      expect(result.content).toContain('Connected to IDE companion');
+    });
     it('should show connecting status', async () => {
       vi.mocked(mockIdeClient.getConnectionStatus).mockReturnValue({
         status: core.IDEConnectionStatus.Connecting,
@@ -268,5 +290,32 @@ describe('ideCommand', () => {
         expect.any(Number),
       );
     });
+
+    it('should include actionable disconnected details when auto-enable fails after install', async () => {
+      vi.useFakeTimers();
+      mockInstall.mockResolvedValue({
+        success: true,
+        message: 'Successfully installed.',
+      });
+      vi.mocked(mockIdeClient.getConnectionStatus).mockReturnValue({
+        status: core.IDEConnectionStatus.Disconnected,
+        details: 'Directory mismatch. Run CLI in the opened workspace.',
+      });
+
+      const command = await ideCommand();
+      const actionPromise = command.subCommands!.find(
+        (c) => c.name === 'install',
+      )!.action!(mockContext, '');
+      await vi.runAllTimersAsync();
+      await actionPromise;
+
+      const errorCalls = vi
+        .mocked(mockContext.ui.addItem)
+        .mock.calls.filter((args) => args[0].type === 'error');
+      expect(errorCalls.length).toBeGreaterThan(0);
+      const lastError = errorCalls[errorCalls.length - 1][0];
+      expect(lastError.text).toContain('Directory mismatch');
+      vi.useRealTimers();
+    }, 10000);
   });
 });
