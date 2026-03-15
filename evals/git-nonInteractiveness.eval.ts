@@ -14,18 +14,17 @@ describe('Git Non-Interactiveness', () => {
         (call) => call.toolRequest.name === 'run_shell_command'
       );
 
-      // Check the output for GIT_TERMINAL_PROMPT being set to 0
-      const terminalPromptSet = shellCommands.some((call) => {
-        const output = rig.readToolOutput(call);
-        return output.includes('0');
-      });
+  const terminalPromptSet = shellCommands.some((call) => {
+  const output = rig.readToolOutput(call);
+  const firstLine = output.split('\n')[0].trim();
+  return firstLine === '0';
+});
 
       expect(
         terminalPromptSet,
         'Expected GIT_TERMINAL_PROMPT=0 to ensure non-interactive git clone'
       ).toBe(true);
 
-      // Optional: Verify that git clone was invoked
       const gitCloneRan = shellCommands.some((call) => {
         const args = typeof call.toolRequest.args === 'string'
           ? JSON.parse(call.toolRequest.args)
