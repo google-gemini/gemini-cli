@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -9,7 +9,11 @@ import { spawn, exec, execFile, execSync } from 'node:child_process';
 import os from 'node:os';
 import fs from 'node:fs';
 import { start_sandbox } from './sandbox.js';
-import { FatalSandboxError, type SandboxConfig } from '@google/gemini-cli-core';
+import {
+  FatalSandboxError,
+  type SandboxConfig,
+  debugLogger,
+} from '@google/gemini-cli-core';
 import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
 import { EventEmitter } from 'node:events';
 
@@ -95,6 +99,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         this.name = 'FatalSandboxError';
       }
     },
+    redactEnvironmentVariable: actual.redactEnvironmentVariable,
     GEMINI_DIR: '.gemini',
     homedir: mockedHomedir,
   };
@@ -437,6 +442,59 @@ describe('sandbox', () => {
       );
     });
 
+    it('should redact sensitive SANDBOX_ENV values in Docker logs', async () => {
+      const config: SandboxConfig = createMockSandboxConfig({
+        command: 'docker',
+        image: 'gemini-cli-sandbox',
+      });
+      process.env['SANDBOX_ENV'] = 'MY_API_KEY=sk-abc123,OTHER_VAR=value';
+
+      // Mock image check
+      interface MockProcessWithStdout extends EventEmitter {
+        stdout: EventEmitter;
+      }
+      const mockImageCheckProcess = new EventEmitter() as MockProcessWithStdout;
+      mockImageCheckProcess.stdout = new EventEmitter();
+      vi.mocked(spawn).mockImplementationOnce(() => {
+        setTimeout(() => {
+          mockImageCheckProcess.stdout.emit('data', Buffer.from('image-id'));
+          mockImageCheckProcess.emit('close', 0);
+        }, 1);
+        return mockImageCheckProcess as unknown as ReturnType<typeof spawn>;
+      });
+
+      const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+        typeof spawn
+      >;
+      mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+        if (event === 'close') {
+          setTimeout(() => cb(0), 10);
+        }
+        return mockSpawnProcess;
+      });
+      vi.mocked(spawn).mockImplementationOnce(() => mockSpawnProcess);
+
+      await start_sandbox(config);
+
+      // Check that the sensitive value is NOT in the logs
+      const logCalls = vi
+        .mocked(debugLogger.log)
+        .mock.calls.map((call) => call[0]);
+      expect(
+        logCalls.some(
+          (log) => typeof log === 'string' && log.includes('sk-abc123'),
+        ),
+      ).toBe(false);
+      expect(
+        logCalls.some(
+          (log) => typeof log === 'string' && log.includes('MY_API_KEY'),
+        ),
+      ).toBe(true);
+
+      // The individual log line should be redacted
+      expect(logCalls).toContain('SANDBOX_ENV: MY_API_KEY=[REDACTED]');
+    });
+
     it('should handle networkAccess: false in Docker', async () => {
       const config: SandboxConfig = createMockSandboxConfig({
         command: 'docker',
@@ -658,6 +716,56 @@ describe('sandbox', () => {
           expect.arrayContaining(['exec', 'gemini-sandbox', '--cwd']),
           expect.objectContaining({ stdio: 'inherit' }),
         );
+      });
+
+      it('should redact sensitive environment variables in LXC debug logs', async () => {
+        process.env['TEST_LXC_LIST_OUTPUT'] = LXC_RUNNING;
+        process.env['SANDBOX_ENV'] = 'MY_API_KEY=sk-abc123,OTHER_VAR=value';
+        const config: SandboxConfig = createMockSandboxConfig({
+          command: 'lxc',
+          image: 'gemini-sandbox',
+        });
+
+        const mockSpawnProcess = new EventEmitter() as unknown as ReturnType<
+          typeof spawn
+        >;
+        mockSpawnProcess.on = vi.fn().mockImplementation((event, cb) => {
+          if (event === 'close') {
+            setTimeout(() => cb(0), 10);
+          }
+          return mockSpawnProcess;
+        });
+
+        vi.mocked(spawn).mockImplementation((cmd) => {
+          if (cmd === 'lxc') {
+            return mockSpawnProcess;
+          }
+          return new EventEmitter() as unknown as ReturnType<typeof spawn>;
+        });
+
+        const promise = start_sandbox(config, [], undefined, ['arg1']);
+        await expect(promise).resolves.toBe(0);
+
+        // Check that the sensitive value is NOT in the logs
+        const logCalls = vi
+          .mocked(debugLogger.log)
+          .mock.calls.map((call) => call[0]);
+        expect(
+          logCalls.some(
+            (log) => typeof log === 'string' && log.includes('sk-abc123'),
+          ),
+        ).toBe(false);
+        expect(
+          logCalls.some(
+            (log) => typeof log === 'string' && log.includes('MY_API_KEY'),
+          ),
+        ).toBe(true);
+        expect(
+          logCalls.some(
+            (log) =>
+              typeof log === 'string' && log.includes('MY_API_KEY=[REDACTED]'),
+          ),
+        ).toBe(true);
       });
 
       it('should throw FatalSandboxError if lxc list fails', async () => {

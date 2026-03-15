@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -140,7 +140,17 @@ export const NEVER_ALLOWED_VALUE_PATTERNS = [
   /xox[abpr]-[a-zA-Z0-9-]+/i,
 ] as const;
 
-function shouldRedactEnvironmentVariable(
+export function redactEnvironmentVariable(
+  key: string,
+  value: string | undefined,
+): string {
+  if (!value) {
+    return '';
+  }
+  return shouldRedactEnvironmentVariable(key, value) ? '[REDACTED]' : value;
+}
+
+export function shouldRedactEnvironmentVariable(
   key: string,
   value: string | undefined,
   allowedSet?: Set<string>,
