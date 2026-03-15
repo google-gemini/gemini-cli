@@ -292,17 +292,9 @@ export class McpClientManager {
 
     const env = { ...(base.env ?? {}), ...(override.env ?? {}) };
 
-    // If override doesn't provide connection details, keep the base ones.
-    const hasConnection =
-      !!override.command || !!override.url || !!override.httpUrl;
-
     return {
       ...base,
       ...override,
-      command: hasConnection ? override.command : base.command,
-      args: hasConnection ? override.args : base.args,
-      url: hasConnection ? override.url : base.url,
-      httpUrl: hasConnection ? override.httpUrl : base.httpUrl,
       includeTools,
       excludeTools: excludeTools.length > 0 ? excludeTools : undefined,
       env: Object.keys(env).length > 0 ? env : undefined,

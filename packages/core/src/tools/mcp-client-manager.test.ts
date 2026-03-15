@@ -561,6 +561,26 @@ describe('McpClientManager', () => {
       expect(lastCall[1].includeTools).toEqual(['user-tool']);
     });
 
+    it('should allow partial overrides of connection properties', async () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      const extConfig = { command: 'node', args: ['ext.js'], timeout: 1000 };
+      const userOverride = { args: ['overridden.js'] };
+
+      // Load extension first
+      await manager.maybeDiscoverMcpServer('test-server', extConfig);
+      mockedMcpClient.getServerConfig.mockReturnValue(extConfig);
+
+      // Apply partial user override
+      await manager.maybeDiscoverMcpServer('test-server', userOverride);
+
+      const lastCall = vi.mocked(McpClient).mock.calls[1];
+      const finalConfig = lastCall[1];
+
+      expect(finalConfig.command).toBe('node'); // Preserved from base
+      expect(finalConfig.args).toEqual(['overridden.js']); // Overridden
+      expect(finalConfig.timeout).toBe(1000); // Preserved from base
+    });
+
     it('should remove servers from blockedMcpServers when stopExtension is called', async () => {
       mockConfig.getBlockedMcpServers.mockReturnValue(['blocked-server']);
       const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
