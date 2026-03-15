@@ -200,9 +200,7 @@ jobs:
 
               // 4. Staleness Check (Scheduled only)
               if (pr.state === 'open' && context.eventName !== 'pull_request') {
-                // PRs with help wanted/maintainer only labels are still checked for staleness
-                // but usually given more leeway. Here we stick to 30 days of no maintainer activity.
-
+                // Skip PRs that were created less than 30 days ago - they cannot be stale yet
                 const prCreatedAt = new Date(pr.created_at);
                 if (prCreatedAt > thirtyDaysAgo) continue;
 
@@ -229,7 +227,14 @@ jobs:
                 } catch (e) {}
 
                 if (lastActivity < thirtyDaysAgo) {
-                  core.info(`PR #${pr.number} is stale.`);
+                  const labels = pr.labels.map(l => l.name.toLowerCase());
+                  const isProtected = labels.includes('help wanted') || labels.includes('🔒 maintainer only');
+                  if (isProtected) {
+                    core.info(`PR #${pr.number} is stale but has a protected label. Skipping closure.`);
+                    continue;
+                  }
+
+                  core.info(`PR #${pr.number} is stale (no maintainer activity for 30+ days). Closing.`);
                   if (!dryRun) {
                     await github.rest.issues.createComment({
                       owner: context.repo.owner,
