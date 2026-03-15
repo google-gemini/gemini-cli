@@ -9,8 +9,8 @@ import { URL } from 'node:url';
 import { Agent, ProxyAgent, setGlobalDispatcher } from 'undici';
 import ipaddr from 'ipaddr.js';
 
-const DEFAULT_HEADERS_TIMEOUT = 300000; // 5 minutes
-const DEFAULT_BODY_TIMEOUT = 300000; // 5 minutes
+const DEFAULT_HEADERS_TIMEOUT = 60000; // 1 minute
+const DEFAULT_BODY_TIMEOUT = 60000; // 1 minute
 
 export class FetchError extends Error {
   constructor(
