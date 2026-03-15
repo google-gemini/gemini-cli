@@ -10,6 +10,7 @@ import {
   type ExecutionHandle,
   type ExecutionResult,
 } from './executionLifecycleService.js';
+import { InjectionService } from '../config/injectionService.js';
 
 function createResult(
   overrides: Partial<ExecutionResult> = {},
@@ -627,6 +628,60 @@ describe('ExecutionLifecycleService', () => {
       expect(info.injectionText).toBe('[notify message]');
 
       ExecutionLifecycleService.offBackgroundComplete(listener);
+    });
+
+    it('injects directly into InjectionService when wired via setInjectionService', async () => {
+      const injectionService = new InjectionService(() => true);
+      ExecutionLifecycleService.setInjectionService(injectionService);
+
+      const injectionListener = vi.fn();
+      injectionService.onInjection(injectionListener);
+
+      const handle = ExecutionLifecycleService.createExecution(
+        '',
+        undefined,
+        'remote_agent',
+        (output) => `[Completed] ${output}`,
+        undefined,
+        'inject',
+      );
+      const executionId = handle.pid!;
+
+      ExecutionLifecycleService.appendOutput(executionId, 'agent output');
+      ExecutionLifecycleService.background(executionId);
+      await handle.result;
+
+      ExecutionLifecycleService.completeExecution(executionId);
+
+      expect(injectionListener).toHaveBeenCalledWith(
+        '[Completed] agent output',
+        'background_completion',
+      );
+    });
+
+    it('does not inject into InjectionService for silent behavior', async () => {
+      const injectionService = new InjectionService(() => true);
+      ExecutionLifecycleService.setInjectionService(injectionService);
+
+      const injectionListener = vi.fn();
+      injectionService.onInjection(injectionListener);
+
+      const handle = ExecutionLifecycleService.createExecution(
+        '',
+        undefined,
+        'none',
+        () => 'should not inject',
+        undefined,
+        'silent',
+      );
+      const executionId = handle.pid!;
+
+      ExecutionLifecycleService.background(executionId);
+      await handle.result;
+
+      ExecutionLifecycleService.completeExecution(executionId);
+
+      expect(injectionListener).not.toHaveBeenCalled();
     });
   });
 });
