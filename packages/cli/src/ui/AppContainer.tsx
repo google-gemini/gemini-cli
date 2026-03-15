@@ -85,8 +85,6 @@ import {
   buildUserSteeringHintPrompt,
   logBillingEvent,
   ApiKeyUpdatedEvent,
-  ExecutionLifecycleService,
-  type BackgroundCompletionInfo,
   type InjectionSource,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
@@ -1116,28 +1114,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     config.injectionService.onInjection(injectionListener);
     return () => {
       config.injectionService.offInjection(injectionListener);
-    };
-  }, [config]);
-
-  // Wire background completion events from ExecutionLifecycleService into the
-  // injection service so completed backgrounded executions are reinjected.
-  useEffect(() => {
-    const bgListener = (info: BackgroundCompletionInfo) => {
-      // Use the execution creator's custom injection text if provided.
-      let text = info.injectionText;
-      if (text === null || text === undefined) {
-        // Fallback: generic format for executions without a custom formatter.
-        const header = info.error
-          ? `[Background execution (ID: ${info.executionId}) completed with error: ${info.error.message}]`
-          : `[Background execution (ID: ${info.executionId}) completed]`;
-        const body = info.output ? `\n${info.output}` : '';
-        text = `${header}${body}`;
-      }
-      config.injectionService.addInjection(text, 'background_completion');
-    };
-    ExecutionLifecycleService.onBackgroundComplete(bgListener);
-    return () => {
-      ExecutionLifecycleService.offBackgroundComplete(bgListener);
     };
   }, [config]);
 

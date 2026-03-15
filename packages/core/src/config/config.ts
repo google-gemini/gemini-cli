@@ -148,6 +148,7 @@ import type { AgentDefinition } from '../agents/types.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
 import { InjectionService } from './injectionService.js';
+import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
 import { loadPoliciesFromToml } from '../policy/toml-loader.js';
 
@@ -938,6 +939,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.injectionService = new InjectionService(() =>
       this.isModelSteeringEnabled(),
     );
+    ExecutionLifecycleService.setInjectionService(this.injectionService);
     this.toolOutputMasking = {
       enabled: params.toolOutputMasking?.enabled ?? true,
       toolProtectionThreshold:
