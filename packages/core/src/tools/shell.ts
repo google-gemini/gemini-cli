@@ -182,10 +182,11 @@ export class ShellToolInvocation extends BaseToolInvocation<
       const commandToExecute = isWindows
         ? strippedCommand
         : (() => {
-            // wrap command to append subprocess pids (via pgrep) to temporary file
+            // Wrap the command to capture direct child PIDs from the shell.
+            // `pgrep -P $$` works on BusyBox and GNU pgrep, unlike `pgrep -g 0`.
             let command = strippedCommand.trim();
             if (!command.endsWith('&')) command += ';';
-            return `{ ${command} }; __code=$?; pgrep -g 0 >${tempFilePath} 2>&1; exit $__code;`;
+            return `{ ${command} }; __code=$?; pgrep -P $$ >${tempFilePath} 2>&1; exit $__code;`;
           })();
 
       const cwd = this.params.dir_path
