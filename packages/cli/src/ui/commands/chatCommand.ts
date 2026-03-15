@@ -90,7 +90,7 @@ const listCommand: SlashCommand = {
 const saveCommand: SlashCommand = {
   name: 'save',
   description:
-    'Save the current conversation as a checkpoint. Usage: /chat save <tag>',
+    'Save the current conversation as a checkpoint. Usage:  save <tag>',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: async (context, args): Promise<SlashCommandActionReturn | void> => {
@@ -159,7 +159,7 @@ const resumeCheckpointCommand: SlashCommand = {
   name: 'resume',
   altNames: ['load'],
   description:
-    'Resume a conversation from a checkpoint. Usage: /chat resume <tag>',
+    'Resume a conversation from a checkpoint. Usage:  resume <tag>',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, args) => {
@@ -237,7 +237,7 @@ const resumeCheckpointCommand: SlashCommand = {
 
 const deleteCommand: SlashCommand = {
   name: 'delete',
-  description: 'Delete a conversation checkpoint. Usage: /chat delete <tag>',
+  description: 'Delete a conversation checkpoint. Usage:  delete <tag>',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, args): Promise<MessageActionReturn> => {
@@ -279,7 +279,7 @@ const deleteCommand: SlashCommand = {
 const shareCommand: SlashCommand = {
   name: 'share',
   description:
-    'Share the current conversation to a markdown or json file. Usage: /chat share <file>'
+    'Share the current conversation to a markdown or json file. Usage:  share <file>'
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   action: async (context, args): Promise<MessageActionReturn> => {
