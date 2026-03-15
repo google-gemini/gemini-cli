@@ -68,7 +68,6 @@ describe('file-system', () => {
     // Accept multiple valid tools for editing files
     const foundToolCall = await rig.waitForAnyToolCall([
       'write_file',
-      'edit',
       'replace',
     ]);
 
@@ -79,7 +78,7 @@ describe('file-system', () => {
 
     expect(
       foundToolCall,
-      'Expected to find a write_file, edit, or replace tool call',
+      'Expected to find a write_file or replace tool call',
     ).toBeTruthy();
 
     assertModelHasOutput(result);
@@ -183,7 +182,7 @@ describe('file-system', () => {
       args: `rewrite the file ${fileName} to replace all instances of "test line" with "new line"`,
     });
 
-    const validTools = ['write_file', 'edit'];
+    const validTools = ['write_file', 'replace'];
     const foundToolCall = await rig.waitForAnyToolCall(validTools);
     if (!foundToolCall) {
       printDebugInfo(rig, result, {
