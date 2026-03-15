@@ -236,6 +236,37 @@ describe('detectIde with ideInfoFromFile', () => {
     expect(detectIde(ideProcessInfo, ideInfoFromFile)).toEqual(ideInfoFromFile);
   });
 
+  it('should trim ideInfoFromFile fields before using them', () => {
+    const ideInfoFromFile = {
+      name: '  custom-ide  ',
+      displayName: '  Custom IDE  ',
+    };
+    expect(detectIde(ideProcessInfo, ideInfoFromFile)).toEqual({
+      name: 'custom-ide',
+      displayName: 'Custom IDE',
+    });
+  });
+
+  it('should fall back to env detection if name is blank after trim', () => {
+    const ideInfoFromFile = { name: '   ', displayName: 'Custom IDE' };
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('POSITRON', '');
+    expect(detectIde(ideProcessInfo, ideInfoFromFile)).toBe(
+      IDE_DEFINITIONS.vscode,
+    );
+  });
+
+  it('should fall back to env detection if displayName is blank after trim', () => {
+    const ideInfoFromFile = { name: 'custom-ide', displayName: '   ' };
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('POSITRON', '');
+    expect(detectIde(ideProcessInfo, ideInfoFromFile)).toBe(
+      IDE_DEFINITIONS.vscode,
+    );
+  });
+
   it('should fall back to env detection if name is missing', () => {
     const ideInfoFromFile = { displayName: 'Custom IDE' };
     vi.stubEnv('TERM_PROGRAM', 'vscode');
