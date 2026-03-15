@@ -65,6 +65,7 @@ import { getToolCallContext } from '../utils/toolCallContext.js';
 import { scheduleAgentTools } from './agent-scheduler.js';
 import { DeadlineTimer } from '../utils/deadlineTimer.js';
 import { formatUserHintsForModel } from '../utils/fastAckHelper.js';
+import type { InjectionSource } from '../config/injectionService.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -526,14 +527,19 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         : DEFAULT_QUERY_STRING;
 
       const pendingHintsQueue: string[] = [];
-      const hintListener = (hint: string) => {
-        pendingHintsQueue.push(hint);
+      const pendingBgCompletionsQueue: string[] = [];
+      const injectionListener = (text: string, source: InjectionSource) => {
+        if (source === 'user_steering') {
+          pendingHintsQueue.push(text);
+        } else if (source === 'background_completion') {
+          pendingBgCompletionsQueue.push(text);
+        }
       };
       // Capture the index of the last hint before starting to avoid re-injecting old hints.
       // NOTE: Hints added AFTER this point will be broadcast to all currently running
       // local agents via the listener below.
       const startIndex = this.config.injectionService.getLatestHintIndex();
-      this.config.injectionService.onUserHint(hintListener);
+      this.config.injectionService.onInjection(injectionListener);
 
       try {
         const initialHints =
@@ -585,20 +591,29 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           // If status is 'continue', update message for the next loop
           currentMessage = turnResult.nextMessage;
 
-          // Check for new user steering hints collected via subscription
+          // Inject background completion output into the next turn.
+          if (pendingBgCompletionsQueue.length > 0) {
+            const bgText = pendingBgCompletionsQueue.join('\n');
+            pendingBgCompletionsQueue.length = 0;
+            currentMessage.parts ??= [];
+            currentMessage.parts.unshift({
+              text: `Background execution update:\n${bgText}\n\nThe above background execution has completed. Review the output and continue your work accordingly.`,
+            });
+          }
+
+          // Check for new user steering hints collected via subscription.
           if (pendingHintsQueue.length > 0) {
             const hintsToProcess = [...pendingHintsQueue];
             pendingHintsQueue.length = 0;
             const formattedHints = formatUserHintsForModel(hintsToProcess);
             if (formattedHints) {
-              // Append hints to the current message (next turn)
               currentMessage.parts ??= [];
               currentMessage.parts.unshift({ text: formattedHints });
             }
           }
         }
       } finally {
-        this.config.injectionService.offUserHint(hintListener);
+        this.config.injectionService.offInjection(injectionListener);
       }
 
       // === UNIFIED RECOVERY BLOCK ===

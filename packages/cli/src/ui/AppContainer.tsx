@@ -85,7 +85,6 @@ import {
   buildUserSteeringHintPrompt,
   logBillingEvent,
   ApiKeyUpdatedEvent,
-  type InjectionSource,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -1078,8 +1077,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const pendingHintsRef = useRef<string[]>([]);
   const [pendingHintCount, setPendingHintCount] = useState(0);
-  const pendingBackgroundCompletionsRef = useRef<string[]>([]);
-  const [pendingBgCompletionCount, setPendingBgCompletionCount] = useState(0);
 
   const consumePendingHints = useCallback(() => {
     if (pendingHintsRef.current.length === 0) {
@@ -1091,29 +1088,14 @@ Logging in with Google... Restarting Gemini CLI to continue.
     return hint;
   }, []);
 
-  const consumePendingBackgroundCompletions = useCallback(() => {
-    if (pendingBackgroundCompletionsRef.current.length === 0) {
-      return null;
-    }
-    const output = pendingBackgroundCompletionsRef.current.join('\n');
-    pendingBackgroundCompletionsRef.current = [];
-    setPendingBgCompletionCount(0);
-    return output;
-  }, []);
-
   useEffect(() => {
-    const injectionListener = (text: string, source: InjectionSource) => {
-      if (source === 'user_steering') {
-        pendingHintsRef.current.push(text);
-        setPendingHintCount((prev) => prev + 1);
-      } else if (source === 'background_completion') {
-        pendingBackgroundCompletionsRef.current.push(text);
-        setPendingBgCompletionCount((prev) => prev + 1);
-      }
+    const hintListener = (hint: string) => {
+      pendingHintsRef.current.push(hint);
+      setPendingHintCount((prev) => prev + 1);
     };
-    config.injectionService.onInjection(injectionListener);
+    config.injectionService.onUserHint(hintListener);
     return () => {
-      config.injectionService.offInjection(injectionListener);
+      config.injectionService.offUserHint(hintListener);
     };
   }, [config]);
 
@@ -2146,38 +2128,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     consumePendingHints,
     pendingHistoryItems,
     pendingHintCount,
-  ]);
-
-  // Reinject completed background execution output into the model conversation.
-  // Unlike user steering hints, this is NOT gated on model steering being enabled.
-  useEffect(() => {
-    if (
-      !isConfigInitialized ||
-      streamingState !== StreamingState.Idle ||
-      !isMcpReady ||
-      isToolAwaitingConfirmation(pendingHistoryItems)
-    ) {
-      return;
-    }
-
-    const bgOutput = consumePendingBackgroundCompletions();
-    if (!bgOutput) {
-      return;
-    }
-
-    void submitQuery([
-      {
-        text: `Background execution update:\n${bgOutput}\n\nThe above background execution has completed. Review the output and continue your work accordingly.`,
-      },
-    ]);
-  }, [
-    isConfigInitialized,
-    isMcpReady,
-    streamingState,
-    submitQuery,
-    consumePendingBackgroundCompletions,
-    pendingHistoryItems,
-    pendingBgCompletionCount,
   ]);
 
   const allToolCalls = useMemo(
