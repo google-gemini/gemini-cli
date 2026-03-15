@@ -328,6 +328,81 @@ describe('extension tests', () => {
       expect(extensions[0].mcpServers?.['test-server'].cwd).toBe(expectedCwd);
     });
 
+    it('should load configuration from extension manifest', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'config-ext',
+        version: '1.0.0',
+        configuration: {
+          context: { includeDirectories: ['/some/dir'] },
+          general: { defaultApprovalMode: 'yolo' },
+        },
+      });
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].configuration).toBeDefined();
+      expect(extensions[0].configuration).toEqual({
+        context: { includeDirectories: ['/some/dir'] },
+        general: { defaultApprovalMode: 'yolo' },
+      });
+    });
+
+    it('should hydrate variables in configuration values', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'hydrate-config-ext',
+        version: '1.0.0',
+        configuration: {
+          context: {
+            includeDirectories: [
+              '${extensionPath}${/}data',
+              '${workspacePath}${/}shared',
+            ],
+          },
+        },
+      });
+
+      const extensions = await extensionManager.loadExtensions();
+      expect(extensions).toHaveLength(1);
+      const config = extensions[0].configuration;
+      expect(config).toBeDefined();
+
+      const configObj = config as {
+        context: { includeDirectories: string[] };
+      };
+      expect(configObj.context.includeDirectories).toEqual([
+        path.join(userExtensionsDir, 'hydrate-config-ext', 'data'),
+        path.join(tempWorkspaceDir, 'shared'),
+      ]);
+    });
+
+    it('should mark inactive extensions configuration correctly', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'inactive-config-ext',
+        version: '1.0.0',
+        configuration: {
+          general: { defaultApprovalMode: 'yolo' },
+        },
+      });
+
+      await extensionManager.loadExtensions();
+      await extensionManager.disableExtension(
+        'inactive-config-ext',
+        SettingScope.User,
+      );
+
+      const extensions = extensionManager.getExtensions();
+      expect(extensions).toHaveLength(1);
+      expect(extensions[0].isActive).toBe(false);
+      // The configuration still exists on the object, but loadCliConfig
+      // filters by isActive before merging configurations.
+      expect(extensions[0].configuration).toEqual({
+        general: { defaultApprovalMode: 'yolo' },
+      });
+    });
+
     it('should load a linked extension correctly', async () => {
       const sourceExtDir = createExtension({
         extensionsDir: tempWorkspaceDir,

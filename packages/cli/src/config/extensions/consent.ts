@@ -172,6 +172,14 @@ async function extensionConsentString(
       '⚠️  This extension contains Hooks which can automatically execute commands.',
     );
   }
+  if (sanitizedConfig.configuration) {
+    const configKeys = Object.keys(sanitizedConfig.configuration);
+    if (configKeys.length > 0) {
+      output.push(
+        `This extension will contribute the following CLI configuration settings: ${configKeys.join(', ')}`,
+      );
+    }
+  }
   if (skills.length > 0) {
     output.push(`\n${chalk.bold('Agent Skills:')}`);
     output.push('\nThis extension will install the following agent skills:\n');

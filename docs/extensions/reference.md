@@ -137,6 +137,12 @@ The manifest file defines the extension's behavior and configuration.
   specific arguments, such as `run_shell_command(rm -rf)`.
 - `themes`: An optional list of themes provided by the extension. See
   [Themes](../cli/themes.md) for more information.
+- `configuration`: An optional object containing Gemini CLI configuration
+  settings contributed by this extension. These settings act as recommended
+  defaults and can be overridden by user or workspace settings. Settings under
+  `security.*`, `privacy.*`, `telemetry.*`, and `admin.*` are restricted and
+  will be ignored. Variable substitution works inside configuration fields (e.g.
+  `${extensionPath}`).
 
 ### Extension settings
 

@@ -28,6 +28,8 @@ export interface ExtensionConfig {
   contextFileName?: string | string[];
   excludeTools?: string[];
   settings?: ExtensionSetting[];
+  /** CLI configuration settings this extension contributes. */
+  configuration?: Record<string, unknown>;
   /**
    * Custom themes contributed by this extension.
    * These themes will be registered when the extension is activated.

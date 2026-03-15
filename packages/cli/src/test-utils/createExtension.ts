@@ -27,6 +27,7 @@ export function createExtension({
   installMetadata = undefined as ExtensionInstallMetadata | undefined,
   settings = undefined as ExtensionSetting[] | undefined,
   themes = undefined as CustomTheme[] | undefined,
+  configuration = undefined as Record<string, unknown> | undefined,
 } = {}): string {
   const extDir = path.join(extensionsDir, name);
   fs.mkdirSync(extDir, { recursive: true });
@@ -39,6 +40,7 @@ export function createExtension({
       mcpServers,
       settings,
       themes,
+      configuration,
     }),
   );
 

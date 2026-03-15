@@ -159,7 +159,39 @@ When a user installs this extension, Gemini CLI will prompt them to enter the
 `sensitive` is true) and injected into the MCP server's process as the
 `MY_SERVICE_API_KEY` environment variable.
 
-## Step 4: Link your extension
+## Step 4: Contribute CLI configuration
+
+Extensions can contribute configuration settings to the Gemini CLI, setting up
+recommended defaults for tools, UI preferences, or context inclusion paths
+without requiring manual user setup.
+
+1.  Open `gemini-extension.json`.
+2.  Add a `configuration` object to the manifest:
+
+    ```json
+    {
+      "name": "mcp-server-example",
+      "version": "1.0.0",
+      "configuration": {
+        "ui": {
+          "customWittyPhrases": ["Loading example extension..."]
+        },
+        "context": {
+          "includeDirectories": ["${extensionPath}/context"]
+        }
+      },
+      "mcpServers": {
+        // ...
+      }
+    }
+    ```
+
+Extension configuration takes precedence over built-in defaults but can always
+be overridden by the user's personal or workspace settings in their
+`settings.json`. Sensitive options under `security.*`, `privacy.*`,
+`telemetry.*`, and `admin.*` cannot be modified by extensions.
+
+## Step 5: Link your extension
 
 Link your extension to your Gemini CLI installation for local development.
 
@@ -183,7 +215,7 @@ Link your extension to your Gemini CLI installation for local development.
 Restart your Gemini CLI session to use the new `fetch_posts` tool. Test it by
 asking: "fetch posts".
 
-## Step 5: Add a custom command
+## Step 6: Add a custom command
 
 Custom commands create shortcuts for complex prompts.
 
@@ -210,7 +242,7 @@ Custom commands create shortcuts for complex prompts.
 After saving the file, restart Gemini CLI. Run `/fs:grep-code "some pattern"` to
 use your new command.
 
-## Step 6: Add a custom `GEMINI.md`
+## Step 7: Add a custom `GEMINI.md`
 
 Provide persistent context to the model by adding a `GEMINI.md` file to your
 extension. This is useful for setting behavior or providing essential tool
@@ -245,7 +277,7 @@ information.
 Restart Gemini CLI. The model now has the context from your `GEMINI.md` file in
 every session where the extension is active.
 
-## (Optional) Step 7: Add an Agent Skill
+## (Optional) Step 8: Add an Agent Skill
 
 [Agent Skills](../cli/skills.md) bundle specialized expertise and workflows.
 Skills are activated only when needed, which saves context tokens.
@@ -278,7 +310,7 @@ Skills are activated only when needed, which saves context tokens.
 Gemini CLI automatically discovers skills bundled with your extension. The model
 activates them when it identifies a relevant task.
 
-## Step 8: Release your extension
+## Step 9: Release your extension
 
 When your extension is ready, share it with others via a Git repository or
 GitHub Releases. Refer to the [Extension Releasing Guide](./releasing.md) for

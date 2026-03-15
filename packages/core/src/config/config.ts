@@ -275,6 +275,8 @@ export interface GeminiCLIExtension {
   resolvedSettings?: ResolvedExtensionSetting[];
   skills?: SkillDefinition[];
   agents?: AgentDefinition[];
+  /** CLI configuration settings contributed by this extension. */
+  configuration?: Record<string, unknown>;
   /**
    * Custom themes contributed by this extension.
    * These themes will be registered when the extension is activated.

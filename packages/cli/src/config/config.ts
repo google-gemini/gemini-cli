@@ -49,7 +49,10 @@ import {
   type MergedSettings,
   saveModelChange,
   loadSettings,
+  getMergeStrategyForPath,
 } from './settings.js';
+import { mergeExtensionConfigurations } from './extensions/extensionConfigMerger.js';
+import { customDeepMerge } from '../utils/deepMerge.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
@@ -452,6 +455,39 @@ export async function loadCliConfig(
 
   const loadedSettings = loadSettings(cwd);
 
+  const extensionManager = new ExtensionManager({
+    settings,
+    requestConsent: requestConsentNonInteractive,
+    requestSetting: promptForSetting,
+    workspaceDir: cwd,
+    enabledExtensionOverrides: argv.extensions,
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    eventEmitter: coreEvents as EventEmitter<ExtensionEvents>,
+    clientVersion: await getVersion(),
+  });
+  await extensionManager.loadExtensions();
+
+  if (settings.experimental?.extensionConfig) {
+    const activeExtensions = extensionManager
+      .getExtensions()
+      .filter((e) => e.isActive);
+    const { settings: extSettings, warnings: extWarnings } =
+      mergeExtensionConfigurations(activeExtensions, getMergeStrategyForPath);
+    for (const warning of extWarnings) {
+      coreEvents.emitFeedback('warning', warning);
+    }
+    loadedSettings.setExtensionSettings(extSettings);
+    // CustomDeepMerge with getMergeStrategyForPath natively applies array strategies.
+    // By passing extSettings followed by settings, we insert the extension defaults
+    // right below user/workspace settings.
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    settings = customDeepMerge(
+      getMergeStrategyForPath,
+      extSettings,
+      settings,
+    ) as MergedSettings;
+  }
+
   if (argv.sandbox) {
     process.env['GEMINI_SANDBOX'] = 'true';
   }
@@ -498,18 +534,6 @@ export async function loadCliConfig(
   const includeDirectories = (settings.context?.includeDirectories || [])
     .map(resolvePath)
     .concat((argv.includeDirectories || []).map(resolvePath));
-
-  const extensionManager = new ExtensionManager({
-    settings,
-    requestConsent: requestConsentNonInteractive,
-    requestSetting: promptForSetting,
-    workspaceDir: cwd,
-    enabledExtensionOverrides: argv.extensions,
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    eventEmitter: coreEvents as EventEmitter<ExtensionEvents>,
-    clientVersion: await getVersion(),
-  });
-  await extensionManager.loadExtensions();
 
   const experimentalJitContext = settings.experimental?.jitContext ?? false;
 

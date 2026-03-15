@@ -384,6 +384,33 @@ describe('consent', () => {
         );
       });
     });
+
+    it('should request consent if configuration changes', async () => {
+      const prevConfig: ExtensionConfig = { ...baseConfig };
+      const newConfig: ExtensionConfig = {
+        ...baseConfig,
+        configuration: {
+          context: {
+            includeDirectories: ['/path/to/include'],
+          },
+        },
+      };
+      const requestConsent = vi.fn().mockResolvedValue(true);
+      await maybeRequestConsentOrFail(
+        newConfig,
+        requestConsent,
+        false,
+        prevConfig,
+        false,
+      );
+
+      expect(requestConsent).toHaveBeenCalledTimes(1);
+      expect(requestConsent).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'This extension will contribute the following CLI configuration settings: context',
+        ),
+      );
+    });
   });
 
   describe('skillsConsentString', () => {

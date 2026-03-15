@@ -251,22 +251,23 @@ export function mergeSettings(
   user: Settings,
   workspace: Settings,
   isTrusted: boolean,
+  extensionSettings: Settings = {},
 ): MergedSettings {
   const safeWorkspace = isTrusted ? workspace : ({} as Settings);
   const schemaDefaults = getDefaultsFromSchema();
 
-  // Settings are merged with the following precedence (last one wins for
-  // single values):
   // 1. Schema Defaults (Built-in)
   // 2. System Defaults
-  // 3. User Settings
-  // 4. Workspace Settings
-  // 5. System Settings (as overrides)
+  // 3. Extension Settings
+  // 4. User Settings
+  // 5. Workspace Settings
+  // 6. System Settings (as overrides)
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return customDeepMerge(
     getMergeStrategyForPath,
     schemaDefaults,
     systemDefaults,
+    extensionSettings,
     user,
     safeWorkspace,
     system,
@@ -338,9 +339,17 @@ export class LoadedSettings {
   private _merged: MergedSettings;
   private _snapshot: LoadedSettingsSnapshot;
   private _remoteAdminSettings: Partial<Settings> | undefined;
+  private _extensionSettings: Settings = {};
 
   get merged(): MergedSettings {
     return this._merged;
+  }
+
+  setExtensionSettings(settings: Settings): void {
+    this._extensionSettings = settings;
+    this._merged = this.computeMergedSettings();
+    this._snapshot = this.computeSnapshot();
+    coreEvents.emitSettingsChanged();
   }
 
   setTrusted(isTrusted: boolean): void {
@@ -370,6 +379,7 @@ export class LoadedSettings {
       this.user.settings,
       this.workspace.settings,
       this.isTrusted,
+      this._extensionSettings,
     );
 
     // Remote admin settings always take precedence and file-based admin settings
