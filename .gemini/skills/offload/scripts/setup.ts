@@ -42,7 +42,7 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   const useContainer = await confirm('Use Container-Native mode (Container-Optimized OS)?');
 
   console.log(`🔍 Verifying access and finding worker ${targetVM}...`);
-  const statusCheck = spawnSync(`gcloud compute instances describe ${targetVM} --project ${projectId} --zone ${zone} --format="json(status,networkInterfaces[0].accessConfigs[0].natIP)"`, { shell: true });
+  const statusCheck = spawnSync(`gcloud compute instances describe ${targetVM} --project ${projectId} --zone ${zone} --format="json(status,networkInterfaces[0].networkIP)"`, { shell: true });
   
   let instanceData: any;
   try {
@@ -55,7 +55,7 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   }
 
   const status = instanceData.status;
-  const publicIp = instanceData.networkInterfaces[0].accessConfigs[0].natIP;
+  const internalIp = instanceData.networkInterfaces[0].networkIP;
 
   if (status !== 'RUNNING') {
     console.log(`⚠️ Worker is ${status}. Starting it for initialization...`);
@@ -63,12 +63,12 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   }
 
   // 1. Configure Fast-Path SSH Alias
-  console.log(`\n🚀 Configuring Fast-Path SSH Alias...`);
+  console.log(`\n🚀 Configuring Fast-Path SSH Alias (Internal IP)...`);
   const sshAlias = 'gcli-worker';
   const sshConfigPath = path.join(os.homedir(), '.ssh/config');
   const sshEntry = `
 Host ${sshAlias}
-    HostName ${publicIp}
+    HostName ${internalIp}
     IdentityFile ~/.ssh/google_compute_engine
     User ${env.USER || 'mattkorwel'}_google_com
     CheckHostIP no

@@ -6,6 +6,7 @@
 import { spawnSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 
 const PROJECT_ID = 'gemini-cli-team-quota';
 const USER = process.env.USER || 'mattkorwel';
@@ -80,6 +81,7 @@ runcmd:
     '--metadata', `enable-oslogin=TRUE${sshKeyMetadata ? `,ssh-keys=${sshKeyMetadata}` : ''}`,
     '--labels', `owner=${USER.replace(/[^a-z0-9_-]/g, '_')},type=offload-worker`,
     '--tags', `gcli-offload-${USER}`,
+    '--network-interface', 'network-tier=PREMIUM,no-address',
     '--scopes', 'https://www.googleapis.com/auth/cloud-platform'
   ], { stdio: 'inherit' });
 
