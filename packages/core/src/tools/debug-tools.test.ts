@@ -109,6 +109,19 @@ describe('debug tools', () => {
     expect(result.llmContent).toContain('Attached debugger session');
   });
 
+  it('rejects non-localhost debug_attach hosts', async () => {
+    const tool = new DebugAttachTool(messageBus);
+    await expect(
+      tool.buildAndExecute(
+        {
+          runtime: 'node',
+          host: '10.0.0.5',
+        },
+        signal,
+      ),
+    ).rejects.toThrow('only supports localhost endpoints');
+  });
+
   it('launches with debug_launch', async () => {
     const config = {
       getTargetDir: vi.fn().mockReturnValue('/workspace'),
@@ -173,6 +186,17 @@ describe('debug tools', () => {
       undefined,
     );
     expect(result.llmContent).toBe('43');
+  });
+
+  it('always requires confirmation for debug_evaluate', async () => {
+    const tool = new DebugEvaluateTool(messageBus);
+    const invocation = tool.build({ expression: 'value + 1' });
+    const confirmation = await invocation.shouldConfirmExecute(signal);
+
+    expect(confirmation).toBeTruthy();
+    if (confirmation && 'title' in confirmation) {
+      expect(confirmation.title).toBe('Confirm Debug Evaluate');
+    }
   });
 
   it('steps according to action', async () => {

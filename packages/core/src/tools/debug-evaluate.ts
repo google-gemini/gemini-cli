@@ -6,17 +6,13 @@
 
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { getDebugSessionManager } from '../debug/session-store.js';
-import {
-  BaseDeclarativeTool,
-  BaseToolInvocation,
-  Kind,
-} from './tools.js';
+import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
 import type {
-  type ToolCallConfirmationDetails,
-  type ToolInvocation,
-  type ToolResult,
-
-  ToolConfirmationOutcome} from './tools.js';
+  ToolCallConfirmationDetails,
+  ToolInvocation,
+  ToolResult,
+  ToolConfirmationOutcome,
+} from './tools.js';
 import { DEBUG_EVALUATE_TOOL_NAME } from './tool-names.js';
 
 interface DebugEvaluateParams {

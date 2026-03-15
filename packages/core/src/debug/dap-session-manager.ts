@@ -78,50 +78,57 @@ export class DapSessionManager extends EventEmitter {
 
     const { client, adapterProcess } = this.spawnAdapterForRuntime(config);
 
-    // Init handshake
-    const capabilities = await client.initialize({
-      adapterID: config.runtime,
-    });
+    try {
+      // Init handshake
+      const capabilities = await client.initialize({
+        adapterID: config.runtime,
+      });
 
-    // Build runtime-specific launch arguments
-    const launchArgs = this.buildLaunchArgs(config);
+      // Build runtime-specific launch arguments
+      const launchArgs = this.buildLaunchArgs(config);
 
-    // Wait for the `initialized` event before configuring
-    const initializedPromise = new Promise<void>((resolve) => {
-      client.once('event:initialized', () => resolve());
-    });
+      // Wait for the `initialized` event before configuring
+      const initializedPromise = new Promise<void>((resolve) => {
+        client.once('event:initialized', () => resolve());
+      });
 
-    await client.sendRequest('launch', launchArgs);
-    await initializedPromise;
+      await client.sendRequest('launch', launchArgs);
+      await initializedPromise;
 
-    const session: DapSession = {
-      id: `debug-${++this.sessionCounter}`,
-      runtime: config.runtime,
-      client,
-      capabilities,
-      adapterProcess,
-    };
-    this.activeSession = session;
+      const session: DapSession = {
+        id: `debug-${++this.sessionCounter}`,
+        runtime: config.runtime,
+        client,
+        capabilities,
+        adapterProcess,
+      };
+      this.activeSession = session;
 
-    // Wire up stopped events
-    client.on('event:stopped', (body: unknown) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const stopped = body as StoppedEventBody;
-      session.stoppedThreadId = stopped.threadId;
-      session.stoppedReason = stopped.reason;
-      this.emit('stopped', stopped);
-    });
+      // Wire up stopped events
+      client.on('event:stopped', (body: unknown) => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const stopped = body as StoppedEventBody;
+        session.stoppedThreadId = stopped.threadId;
+        session.stoppedReason = stopped.reason;
+        this.emit('stopped', stopped);
+      });
 
-    client.on('event:terminated', () => {
-      this.emit('terminated');
-      this.activeSession = null;
-    });
+      client.on('event:terminated', () => {
+        this.emit('terminated');
+        this.terminateAdapterProcess(session.adapterProcess);
+        this.activeSession = null;
+      });
 
-    client.on('event:exited', (body: unknown) => {
-      this.emit('exited', body);
-    });
+      client.on('event:exited', (body: unknown) => {
+        this.emit('exited', body);
+      });
 
-    return session;
+      return session;
+    } catch (error) {
+      this.terminateAdapterProcess(adapterProcess);
+      await client.disconnect().catch(() => undefined);
+      throw error;
+    }
   }
 
   /**
@@ -136,43 +143,48 @@ export class DapSessionManager extends EventEmitter {
     const host = config.host ?? 'localhost';
     const port = config.port ?? DEFAULT_DEBUG_PORTS[config.runtime];
 
-    await client.connectTcp(host, port);
+    try {
+      await client.connectTcp(host, port);
 
-    const capabilities = await client.initialize({
-      adapterID: config.runtime,
-    });
+      const capabilities = await client.initialize({
+        adapterID: config.runtime,
+      });
 
-    const attachArgs: AttachRequestArguments = this.buildAttachArgs(config);
+      const attachArgs: AttachRequestArguments = this.buildAttachArgs(config);
 
-    const initializedPromise = new Promise<void>((resolve) => {
-      client.once('event:initialized', () => resolve());
-    });
+      const initializedPromise = new Promise<void>((resolve) => {
+        client.once('event:initialized', () => resolve());
+      });
 
-    await client.sendRequest('attach', attachArgs);
-    await initializedPromise;
+      await client.sendRequest('attach', attachArgs);
+      await initializedPromise;
 
-    const session: DapSession = {
-      id: `debug-${++this.sessionCounter}`,
-      runtime: config.runtime,
-      client,
-      capabilities,
-    };
-    this.activeSession = session;
+      const session: DapSession = {
+        id: `debug-${++this.sessionCounter}`,
+        runtime: config.runtime,
+        client,
+        capabilities,
+      };
+      this.activeSession = session;
 
-    client.on('event:stopped', (body: unknown) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const stopped = body as StoppedEventBody;
-      session.stoppedThreadId = stopped.threadId;
-      session.stoppedReason = stopped.reason;
-      this.emit('stopped', stopped);
-    });
+      client.on('event:stopped', (body: unknown) => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const stopped = body as StoppedEventBody;
+        session.stoppedThreadId = stopped.threadId;
+        session.stoppedReason = stopped.reason;
+        this.emit('stopped', stopped);
+      });
 
-    client.on('event:terminated', () => {
-      this.emit('terminated');
-      this.activeSession = null;
-    });
+      client.on('event:terminated', () => {
+        this.emit('terminated');
+        this.activeSession = null;
+      });
 
-    return session;
+      return session;
+    } catch (error) {
+      await client.disconnect().catch(() => undefined);
+      throw error;
+    }
   }
 
   /**
@@ -183,7 +195,7 @@ export class DapSessionManager extends EventEmitter {
       return;
     }
 
-    const { client } = this.activeSession;
+    const { client, adapterProcess } = this.activeSession;
     try {
       await client.sendRequest('disconnect', {
         terminateDebuggee: terminate,
@@ -193,8 +205,19 @@ export class DapSessionManager extends EventEmitter {
     }
 
     await client.disconnect();
+    this.terminateAdapterProcess(adapterProcess);
     this.activeSession = null;
     this.emit('disconnected');
+  }
+
+  private terminateAdapterProcess(adapterProcess?: ChildProcess): void {
+    if (!adapterProcess) {
+      return;
+    }
+
+    if (!adapterProcess.killed && adapterProcess.exitCode === null) {
+      adapterProcess.kill();
+    }
   }
 
   getActiveSession(): DapSession | null {
