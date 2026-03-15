@@ -38,6 +38,34 @@ main agent calls the tool, it delegates the task to the subagent. Once the
 subagent completes its task, it reports back to the main agent with its
 findings.
 
+## How to use subagents
+
+You can use subagents through automatic delegation or by explicitly forcing them
+in your prompt.
+
+### Automatic delegation
+
+Gemini CLI's main agent is instructed to use specialized subagents when a task
+matches their expertise. For example, if you ask "How does the auth system
+work?", the main agent may decide to call the `codebase_investigator` subagent
+to perform the research.
+
+### Forcing a subagent (@ syntax)
+
+You can explicitly direct a task to a specific subagent by using the `@` symbol
+followed by the subagent's name at the beginning of your prompt. This is useful
+when you want to bypass the main agent's decision-making and go straight to a
+specialist.
+
+**Example:**
+
+```bash
+@codebase_investigator Map out the relationship between the AgentRegistry and the LocalAgentExecutor.
+```
+
+When you use the `@` syntax, the CLI injects a system note that nudges the
+primary model to use that specific subagent tool immediately.
+
 ## Built-in subagents
 
 Gemini CLI comes with the following built-in subagents:
@@ -49,15 +77,17 @@ Gemini CLI comes with the following built-in subagents:
   dependencies.
 - **When to use:** "How does the authentication system work?", "Map out the
   dependencies of the `AgentRegistry` class."
-- **Configuration:** Enabled by default. You can configure it in
-  `settings.json`. Example (forcing a specific model):
+- **Configuration:** Enabled by default. You can override its settings in
+  `settings.json` under `agents.overrides`. Example (forcing a specific model
+  and increasing turns):
   ```json
   {
-    "experimental": {
-      "codebaseInvestigatorSettings": {
-        "enabled": true,
-        "maxNumTurns": 20,
-        "model": "gemini-2.5-pro"
+    "agents": {
+      "overrides": {
+        "codebase_investigator": {
+          "modelConfig": { "model": "gemini-3-flash-preview" },
+          "runConfig": { "maxTurns": 50 }
+        }
       }
     }
   }
@@ -233,7 +263,7 @@ kind: local
 tools:
   - read_file
   - grep_search
-model: gemini-2.5-pro
+model: gemini-3-flash-preview
 temperature: 0.2
 max_turns: 10
 ---
@@ -254,16 +284,102 @@ it yourself; just report it.
 
 ### Configuration schema
 
-| Field          | Type   | Required | Description                                                                                                               |
-| :------------- | :----- | :------- | :------------------------------------------------------------------------------------------------------------------------ |
-| `name`         | string | Yes      | Unique identifier (slug) used as the tool name for the agent. Only lowercase letters, numbers, hyphens, and underscores.  |
-| `description`  | string | Yes      | Short description of what the agent does. This is visible to the main agent to help it decide when to call this subagent. |
-| `kind`         | string | No       | `local` (default) or `remote`.                                                                                            |
-| `tools`        | array  | No       | List of tool names this agent can use. If omitted, it may have access to a default set.                                   |
-| `model`        | string | No       | Specific model to use (e.g., `gemini-2.5-pro`). Defaults to `inherit` (uses the main session model).                      |
-| `temperature`  | number | No       | Model temperature (0.0 - 2.0).                                                                                            |
-| `max_turns`    | number | No       | Maximum number of conversation turns allowed for this agent before it must return. Defaults to `15`.                      |
-| `timeout_mins` | number | No       | Maximum execution time in minutes. Defaults to `5`.                                                                       |
+| Field          | Type   | Required | Description                                                                                                                                                                                                   |
+| :------------- | :----- | :------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`         | string | Yes      | Unique identifier (slug) used as the tool name for the agent. Only lowercase letters, numbers, hyphens, and underscores.                                                                                      |
+| `description`  | string | Yes      | Short description of what the agent does. This is visible to the main agent to help it decide when to call this subagent.                                                                                     |
+| `kind`         | string | No       | `local` (default) or `remote`.                                                                                                                                                                                |
+| `tools`        | array  | No       | List of tool names this agent can use. Supports wildcards: `*` (all tools), `mcp_*` (all MCP tools), `mcp_server_*` (all tools from a server). **If omitted, it inherits all tools from the parent session.** |
+| `model`        | string | No       | Specific model to use (e.g., `gemini-3-preview`). Defaults to `inherit` (uses the main session model).                                                                                                        |
+| `temperature`  | number | No       | Model temperature (0.0 - 2.0). Defaults to `1`.                                                                                                                                                               |
+| `max_turns`    | number | No       | Maximum number of conversation turns allowed for this agent before it must return. Defaults to `30`.                                                                                                          |
+| `timeout_mins` | number | No       | Maximum execution time in minutes. Defaults to `10`.                                                                                                                                                          |
+
+### Tool wildcards
+
+When defining `tools` for a subagent, you can use wildcards to quickly grant
+access to groups of tools:
+
+- `*`: Grant access to all available built-in and discovered tools.
+- `mcp_*`: Grant access to all tools from all connected MCP servers.
+- `mcp_my-server_*`: Grant access to all tools from a specific MCP server named
+  `my-server`.
+
+### Isolation and recursion protection
+
+Each subagent runs in its own isolated context loop. This means:
+
+- **Independent history:** The subagent's conversation history does not bloat
+  the main agent's context.
+- **Isolated tools:** The subagent only has access to the tools you explicitly
+  grant it.
+- **Recursion protection:** To prevent infinite loops and excessive token usage,
+  subagents **cannot** call other subagents. If a subagent is granted the `*`
+  tool wildcard, it will still be unable to see or invoke other agents.
+
+## Managing subagents
+
+You can manage subagents interactively using the `/agents` command or
+persistently via `settings.json`.
+
+### Interactive management (/agents)
+
+If you are in an interactive CLI session, you can use the `/agents` command to
+manage subagents without editing configuration files manually. This is the
+recommended way to quickly enable, disable, or re-configure agents on the fly.
+
+For a full list of sub-commands and usage, see the
+[`/agents` command reference](../reference/commands.md#agents).
+
+### Persistent configuration (settings.json)
+
+While the `/agents` command and agent definition files provide a starting point,
+you can use `settings.json` for global, persistent overrides. This is useful for
+enforcing specific models or execution limits across all sessions.
+
+#### `agents.overrides`
+
+Use this to enable or disable specific agents or override their run
+configurations.
+
+```json
+{
+  "agents": {
+    "overrides": {
+      "security-auditor": {
+        "enabled": false,
+        "runConfig": {
+          "maxTurns": 20,
+          "maxTimeMinutes": 10
+        }
+      }
+    }
+  }
+}
+```
+
+#### `modelConfigs.overrides`
+
+You can target specific subagents with custom model settings (like system
+instruction prefixes or specific safety settings) using the `overrideScope`
+field.
+
+```json
+{
+  "modelConfigs": {
+    "overrides": [
+      {
+        "match": { "overrideScope": "security-auditor" },
+        "modelConfig": {
+          "generateContentConfig": {
+            "temperature": 0.1
+          }
+        }
+      }
+    ]
+  }
+}
+```
 
 ### Optimizing your subagent
 
@@ -298,7 +414,7 @@ Gemini CLI can also delegate tasks to remote subagents using the Agent-to-Agent
 > **Note: Remote subagents are currently an experimental feature.**
 
 See the [Remote Subagents documentation](remote-agents) for detailed
-configuration and usage instructions.
+configuration, authentication, and usage instructions.
 
 ## Extension subagents
 
