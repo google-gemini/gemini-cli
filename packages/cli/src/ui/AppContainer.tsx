@@ -908,6 +908,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       openAgentConfigDialog,
       openPermissionsDialog,
       quit: (messages: HistoryItem[]) => {
+        closeThemeDialog();
         setQuittingMessages(messages);
         setTimeout(async () => {
           await runExitCleanup();
@@ -936,6 +937,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     [
       setAuthState,
       openThemeDialog,
+      closeThemeDialog,
       openEditorDialog,
       openSettingsDialog,
       openSessionBrowser,

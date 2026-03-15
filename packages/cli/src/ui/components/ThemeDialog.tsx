@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import { themeManager, DEFAULT_THEME } from '../themes/theme-manager.js';
@@ -91,6 +91,18 @@ export function ThemeDialog({
     SettingScope.User,
   );
 
+  const originalThemeRef = useRef(settings.merged.ui.theme);
+  const isSelectedRef = useRef(false);
+
+  useEffect(() => {
+    const originalTheme = originalThemeRef.current;
+    return () => {
+      if (!isSelectedRef.current) {
+        themeManager.setActiveTheme(originalTheme);
+      }
+    };
+  }, []);
+
   // Track the currently highlighted theme name
   const [highlightedThemeName, setHighlightedThemeName] = useState<string>(
     () => {
@@ -145,6 +157,7 @@ export function ThemeDialog({
 
   const handleThemeSelect = useCallback(
     async (themeName: string) => {
+      isSelectedRef.current = true;
       await onSelect(themeName, selectedScope);
     },
     [onSelect, selectedScope],
@@ -161,6 +174,7 @@ export function ThemeDialog({
 
   const handleScopeSelect = useCallback(
     async (scope: LoadableSettingScope) => {
+      isSelectedRef.current = true;
       await onSelect(highlightedThemeName, scope);
     },
     [onSelect, highlightedThemeName],

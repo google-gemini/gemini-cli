@@ -131,6 +131,23 @@ describe('ThemeDialog Snapshots', () => {
     });
     unmount();
   });
+
+  it('should revert the theme to the original one on unmount if no theme is selected', async () => {
+    const settings = createMockSettings({ ui: { theme: 'DefaultDark' } });
+    themeManager.setActiveTheme('DefaultDark');
+    const setActiveThemeSpy = vi.spyOn(themeManager, 'setActiveTheme');
+
+    const { unmount, waitUntilReady } = renderWithProviders(
+      <ThemeDialog {...baseProps} settings={settings} />,
+      { settings },
+    );
+    await waitUntilReady();
+
+    // Do NOT select a theme, just unmount
+    unmount();
+
+    expect(setActiveThemeSpy).toHaveBeenCalledWith('DefaultDark');
+  });
 });
 
 describe('Initial Theme Selection', () => {
