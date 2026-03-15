@@ -51,8 +51,7 @@ export async function buildTodosReturnDisplay(
   const statusOrder = {
     [TaskStatus.IN_PROGRESS]: 0,
     [TaskStatus.OPEN]: 1,
-    [TaskStatus.BLOCKED]: 2,
-    [TaskStatus.CLOSED]: 3,
+    [TaskStatus.CLOSED]: 2,
   };
 
   const sortTasks = (a: TrackerTask, b: TrackerTask) => {
@@ -586,7 +585,6 @@ class TrackerVisualizeInvocation extends BaseToolInvocation<
     const statusEmojis: Record<TaskStatus, string> = {
       open: '⭕',
       in_progress: '🚧',
-      blocked: '🚫',
       closed: '✅',
     };
 
