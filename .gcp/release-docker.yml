@@ -35,7 +35,7 @@ steps:
         echo "Determined image tag: $$FINAL_TAG"
         echo "$$FINAL_TAG" > /workspace/image_tag.txt
 
-  # Step 5: Build sandbox container image
+  # Step 5: Build sandbox container image (Final stage)
   - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
     id: 'Build sandbox Docker image'
     entrypoint: 'bash'
@@ -43,8 +43,21 @@ steps:
       - '-c'
       - |-
         export GEMINI_SANDBOX_IMAGE_TAG=$$(cat /workspace/image_tag.txt)
-        echo "Using Docker image tag for build: $$GEMINI_SANDBOX_IMAGE_TAG"
         npm run build:sandbox -- --output-file /workspace/final_image_uri.txt
+    env:
+      - 'GEMINI_SANDBOX=$_CONTAINER_TOOL'
+
+  # Step 6: Build maintainer container image (Maintainer stage)
+  - name: 'us-west1-docker.pkg.dev/gemini-code-dev/gemini-code-containers/gemini-code-builder'
+    id: 'Build maintainer Docker image'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |-
+        export TAG=$$(cat /workspace/image_tag.txt)
+        IMAGE_BASE="us-docker.pkg.dev/gemini-code-dev/gemini-cli/maintainer"
+        docker build --target maintainer -t "$${IMAGE_BASE}:$${TAG}" .
+        docker push "$${IMAGE_BASE}:$${TAG}"
     env:
       - 'GEMINI_SANDBOX=$_CONTAINER_TOOL'
 
@@ -57,8 +70,6 @@ steps:
       - |-
         set -e
         FINAL_IMAGE_URI=$$(cat /workspace/final_image_uri.txt)
-
-        echo "Pushing sandbox image: $${FINAL_IMAGE_URI}"
         $_CONTAINER_TOOL push "$${FINAL_IMAGE_URI}"
     env:
       - 'GEMINI_SANDBOX=$_CONTAINER_TOOL'
