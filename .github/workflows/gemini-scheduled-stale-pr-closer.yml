@@ -20,7 +20,6 @@ jobs:
     permissions:
       pull-requests: 'write'
       issues: 'write'
-      members: 'read' # To check org membership if using a PAT or App Token
     steps:
       - name: 'Generate GitHub App Token'
         id: 'generate_token'
