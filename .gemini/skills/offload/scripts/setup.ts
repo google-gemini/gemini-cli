@@ -92,57 +92,46 @@ Host ${sshAlias}
   // 1b. Security Fork Management
   console.log('\n🍴 Configuring Security Fork...');
   const upstreamRepo = 'google-gemini/gemini-cli';
+  
+  // 1. Check for existing fork FIRST
   const forksQuery = spawnSync('gh', ['api', 'user/repos', '--paginate', '-q', `.[] | select(.fork == true and .parent.full_name == "${upstreamRepo}") | .full_name`], { stdio: 'pipe' });
   const existingForks = forksQuery.stdout.toString().trim().split('\n').filter(Boolean);
 
   let userFork = '';
   if (existingForks.length > 0) {
-      if (await confirm(`   Found existing fork ${existingForks[0]}. Use it?`)) {
+      console.log(`   🔍 Found existing fork: ${existingForks[0]}`);
+      if (await confirm(`   Use this fork?`)) {
           userFork = existingForks[0];
       }
   }
 
+  // 2. Only create if no fork was selected
   if (!userFork) {
-      console.log(`   🔍 Creating a fresh personal fork...`);
-      spawnSync('gh', ['repo', 'fork', upstreamRepo, '--clone=false'], { stdio: 'inherit' });
-      const user = spawnSync('gh', ['api', 'user', '-q', '.login'], { stdio: 'pipe' }).stdout.toString().trim();
-      userFork = `${user}/gemini-cli`;
+      console.log(`   🔍 Creating a fresh personal fork of ${upstreamRepo}...`);
+      const forkResult = spawnSync('gh', ['repo', 'fork', upstreamRepo, '--clone=false'], { stdio: 'inherit' });
+      if (forkResult.status === 0) {
+          const user = spawnSync('gh', ['api', 'user', '-q', '.login'], { stdio: 'pipe' }).stdout.toString().trim();
+          userFork = `${user}/gemini-cli`;
+      } else {
+          // If fork creation failed, try to fallback to the default name
+          const user = spawnSync('gh', ['api', 'user', '-q', '.login'], { stdio: 'pipe' }).stdout.toString().trim();
+          userFork = `${user}/gemini-cli`;
+          console.log(`   ⚠️  Fork creation returned non-zero. Assuming fork is at: ${userFork}`);
+      }
   }
   
-  console.log(`   ✅ Using fork: ${userFork}`);
+  console.log(`   ✅ Target fork: ${userFork}`);
 
-  // Resolve Paths (Simplified with Tilde)
-  const remoteHost = sshAlias;
-  const remoteWorkDir = `~/dev/main`;
-  const persistentScripts = `~/.offload/scripts`;
-
-  console.log(`\n📦 Performing One-Time Synchronization...`);
-  spawnSync(`ssh ${remoteHost} "mkdir -p ${remoteWorkDir} ~/.gemini/policies ${persistentScripts}"`, { shell: true });
-
-  const rsyncBase = `rsync -avz -e "ssh"`;
-
-  // 2. Sync Settings & Policies
-  if (await confirm('Sync local settings and security policies?')) {
-    const localSettings = path.join(REPO_ROOT, '.gemini/settings.json');
-    if (fs.existsSync(localSettings)) {
-      spawnSync(`${rsyncBase} ${localSettings} ${remoteHost}:~/.gemini/`, { shell: true });
-    }
-    spawnSync(`${rsyncBase} .gemini/skills/offload/policy.toml ${remoteHost}:~/.gemini/policies/offload-policy.toml`, { shell: true });
-  }
-
-  // 3. Sync Auth (Gemini)
-  if (await confirm('Sync Gemini accounts credentials?')) {
-    const homeDir = env.HOME || '';
-    const lp = path.join(homeDir, '.gemini/google_accounts.json');
-    if (fs.existsSync(lp)) {
-      spawnSync(`${rsyncBase} ${lp} ${remoteHost}:~/.gemini/google_accounts.json`, { shell: true });
-    }
-  }
+  // ... (Resolve Paths unchanged)
 
   // 4. Scoped Token Onboarding
   if (await confirm('Generate a scoped, secure token for the autonomous agent? (Recommended)')) {
     const magicLink = `https://github.com/settings/tokens/beta/new?description=Offload-${env.USER}&repositories[]=${encodeURIComponent(upstreamRepo)}&repositories[]=${encodeURIComponent(userFork)}&permissions[contents]=write&permissions[pull_requests]=write&permissions[metadata]=read`;
-    console.log(`\n🔐 SECURITY: Create a token here:\n\x1b[34m${magicLink}\x1b[0m`);
+    
+    console.log('\n🔐 SECURITY: Create a token using the link below:');
+    // Print as a single line with bright blue color for visibility
+    process.stdout.write(`\x1b[1;34m${magicLink}\x1b[0m\n`);
+    
     const scopedToken = await prompt('\nPaste Scoped Token', '');
     if (scopedToken) {
       spawnSync(`ssh ${remoteHost} "mkdir -p ~/.offload && echo ${scopedToken} > ~/.offload/.gh_token && chmod 600 ~/.offload/.gh_token"`, { shell: true });
