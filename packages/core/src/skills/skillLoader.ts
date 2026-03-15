@@ -27,6 +27,8 @@ export interface SkillDefinition {
   disabled?: boolean;
   /** Whether the skill is a built-in skill. */
   isBuiltin?: boolean;
+  /** The name of the extension that provided this skill, if any. */
+  extensionName?: string;
 }
 
 export const FRONTMATTER_REGEX =
