@@ -51,11 +51,34 @@ export interface ModelConfigAlias {
   modelConfig: ModelConfig;
 }
 
+// A model definition is a mapping from a model name to a list of features
+// that the model supports. Model names can be either direct model IDs
+// (gemini-2.5-pro) or aliases (auto).
+export interface ModelDefinition {
+  displayName?: string;
+  tier?: string; // 'pro' | 'flash' | 'flash-lite' | 'custom' | 'auto'
+  family?: string; // The gemini family, e.g. 'gemini-3' | 'gemini-2'
+  isPreview?: boolean;
+  // Specifies which view the model should appear in. If unset, the model will
+  // not appear in the dialog.
+  dialogLocation?: 'main' | 'manual';
+  /** A short description of the model for the dialog. */
+  dialogDescription?: string;
+  features?: {
+    // Whether the model supports thinking.
+    thinking?: boolean;
+    // Whether the model supports mutlimodal function responses. This is
+    // supported in Gemini 3.
+    multimodalToolUse?: boolean;
+  };
+}
+
 export interface ModelConfigServiceConfig {
   aliases?: Record<string, ModelConfigAlias>;
   customAliases?: Record<string, ModelConfigAlias>;
   overrides?: ModelConfigOverride[];
   customOverrides?: ModelConfigOverride[];
+  modelDefinitions?: Record<string, ModelDefinition>;
 }
 
 const MAX_ALIAS_CHAIN_DEPTH = 100;
@@ -75,6 +98,28 @@ export class ModelConfigService {
 
   // TODO(12597): Process config to build a typed alias hierarchy.
   constructor(private readonly config: ModelConfigServiceConfig) {}
+
+  getModelDefinition(modelId: string): ModelDefinition | undefined {
+    const definition = this.config.modelDefinitions?.[modelId];
+    if (definition) {
+      return definition;
+    }
+
+    // For unknown models, return an implicit custom definition to match legacy behavior.
+    if (!modelId.startsWith('gemini-')) {
+      return {
+        tier: 'custom',
+        family: 'custom',
+        features: {},
+      };
+    }
+
+    return undefined;
+  }
+
+  getModelDefinitions(): Record<string, ModelDefinition> {
+    return this.config.modelDefinitions ?? {};
+  }
 
   registerRuntimeModelConfig(aliasName: string, alias: ModelConfigAlias): void {
     this.runtimeAliases[aliasName] = alias;

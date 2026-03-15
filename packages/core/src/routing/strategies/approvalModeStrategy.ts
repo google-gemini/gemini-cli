@@ -36,7 +36,7 @@ export class ApprovalModeStrategy implements RoutingStrategy {
     const model = context.requestedModel ?? config.getModel();
 
     // This strategy only applies to "auto" models.
-    if (!isAutoModel(model)) {
+    if (!isAutoModel(model, config)) {
       return null;
     }
 
