@@ -41,6 +41,8 @@ jobs:
           github-token: '${{ steps.generate_token.outputs.token || secrets.GITHUB_TOKEN }}'
           script: |
             const dryRun = process.env.DRY_RUN === 'true';
+            const fourteenDaysAgo = new Date();
+            fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
             const thirtyDaysAgo = new Date();
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -163,15 +165,23 @@ jobs:
 
               const hasLinkedIssue = linkedIssues.length > 0;
 
-              // Closure Policy: No help-wanted label = Close
+              // Closure Policy: No help-wanted label = Close after 14 days
               if (pr.state === 'open' && !hasHelpWanted && !hasMaintainerOnly) {
-                core.info(`PR #${pr.number} is not associated with a 'help wanted' issue. Closing.`);
+                const prCreatedAt = new Date(pr.created_at);
+                
+                // We give a 14-day grace period for non-help-wanted PRs to be manually reviewed/labeled by an EM
+                if (prCreatedAt > fourteenDaysAgo) {
+                  core.info(`PR #${pr.number} is new and lacks 'help wanted'. Giving 14-day grace period for EM review.`);
+                  continue;
+                }
+
+                core.info(`PR #${pr.number} is older than 14 days and lacks 'help wanted' association. Closing.`);
                 if (!dryRun) {
                   await github.rest.issues.createComment({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                     issue_number: pr.number,
-                    body: "Hi there! Thank you for your interest in contributing to Gemini CLI. \n\nAs part of our effort to maintain high code quality and focus on prioritized tasks, we have recently changed our contribution policy (see [Discussion #17383](https://github.com/google-gemini/gemini-cli/discussions/17383)). \n\n**We currently only accept pull requests for issues that are explicitly labeled as 'help wanted'.** This pull request is being closed because it is not associated with such an issue. \n\nWe encourage you to find and contribute to existing 'help wanted' issues in our backlog! If you believe this PR should be an exception, please reach out in the linked discussion. Thank you for your understanding and for being part of our community!"
+                    body: "Hi there! Thank you for your interest in contributing to Gemini CLI. \n\nTo ensure we maintain high code quality and focus on our prioritized roadmap, we have updated our contribution policy (see [Discussion #17383](https://github.com/google-gemini/gemini-cli/discussions/17383)). \n\n**We only *guarantee* acceptance of pull requests for issues that are explicitly labeled as 'help wanted'.** All other community pull requests are subject to closure after 14 days if they do not align with our current focus areas. For this reason, we strongly recommend that contributors only submit pull requests against issues explicitly labeled as **'help-wanted'**. \n\nThis pull request is being closed as it has been open for 14 days without a 'help wanted' designation. We encourage you to find and contribute to existing 'help wanted' issues in our backlog! Thank you for your understanding and for being part of our community!"
                   });
                   await github.rest.pulls.update({
                     owner: context.repo.owner,
