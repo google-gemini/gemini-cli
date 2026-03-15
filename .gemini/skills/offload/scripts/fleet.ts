@@ -4,6 +4,8 @@
  * Manages dynamic GCP workers for offloading tasks.
  */
 import { spawnSync } from 'child_process';
+import path from 'path';
+import fs from 'fs';
 
 const PROJECT_ID = 'gemini-cli-team-quota';
 const USER = process.env.USER || 'mattkorwel';
@@ -41,33 +43,51 @@ async function provisionWorker() {
     return;
   }
 
-  console.log(`🚀 Provisioning "Invisible VM" (Container-Optimized OS): ${name}...`);
-  console.log(`   - Image: ${imageUri}`);
-  console.log(`   - OS:    Container-Optimized OS (Docker Pre-installed)`);
+  console.log(`🚀 Provisioning modern container worker (COS + Cloud-Init): ${name}...`);
   
+  // Get local public key for native SSH access
+  const pubKeyPath = path.join(os.homedir(), '.ssh/google_compute_engine.pub');
+  const pubKey = fs.existsSync(pubKeyPath) ? fs.readFileSync(pubKeyPath, 'utf8').trim() : '';
+  const sshKeyMetadata = pubKey ? `${USER}:${pubKey}` : '';
+
+  // Modern Cloud-Init (user-data) configuration for COS
+  const cloudConfig = `#cloud-config
+runcmd:
+  - |
+    # Expand the root partition to use the full 200GB for high performance
+    /usr/bin/growpart /dev/sda 1
+    /usr/sbin/resize2fs /dev/sda1
+  - docker run -d --name maintainer-worker --restart always \\
+      -v /home/node/dev:/home/node/dev:rw \\
+      -v /home/node/.gemini:/home/node/.gemini:rw \\
+      -v /home/node/.offload:/home/node/.offload:rw \\
+      ${imageUri} /bin/bash -c "while true; do sleep 1000; done"
+`;
+
+  const tempPath = path.join(process.env.TMPDIR || '/tmp', `cloud-init-${name}.yaml`);
+  fs.writeFileSync(tempPath, cloudConfig);
+
   const result = spawnSync('gcloud', [
-    'compute', 'instances', 'create-with-container', name,
+    'compute', 'instances', 'create', name,
     '--project', PROJECT_ID,
-    '--zone', zone,
+    '--zone', 'us-west1-a',
     '--machine-type', 'n2-standard-8',
     '--image-family', 'cos-stable',
     '--image-project', 'cos-cloud',
     '--boot-disk-size', '200GB',
     '--boot-disk-type', 'pd-balanced',
-    '--container-image', imageUri,
-    '--container-name', 'maintainer-worker',
-    '--container-restart-policy', 'always',
-    '--container-mount-host-path', 'host-path=/home/$(whoami)/dev,mount-path=/home/node/dev,mode=rw',
-    '--container-mount-host-path', 'host-path=/home/$(whoami)/.gemini,mount-path=/home/node/.gemini,mode=rw',
-    '--container-mount-host-path', 'host-path=/home/$(whoami)/.offload,mount-path=/home/node/.offload,mode=rw',
+    '--metadata-from-file', `user-data=${tempPath}`,
+    '--metadata', `enable-oslogin=TRUE${sshKeyMetadata ? `,ssh-keys=${sshKeyMetadata}` : ''}`,
     '--labels', `owner=${USER.replace(/[^a-z0-9_-]/g, '_')},type=offload-worker`,
     '--tags', `gcli-offload-${USER}`,
     '--scopes', 'https://www.googleapis.com/auth/cloud-platform'
-  ], { stdio: 'inherit', shell: true });
+  ], { stdio: 'inherit' });
+
+  fs.unlinkSync(tempPath);
 
   if (result.status === 0) {
-    console.log(`\n✅ Container worker ${name} is being provisioned.`);
-    console.log(`👉 The container will start automatically on boot.`);
+    console.log(`\n✅ Worker ${name} is being provisioned.`);
+    console.log(`👉 Container 'maintainer-worker' will start natively via Cloud-Init.`);
   }
 }
 
@@ -120,10 +140,15 @@ async function stopWorker() {
 
 async function remoteStatus() {
   const name = INSTANCE_PREFIX;
-  const zone = 'us-west1-a';
-  
   console.log(`📡 Fetching remote status from ${name}...`);
   spawnSync('ssh', ['gcli-worker', 'tsx .offload/scripts/status.ts'], { stdio: 'inherit', shell: true });
+}
+
+async function rebuildWorker() {
+  const name = INSTANCE_PREFIX;
+  console.log(`🔥 Rebuilding worker ${name}...`);
+  spawnSync('gcloud', ['compute', 'instances', 'delete', name, '--project', PROJECT_ID, '--zone', 'us-west1-a', '--quiet'], { stdio: 'inherit' });
+  await provisionWorker();
 }
 
 async function main() {
@@ -135,6 +160,9 @@ async function main() {
       break;
     case 'provision':
       await provisionWorker();
+      break;
+    case 'rebuild':
+      await rebuildWorker();
       break;
     case 'stop':
       await stopWorker();
