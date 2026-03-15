@@ -58,9 +58,16 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   `;
   spawnSync(`ssh ${remoteHost} ${q(setupCmd)}`, { shell: true, stdio: 'inherit' });
 
-  // 4. Execution Logic (Persistent OS Mode)
+  // 4. Execution Logic (Persistent Workstation Mode)
+  // We use docker exec if container mode is enabled, otherwise run on host.
   const remoteWorker = `tsx ${persistentScripts}/entrypoint.ts ${prNumber} remote-branch ${remotePolicyPath} ${action}`;
-  const tmuxCmd = `cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL`;
+  
+  let tmuxCmd = `cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL`;
+  if (useContainer) {
+    // If in container mode, we jump into the shared 'gemini-sandbox' container
+    // We must use -i and -t for the interactive tmux session
+    tmuxCmd = `docker exec -it -w /home/node/dev/worktrees/offload-${prNumber}-${action} gemini-sandbox sh -c "${remoteWorker}; exec $SHELL"`;
+  }
   
   const sshInternal = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'offload' ${q(tmuxCmd)}`;
   const finalSSH = `ssh -t ${remoteHost} ${q(sshInternal)}`;
