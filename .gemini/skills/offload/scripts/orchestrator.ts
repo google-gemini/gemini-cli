@@ -64,9 +64,9 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   
   let tmuxCmd = `cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL`;
   if (useContainer) {
-    // If in container mode, we jump into the shared 'gemini-sandbox' container
+    // If in container mode, we jump into the shared 'maintainer-worker' container
     // We must use -i and -t for the interactive tmux session
-    tmuxCmd = `docker exec -it -w /home/node/dev/worktrees/offload-${prNumber}-${action} gemini-sandbox sh -c "${remoteWorker}; exec $SHELL"`;
+    tmuxCmd = `docker exec -it -w /home/node/dev/worktrees/offload-${prNumber}-${action} maintainer-worker sh -c "${remoteWorker}; exec $SHELL"`;
   }
   
   const sshInternal = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'offload' ${q(tmuxCmd)}`;

@@ -55,6 +55,7 @@ async function provisionWorker() {
     '--boot-disk-size', '200GB',
     '--boot-disk-type', 'pd-balanced',
     '--container-image', imageUri,
+    '--container-name', 'maintainer-worker',
     '--container-restart-policy', 'always',
     '--container-mount-host-path', 'host-path=/home/$(whoami)/dev,mount-path=/home/node/dev,mode=rw',
     '--container-mount-host-path', 'host-path=/home/$(whoami)/.gemini,mount-path=/home/node/.gemini,mode=rw',

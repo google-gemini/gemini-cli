@@ -21,7 +21,7 @@ function getStatus() {
   const activeSessions = tmux.stdout.toString().split('\n').filter(s => s.startsWith('offload-'));
 
   // 2. Scan worktrees inside the CONTAINER
-  const findJobs = spawnSync('docker', ['exec', 'gemini-sandbox', 'ls', WORKTREE_BASE], { stdio: 'pipe' });
+  const findJobs = spawnSync('docker', ['exec', 'maintainer-worker', 'ls', WORKTREE_BASE], { stdio: 'pipe' });
   const jobs = findJobs.stdout.toString().split('\n').filter(d => d.startsWith('offload-'));
 
   if (jobs.length === 0 && activeSessions.length === 0) {
@@ -42,11 +42,11 @@ function getStatus() {
       state = '🏃 RUNNING';
     } else {
       // Check logs inside the container
-      const logCheck = spawnSync('docker', ['exec', 'gemini-sandbox', 'sh', '-c', `ls ${WORKTREE_BASE}/${id}/.gemini/logs/*.log 2>/dev/null | tail -n 1`], { stdio: 'pipe' });
+      const logCheck = spawnSync('docker', ['exec', 'maintainer-worker', 'sh', '-c', `ls ${WORKTREE_BASE}/${id}/.gemini/logs/*.log 2>/dev/null | tail -n 1`], { stdio: 'pipe' });
       const lastLogFile = logCheck.stdout.toString().trim();
       
       if (lastLogFile) {
-          const logContent = spawnSync('docker', ['exec', 'gemini-sandbox', 'cat', lastLogFile], { stdio: 'pipe' }).stdout.toString();
+          const logContent = spawnSync('docker', ['exec', 'maintainer-worker', 'cat', lastLogFile], { stdio: 'pipe' }).stdout.toString();
           if (logContent.includes('SUCCESS')) state = '✅ SUCCESS';
           else if (logContent.includes('FAILED')) state = '❌ FAILED';
           else state = '🏁 FINISHED';
