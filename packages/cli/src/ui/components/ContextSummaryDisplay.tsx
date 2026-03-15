@@ -64,7 +64,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     const name = allNamesTheSame ? contextFileNames[0] : 'context';
     return `${geminiMdFileCount} ${name} file${
       geminiMdFileCount > 1 ? 's' : ''
-    }`;
+    } (/memory)`;
   })();
 
   const mcpText = (() => {
@@ -86,14 +86,14 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
       }
       parts.push(blockedText);
     }
-    return parts.join(', ');
+    return parts.join(', ') + ' (/mcp)';
   })();
 
   const skillText = (() => {
     if (skillCount === 0) {
       return '';
     }
-    return `${skillCount} skill${skillCount > 1 ? 's' : ''}`;
+    return `${skillCount} skill${skillCount > 1 ? 's' : ''} (/skills)`;
   })();
 
   const backgroundText = (() => {
@@ -102,7 +102,7 @@ export const ContextSummaryDisplay: React.FC<ContextSummaryDisplayProps> = ({
     }
     return `${backgroundProcessCount} Background process${
       backgroundProcessCount > 1 ? 'es' : ''
-    }`;
+    } (/shells)`;
   })();
 
   const summaryParts = [

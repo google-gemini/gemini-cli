@@ -6,14 +6,15 @@ exports[`<ContextSummaryDisplay /> > should not render empty parts 1`] = `
 `;
 
 exports[`<ContextSummaryDisplay /> > should render on a single line on a wide screen 1`] = `
-" 1 open file (ctrl+g to view) | 1 GEMINI.md file | 1 MCP server | 1 skill
+" 1 open file (ctrl+g to view) | 1 GEMINI.md file (/memory) | 1 MCP server (/mcp) | 1 skill
+ (/skills)
 "
 `;
 
 exports[`<ContextSummaryDisplay /> > should render on multiple lines on a narrow screen 1`] = `
 " - 1 open file (ctrl+g to view)
- - 1 GEMINI.md file
- - 1 MCP server
- - 1 skill
+ - 1 GEMINI.md file (/memory)
+ - 1 MCP server (/mcp)
+ - 1 skill (/skills)
 "
 `;
