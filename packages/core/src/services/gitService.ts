@@ -12,24 +12,19 @@ import type { SimpleGit } from 'simple-git';
 import type { Storage } from '../config/storage.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
-// Cache the dynamic import so repeated calls reuse the same resolved module.
-interface SimpleGitExports {
-  simpleGit: typeof import('simple-git').simpleGit;
-  CheckRepoActions: typeof import('simple-git').CheckRepoActions;
-}
-let _simpleGitModule: SimpleGitExports | undefined;
-async function loadSimpleGit(): Promise<SimpleGitExports> {
-  if (!_simpleGitModule) {
-    _simpleGitModule =
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- dynamic import() namespace type includes 'default' which doesn't match the narrower interface
-      (await import('simple-git')) as unknown as SimpleGitExports;
-  }
-  return _simpleGitModule;
-}
-
 export class GitService {
   private projectRoot: string;
   private storage: Storage;
+  private simpleGitPromise?: ReturnType<typeof GitService.loadSimpleGit>;
+
+  private static async loadSimpleGit() {
+    return import('simple-git');
+  }
+
+  private getSimpleGit() {
+    this.simpleGitPromise ??= GitService.loadSimpleGit();
+    return this.simpleGitPromise;
+  }
 
   constructor(projectRoot: string, storage: Storage) {
     this.projectRoot = path.resolve(projectRoot);
@@ -94,7 +89,7 @@ export class GitService {
 
     const shadowRepoEnv = this.getShadowRepoEnv(repoDir);
     await fs.writeFile(shadowRepoEnv.GIT_CONFIG_SYSTEM, '');
-    const { simpleGit, CheckRepoActions } = await loadSimpleGit();
+    const { simpleGit, CheckRepoActions } = await this.getSimpleGit();
     const repo = simpleGit(repoDir).env(shadowRepoEnv);
     let isRepoDefined = false;
     try {
@@ -131,7 +126,7 @@ export class GitService {
   }
 
   private async getShadowGitRepository(): Promise<SimpleGit> {
-    const { simpleGit } = await loadSimpleGit();
+    const { simpleGit } = await this.getSimpleGit();
     const repoDir = this.getHistoryDir();
     return simpleGit(this.projectRoot).env({
       GIT_DIR: path.join(repoDir, '.git'),
