@@ -26,22 +26,24 @@ steps:
       - |-
         IMAGE_BASE="us-docker.pkg.dev/gemini-code-dev/gemini-cli/maintainer"
         
-        # Sanitize branch name (lowercase, replace non-alphanumeric with -)
-        # Handles both _HEAD_BRANCH (PRs) and BRANCH_NAME (Pushes)
+        # Determine the primary tag (branch name or 'latest' for main)
         RAW_BRANCH="${_HEAD_BRANCH:-${BRANCH_NAME}}"
-        CLEAN_BRANCH=$(echo "$${RAW_BRANCH}" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]')
+        if [ "$${RAW_BRANCH}" == "main" ]; then
+          TAG_PRIMARY="latest"
+        else
+          TAG_PRIMARY=$(echo "$${RAW_BRANCH}" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]')
+        fi
         
         TAG_SHA="${SHORT_SHA}"
-        TAG_BRANCH="$${CLEAN_BRANCH}"
         
-        echo "📦 Building Maintainer Image for branch: $${RAW_BRANCH} ($${CLEAN_BRANCH})"
+        echo "📦 Building Maintainer Image for: $${RAW_BRANCH} -> $${TAG_PRIMARY}"
         
         docker build -f .gcp/Dockerfile.maintainer \
           -t "$${IMAGE_BASE}:$${TAG_SHA}" \
-          -t "$${IMAGE_BASE}:$${TAG_BRANCH}" .
+          -t "$${IMAGE_BASE}:$${TAG_PRIMARY}" .
           
         docker push "$${IMAGE_BASE}:$${TAG_SHA}"
-        docker push "$${IMAGE_BASE}:$${TAG_BRANCH}"
+        docker push "$${IMAGE_BASE}:$${TAG_PRIMARY}"
 
 options:
   defaultLogsBucketBehavior: 'REGIONAL_USER_OWNED_BUCKET'

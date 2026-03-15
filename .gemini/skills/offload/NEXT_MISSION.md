@@ -13,22 +13,30 @@ Shift from a "Manual VM" to an "Invisible VM" (Container-Optimized OS) that runs
    - Optimize `.gcp/Dockerfile.maintainer` to include `tsx`, `vitest`, `gh`, and system dependencies (`libsecret`, `build-essential`).
    - *Verified locally: Node v20, GH CLI, Git, TSX, and Vitest are functional with required headers.*
 2. **Dedicated Pipeline**:
-   - Use `.gcp/maintainer-worker.yml` for isolated PR builds.
-   - **Tagging Strategy**: Dual-tag images with `${SHORT_SHA}` (immutable) and `${CLEAN_BRANCH}` (latest-on-branch).
+   - Use `.gcp/maintainer-worker.yml` for isolated builds.
+   - **Tagging Strategy**: 
+     - `latest`: Automatically updated on every merge to `main`.
+     - `branch-name`: Created on-demand for PRs via `/gcbrun` comment.
 3. **Setup Script (`setup.ts`)**:
    - Refactor `provision` to use `gcloud compute instances create-with-container`.
    - Point to the new `maintainer` image in Artifact Registry.
 4. **Orchestrator (`orchestrator.ts`)**:
    - Update SSH logic to include the `--container` flag.
 
-## GCP Console Setup (Manual Action)
-To enable the automatic maintainer image builds on PRs:
-1. **Create Trigger**: Go to **Cloud Build > Triggers** and create a new trigger.
-2. **Event**: Set to **Pull Request**.
-3. **Source**: Select the `google-gemini/gemini-cli` repository.
-4. **Configuration**: Point to `.gcp/maintainer-worker.yml` in the repo.
-5. **Filters**: Set the base branch to `^main$`.
-6. **Service Account**: Ensure it has `Artifact Registry Writer` permissions.
+## GCP Console Setup (Two Triggers)
+
+### Trigger 1: Production Maintainer Image (Automatic)
+1. **Event**: Push to branch.
+2. **Branch**: `^main$`.
+3. **Configuration**: Point to `.gcp/maintainer-worker.yml`.
+4. **Purpose**: Keeps the stable "Golden Image" up to date for daily use.
+
+### Trigger 2: On-Demand Testing (Comment-Gated)
+1. **Event**: Pull request.
+2. **Base Branch**: `^main$`.
+3. **Comment Control**: Set to **"Required"** (e.g. `/gcbrun`).
+4. **Configuration**: Point to `.gcp/maintainer-worker.yml`.
+5. **Purpose**: Allows developers to test infrastructure changes before merging.
 
 ## How to Resume
 1. Load the checkpoint: `/checkpoint save offload-container-refactor` (if available).
