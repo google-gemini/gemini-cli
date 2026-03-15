@@ -22,7 +22,6 @@ import {
   GEMINI_MODEL_ALIAS_PRO,
   GEMINI_MODEL_ALIAS_FLASH,
   GEMINI_MODEL_ALIAS_AUTO,
-  GEMINI_MODEL_ALIAS_FLASH_LITE,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
   DEFAULT_GEMINI_MODEL_AUTO,
@@ -31,11 +30,97 @@ import {
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   isPreviewModel,
   isProModel,
-  isValidModelOrAlias,
-  getValidModelsAndAliases,
-  VALID_GEMINI_MODELS,
-  VALID_ALIASES,
 } from './models.js';
+import type { Config } from './config.js';
+import { ModelConfigService } from '../services/modelConfigService.js';
+import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
+
+const modelConfigService = new ModelConfigService(DEFAULT_MODEL_CONFIGS);
+
+const dynamicConfig = {
+  getExperimentalDynamicModelConfiguration: () => true,
+  modelConfigService,
+} as unknown as Config;
+
+const legacyConfig = {
+  getExperimentalDynamicModelConfiguration: () => false,
+  modelConfigService,
+} as unknown as Config;
+
+describe('Dynamic Configuration Parity', () => {
+  const modelsToTest = [
+    GEMINI_MODEL_ALIAS_AUTO,
+    GEMINI_MODEL_ALIAS_PRO,
+    GEMINI_MODEL_ALIAS_FLASH,
+    PREVIEW_GEMINI_MODEL_AUTO,
+    DEFAULT_GEMINI_MODEL_AUTO,
+    PREVIEW_GEMINI_MODEL,
+    DEFAULT_GEMINI_MODEL,
+    'custom-model',
+  ];
+
+  it('getDisplayString should match legacy behavior', () => {
+    for (const model of modelsToTest) {
+      const legacy = getDisplayString(model, legacyConfig);
+      const dynamic = getDisplayString(model, dynamicConfig);
+      expect(dynamic).toBe(legacy);
+    }
+  });
+
+  it('isPreviewModel should match legacy behavior', () => {
+    const allModels = [
+      ...modelsToTest,
+      PREVIEW_GEMINI_3_1_MODEL,
+      PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+      PREVIEW_GEMINI_FLASH_MODEL,
+    ];
+    for (const model of allModels) {
+      const legacy = isPreviewModel(model, legacyConfig);
+      const dynamic = isPreviewModel(model, dynamicConfig);
+      expect(dynamic).toBe(legacy);
+    }
+  });
+
+  it('isProModel should match legacy behavior', () => {
+    for (const model of modelsToTest) {
+      const legacy = isProModel(model, legacyConfig);
+      const dynamic = isProModel(model, dynamicConfig);
+      expect(dynamic).toBe(legacy);
+    }
+  });
+
+  it('isGemini3Model should match legacy behavior', () => {
+    for (const model of modelsToTest) {
+      const legacy = isGemini3Model(model, legacyConfig);
+      const dynamic = isGemini3Model(model, dynamicConfig);
+      expect(dynamic).toBe(legacy);
+    }
+  });
+
+  it('isCustomModel should match legacy behavior', () => {
+    for (const model of modelsToTest) {
+      const legacy = isCustomModel(model, legacyConfig);
+      const dynamic = isCustomModel(model, dynamicConfig);
+      expect(dynamic).toBe(legacy);
+    }
+  });
+
+  it('supportsModernFeatures should match legacy behavior', () => {
+    for (const model of modelsToTest) {
+      const legacy = supportsModernFeatures(model);
+      const dynamic = supportsModernFeatures(model);
+      expect(dynamic).toBe(legacy);
+    }
+  });
+
+  it('supportsMultimodalFunctionResponse should match legacy behavior', () => {
+    for (const model of modelsToTest) {
+      const legacy = supportsMultimodalFunctionResponse(model, legacyConfig);
+      const dynamic = supportsMultimodalFunctionResponse(model, dynamicConfig);
+      expect(dynamic).toBe(legacy);
+    }
+  });
+});
 
 describe('isPreviewModel', () => {
   it('should return true for preview models', () => {
@@ -392,64 +477,5 @@ describe('isActiveModel', () => {
     expect(
       isActiveModel(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL, false, false),
     ).toBe(false);
-  });
-});
-
-describe('isValidModelOrAlias', () => {
-  it('should return true for valid model names', () => {
-    expect(isValidModelOrAlias(DEFAULT_GEMINI_MODEL)).toBe(true);
-    expect(isValidModelOrAlias(PREVIEW_GEMINI_MODEL)).toBe(true);
-    expect(isValidModelOrAlias(DEFAULT_GEMINI_FLASH_MODEL)).toBe(true);
-    expect(isValidModelOrAlias(DEFAULT_GEMINI_FLASH_LITE_MODEL)).toBe(true);
-    expect(isValidModelOrAlias(PREVIEW_GEMINI_FLASH_MODEL)).toBe(true);
-    expect(isValidModelOrAlias(PREVIEW_GEMINI_3_1_MODEL)).toBe(true);
-    expect(isValidModelOrAlias(PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL)).toBe(
-      true,
-    );
-  });
-
-  it('should return true for valid aliases', () => {
-    expect(isValidModelOrAlias(GEMINI_MODEL_ALIAS_AUTO)).toBe(true);
-    expect(isValidModelOrAlias(GEMINI_MODEL_ALIAS_PRO)).toBe(true);
-    expect(isValidModelOrAlias(GEMINI_MODEL_ALIAS_FLASH)).toBe(true);
-    expect(isValidModelOrAlias(GEMINI_MODEL_ALIAS_FLASH_LITE)).toBe(true);
-    expect(isValidModelOrAlias(PREVIEW_GEMINI_MODEL_AUTO)).toBe(true);
-    expect(isValidModelOrAlias(DEFAULT_GEMINI_MODEL_AUTO)).toBe(true);
-  });
-
-  it('should return true for custom (non-gemini) models', () => {
-    expect(isValidModelOrAlias('gpt-4')).toBe(true);
-    expect(isValidModelOrAlias('claude-3')).toBe(true);
-    expect(isValidModelOrAlias('my-custom-model')).toBe(true);
-  });
-
-  it('should return false for invalid gemini model names', () => {
-    expect(isValidModelOrAlias('gemini-4-pro')).toBe(false);
-    expect(isValidModelOrAlias('gemini-99-flash')).toBe(false);
-    expect(isValidModelOrAlias('gemini-invalid')).toBe(false);
-  });
-});
-
-describe('getValidModelsAndAliases', () => {
-  it('should return a sorted array', () => {
-    const result = getValidModelsAndAliases();
-    const sorted = [...result].sort();
-    expect(result).toEqual(sorted);
-  });
-
-  it('should include all valid models and aliases', () => {
-    const result = getValidModelsAndAliases();
-    for (const model of VALID_GEMINI_MODELS) {
-      expect(result).toContain(model);
-    }
-    for (const alias of VALID_ALIASES) {
-      expect(result).toContain(alias);
-    }
-  });
-
-  it('should not contain duplicates', () => {
-    const result = getValidModelsAndAliases();
-    const unique = [...new Set(result)];
-    expect(result).toEqual(unique);
   });
 });
