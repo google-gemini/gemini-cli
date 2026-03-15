@@ -24,12 +24,24 @@ steps:
     args:
       - '-c'
       - |-
-        # Use commit SHA for PR builds to ensure isolation
         IMAGE_BASE="us-docker.pkg.dev/gemini-code-dev/gemini-cli/maintainer"
-        TAG="${SHORT_SHA}"
         
-        docker build -f .gcp/Dockerfile.maintainer -t "$${IMAGE_BASE}:$${TAG}" .
-        docker push "$${IMAGE_BASE}:$${TAG}"
+        # Sanitize branch name (lowercase, replace non-alphanumeric with -)
+        # Handles both _HEAD_BRANCH (PRs) and BRANCH_NAME (Pushes)
+        RAW_BRANCH="${_HEAD_BRANCH:-${BRANCH_NAME}}"
+        CLEAN_BRANCH=$(echo "$${RAW_BRANCH}" | sed 's/[^a-zA-Z0-9]/-/g' | tr '[:upper:]' '[:lower:]')
+        
+        TAG_SHA="${SHORT_SHA}"
+        TAG_BRANCH="$${CLEAN_BRANCH}"
+        
+        echo "📦 Building Maintainer Image for branch: $${RAW_BRANCH} ($${CLEAN_BRANCH})"
+        
+        docker build -f .gcp/Dockerfile.maintainer \
+          -t "$${IMAGE_BASE}:$${TAG_SHA}" \
+          -t "$${IMAGE_BASE}:$${TAG_BRANCH}" .
+          
+        docker push "$${IMAGE_BASE}:$${TAG_SHA}"
+        docker push "$${IMAGE_BASE}:$${TAG_BRANCH}"
 
 options:
   defaultLogsBucketBehavior: 'REGIONAL_USER_OWNED_BUCKET'
