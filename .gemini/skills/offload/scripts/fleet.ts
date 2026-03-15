@@ -41,47 +41,32 @@ async function provisionWorker() {
     return;
   }
 
-  console.log(`🚀 Provisioning high-performance container worker: ${name}...`);
+  console.log(`🚀 Provisioning "Invisible VM" (Container-Optimized OS): ${name}...`);
   console.log(`   - Image: ${imageUri}`);
-  console.log(`   - Disk:  200GB (High Performance)`);
+  console.log(`   - OS:    Container-Optimized OS (Docker Pre-installed)`);
   
-  // Use a startup script to run the container. This is the modern replacement 
-  // for the deprecated create-with-container agent.
-  const startupScript = `#!/bin/bash
-    # Install Docker
-    apt-get update && apt-get install -y docker.io
-    
-    # Authenticate to Artifact Registry
-    # (The VM Service Account must have Artifact Registry Reader permissions)
-    gcloud auth configure-docker us-docker.pkg.dev --quiet
-    
-    # Pull and Run the maintainer container
-    docker pull ${imageUri}
-    docker run -d --name gemini-sandbox --restart always \\
-      -v /home/$(whoami)/dev:/home/node/dev:rw \\
-      -v /home/$(whoami)/.gemini:/home/node/.gemini:rw \\
-      -v /home/$(whoami)/.offload:/home/node/.offload:rw \\
-      ${imageUri} /bin/bash -c "while true; do sleep 1000; done"
-  `;
-
   const result = spawnSync('gcloud', [
-    'compute', 'instances', 'create', name,
+    'compute', 'instances', 'create-with-container', name,
     '--project', PROJECT_ID,
     '--zone', zone,
     '--machine-type', 'n2-standard-8',
-    '--image-family', 'ubuntu-2204-lts',
-    '--image-project', 'ubuntu-os-cloud',
+    '--image-family', 'cos-stable',
+    '--image-project', 'cos-cloud',
     '--boot-disk-size', '200GB',
     '--boot-disk-type', 'pd-balanced',
-    '--metadata', `startup-script=${startupScript}`,
+    '--container-image', imageUri,
+    '--container-restart-policy', 'always',
+    '--container-mount-host-path', 'host-path=/home/$(whoami)/dev,mount-path=/home/node/dev,mode=rw',
+    '--container-mount-host-path', 'host-path=/home/$(whoami)/.gemini,mount-path=/home/node/.gemini,mode=rw',
+    '--container-mount-host-path', 'host-path=/home/$(whoami)/.offload,mount-path=/home/node/.offload,mode=rw',
     '--labels', `owner=${USER.replace(/[^a-z0-9_-]/g, '_')},type=offload-worker`,
     '--tags', `gcli-offload-${USER}`,
     '--scopes', 'https://www.googleapis.com/auth/cloud-platform'
   ], { stdio: 'inherit', shell: true });
 
   if (result.status === 0) {
-    console.log(`\n✅ Worker ${name} is being provisioned.`);
-    console.log(`👉 Container 'gemini-sandbox' will start automatically once booted.`);
+    console.log(`\n✅ Container worker ${name} is being provisioned.`);
+    console.log(`👉 The container will start automatically on boot.`);
   }
 }
 
