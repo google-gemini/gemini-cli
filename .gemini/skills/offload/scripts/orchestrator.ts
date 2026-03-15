@@ -70,7 +70,9 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   }
   
   const sshInternal = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'offload' ${q(tmuxCmd)}`;
-  const finalSSH = `ssh -t ${remoteHost} ${q(sshInternal)}`;
+  
+  // High-performance primary SSH with IAP fallback
+  const finalSSH = `ssh -o ConnectTimeout=5 -t ${remoteHost} ${q(sshInternal)} || gcloud compute ssh ${targetVM} --project ${projectId} --zone ${zone} --tunnel-through-iap --command ${q(sshInternal)}`;
 
   // 5. Open in iTerm2
   const isWithinGemini = !!env.GEMINI_CLI || !!env.GEMINI_SESSION_ID || !!env.GCLI_SESSION_ID;

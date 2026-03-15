@@ -62,18 +62,24 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
     spawnSync(`gcloud compute instances start ${targetVM} --project ${projectId} --zone ${zone}`, { shell: true, stdio: 'inherit' });
   }
 
-  // 1. Configure Fast-Path SSH Alias
-  console.log(`\n🚀 Configuring Fast-Path SSH Alias (Internal IP)...`);
+  // 1. Configure Fast-Path SSH Alias (Direct Internal Hostname)
+  console.log(`\n🚀 Configuring Fast-Path SSH Alias (Internal Hostname)...`);
+  const dnsSuffix = await prompt('Internal DNS Suffix (e.g. .internal or .internal.gcpnode.com)', '.internal');
+  
+  // Construct the high-performance direct hostname
+  const internalHostname = `${targetVM}.${zone}.c.${projectId}${dnsSuffix}`;
   const sshAlias = 'gcli-worker';
   const sshConfigPath = path.join(os.homedir(), '.ssh/config');
+  
   const sshEntry = `
 Host ${sshAlias}
-    HostName ${internalIp}
+    HostName ${internalHostname}
     IdentityFile ~/.ssh/google_compute_engine
     User ${env.USER || 'mattkorwel'}_google_com
     CheckHostIP no
     StrictHostKeyChecking no
 `;
+
 
   let currentConfig = '';
   if (fs.existsSync(sshConfigPath)) currentConfig = fs.readFileSync(sshConfigPath, 'utf8');

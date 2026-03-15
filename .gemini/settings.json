@@ -12,8 +12,9 @@
       "projectId": "gemini-cli-team-quota",
       "zone": "us-west1-a",
       "remoteHost": "gcli-worker",
-      "remoteHome": "/home/mattkorwel_google_com",
-      "remoteWorkDir": "/home/mattkorwel_google_com/dev/main",
+      "remoteHome": "/home/node",
+      "remoteWorkDir": "/home/node/dev/main",
+      "useContainer": true,
       "terminalType": "iterm2"
     }
   }
