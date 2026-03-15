@@ -2569,4 +2569,64 @@ describe('GeminiChat', () => {
       });
     });
   });
+
+  describe('sendMessageStream generator abandonment (fix #22521)', () => {
+    it('should not mutate history if the returned generator is never iterated', async () => {
+      // Obtain the generator but never iterate it
+      await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'abandoned message',
+        'prompt-id',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      // History must remain empty � no orphaned user message
+      expect(chat.getHistory()).toHaveLength(0);
+    });
+
+    it('should not deadlock subsequent calls if the returned generator is never iterated', async () => {
+      mockRetryWithBackoff.mockImplementation(async (apiCall) => apiCall());
+      vi.mocked(mockContentGenerator.generateContentStream).mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: { parts: [{ text: 'hello' }], role: 'model' },
+                finishReason: 'STOP',
+              },
+            ],
+          };
+        })(),
+      );
+
+      // First call � obtain generator but never iterate it
+      await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'first message never iterated',
+        'prompt-id-1',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      // Second call � must resolve without hanging
+      const secondStream = await chat.sendMessageStream(
+        { model: 'gemini-pro' },
+        'second message',
+        'prompt-id-2',
+        new AbortController().signal,
+        LlmRole.MAIN,
+      );
+
+      const events: StreamEvent[] = [];
+      for await (const event of secondStream) {
+        events.push(event);
+      }
+
+      // Second call must succeed and history must have exactly one exchange
+      expect(chat.getHistory()).toHaveLength(2);
+      expect(chat.getHistory()[0]).toMatchObject({ role: 'user' });
+      expect(chat.getHistory()[1]).toMatchObject({ role: 'model' });
+    });
+  });
 });
