@@ -38,6 +38,23 @@ Shift from a "Manual VM" to an "Invisible VM" (Container-Optimized OS) that runs
 4. **Configuration**: Point to `.gcp/maintainer-worker.yml`.
 5. **Purpose**: Allows developers to test infrastructure changes before merging.
 
+## Phase 2: Refactoring setup.ts for Container-OS
+This phase is currently **ARCHIVED** in favor of the Persistent Workstation model. 
+
+### Implementation Logic (Snapshot)
+The orchestrator should launch isolated containers using this pattern:
+```bash
+docker run --rm -it \
+  --name offload-job-id \
+  -v ~/dev/worktrees/job-id:/home/node/dev/worktree:rw \
+  -v ~/dev/main:/home/node/dev/main:ro \
+  -v ~/.gemini:/home/node/.gemini:ro \
+  -w /home/node/dev/worktree \
+  maintainer-image:latest \
+  sh -c "tsx ~/.offload/scripts/entrypoint.ts ..."
+```
+
 ## How to Resume
-1. Load the checkpoint: `/checkpoint save offload-container-refactor` (if available).
-2. Tell Gemini: *"Read .gemini/skills/offload/NEXT_MISSION.md and start Phase 3: Refactoring setup.ts for Container-OS."*
+1. Review the archived container-launch logic above.
+2. Update `setup.ts` to use `gcloud compute instances create-with-container`.
+3. Update `orchestrator.ts` to use `docker run` instead of standard `ssh`.

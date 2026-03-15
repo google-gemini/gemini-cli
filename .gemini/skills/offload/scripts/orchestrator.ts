@@ -1,7 +1,7 @@
 /**
  * Universal Offload Orchestrator (Local)
  * 
- * Automatically connects to your dedicated worker and launches an isolated job container.
+ * Automatically connects to your dedicated worker and launches a persistent tmux task.
  */
 import { spawnSync } from 'child_process';
 import path from 'path';
@@ -31,7 +31,7 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
     return 1;
   }
 
-  const { projectId, zone, remoteHost, remoteWorkDir, useContainer } = config;
+  const { projectId, zone, remoteHost, remoteWorkDir } = config;
   const targetVM = `gcli-offload-${env.USER || 'mattkorwel'}`;
 
   // 2. Wake Worker
@@ -48,8 +48,8 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   const sessionName = `offload-${prNumber}-${action}`;
   const remoteWorktreeDir = `~/dev/worktrees/offload-${prNumber}-${action}`;
 
-  // 3. Remote Context Setup (Executed on Host for efficiency)
-  console.log(`🚀 Provisioning clean worktree for ${action} on PR #${prNumber}...`);
+  // 3. Remote Context Setup (Parallel Worktree)
+  console.log(`🚀 Provisioning persistent worktree for ${action} on PR #${prNumber}...`);
   const setupCmd = `
     mkdir -p ~/dev/worktrees && \
     cd ${remoteWorkDir} && \
@@ -58,22 +58,12 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   `;
   spawnSync(`ssh ${remoteHost} ${q(setupCmd)}`, { shell: true, stdio: 'inherit' });
 
-  // 4. Launch Isolated Container for Playbook
-  // We mount the specific worktree as RW, and the rest as RO for maximum safety.
-  const containerImage = 'us-docker.pkg.dev/gemini-code-dev/gemini-cli/maintainer:latest';
-  const dockerRun = `
-    docker run --rm -it \
-      --name ${sessionName} \
-      -v ${remoteWorktreeDir}:/home/node/dev/worktree:rw \
-      -v ${remoteWorkDir}:/home/node/dev/main:ro \
-      -v ~/.gemini:/home/node/.gemini:ro \
-      -v ~/.offload:/home/node/.offload:ro \
-      -w /home/node/dev/worktree \
-      ${containerImage} \
-      sh -c "tsx ${persistentScripts}/entrypoint.ts ${prNumber} remote-branch /home/node/.gemini/policies/offload-policy.toml ${action}; exec $SHELL"
-  `;
-
-  const finalSSH = `ssh -t ${remoteHost} ${q(dockerRun)}`;
+  // 4. Execution Logic (Persistent OS Mode)
+  const remoteWorker = `tsx ${persistentScripts}/entrypoint.ts ${prNumber} remote-branch ${remotePolicyPath} ${action}`;
+  const tmuxCmd = `cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL`;
+  
+  const sshInternal = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'offload' ${q(tmuxCmd)}`;
+  const finalSSH = `ssh -t ${remoteHost} ${q(sshInternal)}`;
 
   // 5. Open in iTerm2
   const isWithinGemini = !!env.GEMINI_CLI || !!env.GEMINI_SESSION_ID || !!env.GCLI_SESSION_ID;
@@ -93,7 +83,7 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
       end run
     `;
     spawnSync('osascript', ['-', tempCmdPath], { input: appleScript });
-    console.log(`✅ iTerm2 window opened on ${remoteHost} (Isolated Container).`);
+    console.log(`✅ iTerm2 window opened on ${remoteHost} (Persistent Session).`);
     return 0;
   }
 
