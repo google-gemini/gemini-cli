@@ -402,6 +402,7 @@ describe('ExecutionLifecycleService', () => {
       expect(info.output).toBe('agent output');
       expect(info.error).toBeNull();
       expect(info.injectionText).toBe('[Agent completed]\nagent output');
+      expect(info.completionBehavior).toBe('inject');
 
       ExecutionLifecycleService.offBackgroundComplete(listener);
     });
@@ -433,7 +434,7 @@ describe('ExecutionLifecycleService', () => {
       ExecutionLifecycleService.offBackgroundComplete(listener);
     });
 
-    it('sets injectionText to null when no formatInjection callback is provided', async () => {
+    it('sets injectionText to null and completionBehavior to silent when no formatInjection is provided', async () => {
       const listener = vi.fn();
       ExecutionLifecycleService.onBackgroundComplete(listener);
 
@@ -452,6 +453,7 @@ describe('ExecutionLifecycleService', () => {
 
       expect(listener).toHaveBeenCalledTimes(1);
       expect(listener.mock.calls[0][0].injectionText).toBeNull();
+      expect(listener.mock.calls[0][0].completionBehavior).toBe('silent');
 
       ExecutionLifecycleService.offBackgroundComplete(listener);
     });
@@ -517,6 +519,114 @@ describe('ExecutionLifecycleService', () => {
       ExecutionLifecycleService.completeExecution(executionId);
 
       expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('explicit notify behavior includes injectionText and auto-dismiss signal', async () => {
+      const listener = vi.fn();
+      ExecutionLifecycleService.onBackgroundComplete(listener);
+
+      const handle = ExecutionLifecycleService.createExecution(
+        '',
+        undefined,
+        'child_process',
+        () => '[Command completed. Output saved to /tmp/bg.log]',
+        undefined,
+        'notify',
+      );
+      const executionId = handle.pid!;
+
+      ExecutionLifecycleService.background(executionId);
+      await handle.result;
+
+      ExecutionLifecycleService.completeExecution(executionId);
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      const info = listener.mock.calls[0][0];
+      expect(info.completionBehavior).toBe('notify');
+      expect(info.injectionText).toBe(
+        '[Command completed. Output saved to /tmp/bg.log]',
+      );
+
+      ExecutionLifecycleService.offBackgroundComplete(listener);
+    });
+
+    it('explicit silent behavior skips injection even when formatInjection is provided', async () => {
+      const formatFn = vi.fn().mockReturnValue('should not appear');
+      const listener = vi.fn();
+      ExecutionLifecycleService.onBackgroundComplete(listener);
+
+      const handle = ExecutionLifecycleService.createExecution(
+        '',
+        undefined,
+        'none',
+        formatFn,
+        undefined,
+        'silent',
+      );
+      const executionId = handle.pid!;
+
+      ExecutionLifecycleService.background(executionId);
+      await handle.result;
+
+      ExecutionLifecycleService.completeExecution(executionId);
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      const info = listener.mock.calls[0][0];
+      expect(info.completionBehavior).toBe('silent');
+      expect(info.injectionText).toBeNull();
+      expect(formatFn).not.toHaveBeenCalled();
+
+      ExecutionLifecycleService.offBackgroundComplete(listener);
+    });
+
+    it('includes completionBehavior in BackgroundStartInfo', async () => {
+      const bgStartListener = vi.fn();
+      ExecutionLifecycleService.onBackground(bgStartListener);
+
+      const handle = ExecutionLifecycleService.createExecution(
+        '',
+        undefined,
+        'remote_agent',
+        () => 'text',
+        'test-label',
+        'inject',
+      );
+
+      ExecutionLifecycleService.background(handle.pid!);
+      await handle.result;
+
+      expect(bgStartListener).toHaveBeenCalledTimes(1);
+      expect(bgStartListener.mock.calls[0][0].completionBehavior).toBe(
+        'inject',
+      );
+
+      ExecutionLifecycleService.offBackground(bgStartListener);
+    });
+
+    it('completionBehavior flows through attachExecution', async () => {
+      const listener = vi.fn();
+      ExecutionLifecycleService.onBackgroundComplete(listener);
+
+      const handle = ExecutionLifecycleService.attachExecution(9999, {
+        executionMethod: 'child_process',
+        formatInjection: () => '[notify message]',
+        completionBehavior: 'notify',
+      });
+
+      ExecutionLifecycleService.background(9999);
+      await handle.result;
+
+      ExecutionLifecycleService.completeWithResult(
+        9999,
+        createResult({ pid: 9999, executionMethod: 'child_process' }),
+      );
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      const info = listener.mock.calls[0][0];
+      expect(info.completionBehavior).toBe('notify');
+      expect(info.injectionText).toBe('[notify message]');
+
+      ExecutionLifecycleService.offBackgroundComplete(listener);
     });
   });
 });

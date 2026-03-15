@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { AnsiOutput } from '@google/gemini-cli-core';
+import type { AnsiOutput, CompletionBehavior } from '@google/gemini-cli-core';
 
 export interface BackgroundShell {
   pid: number;
@@ -14,6 +14,7 @@ export interface BackgroundShell {
   binaryBytesReceived: number;
   status: 'running' | 'exited';
   exitCode?: number;
+  completionBehavior?: CompletionBehavior;
 }
 
 export interface ShellState {
@@ -33,6 +34,7 @@ export type ShellAction =
       pid: number;
       command: string;
       initialOutput: string | AnsiOutput;
+      completionBehavior?: CompletionBehavior;
     }
   | { type: 'UPDATE_SHELL'; pid: number; update: Partial<BackgroundShell> }
   | { type: 'APPEND_SHELL_OUTPUT'; pid: number; chunk: string | AnsiOutput }
@@ -72,6 +74,7 @@ export function shellReducer(
         isBinary: false,
         binaryBytesReceived: 0,
         status: 'running',
+        completionBehavior: action.completionBehavior,
       });
       return { ...state, backgroundShells: nextShells };
     }

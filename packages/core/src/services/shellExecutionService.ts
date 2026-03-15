@@ -448,6 +448,14 @@ export class ShellExecutionService {
                 return false;
               }
             },
+            formatInjection: (_output, error) => {
+              const logPath = ShellExecutionService.getLogFilePath(child.pid!);
+              const status = error
+                ? `with error: ${error.message}`
+                : 'successfully';
+              return `[Background command completed ${status}. Output saved to ${logPath}]`;
+            },
+            completionBehavior: 'notify',
           })
         : undefined;
 
@@ -782,6 +790,14 @@ export class ShellExecutionService {
           );
           return bufferData.length > 0 ? bufferData : undefined;
         },
+        formatInjection: (_output, error) => {
+          const logPath = ShellExecutionService.getLogFilePath(ptyPid);
+          const status = error
+            ? `with error: ${error.message}`
+            : 'successfully';
+          return `[Background command completed ${status}. Output saved to ${logPath}]`;
+        },
+        completionBehavior: 'notify',
       }).result;
 
       let processingChain = Promise.resolve();

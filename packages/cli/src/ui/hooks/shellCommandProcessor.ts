@@ -9,7 +9,12 @@ import type {
   IndividualToolCallDisplay,
 } from '../types.js';
 import { useCallback, useReducer, useRef, useEffect } from 'react';
-import type { AnsiOutput, Config, GeminiClient } from '@google/gemini-cli-core';
+import type {
+  AnsiOutput,
+  Config,
+  GeminiClient,
+  CompletionBehavior,
+} from '@google/gemini-cli-core';
 import {
   isBinary,
   ShellExecutionService,
@@ -238,8 +243,19 @@ export const useShellCommandProcessor = (
   );
 
   const registerBackgroundTask = useCallback(
-    (pid: number, command: string, initialOutput: string | AnsiOutput) => {
-      dispatch({ type: 'REGISTER_SHELL', pid, command, initialOutput });
+    (
+      pid: number,
+      command: string,
+      initialOutput: string | AnsiOutput,
+      completionBehavior?: CompletionBehavior,
+    ) => {
+      dispatch({
+        type: 'REGISTER_SHELL',
+        pid,
+        command,
+        initialOutput,
+        completionBehavior,
+      });
 
       // Subscribe to exit via ExecutionLifecycleService (works for all execution types)
       const exitUnsubscribe = ExecutionLifecycleService.onExit(pid, (code) => {
@@ -248,8 +264,11 @@ export const useShellCommandProcessor = (
           pid,
           update: { status: 'exited', exitCode: code },
         });
-        // Auto-dismiss completed tasks from the background panel.
-        dispatch({ type: 'DISMISS_SHELL', pid });
+        // Auto-dismiss for inject/notify (output was delivered to conversation).
+        // Silent tasks stay in the UI until manually dismissed.
+        if (completionBehavior !== 'silent') {
+          dispatch({ type: 'DISMISS_SHELL', pid });
+        }
         const unsub = m.subscriptions.get(pid);
         if (unsub) {
           unsub();
@@ -304,12 +323,18 @@ export const useShellCommandProcessor = (
       executionId: number;
       label: string;
       output: string;
+      completionBehavior: CompletionBehavior;
     }) => {
       // Skip if already registered (e.g. shells register via their own flow)
       if (m.backgroundedPids.has(info.executionId)) {
         return;
       }
-      registerBackgroundTask(info.executionId, info.label, info.output);
+      registerBackgroundTask(
+        info.executionId,
+        info.label,
+        info.output,
+        info.completionBehavior,
+      );
     };
     ExecutionLifecycleService.onBackground(listener);
     return () => {
@@ -489,7 +514,12 @@ export const useShellCommandProcessor = (
           setPendingHistoryItem(null);
 
           if (result.backgrounded && result.pid) {
-            registerBackgroundTask(result.pid, rawQuery, cumulativeStdout);
+            registerBackgroundTask(
+              result.pid,
+              rawQuery,
+              cumulativeStdout,
+              'notify',
+            );
             dispatch({ type: 'SET_ACTIVE_PTY', pid: null });
           }
 
