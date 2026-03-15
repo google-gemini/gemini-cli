@@ -3619,17 +3619,19 @@ describe('loadCliConfig mcpEnabled', () => {
 
 describe('loadCliConfig acpMode and clientName', () => {
   beforeEach(() => {
-    vi.resetAllMocks();
+      vi.resetAllMocks();
     vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
     vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.stubEnv('CURSOR_TRACE_ID', '');
+    vi.stubEnv('__COG_BASHRC_SOURCED', '');
+    vi.stubEnv('REPLIT_USER', '');
+    vi.stubEnv('CODESPACES', '');
     vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
   });
-
   afterEach(() => {
     vi.unstubAllEnvs();
   });
-
-  it('should set acpMode to true and detect clientName when --acp flag is used', async () => {
+  it('should set acpMode to true and detect clientName when --acp flag is used',async () => {
     process.argv = ['node', 'script.js', '--acp'];
     vi.stubEnv('TERM_PROGRAM', 'vscode');
     vi.stubEnv('VSCODE_GIT_ASKPASS_MAIN', '');
