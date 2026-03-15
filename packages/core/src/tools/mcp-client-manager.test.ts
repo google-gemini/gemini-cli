@@ -751,6 +751,19 @@ describe('McpClientManager', () => {
       );
     });
 
+    it('should remove the client from the clients map if initialization fails', async () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      const name = 'test-server';
+      const config = { command: 'node', args: ['fail.js'] };
+
+      mockedMcpClient.connect.mockRejectedValue(new Error('Connection failed'));
+
+      // maybeDiscoverMcpServer returns a promise that resolves when discovery is finished.
+      await manager.maybeDiscoverMcpServer(name, config);
+
+      expect(manager.getClient(name)).toBeUndefined();
+    });
+
     it('should show previously deduplicated errors after interaction clears state', () => {
       const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
 

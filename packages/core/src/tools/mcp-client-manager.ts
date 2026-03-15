@@ -404,6 +404,7 @@ export class McpClientManager {
             await client.discover(this.cliConfig);
             this.eventEmitter?.emit('mcp-client-update', this.clients);
           } catch (error) {
+            this.clients.delete(name);
             this.eventEmitter?.emit('mcp-client-update', this.clients);
             // Check if this is a 401/auth error - if so, don't show as red error
             // (the info message was already shown in mcp-client.ts)
@@ -418,6 +419,7 @@ export class McpClientManager {
             }
           }
         } catch (error) {
+          this.clients.delete(name);
           const errorMessage = getErrorMessage(error);
           this.emitDiagnostic(
             'error',
