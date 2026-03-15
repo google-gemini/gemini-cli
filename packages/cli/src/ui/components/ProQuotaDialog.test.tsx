@@ -14,6 +14,7 @@ import {
   PREVIEW_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   AuthType,
+  type Config,
 } from '@google/gemini-cli-core';
 
 // Mock the child component to make it easier to test the parent
@@ -23,9 +24,13 @@ vi.mock('./shared/RadioButtonSelect.js', () => ({
 
 describe('ProQuotaDialog', () => {
   const mockOnChoice = vi.fn();
+  const mockConfig = {
+    getHasProModelAccessSync: vi.fn().mockReturnValue(false),
+  } as unknown as Config;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(mockConfig.getHasProModelAccessSync).mockReturnValue(false);
   });
 
   describe('for flash model failures', () => {
@@ -72,6 +77,7 @@ describe('ProQuotaDialog', () => {
             isTerminalQuotaError={true}
             isModelNotFoundError={false}
             authType={AuthType.LOGIN_WITH_GOOGLE}
+            config={mockConfig}
             onChoice={mockOnChoice}
           />,
         );
@@ -174,6 +180,7 @@ describe('ProQuotaDialog', () => {
             isTerminalQuotaError={true}
             isModelNotFoundError={false}
             authType={AuthType.LOGIN_WITH_GOOGLE}
+            config={mockConfig}
             onChoice={mockOnChoice}
           />,
         );
@@ -213,6 +220,41 @@ describe('ProQuotaDialog', () => {
             isModelNotFoundError={false}
             authType={AuthType.LOGIN_WITH_GOOGLE}
             tierName="Gemini Advanced Ultra"
+            onChoice={mockOnChoice}
+          />,
+        );
+
+        expect(RadioButtonSelect).toHaveBeenCalledWith(
+          expect.objectContaining({
+            items: [
+              {
+                label: 'Switch to gemini-2.5-flash',
+                value: 'retry_always',
+                key: 'retry_always',
+              },
+              {
+                label: 'Stop',
+                value: 'retry_later',
+                key: 'retry_later',
+              },
+            ],
+          }),
+          undefined,
+        );
+        unmount();
+      });
+
+      it('should NOT render upgrade option for LOGIN_WITH_GOOGLE if hasAccessToProModel is true', () => {
+        vi.mocked(mockConfig.getHasProModelAccessSync).mockReturnValue(true);
+        const { unmount } = render(
+          <ProQuotaDialog
+            failedModel="gemini-2.5-pro"
+            fallbackModel="gemini-2.5-flash"
+            message="free tier quota error"
+            isTerminalQuotaError={true}
+            isModelNotFoundError={false}
+            authType={AuthType.LOGIN_WITH_GOOGLE}
+            config={mockConfig}
             onChoice={mockOnChoice}
           />,
         );
@@ -283,6 +325,7 @@ describe('ProQuotaDialog', () => {
             isTerminalQuotaError={false}
             isModelNotFoundError={true}
             authType={AuthType.LOGIN_WITH_GOOGLE}
+            config={mockConfig}
             onChoice={mockOnChoice}
           />,
         );

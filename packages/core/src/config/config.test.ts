@@ -583,6 +583,70 @@ describe('Server Config (config.ts)', () => {
         expect(await config.getResolvedClassifierThreshold()).toBe(90);
       });
     });
+
+    describe('getHasProModelAccessSync', () => {
+      it('should return true if experiments are missing', () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: undefined,
+        } as unknown as ConfigParameters);
+        expect(config.getHasProModelAccessSync()).toBe(true);
+      });
+
+      it('should return true if experiments flags are empty', () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {},
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(config.getHasProModelAccessSync()).toBe(true);
+      });
+
+      it('should return the flag value if present', () => {
+        const configTrue = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.PRO_MODEL_ACCESS]: {
+                boolValue: true,
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(configTrue.getHasProModelAccessSync()).toBe(true);
+
+        const configFalse = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.PRO_MODEL_ACCESS]: {
+                boolValue: false,
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(configFalse.getHasProModelAccessSync()).toBe(false);
+      });
+
+      it('should return false if experiments are present but the flag is missing', () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.USER_CACHING]: {
+                boolValue: true,
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(config.getHasProModelAccessSync()).toBe(false);
+      });
+    });
   });
 
   describe('refreshAuth', () => {

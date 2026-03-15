@@ -128,11 +128,11 @@ import {
   type SafetyCheckerRule,
 } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
-import type {
+import {
   UserTierId,
-  GeminiUserTier,
-  RetrieveUserQuotaResponse,
-  AdminControlsSettings,
+  type GeminiUserTier,
+  type RetrieveUserQuotaResponse,
+  type AdminControlsSettings,
 } from '../code_assist/types.js';
 import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
@@ -1371,6 +1371,11 @@ export class Config implements McpContext, AgentLoopContext {
       },
     );
     this.setRemoteAdminSettings(adminControls);
+
+    const userTier = this.getUserTier();
+    if (userTier === UserTierId.FREE && isAutoModel(this.model)) {
+      this.setModel(PREVIEW_GEMINI_FLASH_MODEL);
+    }
   }
 
   async getExperimentsAsync(): Promise<Experiments | undefined> {
@@ -2654,6 +2659,30 @@ export class Config implements McpContext, AgentLoopContext {
     return (
       this.experiments?.flags[ExperimentFlags.BANNER_TEXT_CAPACITY_ISSUES]
         ?.stringValue ?? ''
+    );
+  }
+
+  /**
+   * Returns whether the user has access to Pro models.
+   * This is determined by the PRO_MODEL_ACCESS experiment flag.
+   */
+  async getHasProModelAccess(): Promise<boolean> {
+    await this.ensureExperimentsLoaded();
+    return this.getHasProModelAccessSync();
+  }
+
+  /**
+   * Returns whether the user has access to Pro models synchronously.
+   *
+   * Note: This method should only be called after startup, once experiments have been loaded.
+   */
+  getHasProModelAccessSync(): boolean {
+    if (!this.experiments || Object.keys(this.experiments.flags).length === 0) {
+      return true;
+    }
+    return (
+      this.experiments?.flags[ExperimentFlags.PRO_MODEL_ACCESS]?.boolValue ??
+      false
     );
   }
 

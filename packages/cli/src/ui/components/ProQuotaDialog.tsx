@@ -8,8 +8,8 @@ import type React from 'react';
 import { Box, Text } from 'ink';
 import { RadioButtonSelect } from './shared/RadioButtonSelect.js';
 import { theme } from '../semantic-colors.js';
-import { AuthType } from '@google/gemini-cli-core';
-import { isUltraTier } from '../../utils/tierUtils.js';
+import { AuthType, type Config } from '@google/gemini-cli-core';
+import { isUltraTier, hasAccessToProModel } from '../../utils/tierUtils.js';
 
 interface ProQuotaDialogProps {
   failedModel: string;
@@ -19,6 +19,7 @@ interface ProQuotaDialogProps {
   isModelNotFoundError?: boolean;
   authType?: AuthType;
   tierName?: string;
+  config?: Config | null;
   onChoice: (
     choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
   ) => void;
@@ -32,6 +33,7 @@ export function ProQuotaDialog({
   isModelNotFoundError,
   authType,
   tierName,
+  config,
   onChoice,
 }: ProQuotaDialogProps): React.JSX.Element {
   let items;
@@ -51,6 +53,7 @@ export function ProQuotaDialog({
     ];
   } else if (isModelNotFoundError || isTerminalQuotaError) {
     const isUltra = isUltraTier(tierName);
+    const hasProAccess = hasAccessToProModel(config);
 
     // free users and out of quota users on G1 pro and Cloud Console gets an option to upgrade
     items = [
@@ -59,7 +62,7 @@ export function ProQuotaDialog({
         value: 'retry_always' as const,
         key: 'retry_always',
       },
-      ...(authType === AuthType.LOGIN_WITH_GOOGLE && !isUltra
+      ...(authType === AuthType.LOGIN_WITH_GOOGLE && !isUltra && !hasProAccess
         ? [
             {
               label: 'Upgrade for higher limits',

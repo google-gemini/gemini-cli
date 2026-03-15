@@ -13,7 +13,7 @@ import {
   UserAccountManager,
   AuthType,
 } from '@google/gemini-cli-core';
-import { isUltraTier } from '../../utils/tierUtils.js';
+import { isUltraTier, hasAccessToProModel } from '../../utils/tierUtils.js';
 
 interface UserIdentityProps {
   config: Config;
@@ -35,6 +35,9 @@ export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
   );
 
   const isUltra = useMemo(() => isUltraTier(tierName), [tierName]);
+  const hasProAccess = useMemo(() => hasAccessToProModel(config), [config]);
+
+  const shouldShowUpgrade = !isUltra && !hasProAccess;
 
   if (!authType) {
     return null;
@@ -63,7 +66,9 @@ export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
           <Text color={theme.text.primary} wrap="truncate-end">
             <Text bold>Plan:</Text> {tierName}
           </Text>
-          {!isUltra && <Text color={theme.text.secondary}> /upgrade</Text>}
+          {shouldShowUpgrade && (
+            <Text color={theme.text.secondary}> /upgrade</Text>
+          )}
         </Box>
       )}
     </Box>
