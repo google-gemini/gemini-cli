@@ -9,14 +9,13 @@ import type React from 'react';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { waitFor } from '../../test-utils/async.js';
-import type { Mock } from 'vitest';
-import { vi, afterAll, beforeAll } from 'vitest';
-import type { Key } from './KeypressContext.js';
+import { vi, afterAll, beforeAll, type Mock } from 'vitest';
 import {
   KeypressProvider,
   useKeypressContext,
   ESC_TIMEOUT,
   FAST_RETURN_TIMEOUT,
+  type Key,
 } from './KeypressContext.js';
 import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js';
 import { useStdin } from 'ink';
@@ -647,6 +646,15 @@ describe('KeypressContext', () => {
       {
         sequence: `\x1b[27;6;9~`,
         expected: { name: 'tab', shift: true, ctrl: true },
+      },
+      // Unicode CJK (Kitty/modifyOtherKeys scalar values)
+      {
+        sequence: '\x1b[44032u',
+        expected: { name: '가', sequence: '가', insertable: true },
+      },
+      {
+        sequence: '\x1b[27;1;44032~',
+        expected: { name: '가', sequence: '가', insertable: true },
       },
       // XTerm Function Key
       { sequence: `\x1b[1;129A`, expected: { name: 'up' } },
@@ -1404,7 +1412,7 @@ describe('KeypressContext', () => {
       expect(keyHandler).toHaveBeenCalledTimes(inputString.length);
       for (const char of inputString) {
         expect(keyHandler).toHaveBeenCalledWith(
-          expect.objectContaining({ sequence: char }),
+          expect.objectContaining({ sequence: char, name: char.toLowerCase() }),
         );
       }
     });

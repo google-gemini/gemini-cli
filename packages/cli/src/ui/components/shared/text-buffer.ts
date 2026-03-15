@@ -1568,6 +1568,7 @@ export interface TextBufferState {
   visualLayout: VisualLayout;
   pastedContent: Record<string, string>;
   expandedPaste: ExpandedPasteInfo | null;
+  yankRegister: { text: string; linewise: boolean } | null;
 }
 
 const historyLimit = 100;
@@ -1722,6 +1723,14 @@ export type TextBufferAction =
       type: 'vim_delete_to_char_backward';
       payload: { char: string; count: number; till: boolean };
     }
+  | { type: 'vim_yank_line'; payload: { count: number } }
+  | { type: 'vim_yank_word_forward'; payload: { count: number } }
+  | { type: 'vim_yank_big_word_forward'; payload: { count: number } }
+  | { type: 'vim_yank_word_end'; payload: { count: number } }
+  | { type: 'vim_yank_big_word_end'; payload: { count: number } }
+  | { type: 'vim_yank_to_end_of_line'; payload: { count: number } }
+  | { type: 'vim_paste_after'; payload: { count: number } }
+  | { type: 'vim_paste_before'; payload: { count: number } }
   | {
       type: 'toggle_paste_expansion';
       payload: { id: string; row: number; col: number };
@@ -2510,6 +2519,14 @@ function textBufferReducerLogic(
     case 'vim_find_char_backward':
     case 'vim_delete_to_char_forward':
     case 'vim_delete_to_char_backward':
+    case 'vim_yank_line':
+    case 'vim_yank_word_forward':
+    case 'vim_yank_big_word_forward':
+    case 'vim_yank_word_end':
+    case 'vim_yank_big_word_end':
+    case 'vim_yank_to_end_of_line':
+    case 'vim_paste_after':
+    case 'vim_paste_before':
       return handleVimAction(state, action as VimAction);
 
     case 'toggle_paste_expansion': {
@@ -2765,6 +2782,7 @@ export function useTextBuffer({
       visualLayout,
       pastedContent: {},
       expandedPaste: null,
+      yankRegister: null,
     };
   }, [initialText, initialCursorOffset, viewport.width, viewport.height]);
 
@@ -3171,6 +3189,38 @@ export function useTextBuffer({
 
   const vimEscapeInsertMode = useCallback((): void => {
     dispatch({ type: 'vim_escape_insert_mode' });
+  }, []);
+
+  const vimYankLine = useCallback((count: number): void => {
+    dispatch({ type: 'vim_yank_line', payload: { count } });
+  }, []);
+
+  const vimYankWordForward = useCallback((count: number): void => {
+    dispatch({ type: 'vim_yank_word_forward', payload: { count } });
+  }, []);
+
+  const vimYankBigWordForward = useCallback((count: number): void => {
+    dispatch({ type: 'vim_yank_big_word_forward', payload: { count } });
+  }, []);
+
+  const vimYankWordEnd = useCallback((count: number): void => {
+    dispatch({ type: 'vim_yank_word_end', payload: { count } });
+  }, []);
+
+  const vimYankBigWordEnd = useCallback((count: number): void => {
+    dispatch({ type: 'vim_yank_big_word_end', payload: { count } });
+  }, []);
+
+  const vimYankToEndOfLine = useCallback((count: number): void => {
+    dispatch({ type: 'vim_yank_to_end_of_line', payload: { count } });
+  }, []);
+
+  const vimPasteAfter = useCallback((count: number): void => {
+    dispatch({ type: 'vim_paste_after', payload: { count } });
+  }, []);
+
+  const vimPasteBefore = useCallback((count: number): void => {
+    dispatch({ type: 'vim_paste_before', payload: { count } });
   }, []);
 
   const openInExternalEditor = useCallback(async (): Promise<void> => {
@@ -3640,6 +3690,14 @@ export function useTextBuffer({
       vimMoveToLastLine,
       vimMoveToLine,
       vimEscapeInsertMode,
+      vimYankLine,
+      vimYankWordForward,
+      vimYankBigWordForward,
+      vimYankWordEnd,
+      vimYankBigWordEnd,
+      vimYankToEndOfLine,
+      vimPasteAfter,
+      vimPasteBefore,
     }),
     [
       lines,
@@ -3735,6 +3793,14 @@ export function useTextBuffer({
       vimMoveToLastLine,
       vimMoveToLine,
       vimEscapeInsertMode,
+      vimYankLine,
+      vimYankWordForward,
+      vimYankBigWordForward,
+      vimYankWordEnd,
+      vimYankBigWordEnd,
+      vimYankToEndOfLine,
+      vimPasteAfter,
+      vimPasteBefore,
     ],
   );
   return returnValue;
@@ -4095,4 +4161,20 @@ export interface TextBuffer {
    * Handle escape from insert mode (moves cursor left if not at line start)
    */
   vimEscapeInsertMode: () => void;
+  /** Yank N lines into the unnamed register (vim 'yy' / 'Nyy') */
+  vimYankLine: (count: number) => void;
+  /** Yank forward N words into the unnamed register (vim 'yw') */
+  vimYankWordForward: (count: number) => void;
+  /** Yank forward N big words into the unnamed register (vim 'yW') */
+  vimYankBigWordForward: (count: number) => void;
+  /** Yank to end of N words into the unnamed register (vim 'ye') */
+  vimYankWordEnd: (count: number) => void;
+  /** Yank to end of N big words into the unnamed register (vim 'yE') */
+  vimYankBigWordEnd: (count: number) => void;
+  /** Yank from cursor to end of line into the unnamed register (vim 'y$') */
+  vimYankToEndOfLine: (count: number) => void;
+  /** Paste the unnamed register after cursor (vim 'p') */
+  vimPasteAfter: (count: number) => void;
+  /** Paste the unnamed register before cursor (vim 'P') */
+  vimPasteBefore: (count: number) => void;
 }
