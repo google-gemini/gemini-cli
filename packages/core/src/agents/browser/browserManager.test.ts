@@ -9,6 +9,7 @@ import { BrowserManager } from './browserManager.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import type { Config } from '../../config/config.js';
 import { injectAutomationOverlay } from './automationOverlay.js';
+import { injectInputBlocker } from './inputBlocker.js';
 
 // Mock the MCP SDK
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
@@ -45,6 +46,10 @@ vi.mock('../../utils/debugLogger.js', () => ({
 
 vi.mock('./automationOverlay.js', () => ({
   injectAutomationOverlay: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('./inputBlocker.js', () => ({
+  injectInputBlocker: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -419,21 +424,66 @@ describe('BrowserManager', () => {
   });
 
   describe('overlay re-injection in callTool', () => {
-    it('should re-inject overlay after click in non-headless mode', async () => {
+    it('should re-inject overlay and input blocker after click in non-headless mode when input disabling is enabled', async () => {
+      // Enable input disabling in config
+      mockConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: false,
+            disableUserInput: true,
+          },
+        },
+      });
+
       const manager = new BrowserManager(mockConfig);
       await manager.callTool('click', { uid: '1_2' });
 
       expect(injectAutomationOverlay).toHaveBeenCalledWith(manager, undefined);
+      expect(injectInputBlocker).toHaveBeenCalledWith(manager);
     });
 
-    it('should re-inject overlay after navigate_page in non-headless mode', async () => {
+    it('should re-inject overlay and input blocker after navigate_page in non-headless mode when input disabling is enabled', async () => {
+      mockConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: false,
+            disableUserInput: true,
+          },
+        },
+      });
+
       const manager = new BrowserManager(mockConfig);
       await manager.callTool('navigate_page', { url: 'https://example.com' });
 
       expect(injectAutomationOverlay).toHaveBeenCalledWith(manager, undefined);
+      expect(injectInputBlocker).toHaveBeenCalledWith(manager);
     });
 
-    it('should re-inject overlay after click_at, new_page, press_key, handle_dialog', async () => {
+    it('should re-inject overlay and input blocker after click_at, new_page, press_key, handle_dialog when input disabling is enabled', async () => {
+      mockConfig = makeFakeConfig({
+        agents: {
+          overrides: {
+            browser_agent: {
+              enabled: true,
+            },
+          },
+          browser: {
+            headless: false,
+            disableUserInput: true,
+          },
+        },
+      });
+
       const manager = new BrowserManager(mockConfig);
       for (const tool of [
         'click_at',
@@ -442,12 +492,14 @@ describe('BrowserManager', () => {
         'handle_dialog',
       ]) {
         vi.mocked(injectAutomationOverlay).mockClear();
+        vi.mocked(injectInputBlocker).mockClear();
         await manager.callTool(tool, {});
         expect(injectAutomationOverlay).toHaveBeenCalledTimes(1);
+        expect(injectInputBlocker).toHaveBeenCalledTimes(1);
       }
     });
 
-    it('should NOT re-inject overlay after read-only tools', async () => {
+    it('should NOT re-inject overlay or input blocker after read-only tools', async () => {
       const manager = new BrowserManager(mockConfig);
       for (const tool of [
         'take_snapshot',
@@ -456,8 +508,10 @@ describe('BrowserManager', () => {
         'fill',
       ]) {
         vi.mocked(injectAutomationOverlay).mockClear();
+        vi.mocked(injectInputBlocker).mockClear();
         await manager.callTool(tool, {});
         expect(injectAutomationOverlay).not.toHaveBeenCalled();
+        expect(injectInputBlocker).not.toHaveBeenCalled();
       }
     });
 
