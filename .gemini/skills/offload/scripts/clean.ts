@@ -1,7 +1,7 @@
 /**
  * Universal Offload Cleanup (Local)
  * 
- * Cleans up tmux sessions and workspace on the GCE worker.
+ * Surgical or full cleanup of sessions and worktrees on the GCE worker.
  */
 import { spawnSync } from 'child_process';
 import path from 'path';
@@ -22,7 +22,10 @@ async function confirm(question: string): Promise<boolean> {
   });
 }
 
-export async function runCleanup() {
+export async function runCleanup(args: string[]) {
+  const prNumber = args[0];
+  const action = args[1];
+
   const settingsPath = path.join(REPO_ROOT, '.gemini/settings.json');
   if (!fs.existsSync(settingsPath)) {
     console.error('❌ Settings not found. Run "npm run offload:setup" first.');
@@ -37,32 +40,49 @@ export async function runCleanup() {
     return 1;
   }
 
-  const { projectId, zone } = config;
-  const targetVM = `gcli-offload-${process.env.USER || 'mattkorwel'}`;
+  const { remoteHost } = config;
 
-  console.log(`🧹 Starting cleanup for ${targetVM}...`);
+  if (prNumber && action) {
+    const sessionName = `offload-${prNumber}-${action}`;
+    const worktreePath = `~/dev/worktrees/${sessionName}`;
+    
+    console.log(`🧹 Surgically removing session and worktree for ${prNumber}-${action}...`);
+    
+    // Kill specific tmux session
+    spawnSync(`ssh ${remoteHost} "tmux kill-session -t ${sessionName} 2>/dev/null"`, { shell: true });
+    
+    // Remove specific worktree
+    spawnSync(`ssh ${remoteHost} "cd ~/dev/main && git worktree remove -f ${worktreePath} 2>/dev/null"`, { shell: true });
+    spawnSync(`ssh ${remoteHost} "cd ~/dev/main && git worktree prune"`, { shell: true });
+    
+    console.log(`✅ Cleaned up ${prNumber}-${action}.`);
+    return 0;
+  }
+
+  // --- Bulk Cleanup (Old Behavior) ---
+  console.log(`🧹 Starting BULK cleanup on ${remoteHost}...`);
 
   // 1. Standard Cleanup
-  console.log('   - Killing remote tmux sessions...');
+  console.log('   - Killing ALL remote tmux sessions...');
   spawnSync(`ssh ${remoteHost} "tmux kill-server"`, { shell: true });
 
-  console.log('   - Cleaning up Git Worktrees...');
+  console.log('   - Cleaning up ALL Git Worktrees...');
   spawnSync(`ssh ${remoteHost} "cd ~/dev/main && git worktree prune"`, { shell: true });
   spawnSync(`ssh ${remoteHost} "rm -rf ~/dev/worktrees/*"`, { shell: true });
 
   console.log('✅ Remote environment cleared.');
 
   // 2. Full Wipe Option
-  const shouldWipe = await confirm('\nWould you like to COMPLETELY wipe the remote workspace directory?');
+  const shouldWipe = await confirm('\nWould you like to COMPLETELY wipe the remote workspace (main clone)?');
   
   if (shouldWipe) {
-    console.log(`🔥 Wiping ~/.offload/workspace...`);
-    spawnSync(`gcloud compute ssh ${targetVM} --project ${projectId} --zone ${zone} --command "rm -rf ~/.offload/workspace && mkdir -p ~/.offload/workspace"`, { stdio: 'inherit', shell: true });
-    console.log('✅ Remote workspace wiped.');
+    console.log(`🔥 Wiping ~/dev/main...`);
+    spawnSync(`ssh ${remoteHost} "rm -rf ~/dev/main && mkdir -p ~/dev/main"`, { stdio: 'inherit', shell: true });
+    console.log('✅ Remote hub wiped. You will need to run npm run offload:setup again.');
   }
   return 0;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  runCleanup().catch(console.error);
+  runCleanup(process.argv.slice(2)).catch(console.error);
 }

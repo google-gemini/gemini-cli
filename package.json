@@ -71,6 +71,7 @@
     "offload:status": "npm run offload:fleet status",
     "offload:attach": "tsx .gemini/skills/offload/scripts/attach.ts",
     "offload:logs": "tsx .gemini/skills/offload/scripts/logs.ts",
+    "offload:remove": "tsx .gemini/skills/offload/scripts/clean.ts",
     "pre-commit": "node scripts/pre-commit.js"
   },
   "overrides": {

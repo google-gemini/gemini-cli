@@ -55,9 +55,10 @@ function getStatus() {
 
     console.log(`${pr.padEnd(10)} | ${action.padEnd(10)} | ${state.padEnd(12)} | ${id.padEnd(25)}`);
     if (state === '🏃 RUNNING') {
-        console.log(`           └─ Attach: npm run offload:attach ${pr} ${action} [--local]`);
-        console.log(`           └─ Logs:   npm run offload:logs ${pr} ${action}`);
+        console.log(`           ├─ Attach: npm run offload:attach ${pr} ${action} [--local]`);
+        console.log(`           ├─ Logs:   npm run offload:logs ${pr} ${action}`);
     }
+    console.log(`           └─ Remove: npm run offload:remove ${pr} ${action}`);
   });
   console.log(''.padEnd(100, '-'));
 }
