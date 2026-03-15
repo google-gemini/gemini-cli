@@ -134,7 +134,7 @@ describe('Scheduler (Orchestrator)', () => {
   const req2: ToolCallRequestInfo = {
     callId: 'call-2',
     name: 'test-tool',
-    args: { foo: 'baz' },
+    args: { foo: 'baz', wait_for_previous: true },
     isClientInitiated: false,
     prompt_id: 'prompt-1',
     schedulerId: ROOT_SCHEDULER_ID,
@@ -844,6 +844,7 @@ describe('Scheduler (Orchestrator)', () => {
         resolution.outcome,
         resolution.lastDetails,
         mockConfig,
+        expect.anything(),
         expect.anything(),
       );
 

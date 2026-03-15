@@ -8,9 +8,9 @@ import path from 'node:path';
 import process from 'node:process';
 import { homedir } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import type { Config } from '../config/config.js';
 import * as snippets from './snippets.js';
 import * as legacySnippets from './snippets.legacy.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 export type ResolvedPath = {
   isSwitch: boolean;
@@ -63,7 +63,7 @@ export function resolvePathFromEnv(envVar?: string): ResolvedPath {
  */
 export function applySubstitutions(
   prompt: string,
-  config: Config,
+  context: AgentLoopContext,
   skillsPrompt: string,
   isGemini3: boolean = false,
 ): string {
@@ -73,7 +73,7 @@ export function applySubstitutions(
 
   const activeSnippets = isGemini3 ? snippets : legacySnippets;
   const subAgentsContent = activeSnippets.renderSubAgents(
-    config
+    context.config
       .getAgentRegistry()
       .getAllDefinitions()
       .map((d) => ({
@@ -84,7 +84,7 @@ export function applySubstitutions(
 
   result = result.replace(/\${SubAgents}/g, subAgentsContent);
 
-  const toolRegistry = config.getToolRegistry();
+  const toolRegistry = context.toolRegistry;
   const allToolNames = toolRegistry.getAllToolNames();
   const availableToolsList =
     allToolNames.length > 0

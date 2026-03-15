@@ -564,7 +564,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
   protected override async startExtension(extension: GeminiCLIExtension) {
     await super.startExtension(extension);
-    if (extension.themes) {
+    if (extension.themes && !themeManager.hasExtensionThemes(extension.name)) {
       themeManager.registerExtensionThemes(extension.name, extension.themes);
     }
   }
@@ -623,6 +623,13 @@ Would you like to attempt to install via "git clone" instead?`,
         }
 
         this.loadedExtensions = builtExtensions;
+
+        // Register extension themes early so they're available at startup.
+        for (const ext of this.loadedExtensions) {
+          if (ext.isActive && ext.themes) {
+            themeManager.registerExtensionThemes(ext.name, ext.themes);
+          }
+        }
 
         await Promise.all(
           this.loadedExtensions.map((ext) => this.maybeStartExtension(ext)),
@@ -891,9 +898,10 @@ Would you like to attempt to install via "git clone" instead?`,
       let skills = await loadSkillsFromDir(
         path.join(effectiveExtensionPath, 'skills'),
       );
-      skills = skills.map((skill) =>
-        recursivelyHydrateStrings(skill, hydrationContext),
-      );
+      skills = skills.map((skill) => ({
+        ...recursivelyHydrateStrings(skill, hydrationContext),
+        extensionName: config.name,
+      }));
 
       let rules: PolicyRule[] | undefined;
       let checkers: SafetyCheckerRule[] | undefined;
@@ -916,9 +924,10 @@ Would you like to attempt to install via "git clone" instead?`,
       const agentLoadResult = await loadAgentsFromDirectory(
         path.join(effectiveExtensionPath, 'agents'),
       );
-      agentLoadResult.agents = agentLoadResult.agents.map((agent) =>
-        recursivelyHydrateStrings(agent, hydrationContext),
-      );
+      agentLoadResult.agents = agentLoadResult.agents.map((agent) => ({
+        ...recursivelyHydrateStrings(agent, hydrationContext),
+        extensionName: config.name,
+      }));
 
       // Log errors but don't fail the entire extension load
       for (const error of agentLoadResult.errors) {
