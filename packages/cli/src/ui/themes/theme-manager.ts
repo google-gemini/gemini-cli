@@ -20,8 +20,7 @@ import { SolarizedLight } from './builtin/light/solarized-light.js';
 import { XCode } from './builtin/light/xcode-light.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { Theme, ThemeType, ColorsTheme } from './theme.js';
-import type { CustomTheme } from '@google/gemini-cli-core';
+import type { Theme, ThemeType, ColorsTheme, CustomTheme } from './theme.js';
 import {
   createCustomTheme,
   validateCustomTheme,
@@ -175,11 +174,6 @@ class ThemeManager {
       return;
     }
 
-    debugLogger.log(
-      `Registering extension themes for "${extensionName}":`,
-      customThemes,
-    );
-
     for (const customThemeConfig of customThemes) {
       const namespacedName = `${customThemeConfig.name} (${extensionName})`;
 
@@ -239,6 +233,17 @@ class ThemeManager {
       this.extensionThemes.delete(namespacedName);
       debugLogger.log(`Unregistered theme: ${namespacedName}`);
     }
+  }
+
+  /**
+   * Checks if themes for a given extension are already registered.
+   * @param extensionName The name of the extension.
+   * @returns True if any themes from the extension are registered.
+   */
+  hasExtensionThemes(extensionName: string): boolean {
+    return Array.from(this.extensionThemes.keys()).some((name) =>
+      name.endsWith(`(${extensionName})`),
+    );
   }
 
   /**

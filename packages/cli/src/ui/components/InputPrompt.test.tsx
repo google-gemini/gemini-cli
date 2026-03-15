@@ -8,31 +8,46 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { createMockSettings } from '../../test-utils/settings.js';
 import { waitFor } from '../../test-utils/async.js';
 import { act, useState } from 'react';
-import type { InputPromptProps } from './InputPrompt.js';
-import { InputPrompt, tryTogglePasteExpansion } from './InputPrompt.js';
-import type { TextBuffer } from './shared/text-buffer.js';
+import {
+  InputPrompt,
+  tryTogglePasteExpansion,
+  type InputPromptProps,
+} from './InputPrompt.js';
 import {
   calculateTransformationsForLine,
   calculateTransformedLine,
+  type TextBuffer,
 } from './shared/text-buffer.js';
-import type { Config } from '@google/gemini-cli-core';
-import { ApprovalMode, debugLogger } from '@google/gemini-cli-core';
+import {
+  ApprovalMode,
+  debugLogger,
+  type Config,
+} from '@google/gemini-cli-core';
 import * as path from 'node:path';
-import type { CommandContext, SlashCommand } from '../commands/types.js';
-import { CommandKind } from '../commands/types.js';
+import {
+  CommandKind,
+  type CommandContext,
+  type SlashCommand,
+} from '../commands/types.js';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { Text } from 'ink';
-import type { UseShellHistoryReturn } from '../hooks/useShellHistory.js';
-import { useShellHistory } from '../hooks/useShellHistory.js';
-import type { UseCommandCompletionReturn } from '../hooks/useCommandCompletion.js';
+import {
+  useShellHistory,
+  type UseShellHistoryReturn,
+} from '../hooks/useShellHistory.js';
 import {
   useCommandCompletion,
   CompletionMode,
+  type UseCommandCompletionReturn,
 } from '../hooks/useCommandCompletion.js';
-import type { UseInputHistoryReturn } from '../hooks/useInputHistory.js';
-import { useInputHistory } from '../hooks/useInputHistory.js';
-import type { UseReverseSearchCompletionReturn } from '../hooks/useReverseSearchCompletion.js';
-import { useReverseSearchCompletion } from '../hooks/useReverseSearchCompletion.js';
+import {
+  useInputHistory,
+  type UseInputHistoryReturn,
+} from '../hooks/useInputHistory.js';
+import {
+  useReverseSearchCompletion,
+  type UseReverseSearchCompletionReturn,
+} from '../hooks/useReverseSearchCompletion.js';
 import clipboardy from 'clipboardy';
 import * as clipboardUtils from '../utils/clipboardUtils.js';
 import { useKittyKeyboardProtocol } from '../hooks/useKittyKeyboardProtocol.js';
@@ -44,7 +59,7 @@ import { terminalCapabilityManager } from '../utils/terminalCapabilityManager.js
 import type { UIState } from '../contexts/UIStateContext.js';
 import { isLowColorDepth } from '../utils/terminalUtils.js';
 import { cpLen } from '../utils/textUtils.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { defaultKeyMatchers, Command } from '../key/keyMatchers.js';
 import type { Key } from '../hooks/useKeypress.js';
 import {
   appEvents,
@@ -79,6 +94,12 @@ afterEach(() => {
 });
 
 const mockSlashCommands: SlashCommand[] = [
+  {
+    name: 'stats',
+    description: 'Check stats',
+    kind: CommandKind.BUILT_IN,
+    isSafeConcurrent: true,
+  },
   {
     name: 'clear',
     kind: CommandKind.BUILT_IN,
@@ -197,7 +218,7 @@ describe('InputPrompt', () => {
       visualCursor: [0, 0],
       visualScrollRow: 0,
       handleInput: vi.fn((key: Key) => {
-        if (keyMatchers[Command.CLEAR_INPUT](key)) {
+        if (defaultKeyMatchers[Command.CLEAR_INPUT](key)) {
           if (mockBuffer.text.length > 0) {
             mockBuffer.setText('');
             return true;
@@ -3860,6 +3881,13 @@ describe('InputPrompt', () => {
         shellMode: false,
         shouldSubmit: false,
         errorMessage: 'Slash commands cannot be queued',
+      },
+      {
+        name: 'should allow concurrent-safe slash commands',
+        bufferText: '/stats',
+        shellMode: false,
+        shouldSubmit: true,
+        errorMessage: null,
       },
       {
         name: 'should prevent shell commands',

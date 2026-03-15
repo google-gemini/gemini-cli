@@ -17,10 +17,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import { LocalAgentExecutor, type ActivityCallback } from './local-executor.js';
 import { makeFakeConfig } from '../test-utils/config.js';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import {
-  DiscoveredMCPTool,
-  MCP_QUALIFIED_NAME_SEPARATOR,
-} from '../tools/mcp-tool.js';
+import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { LSTool } from '../tools/ls.js';
 import { LS_TOOL_NAME, READ_FILE_TOOL_NAME } from '../tools/tool-names.js';
 import {
@@ -36,6 +33,7 @@ import {
   type PartListUnion,
   type Tool,
   type CallableTool,
+  type FunctionDeclaration,
 } from '@google/genai';
 import type { Config } from '../config/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
@@ -310,19 +308,23 @@ describe('LocalAgentExecutor', () => {
     vi.useFakeTimers();
 
     mockConfig = makeFakeConfig();
-    parentToolRegistry = new ToolRegistry(
-      mockConfig,
-      mockConfig.getMessageBus(),
-    );
+    // .config is already set correctly by the getter on the instance.
+    Object.defineProperty(mockConfig, 'promptId', {
+      get: () => 'test-prompt-id',
+      configurable: true,
+    });
+    parentToolRegistry = new ToolRegistry(mockConfig, mockConfig.messageBus);
     parentToolRegistry.registerTool(
-      new LSTool(mockConfig, mockConfig.getMessageBus()),
+      new LSTool(mockConfig, mockConfig.messageBus),
     );
     parentToolRegistry.registerTool(
       new MockTool({ name: READ_FILE_TOOL_NAME }),
     );
     parentToolRegistry.registerTool(MOCK_TOOL_NOT_ALLOWED);
 
-    vi.spyOn(mockConfig, 'getToolRegistry').mockReturnValue(parentToolRegistry);
+    vi.spyOn(mockConfig, 'toolRegistry', 'get').mockReturnValue(
+      parentToolRegistry,
+    );
     vi.spyOn(mockConfig, 'getAgentRegistry').mockReturnValue({
       getAllAgentNames: () => [],
     } as unknown as AgentRegistry);
@@ -385,7 +387,10 @@ describe('LocalAgentExecutor', () => {
 
     it('should use parentPromptId from context to create agentId', async () => {
       const parentId = 'parent-id';
-      mockedPromptIdContext.getStore.mockReturnValue(parentId);
+      Object.defineProperty(mockConfig, 'promptId', {
+        get: () => parentId,
+        configurable: true,
+      });
 
       const definition = createTestDefinition();
       const executor = await LocalAgentExecutor.create(
@@ -503,7 +508,7 @@ describe('LocalAgentExecutor', () => {
     it('should automatically qualify MCP tools in agent definitions', async () => {
       const serverName = 'mcp-server';
       const toolName = 'mcp-tool';
-      const qualifiedName = `${serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${toolName}`;
+      const qualifiedName = `mcp_${serverName}_${toolName}`;
 
       const mockMcpTool = {
         tool: vi.fn(),
@@ -516,7 +521,7 @@ describe('LocalAgentExecutor', () => {
         toolName,
         'description',
         {},
-        mockConfig.getMessageBus(),
+        mockConfig.messageBus,
       );
 
       // Mock getTool to return our real DiscoveredMCPTool instance
@@ -552,6 +557,34 @@ describe('LocalAgentExecutor', () => {
       expect(agentRegistry2.getTool(qualifiedName)).toBeDefined();
 
       getToolSpy.mockRestore();
+    });
+
+    it('should not duplicate schemas when instantiated tools are provided in toolConfig', async () => {
+      // Create an instantiated mock tool
+      const instantiatedTool = new MockTool({ name: 'instantiated_tool' });
+
+      // Create an agent definition containing the instantiated tool
+      const definition = createTestDefinition([instantiatedTool]);
+
+      // Create the executor
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Extract the prepared tools list using the private method
+      const toolsList = (
+        executor as unknown as { prepareToolsList: () => FunctionDeclaration[] }
+      ).prepareToolsList();
+
+      // Filter for the specific tool schema
+      const foundSchemas = (
+        toolsList as unknown as FunctionDeclaration[]
+      ).filter((t: FunctionDeclaration) => t.name === 'instantiated_tool');
+
+      // Assert that there is exactly ONE schema for this tool
+      expect(foundSchemas).toHaveLength(1);
     });
   });
 
@@ -930,11 +963,11 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'ERROR',
-          data: {
+          data: expect.objectContaining({
             context: 'tool_call',
             name: TASK_COMPLETE_TOOL_NAME,
             error: expectedError,
-          },
+          }),
         }),
       );
 
@@ -1216,11 +1249,11 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'ERROR',
-          data: {
+          data: expect.objectContaining({
             context: 'tool_call',
             name: TASK_COMPLETE_TOOL_NAME,
             error: expect.stringContaining('Output validation failed'),
-          },
+          }),
         }),
       );
 
@@ -1341,11 +1374,11 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'ERROR',
-          data: {
+          data: expect.objectContaining({
             context: 'tool_call',
             name: LS_TOOL_NAME,
             error: toolErrorMessage,
-          },
+          }),
         }),
       );
 
@@ -1702,15 +1735,17 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'THOUGHT_CHUNK',
-          data: {
+          data: expect.objectContaining({
             text: 'Execution limit reached (MAX_TURNS). Attempting one final recovery turn with a grace period.',
-          },
+          }),
         }),
       );
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'THOUGHT_CHUNK',
-          data: { text: 'Graceful recovery succeeded.' },
+          data: expect.objectContaining({
+            text: 'Graceful recovery succeeded.',
+          }),
         }),
       );
     });
@@ -1787,9 +1822,9 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'THOUGHT_CHUNK',
-          data: {
+          data: expect.objectContaining({
             text: 'Execution limit reached (ERROR_NO_COMPLETE_TASK_CALL). Attempting one final recovery turn with a grace period.',
-          },
+          }),
         }),
       );
     });
@@ -1885,9 +1920,9 @@ describe('LocalAgentExecutor', () => {
       expect(activities).toContainEqual(
         expect.objectContaining({
           type: 'THOUGHT_CHUNK',
-          data: {
+          data: expect.objectContaining({
             text: 'Execution limit reached (TIMEOUT). Attempting one final recovery turn with a grace period.',
-          },
+          }),
         }),
       );
     });
@@ -2053,7 +2088,7 @@ describe('LocalAgentExecutor', () => {
         vi.spyOn(configWithHints, 'getAgentRegistry').mockReturnValue({
           getAllAgentNames: () => [],
         } as unknown as AgentRegistry);
-        vi.spyOn(configWithHints, 'getToolRegistry').mockReturnValue(
+        vi.spyOn(configWithHints, 'toolRegistry', 'get').mockReturnValue(
           parentToolRegistry,
         );
       });
@@ -2455,6 +2490,339 @@ describe('LocalAgentExecutor', () => {
 
       expect(mockSetHistory).toHaveBeenCalledTimes(1);
       expect(mockSetHistory).toHaveBeenCalledWith(compressedHistory);
+    });
+  });
+
+  describe('DeclarativeTool instance tools (browser agent pattern)', () => {
+    /**
+     * The browser agent passes DeclarativeTool instances (not string names) in
+     * toolConfig.tools.  These tests ensure that prepareToolsList() and
+     * create() handle that pattern correctly — in particular, that each tool
+     * appears exactly once in the function declarations sent to the model.
+     */
+
+    /**
+     * Helper that creates a definition using MockTool *instances* in
+     * toolConfig.tools — the same pattern the browser agent uses.
+     */
+    const createInstanceToolDefinition = (
+      instanceTools: MockTool[],
+      outputConfigMode: 'default' | 'none' = 'default',
+    ): LocalAgentDefinition => {
+      const outputConfig =
+        outputConfigMode === 'default'
+          ? {
+              outputName: 'finalResult',
+              description: 'The final result.',
+              schema: z.string(),
+            }
+          : undefined;
+
+      return {
+        kind: 'local',
+        name: 'BrowserLikeAgent',
+        description: 'An agent using instance tools.',
+        inputConfig: {
+          inputSchema: {
+            type: 'object',
+            properties: {
+              goal: { type: 'string', description: 'goal' },
+            },
+            required: ['goal'],
+          },
+        },
+        modelConfig: {
+          model: 'gemini-test-model',
+          generateContentConfig: { temperature: 0, topP: 1 },
+        },
+        runConfig: { maxTimeMinutes: 5, maxTurns: 5 },
+        promptConfig: { systemPrompt: 'Achieve: ${goal}.' },
+        toolConfig: {
+          // Cast required because the type expects AnyDeclarativeTool |
+          // string | FunctionDeclaration; MockTool satisfies the first.
+          tools: instanceTools as unknown as AnyDeclarativeTool[],
+        },
+        outputConfig,
+      } as unknown as LocalAgentDefinition;
+    };
+
+    /**
+     * Helper to extract the functionDeclarations sent to GeminiChat.
+     */
+    const getSentFunctionDeclarations = () => {
+      const chatCtorArgs = MockedGeminiChat.mock.calls[0];
+      const toolsArg = chatCtorArgs[2] as Tool[];
+      return toolsArg[0].functionDeclarations ?? [];
+    };
+
+    it('should produce NO duplicate function declarations when tools are DeclarativeTool instances', async () => {
+      const clickTool = new MockTool({ name: 'click' });
+      const fillTool = new MockTool({ name: 'fill' });
+      const snapshotTool = new MockTool({ name: 'take_snapshot' });
+
+      const definition = createInstanceToolDefinition([
+        clickTool,
+        fillTool,
+        snapshotTool,
+      ]);
+
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'c1',
+        },
+      ]);
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      await executor.run({ goal: 'Test' }, signal);
+
+      const declarations = getSentFunctionDeclarations();
+      const names = declarations.map((d) => d.name);
+
+      // Each tool must appear exactly once
+      expect(names.filter((n) => n === 'click')).toHaveLength(1);
+      expect(names.filter((n) => n === 'fill')).toHaveLength(1);
+      expect(names.filter((n) => n === 'take_snapshot')).toHaveLength(1);
+
+      // Total = 3 tools + complete_task
+      expect(declarations).toHaveLength(4);
+    });
+
+    it('should register DeclarativeTool instances in the isolated tool registry', async () => {
+      const clickTool = new MockTool({ name: 'click' });
+      const navTool = new MockTool({ name: 'navigate_page' });
+
+      const definition = createInstanceToolDefinition([clickTool, navTool]);
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      const registry = executor['toolRegistry'];
+      expect(registry.getTool('click')).toBeDefined();
+      expect(registry.getTool('navigate_page')).toBeDefined();
+      // Should NOT have tools that were not passed
+      expect(registry.getTool(LS_TOOL_NAME)).toBeUndefined();
+    });
+
+    it('should handle mixed string + DeclarativeTool instances without duplicates', async () => {
+      const instanceTool = new MockTool({ name: 'fill' });
+
+      const definition: LocalAgentDefinition = {
+        kind: 'local',
+        name: 'MixedAgent',
+        description: 'Uses both patterns.',
+        inputConfig: {
+          inputSchema: {
+            type: 'object',
+            properties: { goal: { type: 'string', description: 'goal' } },
+          },
+        },
+        modelConfig: {
+          model: 'gemini-test-model',
+          generateContentConfig: { temperature: 0, topP: 1 },
+        },
+        runConfig: { maxTimeMinutes: 5, maxTurns: 5 },
+        promptConfig: { systemPrompt: 'Achieve: ${goal}.' },
+        toolConfig: {
+          tools: [
+            LS_TOOL_NAME, // string reference
+            instanceTool as unknown as AnyDeclarativeTool, // instance
+          ],
+        },
+        outputConfig: {
+          outputName: 'finalResult',
+          description: 'result',
+          schema: z.string(),
+        },
+      } as unknown as LocalAgentDefinition;
+
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'ok' },
+          id: 'c1',
+        },
+      ]);
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      await executor.run({ goal: 'Mixed' }, signal);
+
+      const declarations = getSentFunctionDeclarations();
+      const names = declarations.map((d) => d.name);
+
+      expect(names.filter((n) => n === LS_TOOL_NAME)).toHaveLength(1);
+      expect(names.filter((n) => n === 'fill')).toHaveLength(1);
+      expect(names.filter((n) => n === TASK_COMPLETE_TOOL_NAME)).toHaveLength(
+        1,
+      );
+      // Total = ls + fill + complete_task
+      expect(declarations).toHaveLength(3);
+    });
+
+    it('should correctly execute tools passed as DeclarativeTool instances', async () => {
+      const executeFn = vi.fn().mockResolvedValue({
+        llmContent: 'Clicked successfully.',
+        returnDisplay: 'Clicked successfully.',
+      });
+      const clickTool = new MockTool({ name: 'click', execute: executeFn });
+
+      const definition = createInstanceToolDefinition([clickTool]);
+
+      // Turn 1: Model calls click
+      mockModelResponse([
+        { name: 'click', args: { uid: '42' }, id: 'call-click' },
+      ]);
+      mockScheduleAgentTools.mockResolvedValueOnce([
+        {
+          status: 'success',
+          request: {
+            callId: 'call-click',
+            name: 'click',
+            args: { uid: '42' },
+            isClientInitiated: false,
+            prompt_id: 'test',
+          },
+          tool: {} as AnyDeclarativeTool,
+          invocation: {} as AnyToolInvocation,
+          response: {
+            callId: 'call-click',
+            resultDisplay: 'Clicked',
+            responseParts: [
+              {
+                functionResponse: {
+                  name: 'click',
+                  response: { result: 'Clicked' },
+                  id: 'call-click',
+                },
+              },
+            ],
+            error: undefined,
+            errorType: undefined,
+            contentLength: undefined,
+          },
+        },
+      ]);
+
+      // Turn 2: Model completes
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'call-done',
+        },
+      ]);
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      const output = await executor.run({ goal: 'Click test' }, signal);
+
+      // The scheduler should have received the click tool call
+      expect(mockScheduleAgentTools).toHaveBeenCalled();
+      const scheduledRequests = mockScheduleAgentTools.mock
+        .calls[0][1] as ToolCallRequestInfo[];
+      expect(scheduledRequests).toHaveLength(1);
+      expect(scheduledRequests[0].name).toBe('click');
+
+      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+    });
+
+    it('should always include complete_task even when all tools are instances', async () => {
+      const definition = createInstanceToolDefinition(
+        [new MockTool({ name: 'take_snapshot' })],
+        'none',
+      );
+
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { result: 'done' },
+          id: 'c1',
+        },
+      ]);
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      await executor.run({ goal: 'Test' }, signal);
+
+      const declarations = getSentFunctionDeclarations();
+      const names = declarations.map((d) => d.name);
+
+      expect(names).toContain(TASK_COMPLETE_TOOL_NAME);
+      expect(names).toContain('take_snapshot');
+      expect(declarations).toHaveLength(2);
+    });
+
+    it('should produce unique declarations for many instance tools (browser agent scale)', async () => {
+      // Simulates the full set of tools the browser agent typically registers
+      const browserToolNames = [
+        'click',
+        'click_at',
+        'fill',
+        'fill_form',
+        'hover',
+        'drag',
+        'press_key',
+        'take_snapshot',
+        'navigate_page',
+        'new_page',
+        'close_page',
+        'select_page',
+        'evaluate_script',
+        'type_text',
+      ];
+      const instanceTools = browserToolNames.map(
+        (name) => new MockTool({ name }),
+      );
+
+      const definition = createInstanceToolDefinition(instanceTools);
+
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'c1',
+        },
+      ]);
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+      await executor.run({ goal: 'Scale test' }, signal);
+
+      const declarations = getSentFunctionDeclarations();
+      const names = declarations.map((d) => d.name);
+
+      // Every tool name must appear exactly once
+      for (const toolName of browserToolNames) {
+        const count = names.filter((n) => n === toolName).length;
+        expect(count).toBe(1);
+      }
+      // Plus complete_task
+      expect(declarations).toHaveLength(browserToolNames.length + 1);
+
+      // Verify the complete set of names has no duplicates
+      const uniqueNames = new Set(names);
+      expect(uniqueNames.size).toBe(names.length);
     });
   });
 });

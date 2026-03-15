@@ -11,11 +11,14 @@ import {
   Kind,
   type ToolInvocation,
   type ToolResult,
+  type PolicyUpdateOptions,
+  type ToolConfirmationOutcome,
 } from './tools.js';
 import { getErrorMessage } from '../utils/errors.js';
 import * as fsPromises from 'node:fs/promises';
 import * as path from 'node:path';
 import { glob, escape } from 'glob';
+import { buildParamArgsPattern } from '../policy/utils.js';
 import {
   detectFileType,
   processSingleFileContent,
@@ -38,6 +41,11 @@ import { READ_MANY_FILES_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 
 import { REFERENCE_CONTENT_END } from '../utils/constants.js';
+import {
+  discoverJitContext,
+  JIT_CONTEXT_PREFIX,
+  JIT_CONTEXT_SUFFIX,
+} from './jit-context.js';
 
 /**
  * Parameters for the ReadManyFilesTool.
@@ -153,6 +161,14 @@ ${finalExclusionPatternsForDescription
       '{filePath}',
       'path/to/file.ext',
     )}".`;
+  }
+
+  override getPolicyUpdateOptions(
+    _outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined {
+    return {
+      argsPattern: buildParamArgsPattern('include', this.params.include),
+    };
   }
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
@@ -398,6 +414,20 @@ ${finalExclusionPatternsForDescription
           reason: `Unexpected error: ${result.reason}`,
         });
       }
+    }
+
+    // Discover JIT subdirectory context for all unique directories of processed files
+    const uniqueDirs = new Set(
+      Array.from(filesToConsider).map((f) => path.dirname(f)),
+    );
+    const jitResults = await Promise.all(
+      Array.from(uniqueDirs).map((dir) => discoverJitContext(this.config, dir)),
+    );
+    const jitParts = jitResults.filter(Boolean);
+    if (jitParts.length > 0) {
+      contentParts.push(
+        `${JIT_CONTEXT_PREFIX}${jitParts.join('\n')}${JIT_CONTEXT_SUFFIX}`,
+      );
     }
 
     let displayMessage = `### ReadManyFiles Result (Target Dir: \`${this.config.getTargetDir()}\`)\n\n`;

@@ -64,7 +64,7 @@ export interface AgentShell {
 
 export interface SessionContext {
   sessionId: string;
-  transcript: Content[];
+  transcript: readonly Content[];
   cwd: string;
   timestamp: string;
   fs: AgentFilesystem;

@@ -119,7 +119,7 @@ describe('Scheduler Parallel Execution', () => {
   const req3: ToolCallRequestInfo = {
     callId: 'call-3',
     name: 'write-tool',
-    args: { path: 'c.txt', content: 'hi' },
+    args: { path: 'c.txt', content: 'hi', wait_for_previous: true },
     isClientInitiated: false,
     prompt_id: 'p1',
     schedulerId: ROOT_SCHEDULER_ID,
@@ -211,12 +211,14 @@ describe('Scheduler Parallel Execution', () => {
 
     mockConfig = {
       getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
-      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      toolRegistry: mockToolRegistry,
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(true),
       setApprovalMode: vi.fn(),
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
     } as unknown as Mocked<Config>;
+
+    (mockConfig as unknown as { config: Config }).config = mockConfig as Config;
 
     mockMessageBus = {
       publish: vi.fn(),
@@ -306,7 +308,7 @@ describe('Scheduler Parallel Execution', () => {
     );
 
     scheduler = new Scheduler({
-      config: mockConfig,
+      context: mockConfig,
       messageBus: mockMessageBus,
       getPreferredEditor,
       schedulerId: 'root',
@@ -502,5 +504,51 @@ describe('Scheduler Parallel Execution', () => {
     // Wave 3: call-1 (parallelizable/read)
     const start1 = executionLog.indexOf('start-call-1');
     expect(start1).toBeGreaterThan(end3);
+  });
+
+  it('should execute non-read-only tools in parallel if wait_for_previous is false', async () => {
+    const executionLog: string[] = [];
+    mockExecutor.execute.mockImplementation(async ({ call }) => {
+      const id = call.request.callId;
+      executionLog.push(`start-${id}`);
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+      executionLog.push(`end-${id}`);
+      return {
+        status: 'success',
+        response: { callId: id, responseParts: [] },
+      } as unknown as SuccessfulToolCall;
+    });
+
+    const w1 = { ...req3, callId: 'w1', args: { wait_for_previous: false } };
+    const w2 = { ...req3, callId: 'w2', args: { wait_for_previous: false } };
+
+    await scheduler.schedule([w1, w2], signal);
+
+    expect(executionLog.slice(0, 2)).toContain('start-w1');
+    expect(executionLog.slice(0, 2)).toContain('start-w2');
+  });
+
+  it('should execute read-only tools sequentially if wait_for_previous is true', async () => {
+    const executionLog: string[] = [];
+    mockExecutor.execute.mockImplementation(async ({ call }) => {
+      const id = call.request.callId;
+      executionLog.push(`start-${id}`);
+      await new Promise<void>((resolve) => setTimeout(resolve, 10));
+      executionLog.push(`end-${id}`);
+      return {
+        status: 'success',
+        response: { callId: id, responseParts: [] },
+      } as unknown as SuccessfulToolCall;
+    });
+
+    const r1 = { ...req1, callId: 'r1', args: { wait_for_previous: false } };
+    const r2 = { ...req1, callId: 'r2', args: { wait_for_previous: true } };
+
+    await scheduler.schedule([r1, r2], signal);
+
+    expect(executionLog[0]).toBe('start-r1');
+    expect(executionLog[1]).toBe('end-r1');
+    expect(executionLog[2]).toBe('start-r2');
+    expect(executionLog[3]).toBe('end-r2');
   });
 });
