@@ -82,11 +82,12 @@ describe('Core System Prompt (prompts.ts)', () => {
     vi.stubEnv('SANDBOX', undefined);
     vi.stubEnv('GEMINI_SYSTEM_MD', undefined);
     vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', undefined);
+    const mockRegistry = {
+      getAllToolNames: vi.fn().mockReturnValue(['grep_search', 'glob']),
+      getAllTools: vi.fn().mockReturnValue([]),
+    };
     mockConfig = {
-      getToolRegistry: vi.fn().mockReturnValue({
-        getAllToolNames: vi.fn().mockReturnValue(['grep_search', 'glob']),
-        getAllTools: vi.fn().mockReturnValue([]),
-      }),
+      getToolRegistry: vi.fn().mockReturnValue(mockRegistry),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
@@ -94,6 +95,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       },
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
+      isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(false),
       isAgentsEnabled: vi.fn().mockReturnValue(false),
       getPreviewFeatures: vi.fn().mockReturnValue(true),
       getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
@@ -114,6 +116,12 @@ describe('Core System Prompt (prompts.ts)', () => {
       getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       isTrackerEnabled: vi.fn().mockReturnValue(false),
+      get config() {
+        return this;
+      },
+      get toolRegistry() {
+        return mockRegistry;
+      },
     } as unknown as Config;
   });
 
@@ -374,7 +382,7 @@ describe('Core System Prompt (prompts.ts)', () => {
 
   it('should redact grep and glob from the system prompt when they are disabled', () => {
     vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
-    vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([]);
+    vi.mocked(mockConfig.toolRegistry.getAllToolNames).mockReturnValue([]);
     const prompt = getCoreSystemPrompt(mockConfig);
 
     expect(prompt).not.toContain('`grep_search`');
@@ -390,16 +398,18 @@ describe('Core System Prompt (prompts.ts)', () => {
   ])(
     'should handle CodebaseInvestigator with tools=%s',
     (toolNames, expectCodebaseInvestigator) => {
+      const mockToolRegistry = {
+        getAllToolNames: vi.fn().mockReturnValue(toolNames),
+      };
       const testConfig = {
-        getToolRegistry: vi.fn().mockReturnValue({
-          getAllToolNames: vi.fn().mockReturnValue(toolNames),
-        }),
+        getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
         getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
         storage: {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
         },
         isInteractive: vi.fn().mockReturnValue(false),
         isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
+        isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(false),
         isAgentsEnabled: vi.fn().mockReturnValue(false),
         getModel: vi.fn().mockReturnValue('auto'),
         getActiveModel: vi.fn().mockReturnValue(PREVIEW_GEMINI_MODEL),
@@ -413,6 +423,12 @@ describe('Core System Prompt (prompts.ts)', () => {
         }),
         getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
         isTrackerEnabled: vi.fn().mockReturnValue(false),
+        get config() {
+          return this;
+        },
+        get toolRegistry() {
+          return mockToolRegistry;
+        },
       } as unknown as Config;
 
       const prompt = getCoreSystemPrompt(testConfig);
@@ -468,7 +484,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         PREVIEW_GEMINI_MODEL,
       );
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
-      vi.mocked(mockConfig.getToolRegistry().getAllTools).mockReturnValue(
+      vi.mocked(mockConfig.toolRegistry.getAllTools).mockReturnValue(
         planModeTools,
       );
     };
@@ -522,7 +538,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         PREVIEW_GEMINI_MODEL,
       );
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
-      vi.mocked(mockConfig.getToolRegistry().getAllTools).mockReturnValue(
+      vi.mocked(mockConfig.toolRegistry.getAllTools).mockReturnValue(
         subsetTools,
       );
 
@@ -667,7 +683,7 @@ describe('Core System Prompt (prompts.ts)', () => {
 
   it('should include planning phase suggestion when enter_plan_mode tool is enabled', () => {
     vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
-    vi.mocked(mockConfig.getToolRegistry().getAllToolNames).mockReturnValue([
+    vi.mocked(mockConfig.toolRegistry.getAllToolNames).mockReturnValue([
       'enter_plan_mode',
     ]);
     const prompt = getCoreSystemPrompt(mockConfig);

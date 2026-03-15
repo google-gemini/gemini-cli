@@ -19,12 +19,12 @@ import {
   LlmLoopCheckEvent,
   LlmRole,
 } from '../telemetry/types.js';
-import type { Config } from '../config/config.js';
 import {
   isFunctionCall,
   isFunctionResponse,
 } from '../utils/messageInspectors.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 const TOOL_CALL_LOOP_THRESHOLD = 5;
 const CONTENT_LOOP_THRESHOLD = 10;
@@ -131,7 +131,7 @@ export interface LoopDetectionResult {
  * Monitors tool call repetitions and content sentence repetitions.
  */
 export class LoopDetectionService {
-  private readonly config: Config;
+  private readonly context: AgentLoopContext;
   private promptId = '';
   private userPrompt = '';
 
@@ -157,8 +157,8 @@ export class LoopDetectionService {
   // Session-level disable flag
   private disabledForSession = false;
 
-  constructor(config: Config) {
-    this.config = config;
+  constructor(context: AgentLoopContext) {
+    this.context = context;
   }
 
   /**
@@ -167,7 +167,7 @@ export class LoopDetectionService {
   disableForSession(): void {
     this.disabledForSession = true;
     logLoopDetectionDisabled(
-      this.config,
+      this.context.config,
       new LoopDetectionDisabledEvent(this.promptId),
     );
   }
@@ -184,7 +184,10 @@ export class LoopDetectionService {
    * @returns A LoopDetectionResult
    */
   addAndCheck(event: ServerGeminiStreamEvent): LoopDetectionResult {
-    if (this.disabledForSession || this.config.getDisableLoopDetection()) {
+    if (
+      this.disabledForSession ||
+      this.context.config.getDisableLoopDetection()
+    ) {
       return { count: 0 };
     }
     if (this.loopDetected) {
@@ -228,7 +231,7 @@ export class LoopDetectionService {
           : LoopType.CONTENT_CHANTING_LOOP;
 
       logLoopDetected(
-        this.config,
+        this.context.config,
         new LoopDetectedEvent(
           this.lastLoopType,
           this.promptId,
@@ -256,7 +259,10 @@ export class LoopDetectionService {
    * @returns A promise that resolves to a LoopDetectionResult.
    */
   async turnStarted(signal: AbortSignal): Promise<LoopDetectionResult> {
-    if (this.disabledForSession || this.config.getDisableLoopDetection()) {
+    if (
+      this.disabledForSession ||
+      this.context.config.getDisableLoopDetection()
+    ) {
       return { count: 0 };
     }
     if (this.loopDetected) {
@@ -283,7 +289,7 @@ export class LoopDetectionService {
         this.lastLoopType = LoopType.LLM_DETECTED_LOOP;
 
         logLoopDetected(
-          this.config,
+          this.context.config,
           new LoopDetectedEvent(
             this.lastLoopType,
             this.promptId,
@@ -536,8 +542,7 @@ export class LoopDetectionService {
     analysis?: string;
     confirmedByModel?: string;
   }> {
-    const recentHistory = this.config
-      .getGeminiClient()
+    const recentHistory = this.context.geminiClient
       .getHistory()
       .slice(-LLM_LOOP_CHECK_HISTORY_COUNT);
 
@@ -590,13 +595,13 @@ export class LoopDetectionService {
         : '';
 
     const doubleCheckModelName =
-      this.config.modelConfigService.getResolvedConfig({
+      this.context.config.modelConfigService.getResolvedConfig({
         model: DOUBLE_CHECK_MODEL_ALIAS,
       }).model;
 
     if (flashConfidence < LLM_CONFIDENCE_THRESHOLD) {
       logLlmLoopCheck(
-        this.config,
+        this.context.config,
         new LlmLoopCheckEvent(
           this.promptId,
           flashConfidence,
@@ -608,12 +613,13 @@ export class LoopDetectionService {
       return { isLoop: false };
     }
 
-    const availability = this.config.getModelAvailabilityService();
+    const availability = this.context.config.getModelAvailabilityService();
 
     if (!availability.snapshot(doubleCheckModelName).available) {
-      const flashModelName = this.config.modelConfigService.getResolvedConfig({
-        model: 'loop-detection',
-      }).model;
+      const flashModelName =
+        this.context.config.modelConfigService.getResolvedConfig({
+          model: 'loop-detection',
+        }).model;
       return {
         isLoop: true,
         analysis: flashAnalysis,
@@ -642,7 +648,7 @@ export class LoopDetectionService {
         : undefined;
 
     logLlmLoopCheck(
-      this.config,
+      this.context.config,
       new LlmLoopCheckEvent(
         this.promptId,
         flashConfidence,
@@ -672,7 +678,7 @@ export class LoopDetectionService {
     signal: AbortSignal,
   ): Promise<Record<string, unknown> | null> {
     try {
-      const result = await this.config.getBaseLlmClient().generateJson({
+      const result = await this.context.config.getBaseLlmClient().generateJson({
         modelConfigKey: { model },
         contents,
         schema: LOOP_DETECTION_SCHEMA,
@@ -692,7 +698,7 @@ export class LoopDetectionService {
       }
       return null;
     } catch (error) {
-      if (this.config.getDebugMode()) {
+      if (this.context.config.getDebugMode()) {
         debugLogger.warn(
           `Error querying loop detection model (${model}): ${String(error)}`,
         );
