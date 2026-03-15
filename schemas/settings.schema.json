@@ -3218,8 +3218,14 @@
                   "useCustomTools": {
                     "type": "boolean"
                   },
-                  "requestedModel": {
-                    "ref": "StringOrStringArray"
+                  "hasAccessToPreview": {
+                    "type": "boolean"
+                  },
+                  "requestedModels": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
                   }
                 }
               },

@@ -2855,7 +2855,11 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
               properties: {
                 useGemini3_1: { type: 'boolean' },
                 useCustomTools: { type: 'boolean' },
-                requestedModel: { ref: 'StringOrStringArray' },
+                hasAccessToPreview: { type: 'boolean' },
+                requestedModels: {
+                  type: 'array',
+                  items: { type: 'string' },
+                },
               },
             },
             target: { type: 'string' },
