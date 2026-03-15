@@ -309,10 +309,9 @@ export class McpClientManager {
     const existing = this.clients.get(name);
     const existingConfig = this.allServerConfigs.get(name);
     if (
-      existing &&
-      existing.getServerConfig().extension?.id &&
+      existingConfig?.extension?.id &&
       config.extension?.id &&
-      existing.getServerConfig().extension?.id !== config.extension?.id
+      existingConfig.extension.id !== config.extension.id
     ) {
       const extensionText = config.extension
         ? ` from extension "${config.extension.name}"`

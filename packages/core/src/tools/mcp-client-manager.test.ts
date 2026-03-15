@@ -598,6 +598,47 @@ describe('McpClientManager', () => {
       expect(finalConfig.timeout).toBe(1000); // Preserved from base
     });
 
+    it('should prevent one extension from hijacking another extension server name', async () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+
+      const extension1: GeminiCLIExtension = {
+        name: 'extension-1',
+        isActive: true,
+        id: 'ext-1',
+        version: '1.0.0',
+        path: '/path1',
+        contextFiles: [],
+        mcpServers: {
+          'shared-name': { command: 'node', args: ['server1.js'] },
+        },
+      };
+
+      const extension2: GeminiCLIExtension = {
+        name: 'extension-2',
+        isActive: true,
+        id: 'ext-2',
+        version: '1.0.0',
+        path: '/path2',
+        contextFiles: [],
+        mcpServers: {
+          'shared-name': { command: 'node', args: ['server2.js'] },
+        },
+      };
+
+      // Start extension 1 (discovery begins but is not yet complete)
+      const p1 = manager.startExtension(extension1);
+
+      // Immediately attempt to start extension 2 with the same name
+      await manager.startExtension(extension2);
+
+      await p1;
+
+      // Only extension 1 should have been initialized
+      expect(vi.mocked(McpClient)).toHaveBeenCalledTimes(1);
+      const lastCall = vi.mocked(McpClient).mock.calls[0];
+      expect(lastCall[1].extension).toBe(extension1);
+    });
+
     it('should remove servers from blockedMcpServers when stopExtension is called', async () => {
       mockConfig.getBlockedMcpServers.mockReturnValue(['blocked-server']);
       const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
