@@ -42,6 +42,7 @@ describe('ToolConfirmationQueue', () => {
   const mockConfig = {
     isTrustedFolder: () => true,
     getIdeMode: () => false,
+    getDisableAlwaysAllow: () => false,
     getModel: () => 'gemini-pro',
     getDebugMode: () => false,
     getTargetDir: () => '/mock/target/dir',
@@ -282,7 +283,10 @@ describe('ToolConfirmationQueue', () => {
     // hideToolIdentity is true for ask_user -> subtracts 4 instead of 6
     // availableContentHeight = 19 - 4 = 15
     // ToolConfirmationMessage handlesOwnUI=true -> returns full 15
-    // AskUserDialog uses 15 lines to render its multi-line question and options.
+    // AskUserDialog allocates questionHeight = availableHeight - overhead - DIALOG_PADDING.
+    // listHeight = 15 - overhead (Header:0, Margin:1, Footer:2) = 12.
+    // maxQuestionHeight = listHeight - 4 = 8.
+    // 8 lines is enough for the 6-line question.
     await waitFor(() => {
       expect(lastFrame()).toContain('Line 6');
       expect(lastFrame()).not.toContain('lines hidden');

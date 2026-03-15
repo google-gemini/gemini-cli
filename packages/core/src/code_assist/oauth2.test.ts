@@ -4,9 +4,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Credentials } from 'google-auth-library';
-import type { Mock } from 'vitest';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  OAuth2Client,
+  Compute,
+  GoogleAuth,
+  type Credentials,
+} from 'google-auth-library';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import {
   getOauthClient,
   resetOauthClientForTesting,
@@ -15,7 +27,6 @@ import {
   authEvents,
 } from './oauth2.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
-import { OAuth2Client, Compute, GoogleAuth } from 'google-auth-library';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import http from 'node:http';
@@ -29,7 +40,10 @@ import { FORCE_ENCRYPTED_FILE_ENV_VAR } from '../mcp/token-storage/index.js';
 import { GEMINI_DIR, homedir as pathsHomedir } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { writeToStdout } from '../utils/stdio.js';
-import { FatalCancellationError } from '../utils/errors.js';
+import {
+  FatalCancellationError,
+  FatalAuthenticationError,
+} from '../utils/errors.js';
 import process from 'node:process';
 import { coreEvents } from '../utils/events.js';
 import { isHeadlessMode } from '../utils/headless.js';
@@ -95,7 +109,8 @@ const mockConfig = {
   getNoBrowser: () => false,
   getProxy: () => 'http://test.proxy.com:8080',
   isBrowserLaunchSuppressed: () => false,
-  getExperimentalZedIntegration: () => false,
+  getAcpMode: () => false,
+  isInteractive: () => true,
 } as unknown as Config;
 
 // Mock fetch globally
@@ -305,11 +320,31 @@ describe('oauth2', () => {
       await eventPromise;
     });
 
+    it('should throw FatalAuthenticationError in non-interactive session when manual auth is required', async () => {
+      const mockConfigNonInteractive = {
+        getNoBrowser: () => true,
+        getProxy: () => 'http://test.proxy.com:8080',
+        isBrowserLaunchSuppressed: () => true,
+        isInteractive: () => false,
+      } as unknown as Config;
+
+      await expect(
+        getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfigNonInteractive),
+      ).rejects.toThrow(FatalAuthenticationError);
+
+      await expect(
+        getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfigNonInteractive),
+      ).rejects.toThrow(
+        'Manual authorization is required but the current session is non-interactive.',
+      );
+    });
+
     it('should perform login with user code', async () => {
       const mockConfigWithNoBrowser = {
         getNoBrowser: () => true,
         getProxy: () => 'http://test.proxy.com:8080',
         isBrowserLaunchSuppressed: () => true,
+        isInteractive: () => true,
       } as unknown as Config;
 
       const mockCodeVerifier = {
@@ -380,6 +415,7 @@ describe('oauth2', () => {
         getNoBrowser: () => true,
         getProxy: () => 'http://test.proxy.com:8080',
         isBrowserLaunchSuppressed: () => true,
+        isInteractive: () => true,
       } as unknown as Config;
 
       const mockCodeVerifier = {
@@ -444,6 +480,7 @@ describe('oauth2', () => {
       expect(fs.existsSync(googleAccountPath)).toBe(true);
       if (fs.existsSync(googleAccountPath)) {
         const cachedGoogleAccount = fs.readFileSync(googleAccountPath, 'utf-8');
+
         expect(JSON.parse(cachedGoogleAccount)).toEqual({
           active: 'test-user-code-account@gmail.com',
           old: [],
@@ -1160,6 +1197,7 @@ describe('oauth2', () => {
           getNoBrowser: () => true,
           getProxy: () => 'http://test.proxy.com:8080',
           isBrowserLaunchSuppressed: () => true,
+          isInteractive: () => true,
         } as unknown as Config;
 
         const mockOAuth2Client = {
@@ -1312,7 +1350,7 @@ describe('oauth2', () => {
         let dataHandler: ((data: Buffer) => void) | undefined;
         await vi.waitFor(() => {
           const dataCall = stdinOnSpy.mock.calls.find(
-            (call: [string, ...unknown[]]) => call[0] === 'data',
+            (call: [string | symbol, ...unknown[]]) => call[0] === 'data',
           );
           dataHandler = dataCall?.[1] as ((data: Buffer) => void) | undefined;
           if (!dataHandler) throw new Error('stdin handler not registered yet');

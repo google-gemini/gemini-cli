@@ -44,16 +44,23 @@ interface FrontmatterLocalAgentDefinition
  * Authentication configuration for remote agents in frontmatter format.
  */
 interface FrontmatterAuthConfig {
-  type: 'apiKey' | 'http';
-  agent_card_requires_auth?: boolean;
+  type: 'apiKey' | 'http' | 'google-credentials' | 'oauth2';
   // API Key
   key?: string;
   name?: string;
   // HTTP
-  scheme?: 'Bearer' | 'Basic';
+  scheme?: string;
   token?: string;
   username?: string;
   password?: string;
+  value?: string;
+  // Google Credentials
+  scopes?: string[];
+  // OAuth2
+  client_id?: string;
+  client_secret?: string;
+  authorization_url?: string;
+  token_url?: string;
 }
 
 interface FrontmatterRemoteAgentDefinition
@@ -101,9 +108,11 @@ const localAgentSchema = z
     display_name: z.string().optional(),
     tools: z
       .array(
-        z.string().refine((val) => isValidToolName(val), {
-          message: 'Invalid tool name',
-        }),
+        z
+          .string()
+          .refine((val) => isValidToolName(val, { allowWildcards: true }), {
+            message: 'Invalid tool name',
+          }),
       )
       .optional(),
     model: z.string().optional(),
@@ -116,9 +125,7 @@ const localAgentSchema = z
 /**
  * Base fields shared by all auth configs.
  */
-const baseAuthFields = {
-  agent_card_requires_auth: z.boolean().optional(),
-};
+const baseAuthFields = {};
 
 /**
  * API Key auth schema.
@@ -139,16 +146,49 @@ const apiKeyAuthSchema = z.object({
 const httpAuthSchema = z.object({
   ...baseAuthFields,
   type: z.literal('http'),
-  scheme: z.enum(['Bearer', 'Basic']),
+  scheme: z.string().min(1),
   token: z.string().min(1).optional(),
   username: z.string().min(1).optional(),
   password: z.string().min(1).optional(),
+  value: z.string().min(1).optional(),
+});
+
+/**
+ * Google Credentials auth schema.
+ */
+const googleCredentialsAuthSchema = z.object({
+  ...baseAuthFields,
+  type: z.literal('google-credentials'),
+  scopes: z.array(z.string()).optional(),
+});
+
+/**
+ * OAuth2 auth schema.
+ * authorization_url and token_url can be discovered from the agent card if omitted.
+ */
+const oauth2AuthSchema = z.object({
+  ...baseAuthFields,
+  type: z.literal('oauth2'),
+  client_id: z.string().optional(),
+  client_secret: z.string().optional(),
+  scopes: z.array(z.string()).optional(),
+  authorization_url: z.string().url().optional(),
+  token_url: z.string().url().optional(),
 });
 
 const authConfigSchema = z
-  .discriminatedUnion('type', [apiKeyAuthSchema, httpAuthSchema])
+  .discriminatedUnion('type', [
+    apiKeyAuthSchema,
+    httpAuthSchema,
+    googleCredentialsAuthSchema,
+    oauth2AuthSchema,
+  ])
   .superRefine((data, ctx) => {
     if (data.type === 'http') {
+      if (data.value) {
+        // Raw mode - only scheme and value are needed
+        return;
+      }
       if (data.scheme === 'Bearer' && !data.token) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -326,9 +366,7 @@ export async function parseAgentMarkdown(
 function convertFrontmatterAuthToConfig(
   frontmatter: FrontmatterAuthConfig,
 ): A2AAuthConfig {
-  const base = {
-    agent_card_requires_auth: frontmatter.agent_card_requires_auth,
-  };
+  const base = {};
 
   switch (frontmatter.type) {
     case 'apiKey':
@@ -342,11 +380,26 @@ function convertFrontmatterAuthToConfig(
         name: frontmatter.name,
       };
 
+    case 'google-credentials':
+      return {
+        ...base,
+        type: 'google-credentials',
+        scopes: frontmatter.scopes,
+      };
+
     case 'http': {
       if (!frontmatter.scheme) {
         throw new Error(
           'Internal error: HTTP scheme missing after validation.',
         );
+      }
+      if (frontmatter.value) {
+        return {
+          ...base,
+          type: 'http',
+          scheme: frontmatter.scheme,
+          value: frontmatter.value,
+        };
       }
       switch (frontmatter.scheme) {
         case 'Bearer':
@@ -375,11 +428,22 @@ function convertFrontmatterAuthToConfig(
             password: frontmatter.password,
           };
         default: {
-          const exhaustive: never = frontmatter.scheme;
-          throw new Error(`Unknown HTTP scheme: ${exhaustive}`);
+          // Other IANA schemes without a value should not reach here after validation
+          throw new Error(`Unknown HTTP scheme: ${frontmatter.scheme}`);
         }
       }
     }
+
+    case 'oauth2':
+      return {
+        ...base,
+        type: 'oauth2',
+        client_id: frontmatter.client_id,
+        client_secret: frontmatter.client_secret,
+        scopes: frontmatter.scopes,
+        authorization_url: frontmatter.authorization_url,
+        token_url: frontmatter.token_url,
+      };
 
     default: {
       const exhaustive: never = frontmatter.type;
@@ -417,7 +481,7 @@ export function markdownToAgentDefinition(
     return {
       kind: 'remote',
       name: markdown.name,
-      description: markdown.description || '(Loading description...)',
+      description: markdown.description || '',
       displayName: markdown.display_name,
       agentCardUrl: markdown.agent_card_url,
       auth: markdown.auth

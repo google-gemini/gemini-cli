@@ -12,8 +12,11 @@ import {
   hasUserOrAssistantMessage,
   SessionError,
 } from './sessionUtils.js';
-import type { Config, MessageRecord } from '@google/gemini-cli-core';
-import { SESSION_FILE_PREFIX } from '@google/gemini-cli-core';
+import {
+  SESSION_FILE_PREFIX,
+  type Config,
+  type MessageRecord,
+} from '@google/gemini-cli-core';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -338,6 +341,29 @@ describe('SessionSelector', () => {
 
     await expect(sessionSelector.resolveSession('999')).rejects.toThrow(
       SessionError,
+    );
+  });
+
+  it('should throw SessionError with NO_SESSIONS_FOUND when resolving latest with no sessions', async () => {
+    // Empty chats directory — no session files
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const emptyConfig = {
+      storage: {
+        getProjectTempDir: () => tmpDir,
+      },
+      getSessionId: () => 'current-session-id',
+    } as Partial<Config> as Config;
+
+    const sessionSelector = new SessionSelector(emptyConfig);
+
+    await expect(sessionSelector.resolveSession('latest')).rejects.toSatisfy(
+      (error) => {
+        expect(error).toBeInstanceOf(SessionError);
+        expect((error as SessionError).code).toBe('NO_SESSIONS_FOUND');
+        return true;
+      },
     );
   });
 

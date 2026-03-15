@@ -14,6 +14,7 @@ import {
   type ToolCallConfirmationDetails,
   type PolicyUpdateOptions,
 } from '../../tools/tools.js';
+import { makeFakeConfig } from '../../test-utils/config.js';
 
 interface TestableConfirmation {
   getConfirmationDetails(
@@ -29,6 +30,7 @@ describe('mcpToolWrapper Confirmation', () => {
   let mockMessageBus: MessageBus;
 
   beforeEach(() => {
+    makeFakeConfig(); // ensure config module is loaded
     mockBrowserManager = {
       getDiscoveredTools: vi
         .fn()
