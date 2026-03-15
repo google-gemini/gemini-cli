@@ -156,6 +156,15 @@ describe('chatCommand', () => {
       mockContext.services.logger.checkpointExists = mockCheckpointExists;
     });
 
+    it('should return an error if tag is missing', async () => {
+      const result = await saveCommand?.action?.(mockContext, '  ');
+      expect(result).toEqual({
+        type: 'message',
+        messageType: 'error',
+        content: 'Missing tag. Usage: /resume save <tag>',
+      });
+    });
+
     it('should show /chat in usage string when invoked with /chat', async () => {
       mockContext.invocation = {
         raw: '/chat save',
