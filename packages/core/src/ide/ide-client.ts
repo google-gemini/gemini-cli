@@ -40,6 +40,40 @@ const logger = {
   error: (...args: any[]) => debugLogger.error('[ERROR] [IDEClient]', ...args),
 };
 
+const DEFAULT_IDE_CONNECT_TIMEOUT_MS = 10_000;
+
+function getIdeConnectTimeoutMs(): number {
+  const timeoutFromEnv = process.env['GEMINI_IDE_CONNECT_TIMEOUT_MS'];
+  const parsed = timeoutFromEnv ? Number(timeoutFromEnv) : NaN;
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return DEFAULT_IDE_CONNECT_TIMEOUT_MS;
+}
+
+function withConnectTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 function parseIdeInfoFromConnectionFile(
   connectionConfig: { ideInfo?: unknown } | undefined,
 ): { name: string; displayName: string } | undefined {
@@ -601,6 +635,7 @@ export class IdeClient {
     authToken: string | undefined,
   ): Promise<boolean> {
     let transport: StreamableHTTPClientTransport | undefined;
+    const connectTimeoutMs = getIdeConnectTimeoutMs();
     try {
       const ideServerHost = getIdeServerHost();
       const portNumber = parseInt(port, 10);
@@ -622,12 +657,17 @@ export class IdeClient {
           headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
         },
       });
-      await this.client.connect(transport);
+      await withConnectTimeout(
+        this.client.connect(transport),
+        connectTimeoutMs,
+        'IDE HTTP connection',
+      );
       this.registerClientHandlers();
       await this.discoverTools();
       this.setState(IDEConnectionStatus.Connected);
       return true;
-    } catch (_error) {
+    } catch (error) {
+      logger.debug('HTTP connection attempt failed:', error);
       if (transport) {
         try {
           await transport.close();
@@ -644,6 +684,7 @@ export class IdeClient {
     args,
   }: StdioConfig): Promise<boolean> {
     let transport: StdioClientTransport | undefined;
+    const connectTimeoutMs = getIdeConnectTimeoutMs();
     try {
       logger.debug('Attempting to connect to IDE via stdio');
       this.client = new Client({
@@ -656,12 +697,17 @@ export class IdeClient {
         command,
         args,
       });
-      await this.client.connect(transport);
+      await withConnectTimeout(
+        this.client.connect(transport),
+        connectTimeoutMs,
+        'IDE stdio connection',
+      );
       this.registerClientHandlers();
       await this.discoverTools();
       this.setState(IDEConnectionStatus.Connected);
       return true;
-    } catch (_error) {
+    } catch (error) {
+      logger.debug('Stdio connection attempt failed:', error);
       if (transport) {
         try {
           await transport.close();

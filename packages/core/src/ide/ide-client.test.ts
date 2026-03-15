@@ -417,6 +417,35 @@ describe('IdeClient', () => {
         }),
       );
     });
+
+    it('should timeout a hanging HTTP connection attempt and return disconnected', async () => {
+      vi.useFakeTimers();
+      process.env['GEMINI_IDE_CONNECT_TIMEOUT_MS'] = '50';
+      vi.mocked(getConnectionConfigFromFile).mockResolvedValue({
+        port: '8080',
+      });
+      vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
+      mockClient.connect.mockImplementation(
+        () => new Promise<void>(() => undefined),
+      );
+
+      const ideClient = await IdeClient.getInstance();
+      let settled = false;
+      const connectPromise = ideClient.connect().finally(() => {
+        settled = true;
+      });
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(settled).toBe(true);
+      await connectPromise;
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Disconnected,
+      );
+      expect(mockHttpTransport.close).toHaveBeenCalled();
+      delete process.env['GEMINI_IDE_CONNECT_TIMEOUT_MS'];
+      vi.useRealTimers();
+    });
   });
 
   describe('isDiffingEnabled', () => {

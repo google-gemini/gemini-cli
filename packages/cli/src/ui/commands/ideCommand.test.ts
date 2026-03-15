@@ -145,7 +145,7 @@ describe('ideCommand', () => {
         type: 'message',
         messageType: 'info',
       });
-      if (result.type !== 'message') {
+      if (!result || result.type !== 'message') {
         throw new Error('expected message result');
       }
       expect(result.content).toContain('Connected to IDE companion');
