@@ -1,6 +1,6 @@
 # Gemini CLI companion plugin: Interface specification
 
-> Last Updated: September 15, 2025
+> Last Updated: March 15, 2026
 
 This document defines the contract for building a companion plugin to enable
 Gemini CLI's IDE mode. For VS Code, these features (native diffing, context
@@ -24,6 +24,9 @@ Protocol (MCP)**.
   all MCP communication.
 - **Port:** The server **MUST** listen on a dynamically assigned port (i.e.,
   listen on port `0`).
+- **Compatibility note:** Gemini CLI also has compatibility fallbacks for
+  stdio-based connection bootstrap, but third-party companion plugins should
+  implement the HTTP contract documented here.
 
 ### 2. Discovery mechanism: The port file
 
@@ -42,8 +45,10 @@ creating a "discovery file."
   - `${PID}`: The process ID of the parent IDE process. Your plugin must
     determine this PID and include it in the filename.
   - `${PORT}`: The port your MCP server is listening on.
+- **Backward compatibility note:** Gemini CLI can still read the legacy filename
+  `gemini-ide-server-${PID}.json`, but new plugins should not use it.
 - **File content and workspace validation:** The file **MUST** contain a JSON
-  object with the following structure:
+  object with at least the following fields:
 
   ```json
   {
@@ -64,14 +69,18 @@ creating a "discovery file."
     a sub-directory of `workspacePath`, the connection will be rejected. Your
     plugin **MUST** provide the correct, absolute path(s) to the root of the
     open workspace(s).
+    - The CLI accepts plain absolute paths, `file://` URIs, and URL-encoded
+      paths, but plugins should emit plain absolute paths for consistency.
   - `authToken` (string, required): A secret token for securing the connection.
     The CLI will include this token in an `Authorization: Bearer <token>` header
     on all requests.
-  - `ideInfo` (object, required): Information about the IDE.
-    - `name` (string, required): A short, lowercase identifier for the IDE
-      (e.g., `vscode`, `jetbrains`).
-    - `displayName` (string, required): A user-friendly name for the IDE (e.g.,
-      `VS Code`, `JetBrains IDE`).
+  - `ideInfo` (object, optional but recommended): Information about the IDE.
+    - `name` (string, required when provided): A short, lowercase identifier for
+      the IDE (e.g., `vscode`, `jetbrains`).
+    - `displayName` (string, required when provided): A user-friendly name for
+      the IDE (e.g., `VS Code`, `JetBrains IDE`).
+    - If `ideInfo` is missing or malformed, the CLI falls back to environment
+      detection.
 
 - **Authentication:** To secure the connection, the plugin **MUST** generate a
   unique, secret token and include it in the discovery file. The CLI will then
@@ -87,6 +96,9 @@ creating a "discovery file."
   windows open for the same workspace, the CLI uses the
   `GEMINI_CLI_IDE_SERVER_PORT` variable to identify and connect to the correct
   window's server.
+- **Connection attempt order (CLI behavior):** For deterministic behavior, the
+  CLI attempts connection in this order: file `port` -> file `stdio` -> env
+  `GEMINI_CLI_IDE_SERVER_PORT` -> env `GEMINI_CLI_IDE_SERVER_STDIO_COMMAND`.
 
 ## II. The context interface
 
@@ -208,13 +220,16 @@ The plugin **MUST** register a `closeDiff` tool on its MCP server.
   interface CloseDiffRequest {
     // The absolute path to the file whose diff view should be closed.
     filePath: string;
+    // Optional compatibility field used by older clients.
+    suppressNotification?: boolean;
   }
   ```
 
 - **Response (`CallToolResult`):** The tool **MUST** return a `CallToolResult`.
   - On Success: If the diff view was closed successfully, the response **MUST**
-    include a single **TextContent** block in the content array containing the
-    file's final content before closing.
+    include a single **TextContent** block in the content array containing JSON
+    with this shape: `{ "content": "<final file content>" }`. If content is not
+    available, return `{ "content": null }`.
   - On Failure: If an error prevented the diff view from closing, the response
     **MUST** have `isError: true` and include a `TextContent` block in the
     `content` array describing the error.
