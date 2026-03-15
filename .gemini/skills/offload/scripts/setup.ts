@@ -93,34 +93,29 @@ Host ${sshAlias}
   console.log('\n🍴 Configuring Security Fork...');
   const upstreamRepo = 'google-gemini/gemini-cli';
   
-  // 1. Check for existing fork FIRST
-  const forksQuery = spawnSync('gh', ['api', 'user/repos', '--paginate', '-q', `.[] | select(.fork == true and .parent.full_name == "${upstreamRepo}") | .full_name`], { stdio: 'pipe' });
-  const existingForks = forksQuery.stdout.toString().trim().split('\n').filter(Boolean);
+  // 1. Robust Discovery using 'gh repo list'
+  const forksCheck = spawnSync('gh', ['repo', 'list', '--fork', '--limit', '100', '--json', 'nameWithOwner,parent'], { stdio: 'pipe' });
+  let existingForks: string[] = [];
+  try {
+      const allForks = JSON.parse(forksCheck.stdout.toString());
+      existingForks = allForks
+          .filter((r: any) => r.parent?.nameWithOwner === upstreamRepo)
+          .map((r: any) => r.nameWithOwner);
+  } catch (e) {}
 
   let userFork = '';
   if (existingForks.length > 0) {
-      console.log(`   🔍 Found existing fork: ${existingForks[0]}`);
-      if (await confirm(`   Use this fork?`)) {
-          userFork = existingForks[0];
-      }
-  }
-
-  // 2. Only create if no fork was selected
-  if (!userFork) {
-      console.log(`   🔍 Creating a fresh personal fork of ${upstreamRepo}...`);
+      console.log(`   ✅ Found personal fork: ${existingForks[0]}`);
+      userFork = existingForks[0];
+  } else {
+      console.log(`   🔍 No personal fork of ${upstreamRepo} found. Creating one...`);
       const forkResult = spawnSync('gh', ['repo', 'fork', upstreamRepo, '--clone=false'], { stdio: 'inherit' });
-      if (forkResult.status === 0) {
-          const user = spawnSync('gh', ['api', 'user', '-q', '.login'], { stdio: 'pipe' }).stdout.toString().trim();
-          userFork = `${user}/gemini-cli`;
-      } else {
-          // If fork creation failed, try to fallback to the default name
-          const user = spawnSync('gh', ['api', 'user', '-q', '.login'], { stdio: 'pipe' }).stdout.toString().trim();
-          userFork = `${user}/gemini-cli`;
-          console.log(`   ⚠️  Fork creation returned non-zero. Assuming fork is at: ${userFork}`);
-      }
+      // Give the API a moment to reflect the new fork
+      const user = spawnSync('gh', ['api', 'user', '-q', '.login'], { stdio: 'pipe' }).stdout.toString().trim();
+      userFork = `${user}/gemini-cli`;
   }
   
-  console.log(`   ✅ Target fork: ${userFork}`);
+  console.log(`   👉 Target fork: ${userFork}`);
 
   // ... (Resolve Paths unchanged)
 
@@ -129,10 +124,10 @@ Host ${sshAlias}
     const magicLink = `https://github.com/settings/tokens/beta/new?description=Offload-${env.USER}&repositories[]=${encodeURIComponent(upstreamRepo)}&repositories[]=${encodeURIComponent(userFork)}&permissions[contents]=write&permissions[pull_requests]=write&permissions[metadata]=read`;
     
     console.log('\n🔐 SECURITY: Create a token using the link below:');
-    // Print as a single line with bright blue color for visibility
-    process.stdout.write(`\x1b[1;34m${magicLink}\x1b[0m\n`);
+    // Print the link as a single, clean line for maximum clickability
+    console.log(`\n\x1b[1;34m${magicLink}\x1b[0m\n`);
     
-    const scopedToken = await prompt('\nPaste Scoped Token', '');
+    const scopedToken = await prompt('Paste Scoped Token', '');
     if (scopedToken) {
       spawnSync(`ssh ${remoteHost} "mkdir -p ~/.offload && echo ${scopedToken} > ~/.offload/.gh_token && chmod 600 ~/.offload/.gh_token"`, { shell: true });
     }
