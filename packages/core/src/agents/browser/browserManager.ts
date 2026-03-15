@@ -23,6 +23,7 @@ import type { Tool as McpTool } from '@modelcontextprotocol/sdk/types.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import type { Config } from '../../config/config.js';
 import { Storage } from '../../config/storage.js';
+import { injectInputBlocker } from './inputBlocker.js';
 import * as path from 'node:path';
 import { injectAutomationOverlay } from './automationOverlay.js';
 
@@ -97,10 +98,12 @@ export class BrowserManager {
    * Always false in headless mode (no visible window to decorate).
    */
   private readonly shouldInjectOverlay: boolean;
+  private readonly shouldDisableInput: boolean;
 
   constructor(private config: Config) {
     const browserConfig = config.getBrowserAgentConfig();
     this.shouldInjectOverlay = !browserConfig?.customConfig?.headless;
+    this.shouldDisableInput = config.shouldDisableBrowserUserInput();
   }
 
   /**
@@ -144,6 +147,19 @@ export class BrowserManager {
       throw signal.reason ?? new Error('Operation cancelled');
     }
 
+    const errorMessage = this.checkNavigationRestrictions(toolName, args);
+    if (errorMessage) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: errorMessage,
+          },
+        ],
+        isError: true,
+      };
+    }
+
     const client = await this.getRawMcpClient();
     const callPromise = client.callTool(
       { name: toolName, arguments: args },
@@ -176,20 +192,32 @@ export class BrowserManager {
       }
     }
 
-    // Re-inject the automation overlay after any tool that can cause a
-    // full-page navigation (including implicit navigations from clicking links).
-    // chrome-devtools-mcp emits no MCP notifications, so callTool() is the
-    // only interception point we have — equivalent to a page-load listener.
+    // Re-inject the automation overlay and input blocker after tools that
+    // can cause a full-page navigation. chrome-devtools-mcp emits no MCP
+    // notifications, so callTool() is the only interception point.
     if (
-      this.shouldInjectOverlay &&
       !result.isError &&
       POTENTIALLY_NAVIGATING_TOOLS.has(toolName) &&
       !signal?.aborted
     ) {
       try {
-        await injectAutomationOverlay(this, signal);
+        if (this.shouldInjectOverlay) {
+          await injectAutomationOverlay(this, signal);
+        }
+        // Only re-inject the input blocker for tools that *reliably*
+        // replace the page DOM (navigate_page, new_page, select_page).
+        // click/click_at are handled by pointer-events suspend/resume
+        // in mcpToolWrapper — no full re-inject roundtrip needed.
+        // press_key/handle_dialog only sometimes navigate.
+        const reliableNavigation =
+          toolName === 'navigate_page' ||
+          toolName === 'new_page' ||
+          toolName === 'select_page';
+        if (this.shouldDisableInput && reliableNavigation) {
+          await injectInputBlocker(this);
+        }
       } catch {
-        // Never let overlay failures interrupt the tool result
+        // Never let overlay/blocker failures interrupt the tool result
       }
     }
 
@@ -327,6 +355,23 @@ export class BrowserManager {
       mcpArgs.push('--userDataDir', defaultProfilePath);
     }
 
+    if (
+      browserConfig.customConfig.allowedDomains &&
+      browserConfig.customConfig.allowedDomains.length > 0
+    ) {
+      const exclusionRules = browserConfig.customConfig.allowedDomains
+        .map((domain) => {
+          if (!/^(\*\.)?([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+$/.test(domain)) {
+            throw new Error(`Invalid domain in allowedDomains: ${domain}`);
+          }
+          return `EXCLUDE ${domain}`;
+        })
+        .join(', ');
+      mcpArgs.push(
+        `--chromeArg="--host-rules=MAP * 127.0.0.1, ${exclusionRules}, EXCLUDE 127.0.0.1"`,
+      );
+    }
+
     debugLogger.log(
       `Launching chrome-devtools-mcp (${sessionMode} mode) with args: ${mcpArgs.join(' ')}`,
     );
@@ -375,6 +420,7 @@ export class BrowserManager {
           await this.rawMcpClient!.connect(this.mcpTransport!);
           debugLogger.log('MCP client connected to chrome-devtools-mcp');
           await this.discoverTools();
+          this.registerInputBlockerHandler();
         })(),
         new Promise<never>((_, reject) => {
           timeoutId = setTimeout(
@@ -483,6 +529,104 @@ export class BrowserManager {
     debugLogger.log(
       `Discovered ${this.discoveredTools.length} tools from chrome-devtools-mcp: ` +
         this.discoveredTools.map((t) => t.name).join(', '),
+    );
+  }
+
+  /**
+   * Check navigation restrictions based on tools and the args sent
+   * along with them.
+   *
+   * @returns error message if failed, undefined if passed.
+   */
+  private checkNavigationRestrictions(
+    toolName: string,
+    args: Record<string, unknown>,
+  ): string | undefined {
+    const pageNavigationTools = ['navigate_page', 'new_page'];
+
+    if (!pageNavigationTools.includes(toolName)) {
+      return undefined;
+    }
+
+    const allowedDomains =
+      this.config.getBrowserAgentConfig().customConfig.allowedDomains;
+    if (!allowedDomains || allowedDomains.length === 0) {
+      return undefined;
+    }
+
+    const url = args['url'];
+    if (!url) {
+      return undefined;
+    }
+    if (typeof url !== 'string') {
+      return `Invalid URL: URL must be a string.`;
+    }
+
+    try {
+      const parsedUrl = new URL(url);
+      const urlHostname = parsedUrl.hostname.replace(/\.$/, '');
+
+      for (const domainPattern of allowedDomains) {
+        if (domainPattern.startsWith('*.')) {
+          const baseDomain = domainPattern.substring(2);
+          if (
+            urlHostname === baseDomain ||
+            urlHostname.endsWith(`.${baseDomain}`)
+          ) {
+            return undefined;
+          }
+        } else {
+          if (urlHostname === domainPattern) {
+            return undefined;
+          }
+        }
+      }
+    } catch {
+      return `Invalid URL: Malformed URL string.`;
+    }
+
+    // If none matched, then deny
+    return `Tool '${toolName}' is not permitted for the requested URL/domain based on your current browser settings.`;
+  }
+
+  /**
+   * Registers a fallback notification handler on the MCP client to
+   * automatically re-inject the input blocker after any server-side
+   * notification (e.g. page navigation, resource updates).
+   *
+   * This covers ALL navigation types (link clicks, form submissions,
+   * history navigation) — not just explicit navigate_page tool calls.
+   */
+  private registerInputBlockerHandler(): void {
+    if (!this.rawMcpClient) {
+      return;
+    }
+
+    if (!this.config.shouldDisableBrowserUserInput()) {
+      return;
+    }
+
+    const existingHandler = this.rawMcpClient.fallbackNotificationHandler;
+    this.rawMcpClient.fallbackNotificationHandler = async (notification: {
+      method: string;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      params?: any;
+    }) => {
+      // Chain with any existing handler first.
+      if (existingHandler) {
+        await existingHandler(notification);
+      }
+
+      // Only re-inject on resource update notifications which indicate
+      // page content has changed (navigation, new page, etc.)
+      if (notification.method === 'notifications/resources/updated') {
+        debugLogger.log('Page content changed, re-injecting input blocker...');
+        void injectInputBlocker(this);
+      }
+    };
+
+    debugLogger.log(
+      'Registered global notification handler for input blocker re-injection',
     );
   }
 }
