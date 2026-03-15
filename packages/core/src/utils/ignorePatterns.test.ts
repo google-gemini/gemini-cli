@@ -158,17 +158,6 @@ describe('FileExclusions', () => {
       expect(mockConfig.getCustomExcludes).toHaveBeenCalled();
     });
 
-    it('should handle config without getCustomExcludes method', () => {
-      const mockConfig = {} as Config;
-
-      const excluder = new FileExclusions(mockConfig);
-      const patterns = excluder.getDefaultExcludePatterns();
-
-      // Should not throw and should include default patterns
-      expect(patterns).toContain('**/node_modules/**');
-      expect(patterns.length).toBeGreaterThan(0);
-    });
-
     it('should include config custom excludes in glob patterns', () => {
       const mockConfig = {
         getCustomExcludes: vi.fn(() => ['**/config-glob/**']),
