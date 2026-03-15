@@ -153,6 +153,21 @@ describe('useAuth', () => {
       });
     });
 
+    it('should initialize as Authenticated when startup auth already succeeded', () => {
+      const { result } = renderHook(() =>
+        useAuthCommand(
+          createSettings(AuthType.LOGIN_WITH_GOOGLE),
+          mockConfig,
+          null,
+          null,
+          true,
+        ),
+      );
+
+      expect(result.current.authState).toBe(AuthState.Authenticated);
+      expect(mockConfig.refreshAuth).not.toHaveBeenCalled();
+    });
+
     it('should set error if no auth type is selected and no env key', async () => {
       const { result } = renderHook(() =>
         useAuthCommand(createSettings(undefined), mockConfig),

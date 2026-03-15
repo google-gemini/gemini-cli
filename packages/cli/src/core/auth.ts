@@ -18,6 +18,7 @@ import type { AccountSuspensionInfo } from '../ui/contexts/UIStateContext.js';
 export interface InitialAuthResult {
   authError: string | null;
   accountSuspensionInfo: AccountSuspensionInfo | null;
+  authSucceeded: boolean;
 }
 
 /**
@@ -31,7 +32,7 @@ export async function performInitialAuth(
   authType: AuthType | undefined,
 ): Promise<InitialAuthResult> {
   if (!authType) {
-    return { authError: null, accountSuspensionInfo: null };
+    return { authError: null, accountSuspensionInfo: null, authSucceeded: false };
   }
 
   try {
@@ -53,6 +54,7 @@ export async function performInitialAuth(
           appealUrl: suspendedError.appealUrl,
           appealLinkText: suspendedError.appealLinkText,
         },
+        authSucceeded: false,
       };
     }
     if (e instanceof ProjectIdRequiredError) {
@@ -61,13 +63,15 @@ export async function performInitialAuth(
       return {
         authError: getErrorMessage(e),
         accountSuspensionInfo: null,
+        authSucceeded: false,
       };
     }
     return {
       authError: `Failed to sign in. Message: ${getErrorMessage(e)}`,
       accountSuspensionInfo: null,
+      authSucceeded: false,
     };
   }
 
-  return { authError: null, accountSuspensionInfo: null };
+  return { authError: null, accountSuspensionInfo: null, authSucceeded: true };
 }
