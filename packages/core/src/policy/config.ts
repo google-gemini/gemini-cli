@@ -81,7 +81,7 @@ export const ALWAYS_ALLOW_PRIORITY_OFFSET =
 
 // Specific priority offsets and derived priorities for dynamic/settings rules.
 
-export const MCP_EXCLUDED_PRIORITY = USER_POLICY_TIER + 0.9;
+export const MCP_EXCLUDED_PRIORITY = USER_POLICY_TIER + 0.98;
 export const EXCLUDE_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.4;
 export const ALLOWED_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.3;
 export const TRUSTED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.2;
@@ -618,9 +618,14 @@ export function createPolicyUpdater(
           return;
         }
 
-        // Normalize toolName for in-memory rules if it's an MCP server wildcard
+        // Normalize toolName for in-memory rules if it's an MCP server wildcard.
+        // Supports both composite subagent format (server__*) and standard MCP format (mcp_server_*).
         let effectiveToolName = toolName;
-        if (message.mcpName && toolName === `${message.mcpName}__*`) {
+        if (
+          message.mcpName &&
+          (toolName === `${message.mcpName}__*` ||
+            toolName === `${MCP_TOOL_PREFIX}${message.mcpName}_*`)
+        ) {
           effectiveToolName = '*';
         }
 
@@ -677,11 +682,19 @@ export function createPolicyUpdater(
 
             if (message.mcpName) {
               newRule.mcpName = message.mcpName;
-              // Extract simple tool name if it has the server prefix
-              const prefix = `${message.mcpName}__`;
-              newRule.toolName = toolName.startsWith(prefix)
-                ? toolName.substring(prefix.length)
-                : toolName;
+              // Extract simple tool name if it has the server prefix.
+              // We check both the composite subagent format (server__tool)
+              // and the standard MCP format (mcp_server_tool).
+              const mcpPrefix = `${MCP_TOOL_PREFIX}${message.mcpName}_`;
+              const subagentPrefix = `${message.mcpName}__`;
+
+              if (toolName.startsWith(mcpPrefix)) {
+                newRule.toolName = toolName.slice(mcpPrefix.length);
+              } else if (toolName.startsWith(subagentPrefix)) {
+                newRule.toolName = toolName.slice(subagentPrefix.length);
+              } else {
+                newRule.toolName = toolName;
+              }
             } else {
               newRule.toolName = toolName;
             }
