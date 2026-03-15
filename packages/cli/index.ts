@@ -9,6 +9,16 @@
 import { main } from './src/gemini.js';
 import { FatalError, writeToStderr } from '@google/gemini-cli-core';
 import { runExitCleanup } from './src/utils/cleanup.js';
+import { existsSync } from 'node:fs';
+
+if (
+  process.platform === 'linux' &&
+  existsSync('/etc/alpine-release') &&
+  !process.env['GEMINI_CLI_NO_RELAUNCH'] &&
+  !process.env['GEMINI_CLI_FORCE_RELAUNCH']
+) {
+  process.env['GEMINI_CLI_NO_RELAUNCH'] = 'true';
+}
 
 // --- Global Entry Point ---
 

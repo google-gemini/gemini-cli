@@ -418,6 +418,8 @@ export interface LoadCliConfigOptions {
   projectHooks?: { [K in HookEventName]?: HookDefinition[] } & {
     disabled?: string[];
   };
+  skipMemoryLoad?: boolean;
+  skipExtensionLoad?: boolean;
 }
 
 export async function loadCliConfig(
@@ -426,7 +428,12 @@ export async function loadCliConfig(
   argv: CliArgs,
   options: LoadCliConfigOptions = {},
 ): Promise<Config> {
-  const { cwd = process.cwd(), projectHooks } = options;
+  const {
+    cwd = process.cwd(),
+    projectHooks,
+    skipMemoryLoad = false,
+    skipExtensionLoad = false,
+  } = options;
   const debugMode = isDebugMode(argv);
 
   const loadedSettings = loadSettings(cwd);
@@ -488,11 +495,15 @@ export async function loadCliConfig(
     eventEmitter: coreEvents as EventEmitter<ExtensionEvents>,
     clientVersion: await getVersion(),
   });
-  await extensionManager.loadExtensions();
+  if (!skipExtensionLoad) {
+    await extensionManager.loadExtensions();
+  }
 
-  const extensionPlanSettings = extensionManager
-    .getExtensions()
-    .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
+  const extensionPlanSettings = skipExtensionLoad
+    ? undefined
+    : extensionManager
+        .getExtensions()
+        .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
 
   const experimentalJitContext = settings.experimental?.jitContext ?? false;
 
@@ -510,7 +521,7 @@ export async function loadCliConfig(
   let fileCount = 0;
   let filePaths: string[] = [];
 
-  if (!experimentalJitContext) {
+  if (!skipMemoryLoad && !experimentalJitContext) {
     // Call the (now wrapper) loadHierarchicalGeminiMemory which calls the server's version
     const result = await loadServerHierarchicalMemory(
       cwd,
