@@ -68,8 +68,8 @@ export function getOpenUrlsCommands(readmeUrl: string): string[] {
   let repoInfo: { owner: string; repo: string } | null = null;
   try {
     repoInfo = getGitHubRepoInfo();
-  } catch {
-    /* ignore */
+  } catch (e) {
+    debugLogger.debug('Could not determine repository info:', e);
   }
 
   if (!repoInfo) {
