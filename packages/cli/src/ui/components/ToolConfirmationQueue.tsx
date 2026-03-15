@@ -18,6 +18,8 @@ import { StickyHeader } from './StickyHeader.js';
 import type { SerializableConfirmationDetails } from '@google/gemini-cli-core';
 import { useUIActions } from '../contexts/UIActionsContext.js';
 
+import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
+
 function getConfirmationHeader(
   details: SerializableConfirmationDetails | undefined,
 ): string {
@@ -48,6 +50,9 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
     constrainHeight,
     availableTerminalHeight: uiAvailableHeight,
   } = useUIState();
+
+  const isAlternateBuffer = useAlternateBuffer();
+
   const { tool, index, total } = confirmingTool;
 
   // Safety check: ToolConfirmationMessage requires confirmationDetails
@@ -116,12 +121,12 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
 
         <Box
           width={mainAreaWidth}
-          borderStyle="round"
+          borderStyle={isAlternateBuffer ? undefined : 'round'}
           borderColor={borderColor}
           borderTop={false}
           borderBottom={false}
-          borderLeft={true}
-          borderRight={true}
+          borderLeft={!isAlternateBuffer}
+          borderRight={!isAlternateBuffer}
           paddingX={1}
           flexDirection="column"
         >
@@ -141,14 +146,14 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           />
         </Box>
         <Box
-          height={1}
+          height={isAlternateBuffer ? 0 : 1}
           width={mainAreaWidth}
-          borderLeft={true}
-          borderRight={true}
+          borderLeft={!isAlternateBuffer}
+          borderRight={!isAlternateBuffer}
           borderTop={false}
-          borderBottom={true}
+          borderBottom={!isAlternateBuffer}
           borderColor={borderColor}
-          borderStyle="round"
+          borderStyle={isAlternateBuffer ? undefined : 'round'}
         />
       </Box>
       <ShowMoreLines constrainHeight={constrainHeight} />

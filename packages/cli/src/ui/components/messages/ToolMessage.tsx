@@ -25,6 +25,8 @@ import { type Config, CoreToolCallStatus, Kind } from '@google/gemini-cli-core';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import { SUBAGENT_MAX_LINES } from '../../constants.js';
 
+import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
+
 export type { TextEmphasis };
 
 export interface ToolMessageProps extends IndividualToolCallDisplay {
@@ -39,6 +41,10 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
   embeddedShellFocused?: boolean;
   ptyId?: number;
   config?: Config;
+  progressMessage?: string;
+  originalRequestName?: string;
+  progress?: number;
+  progressTotal?: number;
 }
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({
@@ -70,6 +76,8 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
     activeShellPtyId,
     embeddedShellFocused,
   );
+
+  const isAlternateBuffer = useAlternateBuffer();
 
   const isThisShellFocusable = checkIsShellFocusable(name, status, config);
 
@@ -111,13 +119,13 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
       </StickyHeader>
       <Box
         width={terminalWidth}
-        borderStyle="round"
+        borderStyle={isAlternateBuffer ? undefined : 'round'}
         borderColor={borderColor}
         borderDimColor={borderDimColor}
         borderTop={false}
         borderBottom={false}
-        borderLeft={true}
-        borderRight={true}
+        borderLeft={!isAlternateBuffer}
+        borderRight={!isAlternateBuffer}
         paddingX={1}
         flexDirection="column"
       >

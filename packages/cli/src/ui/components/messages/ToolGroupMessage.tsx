@@ -17,6 +17,7 @@ import { ToolMessage } from './ToolMessage.js';
 import { ShellToolMessage } from './ShellToolMessage.js';
 import { theme } from '../../semantic-colors.js';
 import { useConfig } from '../../contexts/ConfigContext.js';
+import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import { isShellTool } from './ToolShared.js';
 import {
   shouldHideToolCall,
@@ -82,6 +83,8 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     backgroundShells,
     pendingHistoryItems,
   } = useUIState();
+
+  const isAlternateBuffer = useAlternateBuffer();
 
   const { borderColor, borderDimColor } = useMemo(
     () =>
@@ -198,14 +201,14 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             )}
             {tool.outputFile && (
               <Box
-                borderLeft={true}
-                borderRight={true}
+                borderLeft={!isAlternateBuffer}
+                borderRight={!isAlternateBuffer}
                 borderTop={false}
                 borderBottom={false}
                 borderColor={borderColor}
                 borderDimColor={borderDimColor}
                 flexDirection="column"
-                borderStyle="round"
+                borderStyle={isAlternateBuffer ? undefined : 'round'}
                 paddingLeft={1}
                 paddingRight={1}
               >
@@ -228,13 +231,15 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           <Box
             height={0}
             width={contentWidth}
-            borderLeft={true}
-            borderRight={true}
+            borderLeft={!isAlternateBuffer}
+            borderRight={!isAlternateBuffer}
             borderTop={false}
-            borderBottom={borderBottomOverride ?? true}
+            borderBottom={
+              isAlternateBuffer ? false : (borderBottomOverride ?? true)
+            }
             borderColor={borderColor}
             borderDimColor={borderDimColor}
-            borderStyle="round"
+            borderStyle={isAlternateBuffer ? undefined : 'round'}
           />
         )
       }

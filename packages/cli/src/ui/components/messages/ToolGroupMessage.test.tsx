@@ -774,6 +774,7 @@ describe('<ToolGroupMessage />', () => {
         {
           config: baseMockConfig,
           settings: fullVerbositySettings,
+          useAlternateBuffer: false,
         },
       );
 
@@ -959,6 +960,7 @@ describe('<ToolGroupMessage />', () => {
         {
           config: baseMockConfig,
           settings: fullVerbositySettings,
+          useAlternateBuffer: false,
         },
       );
 
