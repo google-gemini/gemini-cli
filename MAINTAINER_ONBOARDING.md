@@ -10,7 +10,24 @@ preflight) to a dedicated GCP worker.
    `gemini-cli-team-quota` project.
 2. **GCloud CLI**: Authenticated locally (`gcloud auth login`).
 3. **GitHub CLI**: Authenticated locally (`gh auth login`).
-4. **iTerm2**: (Optional) For automated window popping on macOS.
+
+- **iTerm2**: (Optional) For automated window popping on macOS.
+
+## Architecture: Why this setup?
+
+The offload system uses a **Hybrid VM + Docker** architecture to balance raw
+power with environmental stability:
+
+1.  **GCE VM (Raw Power)**: High-performance machines handle the "heavy lifting"
+    (full project builds, exhaustive test suites), keeping your local primary
+    workstation responsive and cool.
+2.  **Docker (Consistency)**: All development tools (`node`, `gh`, `tsx`,
+    `vitest`) are managed via `.gcp/Dockerfile.maintainer`. This ensures every
+    maintainer works in an identical environment, eliminating "it works on my
+    machine" issues.
+3.  **Persistence + Isolation**: Tmux sessions on the host VM provide
+    persistence (surviving disconnects), while Git Worktrees and isolated Docker
+    runs ensure that multiple jobs don't interfere with each other.
 
 ## Setup Workflow
 

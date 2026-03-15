@@ -41,6 +41,17 @@ When you run `npm run offload <PR> fix`, the orchestrator provisions the remote
 environment and then launches a Gemini CLI session specifically powered by the
 `fix-pr` skill.
 
+## Architecture: The Hybrid Powerhouse
+
+The offload system uses a **Hybrid VM + Docker** architecture designed for maximum performance and reliability:
+
+1.  **The GCE VM (Raw Power)**: By running on high-performance Google Compute Engine instances, we offload heavy CPU and RAM tasks (like full project builds and massive test suites) from your local machine, keeping your primary workstation responsive.
+2.  **The Docker Container (Consistency & Resilience)**:
+    *   **Source of Truth**: The `.gcp/Dockerfile.maintainer` defines the exact environment. If a tool is added there, every maintainer gets it instantly.
+    *   **Zero Drift**: Containers are immutable. Every job starts in a fresh state, preventing the "OS rot" that typically affects persistent VMs.
+    *   **Local-to-Remote Parity**: The same image can be run locally on your Mac or remotely in GCP, ensuring that "it works on my machine" translates 100% to the remote worker.
+    *   **Safe Multi-tenancy**: Using Git Worktrees inside an isolated container environment allows multiple jobs to run in parallel without sharing state or polluting the host system.
+
 ## Playbooks
 
 -   **`review`** (default): Build, CI check, static analysis, and behavioral proofs.

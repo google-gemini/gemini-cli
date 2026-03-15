@@ -2,7 +2,8 @@
 
 This skill provides a high-performance, parallelized workflow for offloading intensive developer tasks (PR reviews, fixing CI, preparing merges) to a remote workstation. It leverages a Node.js orchestration engine to run complex validation playbooks concurrently in a dedicated terminal window.
 
-## Playbooks
+## Performance Workflow
+
 
 The `offload` skill supports the following specialized playbooks:
 
