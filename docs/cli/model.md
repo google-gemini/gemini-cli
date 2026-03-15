@@ -25,15 +25,6 @@ Running this command will open a dialog with your options:
 | Auto (Gemini 2.5) | Let the system choose the best Gemini 2.5 model for your task. | gemini-2.5-pro, gemini-2.5-flash             |
 | Manual            | Select a specific model.                                       | Any available model.                         |
 
-> **Note:** The models available in the `/model` dialog depend on your
-> authentication method. If you authenticate using a Gemini API key from
-> Google AI Studio, you will see `gemini-3.1-pro-preview-customtools` as an
-> available model. This variant is optimized for custom tool use and is
-> exclusively available to Gemini API Key users. Users authenticating via
-> Google Sign-in or Vertex AI will see `gemini-3.1-pro-preview` instead.
-> If you switch authentication methods, the available models in this dialog
-> will change accordingly.
-
 We recommend selecting one of the above **Auto** options. However, you can
 select **Manual** to select a specific model from those available.
 

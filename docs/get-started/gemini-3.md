@@ -13,12 +13,6 @@ Gemini 3 Pro and Gemini 3 Flash are available on Gemini CLI for all users!
 > ```
 > gemini -m gemini-3.1-pro-preview
 > ```
-> **Note:** If you authenticate using a Gemini API key from Google AI Studio,
-> you will have access to `gemini-3.1-pro-preview-customtools` — a variant of
-> Gemini 3.1 Pro optimized for custom tool use. This variant is only available
-> with Gemini API Key authentication. Users authenticating via Google Sign-in
-> or Vertex AI will use `gemini-3.1-pro-preview` instead. You can verify which
-> variant is active via the `/model` dialog.
 >
 > Learn more about [models](../cli/model.md) and
 > [model routing](../cli/model-routing.md).

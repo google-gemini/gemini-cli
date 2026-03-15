@@ -19,7 +19,7 @@ Select the authentication method that matches your situation in the table below:
 | :--------------------------------------------------------------------- | :--------------------------------------------------------------- | :---------------------------------------------------------- |
 | Individual Google accounts                                             | [Sign in with Google](#login-google)                             | No, with exceptions                                         |
 | Organization users with a company, school, or Google Workspace account | [Sign in with Google](#login-google)                             | [Yes](#set-gcp)                                             |
-| AI Studio user with a Gemini API key                                   | [Use Gemini API Key](#gemini-api)                                | No — but unlocks the `gemini-3.1-pro-preview-customtools` model variant |                                                        
+| AI Studio user with a Gemini API key                                   | [Use Gemini API Key](#gemini-api)                                | No                                                          |
 | Google Cloud Vertex AI user                                            | [Vertex AI](#vertex-ai)                                          | [Yes](#set-gcp)                                             |
 | [Headless mode](#headless)                                             | [Use Gemini API Key](#gemini-api) or<br> [Vertex AI](#vertex-ai) | No (for Gemini API Key)<br> [Yes](#set-gcp) (for Vertex AI) |
 
@@ -107,12 +107,6 @@ To authenticate and use Gemini CLI with a Gemini API key:
 
 4. Select **Use Gemini API key**.
 
-> **Note:** Authenticating with a Gemini API key from AI Studio unlocks the
-> `gemini-3.1-pro-preview-customtools` model variant. This variant is only
-> available with this authentication method. Users authenticating via Google
-> Sign-in or Vertex AI will use `gemini-3.1-pro-preview` instead. You may
-> notice different models listed in the `/model` dialog depending on your
-> authentication method — this is expected behavior.
 > **Warning:** Treat API keys, especially for services like Gemini, as sensitive
 > credentials. Protect them to prevent unauthorized access and potential misuse
 > of the service under your account.
