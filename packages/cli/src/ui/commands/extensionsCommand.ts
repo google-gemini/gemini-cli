@@ -7,12 +7,12 @@
 import {
   debugLogger,
   listExtensions,
+  getErrorMessage,
   type ExtensionInstallMetadata,
   isInsideSandboxEnvironment,
   isMacOsSeatbeltSandbox,
 } from '@google/gemini-cli-core';
 import type { ExtensionUpdateInfo } from '../../config/extension.js';
-import { getErrorMessage } from '../../utils/errors.js';
 import {
   emptyIcon,
   MessageType,
@@ -281,9 +281,9 @@ async function exploreAction(
       return {
         type: 'custom_dialog' as const,
         component: React.createElement(ExtensionRegistryView, {
-          onSelect: (extension) => {
+          onSelect: async (extension, requestConsentOverride) => {
             debugLogger.log(`Selected extension: ${extension.extensionName}`);
-            void installAction(context, extension.url);
+            await installAction(context, extension.url, requestConsentOverride);
             context.ui.removeComponent();
           },
           onClose: () => context.ui.removeComponent(),
@@ -457,7 +457,11 @@ async function enableAction(context: CommandContext, args: string) {
   }
 }
 
-async function installAction(context: CommandContext, args: string) {
+async function installAction(
+  context: CommandContext,
+  args: string,
+  requestConsentOverride?: (consent: string) => Promise<boolean>,
+) {
   const extensionLoader = context.services.config?.getExtensionLoader();
   if (!(extensionLoader instanceof ExtensionManager)) {
     debugLogger.error(
@@ -504,8 +508,11 @@ async function installAction(context: CommandContext, args: string) {
 
   try {
     const installMetadata = await inferInstallMetadata(source);
-    const extension =
-      await extensionLoader.installOrUpdateExtension(installMetadata);
+    const extension = await extensionLoader.installOrUpdateExtension(
+      installMetadata,
+      undefined,
+      requestConsentOverride,
+    );
     context.ui.addItem({
       type: MessageType.INFO,
       text: `Extension "${extension.name}" installed successfully.`,

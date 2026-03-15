@@ -475,14 +475,18 @@ describe('extensionsCommand', () => {
       mockInstallExtension.mockResolvedValue({ name: extension.url });
 
       // Call onSelect
-      component.props.onSelect?.(extension);
+      await component.props.onSelect?.(extension);
 
       await waitFor(() => {
         expect(inferInstallMetadata).toHaveBeenCalledWith(extension.url);
-        expect(mockInstallExtension).toHaveBeenCalledWith({
-          source: extension.url,
-          type: 'git',
-        });
+        expect(mockInstallExtension).toHaveBeenCalledWith(
+          {
+            source: extension.url,
+            type: 'git',
+          },
+          undefined,
+          undefined,
+        );
       });
       expect(mockContext.ui.removeComponent).toHaveBeenCalledTimes(1);
 
@@ -636,10 +640,14 @@ describe('extensionsCommand', () => {
       mockInstallExtension.mockResolvedValue({ name: packageName });
       await installAction!(mockContext, packageName);
       expect(inferInstallMetadata).toHaveBeenCalledWith(packageName);
-      expect(mockInstallExtension).toHaveBeenCalledWith({
-        source: packageName,
-        type: 'git',
-      });
+      expect(mockInstallExtension).toHaveBeenCalledWith(
+        {
+          source: packageName,
+          type: 'git',
+        },
+        undefined,
+        undefined,
+      );
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.INFO,
         text: `Installing extension from "${packageName}"...`,
@@ -661,10 +669,14 @@ describe('extensionsCommand', () => {
 
       await installAction!(mockContext, packageName);
       expect(inferInstallMetadata).toHaveBeenCalledWith(packageName);
-      expect(mockInstallExtension).toHaveBeenCalledWith({
-        source: packageName,
-        type: 'git',
-      });
+      expect(mockInstallExtension).toHaveBeenCalledWith(
+        {
+          source: packageName,
+          type: 'git',
+        },
+        undefined,
+        undefined,
+      );
       expect(mockContext.ui.addItem).toHaveBeenCalledWith({
         type: MessageType.ERROR,
         text: `Failed to install extension from "${packageName}": ${errorMessage}`,

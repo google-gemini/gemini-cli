@@ -6,6 +6,7 @@
 
 // Export config
 export * from './config/config.js';
+export * from './config/agent-loop-context.js';
 export * from './config/memory.js';
 export * from './config/defaultModelConfigs.js';
 export * from './config/models.js';
@@ -47,6 +48,7 @@ export * from './scheduler/tool-executor.js';
 export * from './core/recordingContentGenerator.js';
 
 export * from './fallback/types.js';
+export * from './fallback/handler.js';
 
 export * from './code_assist/codeAssist.js';
 export * from './code_assist/oauth2.js';
@@ -66,6 +68,7 @@ export * from './utils/checks.js';
 export * from './utils/headless.js';
 export * from './utils/schemaValidator.js';
 export * from './utils/errors.js';
+export * from './utils/fsErrorMessages.js';
 export * from './utils/exitCodes.js';
 export * from './utils/getFolderStructure.js';
 export * from './utils/memoryDiscovery.js';
@@ -144,6 +147,7 @@ export * from './ide/types.js';
 
 // Export Shell Execution Service
 export * from './services/shellExecutionService.js';
+export * from './services/sandboxManager.js';
 
 // Export base tool definitions
 export * from './tools/tools.js';
@@ -217,6 +221,9 @@ export * from './agents/types.js';
 // Export stdio utils
 export * from './utils/stdio.js';
 export * from './utils/terminal.js';
+
+// Export voice utilities
+export * from './voice/responseFormatter.js';
 
 // Export types from @google/genai
 export type { Content, Part, FunctionCall } from '@google/genai';
