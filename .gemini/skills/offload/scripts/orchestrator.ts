@@ -31,7 +31,7 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
     return 1;
   }
 
-  const { projectId, zone, remoteHost, remoteHome, remoteWorkDir, useContainer } = config;
+  const { projectId, zone, remoteHost, remoteWorkDir, useContainer } = config;
   const targetVM = `gcli-offload-${env.USER || 'mattkorwel'}`;
 
   // 2. Wake Worker
@@ -43,16 +43,16 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
     spawnSync(`gcloud compute instances start ${targetVM} --project ${projectId} --zone ${zone}`, { shell: true, stdio: 'inherit' });
   }
 
-  const remotePolicyPath = `${remoteHome}/.gemini/policies/offload-policy.toml`;
-  const persistentScripts = `${remoteHome}/.offload/scripts`;
+  const remotePolicyPath = `~/.gemini/policies/offload-policy.toml`;
+  const persistentScripts = `~/.offload/scripts`;
   const sessionName = `offload-${prNumber}-${action}`;
 
   // 3. Remote Context Setup (Parallel Worktree)
   console.log(`🚀 Provisioning clean worktree for ${action} on PR #${prNumber}...`);
-  const remoteWorktreeDir = `${remoteHome}/dev/worktrees/offload-${prNumber}-${action}`;
+  const remoteWorktreeDir = `~/dev/worktrees/offload-${prNumber}-${action}`;
   
   const setupCmd = `
-    mkdir -p ${remoteHome}/dev/worktrees && \
+    mkdir -p ~/dev/worktrees && \
     cd ${remoteWorkDir} && \
     git fetch upstream pull/${prNumber}/head && \
     git worktree add -f ${remoteWorktreeDir} FETCH_HEAD
@@ -70,10 +70,7 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   
   let tmuxCmd = `cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL`;
   if (useContainer) {
-    // Inside container, we need to ensure the environment is loaded
     tmuxCmd = `docker exec -it -w ${remoteWorktreeDir} gemini-sandbox sh -c "${remoteWorker}; exec $SHELL"`;
-  } else {
-    tmuxCmd = `cd ${remoteWorktreeDir} && ${tmuxCmd}`;
   }
   
   const sshInternal = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'offload' ${q(tmuxCmd)}`;
