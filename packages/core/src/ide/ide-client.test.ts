@@ -28,6 +28,7 @@ import {
   getPortFromEnv,
   validateWorkspacePath,
   getIdeServerHost,
+  getConnectionFailureMessage,
 } from './ide-connection-utils.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -410,8 +411,10 @@ describe('IdeClient', () => {
       expect(ideClient.getConnectionStatus().status).toBe(
         IDEConnectionStatus.Disconnected,
       );
-      expect(ideClient.getConnectionStatus().details).toContain(
-        'Failed to connect',
+      expect(ideClient.getConnectionStatus().details).toBe(
+        getConnectionFailureMessage('connectFailed', {
+          ideDisplayName: 'VS Code',
+        }),
       );
     });
   });

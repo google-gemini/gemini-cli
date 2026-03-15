@@ -29,6 +29,7 @@ import {
   getStdioConfigFromEnv,
   validateWorkspacePath,
   createProxyAwareFetch,
+  getConnectionFailureMessage,
   type StdioConfig,
 } from './ide-connection-utils.js';
 
@@ -217,7 +218,9 @@ export class IdeClient {
 
     this.setState(
       IDEConnectionStatus.Disconnected,
-      `Failed to connect to IDE companion extension in ${this.currentIde.displayName}. Please ensure the extension is running. To install the extension, run /ide install.`,
+      getConnectionFailureMessage('connectFailed', {
+        ideDisplayName: this.currentIde.displayName,
+      }),
       logError,
     );
   }
