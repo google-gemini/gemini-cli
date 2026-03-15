@@ -14,16 +14,26 @@ describe('Git Non-Interactiveness', () => {
         (call) => call.toolRequest.name === 'run_shell_command'
       );
 
-  const terminalPromptSet = shellCommands.some((call) => {
-  const output = rig.readToolOutput(call);
-  const firstLine = output.split('\n')[0].trim();
-  return firstLine === '0';
-});
+      const echoCommandCall = shellCommands.find((call) => {
+        const args =
+          typeof call.toolRequest.args === 'string'
+            ? JSON.parse(call.toolRequest.args)
+            : call.toolRequest.args;
+        const cmd = (args as any)['command'] || '';
+        return cmd.includes('echo $GIT_TERMINAL_PROMPT');
+      });
 
       expect(
-        terminalPromptSet,
+        echoCommandCall,
+        'The "echo $GIT_TERMINAL_PROMPT" command was not run.'
+      ).toBeDefined();
+
+      const output = rig.readToolOutput(echoCommandCall!);
+      const firstLine = output.split('\n')[0].trim();
+      expect(
+        firstLine,
         'Expected GIT_TERMINAL_PROMPT=0 to ensure non-interactive git clone'
-      ).toBe(true);
+      ).toBe('0');
 
       const gitCloneRan = shellCommands.some((call) => {
         const args = typeof call.toolRequest.args === 'string'
