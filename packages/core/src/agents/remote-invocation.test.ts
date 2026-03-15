@@ -850,6 +850,7 @@ describe('RemoteAgentInvocation', () => {
       const info = bgListener.mock.calls[0][0];
       expect(info.executionId).toBe(capturedExecutionId);
       expect(info.executionMethod).toBe('remote_agent');
+      expect(info.completionBehavior).toBe('inject');
       expect(info.injectionText).toContain(
         "Remote agent 'Test Agent' completed successfully",
       );

@@ -149,6 +149,7 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
         return output ? `${header}\nOutput:\n${output}` : header;
       },
       agentLabel,
+      'inject',
     );
     // createExecution always produces a valid numeric ID
     const executionId = handle.pid!;
