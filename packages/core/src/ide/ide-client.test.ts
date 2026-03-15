@@ -51,6 +51,14 @@ vi.mock('./detect-ide.js');
 vi.mock('node:os');
 vi.mock('./ide-connection-utils.js');
 
+function resetIdeClientSingleton() {
+  (
+    IdeClient as unknown as {
+      instancePromise: Promise<IdeClient> | null;
+    }
+  ).instancePromise = null;
+}
+
 describe('IdeClient', () => {
   let mockClient: Mocked<Client>;
   let mockHttpTransport: Mocked<StreamableHTTPClientTransport>;
@@ -58,8 +66,7 @@ describe('IdeClient', () => {
 
   beforeEach(async () => {
     // Reset singleton instance for test isolation
-    (IdeClient as unknown as { instance: IdeClient | undefined }).instance =
-      undefined;
+    resetIdeClientSingleton();
 
     // Mock environment variables
     process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/test/workspace';
@@ -105,6 +112,50 @@ describe('IdeClient', () => {
   });
 
   describe('connect', () => {
+    it('should pass valid ideInfo from file to detectIde', async () => {
+      vi.mocked(getConnectionConfigFromFile).mockResolvedValue({
+        ideInfo: { name: 'custom-ide', displayName: 'Custom IDE' },
+      });
+
+      resetIdeClientSingleton();
+      await IdeClient.getInstance();
+
+      expect(detectIde).toHaveBeenLastCalledWith(
+        { pid: 12345, command: 'test-ide' },
+        { name: 'custom-ide', displayName: 'Custom IDE' },
+      );
+    });
+
+    it('should ignore partial ideInfo from file and fall back to env detection', async () => {
+      vi.mocked(getConnectionConfigFromFile).mockResolvedValue({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ideInfo: { name: 'custom-ide' } as any,
+      });
+
+      resetIdeClientSingleton();
+      await IdeClient.getInstance();
+
+      expect(detectIde).toHaveBeenLastCalledWith(
+        { pid: 12345, command: 'test-ide' },
+        undefined,
+      );
+    });
+
+    it('should ignore malformed ideInfo from file and fall back to env detection', async () => {
+      vi.mocked(getConnectionConfigFromFile).mockResolvedValue({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ideInfo: { name: 123, displayName: ['Custom IDE'] } as any,
+      });
+
+      resetIdeClientSingleton();
+      await IdeClient.getInstance();
+
+      expect(detectIde).toHaveBeenLastCalledWith(
+        { pid: 12345, command: 'test-ide' },
+        undefined,
+      );
+    });
+
     it('should connect using HTTP when port is provided in config file', async () => {
       const config = { port: '8080' };
       vi.mocked(getConnectionConfigFromFile).mockResolvedValue(config);

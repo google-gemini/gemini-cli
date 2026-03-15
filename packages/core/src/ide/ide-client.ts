@@ -39,6 +39,28 @@ const logger = {
   error: (...args: any[]) => debugLogger.error('[ERROR] [IDEClient]', ...args),
 };
 
+function parseIdeInfoFromConnectionFile(
+  connectionConfig: { ideInfo?: unknown } | undefined,
+): { name: string; displayName: string } | undefined {
+  const ideInfo = connectionConfig?.ideInfo;
+  if (
+    !ideInfo ||
+    typeof ideInfo !== 'object' ||
+    !('name' in ideInfo) ||
+    !('displayName' in ideInfo)
+  ) {
+    return undefined;
+  }
+
+  const name = ideInfo.name;
+  const displayName = ideInfo.displayName;
+  if (typeof name !== 'string' || typeof displayName !== 'string') {
+    return undefined;
+  }
+
+  return { name, displayName };
+}
+
 export type DiffUpdateResult =
   | {
       status: 'accepted';
@@ -97,7 +119,7 @@ export class IdeClient {
           : undefined;
         client.currentIde = detectIde(
           client.ideProcessInfo,
-          connectionConfig?.ideInfo,
+          parseIdeInfoFromConnectionFile(connectionConfig),
         );
         return client;
       })();
