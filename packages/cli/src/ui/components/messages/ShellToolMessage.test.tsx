@@ -18,6 +18,8 @@ import {
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { formatCommand } from '../../key/keybindingUtils.js';
+import { Command } from '../../key/keyBindings.js';
 import { SHELL_COMMAND_NAME, ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 
 describe('<ShellToolMessage />', () => {
@@ -116,6 +118,82 @@ describe('<ShellToolMessage />', () => {
         expect(mockSetEmbeddedShellFocused).toHaveBeenCalledWith(false);
         expect(lastFrame()).not.toContain('(Shift+Tab to unfocus)');
       });
+      unmount();
+    });
+  });
+
+  describe('Expand description hotkey', () => {
+    it('expands and collapses description on Ctrl+O when focused', async () => {
+      const { lastFrame, stdin, unmount } = renderShell(
+        {
+          status: CoreToolCallStatus.Executing,
+          ptyId: 1,
+          name: SHELL_COMMAND_NAME,
+          description:
+            'this is a very long shell command that should be expanded when the user presses the right hotkeys',
+        },
+        {
+          uiState: {
+            embeddedShellFocused: true,
+            activePtyId: 1,
+          },
+        },
+      );
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        expect(frame).toContain(
+          `(press ${formatCommand(Command.SHOW_MORE_LINES)} to expand command)`,
+        );
+      });
+
+      await act(async () => {
+        stdin.write('\x0f');
+      });
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        expect(frame).toContain(
+          `(press ${formatCommand(Command.SHOW_MORE_LINES)} to collapse command)`,
+        );
+      });
+
+      unmount();
+    });
+
+    it('does not expand description on Ctrl+O when unfocused', async () => {
+      const { lastFrame, stdin, unmount } = renderShell(
+        {
+          status: CoreToolCallStatus.Executing,
+          ptyId: 1,
+          name: SHELL_COMMAND_NAME,
+        },
+        {
+          uiState: {
+            embeddedShellFocused: false,
+            activePtyId: undefined,
+          },
+        },
+      );
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        expect(frame).not.toContain(
+          `(press ${formatCommand(Command.SHOW_MORE_LINES)} to expand command)`,
+        );
+      });
+
+      await act(async () => {
+        stdin.write('\x0f');
+      });
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        expect(frame).not.toContain(
+          `(press ${formatCommand(Command.SHOW_MORE_LINES)} to collapse command)`,
+        );
+      });
+
       unmount();
     });
   });
