@@ -97,7 +97,8 @@ export async function start_sandbox(
       ];
 
       // Add included directories from the workspace context
-      // Always add 5 INCLUDE_DIR parameters to ensure .sb files can reference them
+      // Always add 5 INCLUDE_DIR parameters to ensure .sb files can reference them.
+      // This is a hard limit of the current macOS Seatbelt implementation.
       const MAX_INCLUDE_DIRS = 5;
       const targetDir = fs.realpathSync(cliConfig?.getTargetDir() || '');
       const includedDirs: string[] = [];
@@ -127,8 +128,16 @@ export async function start_sandbox(
             if (!includedDirs.includes(realDir) && realDir !== targetDir) {
               includedDirs.push(realDir);
             }
+          } else if (hostPath && path.isAbsolute(hostPath)) {
+            debugLogger.warn(`Skipping missing allowedPath: ${hostPath}`);
           }
         }
+      }
+
+      if (includedDirs.length > MAX_INCLUDE_DIRS) {
+        debugLogger.warn(
+          `macOS sandbox only supports ${MAX_INCLUDE_DIRS} allowedPaths/workspace directories. The following paths will be ignored: ${includedDirs.slice(MAX_INCLUDE_DIRS).join(', ')}`,
+        );
       }
 
       for (let i = 0; i < MAX_INCLUDE_DIRS; i++) {
@@ -416,12 +425,16 @@ export async function start_sandbox(
     // mount paths listed in config.allowedPaths
     if (config.allowedPaths) {
       for (const hostPath of config.allowedPaths) {
-        if (hostPath && path.isAbsolute(hostPath) && fs.existsSync(hostPath)) {
-          const containerPath = getContainerPath(hostPath);
-          debugLogger.log(
-            `Config allowedPath: ${hostPath} -> ${containerPath} (ro)`,
-          );
-          args.push('--volume', `${hostPath}:${containerPath}:ro`);
+        if (hostPath && path.isAbsolute(hostPath)) {
+          if (fs.existsSync(hostPath)) {
+            const containerPath = getContainerPath(hostPath);
+            debugLogger.log(
+              `Config allowedPath: ${hostPath} -> ${containerPath} (ro)`,
+            );
+            args.push('--volume', `${hostPath}:${containerPath}:ro`);
+          } else {
+            debugLogger.warn(`Skipping missing allowedPath: ${hostPath}`);
+          }
         }
       }
     }
@@ -922,30 +935,34 @@ async function start_lxc_sandbox(
     // Add custom allowed paths from config
     if (config.allowedPaths) {
       for (const hostPath of config.allowedPaths) {
-        if (hostPath && path.isAbsolute(hostPath) && fs.existsSync(hostPath)) {
-          const allowedDeviceName = `gemini-allowed-${randomBytes(4).toString(
-            'hex',
-          )}`;
-          devicesToRemove.push(allowedDeviceName);
-          try {
-            await execFileAsync('lxc', [
-              'config',
-              'device',
-              'add',
-              containerName,
-              allowedDeviceName,
-              'disk',
-              `source=${hostPath}`,
-              `path=${hostPath}`,
-              'readonly=true',
-            ]);
-            debugLogger.log(
-              `mounted allowed path '${hostPath}' into container as device '${allowedDeviceName}' (ro)`,
-            );
-          } catch (err) {
-            debugLogger.warn(
-              `Failed to mount allowed path '${hostPath}' into LXC container: ${err instanceof Error ? err.message : String(err)}`,
-            );
+        if (hostPath && path.isAbsolute(hostPath)) {
+          if (fs.existsSync(hostPath)) {
+            const allowedDeviceName = `gemini-allowed-${randomBytes(4).toString(
+              'hex',
+            )}`;
+            devicesToRemove.push(allowedDeviceName);
+            try {
+              await execFileAsync('lxc', [
+                'config',
+                'device',
+                'add',
+                containerName,
+                allowedDeviceName,
+                'disk',
+                `source=${hostPath}`,
+                `path=${hostPath}`,
+                'readonly=true',
+              ]);
+              debugLogger.log(
+                `mounted allowed path '${hostPath}' into container as device '${allowedDeviceName}' (ro)`,
+              );
+            } catch (err) {
+              debugLogger.warn(
+                `Failed to mount allowed path '${hostPath}' into LXC container: ${err instanceof Error ? err.message : String(err)}`,
+              );
+            }
+          } else {
+            debugLogger.warn(`Skipping missing allowedPath: ${hostPath}`);
           }
         }
       }
