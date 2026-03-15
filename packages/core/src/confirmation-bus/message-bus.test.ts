@@ -235,6 +235,24 @@ describe('MessageBus', () => {
     });
   });
 
+  describe('request', () => {
+    it('should reject when publish() rejects instead of hanging until timeout', async () => {
+      const publishError = new Error('publish failed');
+      vi.spyOn(messageBus, 'publish').mockRejectedValue(publishError);
+
+      await expect(
+        messageBus.request<ToolConfirmationRequest, ToolConfirmationResponse>(
+          {
+            type: MessageBusType.TOOL_CONFIRMATION_REQUEST,
+            toolCall: { name: 'test-tool', args: {} },
+          },
+          MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+          1000,
+        ),
+      ).rejects.toThrow('publish failed');
+    });
+  });
+
   describe('error handling', () => {
     it('should not crash on errors during message processing', async () => {
       const errorHandler = vi.fn();

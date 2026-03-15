@@ -900,9 +900,9 @@ describe('WebFetchTool', () => {
 
     it('should handle message bus publish errors gracefully', async () => {
       const { invocation } = createToolWithMessageBus(messageBus);
-      vi.spyOn(messageBus, 'publish').mockImplementation(() => {
-        throw new Error('Message bus error');
-      });
+      vi.spyOn(messageBus, 'publish').mockRejectedValue(
+        new Error('Message bus error'),
+      );
 
       const result = await invocation.shouldConfirmExecute(
         new AbortController().signal,
