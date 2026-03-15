@@ -24,7 +24,7 @@ export {
   parseBooleanEnvFlag,
   parseTelemetryTargetValue,
 } from './config.js';
-export {
+export type {
   GcpTraceExporter,
   GcpMetricExporter,
   GcpLogExporter,
