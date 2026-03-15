@@ -11,8 +11,24 @@ import type {
   MessageRecord,
 } from '@google/gemini-cli-core';
 import { partListUnionToString } from '@google/gemini-cli-core';
-import type { Content, Part } from '@google/genai';
+import type { Content, Part, PartListUnion } from '@google/genai';
 import { logger } from './logger.js';
+
+/**
+ * Converts a PartListUnion into a normalized array of Part objects.
+ * This handles converting raw strings into { text: string } parts.
+ */
+function ensurePartArray(content: PartListUnion): Part[] {
+  if (Array.isArray(content)) {
+    return content.map((part) =>
+      typeof part === 'string' ? { text: part } : part,
+    );
+  }
+  if (typeof content === 'string') {
+    return [{ text: content }];
+  }
+  return [content];
+}
 
 /**
  * Convert MessageRecord[] from a ConversationRecord into Gemini Content[] format.
@@ -46,10 +62,7 @@ export function convertMessagesToClientHistory(
 
       clientHistory.push({
         role: 'user',
-        parts: Array.isArray(msg.content)
-          ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            (msg.content as Part[])
-          : [{ text: contentString }],
+        parts: ensurePartArray(msg.content),
       });
     } else if (msg.type === 'gemini') {
       const hasToolCalls = msg.toolCalls && msg.toolCalls.length > 0;
@@ -57,9 +70,8 @@ export function convertMessagesToClientHistory(
       if (hasToolCalls) {
         const modelParts: Part[] = [];
 
-        const contentString = partListUnionToString(msg.content);
-        if (msg.content && contentString.trim()) {
-          modelParts.push({ text: contentString });
+        if (msg.content) {
+          modelParts.push(...ensurePartArray(msg.content));
         }
 
         for (const toolCall of msg.toolCalls!) {
@@ -72,7 +84,9 @@ export function convertMessagesToClientHistory(
           });
         }
 
-        clientHistory.push({ role: 'model', parts: modelParts });
+        if (modelParts.length > 0) {
+          clientHistory.push({ role: 'model', parts: modelParts });
+        }
 
         const functionResponseParts: Part[] = [];
         for (const toolCall of msg.toolCalls!) {
@@ -86,8 +100,7 @@ export function convertMessagesToClientHistory(
                 },
               });
             } else if (Array.isArray(toolCall.result)) {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-              functionResponseParts.push(...(toolCall.result as Part[]));
+              functionResponseParts.push(...ensurePartArray(toolCall.result));
             } else {
               functionResponseParts.push(toolCall.result);
             }
@@ -98,12 +111,14 @@ export function convertMessagesToClientHistory(
           clientHistory.push({ role: 'user', parts: functionResponseParts });
         }
       } else {
-        const contentString = partListUnionToString(msg.content);
-        if (msg.content && contentString.trim()) {
-          clientHistory.push({
-            role: 'model',
-            parts: [{ text: contentString }],
-          });
+        if (msg.content) {
+          const modelParts = ensurePartArray(msg.content);
+          if (modelParts.length > 0) {
+            clientHistory.push({
+              role: 'model',
+              parts: modelParts,
+            });
+          }
         }
       }
     }
@@ -120,7 +135,7 @@ export function convertMessagesToClientHistory(
  *    convert messages to Content[], and pass ResumedSessionData so
  *    ChatRecordingService continues writing to the same file.
  *
- * Returns true if session history was loaded, false otherwise.
+ * This function does not return a value. It will either resume the chat or do nothing.
  */
 export async function resumeSessionHistory(
   geminiClient: GeminiClient,
