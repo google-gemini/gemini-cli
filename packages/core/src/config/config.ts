@@ -869,6 +869,7 @@ export class Config implements McpContext, AgentLoopContext {
   private lastModeSwitchTime: number = performance.now();
   readonly userHintService: UserHintService;
   private approvedPlanPath: string | undefined;
+  private debugCompanionMode = false;
 
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
@@ -1784,6 +1785,15 @@ export class Config implements McpContext, AgentLoopContext {
   getDebugMode(): boolean {
     return this.debugMode;
   }
+
+  getDebugCompanionMode(): boolean {
+    return this.debugCompanionMode;
+  }
+
+  setDebugCompanionMode(enabled: boolean): void {
+    this.debugCompanionMode = enabled;
+  }
+
   getQuestion(): string | undefined {
     return this.question;
   }
