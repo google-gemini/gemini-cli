@@ -39,15 +39,18 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   const projectId = await prompt('GCP Project ID', 'gemini-cli-team-quota');
   const zone = await prompt('Compute Zone', 'us-west1-a');
   const targetVM = `gcli-offload-${env.USER || 'mattkorwel'}`;
+  const useContainer = await confirm('Use Container-Native mode (Container-Optimized OS)?');
 
   console.log(`🔍 Verifying access and finding worker ${targetVM}...`);
   const statusCheck = spawnSync(`gcloud compute instances describe ${targetVM} --project ${projectId} --zone ${zone} --format="json(status,networkInterfaces[0].accessConfigs[0].natIP)"`, { shell: true });
   
   let instanceData: any;
   try {
-    instanceData = JSON.parse(statusCheck.stdout.toString());
+    const output = statusCheck.stdout.toString().trim();
+    if (!output) throw new Error('Empty output');
+    instanceData = JSON.parse(output);
   } catch (e) {
-    console.error(`❌ Worker ${targetVM} not found. Run "npm run offload:fleet provision" first.`);
+    console.error(`❌ Worker ${targetVM} not found or error fetching status. Run "npm run offload:fleet provision" first.`);
     return 1;
   }
 
@@ -82,14 +85,10 @@ Host ${sshAlias}
     console.log(`   ℹ️  '${sshAlias}' alias already exists in ~/.ssh/config`);
   }
 
-  // 1. Configure Fast-Path SSH Alias
-  // ... (unchanged)
-
   // 1b. Security Fork Management
   console.log('\n🍴 Configuring Security Fork...');
   const upstreamRepo = 'google-gemini/gemini-cli';
   
-  // Use API to find all forks owned by the user
   const forksQuery = spawnSync('gh', ['api', 'user/repos', '--paginate', '-q', `.[] | select(.fork == true and .parent.full_name == "${upstreamRepo}") | .full_name`], { stdio: 'pipe' });
   const existingForks = forksQuery.stdout.toString().trim().split('\n').filter(Boolean);
 
@@ -123,19 +122,33 @@ Host ${sshAlias}
   }
   console.log(`   ✅ Using fork: ${userFork}`);
 
-  // Use the alias for remaining setup steps
+  // Resolve Paths
   const remoteHost = sshAlias;
-  const remoteHome = spawnSync(`ssh ${remoteHost} "pwd"`, { shell: true }).stdout.toString().trim();
+  // Standard home is /home/node inside our maintainer container
+  const remoteHome = useContainer ? '/home/node' : spawnSync(`ssh ${remoteHost} "pwd"`, { shell: true }).stdout.toString().trim();
   const remoteWorkDir = `${remoteHome}/dev/main`;
   const persistentScripts = `${remoteHome}/.offload/scripts`;
 
   console.log(`\n📦 Performing One-Time Synchronization...`);
-  spawnSync(`ssh ${remoteHost} "mkdir -p ${remoteWorkDir} ${remoteHome}/.gemini/policies ${persistentScripts}"`, { shell: true });
+  // If in container mode, we use the host mount logic
+  const mkdirCmd = useContainer 
+    ? `docker exec gemini-sandbox mkdir -p ${remoteWorkDir} ${remoteHome}/.gemini/policies ${persistentScripts}`
+    : `mkdir -p ${remoteWorkDir} ${remoteHome}/.gemini/policies ${persistentScripts}`;
+  
+  spawnSync(`ssh ${remoteHost} ${JSON.stringify(mkdirCmd)}`, { shell: true });
 
-  // Sync offload scripts to persistent location
-  console.log('   - Pushing offload logic to persistent worker directory...');
-  spawnSync(`rsync -avz --delete .gemini/skills/offload/scripts/ ${remoteHost}:${persistentScripts}/`, { shell: true });
-  spawnSync(`rsync -avz .gemini/skills/offload/policy.toml ${remoteHost}:${remoteHome}/.gemini/policies/offload-policy.toml`, { shell: true });
+  const rsyncBase = `rsync -avz -e "ssh"`;
+
+  // 2. Sync Settings & Policies
+  if (await confirm('Sync local settings and security policies?')) {
+    const localSettings = path.join(REPO_ROOT, '.gemini/settings.json');
+    const remoteDest = useContainer ? `${remoteHost}:~/dev/.gemini/` : `${remoteHost}:${remoteHome}/.gemini/`;
+    if (fs.existsSync(localSettings)) {
+      spawnSync(`${rsyncBase} ${localSettings} ${remoteDest}`, { shell: true });
+    }
+    const policyDest = useContainer ? `${remoteHost}:~/dev/.gemini/policies/offload-policy.toml` : `${remoteHost}:${remoteHome}/.gemini/policies/offload-policy.toml`;
+    spawnSync(`${rsyncBase} .gemini/skills/offload/policy.toml ${policyDest}`, { shell: true });
+  }
 
   // 3. Sync Auth (Gemini)
   if (await confirm('Sync Gemini accounts credentials?')) {
@@ -143,54 +156,37 @@ Host ${sshAlias}
     const lp = path.join(homeDir, '.gemini/google_accounts.json');
     if (fs.existsSync(lp)) {
       console.log(`   - Syncing .gemini/google_accounts.json...`);
-      spawnSync(`rsync -avz ${lp} ${remoteHost}:${remoteHome}/.gemini/google_accounts.json`, { shell: true });
+      const authDest = useContainer ? `${remoteHost}:~/dev/.gemini/google_accounts.json` : `${remoteHost}:${remoteHome}/.gemini/google_accounts.json`;
+      spawnSync(`${rsyncBase} ${lp} ${authDest}`, { shell: true });
     }
   }
 
-  // 4. Scoped Token Onboarding (Security Hardening)
+  // 4. Scoped Token Onboarding
   if (await confirm('Generate a scoped, secure token for the autonomous agent? (Recommended)')) {
-    const user = spawnSync('gh', ['api', 'user', '-q', '.login'], { stdio: 'pipe' }).stdout.toString().trim();
-    
-    // Construct the Pre-Filled Magic Link for Fine-Grained PAT
-    const scopes = 'contents:write,pull_requests:write,metadata:read';
-    const description = `Gemini CLI Offload - ${env.USER || 'maintainer'}`;
-    const magicLink = `https://github.com/settings/tokens/beta/new?description=${encodeURIComponent(description)}&repositories[]=${encodeURIComponent(upstreamRepo)}&repositories[]=${encodeURIComponent(userFork)}&permissions[contents]=write&permissions[pull_requests]=write&permissions[metadata]=read`;
-
-    console.log('\n🔐 SECURITY HARDENING:');
-    console.log('1. Open this Magic Link in your browser to create a scoped token:');
-    console.log(`   \x1b[34m${magicLink}\x1b[0m`);
-    console.log('2. Click "Generate token" at the bottom of the page.');
-    console.log('3. Copy the token and paste it here.');
-    
+    const magicLink = `https://github.com/settings/tokens/beta/new?description=Offload-${env.USER}&repositories[]=${encodeURIComponent(upstreamRepo)}&repositories[]=${encodeURIComponent(userFork)}&permissions[contents]=write&permissions[pull_requests]=write&permissions[metadata]=read`;
+    console.log(`\n🔐 SECURITY: Open this Magic Link to create a token:\n\x1b[34m${magicLink}\x1b[0m`);
     const scopedToken = await prompt('\nPaste Scoped Token', '');
-    
     if (scopedToken) {
-      console.log(`   - Mirroring scoped token to worker...`);
-      // Save it to a persistent file on the worker that entrypoint.ts will prioritize
-      spawnSync(`ssh ${remoteHost} "mkdir -p ~/.offload && echo ${scopedToken} > ~/.offload/.gh_token && chmod 600 ~/.offload/.gh_token"`, { shell: true });
-      console.log('   ✅ Scoped token saved on worker.');
-    }
-  } else {
-    // Fallback: Standard gh auth login if they skip scoped token
-    if (await confirm('Fallback: Authenticate via standard GitHub CLI login?')) {
-        console.log('\n🔐 Starting GitHub CLI authentication on worker...');
-        const localToken = spawnSync('gh', ['auth', 'token'], { stdio: 'pipe' }).stdout.toString().trim();
-        const loginCmd = `gh auth login --with-token --insecure-storage`;
-        spawnSync(`echo ${localToken} | ssh ${remoteHost} ${JSON.stringify(loginCmd)}`, { shell: true });
+      const tokenCmd = useContainer 
+        ? `docker exec gemini-sandbox sh -c "mkdir -p ~/.offload && echo ${scopedToken} > ~/.offload/.gh_token && chmod 600 ~/.offload/.gh_token"`
+        : `mkdir -p ~/.offload && echo ${scopedToken} > ~/.offload/.gh_token && chmod 600 ~/.offload/.gh_token`;
+      spawnSync(`ssh ${remoteHost} ${JSON.stringify(tokenCmd)}`, { shell: true });
     }
   }
 
   // 5. Global Tooling & Clone
-  if (await confirm('Configure global tools (tsx, vitest) and clone repository?')) {
-    console.log('🚀 Installing global developer tools...');
-    spawnSync(`ssh ${remoteHost} "sudo npm install -g tsx vitest"`, { shell: true, stdio: 'inherit' });
+  if (await confirm('Initialize tools and clone repository?')) {
+    if (!useContainer) {
+      spawnSync(`ssh ${remoteHost} "sudo npm install -g tsx vitest"`, { shell: true, stdio: 'inherit' });
+    }
 
     console.log(`🚀 Cloning fork ${userFork} on worker...`);
     const repoUrl = `https://github.com/${userFork}.git`;
-    const cloneCmd = `[ -d ${remoteWorkDir}/.git ] || (git clone --filter=blob:none ${repoUrl} ${remoteWorkDir} && cd ${remoteWorkDir} && git remote add upstream https://github.com/${upstreamRepo}.git && git fetch upstream)`;
-    spawnSync(`ssh ${remoteHost} ${JSON.stringify(cloneCmd)}`, { shell: true, stdio: 'inherit' });
+    const cloneCmd = useContainer
+      ? `docker exec gemini-sandbox sh -c "[ -d ${remoteWorkDir}/.git ] || (git clone --filter=blob:none ${repoUrl} ${remoteWorkDir} && cd ${remoteWorkDir} && git remote add upstream https://github.com/${upstreamRepo}.git && git fetch upstream)"`
+      : `[ -d ${remoteWorkDir}/.git ] || (git clone --filter=blob:none ${repoUrl} ${remoteWorkDir} && cd ${remoteWorkDir} && git remote add upstream https://github.com/${upstreamRepo}.git && git fetch upstream)`;
     
-    // We skip the full npm install here as requested; per-worktree builds will handle it if needed.
+    spawnSync(`ssh ${remoteHost} ${JSON.stringify(cloneCmd)}`, { shell: true, stdio: 'inherit' });
   }
 
   // Save Settings
@@ -201,18 +197,13 @@ Host ${sshAlias}
   }
   settings.maintainer = settings.maintainer || {};
   settings.maintainer.deepReview = { 
-    projectId, 
-    zone, 
-    remoteHost,
-    remoteHome,
-    remoteWorkDir,
-    userFork,
-    upstreamRepo,
+    projectId, zone, remoteHost, remoteHome, remoteWorkDir, userFork, upstreamRepo,
+    useContainer,
     terminalType: 'iterm2'
   };
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
   
-  console.log('\n✅ Initialization complete! Your dedicated worker is ready via fast-path SSH.');
+  console.log('\n✅ Initialization complete!');
   return 0;
 }
 

@@ -27,6 +27,7 @@ async function listWorkers() {
 async function provisionWorker() {
   const name = INSTANCE_PREFIX;
   const zone = 'us-west1-a';
+  const imageUri = 'us-docker.pkg.dev/gemini-code-dev/gemini-cli/maintainer:latest';
   
   console.log(`🔍 Checking if worker ${name} already exists...`);
   const existCheck = spawnSync('gcloud', [
@@ -40,24 +41,27 @@ async function provisionWorker() {
     return;
   }
 
-  console.log(`🚀 Provisioning secure offload worker: ${name}...`);
+  console.log(`🚀 Provisioning container-native offload worker: ${name}...`);
+  console.log(`   - Image: ${imageUri}`);
   
   const result = spawnSync('gcloud', [
-    'compute', 'instances', 'create', name,
+    'compute', 'instances', 'create-with-container', name,
     '--project', PROJECT_ID,
     '--zone', zone,
     '--machine-type', 'n2-standard-8',
-    '--image-family', 'gcli-maintainer-worker',
-    '--image-project', PROJECT_ID,
-    '--metadata', `enable-oslogin=TRUE`,
+    '--container-image', imageUri,
+    '--container-name', 'gemini-sandbox',
+    '--container-restart-policy', 'always',
+    '--container-mount-host-path', `mount-path=/home/node/dev,host-path=/home/$(whoami)/dev,mode=rw`,
+    '--boot-disk-size', '50GB',
     '--labels', `owner=${USER.replace(/[^a-z0-9_-]/g, '_')},type=offload-worker`,
     '--tags', `gcli-offload-${USER}`,
     '--scopes', 'https://www.googleapis.com/auth/cloud-platform'
-  ], { stdio: 'inherit' });
+  ], { stdio: 'inherit', shell: true });
 
   if (result.status === 0) {
-    console.log(`\n✅ Worker ${name} is being provisioned.`);
-    console.log(`👉 Access is restricted via OS Login and tags.`);
+    console.log(`\n✅ Container worker ${name} is being provisioned.`);
+    console.log(`👉 Access is managed via 'gcloud compute ssh --container'.`);
   }
 }
 

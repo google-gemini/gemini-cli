@@ -31,7 +31,7 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
     return 1;
   }
 
-  const { projectId, zone, remoteHost, remoteHome, remoteWorkDir } = config;
+  const { projectId, zone, remoteHost, remoteHome, remoteWorkDir, useContainer } = config;
   const targetVM = `gcli-offload-${env.USER || 'mattkorwel'}`;
 
   // 2. Wake Worker
@@ -47,7 +47,7 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   const persistentScripts = `${remoteHome}/.offload/scripts`;
   const sessionName = `offload-${prNumber}-${action}`;
 
-  // 3. Remote Context Setup (Parallel Worktree, NO symlinking)
+  // 3. Remote Context Setup (Parallel Worktree)
   console.log(`🚀 Provisioning clean worktree for ${action} on PR #${prNumber}...`);
   const remoteWorktreeDir = `${remoteHome}/dev/worktrees/offload-${prNumber}-${action}`;
   
@@ -58,16 +58,28 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
     git worktree add -f ${remoteWorktreeDir} FETCH_HEAD
   `;
 
-  spawnSync(`ssh ${remoteHost} ${q(setupCmd)}`, { shell: true, stdio: 'inherit' });
+  // Wrap in docker exec if needed
+  const finalSetupCmd = useContainer 
+    ? `docker exec gemini-sandbox sh -c ${q(setupCmd)}`
+    : setupCmd;
 
-  // Use global tsx for the runner
+  spawnSync(`ssh ${remoteHost} ${q(finalSetupCmd)}`, { shell: true, stdio: 'inherit' });
+
+  // 4. Execution Logic
   const remoteWorker = `tsx ${persistentScripts}/entrypoint.ts ${prNumber} remote-branch ${remotePolicyPath} ${action}`;
-  const tmuxCmd = `cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL`;
+  
+  let tmuxCmd = `cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL`;
+  if (useContainer) {
+    // Inside container, we need to ensure the environment is loaded
+    tmuxCmd = `docker exec -it -w ${remoteWorktreeDir} gemini-sandbox sh -c "${remoteWorker}; exec $SHELL"`;
+  } else {
+    tmuxCmd = `cd ${remoteWorktreeDir} && ${tmuxCmd}`;
+  }
   
   const sshInternal = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'offload' ${q(tmuxCmd)}`;
   const finalSSH = `ssh -t ${remoteHost} ${q(sshInternal)}`;
 
-  // 4. Open in iTerm2
+  // 5. Open in iTerm2
   const isWithinGemini = !!env.GEMINI_CLI || !!env.GEMINI_SESSION_ID || !!env.GCLI_SESSION_ID;
   if (isWithinGemini) {
     const tempCmdPath = path.join(process.env.TMPDIR || '/tmp', `offload-ssh-${prNumber}.sh`);
