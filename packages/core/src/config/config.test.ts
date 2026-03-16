@@ -694,7 +694,7 @@ describe('Server Config (config.ts)', () => {
       vi.mocked(getExperiments).mockResolvedValue({
         experimentIds: [],
         flags: {
-          [ExperimentFlags.PRO_MODEL_ACCESS]: {
+          [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
             boolValue: false,
           },
         },
@@ -714,7 +714,7 @@ describe('Server Config (config.ts)', () => {
       vi.mocked(getExperiments).mockResolvedValue({
         experimentIds: [],
         flags: {
-          [ExperimentFlags.PRO_MODEL_ACCESS]: {
+          [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
             boolValue: true,
           },
         },

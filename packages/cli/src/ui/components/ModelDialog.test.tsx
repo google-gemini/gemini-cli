@@ -21,7 +21,6 @@ import {
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
   AuthType,
-  UserTierId,
 } from '@google/gemini-cli-core';
 import type { Config, ModelSlashCommandEvent } from '@google/gemini-cli-core';
 
@@ -53,9 +52,8 @@ describe('<ModelDialog />', () => {
   const mockOnClose = vi.fn();
   const mockGetHasAccessToPreviewModel = vi.fn();
   const mockGetGemini31LaunchedSync = vi.fn();
-  const mockGetUserTier = vi.fn();
-  const mockGetProModelAccess = vi.fn();
-  const mockGetProModelAccessSync = vi.fn();
+  const mockGetProModelNoAccess = vi.fn();
+  const mockGetProModelNoAccessSync = vi.fn();
 
   interface MockConfig extends Partial<Config> {
     setModel: (model: string, isTemporary?: boolean) => void;
@@ -63,9 +61,8 @@ describe('<ModelDialog />', () => {
     getHasAccessToPreviewModel: () => boolean;
     getIdeMode: () => boolean;
     getGemini31LaunchedSync: () => boolean;
-    getUserTier: () => string | undefined;
-    getProModelAccess: () => Promise<boolean>;
-    getProModelAccessSync: () => boolean;
+    getProModelNoAccess: () => Promise<boolean>;
+    getProModelNoAccessSync: () => boolean;
   }
 
   const mockConfig: MockConfig = {
@@ -74,9 +71,8 @@ describe('<ModelDialog />', () => {
     getHasAccessToPreviewModel: mockGetHasAccessToPreviewModel,
     getIdeMode: () => false,
     getGemini31LaunchedSync: mockGetGemini31LaunchedSync,
-    getUserTier: mockGetUserTier,
-    getProModelAccess: mockGetProModelAccess,
-    getProModelAccessSync: mockGetProModelAccessSync,
+    getProModelNoAccess: mockGetProModelNoAccess,
+    getProModelNoAccessSync: mockGetProModelNoAccessSync,
   };
 
   beforeEach(() => {
@@ -84,9 +80,8 @@ describe('<ModelDialog />', () => {
     mockGetModel.mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO);
     mockGetHasAccessToPreviewModel.mockReturnValue(false);
     mockGetGemini31LaunchedSync.mockReturnValue(false);
-    mockGetUserTier.mockReturnValue(undefined);
-    mockGetProModelAccess.mockResolvedValue(true);
-    mockGetProModelAccessSync.mockReturnValue(true);
+    mockGetProModelNoAccess.mockResolvedValue(false);
+    mockGetProModelNoAccessSync.mockReturnValue(false);
 
     // Default implementation for getDisplayString
     mockGetDisplayString.mockImplementation((val: string) => {
@@ -125,9 +120,9 @@ describe('<ModelDialog />', () => {
     unmount();
   });
 
-  it('renders the "manual" view initially for free tier users and filters Pro models with correct order', async () => {
-    mockGetUserTier.mockReturnValue(UserTierId.FREE);
-    mockGetProModelAccessSync.mockReturnValue(false);
+  it('renders the "manual" view initially for users with no pro access and filters Pro models with correct order', async () => {
+    mockGetProModelNoAccessSync.mockReturnValue(true);
+    mockGetProModelNoAccess.mockResolvedValue(true);
     mockGetHasAccessToPreviewModel.mockReturnValue(true);
     mockGetDisplayString.mockImplementation((val: string) => val);
 
@@ -154,9 +149,9 @@ describe('<ModelDialog />', () => {
     unmount();
   });
 
-  it('closes dialog on escape in "manual" view for free tier users', async () => {
-    mockGetUserTier.mockReturnValue(UserTierId.FREE);
-    mockGetProModelAccessSync.mockReturnValue(false);
+  it('closes dialog on escape in "manual" view for users with no pro access', async () => {
+    mockGetProModelNoAccessSync.mockReturnValue(true);
+    mockGetProModelNoAccess.mockResolvedValue(true);
     const { stdin, waitUntilReady, unmount } = await renderComponent();
 
     // Already in manual view
@@ -434,8 +429,9 @@ describe('<ModelDialog />', () => {
       unmount();
     });
 
-    it('hides Flash Lite Preview model for STANDARD tier users', async () => {
-      mockGetUserTier.mockReturnValue(UserTierId.STANDARD);
+    it('hides Flash Lite Preview model for users with pro access', async () => {
+      mockGetProModelNoAccessSync.mockReturnValue(false);
+      mockGetProModelNoAccess.mockResolvedValue(false);
       mockGetHasAccessToPreviewModel.mockReturnValue(true);
       const { lastFrame, stdin, waitUntilReady, unmount } =
         await renderComponent();

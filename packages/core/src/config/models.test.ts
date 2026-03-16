@@ -238,6 +238,12 @@ describe('resolveModel', () => {
       ).toBe(DEFAULT_GEMINI_FLASH_MODEL);
     });
 
+    it('should return default flash lite model when access to preview is false and preview flash lite model is requested', () => {
+      expect(
+        resolveModel(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL, false, false, false),
+      ).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
+    });
+
     it('should return default model when access to preview is false and auto-gemini-3 is requested', () => {
       expect(resolveModel(PREVIEW_GEMINI_MODEL_AUTO, false, false, false)).toBe(
         DEFAULT_GEMINI_MODEL,

@@ -1372,7 +1372,7 @@ export class Config implements McpContext, AgentLoopContext {
     );
     this.setRemoteAdminSettings(adminControls);
 
-    if (!this.getProModelAccessSync() && isAutoModel(this.model)) {
+    if ((await this.getProModelNoAccess()) && isAutoModel(this.model)) {
       this.setModel(PREVIEW_GEMINI_FLASH_MODEL);
     }
   }
@@ -2663,11 +2663,11 @@ export class Config implements McpContext, AgentLoopContext {
 
   /**
    * Returns whether the user has access to Pro models.
-   * This is determined by the PRO_MODEL_ACCESS experiment flag.
+   * This is determined by the PRO_MODEL_NO_ACCESS experiment flag.
    */
-  async getProModelAccess(): Promise<boolean> {
+  async getProModelNoAccess(): Promise<boolean> {
     await this.ensureExperimentsLoaded();
-    return this.getProModelAccessSync();
+    return this.getProModelNoAccessSync();
   }
 
   /**
@@ -2675,15 +2675,9 @@ export class Config implements McpContext, AgentLoopContext {
    *
    * Note: This method should only be called after startup, once experiments have been loaded.
    */
-  getProModelAccessSync(): boolean {
-    if (!this.experiments || Object.keys(this.experiments.flags).length === 0) {
-      return true;
-    }
-    if (this.contentGeneratorConfig?.authType !== AuthType.LOGIN_WITH_GOOGLE) {
-      return true;
-    }
+  getProModelNoAccessSync(): boolean {
     return (
-      this.experiments?.flags[ExperimentFlags.PRO_MODEL_ACCESS]?.boolValue ??
+      this.experiments?.flags[ExperimentFlags.PRO_MODEL_NO_ACCESS]?.boolValue ??
       false
     );
   }

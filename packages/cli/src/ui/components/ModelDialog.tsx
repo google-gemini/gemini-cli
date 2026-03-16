@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useCallback, useContext, useMemo, useState } from 'react';
+import { useCallback, useContext, useMemo, useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import {
   PREVIEW_GEMINI_MODEL,
@@ -23,7 +23,6 @@ import {
   AuthType,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   isProModel,
-  UserTierId,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
@@ -38,10 +37,25 @@ interface ModelDialogProps {
 export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   const config = useContext(ConfigContext);
   const settings = useSettings();
+  const [hasAccessToProModel, setHasAccessToProModel] = useState<boolean>(
+    () => !(config?.getProModelNoAccessSync() ?? false),
+  );
   const [view, setView] = useState<'main' | 'manual'>(() =>
-    config?.getProModelAccessSync() ? 'main' : 'manual',
+    config?.getProModelNoAccessSync() ? 'manual' : 'main',
   );
   const [persistMode, setPersistMode] = useState(false);
+
+  useEffect(() => {
+    async function checkAccess() {
+      if (!config) return;
+      const noAccess = await config.getProModelNoAccess();
+      setHasAccessToProModel(!noAccess);
+      if (noAccess) {
+        setView('manual');
+      }
+    }
+    void checkAccess();
+  }, [config]);
 
   // Determine the Preferred Model (read once when the dialog opens).
   const preferredModel = config?.getModel() || DEFAULT_GEMINI_MODEL_AUTO;
@@ -71,7 +85,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   useKeypress(
     (key) => {
       if (key.name === 'escape') {
-        if (view === 'manual' && config?.getProModelAccessSync()) {
+        if (view === 'manual' && hasAccessToProModel) {
           setView('main');
         } else {
           onClose();
@@ -120,7 +134,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   }, [shouldShowPreviewModels, manualModelSelected, useGemini31]);
 
   const manualOptions = useMemo(() => {
-    const hasAccessToProModel = config?.getProModelAccessSync();
     const list = [
       {
         value: DEFAULT_GEMINI_MODEL,
@@ -161,7 +174,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         },
       ];
 
-      if (config?.getUserTier() === UserTierId.FREE) {
+      if (!hasAccessToProModel) {
         previewOptions.push({
           value: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
           title: getDisplayString(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL),
@@ -178,7 +191,12 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     }
 
     return list;
-  }, [shouldShowPreviewModels, useGemini31, useCustomToolModel, config]);
+  }, [
+    shouldShowPreviewModels,
+    useGemini31,
+    useCustomToolModel,
+    hasAccessToProModel,
+  ]);
 
   const options = view === 'main' ? mainOptions : manualOptions;
 
