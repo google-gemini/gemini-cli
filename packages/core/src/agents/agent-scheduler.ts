@@ -67,17 +67,8 @@ export async function scheduleAgentTools(
     configurable: true,
   });
 
-  const schedulerContext = {
-    config: agentConfig,
-    promptId: config.promptId,
-    toolRegistry,
-    messageBus: toolRegistry.messageBus,
-    geminiClient: config.geminiClient,
-    sandboxManager: config.sandboxManager,
-  };
-
   const scheduler = new Scheduler({
-    context: schedulerContext,
+    context: agentConfig,
     messageBus: toolRegistry.messageBus,
     getPreferredEditor: getPreferredEditor ?? (() => undefined),
     schedulerId,
@@ -86,5 +77,10 @@ export async function scheduleAgentTools(
     onWaitingForConfirmation,
   });
 
-  return scheduler.schedule(requests, signal);
+  try {
+    return await scheduler.schedule(requests, signal);
+  } finally {
+    scheduler.dispose();
+  }
 }
+
