@@ -269,9 +269,11 @@ export async function initializeTelemetry(
     );
     spanExporter = new GcpTraceExporter(gcpProjectId, credentials);
     logExporter = new GcpLogExporter(gcpProjectId, credentials);
+    const exportInterval = 30000;
     metricReader = new PeriodicExportingMetricReader({
       exporter: new GcpMetricExporter(gcpProjectId, credentials),
-      exportIntervalMillis: 30000,
+      exportIntervalMillis: exportInterval,
+      exportTimeoutMillis: exportInterval / 2,
     });
   } else if (useOtlp) {
     if (otlpProtocol === 'http') {
@@ -287,11 +289,13 @@ export async function initializeTelemetry(
       logExporter = new OTLPLogExporterHttp({
         url: buildUrl('v1/logs'),
       });
+      const exportInterval = 10000;
       metricReader = new PeriodicExportingMetricReader({
         exporter: new OTLPMetricExporterHttp({
           url: buildUrl('v1/metrics'),
         }),
-        exportIntervalMillis: 10000,
+        exportIntervalMillis: exportInterval,
+        exportTimeoutMillis: exportInterval / 2,
       });
     } else {
       // grpc
@@ -303,27 +307,33 @@ export async function initializeTelemetry(
         url: parsedEndpoint,
         compression: CompressionAlgorithm.GZIP,
       });
+      const exportInterval = 10000;
       metricReader = new PeriodicExportingMetricReader({
         exporter: new OTLPMetricExporter({
           url: parsedEndpoint,
           compression: CompressionAlgorithm.GZIP,
         }),
-        exportIntervalMillis: 10000,
+        exportIntervalMillis: exportInterval,
+        exportTimeoutMillis: exportInterval / 2,
       });
     }
   } else if (telemetryOutfile) {
     spanExporter = new FileSpanExporter(telemetryOutfile);
     logExporter = new FileLogExporter(telemetryOutfile);
+    const exportInterval = 10000;
     metricReader = new PeriodicExportingMetricReader({
       exporter: new FileMetricExporter(telemetryOutfile),
-      exportIntervalMillis: 10000,
+      exportIntervalMillis: exportInterval,
+      exportTimeoutMillis: exportInterval / 2,
     });
   } else {
     spanExporter = new ConsoleSpanExporter();
     logExporter = new ConsoleLogRecordExporter();
+    const exportInterval = 10000;
     metricReader = new PeriodicExportingMetricReader({
       exporter: new ConsoleMetricExporter(),
-      exportIntervalMillis: 10000,
+      exportIntervalMillis: exportInterval,
+      exportTimeoutMillis: exportInterval / 2,
     });
   }
 
