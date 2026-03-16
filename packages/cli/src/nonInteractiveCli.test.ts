@@ -235,6 +235,30 @@ describe('runNonInteractive', () => {
   const getWrittenOutput = () =>
     processStdoutSpy.mock.calls.map((c) => c[0]).join('');
 
+  it('should initialize ConsolePatcher with correct value', async () => {
+    const { ConsolePatcher } = await import('./ui/utils/ConsolePatcher.js');
+    const patcherSpy = vi.spyOn(ConsolePatcher.prototype, 'patch');
+
+    const events: ServerGeminiStreamEvent[] = [
+      {
+        type: GeminiEventType.DONE,
+        metrics: { ...MOCK_SESSION_METRICS },
+      },
+    ];
+    mockGeminiClient.sendMessageStream.mockReturnValueOnce(
+      createStreamFromEvents(events),
+    );
+
+    await runNonInteractive({
+      config: mockConfig,
+      settings: mockSettings,
+      input: 'test input',
+      prompt_id: 'test-prompt-id',
+    });
+
+    expect(patcherSpy).toHaveBeenCalled();
+  });
+
   it('should process input and write text output', async () => {
     const events: ServerGeminiStreamEvent[] = [
       { type: GeminiEventType.Content, value: 'Hello' },
