@@ -494,11 +494,12 @@ export async function loadCliConfig(
     .getExtensions()
     .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
 
-  const experimentalJitContext = settings.experimental?.jitContext ?? false;
+  const experimentalJitContext = settings.experimental.jitContext;
 
-  let extensionRegistryURI: string | undefined = trustedFolder
-    ? settings.experimental?.extensionRegistryURI
-    : undefined;
+  let extensionRegistryURI =
+    process.env['GEMINI_CLI_EXTENSION_REGISTRY_URI'] ??
+    (trustedFolder ? settings.experimental?.extensionRegistryURI : undefined);
+
   if (extensionRegistryURI && !extensionRegistryURI.startsWith('http')) {
     extensionRegistryURI = resolveToRealPath(
       path.resolve(cwd, resolvePath(extensionRegistryURI)),
@@ -813,6 +814,7 @@ export async function loadCliConfig(
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     modelSteering: settings.experimental?.modelSteering,
+    topicUpdateNarration: settings.experimental?.topicUpdateNarration,
     toolOutputMasking: settings.experimental?.toolOutputMasking,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
@@ -847,6 +849,7 @@ export async function loadCliConfig(
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
     rawOutput: argv.rawOutput,
     acceptRawOutputRisk: argv.acceptRawOutputRisk,
+    dynamicModelConfiguration: settings.experimental?.dynamicModelConfiguration,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
     enableHooks: settings.hooksConfig.enabled,

@@ -520,23 +520,55 @@ export class AgentRegistry {
       return definition;
     }
 
-    // Use Object.create to preserve lazy getters on the definition object
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const merged: LocalAgentDefinition<TOutput> = Object.create(definition);
-
-    if (overrides.runConfig) {
-      merged.runConfig = {
-        ...definition.runConfig,
-        ...overrides.runConfig,
-      };
-    }
-
-    if (overrides.modelConfig) {
-      merged.modelConfig = ModelConfigService.merge(
-        definition.modelConfig,
-        overrides.modelConfig,
-      );
-    }
+    // Preserve lazy getters on the definition object by wrapping in a new object with getters
+    const merged: LocalAgentDefinition<TOutput> = {
+      get kind() {
+        return definition.kind;
+      },
+      get name() {
+        return definition.name;
+      },
+      get displayName() {
+        return definition.displayName;
+      },
+      get description() {
+        return definition.description;
+      },
+      get experimental() {
+        return definition.experimental;
+      },
+      get metadata() {
+        return definition.metadata;
+      },
+      get inputConfig() {
+        return definition.inputConfig;
+      },
+      get outputConfig() {
+        return definition.outputConfig;
+      },
+      get promptConfig() {
+        return definition.promptConfig;
+      },
+      get toolConfig() {
+        return definition.toolConfig;
+      },
+      get processOutput() {
+        return definition.processOutput;
+      },
+      get runConfig() {
+        return overrides.runConfig
+          ? { ...definition.runConfig, ...overrides.runConfig }
+          : definition.runConfig;
+      },
+      get modelConfig() {
+        return overrides.modelConfig
+          ? ModelConfigService.merge(
+              definition.modelConfig,
+              overrides.modelConfig,
+            )
+          : definition.modelConfig;
+      },
+    };
 
     return merged;
   }
