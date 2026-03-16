@@ -16,6 +16,7 @@ import {
   type PolicyRule,
   type PolicySettings,
   type SafetyCheckerRule,
+  ALWAYS_ALLOW_PRIORITY_OFFSET,
 } from './types.js';
 import type { PolicyEngine } from './policy-engine.js';
 import { loadPoliciesFromToml, type PolicyFileError } from './toml-loader.js';
@@ -65,19 +66,6 @@ export const EXTENSION_POLICY_TIER = 2;
 export const WORKSPACE_POLICY_TIER = 3;
 export const USER_POLICY_TIER = 4;
 export const ADMIN_POLICY_TIER = 5;
-
-/**
- * The fractional priority of "Always allow" rules (e.g., 950/1000).
- * Higher fraction within a tier wins.
- */
-export const ALWAYS_ALLOW_PRIORITY_FRACTION = 950;
-
-/**
- * The fractional priority offset for "Always allow" rules (e.g., 0.95).
- * This ensures consistency between in-memory rules and persisted rules.
- */
-export const ALWAYS_ALLOW_PRIORITY_OFFSET =
-  ALWAYS_ALLOW_PRIORITY_FRACTION / 1000;
 
 // Specific priority offsets and derived priorities for dynamic/settings rules.
 
@@ -535,6 +523,7 @@ export async function createPolicyEngineConfig(
     checkers,
     defaultDecision: PolicyDecision.ASK_USER,
     approvalMode,
+    disableAlwaysAllow: settings.disableAlwaysAllow,
   };
 }
 
@@ -669,10 +658,13 @@ export function createPolicyUpdater(
 
             if (message.mcpName) {
               newRule.mcpName = message.mcpName;
-              // Extract simple tool name
-              newRule.toolName = toolName.startsWith(`${message.mcpName}__`)
-                ? toolName.slice(message.mcpName.length + 2)
-                : toolName;
+
+              const expectedPrefix = `${MCP_TOOL_PREFIX}${message.mcpName}_`;
+              if (toolName.startsWith(expectedPrefix)) {
+                newRule.toolName = toolName.slice(expectedPrefix.length);
+              } else {
+                newRule.toolName = toolName;
+              }
             } else {
               newRule.toolName = toolName;
             }
