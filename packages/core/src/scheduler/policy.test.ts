@@ -102,6 +102,32 @@ describe('policy.ts', () => {
       );
     });
 
+    it('should respect disableAlwaysAllow from config', async () => {
+      const mockPolicyEngine = {
+        check: vi.fn().mockResolvedValue({ decision: PolicyDecision.ALLOW }),
+      } as unknown as Mocked<PolicyEngine>;
+
+      const mockConfig = {
+        getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+        getDisableAlwaysAllow: vi.fn().mockReturnValue(true),
+      } as unknown as Mocked<Config>;
+
+      (mockConfig as unknown as { config: Config }).config =
+        mockConfig as Config;
+
+      const toolCall = {
+        request: { name: 'test-tool', args: {} },
+        tool: { name: 'test-tool' },
+      } as ValidatingToolCall;
+
+      // Note: checkPolicy calls config.getPolicyEngine().check()
+      // The PolicyEngine itself is already configured with disableAlwaysAllow
+      // when created in Config. Here we are just verifying that checkPolicy
+      // doesn't somehow bypass it.
+      await checkPolicy(toolCall, mockConfig);
+      expect(mockPolicyEngine.check).toHaveBeenCalled();
+    });
+
     it('should throw if ASK_USER is returned in non-interactive mode', async () => {
       const mockPolicyEngine = {
         check: vi.fn().mockResolvedValue({ decision: PolicyDecision.ASK_USER }),
