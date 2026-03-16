@@ -238,6 +238,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                   inlineThinkingMode === 'full' ? 'Thinking...' : undefined
                 }
                 elapsedTime={uiState.elapsedTime}
+                suppressText={settings.merged.ui.loadingPhrases === 'off'}
               />
             )}
           </Box>
@@ -280,6 +281,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                     inlineThinkingMode === 'full' ? 'Thinking...' : undefined
                   }
                   elapsedTime={uiState.elapsedTime}
+                  suppressText={settings.merged.ui.loadingPhrases === 'off'}
                 />
               )}
               {showMinimalModeBleedThrough && minimalModeBleedThrough && (
