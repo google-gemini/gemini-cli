@@ -210,6 +210,8 @@ class McpDeclarativeTool extends DeclarativeTool<
     );
   }
 
+  // Used for determining tool identity in the policy engine to check if a tool
+  // call is allowed based on policy.
   override get toolAnnotations(): Record<string, unknown> {
     return {
       _serverName: BROWSER_AGENT_SERVER_NAME,
