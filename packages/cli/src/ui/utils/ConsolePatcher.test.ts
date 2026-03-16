@@ -24,12 +24,8 @@ describe('ConsolePatcher', () => {
   });
 
   it('should suppress output when suppressConsoleOutput is true and debugMode is false', () => {
-    // We need to spy on the original console methods that ConsolePatcher will call
-    // ConsolePatcher captures the original methods at construction time or patch time?
-    // It captures them at construction time.
-
-    const originalLog = console.log;
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const originalError = console.error;
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     patcher = new ConsolePatcher({
       debugMode: false,
@@ -40,11 +36,11 @@ describe('ConsolePatcher', () => {
 
     console.log('test log');
 
-    expect(logSpy).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
 
     patcher.cleanup();
-    logSpy.mockRestore();
-    console.log = originalLog;
+    errorSpy.mockRestore();
+    console.error = originalError;
   });
 
   it('should NOT suppress output when suppressConsoleOutput is true but debugMode is true', () => {
