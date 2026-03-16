@@ -22,6 +22,7 @@ import { LoggingContentGenerator } from './loggingContentGenerator.js';
 import { InstallationManager } from '../utils/installationManager.js';
 import { FakeContentGenerator } from './fakeContentGenerator.js';
 import { parseCustomHeaders } from '../utils/customHeaderUtils.js';
+import { determineSurface } from '../utils/surface.js';
 import { RecordingContentGenerator } from './recordingContentGenerator.js';
 import { getVersion, resolveModel } from '../../index.js';
 import type { LlmRole } from '../telemetry/llmRole.js';
@@ -173,7 +174,12 @@ export async function createContentGenerator(
     );
     const customHeadersEnv =
       process.env['GEMINI_CLI_CUSTOM_HEADERS'] || undefined;
-    const userAgent = `GeminiCLI/${version}/${model} (${process.platform}; ${process.arch})`;
+    const clientName = gcConfig.getClientName();
+    const userAgentPrefix = clientName
+      ? `GeminiCLI-${clientName}`
+      : 'GeminiCLI';
+    const surface = determineSurface();
+    const userAgent = `${userAgentPrefix}/${version}/${model} (${process.platform}; ${process.arch}; ${surface})`;
     const customHeadersMap = parseCustomHeaders(customHeadersEnv);
     const apiKeyAuthMechanism =
       process.env['GEMINI_API_KEY_AUTH_MECHANISM'] || 'x-goog-api-key';
@@ -225,13 +231,25 @@ export async function createContentGenerator(
           'x-gemini-api-privileged-user-id': `${installationId}`,
         };
       }
+      let baseUrl = config.baseUrl;
+      if (!baseUrl) {
+        const envBaseUrl = config.vertexai
+          ? process.env['GOOGLE_VERTEX_BASE_URL']
+          : process.env['GOOGLE_GEMINI_BASE_URL'];
+        if (envBaseUrl) {
+          validateBaseUrl(envBaseUrl);
+          baseUrl = envBaseUrl;
+        }
+      } else {
+        validateBaseUrl(baseUrl);
+      }
       const httpOptions: {
         baseUrl?: string;
         headers: Record<string, string>;
       } = { headers };
 
-      if (config.baseUrl) {
-        httpOptions.baseUrl = config.baseUrl;
+      if (baseUrl) {
+        httpOptions.baseUrl = baseUrl;
       }
 
       const googleGenAI = new GoogleGenAI({
@@ -252,4 +270,18 @@ export async function createContentGenerator(
   }
 
   return generator;
+}
+
+const LOCAL_HOSTNAMES = ['localhost', '127.0.0.1', '[::1]'];
+
+export function validateBaseUrl(baseUrl: string): void {
+  let url: URL;
+  try {
+    url = new URL(baseUrl);
+  } catch {
+    throw new Error(`Invalid custom base URL: ${baseUrl}`);
+  }
+  if (url.protocol !== 'https:' && !LOCAL_HOSTNAMES.includes(url.hostname)) {
+    throw new Error('Custom base URL must use HTTPS unless it is localhost.');
+  }
 }
