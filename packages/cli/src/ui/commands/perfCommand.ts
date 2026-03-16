@@ -5,13 +5,16 @@
  */
 
 import { MessageType } from '../types.js';
-import type { HistoryItemPerfDashboard } from '../types.js';
+import type { HistoryItemPerfDashboard, PerfSnapshot } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
 import {
   type CommandContext,
   type SlashCommand,
   CommandKind,
 } from './types.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { startupProfiler } from '@google/gemini-cli-core';
 
 /**
  * Collects a performance snapshot from the current session context.
@@ -34,8 +37,10 @@ function collectPerfSnapshot(context: CommandContext) {
   }> = [];
 
   for (const [name, toolStats] of Object.entries(metrics.tools.byName)) {
-    const avgMs = toolStats.count > 0 ? toolStats.durationMs / toolStats.count : 0;
-    const successRate = toolStats.count > 0 ? (toolStats.success / toolStats.count) * 100 : 0;
+    const avgMs =
+      toolStats.count > 0 ? toolStats.durationMs / toolStats.count : 0;
+    const successRate =
+      toolStats.count > 0 ? (toolStats.success / toolStats.count) * 100 : 0;
     toolPerf.push({
       name,
       calls: toolStats.count,
@@ -61,12 +66,14 @@ function collectPerfSnapshot(context: CommandContext) {
   }> = [];
 
   for (const [model, modelMetrics] of Object.entries(metrics.models)) {
-    const avgLatency = modelMetrics.api.totalRequests > 0
-      ? modelMetrics.api.totalLatencyMs / modelMetrics.api.totalRequests
-      : 0;
-    const errorRate = modelMetrics.api.totalRequests > 0
-      ? (modelMetrics.api.totalErrors / modelMetrics.api.totalRequests) * 100
-      : 0;
+    const avgLatency =
+      modelMetrics.api.totalRequests > 0
+        ? modelMetrics.api.totalLatencyMs / modelMetrics.api.totalRequests
+        : 0;
+    const errorRate =
+      modelMetrics.api.totalRequests > 0
+        ? (modelMetrics.api.totalErrors / modelMetrics.api.totalRequests) * 100
+        : 0;
     apiPerf.push({
       model: model.replace('-001', ''),
       requests: modelMetrics.api.totalRequests,
@@ -100,21 +107,31 @@ function collectPerfSnapshot(context: CommandContext) {
     memoryWarnings.push('Warning: RSS memory exceeds 512MB');
   }
 
-  // Total token counts
-  const totalInputTokens = Object.values(metrics.models).reduce(
-    (acc, m) => acc + m.tokens.input, 0,
-  );
-  const totalOutputTokens = Object.values(metrics.models).reduce(
-    (acc, m) => acc + m.tokens.candidates, 0,
-  );
-  const totalCachedTokens = Object.values(metrics.models).reduce(
-    (acc, m) => acc + m.tokens.cached, 0,
+  // Aggregate model-related totals in a single pass
+  const {
+    totalInputTokens,
+    totalOutputTokens,
+    totalCachedTokens,
+    totalApiTime,
+    totalApiRequests,
+  } = Object.values(metrics.models).reduce(
+    (totals, m) => {
+      totals.totalInputTokens += m.tokens.input;
+      totals.totalOutputTokens += m.tokens.candidates;
+      totals.totalCachedTokens += m.tokens.cached;
+      totals.totalApiTime += m.api.totalLatencyMs;
+      totals.totalApiRequests += m.api.totalRequests;
+      return totals;
+    },
+    {
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      totalCachedTokens: 0,
+      totalApiTime: 0,
+      totalApiRequests: 0,
+    },
   );
 
-  // Total API time and tool time
-  const totalApiTime = Object.values(metrics.models).reduce(
-    (acc, m) => acc + m.api.totalLatencyMs, 0,
-  );
   const totalToolTime = metrics.tools.totalDurationMs;
 
   return {
@@ -126,33 +143,41 @@ function collectPerfSnapshot(context: CommandContext) {
     apiPerf,
     totalToolCalls: metrics.tools.totalCalls,
     totalToolTime,
-    totalApiRequests: Object.values(metrics.models).reduce(
-      (acc, m) => acc + m.api.totalRequests, 0,
-    ),
+    totalApiRequests,
     totalApiTime,
     totalInputTokens,
     totalOutputTokens,
     totalCachedTokens,
     totalLinesAdded: metrics.files.totalLinesAdded,
     totalLinesRemoved: metrics.files.totalLinesRemoved,
+    startupPhases: startupProfiler.getBufferedPhases().map((p) => ({
+      name: p.name,
+      durationMs: p.duration_ms,
+    })),
   };
 }
+
+/**
+ * Factory function to create performance dashboard view actions.
+ * Reduces duplication across subcommands.
+ */
+const createPerfViewAction =
+  (view: HistoryItemPerfDashboard['view']) => (context: CommandContext) =>
+    void context.ui.addItem({
+      type: MessageType.PERF_DASHBOARD,
+      view,
+      snapshot: collectPerfSnapshot(context),
+    } as HistoryItemPerfDashboard);
 
 export const perfCommand: SlashCommand = {
   name: 'perf',
   altNames: ['performance'],
-  description: 'Performance monitoring dashboard. Usage: /perf [overview|memory|tools|api]',
+  description:
+    'Performance monitoring dashboard. Usage: /perf [overview|memory|tools|api|startup|regression|baseline]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   isSafeConcurrent: true,
-  action: async (context: CommandContext) => {
-    const snapshot = collectPerfSnapshot(context);
-    context.ui.addItem({
-      type: MessageType.PERF_DASHBOARD,
-      view: 'overview',
-      snapshot,
-    } as HistoryItemPerfDashboard);
-  },
+  action: createPerfViewAction('overview'),
   subCommands: [
     {
       name: 'overview',
@@ -160,14 +185,7 @@ export const perfCommand: SlashCommand = {
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
       isSafeConcurrent: true,
-      action: (context: CommandContext) => {
-        const snapshot = collectPerfSnapshot(context);
-        context.ui.addItem({
-          type: MessageType.PERF_DASHBOARD,
-          view: 'overview',
-          snapshot,
-        } as HistoryItemPerfDashboard);
-      },
+      action: createPerfViewAction('overview'),
     },
     {
       name: 'memory',
@@ -175,14 +193,7 @@ export const perfCommand: SlashCommand = {
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
       isSafeConcurrent: true,
-      action: (context: CommandContext) => {
-        const snapshot = collectPerfSnapshot(context);
-        context.ui.addItem({
-          type: MessageType.PERF_DASHBOARD,
-          view: 'memory',
-          snapshot,
-        } as HistoryItemPerfDashboard);
-      },
+      action: createPerfViewAction('memory'),
     },
     {
       name: 'tools',
@@ -190,14 +201,7 @@ export const perfCommand: SlashCommand = {
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
       isSafeConcurrent: true,
-      action: (context: CommandContext) => {
-        const snapshot = collectPerfSnapshot(context);
-        context.ui.addItem({
-          type: MessageType.PERF_DASHBOARD,
-          view: 'tools',
-          snapshot,
-        } as HistoryItemPerfDashboard);
-      },
+      action: createPerfViewAction('tools'),
     },
     {
       name: 'api',
@@ -205,13 +209,75 @@ export const perfCommand: SlashCommand = {
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
       isSafeConcurrent: true,
+      action: createPerfViewAction('api'),
+    },
+    {
+      name: 'startup',
+      description: 'Show startup sequence performance breakdown',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      isSafeConcurrent: true,
+      action: createPerfViewAction('startup'),
+    },
+    {
+      name: 'regression',
+      description: 'Check for performance regressions against baseline',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      isSafeConcurrent: true,
       action: (context: CommandContext) => {
         const snapshot = collectPerfSnapshot(context);
+        const baselinePath = path.resolve(
+          process.cwd(),
+          '.gemini-perf-baseline.json',
+        );
+        let baseline: PerfSnapshot | undefined;
+
+        if (fs.existsSync(baselinePath)) {
+          try {
+            const content = fs.readFileSync(baselinePath, 'utf8');
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            baseline = JSON.parse(content) as PerfSnapshot;
+          } catch (e: unknown) {
+            context.ui.addItem({
+              type: MessageType.ERROR,
+              text: `Failed to load baseline: ${e instanceof Error ? e.message : String(e)}`,
+            });
+          }
+        }
+
         context.ui.addItem({
           type: MessageType.PERF_DASHBOARD,
-          view: 'api',
+          view: 'regression',
           snapshot,
+          baseline,
         } as HistoryItemPerfDashboard);
+      },
+    },
+    {
+      name: 'baseline',
+      description: 'Save current performance snapshot as baseline',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      isSafeConcurrent: true,
+      action: (context: CommandContext) => {
+        const snapshot = collectPerfSnapshot(context);
+        const baselinePath = path.resolve(
+          process.cwd(),
+          '.gemini-perf-baseline.json',
+        );
+        try {
+          fs.writeFileSync(baselinePath, JSON.stringify(snapshot, null, 2));
+          context.ui.addItem({
+            type: MessageType.INFO,
+            text: `📊 Performance baseline saved to \`${baselinePath}\``,
+          });
+        } catch (error) {
+          context.ui.addItem({
+            type: MessageType.ERROR,
+            text: `Failed to save baseline: ${error instanceof Error ? error.message : String(error)}`,
+          });
+        }
       },
     },
     {
@@ -222,11 +288,12 @@ export const perfCommand: SlashCommand = {
       isSafeConcurrent: true,
       action: (context: CommandContext) => {
         const snapshot = collectPerfSnapshot(context);
-        const report = JSON.stringify({
+        const reportObj = {
           timestamp: new Date().toISOString(),
           session_id: context.session.stats.sessionId,
           uptime_ms: snapshot.uptimeMs,
           memory: snapshot.memory,
+          startup: snapshot.startupPhases,
           tools: {
             total_calls: snapshot.totalToolCalls,
             total_time_ms: snapshot.totalToolTime,
@@ -246,12 +313,49 @@ export const perfCommand: SlashCommand = {
             lines_added: snapshot.totalLinesAdded,
             lines_removed: snapshot.totalLinesRemoved,
           },
-        }, null, 2);
+        };
 
-        context.ui.addItem({
-          type: MessageType.INFO,
-          text: `📊 Performance Report (JSON):\n\n${report}`,
-        });
+        const jsonReport = JSON.stringify(reportObj, null, 2);
+        const jsonPath = path.resolve(process.cwd(), 'perf-report.json');
+
+        try {
+          fs.writeFileSync(jsonPath, jsonReport);
+
+          // Generate Markdown report
+          const mdReport =
+            `# Gemini CLI Performance Report\n\n` +
+            `**Session ID:** ${reportObj.session_id}\n` +
+            `**Timestamp:** ${reportObj.timestamp}\n` +
+            `**Uptime:** ${reportObj.uptime_ms}ms\n\n` +
+            `## Memory Usage\n` +
+            `- Heap Used: ${reportObj.memory.heapUsedMB} MB\n` +
+            `- Heap Total: ${reportObj.memory.heapTotalMB} MB\n` +
+            `- RSS: ${reportObj.memory.rssMB} MB\n\n` +
+            `## Startup Breakdown\n` +
+            reportObj.startup
+              .map((p) => `- ${p.name}: ${p.durationMs}ms`)
+              .join('\n') +
+            '\n\n' +
+            `## Tool Execution\n` +
+            `- Total Calls: ${reportObj.tools.total_calls}\n` +
+            `- Total Time: ${reportObj.tools.total_time_ms}ms\n\n` +
+            `## API Latency\n` +
+            `- Total Requests: ${reportObj.api.total_requests}\n` +
+            `- Total Time: ${reportObj.api.total_time_ms}ms\n`;
+
+          const mdPath = path.resolve(process.cwd(), 'perf-report.md');
+          fs.writeFileSync(mdPath, mdReport);
+
+          context.ui.addItem({
+            type: MessageType.INFO,
+            text: `📊 Performance report exported to:\n- \`${jsonPath}\`\n- \`${mdPath}\``,
+          });
+        } catch (error) {
+          context.ui.addItem({
+            type: MessageType.ERROR,
+            text: `Failed to export performance report: ${error instanceof Error ? error.message : String(error)}`,
+          });
+        }
       },
     },
   ],
