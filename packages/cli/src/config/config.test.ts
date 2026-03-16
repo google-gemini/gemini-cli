@@ -810,6 +810,7 @@ describe('loadCliConfig', () => {
 describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '');
     // Restore ExtensionManager mocks that were reset
     ExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([]);
     ExtensionManager.prototype.loadExtensions = vi
@@ -821,6 +822,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
