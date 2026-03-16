@@ -295,7 +295,9 @@ export class McpClient implements McpProgressReporter {
   private getConnectedClient(): Client {
     this.assertConnected();
     if (!this.client) {
-      throw new Error('Client is not initialized');
+      throw new Error(
+        'Internal error: Client is not initialized in a connected state',
+      );
     }
     return this.client;
   }
