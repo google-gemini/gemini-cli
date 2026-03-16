@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-// import type React from 'react';
 import { render } from '../../../test-utils/render.js';
 import { describe, it, expect } from 'vitest';
-import { SearchModeDisplay } from './SearchModeDisplay.js';
-import { NavigationHelp } from './NavigationHelp.js';
+import {
+  SearchModeDisplay,
+  NavigationHelpDisplay,
+  NoResultsDisplay,
+} from './SessionBrowserNav.js';
 import { SessionListHeader } from './SessionListHeader.js';
-import { NoResultsDisplay } from './NoResultsDisplay.js';
 import type { SessionBrowserState } from '../SessionBrowser.js';
 
 describe('SessionBrowser Search and Navigation Components', () => {
@@ -24,7 +25,7 @@ describe('SessionBrowser Search and Navigation Components', () => {
   });
 
   it('NavigationHelp renders correctly', async () => {
-    const { lastFrame, waitUntilReady } = render(<NavigationHelp />);
+    const { lastFrame, waitUntilReady } = render(<NavigationHelpDisplay />);
     await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();
   });

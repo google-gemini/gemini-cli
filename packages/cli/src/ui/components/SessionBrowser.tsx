@@ -110,10 +110,12 @@ const SESSIONS_PER_PAGE = 20;
 // If the SessionItem layout changes, update this accordingly.
 const FIXED_SESSION_COLUMNS_WIDTH = 30;
 
-import { SearchModeDisplay } from './SessionBrowser/SearchModeDisplay.js';
-import { NavigationHelp } from './SessionBrowser/NavigationHelp.js';
+import {
+  SearchModeDisplay,
+  NavigationHelpDisplay,
+  NoResultsDisplay,
+} from './SessionBrowser/SessionBrowserNav.js';
 import { SessionListHeader } from './SessionBrowser/SessionListHeader.js';
-import { NoResultsDisplay } from './SessionBrowser/NoResultsDisplay.js';
 import { SessionBrowserLoading } from './SessionBrowser/SessionBrowserLoading.js';
 import { SessionBrowserError } from './SessionBrowser/SessionBrowserError.js';
 import { SessionBrowserEmpty } from './SessionBrowser/SessionBrowserEmpty.js';
@@ -320,7 +322,7 @@ const SessionList = ({
   <Box flexDirection="column">
     {/* Table Header */}
     <Box flexDirection="column">
-      {!state.isSearchMode && <NavigationHelp />}
+      {!state.isSearchMode && <NavigationHelpDisplay />}
       <SessionTableHeader state={state} />
     </Box>
 

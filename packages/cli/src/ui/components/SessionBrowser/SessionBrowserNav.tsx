@@ -7,6 +7,7 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { Colors } from '../../colors.js';
+import type { SessionBrowserState } from '../SessionBrowser.js';
 
 const Kbd = ({ name, shortcut }: { name: string; shortcut: string }) => (
   <>
@@ -17,7 +18,7 @@ const Kbd = ({ name, shortcut }: { name: string; shortcut: string }) => (
 /**
  * Navigation help component showing keyboard shortcuts.
  */
-export const NavigationHelp = (): React.JSX.Element => (
+export const NavigationHelpDisplay = (): React.JSX.Element => (
   <Box flexDirection="column">
     <Text color={Colors.Gray}>
       <Kbd name="Navigate" shortcut="↑/↓" />
@@ -36,6 +37,36 @@ export const NavigationHelp = (): React.JSX.Element => (
       <Kbd name="Reverse" shortcut="r" />
       {'      '}
       <Kbd name="First/Last" shortcut="g/G" />
+    </Text>
+  </Box>
+);
+
+/**
+ * Search input display component.
+ */
+export const SearchModeDisplay = ({
+  state,
+}: {
+  state: SessionBrowserState;
+}): React.JSX.Element => (
+  <Box marginTop={1}>
+    <Text color={Colors.Gray}>Search: </Text>
+    <Text color={Colors.AccentPurple}>{state.searchQuery}</Text>
+    <Text color={Colors.Gray}> (Esc to cancel)</Text>
+  </Box>
+);
+
+/**
+ * No results display component for empty search results.
+ */
+export const NoResultsDisplay = ({
+  state,
+}: {
+  state: SessionBrowserState;
+}): React.JSX.Element => (
+  <Box marginTop={1}>
+    <Text color={Colors.Gray} dimColor>
+      No sessions found matching &apos;{state.searchQuery}&apos;.
     </Text>
   </Box>
 );
