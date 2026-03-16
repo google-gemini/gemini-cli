@@ -89,6 +89,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     })),
     startupProfiler: {
       flush: vi.fn(),
+      getLastFlushResults: vi.fn(() => []),
       start: vi.fn(),
       end: vi.fn(),
     },

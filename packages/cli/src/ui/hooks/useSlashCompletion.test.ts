@@ -187,7 +187,7 @@ describe('useSlashCompletion', () => {
           name: 'stats',
           altNames: ['usage'],
           description:
-            'check session stats. Usage: /stats [session|model|tools]',
+            'check session stats. Usage: /stats [session|model|tools|perf]',
         }),
         createTestCommand({ name: 'clear', description: 'Clear the screen' }),
         createTestCommand({
@@ -287,7 +287,7 @@ describe('useSlashCompletion', () => {
           name: 'stats',
           altNames: ['usage'],
           description:
-            'check session stats. Usage: /stats [session|model|tools]',
+            'check session stats. Usage: /stats [session|model|tools|perf]',
         }),
       ];
       let result: {
@@ -313,7 +313,7 @@ describe('useSlashCompletion', () => {
             label: 'stats',
             value: 'stats',
             description:
-              'check session stats. Usage: /stats [session|model|tools]',
+              'check session stats. Usage: /stats [session|model|tools|perf]',
             commandKind: CommandKind.BUILT_IN,
           },
         ]);
@@ -368,7 +368,7 @@ describe('useSlashCompletion', () => {
             name: 'stats',
             altNames: ['usage'],
             description:
-              'check session stats. Usage: /stats [session|model|tools]',
+              'check session stats. Usage: /stats [session|model|tools|perf]',
             action: vi.fn(),
           }),
         ];

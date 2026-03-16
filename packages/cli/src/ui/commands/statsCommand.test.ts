@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import process from 'node:process';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { statsCommand } from './statsCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
-import type { Config } from '@google/gemini-cli-core';
+import { startupProfiler, type Config } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -38,6 +39,11 @@ describe('statsCommand', () => {
 
     // 2. Directly set the property on the created mock context
     mockContext.session.stats.sessionStartTime = startTime;
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.useRealTimers();
   });
 
   it('should display general session stats when run with no subcommand', async () => {
@@ -137,6 +143,101 @@ describe('statsCommand', () => {
 
     expect(mockContext.ui.addItem).toHaveBeenCalledWith({
       type: MessageType.TOOL_STATS,
+    });
+  });
+
+  it('should display perf stats when using the "perf" subcommand', () => {
+    const perfSubCommand = statsCommand.subCommands?.find(
+      (sc) => sc.name === 'perf',
+    );
+    if (!perfSubCommand?.action) throw new Error('Subcommand has no action');
+
+    vi.spyOn(process, 'memoryUsage').mockReturnValue({
+      rss: 100 * 1024 * 1024,
+      heapUsed: 50 * 1024 * 1024,
+      heapTotal: 100 * 1024 * 1024,
+      external: 5 * 1024 * 1024,
+      arrayBuffers: 0,
+    });
+    vi.spyOn(startupProfiler, 'getLastFlushResults').mockReturnValue([
+      {
+        name: 'load_settings',
+        duration_ms: 42,
+        cpu_usage_user_usec: 100,
+        cpu_usage_system_usec: 50,
+        start_time_usec: 1000,
+        end_time_usec: 43000,
+      },
+    ]);
+
+    mockContext.session.stats.metrics = {
+      models: {
+        'gemini-2.5-pro': {
+          api: {
+            totalRequests: 1,
+            totalErrors: 0,
+            totalLatencyMs: 1200,
+          },
+          tokens: {
+            input: 150,
+            prompt: 200,
+            candidates: 100,
+            total: 300,
+            cached: 70,
+            thoughts: 0,
+            tool: 0,
+          },
+          roles: {},
+        },
+      },
+      tools: {
+        totalCalls: 2,
+        totalSuccess: 2,
+        totalFail: 0,
+        totalDurationMs: 800,
+        totalDecisions: {
+          accept: 1,
+          reject: 0,
+          modify: 0,
+          auto_accept: 1,
+        },
+        byName: {},
+      },
+      files: {
+        totalLinesAdded: 0,
+        totalLinesRemoved: 0,
+      },
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-floating-promises
+    perfSubCommand.action(mockContext, '');
+
+    expect(mockContext.ui.addItem).toHaveBeenCalledWith({
+      type: MessageType.PERF_STATS,
+      memory: {
+        rss: 100 * 1024 * 1024,
+        heapUsed: 50 * 1024 * 1024,
+        heapTotal: 100 * 1024 * 1024,
+        heapUsedPercent: 50,
+        external: 5 * 1024 * 1024,
+      },
+      runtime: {
+        apiTimeMs: 1200,
+        apiTimePercent: 60,
+        toolTimeMs: 800,
+        toolTimePercent: 40,
+        cacheEfficiency: 35,
+      },
+      startupPhases: [
+        {
+          name: 'load_settings',
+          duration_ms: 42,
+          cpu_usage_user_usec: 100,
+          cpu_usage_system_usec: 50,
+          start_time_usec: 1000,
+          end_time_usec: 43000,
+        },
+      ],
     });
   });
 });

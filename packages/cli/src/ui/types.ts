@@ -16,6 +16,7 @@ import {
   type AgentDefinition,
   type ApprovalMode,
   type Kind,
+  type StartupPhaseStats,
   CoreToolCallStatus,
   checkExhaustive,
 } from '@google/gemini-cli-core';
@@ -218,6 +219,29 @@ export type HistoryItemToolStats = HistoryItemBase & {
   type: 'tool_stats';
 };
 
+export interface PerfMemoryStats {
+  rss: number;
+  heapUsed: number;
+  heapTotal: number;
+  heapUsedPercent: number;
+  external: number;
+}
+
+export interface PerfRuntimeStats {
+  apiTimeMs: number;
+  apiTimePercent: number;
+  toolTimeMs: number;
+  toolTimePercent: number;
+  cacheEfficiency: number;
+}
+
+export type HistoryItemPerfStats = HistoryItemBase & {
+  type: 'perf_stats';
+  memory: PerfMemoryStats;
+  runtime: PerfRuntimeStats;
+  startupPhases: StartupPhaseStats[];
+};
+
 export type HistoryItemModel = HistoryItemBase & {
   type: 'model';
   model: string;
@@ -370,6 +394,7 @@ export type HistoryItemWithoutId =
   | HistoryItemStats
   | HistoryItemModelStats
   | HistoryItemToolStats
+  | HistoryItemPerfStats
   | HistoryItemModel
   | HistoryItemQuit
   | HistoryItemCompression
@@ -395,6 +420,7 @@ export enum MessageType {
   STATS = 'stats',
   MODEL_STATS = 'model_stats',
   TOOL_STATS = 'tool_stats',
+  PERF_STATS = 'perf_stats',
   QUIT = 'quit',
   GEMINI = 'gemini',
   COMPRESSION = 'compression',
