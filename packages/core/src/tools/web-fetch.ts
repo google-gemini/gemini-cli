@@ -318,10 +318,7 @@ class WebFetchToolInvocation extends BaseToolInvocation<
     let textContent: string;
 
     // Only use html-to-text if content type is HTML, or if no content type is provided (assume HTML)
-    if (
-      contentType.toLowerCase().includes('text/html') ||
-      contentType === ''
-    ) {
+    if (contentType.toLowerCase().includes('text/html') || contentType === '') {
       textContent = convert(rawContent, {
         wordwrap: false,
         selectors: [
@@ -349,7 +346,9 @@ class WebFetchToolInvocation extends BaseToolInvocation<
 
     for (const url of uniqueUrls) {
       if (this.isBlockedHost(url)) {
-        debugLogger.warn(`[WebFetchTool] Skipped private or local host: ${url}`);
+        debugLogger.warn(
+          `[WebFetchTool] Skipped private or local host: ${url}`,
+        );
         logWebFetchFallbackAttempt(
           this.context.config,
           new WebFetchFallbackAttemptEvent('private_ip_skipped'),

@@ -175,7 +175,6 @@ export async function fetchWithTimeout(
   }
 
   try {
-     
     const response = await fetch(url, {
       ...options,
       signal: controller.signal,
