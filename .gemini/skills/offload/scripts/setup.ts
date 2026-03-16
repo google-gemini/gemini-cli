@@ -89,10 +89,11 @@ Host ${sshAlias}
     console.log(`   ✅ Added '${sshAlias}' alias to ~/.ssh/config`);
   }
 
+  /* --- Temporarily Skipping Fork Management ---
   // 1b. Security Fork Management
   console.log('\n🍴 Configuring Security Fork...');
   const upstreamRepo = 'google-gemini/gemini-cli';
-  
+
   // 1. Robust Discovery using 'gh repo list'
   const forksCheck = spawnSync('gh', ['repo', 'list', '--fork', '--limit', '100', '--json', 'nameWithOwner,parent'], { stdio: 'pipe' });
   let existingForks: string[] = [];
@@ -114,8 +115,12 @@ Host ${sshAlias}
       const user = spawnSync('gh', ['api', 'user', '-q', '.login'], { stdio: 'pipe' }).stdout.toString().trim();
       userFork = `${user}/gemini-cli`;
   }
-  
-  console.log(`   ✅ Target fork: ${userFork}`);
+
+  console.log(`   👉 Target fork: ${userFork}`);
+  */
+  const userFork = 'google-gemini/gemini-cli'; // Fallback to main repo for now
+  const upstreamRepo = 'google-gemini/gemini-cli';
+
 
   // Resolve Paths (Simplified with Tilde)
   const remoteHost = sshAlias;
@@ -145,7 +150,13 @@ Host ${sshAlias}
     // Correct URL for Fine-Grained PAT (Beta)
     const baseUrl = 'https://github.com/settings/personal-access-tokens/new';
     const name = `Offload-${env.USER}`;
-    const magicLink = `${baseUrl}?name=${encodeURIComponent(name)}&description=Gemini+CLI+Offload+Worker&contents=write&pull_requests=write&metadata=read`;
+    
+    // Determine which repos to include in the link
+    const repoParams = userFork !== upstreamRepo 
+        ? `&repositories[]=${encodeURIComponent(upstreamRepo)}&repositories[]=${encodeURIComponent(userFork)}`
+        : `&repositories[]=${encodeURIComponent(upstreamRepo)}`;
+
+    const magicLink = `${baseUrl}?name=${encodeURIComponent(name)}&description=Gemini+CLI+Offload+Worker${repoParams}&contents=write&pull_requests=write&metadata=read`;
 
     console.log('\n🔐 SECURITY: Create a token using the link below:');
     console.log('\n' + magicLink + '\n');
