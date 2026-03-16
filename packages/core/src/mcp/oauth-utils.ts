@@ -192,8 +192,9 @@ export class OAuthUtils {
     if (registrationUrl) {
       try {
         const regUrl = new URL(registrationUrl);
-        // RFC 7591 §3.1: the client registration endpoint MUST be an HTTPS URL.
-        if (regUrl.protocol !== 'https:') {
+        // RFC 7591 §3.1: the client registration endpoint MUST be an HTTPS URL,
+        // with the same loopback exemption as other endpoints (RFC 8252 §8.3).
+        if (regUrl.protocol !== 'https:' && !OAuthUtils.isLoopback(regUrl)) {
           debugLogger.debug(
             'registration_endpoint must use https: protocol; discarding.',
           );
@@ -205,13 +206,12 @@ export class OAuthUtils {
 
           if (authServerUrl) {
             const authUrl = new URL(authServerUrl);
-            // RFC 8414 §3: the authorization server URL must also use HTTPS.
-            if (authUrl.protocol !== 'https:') {
-              debugLogger.debug(
-                'authServerUrl must use https: protocol; discarding registration_endpoint.',
-              );
-              registrationUrl = undefined;
-            } else {
+            // Only apply domain validation for public HTTPS discovery URLs.
+            // Loopback auth servers are used in local dev and are exempt.
+            if (
+              authUrl.protocol === 'https:' &&
+              !OAuthUtils.isLoopback(authUrl)
+            ) {
               // Anchor validation to the trusted discovery URL (RFC 8414 §3).
               // The registration_endpoint must share the registrable domain with
               // the authorization server the metadata was fetched from.

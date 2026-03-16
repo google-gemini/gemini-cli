@@ -439,15 +439,14 @@ describe('OAuthUtils', () => {
         registration_endpoint: 'http://localhost:8080/register',
       };
 
-      // authServerUrl is HTTP → registration_endpoint discarded, but the
-      // authorization/token endpoints are still usable (loopback exemption).
+      // All endpoints are loopback HTTP → all are allowed (loopback exemption).
       const config = OAuthUtils.metadataToOAuthConfig(
         metadata,
         'http://localhost:8080',
       );
       expect(config).not.toBeNull();
       expect(config!.authorizationUrl).toBe('http://localhost:8080/authorize');
-      expect(config!.registrationUrl).toBeUndefined();
+      expect(config!.registrationUrl).toBe('http://localhost:8080/register');
     });
 
     it('should return null when auth endpoints use http (non-loopback)', () => {
@@ -543,7 +542,10 @@ describe('OAuthUtils', () => {
       expect(config!.registrationUrl).toBeUndefined();
     });
 
-    it('should exclude registrationUrl when authServerUrl uses http', () => {
+    it('should preserve registrationUrl when authServerUrl uses http (domain validation skipped for non-HTTPS)', () => {
+      // When authServerUrl is not a public HTTPS URL, domain validation is
+      // skipped (matching the same pattern used for auth/token endpoints).
+      // The registration_endpoint itself is HTTPS and valid on its own.
       const metadata: OAuthAuthorizationServerMetadata = {
         issuer: 'https://auth.example.com',
         authorization_endpoint: 'https://auth.example.com/authorize',
@@ -555,7 +557,7 @@ describe('OAuthUtils', () => {
         'http://auth.example.com',
       );
       expect(config).not.toBeNull();
-      expect(config!.registrationUrl).toBeUndefined();
+      expect(config!.registrationUrl).toBe('https://auth.example.com/register');
     });
 
     it('should discard registrationUrl when no authServerUrl is provided', () => {
