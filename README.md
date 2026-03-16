@@ -273,7 +273,15 @@ cd gemini-cli
 gemini
 > Give me a summary of all of the changes that went in yesterday
 ```
-
+```bash
+gemini -p "Write unit tests for this file"
+```
+```bash
+gemini -p "Refactor this code using best practices"
+```
+```bash
+gemini -p "Find potential bugs in this file"
+```
 ## 📚 Documentation
 
 ### Getting Started
