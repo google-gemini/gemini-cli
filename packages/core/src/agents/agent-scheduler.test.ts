@@ -28,10 +28,10 @@ describe('agent-scheduler', () => {
     mockMessageBus = {} as Mocked<MessageBus>;
     mockToolRegistry = {
       getTool: vi.fn(),
-      getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
+      messageBus: mockMessageBus,
     } as unknown as Mocked<ToolRegistry>;
     mockConfig = {
-      getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
+      messageBus: mockMessageBus,
       toolRegistry: mockToolRegistry,
     } as unknown as Mocked<Config>;
     (mockConfig as unknown as { messageBus: MessageBus }).messageBus =
@@ -42,7 +42,7 @@ describe('agent-scheduler', () => {
 
   it('should create a scheduler with agent-specific config', async () => {
     const mockConfig = {
-      getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
+      messageBus: mockMessageBus,
       toolRegistry: mockToolRegistry,
     } as unknown as Mocked<Config>;
 
@@ -87,11 +87,11 @@ describe('agent-scheduler', () => {
     const mainRegistry = { _id: 'main' } as unknown as Mocked<ToolRegistry>;
     const agentRegistry = {
       _id: 'agent',
-      getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
+      messageBus: mockMessageBus,
     } as unknown as Mocked<ToolRegistry>;
 
     const config = {
-      getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
+      messageBus: mockMessageBus,
     } as unknown as Mocked<Config>;
     Object.defineProperty(config, 'toolRegistry', {
       get: () => mainRegistry,
@@ -119,5 +119,26 @@ describe('agent-scheduler', () => {
     const schedulerConfig = vi.mocked(Scheduler).mock.calls[0][0].context;
     expect(schedulerConfig.toolRegistry).toBe(agentRegistry);
     expect(schedulerConfig.toolRegistry).not.toBe(mainRegistry);
+  });
+
+  it('should create an AgentLoopContext that has a defined .config property', async () => {
+    const mockConfig = {
+      messageBus: mockMessageBus,
+      toolRegistry: mockToolRegistry,
+      promptId: 'test-prompt',
+    } as unknown as Mocked<Config>;
+
+    const options = {
+      schedulerId: 'subagent-1',
+      toolRegistry: mockToolRegistry as unknown as ToolRegistry,
+      signal: new AbortController().signal,
+    };
+
+    await scheduleAgentTools(mockConfig as unknown as Config, [], options);
+
+    const schedulerContext = vi.mocked(Scheduler).mock.calls[0][0].context;
+    expect(schedulerContext.config).toBeDefined();
+    expect(schedulerContext.config.promptId).toBe('test-prompt');
+    expect(schedulerContext.toolRegistry).toBe(mockToolRegistry);
   });
 });
