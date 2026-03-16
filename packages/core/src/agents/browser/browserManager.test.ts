@@ -775,7 +775,6 @@ describe('BrowserManager', () => {
 
       const manager = new BrowserManager(mockConfig);
       await manager.callTool('click', { uid: 'bad' });
-
     });
   });
 });

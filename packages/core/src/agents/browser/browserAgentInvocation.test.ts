@@ -38,9 +38,7 @@ vi.mock('../local-executor.js', () => ({
   },
 }));
 
-import {
-  createBrowserAgentDefinition,
-} from './browserAgentFactory.js';
+import { createBrowserAgentDefinition } from './browserAgentFactory.js';
 import { removeInputBlocker } from './inputBlocker.js';
 import { LocalAgentExecutor } from '../local-executor.js';
 import type { ToolLiveOutput } from '../../tools/tools.js';
