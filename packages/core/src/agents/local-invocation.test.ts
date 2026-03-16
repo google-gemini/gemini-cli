@@ -321,12 +321,19 @@ describe('LocalSubagentInvocation', () => {
 
       const result = await invocation.execute(signal, updateOutput);
 
+      // The implementation intentionally omits `error`
       expect(result.error).toBeUndefined();
-      expect(result.llmContent).toBe(
+
+      expect(result.llmContent).toContain(
         `Subagent 'MockAgent' failed. Error: ${error.message}`,
       );
+
       const display = result.returnDisplay as SubagentProgress;
+
       expect(display.isSubagentProgress).toBe(true);
+      expect(display.agentName).toBe('MockAgent');
+      expect(display.state).toBe('error');
+
       expect(display.recentActivity).toContainEqual(
         expect.objectContaining({
           type: 'thought',

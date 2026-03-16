@@ -22,6 +22,7 @@ export enum ToolErrorType {
   UNHANDLED_EXCEPTION = 'unhandled_exception',
   TOOL_NOT_REGISTERED = 'tool_not_registered',
   EXECUTION_FAILED = 'execution_failed',
+  LLM_API_ERROR = 'llm_api_error',
 
   // File System Errors
   FILE_NOT_FOUND = 'file_not_found',
