@@ -24,6 +24,7 @@ const mockBrowserManager = {
     { name: 'click', description: 'Click element' },
     { name: 'fill', description: 'Fill form field' },
     { name: 'navigate_page', description: 'Navigate to URL' },
+    { name: 'type_text', description: 'Type text into an element' },
     // Visual tools (from --experimental-vision)
     { name: 'click_at', description: 'Click at coordinates' },
   ]),
@@ -70,6 +71,7 @@ describe('browserAgentFactory', () => {
       { name: 'click', description: 'Click element' },
       { name: 'fill', description: 'Fill form field' },
       { name: 'navigate_page', description: 'Navigate to URL' },
+      { name: 'type_text', description: 'Type text into an element' },
       // Visual tools (from --experimental-vision)
       { name: 'click_at', description: 'Click at coordinates' },
     ]);
@@ -135,7 +137,7 @@ describe('browserAgentFactory', () => {
       );
 
       expect(definition.name).toBe(BROWSER_AGENT_NAME);
-      // 5 MCP tools + 1 type_text composite tool (no analyze_screenshot without visualModel)
+      // 6 MCP tools (no analyze_screenshot without visualModel)
       expect(definition.toolConfig?.tools).toHaveLength(6);
     });
 
@@ -228,7 +230,7 @@ describe('browserAgentFactory', () => {
         mockMessageBus,
       );
 
-      // 5 MCP tools + 1 type_text + 1 analyze_screenshot
+      // 6 MCP tools + 1 analyze_screenshot
       expect(definition.toolConfig?.tools).toHaveLength(7);
       const toolNames =
         definition.toolConfig?.tools
@@ -268,6 +270,7 @@ describe('browserAgentFactory', () => {
         { name: 'close_page', description: 'Close page' },
         { name: 'select_page', description: 'Select page' },
         { name: 'press_key', description: 'Press key' },
+        { name: 'type_text', description: 'Type text into an element' },
         { name: 'hover', description: 'Hover element' },
       ]);
 
@@ -291,7 +294,6 @@ describe('browserAgentFactory', () => {
       expect(toolNames).toContain('click');
       expect(toolNames).toContain('take_snapshot');
       expect(toolNames).toContain('press_key');
-      // Custom composite tool must also be present
       expect(toolNames).toContain('type_text');
       // Total: 9 MCP + 1 type_text (no analyze_screenshot without visualModel)
       expect(definition.toolConfig?.tools).toHaveLength(10);
