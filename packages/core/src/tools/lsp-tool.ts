@@ -16,6 +16,7 @@ import type { Config } from '../config/config.js';
 import { LspServerManager } from '../lsp/LspServerManager.js';
 import path from 'node:path';
 import fs from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import {
   LSP_TOOL_NAME,
   LSP_PARAM_OPERATION,
@@ -27,6 +28,72 @@ import { LSP_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
 
 let globalLspManager: LspServerManager | null = null;
+
+/**
+ * Maps common file extensions to standard LSP language identifiers.
+ */
+const LANGUAGE_ID_MAP: Record<string, string> = {
+  '.ts': 'typescript',
+  '.tsx': 'typescriptreact',
+  '.js': 'javascript',
+  '.jsx': 'javascriptreact',
+  '.mjs': 'javascript',
+  '.cjs': 'javascript',
+  '.py': 'python',
+  '.pyi': 'python',
+  '.go': 'go',
+  '.rs': 'rust',
+  '.c': 'c',
+  '.cpp': 'cpp',
+  '.cc': 'cpp',
+  '.h': 'cpp',
+  '.sh': 'shellscript',
+  '.bash': 'shellscript',
+  '.rb': 'ruby',
+  '.java': 'java',
+  '.lua': 'lua',
+  '.php': 'php',
+  '.yaml': 'yaml',
+  '.yml': 'yaml',
+  '.astro': 'astro',
+  '.cs': 'csharp',
+  '.clj': 'clojure',
+  '.dart': 'dart',
+  '.ex': 'elixir',
+  '.fs': 'fsharp',
+  '.gleam': 'gleam',
+  '.hs': 'haskell',
+  '.jl': 'julia',
+  '.kt': 'kotlin',
+  '.nix': 'nix',
+  '.ml': 'ocaml',
+  '.prisma': 'prisma',
+  '.svelte': 'svelte',
+  '.swift': 'swift',
+  '.tf': 'terraform',
+  '.typ': 'typst',
+  '.vue': 'vue',
+  '.zig': 'zig',
+};
+
+/**
+ * Resolves the standard LSP language identifier for a given file path.
+ */
+function getLanguageId(absolutePath: string): string {
+  const ext = path.extname(absolutePath).toLowerCase();
+  return LANGUAGE_ID_MAP[ext] || ext.substring(1) || 'plaintext';
+}
+
+/**
+ * Shuts down all active language server processes.
+ * Should be called during CLI cleanup to prevent zombie processes.
+ */
+export async function shutdownLspServers(): Promise<void> {
+  if (globalLspManager) {
+    await globalLspManager.shutdownAll();
+    globalLspManager = null;
+  }
+}
 
 /**
  * The declarative schema parameters for the LSP tool.
@@ -112,7 +179,7 @@ class LspToolInvocation extends BaseToolInvocation<LspToolParams, ToolResult> {
 
     try {
       const client = await globalLspManager.getClientForFile(absolutePath);
-      const uri = `file://${absolutePath}`;
+      const uri = pathToFileURL(absolutePath).href;
 
       // Notify the server about the open document if not already open
       // We can just simulate opening it
@@ -120,7 +187,7 @@ class LspToolInvocation extends BaseToolInvocation<LspToolParams, ToolResult> {
       client.sendNotification('textDocument/didOpen', {
         textDocument: {
           uri,
-          languageId: path.extname(absolutePath).substring(1),
+          languageId: getLanguageId(absolutePath),
           version: 1,
           text: content,
         },

@@ -7,6 +7,7 @@
 import { LspClient } from './LspClient.js';
 import { extname } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { debugLogger } from '../utils/debugLogger.js';
 
 export interface LanguageServerConfig {
@@ -517,7 +518,7 @@ export class LspServerManager {
         config.args,
         this.projectRoot,
       );
-      const rootUri = `file://${this.projectRoot}`;
+      const rootUri = pathToFileURL(this.projectRoot).href;
 
       await client.initialize(rootUri);
 

@@ -6,6 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { LspServerManager } from './LspServerManager.js';
+import { LspClient } from './LspClient.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -17,6 +18,14 @@ vi.mock('node:child_process', async (importOriginal) => {
     spawnSync: vi.fn(),
   };
 });
+
+vi.mock('./LspClient.js', () => ({
+    LspClient: vi.fn().mockImplementation(() => ({
+      initialize: vi.fn().mockResolvedValue({}),
+      shutdown: vi.fn().mockResolvedValue({}),
+      kill: vi.fn(),
+    })),
+  }));
 
 describe('LspServerManager', () => {
   const projectRoot = process.cwd();
@@ -31,6 +40,26 @@ describe('LspServerManager', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('should shut down all clients when shutdownAll is called', async () => {
+    vi.mocked(spawnSync).mockReturnValue({
+      status: 0,
+      stdout: Buffer.from('/usr/bin/ts-ls'),
+      stderr: Buffer.from(''),
+    } as unknown as ReturnType<typeof spawnSync>);
+
+    const manager = new LspServerManager(projectRoot);
+
+    // Get a client to populate the map
+    await manager.getClientForFile('test.ts');
+
+    const client = vi.mocked(LspClient).mock.results[0].value;
+
+    await manager.shutdownAll();
+
+    expect(client.shutdown).toHaveBeenCalled();
+    expect(client.kill).toHaveBeenCalled();
   });
 
   it('should throw an error with a proactive hint if the binary is missing', async () => {
