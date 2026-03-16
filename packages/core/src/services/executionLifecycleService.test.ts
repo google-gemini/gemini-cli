@@ -295,4 +295,153 @@ describe('ExecutionLifecycleService', () => {
       });
     }).toThrow('Execution 4324 is already attached.');
   });
+
+  describe('Background Completion Listeners', () => {
+    it('fires onBackgroundComplete with formatInjection text when backgrounded execution settles', async () => {
+      const listener = vi.fn();
+      ExecutionLifecycleService.onBackgroundComplete(listener);
+
+      const handle = ExecutionLifecycleService.createExecution(
+        '',
+        undefined,
+        'remote_agent',
+        (output, error) => {
+          const header = error
+            ? `[Agent error: ${error.message}]`
+            : '[Agent completed]';
+          return output ? `${header}\n${output}` : header;
+        },
+      );
+      const executionId = handle.pid!;
+
+      ExecutionLifecycleService.appendOutput(executionId, 'agent output');
+      ExecutionLifecycleService.background(executionId);
+      await handle.result;
+
+      ExecutionLifecycleService.completeExecution(executionId);
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      const info = listener.mock.calls[0][0];
+      expect(info.executionId).toBe(executionId);
+      expect(info.executionMethod).toBe('remote_agent');
+      expect(info.output).toBe('agent output');
+      expect(info.error).toBeNull();
+      expect(info.injectionText).toBe('[Agent completed]\nagent output');
+
+      ExecutionLifecycleService.offBackgroundComplete(listener);
+    });
+
+    it('passes error to formatInjection when backgrounded execution fails', async () => {
+      const listener = vi.fn();
+      ExecutionLifecycleService.onBackgroundComplete(listener);
+
+      const handle = ExecutionLifecycleService.createExecution(
+        '',
+        undefined,
+        'none',
+        (output, error) => (error ? `Error: ${error.message}` : output),
+      );
+      const executionId = handle.pid!;
+
+      ExecutionLifecycleService.background(executionId);
+      await handle.result;
+
+      ExecutionLifecycleService.completeExecution(executionId, {
+        error: new Error('something broke'),
+      });
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      const info = listener.mock.calls[0][0];
+      expect(info.error?.message).toBe('something broke');
+      expect(info.injectionText).toBe('Error: something broke');
+
+      ExecutionLifecycleService.offBackgroundComplete(listener);
+    });
+
+    it('sets injectionText to null when no formatInjection callback is provided', async () => {
+      const listener = vi.fn();
+      ExecutionLifecycleService.onBackgroundComplete(listener);
+
+      const handle = ExecutionLifecycleService.createExecution(
+        '',
+        undefined,
+        'none',
+      );
+      const executionId = handle.pid!;
+
+      ExecutionLifecycleService.appendOutput(executionId, 'output');
+      ExecutionLifecycleService.background(executionId);
+      await handle.result;
+
+      ExecutionLifecycleService.completeExecution(executionId);
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener.mock.calls[0][0].injectionText).toBeNull();
+
+      ExecutionLifecycleService.offBackgroundComplete(listener);
+    });
+
+    it('does not fire onBackgroundComplete for non-backgrounded executions', async () => {
+      const listener = vi.fn();
+      ExecutionLifecycleService.onBackgroundComplete(listener);
+
+      const handle = ExecutionLifecycleService.createExecution(
+        '',
+        undefined,
+        'none',
+        () => 'text',
+      );
+      const executionId = handle.pid!;
+
+      ExecutionLifecycleService.completeExecution(executionId);
+      await handle.result;
+
+      expect(listener).not.toHaveBeenCalled();
+
+      ExecutionLifecycleService.offBackgroundComplete(listener);
+    });
+
+    it('does not fire onBackgroundComplete when execution is killed (aborted)', async () => {
+      const listener = vi.fn();
+      ExecutionLifecycleService.onBackgroundComplete(listener);
+
+      const handle = ExecutionLifecycleService.createExecution(
+        '',
+        undefined,
+        'none',
+        () => 'text',
+      );
+      const executionId = handle.pid!;
+
+      ExecutionLifecycleService.background(executionId);
+      await handle.result;
+
+      ExecutionLifecycleService.kill(executionId);
+
+      expect(listener).not.toHaveBeenCalled();
+
+      ExecutionLifecycleService.offBackgroundComplete(listener);
+    });
+
+    it('offBackgroundComplete removes the listener', async () => {
+      const listener = vi.fn();
+      ExecutionLifecycleService.onBackgroundComplete(listener);
+      ExecutionLifecycleService.offBackgroundComplete(listener);
+
+      const handle = ExecutionLifecycleService.createExecution(
+        '',
+        undefined,
+        'none',
+        () => 'text',
+      );
+      const executionId = handle.pid!;
+
+      ExecutionLifecycleService.background(executionId);
+      await handle.result;
+
+      ExecutionLifecycleService.completeExecution(executionId);
+
+      expect(listener).not.toHaveBeenCalled();
+    });
+  });
 });
