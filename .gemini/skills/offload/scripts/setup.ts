@@ -65,8 +65,10 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   console.log(`\n🚀 Configuring Isolated SSH Alias...`);
   let dnsSuffix = await prompt('Internal DNS Suffix (e.g. .internal or .internal.gcpnode.com)', '.internal.gcpnode.com');
   
-  // Ensure suffix starts with a dot
-  if (dnsSuffix && !dnsSuffix.startsWith('.')) dnsSuffix = '.' + dnsSuffix;
+  // FIX: Ensure exactly ONE dot between projectId and suffix
+  if (dnsSuffix && !dnsSuffix.startsWith('.')) {
+      dnsSuffix = '.' + dnsSuffix;
+  }
   
   // PREPEND nic0. for direct internal routing
   const internalHostname = `nic0.${targetVM}.${zone}.c.${projectId}${dnsSuffix}`;
