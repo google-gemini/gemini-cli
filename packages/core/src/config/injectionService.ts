@@ -9,6 +9,9 @@
  * - `user_steering`: Interactive guidance from the user (gated on model steering).
  * - `background_completion`: Output from a backgrounded execution that has finished.
  */
+
+import { debugLogger } from '../utils/debugLogger.js';
+
 export type InjectionSource = 'user_steering' | 'background_completion';
 
 /**
@@ -50,7 +53,13 @@ export class InjectionService {
     this.injections.push({ text: trimmed, source, timestamp: Date.now() });
 
     for (const listener of this.injectionListeners) {
-      listener(trimmed, source);
+      try {
+        listener(trimmed, source);
+      } catch (error) {
+        debugLogger.warn(
+          `Injection listener failed for source "${source}": ${error}`,
+        );
+      }
     }
   }
 

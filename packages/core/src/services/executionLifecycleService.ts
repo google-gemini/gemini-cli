@@ -6,6 +6,7 @@
 
 import type { InjectionService } from '../config/injectionService.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export type ExecutionMethod =
   | 'lydell-node-pty'
@@ -345,7 +346,11 @@ export class ExecutionLifecycleService {
       }
 
       for (const listener of this.backgroundCompletionListeners) {
-        listener(info);
+        try {
+          listener(info);
+        } catch (error) {
+          debugLogger.warn(`Background completion listener failed: ${error}`);
+        }
       }
     }
 

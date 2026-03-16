@@ -64,7 +64,10 @@ import { getVersion } from '../utils/version.js';
 import { getToolCallContext } from '../utils/toolCallContext.js';
 import { scheduleAgentTools } from './agent-scheduler.js';
 import { DeadlineTimer } from '../utils/deadlineTimer.js';
-import { formatUserHintsForModel } from '../utils/fastAckHelper.js';
+import {
+  formatUserHintsForModel,
+  formatBackgroundCompletionForModel,
+} from '../utils/fastAckHelper.js';
 import type { InjectionSource } from '../config/injectionService.js';
 
 /** A callback function to report on agent activity. */
@@ -611,7 +614,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             pendingBgCompletionsQueue.length = 0;
             currentMessage.parts ??= [];
             currentMessage.parts.unshift({
-              text: `Background execution update:\n${bgText}\n\nThe above background execution has completed. Review the output and continue your work accordingly.`,
+              text: formatBackgroundCompletionForModel(bgText),
             });
           }
         }
