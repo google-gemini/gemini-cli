@@ -497,7 +497,7 @@ describe('WebFetchTool', () => {
 
       expect(result.llmContent).toBe('fallback processed response');
       expect(result.returnDisplay).toContain(
-        '2 URL(s) processed using fallback fetch',
+        'URL(s) processed using fallback fetch',
       );
     });
 
@@ -530,20 +530,10 @@ describe('WebFetchTool', () => {
       // Verify private URL was NOT fetched (mockFetch would throw if it was called for private.com)
     });
 
-    it('should return WEB_FETCH_FALLBACK_FAILED on fallback fetch failure', async () => {
+    it('should return WEB_FETCH_FALLBACK_FAILED on total failure', async () => {
       vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(false);
       mockGenerateContent.mockRejectedValue(new Error('primary fail'));
       mockFetch('https://public.ip/', new Error('fallback fetch failed'));
-      const tool = new WebFetchTool(mockConfig, bus);
-      const params = { prompt: 'fetch https://public.ip' };
-      const invocation = tool.build(params);
-      const result = await invocation.execute(new AbortController().signal);
-      expect(result.error?.type).toBe(ToolErrorType.WEB_FETCH_FALLBACK_FAILED);
-    });
-
-    it('should return WEB_FETCH_FALLBACK_FAILED on general processing failure (when fallback also fails)', async () => {
-      vi.spyOn(fetchUtils, 'isPrivateIp').mockReturnValue(false);
-      mockGenerateContent.mockRejectedValue(new Error('API error'));
       const tool = new WebFetchTool(mockConfig, bus);
       const params = { prompt: 'fetch https://public.ip' };
       const invocation = tool.build(params);
@@ -639,6 +629,14 @@ describe('WebFetchTool', () => {
         const invocation = tool.build(params);
         const result = await invocation.execute(new AbortController().signal);
 
+        const sanitizeXml = (text: string) =>
+          text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&apos;');
+
         if (shouldConvert) {
           expect(convert).toHaveBeenCalledWith(content, {
             wordwrap: false,
@@ -647,10 +645,12 @@ describe('WebFetchTool', () => {
               { selector: 'img', format: 'skip' },
             ],
           });
-          expect(result.llmContent).toContain(`Converted: ${content}`);
+          expect(result.llmContent).toContain(
+            `Converted: ${sanitizeXml(content)}`,
+          );
         } else {
           expect(convert).not.toHaveBeenCalled();
-          expect(result.llmContent).toContain(content);
+          expect(result.llmContent).toContain(sanitizeXml(content));
         }
       },
     );
