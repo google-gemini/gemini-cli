@@ -723,7 +723,7 @@ export async function loadCliConfig(
     }
   }
 
-  const config = new Config({
+  return new Config({
     acpMode: isAcpMode,
     clientName,
     sessionId,
@@ -864,8 +864,6 @@ export async function loadCliConfig(
     },
     enableConseca: settings.security?.enableConseca,
   });
-
-  return config;
 }
 
 function mergeExcludeTools(

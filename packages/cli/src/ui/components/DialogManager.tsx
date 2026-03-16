@@ -88,7 +88,6 @@ export const DialogManager = ({
         }
         authType={uiState.quota.proQuotaRequest.authType}
         tierName={config?.getUserTierName()}
-        config={config}
         onChoice={uiActions.handleProQuotaChoice}
       />
     );

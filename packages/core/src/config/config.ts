@@ -130,9 +130,9 @@ import {
 import { HookSystem } from '../hooks/index.js';
 import type {
   UserTierId,
-  type GeminiUserTier,
-  type RetrieveUserQuotaResponse,
-  type AdminControlsSettings,
+  GeminiUserTier,
+  RetrieveUserQuotaResponse,
+  AdminControlsSettings,
 } from '../code_assist/types.js';
 import type { HierarchicalMemory } from './memory.js';
 import { getCodeAssistServer } from '../code_assist/codeAssist.js';
@@ -1372,7 +1372,7 @@ export class Config implements McpContext, AgentLoopContext {
     );
     this.setRemoteAdminSettings(adminControls);
 
-    if (!this.getHasProModelAccessSync() && isAutoModel(this.model)) {
+    if (!this.getProModelAccessSync() && isAutoModel(this.model)) {
       this.setModel(PREVIEW_GEMINI_FLASH_MODEL);
     }
   }
@@ -2665,9 +2665,9 @@ export class Config implements McpContext, AgentLoopContext {
    * Returns whether the user has access to Pro models.
    * This is determined by the PRO_MODEL_ACCESS experiment flag.
    */
-  async getHasProModelAccess(): Promise<boolean> {
+  async getProModelAccess(): Promise<boolean> {
     await this.ensureExperimentsLoaded();
-    return this.getHasProModelAccessSync();
+    return this.getProModelAccessSync();
   }
 
   /**
@@ -2675,8 +2675,11 @@ export class Config implements McpContext, AgentLoopContext {
    *
    * Note: This method should only be called after startup, once experiments have been loaded.
    */
-  getHasProModelAccessSync(): boolean {
+  getProModelAccessSync(): boolean {
     if (!this.experiments || Object.keys(this.experiments.flags).length === 0) {
+      return true;
+    }
+    if (this.contentGeneratorConfig?.authType !== AuthType.LOGIN_WITH_GOOGLE) {
       return true;
     }
     return (

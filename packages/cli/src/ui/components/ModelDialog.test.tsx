@@ -54,6 +54,8 @@ describe('<ModelDialog />', () => {
   const mockGetHasAccessToPreviewModel = vi.fn();
   const mockGetGemini31LaunchedSync = vi.fn();
   const mockGetUserTier = vi.fn();
+  const mockGetProModelAccess = vi.fn();
+  const mockGetProModelAccessSync = vi.fn();
 
   interface MockConfig extends Partial<Config> {
     setModel: (model: string, isTemporary?: boolean) => void;
@@ -62,6 +64,8 @@ describe('<ModelDialog />', () => {
     getIdeMode: () => boolean;
     getGemini31LaunchedSync: () => boolean;
     getUserTier: () => string | undefined;
+    getProModelAccess: () => Promise<boolean>;
+    getProModelAccessSync: () => boolean;
   }
 
   const mockConfig: MockConfig = {
@@ -71,6 +75,8 @@ describe('<ModelDialog />', () => {
     getIdeMode: () => false,
     getGemini31LaunchedSync: mockGetGemini31LaunchedSync,
     getUserTier: mockGetUserTier,
+    getProModelAccess: mockGetProModelAccess,
+    getProModelAccessSync: mockGetProModelAccessSync,
   };
 
   beforeEach(() => {
@@ -79,6 +85,8 @@ describe('<ModelDialog />', () => {
     mockGetHasAccessToPreviewModel.mockReturnValue(false);
     mockGetGemini31LaunchedSync.mockReturnValue(false);
     mockGetUserTier.mockReturnValue(undefined);
+    mockGetProModelAccess.mockResolvedValue(true);
+    mockGetProModelAccessSync.mockReturnValue(true);
 
     // Default implementation for getDisplayString
     mockGetDisplayString.mockImplementation((val: string) => {
@@ -119,6 +127,7 @@ describe('<ModelDialog />', () => {
 
   it('renders the "manual" view initially for free tier users and filters Pro models with correct order', async () => {
     mockGetUserTier.mockReturnValue(UserTierId.FREE);
+    mockGetProModelAccessSync.mockReturnValue(false);
     mockGetHasAccessToPreviewModel.mockReturnValue(true);
     mockGetDisplayString.mockImplementation((val: string) => val);
 
@@ -147,6 +156,7 @@ describe('<ModelDialog />', () => {
 
   it('closes dialog on escape in "manual" view for free tier users', async () => {
     mockGetUserTier.mockReturnValue(UserTierId.FREE);
+    mockGetProModelAccessSync.mockReturnValue(false);
     const { stdin, waitUntilReady, unmount } = await renderComponent();
 
     // Already in manual view
@@ -421,6 +431,27 @@ describe('<ModelDialog />', () => {
           true,
         );
       });
+      unmount();
+    });
+
+    it('hides Flash Lite Preview model for STANDARD tier users', async () => {
+      mockGetUserTier.mockReturnValue(UserTierId.STANDARD);
+      mockGetHasAccessToPreviewModel.mockReturnValue(true);
+      const { lastFrame, stdin, waitUntilReady, unmount } =
+        await renderComponent();
+
+      // Go to manual view
+      await act(async () => {
+        stdin.write('\u001B[B'); // Manual
+      });
+      await waitUntilReady();
+      await act(async () => {
+        stdin.write('\r');
+      });
+      await waitUntilReady();
+
+      const output = lastFrame();
+      expect(output).not.toContain(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL);
       unmount();
     });
   });
