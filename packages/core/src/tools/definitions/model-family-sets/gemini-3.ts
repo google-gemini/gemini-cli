@@ -585,7 +585,13 @@ The agent did not use the todo list because this task could be completed by a ti
               [TODOS_ITEM_PARAM_STATUS]: {
                 type: 'string',
                 description: 'The current status of the task.',
-                enum: ['pending', 'in_progress', 'completed', 'cancelled', 'blocked'],
+                enum: [
+                  'pending',
+                  'in_progress',
+                  'completed',
+                  'cancelled',
+                  'blocked',
+                ],
               },
             },
             required: [TODOS_ITEM_PARAM_DESCRIPTION, TODOS_ITEM_PARAM_STATUS],
