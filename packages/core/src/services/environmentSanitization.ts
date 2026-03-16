@@ -162,6 +162,10 @@ function shouldRedactEnvironmentVariable(
     }
   }
 
+  if (key.startsWith('GIT_CONFIG_')) {
+    return false;
+  }
+
   if (allowedSet?.has(key)) {
     return false;
   }
