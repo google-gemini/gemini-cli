@@ -416,14 +416,19 @@ ${finalExclusionPatternsForDescription
       }
     }
 
-    // Discover JIT subdirectory context for all unique directories of processed files
+    // Discover JIT subdirectory context for all unique directories of processed files.
+    // Run sequentially so each call sees paths marked as loaded by the previous
+    // one, preventing shared parent GEMINI.md files from being injected twice.
     const uniqueDirs = new Set(
       Array.from(filesToConsider).map((f) => path.dirname(f)),
     );
-    const jitResults = await Promise.all(
-      Array.from(uniqueDirs).map((dir) => discoverJitContext(this.config, dir)),
-    );
-    const jitParts = jitResults.filter(Boolean);
+    const jitParts: string[] = [];
+    for (const dir of uniqueDirs) {
+      const ctx = await discoverJitContext(this.config, dir);
+      if (ctx) {
+        jitParts.push(ctx);
+      }
+    }
     if (jitParts.length > 0) {
       contentParts.push(
         `${JIT_CONTEXT_PREFIX}${jitParts.join('\n')}${JIT_CONTEXT_SUFFIX}`,
