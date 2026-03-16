@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { type MutableRefObject, Component, type ReactNode } from 'react';
+import { type MutableRefObject, Component, type ReactNode, act } from 'react';
 import { render } from '../../test-utils/render.js';
-
-import { act } from 'react';
-import type { SessionMetrics } from './SessionContext.js';
-import { SessionStatsProvider, useSessionStats } from './SessionContext.js';
+import {
+  SessionStatsProvider,
+  useSessionStats,
+  type SessionMetrics,
+} from './SessionContext.js';
 import { describe, it, expect, vi } from 'vitest';
 import { uiTelemetryService } from '@google/gemini-cli-core';
 
@@ -235,6 +236,34 @@ describe('SessionStatsContext', () => {
     });
 
     expect(renderCount).toBe(3);
+    unmount();
+  });
+
+  it('should update session ID and reset stats when the uiTelemetryService emits a clear event', () => {
+    const contextRef: MutableRefObject<
+      ReturnType<typeof useSessionStats> | undefined
+    > = { current: undefined };
+
+    const { unmount } = render(
+      <SessionStatsProvider>
+        <TestHarness contextRef={contextRef} />
+      </SessionStatsProvider>,
+    );
+
+    const initialStartTime = contextRef.current?.stats.sessionStartTime;
+    const newSessionId = 'new-session-id';
+
+    act(() => {
+      uiTelemetryService.emit('clear', newSessionId);
+    });
+
+    const stats = contextRef.current?.stats;
+    expect(stats?.sessionId).toBe(newSessionId);
+    expect(stats?.promptCount).toBe(0);
+    expect(stats?.sessionStartTime.getTime()).toBeGreaterThanOrEqual(
+      initialStartTime!.getTime(),
+    );
+
     unmount();
   });
 
