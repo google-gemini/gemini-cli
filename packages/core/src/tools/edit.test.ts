@@ -131,6 +131,7 @@ describe('EditTool', () => {
       isInteractive: () => false,
       getDisableLLMCorrection: vi.fn(() => true),
       getExperiments: () => {},
+      isPlanMode: () => false,
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project'),
       },
