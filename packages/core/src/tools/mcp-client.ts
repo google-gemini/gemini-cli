@@ -267,6 +267,14 @@ export class McpClient implements McpProgressReporter {
   }
 
   /**
+   * Unregisters registries so this client will no longer update them when it receives
+   * list_changed notifications from the server.
+   */
+  removeRegistries(registries: RegistrySet): void {
+    this.registeredRegistries.delete(registries);
+  }
+
+  /**
    * Disconnects from the MCP server.
    */
   async disconnect(): Promise<void> {

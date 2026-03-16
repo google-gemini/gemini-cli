@@ -164,6 +164,16 @@ export class McpClientManager {
     return this.clients.get(serverName);
   }
 
+  removeRegistries(registries: {
+    toolRegistry: ToolRegistry;
+    promptRegistry: PromptRegistry;
+    resourceRegistry: ResourceRegistry;
+  }): void {
+    for (const client of this.clients.values()) {
+      client.removeRegistries(registries);
+    }
+  }
+
   /**
    * For all the MCP servers associated with this extension:
    *

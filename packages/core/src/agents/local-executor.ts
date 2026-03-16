@@ -625,6 +625,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         }
       } finally {
         this.config.userHintService.offUserHint(hintListener);
+
+        const globalMcpManager = this.context.config.getMcpClientManager();
+        if (globalMcpManager) {
+          globalMcpManager.removeRegistries({
+            toolRegistry: this.toolRegistry,
+            promptRegistry: this.promptRegistry,
+            resourceRegistry: this.resourceRegistry,
+          });
+        }
       }
 
       // === UNIFIED RECOVERY BLOCK ===
