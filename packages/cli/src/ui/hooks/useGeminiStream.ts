@@ -34,6 +34,7 @@ import {
   CoreEvent,
   CoreToolCallStatus,
   buildUserSteeringHintPrompt,
+  generateSteeringAckMessage,
   GeminiCliOperation,
   getPlanModeExitMessage,
   isBackgroundExecutionData,
@@ -1277,8 +1278,9 @@ export const useGeminiStream = (
           userMessageTimestamp,
         );
       }
+      setThought(null);
     },
-    [addItem],
+    [addItem, setThought],
   );
 
   const handleChatCompressionEvent = useCallback(
@@ -1740,6 +1742,7 @@ export const useGeminiStream = (
             } finally {
               if (activeQueryIdRef.current === queryId) {
                 setIsResponding(false);
+                setThought(null);
               }
             }
           });
@@ -2021,6 +2024,18 @@ export const useGeminiStream = (
           responsesToSend.unshift({
             text: buildUserSteeringHintPrompt(hintText),
           });
+          void generateSteeringAckMessage(
+            config.getBaseLlmClient(),
+            hintText,
+          ).then((ackText) => {
+            addItem({
+              type: MessageType.INFO,
+              icon: '· ',
+              color: theme.text.secondary,
+              marginBottom: 1,
+              text: ackText,
+            } as HistoryItemInfo);
+          });
         }
       }
 
@@ -2061,6 +2076,7 @@ export const useGeminiStream = (
       maybeAddSuppressedToolErrorNote,
       maybeAddLowVerbosityFailureNote,
       setIsResponding,
+      config,
     ],
   );
 
