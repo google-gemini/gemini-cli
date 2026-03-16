@@ -122,4 +122,16 @@ describe('SkillCommandLoader', () => {
     const actionResult = (await commands[0].action!({} as any, '')) as any;
     expect(actionResult.toolArgs).toEqual({ name: 'my awesome skill' });
   });
+
+  it('should propagate extensionName to the generated slash command', async () => {
+    const mockSkills = [
+      { name: 'skill1', description: 'desc', extensionName: 'ext1' },
+    ];
+    mockSkillManager.getDisplayableSkills.mockReturnValue(mockSkills);
+
+    const loader = new SkillCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+
+    expect(commands[0].extensionName).toBe('ext1');
+  });
 });
