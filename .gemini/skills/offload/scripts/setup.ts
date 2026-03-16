@@ -139,6 +139,7 @@ Host ${sshAlias}
     if (fs.existsSync(lp)) {
       spawnSync(`${rsyncBase} ${lp} ${remoteHost}:~/.gemini/google_accounts.json`, { shell: true });
     }
+  }
   // 4. Scoped Token Onboarding
   if (await confirm('Generate a scoped, secure token for the autonomous agent? (Recommended)')) {
     // Correct URL for Fine-Grained PAT (Beta)
