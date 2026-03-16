@@ -677,6 +677,141 @@ their corresponding top-level category object in your `settings.json` file.
     used.
   - **Default:** `[]`
 
+- **`modelConfigs.modelDefinitions`** (object):
+  - **Description:** Registry of model metadata, including tier, family, and
+    features.
+  - **Default:**
+
+    ```json
+    {
+      "gemini-3.1-pro-preview": {
+        "tier": "pro",
+        "family": "gemini-3",
+        "isPreview": true,
+        "dialogLocation": "manual",
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": true
+        }
+      },
+      "gemini-3.1-pro-preview-customtools": {
+        "tier": "pro",
+        "family": "gemini-3",
+        "isPreview": true,
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": true
+        }
+      },
+      "gemini-3-pro-preview": {
+        "tier": "pro",
+        "family": "gemini-3",
+        "isPreview": true,
+        "dialogLocation": "manual",
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": true
+        }
+      },
+      "gemini-3-flash-preview": {
+        "tier": "flash",
+        "family": "gemini-3",
+        "isPreview": true,
+        "dialogLocation": "manual",
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": true
+        }
+      },
+      "gemini-2.5-pro": {
+        "tier": "pro",
+        "family": "gemini-2.5",
+        "isPreview": false,
+        "dialogLocation": "manual",
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": false
+        }
+      },
+      "gemini-2.5-flash": {
+        "tier": "flash",
+        "family": "gemini-2.5",
+        "isPreview": false,
+        "dialogLocation": "manual",
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": false
+        }
+      },
+      "gemini-2.5-flash-lite": {
+        "tier": "flash-lite",
+        "family": "gemini-2.5",
+        "isPreview": false,
+        "dialogLocation": "manual",
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": false
+        }
+      },
+      "auto": {
+        "tier": "auto",
+        "isPreview": true,
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": false
+        }
+      },
+      "pro": {
+        "tier": "pro",
+        "isPreview": false,
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": false
+        }
+      },
+      "flash": {
+        "tier": "flash",
+        "isPreview": false,
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": false
+        }
+      },
+      "flash-lite": {
+        "tier": "flash-lite",
+        "isPreview": false,
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": false
+        }
+      },
+      "auto-gemini-3": {
+        "displayName": "Auto (Gemini 3)",
+        "tier": "auto",
+        "isPreview": true,
+        "dialogLocation": "main",
+        "dialogDescription": "Let Gemini CLI decide the best model for the task: gemini-3.1-pro, gemini-3-flash",
+        "features": {
+          "thinking": true,
+          "multimodalToolUse": false
+        }
+      },
+      "auto-gemini-2.5": {
+        "displayName": "Auto (Gemini 2.5)",
+        "tier": "auto",
+        "isPreview": false,
+        "dialogLocation": "main",
+        "dialogDescription": "Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash",
+        "features": {
+          "thinking": false,
+          "multimodalToolUse": false
+        }
+      }
+    }
+    ```
+
+  - **Requires restart:** Yes
+
 #### `agents`
 
 - **`agents.overrides`** (object):
@@ -1091,6 +1226,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.dynamicModelConfiguration`** (boolean):
+  - **Description:** Enable dynamic model configuration (definitions,
+    resolutions, and chains) via settings.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.gemmaModelRouter.enabled`** (boolean):
   - **Description:** Enable the Gemma Model Router (experimental). Requires a
     local endpoint serving Gemma via the Gemini API using LiteRT-LM shim.
@@ -1107,6 +1248,11 @@ their corresponding top-level category object in your `settings.json` file.
     `gemma3-1b-gpu-custom`.
   - **Default:** `"gemma3-1b-gpu-custom"`
   - **Requires restart:** Yes
+
+- **`experimental.topicUpdateNarration`** (boolean):
+  - **Description:** Enable the experimental Topic & Update communication model
+    for reduced chattiness and structured progress reporting.
+  - **Default:** `false`
 
 #### `skills`
 

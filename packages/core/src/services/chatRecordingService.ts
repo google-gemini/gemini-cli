@@ -590,50 +590,140 @@ export class ChatRecordingService {
   }
 
   /**
-   * Deletes a session file by session ID.
+   * Deletes a session file by sessionId, filename, or basename.
+   * Derives an 8-character shortId to find and delete all associated files
+   * (parent and subagents).
+   *
+   * @throws {Error} If shortId validation fails.
    */
-  deleteSession(sessionId: string): void {
+  deleteSession(sessionIdOrBasename: string): void {
     try {
       const tempDir = this.context.config.storage.getProjectTempDir();
       const chatsDir = path.join(tempDir, 'chats');
-      const sessionPath = path.join(chatsDir, `${sessionId}.json`);
-      if (fs.existsSync(sessionPath)) {
-        fs.unlinkSync(sessionPath);
+
+      const shortId = this.deriveShortId(sessionIdOrBasename);
+
+      if (!fs.existsSync(chatsDir)) {
+        return; // Nothing to delete
       }
 
-      // Cleanup Activity logs in the project logs directory
-      const logsDir = path.join(tempDir, 'logs');
-      const logPath = path.join(logsDir, `session-${sessionId}.jsonl`);
-      if (fs.existsSync(logPath)) {
-        fs.unlinkSync(logPath);
-      }
+      const matchingFiles = this.getMatchingSessionFiles(chatsDir, shortId);
 
-      // Cleanup tool outputs for this session
-      const safeSessionId = sanitizeFilenamePart(sessionId);
-      const toolOutputDir = path.join(
-        tempDir,
-        'tool-outputs',
-        `session-${safeSessionId}`,
-      );
-
-      // Robustness: Ensure the path is strictly within the tool-outputs base
-      const toolOutputsBase = path.join(tempDir, 'tool-outputs');
-      if (
-        fs.existsSync(toolOutputDir) &&
-        toolOutputDir.startsWith(toolOutputsBase)
-      ) {
-        fs.rmSync(toolOutputDir, { recursive: true, force: true });
-      }
-
-      // ALSO cleanup the session-specific directory (contains plans, tasks, etc.)
-      const sessionDir = path.join(tempDir, safeSessionId);
-      // Robustness: Ensure the path is strictly within the temp root
-      if (fs.existsSync(sessionDir) && sessionDir.startsWith(tempDir)) {
-        fs.rmSync(sessionDir, { recursive: true, force: true });
+      for (const file of matchingFiles) {
+        this.deleteSessionAndArtifacts(chatsDir, file, tempDir);
       }
     } catch (error) {
       debugLogger.error('Error deleting session file.', error);
       throw error;
+    }
+  }
+
+  /**
+   * Derives an 8-character shortId from a sessionId, filename, or basename.
+   */
+  private deriveShortId(sessionIdOrBasename: string): string {
+    let shortId = sessionIdOrBasename;
+    if (sessionIdOrBasename.startsWith(SESSION_FILE_PREFIX)) {
+      const withoutExt = sessionIdOrBasename.replace('.json', '');
+      const parts = withoutExt.split('-');
+      shortId = parts[parts.length - 1];
+    } else if (sessionIdOrBasename.length >= 8) {
+      shortId = sessionIdOrBasename.slice(0, 8);
+    } else {
+      throw new Error('Invalid sessionId or basename provided for deletion');
+    }
+
+    if (shortId.length !== 8) {
+      throw new Error('Derived shortId must be exactly 8 characters');
+    }
+
+    return shortId;
+  }
+
+  /**
+   * Finds all session files matching the pattern session-*-<shortId>.json
+   */
+  private getMatchingSessionFiles(chatsDir: string, shortId: string): string[] {
+    const files = fs.readdirSync(chatsDir);
+    return files.filter(
+      (f) =>
+        f.startsWith(SESSION_FILE_PREFIX) && f.endsWith(`-${shortId}.json`),
+    );
+  }
+
+  /**
+   * Deletes a single session file and its associated logs, tool-outputs, and directory.
+   */
+  private deleteSessionAndArtifacts(
+    chatsDir: string,
+    file: string,
+    tempDir: string,
+  ): void {
+    const filePath = path.join(chatsDir, file);
+    try {
+      const fileContent = fs.readFileSync(filePath, 'utf8');
+      const content = JSON.parse(fileContent) as unknown;
+
+      let fullSessionId: string | undefined;
+      if (content && typeof content === 'object' && 'sessionId' in content) {
+        const id = (content as Record<string, unknown>)['sessionId'];
+        if (typeof id === 'string') {
+          fullSessionId = id;
+        }
+      }
+
+      // Delete the session file
+      fs.unlinkSync(filePath);
+
+      if (fullSessionId) {
+        this.deleteSessionLogs(fullSessionId, tempDir);
+        this.deleteSessionToolOutputs(fullSessionId, tempDir);
+        this.deleteSessionDirectory(fullSessionId, tempDir);
+      }
+    } catch (error) {
+      debugLogger.error(`Error deleting associated file ${file}:`, error);
+    }
+  }
+
+  /**
+   * Cleans up activity logs for a session.
+   */
+  private deleteSessionLogs(sessionId: string, tempDir: string): void {
+    const logsDir = path.join(tempDir, 'logs');
+    const safeSessionId = sanitizeFilenamePart(sessionId);
+    const logPath = path.join(logsDir, `session-${safeSessionId}.jsonl`);
+    if (fs.existsSync(logPath) && logPath.startsWith(logsDir)) {
+      fs.unlinkSync(logPath);
+    }
+  }
+
+  /**
+   * Cleans up tool outputs for a session.
+   */
+  private deleteSessionToolOutputs(sessionId: string, tempDir: string): void {
+    const safeSessionId = sanitizeFilenamePart(sessionId);
+    const toolOutputDir = path.join(
+      tempDir,
+      'tool-outputs',
+      `session-${safeSessionId}`,
+    );
+    const toolOutputsBase = path.join(tempDir, 'tool-outputs');
+    if (
+      fs.existsSync(toolOutputDir) &&
+      toolOutputDir.startsWith(toolOutputsBase)
+    ) {
+      fs.rmSync(toolOutputDir, { recursive: true, force: true });
+    }
+  }
+
+  /**
+   * Cleans up the session-specific directory.
+   */
+  private deleteSessionDirectory(sessionId: string, tempDir: string): void {
+    const safeSessionId = sanitizeFilenamePart(sessionId);
+    const sessionDir = path.join(tempDir, safeSessionId);
+    if (fs.existsSync(sessionDir) && sessionDir.startsWith(tempDir)) {
+      fs.rmSync(sessionDir, { recursive: true, force: true });
     }
   }
 
