@@ -42,6 +42,10 @@ import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
 import {
+  createSandboxManager,
+  type SandboxManager,
+} from '../services/sandboxManager.js';
+import {
   initializeTelemetry,
   DEFAULT_TELEMETRY_TARGET,
   DEFAULT_OTLP_ENDPOINT,
@@ -147,7 +151,8 @@ import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
-import { UserHintService } from './userHintService.js';
+import { InjectionService } from './injectionService.js';
+import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
 import { loadPoliciesFromToml } from '../policy/toml-loader.js';
 
@@ -316,6 +321,8 @@ export interface BrowserAgentCustomConfig {
   profilePath?: string;
   /** Model override for the visual agent. */
   visualModel?: string;
+  /** List of allowed domains for the browser agent (e.g., ["github.com", "*.google.com"]). */
+  allowedDomains?: string[];
   /** Disable user input on the browser window during automation. Default: true in non-headless mode */
   disableUserInput?: boolean;
 }
@@ -508,6 +515,7 @@ export interface ConfigParameters {
   clientVersion?: string;
   embeddingModel?: string;
   sandbox?: SandboxConfig;
+  toolSandboxing?: boolean;
   targetDir: string;
   debugMode: boolean;
   question?: string;
@@ -599,8 +607,10 @@ export interface ConfigParameters {
   recordResponses?: string;
   ptyInfo?: string;
   disableYoloMode?: boolean;
+  disableAlwaysAllow?: boolean;
   rawOutput?: boolean;
   acceptRawOutputRisk?: boolean;
+  dynamicModelConfiguration?: boolean;
   modelConfigServiceConfig?: ModelConfigServiceConfig;
   enableHooks?: boolean;
   enableHooksUI?: boolean;
@@ -614,6 +624,7 @@ export interface ConfigParameters {
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
+  topicUpdateNarration?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
   plan?: boolean;
@@ -684,6 +695,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly telemetrySettings: TelemetrySettings;
   private readonly usageStatisticsEnabled: boolean;
   private _geminiClient!: GeminiClient;
+  private readonly _sandboxManager: SandboxManager;
   private baseLlmClient!: BaseLlmClient;
   private localLiteRtLmClient?: LocalLiteRtLmClient;
   private modelRouterService: ModelRouterService;
@@ -797,8 +809,10 @@ export class Config implements McpContext, AgentLoopContext {
   readonly fakeResponses?: string;
   readonly recordResponses?: string;
   private readonly disableYoloMode: boolean;
+  private readonly disableAlwaysAllow: boolean;
   private readonly rawOutput: boolean;
   private readonly acceptRawOutputRisk: boolean;
+  private readonly dynamicModelConfiguration: boolean;
   private pendingIncludeDirectories: string[];
   private readonly enableHooks: boolean;
   private readonly enableHooksUI: boolean;
@@ -832,6 +846,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly adminSkillsEnabled: boolean;
 
   private readonly experimentalJitContext: boolean;
+  private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
   private readonly trackerEnabled: boolean;
@@ -842,7 +857,7 @@ export class Config implements McpContext, AgentLoopContext {
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
   private lastModeSwitchTime: number = performance.now();
-  readonly userHintService: UserHintService;
+  readonly injectionService: InjectionService;
   private approvedPlanPath: string | undefined;
 
   constructor(params: ConfigParameters) {
@@ -853,7 +868,19 @@ export class Config implements McpContext, AgentLoopContext {
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
     this.fileSystemService = new StandardFileSystemService();
-    this.sandbox = params.sandbox;
+    this.sandbox = params.sandbox
+      ? {
+          enabled: params.sandbox.enabled ?? false,
+          allowedPaths: params.sandbox.allowedPaths ?? [],
+          networkAccess: params.sandbox.networkAccess ?? false,
+          command: params.sandbox.command,
+          image: params.sandbox.image,
+        }
+      : {
+          enabled: false,
+          allowedPaths: [],
+          networkAccess: false,
+        };
     this.targetDir = path.resolve(params.targetDir);
     this.folderTrust = params.folderTrust ?? false;
     this.workspaceContext = new WorkspaceContext(this.targetDir, []);
@@ -922,7 +949,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.model = params.model;
     this.disableLoopDetection = params.disableLoopDetection ?? false;
     this._activeModel = params.model;
-    this.enableAgents = params.enableAgents ?? false;
+    this.enableAgents = params.enableAgents ?? true;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? true;
@@ -933,11 +960,47 @@ export class Config implements McpContext, AgentLoopContext {
     this.disabledSkills = params.disabledSkills ?? [];
     this.adminSkillsEnabled = params.adminSkillsEnabled ?? true;
     this.modelAvailabilityService = new ModelAvailabilityService();
+    this.dynamicModelConfiguration = params.dynamicModelConfiguration ?? false;
+
+    // HACK: The settings loading logic doesn't currently merge the default
+    // generation config with the user's settings. This means if a user provides
+    // any `generation` settings (e.g., just `overrides`), the default `aliases`
+    // are lost. This hack manually merges the default aliases back in if they
+    // are missing from the user's config.
+    // TODO(12593): Fix the settings loading logic to properly merge defaults and
+    // remove this hack.
+    let modelConfigServiceConfig = params.modelConfigServiceConfig;
+    if (modelConfigServiceConfig) {
+      // Ensure user-defined model definitions augment, not replace, the defaults.
+      const mergedModelDefinitions = {
+        ...DEFAULT_MODEL_CONFIGS.modelDefinitions,
+        ...modelConfigServiceConfig.modelDefinitions,
+      };
+
+      modelConfigServiceConfig = {
+        // Preserve other user settings like customAliases
+        ...modelConfigServiceConfig,
+        // Apply defaults for aliases and overrides if they are not provided
+        aliases:
+          modelConfigServiceConfig.aliases ?? DEFAULT_MODEL_CONFIGS.aliases,
+        overrides:
+          modelConfigServiceConfig.overrides ?? DEFAULT_MODEL_CONFIGS.overrides,
+        // Use the merged model definitions
+        modelDefinitions: mergedModelDefinitions,
+      };
+    }
+
+    this.modelConfigService = new ModelConfigService(
+      modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
+    );
+
     this.experimentalJitContext = params.experimentalJitContext ?? false;
+    this.topicUpdateNarration = params.topicUpdateNarration ?? false;
     this.modelSteering = params.modelSteering ?? false;
-    this.userHintService = new UserHintService(() =>
+    this.injectionService = new InjectionService(() =>
       this.isModelSteeringEnabled(),
     );
+    ExecutionLifecycleService.setInjectionService(this.injectionService);
     this.toolOutputMasking = {
       enabled: params.toolOutputMasking?.enabled ?? true,
       toolProtectionThreshold:
@@ -983,11 +1046,12 @@ export class Config implements McpContext, AgentLoopContext {
       showColor: params.shellExecutionConfig?.showColor ?? false,
       pager: params.shellExecutionConfig?.pager ?? 'cat',
       sanitizationConfig: this.sanitizationConfig,
+      sandboxManager: this.sandboxManager,
     };
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
-    this.useWriteTodos = isPreviewModel(this.model)
+    this.useWriteTodos = isPreviewModel(this.model, this)
       ? false
       : (params.useWriteTodos ?? true);
     this.workspacePoliciesDir = params.workspacePoliciesDir;
@@ -1024,11 +1088,13 @@ export class Config implements McpContext, AgentLoopContext {
     this.policyUpdateConfirmationRequest =
       params.policyUpdateConfirmationRequest;
 
+    this.disableAlwaysAllow = params.disableAlwaysAllow ?? false;
     this.policyEngine = new PolicyEngine(
       {
         ...params.policyEngineConfig,
         approvalMode:
           params.approvalMode ?? params.policyEngineConfig?.approvalMode,
+        disableAlwaysAllow: this.disableAlwaysAllow,
       },
       checkerRunner,
     );
@@ -1100,34 +1166,12 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
     this._geminiClient = new GeminiClient(this);
-    this.modelRouterService = new ModelRouterService(this);
-
-    // HACK: The settings loading logic doesn't currently merge the default
-    // generation config with the user's settings. This means if a user provides
-    // any `generation` settings (e.g., just `overrides`), the default `aliases`
-    // are lost. This hack manually merges the default aliases back in if they
-    // are missing from the user's config.
-    // TODO(12593): Fix the settings loading logic to properly merge defaults and
-    // remove this hack.
-    let modelConfigServiceConfig = params.modelConfigServiceConfig;
-    if (modelConfigServiceConfig) {
-      if (!modelConfigServiceConfig.aliases) {
-        modelConfigServiceConfig = {
-          ...modelConfigServiceConfig,
-          aliases: DEFAULT_MODEL_CONFIGS.aliases,
-        };
-      }
-      if (!modelConfigServiceConfig.overrides) {
-        modelConfigServiceConfig = {
-          ...modelConfigServiceConfig,
-          overrides: DEFAULT_MODEL_CONFIGS.overrides,
-        };
-      }
-    }
-
-    this.modelConfigService = new ModelConfigService(
-      modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
+    this._sandboxManager = createSandboxManager(
+      params.toolSandboxing ?? false,
+      this.targetDir,
     );
+    this.shellExecutionConfig.sandboxManager = this._sandboxManager;
+    this.modelRouterService = new ModelRouterService(this);
   }
 
   get config(): Config {
@@ -1325,7 +1369,10 @@ export class Config implements McpContext, AgentLoopContext {
 
     // Only reset when we have explicit "no access" (hasAccessToPreviewModel === false).
     // When null (quota not fetched) or true, we preserve the saved model.
-    if (isPreviewModel(this.model) && this.hasAccessToPreviewModel === false) {
+    if (
+      isPreviewModel(this.model, this) &&
+      this.hasAccessToPreviewModel === false
+    ) {
       this.setModel(DEFAULT_GEMINI_MODEL_AUTO);
     }
 
@@ -1344,6 +1391,10 @@ export class Config implements McpContext, AgentLoopContext {
       },
     );
     this.setRemoteAdminSettings(adminControls);
+
+    if ((await this.getProModelNoAccess()) && isAutoModel(this.model)) {
+      this.setModel(PREVIEW_GEMINI_FLASH_MODEL);
+    }
   }
 
   async getExperimentsAsync(): Promise<Experiments | undefined> {
@@ -1419,6 +1470,10 @@ export class Config implements McpContext, AgentLoopContext {
    */
   get geminiClient(): GeminiClient {
     return this._geminiClient;
+  }
+
+  get sandboxManager(): SandboxManager {
+    return this._sandboxManager;
   }
 
   getSessionId(): string {
@@ -1593,7 +1648,7 @@ export class Config implements McpContext, AgentLoopContext {
 
     const isPreview =
       model === PREVIEW_GEMINI_MODEL_AUTO ||
-      isPreviewModel(this.getActiveModel());
+      isPreviewModel(this.getActiveModel(), this);
     const proModel = isPreview ? PREVIEW_GEMINI_MODEL : DEFAULT_GEMINI_MODEL;
     const flashModel = isPreview
       ? PREVIEW_GEMINI_FLASH_MODEL
@@ -1791,8 +1846,9 @@ export class Config implements McpContext, AgentLoopContext {
       }
 
       const hasAccess =
-        quota.buckets?.some((b) => b.modelId && isPreviewModel(b.modelId)) ??
-        false;
+        quota.buckets?.some(
+          (b) => b.modelId && isPreviewModel(b.modelId, this),
+        ) ?? false;
       this.setHasAccessToPreviewModel(hasAccess);
       return quota;
     } catch (e) {
@@ -2014,6 +2070,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.experimentalJitContext;
   }
 
+  isTopicUpdateNarrationEnabled(): boolean {
+    return this.topicUpdateNarration;
+  }
+
   isModelSteeringEnabled(): boolean {
     return this.modelSteering;
   }
@@ -2176,12 +2236,20 @@ export class Config implements McpContext, AgentLoopContext {
     return this.disableYoloMode || !this.isTrustedFolder();
   }
 
+  getDisableAlwaysAllow(): boolean {
+    return this.disableAlwaysAllow;
+  }
+
   getRawOutput(): boolean {
     return this.rawOutput;
   }
 
   getAcceptRawOutputRisk(): boolean {
     return this.acceptRawOutputRisk;
+  }
+
+  getExperimentalDynamicModelConfiguration(): boolean {
+    return this.dynamicModelConfiguration;
   }
 
   getPendingIncludeDirectories(): string[] {
@@ -2623,6 +2691,30 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
+   * Returns whether the user has access to Pro models.
+   * This is determined by the PRO_MODEL_NO_ACCESS experiment flag.
+   */
+  async getProModelNoAccess(): Promise<boolean> {
+    await this.ensureExperimentsLoaded();
+    return this.getProModelNoAccessSync();
+  }
+
+  /**
+   * Returns whether the user has access to Pro models synchronously.
+   *
+   * Note: This method should only be called after startup, once experiments have been loaded.
+   */
+  getProModelNoAccessSync(): boolean {
+    if (this.contentGeneratorConfig?.authType !== AuthType.LOGIN_WITH_GOOGLE) {
+      return false;
+    }
+    return (
+      this.experiments?.flags[ExperimentFlags.PRO_MODEL_NO_ACCESS]?.boolValue ??
+      false
+    );
+  }
+
+  /**
    * Returns whether Gemini 3.1 has been launched.
    * This method is async and ensures that experiments are loaded before returning the result.
    */
@@ -2808,6 +2900,8 @@ export class Config implements McpContext, AgentLoopContext {
       sanitizationConfig:
         config.sanitizationConfig ??
         this.shellExecutionConfig.sanitizationConfig,
+      sandboxManager:
+        config.sandboxManager ?? this.shellExecutionConfig.sandboxManager,
     };
   }
   getScreenReader(): boolean {
@@ -2902,6 +2996,7 @@ export class Config implements McpContext, AgentLoopContext {
         headless: customConfig.headless ?? false,
         profilePath: customConfig.profilePath,
         visualModel: customConfig.visualModel,
+        allowedDomains: customConfig.allowedDomains,
         disableUserInput: customConfig.disableUserInput,
       },
     };
@@ -3057,22 +3152,23 @@ export class Config implements McpContext, AgentLoopContext {
    */
   private registerSubAgentTools(registry: ToolRegistry): void {
     const agentsOverrides = this.getAgentsSettings().overrides ?? {};
-    if (
-      this.isAgentsEnabled() ||
-      agentsOverrides['codebase_investigator']?.enabled !== false ||
-      agentsOverrides['cli_help']?.enabled !== false
-    ) {
-      const definitions = this.agentRegistry.getAllDefinitions();
+    const definitions = this.agentRegistry.getAllDefinitions();
 
-      for (const definition of definitions) {
-        try {
-          const tool = new SubagentTool(definition, this, this.messageBus);
-          registry.registerTool(tool);
-        } catch (e: unknown) {
-          debugLogger.warn(
-            `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
-          );
+    for (const definition of definitions) {
+      try {
+        if (
+          !this.isAgentsEnabled() ||
+          agentsOverrides[definition.name]?.enabled === false
+        ) {
+          continue;
         }
+
+        const tool = new SubagentTool(definition, this, this.messageBus);
+        registry.registerTool(tool);
+      } catch (e: unknown) {
+        debugLogger.warn(
+          `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
+        );
       }
     }
   }
