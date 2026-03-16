@@ -6,18 +6,13 @@
 
 export type WithMeta = { _meta?: Record<string, unknown> };
 
-export interface AgentSession<
-  ConfigType = Record<string, unknown>,
-  ActionType = { type: string; data: unknown },
-> extends Trajectory {
+export interface AgentSession extends Trajectory {
   /**
    * Send data to the agent. Promise resolves when action is acknowledged.
    * Returns the `streamId` of the stream the message was correlated to -- this may
    * be a new stream if idle or an existing stream.
    */
-  send(
-    payload: AgentSend<ConfigType, ActionType>,
-  ): Promise<{ streamId: string }>;
+  send(payload: AgentSend): Promise<{ streamId: string }>;
   /**
    * Begin listening to actively streaming data. Stream must have the following
    * properties:
@@ -43,35 +38,34 @@ export interface AgentSession<
 }
 
 export type NullSend = {
-  message: never;
-  elicitations: never;
-  update: never;
-  action: never;
+  message?: never;
+  elicitations?: never;
+  update?: never;
+  action?: never;
 };
 
 /** Send a user message to the agent. Acts as steering when mid-stream. */
-export type MessageSend = NullSend & { message: ContentPart[] };
+export type MessageSend = Omit<NullSend, 'message'> & {
+  message: ContentPart[];
+};
 /** Send responses to one or more elicitations to the agent. */
-export type ElicitationSend = NullSend & {
+export type ElicitationSend = Omit<NullSend, 'elicitations'> & {
   elicitations: ElicitationResponse[];
 };
 /** Update session properties. */
-export type UpdateSend<ConfigType = Record<string, unknown>> = NullSend & {
-  update: { title?: string; model?: string; config?: ConfigType };
+export type UpdateSend = Omit<NullSend, 'update'> & {
+  update: { title?: string; model?: string; config?: Record<string, unknown> };
 };
 /** Send an action to the agent. */
-export type ActionSend<ActionType = { type: string; data: unknown }> = {
-  action: ActionType;
+export type ActionSend = Omit<NullSend, 'action'> & {
+  action: { type: string; data: unknown };
 };
 
-export type AgentSend<
-  ConfigType = Record<string, unknown>,
-  ActionType = { type: string; data: unknown },
-> = (
+export type AgentSend = (
   | MessageSend
   | ElicitationSend
-  | UpdateSend<ConfigType>
-  | ActionSend<ActionType>
+  | UpdateSend
+  | ActionSend
 ) &
   WithMeta;
 
