@@ -504,8 +504,11 @@ export class LspServerManager {
       encoding: 'utf-8',
     });
 
-    if (checkResult.status !== 0) {
-      throw new Error(`[LSP Configuration Error]: ${config.installHint}`);
+    if (checkResult.error || checkResult.status !== 0) {
+      const errorMessage = checkResult.error
+        ? `Failed to check for language server binary. Please ensure '${checkCmd}' is in your system's PATH.`
+        : `[LSP Configuration Error]: ${config.installHint}`;
+      throw new Error(errorMessage);
     }
 
     try {
