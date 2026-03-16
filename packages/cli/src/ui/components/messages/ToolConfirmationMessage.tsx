@@ -88,6 +88,37 @@ export const ToolConfirmationMessage: React.FC<
     useState(0);
   const securityWarningsRef = useRef<DOMElement>(null);
 
+  const deceptiveUrlWarnings = useMemo(() => {
+    const urls: string[] = [];
+    if (confirmationDetails.type === 'info' && confirmationDetails.urls) {
+      urls.push(...confirmationDetails.urls);
+    } else if (confirmationDetails.type === 'exec') {
+      const commands =
+        confirmationDetails.commands && confirmationDetails.commands.length > 0
+          ? confirmationDetails.commands
+          : [confirmationDetails.command];
+      for (const cmd of commands) {
+        const matches = cmd.match(/https?:\/\/[^\s"'`<>;&|()]+/g);
+        if (matches) urls.push(...matches);
+      }
+    }
+
+    const uniqueUrls = Array.from(new Set(urls));
+    return uniqueUrls
+      .map(getDeceptiveUrlDetails)
+      .filter((d): d is DeceptiveUrlDetails => d !== null);
+  }, [confirmationDetails]);
+
+  const deceptiveUrlWarningText = useMemo(() => {
+    if (deceptiveUrlWarnings.length === 0) return null;
+    return `**Warning:** Deceptive URL(s) detected:\n\n${deceptiveUrlWarnings
+      .map(
+        (w) =>
+          `   **Original:** ${w.originalUrl}\n   **Actual Host (Punycode):** ${w.punycodeUrl}`,
+      )
+      .join('\n\n')}`;
+  }, [deceptiveUrlWarnings]);
+
   useLayoutEffect(() => {
     if (securityWarningsRef.current) {
       const measurement = measureElement(securityWarningsRef.current);
@@ -98,7 +129,7 @@ export const ToolConfirmationMessage: React.FC<
     } else if (measuredSecurityWarningsHeight !== 0) {
       setMeasuredSecurityWarningsHeight(0);
     }
-  }, [measuredSecurityWarningsHeight]);
+  }, [measuredSecurityWarningsHeight, terminalWidth, deceptiveUrlWarningText]);
 
   const settings = useSettings();
   const allowPermanentApproval =
@@ -216,37 +247,6 @@ export const ToolConfirmationMessage: React.FC<
     (item: ToolConfirmationOutcome) => handleConfirm(item),
     [handleConfirm],
   );
-
-  const deceptiveUrlWarnings = useMemo(() => {
-    const urls: string[] = [];
-    if (confirmationDetails.type === 'info' && confirmationDetails.urls) {
-      urls.push(...confirmationDetails.urls);
-    } else if (confirmationDetails.type === 'exec') {
-      const commands =
-        confirmationDetails.commands && confirmationDetails.commands.length > 0
-          ? confirmationDetails.commands
-          : [confirmationDetails.command];
-      for (const cmd of commands) {
-        const matches = cmd.match(/https?:\/\/[^\s"'`<>;&|()]+/g);
-        if (matches) urls.push(...matches);
-      }
-    }
-
-    const uniqueUrls = Array.from(new Set(urls));
-    return uniqueUrls
-      .map(getDeceptiveUrlDetails)
-      .filter((d): d is DeceptiveUrlDetails => d !== null);
-  }, [confirmationDetails]);
-
-  const deceptiveUrlWarningText = useMemo(() => {
-    if (deceptiveUrlWarnings.length === 0) return null;
-    return `**Warning:** Deceptive URL(s) detected:\n\n${deceptiveUrlWarnings
-      .map(
-        (w) =>
-          `   **Original:** ${w.originalUrl}\n   **Actual Host (Punycode):** ${w.punycodeUrl}`,
-      )
-      .join('\n\n')}`;
-  }, [deceptiveUrlWarnings]);
 
   const getOptions = useCallback(() => {
     const options: Array<RadioSelectItem<ToolConfirmationOutcome>> = [];
