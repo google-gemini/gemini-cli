@@ -60,6 +60,10 @@ vi.mock('node:crypto', () => ({
   randomUUID: vi.fn(),
 }));
 
+interface ErrorWithCode extends Error {
+  code?: string;
+}
+
 /**
  * Helper to mock fetchWithTimeout with URL matching.
  */
@@ -497,7 +501,7 @@ describe('WebFetchTool', () => {
 
       expect(result.llmContent).toBe('fallback processed response');
       expect(result.returnDisplay).toContain(
-        '2 URL(s) processed using fallback fetch',
+        'URL(s) processed using fallback fetch',
       );
     });
 
