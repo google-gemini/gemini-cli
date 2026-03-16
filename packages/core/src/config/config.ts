@@ -948,7 +948,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.model = params.model;
     this.disableLoopDetection = params.disableLoopDetection ?? false;
     this._activeModel = params.model;
-    this.enableAgents = params.enableAgents ?? false;
+    this.enableAgents = params.enableAgents ?? true;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? true;
@@ -1386,6 +1386,10 @@ export class Config implements McpContext, AgentLoopContext {
       },
     );
     this.setRemoteAdminSettings(adminControls);
+
+    if ((await this.getProModelNoAccess()) && isAutoModel(this.model)) {
+      this.setModel(PREVIEW_GEMINI_FLASH_MODEL);
+    }
   }
 
   async getExperimentsAsync(): Promise<Experiments | undefined> {
@@ -2682,6 +2686,30 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
+   * Returns whether the user has access to Pro models.
+   * This is determined by the PRO_MODEL_NO_ACCESS experiment flag.
+   */
+  async getProModelNoAccess(): Promise<boolean> {
+    await this.ensureExperimentsLoaded();
+    return this.getProModelNoAccessSync();
+  }
+
+  /**
+   * Returns whether the user has access to Pro models synchronously.
+   *
+   * Note: This method should only be called after startup, once experiments have been loaded.
+   */
+  getProModelNoAccessSync(): boolean {
+    if (this.contentGeneratorConfig?.authType !== AuthType.LOGIN_WITH_GOOGLE) {
+      return false;
+    }
+    return (
+      this.experiments?.flags[ExperimentFlags.PRO_MODEL_NO_ACCESS]?.boolValue ??
+      false
+    );
+  }
+
+  /**
    * Returns whether Gemini 3.1 has been launched.
    * This method is async and ensures that experiments are loaded before returning the result.
    */
@@ -3119,22 +3147,23 @@ export class Config implements McpContext, AgentLoopContext {
    */
   private registerSubAgentTools(registry: ToolRegistry): void {
     const agentsOverrides = this.getAgentsSettings().overrides ?? {};
-    if (
-      this.isAgentsEnabled() ||
-      agentsOverrides['codebase_investigator']?.enabled !== false ||
-      agentsOverrides['cli_help']?.enabled !== false
-    ) {
-      const definitions = this.agentRegistry.getAllDefinitions();
+    const definitions = this.agentRegistry.getAllDefinitions();
 
-      for (const definition of definitions) {
-        try {
-          const tool = new SubagentTool(definition, this, this.messageBus);
-          registry.registerTool(tool);
-        } catch (e: unknown) {
-          debugLogger.warn(
-            `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
-          );
+    for (const definition of definitions) {
+      try {
+        if (
+          !this.isAgentsEnabled() ||
+          agentsOverrides[definition.name]?.enabled === false
+        ) {
+          continue;
         }
+
+        const tool = new SubagentTool(definition, this, this.messageBus);
+        registry.registerTool(tool);
+      } catch (e: unknown) {
+        debugLogger.warn(
+          `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
+        );
       }
     }
   }

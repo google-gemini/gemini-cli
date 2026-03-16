@@ -135,6 +135,7 @@ export const FolderTrustDialog: React.FC<FolderTrustDialogProps> = ({
     { label: 'MCP Servers', items: discoveryResults?.mcps ?? [] },
     { label: 'Hooks', items: discoveryResults?.hooks ?? [] },
     { label: 'Skills', items: discoveryResults?.skills ?? [] },
+    { label: 'Agents', items: discoveryResults?.agents ?? [] },
     { label: 'Setting overrides', items: discoveryResults?.settings ?? [] },
   ].filter((g) => g.items.length > 0);
 
