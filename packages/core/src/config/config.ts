@@ -2288,6 +2288,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.policyEngine.getApprovalMode();
   }
 
+  isPlanMode(): boolean {
+    return this.getApprovalMode() === ApprovalMode.PLAN;
+  }
+
   getPolicyUpdateConfirmationRequest():
     | PolicyUpdateConfirmationRequest
     | undefined {
