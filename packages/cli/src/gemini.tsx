@@ -76,6 +76,7 @@ import {
   getVersion,
   ValidationCancelledError,
   ValidationRequiredError,
+  FatalSandboxError,
   type AdminControlsSettings,
 } from '@google/gemini-cli-core';
 import {
@@ -567,9 +568,18 @@ export async function main() {
 
       const sandboxArgs = injectStdinIntoArgs(process.argv, stdinData);
 
-      await relaunchOnExitCode(() =>
-        start_sandbox(sandboxConfig, memoryArgs, partialConfig, sandboxArgs),
-      );
+      try {
+        await relaunchOnExitCode(() =>
+          start_sandbox(sandboxConfig, memoryArgs, partialConfig, sandboxArgs),
+        );
+      } catch (error) {
+        if (error instanceof FatalSandboxError) {
+          throw new FatalSandboxError(
+            `${error.message}\n\nTo disable sandbox, remove the "tools.sandbox" block from .gemini/settings.json or run /sandbox-setup inside the CLI.`,
+          );
+        }
+        throw error;
+      }
       await runExitCleanup();
       process.exit(ExitCodes.SUCCESS);
     } else {

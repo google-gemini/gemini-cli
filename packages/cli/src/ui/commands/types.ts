@@ -126,7 +126,8 @@ export interface OpenDialogActionReturn {
     | 'sessionBrowser'
     | 'model'
     | 'agentConfig'
-    | 'permissions';
+    | 'permissions'
+    | 'sandbox-setup';
 }
 
 /**

@@ -130,6 +130,7 @@ export interface UIState {
   selectedAgentDefinition?: AgentDefinition;
   isPermissionsDialogOpen: boolean;
   permissionsDialogProps: { targetDirectory?: string } | null;
+  isSandboxSetupDialogOpen: boolean;
   slashCommands: readonly SlashCommand[] | undefined;
   pendingSlashCommandHistoryItems: HistoryItemWithoutId[];
   commandContext: CommandContext;

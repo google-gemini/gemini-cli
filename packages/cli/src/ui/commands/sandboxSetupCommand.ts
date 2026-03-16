@@ -1,0 +1,20 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import type { OpenDialogActionReturn, SlashCommand } from './types.js';
+import { CommandKind } from './types.js';
+
+export const sandboxSetupCommand: SlashCommand = {
+  name: 'sandbox-setup',
+  description:
+    'Interactive wizard to configure sandbox security policies for this project',
+  kind: CommandKind.BUILT_IN,
+  autoExecute: true,
+  action: (): OpenDialogActionReturn => ({
+    type: 'dialog',
+    dialog: 'sandbox-setup',
+  }),
+};
