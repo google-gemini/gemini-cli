@@ -27,6 +27,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   isActiveModel,
   PREVIEW_GEMINI_3_1_MODEL,
+  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   isPreviewModel,
   isProModel,
@@ -245,6 +246,12 @@ describe('getDisplayString', () => {
     );
   });
 
+  it('should return PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL for PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL', () => {
+    expect(getDisplayString(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL)).toBe(
+      PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
+    );
+  });
+
   it('should return the model name as is for other models', () => {
     expect(getDisplayString('custom-model')).toBe('custom-model');
     expect(getDisplayString(DEFAULT_GEMINI_FLASH_LITE_MODEL)).toBe(
@@ -319,6 +326,12 @@ describe('resolveModel', () => {
       expect(
         resolveModel(PREVIEW_GEMINI_FLASH_MODEL, false, false, false),
       ).toBe(DEFAULT_GEMINI_FLASH_MODEL);
+    });
+
+    it('should return default flash lite model when access to preview is false and preview flash lite model is requested', () => {
+      expect(
+        resolveModel(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL, false, false, false),
+      ).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
     });
 
     it('should return default model when access to preview is false and auto-gemini-3 is requested', () => {
@@ -439,6 +452,7 @@ describe('isActiveModel', () => {
     expect(isActiveModel(DEFAULT_GEMINI_MODEL)).toBe(true);
     expect(isActiveModel(PREVIEW_GEMINI_MODEL)).toBe(true);
     expect(isActiveModel(DEFAULT_GEMINI_FLASH_MODEL)).toBe(true);
+    expect(isActiveModel(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL)).toBe(true);
   });
 
   it('should return true for unknown models and aliases', () => {
@@ -452,6 +466,7 @@ describe('isActiveModel', () => {
 
   it('should return true for other valid models when useGemini3_1 is true', () => {
     expect(isActiveModel(DEFAULT_GEMINI_MODEL, true)).toBe(true);
+    expect(isActiveModel(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL, true)).toBe(true);
   });
 
   it('should correctly filter Gemini 3.1 models based on useCustomToolModel when useGemini3_1 is true', () => {
