@@ -45,7 +45,7 @@ describe('NoopSandboxManager', () => {
     expect(result.env['MY_SECRET']).toBeUndefined();
   });
 
-  it('should allow disabling environment variable redaction if requested in config', async () => {
+  it('should NOT allow disabling environment variable redaction if requested in config (vulnerability fix)', async () => {
     const req = {
       command: 'echo',
       args: ['hello'],
@@ -62,29 +62,31 @@ describe('NoopSandboxManager', () => {
 
     const result = await sandboxManager.prepareCommand(req);
 
-    expect(result.env['API_KEY']).toBe('sensitive-key');
+    // API_KEY should be redacted because SandboxManager forces redaction and API_KEY matches NEVER_ALLOWED_NAME_PATTERNS
+    expect(result.env['API_KEY']).toBeUndefined();
   });
 
-  it('should respect allowedEnvironmentVariables in config', async () => {
+  it('should respect allowedEnvironmentVariables in config but filter sensitive ones', async () => {
     const req = {
       command: 'echo',
       args: ['hello'],
       cwd: '/tmp',
       env: {
+        MY_SAFE_VAR: 'safe-value',
         MY_TOKEN: 'secret-token',
-        OTHER_SECRET: 'another-secret',
       },
       config: {
         sanitizationConfig: {
-          allowedEnvironmentVariables: ['MY_TOKEN'],
+          allowedEnvironmentVariables: ['MY_SAFE_VAR', 'MY_TOKEN'],
         },
       },
     };
 
     const result = await sandboxManager.prepareCommand(req);
 
-    expect(result.env['MY_TOKEN']).toBe('secret-token');
-    expect(result.env['OTHER_SECRET']).toBeUndefined();
+    expect(result.env['MY_SAFE_VAR']).toBe('safe-value');
+    // MY_TOKEN matches /TOKEN/i so it should be redacted despite being allowed in config
+    expect(result.env['MY_TOKEN']).toBeUndefined();
   });
 
   it('should respect blockedEnvironmentVariables in config', async () => {

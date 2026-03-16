@@ -11,6 +11,7 @@ import {
 } from '../../services/sandboxManager.js';
 import {
   sanitizeEnvironment,
+  getSecureSanitizationConfig,
   type EnvironmentSanitizationConfig,
 } from '../../services/environmentSanitization.js';
 
@@ -22,6 +23,8 @@ export interface LinuxSandboxOptions {
   workspace: string;
   /** Additional paths to bind into the sandbox. */
   allowedPaths?: string[];
+  /** Optional base sanitization config. */
+  sanitizationConfig?: EnvironmentSanitizationConfig;
 }
 
 /**
@@ -31,29 +34,27 @@ export class LinuxSandboxManager implements SandboxManager {
   constructor(private readonly options: LinuxSandboxOptions) {}
 
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
-    const sanitizationConfig: EnvironmentSanitizationConfig = {
-      allowedEnvironmentVariables:
-        req.config?.sanitizationConfig?.allowedEnvironmentVariables ?? [],
-      blockedEnvironmentVariables:
-        req.config?.sanitizationConfig?.blockedEnvironmentVariables ?? [],
-      enableEnvironmentVariableRedaction:
-        req.config?.sanitizationConfig?.enableEnvironmentVariableRedaction ??
-        true,
-    };
+    const sanitizationConfig = getSecureSanitizationConfig(
+      req.config?.sanitizationConfig,
+      this.options.sanitizationConfig,
+    );
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
     const bwrapArgs: string[] = [
       '--unshare-all',
+      '--new-session', // Isolate session
+      '--die-with-parent', // Prevent orphaned runaway processes
       '--ro-bind',
       '/',
       '/',
-      '--dev-bind',
+      '--dev', // Creates a safe, minimal /dev (replaces --dev-bind)
       '/dev',
-      '/dev',
-      '--bind',
-      '/dev/pts',
-      '/dev/pts',
+      '--proc', // Creates a fresh procfs for the unshared PID namespace
+      '/proc',
+      '--tmpfs', // Provides an isolated, writable /tmp directory
+      '/tmp',
+      // Note: --dev /dev sets up /dev/pts automatically
       '--bind',
       this.options.workspace,
       this.options.workspace,
