@@ -44,29 +44,23 @@ async function provisionWorker() {
     return;
   }
 
-  console.log(`🚀 Provisioning modern container worker (COS + Cloud-Init): ${name}...`);
+  console.log(`🚀 Provisioning modern container worker (COS + Startup Script): ${name}...`);
   
   // Get local public key for native SSH access
   const pubKeyPath = path.join(os.homedir(), '.ssh/google_compute_engine.pub');
   const pubKey = fs.existsSync(pubKeyPath) ? fs.readFileSync(pubKeyPath, 'utf8').trim() : '';
   const sshKeyMetadata = pubKey ? `${USER}:${pubKey}` : '';
 
-  // Modern Cloud-Init (user-data) configuration for COS
-  const cloudConfig = `#cloud-config
-runcmd:
-  - |
-    # Expand the root partition to use the full 200GB for high performance
-    /usr/bin/growpart /dev/sda 1
-    /usr/sbin/resize2fs /dev/sda1
-  - docker run -d --name maintainer-worker --restart always \\
+  // Direct Startup Script for COS (Native Docker launch)
+  const startupScript = `#!/bin/bash
+    # Pull and Run the maintainer container
+    docker pull ${imageUri}
+    docker run -d --name maintainer-worker --restart always \\
       -v /home/node/dev:/home/node/dev:rw \\
       -v /home/node/.gemini:/home/node/.gemini:rw \\
       -v /home/node/.offload:/home/node/.offload:rw \\
       ${imageUri} /bin/bash -c "while true; do sleep 1000; done"
-`;
-
-  const tempPath = path.join(process.env.TMPDIR || '/tmp', `cloud-init-${name}.yaml`);
-  fs.writeFileSync(tempPath, cloudConfig);
+  `;
 
   const result = spawnSync('gcloud', [
     'compute', 'instances', 'create', name,
@@ -77,15 +71,12 @@ runcmd:
     '--image-project', 'cos-cloud',
     '--boot-disk-size', '200GB',
     '--boot-disk-type', 'pd-balanced',
-    '--metadata-from-file', `user-data=${tempPath}`,
-    '--metadata', `enable-oslogin=TRUE${sshKeyMetadata ? `,ssh-keys=${sshKeyMetadata}` : ''}`,
+    '--metadata', `startup-script=${startupScript},enable-oslogin=TRUE${sshKeyMetadata ? `,ssh-keys=${sshKeyMetadata}` : ''}`,
     '--labels', `owner=${USER.replace(/[^a-z0-9_-]/g, '_')},type=offload-worker`,
     '--tags', `gcli-offload-${USER}`,
     '--network-interface', 'network-tier=PREMIUM,no-address',
     '--scopes', 'https://www.googleapis.com/auth/cloud-platform'
   ], { stdio: 'inherit' });
-
-  fs.unlinkSync(tempPath);
 
   if (result.status === 0) {
     console.log(`\n✅ Worker ${name} is being provisioned.`);

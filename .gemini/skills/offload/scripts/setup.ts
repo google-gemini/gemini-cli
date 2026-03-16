@@ -139,15 +139,23 @@ Host ${sshAlias}
     if (fs.existsSync(lp)) {
       spawnSync(`${rsyncBase} ${lp} ${remoteHost}:~/.gemini/google_accounts.json`, { shell: true });
     }
-  }
+  // 4. Scoped Token Onboarding
   if (await confirm('Generate a scoped, secure token for the autonomous agent? (Recommended)')) {
-    const magicLink = `https://github.com/settings/tokens/beta/new?description=Offload-${env.USER}&repositories[]=${encodeURIComponent(upstreamRepo)}&repositories[]=${encodeURIComponent(userFork)}&permissions[contents]=write&permissions[pull_requests]=write&permissions[metadata]=read`;
-    
+    // Correct URL for Fine-Grained PAT (Beta)
+    const baseUrl = 'https://github.com/settings/personal-access-tokens/new';
+    const name = `Offload-${env.USER}`;
+    const magicLink = `${baseUrl}?name=${encodeURIComponent(name)}&description=Gemini+CLI+Offload+Worker&contents=write&pull_requests=write&metadata=read`;
+
     console.log('\n🔐 SECURITY: Create a token using the link below:');
-    // Print the link as a single, clean line for maximum clickability
-    console.log(`\n\x1b[1;34m${magicLink}\x1b[0m\n`);
-    
-    const scopedToken = await prompt('Paste Scoped Token', '');
+    console.log('\n' + magicLink + '\n');
+    console.log('👉 INSTRUCTIONS:');
+    console.log('1. Click the link above.');
+    console.log('2. Under "Repository access", select "Only select repositories".');
+    console.log(`3. Select "${upstreamRepo}" and "${userFork}".`);
+    console.log('4. Click "Generate token" at the bottom.');
+
+    const scopedToken = await prompt('\nPaste Scoped Token', '');
+
     if (scopedToken) {
       spawnSync(`ssh ${remoteHost} "mkdir -p ~/.offload && echo ${scopedToken} > ~/.offload/.gh_token && chmod 600 ~/.offload/.gh_token"`, { shell: true });
     }
