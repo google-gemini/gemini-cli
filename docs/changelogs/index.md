@@ -125,10 +125,6 @@ on GitHub.
 
 ## Announcements: v0.28.0 - 2026-02-10
 
-- **Slash Command:** We've added a new `/prompt-suggest` slash command to help
-  you generate prompt suggestions
-  ([#17264](https://github.com/google-gemini/gemini-cli/pull/17264) by
-  @NTaylorMullen).
 - **IDE Support:** Gemini CLI now supports the Positron IDE
   ([#15047](https://github.com/google-gemini/gemini-cli/pull/15047) by
   @kapsner).
@@ -168,8 +164,8 @@ on GitHub.
   ([#16638](https://github.com/google-gemini/gemini-cli/pull/16638) by
   @joshualitt).
 - **UI/UX Improvements:** You can now "Rewind" through your conversation history
-  ([#15717](https://github.com/google-gemini/gemini-cli/pull/15717) by @Adib234)
-  and use a new `/introspect` command for debugging.
+  ([#15717](https://github.com/google-gemini/gemini-cli/pull/15717) by
+  @Adib234).
 - **Core and Scheduler Refactoring:** The core scheduler has been significantly
   refactored to improve performance and reliability
   ([#16895](https://github.com/google-gemini/gemini-cli/pull/16895) by
