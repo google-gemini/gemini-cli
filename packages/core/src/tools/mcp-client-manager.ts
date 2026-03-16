@@ -306,10 +306,8 @@ export class McpClientManager {
     name: string,
     config: MCPServerConfig,
   ): Promise<void> {
-    const existing = this.clients.get(name);
-    const existingConfig = existing?.getServerConfig();
+    const existingConfig = this.allServerConfigs.get(name);
     if (
-      existing &&
       existingConfig?.extension?.id &&
       config.extension?.id &&
       existingConfig.extension.id !== config.extension.id
@@ -324,7 +322,7 @@ export class McpClientManager {
     }
 
     let finalConfig = config;
-    if (existing && existingConfig) {
+    if (existingConfig) {
       // If we're merging an extension config into a user config,
       // the user config should be the override.
       if (config.extension && !existingConfig.extension) {
@@ -338,6 +336,19 @@ export class McpClientManager {
 
     // Always track server config for UI display
     this.allServerConfigs.set(name, finalConfig);
+
+    // Capture the existing client synchronously here before any asynchronous
+    // operations. This ensures that if multiple discovery turns happen
+    // concurrently, this turn only replaces/disconnects the client that was
+    // present when this specific configuration update request began.
+    const existing = this.clients.get(name);
+
+    // If no connection details are provided, we can't discover this server.
+    // This often happens when a user provides only overrides (like excludeTools)
+    // for a server that is actually provided by an extension.
+    if (!finalConfig.command && !finalConfig.url && !finalConfig.httpUrl) {
+      return;
+    }
 
     // Check if blocked by admin settings (allowlist/excludelist)
     if (this.isBlockedBySettings(name)) {
