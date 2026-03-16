@@ -20,22 +20,33 @@ Generally, there are three categories to choose from:
 - Pay-As-You-Go: The most flexible option for professional use, long-running
   tasks, or when you need full control over your usage.
 
+## Additional Gemini Code Assist feature quotas
+
+Gemini Code Assist enforces quotas for certain features that may also affect
+Gemini CLI workflows.
+
+- Local codebase awareness: **1,000,000 token context window**
+- Code customization repositories: **20,000**
+
+These quotas apply to the underlying Gemini Code Assist infrastructure used by
+Gemini CLI and related tools.
+
 ## Free usage
 
 Access to Gemini CLI begins with a generous free tier, perfect for
 experimentation and light use.
 
-Your free usage is governed by the following limits, which depend on your
-authorization type.
+Your free usage depends on the **authentication method** you use to access
+Gemini CLI.
 
 ### Log in with Google (Gemini Code Assist for individuals)
 
 For users who authenticate by using their Google account to access Gemini Code
 Assist for individuals. This includes:
 
-- 1000 model requests / user / day
-- 60 model requests / user / minute
-- Model requests will be made across the Gemini model family as determined by
+- 1000 requests per user per day
+- 60 requests per user per minute
+- Requests may be distributed across the Gemini model family as determined by
   Gemini CLI.
 
 Learn more at
@@ -46,9 +57,9 @@ Learn more at
 If you are using a Gemini API key, you can also benefit from a free tier. This
 includes:
 
-- 250 model requests / user / day
-- 10 model requests / user / minute
-- Model requests to Flash model only.
+- 250 requests per user per day
+- 10 requests per user per minute
+- Requests are limited to **Gemini Flash models only**
 
 Learn more at
 [Gemini API Rate Limits](https://ai.google.dev/gemini-api/docs/rate-limits).
@@ -79,55 +90,73 @@ you're on a personal account, visit
 - If you are not on a personal account, you will see: "You're currently signed
   in to your Google Workspace Account."
 
-**Supported tiers:** _- Tiers not listed above, including Google AI Plus, are
-not supported._
+**Supported tiers:** _Only the tiers listed below are currently supported. Other
+tiers (for example Google AI Plus) are not currently supported._
 
-- [Google AI Pro and AI Ultra](https://gemini.google/subscriptions/). This is
-  recommended for individual developers. Quotas and pricing are based on a fixed
-  price subscription.
-
-  For predictable costs, you can log in with Google.
+- [Google AI Pro and AI Ultra](https://gemini.google/subscriptions/). These
+  subscriptions are recommended for individual developers. Quotas and pricing
+  are based on a fixed price subscription.
 
   Learn more at
   [Gemini Code Assist Quotas and Limits](https://developers.google.com/gemini-code-assist/resources/quotas)
 
 ### Through your organization
 
-These tiers are applicable when you are signing in with a Google Workspace
-account.
+These tiers are applicable when signing in with a Google Workspace account.
 
 - To verify your account type, visit
   [the Google One page](https://one.google.com/about/plans?hl=en-US&g1_landing_page=0).
 - You are on a workspace account if you see the message "You're currently signed
   in to your Google Workspace Account".
 
-**Supported tiers:** _- Tiers not listed above, including Workspace AI
-Standard/Plus and AI Expanded, are not supported._
+**Supported tiers:** _Only the tiers listed below are currently supported. Other
+tiers (for example Workspace AI Standard/Plus and AI Expanded) are not
+supported._
 
 - [Workspace AI Ultra Access](https://workspace.google.com/products/ai-ultra/).
 - [Purchase a Gemini Code Assist Subscription through Google Cloud](https://cloud.google.com/gemini/docs/codeassist/overview).
 
   Quotas and pricing are based on a fixed price subscription with assigned
-  license seats. For predictable costs, you can sign in with Google.
+  license seats.
 
   This includes the following request limits:
   - Gemini Code Assist Standard edition:
-    - 1500 model requests / user / day
-    - 120 model requests / user / minute
+    - 1500 requests per user per day
+    - 120 requests per user per minute
+
   - Gemini Code Assist Enterprise edition:
-    - 2000 model requests / user / day
-    - 120 model requests / user / minute
-  - Model requests will be made across the Gemini model family as determined by
-    Gemini CLI.
+    - 2000 requests per user per day
+    - 120 requests per user per minute
+
+  - Requests may be made across the Gemini model family as determined by Gemini
+    CLI.
 
   [Learn more about Gemini Code Assist license limits](https://developers.google.com/gemini-code-assist/resources/quotas#quotas-for-agent-mode-gemini-cli).
 
+  **Note:** Quotas for requests from **Gemini Code Assist agent mode and Gemini
+  CLI are shared**. A single prompt may trigger multiple requests.
+
+  For detailed quota information, see the official Gemini Code Assist quotas
+  documentation:
+  [Gemini Code Assist quotas documentation](https://developers.google.com/gemini-code-assist/resources/quotas)
+
+## Additional quotas for Gemini Code Assist on GitHub
+
+Usage of Gemini Code Assist on GitHub is not counted as part of the general
+quotas for Gemini Code Assist.
+
+- Consumer version: 33 pull request reviews per day
+- Enterprise version (Preview): at least 100 pull request reviews per day
+
+The exact number of pull request reviews may vary depending on the number of
+model calls required per review.
+
 ## Pay as you go
 
-If you hit your daily request limits or exhaust your Gemini Pro quota even after
-upgrading, the most flexible solution is to switch to a pay-as-you-go model,
-where you pay for the specific amount of processing you use. This is the
-recommended path for uninterrupted access.
+If you hit your daily request limits or require **higher throughput than the
+free or subscription tiers provide**, the most flexible solution is to switch to
+a pay-as-you-go model, where you pay for the specific amount of processing you
+use. This is the recommended path for uninterrupted access.
 
 To do this, log in using a Gemini API key or Vertex AI.
 
@@ -148,19 +177,16 @@ and [Vertex AI Pricing](https://cloud.google.com/vertex-ai/pricing).
 ### Gemini API key
 
 Ideal for developers who want to quickly build applications with the Gemini
-models. This is the most direct way to use the models.
+models.
 
 - Quota: Varies by pricing tier.
 - Cost: Varies by pricing tier and model/token usage.
 
+When using an API key, billing is based on token usage and API calls.
+
 Learn more at
 [Gemini API Rate Limits](https://ai.google.dev/gemini-api/docs/rate-limits),
 [Gemini API Pricing](https://ai.google.dev/gemini-api/docs/pricing)
-
-It’s important to highlight that when using an API key, you pay per token/call.
-This can be more expensive for many small calls with few tokens, but it's the
-only way to ensure your workflow isn't interrupted by reaching a limit on your
-quota.
 
 ## Gemini for workspace plans
 
