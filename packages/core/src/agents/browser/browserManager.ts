@@ -25,6 +25,7 @@ import type { Config } from '../../config/config.js';
 import { Storage } from '../../config/storage.js';
 import { injectInputBlocker } from './inputBlocker.js';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { injectAutomationOverlay } from './automationOverlay.js';
 
@@ -345,12 +346,18 @@ export class BrowserManager {
     // Create stdio transport to the bundled chrome-devtools-mcp.
     // stderr is piped (not inherited) to prevent MCP server banners and
     // warnings from corrupting the UI in alternate buffer mode.
-    const bundleMcpPath = path.resolve(
+    let bundleMcpPath = path.resolve(
       __dirname,
-      __dirname.includes(`${path.sep}dist${path.sep}`)
-        ? '../../../bundled/chrome-devtools-mcp.mjs'
-        : '../../../dist/bundled/chrome-devtools-mcp.mjs',
+      'bundled/chrome-devtools-mcp.mjs',
     );
+    if (!fs.existsSync(bundleMcpPath)) {
+      bundleMcpPath = path.resolve(
+        __dirname,
+        __dirname.includes(`${path.sep}dist${path.sep}`)
+          ? '../../../bundled/chrome-devtools-mcp.mjs'
+          : '../../../dist/bundled/chrome-devtools-mcp.mjs',
+      );
+    }
 
     this.mcpTransport = new StdioClientTransport({
       command: 'node',
