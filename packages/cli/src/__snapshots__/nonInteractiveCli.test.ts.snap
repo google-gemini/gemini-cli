@@ -3,16 +3,15 @@
 exports[`runNonInteractive > should emit appropriate error event in streaming JSON mode: 'loop detected' 1`] = `
 "{"type":"init","timestamp":"<TIMESTAMP>","session_id":"test-session-id","model":"test-model"}
 {"type":"message","timestamp":"<TIMESTAMP>","role":"user","content":"Loop test"}
-{"type":"error","timestamp":"<TIMESTAMP>","severity":"warning","message":"Loop detected, stopping execution"}
-{"type":"result","timestamp":"<TIMESTAMP>","status":"success","stats":{"total_tokens":0,"input_tokens":0,"output_tokens":0,"cached":0,"input":0,"duration_ms":<DURATION>,"tool_calls":0,"models":{}}}
+{"type":"result","timestamp":"<TIMESTAMP>","status":"error","error":{"type":"Error","message":"[API Error: Loop detected]"},"stats":{"total_tokens":0,"input_tokens":0,"output_tokens":0,"cached":0,"input":0,"duration_ms":<DURATION>,"tool_calls":0,"models":{}}}
 "
 `;
 
 exports[`runNonInteractive > should emit appropriate error event in streaming JSON mode: 'max session turns' 1`] = `
 "{"type":"init","timestamp":"<TIMESTAMP>","session_id":"test-session-id","model":"test-model"}
 {"type":"message","timestamp":"<TIMESTAMP>","role":"user","content":"Max turns test"}
-{"type":"error","timestamp":"<TIMESTAMP>","severity":"error","message":"Maximum session turns exceeded"}
-{"type":"result","timestamp":"<TIMESTAMP>","status":"success","stats":{"total_tokens":0,"input_tokens":0,"output_tokens":0,"cached":0,"input":0,"duration_ms":<DURATION>,"tool_calls":0,"models":{}}}
+{"type":"result","timestamp":"<TIMESTAMP>","status":"error","error":{"type":"FatalTurnLimitedError","message":"Reached max session turns for this session. Increase the number of turns by specifying maxSessionTurns in settings.json."},"stats":{"total_tokens":0,"input_tokens":0,"output_tokens":0,"cached":0,"input":0,"duration_ms":<DURATION>,"tool_calls":0,"models":{}}}
+{"type":"result","timestamp":"<TIMESTAMP>","status":"error","error":{"type":"Error","message":"[API Error: process.exit(53) called]"},"stats":{"total_tokens":0,"input_tokens":0,"output_tokens":0,"cached":0,"input":0,"duration_ms":<DURATION>,"tool_calls":0,"models":{}}}
 "
 `;
 

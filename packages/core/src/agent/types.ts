@@ -79,9 +79,16 @@ export type AgentEventData<
   EventType extends keyof AgentEvents = keyof AgentEvents,
 > = AgentEvents[EventType] & { type: EventType };
 
+/**
+ * Mapped type that produces a proper discriminated union when `EventType` is
+ * the default (all keys), enabling `switch (event.type)` narrowing.
+ * When a specific EventType is provided, resolves to a single variant.
+ */
 export type AgentEvent<
   EventType extends keyof AgentEvents = keyof AgentEvents,
-> = AgentEventCommon & AgentEventData<EventType>;
+> = {
+  [K in EventType]: AgentEventCommon & AgentEvents[K] & { type: K };
+}[EventType];
 
 export interface AgentEvents {
   /** MUST be the first event emitted in a session. */
@@ -261,7 +268,7 @@ export interface StreamStart {
   streamId: string;
 }
 
-type StreamEndReason =
+export type StreamEndReason =
   | 'completed'
   | 'failed'
   | 'aborted'
