@@ -24,6 +24,7 @@ export async function runLogs(args: string[]) {
   const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
   const config = settings.maintainer?.deepReview;
   const { remoteHost, remoteHome } = config;
+  const sshConfigPath = path.join(REPO_ROOT, '.gemini/offload_ssh_config');
 
   const jobDir = `${remoteHome}/dev/worktrees/offload-${prNumber}-${action}`;
   const logDir = `${jobDir}/.gemini/logs`;
@@ -41,7 +42,7 @@ export async function runLogs(args: string[]) {
     tail -f "$latest_log"
   `;
 
-  spawnSync(`ssh ${remoteHost} ${JSON.stringify(tailCmd)}`, { stdio: 'inherit', shell: true });
+  spawnSync(`ssh -F ${sshConfigPath} ${remoteHost} ${JSON.stringify(tailCmd)}`, { stdio: 'inherit', shell: true });
   return 0;
 }
 

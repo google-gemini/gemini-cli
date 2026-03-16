@@ -12,9 +12,10 @@
       "projectId": "gemini-cli-team-quota",
       "zone": "us-west1-a",
       "remoteHost": "gcli-worker",
-      "remoteHome": "/home/node",
-      "remoteWorkDir": "/home/node/dev/main",
-      "useContainer": true,
+      "remoteWorkDir": "~/dev/main",
+      "userFork": "google-gemini/gemini-cli",
+      "upstreamRepo": "google-gemini/gemini-cli",
+      "useContainer": false,
       "terminalType": "iterm2"
     }
   }

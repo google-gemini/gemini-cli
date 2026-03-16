@@ -33,8 +33,9 @@ export async function runAttach(args: string[], env: NodeJS.ProcessEnv = process
   }
 
   const { remoteHost } = config;
+  const sshConfigPath = path.join(REPO_ROOT, '.gemini/offload_ssh_config');
   const sessionName = `offload-${prNumber}-${action}`;
-  const finalSSH = `ssh -t ${remoteHost} "tmux attach-session -t ${sessionName}"`;
+  const finalSSH = `ssh -F ${sshConfigPath} -t ${remoteHost} "tmux attach-session -t ${sessionName}"`;
 
   console.log(`🔗 Attaching to session: ${sessionName}...`);
 

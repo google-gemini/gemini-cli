@@ -133,13 +133,22 @@ async function stopWorker() {
 
 async function remoteStatus() {
   const name = INSTANCE_PREFIX;
+  const sshConfigPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../offload_ssh_config');
   console.log(`📡 Fetching remote status from ${name}...`);
-  spawnSync('ssh', ['gcli-worker', 'tsx .offload/scripts/status.ts'], { stdio: 'inherit', shell: true });
+  spawnSync('ssh', ['-F', sshConfigPath, 'gcli-worker', 'tsx .offload/scripts/status.ts'], { stdio: 'inherit', shell: true });
 }
 
 async function rebuildWorker() {
   const name = INSTANCE_PREFIX;
   console.log(`🔥 Rebuilding worker ${name}...`);
+  
+  // Clear isolated known_hosts to prevent ID mismatch on rebuild
+  const knownHostsPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../offload_known_hosts');
+  if (fs.existsSync(knownHostsPath)) {
+      console.log(`   - Clearing isolated known_hosts...`);
+      fs.unlinkSync(knownHostsPath);
+  }
+
   spawnSync('gcloud', ['compute', 'instances', 'delete', name, '--project', PROJECT_ID, '--zone', 'us-west1-a', '--quiet'], { stdio: 'inherit' });
   await provisionWorker();
 }

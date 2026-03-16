@@ -47,6 +47,8 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   const persistentScripts = `~/.offload/scripts`;
   const sessionName = `offload-${prNumber}-${action}`;
   const remoteWorktreeDir = `~/dev/worktrees/${sessionName}`;
+  const sshConfigPath = path.join(REPO_ROOT, '.gemini/offload_ssh_config');
+  const sshBase = `ssh -F ${sshConfigPath}`;
 
   // 3. Remote Context Setup (Parallel Worktree)
   console.log(`🚀 Provisioning persistent worktree for ${action} on #${prNumber}...`);
@@ -76,7 +78,7 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
     setupCmd = `docker exec maintainer-worker sh -c ${q(setupCmd)}`;
   }
 
-  spawnSync(`ssh ${remoteHost} ${q(setupCmd)}`, { shell: true, stdio: 'inherit' });
+  spawnSync(`${sshBase} ${remoteHost} ${q(setupCmd)}`, { shell: true, stdio: 'inherit' });
 
   // 4. Execution Logic (Persistent Workstation Mode)
   // We use docker exec if container mode is enabled, otherwise run on host.
@@ -92,7 +94,7 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   const sshInternal = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'offload' ${q(tmuxCmd)}`;
   
   // High-performance primary SSH with IAP fallback
-  const finalSSH = `ssh -o ConnectTimeout=5 -t ${remoteHost} ${q(sshInternal)} || gcloud compute ssh ${targetVM} --project ${projectId} --zone ${zone} --tunnel-through-iap --command ${q(sshInternal)}`;
+  const finalSSH = `${sshBase} -o ConnectTimeout=5 -t ${remoteHost} ${q(sshInternal)} || gcloud compute ssh ${targetVM} --project ${projectId} --zone ${zone} --tunnel-through-iap --command ${q(sshInternal)}`;
 
   // 5. Open in iTerm2
   const isWithinGemini = !!env.GEMINI_CLI || !!env.GEMINI_SESSION_ID || !!env.GCLI_SESSION_ID;

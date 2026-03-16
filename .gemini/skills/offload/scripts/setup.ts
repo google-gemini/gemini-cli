@@ -62,76 +62,40 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
     spawnSync(`gcloud compute instances start ${targetVM} --project ${projectId} --zone ${zone}`, { shell: true, stdio: 'inherit' });
   }
 
-  // 1. Configure Fast-Path SSH Alias (Direct Internal Hostname)
-  console.log(`\n🚀 Configuring Fast-Path SSH Alias (Internal Hostname)...`);
+  // 1. Configure Isolated SSH Alias (Project-Specific)
+  console.log(`\n🚀 Configuring Isolated SSH Alias...`);
   const dnsSuffix = await prompt('Internal DNS Suffix (e.g. .internal or .internal.gcpnode.com)', '.internal');
-  
-  // Construct the high-performance direct hostname
   const internalHostname = `${targetVM}.${zone}.c.${projectId}${dnsSuffix}`;
+
   const sshAlias = 'gcli-worker';
-  const sshConfigPath = path.join(os.homedir(), '.ssh/config');
-  
+  const sshConfigPath = path.join(REPO_ROOT, '.gemini/offload_ssh_config');
+  const knownHostsPath = path.join(REPO_ROOT, '.gemini/offload_known_hosts');
+
   const sshEntry = `
-Host ${sshAlias}
+  Host ${sshAlias}
     HostName ${internalHostname}
     IdentityFile ~/.ssh/google_compute_engine
     User ${env.USER || 'mattkorwel'}_google_com
+    UserKnownHostsFile ${knownHostsPath}
     CheckHostIP no
     StrictHostKeyChecking no
-`;
+  `;
 
+  fs.writeFileSync(sshConfigPath, sshEntry);
+  console.log(`   ✅ Created project SSH config: ${sshConfigPath}`);
 
-  let currentConfig = '';
-  if (fs.existsSync(sshConfigPath)) currentConfig = fs.readFileSync(sshConfigPath, 'utf8');
-
-  if (!currentConfig.includes(`Host ${sshAlias}`)) {
-    fs.appendFileSync(sshConfigPath, sshEntry);
-    console.log(`   ✅ Added '${sshAlias}' alias to ~/.ssh/config`);
-  }
-
-  /* --- Temporarily Skipping Fork Management ---
-  // 1b. Security Fork Management
-  console.log('\n🍴 Configuring Security Fork...');
-  const upstreamRepo = 'google-gemini/gemini-cli';
-
-  // 1. Robust Discovery using 'gh repo list'
-  const forksCheck = spawnSync('gh', ['repo', 'list', '--fork', '--limit', '100', '--json', 'nameWithOwner,parent'], { stdio: 'pipe' });
-  let existingForks: string[] = [];
-  try {
-      const allForks = JSON.parse(forksCheck.stdout.toString());
-      existingForks = allForks
-          .filter((r: any) => r.parent?.nameWithOwner === upstreamRepo)
-          .map((r: any) => r.nameWithOwner);
-  } catch (e) {}
-
-  let userFork = '';
-  if (existingForks.length > 0) {
-      console.log(`   ✅ Found personal fork: ${existingForks[0]}`);
-      userFork = existingForks[0];
-  } else {
-      console.log(`   🔍 No personal fork of ${upstreamRepo} found. Creating one...`);
-      const forkResult = spawnSync('gh', ['repo', 'fork', upstreamRepo, '--clone=false'], { stdio: 'inherit' });
-      // Give the API a moment to reflect the new fork
-      const user = spawnSync('gh', ['api', 'user', '-q', '.login'], { stdio: 'pipe' }).stdout.toString().trim();
-      userFork = `${user}/gemini-cli`;
-  }
-
-  console.log(`   👉 Target fork: ${userFork}`);
-  */
-  const userFork = 'google-gemini/gemini-cli'; // Fallback to main repo for now
-  const upstreamRepo = 'google-gemini/gemini-cli';
-
-
-  // Resolve Paths (Simplified with Tilde)
+  // Resolve Paths
+  const sshCmd = `ssh -F ${sshConfigPath}`;
   const remoteHost = sshAlias;
+  const remoteHome = '/home/node'; // Hardcoded for our maintainer container
   const remoteWorkDir = `~/dev/main`;
   const persistentScripts = `~/.offload/scripts`;
 
   console.log(`\n📦 Performing One-Time Synchronization...`);
-  spawnSync(`ssh ${remoteHost} "mkdir -p ${remoteWorkDir} ~/.gemini/policies ${persistentScripts}"`, { shell: true });
+  // Ensure host directories exist (on the VM Host)
+  spawnSync(sshCmd, [remoteHost, `mkdir -p ~/dev/main ~/.gemini/policies ~/.offload/scripts`], { shell: true });
 
-  const rsyncBase = `rsync -avz -e "ssh" --exclude=".gemini/settings.json"`;
-
+  const rsyncBase = `rsync -avz -e "${sshCmd}" --exclude=".gemini/settings.json"`;
   // 2. Sync Scripts & Policies
   console.log('   - Pushing offload logic to persistent worker directory...');
   spawnSync(`${rsyncBase} --delete .gemini/skills/offload/scripts/ ${remoteHost}:${persistentScripts}/`, { shell: true });
