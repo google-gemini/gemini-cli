@@ -91,6 +91,15 @@ describe('loadConfig', () => {
       expect(fetchAdminControlsOnce).not.toHaveBeenCalled();
     });
 
+    it('should pass clientName as a2a-server to Config', async () => {
+      await loadConfig(mockSettings, mockExtensionLoader, taskId);
+      expect(Config).toHaveBeenCalledWith(
+        expect.objectContaining({
+          clientName: 'a2a-server',
+        }),
+      );
+    });
+
     describe('when admin controls experiment is enabled', () => {
       beforeEach(() => {
         // We need to cast to any here to modify the mock implementation

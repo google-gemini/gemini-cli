@@ -58,6 +58,7 @@ export function parseMcpToolName(name: string): {
   // Remove the prefix
   const withoutPrefix = name.slice(MCP_TOOL_PREFIX.length);
   // The first segment is the server name, the rest is the tool name
+  // Must be strictly `server_tool` where neither are empty
   const match = withoutPrefix.match(/^([^_]+)_(.+)$/);
   if (match) {
     return {
@@ -184,10 +185,13 @@ export class DiscoveredMCPToolInvocation extends BaseToolInvocation<
     );
   }
 
-  protected override getPolicyUpdateOptions(
+  override getPolicyUpdateOptions(
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
-    return { mcpName: this.serverName };
+    return {
+      mcpName: this.serverName,
+      toolName: this.serverToolName,
+    };
   }
 
   protected override async getConfirmationDetails(
@@ -390,25 +394,6 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
       `${this.serverName}${MCP_QUALIFIED_NAME_SEPARATOR}${this.serverToolName}`,
     );
   }
-
-  asFullyQualifiedTool(): DiscoveredMCPTool {
-    return new DiscoveredMCPTool(
-      this.mcpTool,
-      this.serverName,
-      this.serverToolName,
-      this.description,
-      this.parameterSchema,
-      this.messageBus,
-      this.trust,
-      this.isReadOnly,
-      this.getFullyQualifiedName(),
-      this.cliConfig,
-      this.extensionName,
-      this.extensionId,
-      this._toolAnnotations,
-    );
-  }
-
   protected createInvocation(
     params: ToolParams,
     messageBus: MessageBus,
