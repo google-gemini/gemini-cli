@@ -99,6 +99,15 @@ Host ${sshAlias}
   const persistentScripts = `/home/node/.offload/scripts`;
 
   console.log(`\n📦 Performing One-Time Synchronization...`);
+  
+  // Trigger any SSH/SSO prompts before bulk sync
+  console.log('   - Verifying connection and triggering SSO...');
+  const connCheck = spawnSync(sshCmd, [remoteHost, 'echo 1'], { stdio: 'inherit', shell: true });
+  if (connCheck.status !== 0) {
+      console.error('\n❌ SSH connection failed. Please ensure you have run "gcert" recently.');
+      return 1;
+  }
+
   // Ensure host directories exist (on the VM Host)
   spawnSync(sshCmd, [remoteHost, `mkdir -p /home/node/dev/main /home/node/.gemini/policies /home/node/.offload/scripts`], { shell: true });
 
