@@ -234,6 +234,15 @@ export class ToolRegistry {
   }
 
   /**
+   * Creates a shallow clone of the registry and its current known tools.
+   */
+  clone(): ToolRegistry {
+    const clone = new ToolRegistry(this.config, this.messageBus);
+    clone.allKnownTools = new Map(this.allKnownTools);
+    return clone;
+  }
+
+  /**
    * Registers a tool definition.
    *
    * Note that excluded tools are still registered to allow for enabling them
