@@ -238,6 +238,7 @@ describe('gemini.tsx main function cleanup', () => {
       setTerminalBackground: vi.fn(),
       refreshAuth: vi.fn(),
       getRemoteAdminSettings: vi.fn(() => undefined),
+      getUseAlternateBuffer: vi.fn(() => false),
     } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
 
     await main();
