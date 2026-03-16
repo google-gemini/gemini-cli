@@ -538,12 +538,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       // Capture the index of the last hint before starting to avoid re-injecting old hints.
       // NOTE: Hints added AFTER this point will be broadcast to all currently running
       // local agents via the listener below.
-      const startIndex = this.config.injectionService.getLatestHintIndex();
+      const startIndex = this.config.injectionService.getLatestInjectionIndex();
       this.config.injectionService.onInjection(injectionListener);
 
       try {
-        const initialHints =
-          this.config.injectionService.getUserHintsAfter(startIndex);
+        const initialHints = this.config.injectionService.getInjectionsAfter(
+          startIndex,
+          'user_steering',
+        );
         const formattedInitialHints = formatUserHintsForModel(initialHints);
 
         let currentMessage: Content = formattedInitialHints
@@ -591,17 +593,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           // If status is 'continue', update message for the next loop
           currentMessage = turnResult.nextMessage;
 
-          // Inject background completion output into the next turn.
-          if (pendingBgCompletionsQueue.length > 0) {
-            const bgText = pendingBgCompletionsQueue.join('\n');
-            pendingBgCompletionsQueue.length = 0;
-            currentMessage.parts ??= [];
-            currentMessage.parts.unshift({
-              text: `Background execution update:\n${bgText}\n\nThe above background execution has completed. Review the output and continue your work accordingly.`,
-            });
-          }
-
-          // Check for new user steering hints collected via subscription.
+          // Prepend inter-turn injections. User hints are unshifted first so
+          // that bg completions (unshifted second) appear before them in the
+          // final message — the model sees context before the user's reaction.
           if (pendingHintsQueue.length > 0) {
             const hintsToProcess = [...pendingHintsQueue];
             pendingHintsQueue.length = 0;
@@ -610,6 +604,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
               currentMessage.parts ??= [];
               currentMessage.parts.unshift({ text: formattedHints });
             }
+          }
+
+          if (pendingBgCompletionsQueue.length > 0) {
+            const bgText = pendingBgCompletionsQueue.join('\n');
+            pendingBgCompletionsQueue.length = 0;
+            currentMessage.parts ??= [];
+            currentMessage.parts.unshift({
+              text: `Background execution update:\n${bgText}\n\nThe above background execution has completed. Review the output and continue your work accordingly.`,
+            });
           }
         }
       } finally {

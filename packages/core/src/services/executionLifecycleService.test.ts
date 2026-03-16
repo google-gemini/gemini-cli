@@ -339,7 +339,7 @@ describe('ExecutionLifecycleService', () => {
         '',
         undefined,
         'none',
-        (output, error) => error ? `Error: ${error.message}` : output,
+        (output, error) => (error ? `Error: ${error.message}` : output),
       );
       const executionId = handle.pid!;
 

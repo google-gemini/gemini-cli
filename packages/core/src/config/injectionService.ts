@@ -69,37 +69,32 @@ export class InjectionService {
   }
 
   /**
-   * Returns all collected injection texts (all sources).
+   * Returns collected injection texts, optionally filtered by source.
    */
-  getUserHints(): string[] {
-    return this.injections.map((h) => h.text);
+  getInjections(source?: InjectionSource): string[] {
+    const items = source
+      ? this.injections.filter((h) => h.source === source)
+      : this.injections;
+    return items.map((h) => h.text);
   }
 
   /**
-   * Returns injection texts added after a specific index.
+   * Returns injection texts added after a specific index, optionally filtered by source.
    */
-  getUserHintsAfter(index: number): string[] {
+  getInjectionsAfter(index: number, source?: InjectionSource): string[] {
     if (index < 0) {
-      return this.getUserHints();
+      return this.getInjections(source);
     }
-    return this.injections.slice(index + 1).map((h) => h.text);
+    const items = this.injections.slice(index + 1);
+    const filtered = source ? items.filter((h) => h.source === source) : items;
+    return filtered.map((h) => h.text);
   }
 
   /**
    * Returns the index of the latest injection.
    */
-  getLatestHintIndex(): number {
+  getLatestInjectionIndex(): number {
     return this.injections.length - 1;
-  }
-
-  /**
-   * Returns the timestamp of the last injection.
-   */
-  getLastUserHintAt(): number | null {
-    if (this.injections.length === 0) {
-      return null;
-    }
-    return this.injections[this.injections.length - 1].timestamp;
   }
 
   /**
