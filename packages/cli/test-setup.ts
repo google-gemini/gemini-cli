@@ -24,14 +24,6 @@ if (process.env.NO_COLOR !== undefined) {
   delete process.env.NO_COLOR;
 }
 
-// Unset TERM_PROGRAM so that the environment running the test does not affect terminal detection
-if (process.env.TERM_PROGRAM !== undefined) {
-  delete process.env.TERM_PROGRAM;
-}
-
-// Set COLORTERM so true color checks evaluate deterministically
-process.env.COLORTERM = 'truecolor';
-
 // Force true color output for ink so that snapshots always include color information.
 process.env.FORCE_COLOR = '3';
 
