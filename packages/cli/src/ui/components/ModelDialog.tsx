@@ -23,6 +23,7 @@ import {
   AuthType,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   isProModel,
+  UserTierId,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
@@ -134,6 +135,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
   }, [shouldShowPreviewModels, manualModelSelected, useGemini31]);
 
   const manualOptions = useMemo(() => {
+    const isFreeTier = config?.getUserTier() === UserTierId.FREE;
     const list = [
       {
         value: DEFAULT_GEMINI_MODEL,
@@ -174,7 +176,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         },
       ];
 
-      if (!hasAccessToProModel) {
+      if (isFreeTier) {
         previewOptions.push({
           value: PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
           title: getDisplayString(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL),
@@ -196,6 +198,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
     useGemini31,
     useCustomToolModel,
     hasAccessToProModel,
+    config,
   ]);
 
   const options = view === 'main' ? mainOptions : manualOptions;
