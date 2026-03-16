@@ -31,13 +31,6 @@ export class PrivateIpError extends Error {
   }
 }
 
-/**
- * NodeFetchInit is a type that includes undici-specific options.
- */
-interface NodeFetchInit extends RequestInit {
-  dispatcher?: Agent | ProxyAgent;
-}
-
 // Configure default global dispatcher with higher timeouts
 setGlobalDispatcher(
   new Agent({
@@ -162,8 +155,7 @@ export async function safeFetch(
   input: RequestInfo | URL,
   init?: RequestInit,
 ): Promise<Response> {
-  // eslint-disable-next-line no-restricted-syntax
-  return await fetch(input, init);
+  return fetch(input, init);
 }
 
 /**
@@ -194,7 +186,7 @@ export async function fetchWithTimeout(
   }
 
   try {
-    // eslint-disable-next-line no-restricted-syntax
+     
     const response = await fetch(url, {
       ...options,
       signal: controller.signal,

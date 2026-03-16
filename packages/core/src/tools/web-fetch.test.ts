@@ -60,10 +60,6 @@ vi.mock('node:crypto', () => ({
   randomUUID: vi.fn(),
 }));
 
-interface ErrorWithCode extends Error {
-  code?: string;
-}
-
 /**
  * Helper to mock fetchWithTimeout with URL matching.
  */
