@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-core",
-  "version": "0.0.0-20260316.d1537e917.euxaristia",
+  "version": "0.35.0-nightly.20260313.bb060d7a9",
   "description": "Gemini CLI Core",
   "license": "Apache-2.0",
   "repository": {
@@ -14,7 +14,6 @@
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
     "test": "vitest run",
-    "test:vitest": "vitest run",
     "test:ci": "vitest run",
     "typecheck": "tsc --noEmit"
   },

@@ -58,20 +58,20 @@ export class ShowMemoryCommand implements Command {
 
 export class RefreshMemoryCommand implements Command {
   readonly name = 'memory refresh';
-  readonly description = 'Refreshes the memory from the source.';
+  readonly description = 'Refreshes the current memory contents.';
 
   async execute(
     context: CommandContext,
     _: string[],
   ): Promise<CommandExecutionResponse> {
-    const result = await refreshMemory(context.config);
-    return { name: this.name, data: result.content };
+    await refreshMemory(context.config);
+    return { name: this.name, data: 'Memory refreshed.' };
   }
 }
 
 export class ListMemoryCommand implements Command {
   readonly name = 'memory list';
-  readonly description = 'Lists the paths of the GEMINI.md files in use.';
+  readonly description = 'Lists the available memory files.';
 
   async execute(
     context: CommandContext,
@@ -84,7 +84,7 @@ export class ListMemoryCommand implements Command {
 
 export class AddMemoryCommand implements Command {
   readonly name = 'memory add';
-  readonly description = 'Add content to the memory.';
+  readonly description = 'Adds a new memory to the system.';
 
   async execute(
     context: CommandContext,
@@ -104,6 +104,8 @@ export class AddMemoryCommand implements Command {
       const signal = abortController.signal;
       await tool.buildAndExecute(result.toolArgs, signal, undefined, {
         sanitizationConfig: DEFAULT_SANITIZATION_CONFIG,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        sandboxManager: loopContext.sandboxManager,
       });
       await refreshMemory(context.config);
       return {

@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-devtools",
-  "version": "0.35.0-nightly.20260313.9600616d0-euxaristia",
+  "version": "0.35.0-nightly.20260313.bb060d7a9",
   "license": "Apache-2.0",
   "type": "module",
   "main": "dist/src/index.js",
@@ -13,8 +13,7 @@
   },
   "scripts": {
     "build": "npm run build:client && tsc -p tsconfig.build.json",
-    "build:client": "node esbuild.client.js",
-    "test:vitest": "echo 'No tests for devtools'"
+    "build:client": "node esbuild.client.js"
   },
   "files": [
     "dist",

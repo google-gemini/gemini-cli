@@ -14,16 +14,19 @@ import type {
   RetryAvailabilityContext,
 } from './modelPolicy.js';
 import {
-  createDefaultPolicy,
-  createSingleModelChain,
-  getModelPolicyChain,
-} from './policyCatalog.js';
-import {
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
+  PREVIEW_GEMINI_MODEL_AUTO,
   isAutoModel,
   isGemini3Model,
   resolveModel,
 } from '../config/models.js';
+import {
+  createDefaultPolicy,
+  createSingleModelChain,
+  getFlashLitePolicyChain,
+  getModelPolicyChain,
+} from './policyCatalog.js';
 import type { ModelSelectionResult } from './modelAvailabilityService.js';
 import type { ModelConfigKey } from '../services/modelConfigService.js';
 
@@ -50,21 +53,44 @@ export function resolvePolicyChain(
     useCustomToolModel,
     hasAccessToPreview,
   );
-  const isAutoPreferred = preferredModel ? isAutoModel(preferredModel) : false;
-  const isAutoConfigured = isAutoModel(configuredModel);
+  const isAutoPreferred = preferredModel
+    ? isAutoModel(preferredModel, config)
+    : false;
+  const isAutoConfigured = isAutoModel(configuredModel, config);
 
   // Auto mode always wraps around so higher-tier models get re-tried
   // once their quota cooldown expires.
   const shouldWrap = wrapsAround ?? (isAutoPreferred || isAutoConfigured);
 
   let chain;
-  if (isGemini3Model(resolvedModel) || isAutoPreferred || isAutoConfigured) {
-    chain = getModelPolicyChain({
-      previewEnabled: hasAccessToPreview,
-      userTier: config.getUserTier(),
-      useGemini31,
-      useCustomToolModel,
-    });
+  if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
+    chain = getFlashLitePolicyChain();
+  } else if (
+    isGemini3Model(resolvedModel, config) ||
+    isAutoPreferred ||
+    isAutoConfigured
+  ) {
+    if (hasAccessToPreview) {
+      const previewEnabled =
+        isGemini3Model(resolvedModel, config) ||
+        preferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
+        configuredModel === PREVIEW_GEMINI_MODEL_AUTO;
+      chain = getModelPolicyChain({
+        previewEnabled,
+        userTier: config.getUserTier(),
+        useGemini31,
+        useCustomToolModel,
+      });
+    } else {
+      // User requested Gemini 3 but has no access. Proactively downgrade
+      // to the stable Gemini 2.5 chain.
+      chain = getModelPolicyChain({
+        previewEnabled: false,
+        userTier: config.getUserTier(),
+        useGemini31,
+        useCustomToolModel,
+      });
+    }
   } else {
     chain = createSingleModelChain(modelFromConfig);
   }

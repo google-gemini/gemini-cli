@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli-a2a-server",
-  "version": "0.35.0-nightly.20260313.9600616d0-euxaristia",
+  "version": "0.35.0-nightly.20260313.bb060d7a9",
   "description": "Gemini CLI A2A Server",
   "repository": {
     "type": "git",
@@ -18,7 +18,6 @@
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
     "test": "vitest run",
-    "test:vitest": "vitest run",
     "test:ci": "vitest run --coverage",
     "typecheck": "tsc --noEmit"
   },
