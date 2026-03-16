@@ -45,7 +45,9 @@ export function mapToDisplay(
       // with a full file body as an arg).
       const rawArgs = JSON.stringify(call.request.args);
       description =
-        rawArgs.length > 120 ? rawArgs.slice(0, 117) + '...' : rawArgs;
+        rawArgs.length > 120
+          ? [...rawArgs].slice(0, 117).join('') + '...'
+          : rawArgs;
     } else {
       description = call.invocation.getDescription();
       renderOutputAsMarkdown = call.tool.isOutputMarkdown;
