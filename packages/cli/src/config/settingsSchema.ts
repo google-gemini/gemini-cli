@@ -1039,6 +1039,20 @@ const SETTINGS_SCHEMA = {
           'Apply specific configuration overrides based on matches, with a primary key of model (or alias). The most specific match will be used.',
         showInDialog: false,
       },
+      modelDefinitions: {
+        type: 'object',
+        label: 'Model Definitions',
+        category: 'Model',
+        requiresRestart: true,
+        default: DEFAULT_MODEL_CONFIGS.modelDefinitions,
+        description:
+          'Registry of model metadata, including tier, family, and features.',
+        showInDialog: false,
+        additionalProperties: {
+          type: 'object',
+          ref: 'ModelDefinition',
+        },
+      },
     },
   },
 
@@ -1541,6 +1555,16 @@ const SETTINGS_SCHEMA = {
         description: 'Disable YOLO mode, even if enabled by a flag.',
         showInDialog: true,
       },
+      disableAlwaysAllow: {
+        type: 'boolean',
+        label: 'Disable Always Allow',
+        category: 'Security',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Disable "Always allow" options in tool confirmation dialogs.',
+        showInDialog: true,
+      },
       enablePermanentToolApproval: {
         type: 'boolean',
         label: 'Allow Permanent Tool Approval',
@@ -1933,6 +1957,16 @@ const SETTINGS_SCHEMA = {
           'Enable web fetch behavior that bypasses LLM summarization.',
         showInDialog: true,
       },
+      dynamicModelConfiguration: {
+        type: 'boolean',
+        label: 'Dynamic Model Configuration',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable dynamic model configuration (definitions, resolutions, and chains) via settings.',
+        showInDialog: false,
+      },
       gemmaModelRouter: {
         type: 'object',
         label: 'Gemma Model Router',
@@ -1984,9 +2018,18 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      topicUpdateNarration: {
+        type: 'boolean',
+        label: 'Topic & Update Narration',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.',
+        showInDialog: true,
+      },
     },
   },
-
   extensions: {
     type: 'object',
     label: 'Extensions',
@@ -2267,7 +2310,8 @@ const SETTINGS_SCHEMA = {
         category: 'Admin',
         requiresRestart: false,
         default: false,
-        description: 'If true, disallows yolo mode from being used.',
+        description:
+          'If true, disallows YOLO mode and "Always allow" options from being used.',
         showInDialog: false,
         mergeStrategy: MergeStrategy.REPLACE,
       },
@@ -2745,6 +2789,25 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
               },
             },
           },
+        },
+      },
+    },
+  },
+  ModelDefinition: {
+    type: 'object',
+    description: 'Model metadata registry entry.',
+    properties: {
+      displayName: { type: 'string' },
+      tier: { enum: ['pro', 'flash', 'flash-lite', 'custom', 'auto'] },
+      family: { type: 'string' },
+      isPreview: { type: 'boolean' },
+      dialogLocation: { enum: ['main', 'manual'] },
+      dialogDescription: { type: 'string' },
+      features: {
+        type: 'object',
+        properties: {
+          thinking: { type: 'boolean' },
+          multimodalToolUse: { type: 'boolean' },
         },
       },
     },
