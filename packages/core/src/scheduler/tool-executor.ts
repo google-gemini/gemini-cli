@@ -112,8 +112,7 @@ export class ToolExecutor {
             signal,
             tool,
             liveOutputCallback,
-            shellExecutionConfig,
-            setExecutionIdCallback,
+            { shellExecutionConfig, setExecutionIdCallback },
             this.config,
             request.originalRequestName,
           );

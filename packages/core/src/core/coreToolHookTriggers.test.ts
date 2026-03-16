@@ -51,10 +51,9 @@ class MockBackgroundableInvocation extends BaseToolInvocation<
   async execute(
     _signal: AbortSignal,
     _updateOutput?: (output: ToolLiveOutput) => void,
-    _shellExecutionConfig?: unknown,
-    setExecutionIdCallback?: (executionId: number) => void,
+    options?: { setExecutionIdCallback?: (executionId: number) => void },
   ) {
-    setExecutionIdCallback?.(4242);
+    options?.setExecutionIdCallback?.(4242);
     return {
       llmContent: 'pid',
       returnDisplay: 'pid',
@@ -111,7 +110,6 @@ describe('executeToolWithHooks', () => {
       mockTool,
       undefined,
       undefined,
-      undefined,
       mockConfig,
     );
 
@@ -134,7 +132,6 @@ describe('executeToolWithHooks', () => {
       'test_tool',
       abortSignal,
       mockTool,
-      undefined,
       undefined,
       undefined,
       mockConfig,
@@ -168,7 +165,6 @@ describe('executeToolWithHooks', () => {
       mockTool,
       undefined,
       undefined,
-      undefined,
       mockConfig,
     );
 
@@ -198,7 +194,6 @@ describe('executeToolWithHooks', () => {
       'test_tool',
       abortSignal,
       mockTool,
-      undefined,
       undefined,
       undefined,
       mockConfig,
@@ -232,7 +227,6 @@ describe('executeToolWithHooks', () => {
       toolName,
       abortSignal,
       mockTool,
-      undefined,
       undefined,
       undefined,
       mockConfig,
@@ -275,7 +269,6 @@ describe('executeToolWithHooks', () => {
       mockTool,
       undefined,
       undefined,
-      undefined,
       mockConfig,
     );
 
@@ -298,8 +291,7 @@ describe('executeToolWithHooks', () => {
       abortSignal,
       mockTool,
       undefined,
-      undefined,
-      setExecutionIdCallback,
+      { setExecutionIdCallback },
       mockConfig,
     );
 
