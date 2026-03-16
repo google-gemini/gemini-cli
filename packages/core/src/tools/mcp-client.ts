@@ -292,15 +292,23 @@ export class McpClient implements McpProgressReporter {
     }
   }
 
+  private getConnectedClient(): Client {
+    this.assertConnected();
+    if (!this.client) {
+      throw new Error('Client is not initialized');
+    }
+    return this.client;
+  }
+
   private async discoverTools(
     cliConfig: McpContext,
     options?: { timeout?: number; signal?: AbortSignal },
   ): Promise<DiscoveredMCPTool[]> {
-    this.assertConnected();
+    const client = this.getConnectedClient();
     return discoverTools(
       this.serverName,
       this.serverConfig,
-      this.client!,
+      client,
       cliConfig,
       this.toolRegistry.messageBus,
       {
@@ -315,18 +323,13 @@ export class McpClient implements McpProgressReporter {
   private async fetchPrompts(options?: {
     signal?: AbortSignal;
   }): Promise<DiscoveredMCPPrompt[]> {
-    this.assertConnected();
-    return discoverPrompts(
-      this.serverName,
-      this.client!,
-      this.cliConfig,
-      options,
-    );
+    const client = this.getConnectedClient();
+    return discoverPrompts(this.serverName, client, this.cliConfig, options);
   }
 
   private async discoverResources(): Promise<Resource[]> {
-    this.assertConnected();
-    return discoverResources(this.serverName, this.client!, this.cliConfig);
+    const client = this.getConnectedClient();
+    return discoverResources(this.serverName, client, this.cliConfig);
   }
 
   private updateResourceRegistry(resources: Resource[]): void {
@@ -337,8 +340,8 @@ export class McpClient implements McpProgressReporter {
     uri: string,
     options?: { signal?: AbortSignal },
   ): Promise<ReadResourceResult> {
-    this.assertConnected();
-    return this.client!.request(
+    const client = this.getConnectedClient();
+    return client.request(
       {
         method: 'resources/read',
         params: { uri },
