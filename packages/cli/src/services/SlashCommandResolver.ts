@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { SlashCommand } from '../ui/commands/types.js';
-import { CommandKind } from '../ui/commands/types.js';
+import { CommandKind, type SlashCommand } from '../ui/commands/types.js';
 import type { CommandConflict } from './types.js';
 
 /**
@@ -175,6 +174,7 @@ export class SlashCommandResolver {
   private static getPrefix(cmd: SlashCommand): string | undefined {
     switch (cmd.kind) {
       case CommandKind.EXTENSION_FILE:
+      case CommandKind.SKILL:
         return cmd.extensionName;
       case CommandKind.MCP_PROMPT:
         return cmd.mcpServerName;
@@ -186,7 +186,6 @@ export class SlashCommandResolver {
         return undefined;
     }
   }
-
   /**
    * Logs a conflict event.
    */

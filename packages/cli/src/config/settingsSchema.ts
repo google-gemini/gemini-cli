@@ -18,6 +18,7 @@ import {
   type AuthType,
   type AgentOverride,
   type CustomTheme,
+  type SandboxConfig,
 } from '@google/gemini-cli-core';
 import type { SessionRetentionSettings } from './settings.js';
 import { DEFAULT_MIN_RETENTION } from '../utils/sessionCleanup.js';
@@ -134,6 +135,18 @@ export interface SettingsSchema {
 export type MemoryImportFormat = 'tree' | 'flat';
 export type DnsResolutionOrder = 'ipv4first' | 'verbatim';
 
+const pathArraySetting = (label: string, description: string) => ({
+  type: 'array' as const,
+  label,
+  category: 'Advanced' as const,
+  requiresRestart: true as const,
+  default: [] as string[],
+  description,
+  showInDialog: false as const,
+  items: { type: 'string' as const },
+  mergeStrategy: MergeStrategy.UNION,
+});
+
 /**
  * The canonical schema for all settings.
  * The structure of this object defines the structure of the `Settings` type.
@@ -156,17 +169,15 @@ const SETTINGS_SCHEMA = {
     },
   },
 
-  policyPaths: {
-    type: 'array',
-    label: 'Policy Paths',
-    category: 'Advanced',
-    requiresRestart: true,
-    default: [] as string[],
-    description: 'Additional policy files or directories to load.',
-    showInDialog: false,
-    items: { type: 'string' },
-    mergeStrategy: MergeStrategy.UNION,
-  },
+  policyPaths: pathArraySetting(
+    'Policy Paths',
+    'Additional policy files or directories to load.',
+  ),
+
+  adminPolicyPaths: pathArraySetting(
+    'Admin Policy Paths',
+    'Additional admin policy files or directories to load.',
+  ),
 
   general: {
     type: 'object',
@@ -204,7 +215,8 @@ const SETTINGS_SCHEMA = {
         description: oneLine`
           The default approval mode for tool execution.
           'default' prompts for approval, 'auto_edit' auto-approves edit tools,
-          and 'plan' is read-only mode. 'yolo' is not supported yet.
+          and 'plan' is read-only mode. YOLO mode (auto-approve all actions) can
+          only be enabled via command line (--yolo or --approval-mode=yolo).
         `,
         showInDialog: true,
         options: [
@@ -306,10 +318,10 @@ const SETTINGS_SCHEMA = {
         label: 'Retry Fetch Errors',
         category: 'General',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Retry on "exception TypeError: fetch failed sending request" errors.',
-        showInDialog: false,
+        showInDialog: true,
       },
       maxAttempts: {
         type: 'number',
@@ -526,6 +538,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: false,
         default: false,
         description: 'Hide helpful tips in the UI',
+        showInDialog: true,
+      },
+      escapePastedAtSymbols: {
+        type: 'boolean',
+        label: 'Escape Pasted @ Symbols',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'When enabled, @ symbols in pasted text are escaped to prevent unintended @path expansion.',
         showInDialog: true,
       },
       showShortcutsHint: {
@@ -1017,6 +1039,20 @@ const SETTINGS_SCHEMA = {
           'Apply specific configuration overrides based on matches, with a primary key of model (or alias). The most specific match will be used.',
         showInDialog: false,
       },
+      modelDefinitions: {
+        type: 'object',
+        label: 'Model Definitions',
+        category: 'Model',
+        requiresRestart: true,
+        default: DEFAULT_MODEL_CONFIGS.modelDefinitions,
+        description:
+          'Registry of model metadata, including tier, family, and features.',
+        showInDialog: false,
+        additionalProperties: {
+          type: 'object',
+          ref: 'ModelDefinition',
+        },
+      },
     },
   },
 
@@ -1093,6 +1129,29 @@ const SETTINGS_SCHEMA = {
             requiresRestart: true,
             default: undefined as string | undefined,
             description: 'Model override for the visual agent.',
+            showInDialog: false,
+          },
+          allowedDomains: {
+            type: 'array',
+            label: 'Allowed Domains',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: ['github.com', '*.google.com', 'localhost'] as string[],
+            description: oneLine`
+              A list of allowed domains for the browser agent
+              (e.g., ["github.com", "*.google.com"]).
+            `,
+            showInDialog: false,
+            items: { type: 'string' },
+          },
+          disableUserInput: {
+            type: 'boolean',
+            label: 'Disable User Input',
+            category: 'Advanced',
+            requiresRestart: false,
+            default: true,
+            description:
+              'Disable user input on browser window during automation.',
             showInDialog: false,
           },
         },
@@ -1252,10 +1311,10 @@ const SETTINGS_SCHEMA = {
         label: 'Sandbox',
         category: 'Tools',
         requiresRestart: true,
-        default: undefined as boolean | string | undefined,
-        ref: 'BooleanOrString',
+        default: undefined as boolean | string | SandboxConfig | undefined,
+        ref: 'BooleanOrStringOrObject',
         description: oneLine`
-          Sandbox execution environment.
+          Legacy full-process sandbox execution environment.
           Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile,
           or specify an explicit sandbox command (e.g., "docker", "podman", "lxc").
         `,
@@ -1477,6 +1536,16 @@ const SETTINGS_SCHEMA = {
     description: 'Security-related settings.',
     showInDialog: false,
     properties: {
+      toolSandboxing: {
+        type: 'boolean',
+        label: 'Tool Sandboxing',
+        category: 'Security',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Experimental tool-level sandboxing (implementation in progress).',
+        showInDialog: true,
+      },
       disableYoloMode: {
         type: 'boolean',
         label: 'Disable YOLO Mode',
@@ -1484,6 +1553,16 @@ const SETTINGS_SCHEMA = {
         requiresRestart: true,
         default: false,
         description: 'Disable YOLO mode, even if enabled by a flag.',
+        showInDialog: true,
+      },
+      disableAlwaysAllow: {
+        type: 'boolean',
+        label: 'Disable Always Allow',
+        category: 'Security',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Disable "Always allow" options in tool confirmation dialogs.',
         showInDialog: true,
       },
       enablePermanentToolApproval: {
@@ -1878,6 +1957,16 @@ const SETTINGS_SCHEMA = {
           'Enable web fetch behavior that bypasses LLM summarization.',
         showInDialog: true,
       },
+      dynamicModelConfiguration: {
+        type: 'boolean',
+        label: 'Dynamic Model Configuration',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable dynamic model configuration (definitions, resolutions, and chains) via settings.',
+        showInDialog: false,
+      },
       gemmaModelRouter: {
         type: 'object',
         label: 'Gemma Model Router',
@@ -1929,9 +2018,18 @@ const SETTINGS_SCHEMA = {
           },
         },
       },
+      topicUpdateNarration: {
+        type: 'boolean',
+        label: 'Topic & Update Narration',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.',
+        showInDialog: true,
+      },
     },
   },
-
   extensions: {
     type: 'object',
     label: 'Extensions',
@@ -2212,7 +2310,8 @@ const SETTINGS_SCHEMA = {
         category: 'Admin',
         requiresRestart: false,
         default: false,
-        description: 'If true, disallows yolo mode from being used.',
+        description:
+          'If true, disallows YOLO mode and "Always allow" options from being used.',
         showInDialog: false,
         mergeStrategy: MergeStrategy.REPLACE,
       },
@@ -2607,9 +2706,44 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
     description: 'Accepts either a single string or an array of strings.',
     anyOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
   },
-  BooleanOrString: {
-    description: 'Accepts either a boolean flag or a string command name.',
-    anyOf: [{ type: 'boolean' }, { type: 'string' }],
+  BooleanOrStringOrObject: {
+    description:
+      'Accepts either a boolean flag, a string command name, or a configuration object.',
+    anyOf: [
+      { type: 'boolean' },
+      { type: 'string' },
+      {
+        type: 'object',
+        description: 'Sandbox configuration object.',
+        additionalProperties: false,
+        properties: {
+          enabled: {
+            type: 'boolean',
+            description: 'Enables or disables the sandbox.',
+          },
+          command: {
+            type: 'string',
+            description:
+              'The sandbox command to use (docker, podman, sandbox-exec, runsc, lxc).',
+            enum: ['docker', 'podman', 'sandbox-exec', 'runsc', 'lxc'],
+          },
+          image: {
+            type: 'string',
+            description: 'The sandbox image to use.',
+          },
+          allowedPaths: {
+            type: 'array',
+            description:
+              'A list of absolute host paths that should be accessible within the sandbox.',
+            items: { type: 'string' },
+          },
+          networkAccess: {
+            type: 'boolean',
+            description: 'Whether the sandbox should have internet access.',
+          },
+        },
+      },
+    ],
   },
   HookDefinitionArray: {
     type: 'array',
@@ -2659,6 +2793,25 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
       },
     },
   },
+  ModelDefinition: {
+    type: 'object',
+    description: 'Model metadata registry entry.',
+    properties: {
+      displayName: { type: 'string' },
+      tier: { enum: ['pro', 'flash', 'flash-lite', 'custom', 'auto'] },
+      family: { type: 'string' },
+      isPreview: { type: 'boolean' },
+      dialogLocation: { enum: ['main', 'manual'] },
+      dialogDescription: { type: 'string' },
+      features: {
+        type: 'object',
+        properties: {
+          thinking: { type: 'boolean' },
+          multimodalToolUse: { type: 'boolean' },
+        },
+      },
+    },
+  },
 };
 
 export function getSettingsSchema(): SettingsSchemaType {
@@ -2676,7 +2829,9 @@ type InferSettings<T extends SettingsSchema> = {
         ? boolean
         : T[K]['default'] extends string
           ? string
-          : T[K]['default'];
+          : T[K]['default'] extends ReadonlyArray<infer U>
+            ? U[]
+            : T[K]['default'];
 };
 
 type InferMergedSettings<T extends SettingsSchema> = {
@@ -2690,7 +2845,9 @@ type InferMergedSettings<T extends SettingsSchema> = {
         ? boolean
         : T[K]['default'] extends string
           ? string
-          : T[K]['default'];
+          : T[K]['default'] extends ReadonlyArray<infer U>
+            ? U[]
+            : T[K]['default'];
 };
 
 export type Settings = InferSettings<SettingsSchemaType>;
