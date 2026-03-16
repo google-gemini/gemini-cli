@@ -156,6 +156,8 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
 
       let finalResponse: SendMessageResult | undefined;
 
+      let isSessionTerminal = false;
+
       for await (const chunk of stream) {
         if (_signal.aborted) {
           throw new Error('Operation aborted');
@@ -173,11 +175,17 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
           clearTaskId,
         } = extractIdsFromResponse(chunk);
 
-        if (newContextId) {
+        if (newContextId !== undefined) {
           this.contextId = newContextId;
         }
 
-        this.taskId = clearTaskId ? undefined : (newTaskId ?? this.taskId);
+        if (clearTaskId) {
+          isSessionTerminal = true;
+        }
+
+        this.taskId = isSessionTerminal
+          ? undefined
+          : (newTaskId ?? this.taskId);
       }
 
       if (!finalResponse) {

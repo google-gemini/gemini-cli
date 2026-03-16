@@ -370,6 +370,140 @@ describe('RemoteAgentInvocation', () => {
       );
     });
 
+    it('should correctly accept an empty string contextId to clear the context', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+
+      // First call: Agent sets an active contextId
+      mockClientManager.sendMessageStream.mockImplementationOnce(
+        async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'msg-1',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Response 1' }],
+            contextId: 'ctx-1',
+            taskId: 'task-1',
+          };
+        },
+      );
+
+      const invocation1 = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'first' },
+        mockMessageBus,
+      );
+      await invocation1.execute(new AbortController().signal);
+
+      // Second call: Agent explicitly clears the context by returning an empty string
+      mockClientManager.sendMessageStream.mockImplementationOnce(
+        async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'msg-2',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Context Cleared' }],
+            contextId: '', // Empty string should be respected, not treated as falsy and ignored
+            taskId: 'task-1',
+          };
+        },
+      );
+
+      const invocation2 = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'second' },
+        mockMessageBus,
+      );
+      await invocation2.execute(new AbortController().signal);
+
+      // Third call: Should send the empty string contextId, proving it wasn't ignored
+      mockClientManager.sendMessageStream.mockImplementationOnce(
+        async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'msg-3',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'New Context' }],
+          };
+        },
+      );
+
+      const invocation3 = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'third' },
+        mockMessageBus,
+      );
+      await invocation3.execute(new AbortController().signal);
+
+      expect(mockClientManager.sendMessageStream).toHaveBeenLastCalledWith(
+        'test-agent',
+        'third',
+        { contextId: '', taskId: 'task-1', signal: expect.any(Object) },
+      );
+    });
+
+    it('should prevent trailing artifact updates from resurrecting a cleared taskId', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+
+      mockClientManager.sendMessageStream.mockImplementationOnce(
+        async function* () {
+          // 1. Task indicates it is done
+          yield {
+            kind: 'task',
+            id: 'task-1',
+            status: { state: 'completed', message: undefined },
+            artifacts: [],
+            history: [],
+          };
+          // 2. A trailing artifact update arrives AFTER the task is terminal.
+          // This used to cause `clearTaskId` to be false for this chunk, resurrecting `task-1`.
+          yield {
+            kind: 'artifact-update',
+            taskId: 'task-1',
+            append: false,
+            artifact: {
+              artifactId: 'art-1',
+              name: 'Result',
+              parts: [{ kind: 'text', text: 'Final Artifact' }],
+            },
+          };
+        },
+      );
+
+      const invocation1 = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'first' },
+        mockMessageBus,
+      );
+      await invocation1.execute(new AbortController().signal);
+
+      // Second call: Should start a new task because the previous one was terminal,
+      // despite the trailing artifact update.
+      mockClientManager.sendMessageStream.mockImplementationOnce(
+        async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'msg-2',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'New Task' }],
+          };
+        },
+      );
+
+      const invocation2 = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'second' },
+        mockMessageBus,
+      );
+      await invocation2.execute(new AbortController().signal);
+
+      expect(mockClientManager.sendMessageStream).toHaveBeenLastCalledWith(
+        'test-agent',
+        'second',
+        // taskId should be undefined, not 'task-1'
+        { contextId: undefined, taskId: undefined, signal: expect.any(Object) },
+      );
+    });
+
     it('should handle streaming updates and reassemble output', async () => {
       mockClientManager.getClient.mockReturnValue({});
       mockClientManager.sendMessageStream.mockImplementation(
