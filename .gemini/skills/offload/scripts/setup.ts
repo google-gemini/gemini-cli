@@ -61,14 +61,15 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
     spawnSync(`gcloud compute instances start ${targetVM} --project ${projectId} --zone ${zone}`, { shell: true, stdio: 'inherit' });
   }
 
-  // 1. Configure Isolated SSH Alias (Project-Specific)
+  // 1. Configure Isolated SSH Alias (Direct Internal Hostname)
   console.log(`\n🚀 Configuring Isolated SSH Alias...`);
-  let dnsSuffix = await prompt('Internal DNS Suffix (e.g. .internal or .internal.gcpnode.com)', '.internal');
+  let dnsSuffix = await prompt('Internal DNS Suffix (e.g. .internal or .internal.gcpnode.com)', '.internal.gcpnode.com');
   
-  // FIX: Ensure suffix starts with a dot
+  // Ensure suffix starts with a dot
   if (dnsSuffix && !dnsSuffix.startsWith('.')) dnsSuffix = '.' + dnsSuffix;
   
-  const internalHostname = `${targetVM}.${zone}.c.${projectId}${dnsSuffix}`;
+  // PREPEND nic0. for direct internal routing
+  const internalHostname = `nic0.${targetVM}.${zone}.c.${projectId}${dnsSuffix}`;
 
   const sshAlias = 'gcli-worker';
   const sshConfigPath = path.join(REPO_ROOT, '.gemini/offload_ssh_config');
