@@ -16,7 +16,8 @@ import { randomUUID } from 'node:crypto';
 
 export const clearCommand: SlashCommand = {
   name: 'clear (new)',
-  description: 'Create new Session and free up context',
+  altNames: ['new'],
+  description: 'Clear the screen and start a new session',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, _args) => {
