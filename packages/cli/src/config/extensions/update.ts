@@ -80,6 +80,7 @@ export async function updateExtension(
 
   const tempDir = await ExtensionStorage.createTmpDir();
   try {
+    await copyExtension(extension.path, tempDir);
     const previousExtensionConfig = await extensionManager.loadExtensionConfig(
       extension.path,
     );
@@ -124,7 +125,12 @@ export async function updateExtension(
     await copyExtension(tempDir, extension.path);
     throw e;
   } finally {
-    await fs.promises.rm(tempDir, { recursive: true, force: true });
+    await fs.promises.rm(tempDir, {
+      recursive: true,
+      force: true,
+      maxRetries: 3,
+      retryDelay: 100,
+    });
   }
 }
 

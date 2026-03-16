@@ -180,6 +180,8 @@ describe('Extension Update Logic', () => {
       expect(fs.promises.rm).toHaveBeenCalledWith('/tmp/mock-dir', {
         recursive: true,
         force: true,
+        maxRetries: 3,
+        retryDelay: 100,
       });
     });
 
@@ -294,6 +296,34 @@ describe('Extension Update Logic', () => {
         },
       });
       expect(fs.promises.rm).toHaveBeenCalled();
+    });
+
+    it('should backup extension to tempDir before calling installOrUpdateExtension', async () => {
+      vi.mocked(mockExtensionManager.loadExtensionConfig).mockReturnValue(
+        Promise.resolve({
+          name: 'test-extension',
+          version: '1.0.0',
+        }),
+      );
+      vi.mocked(
+        mockExtensionManager.installOrUpdateExtension,
+      ).mockResolvedValue({
+        ...mockExtension,
+        version: '1.1.0',
+      });
+
+      await updateExtension(
+        mockExtension,
+        mockExtensionManager,
+        ExtensionUpdateState.UPDATE_AVAILABLE,
+        mockDispatch,
+      );
+
+      // First call should be the backup: extension.path -> tempDir
+      expect(copyExtension).toHaveBeenCalledWith(
+        mockExtension.path,
+        '/tmp/mock-dir',
+      );
     });
   });
 
