@@ -3123,13 +3123,10 @@ export class Config implements McpContext, AgentLoopContext {
 
     for (const definition of definitions) {
       try {
-        const override = agentsOverrides[definition.name];
-
-        const isEnabled = this.isAgentsEnabled()
-          ? override?.enabled !== false
-          : override?.enabled === true;
-
-        if (!isEnabled) {
+        if (
+          !this.isAgentsEnabled() ||
+          agentsOverrides[definition.name]?.enabled === false
+        ) {
           continue;
         }
 
