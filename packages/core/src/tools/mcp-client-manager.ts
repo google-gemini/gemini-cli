@@ -284,6 +284,51 @@ export class McpClientManager {
     return createHash('sha256').update(stableStringify(keyData)).digest('hex');
   }
 
+  /**
+   * Merges two MCP configurations. The second configuration (override)
+   * takes precedence for scalar properties, but array properties are
+   * merged securely (exclude = union, include = intersection) and
+   * environment objects are merged.
+   */
+  private mergeMcpConfigs(
+    base: MCPServerConfig,
+    override: MCPServerConfig,
+  ): MCPServerConfig {
+    // For allowlists (includeTools), use intersection to ensure the most
+    // restrictive policy wins. A tool must be allowed by BOTH parties.
+    let includeTools: string[] | undefined;
+    if (base.includeTools && override.includeTools) {
+      includeTools = base.includeTools.filter((t) =>
+        override.includeTools!.includes(t),
+      );
+      // If the intersection is empty, we must keep an empty array to indicate
+      // that NO tools are allowed (undefined would allow everything).
+    } else {
+      // If only one provides an allowlist, use that.
+      includeTools = override.includeTools ?? base.includeTools;
+    }
+
+    // For blocklists (excludeTools), use union so if ANY party blocks it,
+    // it stays blocked.
+    const excludeTools = [
+      ...new Set([
+        ...(base.excludeTools ?? []),
+        ...(override.excludeTools ?? []),
+      ]),
+    ];
+
+    const env = { ...(base.env ?? {}), ...(override.env ?? {}) };
+
+    return {
+      ...base,
+      ...override,
+      includeTools,
+      excludeTools: excludeTools.length > 0 ? excludeTools : undefined,
+      env: Object.keys(env).length > 0 ? env : undefined,
+      extension: override.extension ?? base.extension,
+    };
+  }
+
   async maybeDiscoverMcpServer(
     name: string,
     config: MCPServerConfig,
@@ -293,8 +338,38 @@ export class McpClientManager {
       resourceRegistry: ResourceRegistry;
     },
   ): Promise<void> {
-    const clientKey = this.getClientKey(name, config);
-    const existing = this.clients.get(clientKey);
+    const existingConfig = this.allServerConfigs.get(name);
+    if (
+      existingConfig?.extension?.id &&
+      config.extension?.id &&
+      existingConfig.extension.id !== config.extension.id
+    ) {
+      const extensionText = config.extension
+        ? ` from extension "${config.extension.name}"`
+        : '';
+      debugLogger.warn(
+        `Skipping MCP config for server with name "${name}"${extensionText} as it already exists.`,
+      );
+      return;
+    }
+
+    let finalConfig = config;
+    if (existingConfig) {
+      // If we're merging an extension config into a user config,
+      // the user config should be the override.
+      if (config.extension && !existingConfig.extension) {
+        finalConfig = this.mergeMcpConfigs(config, existingConfig);
+      } else {
+        // Otherwise (User over Extension, or User over User),
+        // the incoming config is the override.
+        finalConfig = this.mergeMcpConfigs(existingConfig, config);
+      }
+    }
+
+    // Always track server config for UI display
+    this.allServerConfigs.set(name, finalConfig);
+
+    const clientKey = this.getClientKey(name, finalConfig);
 
     // If no registries are provided (main agent) and a server with this name already exists
     // but with a different configuration, handle potential conflicts.
@@ -303,43 +378,32 @@ export class McpClientManager {
         (c) => c.getServerName() === name,
       );
       if (existingSameName) {
-        const existingConfig = existingSameName.getServerConfig();
-        const existingKey = this.getClientKey(name, existingConfig);
+        const existingConfigFromClient = existingSameName.getServerConfig();
+        const existingKey = this.getClientKey(name, existingConfigFromClient);
 
         if (existingKey !== clientKey) {
-          const bothMain = !config.extension && !existingConfig.extension;
-          const sameExtension =
-            config.extension &&
-            existingConfig.extension &&
-            config.extension.id === existingConfig.extension.id;
-
-          if (bothMain || sameExtension) {
-            // This is a configuration update from the same source (hot-reload).
-            // We should stop the old client before starting the new one.
-            await this.disconnectClient(existingKey, true);
-          } else {
-            // This is a conflict (e.g. an extension trying to overwrite a main server).
-            const extensionText = config.extension
-              ? ` from extension "${config.extension.name}"`
-              : '';
-            debugLogger.warn(
-              `Skipping MCP config for server with name "${name}"${extensionText} as a server with that name already exists from a different source.`,
-            );
-            return;
-          }
+          // This is a configuration update (hot-reload).
+          // We should stop the old client before starting the new one.
+          await this.disconnectClient(existingKey, true);
         }
       }
     }
 
-    // Always track server config for UI display
-    this.allServerConfigs.set(name, config);
+    const existing = this.clients.get(clientKey);
+
+    // If no connection details are provided, we can't discover this server.
+    // This often happens when a user provides only overrides (like excludeTools)
+    // for a server that is actually provided by an extension.
+    if (!finalConfig.command && !finalConfig.url && !finalConfig.httpUrl) {
+      return;
+    }
 
     // Check if blocked by admin settings (allowlist/excludelist)
     if (this.isBlockedBySettings(name)) {
       if (!this.blockedMcpServers.find((s) => s.name === name)) {
         this.blockedMcpServers?.push({
           name,
-          extensionName: config.extension?.name ?? '',
+          extensionName: finalConfig.extension?.name ?? '',
         });
       }
       return;
@@ -354,7 +418,7 @@ export class McpClientManager {
     if (!this.cliConfig.isTrustedFolder()) {
       return;
     }
-    if (config.extension && !config.extension.isActive) {
+    if (finalConfig.extension && !finalConfig.extension.isActive) {
       return;
     }
 
@@ -365,7 +429,7 @@ export class McpClientManager {
           if (!client) {
             client = new McpClient(
               name,
-              config,
+              finalConfig,
               this.cliConfig.getWorkspaceContext(),
               this.cliConfig,
               this.cliConfig.getDebugMode(),
