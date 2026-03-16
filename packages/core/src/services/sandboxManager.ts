@@ -4,11 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import os from 'node:os';
 import {
   sanitizeEnvironment,
   getSecureSanitizationConfig,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
+import { LinuxSandboxManager } from '../sandbox/linux/LinuxSandboxManager.js';
 
 /**
  * Request for preparing a command to run in a sandbox.
@@ -90,8 +92,12 @@ export class LocalSandboxManager implements SandboxManager {
  */
 export function createSandboxManager(
   sandboxingEnabled: boolean,
+  workspace: string,
 ): SandboxManager {
   if (sandboxingEnabled) {
+    if (os.platform() === 'linux') {
+      return new LinuxSandboxManager({ workspace });
+    }
     return new LocalSandboxManager();
   }
   return new NoopSandboxManager();

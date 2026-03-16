@@ -4,8 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, expect, it } from 'vitest';
-import { NoopSandboxManager } from './sandboxManager.js';
+import os from 'node:os';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  NoopSandboxManager,
+  LocalSandboxManager,
+  createSandboxManager,
+} from './sandboxManager.js';
+import { LinuxSandboxManager } from '../sandbox/linux/LinuxSandboxManager.js';
 
 describe('NoopSandboxManager', () => {
   const sandboxManager = new NoopSandboxManager();
@@ -109,5 +115,32 @@ describe('NoopSandboxManager', () => {
 
     expect(result.env['SAFE_VAR']).toBe('safe-value');
     expect(result.env['BLOCKED_VAR']).toBeUndefined();
+  });
+});
+
+describe('createSandboxManager', () => {
+  it('should return NoopSandboxManager if sandboxing is disabled', () => {
+    const manager = createSandboxManager(false, '/workspace');
+    expect(manager).toBeInstanceOf(NoopSandboxManager);
+  });
+
+  it('should return LinuxSandboxManager if sandboxing is enabled and platform is linux', () => {
+    const osSpy = vi.spyOn(os, 'platform').mockReturnValue('linux');
+    try {
+      const manager = createSandboxManager(true, '/workspace');
+      expect(manager).toBeInstanceOf(LinuxSandboxManager);
+    } finally {
+      osSpy.mockRestore();
+    }
+  });
+
+  it('should return LocalSandboxManager if sandboxing is enabled and platform is not linux', () => {
+    const osSpy = vi.spyOn(os, 'platform').mockReturnValue('darwin');
+    try {
+      const manager = createSandboxManager(true, '/workspace');
+      expect(manager).toBeInstanceOf(LocalSandboxManager);
+    } finally {
+      osSpy.mockRestore();
+    }
   });
 });
