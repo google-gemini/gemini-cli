@@ -16,6 +16,7 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
+import { NoopSandboxManager } from '@google/gemini-cli-core';
 
 const mockIsBinary = vi.hoisted(() => vi.fn());
 const mockShellExecutionService = vi.hoisted(() => vi.fn());
@@ -109,8 +110,14 @@ describe('useShellCommandProcessor', () => {
       getShellExecutionConfig: () => ({
         terminalHeight: 20,
         terminalWidth: 80,
+        sandboxManager: new NoopSandboxManager(),
+        sanitizationConfig: {
+          allowedEnvironmentVariables: [],
+          blockedEnvironmentVariables: [],
+          enableEnvironmentVariableRedaction: false,
+        },
       }),
-    } as Config;
+    } as unknown as Config;
     mockGeminiClient = { addHistory: vi.fn() } as unknown as GeminiClient;
 
     vi.mocked(os.platform).mockReturnValue('linux');
