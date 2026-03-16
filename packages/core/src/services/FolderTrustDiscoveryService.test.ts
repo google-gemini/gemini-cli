@@ -42,6 +42,11 @@ describe('FolderTrustDiscoveryService', () => {
     await fs.mkdir(path.join(skillsDir, 'test-skill'), { recursive: true });
     await fs.writeFile(path.join(skillsDir, 'test-skill', 'SKILL.md'), 'body');
 
+    // Mock agents
+    const agentsDir = path.join(geminiDir, 'agents');
+    await fs.mkdir(agentsDir);
+    await fs.writeFile(path.join(agentsDir, 'test-agent.md'), 'body');
+
     // Mock settings (MCPs, Hooks, and general settings)
     const settings = {
       mcpServers: {
@@ -62,6 +67,7 @@ describe('FolderTrustDiscoveryService', () => {
 
     expect(results.commands).toContain('test-cmd');
     expect(results.skills).toContain('test-skill');
+    expect(results.agents).toContain('test-agent');
     expect(results.mcps).toContain('test-mcp');
     expect(results.hooks).toContain('test-hook');
     expect(results.settings).toContain('general');
@@ -79,9 +85,6 @@ describe('FolderTrustDiscoveryService', () => {
         allowed: ['git'],
         sandbox: false,
       },
-      experimental: {
-        enableAgents: true,
-      },
       security: {
         folderTrust: {
           enabled: false,
@@ -97,9 +100,6 @@ describe('FolderTrustDiscoveryService', () => {
 
     expect(results.securityWarnings).toContain(
       'This project auto-approves certain tools (tools.allowed).',
-    );
-    expect(results.securityWarnings).toContain(
-      'This project enables autonomous agents (enableAgents).',
     );
     expect(results.securityWarnings).toContain(
       'This project attempts to disable folder trust (security.folderTrust.enabled).',
@@ -157,5 +157,21 @@ describe('FolderTrustDiscoveryService', () => {
     const results = await FolderTrustDiscoveryService.discover(tempDir);
     expect(results.discoveryErrors).toHaveLength(0);
     expect(results.settings).toHaveLength(0);
+  });
+
+  it('should flag security warning for custom agents', async () => {
+    const geminiDir = path.join(tempDir, GEMINI_DIR);
+    await fs.mkdir(geminiDir, { recursive: true });
+
+    const agentsDir = path.join(geminiDir, 'agents');
+    await fs.mkdir(agentsDir);
+    await fs.writeFile(path.join(agentsDir, 'test-agent.md'), 'body');
+
+    const results = await FolderTrustDiscoveryService.discover(tempDir);
+
+    expect(results.agents).toContain('test-agent');
+    expect(results.securityWarnings).toContain(
+      'This project contains custom agents.',
+    );
   });
 });
