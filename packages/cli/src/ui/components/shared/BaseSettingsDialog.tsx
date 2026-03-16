@@ -325,13 +325,18 @@ export function BaseSettingsDialog({
           return;
         }
 
-        // Up/Down in edit mode - commit and navigate
-        if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key)) {
+        // Up/Down in edit mode - commit and navigate.
+        // Only trigger on non-insertable keys (arrow keys) so that typing
+        // j/k characters into the edit buffer is not intercepted.
+        if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key) && !key.insertable) {
           commitEdit();
           moveUp();
           return;
         }
-        if (keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key)) {
+        if (
+          keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key) &&
+          !key.insertable
+        ) {
           commitEdit();
           moveDown();
           return;

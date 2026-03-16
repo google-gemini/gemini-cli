@@ -494,7 +494,7 @@ export class AppRig {
   }
 
   async waitForPendingConfirmation(
-    toolNameOrDisplayName?: string | RegExp,
+    toolNameOrDisplayName?: string | RegExp | string[],
     timeout = 30000,
   ): Promise<PendingConfirmation> {
     const matches = (p: PendingConfirmation) => {
@@ -503,6 +503,12 @@ export class AppRig {
         return (
           p.toolName === toolNameOrDisplayName ||
           p.toolDisplayName === toolNameOrDisplayName
+        );
+      }
+      if (Array.isArray(toolNameOrDisplayName)) {
+        return (
+          toolNameOrDisplayName.includes(p.toolName) ||
+          toolNameOrDisplayName.includes(p.toolDisplayName || '')
         );
       }
       return (
