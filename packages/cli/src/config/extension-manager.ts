@@ -984,9 +984,7 @@ Would you like to attempt to install via "git clone" instead?`,
     } catch (e) {
       const extName = path.basename(extensionDir);
       debugLogger.warn(
-        `Warning: Removing broken extension "${extName}": ${getErrorMessage(
-          e,
-        )}`,
+        `Warning: Removing broken extension ${extName}: ${getErrorMessage(e)}`,
       );
       try {
         await fs.promises.rm(extensionDir, { recursive: true, force: true });
