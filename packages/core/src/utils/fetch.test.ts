@@ -9,7 +9,6 @@ import {
   isPrivateIp,
   isPrivateIpAsync,
   isAddressPrivate,
-  safeFetch,
   fetchWithTimeout,
 } from './fetch.js';
 import * as dnsPromises from 'node:dns/promises';
@@ -155,19 +154,6 @@ describe('fetch utils', () => {
 
     it('should return false for invalid URLs instead of throwing verification error', async () => {
       expect(await isPrivateIpAsync('not-a-url')).toBe(false);
-    });
-  });
-
-  describe('safeFetch', () => {
-    it('should forward to fetch', async () => {
-      vi.mocked(global.fetch).mockResolvedValue(new Response('ok'));
-
-      const response = await safeFetch('https://example.com');
-      expect(response.status).toBe(200);
-      expect(global.fetch).toHaveBeenCalledWith(
-        'https://example.com',
-        undefined,
-      );
     });
   });
 

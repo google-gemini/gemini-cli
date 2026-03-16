@@ -148,17 +148,6 @@ export async function isPrivateIpAsync(url: string): Promise<boolean> {
 }
 
 /**
- * Enhanced fetch with SSRF protection.
- * Prevents access to private/internal networks at the connection level.
- */
-export async function safeFetch(
-  input: RequestInfo | URL,
-  init?: RequestInit,
-): Promise<Response> {
-  return fetch(input, init);
-}
-
-/**
  * Creates an undici ProxyAgent that incorporates safe DNS lookup.
  */
 export function createSafeProxyAgent(proxyUrl: string): ProxyAgent {
