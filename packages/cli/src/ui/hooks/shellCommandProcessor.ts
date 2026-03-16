@@ -14,6 +14,7 @@ import {
   isBinary,
   ShellExecutionService,
   CoreToolCallStatus,
+  PolicyDecision,
 } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -298,6 +299,45 @@ export const useShellCommandProcessor = (
       }
 
       const executeCommand = async () => {
+        try {
+          const policyEngine = config.getPolicyEngine();
+          const { decision } = await policyEngine.check(
+            { name: 'run_shell_command', args: { command: rawQuery } },
+            undefined,
+          );
+
+          if (decision === PolicyDecision.DENY) {
+            addItemToHistory(
+              {
+                type: 'error',
+                text: `Command cannot be run. Blocked command: "${rawQuery}". Reason: Blocked by policy.`,
+              },
+              userMessageTimestamp,
+            );
+            if (pwdFilePath && fs.existsSync(pwdFilePath)) {
+              fs.unlinkSync(pwdFilePath);
+            }
+            dispatch({ type: 'SET_ACTIVE_PTY', pid: null });
+            setShellInputFocused(false);
+            return;
+          }
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          addItemToHistory(
+            {
+              type: 'error',
+              text: `Policy validation error: ${errorMessage}`,
+            },
+            userMessageTimestamp,
+          );
+          if (pwdFilePath && fs.existsSync(pwdFilePath)) {
+            fs.unlinkSync(pwdFilePath);
+          }
+          dispatch({ type: 'SET_ACTIVE_PTY', pid: null });
+          setShellInputFocused(false);
+          return;
+        }
+
         let cumulativeStdout: string | AnsiOutput = '';
         let isBinaryStream = false;
         let binaryBytesReceived = 0;

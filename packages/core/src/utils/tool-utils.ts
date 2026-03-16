@@ -10,6 +10,7 @@ import {
   type AnyToolInvocation,
 } from '../index.js';
 import { SHELL_TOOL_NAMES } from './shell-utils.js';
+import { extractCommandsFromAst } from './shell-ast-parser.js';
 import levenshtein from 'fast-levenshtein';
 import { ApprovalMode } from '../policy/types.js';
 import {
@@ -153,48 +154,72 @@ export function doesToolInvocationMatch(
     toolNames = [toolOrToolName];
   }
 
-  if (toolNames.some((name) => SHELL_TOOL_NAMES.includes(name))) {
+  const isShellTool = toolNames.some((name) => SHELL_TOOL_NAMES.includes(name));
+
+  if (isShellTool) {
     toolNames = [...new Set([...toolNames, ...SHELL_TOOL_NAMES])];
-  }
 
-  for (const pattern of patterns) {
-    const openParen = pattern.indexOf('(');
-
-    if (openParen === -1) {
-      // No arguments, just a tool name
-      if (toolNames.includes(pattern)) {
-        return true;
-      }
-      continue;
-    }
-
-    const patternToolName = pattern.substring(0, openParen);
-    if (!toolNames.includes(patternToolName)) {
-      continue;
-    }
-
-    if (!pattern.endsWith(')')) {
-      continue;
-    }
-
-    const argPattern = pattern.substring(openParen + 1, pattern.length - 1);
-
-    let command: string;
+    let command: string | undefined;
     if (typeof invocation === 'string') {
       command = invocation;
     } else {
       if (!('command' in invocation.params)) {
-        // This invocation has no command - nothing to check.
-        continue;
+        return false;
       }
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       command = String((invocation.params as { command: string }).command);
     }
 
-    if (toolNames.some((name) => SHELL_TOOL_NAMES.includes(name))) {
-      if (command === argPattern || command.startsWith(argPattern + ' ')) {
-        return true;
+    if (!command) {
+      return false;
+    }
+
+    const subCommands = extractCommandsFromAst(command);
+    if (subCommands.length === 0) {
+      return false; // Fail-closed for empty or unparseable commands
+    }
+
+    // Every extracted sub-command must match at least one pattern.
+    for (const subCommand of subCommands) {
+      let subCommandMatched = false;
+
+      for (const pattern of patterns) {
+        const openParen = pattern.indexOf('(');
+
+        if (openParen === -1) {
+          // No arguments, just a tool name
+          if (toolNames.includes(pattern)) {
+            subCommandMatched = true;
+            break;
+          }
+          continue;
+        }
+
+        const patternToolName = pattern.substring(0, openParen);
+        if (!toolNames.includes(patternToolName) || !pattern.endsWith(')')) {
+          continue;
+        }
+
+        const argPattern = pattern.substring(openParen + 1, pattern.length - 1);
+        if (subCommand === argPattern || subCommand.startsWith(argPattern + ' ')) {
+          subCommandMatched = true;
+          break;
+        }
       }
+
+      if (!subCommandMatched) {
+        return false; // This sub-command failed all patterns, so the whole invocation fails
+      }
+    }
+
+    return true; // All sub-commands matched at least one pattern
+  }
+
+  // Non-shell tool validation
+  for (const pattern of patterns) {
+    const openParen = pattern.indexOf('(');
+    if (openParen === -1 && toolNames.includes(pattern)) {
+      return true;
     }
   }
 

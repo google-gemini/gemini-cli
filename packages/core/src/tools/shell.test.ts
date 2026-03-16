@@ -102,9 +102,9 @@ describe('ShellTool', () => {
         stripThoughtsFromHistory: vi.fn(),
       },
 
-      getAllowedTools: vi.fn().mockReturnValue([]),
+      getAllowedTools: vi.fn().mockReturnValue(undefined),
       getApprovalMode: vi.fn().mockReturnValue('strict'),
-      getCoreTools: vi.fn().mockReturnValue([]),
+      getCoreTools: vi.fn().mockReturnValue(undefined),
       getExcludeTools: vi.fn().mockReturnValue(new Set([])),
       getDebugMode: vi.fn().mockReturnValue(false),
       getTargetDir: vi.fn().mockReturnValue(tempRootDir),
@@ -437,6 +437,19 @@ describe('ShellTool', () => {
       expect(() => shellTool.build({ command: '' })).toThrow(
         'Command cannot be empty.',
       );
+    });
+
+    it('should return a policy violation error if the command is disallowed', async () => {
+      (mockConfig.getAllowedTools as Mock).mockReturnValueOnce(['run_shell_command(ls)']);
+      const invocation = shellTool.build({ command: 'ls && cat /etc/passwd' });
+      const promise = invocation.execute(mockAbortSignal);
+
+      const result = await promise;
+
+      expect(result.error).toBeDefined();
+      expect(result.error?.type).toBe(ToolErrorType.SHELL_EXECUTE_ERROR);
+      expect(result.error?.message).toBe('Command rejected by policy.');
+      expect(result.llmContent).toBe('Command rejected by policy.');
     });
 
     it('should summarize output when configured', async () => {

@@ -77,6 +77,7 @@ import {
   type ShellExecutionResult,
   type ShellOutputEvent,
   CoreToolCallStatus,
+  PolicyDecision,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -107,6 +108,7 @@ describe('useShellCommandProcessor', () => {
     mockConfig = {
       getTargetDir: () => '/test/dir',
       getEnableInteractiveShell: () => false,
+      getPolicyEngine: () => ({ check: vi.fn().mockResolvedValue({ decision: PolicyDecision.ALLOW }) }),
       getShellExecutionConfig: () => ({
         terminalHeight: 20,
         terminalWidth: 80,
@@ -228,8 +230,8 @@ describe('useShellCommandProcessor', () => {
   it('should handle successful execution and update history correctly', async () => {
     const { result } = renderProcessorHook();
 
-    act(() => {
-      result.current.handleShellCommand(
+    await act(async () => {
+result.current.handleShellCommand(
         'echo "ok"',
         new AbortController().signal,
       );
@@ -260,8 +262,8 @@ describe('useShellCommandProcessor', () => {
   it('should handle command failure and display error status', async () => {
     const { result } = renderProcessorHook();
 
-    act(() => {
-      result.current.handleShellCommand(
+    await act(async () => {
+result.current.handleShellCommand(
         'bad-cmd',
         new AbortController().signal,
       );
@@ -357,8 +359,8 @@ describe('useShellCommandProcessor', () => {
 
     it('should show binary progress messages correctly', async () => {
       const { result } = renderProcessorHook();
-      act(() => {
-        result.current.handleShellCommand(
+      await act(async () => {
+result.current.handleShellCommand(
           'cat img',
           new AbortController().signal,
         );
@@ -449,8 +451,8 @@ describe('useShellCommandProcessor', () => {
     const { result } = renderProcessorHook();
     const abortController = new AbortController();
 
-    act(() => {
-      result.current.handleShellCommand('sleep 5', abortController.signal);
+    await act(async () => {
+result.current.handleShellCommand('sleep 5', abortController.signal);
     });
     const execPromise = onExecMock.mock.calls[0][0];
 
@@ -474,8 +476,8 @@ describe('useShellCommandProcessor', () => {
     const binaryBuffer = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
     mockIsBinary.mockReturnValue(true);
 
-    act(() => {
-      result.current.handleShellCommand(
+    await act(async () => {
+result.current.handleShellCommand(
         'cat image.png',
         new AbortController().signal,
       );
@@ -504,8 +506,8 @@ describe('useShellCommandProcessor', () => {
       result: Promise.reject(testError),
     }));
 
-    act(() => {
-      result.current.handleShellCommand(
+    await act(async () => {
+result.current.handleShellCommand(
         'a-command',
         new AbortController().signal,
       );
@@ -533,8 +535,8 @@ describe('useShellCommandProcessor', () => {
 
     const { result } = renderProcessorHook();
 
-    act(() => {
-      result.current.handleShellCommand(
+    await act(async () => {
+result.current.handleShellCommand(
         'a-command',
         new AbortController().signal,
       );
@@ -562,8 +564,8 @@ describe('useShellCommandProcessor', () => {
       vi.mocked(fs.readFileSync).mockReturnValue('/test/dir/new'); // A different directory
 
       const { result } = renderProcessorHook();
-      act(() => {
-        result.current.handleShellCommand(
+      await act(async () => {
+result.current.handleShellCommand(
           'cd new',
           new AbortController().signal,
         );
@@ -587,8 +589,8 @@ describe('useShellCommandProcessor', () => {
       vi.mocked(fs.readFileSync).mockReturnValue('/test/dir'); // The same directory
 
       const { result } = renderProcessorHook();
-      act(() => {
-        result.current.handleShellCommand('ls', new AbortController().signal);
+      await act(async () => {
+result.current.handleShellCommand('ls', new AbortController().signal);
       });
       const execPromise = onExecMock.mock.calls[0][0];
 
@@ -729,8 +731,8 @@ describe('useShellCommandProcessor', () => {
 
       expect(result.current.activeShellPtyId).toBeNull(); // Pre-condition
 
-      act(() => {
-        result.current.handleShellCommand('cmd', new AbortController().signal);
+      await act(async () => {
+result.current.handleShellCommand('cmd', new AbortController().signal);
       });
       const execPromise = onExecMock.mock.calls[0][0];
 
@@ -756,8 +758,8 @@ describe('useShellCommandProcessor', () => {
 
       const { result } = renderProcessorHook();
 
-      act(() => {
-        result.current.handleShellCommand('ls', new AbortController().signal);
+      await act(async () => {
+result.current.handleShellCommand('ls', new AbortController().signal);
       });
 
       // Let microtasks run
@@ -1104,8 +1106,8 @@ describe('useShellCommandProcessor', () => {
       expect(result.current.isBackgroundShellVisible).toBe(true);
 
       // 2. Start foreground shell
-      act(() => {
-        result.current.handleShellCommand('ls', new AbortController().signal);
+      await act(async () => {
+result.current.handleShellCommand('ls', new AbortController().signal);
       });
 
       // Wait for PID to be set
@@ -1140,8 +1142,8 @@ describe('useShellCommandProcessor', () => {
       expect(result.current.isBackgroundShellVisible).toBe(true);
 
       // 2. Start foreground shell
-      act(() => {
-        result.current.handleShellCommand('ls', new AbortController().signal);
+      await act(async () => {
+result.current.handleShellCommand('ls', new AbortController().signal);
       });
       await waitFor(() => expect(result.current.activeShellPtyId).toBe(12345));
       expect(result.current.isBackgroundShellVisible).toBe(false);

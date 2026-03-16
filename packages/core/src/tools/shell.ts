@@ -44,6 +44,7 @@ import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { getShellDefinition } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { doesToolInvocationMatch } from '../utils/tool-utils.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
@@ -153,6 +154,34 @@ export class ShellToolInvocation extends BaseToolInvocation<
     shellExecutionConfig?: ShellExecutionConfig,
     setExecutionIdCallback?: (executionId: number) => void,
   ): Promise<ToolResult> {
+    const allowedTools = this.context.config.getAllowedTools?.();
+    if (allowedTools !== undefined) {
+      if (!doesToolInvocationMatch('ShellTool', this.params.command, allowedTools)) {
+        return {
+          llmContent: 'Command rejected by policy.',
+          returnDisplay: 'Command rejected by policy.',
+          error: {
+            message: 'Command rejected by policy.',
+            type: ToolErrorType.SHELL_EXECUTE_ERROR,
+          },
+        };
+      }
+    }
+
+    const coreTools = this.context.config.getCoreTools?.();
+    if (coreTools !== undefined) {
+      if (!doesToolInvocationMatch('ShellTool', this.params.command, coreTools)) {
+        return {
+          llmContent: 'Command rejected by policy.',
+          returnDisplay: 'Command rejected by policy.',
+          error: {
+            message: 'Command rejected by policy.',
+            type: ToolErrorType.SHELL_EXECUTE_ERROR,
+          },
+        };
+      }
+    }
+
     const strippedCommand = stripShellWrapper(this.params.command);
 
     if (signal.aborted) {
