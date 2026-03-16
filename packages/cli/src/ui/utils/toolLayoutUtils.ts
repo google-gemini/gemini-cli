@@ -39,8 +39,14 @@ export function calculateToolContentMaxLines(options: {
   availableTerminalHeight: number | undefined;
   isAlternateBuffer: boolean;
   maxLinesLimit?: number;
+  isFullscreen?: boolean;
 }): number | undefined {
-  const { availableTerminalHeight, isAlternateBuffer, maxLinesLimit } = options;
+  const {
+    availableTerminalHeight,
+    isAlternateBuffer,
+    maxLinesLimit,
+    isFullscreen,
+  } = options;
 
   const reservedLines = isAlternateBuffer
     ? TOOL_RESULT_ASB_RESERVED_LINE_COUNT
@@ -48,7 +54,8 @@ export function calculateToolContentMaxLines(options: {
 
   let contentHeight = availableTerminalHeight
     ? Math.max(
-        availableTerminalHeight - TOOL_RESULT_STATIC_HEIGHT - reservedLines,
+        availableTerminalHeight -
+          (isFullscreen ? 3 : TOOL_RESULT_STATIC_HEIGHT + reservedLines),
         TOOL_RESULT_MIN_LINES_SHOWN + 1,
       )
     : undefined;
@@ -78,6 +85,7 @@ export function calculateShellMaxLines(options: {
   availableTerminalHeight: number | undefined;
   constrainHeight: boolean;
   isExpandable: boolean | undefined;
+  isFullscreen?: boolean;
 }): number | undefined {
   const {
     status,
@@ -86,6 +94,7 @@ export function calculateShellMaxLines(options: {
     availableTerminalHeight,
     constrainHeight,
     isExpandable,
+    isFullscreen,
   } = options;
 
   // 1. If the user explicitly requested expansion (unconstrained), remove all caps.
@@ -102,7 +111,12 @@ export function calculateShellMaxLines(options: {
 
   const maxLinesBasedOnHeight = Math.max(1, availableTerminalHeight - 2);
 
-  // 3. Handle ASB mode focus expansion.
+  // 3. Handle Fullscreen or ASB mode focus expansion.
+  // Fullscreen mode always takes the full available height.
+  if (isFullscreen && isThisShellFocused) {
+    return maxLinesBasedOnHeight;
+  }
+
   // We allow a focused shell in ASB mode to take up the full available height,
   // BUT only if we aren't trying to maintain a constrained view (e.g., history items).
   if (isAlternateBuffer && isThisShellFocused && !constrainHeight) {

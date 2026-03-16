@@ -39,9 +39,12 @@ export const DefaultAppLayout: React.FC = () => {
       overflow="hidden"
       ref={uiState.rootUiRef}
     >
-      <MainContent />
+      <Box flexGrow={1} flexDirection="column">
+        <MainContent />
+      </Box>
 
       {uiState.isBackgroundShellVisible &&
+        !uiState.isForegroundShellFullscreen &&
         uiState.backgroundShells.size > 0 &&
         uiState.activeBackgroundShellPid &&
         uiState.backgroundShellHeight > 0 &&

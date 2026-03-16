@@ -35,6 +35,7 @@ interface ToolGroupMessageProps {
   borderTop?: boolean;
   borderBottom?: boolean;
   isExpandable?: boolean;
+  isFullscreen?: boolean;
 }
 
 // Main component renders the border and maps the tools using ToolMessage
@@ -48,6 +49,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
   borderTop: borderTopOverride,
   borderBottom: borderBottomOverride,
   isExpandable,
+  isFullscreen,
 }) => {
   const settings = useSettings();
   const isLowErrorVerbosity = settings.merged.ui?.errorVerbosity !== 'full';
@@ -140,7 +142,8 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       )
     : undefined;
 
-  const contentWidth = terminalWidth - TOOL_MESSAGE_HORIZONTAL_MARGIN;
+  const horizontalMargin = TOOL_MESSAGE_HORIZONTAL_MARGIN;
+  const contentWidth = terminalWidth - horizontalMargin;
 
   // If all tools are filtered out (e.g., in-progress AskUser tools, low-verbosity
   // internal errors, plan-mode hidden write/edit), we should not emit standalone
@@ -164,7 +167,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
       cause tearing.
     */
       width={terminalWidth}
-      paddingRight={TOOL_MESSAGE_HORIZONTAL_MARGIN}
+      paddingRight={horizontalMargin}
     >
       {visibleToolCalls.map((tool, index) => {
         const isFirst = index === 0;
@@ -182,6 +185,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
           borderColor,
           borderDimColor,
           isExpandable,
+          isFullscreen,
         };
 
         return (
@@ -226,7 +230,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
            */
         (visibleToolCalls.length > 0 || borderBottomOverride !== undefined) && (
           <Box
-            height={0}
+            height={isFullscreen ? 1 : 0}
             width={contentWidth}
             borderLeft={true}
             borderRight={true}

@@ -28,6 +28,8 @@ export function useBackgroundShellManager({
 }: BackgroundShellManagerProps) {
   const [isBackgroundShellListOpen, setIsBackgroundShellListOpen] =
     useState(false);
+  const [isBackgroundShellFullscreen, setIsBackgroundShellFullscreen] =
+    useState(false);
   const [activeBackgroundShellPid, setActiveBackgroundShellPid] = useState<
     number | null
   >(null);
@@ -73,17 +75,27 @@ export function useBackgroundShellManager({
     setEmbeddedShellFocused,
   ]);
 
-  const backgroundShellHeight = useMemo(
-    () =>
-      isBackgroundShellVisible && backgroundShells.size > 0
-        ? Math.max(Math.floor(terminalHeight * 0.3), 5)
-        : 0,
-    [isBackgroundShellVisible, backgroundShells.size, terminalHeight],
-  );
+  const backgroundShellHeight = useMemo(() => {
+    if (!isBackgroundShellVisible || backgroundShells.size === 0) {
+      return 0;
+    }
+    if (isBackgroundShellFullscreen) {
+      // Leave enough room for the footer/composer (approx 7 lines)
+      return Math.max(terminalHeight - 7, 5);
+    }
+    return Math.max(Math.floor(terminalHeight * 0.3), 5);
+  }, [
+    isBackgroundShellVisible,
+    backgroundShells.size,
+    terminalHeight,
+    isBackgroundShellFullscreen,
+  ]);
 
   return {
     isBackgroundShellListOpen,
     setIsBackgroundShellListOpen,
+    isBackgroundShellFullscreen,
+    setIsBackgroundShellFullscreen,
     activeBackgroundShellPid,
     setActiveBackgroundShellPid,
     backgroundShellHeight,

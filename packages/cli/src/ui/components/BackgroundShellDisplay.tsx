@@ -33,6 +33,7 @@ import {
   type RadioSelectItem,
 } from './shared/RadioButtonSelect.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
+import { useSettings } from '../contexts/SettingsContext.js';
 
 interface BackgroundShellDisplayProps {
   shells: Map<number, BackgroundShell>;
@@ -70,6 +71,7 @@ export const BackgroundShellDisplay = ({
   isListOpenProp,
 }: BackgroundShellDisplayProps) => {
   const keyMatchers = useKeyMatchers();
+  const settings = useSettings();
   const {
     dismissBackgroundShell,
     setActiveBackgroundShellPid,
@@ -178,6 +180,10 @@ export const BackgroundShellDisplay = ({
         return false;
       }
 
+      if (keyMatchers[Command.TOGGLE_SHELL_FULLSCREEN](key)) {
+        return false;
+      }
+
       if (keyMatchers[Command.KILL_BACKGROUND_SHELL](key)) {
         void dismissBackgroundShell(activeShell.pid);
         return true;
@@ -207,6 +213,9 @@ export const BackgroundShellDisplay = ({
     { label: 'Close', command: Command.TOGGLE_BACKGROUND_SHELL },
     { label: 'Kill', command: Command.KILL_BACKGROUND_SHELL },
     { label: 'List', command: Command.TOGGLE_BACKGROUND_SHELL_LIST },
+    ...(settings.merged.experimental.fullscreen
+      ? [{ label: 'Fullscreen', command: Command.TOGGLE_SHELL_FULLSCREEN }]
+      : []),
   ];
 
   const helpTextStr = helpTextParts

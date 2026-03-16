@@ -34,6 +34,7 @@ export interface ToolResultDisplayProps {
   maxLines?: number;
   hasFocus?: boolean;
   overflowDirection?: 'top' | 'bottom';
+  isFullscreen?: boolean;
 }
 
 interface FileDiffResult {
@@ -49,6 +50,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
   maxLines,
   hasFocus = false,
   overflowDirection = 'top',
+  isFullscreen = false,
 }) => {
   const { renderMarkdown } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
@@ -57,6 +59,7 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     availableTerminalHeight,
     isAlternateBuffer,
     maxLinesLimit: maxLines,
+    isFullscreen,
   });
 
   const combinedPaddingAndBorderWidth = 4;
@@ -173,11 +176,13 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
     // Virtualized path for large ANSI arrays
     if (Array.isArray(resultDisplay)) {
       const limit = maxLines ?? availableHeight ?? ACTIVE_SHELL_MAX_LINES;
-      const listHeight = Math.min(
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        (resultDisplay as AnsiOutput).length,
-        limit,
-      );
+      const listHeight = isFullscreen
+        ? limit
+        : Math.min(
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            (resultDisplay as AnsiOutput).length,
+            limit,
+          );
 
       return (
         <Box width={childWidth} flexDirection="column" maxHeight={listHeight}>

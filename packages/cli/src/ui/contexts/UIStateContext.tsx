@@ -217,6 +217,8 @@ export interface UIState {
   backgroundShells: Map<number, BackgroundShell>;
   activeBackgroundShellPid: number | null;
   backgroundShellHeight: number;
+  isBackgroundShellFullscreen: boolean;
+  isForegroundShellFullscreen: boolean;
   isBackgroundShellListOpen: boolean;
   adminSettingsChanged: boolean;
   newAgents: AgentDefinition[] | null;

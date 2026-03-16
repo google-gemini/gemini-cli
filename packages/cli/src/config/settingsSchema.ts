@@ -1928,6 +1928,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Plan Mode.',
         showInDialog: true,
       },
+      fullscreen: {
+        type: 'boolean',
+        label: 'Fullscreen Mode',
+        category: 'Experimental',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Enable experimental fullscreen mode for integrated and background shells (toggle with ctrl+7).',
+        showInDialog: true,
+      },
       taskTracker: {
         type: 'boolean',
         label: 'Task Tracker',

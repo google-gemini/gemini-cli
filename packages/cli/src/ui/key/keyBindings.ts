@@ -100,6 +100,7 @@ export enum Command {
   BACKGROUND_SHELL_SELECT = 'background.select',
   TOGGLE_BACKGROUND_SHELL = 'background.toggle',
   TOGGLE_BACKGROUND_SHELL_LIST = 'background.toggleList',
+  TOGGLE_SHELL_FULLSCREEN = 'shell.toggleFullscreen',
   KILL_BACKGROUND_SHELL = 'background.kill',
   UNFOCUS_BACKGROUND_SHELL = 'background.unfocus',
   UNFOCUS_BACKGROUND_SHELL_LIST = 'background.unfocusList',
@@ -395,6 +396,7 @@ export const defaultKeyBindingConfig: KeyBindingConfig = new Map([
   [Command.BACKGROUND_SHELL_SELECT, [new KeyBinding('enter')]],
   [Command.TOGGLE_BACKGROUND_SHELL, [new KeyBinding('ctrl+b')]],
   [Command.TOGGLE_BACKGROUND_SHELL_LIST, [new KeyBinding('ctrl+l')]],
+  [Command.TOGGLE_SHELL_FULLSCREEN, [new KeyBinding('ctrl+7')]],
   [Command.KILL_BACKGROUND_SHELL, [new KeyBinding('ctrl+k')]],
   [Command.UNFOCUS_BACKGROUND_SHELL, [new KeyBinding('shift+tab')]],
   [Command.UNFOCUS_BACKGROUND_SHELL_LIST, [new KeyBinding('tab')]],
@@ -519,6 +521,7 @@ export const commandCategories: readonly CommandCategory[] = [
       Command.BACKGROUND_SHELL_SELECT,
       Command.TOGGLE_BACKGROUND_SHELL,
       Command.TOGGLE_BACKGROUND_SHELL_LIST,
+      Command.TOGGLE_SHELL_FULLSCREEN,
       Command.KILL_BACKGROUND_SHELL,
       Command.UNFOCUS_BACKGROUND_SHELL,
       Command.UNFOCUS_BACKGROUND_SHELL_LIST,
@@ -625,6 +628,8 @@ export const commandDescriptions: Readonly<Record<Command, string>> = {
   [Command.TOGGLE_BACKGROUND_SHELL]:
     'Toggle current background shell visibility.',
   [Command.TOGGLE_BACKGROUND_SHELL_LIST]: 'Toggle background shell list.',
+  [Command.TOGGLE_SHELL_FULLSCREEN]:
+    'Toggle fullscreen mode for the active integrated or background shell.',
   [Command.KILL_BACKGROUND_SHELL]: 'Kill the active background shell.',
   [Command.UNFOCUS_BACKGROUND_SHELL]:
     'Move focus from background shell to Gemini.',

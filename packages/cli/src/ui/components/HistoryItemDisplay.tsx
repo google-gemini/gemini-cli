@@ -48,6 +48,7 @@ interface HistoryItemDisplayProps {
   isExpandable?: boolean;
   isFirstThinking?: boolean;
   isFirstAfterThinking?: boolean;
+  isFullscreen?: boolean;
 }
 
 export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
@@ -60,6 +61,7 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
   isExpandable,
   isFirstThinking = false,
   isFirstAfterThinking = false,
+  isFullscreen = false,
 }) => {
   const settings = useSettings();
   const inlineThinkingMode = getInlineThinkingMode(settings);
@@ -73,7 +75,8 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
       flexDirection="column"
       key={itemForDisplay.id}
       width={terminalWidth}
-      marginTop={needsTopMarginAfterThinking ? 1 : 0}
+      marginTop={isFullscreen ? 0 : needsTopMarginAfterThinking ? 1 : 0}
+      paddingTop={isFullscreen ? 1 : 0}
     >
       {/* Render standard message types */}
       {itemForDisplay.type === 'thinking' && inlineThinkingMode !== 'off' && (
@@ -197,9 +200,10 @@ export const HistoryItemDisplay: React.FC<HistoryItemDisplayProps> = ({
           toolCalls={itemForDisplay.tools}
           availableTerminalHeight={availableTerminalHeight}
           terminalWidth={terminalWidth}
-          borderTop={itemForDisplay.borderTop}
-          borderBottom={itemForDisplay.borderBottom}
+          borderTop={isFullscreen ? true : itemForDisplay.borderTop}
+          borderBottom={isFullscreen ? true : itemForDisplay.borderBottom}
           isExpandable={isExpandable}
+          isFullscreen={isFullscreen}
         />
       )}
       {itemForDisplay.type === 'compression' && (
