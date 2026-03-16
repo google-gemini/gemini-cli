@@ -868,16 +868,16 @@ Content of file[1]
       // Sequential execution means the second call sees the parent already
       // loaded, so it only returns its own leaf context.
       const callOrder: string[] = [];
+      let firstCallDone = false;
       vi.mocked(discoverJitContext).mockImplementation(async (_config, dir) => {
         callOrder.push(dir);
-        if (dir.includes('subA')) {
-          return 'Parent context\nSubA context';
+        if (!firstCallDone) {
+          // First call (whichever dir) loads the shared parent + its own leaf
+          firstCallDone = true;
+          return 'Parent context\nFirst leaf context';
         }
-        if (dir.includes('subB')) {
-          // Parent already loaded by subA, only leaf context returned
-          return 'SubB context';
-        }
-        return '';
+        // Second call only returns its own leaf (parent already loaded)
+        return 'Second leaf context';
       });
 
       // Create files in two sibling subdirectories
@@ -897,19 +897,23 @@ Content of file[1]
       const invocation = tool.build({ include: ['subA/a.ts', 'subB/b.ts'] });
       const result = await invocation.execute(new AbortController().signal);
 
-      // Verify calls were made sequentially (second call starts after first completes)
+      // Verify both directories were discovered (order depends on Set iteration)
       expect(callOrder).toHaveLength(2);
-      expect(callOrder[0]).toContain('subA');
-      expect(callOrder[1]).toContain('subB');
+      expect(callOrder).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('subA'),
+          expect.stringContaining('subB'),
+        ]),
+      );
 
       const llmContent = Array.isArray(result.llmContent)
         ? result.llmContent.join('')
         : String(result.llmContent);
       expect(llmContent).toContain('Parent context');
-      expect(llmContent).toContain('SubA context');
-      expect(llmContent).toContain('SubB context');
+      expect(llmContent).toContain('First leaf context');
+      expect(llmContent).toContain('Second leaf context');
 
-      // Parent context should appear only once (from subA), not duplicated
+      // Parent context should appear only once (from the first call), not duplicated
       const parentMatches = llmContent.match(/Parent context/g);
       expect(parentMatches).toHaveLength(1);
     });

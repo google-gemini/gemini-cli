@@ -667,8 +667,7 @@ describe('ReadFileTool', () => {
       const parts = result.llmContent as Array<Record<string, unknown>>;
       const jitTextPart = parts.find(
         (p) =>
-          typeof p['text'] === 'string' &&
-          (p['text']).includes('Auth rules'),
+          typeof p['text'] === 'string' && p['text'].includes('Auth rules'),
       );
       expect(jitTextPart).toBeDefined();
       expect(jitTextPart!['text']).toContain(
