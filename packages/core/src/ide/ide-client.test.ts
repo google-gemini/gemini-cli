@@ -127,7 +127,7 @@ describe('IdeClient', () => {
       );
     });
 
-    it('should ignore partial ideInfo from file and fall back to env detection', async () => {
+    it('should pass partial ideInfo from file to detectIde for fallback handling', async () => {
       vi.mocked(getConnectionConfigFromFile).mockResolvedValue({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ideInfo: { name: 'custom-ide' } as any,
@@ -138,11 +138,11 @@ describe('IdeClient', () => {
 
       expect(detectIde).toHaveBeenLastCalledWith(
         { pid: 12345, command: 'test-ide' },
-        undefined,
+        { name: 'custom-ide' },
       );
     });
 
-    it('should ignore malformed ideInfo from file and fall back to env detection', async () => {
+    it('should pass malformed ideInfo from file to detectIde for fallback handling', async () => {
       vi.mocked(getConnectionConfigFromFile).mockResolvedValue({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ideInfo: { name: 123, displayName: ['Custom IDE'] } as any,
@@ -153,7 +153,7 @@ describe('IdeClient', () => {
 
       expect(detectIde).toHaveBeenLastCalledWith(
         { pid: 12345, command: 'test-ide' },
-        undefined,
+        { name: 123, displayName: ['Custom IDE'] },
       );
     });
 
