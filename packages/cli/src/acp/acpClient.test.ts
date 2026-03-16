@@ -172,10 +172,11 @@ describe('GeminiAgent', () => {
         unsubscribe: vi.fn(),
       }),
       getApprovalMode: vi.fn().mockReturnValue('default'),
-      isPlanEnabled: vi.fn().mockReturnValue(false),
+      isPlanEnabled: vi.fn().mockReturnValue(true),
       getGemini31LaunchedSync: vi.fn().mockReturnValue(false),
       getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
       getCheckpointingEnabled: vi.fn().mockReturnValue(false),
+      getDisableAlwaysAllow: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Awaited<ReturnType<typeof loadCliConfig>>>;
     mockSettings = {
       merged: {
@@ -650,10 +651,11 @@ describe('Session', () => {
       getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
       setApprovalMode: vi.fn(),
       setModel: vi.fn(),
-      isPlanEnabled: vi.fn().mockReturnValue(false),
+      isPlanEnabled: vi.fn().mockReturnValue(true),
       getCheckpointingEnabled: vi.fn().mockReturnValue(false),
       getGitService: vi.fn().mockResolvedValue({} as GitService),
       waitForMcpInit: vi.fn(),
+      getDisableAlwaysAllow: vi.fn().mockReturnValue(false),
     } as unknown as Mocked<Config>;
     mockConnection = {
       sessionUpdate: vi.fn(),
@@ -944,6 +946,61 @@ describe('Session', () => {
     expect(mockConnection.requestPermission).toHaveBeenCalled();
     expect(confirmationDetails.onConfirm).toHaveBeenCalledWith(
       ToolConfirmationOutcome.ProceedOnce,
+    );
+  });
+
+  it('should exclude always allow options when disableAlwaysAllow is true', async () => {
+    mockConfig.getDisableAlwaysAllow = vi.fn().mockReturnValue(true);
+    const confirmationDetails = {
+      type: 'info',
+      onConfirm: vi.fn(),
+    };
+    mockTool.build.mockReturnValue({
+      getDescription: () => 'Test Tool',
+      toolLocations: () => [],
+      shouldConfirmExecute: vi.fn().mockResolvedValue(confirmationDetails),
+      execute: vi.fn().mockResolvedValue({ llmContent: 'Tool Result' }),
+    });
+
+    mockConnection.requestPermission.mockResolvedValue({
+      outcome: {
+        outcome: 'selected',
+        optionId: ToolConfirmationOutcome.ProceedOnce,
+      },
+    });
+
+    const stream1 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: {
+          functionCalls: [{ name: 'test_tool', args: {} }],
+        },
+      },
+    ]);
+    const stream2 = createMockStream([
+      {
+        type: StreamEventType.CHUNK,
+        value: { candidates: [] },
+      },
+    ]);
+
+    mockChat.sendMessageStream
+      .mockResolvedValueOnce(stream1)
+      .mockResolvedValueOnce(stream2);
+
+    await session.prompt({
+      sessionId: 'session-1',
+      prompt: [{ type: 'text', text: 'Call tool' }],
+    });
+
+    expect(mockConnection.requestPermission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.not.arrayContaining([
+          expect.objectContaining({
+            optionId: ToolConfirmationOutcome.ProceedAlways,
+          }),
+        ]),
+      }),
     );
   });
 

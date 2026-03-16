@@ -62,6 +62,7 @@ export async function loadConfig(
 
   const configParams: ConfigParameters = {
     sessionId: taskId,
+    clientName: 'a2a-server',
     model: PREVIEW_GEMINI_MODEL,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: undefined, // Sandbox might not be relevant for a server-side agent
@@ -120,7 +121,6 @@ export async function loadConfig(
     await loadServerHierarchicalMemory(
       workspaceDir,
       [workspaceDir],
-      false,
       fileService,
       extensionLoader,
       folderTrust,
