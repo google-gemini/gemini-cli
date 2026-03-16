@@ -714,9 +714,15 @@ export function createPolicyUpdater(
                   'warning',
                   `Syntax error found in policy file. Backing up corrupted file to ${policyFile}.bak and starting fresh.`,
                 );
-                await fs
-                  .copyFile(policyFile, `${policyFile}.bak`)
-                  .catch(() => {});
+                if (
+                  !(
+                    await fs.lstat(policyFile).catch(() => null)
+                  )?.isSymbolicLink()
+                ) {
+                  await fs
+                    .copyFile(policyFile, `${policyFile}.bak`)
+                    .catch(() => {});
+                }
                 existingData = {};
               } else {
                 // Real filesystem error (e.g. EACCES) — throw to prevent silent failure
@@ -787,6 +793,12 @@ export function createPolicyUpdater(
                 isNodeError(renameError) &&
                 (renameError.code === 'EXDEV' || renameError.code === 'EBUSY')
               ) {
+                if (
+                  (
+                    await fs.lstat(policyFile).catch(() => null)
+                  )?.isSymbolicLink()
+                )
+                  throw renameError;
                 await fs.copyFile(tmpFile, policyFile);
                 await fs.unlink(tmpFile).catch(() => {});
               } else {
