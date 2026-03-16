@@ -32,6 +32,96 @@ import {
   isPreviewModel,
   isProModel,
 } from './models.js';
+import type { Config } from './config.js';
+import { ModelConfigService } from '../services/modelConfigService.js';
+import { DEFAULT_MODEL_CONFIGS } from './defaultModelConfigs.js';
+
+const modelConfigService = new ModelConfigService(DEFAULT_MODEL_CONFIGS);
+
+const dynamicConfig = {
+  getExperimentalDynamicModelConfiguration: () => true,
+  modelConfigService,
+} as unknown as Config;
+
+const legacyConfig = {
+  getExperimentalDynamicModelConfiguration: () => false,
+  modelConfigService,
+} as unknown as Config;
+
+describe('Dynamic Configuration Parity', () => {
+  const modelsToTest = [
+    GEMINI_MODEL_ALIAS_AUTO,
+    GEMINI_MODEL_ALIAS_PRO,
+    GEMINI_MODEL_ALIAS_FLASH,
+    PREVIEW_GEMINI_MODEL_AUTO,
+    DEFAULT_GEMINI_MODEL_AUTO,
+    PREVIEW_GEMINI_MODEL,
+    DEFAULT_GEMINI_MODEL,
+    'custom-model',
+  ];
+
+  it('getDisplayString should match legacy behavior', () => {
+    for (const model of modelsToTest) {
+      const legacy = getDisplayString(model, legacyConfig);
+      const dynamic = getDisplayString(model, dynamicConfig);
+      expect(dynamic).toBe(legacy);
+    }
+  });
+
+  it('isPreviewModel should match legacy behavior', () => {
+    const allModels = [
+      ...modelsToTest,
+      PREVIEW_GEMINI_3_1_MODEL,
+      PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+      PREVIEW_GEMINI_FLASH_MODEL,
+    ];
+    for (const model of allModels) {
+      const legacy = isPreviewModel(model, legacyConfig);
+      const dynamic = isPreviewModel(model, dynamicConfig);
+      expect(dynamic).toBe(legacy);
+    }
+  });
+
+  it('isProModel should match legacy behavior', () => {
+    for (const model of modelsToTest) {
+      const legacy = isProModel(model, legacyConfig);
+      const dynamic = isProModel(model, dynamicConfig);
+      expect(dynamic).toBe(legacy);
+    }
+  });
+
+  it('isGemini3Model should match legacy behavior', () => {
+    for (const model of modelsToTest) {
+      const legacy = isGemini3Model(model, legacyConfig);
+      const dynamic = isGemini3Model(model, dynamicConfig);
+      expect(dynamic).toBe(legacy);
+    }
+  });
+
+  it('isCustomModel should match legacy behavior', () => {
+    for (const model of modelsToTest) {
+      const legacy = isCustomModel(model, legacyConfig);
+      const dynamic = isCustomModel(model, dynamicConfig);
+      expect(dynamic).toBe(legacy);
+    }
+  });
+
+  it('supportsModernFeatures should match legacy behavior', () => {
+    for (const model of modelsToTest) {
+      const legacy = supportsModernFeatures(model);
+      const dynamic = supportsModernFeatures(model);
+      expect(dynamic).toBe(legacy);
+    }
+  });
+
+  it('supportsMultimodalFunctionResponse should match legacy behavior', () => {
+    for (const model of modelsToTest) {
+      const legacy = supportsMultimodalFunctionResponse(model, legacyConfig);
+      const dynamic = supportsMultimodalFunctionResponse(model, dynamicConfig);
+      expect(dynamic).toBe(legacy);
+    }
+  });
+});
 
 describe('isPreviewModel', () => {
   it('should return true for preview models', () => {
