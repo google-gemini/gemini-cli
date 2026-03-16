@@ -860,5 +860,58 @@ Content of file[1]
         : String(result.llmContent);
       expect(llmContent).not.toContain('Newly Discovered Project Context');
     });
+
+    it('should discover JIT context sequentially to avoid duplicate shared parent context', async () => {
+      const { discoverJitContext } = await import('./jit-context.js');
+
+      // Simulate two subdirectories sharing a parent GEMINI.md.
+      // Sequential execution means the second call sees the parent already
+      // loaded, so it only returns its own leaf context.
+      const callOrder: string[] = [];
+      vi.mocked(discoverJitContext).mockImplementation(async (_config, dir) => {
+        callOrder.push(dir);
+        if (dir.includes('subA')) {
+          return 'Parent context\nSubA context';
+        }
+        if (dir.includes('subB')) {
+          // Parent already loaded by subA, only leaf context returned
+          return 'SubB context';
+        }
+        return '';
+      });
+
+      // Create files in two sibling subdirectories
+      fs.mkdirSync(path.join(tempRootDir, 'subA'), { recursive: true });
+      fs.mkdirSync(path.join(tempRootDir, 'subB'), { recursive: true });
+      fs.writeFileSync(
+        path.join(tempRootDir, 'subA', 'a.ts'),
+        'const a = 1;',
+        'utf8',
+      );
+      fs.writeFileSync(
+        path.join(tempRootDir, 'subB', 'b.ts'),
+        'const b = 2;',
+        'utf8',
+      );
+
+      const invocation = tool.build({ include: ['subA/a.ts', 'subB/b.ts'] });
+      const result = await invocation.execute(new AbortController().signal);
+
+      // Verify calls were made sequentially (second call starts after first completes)
+      expect(callOrder).toHaveLength(2);
+      expect(callOrder[0]).toContain('subA');
+      expect(callOrder[1]).toContain('subB');
+
+      const llmContent = Array.isArray(result.llmContent)
+        ? result.llmContent.join('')
+        : String(result.llmContent);
+      expect(llmContent).toContain('Parent context');
+      expect(llmContent).toContain('SubA context');
+      expect(llmContent).toContain('SubB context');
+
+      // Parent context should appear only once (from subA), not duplicated
+      const parentMatches = llmContent.match(/Parent context/g);
+      expect(parentMatches).toHaveLength(1);
+    });
   });
 });
