@@ -38,7 +38,7 @@ import {
 import type { Config } from '../config/config.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
-import { z } from 'zod';
+import * as z from 'zod';
 import { getErrorMessage } from '../utils/errors.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
 import {

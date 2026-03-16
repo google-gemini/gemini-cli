@@ -6,7 +6,7 @@
 
 import type { AgentDefinition } from './types.js';
 import { GEMINI_MODEL_ALIAS_FLASH } from '../config/models.js';
-import { z } from 'zod';
+import * as z from 'zod';
 import { GetInternalDocsTool } from '../tools/get-internal-docs.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 

@@ -233,16 +233,11 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                     ? undefined
                     : uiState.thought
                 }
-                currentLoadingPhrase={
-                  settings.merged.ui.loadingPhrases === 'off'
-                    ? undefined
-                    : uiState.currentLoadingPhrase
-                }
+                currentLoadingPhrase={uiState.currentLoadingPhrase}
                 thoughtLabel={
                   inlineThinkingMode === 'full' ? 'Thinking...' : undefined
                 }
                 elapsedTime={uiState.elapsedTime}
-                suppressText={settings.merged.ui.loadingPhrases === 'off'}
               />
             )}
           </Box>
@@ -280,16 +275,11 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                       ? undefined
                       : uiState.thought
                   }
-                  currentLoadingPhrase={
-                    settings.merged.ui.loadingPhrases === 'off'
-                      ? undefined
-                      : uiState.currentLoadingPhrase
-                  }
+                  currentLoadingPhrase={uiState.currentLoadingPhrase}
                   thoughtLabel={
                     inlineThinkingMode === 'full' ? 'Thinking...' : undefined
                   }
                   elapsedTime={uiState.elapsedTime}
-                  suppressText={settings.merged.ui.loadingPhrases === 'off'}
                 />
               )}
               {showMinimalModeBleedThrough && minimalModeBleedThrough && (

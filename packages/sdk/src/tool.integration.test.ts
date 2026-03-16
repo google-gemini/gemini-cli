@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { GeminiCliAgent } from './agent.js';
 import * as path from 'node:path';
-import { z } from 'zod';
+import * as z from 'zod';
 import { tool, ModelVisibleError } from './tool.js';
 import { fileURLToPath } from 'node:url';
 

@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import { z } from 'zod';
+import * as z from 'zod';
 import {
   getToolCallDataSchema,
   generateCheckpointFileName,

@@ -24,7 +24,6 @@ interface LoadingIndicatorProps {
   thought?: ThoughtSummary | null;
   thoughtLabel?: string;
   showCancelAndTimer?: boolean;
-  suppressText?: boolean;
 }
 
 export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
@@ -35,7 +34,6 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   thought,
   thoughtLabel,
   showCancelAndTimer = true,
-  suppressText = false,
 }) => {
   const streamingState = useStreamingContext();
   const { columns: terminalWidth } = useTerminalSize();
@@ -54,11 +52,9 @@ export const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({
   const primaryText =
     currentLoadingPhrase === INTERACTIVE_SHELL_WAITING_PHRASE
       ? currentLoadingPhrase
-      : suppressText
-        ? undefined
-        : thought?.subject
-          ? (thoughtLabel ?? thought.subject)
-          : currentLoadingPhrase;
+      : thought?.subject
+        ? (thoughtLabel ?? thought.subject)
+        : currentLoadingPhrase;
   const hasThoughtIndicator =
     currentLoadingPhrase !== INTERACTIVE_SHELL_WAITING_PHRASE &&
     Boolean(thought?.subject?.trim());

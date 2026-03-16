@@ -71,7 +71,7 @@ Trusted Tools (Context):
 {{trusted_content}}
 `;
 
-import { z } from 'zod';
+import * as z from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
 const ToolPolicySchema = z.object({

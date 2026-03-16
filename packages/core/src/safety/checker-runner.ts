@@ -18,7 +18,7 @@ import {
 } from './protocol.js';
 import type { CheckerRegistry } from './registry.js';
 import type { ContextBuilder } from './context-builder.js';
-import { z } from 'zod';
+import * as z from 'zod';
 
 const SafetyCheckResultSchema: z.ZodType<SafetyCheckResult> =
   z.discriminatedUnion('decision', [

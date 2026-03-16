@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { z } from 'zod';
+import * as z from 'zod';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { getCoreSystemPrompt } from '../core/prompts.js';
 import type { LocalAgentDefinition } from './types.js';

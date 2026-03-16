@@ -8,7 +8,7 @@ import * as path from 'node:path';
 import type { GitService } from '../services/gitService.js';
 import type { GeminiClient } from '../core/client.js';
 import { getErrorMessage } from './errors.js';
-import { z } from 'zod';
+import * as z from 'zod';
 import type { Content } from '@google/genai';
 import type { ToolCallRequestInfo } from '../scheduler/types.js';
 

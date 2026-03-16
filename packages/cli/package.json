@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.0.0-20260315.21282bf66.euxaristia",
+  "version": "0.0.0-20260316.57965c5fb.euxaristia",
   "description": "Gemini CLI",
   "license": "Apache-2.0",
   "repository": {
@@ -27,7 +27,7 @@
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.0.0-20260315.21282bf66.euxaristia"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.0.0-20260316.57965c5fb.euxaristia"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.12.0",

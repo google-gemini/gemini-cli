@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { inspect } from 'node:util';
 import process from 'node:process';
-import { z } from 'zod';
+import * as z from 'zod';
 import {
   AuthType,
   createContentGenerator,

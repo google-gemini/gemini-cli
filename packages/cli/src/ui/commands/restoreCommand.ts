@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
-import { z } from 'zod';
+import * as z from 'zod';
 import {
   type Config,
   formatCheckpointDisplayList,

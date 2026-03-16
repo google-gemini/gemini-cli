@@ -15,7 +15,7 @@
 
 import type { LocalAgentDefinition } from '../types.js';
 import type { Config } from '../../config/config.js';
-import { z } from 'zod';
+import * as z from 'zod';
 import {
   isPreviewModel,
   PREVIEW_GEMINI_FLASH_MODEL,
