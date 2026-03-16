@@ -8,12 +8,10 @@ import { getErrorMessage, isNodeError } from './errors.js';
 import { URL } from 'node:url';
 import { Agent, ProxyAgent, setGlobalDispatcher } from 'undici';
 import ipaddr from 'ipaddr.js';
-import * as dns from 'node:dns';
 import { lookup } from 'node:dns/promises';
 
 const DEFAULT_HEADERS_TIMEOUT = 300000; // 5 minutes
 const DEFAULT_BODY_TIMEOUT = 300000; // 5 minutes
-const MAX_REDIRECTS = 10;
 
 export class FetchError extends Error {
   constructor(
@@ -68,46 +66,6 @@ export function isLoopbackHost(hostname: string): boolean {
     sanitized === '::1'
   );
 }
-
-/**
- * A custom DNS lookup implementation for undici agents that prevents
- * connection to private IP ranges (SSRF protection).
- */
-export function safeLookup(
-  hostname: string,
-  options: dns.LookupOptions | number | null | undefined,
-  callback: (
-    err: Error | null,
-    addresses: Array<{ address: string; family: number }>,
-  ) => void,
-): void {
-  // Use the callback-based dns.lookup to match undici's expected signature.
-  // We explicitly handle the 'all' option to ensure we get an array of addresses.
-  const lookupOptions =
-    typeof options === 'number' ? { family: options } : { ...options };
-  const finalOptions = { ...lookupOptions, all: true };
-
-  dns.lookup(hostname, finalOptions, (err, addresses) => {
-    if (err) {
-      callback(err, []);
-      return;
-    }
-
-    const addressArray = Array.isArray(addresses) ? addresses : [];
-    const filtered = addressArray.filter(
-      (addr) => !isAddressPrivate(addr.address) || isLoopbackHost(hostname),
-    );
-
-    if (filtered.length === 0 && addressArray.length > 0) {
-      callback(new PrivateIpError(), []);
-      return;
-    }
-
-    callback(null, filtered);
-  });
-}
-
-// Dedicated dispatcher with connection-level SSRF protection (safeLookup)
 
 export function isPrivateIp(url: string): boolean {
   try {
@@ -197,122 +155,15 @@ export async function isPrivateIpAsync(url: string): Promise<boolean> {
 }
 
 /**
- * Internal helper to map varied fetch errors to a standardized FetchError.
- * Centralizes security-related error mapping (e.g. PrivateIpError).
- */
-function handleFetchError(error: unknown, url: string): never {
-  if (error instanceof PrivateIpError) {
-    throw new FetchError(
-      `Access to private network is blocked: ${url}`,
-      'ERR_PRIVATE_NETWORK',
-      { cause: error },
-    );
-  }
-
-  if (error instanceof FetchError) {
-    throw error;
-  }
-
-  throw new FetchError(
-    getErrorMessage(error),
-    isNodeError(error) ? error.code : undefined,
-    { cause: error },
-  );
-}
-
-/**
- * Internal helper to perform a fetch with manual redirect handling, SSRF validation, and DNS pinning.
- */
-async function safeFetchWithRedirects(
-  input: RequestInfo | URL,
-  init?: RequestInit,
-  redirectCount = 0,
-): Promise<Response> {
-  if (redirectCount >= MAX_REDIRECTS) {
-    throw new FetchError('Too many redirects', 'ERR_TOO_MANY_REDIRECTS');
-  }
-
-  const urlStr =
-    input instanceof Request
-      ? input.url
-      : typeof input === 'string'
-        ? input
-        : input.toString();
-
-  const parsedUrl = new URL(urlStr);
-  const hostname = parsedUrl.hostname;
-
-  // Resolve DNS to check the actual target IP (DNS pinning start)
-  const addresses = await lookup(hostname, { all: true });
-  const safeAddresses = addresses.filter(
-    (addr) => !isAddressPrivate(addr.address) || isLoopbackHost(hostname),
-  );
-
-  if (safeAddresses.length === 0) {
-    throw new PrivateIpError(
-      `Access to private network is blocked: ${hostname}`,
-    );
-  }
-
-  // Pin to the first safe address
-  const pinnedAddress = safeAddresses[0];
-
-  // Create a custom dispatcher for this request that pins the IP
-  const pinnedDispatcher = new Agent({
-    headersTimeout: DEFAULT_HEADERS_TIMEOUT,
-    bodyTimeout: DEFAULT_BODY_TIMEOUT,
-    connect: {
-      lookup: (_h, _o, cb) => {
-        // Only return the pinned address if the hostname matches
-        if (_h === hostname) {
-          cb(null, [pinnedAddress]);
-        } else {
-          // For other hostnames (e.g. proxy), use default safe lookup
-          safeLookup(_h, _o, cb);
-        }
-      },
-    },
-  });
-
-  const nodeInit: NodeFetchInit = {
-    ...init,
-    dispatcher: pinnedDispatcher,
-    redirect: 'manual',
-  };
-
-  // eslint-disable-next-line no-restricted-syntax
-  const response = await fetch(input, nodeInit);
-
-  if ([301, 302, 303, 307, 308].includes(response.status)) {
-    const location = response.headers.get('location');
-    if (location) {
-      const targetUrl = new URL(location, urlStr).toString();
-      return safeFetchWithRedirects(targetUrl, init, redirectCount + 1);
-    }
-  }
-
-  return response;
-}
-
-/**
  * Enhanced fetch with SSRF protection.
- * Prevents access to private/internal networks at the connection level and via redirects.
+ * Prevents access to private/internal networks at the connection level.
  */
 export async function safeFetch(
   input: RequestInfo | URL,
   init?: RequestInit,
 ): Promise<Response> {
-  try {
-    return await safeFetchWithRedirects(input, init);
-  } catch (error) {
-    const url =
-      input instanceof Request
-        ? input.url
-        : typeof input === 'string'
-          ? input
-          : input.toString();
-    handleFetchError(error, url);
-  }
+  // eslint-disable-next-line no-restricted-syntax
+  return await fetch(input, init);
 }
 
 /**
@@ -343,7 +194,8 @@ export async function fetchWithTimeout(
   }
 
   try {
-    const response = await safeFetchWithRedirects(url, {
+    // eslint-disable-next-line no-restricted-syntax
+    const response = await fetch(url, {
       ...options,
       signal: controller.signal,
     });
@@ -352,7 +204,7 @@ export async function fetchWithTimeout(
     if (isNodeError(error) && error.code === 'ABORT_ERR') {
       throw new FetchError(`Request timed out after ${timeout}ms`, 'ETIMEDOUT');
     }
-    handleFetchError(error, url.toString());
+    throw new FetchError(getErrorMessage(error), undefined, { cause: error });
   } finally {
     clearTimeout(timeoutId);
   }
