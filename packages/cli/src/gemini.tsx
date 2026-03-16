@@ -30,6 +30,9 @@ import {
   ValidationCancelledError,
   ValidationRequiredError,
   type AdminControlsSettings,
+  isAbortError,
+  isTimeoutError,
+  getErrorMessage,
   debugLogger,
 } from '@google/gemini-cli-core';
 
@@ -142,11 +145,18 @@ export function getNodeMemoryArgs(isDebugMode: boolean): string[] {
 export function setupUnhandledRejectionHandler() {
   let unhandledRejectionOccurred = false;
   process.on('unhandledRejection', (reason, _promise) => {
-    // AbortError is expected when the user cancels a request (e.g. pressing ESC).
-    // It may surface as an unhandled rejection due to async timing in the
-    // streaming pipeline, but it is not a bug.
-    if (reason instanceof Error && reason.name === 'AbortError') {
+    // AbortError and TimeoutError are expected in various scenarios (user cancel,
+    // poor connection, quota limits). They may surface as unhandled rejections
+    // due to async timing in the streaming pipeline, but they are not crashes.
+    if (isAbortError(reason)) {
       debugLogger.log(`Suppressed unhandled AbortError: ${reason.message}`);
+      return;
+    }
+
+    if (isTimeoutError(reason)) {
+      debugLogger.log(
+        `Suppressed unhandled TimeoutError: ${getErrorMessage(reason)}`,
+      );
       return;
     }
 

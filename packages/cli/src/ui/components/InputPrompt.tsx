@@ -611,8 +611,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     (event: MouseEvent) => {
       if (event.name === 'right-release') {
         setSuppressCompletion(false);
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        handleClipboardPaste();
+         
+        handleClipboardPaste().catch((error) => {
+          debugLogger.error('Failed to handle clipboard paste:', error);
+        });
       }
     },
     { isActive: focus },
@@ -1219,8 +1221,10 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
       // Ctrl+V for clipboard paste
       if (keyMatchers[Command.PASTE_CLIPBOARD](key)) {
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        handleClipboardPaste();
+         
+        handleClipboardPaste().catch((error) => {
+          debugLogger.error('Failed to handle clipboard paste:', error);
+        });
         return true;
       }
 

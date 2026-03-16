@@ -125,6 +125,16 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
       })),
       clearInstance: vi.fn(),
     },
+    isAbortError: vi.fn((err) =>
+      actual.isAbortError
+        ? actual.isAbortError(err)
+        : err instanceof Error && err.name === 'AbortError',
+    ),
+    isTimeoutError: vi.fn((err) =>
+      actual.isTimeoutError
+        ? actual.isTimeoutError(err)
+        : err instanceof Error && err.name === 'TimeoutError',
+    ),
     coreEvents: {
       ...actual.coreEvents,
       emitFeedback: vi.fn(),
@@ -317,6 +327,23 @@ describe('gemini.tsx main function', () => {
     expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
     expect(debugLoggerLogSpy).toHaveBeenCalledWith(
       expect.stringContaining('Suppressed unhandled AbortError'),
+    );
+  });
+
+  it('should suppress TimeoutError and not open debug console', async () => {
+    const debugLoggerErrorSpy = vi.spyOn(debugLogger, 'error');
+    const debugLoggerLogSpy = vi.spyOn(debugLogger, 'log');
+    const timeoutError = new Error('The operation timed out.');
+    timeoutError.name = 'TimeoutError';
+
+    setupUnhandledRejectionHandler();
+    process.emit('unhandledRejection', timeoutError, Promise.resolve());
+
+    await new Promise(process.nextTick);
+
+    expect(debugLoggerErrorSpy).not.toHaveBeenCalled();
+    expect(debugLoggerLogSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Suppressed unhandled TimeoutError'),
     );
   });
 

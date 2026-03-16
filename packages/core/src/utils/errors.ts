@@ -29,8 +29,46 @@ export function isNodeError(error: unknown): error is NodeJS.ErrnoException {
 /**
  * Checks if an error is an AbortError.
  */
-export function isAbortError(error: unknown): boolean {
+export function isAbortError(error: unknown): error is Error {
   return error instanceof Error && error.name === 'AbortError';
+}
+
+/**
+ * Checks if an error is a TimeoutError.
+ */
+export function isTimeoutError(
+  error: unknown,
+): error is Error | Record<string, unknown> {
+  if (error instanceof Error) {
+    if (error.name === 'TimeoutError') {
+      return true;
+    }
+    if ('code' in error && typeof error.code === 'string') {
+      return (
+        error.code === 'UND_ERR_HEADERS_TIMEOUT' ||
+        error.code === 'UND_ERR_BODY_TIMEOUT'
+      );
+    }
+    return false;
+  }
+  if (typeof error === 'object' && error !== null) {
+    const name =
+      'name' in error && typeof (error as { name: unknown }).name === 'string'
+        ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          (error as { name: string }).name
+        : undefined;
+    const code =
+      'code' in error && typeof (error as { code: unknown }).code === 'string'
+        ? // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          (error as { code: string }).code
+        : undefined;
+    return (
+      name === 'TimeoutError' ||
+      code === 'UND_ERR_HEADERS_TIMEOUT' ||
+      code === 'UND_ERR_BODY_TIMEOUT'
+    );
+  }
+  return false;
 }
 
 export function getErrorMessage(error: unknown): string {

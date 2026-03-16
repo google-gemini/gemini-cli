@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import {
   isAuthenticationError,
   isAbortError,
+  isTimeoutError,
   UnauthorizedError,
   toFriendlyError,
   BadRequestError,
@@ -69,6 +70,48 @@ describe('isAbortError', () => {
     expect(isAbortError({ name: 'AbortError' })).toBe(false);
     expect(isAbortError(null)).toBe(false);
     expect(isAbortError('AbortError')).toBe(false);
+  });
+});
+
+describe('isTimeoutError', () => {
+  it('should return true for standard TimeoutError', () => {
+    const error = new Error('The operation timed out.');
+    error.name = 'TimeoutError';
+    expect(isTimeoutError(error)).toBe(true);
+  });
+
+  it('should return true for Undici headers timeout code', () => {
+    const error = new Error('Headers timeout');
+    (error as { code?: string }).code = 'UND_ERR_HEADERS_TIMEOUT';
+    expect(isTimeoutError(error)).toBe(true);
+  });
+
+  it('should return true for Undici body timeout code', () => {
+    const error = new Error('Body timeout');
+    (error as { code?: string }).code = 'UND_ERR_BODY_TIMEOUT';
+    expect(isTimeoutError(error)).toBe(true);
+  });
+
+  it('should return true for plain objects with TimeoutError name', () => {
+    expect(isTimeoutError({ name: 'TimeoutError' })).toBe(true);
+  });
+
+  it('should return true for plain objects with Undici timeout code', () => {
+    expect(isTimeoutError({ code: 'UND_ERR_HEADERS_TIMEOUT' })).toBe(true);
+    expect(isTimeoutError({ code: 'UND_ERR_BODY_TIMEOUT' })).toBe(true);
+  });
+
+  it('should return false for other errors', () => {
+    expect(isTimeoutError(new Error('Other error'))).toBe(false);
+    expect(isTimeoutError({ name: 'OtherError', code: 'OTHER_CODE' })).toBe(
+      false,
+    );
+  });
+
+  it('should return false for non-objects', () => {
+    expect(isTimeoutError(null)).toBe(false);
+    expect(isTimeoutError(undefined)).toBe(false);
+    expect(isTimeoutError('TimeoutError')).toBe(false);
   });
 });
 
