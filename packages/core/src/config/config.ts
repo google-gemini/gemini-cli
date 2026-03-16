@@ -33,6 +33,7 @@ import { WebFetchTool } from '../tools/web-fetch.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
+import { LspTool } from '../tools/lsp-tool.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
 import { EnterPlanModeTool } from '../tools/enter-plan-mode.js';
 import { GeminiClient } from '../core/client.js';
@@ -3098,6 +3099,9 @@ export class Config implements McpContext, AgentLoopContext {
     );
     maybeRegister(AskUserTool, () =>
       registry.registerTool(new AskUserTool(this.messageBus)),
+    );
+    maybeRegister(LspTool, () =>
+      registry.registerTool(new LspTool(this, this.messageBus)),
     );
     if (this.getUseWriteTodos()) {
       maybeRegister(WriteTodosTool, () =>

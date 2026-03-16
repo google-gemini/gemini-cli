@@ -17,6 +17,7 @@ import {
   SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
+  LSP_TOOL_NAME,
   GREP_PARAM_TOTAL_MAX_MATCHES,
   GREP_PARAM_INCLUDE_PATTERN,
   GREP_PARAM_EXCLUDE_PATTERN,
@@ -70,6 +71,7 @@ export interface PrimaryWorkflowsOptions {
   enableEnterPlanModeTool: boolean;
   enableGrep: boolean;
   enableGlob: boolean;
+  enableLspTool: boolean;
   approvedPlan?: { path: string };
   taskTracker?: boolean;
   topicUpdateNarration: boolean;
@@ -649,13 +651,14 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
   const searchTools: string[] = [];
   if (options.enableGrep) searchTools.push(formatToolName(GREP_TOOL_NAME));
   if (options.enableGlob) searchTools.push(formatToolName(GLOB_TOOL_NAME));
+  if (options.enableLspTool) searchTools.push(formatToolName(LSP_TOOL_NAME));
 
   let searchSentence =
     ' Use search tools extensively to understand file structures, existing code patterns, and conventions.';
   if (searchTools.length > 0) {
     const toolsStr = searchTools.join(' and ');
     const toolOrTools = searchTools.length > 1 ? 'tools' : 'tool';
-    searchSentence = ` Use ${toolsStr} search ${toolOrTools} extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions.`;
+    searchSentence = ` Use ${toolsStr} ${toolOrTools} extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions.`;
   }
 
   if (options.enableCodebaseInvestigator) {

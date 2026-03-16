@@ -393,8 +393,11 @@ describe('Core System Prompt (prompts.ts)', () => {
   });
 
   it.each([
-    [[CodebaseInvestigatorAgent.name, 'grep_search', 'glob'], true],
-    [['grep_search', 'glob'], false],
+    [
+      [CodebaseInvestigatorAgent.name, 'grep_search', 'glob', 'lsp_query'],
+      true,
+    ],
+    [['grep_search', 'glob', 'lsp_query'], false],
   ])(
     'should handle CodebaseInvestigator with tools=%s',
     (toolNames, expectCodebaseInvestigator) => {
@@ -437,14 +440,14 @@ describe('Core System Prompt (prompts.ts)', () => {
           `Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery`,
         );
         expect(prompt).not.toContain(
-          'Use `grep_search` and `glob` search tools extensively',
+          'Use `grep_search` and `glob` and `lsp_query` tools extensively',
         );
       } else {
         expect(prompt).not.toContain(
           `Utilize specialized sub-agents (e.g., \`codebase_investigator\`) as the primary mechanism for initial discovery`,
         );
         expect(prompt).toContain(
-          'Use `grep_search` and `glob` search tools extensively',
+          'Use `grep_search` and `glob` and `lsp_query` tools extensively',
         );
       }
       expect(prompt).toMatchSnapshot();

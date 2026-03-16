@@ -108,6 +108,7 @@
             ]
           },
           { "label": "IDE integration", "slug": "docs/ide-integration" },
+          { "label": "LSP Query", "slug": "docs/tools/lsp-query" },
           { "label": "MCP servers", "slug": "docs/tools/mcp-server" },
           { "label": "Model routing", "slug": "docs/cli/model-routing" },
           { "label": "Model selection", "slug": "docs/cli/model" },

@@ -26,6 +26,7 @@ import {
   ENTER_PLAN_MODE_TOOL_NAME,
   GLOB_TOOL_NAME,
   GREP_TOOL_NAME,
+  LSP_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { resolveModel, supportsModernFeatures } from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
@@ -159,6 +160,7 @@ export class PromptProvider {
             ),
             enableGrep: enabledToolNames.has(GREP_TOOL_NAME),
             enableGlob: enabledToolNames.has(GLOB_TOOL_NAME),
+            enableLspTool: enabledToolNames.has(LSP_TOOL_NAME),
             approvedPlan: approvedPlanPath
               ? { path: approvedPlanPath }
               : undefined,

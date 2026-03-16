@@ -25,6 +25,7 @@ import {
   GET_INTERNAL_DOCS_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  LSP_TOOL_NAME,
   // Shared parameter names
   PARAM_FILE_PATH,
   PARAM_DIR_PATH,
@@ -73,6 +74,9 @@ import {
   ASK_USER_OPTION_PARAM_LABEL,
   ASK_USER_OPTION_PARAM_DESCRIPTION,
   PLAN_MODE_PARAM_REASON,
+  LSP_PARAM_OPERATION,
+  LSP_PARAM_LINE,
+  LSP_PARAM_CHARACTER,
 } from '../base-declarations.js';
 import {
   getShellDeclaration,
@@ -89,6 +93,37 @@ import {
  * Gemini 3 tool set. Initially a copy of the default legacy set.
  */
 export const GEMINI_3_SET: CoreToolSet = {
+  lsp_query: {
+    name: LSP_TOOL_NAME,
+    description: `Execute Language Server Protocol queries (definition, references, hover, documentSymbols) to semantically analyze code.
+If a required language server is missing, this tool will tell you what command is needed to install it. Please prompt the user to run it.`,
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        [LSP_PARAM_OPERATION]: {
+          type: 'string',
+          enum: ['definition', 'references', 'hover', 'documentSymbols'],
+          description: 'The LSP operation to perform.',
+        },
+        [PARAM_FILE_PATH]: {
+          type: 'string',
+          description: 'The file path relative to workspace root.',
+        },
+        [LSP_PARAM_LINE]: {
+          type: 'number',
+          description:
+            '0-indexed line number. Required for definition, references, hover.',
+        },
+        [LSP_PARAM_CHARACTER]: {
+          type: 'number',
+          description:
+            '0-indexed character offset. Required for definition, references, hover.',
+        },
+      },
+      required: [LSP_PARAM_OPERATION, PARAM_FILE_PATH],
+    },
+  },
+
   read_file: {
     name: READ_FILE_TOOL_NAME,
     description: `Reads and returns the content of a specified file. To maintain context efficiency, you MUST use 'start_line' and 'end_line' for targeted, surgical reads of specific sections. For your safety, the tool will automatically truncate output exceeding ${DEFAULT_MAX_LINES_TEXT_FILE} lines, ${MAX_LINE_LENGTH_TEXT_FILE} characters per line, or ${MAX_FILE_SIZE_MB}MB in size; however, triggering these limits is considered token-inefficient. Always retrieve only the minimum content necessary for your next step. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), audio files (MP3, WAV, AIFF, AAC, OGG, FLAC), and PDF files.`,

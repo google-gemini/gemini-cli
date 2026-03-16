@@ -38,6 +38,7 @@ export {
   ASK_USER_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
+  LSP_TOOL_NAME,
   // Shared parameter names
   PARAM_FILE_PATH,
   PARAM_DIR_PATH,
@@ -91,6 +92,10 @@ export {
   PLAN_MODE_PARAM_REASON,
   EXIT_PLAN_PARAM_PLAN_PATH,
   SKILL_PARAM_NAME,
+  LSP_PARAM_OPERATION,
+  LSP_PARAM_FILE_PATH,
+  LSP_PARAM_LINE,
+  LSP_PARAM_CHARACTER,
 } from './base-declarations.js';
 
 // Re-export sets for compatibility
@@ -219,6 +224,13 @@ export const ENTER_PLAN_MODE_DEFINITION: ToolDefinition = {
     return DEFAULT_LEGACY_SET.enter_plan_mode;
   },
   overrides: (modelId) => getToolSet(modelId).enter_plan_mode,
+};
+
+export const LSP_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.lsp_query;
+  },
+  overrides: (modelId) => getToolSet(modelId).lsp_query,
 };
 
 // ============================================================================
