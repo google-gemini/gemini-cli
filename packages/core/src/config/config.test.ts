@@ -1246,7 +1246,7 @@ describe('Server Config (config.ts)', () => {
       const config = new Config(params);
 
       const mockAgentDefinition = {
-        name: 'codebase-investigator',
+        name: 'codebase_investigator',
         description: 'Agent 1',
         instructions: 'Inst 1',
       };
@@ -1294,7 +1294,7 @@ describe('Server Config (config.ts)', () => {
     it('should register subagents as tools even when they are not in allowedTools', async () => {
       const params: ConfigParameters = {
         ...baseParams,
-        allowedTools: ['read_file'], // codebase-investigator is NOT here
+        allowedTools: ['read_file'], // codebase_investigator is NOT here
         agents: {
           overrides: {
             codebase_investigator: { enabled: true },
@@ -1304,7 +1304,7 @@ describe('Server Config (config.ts)', () => {
       const config = new Config(params);
 
       const mockAgentDefinition = {
-        name: 'codebase-investigator',
+        name: 'codebase_investigator',
         description: 'Agent 1',
         instructions: 'Inst 1',
       };
