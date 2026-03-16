@@ -2105,7 +2105,10 @@ describe('LocalAgentExecutor', () => {
         // Give the loop a chance to start and register the listener
         await vi.advanceTimersByTimeAsync(1);
 
-        configWithHints.injectionService.addUserHint('Initial Hint');
+        configWithHints.injectionService.addInjection(
+          'Initial Hint',
+          'user_steering',
+        );
 
         // Resolve the tool call to complete Turn 1
         resolveToolCall!([
@@ -2151,7 +2154,10 @@ describe('LocalAgentExecutor', () => {
 
       it('should NOT inject legacy hints added before executor was created', async () => {
         const definition = createTestDefinition();
-        configWithHints.injectionService.addUserHint('Legacy Hint');
+        configWithHints.injectionService.addInjection(
+          'Legacy Hint',
+          'user_steering',
+        );
 
         const executor = await LocalAgentExecutor.create(
           definition,
@@ -2218,7 +2224,10 @@ describe('LocalAgentExecutor', () => {
         await vi.advanceTimersByTimeAsync(1);
 
         // Add the hint while the tool call is pending
-        configWithHints.injectionService.addUserHint('Corrective Hint');
+        configWithHints.injectionService.addInjection(
+          'Corrective Hint',
+          'user_steering',
+        );
 
         // Now resolve the tool call to complete Turn 1
         resolveToolCall!([

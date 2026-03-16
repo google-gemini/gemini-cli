@@ -611,7 +611,7 @@ export class AppRig {
   async addUserHint(hint: string) {
     if (!this.config) throw new Error('AppRig not initialized');
     await act(async () => {
-      this.config!.injectionService.addUserHint(hint);
+      this.config!.injectionService.addInjection(hint, 'user_steering');
     });
   }
 
