@@ -4,9 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import * as grpc from '@grpc/grpc-js';
-import { lookup } from 'node:dns/promises';
-import { z } from 'zod';
 import type {
   Message,
   Part,
@@ -18,36 +15,9 @@ import type {
   AgentCard,
   AgentInterface,
 } from '@a2a-js/sdk';
-import { isAddressPrivate } from '../utils/fetch.js';
 import type { SendMessageResult } from './a2a-client-manager.js';
 
 export const AUTH_REQUIRED_MSG = `[Authorization Required] The agent has indicated it requires authorization to proceed. Please follow the agent's instructions.`;
-
-const AgentInterfaceSchema = z
-  .object({
-    url: z.string().default(''),
-    transport: z.string().optional(),
-    protocolBinding: z.string().optional(),
-  })
-  .passthrough();
-
-const AgentCardSchema = z
-  .object({
-    name: z.string().default('unknown'),
-    description: z.string().default(''),
-    url: z.string().default(''),
-    version: z.string().default(''),
-    protocolVersion: z.string().default(''),
-    capabilities: z.record(z.unknown()).default({}),
-    skills: z.array(z.union([z.string(), z.record(z.unknown())])).default([]),
-    defaultInputModes: z.array(z.string()).default([]),
-    defaultOutputModes: z.array(z.string()).default([]),
-
-    additionalInterfaces: z.array(AgentInterfaceSchema).optional(),
-    supportedInterfaces: z.array(AgentInterfaceSchema).optional(),
-    preferredTransport: z.string().optional(),
-  })
-  .passthrough();
 
 /**
  * Reassembles incremental A2A streaming updates into a coherent result.
@@ -241,164 +211,43 @@ function extractPartText(part: Part): string {
 }
 
 /**
- * Normalizes an agent card by ensuring it has the required properties
- * and resolving any inconsistencies between protocol versions.
+ * Normalizes proto field name aliases that the SDK doesn't handle yet.
+ * The A2A proto spec uses `supported_interfaces` and `protocol_binding`,
+ * while the SDK expects `additionalInterfaces` and `transport`.
+ * TODO: Remove once @a2a-js/sdk handles these aliases natively.
  */
 export function normalizeAgentCard(card: unknown): AgentCard {
   if (!isObject(card)) {
     throw new Error('Agent card is missing.');
   }
 
-  // Use Zod to validate and parse the card, ensuring safe defaults and narrowing types.
-  const parsed = AgentCardSchema.parse(card);
-  // Narrowing to AgentCard interface after runtime validation.
+  // Shallow-copy to avoid mutating the SDK's cached object.
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const result = parsed as unknown as AgentCard;
+  const result = { ...card } as unknown as AgentCard;
 
-  // Normalize interfaces and synchronize both interface fields.
-  const normalizedInterfaces = extractNormalizedInterfaces(parsed);
-  result.additionalInterfaces = normalizedInterfaces;
-
-  // Sync supportedInterfaces for backward compatibility.
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const legacyResult = result as unknown as Record<string, AgentInterface[]>;
-  legacyResult['supportedInterfaces'] = normalizedInterfaces;
-
-  // Fallback preferredTransport: If not specified, default to GRPC if available.
-  if (
-    !result.preferredTransport &&
-    normalizedInterfaces.some((i) => i.transport === 'GRPC')
-  ) {
-    result.preferredTransport = 'GRPC';
+  // Map supportedInterfaces → additionalInterfaces if needed
+  if (!result.additionalInterfaces) {
+    const raw = card;
+    if (Array.isArray(raw['supportedInterfaces'])) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      result.additionalInterfaces = raw[
+        'supportedInterfaces'
+      ] as AgentInterface[];
+    }
   }
 
-  // Fallback: If top-level URL is missing, use the first interface's URL.
-  if (result.url === '' && normalizedInterfaces.length > 0) {
-    result.url = normalizedInterfaces[0].url;
+  // Map protocolBinding → transport on each interface
+  for (const intf of result.additionalInterfaces ?? []) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const raw = intf as unknown as Record<string, unknown>;
+    const binding = raw['protocolBinding'];
+
+    if (!intf.transport && typeof binding === 'string') {
+      intf.transport = binding;
+    }
   }
 
   return result;
-}
-
-/**
- * Returns gRPC channel credentials based on the URL scheme.
- */
-export function getGrpcCredentials(url: string): grpc.ChannelCredentials {
-  return url.startsWith('https://')
-    ? grpc.credentials.createSsl()
-    : grpc.credentials.createInsecure();
-}
-
-/**
- * Returns gRPC channel options to ensure SSL/authority matches the original hostname
- * when connecting via a pinned IP address.
- */
-export function getGrpcChannelOptions(
-  hostname: string,
-): Record<string, unknown> {
-  return {
-    'grpc.default_authority': hostname,
-    'grpc.ssl_target_name_override': hostname,
-  };
-}
-
-/**
- * Resolves a hostname to its IP address and validates it against SSRF.
- * Returns the pinned IP-based URL and the original hostname.
- */
-export async function pinUrlToIp(
-  url: string,
-  agentName: string,
-): Promise<{ pinnedUrl: string; hostname: string }> {
-  if (!url) return { pinnedUrl: url, hostname: '' };
-
-  // gRPC URLs in A2A can be 'host:port' or 'dns:///host:port' or have schemes.
-  // We normalize to host:port for resolution.
-  const hasScheme = url.includes('://');
-  const normalizedUrl = hasScheme ? url : `http://${url}`;
-
-  try {
-    const parsed = new URL(normalizedUrl);
-    const hostname = parsed.hostname;
-
-    const sanitizedHost =
-      hostname.startsWith('[') && hostname.endsWith(']')
-        ? hostname.slice(1, -1)
-        : hostname;
-
-    // Resolve DNS to check the actual target IP and pin it
-    const addresses = await lookup(hostname, { all: true });
-    const publicAddresses = addresses.filter(
-      (addr) =>
-        !isAddressPrivate(addr.address) ||
-        sanitizedHost === 'localhost' ||
-        sanitizedHost === '127.0.0.1' ||
-        sanitizedHost === '::1',
-    );
-
-    if (publicAddresses.length === 0) {
-      if (addresses.length > 0) {
-        throw new Error(
-          `Refusing to load agent '${agentName}': transport URL '${url}' resolves to private IP range.`,
-        );
-      }
-      throw new Error(
-        `Failed to resolve any public IP addresses for host: ${hostname}`,
-      );
-    }
-
-    const pinnedIp = publicAddresses[0].address;
-    const pinnedHostname = pinnedIp.includes(':') ? `[${pinnedIp}]` : pinnedIp;
-
-    // Reconstruct URL with IP
-    parsed.hostname = pinnedHostname;
-    let pinnedUrl = parsed.toString();
-
-    // If original didn't have scheme, remove it (standard for gRPC targets)
-    if (!hasScheme) {
-      pinnedUrl = pinnedUrl.replace(/^http:\/\//, '');
-      // URL.toString() might append a trailing slash
-      if (pinnedUrl.endsWith('/') && !url.endsWith('/')) {
-        pinnedUrl = pinnedUrl.slice(0, -1);
-      }
-    }
-
-    return { pinnedUrl, hostname };
-  } catch (e) {
-    if (e instanceof Error && e.message.includes('Refusing')) throw e;
-    throw new Error(`Failed to resolve host for agent '${agentName}': ${url}`, {
-      cause: e,
-    });
-  }
-}
-
-/**
- * Splts an agent card URL into a baseUrl and a standard path if it already
- * contains '.well-known/agent-card.json'.
- */
-export function splitAgentCardUrl(url: string): {
-  baseUrl: string;
-  path?: string;
-} {
-  const standardPath = '.well-known/agent-card.json';
-  try {
-    const parsedUrl = new URL(url);
-    if (parsedUrl.pathname.endsWith(standardPath)) {
-      // Reconstruct baseUrl from parsed components to avoid issues with hashes or query params.
-      parsedUrl.pathname = parsedUrl.pathname.substring(
-        0,
-        parsedUrl.pathname.lastIndexOf(standardPath),
-      );
-      parsedUrl.search = '';
-      parsedUrl.hash = '';
-      // We return undefined for path if it's the standard one,
-      // because the SDK's DefaultAgentCardResolver appends it automatically.
-      return { baseUrl: parsedUrl.toString(), path: undefined };
-    }
-  } catch (_e) {
-    // Ignore URL parsing errors here, let the resolver handle them.
-  }
-  return { baseUrl: url };
 }
 
 /**
@@ -444,65 +293,6 @@ export function extractIdsFromResponse(result: SendMessageResult): {
   }
 
   return { contextId, taskId, clearTaskId };
-}
-
-/**
- * Extracts and normalizes interfaces from the card, handling protocol version fallbacks.
- * Preserves all original fields to maintain SDK compatibility.
- */
-function extractNormalizedInterfaces(
-  card: Record<string, unknown>,
-): AgentInterface[] {
-  const rawInterfaces =
-    getArray(card, 'additionalInterfaces') ||
-    getArray(card, 'supportedInterfaces');
-
-  if (!rawInterfaces) {
-    return [];
-  }
-
-  const mapped: AgentInterface[] = [];
-  for (const i of rawInterfaces) {
-    if (isObject(i)) {
-      // Use schema to validate interface object.
-      const parsed = AgentInterfaceSchema.parse(i);
-      // Narrowing to AgentInterface after runtime validation.
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const normalized = parsed as unknown as AgentInterface & {
-        protocolBinding?: string;
-      };
-
-      // Normalize 'transport' from 'protocolBinding' if missing.
-      if (!normalized.transport && normalized.protocolBinding) {
-        normalized.transport = normalized.protocolBinding;
-      }
-
-      // Robust URL: Ensure the URL has a scheme (except for gRPC).
-      if (
-        normalized.url &&
-        !normalized.url.includes('://') &&
-        !normalized.url.startsWith('/') &&
-        normalized.transport !== 'GRPC'
-      ) {
-        // Default to http:// for insecure REST/JSON-RPC if scheme is missing.
-        normalized.url = `http://${normalized.url}`;
-      }
-
-      mapped.push(normalized as AgentInterface);
-    }
-  }
-  return mapped;
-}
-
-/**
- * Safely extracts an array property from an object.
- */
-function getArray(
-  obj: Record<string, unknown>,
-  key: string,
-): unknown[] | undefined {
-  const val = obj[key];
-  return Array.isArray(val) ? val : undefined;
 }
 
 // Type Guards

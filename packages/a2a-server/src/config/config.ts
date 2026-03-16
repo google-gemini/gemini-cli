@@ -62,6 +62,7 @@ export async function loadConfig(
 
   const configParams: ConfigParameters = {
     sessionId: taskId,
+    clientName: 'a2a-server',
     model: PREVIEW_GEMINI_MODEL,
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: undefined, // Sandbox might not be relevant for a server-side agent
@@ -106,8 +107,6 @@ export async function loadConfig(
     trustedFolder: true,
     extensionLoader,
     checkpointing,
-    enableEventDrivenScheduler:
-      settings.experimental?.enableEventDrivenScheduler ?? true,
     interactive: !isHeadlessMode(),
     enableInteractiveShell: !isHeadlessMode(),
     ptyInfo: 'auto',
