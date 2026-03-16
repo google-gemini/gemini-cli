@@ -123,13 +123,13 @@ export const ToolConfirmationMessage: React.FC<
     if (securityWarningsRef.current) {
       const measurement = measureElement(securityWarningsRef.current);
       const newHeight = Math.round(measurement.height);
-      if (newHeight > 0 && newHeight !== measuredSecurityWarningsHeight) {
-        setMeasuredSecurityWarningsHeight(newHeight);
-      }
-    } else if (measuredSecurityWarningsHeight !== 0) {
-      setMeasuredSecurityWarningsHeight(0);
+      setMeasuredSecurityWarningsHeight((prev) =>
+        newHeight > 0 && newHeight !== prev ? newHeight : prev,
+      );
+    } else {
+      setMeasuredSecurityWarningsHeight((prev) => (prev !== 0 ? 0 : prev));
     }
-  }, [measuredSecurityWarningsHeight, terminalWidth, deceptiveUrlWarningText]);
+  }, [terminalWidth, deceptiveUrlWarningText]);
 
   const settings = useSettings();
   const allowPermanentApproval =
