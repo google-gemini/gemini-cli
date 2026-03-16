@@ -83,6 +83,7 @@ import {
   ProjectIdRequiredError,
   CoreToolCallStatus,
   buildUserSteeringHintPrompt,
+  formatBackgroundCompletionForModel,
   logBillingEvent,
   ApiKeyUpdatedEvent,
   type InjectionSource,
@@ -1078,6 +1079,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const pendingHintsRef = useRef<string[]>([]);
   const [pendingHintCount, setPendingHintCount] = useState(0);
+  const pendingBgCompletionsRef = useRef<string[]>([]);
+  const [pendingBgCompletionCount, setPendingBgCompletionCount] = useState(0);
 
   const consumePendingHints = useCallback(() => {
     if (pendingHintsRef.current.length === 0) {
@@ -1090,16 +1093,18 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, []);
 
   useEffect(() => {
-    const hintListener = (text: string, source: InjectionSource) => {
-      if (source !== 'user_steering') {
-        return;
+    const injectionListener = (text: string, source: InjectionSource) => {
+      if (source === 'user_steering') {
+        pendingHintsRef.current.push(text);
+        setPendingHintCount((prev) => prev + 1);
+      } else if (source === 'background_completion') {
+        pendingBgCompletionsRef.current.push(text);
+        setPendingBgCompletionCount((prev) => prev + 1);
       }
-      pendingHintsRef.current.push(text);
-      setPendingHintCount((prev) => prev + 1);
     };
-    config.injectionService.onInjection(hintListener);
+    config.injectionService.onInjection(injectionListener);
     return () => {
-      config.injectionService.offInjection(hintListener);
+      config.injectionService.offInjection(injectionListener);
     };
   }, [config]);
 
@@ -2132,6 +2137,29 @@ Logging in with Google... Restarting Gemini CLI to continue.
     consumePendingHints,
     pendingHistoryItems,
     pendingHintCount,
+  ]);
+
+  useEffect(() => {
+    if (
+      !isConfigInitialized ||
+      streamingState !== StreamingState.Idle ||
+      !isMcpReady ||
+      pendingBgCompletionsRef.current.length === 0
+    ) {
+      return;
+    }
+
+    const bgText = pendingBgCompletionsRef.current.join('\n');
+    pendingBgCompletionsRef.current = [];
+    setPendingBgCompletionCount(0);
+
+    void submitQuery([{ text: formatBackgroundCompletionForModel(bgText) }]);
+  }, [
+    isConfigInitialized,
+    isMcpReady,
+    streamingState,
+    submitQuery,
+    pendingBgCompletionCount,
   ]);
 
   const allToolCalls = useMemo(
