@@ -6,7 +6,12 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { main } from './gemini.js';
-import { debugLogger, type Config } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  SessionEndReason,
+  type Config,
+  type HookSystem,
+} from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -197,11 +202,11 @@ describe('gemini.tsx main function cleanup', () => {
       setValue: vi.fn(),
       forScope: () => ({ settings: {}, originalSettings: {}, path: '' }),
       errors: [],
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    } as unknown as ReturnType<typeof loadSettings>);
 
     vi.mocked(parseArguments).mockResolvedValue({
       promptInteractive: false,
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    } as unknown as Awaited<ReturnType<typeof parseArguments>>);
     vi.mocked(loadCliConfig).mockResolvedValue({
       isInteractive: vi.fn(() => false),
       getQuestion: vi.fn(() => 'test'),
@@ -239,7 +244,7 @@ describe('gemini.tsx main function cleanup', () => {
       refreshAuth: vi.fn(),
       getRemoteAdminSettings: vi.fn(() => undefined),
       getUseAlternateBuffer: vi.fn(() => false),
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    } as unknown as Config);
 
     await main();
 
@@ -259,13 +264,34 @@ describe('gemini.tsx main function cleanup', () => {
     const mockHookSystem = {
       fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
       fireSessionStartEvent: vi.fn().mockResolvedValue(undefined),
-    };
+    } as unknown as HookSystem;
 
     vi.mocked(parseArguments).mockResolvedValue({
       promptInteractive: false,
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+    } as unknown as Awaited<ReturnType<typeof parseArguments>>);
 
-    vi.mocked(loadCliConfig).mockResolvedValue({
+    vi.mocked(loadCliConfig).mockResolvedValue(
+      buildMockConfig({
+        getHookSystem: vi.fn(() => mockHookSystem),
+      }),
+    );
+
+    vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+
+    await main();
+
+    const registeredCallbacks = vi
+      .mocked(registerCleanup)
+      .mock.calls.map(([fn]) => fn);
+    for (const fn of registeredCallbacks) await fn();
+    expect(mockHookSystem.fireSessionEndEvent).toHaveBeenCalledTimes(1);
+    expect(mockHookSystem.fireSessionEndEvent).toHaveBeenCalledWith(
+      SessionEndReason.Exit,
+    );
+  });
+
+  function buildMockConfig(overrides: Partial<Config> = {}): Config {
+    return {
       isInteractive: vi.fn(() => false),
       getQuestion: vi.fn(() => 'test'),
       getSandbox: vi.fn(() => false),
@@ -273,11 +299,10 @@ describe('gemini.tsx main function cleanup', () => {
       getPolicyEngine: vi.fn(),
       getMessageBus: () => ({ subscribe: vi.fn() }),
       getEnableHooks: vi.fn(() => true),
-      getHookSystem: () => mockHookSystem,
+      getHookSystem: vi.fn(() => undefined),
       initialize: vi.fn(),
       storage: { initialize: vi.fn().mockResolvedValue(undefined) },
       getContentGeneratorConfig: vi.fn(),
-      getMcpServers: () => ({}),
       getMcpClientManager: vi.fn(),
       getIdeMode: vi.fn(() => false),
       getAcpMode: vi.fn(() => false),
@@ -302,17 +327,7 @@ describe('gemini.tsx main function cleanup', () => {
       refreshAuth: vi.fn(),
       getRemoteAdminSettings: vi.fn(() => undefined),
       getUseAlternateBuffer: vi.fn(() => false),
-    } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
-
-    vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
-
-    await main();
-
-    const sessionEndCalls = vi
-      .mocked(registerCleanup)
-      .mock.calls.filter(([fn]) =>
-        fn.toString().includes('fireSessionEndEvent'),
-      );
-    expect(sessionEndCalls).toHaveLength(1);
-  });
+      ...overrides,
+    } as unknown as Config;
+  }
 });
