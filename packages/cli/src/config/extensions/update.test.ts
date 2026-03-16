@@ -15,13 +15,16 @@ import {
   type ExtensionUpdateStatus,
 } from '../../ui/state/extensions.js';
 import { ExtensionStorage } from './storage.js';
-import { copyExtension, type ExtensionManager } from '../extension-manager.js';
+import { type ExtensionManager, copyExtension } from '../extension-manager.js';
 import { checkForExtensionUpdate } from './github.js';
 import { loadInstallMetadata } from '../extension.js';
 import * as fs from 'node:fs';
-import type { GeminiCLIExtension } from '@google/gemini-cli-core';
+import {
+  type GeminiCLIExtension,
+  type ExtensionInstallMetadata,
+  IntegrityDataStatus,
+} from '@google/gemini-cli-core';
 
-// Mock dependencies
 vi.mock('./storage.js', () => ({
   ExtensionStorage: {
     createTmpDir: vi.fn(),
@@ -64,8 +67,18 @@ describe('Extension Update Logic', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockExtensionManager = {
-      loadExtensionConfig: vi.fn(),
-      installOrUpdateExtension: vi.fn(),
+      loadExtensionConfig: vi.fn().mockResolvedValue({
+        name: 'test-extension',
+        version: '1.0.0',
+      }),
+      installOrUpdateExtension: vi.fn().mockResolvedValue({
+        ...mockExtension,
+        version: '1.1.0',
+      }),
+      verifyExtensionIntegrity: vi
+        .fn()
+        .mockResolvedValue(IntegrityDataStatus.VERIFIED),
+      storeExtensionIntegrity: vi.fn().mockResolvedValue(undefined),
     } as unknown as ExtensionManager;
     mockDispatch = vi.fn();
 
@@ -92,7 +105,7 @@ describe('Extension Update Logic', () => {
     it('should throw error and set state to ERROR if install metadata type is unknown', async () => {
       vi.mocked(loadInstallMetadata).mockReturnValue({
         type: undefined,
-      } as unknown as import('@google/gemini-cli-core').ExtensionInstallMetadata);
+      } as unknown as ExtensionInstallMetadata);
 
       await expect(
         updateExtension(
@@ -294,6 +307,77 @@ describe('Extension Update Logic', () => {
         },
       });
       expect(fs.promises.rm).toHaveBeenCalled();
+    });
+
+    describe('Integrity Verification', () => {
+      it('should fail update with security alert if integrity is invalid', async () => {
+        vi.mocked(
+          mockExtensionManager.verifyExtensionIntegrity,
+        ).mockResolvedValue(IntegrityDataStatus.INVALID);
+
+        await expect(
+          updateExtension(
+            mockExtension,
+            mockExtensionManager,
+            ExtensionUpdateState.UPDATE_AVAILABLE,
+            mockDispatch,
+          ),
+        ).rejects.toThrow(
+          'Extension test-extension cannot be updated. Extension integrity cannot be verified.',
+        );
+
+        expect(mockDispatch).toHaveBeenCalledWith({
+          type: 'SET_STATE',
+          payload: {
+            name: mockExtension.name,
+            state: ExtensionUpdateState.ERROR,
+          },
+        });
+      });
+
+      it('should establish trust on first update if integrity data is missing', async () => {
+        vi.mocked(
+          mockExtensionManager.verifyExtensionIntegrity,
+        ).mockResolvedValue(IntegrityDataStatus.MISSING);
+
+        await updateExtension(
+          mockExtension,
+          mockExtensionManager,
+          ExtensionUpdateState.UPDATE_AVAILABLE,
+          mockDispatch,
+        );
+
+        // Verify updateExtension delegates to installOrUpdateExtension,
+        // which is responsible for establishing trust internally.
+        expect(
+          mockExtensionManager.installOrUpdateExtension,
+        ).toHaveBeenCalled();
+
+        expect(mockDispatch).toHaveBeenCalledWith({
+          type: 'SET_STATE',
+          payload: {
+            name: mockExtension.name,
+            state: ExtensionUpdateState.UPDATED_NEEDS_RESTART,
+          },
+        });
+      });
+
+      it('should throw if integrity manager throws', async () => {
+        vi.mocked(
+          mockExtensionManager.verifyExtensionIntegrity,
+        ).mockRejectedValue(new Error('Verification failed'));
+
+        await expect(
+          updateExtension(
+            mockExtension,
+            mockExtensionManager,
+            ExtensionUpdateState.UPDATE_AVAILABLE,
+            mockDispatch,
+          ),
+        ).rejects.toThrow(
+          'Extension test-extension cannot be updated. Verification failed',
+        );
+      });
     });
   });
 
