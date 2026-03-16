@@ -513,7 +513,7 @@ describe('runNonInteractive', () => {
       .mockReturnValueOnce(createStreamFromEvents(finalResponse));
 
     await runNonInteractive({
-      config: mockConfig,
+      config: { ...mockConfig, getDebugMode: () => true } as Config,
       settings: mockSettings,
       input: 'Trigger tool error',
       prompt_id: 'prompt-id-3',
@@ -608,7 +608,7 @@ describe('runNonInteractive', () => {
       .mockReturnValueOnce(createStreamFromEvents(finalResponse));
 
     await runNonInteractive({
-      config: mockConfig,
+      config: { ...mockConfig, getDebugMode: () => true } as Config,
       settings: mockSettings,
       input: 'Trigger tool not found',
       prompt_id: 'prompt-id-5',

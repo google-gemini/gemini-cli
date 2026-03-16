@@ -13,6 +13,7 @@ interface ConsolePatcherParams {
   onNewMessage?: (message: Omit<ConsoleMessageItem, 'id'>) => void;
   debugMode: boolean;
   stderr?: boolean;
+  suppressConsoleOutput?: boolean;
 }
 
 export class ConsolePatcher {
@@ -49,6 +50,10 @@ export class ConsolePatcher {
   private patchConsoleMethod =
     (type: 'log' | 'warn' | 'error' | 'debug' | 'info') =>
     (...args: unknown[]) => {
+      if (this.params.suppressConsoleOutput && !this.params.debugMode) {
+        return;
+      }
+
       if (this.params.stderr) {
         if (type !== 'debug' || this.params.debugMode) {
           this.originalConsoleError(this.formatArgs(args));
