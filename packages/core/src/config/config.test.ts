@@ -695,7 +695,7 @@ describe('Server Config (config.ts)', () => {
         experimentIds: [],
         flags: {
           [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
-            boolValue: false,
+            boolValue: true,
           },
         },
       });
@@ -715,7 +715,7 @@ describe('Server Config (config.ts)', () => {
         experimentIds: [],
         flags: {
           [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
-            boolValue: true,
+            boolValue: false,
           },
         },
       });

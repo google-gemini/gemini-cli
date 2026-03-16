@@ -21,6 +21,7 @@ import {
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
   AuthType,
+  UserTierId,
 } from '@google/gemini-cli-core';
 import type { Config, ModelSlashCommandEvent } from '@google/gemini-cli-core';
 
@@ -54,6 +55,7 @@ describe('<ModelDialog />', () => {
   const mockGetGemini31LaunchedSync = vi.fn();
   const mockGetProModelNoAccess = vi.fn();
   const mockGetProModelNoAccessSync = vi.fn();
+  const mockGetUserTier = vi.fn();
 
   interface MockConfig extends Partial<Config> {
     setModel: (model: string, isTemporary?: boolean) => void;
@@ -63,6 +65,7 @@ describe('<ModelDialog />', () => {
     getGemini31LaunchedSync: () => boolean;
     getProModelNoAccess: () => Promise<boolean>;
     getProModelNoAccessSync: () => boolean;
+    getUserTier: () => UserTierId | undefined;
   }
 
   const mockConfig: MockConfig = {
@@ -73,6 +76,7 @@ describe('<ModelDialog />', () => {
     getGemini31LaunchedSync: mockGetGemini31LaunchedSync,
     getProModelNoAccess: mockGetProModelNoAccess,
     getProModelNoAccessSync: mockGetProModelNoAccessSync,
+    getUserTier: mockGetUserTier,
   };
 
   beforeEach(() => {
@@ -82,6 +86,7 @@ describe('<ModelDialog />', () => {
     mockGetGemini31LaunchedSync.mockReturnValue(false);
     mockGetProModelNoAccess.mockResolvedValue(false);
     mockGetProModelNoAccessSync.mockReturnValue(false);
+    mockGetUserTier.mockReturnValue(UserTierId.STANDARD);
 
     // Default implementation for getDisplayString
     mockGetDisplayString.mockImplementation((val: string) => {
@@ -124,6 +129,7 @@ describe('<ModelDialog />', () => {
     mockGetProModelNoAccessSync.mockReturnValue(true);
     mockGetProModelNoAccess.mockResolvedValue(true);
     mockGetHasAccessToPreviewModel.mockReturnValue(true);
+    mockGetUserTier.mockReturnValue(UserTierId.FREE);
     mockGetDisplayString.mockImplementation((val: string) => val);
 
     const { lastFrame, unmount } = await renderComponent();
@@ -448,6 +454,29 @@ describe('<ModelDialog />', () => {
 
       const output = lastFrame();
       expect(output).not.toContain(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL);
+      unmount();
+    });
+
+    it('shows Flash Lite Preview model for free tier users', async () => {
+      mockGetProModelNoAccessSync.mockReturnValue(false);
+      mockGetProModelNoAccess.mockResolvedValue(false);
+      mockGetHasAccessToPreviewModel.mockReturnValue(true);
+      mockGetUserTier.mockReturnValue(UserTierId.FREE);
+      const { lastFrame, stdin, waitUntilReady, unmount } =
+        await renderComponent();
+
+      // Go to manual view
+      await act(async () => {
+        stdin.write('\u001B[B'); // Manual
+      });
+      await waitUntilReady();
+      await act(async () => {
+        stdin.write('\r');
+      });
+      await waitUntilReady();
+
+      const output = lastFrame();
+      expect(output).toContain(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL);
       unmount();
     });
   });
