@@ -115,11 +115,31 @@ Host ${sshAlias}
       userFork = `${user}/gemini-cli`;
   }
   
-  console.log(`   👉 Target fork: ${userFork}`);
+  console.log(`   ✅ Target fork: ${userFork}`);
 
-  // ... (Resolve Paths unchanged)
+  // Resolve Paths (Simplified with Tilde)
+  const remoteHost = sshAlias;
+  const remoteWorkDir = `~/dev/main`;
+  const persistentScripts = `~/.offload/scripts`;
 
-  // 4. Scoped Token Onboarding
+  console.log(`\n📦 Performing One-Time Synchronization...`);
+  spawnSync(`ssh ${remoteHost} "mkdir -p ${remoteWorkDir} ~/.gemini/policies ${persistentScripts}"`, { shell: true });
+
+  const rsyncBase = `rsync -avz -e "ssh" --exclude=".gemini/settings.json"`;
+
+  // 2. Sync Scripts & Policies
+  console.log('   - Pushing offload logic to persistent worker directory...');
+  spawnSync(`${rsyncBase} --delete .gemini/skills/offload/scripts/ ${remoteHost}:${persistentScripts}/`, { shell: true });
+  spawnSync(`${rsyncBase} .gemini/skills/offload/policy.toml ${remoteHost}:~/.gemini/policies/offload-policy.toml`, { shell: true });
+
+  // 3. Sync Auth (Gemini)
+  if (await confirm('Sync Gemini accounts credentials?')) {
+    const homeDir = env.HOME || '';
+    const lp = path.join(homeDir, '.gemini/google_accounts.json');
+    if (fs.existsSync(lp)) {
+      spawnSync(`${rsyncBase} ${lp} ${remoteHost}:~/.gemini/google_accounts.json`, { shell: true });
+    }
+  }
   if (await confirm('Generate a scoped, secure token for the autonomous agent? (Recommended)')) {
     const magicLink = `https://github.com/settings/tokens/beta/new?description=Offload-${env.USER}&repositories[]=${encodeURIComponent(upstreamRepo)}&repositories[]=${encodeURIComponent(userFork)}&permissions[contents]=write&permissions[pull_requests]=write&permissions[metadata]=read`;
     

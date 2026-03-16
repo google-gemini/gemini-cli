@@ -46,16 +46,36 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   const remotePolicyPath = `~/.gemini/policies/offload-policy.toml`;
   const persistentScripts = `~/.offload/scripts`;
   const sessionName = `offload-${prNumber}-${action}`;
-  const remoteWorktreeDir = `~/dev/worktrees/offload-${prNumber}-${action}`;
+  const remoteWorktreeDir = `~/dev/worktrees/${sessionName}`;
 
   // 3. Remote Context Setup (Parallel Worktree)
-  console.log(`🚀 Provisioning persistent worktree for ${action} on PR #${prNumber}...`);
-  const setupCmd = `
-    mkdir -p ~/dev/worktrees && \
-    cd ${remoteWorkDir} && \
-    git fetch upstream pull/${prNumber}/head && \
-    git worktree add -f ${remoteWorktreeDir} FETCH_HEAD
-  `;
+  console.log(`🚀 Provisioning persistent worktree for ${action} on #${prNumber}...`);
+  
+  let setupCmd = '';
+  if (action === 'implement') {
+      // FIX: Always use explicit base (upstream/main) to prevent Branch Bleeding
+      const branchName = `impl-${prNumber}`;
+      setupCmd = `
+        mkdir -p ~/dev/worktrees && \
+        cd ${remoteWorkDir} && \
+        git fetch upstream main && \
+        git worktree add -f -b ${branchName} ${remoteWorktreeDir} upstream/main
+      `;
+  } else {
+      // For PR-based actions, we fetch the PR head
+      setupCmd = `
+        mkdir -p ~/dev/worktrees && \
+        cd ${remoteWorkDir} && \
+        git fetch upstream pull/${prNumber}/head && \
+        git worktree add -f ${remoteWorktreeDir} FETCH_HEAD
+      `;
+  }
+
+  // Wrap in docker exec if needed
+  if (useContainer) {
+    setupCmd = `docker exec maintainer-worker sh -c ${q(setupCmd)}`;
+  }
+
   spawnSync(`ssh ${remoteHost} ${q(setupCmd)}`, { shell: true, stdio: 'inherit' });
 
   // 4. Execution Logic (Persistent Workstation Mode)
