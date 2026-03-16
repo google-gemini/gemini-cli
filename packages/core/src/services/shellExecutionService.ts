@@ -835,6 +835,14 @@ export class ShellExecutionService {
           this.activePtys.delete(ptyPid);
         },
         isActive: () => {
+          // On Windows, process.kill(pid, 0) is unreliable for ConPTY-managed
+          // processes and can return false-negatives, causing writeToPty to
+          // silently discard arrow-key writes before the process has exited.
+          // Checking the activePtys map avoids this: the entry is only removed
+          // on confirmed exit (ptyProcess.onExit), so it is authoritative.
+          if (ShellExecutionService.activePtys.has(ptyPid)) {
+            return true;
+          }
           try {
             return process.kill(ptyPid, 0);
           } catch {

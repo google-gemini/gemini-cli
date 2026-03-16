@@ -23,7 +23,6 @@ import {
   type Storage,
   NoopSandboxManager,
   type ToolRegistry,
-  type SandboxManager,
 } from '@google/gemini-cli-core';
 import { createMockMessageBus } from '@google/gemini-cli-core/src/test-utils/mock-message-bus.js';
 import { expect, vi } from 'vitest';
@@ -100,8 +99,7 @@ export function createMockConfig(
     getGitService: vi.fn(),
     validatePathAccess: vi.fn().mockReturnValue(undefined),
     getShellExecutionConfig: vi.fn().mockReturnValue({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      sandboxManager: new NoopSandboxManager() as unknown as SandboxManager,
+      sandboxManager: new NoopSandboxManager(),
       sanitizationConfig: {
         allowedEnvironmentVariables: [],
         blockedEnvironmentVariables: [],
