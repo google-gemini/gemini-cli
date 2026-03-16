@@ -1168,7 +1168,10 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
     this._geminiClient = new GeminiClient(this);
-    this._sandboxManager = createSandboxManager(params.toolSandboxing ?? false);
+    this._sandboxManager = createSandboxManager(
+      params.toolSandboxing ?? false,
+      this.targetDir,
+    );
     this.shellExecutionConfig.sandboxManager = this._sandboxManager;
     this.modelRouterService = new ModelRouterService(this);
   }
