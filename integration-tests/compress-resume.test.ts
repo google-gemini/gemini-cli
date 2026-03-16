@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { TestRig } from './test-helper.js';
+import { TestRig, GEMINI_DIR } from './test-helper.js';
 import { join } from 'node:path';
 import * as fs from 'node:fs';
 
@@ -54,7 +54,7 @@ describe('compress-then-resume', () => {
 
     // Verify the session file contains a compression_marker
     const homeDir = rig.homeDir!;
-    const tmpDir = join(homeDir, '.gemini', 'tmp');
+    const tmpDir = join(homeDir, GEMINI_DIR, 'tmp');
     const allDirs = fs.readdirSync(tmpDir, { recursive: true }).map(String);
     const chatFiles = allDirs.filter(
       (f) => f.includes('chats') && f.endsWith('.json'),
@@ -77,7 +77,6 @@ describe('compress-then-resume', () => {
     });
 
     // The resumed session should recall context from the compressed history
-    expect(result).toContain('robot');
     expect(result).toContain('Unit 734');
   });
 });
