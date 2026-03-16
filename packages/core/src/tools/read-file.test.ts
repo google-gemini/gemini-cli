@@ -30,6 +30,13 @@ vi.mock('./jit-context.js', () => ({
     if (!context) return content;
     return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
   }),
+  appendJitContextToParts: vi.fn().mockImplementation((content, context) => {
+    const jitPart = {
+      text: `\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`,
+    };
+    const existing = Array.isArray(content) ? content : [content];
+    return [...existing, jitPart];
+  }),
   JIT_CONTEXT_PREFIX: '\n\n--- Newly Discovered Project Context ---\n',
   JIT_CONTEXT_SUFFIX: '\n--- End Project Context ---',
 }));

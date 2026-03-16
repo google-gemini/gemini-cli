@@ -20,7 +20,7 @@ import {
 import { ToolErrorType } from './tool-error.js';
 import { buildFilePathArgsPattern } from '../policy/utils.js';
 
-import type { Part, PartListUnion, PartUnion } from '@google/genai';
+import type { PartListUnion } from '@google/genai';
 import {
   processSingleFileContent,
   getSpecificMimeType,
@@ -37,8 +37,7 @@ import { resolveToolDeclaration } from './definitions/resolver.js';
 import {
   discoverJitContext,
   appendJitContext,
-  JIT_CONTEXT_PREFIX,
-  JIT_CONTEXT_SUFFIX,
+  appendJitContextToParts,
 } from './jit-context.js';
 
 /**
@@ -182,15 +181,7 @@ ${result.llmContent}`;
       if (typeof llmContent === 'string') {
         llmContent = appendJitContext(llmContent, jitContext);
       } else {
-        // For non-string content (e.g., images/PDFs), wrap both the original
-        // content and JIT context into a Part array.
-        const jitPart: Part = {
-          text: `${JIT_CONTEXT_PREFIX}${jitContext}${JIT_CONTEXT_SUFFIX}`,
-        };
-        const existingParts: PartUnion[] = Array.isArray(llmContent)
-          ? llmContent
-          : [llmContent];
-        llmContent = [...existingParts, jitPart];
+        llmContent = appendJitContextToParts(llmContent, jitContext);
       }
     }
 
