@@ -244,7 +244,7 @@ export class FileCommandLoader implements ICommandLoader {
     if (extensionPath) {
       validDef.prompt = validDef.prompt.replace(
         /\$\{extensionPath\}/g,
-        extensionPath,
+        () => extensionPath,
       );
     }
 
