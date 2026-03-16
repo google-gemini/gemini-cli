@@ -9,11 +9,13 @@ import {
   type Config,
   getErrorMessage,
 } from '@google/gemini-cli-core';
+import open from 'open';
 import { SettingScope } from '../../config/settings.js';
 import {
   ExtensionManager,
   inferInstallMetadata,
 } from '../../config/extension-manager.js';
+import { ExtensionRegistryClient } from '../../config/extensionRegistryClient.js';
 import { McpServerEnablementManager } from '../../config/mcp/mcpServerEnablement.js';
 import { stat } from 'node:fs/promises';
 import type {
@@ -28,6 +30,7 @@ export class ExtensionsCommand implements Command {
   readonly subCommands = [
     new ListExtensionsCommand(),
     new ExploreExtensionsCommand(),
+    new SearchExtensionsCommand(),
     new EnableExtensionCommand(),
     new DisableExtensionCommand(),
     new InstallExtensionCommand(),
@@ -62,17 +65,85 @@ export class ListExtensionsCommand implements Command {
 
 export class ExploreExtensionsCommand implements Command {
   readonly name = 'extensions explore';
-  readonly description = 'Explore available extensions.';
+  readonly description = 'Explore available extensions in your browser.';
 
   async execute(
     _context: CommandContext,
     _: string[],
   ): Promise<CommandExecutionResponse> {
     const extensionsUrl = 'https://geminicli.com/extensions/';
+    await open(extensionsUrl);
     return {
       name: this.name,
-      data: `View or install available extensions at ${extensionsUrl}`,
+      data: `Opening ${extensionsUrl} in your browser...`,
     };
+  }
+}
+
+export class SearchExtensionsCommand implements Command {
+  readonly name = 'extensions search';
+  readonly description = 'Search for available extensions.';
+
+  async execute(
+    context: CommandContext,
+    args: string[],
+  ): Promise<CommandExecutionResponse> {
+    const registryURI = context.config.getExtensionRegistryURI();
+    const client = new ExtensionRegistryClient(registryURI);
+
+    try {
+      const searchTerm = args.join(' ').trim();
+      let extensions = await client.searchExtensions(searchTerm);
+
+      const isSearch = searchTerm.length > 0;
+      if (!isSearch) {
+        // If no search term, just show top 10 ranked extensions
+        extensions = extensions.sort((a, b) => a.rank - b.rank).slice(0, 10);
+      }
+
+      if (extensions.length === 0) {
+        return {
+          name: this.name,
+          data: `No extensions found matching "${searchTerm}".`,
+        };
+      }
+
+      const output = extensions
+        .map((ext) => {
+          const description =
+            ext.extensionDescription || ext.repoDescription || '';
+          let entry = `* ${ext.extensionName} (${ext.fullName})\n  ${description}`;
+          const capabilities: string[] = [];
+          if (ext.hasMCP) capabilities.push('MCP');
+          if (ext.hasSkills) capabilities.push('Skills');
+          if (ext.hasHooks) capabilities.push('Hooks');
+          if (ext.hasContext) capabilities.push('Context');
+          if (ext.hasCustomCommands) capabilities.push('Commands');
+
+          if (capabilities.length > 0) {
+            entry += ` [${capabilities.join(', ')}]`;
+          }
+          entry += `\n  Install: /extensions install ${ext.url}`;
+          return entry;
+        })
+        .join('\n\n');
+
+      const header = isSearch
+        ? `Found ${extensions.length} extensions matching "${searchTerm}":`
+        : `Top ${extensions.length} available extensions:`;
+
+      const footer = `\n\nRun "/extensions explore" to view the full gallery in your browser.`;
+
+      return {
+        name: this.name,
+        data: `${header}\n\n${output}${footer}`,
+      };
+    } catch (error) {
+      return {
+        name: this.name,
+        data: `Failed to fetch extensions: ${getErrorMessage(error)}\nRun "/extensions explore" to view available extensions in your browser.`,
+      };
+    }
   }
 }
 
