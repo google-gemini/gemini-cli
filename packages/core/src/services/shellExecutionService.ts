@@ -6,7 +6,7 @@
 
 import stripAnsi from 'strip-ansi';
 import { getPty, type PtyImplementation } from '../utils/getPty.js';
-import { spawn as cpSpawn, type ChildProcess } from 'node:child_process';
+import { spawn as cpSpawn, exec, type ChildProcess } from 'node:child_process';
 import { TextDecoder } from 'node:util';
 import os from 'node:os';
 import type { IPty } from '@lydell/node-pty';
@@ -232,6 +232,7 @@ export class ShellExecutionService {
     shouldUseNodePty: boolean,
     shellExecutionConfig: ShellExecutionConfig,
     profile?: SandboxProfile,
+    ephemeralRules?: string[],
   ): Promise<ShellExecutionHandle> {
     const { executable, argsPrefix, shell } = getShellConfiguration();
     const resolvedExecutable = (await resolveExecutable(executable)) ?? executable;
@@ -253,6 +254,7 @@ export class ShellExecutionService {
           shellExecutionConfig.sanitizationConfig,
         ),
         profile,
+        ephemeralRules,
       });
       finalExecutable = sandboxed.program;
       finalArgs = sandboxed.args;
@@ -445,7 +447,7 @@ export class ShellExecutionService {
           }
         };
 
-        const handleExit = (
+        const handleExit = async (
           code: number | null,
           signal: NodeJS.Signals | null,
         ) => {
@@ -460,9 +462,28 @@ export class ShellExecutionService {
             combinedOutput += truncationMessage;
           }
 
-          const finalStrippedOutput = stripAnsi(combinedOutput).trim();
+          let finalStrippedOutput = stripAnsi(combinedOutput).trim();
           const exitCode = code;
           const exitSignal = signal ? os.constants.signals[signal] : null;
+
+          let epermFallback = false;
+          if (exitSignal === 6 && child.pid) {
+            const violation = await ShellExecutionService.extractSandboxViolation(child.pid);
+            if (violation) {
+              finalStrippedOutput += `\n[Sandbox Violation Detected]: ${violation}`;
+            } else {
+              epermFallback = true;
+            }
+          } else if (exitCode !== 0 && exitCode !== null) {
+            epermFallback = true;
+          }
+
+          if (epermFallback) {
+            const epermViolation = ShellExecutionService.extractEpermViolation(finalStrippedOutput);
+            if (epermViolation) {
+              finalStrippedOutput += `\n[Sandbox Violation Detected]: EPERM ${epermViolation}`;
+            }
+          }
 
           if (child.pid) {
             const event: ShellOutputEvent = {
@@ -829,7 +850,7 @@ export class ShellExecutionService {
               // Ignore errors during cleanup
             }
 
-            const finalize = () => {
+            const finalize = async () => {
               render(true);
 
               // Store exit info for late subscribers (e.g. backgrounding race condition)
@@ -859,9 +880,29 @@ export class ShellExecutionService {
                 cleanup();
               }
 
+              let finalOutput = getFullBufferText(headlessTerminal);
+              let epermFallback = false;
+              if (signal === 6) {
+                const violation = await ShellExecutionService.extractSandboxViolation(ptyProcess.pid);
+                if (violation) {
+                  finalOutput += `\n[Sandbox Violation Detected]: ${violation}`;
+                } else {
+                  epermFallback = true;
+                }
+              } else if (exitCode !== 0 && exitCode !== null) {
+                epermFallback = true;
+              }
+
+              if (epermFallback) {
+                const epermViolation = ShellExecutionService.extractEpermViolation(stripAnsi(finalOutput).trim());
+                if (epermViolation) {
+                  finalOutput += `\n[Sandbox Violation Detected]: EPERM ${epermViolation}`;
+                }
+              }
+
               resolve({
                 rawOutput: finalBuffer,
-                output: getFullBufferText(headlessTerminal),
+                output: finalOutput,
                 exitCode,
                 signal: signal ?? null,
                 error,
@@ -1225,5 +1266,47 @@ export class ShellExecutionService {
         }
       }
     }
+  }
+
+  private static extractEpermViolation(output: string): string | undefined {
+    // Matches patterns like: /bin/bash: /path/to/file: Operation not permitted
+    // or: curl: (23) Failed writing body ... Permission denied
+    // or: fatal: unable to access '/Users/galzahavi/.gitconfig': Operation not permitted
+    const match = output.match(/(.*?):\s+(?:Operation not permitted|Permission denied)/i);
+    if (match) {
+      const text = match[1];
+      const pathMatch = text.match(/['"]([^<>'"]+)['"]/) || text.match(/(?:^|\s)(\/[^\s:]+)/);
+      if (pathMatch) {
+        return pathMatch[1];
+      }
+      // The first capture group usually contains the tool and the path, e.g., "/bin/bash: /path"
+      const parts = text.split(':').map((p) => p.trim());
+      // The last part before the error message is usually the path
+      const path = parts[parts.length - 1];
+      if (path && path.startsWith('/')) {
+        return path;
+      }
+    }
+    return undefined;
+  }
+
+  private static async extractSandboxViolation(pid: number): Promise<string | undefined> {
+    if (process.platform !== 'darwin') return undefined;
+    return new Promise((resolve) => {
+      // Allow max 2000ms for log extraction to avoid hanging
+      const child = exec(`log show --predicate 'process == "sandboxd" and eventMessage contains "${pid}"' --last 1m --style compact`, { timeout: 2000 }, (error, stdout) => {
+        if (!error && stdout) {
+          const lines = stdout.split('\n');
+          for (const line of lines) {
+            if (line.includes('System Policy:') && line.includes('deny')) {
+              resolve(line.trim());
+              return;
+            }
+          }
+        }
+        resolve(undefined);
+      });
+      child.on('error', () => resolve(undefined));
+    });
   }
 }

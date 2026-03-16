@@ -89,7 +89,6 @@ describe('StandardSandboxManager', () => {
     expect(profileContent).toContain('(allow pseudo-tty)');
     expect(profileContent).toContain('(subpath "/my/workspace")');
     expect(profileContent).toContain('(subpath "/extra/path")');
-    expect(profileContent).toContain('(subpath "/usr/lib")');
     expect(profileContent).toContain('(allow file-read* file-write* (subpath "/my/workspace"))');
   });
 

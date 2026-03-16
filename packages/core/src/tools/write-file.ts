@@ -46,6 +46,7 @@ import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import { WRITE_FILE_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { promptSandboxExpansion } from '../utils/sandbox-prompt.js';
 import { detectOmissionPlaceholders } from './omissionPlaceholderDetector.js';
 import { isGemini3Model } from '../config/models.js';
 
@@ -240,14 +241,21 @@ class WriteFileToolInvocation extends BaseToolInvocation<
   async execute(abortSignal: AbortSignal): Promise<ToolResult> {
     const validationError = this.config.validatePathAccess(this.resolvedPath);
     if (validationError) {
-      return {
-        llmContent: validationError,
-        returnDisplay: 'Error: Path not in workspace.',
-        error: {
-          message: validationError,
-          type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
-        },
-      };
+      const decision = await promptSandboxExpansion(
+        this.messageBus,
+        this.resolvedPath,
+        this.config.getTargetDir()
+      );
+      if (decision !== 'Allow Once' && decision !== 'Always Allow') {
+        return {
+          llmContent: `Sandbox Violation: The command was blocked from accessing ${this.resolvedPath}. The user denied the sandbox expansion request.`,
+          returnDisplay: `Error: Blocked access to ${this.resolvedPath}. User denied request.`,
+          error: {
+            message: validationError,
+            type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+          },
+        };
+      }
     }
 
     const { content, ai_proposed_content, modified_by_user } = this.params;
@@ -463,11 +471,6 @@ export class WriteFileTool
     }
 
     const resolvedPath = path.resolve(this.config.getTargetDir(), filePath);
-
-    const validationError = this.config.validatePathAccess(resolvedPath);
-    if (validationError) {
-      return validationError;
-    }
 
     try {
       if (fs.existsSync(resolvedPath)) {

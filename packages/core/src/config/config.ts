@@ -2406,7 +2406,16 @@ export class Config implements McpContext {
     const projectTempDir = this.storage.getProjectTempDir();
     const resolvedTempDir = realpath(projectTempDir);
 
-    return isSubpath(resolvedTempDir, resolvedPath);
+    if (isSubpath(resolvedTempDir, resolvedPath)) {
+      return true;
+    }
+
+    const sandboxConfig = this.getSandbox();
+    if (sandboxConfig?.allowedPaths?.some(p => isSubpath(realpath(p), resolvedPath))) {
+      return true;
+    }
+
+    return false;
   }
 
   /**

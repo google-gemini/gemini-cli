@@ -19,6 +19,7 @@ import {
   type WriteFileToolParams,
 } from './write-file.js';
 import { ToolErrorType } from './tool-error.js';
+import { MessageBusType } from '../confirmation-bus/types.js';
 import {
   ToolConfirmationOutcome,
   type FileDiff,
@@ -246,13 +247,30 @@ describe('WriteFileTool', () => {
       expect(invocation.params).toEqual(params);
     });
 
-    it('should throw an error for a path outside root', () => {
+    it('should return error for a path outside root during execute', async () => {
       const outsidePath = path.resolve(tempDir, 'outside-root.txt');
       const params = {
         file_path: outsidePath,
         content: 'hello',
       };
-      expect(() => tool.build(params)).toThrow(/Path not in workspace/);
+      const invocation = tool.build(params);
+
+      setTimeout(() => {
+        const bus = (tool as any).messageBus;
+        const mockBus = getMockMessageBusInstance(bus) as any;
+        const msg = mockBus.publishedMessages.find((m: any) => m.type === MessageBusType.ASK_USER_REQUEST);
+        if (msg) {
+          mockBus.publish({
+            type: MessageBusType.ASK_USER_RESPONSE,
+            correlationId: msg.correlationId,
+            answers: {},
+            cancelled: true,
+          });
+        }
+      }, 50);
+
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.error?.type).toBe(ToolErrorType.PATH_NOT_IN_WORKSPACE);
     });
 
     it('should throw an error if path is a directory', () => {
@@ -893,12 +911,29 @@ describe('WriteFileTool', () => {
       expect(() => tool.build(params)).not.toThrow();
     });
 
-    it('should reject paths outside workspace root', () => {
+    it('should reject paths outside workspace root during execute', async () => {
       const params = {
         file_path: '/etc/passwd',
         content: 'malicious',
       };
-      expect(() => tool.build(params)).toThrow(/Path not in workspace/);
+      const invocation = tool.build(params);
+
+      setTimeout(() => {
+        const bus = (tool as any).messageBus;
+        const mockBus = getMockMessageBusInstance(bus) as any;
+        const msg = mockBus.publishedMessages.find((m: any) => m.type === MessageBusType.ASK_USER_REQUEST);
+        if (msg) {
+          mockBus.publish({
+            type: MessageBusType.ASK_USER_RESPONSE,
+            correlationId: msg.correlationId,
+            answers: {},
+            cancelled: true,
+          });
+        }
+      }, 50);
+
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.error?.type).toBe(ToolErrorType.PATH_NOT_IN_WORKSPACE);
     });
 
     it('should allow paths within the plans directory', () => {
@@ -909,12 +944,29 @@ describe('WriteFileTool', () => {
       expect(() => tool.build(params)).not.toThrow();
     });
 
-    it('should reject paths that try to escape the plans directory', () => {
+    it('should reject paths that try to escape the plans directory during execute', async () => {
       const params = {
         file_path: path.join(plansDir, '..', 'escaped.txt'),
         content: 'malicious',
       };
-      expect(() => tool.build(params)).toThrow(/Path not in workspace/);
+      const invocation = tool.build(params);
+
+      setTimeout(() => {
+        const bus = (tool as any).messageBus;
+        const mockBus = getMockMessageBusInstance(bus) as any;
+        const msg = mockBus.publishedMessages.find((m: any) => m.type === MessageBusType.ASK_USER_REQUEST);
+        if (msg) {
+          mockBus.publish({
+            type: MessageBusType.ASK_USER_RESPONSE,
+            correlationId: msg.correlationId,
+            answers: {},
+            cancelled: true,
+          });
+        }
+      }, 50);
+
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.error?.type).toBe(ToolErrorType.PATH_NOT_IN_WORKSPACE);
     });
   });
 

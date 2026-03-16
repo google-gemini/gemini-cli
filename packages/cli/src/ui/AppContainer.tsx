@@ -85,6 +85,7 @@ import {
   buildUserSteeringHintPrompt,
   logBillingEvent,
   ApiKeyUpdatedEvent,
+  MessageBusType,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -148,6 +149,7 @@ import { useSessionResume } from './hooks/useSessionResume.js';
 import { useIncludeDirsTrust } from './hooks/useIncludeDirsTrust.js';
 import { isWorkspaceTrusted } from '../config/trustedFolders.js';
 import { useSettings } from './contexts/SettingsContext.js';
+import { AskUserDialog } from './components/AskUserDialog.js';
 import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useBanner } from './hooks/useBanner.js';
@@ -1551,6 +1553,43 @@ Logging in with Google... Restarting Gemini CLI to continue.
   const isInitialMount = useRef(true);
 
   useIncludeDirsTrust(config, isTrustedFolder, historyManager, setCustomDialog);
+
+  useEffect(() => {
+    const messageBus = config.getMessageBus();
+    const handler = (msg: any) => {
+      if (msg.type === MessageBusType.ASK_USER_REQUEST) {
+        setCustomDialog(
+          <AskUserDialog
+            questions={msg.questions}
+            width={terminalWidth}
+            availableHeight={terminalHeight}
+            onSubmit={(answers) => {
+              messageBus.publish({
+                type: MessageBusType.ASK_USER_RESPONSE,
+                correlationId: msg.correlationId,
+                answers,
+                cancelled: false,
+              });
+              setCustomDialog(null);
+            }}
+            onCancel={() => {
+              messageBus.publish({
+                type: MessageBusType.ASK_USER_RESPONSE,
+                correlationId: msg.correlationId,
+                answers: {},
+                cancelled: true,
+              });
+              setCustomDialog(null);
+            }}
+          />
+        );
+      }
+    };
+    messageBus.subscribe(MessageBusType.ASK_USER_REQUEST, handler);
+    return () => {
+      messageBus.unsubscribe(MessageBusType.ASK_USER_REQUEST, handler);
+    };
+  }, [config, setCustomDialog, terminalWidth, terminalHeight]);
 
   const tabFocusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 

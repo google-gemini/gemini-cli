@@ -57,7 +57,6 @@ import { isSubpath } from '../utils/paths.js';
 import * as crypto from 'node:crypto';
 import * as summarizer from '../utils/summarizer.js';
 import { ToolErrorType } from './tool-error.js';
-import { ToolConfirmationOutcome } from './tools.js';
 import { SHELL_TOOL_NAME } from './tool-names.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
 import {
@@ -277,6 +276,7 @@ describe('ShellTool', () => {
         false,
         { pager: 'cat', sanitizationConfig: {} },
         SandboxProfile.WORKSPACE_WRITE,
+        [],
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
       // The file should be deleted by the tool
@@ -303,6 +303,7 @@ describe('ShellTool', () => {
         false,
         { pager: 'cat', sanitizationConfig: {} },
         SandboxProfile.WORKSPACE_WRITE,
+        [],
       );
     });
 
@@ -325,6 +326,7 @@ describe('ShellTool', () => {
         false,
         { pager: 'cat', sanitizationConfig: {} },
         SandboxProfile.WORKSPACE_WRITE,
+        [],
       );
     });
 
@@ -395,6 +397,42 @@ describe('ShellTool', () => {
       const result = await promise;
       expect(result.llmContent).toContain('Error: wrapped command failed');
       expect(result.llmContent).not.toContain('pgrep');
+    });
+
+    it('should format return payload on sandbox violation correctly', async () => {
+      const invocation = shellTool.build({ command: 'cat /secret/file' });
+      const promise = invocation.execute(mockAbortSignal);
+      resolveShellExecution({
+        exitCode: 1,
+        output: '[Sandbox Violation Detected]: EPERM /secret/file',
+        rawOutput: Buffer.from('[Sandbox Violation Detected]: EPERM /secret/file'),
+        signal: null,
+        aborted: false,
+        pid: 12345,
+        executionMethod: 'child_process',
+      });
+
+      // Advance timers and simulate UI response
+      let msg: any = null;
+      const mockBus = getMockMessageBusInstance((shellTool as any).messageBus) as any;
+      for (let i = 0; i < 10; i++) {
+        await vi.advanceTimersByTimeAsync(10);
+        msg = mockBus.publishedMessages.find((m: any) => m.type === MessageBusType.ASK_USER_REQUEST);
+        if (msg) break;
+      }
+
+      if (msg) {
+        mockBus.publish({
+          type: MessageBusType.ASK_USER_RESPONSE,
+          correlationId: msg.correlationId,
+          answers: {},
+          cancelled: true,
+        });
+      }
+
+      const result = await promise;
+      expect(result.llmContent).toContain("Sandbox Violation: The command was blocked from accessing /secret/file. The user denied the sandbox expansion request.");
+      expect(result.returnDisplay).toContain('Sandbox Violation: Blocked access to /secret/file. User denied request.');
     });
 
     it('should return a SHELL_EXECUTE_ERROR for a command failure', async () => {
@@ -587,37 +625,15 @@ describe('ShellTool', () => {
   });
 
   describe('shouldConfirmExecute', () => {
-    it('should request confirmation for a new command and allowlist it on "Always"', async () => {
+    it('should bypass confirmation for all commands in YOLO mode', async () => {
       const params = { command: 'npm install' };
       const invocation = shellTool.build(params);
 
-      // Accessing protected messageBus for testing purposes
-      const bus = (shellTool as unknown as { messageBus: MessageBus })
-        .messageBus;
-      const mockBus = getMockMessageBusInstance(
-        bus,
-      ) as unknown as TestableMockMessageBus;
-
-      // Initially needs confirmation
-      mockBus.defaultToolDecision = 'ask_user';
       const confirmation = await invocation.shouldConfirmExecute(
         new AbortController().signal,
       );
 
-      expect(confirmation).not.toBe(false);
-      expect(confirmation && confirmation.type).toBe('exec');
-
-      if (confirmation && confirmation.type === 'exec') {
-        await confirmation.onConfirm(ToolConfirmationOutcome.ProceedAlways);
-      }
-
-      // After "Always", it should be allowlisted in the mock engine
-      mockBus.defaultToolDecision = 'allow';
-      const secondInvocation = shellTool.build({ command: 'npm test' });
-      const secondConfirmation = await secondInvocation.shouldConfirmExecute(
-        new AbortController().signal,
-      );
-      expect(secondConfirmation).toBe(false);
+      expect(confirmation).toBe(false);
     });
 
     it('should throw an error if validation fails', () => {

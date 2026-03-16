@@ -7,6 +7,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import toml from '@iarna/toml';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 
@@ -55,6 +56,7 @@ export interface SandboxOptions {
    * Defaults to WORKSPACE_WRITE if not specified.
    */
   profile?: SandboxProfile;
+  ephemeralRules?: string[];
 }
 
 /**
@@ -113,6 +115,20 @@ export class StandardSandboxManager implements SandboxManager {
         
         // Start with explicitly allowed paths from config
         const allowedPaths = [...(sandboxConfig.allowedPaths || [])];
+
+        try {
+          const sandboxingTomlPath = path.join(path.resolve(options.cwd), '.gemini', 'sandboxing.toml');
+          if (fs.existsSync(sandboxingTomlPath)) {
+            const content = fs.readFileSync(sandboxingTomlPath, 'utf8');
+            const parsed = toml.parse(content) as Record<string, unknown>;
+            const sandboxSection = parsed?.['sandbox'] as Record<string, unknown> | undefined;
+            if (sandboxSection?.['allowedPaths'] && Array.isArray(sandboxSection['allowedPaths'])) {
+              allowedPaths.push(...(sandboxSection['allowedPaths'] as string[]));
+            }
+          }
+        } catch (error) {
+          debugLogger.error('Failed to parse .gemini/sandboxing.toml:', error);
+        }
 
         fs.writeFileSync(
           profilePath,
@@ -216,6 +232,9 @@ export class StandardSandboxManager implements SandboxManager {
 
       // Metadata access
       '(allow file-read-metadata)',
+      
+      // Ephemeral Rules
+      ...(options.ephemeralRules || []),
     ];
 
     return rules.join('\n');

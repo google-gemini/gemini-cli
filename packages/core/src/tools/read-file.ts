@@ -31,6 +31,7 @@ import { READ_FILE_TOOL_NAME, READ_FILE_DISPLAY_NAME } from './tool-names.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { READ_FILE_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { promptSandboxExpansion } from '../utils/sandbox-prompt.js';
 
 /**
  * Parameters for the ReadFile tool
@@ -94,14 +95,21 @@ class ReadFileToolInvocation extends BaseToolInvocation<
       'read',
     );
     if (validationError) {
-      return {
-        llmContent: validationError,
-        returnDisplay: 'Path not in workspace.',
-        error: {
-          message: validationError,
-          type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
-        },
-      };
+      const decision = await promptSandboxExpansion(
+        this.messageBus,
+        this.resolvedPath,
+        this.config.getTargetDir()
+      );
+      if (decision !== 'Allow Once' && decision !== 'Always Allow') {
+        return {
+          llmContent: `Sandbox Violation: The command was blocked from accessing ${this.resolvedPath}. The user denied the sandbox expansion request.`,
+          returnDisplay: `Sandbox Violation: Blocked access to ${this.resolvedPath}. User denied request.`,
+          error: {
+            message: validationError,
+            type: ToolErrorType.PATH_NOT_IN_WORKSPACE,
+          },
+        };
+      }
     }
 
     const result = await processSingleFileContent(
@@ -207,14 +215,6 @@ export class ReadFileTool extends BaseDeclarativeTool<
       this.config.getTargetDir(),
       params.file_path,
     );
-
-    const validationError = this.config.validatePathAccess(
-      resolvedPath,
-      'read',
-    );
-    if (validationError) {
-      return validationError;
-    }
 
     if (params.start_line !== undefined && params.start_line < 1) {
       return 'start_line must be at least 1';

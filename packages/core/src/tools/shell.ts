@@ -45,6 +45,7 @@ import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { getShellDefinition } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
+import { promptSandboxExpansion } from '../utils/sandbox-prompt.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
@@ -56,12 +57,19 @@ export interface ShellToolParams {
   description?: string;
   dir_path?: string;
   is_background?: boolean;
+  sandbox_ephemeral_rules?: string[];
 }
 
 export class ShellToolInvocation extends BaseToolInvocation<
   ShellToolParams,
   ToolResult
 > {
+  override async shouldConfirmExecute(
+    _abortSignal: AbortSignal,
+  ): Promise<import('./tools.js').ToolCallConfirmationDetails | false> {
+    // YOLO Mode: Bypass pre-execution policy confirmation and rely entirely on the OS sandbox.
+    return false;
+  }
   constructor(
     private readonly config: Config,
     params: ShellToolParams,
@@ -226,80 +234,113 @@ export class ShellToolInvocation extends BaseToolInvocation<
         once: true,
       });
 
-      // Start timeout
-      resetTimeout();
+      let ephemeralRules: string[] = this.params.sandbox_ephemeral_rules ? this.params.sandbox_ephemeral_rules.map(r => r.startsWith('(') ? r : `(allow file-read* file-write* (subpath "${r}"))`) : [];
+      let result;
 
-      const { result: resultPromise, pid } =
-        await ShellExecutionService.execute(
-          commandToExecute,
-          cwd,
-          (event: ShellOutputEvent) => {
-            resetTimeout(); // Reset timeout on any event
-            if (!updateOutput) {
-              return;
-            }
+      while (true) {
+        // Start timeout
+        resetTimeout();
 
-            let shouldUpdate = false;
-
-            switch (event.type) {
-              case 'data':
-                if (isBinaryStream) break;
-                cumulativeOutput = event.chunk;
-                shouldUpdate = true;
-                break;
-              case 'binary_detected':
-                isBinaryStream = true;
-                cumulativeOutput =
-                  '[Binary output detected. Halting stream...]';
-                shouldUpdate = true;
-                break;
-              case 'binary_progress':
-                isBinaryStream = true;
-                cumulativeOutput = `[Receiving binary output... ${formatBytes(
-                  event.bytesReceived,
-                )} received]`;
-                if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
-                  shouldUpdate = true;
-                }
-                break;
-              case 'exit':
-                break;
-              default: {
-                throw new Error('An unhandled ShellOutputEvent was found.');
+        const { result: resultPromise, pid } =
+          await ShellExecutionService.execute(
+            commandToExecute,
+            cwd,
+            (event: ShellOutputEvent) => {
+              resetTimeout(); // Reset timeout on any event
+              if (!updateOutput) {
+                return;
               }
-            }
 
-            if (shouldUpdate && !this.params.is_background) {
-              updateOutput(cumulativeOutput);
-              lastUpdateTime = Date.now();
-            }
-          },
-          combinedController.signal,
-          this.config.getEnableInteractiveShell(),
-          {
-            ...shellExecutionConfig,
-            pager: 'cat',
-            sanitizationConfig:
-              shellExecutionConfig?.sanitizationConfig ??
-              this.config.sanitizationConfig,
-          },
-          SandboxProfile.WORKSPACE_WRITE,
-        );
+              let shouldUpdate = false;
 
-      if (pid) {
-        if (setPidCallback) {
-          setPidCallback(pid);
+              switch (event.type) {
+                case 'data':
+                  if (isBinaryStream) break;
+                  cumulativeOutput = event.chunk;
+                  shouldUpdate = true;
+                  break;
+                case 'binary_detected':
+                  isBinaryStream = true;
+                  cumulativeOutput =
+                    '[Binary output detected. Halting stream...]';
+                  shouldUpdate = true;
+                  break;
+                case 'binary_progress':
+                  isBinaryStream = true;
+                  cumulativeOutput = `[Receiving binary output... ${formatBytes(
+                    event.bytesReceived,
+                  )} received]`;
+                  if (Date.now() - lastUpdateTime > OUTPUT_UPDATE_INTERVAL_MS) {
+                    shouldUpdate = true;
+                  }
+                  break;
+                case 'exit':
+                  break;
+                default: {
+                  throw new Error('An unhandled ShellOutputEvent was found.');
+                }
+              }
+
+              if (shouldUpdate && !this.params.is_background) {
+                updateOutput(cumulativeOutput);
+                lastUpdateTime = Date.now();
+              }
+            },
+            combinedController.signal,
+            this.config.getEnableInteractiveShell(),
+            {
+              ...shellExecutionConfig,
+              pager: 'cat',
+              sanitizationConfig:
+                shellExecutionConfig?.sanitizationConfig ??
+                this.config.sanitizationConfig,
+            },
+            SandboxProfile.WORKSPACE_WRITE,
+            ephemeralRules,
+          );
+
+        if (pid) {
+          if (setPidCallback) {
+            setPidCallback(pid);
+          }
+
+          // If the model requested to run in the background, do so after a short delay.
+          if (this.params.is_background) {
+            setTimeout(() => {
+              ShellExecutionService.background(pid);
+            }, BACKGROUND_DELAY_MS);
+          }
         }
 
-        // If the model requested to run in the background, do so after a short delay.
-        if (this.params.is_background) {
-          setTimeout(() => {
-            ShellExecutionService.background(pid);
-          }, BACKGROUND_DELAY_MS);
+        result = await resultPromise;
+
+        if (result.output.includes('[Sandbox Violation Detected]')) {
+          let blockedPath = null;
+          let match = result.output.match(/\[Sandbox Violation Detected\]:.*?deny\(\d+\) [^\s]+ (.*)/);
+          if (match) {
+            blockedPath = match[1].trim();
+          } else {
+            match = result.output.match(/\[Sandbox Violation Detected\]: EPERM (.*)/);
+            if (match) {
+              blockedPath = match[1].trim();
+            }
+          }
+          if (blockedPath) {
+            const decision = await promptSandboxExpansion(this.messageBus, blockedPath, cwd);
+
+            if (decision === 'Allow Once' || decision === 'Always Allow') {
+               ephemeralRules.push(`(allow file-read* file-write* (subpath "${blockedPath}"))`);
+               continue;
+            } else {
+               return {
+                 llmContent: `Sandbox Violation: The command was blocked from accessing ${blockedPath}. The user denied the sandbox expansion request.\n\nOriginal output:\n${result.output}`,
+                 returnDisplay: `Sandbox Violation: Blocked access to ${blockedPath}. User denied request.`
+               };
+            }
+          }
         }
+        break;
       }
-
-      const result = await resultPromise;
 
       const backgroundPIDs: number[] = [];
       if (os.platform() !== 'win32') {

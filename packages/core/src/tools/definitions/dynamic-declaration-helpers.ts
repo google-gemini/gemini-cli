@@ -109,6 +109,14 @@ export function getShellDeclaration(
           description:
             'Set to true if this command should be run in the background (e.g. for long-running servers or watchers). The command will be started, allowed to run for a brief moment to check for immediate errors, and then moved to the background.',
         },
+        sandbox_ephemeral_rules: {
+          type: 'array',
+          items: {
+            type: 'string',
+          },
+          description:
+            'Optional list of paths to allow via ephemeral sandbox rules on a retry. Only provide this if the command previously failed with a Sandbox Violation.',
+        },
       },
       required: [SHELL_PARAM_COMMAND],
     },

@@ -5,6 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { MessageBusType } from '../confirmation-bus/types.js';
 import { ReadFileTool, type ReadFileToolParams } from './read-file.js';
 import { ToolErrorType } from './tool-error.js';
 import path from 'node:path';
@@ -17,7 +18,10 @@ import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { StandardFileSystemService } from '../services/fileSystemService.js';
 import { createMockWorkspaceContext } from '../test-utils/mockWorkspaceContext.js';
 import { WorkspaceContext } from '../utils/workspaceContext.js';
-import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import {
+  createMockMessageBus,
+  getMockMessageBusInstance,
+} from '../test-utils/mock-message-bus.js';
 import { GEMINI_IGNORE_FILE_NAME } from '../config/constants.js';
 
 vi.mock('../telemetry/loggers.js', () => ({
@@ -97,11 +101,29 @@ describe('ReadFileTool', () => {
       );
     });
 
-    it('should throw error if path is outside root', () => {
+    it('should return error if path is outside root during execute', async () => {
       const params: ReadFileToolParams = {
         file_path: '/outside/root.txt',
       };
-      expect(() => tool.build(params)).toThrow(/Path not in workspace/);
+      const invocation = tool.build(params);
+      
+      // Simulate denying the prompt
+      setTimeout(() => {
+        const bus = (tool as any).messageBus;
+        const mockBus = getMockMessageBusInstance(bus) as any;
+        const msg = mockBus.publishedMessages.find((m: any) => m.type === MessageBusType.ASK_USER_REQUEST);
+        if (msg) {
+          mockBus.publish({
+            type: MessageBusType.ASK_USER_RESPONSE,
+            correlationId: msg.correlationId,
+            answers: {},
+            cancelled: true,
+          });
+        }
+      }, 50);
+
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.error?.type).toBe(ToolErrorType.PATH_NOT_IN_WORKSPACE);
     });
 
     it('should allow access to files in project temp directory', () => {
@@ -113,11 +135,30 @@ describe('ReadFileTool', () => {
       expect(typeof result).not.toBe('string');
     });
 
-    it('should show temp directory in error message when path is outside workspace and temp dir', () => {
+    it('should show temp directory in error message when path is outside workspace and temp dir during execute', async () => {
       const params: ReadFileToolParams = {
         file_path: '/completely/outside/path.txt',
       };
-      expect(() => tool.build(params)).toThrow(/Path not in workspace/);
+      const invocation = tool.build(params);
+
+      // Simulate denying the prompt
+      setTimeout(() => {
+        const bus = (tool as any).messageBus;
+        const mockBus = getMockMessageBusInstance(bus) as any;
+        const msg = mockBus.publishedMessages.find((m: any) => m.type === MessageBusType.ASK_USER_REQUEST);
+        if (msg) {
+          mockBus.publish({
+            type: MessageBusType.ASK_USER_RESPONSE,
+            correlationId: msg.correlationId,
+            answers: {},
+            cancelled: true,
+          });
+        }
+      }, 50);
+
+      const result = await invocation.execute(new AbortController().signal);
+      expect(result.error?.message).toMatch(/Path not in workspace/);
+      expect(result.error?.message).toContain(tempRootDir);
     });
 
     it('should throw error if path is empty', () => {
