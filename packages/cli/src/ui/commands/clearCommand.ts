@@ -15,8 +15,8 @@ import { MessageType } from '../types.js';
 import { randomUUID } from 'node:crypto';
 
 export const clearCommand: SlashCommand = {
-  name: 'clear',
-  description: 'Clear the screen and conversation history',
+  name: 'clear (new)',
+  description: 'Create new Session and free up context',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context, _args) => {
