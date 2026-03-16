@@ -204,8 +204,8 @@ export const useShellCommandProcessor = (
       // Use ShellExecutionService for shell PTYs (handles log files, etc.),
       // fall back to ExecutionLifecycleService for non-shell executions
       // (e.g. remote agents, MCP tools, local agents).
-      m.backgroundedPids.add(pidToBackground);
       if (state.activeShellPtyId) {
+        m.backgroundedPids.add(pidToBackground);
         ShellExecutionService.background(pidToBackground);
       } else {
         ExecutionLifecycleService.background(pidToBackground);
