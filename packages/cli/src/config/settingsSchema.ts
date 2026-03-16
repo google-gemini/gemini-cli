@@ -1904,7 +1904,7 @@ const SETTINGS_SCHEMA = {
         label: 'JIT Context Loading',
         category: 'Experimental',
         requiresRestart: true,
-        default: false,
+        default: true,
         description: 'Enable Just-In-Time (JIT) context loading.',
         showInDialog: false,
       },
