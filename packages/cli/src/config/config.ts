@@ -28,8 +28,6 @@ import {
   ASK_USER_TOOL_NAME,
   getVersion,
   PREVIEW_GEMINI_MODEL_AUTO,
-  DEFAULT_GEMINI_FLASH_MODEL,
-  UserTierId,
   type HierarchicalMemory,
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
@@ -669,10 +667,7 @@ export async function loadCliConfig(
   );
   policyEngineConfig.nonInteractive = !interactive;
 
-  const defaultModel =
-    settings.userTier?.id === UserTierId.FREE
-      ? DEFAULT_GEMINI_FLASH_MODEL
-      : PREVIEW_GEMINI_MODEL_AUTO;
+  const defaultModel = PREVIEW_GEMINI_MODEL_AUTO;
   const specifiedModel =
     argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
 
@@ -728,7 +723,7 @@ export async function loadCliConfig(
     }
   }
 
-  return new Config({
+  const config = new Config({
     acpMode: isAcpMode,
     clientName,
     sessionId,
@@ -869,6 +864,8 @@ export async function loadCliConfig(
     },
     enableConseca: settings.security?.enableConseca,
   });
+
+  return config;
 }
 
 function mergeExcludeTools(

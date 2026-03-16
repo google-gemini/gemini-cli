@@ -128,7 +128,7 @@ import {
   type SafetyCheckerRule,
 } from '../policy/types.js';
 import { HookSystem } from '../hooks/index.js';
-import {
+import type {
   UserTierId,
   type GeminiUserTier,
   type RetrieveUserQuotaResponse,
@@ -1372,8 +1372,7 @@ export class Config implements McpContext, AgentLoopContext {
     );
     this.setRemoteAdminSettings(adminControls);
 
-    const userTier = this.getUserTier();
-    if (userTier === UserTierId.FREE && isAutoModel(this.model)) {
+    if (!this.getHasProModelAccessSync() && isAutoModel(this.model)) {
       this.setModel(PREVIEW_GEMINI_FLASH_MODEL);
     }
   }
