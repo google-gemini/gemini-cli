@@ -118,10 +118,30 @@ describe('<ToolGroupMessage />', () => {
         { config: baseMockConfig, settings: fullVerbositySettings },
       );
 
-      // Should now render confirming tools
+      // Should now hide confirming tools (to avoid duplication with Global Queue)
+      await waitUntilReady();
+      expect(lastFrame({ allowEmpty: true })).toBe('');
+      unmount();
+    });
+
+    it('renders canceled tool calls', async () => {
+      const toolCalls = [
+        createToolCall({
+          callId: 'canceled-tool',
+          name: 'canceled-tool',
+          status: CoreToolCallStatus.Cancelled,
+        }),
+      ];
+      const item = createItem(toolCalls);
+
+      const { lastFrame, unmount, waitUntilReady } = renderWithProviders(
+        <ToolGroupMessage {...baseProps} item={item} toolCalls={toolCalls} />,
+        { config: baseMockConfig, settings: fullVerbositySettings },
+      );
+
       await waitUntilReady();
       const output = lastFrame();
-      expect(output).toContain('test-tool');
+      expect(output).toMatchSnapshot('canceled_tool');
       unmount();
     });
 
@@ -842,7 +862,7 @@ describe('<ToolGroupMessage />', () => {
       );
 
       await waitUntilReady();
-      expect(lastFrame({ allowEmpty: true })).not.toBe('');
+      expect(lastFrame({ allowEmpty: true })).toBe('');
       unmount();
     });
 
