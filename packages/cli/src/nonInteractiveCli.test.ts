@@ -241,8 +241,8 @@ describe('runNonInteractive', () => {
 
     const events: ServerGeminiStreamEvent[] = [
       {
-        type: GeminiEventType.DONE,
-        metrics: { ...MOCK_SESSION_METRICS },
+        type: GeminiEventType.Finished,
+        value: { reason: undefined, usageMetadata: undefined },
       },
     ];
     mockGeminiClient.sendMessageStream.mockReturnValueOnce(

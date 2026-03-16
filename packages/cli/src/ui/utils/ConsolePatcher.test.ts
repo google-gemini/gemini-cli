@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/* eslint-disable no-console */
+
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ConsolePatcher } from './ConsolePatcher.js';
 
@@ -25,10 +27,10 @@ describe('ConsolePatcher', () => {
     // We need to spy on the original console methods that ConsolePatcher will call
     // ConsolePatcher captures the original methods at construction time or patch time?
     // It captures them at construction time.
-    
+
     const originalLog = console.log;
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    
+
     patcher = new ConsolePatcher({
       debugMode: false,
       suppressConsoleOutput: true,
@@ -39,7 +41,7 @@ describe('ConsolePatcher', () => {
     console.log('test log');
 
     expect(logSpy).not.toHaveBeenCalled();
-    
+
     patcher.cleanup();
     logSpy.mockRestore();
     console.log = originalLog;
@@ -48,7 +50,7 @@ describe('ConsolePatcher', () => {
   it('should NOT suppress output when suppressConsoleOutput is true but debugMode is true', () => {
     const originalError = console.error;
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    
+
     patcher = new ConsolePatcher({
       debugMode: true,
       suppressConsoleOutput: true,
@@ -59,7 +61,7 @@ describe('ConsolePatcher', () => {
     console.log('test log');
     // When stderr is true, log goes to originalConsoleError
     expect(errorSpy).toHaveBeenCalled();
-    
+
     patcher.cleanup();
     errorSpy.mockRestore();
     console.error = originalError;
@@ -68,7 +70,7 @@ describe('ConsolePatcher', () => {
   it('should NOT suppress output when suppressConsoleOutput is false', () => {
     const originalError = console.error;
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    
+
     patcher = new ConsolePatcher({
       debugMode: false,
       suppressConsoleOutput: false,
@@ -78,7 +80,7 @@ describe('ConsolePatcher', () => {
 
     console.error('test error');
     expect(errorSpy).toHaveBeenCalled();
-    
+
     patcher.cleanup();
     errorSpy.mockRestore();
     console.error = originalError;
@@ -94,11 +96,13 @@ describe('ConsolePatcher', () => {
     patcher.patch();
 
     console.log('test log');
-    expect(onNewMessage).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'log',
-      content: 'test log',
-    }));
-    
+    expect(onNewMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'log',
+        content: 'test log',
+      }),
+    );
+
     patcher.cleanup();
   });
 
@@ -113,7 +117,7 @@ describe('ConsolePatcher', () => {
     patcher.patch();
 
     console.log('test log');
-    
+
     expect(onNewMessage).toHaveBeenCalled();
     patcher.cleanup();
   });
