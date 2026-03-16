@@ -176,144 +176,6 @@ class McpToolInvocation extends BaseToolInvocation<
 }
 
 /**
- * Composite tool invocation that types a full string by calling press_key
- * for each character internally, avoiding N model round-trips.
- */
-class TypeTextInvocation extends BaseToolInvocation<
-  Record<string, unknown>,
-  ToolResult
-> {
-  constructor(
-    private readonly browserManager: BrowserManager,
-    private readonly text: string,
-    private readonly submitKey: string | undefined,
-    messageBus: MessageBus,
-  ) {
-    super({ text, submitKey }, messageBus, 'type_text', 'type_text');
-  }
-
-  getDescription(): string {
-    const preview = `"${this.text.substring(0, 50)}${this.text.length > 50 ? '...' : ''}"`;
-    return this.submitKey
-      ? `type_text: ${preview} + ${this.submitKey}`
-      : `type_text: ${preview}`;
-  }
-
-  protected override async getConfirmationDetails(
-    _abortSignal: AbortSignal,
-  ): Promise<ToolCallConfirmationDetails | false> {
-    if (!this.messageBus) {
-      return false;
-    }
-
-    return {
-      type: 'mcp',
-      title: `Confirm Tool: type_text`,
-      serverName: 'browser-agent',
-      toolName: 'type_text',
-      toolDisplayName: 'type_text',
-      onConfirm: async (outcome: ToolConfirmationOutcome) => {
-        await this.publishPolicyUpdate(outcome);
-      },
-    };
-  }
-
-  override getPolicyUpdateOptions(
-    _outcome: ToolConfirmationOutcome,
-  ): PolicyUpdateOptions | undefined {
-    return {
-      mcpName: 'browser-agent',
-    };
-  }
-
-  override async execute(signal: AbortSignal): Promise<ToolResult> {
-    try {
-      if (signal.aborted) {
-        return {
-          llmContent: 'Error: Operation cancelled before typing started.',
-          returnDisplay: 'Operation cancelled before typing started.',
-          error: { message: 'Operation cancelled' },
-        };
-      }
-
-      await this.typeCharByChar(signal);
-
-      // Optionally press a submit key (Enter, Tab, etc.) after typing
-      if (this.submitKey && !signal.aborted) {
-        const keyResult = await this.browserManager.callTool(
-          'press_key',
-          { key: this.submitKey },
-          signal,
-        );
-        if (keyResult.isError) {
-          const errText = this.extractErrorText(keyResult);
-          debugLogger.warn(
-            `type_text: submitKey("${this.submitKey}") failed: ${errText}`,
-          );
-        }
-      }
-
-      const summary = this.submitKey
-        ? `Successfully typed "${this.text}" and pressed ${this.submitKey}`
-        : `Successfully typed "${this.text}"`;
-
-      return {
-        llmContent: summary,
-        returnDisplay: summary,
-      };
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-
-      // Chrome connection errors are fatal
-      if (errorMsg.includes('Could not connect to Chrome')) {
-        throw error;
-      }
-
-      debugLogger.error(`type_text failed: ${errorMsg}`);
-      return {
-        llmContent: `Error: ${errorMsg}`,
-        returnDisplay: `Error: ${errorMsg}`,
-        error: { message: errorMsg },
-      };
-    }
-  }
-
-  /** Types each character via individual press_key MCP calls. */
-  private async typeCharByChar(signal: AbortSignal): Promise<void> {
-    const chars = [...this.text]; // Handle Unicode correctly
-    for (const char of chars) {
-      if (signal.aborted) return;
-
-      // Map special characters to key names
-      const key = char === ' ' ? 'Space' : char;
-      const result = await this.browserManager.callTool(
-        'press_key',
-        { key },
-        signal,
-      );
-
-      if (result.isError) {
-        debugLogger.warn(
-          `type_text: press_key("${key}") failed: ${this.extractErrorText(result)}`,
-        );
-      }
-    }
-  }
-
-  /** Extract error text from an MCP tool result. */
-  private extractErrorText(result: McpToolCallResult): string {
-    return (
-      result.content
-        ?.filter(
-          (c: { type: string; text?: string }) => c.type === 'text' && c.text,
-        )
-        .map((c: { type: string; text?: string }) => c.text)
-        .join('\n') || 'Unknown error'
-    );
-  }
-}
-
-/**
  * DeclarativeTool wrapper for an MCP tool.
  */
 class McpDeclarativeTool extends DeclarativeTool<
@@ -354,65 +216,6 @@ class McpDeclarativeTool extends DeclarativeTool<
 }
 
 /**
- * DeclarativeTool for the custom type_text composite tool.
- */
-class TypeTextDeclarativeTool extends DeclarativeTool<
-  Record<string, unknown>,
-  ToolResult
-> {
-  constructor(
-    private readonly browserManager: BrowserManager,
-    messageBus: MessageBus,
-  ) {
-    super(
-      'type_text',
-      'type_text',
-      'Types a full text string into the currently focused element. ' +
-        'Much faster than calling press_key for each character individually. ' +
-        'Use this to enter text into form fields, search boxes, spreadsheet cells, or any focused input. ' +
-        'The element must already be focused (e.g., after a click). ' +
-        'Use submitKey to press a key after typing (e.g., submitKey="Enter" to submit a form or confirm a value, submitKey="Tab" to move to the next field).',
-      Kind.Other,
-      {
-        type: 'object',
-        properties: {
-          text: {
-            type: 'string',
-            description: 'The text to type into the focused element.',
-          },
-          submitKey: {
-            type: 'string',
-            description:
-              'Optional key to press after typing (e.g., "Enter", "Tab", "Escape"). ' +
-              'Useful for submitting form fields or moving to the next cell in a spreadsheet.',
-          },
-        },
-        required: ['text'],
-      },
-      messageBus,
-      /* isOutputMarkdown */ true,
-      /* canUpdateOutput */ false,
-    );
-  }
-
-  build(
-    params: Record<string, unknown>,
-  ): ToolInvocation<Record<string, unknown>, ToolResult> {
-    const submitKey =
-      // eslint-disable-next-line no-restricted-syntax
-      typeof params['submitKey'] === 'string' && params['submitKey']
-        ? params['submitKey']
-        : undefined;
-    return new TypeTextInvocation(
-      this.browserManager,
-      String(params['text'] ?? ''),
-      submitKey,
-      this.messageBus,
-    );
-  }
-}
-
-/**
  * Creates DeclarativeTool instances from dynamically discovered MCP tools,
  * plus custom composite tools (like type_text).
  *
@@ -423,13 +226,14 @@ class TypeTextDeclarativeTool extends DeclarativeTool<
  *
  * @param browserManager The browser manager with isolated MCP client
  * @param messageBus Message bus for tool invocations
+ * @param shouldDisableInput Whether input should be disabled for this agent
  * @returns Array of DeclarativeTools that dispatch to the isolated MCP client
  */
 export async function createMcpDeclarativeTools(
   browserManager: BrowserManager,
   messageBus: MessageBus,
   shouldDisableInput: boolean = false,
-): Promise<Array<McpDeclarativeTool | TypeTextDeclarativeTool>> {
+): Promise<McpDeclarativeTool[]> {
   // Get dynamically discovered tools from the MCP server
   const mcpTools = await browserManager.getDiscoveredTools();
 
@@ -438,29 +242,25 @@ export async function createMcpDeclarativeTools(
       (shouldDisableInput ? ' (input blocker enabled)' : ''),
   );
 
-  const tools: Array<McpDeclarativeTool | TypeTextDeclarativeTool> =
-    mcpTools.map((mcpTool) => {
-      const schema = convertMcpToolToFunctionDeclaration(mcpTool);
-      // Augment description with uid-context hints
-      const augmentedDescription = augmentToolDescription(
-        mcpTool.name,
-        mcpTool.description ?? '',
-      );
-      return new McpDeclarativeTool(
-        browserManager,
-        mcpTool.name,
-        augmentedDescription,
-        schema.parametersJsonSchema,
-        messageBus,
-        shouldDisableInput,
-      );
-    });
-
-  // Add custom composite tools
-  tools.push(new TypeTextDeclarativeTool(browserManager, messageBus));
+  const tools: McpDeclarativeTool[] = mcpTools.map((mcpTool) => {
+    const schema = convertMcpToolToFunctionDeclaration(mcpTool);
+    // Augment description with uid-context hints
+    const augmentedDescription = augmentToolDescription(
+      mcpTool.name,
+      mcpTool.description ?? '',
+    );
+    return new McpDeclarativeTool(
+      browserManager,
+      mcpTool.name,
+      augmentedDescription,
+      schema.parametersJsonSchema,
+      messageBus,
+      shouldDisableInput,
+    );
+  });
 
   debugLogger.log(
-    `Total tools registered: ${tools.length} (${mcpTools.length} MCP + 1 custom)`,
+    `Total tools registered: ${tools.length} (${mcpTools.length} MCP)`,
   );
 
   return tools;

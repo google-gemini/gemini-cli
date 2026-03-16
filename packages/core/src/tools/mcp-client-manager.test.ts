@@ -65,7 +65,7 @@ describe('McpClientManager', () => {
 
   it('should discover tools from all configured', async () => {
     mockConfig.getMcpServers.mockReturnValue({
-      'test-server': {},
+      'test-server': { command: 'node' },
     });
     const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
     await manager.startConfiguredMcpServers();
@@ -76,9 +76,9 @@ describe('McpClientManager', () => {
 
   it('should batch context refresh when starting multiple servers', async () => {
     mockConfig.getMcpServers.mockReturnValue({
-      'server-1': {},
-      'server-2': {},
-      'server-3': {},
+      'server-1': { command: 'node' },
+      'server-2': { command: 'node' },
+      'server-3': { command: 'node' },
     });
     const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
     await manager.startConfiguredMcpServers();
@@ -93,7 +93,7 @@ describe('McpClientManager', () => {
 
   it('should update global discovery state', async () => {
     mockConfig.getMcpServers.mockReturnValue({
-      'test-server': {},
+      'test-server': { command: 'node' },
     });
     const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
     expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.NOT_STARTED);
@@ -105,7 +105,7 @@ describe('McpClientManager', () => {
 
   it('should mark discovery completed when all configured servers are user-disabled', async () => {
     mockConfig.getMcpServers.mockReturnValue({
-      'test-server': {},
+      'test-server': { command: 'node' },
     });
     mockConfig.getMcpEnablementCallbacks.mockReturnValue({
       isSessionDisabled: vi.fn().mockReturnValue(false),
@@ -125,7 +125,7 @@ describe('McpClientManager', () => {
 
   it('should mark discovery completed when all configured servers are blocked', async () => {
     mockConfig.getMcpServers.mockReturnValue({
-      'test-server': {},
+      'test-server': { command: 'node' },
     });
     mockConfig.getBlockedMcpServers.mockReturnValue(['test-server']);
 
@@ -142,7 +142,7 @@ describe('McpClientManager', () => {
 
   it('should not discover tools if folder is not trusted', async () => {
     mockConfig.getMcpServers.mockReturnValue({
-      'test-server': {},
+      'test-server': { command: 'node' },
     });
     mockConfig.isTrustedFolder.mockReturnValue(false);
     const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
@@ -153,7 +153,7 @@ describe('McpClientManager', () => {
 
   it('should not start blocked servers', async () => {
     mockConfig.getMcpServers.mockReturnValue({
-      'test-server': {},
+      'test-server': { command: 'node' },
     });
     mockConfig.getBlockedMcpServers.mockReturnValue(['test-server']);
     const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
@@ -164,8 +164,8 @@ describe('McpClientManager', () => {
 
   it('should only start allowed servers if allow list is not empty', async () => {
     mockConfig.getMcpServers.mockReturnValue({
-      'test-server': {},
-      'another-server': {},
+      'test-server': { command: 'node' },
+      'another-server': { command: 'node' },
     });
     mockConfig.getAllowedMcpServers.mockReturnValue(['another-server']);
     const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
@@ -179,7 +179,7 @@ describe('McpClientManager', () => {
     await manager.startExtension({
       name: 'test-extension',
       mcpServers: {
-        'test-server': {},
+        'test-server': { command: 'node' },
       },
       isActive: true,
       version: '1.0.0',
@@ -196,7 +196,7 @@ describe('McpClientManager', () => {
     await manager.startExtension({
       name: 'test-extension',
       mcpServers: {
-        'test-server': {},
+        'test-server': { command: 'node' },
       },
       isActive: false,
       version: '1.0.0',
@@ -210,7 +210,7 @@ describe('McpClientManager', () => {
 
   it('should add blocked servers to the blockedMcpServers list', async () => {
     mockConfig.getMcpServers.mockReturnValue({
-      'test-server': {},
+      'test-server': { command: 'node' },
     });
     mockConfig.getBlockedMcpServers.mockReturnValue(['test-server']);
     const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
@@ -220,12 +220,26 @@ describe('McpClientManager', () => {
     ]);
   });
 
+  it('should skip discovery for servers without connection details', async () => {
+    mockConfig.getMcpServers.mockReturnValue({
+      'test-server': { excludeTools: ['dangerous_tool'] },
+    });
+    const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+    await manager.startConfiguredMcpServers();
+    expect(mockedMcpClient.connect).not.toHaveBeenCalled();
+    expect(mockedMcpClient.discover).not.toHaveBeenCalled();
+
+    // But it should still be tracked in allServerConfigs
+    expect(manager.getMcpServers()).toHaveProperty('test-server');
+  });
+
   describe('restart', () => {
     it('should restart all running servers', async () => {
+      const serverConfig = { command: 'node' };
       mockConfig.getMcpServers.mockReturnValue({
-        'test-server': {},
+        'test-server': serverConfig,
       });
-      mockedMcpClient.getServerConfig.mockReturnValue({});
+      mockedMcpClient.getServerConfig.mockReturnValue(serverConfig);
       const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
       await manager.startConfiguredMcpServers();
 
@@ -241,10 +255,11 @@ describe('McpClientManager', () => {
 
   describe('restartServer', () => {
     it('should restart the specified server', async () => {
+      const serverConfig = { command: 'node' };
       mockConfig.getMcpServers.mockReturnValue({
-        'test-server': {},
+        'test-server': serverConfig,
       });
-      mockedMcpClient.getServerConfig.mockReturnValue({});
+      mockedMcpClient.getServerConfig.mockReturnValue(serverConfig);
       const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
       await manager.startConfiguredMcpServers();
 
@@ -326,8 +341,8 @@ describe('McpClientManager', () => {
       );
 
       mockConfig.getMcpServers.mockReturnValue({
-        'server-with-instructions': {},
-        'server-without-instructions': {},
+        'server-with-instructions': { command: 'node' },
+        'server-without-instructions': { command: 'node' },
       });
       await manager.startConfiguredMcpServers();
 
@@ -355,7 +370,7 @@ describe('McpClientManager', () => {
       });
 
       mockConfig.getMcpServers.mockReturnValue({
-        'test-server': {},
+        'test-server': { command: 'node' },
       });
 
       const manager = new McpClientManager(
@@ -375,10 +390,10 @@ describe('McpClientManager', () => {
           throw new Error('Disconnect failed unexpectedly');
         }
       });
-      mockedMcpClient.getServerConfig.mockReturnValue({});
+      mockedMcpClient.getServerConfig.mockReturnValue({ command: 'node' });
 
       mockConfig.getMcpServers.mockReturnValue({
-        'test-server': {},
+        'test-server': { command: 'node' },
       });
 
       const manager = new McpClientManager(
@@ -511,12 +526,16 @@ describe('McpClientManager', () => {
       const manager2 = new McpClientManager('0.0.1', toolRegistry, mockConfig);
 
       // Case 2: User config loads first, then Extension loads
+      // This call will skip discovery because userConfig has no connection details
       await manager2.maybeDiscoverMcpServer('test-server', userConfig);
-      mockedMcpClient.getServerConfig.mockReturnValue(userConfig);
+
+      // In Case 2, the existing client is NOT created yet because discovery was skipped.
+      // So getServerConfig on mockedMcpClient won't be called yet.
+      // However, startExtension will call maybeDiscoverMcpServer which will merge.
 
       await manager2.startExtension(extension);
 
-      lastCall = vi.mocked(McpClient).mock.calls[1];
+      lastCall = vi.mocked(McpClient).mock.calls[0];
       mergedConfig = lastCall[1];
 
       expect(mergedConfig.excludeTools).toContain('ext-tool');
@@ -541,10 +560,9 @@ describe('McpClientManager', () => {
       };
 
       await manager.maybeDiscoverMcpServer('test-server', userConfig);
-      mockedMcpClient.getServerConfig.mockReturnValue(userConfig);
       await manager.maybeDiscoverMcpServer('test-server', extConfig);
 
-      const lastCall = vi.mocked(McpClient).mock.calls[1];
+      const lastCall = vi.mocked(McpClient).mock.calls[0];
       expect(lastCall[1].includeTools).toEqual([]); // Empty array = no tools allowed
     });
 
@@ -554,10 +572,9 @@ describe('McpClientManager', () => {
       const extConfig = { command: 'node', args: ['ext.js'] };
 
       await manager.maybeDiscoverMcpServer('test-server', userConfig);
-      mockedMcpClient.getServerConfig.mockReturnValue(userConfig);
       await manager.maybeDiscoverMcpServer('test-server', extConfig);
 
-      const lastCall = vi.mocked(McpClient).mock.calls[1];
+      const lastCall = vi.mocked(McpClient).mock.calls[0];
       expect(lastCall[1].includeTools).toEqual(['user-tool']);
     });
 
@@ -579,6 +596,47 @@ describe('McpClientManager', () => {
       expect(finalConfig.command).toBe('node'); // Preserved from base
       expect(finalConfig.args).toEqual(['overridden.js']); // Overridden
       expect(finalConfig.timeout).toBe(1000); // Preserved from base
+    });
+
+    it('should prevent one extension from hijacking another extension server name', async () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+
+      const extension1: GeminiCLIExtension = {
+        name: 'extension-1',
+        isActive: true,
+        id: 'ext-1',
+        version: '1.0.0',
+        path: '/path1',
+        contextFiles: [],
+        mcpServers: {
+          'shared-name': { command: 'node', args: ['server1.js'] },
+        },
+      };
+
+      const extension2: GeminiCLIExtension = {
+        name: 'extension-2',
+        isActive: true,
+        id: 'ext-2',
+        version: '1.0.0',
+        path: '/path2',
+        contextFiles: [],
+        mcpServers: {
+          'shared-name': { command: 'node', args: ['server2.js'] },
+        },
+      };
+
+      // Start extension 1 (discovery begins but is not yet complete)
+      const p1 = manager.startExtension(extension1);
+
+      // Immediately attempt to start extension 2 with the same name
+      await manager.startExtension(extension2);
+
+      await p1;
+
+      // Only extension 1 should have been initialized
+      expect(vi.mocked(McpClient)).toHaveBeenCalledTimes(1);
+      const lastCall = vi.mocked(McpClient).mock.calls[0];
+      expect(lastCall[1].extension).toBe(extension1);
     });
 
     it('should remove servers from blockedMcpServers when stopExtension is called', async () => {
