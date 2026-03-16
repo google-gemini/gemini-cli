@@ -60,19 +60,25 @@ export async function scheduleAgentTools(
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const agentConfig: Config = Object.create(config);
   agentConfig.getToolRegistry = () => toolRegistry;
-  // Override toolRegistry and messageBus properties so AgentLoopContext reads the agent-specific registry and bus.
+  agentConfig.getMessageBus = () => toolRegistry.messageBus;
+  // Override toolRegistry property so AgentLoopContext reads the agent-specific registry.
   Object.defineProperty(agentConfig, 'toolRegistry', {
     get: () => toolRegistry,
     configurable: true,
   });
-  Object.defineProperty(agentConfig, 'messageBus', {
-    get: () => toolRegistry.getMessageBus(),
-    configurable: true,
-  });
+
+  const schedulerContext = {
+    config: agentConfig,
+    promptId: config.promptId,
+    toolRegistry,
+    messageBus: toolRegistry.messageBus,
+    geminiClient: config.geminiClient,
+    sandboxManager: config.sandboxManager,
+  };
 
   const scheduler = new Scheduler({
-    context: agentConfig,
-    messageBus: toolRegistry.getMessageBus(),
+    context: schedulerContext,
+    messageBus: toolRegistry.messageBus,
     getPreferredEditor: getPreferredEditor ?? (() => undefined),
     schedulerId,
     subagent,

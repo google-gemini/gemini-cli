@@ -246,7 +246,7 @@ describe('createPolicyEngineConfig', () => {
       (r) => r.mcpName === 'my-server' && r.decision === PolicyDecision.DENY,
     );
     expect(rule).toBeDefined();
-    expect(rule?.priority).toBe(4.98); // MCP excluded server
+    expect(rule?.priority).toBe(4.9); // MCP excluded server
   });
 
   it('should allow tools from trusted MCP servers', async () => {
@@ -308,7 +308,7 @@ describe('createPolicyEngineConfig', () => {
         r.mcpName === 'excluded-server' && r.decision === PolicyDecision.DENY,
     );
     expect(excludedRule).toBeDefined();
-    expect(excludedRule?.priority).toBe(4.98); // MCP excluded server
+    expect(excludedRule?.priority).toBe(4.9); // MCP excluded server
   });
 
   it('should allow all tools in YOLO mode', async () => {
@@ -377,11 +377,11 @@ describe('createPolicyEngineConfig', () => {
     );
 
     expect(serverDenyRule).toBeDefined();
-    expect(serverDenyRule?.priority).toBe(4.98); // MCP excluded server
+    expect(serverDenyRule?.priority).toBe(4.9); // MCP excluded server
     expect(toolAllowRule).toBeDefined();
     expect(toolAllowRule?.priority).toBeCloseTo(4.3, 5); // Command line allow
 
-    // Server deny (4.98) has higher priority than tool allow (4.3),
+    // Server deny (4.9) has higher priority than tool allow (4.3),
     // so server deny wins (this is expected behavior - server-level blocks are security critical)
   });
 
@@ -431,7 +431,7 @@ describe('createPolicyEngineConfig', () => {
       },
       mcp: {
         allowed: ['allowed-server'], // Priority 4.1
-        excluded: ['excluded-server'], // Priority 4.98
+        excluded: ['excluded-server'], // Priority 4.9
       },
       mcpServers: {
         'trusted-server': {
@@ -468,11 +468,11 @@ describe('createPolicyEngineConfig', () => {
       }))
       .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 
-    // Check that the highest priority items are the excludes (user tier: 4.4 and 4.98)
+    // Check that the highest priority items are the excludes (user tier: 4.4 and 4.9)
     const highestPriorityExcludes = priorities?.filter(
       (p) =>
         Math.abs(p.priority! - 4.4) < 0.01 ||
-        Math.abs(p.priority! - 4.98) < 0.01,
+        Math.abs(p.priority! - 4.9) < 0.01,
     );
     expect(
       highestPriorityExcludes?.every((p) => p.decision === PolicyDecision.DENY),

@@ -25,6 +25,7 @@ import {
 } from '../tools/tools.js';
 import { buildFilePathArgsPattern } from '../policy/utils.js';
 import { makeRelative } from '../utils/paths.js';
+import { DiscoveredMCPTool, formatMcpToolName } from '../tools/mcp-tool.js';
 import { EDIT_TOOL_NAMES } from '../tools/tool-names.js';
 import type { ValidatingToolCall } from './types.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
@@ -53,7 +54,10 @@ export async function checkPolicy(
   config: Config,
   subagent?: string,
 ): Promise<CheckResult> {
-  const serverName = toolCall.tool.serverName;
+  const serverName =
+    toolCall.tool instanceof DiscoveredMCPTool
+      ? toolCall.tool.serverName
+      : undefined;
 
   const toolAnnotations = toolCall.tool.toolAnnotations;
 
@@ -110,13 +114,12 @@ export async function updatePolicy(
   outcome: ToolConfirmationOutcome,
   confirmationDetails: SerializableConfirmationDetails | undefined,
   context: AgentLoopContext,
+  messageBus: MessageBus,
   toolInvocation?: AnyToolInvocation,
 ): Promise<void> {
-  const { config, messageBus } = context;
-
   // Mode Transitions (AUTO_EDIT)
   if (isAutoEditTransition(tool, outcome)) {
-    config.setApprovalMode(ApprovalMode.AUTO_EDIT);
+    context.config.setApprovalMode(ApprovalMode.AUTO_EDIT);
     return;
   }
 
@@ -125,8 +128,9 @@ export async function updatePolicy(
   if (outcome === ToolConfirmationOutcome.ProceedAlwaysAndSave) {
     // If folder is trusted and workspace policies are enabled, we prefer workspace scope.
     if (
-      config.isTrustedFolder() &&
-      config.getWorkspacePoliciesDir() !== undefined
+      context.config &&
+      context.config.isTrustedFolder() &&
+      context.config.getWorkspacePoliciesDir() !== undefined
     ) {
       persistScope = 'workspace';
     } else {
@@ -154,7 +158,7 @@ export async function updatePolicy(
     messageBus,
     persistScope,
     toolInvocation,
-    config,
+    context.config,
   );
 }
 
@@ -243,7 +247,7 @@ async function handleMcpPolicyUpdate(
 
   // If "Always allow all tools from this server", use the wildcard pattern
   if (outcome === ToolConfirmationOutcome.ProceedAlwaysServer) {
-    toolName = `${confirmationDetails.serverName}__*`;
+    toolName = formatMcpToolName(confirmationDetails.serverName, '*');
   }
 
   await messageBus.publish({

@@ -62,26 +62,78 @@ export function clearEmittedPolicyWarnings(): void {
 // Policy tier constants for priority calculation
 export const DEFAULT_POLICY_TIER = 1;
 export const EXTENSION_POLICY_TIER = 2;
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
+import * as crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { Storage } from '../config/storage.js';
+import {
+  ApprovalMode,
+  type PolicyEngineConfig,
+  PolicyDecision,
+  type PolicyRule,
+  type PolicySettings,
+  type SafetyCheckerRule,
+  ALWAYS_ALLOW_PRIORITY_OFFSET,
+} from './types.js';
+import type { PolicyEngine } from './policy-engine.js';
+import { loadPoliciesFromToml, type PolicyFileError } from './toml-loader.js';
+import { buildArgsPatterns, isSafeRegExp } from './utils.js';
+import toml from '@iarna/toml';
+import {
+  MessageBusType,
+  type UpdatePolicy,
+} from '../confirmation-bus/types.js';
+import { type MessageBus } from '../confirmation-bus/message-bus.js';
+import { coreEvents } from '../utils/events.js';
+import { debugLogger } from '../utils/debugLogger.js';
+import { SHELL_TOOL_NAMES } from '../utils/shell-utils.js';
+import { SHELL_TOOL_NAME, SENSITIVE_TOOLS } from '../tools/tool-names.js';
+import { isNodeError } from '../utils/errors.js';
+import { MCP_TOOL_PREFIX } from '../tools/mcp-tool.js';
+
+import { isDirectorySecure } from '../utils/security.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+export const DEFAULT_CORE_POLICIES_DIR = path.join(__dirname, 'policies');
+
+// Cache to prevent duplicate warnings in the same process
+const emittedWarnings = new Set<string>();
+
+/**
+ * Emits a warning feedback event only once per process.
+ */
+function emitWarningOnce(message: string): void {
+  if (!emittedWarnings.has(message)) {
+    coreEvents.emitFeedback('warning', message);
+    emittedWarnings.add(message);
+  }
+}
+
+/**
+ * Clears the emitted warnings cache. Used primarily for tests.
+ */
+export function clearEmittedPolicyWarnings(): void {
+  emittedWarnings.clear();
+}
+
+// Policy tier constants for priority calculation
+export const DEFAULT_POLICY_TIER = 1;
+export const EXTENSION_POLICY_TIER = 2;
 export const WORKSPACE_POLICY_TIER = 3;
 export const USER_POLICY_TIER = 4;
 export const ADMIN_POLICY_TIER = 5;
 
-/**
- * The fractional priority of "Always allow" rules (e.g., 950/1000).
- * Higher fraction within a tier wins.
- */
-export const ALWAYS_ALLOW_PRIORITY_FRACTION = 950;
-
-/**
- * The fractional priority offset for "Always allow" rules (e.g., 0.95).
- * This ensures consistency between in-memory rules and persisted rules.
- */
-export const ALWAYS_ALLOW_PRIORITY_OFFSET =
-  ALWAYS_ALLOW_PRIORITY_FRACTION / 1000;
-
 // Specific priority offsets and derived priorities for dynamic/settings rules.
 
-export const MCP_EXCLUDED_PRIORITY = USER_POLICY_TIER + 0.98;
+export const MCP_EXCLUDED_PRIORITY = USER_POLICY_TIER + 0.9;
 export const EXCLUDE_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.4;
 export const ALLOWED_TOOLS_FLAG_PRIORITY = USER_POLICY_TIER + 0.3;
 export const TRUSTED_MCP_SERVER_PRIORITY = USER_POLICY_TIER + 0.2;
@@ -535,6 +587,7 @@ export async function createPolicyEngineConfig(
     checkers,
     defaultDecision: PolicyDecision.ASK_USER,
     approvalMode,
+    disableAlwaysAllow: settings.disableAlwaysAllow,
   };
 }
 
@@ -584,7 +637,6 @@ export function createPolicyUpdater(
             // which is safe and won't contain ReDoS patterns.
             policyEngine.addRule({
               toolName,
-              mcpName: message.mcpName,
               decision: PolicyDecision.ALLOW,
               priority,
               argsPattern: new RegExp(pattern),
@@ -618,20 +670,8 @@ export function createPolicyUpdater(
           return;
         }
 
-        // Normalize toolName for in-memory rules if it's an MCP server wildcard.
-        // Supports both composite subagent format (server__*) and standard MCP format (mcp_server_*).
-        let effectiveToolName = toolName;
-        if (
-          message.mcpName &&
-          (toolName === `${message.mcpName}__*` ||
-            toolName === `${MCP_TOOL_PREFIX}${message.mcpName}_*`)
-        ) {
-          effectiveToolName = '*';
-        }
-
         policyEngine.addRule({
-          toolName: effectiveToolName,
-          mcpName: message.mcpName,
+          toolName,
           decision: PolicyDecision.ALLOW,
           priority,
           argsPattern,
@@ -682,16 +722,10 @@ export function createPolicyUpdater(
 
             if (message.mcpName) {
               newRule.mcpName = message.mcpName;
-              // Extract simple tool name if it has the server prefix.
-              // We check both the composite subagent format (server__tool)
-              // and the standard MCP format (mcp_server_tool).
-              const mcpPrefix = `${MCP_TOOL_PREFIX}${message.mcpName}_`;
-              const subagentPrefix = `${message.mcpName}__`;
 
-              if (toolName.startsWith(mcpPrefix)) {
-                newRule.toolName = toolName.slice(mcpPrefix.length);
-              } else if (toolName.startsWith(subagentPrefix)) {
-                newRule.toolName = toolName.slice(subagentPrefix.length);
+              const expectedPrefix = `${MCP_TOOL_PREFIX}${message.mcpName}_`;
+              if (toolName.startsWith(expectedPrefix)) {
+                newRule.toolName = toolName.slice(expectedPrefix.length);
               } else {
                 newRule.toolName = toolName;
               }

@@ -25,6 +25,9 @@ import {
 /** Canonical agent name — used for routing and configuration lookup. */
 export const BROWSER_AGENT_NAME = 'browser_agent';
 
+/** Server name used for browser agent tools in policy rules. */
+export const BROWSER_AGENT_SERVER_NAME = 'browser-agent';
+
 /**
  * Output schema for browser agent results.
  */

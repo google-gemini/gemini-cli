@@ -31,6 +31,8 @@ import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import type { BrowserManager, McpToolCallResult } from './browserManager.js';
 import { debugLogger } from '../../utils/debugLogger.js';
 import { suspendInputBlocker, resumeInputBlocker } from './inputBlocker.js';
+import { MCP_TOOL_PREFIX } from '../../tools/mcp-tool.js';
+import { BROWSER_AGENT_SERVER_NAME } from './browserAgentDefinition.js';
 
 /**
  * Tools that interact with page elements and require the input blocker
@@ -62,7 +64,13 @@ class McpToolInvocation extends BaseToolInvocation<
     messageBus: MessageBus,
     private readonly shouldDisableInput: boolean,
   ) {
-    super(params, messageBus, toolName, toolName);
+    super(
+      params,
+      messageBus,
+      `${MCP_TOOL_PREFIX}${BROWSER_AGENT_SERVER_NAME}_${toolName}`,
+      toolName,
+      BROWSER_AGENT_SERVER_NAME,
+    );
   }
 
   getDescription(): string {
@@ -79,11 +87,11 @@ class McpToolInvocation extends BaseToolInvocation<
     return {
       type: 'mcp',
       title: `Confirm MCP Tool: ${this.toolName}`,
-      serverName: 'browser-agent',
+      serverName: BROWSER_AGENT_SERVER_NAME,
       toolName: this.toolName,
       toolDisplayName: this.toolName,
-      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
-        // Policy updates are now handled centrally by the scheduler
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
+        await this.publishPolicyUpdate(outcome);
       },
     };
   }
@@ -92,7 +100,7 @@ class McpToolInvocation extends BaseToolInvocation<
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
     return {
-      mcpName: 'browser-agent',
+      mcpName: BROWSER_AGENT_SERVER_NAME,
     };
   }
 
@@ -189,7 +197,13 @@ class TypeTextInvocation extends BaseToolInvocation<
     private readonly submitKey: string | undefined,
     messageBus: MessageBus,
   ) {
-    super({ text, submitKey }, messageBus, 'type_text', 'type_text');
+    super(
+      { text, submitKey },
+      messageBus,
+      `${MCP_TOOL_PREFIX}${BROWSER_AGENT_SERVER_NAME}_type_text`,
+      'type_text',
+      BROWSER_AGENT_SERVER_NAME,
+    );
   }
 
   getDescription(): string {
@@ -209,11 +223,11 @@ class TypeTextInvocation extends BaseToolInvocation<
     return {
       type: 'mcp',
       title: `Confirm Tool: type_text`,
-      serverName: 'browser-agent',
+      serverName: BROWSER_AGENT_SERVER_NAME,
       toolName: 'type_text',
       toolDisplayName: 'type_text',
-      onConfirm: async (_outcome: ToolConfirmationOutcome) => {
-        // Policy updates are now handled centrally by the scheduler
+      onConfirm: async (outcome: ToolConfirmationOutcome) => {
+        await this.publishPolicyUpdate(outcome);
       },
     };
   }
@@ -222,7 +236,7 @@ class TypeTextInvocation extends BaseToolInvocation<
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
     return {
-      mcpName: 'browser-agent',
+      mcpName: BROWSER_AGENT_SERVER_NAME,
     };
   }
 
@@ -327,7 +341,6 @@ class McpDeclarativeTool extends DeclarativeTool<
     parameterSchema: unknown,
     messageBus: MessageBus,
     private readonly shouldDisableInput: boolean,
-    serverName?: string,
   ) {
     super(
       name,
@@ -338,10 +351,13 @@ class McpDeclarativeTool extends DeclarativeTool<
       messageBus,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ false,
-      /* extensionName */ undefined,
-      /* extensionId */ undefined,
-      serverName,
     );
+  }
+
+  override get toolAnnotations(): Record<string, unknown> {
+    return {
+      _serverName: BROWSER_AGENT_SERVER_NAME,
+    };
   }
 
   build(
@@ -367,7 +383,6 @@ class TypeTextDeclarativeTool extends DeclarativeTool<
   constructor(
     private readonly browserManager: BrowserManager,
     messageBus: MessageBus,
-    serverName?: string,
   ) {
     super(
       'type_text',
@@ -397,10 +412,13 @@ class TypeTextDeclarativeTool extends DeclarativeTool<
       messageBus,
       /* isOutputMarkdown */ true,
       /* canUpdateOutput */ false,
-      /* extensionName */ undefined,
-      /* extensionId */ undefined,
-      serverName,
     );
+  }
+
+  override get toolAnnotations(): Record<string, unknown> {
+    return {
+      _serverName: BROWSER_AGENT_SERVER_NAME,
+    };
   }
 
   build(
@@ -461,14 +479,11 @@ export async function createMcpDeclarativeTools(
         schema.parametersJsonSchema,
         messageBus,
         shouldDisableInput,
-        'browser-agent',
       );
     });
 
   // Add custom composite tools
-  tools.push(
-    new TypeTextDeclarativeTool(browserManager, messageBus, 'browser-agent'),
-  );
+  tools.push(new TypeTextDeclarativeTool(browserManager, messageBus));
 
   debugLogger.log(
     `Total tools registered: ${tools.length} (${mcpTools.length} MCP + 1 custom)`,

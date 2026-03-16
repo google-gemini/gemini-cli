@@ -29,7 +29,6 @@ describe('agent-scheduler', () => {
     mockToolRegistry = {
       getTool: vi.fn(),
       messageBus: mockMessageBus,
-      getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
     } as unknown as Mocked<ToolRegistry>;
     mockConfig = {
       messageBus: mockMessageBus,
@@ -42,6 +41,11 @@ describe('agent-scheduler', () => {
   });
 
   it('should create a scheduler with agent-specific config', async () => {
+    const mockConfig = {
+      messageBus: mockMessageBus,
+      toolRegistry: mockToolRegistry,
+    } as unknown as Mocked<Config>;
+
     const requests: ToolCallRequestInfo[] = [
       {
         callId: 'call-1',
@@ -84,7 +88,6 @@ describe('agent-scheduler', () => {
     const agentRegistry = {
       _id: 'agent',
       messageBus: mockMessageBus,
-      getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
     } as unknown as Mocked<ToolRegistry>;
 
     const config = {
@@ -116,5 +119,26 @@ describe('agent-scheduler', () => {
     const schedulerConfig = vi.mocked(Scheduler).mock.calls[0][0].context;
     expect(schedulerConfig.toolRegistry).toBe(agentRegistry);
     expect(schedulerConfig.toolRegistry).not.toBe(mainRegistry);
+  });
+
+  it('should create an AgentLoopContext that has a defined .config property', async () => {
+    const mockConfig = {
+      messageBus: mockMessageBus,
+      toolRegistry: mockToolRegistry,
+      promptId: 'test-prompt',
+    } as unknown as Mocked<Config>;
+
+    const options = {
+      schedulerId: 'subagent-1',
+      toolRegistry: mockToolRegistry as unknown as ToolRegistry,
+      signal: new AbortController().signal,
+    };
+
+    await scheduleAgentTools(mockConfig as unknown as Config, [], options);
+
+    const schedulerContext = vi.mocked(Scheduler).mock.calls[0][0].context;
+    expect(schedulerContext.config).toBeDefined();
+    expect(schedulerContext.config.promptId).toBe('test-prompt');
+    expect(schedulerContext.toolRegistry).toBe(mockToolRegistry);
   });
 });

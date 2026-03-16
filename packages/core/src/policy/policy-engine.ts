@@ -13,6 +13,7 @@ import {
   type HookCheckerRule,
   ApprovalMode,
   type CheckResult,
+  ALWAYS_ALLOW_PRIORITY_FRACTION,
 } from './types.js';
 import { stableStringify } from './stable-stringify.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -34,12 +35,6 @@ import {
 function isWildcardPattern(name: string): boolean {
   return name === '*' || name.includes('*');
 }
-
-/**
- * Wildcard suffix used for MCP server-wide policies.
- * Matches the format used in handleMcpPolicyUpdate.
- */
-export const MCP_SERVER_WILDCARD_SUFFIX = '__*';
 
 /**
  * Checks if a tool call matches a wildcard pattern.
@@ -67,15 +62,6 @@ function matchesWildcard(
       return false;
     }
     return toolName.startsWith(`${MCP_TOOL_PREFIX}${expectedServerName}_`);
-  }
-
-  // Handle {server}__* format (used for non-prefixed tools in subagents)
-  if (pattern.endsWith(MCP_SERVER_WILDCARD_SUFFIX)) {
-    const expectedServerName = pattern.slice(
-      0,
-      -MCP_SERVER_WILDCARD_SUFFIX.length,
-    );
-    return serverName === expectedServerName;
   }
 
   // Not a recognized wildcard pattern, fallback to exact match just in case
@@ -169,6 +155,7 @@ export class PolicyEngine {
   private hookCheckers: HookCheckerRule[];
   private readonly defaultDecision: PolicyDecision;
   private readonly nonInteractive: boolean;
+  private readonly disableAlwaysAllow: boolean;
   private readonly checkerRunner?: CheckerRunner;
   private approvalMode: ApprovalMode;
 
@@ -184,6 +171,7 @@ export class PolicyEngine {
     );
     this.defaultDecision = config.defaultDecision ?? PolicyDecision.ASK_USER;
     this.nonInteractive = config.nonInteractive ?? false;
+    this.disableAlwaysAllow = config.disableAlwaysAllow ?? false;
     this.checkerRunner = checkerRunner;
     this.approvalMode = config.approvalMode ?? ApprovalMode.DEFAULT;
   }
@@ -200,6 +188,13 @@ export class PolicyEngine {
    */
   getApprovalMode(): ApprovalMode {
     return this.approvalMode;
+  }
+
+  private isAlwaysAllowRule(rule: PolicyRule): boolean {
+    return (
+      rule.priority !== undefined &&
+      Math.round((rule.priority % 1) * 1000) === ALWAYS_ALLOW_PRIORITY_FRACTION
+    );
   }
 
   private shouldDowngradeForRedirection(
@@ -437,6 +432,10 @@ export class PolicyEngine {
     }
 
     for (const rule of this.rules) {
+      if (this.disableAlwaysAllow && this.isAlwaysAllowRule(rule)) {
+        continue;
+      }
+
       const match = toolCallsToTry.some((tc) =>
         ruleMatches(
           rule,
@@ -699,6 +698,10 @@ export class PolicyEngine {
 
       // Evaluate rules in priority order (they are already sorted in constructor)
       for (const rule of this.rules) {
+        if (this.disableAlwaysAllow && this.isAlwaysAllowRule(rule)) {
+          continue;
+        }
+
         // Create a copy of the rule without argsPattern to see if it targets the tool
         // regardless of the runtime arguments it might receive.
         const ruleWithoutArgs: PolicyRule = { ...rule, argsPattern: undefined };
