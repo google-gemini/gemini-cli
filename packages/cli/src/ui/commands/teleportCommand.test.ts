@@ -10,6 +10,7 @@ import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { type Config } from '@google/gemini-cli-core';
 import { existsSync } from 'node:fs';
+import * as fs from 'node:fs';
 
 const mockExportSession = vi.fn();
 const mockImportSession = vi.fn();
@@ -131,13 +132,15 @@ describe('teleportCommand', () => {
         (c) => c.name === 'export',
       );
       vi.mocked(existsSync).mockReturnValue(true);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      vi.mocked(fs.readFileSync as any).mockReturnValue('file-secret');
 
       await exportSubCommand?.action?.(mockContext, '--key-file /path/to/key');
 
       expect(mockExportSession).toHaveBeenCalledWith(
         'current-session-id',
         expect.any(String),
-        expect.any(String),
+        'file-secret',
         undefined,
       );
     });
