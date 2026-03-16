@@ -17,11 +17,11 @@ const INSTANCE_PREFIX = `gcli-offload-${USER}`;
 const DEFAULT_ZONE = 'us-west1-a';
 
 function getProjectId(): string {
-  const settingsPath = path.join(REPO_ROOT, '.gemini/settings.json');
+  const settingsPath = path.join(REPO_ROOT, '.gemini/offload/settings.json');
   if (fs.existsSync(settingsPath)) {
     try {
       const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-      return settings.maintainer?.deepReview?.projectId;
+      return settings.deepReview?.projectId;
     } catch (e) {}
   }
   return process.env.GOOGLE_CLOUD_PROJECT || '';
@@ -79,13 +79,13 @@ async function stopWorker() {
 }
 
 async function remoteStatus() {
-  const settingsPath = path.join(REPO_ROOT, '.gemini/settings.json');
+  const settingsPath = path.join(REPO_ROOT, '.gemini/offload/settings.json');
   if (!fs.existsSync(settingsPath)) {
       console.error('❌ Settings not found. Run "npm run offload:setup" first.');
       return;
   }
   const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-  const config = settings.maintainer?.deepReview;
+  const config = settings.deepReview;
   
   const provider = ProviderFactory.getProvider({ 
     projectId: config?.projectId || getProjectId(), 

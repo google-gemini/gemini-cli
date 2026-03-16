@@ -68,8 +68,9 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   const setupRes = await provider.setup({ projectId, zone, dnsSuffix });
   if (setupRes !== 0) return setupRes;
 
-  const sshConfigPath = path.join(REPO_ROOT, '.gemini/offload_ssh_config');
-  const knownHostsPath = path.join(REPO_ROOT, '.gemini/offload_known_hosts');
+  const offloadDir = path.join(REPO_ROOT, '.gemini/offload');
+  const sshConfigPath = path.join(offloadDir, 'ssh_config');
+  const knownHostsPath = path.join(offloadDir, 'known_hosts');
 
   // 1b. Security Fork Management (Temporarily Disabled)
   const upstreamRepo = 'google-gemini/gemini-cli';
@@ -133,13 +134,12 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   }
 
   // Save Settings
-  const settingsPath = path.join(REPO_ROOT, '.gemini/settings.json');
+  const settingsPath = path.join(REPO_ROOT, '.gemini/offload/settings.json');
   let settings: any = {};
   if (fs.existsSync(settingsPath)) {
     try { settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8')); } catch (e) {}
   }
-  settings.maintainer = settings.maintainer || {};
-  settings.maintainer.deepReview = { 
+  settings.deepReview = { 
     projectId, zone, 
     remoteHost: 'gcli-worker', 
     remoteWorkDir, userFork, upstreamRepo,

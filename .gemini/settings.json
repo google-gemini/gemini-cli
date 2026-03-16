@@ -6,17 +6,5 @@
   },
   "general": {
     "devtools": true
-  },
-  "maintainer": {
-    "deepReview": {
-      "projectId": "gemini-cli-team-quota",
-      "zone": "us-west1-a",
-      "remoteHost": "gcli-worker",
-      "remoteWorkDir": "~/dev/main",
-      "userFork": "google-gemini/gemini-cli",
-      "upstreamRepo": "google-gemini/gemini-cli",
-      "useContainer": false,
-      "terminalType": "iterm2"
-    }
   }
 }

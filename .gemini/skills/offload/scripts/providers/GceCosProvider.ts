@@ -22,8 +22,10 @@ export class GceCosProvider implements WorkerProvider {
     this.projectId = projectId;
     this.zone = zone;
     this.instanceName = instanceName;
-    this.sshConfigPath = path.join(repoRoot, '.gemini/offload_ssh_config');
-    this.knownHostsPath = path.join(repoRoot, '.gemini/offload_known_hosts');
+    const offloadDir = path.join(repoRoot, '.gemini/offload');
+    if (!fs.existsSync(offloadDir)) fs.mkdirSync(offloadDir, { recursive: true });
+    this.sshConfigPath = path.join(offloadDir, 'ssh_config');
+    this.knownHostsPath = path.join(offloadDir, 'known_hosts');
   }
 
   async provision(): Promise<number> {

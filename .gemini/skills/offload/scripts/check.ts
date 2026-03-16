@@ -14,13 +14,13 @@ export async function runChecker(args: string[], env: NodeJS.ProcessEnv = proces
     return 1;
   }
 
-  const settingsPath = path.join(REPO_ROOT, '.gemini/settings.json');
+  const settingsPath = path.join(REPO_ROOT, '.gemini/offload/settings.json');
   if (!fs.existsSync(settingsPath)) {
     console.error('❌ Settings not found. Run "npm run offload:setup" first.');
     return 1;
   }
   const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-  const config = settings.maintainer?.deepReview;
+  const config = settings.deepReview;
   if (!config) {
     console.error('❌ Deep Review configuration not found.');
     return 1;
