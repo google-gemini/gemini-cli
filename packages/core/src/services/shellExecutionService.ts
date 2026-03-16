@@ -455,7 +455,7 @@ export class ShellExecutionService {
                 : 'successfully';
               return `[Background command completed ${status}. Output saved to ${logPath}]`;
             },
-            completionBehavior: 'notify',
+            completionBehavior: 'silent',
           })
         : undefined;
 
@@ -797,7 +797,7 @@ export class ShellExecutionService {
             : 'successfully';
           return `[Background command completed ${status}. Output saved to ${logPath}]`;
         },
-        completionBehavior: 'notify',
+        completionBehavior: 'silent',
       }).result;
 
       let processingChain = Promise.resolve();
