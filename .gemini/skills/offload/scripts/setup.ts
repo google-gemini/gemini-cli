@@ -55,7 +55,6 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   }
 
   const status = instanceData.status;
-  const internalIp = instanceData.networkInterfaces[0].networkIP;
 
   if (status !== 'RUNNING') {
     console.log(`⚠️ Worker is ${status}. Starting it for initialization...`);
@@ -72,20 +71,46 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   const knownHostsPath = path.join(REPO_ROOT, '.gemini/offload_known_hosts');
 
   const sshEntry = `
-  Host ${sshAlias}
+Host ${sshAlias}
     HostName ${internalHostname}
     IdentityFile ~/.ssh/google_compute_engine
     User ${env.USER || 'mattkorwel'}_google_com
     UserKnownHostsFile ${knownHostsPath}
     CheckHostIP no
     StrictHostKeyChecking no
-  `;
+`;
 
   fs.writeFileSync(sshConfigPath, sshEntry);
   console.log(`   ✅ Created project SSH config: ${sshConfigPath}`);
 
+  // 1b. Security Fork Management (Temporarily Disabled)
+  const upstreamRepo = 'google-gemini/gemini-cli';
+  /*
+  console.log('\n🍴 Configuring Security Fork...');
+  const forksCheck = spawnSync('gh', ['repo', 'list', '--fork', '--limit', '100', '--json', 'nameWithOwner,parent'], { stdio: 'pipe' });
+  let existingForks: string[] = [];
+  try {
+      const allForks = JSON.parse(forksCheck.stdout.toString());
+      existingForks = allForks
+          .filter((r: any) => r.parent?.nameWithOwner === upstreamRepo)
+          .map((r: any) => r.nameWithOwner);
+  } catch (e) {}
+
+  let userFork = '';
+  if (existingForks.length > 0) {
+      console.log(`   ✅ Found personal fork: ${existingForks[0]}`);
+      userFork = existingForks[0];
+  } else {
+      console.log(`   🔍 No personal fork of ${upstreamRepo} found. Creating one...`);
+      spawnSync('gh', ['repo', 'fork', upstreamRepo, '--clone=false'], { stdio: 'inherit' });
+      const user = spawnSync('gh', ['api', 'user', '-q', '.login'], { stdio: 'pipe' }).stdout.toString().trim();
+      userFork = `${user}/gemini-cli`;
+  }
+  */
+  const userFork = upstreamRepo; // Fallback for now
+
   // Resolve Paths
-  const sshCmd = `ssh -F ${sshConfigPath}`;
+  const sshCmd = `ssh -F ${sshConfigPath} -o StrictHostKeyChecking=no -o UserKnownHostsFile=${knownHostsPath}`;
   const remoteHost = sshAlias;
   const remoteHome = '/home/node'; // Hardcoded for our maintainer container
   const remoteWorkDir = `~/dev/main`;
@@ -96,6 +121,7 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   spawnSync(sshCmd, [remoteHost, `mkdir -p ~/dev/main ~/.gemini/policies ~/.offload/scripts`], { shell: true });
 
   const rsyncBase = `rsync -avz -e "${sshCmd}" --exclude=".gemini/settings.json"`;
+  
   // 2. Sync Scripts & Policies
   console.log('   - Pushing offload logic to persistent worker directory...');
   spawnSync(`${rsyncBase} --delete .gemini/skills/offload/scripts/ ${remoteHost}:${persistentScripts}/`, { shell: true });
@@ -109,13 +135,11 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
       spawnSync(`${rsyncBase} ${lp} ${remoteHost}:~/.gemini/google_accounts.json`, { shell: true });
     }
   }
+
   // 4. Scoped Token Onboarding
   if (await confirm('Generate a scoped, secure token for the autonomous agent? (Recommended)')) {
-    // Correct URL for Fine-Grained PAT (Beta)
     const baseUrl = 'https://github.com/settings/personal-access-tokens/new';
     const name = `Offload-${env.USER}`;
-    
-    // Determine which repos to include in the link
     const repoParams = userFork !== upstreamRepo 
         ? `&repositories[]=${encodeURIComponent(upstreamRepo)}&repositories[]=${encodeURIComponent(userFork)}`
         : `&repositories[]=${encodeURIComponent(upstreamRepo)}`;
@@ -131,22 +155,21 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
     console.log('4. Click "Generate token" at the bottom.');
 
     const scopedToken = await prompt('\nPaste Scoped Token', '');
-
     if (scopedToken) {
-      spawnSync(`ssh ${remoteHost} "mkdir -p ~/.offload && echo ${scopedToken} > ~/.offload/.gh_token && chmod 600 ~/.offload/.gh_token"`, { shell: true });
+      spawnSync(sshCmd, [remoteHost, `mkdir -p ~/.offload && echo ${scopedToken} > ~/.offload/.gh_token && chmod 600 ~/.offload/.gh_token`], { shell: true });
     }
   }
 
   // 5. Tooling & Clone
   if (await confirm('Initialize tools and clone repository?')) {
     if (!useContainer) {
-      spawnSync(`ssh ${remoteHost} "sudo npm install -g tsx vitest"`, { shell: true, stdio: 'inherit' });
+      spawnSync(sshCmd, [remoteHost, `sudo npm install -g tsx vitest`], { shell: true, stdio: 'inherit' });
     }
 
     console.log(`🚀 Cloning fork ${userFork} on worker...`);
     const repoUrl = `https://github.com/${userFork}.git`;
     const cloneCmd = `[ -d ${remoteWorkDir}/.git ] || (git clone --filter=blob:none ${repoUrl} ${remoteWorkDir} && cd ${remoteWorkDir} && git remote add upstream https://github.com/${upstreamRepo}.git && git fetch upstream)`;
-    spawnSync(`ssh ${remoteHost} ${JSON.stringify(cloneCmd)}`, { shell: true, stdio: 'inherit' });
+    spawnSync(sshCmd, [remoteHost, cloneCmd], { shell: true, stdio: 'inherit' });
   }
 
   // Save Settings
