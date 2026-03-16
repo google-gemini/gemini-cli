@@ -30,7 +30,7 @@ export const clearCommand: SlashCommand = {
     }
 
     // Reset user steering hints
-    config?.userHintService.clear();
+    config?.injectionService.clear();
 
     // Start a new conversation recording with a new session ID
     // We MUST do this before calling resetChat() so the new ChatRecordingService
