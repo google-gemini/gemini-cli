@@ -177,10 +177,13 @@ describe('a2a-server memory commands', () => {
         expect.any(AbortSignal),
         undefined,
         {
-          sanitizationConfig: {
-            allowedEnvironmentVariables: [],
-            blockedEnvironmentVariables: [],
-            enableEnvironmentVariableRedaction: false,
+          shellExecutionConfig: {
+            sanitizationConfig: {
+              allowedEnvironmentVariables: [],
+              blockedEnvironmentVariables: [],
+              enableEnvironmentVariableRedaction: false,
+            },
+            sandboxManager: undefined,
           },
         },
       );
