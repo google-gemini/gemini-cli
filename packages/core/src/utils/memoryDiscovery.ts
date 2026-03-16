@@ -767,8 +767,24 @@ export async function loadJitSubdirectoryMemory(
     `(Trusted root: ${bestRoot})`,
   );
 
-  // Traverse from target up to the trusted root
-  const potentialPaths = await findUpwardGeminiFiles(resolvedTarget, bestRoot);
+  // Resolve the target to a directory before traversing upward.
+  // When the target is a file (e.g. /app/src/file.ts), start from its
+  // parent directory to avoid a wasted fs.access check on a nonsensical
+  // path like /app/src/file.ts/GEMINI.md.
+  let startDir = resolvedTarget;
+  try {
+    const stat = await fs.stat(resolvedTarget);
+    if (stat.isFile()) {
+      startDir = normalizePath(path.dirname(resolvedTarget));
+    }
+  } catch {
+    // If stat fails (e.g. file doesn't exist yet for write_file),
+    // assume it's a file path and use its parent directory.
+    startDir = normalizePath(path.dirname(resolvedTarget));
+  }
+
+  // Traverse from the resolved directory up to the trusted root
+  const potentialPaths = await findUpwardGeminiFiles(startDir, bestRoot);
 
   if (potentialPaths.length === 0) {
     return { files: [], fileIdentities: [] };

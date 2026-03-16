@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { Part, PartListUnion, PartUnion } from '@google/genai';
 import type { Config } from '../config/config.js';
 
 /**
@@ -62,4 +63,25 @@ export function appendJitContext(
     return llmContent;
   }
   return `${llmContent}${JIT_CONTEXT_PREFIX}${jitContext}${JIT_CONTEXT_SUFFIX}`;
+}
+
+/**
+ * Appends JIT context to non-string tool content (e.g., images, PDFs) by
+ * wrapping both the original content and the JIT context into a Part array.
+ *
+ * @param llmContent - The original non-string tool output content.
+ * @param jitContext - The discovered JIT context string.
+ * @returns A Part array containing the original content and JIT context.
+ */
+export function appendJitContextToParts(
+  llmContent: PartListUnion,
+  jitContext: string,
+): PartUnion[] {
+  const jitPart: Part = {
+    text: `${JIT_CONTEXT_PREFIX}${jitContext}${JIT_CONTEXT_SUFFIX}`,
+  };
+  const existingParts: PartUnion[] = Array.isArray(llmContent)
+    ? llmContent
+    : [llmContent];
+  return [...existingParts, jitPart];
 }
