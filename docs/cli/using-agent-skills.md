@@ -1,10 +1,10 @@
-# Tutorial: Use and manage Agent Skills
+# Using Agent Skills
 
 Agent Skills provide Gemini CLI with specialized expertise on demand. Unlike
 general instructions, a "skill" is a self-contained capability that the agent
 activates only when needed.
 
-This tutorial walks you through how to discover, activate, and install skills in
+This guide walks you through how to discover, activate, and install skills in
 your environment.
 
 ## Step 1: Discover available skills
@@ -95,7 +95,9 @@ gemini skills uninstall <name>
 Now that you know how to use and manage skills, try building your own to
 automate your specific workflows:
 
-- [Developer guide: Build Agent Skills](./tutorials/skills-getting-started.md):
-  Create your first skill from scratch.
+- [Get started with Agent Skills](./tutorials/skills-getting-started.md): A
+  quick walkthrough of triggering and using skills.
+- [Creating Agent Skills](./creating-skills.md): Create your first skill from
+  scratch.
 - [Skill best practices](./skills-best-practices.md): Learn how to design
   reliable and effective expertise.

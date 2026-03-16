@@ -97,12 +97,16 @@
             "items": [
               { "label": "Overview", "slug": "docs/cli/skills" },
               {
-                "label": "User guide: Use and manage",
-                "slug": "docs/cli/using-skills"
+                "label": "Get started with Agent Skills",
+                "slug": "docs/cli/tutorials/skills-getting-started"
               },
               {
-                "label": "Developer guide: Build Agent Skills",
-                "slug": "docs/cli/tutorials/skills-getting-started"
+                "label": "Creating Agent Skills",
+                "slug": "docs/cli/creating-skills"
+              },
+              {
+                "label": "Using Agent Skills",
+                "slug": "docs/cli/using-agent-skills"
               },
               {
                 "label": "Developer guide: Best practices",

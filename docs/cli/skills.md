@@ -126,9 +126,11 @@ For more details on CLI commands, see the
 Explore these resources to refine your skills and understand the framework
 better.
 
-- [Use and manage Agent Skills](./using-skills.md): Learn how to leverage
-  built-in and custom skills.
-- [Build Agent Skills](./tutorials/skills-getting-started.md): Create your first
-  skill and bundle custom logic.
+- [Get started with Agent Skills](./tutorials/skills-getting-started.md): A
+  quick walkthrough of triggering and using skills.
+- [Creating Agent Skills](./creating-skills.md): Create your first skill and
+  bundle custom logic.
+- [Using Agent Skills](./using-agent-skills.md): Learn how to leverage built-in
+  and custom skills.
 - [Best practices](./skills-best-practices.md): Learn strategies for building
   effective skills.
