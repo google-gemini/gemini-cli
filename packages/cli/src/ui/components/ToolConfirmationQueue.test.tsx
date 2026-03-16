@@ -515,7 +515,7 @@ describe('ToolConfirmationQueue', () => {
       renderResult.unmount();
     });
 
-    it('should render the full queue wrapper with borders and correctly account for security warnings height', async () => {
+    it('should handle security warning height correctly', async () => {
       let largeCommand = '';
       for (let i = 1; i <= 50; i++) {
         largeCommand += `echo "Line ${i}"\n`;
