@@ -37,37 +37,19 @@ export interface AgentSession extends Trajectory {
   readonly events: AgentEvent[];
 }
 
-export type NullSend = {
-  message?: never;
-  elicitations?: never;
-  update?: never;
-  action?: never;
-};
+type RequireExactlyOne<T> = {
+  [K in keyof T]: Required<Pick<T, K>> &
+    Partial<Record<Exclude<keyof T, K>, never>>;
+}[keyof T];
 
-/** Send a user message to the agent. Acts as steering when mid-stream. */
-export type MessageSend = Omit<NullSend, 'message'> & {
+interface AgentSendPayloads {
   message: ContentPart[];
-};
-/** Send responses to one or more elicitations to the agent. */
-export type ElicitationSend = Omit<NullSend, 'elicitations'> & {
   elicitations: ElicitationResponse[];
-};
-/** Update session properties. */
-export type UpdateSend = Omit<NullSend, 'update'> & {
   update: { title?: string; model?: string; config?: Record<string, unknown> };
-};
-/** Send an action to the agent. */
-export type ActionSend = Omit<NullSend, 'action'> & {
   action: { type: string; data: unknown };
-};
+}
 
-export type AgentSend = (
-  | MessageSend
-  | ElicitationSend
-  | UpdateSend
-  | ActionSend
-) &
-  WithMeta;
+export type AgentSend = RequireExactlyOne<AgentSendPayloads> & WithMeta;
 
 export interface Trajectory {
   readonly events: AgentEvent[];
