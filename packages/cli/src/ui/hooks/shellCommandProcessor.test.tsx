@@ -16,6 +16,7 @@ import {
   afterEach,
   type Mock,
 } from 'vitest';
+import { NoopSandboxManager } from '@google/gemini-cli-core';
 
 const mockIsBinary = vi.hoisted(() => vi.fn());
 const mockShellExecutionService = vi.hoisted(() => vi.fn());
@@ -109,8 +110,14 @@ describe('useShellCommandProcessor', () => {
       getShellExecutionConfig: () => ({
         terminalHeight: 20,
         terminalWidth: 80,
+        sandboxManager: new NoopSandboxManager(),
+        sanitizationConfig: {
+          allowedEnvironmentVariables: [],
+          blockedEnvironmentVariables: [],
+          enableEnvironmentVariableRedaction: false,
+        },
       }),
-    } as Config;
+    } as unknown as Config;
     mockGeminiClient = { addHistory: vi.fn() } as unknown as GeminiClient;
 
     vi.mocked(os.platform).mockReturnValue('linux');
@@ -830,8 +837,8 @@ describe('useShellCommandProcessor', () => {
         result.current.registerBackgroundShell(1001, 'bg-cmd', 'initial');
       });
 
-      act(() => {
-        result.current.dismissBackgroundShell(1001);
+      await act(async () => {
+        await result.current.dismissBackgroundShell(1001);
       });
 
       expect(mockShellKill).toHaveBeenCalledWith(1001);
@@ -936,8 +943,8 @@ describe('useShellCommandProcessor', () => {
       expect(shell?.exitCode).toBe(1);
 
       // Now dismiss it
-      act(() => {
-        result.current.dismissBackgroundShell(999);
+      await act(async () => {
+        await result.current.dismissBackgroundShell(999);
       });
       expect(result.current.backgroundShellCount).toBe(0);
     });

@@ -17,6 +17,7 @@ import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 import type { CallableTool } from '@google/genai';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { ToolRegistry } from '../tools/tool-registry.js';
 
 vi.mock('../tools/memoryTool.js', async (importOriginal) => {
   const actual = await importOriginal();
@@ -38,11 +39,20 @@ describe('PromptProvider', () => {
     vi.stubEnv('GEMINI_SYSTEM_MD', '');
     vi.stubEnv('GEMINI_WRITE_SYSTEM_MD', '');
 
+    const mockToolRegistry = {
+      getAllToolNames: vi.fn().mockReturnValue([]),
+      getAllTools: vi.fn().mockReturnValue([]),
+    };
     mockConfig = {
-      getToolRegistry: vi.fn().mockReturnValue({
-        getAllToolNames: vi.fn().mockReturnValue([]),
-        getAllTools: vi.fn().mockReturnValue([]),
-      }),
+      get config() {
+        return this as unknown as Config;
+      },
+      get toolRegistry() {
+        return (
+          this as { getToolRegistry: () => ToolRegistry }
+        ).getToolRegistry?.() as unknown as ToolRegistry;
+      },
+      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
@@ -50,6 +60,7 @@ describe('PromptProvider', () => {
       },
       isInteractive: vi.fn().mockReturnValue(true),
       isInteractiveShellEnabled: vi.fn().mockReturnValue(true),
+      isTopicUpdateNarrationEnabled: vi.fn().mockReturnValue(false),
       getSkillManager: vi.fn().mockReturnValue({
         getSkills: vi.fn().mockReturnValue([]),
       }),

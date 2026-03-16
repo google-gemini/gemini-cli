@@ -8,7 +8,7 @@ import { renderWithProviders } from '../../test-utils/render.js';
 import { describe, it, expect, vi } from 'vitest';
 import { StatsDisplay } from './StatsDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
-import type { SessionMetrics } from '../contexts/SessionContext.js';
+import { type SessionMetrics } from '../contexts/SessionContext.js';
 import {
   ToolCallDecision,
   type RetrieveUserQuotaResponse,
@@ -616,7 +616,7 @@ describe('<StatsDisplay />', () => {
       const output = lastFrame();
 
       expect(output).toContain('Auth Method:');
-      expect(output).toContain('Logged in with Google (test@example.com)');
+      expect(output).toContain('Signed in with Google (test@example.com)');
       expect(output).toContain('Tier:');
       expect(output).toContain('Pro');
     });
