@@ -50,7 +50,11 @@ export class ConsolePatcher {
   private patchConsoleMethod =
     (type: 'log' | 'warn' | 'error' | 'debug' | 'info') =>
     (...args: unknown[]) => {
-      if (this.params.suppressConsoleOutput && !this.params.debugMode) {
+      if (
+        this.params.suppressConsoleOutput &&
+        !this.params.debugMode &&
+        type !== 'error'
+      ) {
         return;
       }
 

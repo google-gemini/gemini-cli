@@ -43,6 +43,26 @@ describe('ConsolePatcher', () => {
     console.error = originalError;
   });
 
+  it('should NOT suppress console.error even when suppressConsoleOutput is true', () => {
+    const originalError = console.error;
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    patcher = new ConsolePatcher({
+      debugMode: false,
+      suppressConsoleOutput: true,
+      stderr: true,
+    });
+    patcher.patch();
+
+    console.error('test error');
+
+    expect(errorSpy).toHaveBeenCalled();
+
+    patcher.cleanup();
+    errorSpy.mockRestore();
+    console.error = originalError;
+  });
+
   it('should NOT suppress output when suppressConsoleOutput is true but debugMode is true', () => {
     const originalError = console.error;
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
