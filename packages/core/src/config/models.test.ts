@@ -224,47 +224,6 @@ describe('resolveModel', () => {
       expect(model).toBe(customModel);
     });
   });
-<<<<<<< HEAD
-=======
-
-  describe('hasAccessToPreview logic', () => {
-    it('should return default model when access to preview is false and preview model is requested', () => {
-      expect(resolveModel(PREVIEW_GEMINI_MODEL, false, false, false)).toBe(
-        DEFAULT_GEMINI_MODEL,
-      );
-    });
-
-    it('should return default flash model when access to preview is false and preview flash model is requested', () => {
-      expect(
-        resolveModel(PREVIEW_GEMINI_FLASH_MODEL, false, false, false),
-      ).toBe(DEFAULT_GEMINI_FLASH_MODEL);
-    });
-
-    it('should return default flash lite model when access to preview is false and preview flash lite model is requested', () => {
-      expect(
-        resolveModel(PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL, false, false, false),
-      ).toBe(DEFAULT_GEMINI_FLASH_LITE_MODEL);
-    });
-
-    it('should return default model when access to preview is false and auto-gemini-3 is requested', () => {
-      expect(resolveModel(PREVIEW_GEMINI_MODEL_AUTO, false, false, false)).toBe(
-        DEFAULT_GEMINI_MODEL,
-      );
-    });
-
-    it('should return default model when access to preview is false and Gemini 3.1 is requested', () => {
-      expect(resolveModel(PREVIEW_GEMINI_MODEL_AUTO, true, false, false)).toBe(
-        DEFAULT_GEMINI_MODEL,
-      );
-    });
-
-    it('should still return default model when access to preview is false and auto-gemini-2.5 is requested', () => {
-      expect(resolveModel(DEFAULT_GEMINI_MODEL_AUTO, false, false, false)).toBe(
-        DEFAULT_GEMINI_MODEL,
-      );
-    });
-  });
->>>>>>> 48130ebd2 (Guard pro model usage (#22665))
 });
 
 describe('isGemini2Model', () => {
