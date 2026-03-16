@@ -390,19 +390,20 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
   }
 
   override getSchema(_modelId?: string): FunctionDeclaration {
+    const schema = super.getSchema(_modelId);
     if (
-      typeof this.parameterSchema === 'object' &&
-      this.parameterSchema !== null &&
-      '$schema' in this.parameterSchema
+      typeof schema.parametersJsonSchema === 'object' &&
+      schema.parametersJsonSchema !== null &&
+      '$schema' in schema.parametersJsonSchema
     ) {
-      const { $schema: _, ...schemaWithout$schema } = this.parameterSchema;
+      const { $schema: _, ...schemaWithout$schema } =
+        schema.parametersJsonSchema as Record<string, unknown>;
       return {
-        name: this.name,
-        description: this.description,
+        ...schema,
         parametersJsonSchema: schemaWithout$schema,
       };
     }
-    return super.getSchema(_modelId);
+    return schema;
   }
 
   getFullyQualifiedPrefix(): string {
@@ -418,7 +419,11 @@ export class DiscoveredMCPTool extends BaseDeclarativeTool<
   }
 
   override validateToolParams(params: ToolParams): string | null {
-    const errors = SchemaValidator.validate(this.parameterSchema, params);
+    const { wait_for_previous: _, ...paramsToValidate } = params;
+    const errors = SchemaValidator.validate(
+      this.parameterSchema,
+      paramsToValidate,
+    );
     if (errors) {
       return errors;
     }
