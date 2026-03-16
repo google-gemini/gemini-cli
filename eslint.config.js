@@ -51,6 +51,7 @@ export default tseslint.config(
       'evals/**',
       'packages/test-utils/**',
       '.gemini/skills/**',
+      '**/*.d.ts',
     ],
   },
   eslint.configs.recommended,
@@ -206,11 +207,26 @@ export default tseslint.config(
   {
     // Rules that only apply to product code
     files: ['packages/*/src/**/*.{ts,tsx}'],
-    ignores: ['**/*.test.ts', '**/*.test.tsx'],
+    ignores: ['**/*.test.ts', '**/*.test.tsx', 'packages/*/src/test-utils/**'],
     rules: {
       '@typescript-eslint/no-unsafe-type-assertion': 'error',
       '@typescript-eslint/no-unsafe-assignment': 'error',
       '@typescript-eslint/no-unsafe-return': 'error',
+      'no-restricted-syntax': [
+        'error',
+        ...commonRestrictedSyntaxRules,
+        {
+          selector:
+            'CallExpression[callee.object.name="Object"][callee.property.name="create"]',
+          message:
+            'Avoid using Object.create() in product code. Use object spread {...obj}, explicit class instantiation, structuredClone(), or copy constructors instead.',
+        },
+        {
+          selector: 'Identifier[name="Reflect"]',
+          message:
+            'Avoid using Reflect namespace in product code. Do not use reflection to make copies. Instead, use explicit object copying or cloning (structuredClone() for values, new instance/clone function for classes).',
+        },
+      ],
     },
   },
   {
