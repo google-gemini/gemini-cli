@@ -53,11 +53,27 @@ Gemini CLI project.
   overriding values. Refer to `text-buffer.ts` for a canonical example.
 - **Logging**: Do not leave `console.log`, `console.warn`, or `console.error` in
   the code.
-- **State & Effects**: Ensure state initialization is explicit (e.g., use
-  `undefined` rather than `true` as a default if the state is truly unknown).
-  Carefully manage `useEffect` dependencies. Prefer a reducer whenever
-  practical. NEVER disable `react-hooks/exhaustive-deps`; fix the code to
-  correctly declare dependencies instead.
+- **State**: Ensure state initialization is explicit (e.g., use `undefined`
+  rather than `true` as a default if the state is truly unknown). Prefer a
+  reducer whenever practical. NEVER disable `react-hooks/exhaustive-deps`; fix
+  the code to correctly declare dependencies instead. Evaluate all the React
+  states in a component and ensure that the `useState` calls are necessary and
+  not cases where values could be derived on render. Identify stale closures
+  where a developer may not realize they are relying on a value from a previous
+  render. React Components that modify Settings should effectively use the
+  `useSettingsStore` pattern. If the author intentionally wants to deliver a
+  user experience that is reliant on unsaved changes, then the store should only
+  be updated on save and the dialog should render from UI state. If the author
+  does not have an intentional reason to rely on unsaved changes, then the
+  component can simply render from and update the settings store. Contributors
+  should be able to defend their choice with reasons grounded in intended user
+  experience.
+- **Effect**: `useEffect` should not be used to synchronize React states, it
+  should only be used for genuine side effects that occur outside of React.
+  Contributors should be able to strongly justify the need for an effect.
+  Consider whether the effect should instead be inside an event handler, or
+  whether it is better off being computed on render. Carefully manage
+  `useEffect` dependencies.
 - **Context & Props**: Avoid excessive property drilling. Leverage existing
   providers, extend them, or propose a new one if necessary. Only use providers
   for properties that are consistent across the entire application.
