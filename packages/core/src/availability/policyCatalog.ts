@@ -14,9 +14,10 @@ import {
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
+  PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
+  PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
-  resolveModel,
 } from '../config/models.js';
 import type { UserTierId } from '../code_assist/types.js';
 
@@ -82,15 +83,23 @@ export function getModelPolicyChain(
   options: ModelPolicyOptions,
 ): ModelPolicyChain {
   if (options.previewEnabled) {
-    const previewModel = resolveModel(
-      PREVIEW_GEMINI_MODEL,
-      options.useGemini31,
-      options.useCustomToolModel,
-    );
-    return [
-      definePolicy({ model: previewModel }),
+    const chain: ModelPolicyChain = [];
+
+    if (options.useGemini31) {
+      if (options.useCustomToolModel) {
+        chain.push(
+          definePolicy({ model: PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL }),
+        );
+      }
+      chain.push(definePolicy({ model: PREVIEW_GEMINI_3_1_MODEL }));
+    }
+
+    chain.push(definePolicy({ model: PREVIEW_GEMINI_MODEL }));
+    chain.push(
       definePolicy({ model: PREVIEW_GEMINI_FLASH_MODEL, isLastResort: true }),
-    ];
+    );
+
+    return chain;
   }
 
   return cloneChain(DEFAULT_CHAIN);
