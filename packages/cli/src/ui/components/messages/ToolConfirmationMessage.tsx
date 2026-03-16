@@ -5,8 +5,8 @@
  */
 
 import type React from 'react';
-import { useMemo, useCallback, useState } from 'react';
-import { Box, Text } from 'ink';
+import { useMemo, useCallback, useState, useLayoutEffect, useRef } from 'react';
+import { Box, Text, measureElement, type DOMElement } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 import {
@@ -81,6 +81,22 @@ export const ToolConfirmationMessage: React.FC<
     mcpDetailsExpansionState.callId === callId
       ? mcpDetailsExpansionState.expanded
       : false;
+
+  const [measuredSecurityWarningsHeight, setMeasuredSecurityWarningsHeight] =
+    useState(0);
+  const securityWarningsRef = useRef<DOMElement>(null);
+
+  useLayoutEffect(() => {
+    if (securityWarningsRef.current) {
+      const measurement = measureElement(securityWarningsRef.current);
+      const newHeight = Math.round(measurement.height);
+      if (newHeight > 0 && newHeight !== measuredSecurityWarningsHeight) {
+        setMeasuredSecurityWarningsHeight(newHeight);
+      }
+    } else if (measuredSecurityWarningsHeight !== 0) {
+      setMeasuredSecurityWarningsHeight(0);
+    }
+  }, [measuredSecurityWarningsHeight]);
 
   const settings = useSettings();
   const allowPermanentApproval =
@@ -376,21 +392,12 @@ export const ToolConfirmationMessage: React.FC<
 
     const optionsCount = getOptions().length;
 
-    let securityWarningsHeight = 0;
-    if (deceptiveUrlWarningText) {
-      securityWarningsHeight =
-        deceptiveUrlWarningText
-          .split('\n')
-          .reduce(
-            (acc, line) =>
-              acc +
-              Math.max(
-                Math.ceil(line.length / Math.max(terminalWidth - 5, 1)),
-                1,
-              ),
-            0,
-          ) + 2;
-    }
+    // The measured height includes the margin inside WarningMessage (1 line).
+    // We also add 1 line for the marginBottom on the securityWarnings container.
+    const securityWarningsHeight =
+      measuredSecurityWarningsHeight > 0
+        ? measuredSecurityWarningsHeight + 1
+        : 0;
 
     const surroundingElementsHeight =
       PADDING_OUTER_Y +
@@ -404,8 +411,7 @@ export const ToolConfirmationMessage: React.FC<
     availableTerminalHeight,
     handlesOwnUI,
     getOptions,
-    deceptiveUrlWarningText,
-    terminalWidth,
+    measuredSecurityWarningsHeight,
   ]);
 
   const { question, bodyContent, options, securityWarnings, initialIndex } =
@@ -747,7 +753,7 @@ export const ToolConfirmationMessage: React.FC<
           </Box>
 
           {securityWarnings && (
-            <Box flexShrink={0} marginBottom={1}>
+            <Box flexShrink={0} marginBottom={1} ref={securityWarningsRef}>
               {securityWarnings}
             </Box>
           )}

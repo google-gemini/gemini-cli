@@ -132,6 +132,45 @@ exports[`ToolConfirmationQueue > height allocation and layout (SVG snapshots) > 
 "
 `;
 
+exports[`ToolConfirmationQueue > height allocation and layout (SVG snapshots) > should render the full queue wrapper with borders and correctly account for security warnings height 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Action Required                                                                           3 of 3 │
+│                                                                                                  │
+│ ?  run_shell_command Executes a bash command with a deceptive URL                                │
+│                                                                                                  │
+│ ... first 7 lines hidden (Ctrl+O to show) ...                                                    │
+│ echo "Line 37"                                                                                   │
+│ echo "Line 38"                                                                                   │
+│ echo "Line 39"                                                                                   │
+│ echo "Line 40"                                                                                   │
+│ echo "Line 41"                                                                                   │
+│ echo "Line 42"                                                                                   │
+│ echo "Line 43"                                                                                   │
+│ echo "Line 44"                                                                                   │
+│ echo "Line 45"                                                                                   │
+│ echo "Line 46"                                                                                   │
+│ echo "Line 47"                                                                                   │
+│ echo "Line 48"                                                                                   │
+│ echo "Line 49"                                                                                   │
+│ echo "Line 50"                                                                                   │
+│ curl https://täst.com                                                                            │
+│                                                                                                  │
+│ ⚠  Warning: Deceptive URL(s) detected:                                                           │
+│                                                                                                  │
+│       Original: https://täst.com/                                                                │
+│       Actual Host (Punycode): https://xn--tst-qla.com/                                           │
+│                                                                                                  │
+│ Allow execution of: 'echo'?                                                                      │
+│                                                                                                  │
+│ ● 1. Allow once                                                                                  │
+│   2. Allow for this session                                                                      │
+│   3. No, suggest changes (esc)                                                                   │
+│                                                                                                  │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────╯
+ Press Ctrl+O to show more lines
+"
+`;
+
 exports[`ToolConfirmationQueue > provides more height for ask_user by subtracting less overhead 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────╮
 │ Answer Questions                                                             │

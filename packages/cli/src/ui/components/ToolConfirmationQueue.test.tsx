@@ -514,5 +514,52 @@ describe('ToolConfirmationQueue', () => {
       await expect(renderResult).toMatchSvgSnapshot();
       renderResult.unmount();
     });
+
+    it('should render the full queue wrapper with borders and correctly account for security warnings height', async () => {
+      let largeCommand = '';
+      for (let i = 1; i <= 50; i++) {
+        largeCommand += `echo "Line ${i}"\n`;
+      }
+      largeCommand += `curl https://täst.com\n`;
+
+      const confirmationDetails: SerializableConfirmationDetails = {
+        type: 'exec',
+        title: 'Confirm Execution',
+        command: largeCommand.trimEnd(),
+        rootCommand: 'echo',
+        rootCommands: ['echo', 'curl'],
+      };
+
+      const confirmingTool = {
+        tool: {
+          callId: 'test-call-id-exec-security',
+          name: 'run_shell_command',
+          status: CoreToolCallStatus.AwaitingApproval,
+          description: 'Executes a bash command with a deceptive URL',
+          confirmationDetails,
+        },
+        index: 3,
+        total: 3,
+      };
+
+      const renderResult = renderWithProviders(
+        <ToolConfirmationQueue
+          confirmingTool={confirmingTool as unknown as ConfirmingToolState}
+        />,
+        {
+          uiState: {
+            mainAreaWidth: 80,
+            terminalHeight: 50,
+            constrainHeight: true,
+            availableTerminalHeight: 40,
+          },
+          config: mockConfig,
+        },
+      );
+      await renderResult.waitUntilReady();
+
+      await expect(renderResult).toMatchSvgSnapshot();
+      renderResult.unmount();
+    });
   });
 });
