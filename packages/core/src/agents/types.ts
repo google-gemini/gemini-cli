@@ -231,4 +231,14 @@ export interface RunConfig {
    * If not specified, defaults to DEFAULT_MAX_TURNS (30).
    */
   maxTurns?: number;
+  /**
+   * The name of the tool that signals task completion.
+   * Defaults to 'complete_task'.
+   */
+  completionToolName?: string;
+  /**
+   * Whether or not this subagent has a custom entry point.
+   * Defaults to `false`, and wraps subagents in a type-safe entry-point.
+   */
+  hasCustomEntryPoint?: boolean;
 }

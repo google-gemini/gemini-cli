@@ -681,6 +681,12 @@ export interface ToolResult {
   };
 
   /**
+   * If true, this tool result signals an agent indicating they have completed a
+   * task.
+   */
+  isTaskCompletion?: boolean;
+
+  /**
    * Optional data payload for passing structured information back to the caller.
    */
   data?: Record<string, unknown>;

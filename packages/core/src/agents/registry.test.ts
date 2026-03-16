@@ -274,6 +274,7 @@ describe('AgentRegistry', () => {
             codebase_investigator: { enabled: false },
             cli_help: { enabled: false },
             generalist: { enabled: false },
+            planner: { enabled: false },
           },
         },
       });
@@ -333,6 +334,15 @@ describe('AgentRegistry', () => {
       await registry.initialize();
 
       expect(registry.getDefinition('generalist')).toBeDefined();
+    });
+
+    it('should NOT register planner agent if plannerSubagent is false', async () => {
+      const config = makeMockedConfig({ plannerSubagent: false });
+      const registry = new TestableAgentRegistry(config);
+
+      await registry.initialize();
+
+      expect(registry.getDefinition('planner')).toBeUndefined();
     });
 
     it('should NOT register a non-experimental agent if enabled is false', async () => {

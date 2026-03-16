@@ -618,6 +618,7 @@ export interface ConfigParameters {
   disabledHooks?: string[];
   projectHooks?: { [K in HookEventName]?: HookDefinition[] };
   enableAgents?: boolean;
+  plannerSubagent?: boolean;
   enableEventDrivenScheduler?: boolean;
   skillsSupport?: boolean;
   disabledSkills?: string[];
@@ -837,6 +838,7 @@ export class Config implements McpContext, AgentLoopContext {
     overageStrategy: OverageStrategy;
   };
 
+  private readonly plannerSubagent: boolean;
   private readonly enableAgents: boolean;
   private agents: AgentSettings;
   private readonly enableEventDrivenScheduler: boolean;
@@ -948,6 +950,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.model = params.model;
     this.disableLoopDetection = params.disableLoopDetection ?? false;
     this._activeModel = params.model;
+    this.plannerSubagent = params.plannerSubagent ?? false;
     this.enableAgents = params.enableAgents ?? false;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
@@ -2481,6 +2484,10 @@ export class Config implements McpContext, AgentLoopContext {
     this.approvedPlanPath = path;
   }
 
+  isPlannerSubagentEnabled(): boolean {
+    return this.plannerSubagent && this.isPlanEnabled();
+  }
+
   isAgentsEnabled(): boolean {
     return this.enableAgents;
   }
@@ -3128,7 +3135,13 @@ export class Config implements McpContext, AgentLoopContext {
 
       for (const definition of definitions) {
         try {
-          const tool = new SubagentTool(definition, this, this.messageBus);
+          if (
+            definition.kind === 'local' &&
+            definition.runConfig.hasCustomEntryPoint === true
+          ) {
+            continue;
+          }
+          const tool = new SubagentTool(definition, this, this._messageBus);
           registry.registerTool(tool);
         } catch (e: unknown) {
           debugLogger.warn(

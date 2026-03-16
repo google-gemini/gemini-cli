@@ -364,6 +364,7 @@ export class ToolExecutor {
       errorType: undefined,
       outputFile,
       contentLength: typeof content === 'string' ? content.length : undefined,
+      isTaskCompletion: toolResult.isTaskCompletion,
       data: toolResult.data,
     };
 

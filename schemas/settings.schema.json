@@ -1968,6 +1968,13 @@
           },
           "additionalProperties": false
         },
+        "plannerSubagent": {
+          "title": "Planner Subagent",
+          "description": "Use the new planner subagent for plan mode.",
+          "markdownDescription": "Use the new planner subagent for plan mode.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "enableAgents": {
           "title": "Enable Agents",
           "description": "Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents",

@@ -57,6 +57,7 @@ export interface ToolCallResponseInfo {
   errorType: ToolErrorType | undefined;
   outputFile?: string | undefined;
   contentLength?: number;
+  isTaskCompletion?: boolean;
   /**
    * Optional data payload for passing structured information back to the caller.
    */
