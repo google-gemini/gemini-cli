@@ -11,13 +11,18 @@ import { theme } from '../semantic-colors.js';
 import process from 'node:process';
 import { formatBytes } from '../utils/formatters.js';
 
-export const MemoryUsageDisplay: React.FC<{ color?: string }> = ({
-  color = theme.text.primary,
-}) => {
+export const MemoryUsageDisplay: React.FC<{
+  color?: string;
+  isActive?: boolean;
+}> = ({ color = theme.text.primary, isActive = true }) => {
   const [memoryUsage, setMemoryUsage] = useState<string>('');
   const [memoryUsageColor, setMemoryUsageColor] = useState<string>(color);
 
   useEffect(() => {
+    if (!isActive) {
+      return;
+    }
+
     const updateMemory = () => {
       const usage = process.memoryUsage().rss;
       setMemoryUsage(formatBytes(usage));
@@ -28,7 +33,7 @@ export const MemoryUsageDisplay: React.FC<{ color?: string }> = ({
     const intervalId = setInterval(updateMemory, 2000);
     updateMemory(); // Initial update
     return () => clearInterval(intervalId);
-  }, [color]);
+  }, [color, isActive]);
 
   return (
     <Box>
