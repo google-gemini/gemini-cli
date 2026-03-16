@@ -63,7 +63,11 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
 
   // 1. Configure Isolated SSH Alias (Project-Specific)
   console.log(`\n🚀 Configuring Isolated SSH Alias...`);
-  const dnsSuffix = await prompt('Internal DNS Suffix (e.g. .internal or .internal.gcpnode.com)', '.internal');
+  let dnsSuffix = await prompt('Internal DNS Suffix (e.g. .internal or .internal.gcpnode.com)', '.internal');
+  
+  // FIX: Ensure suffix starts with a dot
+  if (dnsSuffix && !dnsSuffix.startsWith('.')) dnsSuffix = '.' + dnsSuffix;
+  
   const internalHostname = `${targetVM}.${zone}.c.${projectId}${dnsSuffix}`;
 
   const sshAlias = 'gcli-worker';
@@ -85,54 +89,32 @@ Host ${sshAlias}
 
   // 1b. Security Fork Management (Temporarily Disabled)
   const upstreamRepo = 'google-gemini/gemini-cli';
-  /*
-  console.log('\n🍴 Configuring Security Fork...');
-  const forksCheck = spawnSync('gh', ['repo', 'list', '--fork', '--limit', '100', '--json', 'nameWithOwner,parent'], { stdio: 'pipe' });
-  let existingForks: string[] = [];
-  try {
-      const allForks = JSON.parse(forksCheck.stdout.toString());
-      existingForks = allForks
-          .filter((r: any) => r.parent?.nameWithOwner === upstreamRepo)
-          .map((r: any) => r.nameWithOwner);
-  } catch (e) {}
-
-  let userFork = '';
-  if (existingForks.length > 0) {
-      console.log(`   ✅ Found personal fork: ${existingForks[0]}`);
-      userFork = existingForks[0];
-  } else {
-      console.log(`   🔍 No personal fork of ${upstreamRepo} found. Creating one...`);
-      spawnSync('gh', ['repo', 'fork', upstreamRepo, '--clone=false'], { stdio: 'inherit' });
-      const user = spawnSync('gh', ['api', 'user', '-q', '.login'], { stdio: 'pipe' }).stdout.toString().trim();
-      userFork = `${user}/gemini-cli`;
-  }
-  */
   const userFork = upstreamRepo; // Fallback for now
 
   // Resolve Paths
   const sshCmd = `ssh -F ${sshConfigPath} -o StrictHostKeyChecking=no -o UserKnownHostsFile=${knownHostsPath}`;
   const remoteHost = sshAlias;
   const remoteHome = '/home/node'; // Hardcoded for our maintainer container
-  const remoteWorkDir = `~/dev/main`;
-  const persistentScripts = `~/.offload/scripts`;
+  const remoteWorkDir = `/home/node/dev/main`; // Use absolute path
+  const persistentScripts = `/home/node/.offload/scripts`;
 
   console.log(`\n📦 Performing One-Time Synchronization...`);
   // Ensure host directories exist (on the VM Host)
-  spawnSync(sshCmd, [remoteHost, `mkdir -p ~/dev/main ~/.gemini/policies ~/.offload/scripts`], { shell: true });
+  spawnSync(sshCmd, [remoteHost, `mkdir -p /home/node/dev/main /home/node/.gemini/policies /home/node/.offload/scripts`], { shell: true });
 
   const rsyncBase = `rsync -avz -e "${sshCmd}" --exclude=".gemini/settings.json"`;
   
   // 2. Sync Scripts & Policies
   console.log('   - Pushing offload logic to persistent worker directory...');
   spawnSync(`${rsyncBase} --delete .gemini/skills/offload/scripts/ ${remoteHost}:${persistentScripts}/`, { shell: true });
-  spawnSync(`${rsyncBase} .gemini/skills/offload/policy.toml ${remoteHost}:~/.gemini/policies/offload-policy.toml`, { shell: true });
+  spawnSync(`${rsyncBase} .gemini/skills/offload/policy.toml ${remoteHost}:/home/node/.gemini/policies/offload-policy.toml`, { shell: true });
 
   // 3. Sync Auth (Gemini)
   if (await confirm('Sync Gemini accounts credentials?')) {
     const homeDir = env.HOME || '';
     const lp = path.join(homeDir, '.gemini/google_accounts.json');
     if (fs.existsSync(lp)) {
-      spawnSync(`${rsyncBase} ${lp} ${remoteHost}:~/.gemini/google_accounts.json`, { shell: true });
+      spawnSync(`${rsyncBase} ${lp} ${remoteHost}:/home/node/.gemini/google_accounts.json`, { shell: true });
     }
   }
 
@@ -156,7 +138,7 @@ Host ${sshAlias}
 
     const scopedToken = await prompt('\nPaste Scoped Token', '');
     if (scopedToken) {
-      spawnSync(sshCmd, [remoteHost, `mkdir -p ~/.offload && echo ${scopedToken} > ~/.offload/.gh_token && chmod 600 ~/.offload/.gh_token`], { shell: true });
+      spawnSync(sshCmd, [remoteHost, `mkdir -p /home/node/.offload && echo ${scopedToken} > /home/node/.offload/.gh_token && chmod 600 /home/node/.offload/.gh_token`], { shell: true });
     }
   }
 
@@ -168,7 +150,9 @@ Host ${sshAlias}
 
     console.log(`🚀 Cloning fork ${userFork} on worker...`);
     const repoUrl = `https://github.com/${userFork}.git`;
-    const cloneCmd = `[ -d ${remoteWorkDir}/.git ] || (git clone --filter=blob:none ${repoUrl} ${remoteWorkDir} && cd ${remoteWorkDir} && git remote add upstream https://github.com/${upstreamRepo}.git && git fetch upstream)`;
+    
+    // Wipe existing dir for a clean clone and use absolute paths
+    const cloneCmd = `rm -rf ${remoteWorkDir} && git clone --filter=blob:none ${repoUrl} ${remoteWorkDir} && cd ${remoteWorkDir} && git remote add upstream https://github.com/${upstreamRepo}.git && git fetch upstream`;
     spawnSync(sshCmd, [remoteHost, cloneCmd], { shell: true, stdio: 'inherit' });
   }
 
