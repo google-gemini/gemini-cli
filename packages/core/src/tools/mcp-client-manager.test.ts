@@ -14,7 +14,7 @@ import {
   type MockedObject,
 } from 'vitest';
 import { McpClientManager } from './mcp-client-manager.js';
-import { McpClient, MCPDiscoveryState } from './mcp-client.js';
+import { McpClient, MCPDiscoveryState, MCPServerStatus } from './mcp-client.js';
 import type { ToolRegistry } from './tool-registry.js';
 import type { Config, GeminiCLIExtension } from '../config/config.js';
 import type { PromptRegistry } from '../prompts/prompt-registry.js';
@@ -38,7 +38,7 @@ describe('McpClientManager', () => {
       connect: vi.fn(),
       discoverInto: vi.fn(),
       disconnect: vi.fn(),
-      getStatus: vi.fn(),
+      getStatus: vi.fn().mockReturnValue(MCPServerStatus.DISCONNECTED),
       getServerConfig: vi.fn(),
       getServerName: vi.fn().mockReturnValue('test-server'),
     } as unknown as McpClient);

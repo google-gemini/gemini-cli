@@ -13,6 +13,7 @@ import type { ToolRegistry } from './tool-registry.js';
 import {
   McpClient,
   MCPDiscoveryState,
+  MCPServerStatus,
   populateMcpServerCommand,
 } from './mcp-client.js';
 import { getErrorMessage, isAuthenticationError } from '../utils/errors.js';
@@ -458,7 +459,9 @@ export class McpClientManager {
               : undefined);
 
           try {
-            await client.connect();
+            if (client.getStatus() === MCPServerStatus.DISCONNECTED) {
+              await client.connect();
+            }
             if (targetRegistries) {
               await client.discoverInto(this.cliConfig, targetRegistries);
             }
