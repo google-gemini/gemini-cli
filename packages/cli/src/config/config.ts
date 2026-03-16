@@ -31,8 +31,6 @@ import {
   type HierarchicalMemory,
   coreEvents,
   GEMINI_MODEL_ALIAS_AUTO,
-  isValidModelOrAlias,
-  getValidModelsAndAliases,
   getAdminErrorMessage,
   isHeadlessMode,
   Config,
@@ -498,9 +496,10 @@ export async function loadCliConfig(
 
   const experimentalJitContext = settings.experimental?.jitContext ?? false;
 
-  let extensionRegistryURI: string | undefined = trustedFolder
-    ? settings.experimental?.extensionRegistryURI
-    : undefined;
+  let extensionRegistryURI =
+    process.env['GEMINI_CLI_EXTENSION_REGISTRY_URI'] ??
+    (trustedFolder ? settings.experimental?.extensionRegistryURI : undefined);
+
   if (extensionRegistryURI && !extensionRegistryURI.startsWith('http')) {
     extensionRegistryURI = resolveToRealPath(
       path.resolve(cwd, resolvePath(extensionRegistryURI)),
@@ -673,18 +672,6 @@ export async function loadCliConfig(
   const specifiedModel =
     argv.model || process.env['GEMINI_MODEL'] || settings.model?.name;
 
-  // Validate the model if one was explicitly specified
-  if (specifiedModel && specifiedModel !== GEMINI_MODEL_ALIAS_AUTO) {
-    if (!isValidModelOrAlias(specifiedModel)) {
-      const validModels = getValidModelsAndAliases();
-
-      throw new FatalConfigError(
-        `Invalid model: "${specifiedModel}"\n\n` +
-          `Valid models and aliases:\n${validModels.map((m) => `  - ${m}`).join('\n')}\n\n` +
-          `Use /model to switch models interactively.`,
-      );
-    }
-  }
   const resolvedModel =
     specifiedModel === GEMINI_MODEL_ALIAS_AUTO
       ? defaultModel
@@ -744,6 +731,7 @@ export async function loadCliConfig(
     clientVersion: await getVersion(),
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
+    toolSandboxing: settings.security?.toolSandboxing ?? false,
     targetDir: cwd,
     includeDirectoryTree,
     includeDirectories,
@@ -784,6 +772,9 @@ export async function loadCliConfig(
     approvalMode,
     disableYoloMode:
       settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,
+    disableAlwaysAllow:
+      settings.security?.disableAlwaysAllow ||
+      settings.admin?.secureModeEnabled,
     showMemoryUsage: settings.ui?.showMemoryUsage || false,
     accessibility: {
       ...settings.ui?.accessibility,
@@ -823,6 +814,7 @@ export async function loadCliConfig(
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     modelSteering: settings.experimental?.modelSteering,
+    topicUpdateNarration: settings.experimental?.topicUpdateNarration,
     toolOutputMasking: settings.experimental?.toolOutputMasking,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
@@ -857,6 +849,7 @@ export async function loadCliConfig(
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
     rawOutput: argv.rawOutput,
     acceptRawOutputRisk: argv.acceptRawOutputRisk,
+    dynamicModelConfiguration: settings.experimental?.dynamicModelConfiguration,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
     enableHooks: settings.hooksConfig.enabled,
