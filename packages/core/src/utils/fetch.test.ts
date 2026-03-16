@@ -12,7 +12,7 @@ import {
   fetchWithTimeout,
 } from './fetch.js';
 import * as dnsPromises from 'node:dns/promises';
-import type { LookupAddress } from 'node:dns';
+import type { LookupAddress, LookupAllOptions } from 'node:dns';
 import ipaddr from 'ipaddr.js';
 
 vi.mock('node:dns/promises', () => ({
@@ -31,16 +31,17 @@ describe('fetch utils', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default DNS lookup to return a public IP, or the IP itself if valid
-    vi.mocked(dnsPromises.lookup).mockImplementation(
-      async (hostname: string): Promise<LookupAddress[]> => {
-        if (ipaddr.isValid(hostname)) {
-          return [
-            { address: hostname, family: hostname.includes(':') ? 6 : 4 },
-          ];
-        }
-        return [{ address: '93.184.216.34', family: 4 }];
-      },
-    );
+    vi.mocked(
+      dnsPromises.lookup as (
+        hostname: string,
+        options: LookupAllOptions,
+      ) => Promise<LookupAddress[]>,
+    ).mockImplementation(async (hostname: string) => {
+      if (ipaddr.isValid(hostname)) {
+        return [{ address: hostname, family: hostname.includes(':') ? 6 : 4 }];
+      }
+      return [{ address: '93.184.216.34', family: 4 }];
+    });
   });
 
   afterAll(() => {
@@ -128,20 +129,22 @@ describe('fetch utils', () => {
     });
 
     it('should identify domains resolving to private IPs', async () => {
-      vi.mocked(dnsPromises.lookup).mockImplementation(
-        async (): Promise<LookupAddress[]> => [
-          { address: '10.0.0.1', family: 4 },
-        ],
-      );
+      vi.mocked(
+        dnsPromises.lookup as (
+          hostname: string,
+          options: LookupAllOptions,
+        ) => Promise<LookupAddress[]>,
+      ).mockImplementation(async () => [{ address: '10.0.0.1', family: 4 }]);
       expect(await isPrivateIpAsync('http://malicious.com/')).toBe(true);
     });
 
     it('should identify domains resolving to public IPs as non-private', async () => {
-      vi.mocked(dnsPromises.lookup).mockImplementation(
-        async (): Promise<LookupAddress[]> => [
-          { address: '8.8.8.8', family: 4 },
-        ],
-      );
+      vi.mocked(
+        dnsPromises.lookup as (
+          hostname: string,
+          options: LookupAllOptions,
+        ) => Promise<LookupAddress[]>,
+      ).mockImplementation(async () => [{ address: '8.8.8.8', family: 4 }]);
       expect(await isPrivateIpAsync('http://google.com/')).toBe(false);
     });
 
