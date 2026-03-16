@@ -26,7 +26,6 @@ import {
 } from '../tools/mcp-tool.js';
 import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
-import { type Message } from '../confirmation-bus/types.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
@@ -132,19 +131,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     const parentMessageBus = context.messageBus;
 
     // Create an override object to inject the subagent name into tool confirmation requests
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const subagentMessageBus = Object.create(
-      parentMessageBus,
-    ) as typeof parentMessageBus;
-    subagentMessageBus.publish = async (message: Message) => {
-      if (message.type === 'tool-confirmation-request') {
-        return parentMessageBus.publish({
-          ...message,
-          subagent: definition.name,
-        });
-      }
-      return parentMessageBus.publish(message);
-    };
+    const subagentMessageBus = parentMessageBus.derive(definition.name);
 
     // Create an isolated tool registry for this agent instance.
     const agentToolRegistry = new ToolRegistry(
@@ -1230,17 +1217,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     if (toolConfig) {
       for (const toolRef of toolConfig.tools) {
-        if (typeof toolRef === 'string') {
-          // The names were already expanded and loaded into the registry during creation.
-        } else if (typeof toolRef === 'object' && 'schema' in toolRef) {
-          // Tool instance with an explicit schema property.
-          toolsList.push(toolRef.schema);
-        } else {
+        if (typeof toolRef === 'object' && !('schema' in toolRef)) {
           // Raw `FunctionDeclaration` object.
           toolsList.push(toolRef);
         }
       }
-      // Add schemas from tools that were explicitly registered by name or wildcard.
+      // Add schemas from tools that were explicitly registered by name, wildcard, or instance.
       toolsList.push(...this.toolRegistry.getFunctionDeclarations());
     }
 

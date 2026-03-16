@@ -1429,6 +1429,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     pager: settings.merged.tools.shell.pager,
     showColor: settings.merged.tools.shell.showColor,
     sanitizationConfig: config.sanitizationConfig,
+    sandboxManager: config.sandboxManager,
   });
 
   const { isFocused, hasReceivedFocusEvent } = useFocus();

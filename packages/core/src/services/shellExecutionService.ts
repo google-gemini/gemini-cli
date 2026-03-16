@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -27,11 +27,8 @@ import {
   serializeTerminalToObject,
   type AnsiOutput,
 } from '../utils/terminalSerializer.js';
-import {
-  sanitizeEnvironment,
-  type EnvironmentSanitizationConfig,
-} from './environmentSanitization.js';
-import { NoopSandboxManager } from './sandboxManager.js';
+import { type EnvironmentSanitizationConfig } from './environmentSanitization.js';
+import { type SandboxManager } from './sandboxManager.js';
 import { killProcessGroup } from '../utils/process-utils.js';
 import {
   ExecutionLifecycleService,
@@ -90,6 +87,7 @@ export interface ShellExecutionConfig {
   defaultFg?: string;
   defaultBg?: string;
   sanitizationConfig: EnvironmentSanitizationConfig;
+  sandboxManager: SandboxManager;
   // Used for testing
   disableDynamicLineTrimming?: boolean;
   scrollback?: number;
@@ -274,15 +272,6 @@ export class ShellExecutionService {
     shouldUseNodePty: boolean,
     shellExecutionConfig: ShellExecutionConfig,
   ): Promise<ShellExecutionHandle> {
-    const sandboxManager = new NoopSandboxManager();
-    const { env: sanitizedEnv } = await sandboxManager.prepareCommand({
-      command: commandToExecute,
-      args: [],
-      env: process.env,
-      cwd,
-      config: shellExecutionConfig,
-    });
-
     if (shouldUseNodePty) {
       const ptyInfo = await getPty();
       if (ptyInfo) {
@@ -294,7 +283,6 @@ export class ShellExecutionService {
             abortSignal,
             shellExecutionConfig,
             ptyInfo,
-            sanitizedEnv,
           );
         } catch (_e) {
           // Fallback to child_process
@@ -307,7 +295,7 @@ export class ShellExecutionService {
       cwd,
       onOutputEvent,
       abortSignal,
-      shellExecutionConfig.sanitizationConfig,
+      shellExecutionConfig,
       shouldUseNodePty,
     );
   }
@@ -342,14 +330,49 @@ export class ShellExecutionService {
     return { newBuffer: truncatedBuffer + chunk, truncated: true };
   }
 
-  private static childProcessFallback(
+  private static async prepareExecution(
+    executable: string,
+    args: string[],
+    cwd: string,
+    env: NodeJS.ProcessEnv,
+    shellExecutionConfig: ShellExecutionConfig,
+    sanitizationConfigOverride?: EnvironmentSanitizationConfig,
+  ): Promise<{
+    program: string;
+    args: string[];
+    env: NodeJS.ProcessEnv;
+    cwd: string;
+  }> {
+    const resolvedExecutable =
+      (await resolveExecutable(executable)) ?? executable;
+
+    const prepared = await shellExecutionConfig.sandboxManager.prepareCommand({
+      command: resolvedExecutable,
+      args,
+      cwd,
+      env,
+      config: {
+        sanitizationConfig:
+          sanitizationConfigOverride ?? shellExecutionConfig.sanitizationConfig,
+      },
+    });
+
+    return {
+      program: prepared.program,
+      args: prepared.args,
+      env: prepared.env,
+      cwd: prepared.cwd ?? cwd,
+    };
+  }
+
+  private static async childProcessFallback(
     commandToExecute: string,
     cwd: string,
     onOutputEvent: (event: ShellOutputEvent) => void,
     abortSignal: AbortSignal,
-    sanitizationConfig: EnvironmentSanitizationConfig,
+    shellExecutionConfig: ShellExecutionConfig,
     isInteractive: boolean,
-  ): ShellExecutionHandle {
+  ): Promise<ShellExecutionHandle> {
     try {
       const isWindows = os.platform() === 'win32';
       const { executable, argsPrefix, shell } = getShellConfiguration();
@@ -361,16 +384,17 @@ export class ShellExecutionService {
       const gitConfigKeys = !isInteractive
         ? Object.keys(process.env).filter((k) => k.startsWith('GIT_CONFIG_'))
         : [];
-      const sanitizedEnv = sanitizeEnvironment(process.env, {
-        ...sanitizationConfig,
+      const localSanitizationConfig = {
+        ...shellExecutionConfig.sanitizationConfig,
         allowedEnvironmentVariables: [
-          ...(sanitizationConfig.allowedEnvironmentVariables || []),
+          ...(shellExecutionConfig.sanitizationConfig
+            .allowedEnvironmentVariables || []),
           ...gitConfigKeys,
         ],
-      });
+      };
 
-      const env: NodeJS.ProcessEnv = {
-        ...sanitizedEnv,
+      const env = {
+        ...process.env,
         [GEMINI_CLI_IDENTIFICATION_ENV_VAR]:
           GEMINI_CLI_IDENTIFICATION_ENV_VAR_VALUE,
         TERM: 'xterm-256color',
@@ -378,12 +402,28 @@ export class ShellExecutionService {
         GIT_PAGER: 'cat',
       };
 
+      const {
+        program: finalExecutable,
+        args: finalArgs,
+        env: sanitizedEnv,
+        cwd: finalCwd,
+      } = await this.prepareExecution(
+        executable,
+        spawnArgs,
+        cwd,
+        env,
+        shellExecutionConfig,
+        localSanitizationConfig,
+      );
+
+      const finalEnv = { ...sanitizedEnv };
+
       if (!isInteractive) {
         const gitConfigCount = parseInt(
-          sanitizedEnv['GIT_CONFIG_COUNT'] || '0',
+          finalEnv['GIT_CONFIG_COUNT'] || '0',
           10,
         );
-        Object.assign(env, {
+        Object.assign(finalEnv, {
           // Disable interactive prompts and session-linked credential helpers
           // in non-interactive mode to prevent hangs in detached process groups.
           GIT_TERMINAL_PROMPT: '0',
@@ -399,13 +439,13 @@ export class ShellExecutionService {
         });
       }
 
-      const child = cpSpawn(executable, spawnArgs, {
-        cwd,
+      const child = cpSpawn(finalExecutable, finalArgs, {
+        cwd: finalCwd,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsVerbatimArguments: isWindows ? false : undefined,
         shell: false,
         detached: !isWindows,
-        env,
+        env: finalEnv,
       });
 
       const state = {
@@ -682,7 +722,6 @@ export class ShellExecutionService {
     abortSignal: AbortSignal,
     shellExecutionConfig: ShellExecutionConfig,
     ptyInfo: PtyImplementation,
-    sanitizedEnv: Record<string, string | undefined>,
   ): Promise<ShellExecutionHandle> {
     if (!ptyInfo) {
       // This should not happen, but as a safeguard...
@@ -695,29 +734,52 @@ export class ShellExecutionService {
       const rows = shellExecutionConfig.terminalHeight ?? 30;
       const { executable, argsPrefix, shell } = getShellConfiguration();
 
-      const resolvedExecutable = await resolveExecutable(executable);
-      if (!resolvedExecutable) {
-        throw new Error(
-          `Shell executable "${executable}" not found in PATH or at absolute location. Please ensure the shell is installed and available in your environment.`,
-        );
-      }
-
       const guardedCommand = ensurePromptvarsDisabled(commandToExecute, shell);
       const args = [...argsPrefix, guardedCommand];
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const ptyProcess = ptyInfo.module.spawn(executable, args, {
+      const env = {
+        ...process.env,
+        GEMINI_CLI: '1',
+        TERM: 'xterm-256color',
+        PAGER: shellExecutionConfig.pager ?? 'cat',
+        GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
+      };
+
+      // Specifically allow GIT_CONFIG_* variables to pass through sanitization
+      // so we can safely append our overrides if needed.
+      const gitConfigKeys = Object.keys(process.env).filter((k) =>
+        k.startsWith('GIT_CONFIG_'),
+      );
+      const localSanitizationConfig = {
+        ...shellExecutionConfig.sanitizationConfig,
+        allowedEnvironmentVariables: [
+          ...(shellExecutionConfig.sanitizationConfig
+            ?.allowedEnvironmentVariables ?? []),
+          ...gitConfigKeys,
+        ],
+      };
+
+      const {
+        program: finalExecutable,
+        args: finalArgs,
+        env: finalEnv,
+        cwd: finalCwd,
+      } = await this.prepareExecution(
+        executable,
+        args,
         cwd,
+        env,
+        shellExecutionConfig,
+        localSanitizationConfig,
+      );
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      const ptyProcess = ptyInfo.module.spawn(finalExecutable, finalArgs, {
+        cwd: finalCwd,
         name: 'xterm-256color',
         cols,
         rows,
-        env: {
-          ...sanitizedEnv,
-          GEMINI_CLI: '1',
-          TERM: 'xterm-256color',
-          PAGER: shellExecutionConfig.pager ?? 'cat',
-          GIT_PAGER: shellExecutionConfig.pager ?? 'cat',
-        },
+        env: finalEnv,
         handleFlowControl: true,
       });
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion

@@ -45,6 +45,7 @@ import { initializeShellParsers } from '../utils/shell-utils.js';
 import { ShellTool, OUTPUT_UPDATE_INTERVAL_MS } from './shell.js';
 import { debugLogger } from '../index.js';
 import { type Config } from '../config/config.js';
+import { NoopSandboxManager } from '../services/sandboxManager.js';
 import {
   type ShellExecutionResult,
   type ShellOutputEvent,
@@ -94,6 +95,13 @@ describe('ShellTool', () => {
     fs.mkdirSync(path.join(tempRootDir, 'subdir'));
 
     mockConfig = {
+      get config() {
+        return this;
+      },
+      geminiClient: {
+        stripThoughtsFromHistory: vi.fn(),
+      },
+
       getAllowedTools: vi.fn().mockReturnValue([]),
       getApprovalMode: vi.fn().mockReturnValue('strict'),
       getCoreTools: vi.fn().mockReturnValue([]),
@@ -130,6 +138,7 @@ describe('ShellTool', () => {
       getEnableInteractiveShell: vi.fn().mockReturnValue(false),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       sanitizationConfig: {},
+      sandboxManager: new NoopSandboxManager(),
     } as unknown as Config;
 
     const bus = createMockMessageBus();
@@ -274,7 +283,11 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat', sanitizationConfig: {} },
+        expect.objectContaining({
+          pager: 'cat',
+          sanitizationConfig: {},
+          sandboxManager: expect.any(Object),
+        }),
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
       // The file should be deleted by the tool
@@ -299,7 +312,11 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat', sanitizationConfig: {} },
+        expect.objectContaining({
+          pager: 'cat',
+          sanitizationConfig: {},
+          sandboxManager: expect.any(Object),
+        }),
       );
     });
 
@@ -320,7 +337,11 @@ describe('ShellTool', () => {
         expect.any(Function),
         expect.any(AbortSignal),
         false,
-        { pager: 'cat', sanitizationConfig: {} },
+        expect.objectContaining({
+          pager: 'cat',
+          sanitizationConfig: {},
+          sandboxManager: expect.any(Object),
+        }),
       );
     });
 
@@ -366,7 +387,11 @@ describe('ShellTool', () => {
           expect.any(Function),
           expect.any(AbortSignal),
           false,
-          { pager: 'cat', sanitizationConfig: {} },
+          {
+            pager: 'cat',
+            sanitizationConfig: {},
+            sandboxManager: new NoopSandboxManager(),
+          },
         );
       },
       20000,
@@ -441,7 +466,7 @@ describe('ShellTool', () => {
         mockConfig,
         { model: 'summarizer-shell' },
         expect.any(String),
-        mockConfig.getGeminiClient(),
+        mockConfig.geminiClient,
         mockAbortSignal,
       );
       expect(result.llmContent).toBe('summarized output');
