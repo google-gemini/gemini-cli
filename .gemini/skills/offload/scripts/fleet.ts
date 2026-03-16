@@ -12,25 +12,47 @@ import { ProviderFactory } from './providers/ProviderFactory.ts';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
-const PROJECT_ID = 'gemini-cli-team-quota';
 const USER = process.env.USER || 'mattkorwel';
 const INSTANCE_PREFIX = `gcli-offload-${USER}`;
 const DEFAULT_ZONE = 'us-west1-a';
 
+function getProjectId(): string {
+  const settingsPath = path.join(REPO_ROOT, '.gemini/settings.json');
+  if (fs.existsSync(settingsPath)) {
+    try {
+      const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+      return settings.maintainer?.deepReview?.projectId;
+    } catch (e) {}
+  }
+  return process.env.GOOGLE_CLOUD_PROJECT || '';
+}
+
 async function listWorkers() {
-  console.log(`🔍 Listing Offload Workers for ${USER} in ${PROJECT_ID}...`);
+  const projectId = getProjectId();
+  if (!projectId) {
+    console.error('❌ Project ID not found. Run "npm run offload:setup" first.');
+    return;
+  }
+  
+  console.log(`🔍 Listing Offload Workers for ${USER} in ${projectId}...`);
   
   spawnSync('gcloud', [
     'compute', 'instances', 'list',
-    '--project', PROJECT_ID,
+    '--project', projectId,
     '--filter', `name~^${INSTANCE_PREFIX}`,
     '--format', 'table(name,zone,status,networkInterfaces[0].networkIP:label=INTERNAL_IP,creationTimestamp)'
   ], { stdio: 'inherit' });
 }
 
 async function provisionWorker() {
+  const projectId = getProjectId();
+  if (!projectId) {
+    console.error('❌ Project ID not found. Run "npm run offload:setup" first.');
+    return;
+  }
+
   const provider = ProviderFactory.getProvider({ 
-    projectId: PROJECT_ID, 
+    projectId: projectId, 
     zone: DEFAULT_ZONE, 
     instanceName: INSTANCE_PREFIX 
   });
@@ -45,8 +67,9 @@ async function provisionWorker() {
 }
 
 async function stopWorker() {
+  const projectId = getProjectId();
   const provider = ProviderFactory.getProvider({ 
-    projectId: PROJECT_ID, 
+    projectId: projectId, 
     zone: DEFAULT_ZONE, 
     instanceName: INSTANCE_PREFIX 
   });
@@ -65,7 +88,7 @@ async function remoteStatus() {
   const config = settings.maintainer?.deepReview;
   
   const provider = ProviderFactory.getProvider({ 
-    projectId: config?.projectId || PROJECT_ID, 
+    projectId: config?.projectId || getProjectId(), 
     zone: config?.zone || DEFAULT_ZONE, 
     instanceName: INSTANCE_PREFIX 
   });
@@ -75,6 +98,7 @@ async function remoteStatus() {
 }
 
 async function rebuildWorker() {
+  const projectId = getProjectId();
   console.log(`🔥 Rebuilding worker ${INSTANCE_PREFIX}...`);
   
   const knownHostsPath = path.join(REPO_ROOT, '.gemini/offload_known_hosts');
@@ -83,7 +107,7 @@ async function rebuildWorker() {
       fs.unlinkSync(knownHostsPath);
   }
 
-  spawnSync('gcloud', ['compute', 'instances', 'delete', INSTANCE_PREFIX, '--project', PROJECT_ID, '--zone', DEFAULT_ZONE, '--quiet'], { stdio: 'inherit' });
+  spawnSync('gcloud', ['compute', 'instances', 'delete', INSTANCE_PREFIX, '--project', projectId, '--zone', DEFAULT_ZONE, '--quiet'], { stdio: 'inherit' });
   await provisionWorker();
 }
 

@@ -6,11 +6,10 @@ preflight) to a dedicated GCP worker.
 
 ## Prerequisites
 
-1.  **Google Cloud Access**: Ensure you have access to the
-    `gemini-cli-team-quota` project.
+1.  **Google Cloud Access**: You will need a Google Cloud Project with billing enabled. You can use a shared team project or, **ideally, your own personal GCP project** for maximum isolation.
 2.  **GCloud CLI**: Authenticated locally (`gcloud auth login`).
 3.  **GitHub CLI**: Authenticated locally (`gh auth login`).
-4.  **IAP Permissions**: Ensure you have the `IAP-secured Tunnel User` role on the project.
+4.  **IAP Permissions**: Ensure you have the `IAP-secured Tunnel User` role on your chosen project.
 5.  **Corporate Identity**: Run `gcert` (or your internal equivalent) recently to ensure SSH certificates are valid.
 
 ## Architecture: Hybrid VM + Container 🏗️

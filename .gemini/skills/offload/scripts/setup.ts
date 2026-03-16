@@ -36,7 +36,14 @@ async function confirm(question: string): Promise<boolean> {
 export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   console.log('\n🌟 Initializing Dedicated Offload Worker...');
 
-  const projectId = await prompt('GCP Project ID', 'gemini-cli-team-quota');
+  const defaultProject = env.GOOGLE_CLOUD_PROJECT || '';
+  const projectId = await prompt('GCP Project ID', defaultProject);
+  
+  if (!projectId) {
+      console.error('❌ Project ID is required. Set GOOGLE_CLOUD_PROJECT or enter it manually.');
+      return 1;
+  }
+
   const zone = await prompt('Compute Zone', 'us-west1-a');
   const targetVM = `gcli-offload-${env.USER || 'mattkorwel'}`;
   
