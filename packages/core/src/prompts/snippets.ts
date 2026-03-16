@@ -79,6 +79,7 @@ export interface OperationalGuidelinesOptions {
   interactive: boolean;
   interactiveShellEnabled: boolean;
   topicUpdateNarration: boolean;
+  memoryManagerEnabled: boolean;
 }
 
 export type SandboxMode = 'macos-seatbelt' | 'generic' | 'outside';
@@ -776,6 +777,9 @@ function toolUsageInteractive(
 function toolUsageRememberingFacts(
   options: OperationalGuidelinesOptions,
 ): string {
+  if (options.memoryManagerEnabled) {
+    return '';
+  }
   const base = `
 - **Memory Tool:** Use ${formatToolName(MEMORY_TOOL_NAME)} only for global user preferences, personal facts, or high-level information that applies across all sessions. Never save workspace-specific context, local file paths, or transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is for persistent user-related information only.`;
   const suffix = options.interactive

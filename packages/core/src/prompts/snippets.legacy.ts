@@ -62,6 +62,7 @@ export interface OperationalGuidelinesOptions {
   isGemini3: boolean;
   enableShellEfficiency: boolean;
   interactiveShellEnabled: boolean;
+  memoryManagerEnabled: boolean;
 }
 
 export type SandboxMode = 'macos-seatbelt' | 'generic' | 'outside';
@@ -615,6 +616,9 @@ function toolUsageInteractive(
 function toolUsageRememberingFacts(
   options: OperationalGuidelinesOptions,
 ): string {
+  if (options.memoryManagerEnabled) {
+    return '';
+  }
   const base = `
 - **Remembering Facts:** Use the '${MEMORY_TOOL_NAME}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information.`;
   const suffix = options.interactive

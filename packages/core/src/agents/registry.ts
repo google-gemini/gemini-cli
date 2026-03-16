@@ -13,6 +13,7 @@ import { CodebaseInvestigatorAgent } from './codebase-investigator.js';
 import { CliHelpAgent } from './cli-help-agent.js';
 import { GeneralistAgent } from './generalist-agent.js';
 import { BrowserAgentDefinition } from './browser/browserAgentDefinition.js';
+import { MemoryManagerAgent } from './memory-manager-agent.js';
 import { A2AClientManager } from './a2a-client-manager.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
@@ -249,6 +250,11 @@ export class AgentRegistry {
     const browserConfig = this.config.getBrowserAgentConfig();
     if (browserConfig.enabled) {
       this.registerLocalAgent(BrowserAgentDefinition(this.config));
+    }
+
+    // Register the memory manager agent as a replacement for the save_memory tool.
+    if (this.config.isMemoryManagerEnabled()) {
+      this.registerLocalAgent(MemoryManagerAgent());
     }
   }
 

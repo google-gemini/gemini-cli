@@ -623,6 +623,7 @@ export interface ConfigParameters {
   disabledSkills?: string[];
   adminSkillsEnabled?: boolean;
   experimentalJitContext?: boolean;
+  experimentalMemoryManager?: boolean;
   topicUpdateNarration?: boolean;
   toolOutputMasking?: Partial<ToolOutputMaskingConfig>;
   disableLLMCorrection?: boolean;
@@ -845,6 +846,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly adminSkillsEnabled: boolean;
 
   private readonly experimentalJitContext: boolean;
+  private readonly experimentalMemoryManager: boolean;
   private readonly topicUpdateNarration: boolean;
   private readonly disableLLMCorrection: boolean;
   private readonly planEnabled: boolean;
@@ -994,6 +996,7 @@ export class Config implements McpContext, AgentLoopContext {
     );
 
     this.experimentalJitContext = params.experimentalJitContext ?? false;
+    this.experimentalMemoryManager = params.experimentalMemoryManager ?? false;
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
     this.modelSteering = params.modelSteering ?? false;
     this.userHintService = new UserHintService(() =>
@@ -2065,6 +2068,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.experimentalJitContext;
   }
 
+  isMemoryManagerEnabled(): boolean {
+    return this.experimentalMemoryManager;
+  }
+
   isTopicUpdateNarrationEnabled(): boolean {
     return this.topicUpdateNarration;
   }
@@ -3088,9 +3095,11 @@ export class Config implements McpContext, AgentLoopContext {
     maybeRegister(ShellTool, () =>
       registry.registerTool(new ShellTool(this, this.messageBus)),
     );
-    maybeRegister(MemoryTool, () =>
-      registry.registerTool(new MemoryTool(this.messageBus)),
-    );
+    if (!this.isMemoryManagerEnabled()) {
+      maybeRegister(MemoryTool, () =>
+        registry.registerTool(new MemoryTool(this.messageBus)),
+      );
+    }
     maybeRegister(WebSearchTool, () =>
       registry.registerTool(new WebSearchTool(this, this.messageBus)),
     );
