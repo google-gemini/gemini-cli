@@ -76,7 +76,7 @@ const createErrorResponse = (
     {
       functionResponse: {
         id: request.callId,
-        name: request.name,
+        name: request.originalRequestName ?? request.name,
         response: { error: error.message },
       },
     },
