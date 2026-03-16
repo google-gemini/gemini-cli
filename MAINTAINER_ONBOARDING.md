@@ -6,78 +6,81 @@ preflight) to a dedicated GCP worker.
 
 ## Prerequisites
 
-1. **Google Cloud Access**: Ensure you have access to the
-   `gemini-cli-team-quota` project.
-2. **GCloud CLI**: Authenticated locally (`gcloud auth login`).
-3. **GitHub CLI**: Authenticated locally (`gh auth login`).
+1.  **Google Cloud Access**: Ensure you have access to the
+    `gemini-cli-team-quota` project.
+2.  **GCloud CLI**: Authenticated locally (`gcloud auth login`).
+3.  **GitHub CLI**: Authenticated locally (`gh auth login`).
+4.  **IAP Permissions**: Ensure you have the `IAP-secured Tunnel User` role on the project.
+5.  **Corporate Identity**: Run `gcert` (or your internal equivalent) recently to ensure SSH certificates are valid.
 
-- **iTerm2**: (Optional) For automated window popping on macOS.
+## Architecture: Hybrid VM + Container 🏗️
 
-## Architecture: Why this setup?
+The offload system uses a **Worker Provider** architecture to abstract the underlying infrastructure:
 
-The offload system uses a **Hybrid VM + Docker** architecture to balance raw
-power with environmental stability:
+1.  **GCE VM (Host)**: A high-performance machine running **Container-Optimized OS (COS)**.
+2.  **maintainer-worker (Container)**: A persistent Docker container acting as your remote workstation.
+3.  **Resilient Connectivity**: A dual-path strategy that uses **Fast-Path SSH** by default and automatically falls back to **IAP Tunneling** if direct access is blocked.
 
-1.  **GCE VM (Raw Power)**: High-performance machines handle the "heavy lifting"
-    (full project builds, exhaustive test suites), keeping your local primary
-    workstation responsive and cool.
-2.  **Docker (Consistency)**: All development tools (`node`, `gh`, `tsx`,
-    `vitest`) are managed via `.gcp/Dockerfile.maintainer`. This ensures every
-    maintainer works in an identical environment, eliminating "it works on my
-    machine" issues.
-3.  **Persistence + Isolation**: Tmux sessions on the host VM provide
-    persistence (surviving disconnects), while Git Worktrees and isolated Docker
-    runs ensure that multiple jobs don't interfere with each other.
+---
 
 ## Setup Workflow
 
-### 1. Fork & Clone
+### 1. Initial Configuration (Discovery)
 
-Start by forking the repository and cloning it to your local machine.
-
-```bash
-gh repo fork google-gemini/gemini-cli --clone
-cd gemini-cli
-```
-
-### 2. Run the Offload Setup
-
-This interactive script will handle all the complex orchestration setup:
-
-- Configures your GCP project and compute zone.
-- Sets up a **Fast-Path SSH Alias** (`gcli-worker`) in `~/.ssh/config`.
-- Creates/Identifies your **Security Fork** for autonomous work.
-- Performs a **One-Shot Authentication** for Gemini and GitHub.
-- Pre-clones the repository to your remote worker.
+This interactive script configures your local environment to recognize the remote worker.
 
 ```bash
 npm run offload:setup
 ```
 
-### 3. Provision Your Worker
+*   **What it does**: Generates `.gemini/offload_ssh_config`, verifies project access, and establishes the initial identity handshake.
+*   **Connectivity**: If direct internal SSH fails, it will attempt to verify access via an IAP tunnel.
 
-Once setup is configured, spin up your dedicated, high-performance VM:
+### 2. Provisioning Your Worker (Infrastructure)
+
+Spin up your dedicated, high-performance VM. If it already exists, this command will verify its health.
 
 ```bash
 npm run offload:fleet provision
 ```
 
-## Daily Workflow
+*   **Specs**: n2-standard-8, 200GB PD-Balanced disk.
+*   **Self-Healing**: It uses a COS startup script to ensure the `maintainer-worker` container is always running.
 
-### Offloading a PR Review
+### 3. Remote Initialization
 
-To perform a deep behavioral review of a PR on your remote worker:
+Once provisioned, return to the setup script to finalize the remote environment.
 
 ```bash
-npm run offload <PR_NUMBER> review
+npm run offload:setup
 ```
 
-_A new iTerm2 window will pop up, instantly connected to your worker, running
-the `review-pr` skill._
+*   **Auth Sync**: Pushes your `google_accounts.json` to the worker.
+*   **Scoped Token**: Generates a magic link for a GitHub PAT and stores it securely on the worker.
+*   **Repo Clone**: Performs a filtered (shallow) clone of the repository onto the remote disk.
 
-### Monitoring Your Jobs
+---
 
-View the real-time status of all your in-flight remote jobs:
+## Daily Workflow
+
+### Running an Offloaded Job
+
+To perform a deep behavioral review or an agentic fix on your remote worker:
+
+```bash
+# For a review
+npm run offload <PR_NUMBER> review
+
+# For an automated fix
+npm run offload <PR_NUMBER> implement
+```
+
+*   **Isolation**: Each job runs in a dedicated **Git Worktree** (`~/dev/worktrees/offload-<id>`).
+*   **Persistence**: Jobs run inside a `tmux` session on the remote host. You can disconnect and reconnect without losing progress.
+
+### Monitoring "Mission Control"
+
+View the real-time state of your worker and all in-flight jobs:
 
 ```bash
 npm run offload:status
@@ -85,17 +88,21 @@ npm run offload:status
 
 ### Stopping Your Worker
 
-To save costs, shut down your worker when you're done for the day. The
-orchestrator will automatically wake it up when you run a new task.
+To save costs, shut down your worker when finished. The orchestrator will automatically wake it up when you start a new task.
 
 ```bash
 npm run offload:fleet stop
 ```
 
-## Security Model
+---
 
-- **Isolation**: Each maintainer has their own dedicated VM
-  (`gcli-offload-<user>`).
-- **Permissions**: The agent uses a scoped token that is read-only to the main
-  repo and read/write only to your personal fork.
-- **OS Login**: Access is managed via your Google corporate identity.
+## Resilience & Troubleshooting
+
+### "SSH Connection Failed"
+If the setup or orchestrator reports a connection failure:
+1.  **Check Identity**: Run `gcert` to refresh your SSH credentials.
+2.  **IAP Fallback**: The system should automatically attempt IAP tunneling. If it still fails, verify your GCP project permissions.
+3.  **Waking Up**: If the worker was stopped, the first command may take ~30 seconds to wake the VM.
+
+### "Worker Not Found"
+If `offload:setup` can't find your worker, ensure you have run `npm run offload:fleet provision` at least once in the current project.

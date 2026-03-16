@@ -59,37 +59,17 @@ The offload system uses a **Hybrid VM + Docker** architecture designed for maxim
 -   **`ready`**: Final full validation (clean install + preflight) before merge.
 -   **`open`**: Provision a worktree and drop directly into a remote tmux session.
 
-## Scenarios and workflows
+## Scenario and workflows
 
-### First-time setup
-Run the setup command once to configure your remote environment:
-```bash
-npm run offload:setup
-```
+### Getting Started (Onboarding)
+For a complete guide on setting up your remote environment, see the [Maintainer Onboarding Guide](../../../MAINTAINER_ONBOARDING.md).
 
-### Offloading a task
-To start an offload task for a pull request:
-```bash
-npm run offload <PR_NUMBER> [action]
-```
+### Technical details
 
-### Monitoring progress
-Check status from your local shell without switching windows:
-```bash
-npm run offload:check <PR_NUMBER>
-```
-
-### Cleanup
-Wipe old PR worktrees and kill inactive sessions:
-```bash
-npm run offload:clean
-```
-
-## Technical details
-
-This skill uses an isolated Gemini profile on the remote host (`~/.offload/gemini-cli-config`) to ensure that verification tasks do not interfere with your primary configuration.
+This skill uses a **Worker Provider** abstraction (`GceCosProvider`) to manage the remote lifecycle. It uses an isolated Gemini profile on the remote host (`~/.offload/gemini-cli-config`) to ensure that verification tasks do not interfere with your primary configuration.
 
 ### Directory structure
+- `scripts/providers/`: Modular worker implementations (GCE, etc.).
 - `scripts/orchestrator.ts`: Local orchestrator (syncs scripts and pops terminal).
 - `scripts/worker.ts`: Remote engine (provisions worktree and runs playbooks).
 - `scripts/check.ts`: Local status poller.
