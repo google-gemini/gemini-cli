@@ -761,6 +761,20 @@ describe('loadCliConfig', () => {
     });
   });
 
+  it('should add IDE workspace folders from GEMINI_CLI_IDE_WORKSPACE_PATH to include directories', async () => {
+    vi.stubEnv(
+      'GEMINI_CLI_IDE_WORKSPACE_PATH',
+      '/project/folderA:/project/folderB',
+    );
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    const dirs = config.getPendingIncludeDirectories();
+    expect(dirs).toContain('/project/folderA');
+    expect(dirs).toContain('/project/folderB');
+  });
+
   it('should use default fileFilter options when unconfigured', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());

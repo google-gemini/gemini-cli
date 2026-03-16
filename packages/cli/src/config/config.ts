@@ -11,7 +11,6 @@ import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   setGeminiMdFilename as setServerGeminiMdFilename,
@@ -35,6 +34,7 @@ import {
   getAdminErrorMessage,
   isHeadlessMode,
   Config,
+  resolveToRealPath,
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
   type HookDefinition,
@@ -478,17 +478,13 @@ export async function loadCliConfig(
   // so Gemini has context of all open folders, not just the cwd.
   const ideWorkspacePath = process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
   if (ideWorkspacePath) {
-    const realCwd = fs.realpathSync(cwd);
+    const realCwd = resolveToRealPath(cwd);
     const ideFolders = ideWorkspacePath.split(path.delimiter).filter((p) => {
       const trimmedPath = p.trim();
       if (!trimmedPath) {
         return false;
       }
-      try {
-        return fs.realpathSync(trimmedPath) !== realCwd;
-      } catch {
-        return trimmedPath !== cwd;
-      }
+      return resolveToRealPath(trimmedPath) !== realCwd;
     });
     includeDirectories.push(...ideFolders);
   }
