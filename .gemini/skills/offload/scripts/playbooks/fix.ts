@@ -14,5 +14,5 @@ export async function runFixPlaybook(prNumber: string, targetDir: string, policy
            until the PR is fully passing and mergeable.`
   ], { stdio: 'inherit' });
 
-  return result.status || 0;
+  return result?.status ?? 1;
 }

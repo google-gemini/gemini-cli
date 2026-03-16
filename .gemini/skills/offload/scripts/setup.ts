@@ -6,9 +6,9 @@
 import { spawnSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
-import os from 'os';
 import { fileURLToPath } from 'url';
 import readline from 'readline';
+import { ProviderFactory } from './providers/ProviderFactory.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
@@ -39,90 +39,55 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   const projectId = await prompt('GCP Project ID', 'gemini-cli-team-quota');
   const zone = await prompt('Compute Zone', 'us-west1-a');
   const targetVM = `gcli-offload-${env.USER || 'mattkorwel'}`;
-  const useContainer = await confirm('Use Container-Native mode (Container-Optimized OS)?');
+  
+  const provider = ProviderFactory.getProvider({ projectId, zone, instanceName: targetVM });
 
   console.log(`🔍 Verifying access and finding worker ${targetVM}...`);
-  const statusCheck = spawnSync(`gcloud compute instances describe ${targetVM} --project ${projectId} --zone ${zone} --format="json(status,networkInterfaces[0].networkIP)"`, { shell: true });
+  const status = await provider.getStatus();
   
-  let instanceData: any;
-  try {
-    const output = statusCheck.stdout.toString().trim();
-    if (!output) throw new Error('Empty output');
-    instanceData = JSON.parse(output);
-  } catch (e) {
+  if (status.status === 'UNKNOWN' || status.status === 'ERROR') {
     console.error(`❌ Worker ${targetVM} not found or error fetching status. Run "npm run offload:fleet provision" first.`);
     return 1;
   }
 
-  const status = instanceData.status;
-
-  if (status !== 'RUNNING') {
-    console.log(`⚠️ Worker is ${status}. Starting it for initialization...`);
-    spawnSync(`gcloud compute instances start ${targetVM} --project ${projectId} --zone ${zone}`, { shell: true, stdio: 'inherit' });
+  if (status.status !== 'RUNNING') {
+    await provider.ensureReady();
   }
 
-  // 1. Configure Isolated SSH Alias (Direct Internal Hostname)
-  console.log(`\n🚀 Configuring Isolated SSH Alias (Direct Internal Path)...`);
-  const dnsSuffix = await prompt('Internal DNS Suffix', '.internal.gcpnode.com');
+  // 1. Configure Isolated SSH Alias (Direct Internal Path with IAP Fallback)
+  console.log(`\n🚀 Configuring Isolated SSH Alias...`);
+  const dnsSuffix = await prompt('Internal DNS Suffix', '.internal');
 
-  // Construct the empirically verified high-performance hostname
-  const internalHostname = `nic0.${targetVM}.${zone}.c.${projectId}${dnsSuffix.startsWith('.') ? dnsSuffix : '.' + dnsSuffix}`;
+  const setupRes = await provider.setup({ projectId, zone, dnsSuffix });
+  if (setupRes !== 0) return setupRes;
 
-
-  const sshAlias = 'gcli-worker';
   const sshConfigPath = path.join(REPO_ROOT, '.gemini/offload_ssh_config');
   const knownHostsPath = path.join(REPO_ROOT, '.gemini/offload_known_hosts');
-
-  const sshEntry = `
-Host ${sshAlias}
-    HostName ${internalHostname}
-    IdentityFile ~/.ssh/google_compute_engine
-    User ${env.USER || 'mattkorwel'}_google_com
-    UserKnownHostsFile ${knownHostsPath}
-    CheckHostIP no
-    StrictHostKeyChecking no
-`;
-
-  fs.writeFileSync(sshConfigPath, sshEntry);
-  console.log(`   ✅ Created project SSH config: ${sshConfigPath}`);
 
   // 1b. Security Fork Management (Temporarily Disabled)
   const upstreamRepo = 'google-gemini/gemini-cli';
   const userFork = upstreamRepo; // Fallback for now
 
   // Resolve Paths
-  const sshCmd = `ssh -F ${sshConfigPath} -o StrictHostKeyChecking=no -o UserKnownHostsFile=${knownHostsPath}`;
-  const remoteHost = sshAlias;
-  const remoteHome = '/home/node'; // Hardcoded for our maintainer container
-  const remoteWorkDir = `/home/node/dev/main`; // Use absolute path
+  const remoteWorkDir = `/home/node/dev/main`;
   const persistentScripts = `/home/node/.offload/scripts`;
 
   console.log(`\n📦 Performing One-Time Synchronization...`);
   
-  // Trigger any SSH/SSO prompts before bulk sync
-  console.log('   - Verifying connection and triggering SSO...');
-  const connCheck = spawnSync(sshCmd, [remoteHost, 'echo 1'], { stdio: 'inherit', shell: true });
-  if (connCheck.status !== 0) {
-      console.error('\n❌ SSH connection failed. Please ensure you have run "gcert" recently.');
-      return 1;
-  }
+  // Ensure host directories exist (using provider.exec to handle IAP fallback)
+  await provider.exec(`mkdir -p /home/node/dev/main /home/node/.gemini/policies /home/node/.offload/scripts`);
 
-  // Ensure host directories exist (on the VM Host)
-  spawnSync(sshCmd, [remoteHost, `mkdir -p /home/node/dev/main /home/node/.gemini/policies /home/node/.offload/scripts`], { shell: true });
-
-  const rsyncBase = `rsync -avz -e "${sshCmd}" --exclude=".gemini/settings.json"`;
-  
   // 2. Sync Scripts & Policies
   console.log('   - Pushing offload logic to persistent worker directory...');
-  spawnSync(`${rsyncBase} --delete .gemini/skills/offload/scripts/ ${remoteHost}:${persistentScripts}/`, { shell: true });
-  spawnSync(`${rsyncBase} .gemini/skills/offload/policy.toml ${remoteHost}:/home/node/.gemini/policies/offload-policy.toml`, { shell: true });
+  await provider.sync('.gemini/skills/offload/scripts/', `${persistentScripts}/`, { delete: true });
+  await provider.sync('.gemini/skills/offload/policy.toml', `/home/node/.gemini/policies/offload-policy.toml`);
 
   // 3. Sync Auth (Gemini)
   if (await confirm('Sync Gemini accounts credentials?')) {
     const homeDir = env.HOME || '';
     const lp = path.join(homeDir, '.gemini/google_accounts.json');
     if (fs.existsSync(lp)) {
-      spawnSync(`${rsyncBase} ${lp} ${remoteHost}:/home/node/.gemini/google_accounts.json`, { shell: true });
+      await provider.sync(lp, `/home/node/.gemini/google_accounts.json`);
     }
   }
 
@@ -146,22 +111,18 @@ Host ${sshAlias}
 
     const scopedToken = await prompt('\nPaste Scoped Token', '');
     if (scopedToken) {
-      spawnSync(sshCmd, [remoteHost, `mkdir -p /home/node/.offload && echo ${scopedToken} > /home/node/.offload/.gh_token && chmod 600 /home/node/.offload/.gh_token`], { shell: true });
+      await provider.exec(`mkdir -p /home/node/.offload && echo ${scopedToken} > /home/node/.offload/.gh_token && chmod 600 /home/node/.offload/.gh_token`);
     }
   }
 
   // 5. Tooling & Clone
   if (await confirm('Initialize tools and clone repository?')) {
-    if (!useContainer) {
-      spawnSync(sshCmd, [remoteHost, `sudo npm install -g tsx vitest`], { shell: true, stdio: 'inherit' });
-    }
-
     console.log(`🚀 Cloning fork ${userFork} on worker...`);
     const repoUrl = `https://github.com/${userFork}.git`;
     
     // Wipe existing dir for a clean clone and use absolute paths
     const cloneCmd = `rm -rf ${remoteWorkDir} && git clone --filter=blob:none ${repoUrl} ${remoteWorkDir} && cd ${remoteWorkDir} && git remote add upstream https://github.com/${upstreamRepo}.git && git fetch upstream`;
-    spawnSync(sshCmd, [remoteHost, cloneCmd], { shell: true, stdio: 'inherit' });
+    await provider.exec(cloneCmd);
   }
 
   // Save Settings
@@ -172,9 +133,10 @@ Host ${sshAlias}
   }
   settings.maintainer = settings.maintainer || {};
   settings.maintainer.deepReview = { 
-    projectId, zone, remoteHost, 
+    projectId, zone, 
+    remoteHost: 'gcli-worker', 
     remoteWorkDir, userFork, upstreamRepo,
-    useContainer,
+    useContainer: true,
     terminalType: 'iterm2'
   };
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
@@ -186,3 +148,4 @@ Host ${sshAlias}
 if (import.meta.url === `file://${process.argv[1]}`) {
   runSetup().catch(console.error);
 }
+

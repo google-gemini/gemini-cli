@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { spawnSync, spawn } from 'child_process';
+import { spawn } from 'child_process';
 import fs from 'fs';
 import { runReviewPlaybook } from '../../scripts/playbooks/review.ts';
 
@@ -22,16 +22,15 @@ describe('Review Playbook', () => {
     });
   });
 
-  it('should register and run build, ci, analysis, and verification', async () => {
-    const promise = runReviewPlaybook('123', '/tmp/target', '/path/policy', '/path/gemini');
+  it('should register and run build, ci, and review tasks', async () => {
+    // We don't await because TaskRunner uses setInterval and we'd need to mock timers
+    // but we can check if spawn was called with the right commands.
+    runReviewPlaybook('123', '/tmp/target', '/path/policy', '/path/gemini');
     
-    // The worker uses setInterval(1500) to check for completion, so we need to wait
-    // or mock the timer. For simplicity in this POC, we'll just verify spawn calls.
     const spawnCalls = vi.mocked(spawn).mock.calls;
     
-    // These should start immediately (no deps)
     expect(spawnCalls.some(c => c[0].includes('npm ci'))).toBe(true);
     expect(spawnCalls.some(c => c[0].includes('gh pr checks'))).toBe(true);
-    expect(spawnCalls.some(c => c[0].includes('/review-frontend'))).toBe(true);
+    expect(spawnCalls.some(c => c[0].includes("activate the 'review-pr' skill"))).toBe(true);
   });
 });

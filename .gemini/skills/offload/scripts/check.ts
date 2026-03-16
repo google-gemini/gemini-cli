@@ -1,17 +1,13 @@
-/**
- * Universal Deep Review Checker (Local)
- * 
- * Polls the remote machine for task status.
- */
 import { spawnSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { ProviderFactory } from './providers/ProviderFactory.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
-export async function runChecker(args: string[]) {
+export async function runChecker(args: string[], env: NodeJS.ProcessEnv = process.env) {
   const prNumber = args[0];
   if (!prNumber) {
     console.error('Usage: npm run review:check <PR_NUMBER>');
@@ -20,7 +16,7 @@ export async function runChecker(args: string[]) {
 
   const settingsPath = path.join(REPO_ROOT, '.gemini/settings.json');
   if (!fs.existsSync(settingsPath)) {
-    console.error('❌ Settings not found. Run "npm run review:setup" first.');
+    console.error('❌ Settings not found. Run "npm run offload:setup" first.');
     return 1;
   }
   const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
@@ -29,9 +25,11 @@ export async function runChecker(args: string[]) {
     console.error('❌ Deep Review configuration not found.');
     return 1;
   }
-  const { remoteHost, remoteWorkDir } = config;
+  const { projectId, zone, remoteWorkDir } = config;
+  const targetVM = `gcli-offload-${env.USER || 'mattkorwel'}`;
+  const provider = ProviderFactory.getProvider({ projectId, zone, instanceName: targetVM });
 
-  console.log(`🔍 Checking remote status for PR #${prNumber} on ${remoteHost}...`);
+  console.log(`🔍 Checking remote status for PR #${prNumber} on ${targetVM}...`);
 
   const branchView = spawnSync('gh', ['pr', 'view', prNumber, '--json', 'headRefName', '-q', '.headRefName'], { shell: true });
   const branchName = branchView.stdout.toString().trim();
@@ -42,13 +40,15 @@ export async function runChecker(args: string[]) {
 
   console.log('\n--- Task Status ---');
   for (const task of tasks) {
-    const checkExit = spawnSync('ssh', [remoteHost, `cat ${logDir}/${task}.exit 2>/dev/null`], { shell: true });
-    if (checkExit.status === 0) {
-      const code = checkExit.stdout.toString().trim();
+    const exitFile = `${logDir}/${task}.exit`;
+    const checkExit = await provider.getExecOutput(`[ -f ${exitFile} ] && cat ${exitFile}`, { wrapContainer: 'maintainer-worker' });
+    
+    if (checkExit.status === 0 && checkExit.stdout.trim()) {
+      const code = checkExit.stdout.trim();
       console.log(`  ${code === '0' ? '✅' : '❌'} ${task.padEnd(10)}: ${code === '0' ? 'SUCCESS' : `FAILED (exit ${code})`}`);
     } else {
-      const checkRunning = spawnSync('ssh', [remoteHost, `[ -f ${logDir}/${task}.log ]`], { shell: true });
-      if (checkRunning.status === 0) {
+      const checkRunning = await provider.exec(`[ -f ${logDir}/${task}.log ]`, { wrapContainer: 'maintainer-worker' });
+      if (checkRunning === 0) {
         console.log(`  ⏳ ${task.padEnd(10)}: RUNNING`);
       } else {
         console.log(`  💤 ${task.padEnd(10)}: PENDING`);

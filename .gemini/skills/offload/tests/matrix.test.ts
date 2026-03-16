@@ -4,10 +4,12 @@ import fs from 'fs';
 import readline from 'readline';
 import { runOrchestrator } from '../scripts/orchestrator.ts';
 import { runWorker } from '../scripts/worker.ts';
+import { ProviderFactory } from '../scripts/providers/ProviderFactory.ts';
 
 vi.mock('child_process');
 vi.mock('fs');
 vi.mock('readline');
+vi.mock('../scripts/providers/ProviderFactory.ts');
 
 describe('Offload Tooling Matrix', () => {
   const mockSettings = {
@@ -15,37 +17,31 @@ describe('Offload Tooling Matrix', () => {
       deepReview: {
         projectId: 'test-project',
         zone: 'us-west1-a',
-        terminalType: 'none',
-        syncAuth: false,
-        geminiSetup: 'isolated',
-        ghSetup: 'isolated'
+        remoteWorkDir: '/home/node/dev/main'
       }
     }
   };
 
+  const mockProvider = {
+    provision: vi.fn().mockResolvedValue(0),
+    ensureReady: vi.fn().mockResolvedValue(0),
+    setup: vi.fn().mockResolvedValue(0),
+    exec: vi.fn().mockResolvedValue(0),
+    getExecOutput: vi.fn().mockResolvedValue({ status: 0, stdout: '', stderr: '' }),
+    sync: vi.fn().mockResolvedValue(0),
+    getStatus: vi.fn().mockResolvedValue({ name: 'test-instance', status: 'RUNNING' }),
+    stop: vi.fn().mockResolvedValue(0)
+  };
+
   beforeEach(() => {
-    vi.resetAllMocks();
+    vi.clearAllMocks();
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(mockSettings));
-    vi.mocked(fs.mkdirSync).mockReturnValue(undefined as any);
-    vi.mocked(fs.writeFileSync).mockReturnValue(undefined as any);
-    vi.mocked(fs.createWriteStream).mockReturnValue({ pipe: vi.fn() } as any);
-    vi.spyOn(process, 'chdir').mockImplementation(() => {});
+    vi.mocked(ProviderFactory.getProvider).mockReturnValue(mockProvider as any);
 
-    vi.mocked(spawnSync).mockImplementation((cmd: any, args: any) => {
-      const callStr = JSON.stringify({ cmd, args });
-      
-      // 1. Mock GCloud Instance List
-      if (callStr.includes('gcloud') && callStr.includes('instances') && callStr.includes('list')) {
-        return { status: 0, stdout: Buffer.from(JSON.stringify([{ name: 'gcli-offload-test-worker' }])), stderr: Buffer.from('') } as any;
-      }
-      
-      // 2. Mock GH Metadata Fetching (local or remote)
-      if (callStr.includes('gh') && callStr.includes('view')) {
-          return { status: 0, stdout: Buffer.from('test-meta\n'), stderr: Buffer.from('') } as any;
-      }
-      
-      return { status: 0, stdout: Buffer.from(''), stderr: Buffer.from('') } as any;
+    vi.mocked(spawnSync).mockImplementation((cmd: any) => {
+      if (cmd === 'gh') return { status: 0, stdout: Buffer.from('test-branch\n') } as any;
+      return { status: 0, stdout: Buffer.from('') } as any;
     });
 
     vi.mocked(spawn).mockImplementation(() => {
@@ -56,24 +52,16 @@ describe('Offload Tooling Matrix', () => {
             pid: 1234
         } as any;
     });
+
+    vi.spyOn(process, 'chdir').mockImplementation(() => {});
   });
 
   describe('Implement Playbook', () => {
     it('should create a branch and run research/implementation', async () => {
       await runOrchestrator(['456', 'implement'], {});
       
-      const spawnCalls = vi.mocked(spawnSync).mock.calls;
-      const ghCall = spawnCalls.find(call => {
-          const s = JSON.stringify(call);
-          return s.includes('gh') && s.includes('issue') && s.includes('view') && s.includes('456');
-      });
-      expect(ghCall).toBeDefined();
-
-      const sshCall = spawnCalls.find(call => {
-          const s = JSON.stringify(call);
-          return s.includes('gcloud') && s.includes('ssh') && s.includes('offload-456-implement');
-      });
-      expect(sshCall).toBeDefined();
+      expect(mockProvider.exec).toHaveBeenCalledWith(expect.stringContaining('git worktree add'), expect.any(Object));
+      expect(mockProvider.exec).toHaveBeenCalledWith(expect.stringContaining('tmux new-session'), expect.any(Object));
     });
   });
 
@@ -81,6 +69,7 @@ describe('Offload Tooling Matrix', () => {
     it('should launch the agentic fix-pr skill', async () => {
       vi.mocked(fs.existsSync).mockReturnValue(true);
       await runWorker(['123', 'test-branch', '/path/policy', 'fix']);
+      
       const spawnSyncCalls = vi.mocked(spawnSync).mock.calls;
       const fixCall = spawnSyncCalls.find(call => 
           JSON.stringify(call).includes("activate the 'fix-pr' skill")

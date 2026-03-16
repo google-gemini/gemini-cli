@@ -6,150 +6,84 @@
 import { spawnSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
-import os from 'os';
+import { fileURLToPath } from 'url';
+import { ProviderFactory } from './providers/ProviderFactory.ts';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
 const PROJECT_ID = 'gemini-cli-team-quota';
 const USER = process.env.USER || 'mattkorwel';
 const INSTANCE_PREFIX = `gcli-offload-${USER}`;
+const DEFAULT_ZONE = 'us-west1-a';
 
 async function listWorkers() {
   console.log(`🔍 Listing Offload Workers for ${USER} in ${PROJECT_ID}...`);
   
-  const result = spawnSync('gcloud', [
+  spawnSync('gcloud', [
     'compute', 'instances', 'list',
     '--project', PROJECT_ID,
     '--filter', `name~^${INSTANCE_PREFIX}`,
     '--format', 'table(name,zone,status,networkInterfaces[0].networkIP:label=INTERNAL_IP,creationTimestamp)'
   ], { stdio: 'inherit' });
-
-  if (result.status !== 0) {
-    console.error('\n❌ Failed to list workers. Ensure you have access to the project and gcloud is authenticated.');
-  }
 }
 
 async function provisionWorker() {
-  const name = INSTANCE_PREFIX;
-  const zone = 'us-west1-a';
-  const imageUri = 'us-docker.pkg.dev/gemini-code-dev/gemini-cli/maintainer:latest';
-  
-  console.log(`🔍 Checking if worker ${name} already exists...`);
-  const existCheck = spawnSync('gcloud', [
-    'compute', 'instances', 'describe', name,
-    '--project', PROJECT_ID,
-    '--zone', zone
-  ], { stdio: 'pipe' });
+  const provider = ProviderFactory.getProvider({ 
+    projectId: PROJECT_ID, 
+    zone: DEFAULT_ZONE, 
+    instanceName: INSTANCE_PREFIX 
+  });
 
-  if (existCheck.status === 0) {
-    console.log(`✅ Worker ${name} already exists and is ready for use.`);
+  const status = await provider.getStatus();
+  if (status.status !== 'UNKNOWN' && status.status !== 'ERROR') {
+    console.log(`✅ Worker ${INSTANCE_PREFIX} already exists and is ${status.status}.`);
     return;
   }
 
-  console.log(`🚀 Provisioning modern container worker (COS + Startup Script): ${name}...`);
-  
-  // Get local public key for native SSH access
-  const pubKeyPath = path.join(os.homedir(), '.ssh/google_compute_engine.pub');
-  const pubKey = fs.existsSync(pubKeyPath) ? fs.readFileSync(pubKeyPath, 'utf8').trim() : '';
-  const sshKeyMetadata = pubKey ? `${USER}:${pubKey}` : '';
-
-  // Direct Startup Script for COS (Native Docker launch)
-  const startupScript = `#!/bin/bash
-    # Pull and Run the maintainer container
-    docker pull ${imageUri}
-    docker run -d --name maintainer-worker --restart always \\
-      -v /home/node/dev:/home/node/dev:rw \\
-      -v /home/node/.gemini:/home/node/.gemini:rw \\
-      -v /home/node/.offload:/home/node/.offload:rw \\
-      ${imageUri} /bin/bash -c "while true; do sleep 1000; done"
-  `;
-
-  const result = spawnSync('gcloud', [
-    'compute', 'instances', 'create', name,
-    '--project', PROJECT_ID,
-    '--zone', 'us-west1-a',
-    '--machine-type', 'n2-standard-8',
-    '--image-family', 'cos-stable',
-    '--image-project', 'cos-cloud',
-    '--boot-disk-size', '200GB',
-    '--boot-disk-type', 'pd-balanced',
-    '--metadata', `startup-script=${startupScript},enable-oslogin=TRUE${sshKeyMetadata ? `,ssh-keys=${sshKeyMetadata}` : ''}`,
-    '--labels', `owner=${USER.replace(/[^a-z0-9_-]/g, '_')},type=offload-worker`,
-    '--tags', `gcli-offload-${USER}`,
-    '--network-interface', 'network-tier=PREMIUM,no-address',
-    '--scopes', 'https://www.googleapis.com/auth/cloud-platform'
-  ], { stdio: 'inherit' });
-
-  if (result.status === 0) {
-    console.log(`\n✅ Worker ${name} is being provisioned.`);
-    console.log(`👉 Container 'maintainer-worker' will start natively via Cloud-Init.`);
-  }
-}
-
-async function createImage() {
-  const name = `gcli-maintainer-worker-build-${Math.floor(Date.now() / 1000)}`;
-  const zone = 'us-west1-a';
-  const imageName = 'gcli-maintainer-worker-v1';
-
-  console.log(`🏗️  Building Maintainer Image: ${imageName}...`);
-
-  // 1. Create a temporary builder VM
-  console.log('   - Creating temporary builder VM...');
-  spawnSync('gcloud', [
-    'compute', 'instances', 'create', name,
-    '--project', PROJECT_ID,
-    '--zone', zone,
-    '--machine-type', 'n2-standard-4',
-    '--image-family', 'ubuntu-2204-lts',
-    '--image-project', 'ubuntu-os-cloud',
-    '--metadata-from-file', `startup-script=.gemini/skills/offload/scripts/provision-worker.sh`
-  ], { stdio: 'inherit' });
-
-  console.log('\n⏳ Waiting for provisioning to complete (this takes ~3-5 mins)...');
-  console.log('   - You can tail the startup script via:');
-  console.log(`     gcloud compute instances get-serial-port-output ${name} --project ${PROJECT_ID} --zone ${zone} --follow`);
-  
-  // Note: For a true automation we'd poll here, but for a maintainer tool,
-  // we'll provide the instructions to finalize.
-  console.log(`\n👉 Once provisioning is DONE, run these commands to finalize:`);
-  console.log(`   1. gcloud compute instances stop ${name} --project ${PROJECT_ID} --zone ${zone}`);
-  console.log(`   2. gcloud compute images create ${imageName} --project ${PROJECT_ID} --source-disk ${name} --source-disk-zone ${zone} --family gcli-maintainer-worker`);
-  console.log(`   3. gcloud compute instances delete ${name} --project ${PROJECT_ID} --zone ${zone} --quiet`);
+  await provider.provision();
 }
 
 async function stopWorker() {
-  const name = INSTANCE_PREFIX;
-  const zone = 'us-west1-a';
+  const provider = ProviderFactory.getProvider({ 
+    projectId: PROJECT_ID, 
+    zone: DEFAULT_ZONE, 
+    instanceName: INSTANCE_PREFIX 
+  });
   
-  console.log(`🛑 Stopping offload worker: ${name}...`);
-  const result = spawnSync('gcloud', [
-    'compute', 'instances', 'stop', name,
-    '--project', PROJECT_ID,
-    '--zone', zone
-  ], { stdio: 'inherit' });
-
-  if (result.status === 0) {
-    console.log(`\n✅ Worker ${name} has been stopped.`);
-  }
+  console.log(`🛑 Stopping offload worker: ${INSTANCE_PREFIX}...`);
+  await provider.stop();
 }
 
 async function remoteStatus() {
-  const name = INSTANCE_PREFIX;
-  const sshConfigPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../offload_ssh_config');
-  console.log(`📡 Fetching remote status from ${name}...`);
-  spawnSync('ssh', ['-F', sshConfigPath, 'gcli-worker', 'tsx .offload/scripts/status.ts'], { stdio: 'inherit', shell: true });
+  const settingsPath = path.join(REPO_ROOT, '.gemini/settings.json');
+  if (!fs.existsSync(settingsPath)) {
+      console.error('❌ Settings not found. Run "npm run offload:setup" first.');
+      return;
+  }
+  const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  const config = settings.maintainer?.deepReview;
+  
+  const provider = ProviderFactory.getProvider({ 
+    projectId: config?.projectId || PROJECT_ID, 
+    zone: config?.zone || DEFAULT_ZONE, 
+    instanceName: INSTANCE_PREFIX 
+  });
+
+  console.log(`📡 Fetching remote status from ${INSTANCE_PREFIX}...`);
+  await provider.exec('tsx .offload/scripts/status.ts');
 }
 
 async function rebuildWorker() {
-  const name = INSTANCE_PREFIX;
-  console.log(`🔥 Rebuilding worker ${name}...`);
+  console.log(`🔥 Rebuilding worker ${INSTANCE_PREFIX}...`);
   
-  // Clear isolated known_hosts to prevent ID mismatch on rebuild
-  const knownHostsPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../offload_known_hosts');
+  const knownHostsPath = path.join(REPO_ROOT, '.gemini/offload_known_hosts');
   if (fs.existsSync(knownHostsPath)) {
       console.log(`   - Clearing isolated known_hosts...`);
       fs.unlinkSync(knownHostsPath);
   }
 
-  spawnSync('gcloud', ['compute', 'instances', 'delete', name, '--project', PROJECT_ID, '--zone', 'us-west1-a', '--quiet'], { stdio: 'inherit' });
+  spawnSync('gcloud', ['compute', 'instances', 'delete', INSTANCE_PREFIX, '--project', PROJECT_ID, '--zone', DEFAULT_ZONE, '--quiet'], { stdio: 'inherit' });
   await provisionWorker();
 }
 
@@ -171,9 +105,6 @@ async function main() {
       break;
     case 'status':
       await remoteStatus();
-      break;
-    case 'create-image':
-      await createImage();
       break;
     default:
       console.error(`❌ Unknown fleet action: ${action}`);
