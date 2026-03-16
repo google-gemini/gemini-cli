@@ -37,6 +37,7 @@ describe('ToolConfirmationMessage', () => {
   const mockConfig = {
     isTrustedFolder: () => true,
     getIdeMode: () => false,
+    getDisableAlwaysAllow: () => false,
   } as unknown as Config;
 
   it('should not display urls if prompt and url are the same', async () => {
@@ -331,8 +332,8 @@ describe('ToolConfirmationMessage', () => {
         const mockConfig = {
           isTrustedFolder: () => true,
           getIdeMode: () => false,
+          getDisableAlwaysAllow: () => false,
         } as unknown as Config;
-
         const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
           <ToolConfirmationMessage
             callId="test-call-id"
@@ -353,6 +354,7 @@ describe('ToolConfirmationMessage', () => {
         const mockConfig = {
           isTrustedFolder: () => false,
           getIdeMode: () => false,
+          getDisableAlwaysAllow: () => false,
         } as unknown as Config;
 
         const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
@@ -388,8 +390,8 @@ describe('ToolConfirmationMessage', () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
+        getDisableAlwaysAllow: () => false,
       } as unknown as Config;
-
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <ToolConfirmationMessage
           callId="test-call-id"
@@ -411,12 +413,12 @@ describe('ToolConfirmationMessage', () => {
       unmount();
     });
 
-    it('should show "Allow for all future sessions" when setting is true', async () => {
+    it('should show "Allow for all future sessions" when trusted', async () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
+        getDisableAlwaysAllow: () => false,
       } as unknown as Config;
-
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <ToolConfirmationMessage
           callId="test-call-id"
@@ -434,7 +436,10 @@ describe('ToolConfirmationMessage', () => {
       );
       await waitUntilReady();
 
-      expect(lastFrame()).toContain('Allow for all future sessions');
+      const output = lastFrame();
+      expect(output).toContain('future sessions');
+      // Verify it is the default selection (matching the indicator in the snapshot)
+      expect(output).toMatchSnapshot();
       unmount();
     });
   });
@@ -454,8 +459,8 @@ describe('ToolConfirmationMessage', () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => false,
+        getDisableAlwaysAllow: () => false,
       } as unknown as Config;
-
       vi.mocked(useToolActions).mockReturnValue({
         confirm: vi.fn(),
         cancel: vi.fn(),
@@ -482,8 +487,8 @@ describe('ToolConfirmationMessage', () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => true,
+        getDisableAlwaysAllow: () => false,
       } as unknown as Config;
-
       vi.mocked(useToolActions).mockReturnValue({
         confirm: vi.fn(),
         cancel: vi.fn(),
@@ -510,8 +515,8 @@ describe('ToolConfirmationMessage', () => {
       const mockConfig = {
         isTrustedFolder: () => true,
         getIdeMode: () => true,
+        getDisableAlwaysAllow: () => false,
       } as unknown as Config;
-
       vi.mocked(useToolActions).mockReturnValue({
         confirm: vi.fn(),
         cancel: vi.fn(),

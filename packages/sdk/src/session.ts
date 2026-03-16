@@ -5,6 +5,7 @@
  */
 
 import {
+  type AgentLoopContext,
   Config,
   type ConfigParameters,
   AuthType,
@@ -124,26 +125,28 @@ export class GeminiCliSession {
     // Re-register ActivateSkillTool if we have skills
     const skillManager = this.config.getSkillManager();
     if (skillManager.getSkills().length > 0) {
-      const registry = this.config.getToolRegistry();
+      const loopContext: AgentLoopContext = this.config;
+      const registry = loopContext.toolRegistry;
       const toolName = ActivateSkillTool.Name;
       if (registry.getTool(toolName)) {
         registry.unregisterTool(toolName);
       }
       registry.registerTool(
-        new ActivateSkillTool(this.config, this.config.getMessageBus()),
+        new ActivateSkillTool(this.config, loopContext.messageBus),
       );
     }
 
     // Register tools
-    const registry = this.config.getToolRegistry();
-    const messageBus = this.config.getMessageBus();
+    const loopContext2: AgentLoopContext = this.config;
+    const registry = loopContext2.toolRegistry;
+    const messageBus = loopContext2.messageBus;
 
     for (const toolDef of this.tools) {
       const sdkTool = new SdkTool(toolDef, messageBus, this.agent, undefined);
       registry.registerTool(sdkTool);
     }
 
-    this.client = this.config.getGeminiClient();
+    this.client = loopContext2.geminiClient;
 
     if (this.resumedData) {
       const history: Content[] = this.resumedData.conversation.messages.map(
@@ -226,7 +229,7 @@ export class GeminiCliSession {
         break;
       }
 
-      const transcript: Content[] = client.getHistory();
+      const transcript: readonly Content[] = client.getHistory();
       const context: SessionContext = {
         sessionId,
         transcript,
@@ -238,7 +241,8 @@ export class GeminiCliSession {
         session: this,
       };
 
-      const originalRegistry = this.config.getToolRegistry();
+      const loopContext: AgentLoopContext = this.config;
+      const originalRegistry = loopContext.toolRegistry;
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const scopedRegistry: ToolRegistry = Object.create(originalRegistry);
       scopedRegistry.getTool = (name: string) => {

@@ -315,6 +315,7 @@ export interface ConversationOffered {
   streamingLatency?: StreamingLatency;
   isAgentic?: boolean;
   initiationMethod?: InitiationMethod;
+  trajectoryId?: string;
 }
 
 export interface StreamingLatency {
@@ -330,6 +331,7 @@ export interface ConversationInteraction {
   removedLines?: string;
   language?: string;
   isAgentic?: boolean;
+  initiationMethod?: InitiationMethod;
 }
 
 export interface FetchAdminControlsRequest {
