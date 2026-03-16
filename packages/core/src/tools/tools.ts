@@ -432,6 +432,7 @@ export abstract class DeclarativeTool<
     // prototype chains or handle non-serializable properties (like functions).
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const cloned = Object.assign(
+      // eslint-disable-next-line no-restricted-syntax
       Object.create(Object.getPrototypeOf(this)),
       this,
     ) as this;
