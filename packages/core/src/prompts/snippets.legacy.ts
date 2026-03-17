@@ -11,9 +11,15 @@ import {
   EDIT_TOOL_NAME,
   ENTER_PLAN_MODE_TOOL_NAME,
   EXIT_PLAN_MODE_TOOL_NAME,
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
   MEMORY_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
   SHELL_PARAM_IS_BACKGROUND,
   SHELL_TOOL_NAME,
+  TRACKER_CREATE_TASK_TOOL_NAME,
+  TRACKER_LIST_TASKS_TOOL_NAME,
+  TRACKER_UPDATE_TASK_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
 } from '../tools/tool-names.js';
@@ -462,10 +468,10 @@ export function renderTaskTracker(): string {
 # TASK MANAGEMENT PROTOCOL
 You are operating with a persistent file-based task tracking system located at \`.tracker/tasks/\`. You must adhere to the following rules:
 
-1.  **NO IN-MEMORY LISTS**: Do not maintain a mental list of tasks or write markdown checkboxes in the chat. Use the provided tools (\${TRACKER_CREATE_TASK_TOOL_NAME}, \${TRACKER_LIST_TASKS_TOOL_NAME}, \${TRACKER_UPDATE_TASK_TOOL_NAME}) for all state management.
-2.  **IMMEDIATE DECOMPOSITION**: Upon receiving a task, evaluate its functional complexity and scope. If the request involves more than a single atomic modification, or necessitates research before execution, you MUST immediately decompose it into discrete entries using \${TRACKER_CREATE_TASK_TOOL_NAME}.
+1.  **NO IN-MEMORY LISTS**: Do not maintain a mental list of tasks or write markdown checkboxes in the chat. Use the provided tools (\`${TRACKER_CREATE_TASK_TOOL_NAME}\`, \`${TRACKER_LIST_TASKS_TOOL_NAME}\`, \`${TRACKER_UPDATE_TASK_TOOL_NAME}\`) for all state management.
+2.  **IMMEDIATE DECOMPOSITION**: Upon receiving a task, evaluate its functional complexity and scope. If the request involves more than a single atomic modification, or necessitates research before execution, you MUST immediately decompose it into discrete entries using \`${TRACKER_CREATE_TASK_TOOL_NAME}\`.
 3.  **IGNORE FORMATTING BIAS**: Trigger the protocol based on the **objective complexity** of the goal, regardless of whether the user provided a structured list or a single block of text/paragraph. "Paragraph-style" goals that imply multiple actions are multi-step projects and MUST be tracked.
-4.  **PLAN MODE INTEGRATION**: If an approved plan exists, you MUST use the \${TRACKER_CREATE_TASK_TOOL_NAME} tool to decompose it into discrete tasks before writing any code. Maintain a bidirectional understanding between the plan document and the task graph.
+4.  **PLAN MODE INTEGRATION**: If an approved plan exists, you MUST use the \`${TRACKER_CREATE_TASK_TOOL_NAME}\` tool to decompose it into discrete tasks before writing any code. Maintain a bidirectional understanding between the plan document and the task graph.
 5.  **VERIFICATION**: Before marking a task as complete, verify the work is actually done (e.g., run the test, check the file existence).
 6.  **STATE OVER CHAT**: If the user says "I think we finished that," but the tool says it is 'pending', trust the tool--or verify explicitly before updating.
 7.  **DEPENDENCY MANAGEMENT**: Respect task topology. Never attempt to execute a task if its dependencies are not marked as 'closed'. If you are blocked, focus only on the leaf nodes of the task graph.`.trim();
@@ -482,7 +488,7 @@ function mandateConfirm(interactive: boolean): string {
 function mandateSkillGuidance(hasSkills: boolean): string {
   if (!hasSkills) return '';
   return `
-- **Skill Guidance:** Once a skill is activated via \\\`\${ACTIVATE_SKILL_TOOL_NAME}\\\`, its instructions and resources are returned wrapped in \\\`<activated_skill>\\\` tags. You MUST treat the content within \\\`<instructions>\\\` as expert procedural guidance, prioritizing these specialized rules and workflows over your general defaults for the duration of the task. You may utilize any listed \\\`<available_resources>\\\` as needed. Follow this expert guidance strictly while continuing to uphold your core safety and security standards.`;
+- **Skill Guidance:** Once a skill is activated via \`${ACTIVATE_SKILL_TOOL_NAME}\`, its instructions and resources are returned wrapped in \`<activated_skill>\` tags. You MUST treat the content within \`<instructions>\` as expert procedural guidance, prioritizing these specialized rules and workflows over your general defaults for the duration of the task. You may utilize any listed \`<available_resources>\` as needed. Follow this expert guidance strictly while continuing to uphold your core safety and security standards.`;
 }
 
 function mandateConflictResolution(hasHierarchicalMemory: boolean): string {
@@ -504,10 +510,10 @@ function mandateContinueWork(interactive: boolean): string {
 
 function workflowStepUnderstand(options: PrimaryWorkflowsOptions): string {
   if (options.enableCodebaseInvestigator) {
-    return `1. **Understand & Strategize:** Think about the user's request and the relevant codebase context. When the task involves **complex refactoring, codebase exploration or system-wide analysis**, your **first and primary action** must be to delegate to the 'codebase_investigator' agent using the 'codebase_investigator' tool. Use it to build a comprehensive understanding of the code, its structure, and dependencies. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), you should use '\\\${GREP_TOOL_NAME}' or '\\\${GLOB_TOOL_NAME}' directly.`;
+    return `1. **Understand & Strategize:** Think about the user's request and the relevant codebase context. When the task involves **complex refactoring, codebase exploration or system-wide analysis**, your **first and primary action** must be to delegate to the 'codebase_investigator' agent using the 'codebase_investigator' tool. Use it to build a comprehensive understanding of the code, its structure, and dependencies. For **simple, targeted searches** (like finding a specific function name, file path, or variable declaration), you should use '${GREP_TOOL_NAME}' or '${GLOB_TOOL_NAME}' directly.`;
   }
-  return `1. **Understand:** Think about the user's request and the relevant codebase context. Use '\\\${GREP_TOOL_NAME}' and '\\\${GLOB_TOOL_NAME}' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions.
-Use '\\\${READ_FILE_TOOL_NAME}' to understand context and validate any assumptions you may have. If you need to read multiple files, you should make multiple parallel calls to '\\\${READ_FILE_TOOL_NAME}'.`;
+  return `1. **Understand:** Think about the user's request and the relevant codebase context. Use '${GREP_TOOL_NAME}' and '${GLOB_TOOL_NAME}' search tools extensively (in parallel if independent) to understand file structures, existing code patterns, and conventions.
+Use '${READ_FILE_TOOL_NAME}' to understand context and validate any assumptions you may have. If you need to read multiple files, you should make multiple parallel calls to '${READ_FILE_TOOL_NAME}'.`;
 }
 
 function workflowStepPlan(options: PrimaryWorkflowsOptions): string {
@@ -583,7 +589,7 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
   - **Mobile App:** Compose Multiplatform (Kotlin Multiplatform) or Flutter (Dart) using Material Design libraries and principles, when sharing code between Android and iOS. Jetpack Compose (Kotlin JVM) with Material Design principles or SwiftUI (Swift) for native apps targeted at either Android or iOS, respectively.
   - **3d Games:** HTML/CSS/JavaScript with Three.js.
   - **2d Games:** HTML/CSS/JavaScript.
-3. **Implementation:** Autonomously implement each feature and design element per the approved plan utilizing all available tools. \${NEW_APP_IMPLEMENTATION_GUIDANCE}
+3. **Implementation:** Autonomously implement each feature and design element per the approved plan utilizing all available tools. ${NEW_APP_IMPLEMENTATION_GUIDANCE}
 4. **Verify:** Review work against the original request, the approved plan. Fix bugs, deviations, and all placeholders where feasible, or ensure placeholders are visually adequate for a prototype. Ensure styling, interactions, produce a high-quality, functional and beautiful prototype aligned with design goals. Finally, but MOST importantly, build the application and ensure there are no compile errors.`.trim();
 }
 
