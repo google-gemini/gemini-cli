@@ -5,15 +5,14 @@
  */
 
 import type { Settings } from '../config/settings.js';
-import type {
-  SettingDefinition,
-  SettingsSchema,
-  SettingsType,
-  SettingsValue,
+import {
+  getSettingsSchema,
+  type SettingDefinition,
+  type SettingsSchema,
+  type SettingsType,
+  type SettingsValue,
 } from '../config/settingsSchema.js';
-import { getSettingsSchema } from '../config/settingsSchema.js';
-import type { Config } from '@google/gemini-cli-core';
-import { ExperimentFlags } from '@google/gemini-cli-core';
+import { ExperimentFlags, type Config } from '@google/gemini-cli-core';
 
 // The schema is now nested, but many parts of the UI and logic work better
 // with a flattened structure and dot-notation keys. This section flattens the
@@ -84,7 +83,7 @@ export function getDefaultValue(key: string): SettingsValue {
 
 /**
  * Get the effective default value for a setting, checking experiment values when available.
- * For settings like compressionThreshold, this will return the experiment value if set,
+ * For settings like Context Compression Threshold, this will return the experiment value if set,
  * otherwise falls back to the schema default.
  */
 export function getEffectiveDefaultValue(
@@ -284,11 +283,23 @@ export function getDisplayValue(
 
   let valueString = String(value);
 
-  if (definition?.type === 'enum' && definition.options) {
+  // Handle object types by stringifying them
+  if (
+    definition?.type === 'object' &&
+    value !== null &&
+    typeof value === 'object'
+  ) {
+    valueString = JSON.stringify(value);
+  } else if (definition?.type === 'enum' && definition.options) {
     const option = definition.options?.find((option) => option.value === value);
     valueString = option?.label ?? `${value}`;
   }
 
+  if (definition?.unit === '%' && typeof value === 'number') {
+    valueString = `${value} (${Math.round(value * 100)}%)`;
+  } else if (definition?.unit) {
+    valueString = `${valueString}${definition.unit}`;
+  }
   if (existsInScope) {
     return `${valueString}*`;
   }

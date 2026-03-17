@@ -98,6 +98,7 @@ describe('TerminalCapabilityManager', () => {
     stdin.emit('data', Buffer.from('\x1b[?62c'));
 
     await promise;
+    manager.enableSupportedModes();
     expect(manager.isKittyProtocolEnabled()).toBe(true);
   });
 
@@ -141,6 +142,8 @@ describe('TerminalCapabilityManager', () => {
     // Should resolve without waiting for timeout
     await promise;
 
+    manager.enableSupportedModes();
+
     expect(manager.isKittyProtocolEnabled()).toBe(true);
     expect(manager.getTerminalBackgroundColor()).toBe('#000000');
   });
@@ -156,6 +159,7 @@ describe('TerminalCapabilityManager', () => {
     vi.advanceTimersByTime(1000);
 
     await promise;
+    manager.enableSupportedModes();
     expect(manager.isKittyProtocolEnabled()).toBe(true);
   });
 
@@ -167,6 +171,7 @@ describe('TerminalCapabilityManager', () => {
     stdin.emit('data', Buffer.from('\x1b[?62c'));
 
     await promise;
+    manager.enableSupportedModes();
     expect(manager.isKittyProtocolEnabled()).toBe(false);
   });
 
@@ -181,6 +186,7 @@ describe('TerminalCapabilityManager', () => {
     stdin.emit('data', Buffer.from('\x1b[?62c'));
 
     await promise;
+    manager.enableSupportedModes();
     expect(manager.isKittyProtocolEnabled()).toBe(true);
   });
 
@@ -196,6 +202,8 @@ describe('TerminalCapabilityManager', () => {
 
       await promise;
 
+      manager.enableSupportedModes();
+
       expect(enableModifyOtherKeys).toHaveBeenCalled();
     });
 
@@ -209,6 +217,8 @@ describe('TerminalCapabilityManager', () => {
       stdin.emit('data', Buffer.from('\x1b[?62c'));
 
       await promise;
+
+      manager.enableSupportedModes();
 
       expect(enableModifyOtherKeys).not.toHaveBeenCalled();
     });
@@ -224,6 +234,7 @@ describe('TerminalCapabilityManager', () => {
       stdin.emit('data', Buffer.from('\x1b[?62c'));
 
       await promise;
+      manager.enableSupportedModes();
       expect(manager.isKittyProtocolEnabled()).toBe(true);
 
       expect(enableKittyKeyboardProtocol).toHaveBeenCalled();
@@ -241,6 +252,8 @@ describe('TerminalCapabilityManager', () => {
 
       await promise;
 
+      manager.enableSupportedModes();
+
       expect(manager.isKittyProtocolEnabled()).toBe(false);
       expect(enableModifyOtherKeys).toHaveBeenCalled();
     });
@@ -257,6 +270,8 @@ describe('TerminalCapabilityManager', () => {
 
       await promise;
 
+      manager.enableSupportedModes();
+
       expect(enableModifyOtherKeys).toHaveBeenCalled();
     });
 
@@ -272,6 +287,8 @@ describe('TerminalCapabilityManager', () => {
 
       await promise;
 
+      manager.enableSupportedModes();
+
       expect(manager.getTerminalBackgroundColor()).toBe('#1a1a1a');
       expect(manager.getTerminalName()).toBe('tmux');
 
@@ -286,6 +303,8 @@ describe('TerminalCapabilityManager', () => {
       stdin.emit('data', Buffer.from('\x1b[?62c'));
 
       await promise;
+
+      manager.enableSupportedModes();
 
       expect(manager.isKittyProtocolEnabled()).toBe(false);
       expect(enableModifyOtherKeys).not.toHaveBeenCalled();

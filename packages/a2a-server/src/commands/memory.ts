@@ -15,6 +15,7 @@ import type {
   CommandContext,
   CommandExecutionResponse,
 } from './types.js';
+import type { AgentLoopContext } from '@google/gemini-cli-core';
 
 const DEFAULT_SANITIZATION_CONFIG = {
   allowedEnvironmentVariables: [],
@@ -95,13 +96,17 @@ export class AddMemoryCommand implements Command {
       return { name: this.name, data: result.content };
     }
 
-    const toolRegistry = context.config.getToolRegistry();
+    const loopContext: AgentLoopContext = context.config;
+    const toolRegistry = loopContext.toolRegistry;
     const tool = toolRegistry.getTool(result.toolName);
     if (tool) {
       const abortController = new AbortController();
       const signal = abortController.signal;
       await tool.buildAndExecute(result.toolArgs, signal, undefined, {
-        sanitizationConfig: DEFAULT_SANITIZATION_CONFIG,
+        shellExecutionConfig: {
+          sanitizationConfig: DEFAULT_SANITIZATION_CONFIG,
+          sandboxManager: loopContext.sandboxManager,
+        },
       });
       await refreshMemory(context.config);
       return {

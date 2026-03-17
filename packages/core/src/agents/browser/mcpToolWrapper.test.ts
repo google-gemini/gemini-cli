@@ -68,18 +68,19 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
-      expect(tools).toHaveLength(3);
+      expect(tools).toHaveLength(2);
       expect(tools[0].name).toBe('take_snapshot');
       expect(tools[1].name).toBe('click');
-      expect(tools[2].name).toBe('type_text');
     });
 
     it('should return tools with correct description', async () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       // Descriptions include augmented hints, so we check they contain the original
@@ -93,6 +94,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const schema = tools[0].schema;
@@ -106,6 +108,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const invocation = tools[0].build({ verbose: true });
@@ -118,6 +121,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const invocation = tools[0].build({});
@@ -131,6 +135,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const invocation = tools[1].build({ uid: 'elem-123' });
@@ -149,6 +154,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const invocation = tools[0].build({ verbose: true });
@@ -167,6 +173,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const invocation = tools[1].build({ uid: 'invalid' });
@@ -184,6 +191,7 @@ describe('mcpToolWrapper', () => {
       const tools = await createMcpDeclarativeTools(
         mockBrowserManager,
         mockMessageBus,
+        false,
       );
 
       const invocation = tools[0].build({});
@@ -191,6 +199,106 @@ describe('mcpToolWrapper', () => {
 
       expect(result.error).toBeDefined();
       expect(result.error?.message).toBe('Connection lost');
+    });
+  });
+
+  describe('Input blocker suspend/resume', () => {
+    it('should suspend and resume input blocker around click (interactive tool)', async () => {
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        true, // shouldDisableInput
+      );
+
+      const clickTool = tools.find((t) => t.name === 'click')!;
+      const invocation = clickTool.build({ uid: 'elem-42' });
+      await invocation.execute(new AbortController().signal);
+
+      // callTool: suspend blocker + click + resume blocker
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(3);
+
+      // First call: suspend blocker (pointer-events: none)
+      expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
+        1,
+        'evaluate_script',
+        expect.objectContaining({
+          function: expect.stringContaining('__gemini_input_blocker'),
+        }),
+      );
+
+      // Second call: click
+      expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
+        2,
+        'click',
+        { uid: 'elem-42' },
+        expect.any(AbortSignal),
+      );
+
+      // Third call: resume blocker (pointer-events: auto)
+      expect(mockBrowserManager.callTool).toHaveBeenNthCalledWith(
+        3,
+        'evaluate_script',
+        expect.objectContaining({
+          function: expect.stringContaining('__gemini_input_blocker'),
+        }),
+      );
+    });
+
+    it('should NOT suspend/resume for take_snapshot (read-only tool)', async () => {
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        true, // shouldDisableInput
+      );
+
+      const snapshotTool = tools.find((t) => t.name === 'take_snapshot')!;
+      const invocation = snapshotTool.build({});
+      await invocation.execute(new AbortController().signal);
+
+      // callTool should only be called once for take_snapshot — no suspend/resume
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(1);
+      expect(mockBrowserManager.callTool).toHaveBeenCalledWith(
+        'take_snapshot',
+        {},
+        expect.any(AbortSignal),
+      );
+    });
+
+    it('should NOT suspend/resume when shouldDisableInput is false', async () => {
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        false, // shouldDisableInput disabled
+      );
+
+      const clickTool = tools.find((t) => t.name === 'click')!;
+      const invocation = clickTool.build({ uid: 'elem-42' });
+      await invocation.execute(new AbortController().signal);
+
+      // callTool should only be called once for click — no suspend/resume
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(1);
+    });
+
+    it('should resume blocker even when interactive tool fails', async () => {
+      vi.mocked(mockBrowserManager.callTool)
+        .mockResolvedValueOnce({ content: [] }) // suspend blocker succeeds
+        .mockRejectedValueOnce(new Error('Click failed')) // tool fails
+        .mockResolvedValueOnce({ content: [] }); // resume succeeds
+
+      const tools = await createMcpDeclarativeTools(
+        mockBrowserManager,
+        mockMessageBus,
+        true, // shouldDisableInput
+      );
+
+      const clickTool = tools.find((t) => t.name === 'click')!;
+      const invocation = clickTool.build({ uid: 'bad-elem' });
+      const result = await invocation.execute(new AbortController().signal);
+
+      // Should return error, not throw
+      expect(result.error).toBeDefined();
+      // Should still try to resume
+      expect(mockBrowserManager.callTool).toHaveBeenCalledTimes(3);
     });
   });
 });

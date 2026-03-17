@@ -1,42 +1,43 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { AyuDark } from './ayu.js';
-import { AyuLight } from './ayu-light.js';
-import { AtomOneDark } from './atom-one-dark.js';
-import { Dracula } from './dracula.js';
-import { GitHubDark } from './github-dark.js';
-import { GitHubLight } from './github-light.js';
-import { GoogleCode } from './googlecode.js';
-import { Holiday } from './holiday.js';
-import { DefaultLight } from './default-light.js';
-import { DefaultDark } from './default.js';
-import { ShadesOfPurple } from './shades-of-purple.js';
-import { SolarizedDark } from './solarized-dark.js';
-import { SolarizedLight } from './solarized-light.js';
-import { XCode } from './xcode.js';
+import { AyuDark } from './builtin/dark/ayu-dark.js';
+import { AyuLight } from './builtin/light/ayu-light.js';
+import { AtomOneDark } from './builtin/dark/atom-one-dark.js';
+import { Dracula } from './builtin/dark/dracula-dark.js';
+import { GitHubDark } from './builtin/dark/github-dark.js';
+import { GitHubLight } from './builtin/light/github-light.js';
+import { GoogleCode } from './builtin/light/googlecode-light.js';
+import { Holiday } from './builtin/dark/holiday-dark.js';
+import { DefaultLight } from './builtin/light/default-light.js';
+import { DefaultDark } from './builtin/dark/default-dark.js';
+import { ShadesOfPurple } from './builtin/dark/shades-of-purple-dark.js';
+import { SolarizedDark } from './builtin/dark/solarized-dark.js';
+import { SolarizedLight } from './builtin/light/solarized-light.js';
+import { XCode } from './builtin/light/xcode-light.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { Theme, ThemeType, ColorsTheme } from './theme.js';
-import type { CustomTheme } from '@google/gemini-cli-core';
-import { createCustomTheme, validateCustomTheme } from './theme.js';
-import type { SemanticColors } from './semantic-tokens.js';
+import type { Theme, ThemeType, ColorsTheme, CustomTheme } from './theme.js';
 import {
+  createCustomTheme,
+  validateCustomTheme,
   interpolateColor,
   getThemeTypeFromBackgroundColor,
   resolveColor,
-} from './color-utils.js';
+} from './theme.js';
+import type { SemanticColors } from './semantic-tokens.js';
 import {
   DEFAULT_BACKGROUND_OPACITY,
   DEFAULT_INPUT_BACKGROUND_OPACITY,
+  DEFAULT_SELECTION_OPACITY,
   DEFAULT_BORDER_OPACITY,
 } from '../constants.js';
-import { ANSI } from './ansi.js';
-import { ANSILight } from './ansi-light.js';
-import { NoColorTheme } from './no-color.js';
+import { ANSI } from './builtin/dark/ansi-dark.js';
+import { ANSILight } from './builtin/light/ansi-light.js';
+import { NoColorTheme } from './builtin/no-color.js';
 import process from 'node:process';
 import { debugLogger, homedir } from '@google/gemini-cli-core';
 
@@ -173,11 +174,6 @@ class ThemeManager {
       return;
     }
 
-    debugLogger.log(
-      `Registering extension themes for "${extensionName}":`,
-      customThemes,
-    );
-
     for (const customThemeConfig of customThemes) {
       const namespacedName = `${customThemeConfig.name} (${extensionName})`;
 
@@ -237,6 +233,17 @@ class ThemeManager {
       this.extensionThemes.delete(namespacedName);
       debugLogger.log(`Unregistered theme: ${namespacedName}`);
     }
+  }
+
+  /**
+   * Checks if themes for a given extension are already registered.
+   * @param extensionName The name of the extension.
+   * @returns True if any themes from the extension are registered.
+   */
+  hasExtensionThemes(extensionName: string): boolean {
+    return Array.from(this.extensionThemes.keys()).some((name) =>
+      name.endsWith(`(${extensionName})`),
+    );
   }
 
   /**
@@ -369,6 +376,11 @@ class ThemeManager {
           colors.Gray,
           DEFAULT_BACKGROUND_OPACITY,
         ),
+        FocusBackground: interpolateColor(
+          this.terminalBackground,
+          activeTheme.colors.FocusColor ?? activeTheme.colors.AccentGreen,
+          DEFAULT_SELECTION_OPACITY,
+        ),
       };
     } else {
       this.cachedColors = colors;
@@ -402,6 +414,7 @@ class ThemeManager {
           primary: this.terminalBackground,
           message: colors.MessageBackground!,
           input: colors.InputBackground!,
+          focus: colors.FocusBackground!,
         },
         border: {
           ...semanticColors.border,
@@ -410,6 +423,7 @@ class ThemeManager {
         ui: {
           ...semanticColors.ui,
           dark: colors.DarkGray,
+          focus: colors.FocusColor ?? colors.AccentGreen,
         },
       };
     } else {

@@ -30,13 +30,17 @@ import {
   IdeClient,
   debugLogger,
   CoreToolCallStatus,
+  IntegrityDataStatus,
 } from '@google/gemini-cli-core';
 import {
   type MockShellCommand,
   MockShellExecutionService,
 } from './MockShellExecutionService.js';
 import { createMockSettings } from './settings.js';
-import { type LoadedSettings } from '../config/settings.js';
+import {
+  type LoadedSettings,
+  resetSettingsCacheForTesting,
+} from '../config/settings.js';
 import { AuthState, StreamingState } from '../ui/types.js';
 import { randomUUID } from 'node:crypto';
 import type {
@@ -115,6 +119,12 @@ class MockExtensionManager extends ExtensionLoader {
   getExtensions = vi.fn().mockReturnValue([]);
   setRequestConsent = vi.fn();
   setRequestSetting = vi.fn();
+  integrityManager = {
+    verifyExtensionIntegrity: vi
+      .fn()
+      .mockResolvedValue(IntegrityDataStatus.VERIFIED),
+    storeExtensionIntegrity: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 // Mock GeminiRespondingSpinner to disable animations (avoiding 'act()' warnings) without triggering screen reader mode.
@@ -171,6 +181,7 @@ export class AppRig {
 
   async initialize() {
     this.setupEnvironment();
+    resetSettingsCacheForTesting();
     this.settings = this.createRigSettings();
 
     const approvalMode =
@@ -483,7 +494,7 @@ export class AppRig {
   }
 
   async waitForPendingConfirmation(
-    toolNameOrDisplayName?: string | RegExp,
+    toolNameOrDisplayName?: string | RegExp | string[],
     timeout = 30000,
   ): Promise<PendingConfirmation> {
     const matches = (p: PendingConfirmation) => {
@@ -492,6 +503,12 @@ export class AppRig {
         return (
           p.toolName === toolNameOrDisplayName ||
           p.toolDisplayName === toolNameOrDisplayName
+        );
+      }
+      if (Array.isArray(toolNameOrDisplayName)) {
+        return (
+          toolNameOrDisplayName.includes(p.toolName) ||
+          toolNameOrDisplayName.includes(p.toolDisplayName || '')
         );
       }
       return (
@@ -607,7 +624,7 @@ export class AppRig {
   async addUserHint(hint: string) {
     if (!this.config) throw new Error('AppRig not initialized');
     await act(async () => {
-      this.config!.userHintService.addUserHint(hint);
+      this.config!.injectionService.addInjection(hint, 'user_steering');
     });
   }
 

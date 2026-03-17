@@ -29,6 +29,8 @@ import {
   cleanupTerminalOnExit,
   terminalCapabilityManager,
 } from '../utils/terminalCapabilityManager.js';
+import { formatCommand } from '../key/keybindingUtils.js';
+import { Command } from '../key/keyBindings.js';
 
 vi.mock('@google/gemini-cli-core', async () => {
   const actual = await vi.importActual('@google/gemini-cli-core');
@@ -99,8 +101,12 @@ describe('useSuspend', () => {
     act(() => {
       result.current.handleSuspend();
     });
+
+    const suspendKey = formatCommand(Command.SUSPEND_APP);
+    const undoKey = formatCommand(Command.UNDO);
+
     expect(handleWarning).toHaveBeenCalledWith(
-      'Press Ctrl+Z again to suspend. Undo has moved to Cmd + Z or Alt/Opt + Z.',
+      `Press ${suspendKey} again to suspend. Undo has moved to ${undoKey}.`,
     );
 
     act(() => {
@@ -190,8 +196,9 @@ describe('useSuspend', () => {
       result.current.handleSuspend();
     });
 
+    const suspendKey = formatCommand(Command.SUSPEND_APP);
     expect(handleWarning).toHaveBeenCalledWith(
-      'Ctrl+Z suspend is not supported on Windows.',
+      `${suspendKey} suspend is not supported on Windows.`,
     );
     expect(killSpy).not.toHaveBeenCalled();
     expect(cleanupTerminalOnExit).not.toHaveBeenCalled();
