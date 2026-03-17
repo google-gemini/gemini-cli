@@ -5,6 +5,7 @@
  */
 
 import { vi } from 'vitest';
+import { NoopSandboxManager } from '@google/gemini-cli-core';
 import type { Config } from '@google/gemini-cli-core';
 import {
   createTestMergedSettings,
@@ -16,7 +17,7 @@ import {
  * Creates a mocked Config object with default values and allows overrides.
  */
 export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+   
   ({
     getSandbox: vi.fn(() => undefined),
     getQuestion: vi.fn(() => ''),
@@ -121,6 +122,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getBannerTextNoCapacityIssues: vi.fn().mockResolvedValue(''),
     getBannerTextCapacityIssues: vi.fn().mockResolvedValue(''),
     isInteractiveShellEnabled: vi.fn().mockReturnValue(false),
+    getDisableAlwaysAllow: vi.fn().mockReturnValue(false),
     isSkillsSupportEnabled: vi.fn().mockReturnValue(false),
     reloadSkills: vi.fn().mockResolvedValue(undefined),
     reloadAgents: vi.fn().mockResolvedValue(undefined),
@@ -131,7 +133,14 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getRetryFetchErrors: vi.fn().mockReturnValue(true),
     getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
     getShellToolInactivityTimeout: vi.fn().mockReturnValue(300000),
-    getShellExecutionConfig: vi.fn().mockReturnValue({}),
+    getShellExecutionConfig: vi.fn().mockReturnValue({
+      sandboxManager: new NoopSandboxManager(),
+      sanitizationConfig: {
+        allowedEnvironmentVariables: [],
+        blockedEnvironmentVariables: [],
+        enableEnvironmentVariableRedaction: false,
+      },
+    }),
     setShellExecutionConfig: vi.fn(),
     getEnableToolOutputTruncation: vi.fn().mockReturnValue(true),
     getTruncateToolOutputThreshold: vi.fn().mockReturnValue(1000),
@@ -173,11 +182,11 @@ export function createMockSettings(
   overrides: Record<string, unknown> = {},
 ): LoadedSettings {
   const merged = createTestMergedSettings(
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+     
     (overrides['merged'] as Partial<Settings>) || {},
   );
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+   
   return {
     system: { settings: {} },
     systemDefaults: { settings: {} },

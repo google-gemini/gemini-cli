@@ -60,7 +60,7 @@ command.
 ```toml
 [[rule]]
 toolName = "run_shell_command"
-commandPrefix = "git "
+commandPrefix = "git"
 decision = "ask_user"
 priority = 100
 ```
@@ -264,7 +264,7 @@ argsPattern = '"command":"(git|npm)'
 
 # (Optional) A string or array of strings that a shell command must start with.
 # This is syntactic sugar for `toolName = "run_shell_command"` and an `argsPattern`.
-commandPrefix = "git "
+commandPrefix = "git"
 
 # (Optional) A regex to match against the entire shell command.
 # This is also syntactic sugar for `toolName = "run_shell_command"`.
@@ -321,7 +321,7 @@ This rule will ask for user confirmation before executing any `git` command.
 ```toml
 [[rule]]
 toolName = "run_shell_command"
-commandPrefix = "git "
+commandPrefix = "git"
 decision = "ask_user"
 priority = 100
 ```
@@ -342,7 +342,9 @@ policies, as it is much more robust than manually writing Fully Qualified Names
 
 **1. Targeting a specific tool on a server**
 
-Combine `mcpName` and `toolName` to target a single operation.
+Combine `mcpName` and `toolName` to target a single operation. When using
+`mcpName`, the `toolName` field should strictly be the simple name of the tool
+(e.g., `search`), **not** the Fully Qualified Name (e.g., `mcp_server_search`).
 
 ```toml
 # Allows the `search` tool on the `my-jira-server` MCP

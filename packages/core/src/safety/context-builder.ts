@@ -5,21 +5,21 @@
  */
 
 import type { SafetyCheckInput, ConversationTurn } from './protocol.js';
-import type { Config } from '../config/config.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { Content, FunctionCall } from '@google/genai';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 /**
  * Builds context objects for safety checkers, ensuring sensitive data is filtered.
  */
 export class ContextBuilder {
-  constructor(private readonly config: Config) {}
+  constructor(private readonly context: AgentLoopContext) {}
 
   /**
    * Builds the full context object with all available data.
    */
   buildFullContext(): SafetyCheckInput['context'] {
-    const clientHistory = this.config.getGeminiClient()?.getHistory() || [];
+    const clientHistory = this.context.geminiClient?.getHistory() || [];
     const history = this.convertHistoryToTurns(clientHistory);
 
     debugLogger.debug(
@@ -29,7 +29,7 @@ export class ContextBuilder {
     // ContextBuilder's responsibility is to provide the *current* context.
     // If the conversation hasn't started (history is empty), we check if there's a pending question.
     // However, if the history is NOT empty, we trust it reflects the true state.
-    const currentQuestion = this.config.getQuestion();
+    const currentQuestion = this.context.config.getQuestion();
     if (currentQuestion && history.length === 0) {
       history.push({
         user: {
@@ -43,7 +43,7 @@ export class ContextBuilder {
       environment: {
         cwd: process.cwd(),
         // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        workspaces: this.config
+        workspaces: this.context.config
           .getWorkspaceContext()
           .getDirectories() as string[],
       },
