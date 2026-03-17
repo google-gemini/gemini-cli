@@ -65,6 +65,8 @@ import {
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_FLASH_MODEL,
 } from './models.js';
 import { Storage } from './storage.js';
 import type { AgentLoopContext } from './agent-loop-context.js';
@@ -690,6 +692,46 @@ describe('Server Config (config.ts)', () => {
         loopContext.geminiClient.stripThoughtsFromHistory,
       ).not.toHaveBeenCalledWith();
     });
+
+    it('should switch to flash model if user has no Pro access and model is auto', async () => {
+      vi.mocked(getExperiments).mockResolvedValue({
+        experimentIds: [],
+        flags: {
+          [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
+            boolValue: true,
+          },
+        },
+      });
+
+      const config = new Config({
+        ...baseParams,
+        model: PREVIEW_GEMINI_MODEL_AUTO,
+      });
+
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+
+      expect(config.getModel()).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+    });
+
+    it('should NOT switch to flash model if user has Pro access and model is auto', async () => {
+      vi.mocked(getExperiments).mockResolvedValue({
+        experimentIds: [],
+        flags: {
+          [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
+            boolValue: false,
+          },
+        },
+      });
+
+      const config = new Config({
+        ...baseParams,
+        model: PREVIEW_GEMINI_MODEL_AUTO,
+      });
+
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+
+      expect(config.getModel()).toBe(PREVIEW_GEMINI_MODEL_AUTO);
+    });
   });
 
   it('Config constructor should store userMemory correctly', () => {
@@ -1207,7 +1249,7 @@ describe('Server Config (config.ts)', () => {
       const config = new Config(params);
 
       const mockAgentDefinition = {
-        name: 'codebase-investigator',
+        name: 'codebase_investigator',
         description: 'Agent 1',
         instructions: 'Inst 1',
       };
@@ -1255,7 +1297,7 @@ describe('Server Config (config.ts)', () => {
     it('should register subagents as tools even when they are not in allowedTools', async () => {
       const params: ConfigParameters = {
         ...baseParams,
-        allowedTools: ['read_file'], // codebase-investigator is NOT here
+        allowedTools: ['read_file'], // codebase_investigator is NOT here
         agents: {
           overrides: {
             codebase_investigator: { enabled: true },
@@ -1265,7 +1307,7 @@ describe('Server Config (config.ts)', () => {
       const config = new Config(params);
 
       const mockAgentDefinition = {
-        name: 'codebase-investigator',
+        name: 'codebase_investigator',
         description: 'Agent 1',
         instructions: 'Inst 1',
       };

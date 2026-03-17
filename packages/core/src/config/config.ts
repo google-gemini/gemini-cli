@@ -151,7 +151,8 @@ import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
-import { UserHintService } from './userHintService.js';
+import { InjectionService } from './injectionService.js';
+import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
 import { loadPoliciesFromToml } from '../policy/toml-loader.js';
 
@@ -860,7 +861,7 @@ export class Config implements McpContext, AgentLoopContext {
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
   private lastModeSwitchTime: number = performance.now();
-  readonly userHintService: UserHintService;
+  readonly injectionService: InjectionService;
   private approvedPlanPath: string | undefined;
 
   constructor(params: ConfigParameters) {
@@ -953,7 +954,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.model = params.model;
     this.disableLoopDetection = params.disableLoopDetection ?? false;
     this._activeModel = params.model;
-    this.enableAgents = params.enableAgents ?? false;
+    this.enableAgents = params.enableAgents ?? true;
     this.agents = params.agents ?? {};
     this.disableLLMCorrection = params.disableLLMCorrection ?? true;
     this.planEnabled = params.plan ?? true;
@@ -998,12 +999,13 @@ export class Config implements McpContext, AgentLoopContext {
       modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
     );
 
-    this.experimentalJitContext = params.experimentalJitContext ?? false;
+    this.experimentalJitContext = params.experimentalJitContext ?? true;
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
     this.modelSteering = params.modelSteering ?? false;
-    this.userHintService = new UserHintService(() =>
+    this.injectionService = new InjectionService(() =>
       this.isModelSteeringEnabled(),
     );
+    ExecutionLifecycleService.setInjectionService(this.injectionService);
     this.toolOutputMasking = {
       enabled: params.toolOutputMasking?.enabled ?? true,
       toolProtectionThreshold:
@@ -1169,7 +1171,10 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
     this._geminiClient = new GeminiClient(this);
-    this._sandboxManager = createSandboxManager(params.toolSandboxing ?? false);
+    this._sandboxManager = createSandboxManager(
+      params.toolSandboxing ?? false,
+      this.targetDir,
+    );
     this.shellExecutionConfig.sandboxManager = this._sandboxManager;
     this.modelRouterService = new ModelRouterService(this);
   }
@@ -1395,6 +1400,10 @@ export class Config implements McpContext, AgentLoopContext {
       },
     );
     this.setRemoteAdminSettings(adminControls);
+
+    if ((await this.getProModelNoAccess()) && isAutoModel(this.model)) {
+      this.setModel(PREVIEW_GEMINI_FLASH_MODEL);
+    }
   }
 
   async getExperimentsAsync(): Promise<Experiments | undefined> {
@@ -2695,6 +2704,30 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   /**
+   * Returns whether the user has access to Pro models.
+   * This is determined by the PRO_MODEL_NO_ACCESS experiment flag.
+   */
+  async getProModelNoAccess(): Promise<boolean> {
+    await this.ensureExperimentsLoaded();
+    return this.getProModelNoAccessSync();
+  }
+
+  /**
+   * Returns whether the user has access to Pro models synchronously.
+   *
+   * Note: This method should only be called after startup, once experiments have been loaded.
+   */
+  getProModelNoAccessSync(): boolean {
+    if (this.contentGeneratorConfig?.authType !== AuthType.LOGIN_WITH_GOOGLE) {
+      return false;
+    }
+    return (
+      this.experiments?.flags[ExperimentFlags.PRO_MODEL_NO_ACCESS]?.boolValue ??
+      false
+    );
+  }
+
+  /**
    * Returns whether Gemini 3.1 has been launched.
    * This method is async and ensures that experiments are loaded before returning the result.
    */
@@ -3136,22 +3169,23 @@ export class Config implements McpContext, AgentLoopContext {
    */
   private registerSubAgentTools(registry: ToolRegistry): void {
     const agentsOverrides = this.getAgentsSettings().overrides ?? {};
-    if (
-      this.isAgentsEnabled() ||
-      agentsOverrides['codebase_investigator']?.enabled !== false ||
-      agentsOverrides['cli_help']?.enabled !== false
-    ) {
-      const definitions = this.agentRegistry.getAllDefinitions();
+    const definitions = this.agentRegistry.getAllDefinitions();
 
-      for (const definition of definitions) {
-        try {
-          const tool = new SubagentTool(definition, this, this.messageBus);
-          registry.registerTool(tool);
-        } catch (e: unknown) {
-          debugLogger.warn(
-            `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
-          );
+    for (const definition of definitions) {
+      try {
+        if (
+          !this.isAgentsEnabled() ||
+          agentsOverrides[definition.name]?.enabled === false
+        ) {
+          continue;
         }
+
+        const tool = new SubagentTool(definition, this, this.messageBus);
+        registry.registerTool(tool);
+      } catch (e: unknown) {
+        debugLogger.warn(
+          `Failed to register tool for agent ${definition.name}: ${getErrorMessage(e)}`,
+        );
       }
     }
   }
