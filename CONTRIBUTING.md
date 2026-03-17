@@ -365,8 +365,6 @@ npm run lint
 - `docs/`: Contains all project documentation.
 - `scripts/`: Utility scripts for building, testing, and development tasks.
 
-For more detailed architecture, see `docs/architecture.md`.
-
 ### Debugging
 
 #### VS Code
