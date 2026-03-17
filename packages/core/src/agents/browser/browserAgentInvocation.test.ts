@@ -19,6 +19,7 @@ import {
 vi.mock('../../utils/debugLogger.js', () => ({
   debugLogger: {
     log: vi.fn(),
+    warn: vi.fn(),
     error: vi.fn(),
   },
 }));
