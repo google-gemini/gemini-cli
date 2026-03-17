@@ -99,8 +99,8 @@ gemini skills uninstall <name>
 Now that you know how to use and manage skills, try building your own to
 automate your specific workflows:
 
-- [Creating Agent Skills](../creating-skills.md): Create your first skill from
-  scratch.
+- [Creating Agent Skills](../creating-skills.md): Create your first skill and
+  bundle custom logic.
 - [Using Agent Skills](../using-agent-skills.md): Detailed guide on installation
   and management.
 - [Skill best practices](../skills-best-practices.md): Learn how to design

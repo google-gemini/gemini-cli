@@ -97,7 +97,7 @@ automate your specific workflows:
 
 - [Get started with Agent Skills](./tutorials/skills-getting-started.md): A
   quick walkthrough of triggering and using skills.
-- [Creating Agent Skills](./creating-skills.md): Create your first skill from
-  scratch.
+- [Creating Agent Skills](./creating-skills.md): Create your first skill and
+  bundle custom logic.
 - [Skill best practices](./skills-best-practices.md): Learn how to design
   reliable and effective expertise.

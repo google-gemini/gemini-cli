@@ -1,15 +1,34 @@
 # Creating Agent Skills
 
 Agent Skills let you extend Gemini CLI with specialized expertise, procedural
-workflows, and task-specific resources. This guide walks you through creating
-your first skill, from defining its purpose to bundling custom scripts and
-assets.
+workflows, and task-specific resources. This guide walks you through both
+automated and manual methods for creating and organizing your skills.
 
-## Quickstart: Create a Code Reviewer skill
+## Quickstart: Create a skill with a prompt
 
-A skill is defined by a directory containing a `SKILL.md` file. In this
-quickstart, you'll create a **Code Reviewer** skill that analyzes local files
-for common errors and style violations.
+The fastest way to create a new skill is to use the built-in `skill-creator`.
+This meta-skill guides you through designing, scaffolding, and validating your
+expertise.
+
+Simply ask Gemini CLI to create a skill for you:
+
+> "Create a new skill called 'code-reviewer' that analyzes local files for
+> common errors and style violations."
+
+Gemini will then:
+
+1.  **Draft instructions**: Generate a high-quality `SKILL.md` with the
+    appropriate metadata and triggers.
+2.  **Scaffold files**: Create the necessary directory structure and script
+    templates.
+3.  **Validate**: Ensure the skill's structure and configuration are correct.
+
+Once created, you can find your new skill in `.gemini/skills/code-reviewer/`.
+
+## Manual creation
+
+While `skill-creator` is recommended for most users, you can also build skills
+from scratch to have full control over every detail.
 
 ### 1. Create the directory structure
 
@@ -155,15 +174,8 @@ is compatible with other AI agent tools following the
 
 ## Advanced development
 
-Once you've built a basic skill, you can use built-in tools and advanced
-workflows to streamline your development process.
-
-### Using built-in creation tools
-
-The built-in `skill-creator` skill is a powerful meta-skill that helps you
-design, validate, and package your own skills. You can trigger it by asking
-Gemini CLI: "create a new skill called 'my-new-skill'". It will guide you
-through creating the directory structure and writing high-quality instructions.
+Once you've built a basic skill, you can use specialized scripts and workflows
+to streamline your development process.
 
 ### Creation scripts
 
