@@ -222,15 +222,23 @@ describe('Tracker Tools Integration', () => {
         status: TaskStatus.IN_PROGRESS,
         dependencies: [],
       };
+      const t4 = {
+        id: 't4',
+        title: 'T4',
+        type: TaskType.TASK,
+        status: TaskStatus.BLOCKED,
+        dependencies: [],
+      };
 
       const mockService = {
-        listTasks: async () => [t1, t2, t3],
+        listTasks: async () => [t1, t2, t3, t4],
       } as unknown as TrackerService;
       const display = await buildTodosReturnDisplay(mockService);
 
       expect(display.todos).toEqual([
         { description: `task: T3 (t3)`, status: 'in_progress' },
         { description: `task: T2 (t2)`, status: 'pending' },
+        { description: `task: T4 (t4)`, status: 'blocked' },
         { description: `task: T1 (t1)`, status: 'completed' },
       ]);
     });

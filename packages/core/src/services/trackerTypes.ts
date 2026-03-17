@@ -22,6 +22,7 @@ export const TASK_TYPE_LABELS: Record<TaskType, string> = {
 export enum TaskStatus {
   OPEN = 'open',
   IN_PROGRESS = 'in_progress',
+  BLOCKED = 'blocked',
   CLOSED = 'closed',
 }
 export const TaskStatusSchema = z.nativeEnum(TaskStatus);
