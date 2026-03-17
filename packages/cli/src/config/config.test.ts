@@ -777,6 +777,22 @@ describe('loadCliConfig', () => {
     expect(dirs).toContain('/project/folderB');
   });
 
+  it('should skip inaccessible workspace folders from GEMINI_CLI_IDE_WORKSPACE_PATH', async () => {
+    vi.stubEnv(
+      'GEMINI_CLI_IDE_WORKSPACE_PATH',
+      ['/project/folderA', '/nonexistent/restricted/folder'].join(
+        path.delimiter,
+      ),
+    );
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    const dirs = config.getPendingIncludeDirectories();
+    expect(dirs).toContain('/project/folderA');
+    // Should not throw even if folder is inaccessible
+  });
+
   it('should use default fileFilter options when unconfigured', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
@@ -830,7 +846,9 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
 
   it('should pass extension context file paths to loadServerHierarchicalMemory', async () => {
     process.argv = ['node', 'script.js'];
-    const settings = createTestMergedSettings();
+    const settings = createTestMergedSettings({
+      experimental: { jitContext: false },
+    });
     vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
       {
         path: '/path/to/ext1',
@@ -881,6 +899,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     process.argv = ['node', 'script.js'];
     const includeDir = path.resolve(path.sep, 'path', 'to', 'include');
     const settings = createTestMergedSettings({
+      experimental: { jitContext: false },
       context: {
         includeDirectories: [includeDir],
         loadMemoryFromIncludeDirectories: true,
@@ -908,6 +927,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   it('should NOT pass includeDirectories to loadServerHierarchicalMemory when loadMemoryFromIncludeDirectories is false', async () => {
     process.argv = ['node', 'script.js'];
     const settings = createTestMergedSettings({
+      experimental: { jitContext: false },
       context: {
         includeDirectories: ['/path/to/include'],
         loadMemoryFromIncludeDirectories: false,

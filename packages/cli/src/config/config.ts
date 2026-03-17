@@ -487,10 +487,15 @@ export async function loadCliConfig(
     const realCwd = resolveToRealPath(cwd);
     const ideFolders = ideWorkspacePath.split(path.delimiter).filter((p) => {
       const trimmedPath = p.trim();
-      if (!trimmedPath) {
+      if (!trimmedPath) return false;
+      try {
+        return resolveToRealPath(trimmedPath) !== realCwd;
+      } catch (e) {
+        debugLogger.debug(
+          `[IDE] Skipping inaccessible workspace folder: ${trimmedPath} (${e instanceof Error ? e.message : String(e)})`,
+        );
         return false;
       }
-      return resolveToRealPath(trimmedPath) !== realCwd;
     });
     includeDirectories.push(...ideFolders);
   }
