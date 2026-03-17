@@ -456,7 +456,7 @@ export class AppRig {
     const actualToolName = toolName === '*' ? undefined : toolName;
     this.config
       .getPolicyEngine()
-       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       .removeRulesForTool(actualToolName as string, source);
     this.breakpointTools.delete(toolName);
   }
