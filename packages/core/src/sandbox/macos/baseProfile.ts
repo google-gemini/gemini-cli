@@ -30,9 +30,12 @@ export const BASE_SEATBELT_PROFILE = `(version 1)
   (subpath "/usr/bin")
   (subpath "/bin")
   (subpath "/sbin")
+  (subpath "/usr/local/bin")
+  (subpath "/opt/homebrew")
   (subpath "/Library")
   (subpath "/private/var/run")
   (subpath "/private/var/db")
+  (subpath "/private/etc")
 )
 
 ; PTY and Terminal support
