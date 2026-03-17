@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import type { InjectionService } from '../config/injectionService.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 export type ExecutionMethod =
   | 'lydell-node-pty'
@@ -65,12 +67,40 @@ export interface ExternalExecutionRegistration {
   isActive?: () => boolean;
 }
 
+/**
+ * Callback that an execution creator provides to control how its output
+ * is formatted when reinjected into the model conversation after backgrounding.
+ * Return `null` to skip injection entirely.
+ */
+export type FormatInjectionFn = (
+  output: string,
+  error: Error | null,
+) => string | null;
+
 interface ManagedExecutionBase {
   executionMethod: ExecutionMethod;
   output: string;
+  backgrounded?: boolean;
+  formatInjection?: FormatInjectionFn;
   getBackgroundOutput?: () => string;
   getSubscriptionSnapshot?: () => string | AnsiOutput | undefined;
 }
+
+/**
+ * Payload emitted when a previously-backgrounded execution settles.
+ */
+export interface BackgroundCompletionInfo {
+  executionId: number;
+  executionMethod: ExecutionMethod;
+  output: string;
+  error: Error | null;
+  /** Pre-formatted injection text from the execution creator, or `null` if skipped. */
+  injectionText: string | null;
+}
+
+export type BackgroundCompletionListener = (
+  info: BackgroundCompletionInfo,
+) => void;
 
 interface VirtualExecutionState extends ManagedExecutionBase {
   kind: 'virtual';
@@ -108,6 +138,32 @@ export class ExecutionLifecycleService {
     number,
     { exitCode: number; signal?: number }
   >();
+  private static backgroundCompletionListeners =
+    new Set<BackgroundCompletionListener>();
+  private static injectionService: InjectionService | null = null;
+
+  /**
+   * Wires a singleton InjectionService so that backgrounded executions
+   * can inject their output directly without routing through the UI layer.
+   */
+  static setInjectionService(service: InjectionService): void {
+    this.injectionService = service;
+  }
+
+  /**
+   * Registers a listener that fires when a previously-backgrounded
+   * execution settles (completes or errors).
+   */
+  static onBackgroundComplete(listener: BackgroundCompletionListener): void {
+    this.backgroundCompletionListeners.add(listener);
+  }
+
+  /**
+   * Unregisters a background completion listener.
+   */
+  static offBackgroundComplete(listener: BackgroundCompletionListener): void {
+    this.backgroundCompletionListeners.delete(listener);
+  }
 
   private static storeExitInfo(
     executionId: number,
@@ -164,6 +220,8 @@ export class ExecutionLifecycleService {
     this.activeResolvers.clear();
     this.activeListeners.clear();
     this.exitedExecutionInfo.clear();
+    this.backgroundCompletionListeners.clear();
+    this.injectionService = null;
     this.nextExecutionId = NON_PROCESS_EXECUTION_ID_START;
   }
 
@@ -200,6 +258,7 @@ export class ExecutionLifecycleService {
     initialOutput = '',
     onKill?: () => void,
     executionMethod: ExecutionMethod = 'none',
+    formatInjection?: FormatInjectionFn,
   ): ExecutionHandle {
     const executionId = this.allocateExecutionId();
 
@@ -208,6 +267,7 @@ export class ExecutionLifecycleService {
       output: initialOutput,
       kind: 'virtual',
       onKill,
+      formatInjection,
       getBackgroundOutput: () => {
         const state = this.activeExecutions.get(executionId);
         return state?.output ?? initialOutput;
@@ -258,8 +318,40 @@ export class ExecutionLifecycleService {
     executionId: number,
     result: ExecutionResult,
   ): void {
-    if (!this.activeExecutions.has(executionId)) {
+    const execution = this.activeExecutions.get(executionId);
+    if (!execution) {
       return;
+    }
+
+    // Fire background completion listeners if this was a backgrounded execution.
+    if (execution.backgrounded && !result.aborted) {
+      const injectionText = execution.formatInjection
+        ? execution.formatInjection(result.output, result.error)
+        : null;
+      const info: BackgroundCompletionInfo = {
+        executionId,
+        executionMethod: execution.executionMethod,
+        output: result.output,
+        error: result.error,
+        injectionText,
+      };
+
+      // Inject directly into the model conversation if injection text is
+      // available and the injection service has been wired up.
+      if (injectionText && this.injectionService) {
+        this.injectionService.addInjection(
+          injectionText,
+          'background_completion',
+        );
+      }
+
+      for (const listener of this.backgroundCompletionListeners) {
+        try {
+          listener(info);
+        } catch (error) {
+          debugLogger.warn(`Background completion listener failed: ${error}`);
+        }
+      }
     }
 
     this.resolvePending(executionId, result);
@@ -341,6 +433,7 @@ export class ExecutionLifecycleService {
     });
 
     this.activeResolvers.delete(executionId);
+    execution.backgrounded = true;
   }
 
   static subscribe(
