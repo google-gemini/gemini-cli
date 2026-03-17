@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { expect, describe, it } from 'vitest';
+import { expect, describe, it, beforeAll } from 'vitest';
 import {
   doesToolInvocationMatch,
   getToolSuggestion,
   shouldHideToolCall,
 } from './tool-utils.js';
+import { initializeShellParsers } from './shell-utils.js';
 import {
   ReadFileTool,
   ApprovalMode,
@@ -137,6 +138,10 @@ describe('getToolSuggestion', () => {
 });
 
 describe('doesToolInvocationMatch', () => {
+  beforeAll(async () => {
+    await initializeShellParsers();
+  });
+
   it('should not match a partial command prefix', () => {
     const invocation = {
       params: { command: 'git commitsomething' },

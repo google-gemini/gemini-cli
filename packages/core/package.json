@@ -54,7 +54,6 @@
     "@xterm/headless": "5.5.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.0",
-    "bash-parser": "^0.5.0",
     "chardet": "^2.1.0",
     "diff": "^8.0.3",
     "dotenv": "^17.2.4",

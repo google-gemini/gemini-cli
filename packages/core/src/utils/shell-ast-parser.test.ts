@@ -4,23 +4,28 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { extractCommandsFromAst } from './shell-ast-parser.js';
+import { initializeShellParsers } from './shell-utils.js';
 
 describe('shell-ast-parser', () => {
+  beforeAll(async () => {
+    await initializeShellParsers();
+  });
+
   it('extracts a simple command', () => {
     const cmds = extractCommandsFromAst('echo "hello"');
-    expect(cmds).toEqual(['echo hello']);
+    expect(cmds).toEqual(['echo "hello"']);
   });
 
   it('extracts commands from a pipeline', () => {
     const cmds = extractCommandsFromAst('echo "hello" | grep h');
-    expect(cmds).toEqual(['echo hello', 'grep h']);
+    expect(cmds).toEqual(['echo "hello"', 'grep h']);
   });
 
   it('extracts commands from lists', () => {
     const cmds = extractCommandsFromAst('mkdir foo && cd foo || echo "failed" ; ls');
-    expect(cmds).toEqual(['mkdir foo', 'cd foo', 'echo failed', 'ls']);
+    expect(cmds).toEqual(['mkdir foo', 'cd foo', 'echo "failed"', 'ls']);
   });
 
   it('extracts commands from subshells', () => {

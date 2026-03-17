@@ -158,7 +158,17 @@ export function doesToolInvocationMatch(
 
   if (isShellTool) {
     toolNames = [...new Set([...toolNames, ...SHELL_TOOL_NAMES])];
+  }
 
+  // Globally allowed tools check (non-shell and shell)
+  for (const pattern of patterns) {
+    const openParen = pattern.indexOf('(');
+    if (openParen === -1 && toolNames.includes(pattern)) {
+      return true;
+    }
+  }
+
+  if (isShellTool) {
     let command: string | undefined;
     if (typeof invocation === 'string') {
       command = invocation;
@@ -213,14 +223,6 @@ export function doesToolInvocationMatch(
     }
 
     return true; // All sub-commands matched at least one pattern
-  }
-
-  // Non-shell tool validation
-  for (const pattern of patterns) {
-    const openParen = pattern.indexOf('(');
-    if (openParen === -1 && toolNames.includes(pattern)) {
-      return true;
-    }
   }
 
   return false;
