@@ -604,7 +604,7 @@ Would you like to attempt to install via "git clone" instead?`,
   /**
    * Loads all installed extensions, should only be called once.
    */
-  async loadExtensions(): Promise<GeminiCLIExtension[]> {
+  async loadExtensions(builtinDir?: string): Promise<GeminiCLIExtension[]> {
     if (this.loadedExtensions) {
       throw new Error('Extensions already loaded, only load extensions once.');
     }
@@ -637,26 +637,30 @@ Would you like to attempt to install via "git clone" instead?`,
           (ext): ext is GeminiCLIExtension => ext !== null,
         );
 
-        let builtinExtensionsDir = path.join(
-          path.dirname(fileURLToPath(import.meta.url)),
-          'extensions',
-          'builtin',
-        );
-        if (!fs.existsSync(builtinExtensionsDir)) {
+        let builtinExtensionsDir = builtinDir;
+        if (!builtinExtensionsDir) {
           builtinExtensionsDir = path.join(
             path.dirname(fileURLToPath(import.meta.url)),
-            '..',
-            '..',
-            '..',
-            '..',
-            'core',
-            'src',
             'extensions',
             'builtin',
           );
+          if (!fs.existsSync(builtinExtensionsDir)) {
+            builtinExtensionsDir = path.join(
+              path.dirname(fileURLToPath(import.meta.url)),
+              '..',
+              '..',
+              '..',
+              '..',
+              'core',
+              'src',
+              'extensions',
+              'builtin',
+            );
+          }
         }
 
-        if (!process.env['VITEST'] && fs.existsSync(builtinExtensionsDir)) {
+        const loadBuiltins = builtinDir || !process.env['VITEST'];
+        if (loadBuiltins && fs.existsSync(builtinExtensionsDir)) {
           const builtinSubdirs =
             await fs.promises.readdir(builtinExtensionsDir);
           const builtinPromises = builtinSubdirs.map((subdir) => {
