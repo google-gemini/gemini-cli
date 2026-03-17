@@ -44,7 +44,7 @@ import {
   type SettingsDialogItem,
 } from './shared/BaseSettingsDialog.js';
 import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
-import { Command } from '../key/keyMatchers.js';
+import { Command, KeyBinding } from '../key/keyBindings.js';
 
 interface FzfResult {
   item: string;
@@ -343,9 +343,11 @@ export function SettingsDialog({
     () => ({
       ...globalKeyMatchers,
       [Command.DIALOG_NAVIGATION_UP]: (key: Key) =>
-        key.name === 'up' || (key.ctrl && key.name === 'p'),
+        new KeyBinding('up').matches(key) ||
+        new KeyBinding('ctrl+p').matches(key),
       [Command.DIALOG_NAVIGATION_DOWN]: (key: Key) =>
-        key.name === 'down' || (key.ctrl && key.name === 'n'),
+        new KeyBinding('down').matches(key) ||
+        new KeyBinding('ctrl+n').matches(key),
     }),
     [globalKeyMatchers],
   );

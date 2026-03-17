@@ -409,13 +409,9 @@ describe('SettingsDialog', () => {
       await waitUntilReady();
 
       // Enter 'j' and 'k' in search
-      await act(async () => {
-        stdin.write('j');
-      });
+      await act(async () => stdin.write('j'));
       await waitUntilReady();
-      await act(async () => {
-        stdin.write('k');
-      });
+      await act(async () => stdin.write('k'));
       await waitUntilReady();
 
       await waitFor(() => {
