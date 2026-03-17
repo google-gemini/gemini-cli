@@ -48,7 +48,7 @@ export async function buildTodosReturnDisplay(
     }
   }
 
-  const statusOrder = {
+  const statusOrder: Record<TaskStatus, number> = {
     [TaskStatus.IN_PROGRESS]: 0,
     [TaskStatus.OPEN]: 1,
     [TaskStatus.BLOCKED]: 2,
