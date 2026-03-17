@@ -34,7 +34,7 @@ export async function validatePlanPath(
   plansDir: string,
 ): Promise<string | null> {
   const safeFilename = path.basename(planPath);
-  const resolvedPath = path.resolve(plansDir, safeFilename);
+  const resolvedPath = path.join(plansDir, safeFilename);
   const realPath = resolveToRealPath(resolvedPath);
   const realPlansDir = resolveToRealPath(plansDir);
 
