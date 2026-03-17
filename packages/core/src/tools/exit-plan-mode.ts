@@ -169,8 +169,8 @@ export class ExitPlanModeInvocation extends BaseToolInvocation<
     };
   }
 
-  override getDescription(): string {
-    return `Requesting plan approval for: ${this.params.plan_filename}`;
+  getDescription(): string {
+    return `Requesting plan approval for: ${path.join(this.config.storage.getPlansDir(), this.params.plan_filename)}`;
   }
 
   /**
