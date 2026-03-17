@@ -412,8 +412,8 @@ To build a custom planning workflow, you can use:
   [custom plan directories](#custom-plan-directory-and-policies) and
   [custom policies](#custom-policies).
 
-> **Note:** Use [Spec-Driven Development (SDD)] as a reference when building
-> your own custom planning workflow.
+> **Note:** Use [Conductor] as a reference when building your own custom
+> planning workflow.
 
 By using Plan Mode as its execution environment, your custom methodology can
 enforce read-only safety during the design phase while benefiting from
@@ -468,4 +468,5 @@ those files are not automatically deleted and must be managed manually.
 [`plan.toml`]:
   https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/policy/policies/plan.toml
 [Spec-Driven Development (SDD)]: ./spec-driven-development.md
+[Conductor]: https://github.com/gemini-cli-extensions/conductor
 [open an issue]: https://github.com/google-gemini/gemini-cli/issues

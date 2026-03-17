@@ -143,5 +143,4 @@ During implementation, you can also:
 | `/spec revert`    | Reverts a track, phase, or task by analyzing git history.                         | Reverts git history                                                                                                                                              |
 | `/spec review`    | Reviews completed work against guidelines and the plan.                           | Reads `plan.md`, `product-guidelines.md`                                                                                                                         |
 
-[Conductor]:
-  https://developers.googleblog.com/conductor-introducing-context-driven-development-for-gemini-cli/
+[Conductor]: https://github.com/gemini-cli-extensions/conductor
