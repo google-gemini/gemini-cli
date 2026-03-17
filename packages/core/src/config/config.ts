@@ -151,7 +151,8 @@ import { startupProfiler } from '../telemetry/startupProfiler.js';
 import type { AgentDefinition } from '../agents/types.js';
 import { fetchAdminControls } from '../code_assist/admin/admin_controls.js';
 import { isSubpath, resolveToRealPath } from '../utils/paths.js';
-import { UserHintService } from './userHintService.js';
+import { InjectionService } from './injectionService.js';
+import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
 import { WORKSPACE_POLICY_TIER } from '../policy/config.js';
 import { loadPoliciesFromToml } from '../policy/toml-loader.js';
 
@@ -239,6 +240,8 @@ export interface AgentOverride {
   modelConfig?: ModelConfig;
   runConfig?: AgentRunConfig;
   enabled?: boolean;
+  tools?: string[];
+  mcpServers?: Record<string, MCPServerConfig>;
 }
 
 export interface AgentSettings {
@@ -856,7 +859,7 @@ export class Config implements McpContext, AgentLoopContext {
   private remoteAdminSettings: AdminControlsSettings | undefined;
   private latestApiRequest: GenerateContentParameters | undefined;
   private lastModeSwitchTime: number = performance.now();
-  readonly userHintService: UserHintService;
+  readonly injectionService: InjectionService;
   private approvedPlanPath: string | undefined;
 
   constructor(params: ConfigParameters) {
@@ -993,12 +996,13 @@ export class Config implements McpContext, AgentLoopContext {
       modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
     );
 
-    this.experimentalJitContext = params.experimentalJitContext ?? false;
+    this.experimentalJitContext = params.experimentalJitContext ?? true;
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
     this.modelSteering = params.modelSteering ?? false;
-    this.userHintService = new UserHintService(() =>
+    this.injectionService = new InjectionService(() =>
       this.isModelSteeringEnabled(),
     );
+    ExecutionLifecycleService.setInjectionService(this.injectionService);
     this.toolOutputMasking = {
       enabled: params.toolOutputMasking?.enabled ?? true,
       toolProtectionThreshold:
@@ -1164,7 +1168,10 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
     this._geminiClient = new GeminiClient(this);
-    this._sandboxManager = createSandboxManager(params.toolSandboxing ?? false);
+    this._sandboxManager = createSandboxManager(
+      params.toolSandboxing ?? false,
+      this.targetDir,
+    );
     this.shellExecutionConfig.sandboxManager = this._sandboxManager;
     this.modelRouterService = new ModelRouterService(this);
   }
