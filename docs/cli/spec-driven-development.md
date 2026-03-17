@@ -33,8 +33,8 @@ project awareness.
 ## Usage
 
 SDD is designed to manage the entire lifecycle of your development tasks. It is
-one of the [planning workflows](./plan-mode.md#planning-workflows) supported by
-Gemini CLI.
+one of the [planning workflows](../cli/plan-mode.md#planning-workflows)
+supported by Gemini CLI.
 
 ### Enabling SDD
 
