@@ -9,6 +9,10 @@ import os from 'node:os';
 import {
   isWindows10,
   isJetBrainsTerminal,
+  isTmux,
+  isGnuScreen,
+  isLowColorTmux,
+  isDumbTerminal,
   supports256Colors,
   supportsTrueColor,
   getCompatibilityWarnings,
@@ -67,17 +71,101 @@ describe('compatibility', () => {
   });
 
   describe('isJetBrainsTerminal', () => {
-    it.each<{ env: string; expected: boolean; desc: string }>([
+    beforeEach(() => {
+      vi.stubEnv('TERMINAL_EMULATOR', '');
+      vi.stubEnv('JETBRAINS_IDE', '');
+    });
+    it.each<{
+      env: Record<string, string>;
+      expected: boolean;
+      desc: string;
+    }>([
       {
-        env: 'JetBrains-JediTerm',
+        env: { TERMINAL_EMULATOR: 'JetBrains-JediTerm' },
         expected: true,
-        desc: 'TERMINAL_EMULATOR is JetBrains-JediTerm',
+        desc: 'TERMINAL_EMULATOR starts with JetBrains',
       },
-      { env: 'something-else', expected: false, desc: 'other terminals' },
-      { env: '', expected: false, desc: 'TERMINAL_EMULATOR is not set' },
+      {
+        env: { JETBRAINS_IDE: 'IntelliJ' },
+        expected: true,
+        desc: 'JETBRAINS_IDE is set',
+      },
+      {
+        env: { TERMINAL_EMULATOR: 'xterm' },
+        expected: false,
+        desc: 'other terminals',
+      },
+      { env: {}, expected: false, desc: 'no env vars set' },
     ])('should return $expected when $desc', ({ env, expected }) => {
-      vi.stubEnv('TERMINAL_EMULATOR', env);
+      vi.stubEnv('TERMINAL_EMULATOR', '');
+      vi.stubEnv('JETBRAINS_IDE', '');
+      for (const [key, value] of Object.entries(env)) {
+        vi.stubEnv(key, value);
+      }
       expect(isJetBrainsTerminal()).toBe(expected);
+    });
+  });
+
+  describe('isTmux', () => {
+    it('should return true when TMUX is set', () => {
+      vi.stubEnv('TMUX', '/tmp/tmux-1001/default,1425,0');
+      expect(isTmux()).toBe(true);
+    });
+
+    it('should return false when TMUX is not set', () => {
+      vi.stubEnv('TMUX', '');
+      expect(isTmux()).toBe(false);
+    });
+  });
+
+  describe('isGnuScreen', () => {
+    it('should return true when STY is set', () => {
+      vi.stubEnv('STY', '1234.pts-0.host');
+      expect(isGnuScreen()).toBe(true);
+    });
+
+    it('should return false when STY is not set', () => {
+      vi.stubEnv('STY', '');
+      expect(isGnuScreen()).toBe(false);
+    });
+  });
+
+  describe('isLowColorTmux', () => {
+    it('should return true when TERM=screen and COLORTERM is not set', () => {
+      vi.stubEnv('TERM', 'screen');
+      vi.stubEnv('TMUX', '1');
+      vi.stubEnv('COLORTERM', '');
+      expect(isLowColorTmux()).toBe(true);
+    });
+
+    it('should return false when TERM=screen and COLORTERM is set', () => {
+      vi.stubEnv('TERM', 'screen');
+      vi.stubEnv('TMUX', '1');
+      vi.stubEnv('COLORTERM', 'truecolor');
+      expect(isLowColorTmux()).toBe(false);
+    });
+
+    it('should return false when TERM=xterm-256color', () => {
+      vi.stubEnv('TERM', 'xterm-256color');
+      vi.stubEnv('COLORTERM', '');
+      expect(isLowColorTmux()).toBe(false);
+    });
+  });
+
+  describe('isDumbTerminal', () => {
+    it('should return true when TERM=dumb', () => {
+      vi.stubEnv('TERM', 'dumb');
+      expect(isDumbTerminal()).toBe(true);
+    });
+
+    it('should return true when TERM=vt100', () => {
+      vi.stubEnv('TERM', 'vt100');
+      expect(isDumbTerminal()).toBe(true);
+    });
+
+    it('should return false when TERM=xterm', () => {
+      vi.stubEnv('TERM', 'xterm');
+      expect(isDumbTerminal()).toBe(false);
     });
   });
 
@@ -110,6 +198,8 @@ describe('compatibility', () => {
       process.stdout.getColorDepth = vi.fn().mockReturnValue(depth);
       if (term !== undefined) {
         vi.stubEnv('TERM', term);
+      } else {
+        vi.stubEnv('TERM', '');
       }
       expect(supports256Colors()).toBe(expected);
     });
@@ -158,6 +248,14 @@ describe('compatibility', () => {
 
   describe('getCompatibilityWarnings', () => {
     beforeEach(() => {
+      // Clear out potential local environment variables that might trigger warnings
+      vi.stubEnv('TERMINAL_EMULATOR', '');
+      vi.stubEnv('JETBRAINS_IDE', '');
+      vi.stubEnv('TMUX', '');
+      vi.stubEnv('STY', '');
+      vi.stubEnv('TERM', 'xterm-256color'); // Prevent dumb terminal warning
+      vi.stubEnv('TERM_PROGRAM', '');
+
       // Default to supporting true color to keep existing tests simple
       vi.stubEnv('COLORTERM', 'truecolor');
       process.stdout.getColorDepth = vi.fn().mockReturnValue(24);
@@ -177,44 +275,71 @@ describe('compatibility', () => {
       );
     });
 
-    it.each<{
-      platform: NodeJS.Platform;
-      release: string;
-      externalTerminal: string;
-      desc: string;
-    }>([
-      {
-        platform: 'darwin',
-        release: '20.6.0',
-        externalTerminal: 'iTerm2 or Ghostty',
-        desc: 'macOS',
-      },
-      {
-        platform: 'win32',
-        release: '10.0.22000',
-        externalTerminal: 'Windows Terminal',
-        desc: 'Windows',
-      }, // Valid Windows 11 release to not trigger the Windows 10 warning
-      {
-        platform: 'linux',
-        release: '5.10.0',
-        externalTerminal: 'Ghostty',
-        desc: 'Linux',
-      },
-    ])(
-      'should return JetBrains warning when detected and in alternate buffer ($desc)',
-      ({ platform, release, externalTerminal }) => {
-        vi.mocked(os.platform).mockReturnValue(platform);
-        vi.mocked(os.release).mockReturnValue(release);
-        vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
+    it('should return JetBrains warning when detected and in alternate buffer', () => {
+      vi.mocked(os.platform).mockReturnValue('darwin');
+      vi.stubEnv('TERMINAL_EMULATOR', 'JetBrains-JediTerm');
 
-        const warnings = getCompatibilityWarnings({ isAlternateBuffer: true });
+      const warnings = getCompatibilityWarnings({ isAlternateBuffer: true });
+      expect(warnings).toContainEqual(
+        expect.objectContaining({
+          id: 'jetbrains-terminal',
+          message: expect.stringContaining('JetBrains terminal detected'),
+          priority: WarningPriority.High,
+        }),
+      );
+    });
+
+    it('should return tmux warning when detected and in alternate buffer', () => {
+      vi.stubEnv('TMUX', '/tmp/tmux-1001/default,1,0');
+
+      const warnings = getCompatibilityWarnings({ isAlternateBuffer: true });
+      expect(warnings).toContainEqual(
+        expect.objectContaining({
+          id: 'tmux-alternate-buffer',
+          message: expect.stringContaining('tmux detected'),
+          priority: WarningPriority.High,
+        }),
+      );
+    });
+
+    it('should return low-color tmux warning when detected', () => {
+      vi.stubEnv('TERM', 'screen');
+      vi.stubEnv('TMUX', '1');
+      vi.stubEnv('COLORTERM', '');
+
+      const warnings = getCompatibilityWarnings();
+      expect(warnings).toContainEqual(
+        expect.objectContaining({
+          id: 'low-color-tmux',
+          message: expect.stringContaining('Limited color support detected'),
+          priority: WarningPriority.High,
+        }),
+      );
+    });
+
+    it('should return GNU screen warning when detected', () => {
+      vi.stubEnv('STY', '1234.pts-0.host');
+
+      const warnings = getCompatibilityWarnings();
+      expect(warnings).toContainEqual(
+        expect.objectContaining({
+          id: 'gnu-screen',
+          message: expect.stringContaining('GNU screen detected'),
+          priority: WarningPriority.Low,
+        }),
+      );
+    });
+
+    it.each(['dumb', 'vt100'])(
+      'should return dumb terminal warning when TERM=%s',
+      (term) => {
+        vi.stubEnv('TERM', term);
+
+        const warnings = getCompatibilityWarnings();
         expect(warnings).toContainEqual(
           expect.objectContaining({
-            id: 'jetbrains-terminal',
-            message: expect.stringContaining(
-              `Warning: JetBrains mouse scrolling is unreliable. Disabling alternate buffer mode in settings or using an external terminal (e.g., ${externalTerminal}) is recommended.`,
-            ),
+            id: 'dumb-terminal',
+            message: `Warning: Basic terminal detected (TERM=${term}). Visual rendering will be limited. For the best experience, use a terminal emulator with truecolor support.`,
             priority: WarningPriority.High,
           }),
         );
