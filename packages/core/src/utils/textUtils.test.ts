@@ -102,6 +102,44 @@ describe('truncateString', () => {
   it('should handle empty string', () => {
     expect(truncateString('', 5)).toBe('');
   });
+
+  it('should not slice surrogate pairs', () => {
+    const emoji = '😭'; // \uD83D\uDE2D, length 2
+    const str = 'a' + emoji; // length 3
+
+    // We expect 'a' (len 1). Adding the emoji (len 2) would make it 3, exceeding maxLength 2.
+    expect(truncateString(str, 2, '')).toBe('a');
+    expect(truncateString(str, 1, '')).toBe('a');
+    expect(truncateString(emoji, 1, '')).toBe('');
+    expect(truncateString(emoji, 2, '')).toBe(emoji);
+  });
+
+  it('should handle pre-existing dangling high surrogates at the cut point', () => {
+    // \uD83D is a high surrogate without a following low surrogate
+    const str = 'a\uD83Db';
+    // 'a' (1) + '\uD83D' (1) = 2.
+    // BUT our function should strip the dangling surrogate for safety.
+    expect(truncateString(str, 2, '')).toBe('a');
+  });
+
+  it('should handle multi-code-point grapheme clusters like combining marks', () => {
+    // FORCE Decomposed form (NFD) to ensure 'e' + 'accent' are separate code units
+    // This ensures the test behaves the same on Linux and Mac.
+    const combinedChar = 'e\u0301'.normalize('NFD');
+
+    // In NFD, combinedChar.length is 2.
+    const str = 'a' + combinedChar; // 'a' + 'e' + '\u0301' (length 3)
+
+    // Truncating at 2: 'a' (1) + 'e\u0301' (2) = 3. Too long, should stay at 'a'.
+    expect(truncateString(str, 2, '')).toBe('a');
+    expect(truncateString(str, 1, '')).toBe('a');
+
+    // Truncating combinedChar (len 2) at maxLength 1: too long, should be empty.
+    expect(truncateString(combinedChar, 1, '')).toBe('');
+
+    // Truncating combinedChar (len 2) at maxLength 2: fits perfectly.
+    expect(truncateString(combinedChar, 2, '')).toBe(combinedChar);
+  });
 });
 
 describe('safeTemplateReplace', () => {
