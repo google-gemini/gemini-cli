@@ -651,8 +651,12 @@ export async function loadCliConfig(
       ...settings.mcp,
       allowed: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
     },
-    policyPaths: argv.policy ?? settings.policyPaths,
-    adminPolicyPaths: argv.adminPolicy ?? settings.adminPolicyPaths,
+    policyPaths: (argv.policy ?? settings.policyPaths)?.map((p) =>
+      resolvePath(p),
+    ),
+    adminPolicyPaths: (argv.adminPolicy ?? settings.adminPolicyPaths)?.map(
+      (p) => resolvePath(p),
+    ),
   };
 
   const { workspacePoliciesDir, policyUpdateConfirmationRequest } =
