@@ -2,6 +2,6 @@
   "name": "sdd",
   "contextFileName": "GEMINI.md",
   "plan": {
-    "directory": "conductor"
+    "directory": ".gemini/specs"
   }
 }

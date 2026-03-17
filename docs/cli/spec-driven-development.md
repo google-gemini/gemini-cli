@@ -58,12 +58,12 @@ features by you or anyone on your team.
 
 **Generated Artifacts:**
 
-- `conductor/product.md`
-- `conductor/product-guidelines.md`
-- `conductor/tech-stack.md`
-- `conductor/workflow.md`
-- `conductor/code_styleguides/`
-- `conductor/tracks.md`
+- `.gemini/specs/product.md`
+- `.gemini/specs/product-guidelines.md`
+- `.gemini/specs/tech-stack.md`
+- `.gemini/specs/workflow.md`
+- `.gemini/specs/code_styleguides/`
+- `.gemini/specs/tracks.md`
 
 ```bash
 /spec setup
@@ -81,9 +81,9 @@ critical artifacts:
 
 **Generated Artifacts:**
 
-- `conductor/tracks/<track_id>/spec.md`
-- `conductor/tracks/<track_id>/plan.md`
-- `conductor/tracks/<track_id>/metadata.json`
+- `.gemini/specs/tracks/<track_id>/spec.md`
+- `.gemini/specs/tracks/<track_id>/plan.md`
+- `.gemini/specs/tracks/<track_id>/metadata.json`
 
 ```bash
 /spec create
@@ -98,8 +98,8 @@ through the `plan.md` file, checking off tasks as it completes them.
 
 **Updated Artifacts:**
 
-- `conductor/tracks.md` (Status updates)
-- `conductor/tracks/<track_id>/plan.md` (Status updates)
+- `.gemini/specs/tracks.md` (Status updates)
+- `.gemini/specs/tracks/<track_id>/plan.md` (Status updates)
 - Project context files (Synchronized on completion)
 
 ```bash
@@ -134,14 +134,14 @@ During implementation, you can also:
 
 ## Commands Reference
 
-| Command           | Description                                                                       | Artifacts                                                                                                                                    |
-| :---------------- | :-------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/spec setup`     | Scaffolds the project and sets up the SDD environment. Run this once per project. | `conductor/product.md`<br>`conductor/product-guidelines.md`<br>`conductor/tech-stack.md`<br>`conductor/workflow.md`<br>`conductor/tracks.md` |
-| `/spec create`    | Starts a new feature or bug track. Generates `spec.md` and `plan.md`.             | `conductor/tracks/<id>/spec.md`<br>`conductor/tracks/<id>/plan.md`<br>`conductor/tracks.md`                                                  |
-| `/spec implement` | Executes the tasks defined in the current track's plan.                           | `conductor/tracks.md`<br>`conductor/tracks/<id>/plan.md`                                                                                     |
-| `/spec status`    | Displays the current progress of the tracks file and active tracks.               | Reads `conductor/tracks.md`                                                                                                                  |
-| `/spec revert`    | Reverts a track, phase, or task by analyzing git history.                         | Reverts git history                                                                                                                          |
-| `/spec review`    | Reviews completed work against guidelines and the plan.                           | Reads `plan.md`, `product-guidelines.md`                                                                                                     |
+| Command           | Description                                                                       | Artifacts                                                                                                                                                        |
+| :---------------- | :-------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/spec setup`     | Scaffolds the project and sets up the SDD environment. Run this once per project. | `.gemini/specs/product.md`<br>`.gemini/specs/product-guidelines.md`<br>`.gemini/specs/tech-stack.md`<br>`.gemini/specs/workflow.md`<br>`.gemini/specs/tracks.md` |
+| `/spec create`    | Starts a new feature or bug track. Generates `spec.md` and `plan.md`.             | `.gemini/specs/tracks/<id>/spec.md`<br>`.gemini/specs/tracks/<id>/plan.md`<br>`.gemini/specs/tracks.md`                                                          |
+| `/spec implement` | Executes the tasks defined in the current track's plan.                           | `.gemini/specs/tracks.md`<br>`.gemini/specs/tracks/<id>/plan.md`                                                                                                 |
+| `/spec status`    | Displays the current progress of the tracks file and active tracks.               | Reads `.gemini/specs/tracks.md`                                                                                                                                  |
+| `/spec revert`    | Reverts a track, phase, or task by analyzing git history.                         | Reverts git history                                                                                                                                              |
+| `/spec review`    | Reviews completed work against guidelines and the plan.                           | Reads `plan.md`, `product-guidelines.md`                                                                                                                         |
 
 [Conductor]:
   https://developers.googleblog.com/conductor-introducing-context-driven-development-for-gemini-cli/
