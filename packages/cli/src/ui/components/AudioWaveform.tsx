@@ -74,7 +74,7 @@ function syntheticAmplitudes(
 
 function amplitudeToChar(amp: number): string {
   const index = Math.round(Math.max(0, Math.min(1, amp)) * (BARS.length - 1));
-  return BARS[index] ?? '█';
+  return BARS[index];
 }
 
 /**
