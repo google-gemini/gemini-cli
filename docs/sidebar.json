@@ -132,6 +132,7 @@
             "badge": "🔬",
             "slug": "docs/core/remote-agents"
           },
+          { "label": "Fork", "slug": "docs/cli/fork" },
           { "label": "Rewind", "slug": "docs/cli/rewind" },
           { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
           { "label": "Settings", "slug": "docs/cli/settings" },
