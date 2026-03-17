@@ -30,6 +30,8 @@ vi.mock('../utils/shell-utils.js', () => ({
 interface ParsedPolicy {
   rule?: Array<{
     commandPrefix?: string | string[];
+    mcpName?: string;
+    toolName?: string;
   }>;
 }
 
@@ -146,11 +148,11 @@ describe('createPolicyUpdater', () => {
       string,
       string,
     ];
-    const parsed = toml.parse(content) as unknown as any;
+    const parsed = toml.parse(content) as unknown as ParsedPolicy;
 
     expect(parsed.rule).toHaveLength(1);
-    expect(parsed.rule[0].mcpName).toBe('test-mcp');
-    expect(parsed.rule[0].toolName).toBe('tool'); // toolName should be stripped of MCP prefix
+    expect(parsed.rule![0].mcpName).toBe('test-mcp');
+    expect(parsed.rule![0].toolName).toBe('tool'); // toolName should be stripped of MCP prefix
   });
 
   it('should add a single rule when commandPrefix is a string', async () => {
