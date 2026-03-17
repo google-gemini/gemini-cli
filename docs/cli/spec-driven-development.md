@@ -36,6 +36,27 @@ SDD is designed to manage the entire lifecycle of your development tasks. It is
 one of the [planning workflows](./plan-mode.md#planning-workflows) supported by
 Gemini CLI.
 
+### Enabling SDD
+
+SDD is currently an experimental feature. To use it, you must enable the
+`experimental.sdd` flag in your settings:
+
+1.  Open the settings dialog by running `/settings`.
+2.  Press `/` to enter search mode and type **SDD**.
+3.  Enable **Spec-Driven Development (SDD)**.
+4.  Restart the CLI for the changes to take effect.
+
+Alternatively, you can navigate to the **Experimental** category to find the
+setting, or enable it manually in your `~/.gemini/settings.json` file:
+
+```json
+{
+  "experimental": {
+    "sdd": true
+  }
+}
+```
+
 **Note on Token Consumption:** SDD's context-driven approach involves reading
 and analyzing your project's context, specifications, and plans. This can lead
 to increased token consumption, especially in larger projects or during

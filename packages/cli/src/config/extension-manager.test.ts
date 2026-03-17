@@ -726,8 +726,10 @@ describe('ExtensionManager', () => {
       const emitSpy = vi.spyOn(coreEvents, 'emitFeedback');
 
       // Create a FRESH manager to ensure loadExtensions actually runs
+      const settings = createTestMergedSettings();
+      settings.experimental.sdd = true;
       const manager = new ExtensionManager({
-        settings: createTestMergedSettings(),
+        settings,
         workspaceDir: tempWorkspaceDir,
         requestConsent: vi.fn().mockResolvedValue(true),
         requestSetting: null,
@@ -765,8 +767,10 @@ describe('ExtensionManager', () => {
       const emitSpy = vi.spyOn(coreEvents, 'emitFeedback');
 
       // Create a FRESH manager
+      const settings = createTestMergedSettings();
+      settings.experimental.sdd = true;
       const manager = new ExtensionManager({
-        settings: createTestMergedSettings(),
+        settings,
         workspaceDir: tempWorkspaceDir,
         requestConsent: vi.fn().mockResolvedValue(true),
         requestSetting: null,
@@ -789,6 +793,30 @@ describe('ExtensionManager', () => {
         'warning',
         expect.stringContaining('/spec setup'),
       );
+    });
+
+    it('should NOT load sdd builtin when experimental.sdd is false', async () => {
+      // Create a builtin extension named 'sdd'
+      createExtension({
+        extensionsDir: builtinExtensionsDir,
+        name: 'sdd',
+        version: '1.0.0',
+      });
+
+      // Create a manager with default settings (experimental.sdd = false)
+      const settings = createTestMergedSettings();
+      settings.experimental.sdd = false;
+      const manager = new ExtensionManager({
+        settings,
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: vi.fn().mockResolvedValue(true),
+        requestSetting: null,
+      });
+
+      const extensions = await manager.loadExtensions(builtinExtensionsDir);
+
+      // Verify builtin was NOT loaded
+      expect(extensions.find((e) => e.name === 'sdd')).toBeUndefined();
     });
   });
 });

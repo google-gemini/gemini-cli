@@ -671,6 +671,11 @@ Would you like to attempt to install via "git clone" instead?`,
 
           for (const builtinExt of builtinResolved) {
             if (builtinExt) {
+              const isSdd = builtinExt.name === 'sdd';
+              if (isSdd && !this.settings.experimental.sdd) {
+                continue;
+              }
+
               const existingIdx = builtExtensions.findIndex(
                 (e) => e.name === builtinExt.name,
               );
@@ -682,7 +687,7 @@ Would you like to attempt to install via "git clone" instead?`,
                 builtExtensions[existingIdx] = builtinExt;
               } else {
                 // Check if this is the new 'sdd' extension and if 'conductor' is installed.
-                if (builtinExt.name === 'sdd') {
+                if (isSdd) {
                   const conductorIdx = builtExtensions.findIndex(
                     (e) => e.name === 'conductor',
                   );
