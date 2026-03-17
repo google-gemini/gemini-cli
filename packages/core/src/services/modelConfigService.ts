@@ -59,9 +59,8 @@ export interface ModelDefinition {
   tier?: string; // 'pro' | 'flash' | 'flash-lite' | 'custom' | 'auto'
   family?: string; // The gemini family, e.g. 'gemini-3' | 'gemini-2'
   isPreview?: boolean;
-  // Specifies which view the model should appear in. If unset, the model will
-  // not appear in the dialog.
-  dialogLocation?: 'main' | 'manual';
+  // Specifies whether the model should be visible in the dialog.
+  isVisible?: boolean;
   /** A short description of the model for the dialog. */
   dialogDescription?: string;
   features?: {
