@@ -31,18 +31,20 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
     return 1;
   }
 
-  const { projectId, zone, remoteWorkDir } = config;
+  const { projectId, zone } = config;
   const targetVM = `gcli-offload-${env.USER || 'mattkorwel'}`;
-  
   const provider = ProviderFactory.getProvider({ projectId, zone, instanceName: targetVM });
 
-  // 2. Wake Worker
+  // 2. Wake Worker & Verify Container
   await provider.ensureReady();
 
-  const remotePolicyPath = `~/.gemini/policies/offload-policy.toml`;
-  const persistentScripts = `~/.offload/scripts`;
+  // Use Absolute Container Paths to avoid ambiguity
+  const containerHome = '/home/node';
+  const remoteWorkDir = `${containerHome}/dev/main`;
+  const remotePolicyPath = `${containerHome}/.gemini/policies/offload-policy.toml`;
+  const persistentScripts = `${containerHome}/.offload/scripts`;
   const sessionName = `offload-${prNumber}-${action}`;
-  const remoteWorktreeDir = `~/dev/worktrees/${sessionName}`;
+  const remoteWorktreeDir = `${containerHome}/dev/worktrees/${sessionName}`;
 
   // 3. Remote Context Setup (Parallel Worktree)
   console.log(`🚀 Provisioning persistent worktree for ${action} on #${prNumber}...`);
@@ -51,14 +53,14 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   if (action === 'implement') {
       const branchName = `impl-${prNumber}`;
       setupCmd = `
-        mkdir -p ~/dev/worktrees && \
+        mkdir -p ${containerHome}/dev/worktrees && \
         cd ${remoteWorkDir} && \
         git fetch upstream main && \
         git worktree add -f -b ${branchName} ${remoteWorktreeDir} upstream/main
       `;
   } else {
       setupCmd = `
-        mkdir -p ~/dev/worktrees && \
+        mkdir -p ${containerHome}/dev/worktrees && \
         cd ${remoteWorkDir} && \
         git fetch upstream pull/${prNumber}/head && \
         git worktree add -f ${remoteWorktreeDir} FETCH_HEAD
@@ -70,16 +72,17 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   // 4. Execution Logic (Persistent Workstation Mode)
   const remoteWorker = `tsx ${persistentScripts}/entrypoint.ts ${prNumber} remote-branch ${remotePolicyPath} ${action}`;
   
-  // We MUST ensure this entire block is interpreted as a SINGLE string passed to the container's shell
-  const remoteTmuxCmd = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'offload' 'cd /home/node/dev/worktrees/${sessionName} && ${remoteWorker}; exec $SHELL'`;
+  // Launch tmux INSIDE the container
+  const remoteTmuxCmd = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'offload' 'cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL'`;
   const containerWrap = `sudo docker exec -it maintainer-worker sh -c ${q(remoteTmuxCmd)}`;
   
   const finalSSH = provider.getRunCommand(containerWrap, { interactive: true });
 
   const isWithinGemini = !!env.GEMINI_CLI || !!env.GEMINI_SESSION_ID || !!env.GCLI_SESSION_ID;
   const terminalTarget = config.terminalTarget || 'tab';
+  const forceMainTerminal = true; // Stay in current terminal for E2E verification
 
-  if (isWithinGemini && env.TERM_PROGRAM === 'iTerm.app') {
+  if (!forceMainTerminal && isWithinGemini && env.TERM_PROGRAM === 'iTerm.app') {
     const tempCmdPath = path.join(process.env.TMPDIR || '/tmp', `offload-ssh-${prNumber}.sh`);
     fs.writeFileSync(tempCmdPath, `#!/bin/bash\n${finalSSH}\nrm "$0"`, { mode: 0o755 });
 

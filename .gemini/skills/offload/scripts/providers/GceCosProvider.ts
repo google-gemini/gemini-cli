@@ -63,7 +63,7 @@ export class GceCosProvider implements WorkerProvider {
     const startupScript = `#!/bin/bash
       set -e
       echo "🚀 Starting Maintainer Worker Resilience Loop..."
-      
+
       # Wait for Docker to be ready
       until docker info >/dev/null 2>&1; do echo "Waiting for docker..."; sleep 2; done
 
@@ -78,10 +78,11 @@ export class GceCosProvider implements WorkerProvider {
           -v ~/.offload:/home/node/.offload:rw \\
           -v ~/dev:/home/node/dev:rw \\
           -v ~/.gemini:/home/node/.gemini:rw \\
-          ${imageUri} /bin/bash -c "apt-get update && apt-get install -y tmux && while true; do sleep 1000; done"
+          ${imageUri} /bin/bash -c "while true; do sleep 1000; done"
       fi
       echo "✅ Maintainer Worker is active."
     `;
+
 
     const result = spawnSync('gcloud', [
       'compute', 'instances', 'create', this.instanceName,
