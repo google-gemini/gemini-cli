@@ -823,7 +823,12 @@ export type ToolResultDisplay =
   | TodoList
   | SubagentProgress;
 
-export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type TodoStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled'
+  | 'blocked';
 
 export interface Todo {
   description: string;
