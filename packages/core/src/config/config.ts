@@ -523,6 +523,7 @@ export interface ConfigParameters {
   question?: string;
 
   coreTools?: string[];
+  mainAgentTools?: string[];
   /** @deprecated Use Policy Engine instead */
   allowedTools?: string[];
   /** @deprecated Use Policy Engine instead */
@@ -678,6 +679,7 @@ export class Config implements McpContext, AgentLoopContext {
   readonly enableConseca: boolean;
 
   private readonly coreTools: string[] | undefined;
+  private readonly mainAgentTools: string[] | undefined;
   /** @deprecated Use Policy Engine instead */
   private readonly allowedTools: string[] | undefined;
   /** @deprecated Use Policy Engine instead */
@@ -891,6 +893,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.question = params.question;
 
     this.coreTools = params.coreTools;
+    this.mainAgentTools = params.mainAgentTools;
     this.allowedTools = params.allowedTools;
     this.excludeTools = params.excludeTools;
     this.toolDiscoveryCommand = params.toolDiscoveryCommand;
@@ -1238,10 +1241,14 @@ export class Config implements McpContext, AgentLoopContext {
     discoverToolsHandle?.end();
     this.mcpClientManager = new McpClientManager(
       this.clientVersion,
-      this._toolRegistry,
       this,
       this.eventEmitter,
     );
+    this.mcpClientManager.setMainRegistries({
+      toolRegistry: this._toolRegistry,
+      promptRegistry: this.promptRegistry,
+      resourceRegistry: this.resourceRegistry,
+    });
     // We do not await this promise so that the CLI can start up even if
     // MCP servers are slow to connect.
     this.mcpInitializationPromise = Promise.allSettled([
@@ -1898,6 +1905,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this.coreTools;
   }
 
+  getMainAgentTools(): string[] | undefined {
+    return this.mainAgentTools;
+  }
+
   getAllowedTools(): string[] | undefined {
     return this.allowedTools;
   }
@@ -2054,6 +2065,43 @@ export class Config implements McpContext, AgentLoopContext {
 
   setUserMemory(newUserMemory: string | HierarchicalMemory): void {
     this.userMemory = newUserMemory;
+  }
+
+  /**
+   * Returns memory for the system instruction.
+   * When JIT is enabled, only global memory (Tier 1) goes in the system
+   * instruction. Extension and project memory (Tier 2) are placed in the
+   * first user message instead, per the tiered context model.
+   */
+  getSystemInstructionMemory(): string | HierarchicalMemory {
+    if (this.experimentalJitContext && this.contextManager) {
+      return this.contextManager.getGlobalMemory();
+    }
+    return this.userMemory;
+  }
+
+  /**
+   * Returns Tier 2 memory (extension + project) for injection into the first
+   * user message when JIT is enabled. Returns empty string when JIT is
+   * disabled (Tier 2 memory is already in the system instruction).
+   */
+  getSessionMemory(): string {
+    if (!this.experimentalJitContext || !this.contextManager) {
+      return '';
+    }
+    const sections: string[] = [];
+    const extension = this.contextManager.getExtensionMemory();
+    const project = this.contextManager.getEnvironmentMemory();
+    if (extension?.trim()) {
+      sections.push(
+        `<extension_context>\n${extension.trim()}\n</extension_context>`,
+      );
+    }
+    if (project?.trim()) {
+      sections.push(`<project_context>\n${project.trim()}\n</project_context>`);
+    }
+    if (sections.length === 0) return '';
+    return `\n<loaded_context>\n${sections.join('\n')}\n</loaded_context>`;
   }
 
   getGlobalMemory(): string {
@@ -3017,7 +3065,11 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
-    const registry = new ToolRegistry(this, this.messageBus);
+    const registry = new ToolRegistry(
+      this,
+      this.messageBus,
+      /* isMainRegistry= */ true,
+    );
 
     // helper to create & register core tools that are enabled
     const maybeRegister = (
