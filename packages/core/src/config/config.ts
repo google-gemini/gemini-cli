@@ -981,6 +981,14 @@ export class Config implements McpContext, AgentLoopContext {
         ...DEFAULT_MODEL_CONFIGS.modelDefinitions,
         ...modelConfigServiceConfig.modelDefinitions,
       };
+      const mergedModelIdResolutions = {
+        ...DEFAULT_MODEL_CONFIGS.modelIdResolutions,
+        ...modelConfigServiceConfig.modelIdResolutions,
+      };
+      const mergedClassifierIdResolutions = {
+        ...DEFAULT_MODEL_CONFIGS.classifierIdResolutions,
+        ...modelConfigServiceConfig.classifierIdResolutions,
+      };
 
       modelConfigServiceConfig = {
         // Preserve other user settings like customAliases
@@ -992,6 +1000,8 @@ export class Config implements McpContext, AgentLoopContext {
           modelConfigServiceConfig.overrides ?? DEFAULT_MODEL_CONFIGS.overrides,
         // Use the merged model definitions
         modelDefinitions: mergedModelDefinitions,
+        modelIdResolutions: mergedModelIdResolutions,
+        classifierIdResolutions: mergedClassifierIdResolutions,
       };
     }
 
