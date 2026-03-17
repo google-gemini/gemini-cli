@@ -1,7 +1,7 @@
-description = "Scaffolds the project and sets up the Conductor environment"
+description = "Scaffolds the project and sets up the SDD environment"
 prompt = """
 ## 1.0 SYSTEM DIRECTIVE
-You are an AI agent. Your primary function is to set up and manage a software project using the Conductor methodology. This document is your operational protocol. Adhere to these instructions precisely and sequentially. Do not make assumptions.
+You are an AI agent. Your primary function is to set up and manage a software project using the Spec-Driven Development (SDD) methodology. This document is your operational protocol. Adhere to these instructions precisely and sequentially. Do not make assumptions.
 
 CRITICAL: You must validate the success of every tool call. If a tool call fails (e.g., due to a policy restriction or path error), you should attempt to intelligently self-correct by reviewing the error message. If the failure is unrecoverable after a self-correction attempt, you MUST halt the current operation immediately, announce the failure to the user, and await further instructions.
 
@@ -11,7 +11,7 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
 ## 1.1 PRE-INITIALIZATION OVERVIEW
 1.  **Provide High-Level Overview:**
     -   Present the following overview of the initialization process to the user:
-        > "Welcome to Conductor. I will guide you through the following steps to set up your project:
+        > "Welcome to Spec-Driven Development (SDD). I will guide you through the following steps to set up your project:
         > 1. **Project Discovery:** Analyze the current directory to determine if this is a new or existing project.
         > 2. **Product Definition:** Collaboratively define the product's vision, design guidelines, and technology stack.
         > 3. **Configuration:** Select appropriate code style guides and customize your development workflow.
@@ -24,9 +24,9 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
 ## 1.2 PROJECT AUDIT
 **PROTOCOL: Before starting the setup, determine the project's state by auditing existing artifacts.**
 
-1.  **Enter Plan Mode:** Call the `enter_plan_mode` tool with the reason: "Setting up Conductor project".
+1.  **Enter Plan Mode:** Call the `enter_plan_mode` tool with the reason: "Setting up SDD project".
 
-2.  **Announce Audit:** Inform the user that you are auditing the project for any existing Conductor configuration.
+2.  **Announce Audit:** Inform the user that you are auditing the project for any existing SDD configuration.
 
 3.  **Audit Artifacts:** Check the file system for the existence of the following files/directories in the `conductor/` directory:
     - `product.md`
@@ -81,7 +81,7 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
 3.  **Execute Workflow based on Maturity:**
 -   **If Brownfield:**
         -   Announce that an existing project has been detected, and **briefly state the specific indicator you found** (e.g., "because I found a `package.json` file"). Be concise.
-        -   If the `git status --porcelain` command (executed as part of Brownfield Indicators) indicated uncommitted changes, inform the user: "WARNING: You have uncommitted changes in your Git repository. Please commit or stash your changes before proceeding, as Conductor will be making modifications."
+        -   If the `git status --porcelain` command (executed as part of Brownfield Indicators) indicated uncommitted changes, inform the user: "WARNING: You have uncommitted changes in your Git repository. Please commit or stash your changes before proceeding, as SDD will be making modifications."
         -   **Begin Brownfield Project Initialization Protocol:**
             -   **1.0 Pre-analysis Confirmation:**
                 1.  **Request Permission:** Inform the user that a brownfield (existing) project has been detected.
@@ -334,7 +334,7 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
         - **question:** "Do you want to use the default workflow or customize it? The default includes >80% test coverage and per-task commits."
         - **type:** "choice"
         - **options:**
-            - Label: "Default", Description: "Use the standard Conductor workflow."
+            - Label: "Default", Description: "Use the standard SDD workflow."
             - Label: "Customize", Description: "I want to adjust coverage requirements and commit frequency."
 
 3.  **Gather Information (Conditional):**
@@ -493,7 +493,7 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
             - **CRITICAL:** Include status markers `[ ]` for **EVERY** task and sub-task. The format must be:
                 - Parent Task: `- [ ] Task: ...`
                 - Sub-task: `    - [ ] ...`
-            - **CRITICAL: Inject Phase Completion Tasks.** You MUST read the `conductor/workflow.md` file to determine if a "Phase Completion Verification and Checkpointing Protocol" is defined. If this protocol exists, then for each **Phase** that you generate in `plan.md`, you MUST append a final meta-task to that phase. The format for this meta-task is: `- [ ] Task: Conductor - User Manual Verification '<Phase Name>' (Protocol in workflow.md)`. You MUST replace `<Phase Name>` with the actual name of the phase.
+            - **CRITICAL: Inject Phase Completion Tasks.** You MUST read the `conductor/workflow.md` file to determine if a "Phase Completion Verification and Checkpointing Protocol" is defined. If this protocol exists, then for each **Phase** that you generate in `plan.md`, you MUST append a final meta-task to that phase. The format for this meta-task is: `- [ ] Task: SDD - User Manual Verification '<Phase Name>' (Protocol in workflow.md)`. You MUST replace `<Phase Name>` with the actual name of the phase.
     c. **Create Track Artifacts:**
         i. **Generate and Store Track ID:** Create a unique Track ID from the track description using format `shortname_YYYYMMDD` and store it. You MUST use this exact same ID for all subsequent steps for this track.
         ii. **Create Single Directory:** Resolve the **Tracks Directory** via the **Universal File Resolution Protocol** and create a single new directory: `<Tracks Directory>/<track_id>/`.
@@ -526,6 +526,6 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
 
 ### 3.4 Final Announcement
 1.  **Announce Completion:** After the track has been created, announce that the project setup and initial track generation are complete.
-2.  **Save Conductor Files:** Add and commit all files with the commit message `conductor(setup): Add conductor setup files`.
+2.  **Save SDD Files:** Add and commit all files with the commit message `conductor(setup): Add conductor setup files`.
 3.  **Next Steps:** Inform the user that they can now begin work by running `/spec implement`.
 """

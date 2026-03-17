@@ -693,6 +693,17 @@ Would you like to attempt to install via "git clone" instead?`,
                 }
                 builtExtensions[existingIdx] = builtinExt;
               } else {
+                // Check if this is the new 'sdd' extension and if 'conductor' is installed.
+                if (builtinExt.name === 'sdd') {
+                  const conductorIdx = builtExtensions.findIndex(
+                    (e) => e.name === 'conductor',
+                  );
+                  if (conductorIdx !== -1) {
+                    const message = `The "conductor" extension has been renamed to "sdd" and is now built-in. Please run "gemini extensions uninstall conductor" to migrate. Your project files in "conductor/" will be preserved.`;
+                    debugLogger.warn(message);
+                    coreEvents.emitFeedback('warning', message);
+                  }
+                }
                 builtExtensions.push(builtinExt);
               }
             }
