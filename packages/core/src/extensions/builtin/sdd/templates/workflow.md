@@ -87,7 +87,7 @@ All tasks follow a strict lifecycle:
 11. **Commit Plan Update:**
     - **Action:** Stage the modified `plan.md` file.
     - **Action:** Commit this change with a descriptive message (e.g.,
-      `conductor(plan): Mark task 'Create user model' as complete`).
+      `sdd(plan): Mark task 'Create user model' as complete`).
 
 ### Phase Completion Verification and Checkpointing Protocol
 
@@ -168,7 +168,7 @@ that also concludes a phase in `plan.md`.
     - Stage all changes. If no changes occurred in this step, proceed with an
       empty commit.
     - Perform the commit with a clear and concise message (e.g.,
-      `conductor(checkpoint): Checkpoint end of Phase X`).
+      `sdd(checkpoint): Checkpoint end of Phase X`).
 
 7.  **Attach Auditable Verification Report using Git Notes:**
     - **Step 7.1: Draft Note Content:** Create a detailed verification report
@@ -189,7 +189,7 @@ that also concludes a phase in `plan.md`.
 9.  **Commit Plan Update:**
     - **Action:** Stage the modified `plan.md` file.
     - **Action:** Commit this change with a descriptive message following the
-      format `conductor(plan): Mark phase '<PHASE NAME>' as complete`.
+      format `sdd(plan): Mark phase '<PHASE NAME>' as complete`.
 
 10. **Announce Completion:** Inform the user that the phase is complete and the
     checkpoint has been created, with the detailed verification report attached

@@ -92,7 +92,7 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
 5.  **Finalize Track:**
     -   After all tasks in the track's local **Implementation Plan** are completed, you MUST update the track's status in the **Tracks Registry**.
     -   This requires finding the specific heading for the track (e.g., `## [~] Track: <Description>`) and replacing it with the completed status (e.g., `## [x] Track: <Description>`).
-    -   **Commit Changes:** Stage the **Tracks Registry** file and commit with the message `chore(conductor): Mark track '<track_description>' as complete`.
+    -   **Commit Changes:** Stage the **Tracks Registry** file and commit with the message `chore(sdd): Mark track '<track_description>' as complete`.
     -   Announce that the track is fully complete and the tracks file has been updated.
 
 ---
@@ -162,7 +162,7 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
     - **Construct the Message:** Based on the records of which files were changed, construct a summary message.
     - **Commit Changes:**
         - If any files were changed (**Product Definition**, **Tech Stack**, or **Product Guidelines**), you MUST stage them and commit them.
-        - **Commit Message:** `docs(conductor): Synchronize docs for track '<track_description>'`
+        - **Commit Message:** `docs(sdd): Synchronize docs for track '<track_description>'`
     - **Example (if Product Definition was changed, but others were not):**
         > "Documentation synchronization is complete.
         > - **Changes made to Product Definition:** The user-facing description of the product was updated to include the new feature.
@@ -197,7 +197,7 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
         i.   **Create Archive Directory:** Check for the existence of `.gemini/specs/archive/`. If it does not exist, create it.
         ii.  **Archive Track Folder:** Move the track's folder from its current location (resolved via the **Tracks Directory**) to `.gemini/specs/archive/<track_id>`.
         iii. **Remove from Tracks File:** Read the content of the **Tracks Registry** file, remove the entire section for the completed track (the part that starts with `---` and contains the track description), and write the modified content back to the file.
-        iv.  **Commit Changes:** Stage the **Tracks Registry** file and `.gemini/specs/archive/`. Commit with the message `chore(conductor): Archive track '<track_description>'`.
+        iv.  **Commit Changes:** Stage the **Tracks Registry** file and `.gemini/specs/archive/`. Commit with the message `chore(sdd): Archive track '<track_description>'`.
         v.   **Announce Success:** Announce: "Track '<track_description>' has been successfully archived."
     *   **If user chooses "Delete":**
         i. **CRITICAL WARNING:** Before proceeding, immediately call the `ask_user` tool to ask for final confirmation (do not repeat the warning in the chat):
@@ -209,7 +209,7 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
             - **If 'yes'**:
                 a. **Delete Track Folder:** Resolve the **Tracks Directory** and permanently delete the track's folder from `<Tracks Directory>/<track_id>`.
                 b. **Remove from Tracks File:** Read the content of the **Tracks Registry** file, remove the entire section for the completed track, and write the modified content back to the file.
-                c. **Commit Changes:** Stage the **Tracks Registry** file and the deletion of the track directory. Commit with the message `chore(conductor): Delete track '<track_description>'`.
+                c. **Commit Changes:** Stage the **Tracks Registry** file and the deletion of the track directory. Commit with the message `chore(sdd): Delete track '<track_description>'`.
                 d. **Announce Success:** Announce: "Track '<track_description>' has been permanently deleted."
             - **If 'no'**:
                 a. **Announce Cancellation:** Announce: "Deletion cancelled. The track has not been changed."

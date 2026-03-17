@@ -169,7 +169,7 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
                     - **header:** "Commit Changes"
                     - **question:** "I've detected uncommitted changes. Should I commit them?"
                     - **type:** "yesno"
-                - If 'yes', stage all changes and commit with `fix(conductor): Apply review suggestions <brief description of changes>`.
+                - If 'yes', stage all changes and commit with `fix(sdd): Apply review suggestions <brief description of changes>`.
                 - Proceed to '3.3 Track Cleanup'.
         b. **Handle Track-Specific Changes:**
             i.   **Confirm with User:** Immediately call the `ask_user` tool (do not repeat the question in the chat):
@@ -188,13 +188,13 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
                      ```
                  - **Commit Code:**
                    - Stage all code changes related to the track (excluding `plan.md`).
-                   - Commit with message: `fix(conductor): Apply review suggestions for track '<track_name>'`.
+                   - Commit with message: `fix(sdd): Apply review suggestions for track '<track_name>'`.
                  - **Record SHA:**
                    - Get the short SHA (first 7 characters) of the commit.
                    - Update the task in `plan.md` to: `- [x] Task: Apply review suggestions <sha>`.
                  - **Commit Plan Update:**
                    - Stage `plan.md`.
-                   - Commit with message: `conductor(plan): Mark task 'Apply review suggestions' as complete`.
+                   - Commit with message: `sdd(plan): Mark task 'Apply review suggestions' as complete`.
                  - **Announce Success:** "Review changes committed and tracked in the plan."
             iii. **If No:** Skip the commit and plan update. Proceed to '3.3 Track Cleanup'.
 
@@ -219,7 +219,7 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
         i.   **Setup:** Ensure `.gemini/specs/archive/` exists.
         ii.  **Move:** Move track folder to `.gemini/specs/archive/<track_id>`.
         iii. **Update Registry:** Remove track section from **Tracks Registry**.
-        iv.  **Commit:** Stage registry and archive. Commit: `chore(conductor): Archive track '<track_name>'`.
+        iv.  **Commit:** Stage registry and archive. Commit: `chore(sdd): Archive track '<track_name>'`.
         v.   **Announce:** "Track '<track_name>' archived."
     *   **If "Delete":**
         i.   **Confirm:** Immediately call the `ask_user` tool to ask for final confirmation (do not repeat the warning in the chat):
@@ -227,7 +227,7 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
                 - **header:** "Confirm"
                 - **question:** "WARNING: This is an irreversible deletion. Do you want to proceed?"
                 - **type:** "yesno"
-        ii.  **If yes:** Delete track folder, remove from **Tracks Registry**, commit (`chore(conductor): Delete track '<track_name>'`), announce success.
+        ii.  **If yes:** Delete track folder, remove from **Tracks Registry**, commit (`chore(sdd): Delete track '<track_name>'`), announce success.
         iii. **If no:** Cancel.
     *   **If "Skip":** Leave track as is.
 """

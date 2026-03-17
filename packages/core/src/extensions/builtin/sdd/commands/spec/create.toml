@@ -177,7 +177,7 @@ PLAN MODE PROTOCOL: Parts of this process run within Plan Mode. While in Plan Mo
         (Replace `<Relative Track Path>` with the path to the track directory relative to the **Tracks Registry** file location.)
 8.  **Commit Code Changes:**
     -   **Announce:** Inform the user you are committing the **Tracks Registry** changes.
-    -   **Commit Changes:** Stage the **Tracks Registry** files and commit with the message `chore(conductor): Add new track '<track_description>'`.
+    -   **Commit Changes:** Stage the **Tracks Registry** files and commit with the message `chore(sdd): Add new track '<track_description>'`.
 9.  **Announce Completion:** Inform the user:
     > "New track '<track_id>' has been created and added to the tracks file. You can now start implementation by running `/spec:implement`."
 

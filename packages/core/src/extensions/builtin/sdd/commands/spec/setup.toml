@@ -529,6 +529,6 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
 1.5 **Ensure Artifact Visibility:** If a `.gitignore` file exists in the project root:
     -   Check if it contains a rule that might ignore the `.gemini/specs/` directory (e.g., `.gemini/`).
     -   To ensure these artifacts are always shared with the team, append `!.gemini/specs/` to the end of the `.gitignore` file if it is not already explicitly exempted.
-2.  **Save SDD Files:** Add and commit all files with the commit message `conductor(setup): Add conductor setup files`.
+2.  **Save SDD Files:** Add and commit all files with the commit message `sdd(setup): Add sdd setup files`.
 3.  **Next Steps:** Inform the user that they can now begin work by running `/spec:implement`.
 """

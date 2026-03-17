@@ -102,7 +102,7 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
     > *   **Target:** Revert Task '[Task Description]'.
     > *   **Commits to Revert:** 2
     > `  - <sha_code_commit> ('feat: Add user profile')`
-    > `  - <sha_plan_commit> ('conductor(plan): Mark task complete')`
+    > `  - <sha_plan_commit> ('sdd(plan): Mark task complete')`
     > *   **Action:** I will run `git revert` on these commits in reverse order.
 
 2.  **Final Go/No-Go:** Immediately call the `ask_user` tool to ask for final confirmation (do not repeat the question in the chat):
