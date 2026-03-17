@@ -15,6 +15,7 @@ describe('<ChecklistItem />', () => {
     { status: 'in_progress', label: 'Doing this' },
     { status: 'completed', label: 'Done this' },
     { status: 'cancelled', label: 'Skipped this' },
+    { status: 'blocked', label: 'Blocked this' },
   ] as ChecklistItemData[])('renders %s item correctly', async (item) => {
     const { lastFrame, waitUntilReady } = render(<ChecklistItem item={item} />);
     await waitUntilReady();
