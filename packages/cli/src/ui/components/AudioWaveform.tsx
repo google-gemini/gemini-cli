@@ -117,7 +117,7 @@ export function AudioWaveform({
       const srcIdx = Math.round(
         (i / (barCount - 1 || 1)) * (amplitudes.length - 1),
       );
-      return amplitudes[Math.min(srcIdx, amplitudes.length - 1)] ?? 0;
+      return amplitudes[srcIdx];
     });
   } else if (isAnimated) {
     bars = syntheticAmplitudes(tick, barCount, state);
