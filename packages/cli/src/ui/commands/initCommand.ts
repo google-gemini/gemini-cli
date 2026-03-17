@@ -33,7 +33,10 @@ export const initCommand: SlashCommand = {
     const targetDir = context.services.config.getTargetDir();
     const geminiMdPath = path.join(targetDir, 'GEMINI.md');
 
-    const result = performInit(fs.existsSync(geminiMdPath));
+    const fileExists = fs.existsSync(geminiMdPath);
+    const fileHasContent =
+      fileExists && fs.readFileSync(geminiMdPath, 'utf8').trim().length > 0;
+    const result = performInit(fileHasContent);
 
     if (result.type === 'submit_prompt') {
       // Create an empty GEMINI.md file

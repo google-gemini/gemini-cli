@@ -6,8 +6,10 @@
 
 import type { CommandActionReturn } from './types.js';
 
-export function performInit(doesGeminiMdExist: boolean): CommandActionReturn {
-  if (doesGeminiMdExist) {
+export function performInit(
+  doesGeminiMdHaveContent: boolean,
+): CommandActionReturn {
+  if (doesGeminiMdHaveContent) {
     return {
       type: 'message',
       messageType: 'info',
