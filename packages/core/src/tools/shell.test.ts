@@ -658,6 +658,33 @@ describe('ShellTool', () => {
       expect(shellTool.description).toMatchSnapshot();
     });
 
+    it('should return the intent description if provided', () => {
+      const invocation = shellTool.build({
+        command: 'ls',
+        description: 'Listing files',
+      });
+      expect(invocation.getDescription()).toBe('Listing files');
+    });
+
+    it('should return the intent description with background suffix if provided', () => {
+      const invocation = shellTool.build({
+        command: 'ls',
+        description: 'Listing files',
+        is_background: true,
+      });
+      expect(invocation.getDescription()).toBe('Listing files [background]');
+    });
+
+    it('should return command and directory if intent description is not provided', () => {
+      const invocation = shellTool.build({
+        command: 'ls',
+        dir_path: 'subdir',
+      });
+      const description = invocation.getDescription();
+      expect(description).toContain('ls');
+      expect(description).toContain('[in subdir]');
+    });
+
     it('should not include efficiency guidelines when disabled', () => {
       mockPlatform.mockReturnValue('linux');
       vi.mocked(mockConfig.getEnableShellOutputEfficiency).mockReturnValue(

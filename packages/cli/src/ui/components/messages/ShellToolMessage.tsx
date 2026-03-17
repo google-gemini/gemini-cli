@@ -5,7 +5,7 @@
  */
 
 import React from 'react';
-import { Box, type DOMElement } from 'ink';
+import { Box, Text, type DOMElement } from 'ink';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import { StickyHeader } from '../StickyHeader.js';
 import { useUIActions } from '../../contexts/UIActionsContext.js';
@@ -24,6 +24,9 @@ import type { ToolMessageProps } from './ToolMessage.js';
 import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
+import { colorizeCode } from '../../utils/CodeColorizer.js';
+import { useSettings } from '../../contexts/SettingsContext.js';
+import { theme } from '../../semantic-colors.js';
 import {
   type Config,
   ShellExecutionService,
@@ -44,6 +47,8 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   name,
 
   description,
+
+  args,
 
   resultDisplay,
 
@@ -77,6 +82,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
     constrainHeight,
   } = useUIState();
   const isAlternateBuffer = useAlternateBuffer();
+  const settings = useSettings();
 
   const isThisShellFocused = checkIsShellFocused(
     name,
@@ -165,6 +171,8 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
     resultDisplay,
   );
 
+  const shellCommand = args?.['command'];
+
   return (
     <>
       <StickyHeader
@@ -209,6 +217,18 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
         paddingX={1}
         flexDirection="column"
       >
+        {typeof shellCommand === 'string' && (
+          <Box flexDirection="row" marginBottom={1}>
+            <Text color={theme.text.secondary}>$ </Text>
+            {colorizeCode({
+              code: shellCommand,
+              language: 'bash',
+              maxWidth: terminalWidth - 4, // account for padding and borders
+              settings,
+              hideLineNumbers: true,
+            })}
+          </Box>
+        )}
         <ToolResultDisplay
           resultDisplay={resultDisplay}
           availableTerminalHeight={availableTerminalHeight}

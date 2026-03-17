@@ -102,6 +102,7 @@ export interface IndividualToolCallDisplay {
   parentCallId?: string;
   name: string;
   description: string;
+  args?: Record<string, unknown>;
   resultDisplay: ToolResultDisplay | undefined;
   status: CoreToolCallStatus;
   // True when the tool was initiated directly by the user (slash/@/shell flows).

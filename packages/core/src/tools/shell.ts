@@ -73,6 +73,14 @@ export class ShellToolInvocation extends BaseToolInvocation<
   }
 
   getDescription(): string {
+    if (this.params.description) {
+      let description = this.params.description.replace(/\n/g, ' ');
+      if (this.params.is_background) {
+        description += ' [background]';
+      }
+      return description;
+    }
+
     let description = `${this.params.command}`;
     // append optional [in directory]
     // note description is needed even if validation fails due to absolute path
@@ -80,10 +88,6 @@ export class ShellToolInvocation extends BaseToolInvocation<
       description += ` [in ${this.params.dir_path}]`;
     } else {
       description += ` [current working directory ${process.cwd()}]`;
-    }
-    // append optional (description), replacing any line breaks with spaces
-    if (this.params.description) {
-      description += ` (${this.params.description.replace(/\n/g, ' ')})`;
     }
     if (this.params.is_background) {
       description += ' [background]';

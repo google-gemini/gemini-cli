@@ -133,6 +133,15 @@ describe('<ShellToolMessage />', () => {
         undefined,
       ],
       [
+        'renders with colorized command in body',
+        {
+          status: CoreToolCallStatus.Success,
+          args: { command: 'for i in {1..3}; do echo $i; done' },
+          description: 'Loop through numbers',
+        },
+        undefined,
+      ],
+      [
         'renders in Error state',
         { status: CoreToolCallStatus.Error, resultDisplay: 'Error output' },
         undefined,

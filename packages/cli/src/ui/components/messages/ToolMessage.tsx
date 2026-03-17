@@ -44,6 +44,7 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
 export const ToolMessage: React.FC<ToolMessageProps> = ({
   name,
   description,
+  args: _args,
   resultDisplay,
   status,
   kind,
