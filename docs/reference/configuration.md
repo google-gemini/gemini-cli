@@ -1215,6 +1215,12 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `false`
   - **Requires restart:** Yes
 
+- **`experimental.akl`** (boolean):
+  - **Description:** Enable the Agent Knowledge Layer for persistent situational
+    awareness.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.modelSteering`** (boolean):
   - **Description:** Enable model steering (user hints) to guide the model
     during tool execution.

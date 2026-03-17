@@ -7,9 +7,10 @@
 import { describe, expect, it } from 'vitest';
 import { WriteTodosTool, type WriteTodosToolParams } from './write-todos.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
+import { makeFakeConfig } from '../test-utils/config.js';
 
 describe('WriteTodosTool', () => {
-  const tool = new WriteTodosTool(createMockMessageBus());
+  const tool = new WriteTodosTool(makeFakeConfig(), createMockMessageBus());
   const signal = new AbortController().signal;
 
   describe('validation', () => {

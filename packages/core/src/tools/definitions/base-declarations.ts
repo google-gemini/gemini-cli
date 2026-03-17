@@ -93,6 +93,29 @@ export const READ_MANY_PARAM_USE_DEFAULT_EXCLUDES = 'useDefaultExcludes';
 export const MEMORY_TOOL_NAME = 'save_memory';
 export const MEMORY_PARAM_FACT = 'fact';
 
+// -- record_learning --
+export const RECORD_LEARNING_TOOL_NAME = 'record_learning';
+export const RECORD_LEARNING_PARAM_FACT = 'fact';
+export const RECORD_LEARNING_PARAM_LEVEL = 'level';
+export const RECORD_LEARNING_PARAM_DIRECTORY = 'directory';
+
+// -- record_decision --
+export const RECORD_DECISION_TOOL_NAME = 'record_decision';
+export const RECORD_DECISION_PARAM_TITLE = 'title';
+export const RECORD_DECISION_PARAM_CONTEXT = 'context';
+export const RECORD_DECISION_PARAM_DECISION = 'decision';
+export const RECORD_DECISION_PARAM_CONSEQUENCES = 'consequences';
+
+// -- update_epic_state --
+export const UPDATE_EPIC_STATE_TOOL_NAME = 'update_epic_state';
+export const UPDATE_EPIC_STATE_PARAM_TYPE = 'update_type';
+export const UPDATE_EPIC_STATE_PARAM_CONTENT = 'content';
+
+// -- query_knowledge --
+export const QUERY_KNOWLEDGE_TOOL_NAME = 'query_knowledge';
+export const QUERY_KNOWLEDGE_PARAM_QUERY = 'query';
+export const QUERY_KNOWLEDGE_PARAM_LEVEL = 'level';
+
 // -- get_internal_docs --
 export const GET_INTERNAL_DOCS_TOOL_NAME = 'get_internal_docs';
 export const DOCS_PARAM_PATH = 'path';

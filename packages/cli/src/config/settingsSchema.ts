@@ -1936,6 +1936,16 @@ const SETTINGS_SCHEMA = {
         description: 'Enable task tracker tools.',
         showInDialog: false,
       },
+      akl: {
+        type: 'boolean',
+        label: 'Agent Knowledge Layer',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description:
+          'Enable the Agent Knowledge Layer for persistent situational awareness.',
+        showInDialog: true,
+      },
       modelSteering: {
         type: 'boolean',
         label: 'Model Steering',

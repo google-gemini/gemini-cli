@@ -31,6 +31,10 @@ import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
+import { RecordLearningTool } from '../tools/recordLearningTool.js';
+import { RecordDecisionTool } from '../tools/recordDecisionTool.js';
+import { UpdateEpicStateTool } from '../tools/updateEpicStateTool.js';
+import { QueryKnowledgeTool } from '../tools/queryKnowledgeTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
@@ -41,6 +45,7 @@ import { LocalLiteRtLmClient } from '../core/localLiteRtLmClient.js';
 import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
+import { AklDiscoveryService } from '../services/aklDiscoveryService.js';
 import {
   createSandboxManager,
   type SandboxManager,
@@ -591,6 +596,8 @@ export interface ConfigParameters {
   truncateToolOutputThreshold?: number;
   eventEmitter?: EventEmitter;
   useWriteTodos?: boolean;
+  akl?: boolean;
+  activeEpicId?: string;
   workspacePoliciesDir?: string;
   policyEngineConfig?: PolicyEngineConfig;
   directWebFetch?: boolean;
@@ -791,6 +798,8 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly fileExclusions: FileExclusions;
   private readonly eventEmitter?: EventEmitter;
   private readonly useWriteTodos: boolean;
+  private readonly akl: boolean;
+  private activeEpicId: string | undefined;
   private readonly workspacePoliciesDir: string | undefined;
   private readonly _messageBus: MessageBus;
   private readonly policyEngine: PolicyEngine;
@@ -858,6 +867,7 @@ export class Config implements McpContext, AgentLoopContext {
   private latestApiRequest: GenerateContentParameters | undefined;
   private lastModeSwitchTime: number = performance.now();
   readonly injectionService: InjectionService;
+  private readonly aklDiscoveryService: AklDiscoveryService;
   private approvedPlanPath: string | undefined;
 
   constructor(params: ConfigParameters) {
@@ -1054,6 +1064,9 @@ export class Config implements McpContext, AgentLoopContext {
     this.useWriteTodos = isPreviewModel(this.model, this)
       ? false
       : (params.useWriteTodos ?? true);
+    this.akl = params.akl ?? false;
+    this.activeEpicId = params.activeEpicId;
+    this.aklDiscoveryService = new AklDiscoveryService(this);
     this.workspacePoliciesDir = params.workspacePoliciesDir;
     this.enableHooksUI = params.enableHooksUI ?? true;
     this.enableHooks = params.enableHooks ?? true;
@@ -2925,6 +2938,22 @@ export class Config implements McpContext, AgentLoopContext {
     return this.useWriteTodos;
   }
 
+  getAklEnabled(): boolean {
+    return this.akl;
+  }
+
+  getAklDiscoveryService(): AklDiscoveryService {
+    return this.aklDiscoveryService;
+  }
+
+  getActiveEpicId(): string | undefined {
+    return this.activeEpicId;
+  }
+
+  setActiveEpicId(epicId: string): void {
+    this.activeEpicId = epicId;
+  }
+
   getOutputFormat(): OutputFormat {
     return this.outputSettings?.format
       ? this.outputSettings.format
@@ -3090,11 +3119,23 @@ export class Config implements McpContext, AgentLoopContext {
     maybeRegister(WebFetchTool, () =>
       registry.registerTool(new WebFetchTool(this, this.messageBus)),
     );
-    maybeRegister(ShellTool, () =>
-      registry.registerTool(new ShellTool(this, this.messageBus)),
-    );
     maybeRegister(MemoryTool, () =>
       registry.registerTool(new MemoryTool(this.messageBus)),
+    );
+    maybeRegister(RecordLearningTool, () =>
+      registry.registerTool(new RecordLearningTool(this.messageBus)),
+    );
+    maybeRegister(RecordDecisionTool, () =>
+      registry.registerTool(new RecordDecisionTool(this, this.messageBus)),
+    );
+    maybeRegister(UpdateEpicStateTool, () =>
+      registry.registerTool(new UpdateEpicStateTool(this, this.messageBus)),
+    );
+    maybeRegister(QueryKnowledgeTool, () =>
+      registry.registerTool(new QueryKnowledgeTool(this, this.messageBus)),
+    );
+    maybeRegister(ShellTool, () =>
+      registry.registerTool(new ShellTool(this, this.messageBus)),
     );
     maybeRegister(WebSearchTool, () =>
       registry.registerTool(new WebSearchTool(this, this.messageBus)),
@@ -3104,7 +3145,7 @@ export class Config implements McpContext, AgentLoopContext {
     );
     if (this.getUseWriteTodos()) {
       maybeRegister(WriteTodosTool, () =>
-        registry.registerTool(new WriteTodosTool(this.messageBus)),
+        registry.registerTool(new WriteTodosTool(this, this.messageBus)),
       );
     }
     if (this.isPlanEnabled()) {

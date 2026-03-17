@@ -75,6 +75,20 @@ export {
   READ_MANY_PARAM_RECURSIVE,
   READ_MANY_PARAM_USE_DEFAULT_EXCLUDES,
   MEMORY_PARAM_FACT,
+  RECORD_LEARNING_TOOL_NAME,
+  RECORD_LEARNING_PARAM_FACT,
+  RECORD_LEARNING_PARAM_LEVEL,
+  RECORD_DECISION_TOOL_NAME,
+  RECORD_DECISION_PARAM_TITLE,
+  RECORD_DECISION_PARAM_CONTEXT,
+  RECORD_DECISION_PARAM_DECISION,
+  RECORD_DECISION_PARAM_CONSEQUENCES,
+  UPDATE_EPIC_STATE_TOOL_NAME,
+  UPDATE_EPIC_STATE_PARAM_TYPE,
+  UPDATE_EPIC_STATE_PARAM_CONTENT,
+  QUERY_KNOWLEDGE_TOOL_NAME,
+  QUERY_KNOWLEDGE_PARAM_QUERY,
+  QUERY_KNOWLEDGE_PARAM_LEVEL,
   TODOS_PARAM_TODOS,
   TODOS_ITEM_PARAM_DESCRIPTION,
   TODOS_ITEM_PARAM_STATUS,
@@ -219,6 +233,34 @@ export const ENTER_PLAN_MODE_DEFINITION: ToolDefinition = {
     return DEFAULT_LEGACY_SET.enter_plan_mode;
   },
   overrides: (modelId) => getToolSet(modelId).enter_plan_mode,
+};
+
+export const RECORD_LEARNING_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.record_learning;
+  },
+  overrides: (modelId) => getToolSet(modelId).record_learning,
+};
+
+export const RECORD_DECISION_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.record_decision;
+  },
+  overrides: (modelId) => getToolSet(modelId).record_decision,
+};
+
+export const UPDATE_EPIC_STATE_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.update_epic_state;
+  },
+  overrides: (modelId) => getToolSet(modelId).update_epic_state,
+};
+
+export const QUERY_KNOWLEDGE_DEFINITION: ToolDefinition = {
+  get base() {
+    return DEFAULT_LEGACY_SET.query_knowledge;
+  },
+  overrides: (modelId) => getToolSet(modelId).query_knowledge,
 };
 
 // ============================================================================

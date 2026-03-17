@@ -59,6 +59,21 @@ import {
   READ_MANY_PARAM_RECURSIVE,
   READ_MANY_PARAM_USE_DEFAULT_EXCLUDES,
   MEMORY_PARAM_FACT,
+  RECORD_LEARNING_TOOL_NAME,
+  RECORD_LEARNING_PARAM_FACT,
+  RECORD_LEARNING_PARAM_LEVEL,
+  RECORD_LEARNING_PARAM_DIRECTORY,
+  RECORD_DECISION_TOOL_NAME,
+  RECORD_DECISION_PARAM_TITLE,
+  RECORD_DECISION_PARAM_CONTEXT,
+  RECORD_DECISION_PARAM_DECISION,
+  RECORD_DECISION_PARAM_CONSEQUENCES,
+  UPDATE_EPIC_STATE_TOOL_NAME,
+  UPDATE_EPIC_STATE_PARAM_TYPE,
+  UPDATE_EPIC_STATE_PARAM_CONTENT,
+  QUERY_KNOWLEDGE_TOOL_NAME,
+  QUERY_KNOWLEDGE_PARAM_QUERY,
+  QUERY_KNOWLEDGE_PARAM_LEVEL,
   TODOS_PARAM_TODOS,
   TODOS_ITEM_PARAM_DESCRIPTION,
   TODOS_ITEM_PARAM_STATUS,
@@ -497,6 +512,116 @@ Use this tool when the user's query implies needing the content of several files
         },
       },
       required: [MEMORY_PARAM_FACT],
+      additionalProperties: false,
+    },
+  },
+
+  record_learning: {
+    name: RECORD_LEARNING_TOOL_NAME,
+    description: `
+Saves a machine-learning insight to the project or global store. These learnings are used by future agents to avoid past mistakes or follow established local patterns.
+
+Levels:
+- 'global': Universal patterns for all projects (~/.gemini/machine-learnings.md).
+- 'project': Architectural decisions or project-wide gotchas (./machine-learnings.md).
+- 'micro': Directory-specific optimizations (.//**/machine-learnings.md).`,
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        [RECORD_LEARNING_PARAM_FACT]: {
+          type: 'string',
+          description: 'The machine-learning insight to record.',
+        },
+        [RECORD_LEARNING_PARAM_LEVEL]: {
+          type: 'string',
+          enum: ['global', 'project', 'micro'],
+          description: 'The scope/level of the learning.',
+        },
+        [RECORD_LEARNING_PARAM_DIRECTORY]: {
+          type: 'string',
+          description:
+            'The directory to save the learning in (only used for "micro" level). Defaults to current directory.',
+        },
+      },
+      required: [RECORD_LEARNING_PARAM_FACT, RECORD_LEARNING_PARAM_LEVEL],
+      additionalProperties: false,
+    },
+  },
+
+  record_decision: {
+    name: RECORD_DECISION_TOOL_NAME,
+    description: `
+Creates an Architecture Decision Record (ADR) in the active Epic context. Use this for significant technical choices made during a workstream.`,
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        [RECORD_DECISION_PARAM_TITLE]: {
+          type: 'string',
+          description: 'Short title of the decision.',
+        },
+        [RECORD_DECISION_PARAM_CONTEXT]: {
+          type: 'string',
+          description: 'The background and motivation for this decision.',
+        },
+        [RECORD_DECISION_PARAM_DECISION]: {
+          type: 'string',
+          description: 'The actual decision made.',
+        },
+        [RECORD_DECISION_PARAM_CONSEQUENCES]: {
+          type: 'string',
+          description: 'The pros, cons, and side effects of this decision.',
+        },
+      },
+      required: [
+        RECORD_DECISION_PARAM_TITLE,
+        RECORD_DECISION_PARAM_CONTEXT,
+        RECORD_DECISION_PARAM_DECISION,
+        RECORD_DECISION_PARAM_CONSEQUENCES,
+      ],
+      additionalProperties: false,
+    },
+  },
+
+  update_epic_state: {
+    name: UPDATE_EPIC_STATE_TOOL_NAME,
+    description: `
+Updates the situational awareness files for the active Epic.`,
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        [UPDATE_EPIC_STATE_PARAM_TYPE]: {
+          type: 'string',
+          enum: ['context', 'task_log', 'notes'],
+          description: 'Which part of the epic state to update.',
+        },
+        [UPDATE_EPIC_STATE_PARAM_CONTENT]: {
+          type: 'string',
+          description: 'The new content or summary to add/update.',
+        },
+      },
+      required: [UPDATE_EPIC_STATE_PARAM_TYPE, UPDATE_EPIC_STATE_PARAM_CONTENT],
+      additionalProperties: false,
+    },
+  },
+
+  query_knowledge: {
+    name: QUERY_KNOWLEDGE_TOOL_NAME,
+    description: `
+Searches the project-wide machine-learning index to answer "How have we handled X before?" or to find established local patterns and past decisions.`,
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        [QUERY_KNOWLEDGE_PARAM_QUERY]: {
+          type: 'string',
+          description: 'The search query or question about past learnings.',
+        },
+        [QUERY_KNOWLEDGE_PARAM_LEVEL]: {
+          type: 'string',
+          enum: ['global', 'project', 'micro', 'epic'],
+          description: 'Optional filter for the scope of the search.',
+        },
+      },
+      required: [QUERY_KNOWLEDGE_PARAM_QUERY],
       additionalProperties: false,
     },
   },

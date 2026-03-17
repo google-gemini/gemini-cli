@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import {
   createUserContent,
   type GenerateContentConfig,
@@ -75,6 +77,8 @@ import {
   resolveModel,
   isGemini2Model,
 } from '../config/models.js';
+import { AklDiscoveryService } from '../services/aklDiscoveryService.js';
+import { KnowledgeIndexingService } from '../services/knowledgeIndexingService.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents, CoreEvent } from '../utils/events.js';
 
@@ -99,6 +103,7 @@ export class GeminiClient {
   private readonly loopDetector: LoopDetectionService;
   private readonly compressionService: ChatCompressionService;
   private readonly toolOutputMaskingService: ToolOutputMaskingService;
+  private readonly aklDiscoveryService: AklDiscoveryService;
   private lastPromptId: string;
   private currentSequenceModel: string | null = null;
   private lastSentIdeContext: IdeContext | undefined;
@@ -114,6 +119,7 @@ export class GeminiClient {
     this.loopDetector = new LoopDetectionService(this.config);
     this.compressionService = new ChatCompressionService();
     this.toolOutputMaskingService = new ToolOutputMaskingService();
+    this.aklDiscoveryService = new AklDiscoveryService(this.config);
     this.lastPromptId = this.config.getSessionId();
 
     coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
@@ -238,8 +244,50 @@ export class GeminiClient {
   }
 
   async initialize() {
+    if (this.config.getAklEnabled()) {
+      await this.runAklDiscovery();
+      // Update the knowledge index in the background
+      const indexer = new KnowledgeIndexingService(this.config);
+      indexer
+        .updateIndex()
+        .catch((err) =>
+          debugLogger.debug(
+            `AKL: Failed to update knowledge index: ${String(err)}`,
+          ),
+        );
+    }
+
     this.chat = await this.startChat();
     this.updateTelemetryTokenCount();
+  }
+
+  private async runAklDiscovery() {
+    const epic = await this.aklDiscoveryService.discoverActiveEpic();
+    if (epic) {
+      debugLogger.debug(`AKL: Active Epic detected: ${epic.epicId}`);
+      this.config.setActiveEpicId(epic.epicId);
+
+      // Sync GitHub context if possible
+      if (epic.issueId) {
+        const githubContext = await this.aklDiscoveryService.syncGitHubContext(
+          epic.issueId,
+        );
+        if (githubContext) {
+          debugLogger.debug(`AKL: Synced GitHub context for #${epic.issueId}`);
+          // Add to situational context if in a worktree
+          const contextPath = path.join(
+            this.config.getProjectRoot(),
+            '.gemini',
+            'situational-context.md',
+          );
+          await fs.writeFile(
+            contextPath,
+            `# Epic Context: ${epic.epicId}\n\n${githubContext}`,
+            'utf-8',
+          );
+        }
+      }
+    }
   }
 
   private getContentGeneratorOrFail(): ContentGenerator {

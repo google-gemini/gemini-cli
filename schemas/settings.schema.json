@@ -2045,6 +2045,13 @@
           "default": false,
           "type": "boolean"
         },
+        "akl": {
+          "title": "Agent Knowledge Layer",
+          "description": "Enable the Agent Knowledge Layer for persistent situational awareness.",
+          "markdownDescription": "Enable the Agent Knowledge Layer for persistent situational awareness.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "modelSteering": {
           "title": "Model Steering",
           "description": "Enable model steering (user hints) to guide the model during tool execution.",

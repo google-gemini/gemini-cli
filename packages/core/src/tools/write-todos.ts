@@ -13,6 +13,7 @@ import {
   type ToolResult,
 } from './tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import type { Config } from '../config/config.js';
 import { WRITE_TODOS_TOOL_NAME } from './tool-names.js';
 import { WRITE_TODOS_DEFINITION } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
@@ -35,13 +36,17 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
   WriteTodosToolParams,
   ToolResult
 > {
+  private readonly config: Config;
+
   constructor(
     params: WriteTodosToolParams,
+    config: Config,
     messageBus: MessageBus,
     _toolName?: string,
     _toolDisplayName?: string,
   ) {
     super(params, messageBus, _toolName, _toolDisplayName);
+    this.config = config;
   }
 
   getDescription(): string {
@@ -63,10 +68,17 @@ class WriteTodosToolInvocation extends BaseToolInvocation<
       )
       .join('\n');
 
-    const llmContent =
+    let llmContent =
       todos.length > 0
         ? `Successfully updated the todo list. The current list is now:\n${todoListString}`
         : 'Successfully cleared the todo list.';
+
+    if (this.config.getAklEnabled() && this.config.getActiveEpicId()) {
+      const completedTask = todos.find((t) => t.status === 'completed');
+      if (completedTask) {
+        llmContent += `\n\n**AKL NOTIFICATION**: You have completed a task. You MUST now update the Epic situational awareness using \`update_epic_state\` (type: 'task_log') and record any new architectural decisions or machine-learnings if applicable.`;
+      }
+    }
 
     return {
       llmContent,
@@ -80,8 +92,9 @@ export class WriteTodosTool extends BaseDeclarativeTool<
   ToolResult
 > {
   static readonly Name = WRITE_TODOS_TOOL_NAME;
+  private readonly config: Config;
 
-  constructor(messageBus: MessageBus) {
+  constructor(config: Config, messageBus: MessageBus) {
     super(
       WriteTodosTool.Name,
       'WriteTodos',
@@ -92,6 +105,7 @@ export class WriteTodosTool extends BaseDeclarativeTool<
       true, // isOutputMarkdown
       false, // canUpdateOutput
     );
+    this.config = config;
   }
 
   override getSchema(modelId?: string) {
@@ -137,6 +151,7 @@ export class WriteTodosTool extends BaseDeclarativeTool<
   ): ToolInvocation<WriteTodosToolParams, ToolResult> {
     return new WriteTodosToolInvocation(
       params,
+      this.config,
       messageBus,
       _toolName,
       _displayName,

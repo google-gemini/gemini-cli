@@ -47,6 +47,10 @@ export interface CoreToolSet {
   get_internal_docs: FunctionDeclaration;
   ask_user: FunctionDeclaration;
   enter_plan_mode: FunctionDeclaration;
+  record_learning: FunctionDeclaration;
+  record_decision: FunctionDeclaration;
+  update_epic_state: FunctionDeclaration;
+  query_knowledge: FunctionDeclaration;
   exit_plan_mode: (plansDir: string) => FunctionDeclaration;
   activate_skill: (skillNames: string[]) => FunctionDeclaration;
 }

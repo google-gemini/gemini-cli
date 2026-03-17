@@ -1281,6 +1281,8 @@ included directory memory
       getImportFormat: vi.fn().mockReturnValue('tree'),
       getFileFilteringOptions: vi.fn().mockReturnValue(undefined),
       getDiscoveryMaxDirs: vi.fn().mockReturnValue(200),
+      getAklEnabled: vi.fn().mockReturnValue(false),
+      getProjectRoot: vi.fn().mockReturnValue(projectRoot),
       setUserMemory: vi.fn(),
       setGeminiMdFileCount: vi.fn(),
       setGeminiMdFilePaths: vi.fn(),

@@ -506,6 +506,44 @@ export async function getEnvironmentMemoryPaths(
   return Array.from(allPaths).sort();
 }
 
+export async function getAklFilePaths(config: Config): Promise<string[]> {
+  if (!config.getAklEnabled()) {
+    return [];
+  }
+
+  const aklPaths: string[] = [];
+  const projectRoot = config.getProjectRoot();
+  const epicId = config.getActiveEpicId();
+
+  // 1. .gemini/notes.md at project root
+  const notesPath = normalizePath(
+    path.join(projectRoot, '.gemini', 'notes.md'),
+  );
+  try {
+    await fs.access(notesPath, fsSync.constants.R_OK);
+    aklPaths.push(notesPath);
+  } catch {
+    // Ignore
+  }
+
+  // 2. Active Epic context
+  if (epicId) {
+    const epicDir = path.join(projectRoot, '.gemini', 'epics', epicId);
+    const epicFiles = ['context.md', 'notes.md', 'patterns.md', 'task_log.md'];
+    for (const file of epicFiles) {
+      const filePath = normalizePath(path.join(epicDir, file));
+      try {
+        await fs.access(filePath, fsSync.constants.R_OK);
+        aklPaths.push(filePath);
+      } catch {
+        // Ignore
+      }
+    }
+  }
+
+  return aklPaths;
+}
+
 export function categorizeAndConcatenate(
   paths: { global: string[]; extension: string[]; project: string[] },
   contentsMap: Map<string, GeminiFileContent>,
@@ -599,6 +637,7 @@ export async function loadServerHierarchicalMemory(
   importFormat: 'flat' | 'tree' = 'tree',
   fileFilteringOptions?: FileFilteringOptions,
   maxDirs: number = 200,
+  config?: Config,
 ): Promise<LoadServerHierarchicalMemoryResponse> {
   // FIX: Use real, canonical paths for a reliable comparison to handle symlinks.
   const realCwd = normalizePath(
@@ -620,6 +659,7 @@ export async function loadServerHierarchicalMemory(
   // For the server, homedir() refers to the server process's home.
   // This is consistent with how MemoryTool already finds the global path.
   const userHomePath = homedir();
+  const aklPaths = config ? await getAklFilePaths(config) : [];
 
   // 1. SCATTER: Gather all paths
   const [discoveryResult, extensionPaths] = await Promise.all([
@@ -640,6 +680,7 @@ export async function loadServerHierarchicalMemory(
       ...discoveryResult.global,
       ...discoveryResult.project,
       ...extensionPaths,
+      ...aklPaths,
     ]),
   );
 
@@ -710,6 +751,7 @@ export async function refreshServerHierarchicalMemory(config: Config) {
     config.getImportFormat(),
     config.getFileFilteringOptions(),
     config.getDiscoveryMaxDirs(),
+    config,
   );
   const mcpInstructions =
     config.getMcpClientManager()?.getMcpInstructions() || '';

@@ -90,6 +90,7 @@ export interface CliArgs {
   includeDirectories: string[] | undefined;
   screenReader: boolean | undefined;
   useWriteTodos: boolean | undefined;
+  akl: boolean | undefined;
   outputFormat: string | undefined;
   fakeResponses: string | undefined;
   recordResponses: string | undefined;
@@ -271,6 +272,10 @@ export async function parseArguments(
         .option('screen-reader', {
           type: 'boolean',
           description: 'Enable screen reader mode for accessibility.',
+        })
+        .option('akl', {
+          type: 'boolean',
+          description: 'Enable the Agent Knowledge Layer (AKL).',
         })
         .option('output-format', {
           alias: 'o',
@@ -835,6 +840,7 @@ export async function loadCliConfig(
     truncateToolOutputThreshold: settings.tools?.truncateToolOutputThreshold,
     eventEmitter: coreEvents,
     useWriteTodos: argv.useWriteTodos ?? settings.useWriteTodos,
+    akl: argv.akl ?? settings.experimental?.akl,
     output: {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       format: (argv.outputFormat ?? settings.output?.format) as OutputFormat,

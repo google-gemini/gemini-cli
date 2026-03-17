@@ -93,6 +93,11 @@ describe('ExtensionManager theme loading', () => {
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const mockConfig = {
+      getAklEnabled: () => false,
+      getImportFormat: () => 'tree' as const,
+      getFileFilteringOptions: () => ({}),
+      getDiscoveryMaxDirs: () => 200,
+      getAklFilePaths: async () => [],
       getEnableExtensionReloading: () => false,
       getMcpClientManager: () => ({
         startExtension: vi.fn().mockResolvedValue(undefined),
@@ -140,7 +145,6 @@ describe('ExtensionManager theme loading', () => {
         getExtensions: () => [],
       }),
       isTrustedFolder: () => true,
-      getImportFormat: () => 'tree',
       reloadSkills: vi.fn(),
     } as unknown as Config;
 
@@ -192,13 +196,12 @@ describe('ExtensionManager theme loading', () => {
       getExtensionLoader: () => ({
         getExtensions: () => [],
       }),
-      isTrustedFolder: () => true,
-      getImportFormat: () => 'tree',
-      getFileFilteringOptions: () => ({
-        respectGitIgnore: true,
-        respectGeminiIgnore: true,
-      }),
+      getAklEnabled: () => false,
+      getAklFilePaths: async () => [],
+      getImportFormat: () => 'tree' as const,
+      getFileFilteringOptions: () => ({}),
       getDiscoveryMaxDirs: () => 200,
+      isTrustedFolder: () => true,
       getMcpClientManager: () => ({
         getMcpInstructions: () => '',
         startExtension: vi.fn().mockResolvedValue(undefined),
