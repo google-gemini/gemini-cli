@@ -70,11 +70,11 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   // 4. Execution Logic (Persistent Workstation Mode)
   const remoteWorker = `tsx ${persistentScripts}/entrypoint.ts ${prNumber} remote-branch ${remotePolicyPath} ${action}`;
   
-  // We launch a tmux session inside the container
-  const tmuxCmd = `docker exec -it -w /home/node/dev/worktrees/${sessionName} maintainer-worker sh -c ${q(`${remoteWorker}; exec $SHELL`)}`;
-  const tmuxAttach = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'offload' ${q(tmuxCmd)}`;
+  // We launch a tmux session INSIDE the container for persistence and tool access
+  const tmuxCmd = `cd /home/node/dev/worktrees/${sessionName} && ${remoteWorker}; exec $SHELL`;
+  const containerTmux = `docker exec -it maintainer-worker sh -c ${q(`tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'offload' ${q(tmuxCmd)}`)}`;
   
-  const finalSSH = provider.getRunCommand(tmuxAttach, { interactive: true });
+  const finalSSH = provider.getRunCommand(containerTmux, { interactive: true });
 
   const isWithinGemini = !!env.GEMINI_CLI || !!env.GEMINI_SESSION_ID || !!env.GCLI_SESSION_ID;
   const terminalTarget = config.terminalTarget || 'tab';

@@ -37,8 +37,8 @@ async function runStatus(env: NodeJS.ProcessEnv = process.env) {
 
   if (status.status === 'RUNNING') {
     console.log(`\n🧵 Active Sessions (tmux):`);
-    // We fetch the list of sessions from the host
-    const tmuxRes = await provider.getExecOutput('tmux list-sessions -F "#S" 2>/dev/null');
+    // We fetch the list of sessions from INSIDE the container
+    const tmuxRes = await provider.getExecOutput('tmux list-sessions -F "#S" 2>/dev/null', { wrapContainer: 'maintainer-worker' });
     
     if (tmuxRes.status === 0 && tmuxRes.stdout.trim()) {
       const sessions = tmuxRes.stdout.trim().split('\n');
