@@ -671,26 +671,10 @@ Would you like to attempt to install via "git clone" instead?`,
                 (e) => e.name === builtinExt.name,
               );
               if (existingIdx !== -1) {
-                // If the user has a manually installed version of the builtin extension, we migrate them.
-                const manualExt = builtExtensions[existingIdx];
-                const storage = new ExtensionStorage(
-                  manualExt.installMetadata?.type === 'link'
-                    ? manualExt.name
-                    : path.basename(manualExt.path),
-                );
-                try {
-                  await fs.promises.rm(storage.getExtensionDir(), {
-                    recursive: true,
-                    force: true,
-                  });
-                  debugLogger.debug(
-                    `Migrated to built-in extension: ${builtinExt.name}. Removed manual installation.`,
-                  );
-                } catch (e) {
-                  debugLogger.warn(
-                    `Failed to clean up manual installation of ${builtinExt.name}: ${getErrorMessage(e)}`,
-                  );
-                }
+                // If the user has a manually installed version of the builtin extension, we warn them.
+                const message = `Extension "${builtinExt.name}" is now built-in. Your manual installation at "${builtExtensions[existingIdx].path}" is being ignored. Please run "gemini extensions uninstall ${builtinExt.name}" to clean up.`;
+                debugLogger.warn(message);
+                coreEvents.emitFeedback('warning', message);
                 builtExtensions[existingIdx] = builtinExt;
               } else {
                 // Check if this is the new 'sdd' extension and if 'conductor' is installed.
