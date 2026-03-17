@@ -627,7 +627,7 @@ describe('runNonInteractive', () => {
         input: 'Trigger loop',
         prompt_id: 'prompt-id-6',
       }),
-    ).rejects.toThrow('process.exit(53) called');
+    ).resolves.toBeUndefined();
   });
 
   it('should preprocess @include commands before sending to the model', async () => {

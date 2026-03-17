@@ -41,7 +41,6 @@ import {
   handleError,
   handleToolError,
   handleCancellationError,
-  handleMaxTurnsExceededError,
 } from './utils/errors.js';
 import { TextOutput } from './ui/utils/textOutput.js';
 
@@ -400,6 +399,14 @@ export async function runNonInteractive({
                 event.content?.[0]?.type === 'text'
                   ? event.content[0].text
                   : 'Tool error';
+
+              if (event.data?.['errorType'] === ToolErrorType.STOP_EXECUTION) {
+                const stopMessage = `Agent execution stopped: ${errorMsg}`;
+                if (config.getOutputFormat() === OutputFormat.TEXT) {
+                  process.stderr.write(`${stopMessage}\n`);
+                }
+              }
+
               handleToolError(
                 event.name,
                 new Error(errorMsg),
@@ -409,15 +416,6 @@ export async function runNonInteractive({
                   : undefined,
                 displayText,
               );
-            }
-            if (
-              event.isError &&
-              event.data?.['errorType'] === ToolErrorType.STOP_EXECUTION
-            ) {
-              const stopMessage = `Agent execution stopped: ${errorMsg}`;
-              if (config.getOutputFormat() === OutputFormat.TEXT) {
-                process.stderr.write(`${stopMessage}\n`);
-              }
             }
             break;
           }
@@ -443,7 +441,19 @@ export async function runNonInteractive({
             if (event.reason === 'aborted') {
               handleCancellationError(config);
             } else if (event.reason === 'max_turns') {
-              handleMaxTurnsExceededError(config);
+              if (config.getOutputFormat() === OutputFormat.TEXT) {
+                process.stderr.write(
+                  `[WARNING] Maximum session turns exceeded\n`,
+                );
+              }
+              if (streamFormatter) {
+                streamFormatter.emitEvent({
+                  type: JsonStreamEventType.ERROR,
+                  timestamp: new Date().toISOString(),
+                  severity: 'error',
+                  message: 'Maximum session turns exceeded',
+                });
+              }
             }
             // Emit final result
             if (streamFormatter) {

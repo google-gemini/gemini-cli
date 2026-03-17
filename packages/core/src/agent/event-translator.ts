@@ -191,8 +191,8 @@ export function translateEvent(
       out.push(
         makeEvent('error', state, {
           status: 'INTERNAL',
-          message: 'Loop detected',
-          fatal: true,
+          message: 'Loop detected, stopping execution',
+          fatal: false,
         }),
       );
       out.push(
