@@ -21,6 +21,7 @@ describe('ToolConfirmationMessage Redirection', () => {
   const mockConfig = {
     isTrustedFolder: () => true,
     getIdeMode: () => false,
+    getDisableAlwaysAllow: () => false,
   } as unknown as Config;
 
   it('should display redirection warning and tip for redirected commands', async () => {
@@ -37,6 +38,7 @@ describe('ToolConfirmationMessage Redirection', () => {
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
         config={mockConfig}
+        getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={100}
       />,

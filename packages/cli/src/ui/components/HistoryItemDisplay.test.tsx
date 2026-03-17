@@ -6,13 +6,12 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { HistoryItemDisplay } from './HistoryItemDisplay.js';
-import { type HistoryItem } from '../types.js';
-import { MessageType } from '../types.js';
+import { MessageType, type HistoryItem } from '../types.js';
 import { SessionStatsProvider } from '../contexts/SessionContext.js';
 import {
+  CoreToolCallStatus,
   type Config,
   type ToolExecuteConfirmationDetails,
-  CoreToolCallStatus,
 } from '@google/gemini-cli-core';
 import { ToolGroupMessage } from './messages/ToolGroupMessage.js';
 import { renderWithProviders } from '../../test-utils/render.js';
@@ -290,6 +289,26 @@ describe('<HistoryItemDisplay />', () => {
       unmount();
     });
 
+    it('renders "Thinking..." header when isFirstThinking is true', async () => {
+      const item: HistoryItem = {
+        ...baseItem,
+        type: 'thinking',
+        thought: { subject: 'Thinking', description: 'test' },
+      };
+      const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+        <HistoryItemDisplay {...baseItem} item={item} isFirstThinking={true} />,
+        {
+          settings: createMockSettings({
+            merged: { ui: { inlineThinkingMode: 'full' } },
+          }),
+        },
+      );
+      await waitUntilReady();
+
+      expect(lastFrame()).toContain(' Thinking...');
+      expect(lastFrame()).toMatchSnapshot();
+      unmount();
+    });
     it('does not render thinking item when disabled', async () => {
       const item: HistoryItem = {
         ...baseItem,

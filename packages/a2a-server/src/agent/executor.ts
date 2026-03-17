@@ -12,23 +12,22 @@ import type {
   RequestContext,
   ExecutionEventBus,
 } from '@a2a-js/sdk/server';
-import type { ToolCallRequestInfo, Config } from '@google/gemini-cli-core';
 import {
   GeminiEventType,
   SimpleExtensionLoader,
+  type ToolCallRequestInfo,
+  type Config,
 } from '@google/gemini-cli-core';
 import { v4 as uuidv4 } from 'uuid';
 
 import { logger } from '../utils/logger.js';
-import type {
-  StateChange,
-  AgentSettings,
-  PersistedStateMetadata,
-} from '../types.js';
 import {
   CoderAgentEvent,
   getPersistedState,
   setPersistedState,
+  type StateChange,
+  type AgentSettings,
+  type PersistedStateMetadata,
   getContextIdFromMetadata,
   getAgentSettingsFromMetadata,
 } from '../types.js';
@@ -253,6 +252,10 @@ export class CoderAgentExecutor implements AgentExecutor {
       );
       await this.taskStore?.save(wrapper.toSDKTask());
       logger.info(`[CoderAgentExecutor] Task ${taskId} state CANCELED saved.`);
+
+      // Cleanup listener subscriptions to avoid memory leaks.
+      wrapper.task.dispose();
+      this.tasks.delete(taskId);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
@@ -321,23 +324,26 @@ export class CoderAgentExecutor implements AgentExecutor {
     if (store) {
       // Grab the raw socket from the request object
       const socket = store.req.socket;
-      const onClientEnd = () => {
+      const onSocketEnd = () => {
         logger.info(
-          `[CoderAgentExecutor] Client socket closed for task ${taskId}. Cancelling execution.`,
+          `[CoderAgentExecutor] Socket ended for message ${userMessage.messageId} (task ${taskId}). Aborting execution loop.`,
         );
         if (!abortController.signal.aborted) {
           abortController.abort();
         }
         // Clean up the listener to prevent memory leaks
-        socket.removeListener('close', onClientEnd);
+        socket.removeListener('end', onSocketEnd);
       };
 
       // Listen on the socket's 'end' event (remote closed the connection)
-      socket.on('end', onClientEnd);
+      socket.on('end', onSocketEnd);
+      socket.once('close', () => {
+        socket.removeListener('end', onSocketEnd);
+      });
 
       // It's also good practice to remove the listener if the task completes successfully
       abortSignal.addEventListener('abort', () => {
-        socket.removeListener('end', onClientEnd);
+        socket.removeListener('end', onSocketEnd);
       });
       logger.info(
         `[CoderAgentExecutor] Socket close handler set up for task ${taskId}.`,
@@ -444,6 +450,26 @@ export class CoderAgentExecutor implements AgentExecutor {
     if (this.executingTasks.has(taskId)) {
       logger.info(
         `[CoderAgentExecutor] Task ${taskId} has a pending execution. Processing message and yielding.`,
+      );
+      currentTask.eventBus = eventBus;
+      for await (const _ of currentTask.acceptUserMessage(
+        requestContext,
+        abortController.signal,
+      )) {
+        logger.info(
+          `[CoderAgentExecutor] Processing user message ${userMessage.messageId} in secondary execution loop for task ${taskId}.`,
+        );
+      }
+      // End this execution-- the original/source will be resumed.
+      return;
+    }
+
+    // Check if this is the primary/initial execution for this task
+    const isPrimaryExecution = !this.executingTasks.has(taskId);
+
+    if (!isPrimaryExecution) {
+      logger.info(
+        `[CoderAgentExecutor] Primary execution already active for task ${taskId}. Starting secondary loop for message ${userMessage.messageId}.`,
       );
       currentTask.eventBus = eventBus;
       for await (const _ of currentTask.acceptUserMessage(
@@ -599,18 +625,30 @@ export class CoderAgentExecutor implements AgentExecutor {
         }
       }
     } finally {
-      this.executingTasks.delete(taskId);
-      logger.info(
-        `[CoderAgentExecutor] Saving final state for task ${taskId}.`,
-      );
-      try {
-        await this.taskStore?.save(wrapper.toSDKTask());
-        logger.info(`[CoderAgentExecutor] Task ${taskId} state saved.`);
-      } catch (saveError) {
-        logger.error(
-          `[CoderAgentExecutor] Failed to save task ${taskId} state in finally block:`,
-          saveError,
+      if (isPrimaryExecution) {
+        this.executingTasks.delete(taskId);
+        logger.info(
+          `[CoderAgentExecutor] Saving final state for task ${taskId}.`,
         );
+        try {
+          await this.taskStore?.save(wrapper.toSDKTask());
+          logger.info(`[CoderAgentExecutor] Task ${taskId} state saved.`);
+        } catch (saveError) {
+          logger.error(
+            `[CoderAgentExecutor] Failed to save task ${taskId} state in finally block:`,
+            saveError,
+          );
+        }
+
+        if (
+          ['canceled', 'failed', 'completed'].includes(currentTask.taskState)
+        ) {
+          logger.info(
+            `[CoderAgentExecutor] Task ${taskId} reached terminal state ${currentTask.taskState}. Evicting and disposing.`,
+          );
+          wrapper.task.dispose();
+          this.tasks.delete(taskId);
+        }
       }
     }
   }

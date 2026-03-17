@@ -151,11 +151,30 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         : undefined,
     );
   const hideShortcutsHintForSuggestions = hideUiDetailsForSuggestions;
+  const isModelIdle = uiState.streamingState === StreamingState.Idle;
+  const isBufferEmpty = uiState.buffer.text.length === 0;
+  const canShowShortcutsHint =
+    isModelIdle && isBufferEmpty && !hasPendingActionRequired;
+  const [showShortcutsHintDebounced, setShowShortcutsHintDebounced] =
+    useState(canShowShortcutsHint);
+
+  useEffect(() => {
+    if (!canShowShortcutsHint) {
+      setShowShortcutsHintDebounced(false);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setShowShortcutsHintDebounced(true);
+    }, 200);
+
+    return () => clearTimeout(timeout);
+  }, [canShowShortcutsHint]);
+
+  const shouldReserveSpaceForShortcutsHint =
+    settings.merged.ui.showShortcutsHint && !hideShortcutsHintForSuggestions;
   const showShortcutsHint =
-    settings.merged.ui.showShortcutsHint &&
-    !hideShortcutsHintForSuggestions &&
-    !hideMinimalModeHintWhileBusy &&
-    !hasPendingActionRequired;
+    shouldReserveSpaceForShortcutsHint && showShortcutsHintDebounced;
   const showMinimalModeBleedThrough =
     !hideUiDetailsForSuggestions && Boolean(minimalModeBleedThrough);
   const showMinimalInlineLoading = !showUiDetails && showLoadingIndicator;
@@ -168,7 +187,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     !showUiDetails &&
     (showMinimalInlineLoading ||
       showMinimalBleedThroughRow ||
-      showShortcutsHint);
+      shouldReserveSpaceForShortcutsHint);
 
   return (
     <Box
@@ -210,8 +229,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                 inline
                 thought={
                   uiState.streamingState ===
-                    StreamingState.WaitingForConfirmation ||
-                  settings.merged.ui.loadingPhrases === 'off'
+                  StreamingState.WaitingForConfirmation
                     ? undefined
                     : uiState.thought
                 }
@@ -221,7 +239,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                     : uiState.currentLoadingPhrase
                 }
                 thoughtLabel={
-                  inlineThinkingMode === 'full' ? 'Thinking ...' : undefined
+                  inlineThinkingMode === 'full' ? 'Thinking...' : undefined
                 }
                 elapsedTime={uiState.elapsedTime}
               />
@@ -231,6 +249,9 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
             marginTop={isNarrow ? 1 : 0}
             flexDirection="column"
             alignItems={isNarrow ? 'flex-start' : 'flex-end'}
+            minHeight={
+              showUiDetails && shouldReserveSpaceForShortcutsHint ? 1 : 0
+            }
           >
             {showUiDetails && showShortcutsHint && <ShortcutsHint />}
           </Box>
@@ -254,8 +275,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                   inline
                   thought={
                     uiState.streamingState ===
-                      StreamingState.WaitingForConfirmation ||
-                    settings.merged.ui.loadingPhrases === 'off'
+                    StreamingState.WaitingForConfirmation
                       ? undefined
                       : uiState.thought
                   }
@@ -265,7 +285,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                       : uiState.currentLoadingPhrase
                   }
                   thoughtLabel={
-                    inlineThinkingMode === 'full' ? 'Thinking ...' : undefined
+                    inlineThinkingMode === 'full' ? 'Thinking...' : undefined
                   }
                   elapsedTime={uiState.elapsedTime}
                 />
@@ -287,11 +307,13 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                 </Box>
               )}
             </Box>
-            {(showMinimalContextBleedThrough || showShortcutsHint) && (
+            {(showMinimalContextBleedThrough ||
+              shouldReserveSpaceForShortcutsHint) && (
               <Box
                 marginTop={isNarrow && showMinimalBleedThroughRow ? 1 : 0}
                 flexDirection={isNarrow ? 'column' : 'row'}
                 alignItems={isNarrow ? 'flex-start' : 'flex-end'}
+                minHeight={1}
               >
                 {showMinimalContextBleedThrough && (
                   <ContextUsageDisplay
@@ -300,18 +322,14 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                     terminalWidth={uiState.terminalWidth}
                   />
                 )}
-                {showShortcutsHint && (
-                  <Box
-                    marginLeft={
-                      showMinimalContextBleedThrough && !isNarrow ? 1 : 0
-                    }
-                    marginTop={
-                      showMinimalContextBleedThrough && isNarrow ? 1 : 0
-                    }
-                  >
-                    <ShortcutsHint />
-                  </Box>
-                )}
+                <Box
+                  marginLeft={
+                    showMinimalContextBleedThrough && !isNarrow ? 1 : 0
+                  }
+                  marginTop={showMinimalContextBleedThrough && isNarrow ? 1 : 0}
+                >
+                  {showShortcutsHint && <ShortcutsHint />}
+                </Box>
               </Box>
             )}
           </Box>
@@ -373,7 +391,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                           marginTop={
                             (showApprovalIndicator ||
                               uiState.shellModeActive) &&
-                            isNarrow
+                            !isNarrow
                               ? 1
                               : 0
                           }

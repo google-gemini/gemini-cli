@@ -174,7 +174,10 @@ describe('BaseSettingsDialog', () => {
 
     it('should render footer content when provided', async () => {
       const { lastFrame, unmount } = await renderDialog({
-        footerContent: <Text>Custom Footer</Text>,
+        footer: {
+          content: <Text>Custom Footer</Text>,
+          height: 1,
+        },
       });
 
       expect(lastFrame()).toContain('Custom Footer');
@@ -531,6 +534,37 @@ describe('BaseSettingsDialog', () => {
   });
 
   describe('edit mode', () => {
+    it('should prioritize editValue over rawValue stringification', async () => {
+      const objectItem: SettingsDialogItem = {
+        key: 'object-setting',
+        label: 'Object Setting',
+        description: 'A complex object setting',
+        displayValue: '{"foo":"bar"}',
+        type: 'object',
+        rawValue: { foo: 'bar' },
+        editValue: '{"foo":"bar"}',
+      };
+      const { stdin } = await renderDialog({
+        items: [objectItem],
+      });
+
+      // Enter edit mode and immediately commit
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+
+      await waitFor(() => {
+        expect(mockOnEditCommit).toHaveBeenCalledWith(
+          'object-setting',
+          '{"foo":"bar"}',
+          expect.objectContaining({ type: 'object' }),
+        );
+      });
+    });
+
     it('should commit edit on Enter', async () => {
       const items = createMockItems(4);
       const stringItem = items.find((i) => i.type === 'string')!;
@@ -726,6 +760,48 @@ describe('BaseSettingsDialog', () => {
       });
       unmount();
     });
+
+    it('should allow j and k characters to be typed in string edit fields without triggering navigation', async () => {
+      const items = createMockItems(4);
+      const stringItem = items.find((i) => i.type === 'string')!;
+      const { stdin, waitUntilReady, unmount } = await renderDialog({
+        items: [stringItem],
+      });
+
+      // Enter edit mode
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+      await waitUntilReady();
+
+      // Type 'j' - should appear in field, NOT trigger navigation
+      await act(async () => {
+        stdin.write('j');
+      });
+      await waitUntilReady();
+
+      // Type 'k' - should appear in field, NOT trigger navigation
+      await act(async () => {
+        stdin.write('k');
+      });
+      await waitUntilReady();
+
+      // Commit with Enter
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+      await waitUntilReady();
+
+      // j and k should be typed into the field
+      await waitFor(() => {
+        expect(mockOnEditCommit).toHaveBeenCalledWith(
+          'string-setting',
+          'test-valuejk', // entered value + j and k
+          expect.objectContaining({ type: 'string' }),
+        );
+      });
+      unmount();
+    });
   });
 
   describe('custom key handling', () => {
@@ -767,6 +843,59 @@ describe('BaseSettingsDialog', () => {
         // Should still show settings as focused
         expect(lastFrame()).toContain('> Test Settings');
       });
+      unmount();
+    });
+  });
+
+  describe('responsiveness', () => {
+    it('should show the scope selector when availableHeight is sufficient (25)', async () => {
+      const { lastFrame, unmount } = await renderDialog({
+        availableHeight: 25,
+        showScopeSelector: true,
+      });
+
+      const frame = lastFrame();
+      expect(frame).toContain('Apply To');
+      unmount();
+    });
+
+    it('should hide the scope selector when availableHeight is small (24) to show more items', async () => {
+      const { lastFrame, unmount } = await renderDialog({
+        availableHeight: 24,
+        showScopeSelector: true,
+      });
+
+      const frame = lastFrame();
+      expect(frame).not.toContain('Apply To');
+      unmount();
+    });
+
+    it('should reduce the number of visible items based on height', async () => {
+      // At height 25, it should show 2 items (math: (25-4 - (10+5))/3 = 2)
+      const { lastFrame, unmount } = await renderDialog({
+        availableHeight: 25,
+        items: createMockItems(10),
+      });
+
+      const frame = lastFrame();
+      // Items 0 and 1 should be there
+      expect(frame).toContain('Boolean Setting');
+      expect(frame).toContain('String Setting');
+      // Item 2 should NOT be there
+      expect(frame).not.toContain('Number Setting');
+      unmount();
+    });
+
+    it('should show scroll indicators when list is truncated by height', async () => {
+      const { lastFrame, unmount } = await renderDialog({
+        availableHeight: 25,
+        items: createMockItems(10),
+      });
+
+      const frame = lastFrame();
+      // Shows both scroll indicators when the list is truncated by height
+      expect(frame).toContain('▼');
+      expect(frame).toContain('▲');
       unmount();
     });
   });

@@ -11,7 +11,10 @@ import type {
 } from '../types.js';
 import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
-import { UserAccountManager } from '@google/gemini-cli-core';
+import {
+  UserAccountManager,
+  getG1CreditBalance,
+} from '@google/gemini-cli-core';
 import {
   type CommandContext,
   type SlashCommand,
@@ -27,8 +30,10 @@ function getUserIdentity(context: CommandContext) {
   const userEmail = cachedAccount ?? undefined;
 
   const tier = context.services.config?.getUserTierName();
+  const paidTier = context.services.config?.getUserPaidTier();
+  const creditBalance = getG1CreditBalance(paidTier) ?? undefined;
 
-  return { selectedAuthType, userEmail, tier };
+  return { selectedAuthType, userEmail, tier, creditBalance };
 }
 
 async function defaultSessionView(context: CommandContext) {
@@ -43,7 +48,8 @@ async function defaultSessionView(context: CommandContext) {
   }
   const wallDuration = now.getTime() - sessionStartTime.getTime();
 
-  const { selectedAuthType, userEmail, tier } = getUserIdentity(context);
+  const { selectedAuthType, userEmail, tier, creditBalance } =
+    getUserIdentity(context);
   const currentModel = context.services.config?.getModel();
 
   const statsItem: HistoryItemStats = {
@@ -53,10 +59,14 @@ async function defaultSessionView(context: CommandContext) {
     userEmail,
     tier,
     currentModel,
+    creditBalance,
   };
 
   if (context.services.config) {
-    const quota = await context.services.config.refreshUserQuota();
+    const [quota] = await Promise.all([
+      context.services.config.refreshUserQuota(),
+      context.services.config.refreshAvailableCredits(),
+    ]);
     if (quota) {
       statsItem.quotas = quota;
       statsItem.pooledRemaining = context.services.config.getQuotaRemaining();
@@ -74,6 +84,7 @@ export const statsCommand: SlashCommand = {
   description: 'Check session stats. Usage: /stats [session|model|tools]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
+  isSafeConcurrent: true,
   action: async (context: CommandContext) => {
     await defaultSessionView(context);
   },
@@ -83,6 +94,7 @@ export const statsCommand: SlashCommand = {
       description: 'Show session-specific usage statistics',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
+      isSafeConcurrent: true,
       action: async (context: CommandContext) => {
         await defaultSessionView(context);
       },
@@ -92,6 +104,7 @@ export const statsCommand: SlashCommand = {
       description: 'Show model-specific usage statistics',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
+      isSafeConcurrent: true,
       action: (context: CommandContext) => {
         const { selectedAuthType, userEmail, tier } = getUserIdentity(context);
         const currentModel = context.services.config?.getModel();
@@ -115,6 +128,7 @@ export const statsCommand: SlashCommand = {
       description: 'Show tool-specific usage statistics',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
+      isSafeConcurrent: true,
       action: (context: CommandContext) => {
         context.ui.addItem({
           type: MessageType.TOOL_STATS,
