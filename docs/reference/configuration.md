@@ -1159,10 +1159,6 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
-<!-- prettier-ignore -->
-> [!WARNING]
-> Subagents is an experimental feature. Uses YOLO mode for subagents.
-
 - **`experimental.enableAgents`** (boolean):
   - **Description:** Enable local and remote subagents.
   - **Default:** `true`
