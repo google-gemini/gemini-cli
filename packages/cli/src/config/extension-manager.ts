@@ -699,7 +699,7 @@ Would you like to attempt to install via "git clone" instead?`,
                     (e) => e.name === 'conductor',
                   );
                   if (conductorIdx !== -1) {
-                    const message = `The "conductor" extension has been renamed to "sdd" and is now built-in. Please run "gemini extensions uninstall conductor" to migrate. Your project files in "conductor/" will be preserved.`;
+                    const message = `The "conductor" extension has been renamed to "sdd" and is now built-in. Please run "gemini extensions uninstall conductor" to migrate. Your project files in ".gemini/specs/" will be preserved.`;
                     debugLogger.warn(message);
                     coreEvents.emitFeedback('warning', message);
                   }

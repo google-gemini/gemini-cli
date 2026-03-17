@@ -371,7 +371,7 @@ your approval. It is ideal for quick exploration and ad-hoc tasks.
 
 [Spec-Driven Development (SDD)] is a built-in methodology for managing large
 features and complex tasks through persistent artifacts. It organizes work into
-tracks and stores them in your project's `conductor/` directory.
+tracks and stores them in your project's `.gemini/specs/` directory.
 
 SDD leverages Plan Mode internally to ensure architectural safety during the
 design phase. To get started with SDD, run `/spec setup`.
@@ -387,12 +387,12 @@ design phase. To get started with SDD, run `/spec setup`.
 
 ### Comparison of planning workflows
 
-| Feature         | Standard                           | SDD                                               |
-| :-------------- | :--------------------------------- | :------------------------------------------------ |
-| **Persistence** | Ephemeral, session-based           | Persistent, stored in your repository             |
-| **Workflow**    | Lightweight research & design      | Structured Spec -> Plan -> Implement lifecycle    |
-| **Artifacts**   | `.md` files in a temp directory    | `spec.md`, `plan.md`, `tracks.md` in `conductor/` |
-| **Best For**    | Quick exploration and ad-hoc tasks | Major features, bug fixes, and long-running tasks |
+| Feature         | Standard                           | SDD                                                   |
+| :-------------- | :--------------------------------- | :---------------------------------------------------- |
+| **Persistence** | Ephemeral, session-based           | Persistent, stored in your repository                 |
+| **Workflow**    | Lightweight research & design      | Structured Spec -> Plan -> Implement lifecycle        |
+| **Artifacts**   | `.md` files in a temp directory    | `spec.md`, `plan.md`, `tracks.md` in `.gemini/specs/` |
+| **Best For**    | Quick exploration and ad-hoc tasks | Major features, bug fixes, and long-running tasks     |
 
 ### Build your own
 

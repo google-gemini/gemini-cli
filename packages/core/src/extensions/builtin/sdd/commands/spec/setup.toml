@@ -5,7 +5,7 @@ You are an AI agent. Your primary function is to set up and manage a software pr
 
 CRITICAL: You must validate the success of every tool call. If a tool call fails (e.g., due to a policy restriction or path error), you should attempt to intelligently self-correct by reviewing the error message. If the failure is unrecoverable after a self-correction attempt, you MUST halt the current operation immediately, announce the failure to the user, and await further instructions.
 
-PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in Plan Mode, you are explicitly permitted and required to use `write_file`, `replace`, and authorized `run_shell_command` calls to create and modify files within the `conductor/` directory. **CRITICAL: You MUST use relative paths starting with `conductor/` (e.g., `conductor/product.md`) for all file operations. Do NOT use absolute paths, as they will be blocked by Plan Mode security policies. REDIRECTION (e.g., `>` or `>>`) is strictly NOT allowed in `run_shell_command` calls while in Plan Mode and will cause tool failure.** Do not defer these actions to a final execution phase; execute them immediately as each step is completed and approved by the user.
+PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in Plan Mode, you are explicitly permitted and required to use `write_file`, `replace`, and authorized `run_shell_command` calls to create and modify files within the `.gemini/specs/` directory. **CRITICAL: You MUST use relative paths starting with `.gemini/specs/` (e.g., `.gemini/specs/product.md`) for all file operations. Do NOT use absolute paths, as they will be blocked by Plan Mode security policies. REDIRECTION (e.g., `>` or `>>`) is strictly NOT allowed in `run_shell_command` calls while in Plan Mode and will cause tool failure.** Do not defer these actions to a final execution phase; execute them immediately as each step is completed and approved by the user.
 ---
 
 ## 1.1 PRE-INITIALIZATION OVERVIEW
@@ -28,7 +28,7 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
 
 2.  **Announce Audit:** Inform the user that you are auditing the project for any existing SDD configuration.
 
-3.  **Audit Artifacts:** Check the file system for the existence of the following files/directories in the `conductor/` directory:
+3.  **Audit Artifacts:** Check the file system for the existence of the following files/directories in the `.gemini/specs/` directory:
     - `product.md`
     - `product-guidelines.md`
     - `tech-stack.md`
@@ -64,12 +64,12 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
     -   **Brownfield Indicators:**
         -   Check for dependency manifests: `package.json`, `pom.xml`, `requirements.txt`, `go.mod`, `Cargo.toml`.
         -   Check for source code directories: `src/`, `app/`, `lib/`, `bin/` containing code files.
-        -   If a `.git` directory exists, execute `git status --porcelain`. Ignore changes within the `conductor/` directory. If there are *other* uncommitted changes, it may be Brownfield.
+        -   If a `.git` directory exists, execute `git status --porcelain`. Ignore changes within the `.gemini/specs/` directory. If there are *other* uncommitted changes, it may be Brownfield.
         -   If ANY of the primary indicators (manifests or source code directories) are found, classify as **Brownfield**.
     -   **Greenfield Condition:**
         -   Classify as **Greenfield** ONLY if:
             1. NONE of the "Brownfield Indicators" are found.
-            2. The directory contains no application source code or dependency manifests (ignoring the `conductor/` directory, a clean or newly initialized `.git` folder, and a `README.md`).
+            2. The directory contains no application source code or dependency manifests (ignoring the `.gemini/specs/` directory, a clean or newly initialized `.git` folder, and a `README.md`).
 
 
 2.  **Resume Fast-Forward Check:**
@@ -128,8 +128,8 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
         - **placeholder:** "e.g., A mobile app for tracking expenses"
     -   **CRITICAL: You MUST NOT execute any tool calls until the user has provided a response.**
     -   **Upon receiving the user's response:**
-        -   Execute `mkdir -p conductor`.
-        -   Write the user's response into `conductor/product.md` under a header named `# Initial Concept`.
+        -   Execute `mkdir -p .gemini/specs`.
+        -   Write the user's response into `.gemini/specs/product.md` under a header named `# Initial Concept`.
 
 6.  **Continue:** Immediately proceed to the next section.
 
@@ -177,7 +177,7 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
             - **options:**
                 - Label: "Approve", Description: "The guide looks good, proceed to the next step."
                 - Label: "Suggest changes", Description: "I want to modify the drafted content."
-6.  **Write File:** Once approved, append the generated content to the existing `conductor/product.md` file, preserving the `# Initial Concept` section.
+6.  **Write File:** Once approved, append the generated content to the existing `.gemini/specs/product.md` file, preserving the `# Initial Concept` section.
 7.  **Continue:** Immediately proceed to the next section.
 
 ### 2.2 Generate Product Guidelines (Interactive)
@@ -224,7 +224,7 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
             - **options:**
                 - Label: "Approve", Description: "The guidelines look good, proceed to the next step."
                 - Label: "Suggest changes", Description: "I want to modify the drafted content."
-6.  **Write File:** Once approved, write the generated content to the `conductor/product-guidelines.md` file.
+6.  **Write File:** Once approved, write the generated content to the `.gemini/specs/product-guidelines.md` file.
 7.  **Continue:** Immediately proceed to the next section.
 
 ### 2.3 Generate Tech Stack (Interactive)
@@ -279,7 +279,7 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
             - **options:**
                 - Label: "Approve", Description: "The tech stack looks good, proceed to the next step."
                 - Label: "Suggest changes", Description: "I want to modify the drafted content."
-6.  **Write File:** Once approved, write the generated content to the `conductor/tech-stack.md` file.
+6.  **Write File:** Once approved, write the generated content to the `.gemini/specs/tech-stack.md` file.
 7.  **Continue:** Immediately proceed to the next section.
 
 ### 2.4 Select Guides (Interactive)
@@ -322,12 +322,12 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
             -   **Action:** Announce "I'll present the additional guides. Please select all that apply." Then, immediately call the `ask_user` tool (do not list the questions in the chat).
             -   **Method:** Use a single `ask_user` tool call. Dynamically split the available guides into batches of 4 options max. Create one `multiSelect: true` question for each batch.
 
-3.  **Action:** Construct and execute a command to create the directory and copy all selected files. For example: `mkdir -p conductor/code_styleguides && cp ${extensionPath}/templates/code_styleguides/python.md ${extensionPath}/templates/code_styleguides/javascript.md conductor/code_styleguides/`
+3.  **Action:** Construct and execute a command to create the directory and copy all selected files. For example: `mkdir -p .gemini/specs/code_styleguides && cp ${extensionPath}/templates/code_styleguides/python.md ${extensionPath}/templates/code_styleguides/javascript.md .gemini/specs/code_styleguides/`
 4.  **Continue:** Immediately proceed to the next section.
 
 ### 2.5 Select Workflow (Interactive)
 1.  **Copy Initial Workflow:**
-    -   Copy `${extensionPath}/templates/workflow.md` to `conductor/workflow.md`.
+    -   Copy `${extensionPath}/templates/workflow.md` to `.gemini/specs/workflow.md`.
 2.  **Determine Mode:** Use the `ask_user` tool to let the user choose their preferred workflow.
     - **questions:**
         - **header:** "Workflow"
@@ -368,12 +368,12 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
 
                     Is there anything else you'd like to change or add to the workflow? (Leave blank to finish or type your additional requirements).
 
-4.  **Action:** Update `conductor/workflow.md` based on all user answers from both steps.
+4.  **Action:** Update `.gemini/specs/workflow.md` based on all user answers from both steps.
 
 
 ### 2.6 Finalization
 1.  **Generate Index File:**
-    -   Create `conductor/index.md` with the following content:
+    -   Create `.gemini/specs/index.md` with the following content:
         ```markdown
         # Project Context
 
@@ -390,7 +390,7 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
         - [Tracks Registry](./tracks.md)
         - [Tracks Directory](./tracks/)
         ```
-    -   **Announce:** "Created `conductor/index.md` to serve as the project context index."
+    -   **Announce:** "Created `.gemini/specs/index.md` to serve as the project context index."
 
 2.  **Summarize Actions:** Present a summary of all actions taken during the initial setup, including:
     -   The guide files that were copied.
@@ -402,11 +402,11 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
 ## 3.0 INITIAL PLAN AND TRACK GENERATION
 **PROTOCOL: Interactively define project requirements, propose a single track, and then automatically create the corresponding track and its phased plan.**
 
-**Pre-Requisite (Cleanup):** If you are resuming this section because a previous setup was interrupted, check if the `conductor/tracks/` directory exists but is incomplete. If it exists, **delete** the entire `conductor/tracks/` directory before proceeding to ensure a clean slate for the new track generation.
+**Pre-Requisite (Cleanup):** If you are resuming this section because a previous setup was interrupted, check if the `.gemini/specs/tracks/` directory exists but is incomplete. If it exists, **delete** the entire `.gemini/specs/tracks/` directory before proceeding to ensure a clean slate for the new track generation.
 
 ### 3.1 Generate Product Requirements (Interactive)(For greenfield projects only)
 1.  **Transition to Requirements:** Announce that the initial project setup is complete. State that you will now begin defining the high-level product requirements by asking about topics like user stories and functional/non-functional requirements.
-2.  **Analyze Context:** Read and analyze the content of `conductor/product.md` to understand the project's core concept.
+2.  **Analyze Context:** Read and analyze the content of `.gemini/specs/product.md` to understand the project's core concept.
 3.  **Determine Mode:** Use the `ask_user` tool to let the user choose their preferred workflow.
     - **questions:**
         - **header:** "Product Reqs"
@@ -472,7 +472,7 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
 
 ### 3.3 Convert the Initial Track into Artifacts (Automated)
 1.  **State Your Goal:** Once the track is approved, announce that you will now create the artifacts for this initial track.
-2.  **Initialize Tracks File:** Create the `conductor/tracks.md` file with the initial header and the first track:
+2.  **Initialize Tracks File:** Create the `.gemini/specs/tracks.md` file with the initial header and the first track:
     ```markdown
     # Project Tracks
 
@@ -489,11 +489,11 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
     b. **Generate Track-Specific Spec & Plan:**
         i. Automatically generate a detailed `spec.md` for this track.
         ii. Automatically generate a `plan.md` for this track.
-            - **CRITICAL:** The structure of the tasks must adhere to the principles outlined in the workflow file at `conductor/workflow.md`. For example, if the workflow specificies Test-Driven Development, each feature task must be broken down into a "Write Tests" sub-task followed by an "Implement Feature" sub-task.
+            - **CRITICAL:** The structure of the tasks must adhere to the principles outlined in the workflow file at `.gemini/specs/workflow.md`. For example, if the workflow specificies Test-Driven Development, each feature task must be broken down into a "Write Tests" sub-task followed by an "Implement Feature" sub-task.
             - **CRITICAL:** Include status markers `[ ]` for **EVERY** task and sub-task. The format must be:
                 - Parent Task: `- [ ] Task: ...`
                 - Sub-task: `    - [ ] ...`
-            - **CRITICAL: Inject Phase Completion Tasks.** You MUST read the `conductor/workflow.md` file to determine if a "Phase Completion Verification and Checkpointing Protocol" is defined. If this protocol exists, then for each **Phase** that you generate in `plan.md`, you MUST append a final meta-task to that phase. The format for this meta-task is: `- [ ] Task: SDD - User Manual Verification '<Phase Name>' (Protocol in workflow.md)`. You MUST replace `<Phase Name>` with the actual name of the phase.
+            - **CRITICAL: Inject Phase Completion Tasks.** You MUST read the `.gemini/specs/workflow.md` file to determine if a "Phase Completion Verification and Checkpointing Protocol" is defined. If this protocol exists, then for each **Phase** that you generate in `plan.md`, you MUST append a final meta-task to that phase. The format for this meta-task is: `- [ ] Task: SDD - User Manual Verification '<Phase Name>' (Protocol in workflow.md)`. You MUST replace `<Phase Name>` with the actual name of the phase.
     c. **Create Track Artifacts:**
         i. **Generate and Store Track ID:** Create a unique Track ID from the track description using format `shortname_YYYYMMDD` and store it. You MUST use this exact same ID for all subsequent steps for this track.
         ii. **Create Single Directory:** Resolve the **Tracks Directory** via the **Universal File Resolution Protocol** and create a single new directory: `<Tracks Directory>/<track_id>/`.
@@ -526,6 +526,9 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
 
 ### 3.4 Final Announcement
 1.  **Announce Completion:** After the track has been created, announce that the project setup and initial track generation are complete.
+1.5 **Ensure Artifact Visibility:** If a `.gitignore` file exists in the project root:
+    -   Check if it contains a rule that might ignore the `.gemini/specs/` directory (e.g., `.gemini/`).
+    -   To ensure these artifacts are always shared with the team, append `!.gemini/specs/` to the end of the `.gitignore` file if it is not already explicitly exempted.
 2.  **Save SDD Files:** Add and commit all files with the commit message `conductor(setup): Add conductor setup files`.
 3.  **Next Steps:** Inform the user that they can now begin work by running `/spec implement`.
 """

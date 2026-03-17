@@ -186,7 +186,7 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
         - **multiSelect:** false
         - **options:**
             - Label: "Review", Description: "Run the review command to verify changes before finalizing."
-            - Label: "Archive", Description: "Move the track's folder to `conductor/archive/` and remove it from the tracks file."
+            - Label: "Archive", Description: "Move the track's folder to `.gemini/specs/archive/` and remove it from the tracks file."
             - Label: "Delete", Description: "Permanently delete the track's folder and remove it from the tracks file."
             - Label: "Skip", Description: "Do nothing and leave it in the tracks file."
 
@@ -194,10 +194,10 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
     *   **If user chooses "Review":**
         *   Announce: "Please run `/spec review` to verify your changes. You will be able to archive or delete the track after the review."
     *   **If user chooses "Archive":**
-        i.   **Create Archive Directory:** Check for the existence of `conductor/archive/`. If it does not exist, create it.
-        ii.  **Archive Track Folder:** Move the track's folder from its current location (resolved via the **Tracks Directory**) to `conductor/archive/<track_id>`.
+        i.   **Create Archive Directory:** Check for the existence of `.gemini/specs/archive/`. If it does not exist, create it.
+        ii.  **Archive Track Folder:** Move the track's folder from its current location (resolved via the **Tracks Directory**) to `.gemini/specs/archive/<track_id>`.
         iii. **Remove from Tracks File:** Read the content of the **Tracks Registry** file, remove the entire section for the completed track (the part that starts with `---` and contains the track description), and write the modified content back to the file.
-        iv.  **Commit Changes:** Stage the **Tracks Registry** file and `conductor/archive/`. Commit with the message `chore(conductor): Archive track '<track_description>'`.
+        iv.  **Commit Changes:** Stage the **Tracks Registry** file and `.gemini/specs/archive/`. Commit with the message `chore(conductor): Archive track '<track_description>'`.
         v.   **Announce Success:** Announce: "Track '<track_description>' has been successfully archived."
     *   **If user chooses "Delete":**
         i. **CRITICAL WARNING:** Before proceeding, immediately call the `ask_user` tool to ask for final confirmation (do not repeat the warning in the chat):

@@ -61,7 +61,7 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
 ### 2.2 Retrieve Context
 1.  **Load Project Context:**
     -   Read `product-guidelines.md` and `tech-stack.md`.
-    -   **CRITICAL:** Check for the existence of `conductor/code_styleguides/` directory.
+    -   **CRITICAL:** Check for the existence of `.gemini/specs/code_styleguides/` directory.
         -   If it exists, list and read ALL `.md` files within it. These are the **Law**. Violations here are **High** severity.
 2.  **Load Track Context (if reviewing a track):**
     -   Read the track's `plan.md`.
@@ -92,7 +92,7 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
 1.  **Intent Verification:** Does the code actually implement what the `plan.md` (and `spec.md` if available) asked for?
 2.  **Style Compliance:**
     -   Does it follow `product-guidelines.md`?
-    -   Does it strictly follow `conductor/code_styleguides/*.md`?
+    -   Does it strictly follow `.gemini/specs/code_styleguides/*.md`?
 3.  **Correctness & Safety:**
     -   Look for bugs, race conditions, null pointer risks.
     -   **Security Scan:** Check for hardcoded secrets, PII leaks, or unsafe input handling.
@@ -210,14 +210,14 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
         - **type:** "choice"
         - **multiSelect:** false
         - **options:**
-            - Label: "Archive", Description: "Move the track's folder to `conductor/archive/` and remove it from the tracks file."
+            - Label: "Archive", Description: "Move the track's folder to `.gemini/specs/archive/` and remove it from the tracks file."
             - Label: "Delete", Description: "Permanently delete the track's folder and remove it from the tracks file."
             - Label: "Skip", Description: "Do nothing and leave it in the tracks file."
 
 3.  **Handle User Response:**
     *   **If "Archive":**
-        i.   **Setup:** Ensure `conductor/archive/` exists.
-        ii.  **Move:** Move track folder to `conductor/archive/<track_id>`.
+        i.   **Setup:** Ensure `.gemini/specs/archive/` exists.
+        ii.  **Move:** Move track folder to `.gemini/specs/archive/<track_id>`.
         iii. **Update Registry:** Remove track section from **Tracks Registry**.
         iv.  **Commit:** Stage registry and archive. Commit: `chore(conductor): Archive track '<track_name>'`.
         v.   **Announce:** "Track '<track_name>' archived."
