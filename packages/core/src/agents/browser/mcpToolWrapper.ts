@@ -61,6 +61,7 @@ class McpToolInvocation extends BaseToolInvocation<
     params: Record<string, unknown>,
     messageBus: MessageBus,
     private readonly shouldDisableInput: boolean,
+    private readonly blockFileUploads: boolean = false,
   ) {
     super(params, messageBus, toolName, toolName);
   }
@@ -106,6 +107,16 @@ class McpToolInvocation extends BaseToolInvocation<
 
   async execute(signal: AbortSignal): Promise<ToolResult> {
     try {
+      // Hard block for file uploads if configured
+      if (this.blockFileUploads && this.toolName === 'upload_file') {
+        const errorMsg = 'File uploads are blocked by configuration.';
+        return {
+          llmContent: `Error: ${errorMsg}`,
+          returnDisplay: `Error: ${errorMsg}`,
+          error: { message: errorMsg },
+        };
+      }
+
       // Suspend the input blocker for interactive tools so
       // chrome-devtools-mcp's interactability checks pass.
       // Only toggles pointer-events CSS — no DOM change, no flicker.
@@ -189,6 +200,7 @@ class McpDeclarativeTool extends DeclarativeTool<
     parameterSchema: unknown,
     messageBus: MessageBus,
     private readonly shouldDisableInput: boolean,
+    private readonly blockFileUploads: boolean = false,
   ) {
     super(
       name,
@@ -211,6 +223,7 @@ class McpDeclarativeTool extends DeclarativeTool<
       params,
       this.messageBus,
       this.shouldDisableInput,
+      this.blockFileUploads,
     );
   }
 }
@@ -233,6 +246,7 @@ export async function createMcpDeclarativeTools(
   browserManager: BrowserManager,
   messageBus: MessageBus,
   shouldDisableInput: boolean = false,
+  blockFileUploads: boolean = false,
 ): Promise<McpDeclarativeTool[]> {
   // Get dynamically discovered tools from the MCP server
   const mcpTools = await browserManager.getDiscoveredTools();
@@ -256,6 +270,7 @@ export async function createMcpDeclarativeTools(
       schema.parametersJsonSchema,
       messageBus,
       shouldDisableInput,
+      blockFileUploads,
     );
   });
 

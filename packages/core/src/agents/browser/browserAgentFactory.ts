@@ -30,6 +30,11 @@ import { createAnalyzeScreenshotTool } from './analyzeScreenshot.js';
 import { injectAutomationOverlay } from './automationOverlay.js';
 import { injectInputBlocker } from './inputBlocker.js';
 import { debugLogger } from '../../utils/debugLogger.js';
+import {
+  ApprovalMode,
+  PolicyDecision,
+  PRIORITY_SUBAGENT_TOOL,
+} from '../../policy/types.js';
 
 /**
  * Creates a browser agent definition with MCP tools configured.
@@ -86,8 +91,59 @@ export async function createBrowserAgentDefinition(
     browserManager,
     messageBus,
     shouldDisableInput,
+    browserConfig.customConfig.blockFileUploads,
   );
   const availableToolNames = mcpTools.map((t) => t.name);
+
+  // Register high-priority policy rules for sensitive actions in YOLO mode
+  const policyEngine = config.getPolicyEngine();
+  if (policyEngine) {
+    // 1. Hard-block or ASK_USER for upload_file in YOLO
+    policyEngine.addRule({
+      toolName: 'upload_file',
+      decision: PolicyDecision.ASK_USER,
+      priority: 999,
+      modes: [ApprovalMode.YOLO],
+      source: 'BrowserAgent (Sensitive Actions)',
+    });
+
+    // 2. ASK_USER for evaluate_script in YOLO
+    policyEngine.addRule({
+      toolName: 'evaluate_script',
+      decision: PolicyDecision.ASK_USER,
+      priority: 999,
+      modes: [ApprovalMode.YOLO],
+      source: 'BrowserAgent (Sensitive Actions)',
+    });
+
+    // 3. ASK_USER for fill_form in YOLO (if enabled)
+    if (browserConfig.customConfig.confirmSensitiveActions) {
+      policyEngine.addRule({
+        toolName: 'fill_form',
+        decision: PolicyDecision.ASK_USER,
+        priority: 999,
+        modes: [ApprovalMode.YOLO],
+        source: 'BrowserAgent (Sensitive Actions)',
+      });
+    }
+
+    // 4. Reduce noise for read-only tools in default mode
+    const readOnlyTools = [
+      'take_snapshot',
+      'list_pages',
+      'list_network_requests',
+    ];
+    for (const toolName of readOnlyTools) {
+      if (availableToolNames.includes(toolName)) {
+        policyEngine.addRule({
+          toolName,
+          decision: PolicyDecision.ALLOW,
+          priority: PRIORITY_SUBAGENT_TOOL,
+          source: 'BrowserAgent (Read-Only)',
+        });
+      }
+    }
+  }
 
   // Validate required semantic tools are available
   const requiredSemanticTools = [
