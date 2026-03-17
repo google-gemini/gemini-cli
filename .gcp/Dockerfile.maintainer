@@ -30,6 +30,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   psmisc \
   lsof \
   socat \
+  tmux \
+  docker.io \
   build-essential \
   libsecret-1-dev \
   libkrb5-dev \
