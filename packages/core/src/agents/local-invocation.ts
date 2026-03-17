@@ -22,6 +22,7 @@ import {
 } from './types.js';
 import { randomUUID } from 'node:crypto';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { appendThoughtChunk } from '../utils/thoughtUtils.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -122,13 +123,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
               lastItem.type === 'thought' &&
               lastItem.status === 'running'
             ) {
-              // Ensure there is a space if concatenating complete thoughts
-              const needsSpace =
-                lastItem.content.length > 0 &&
-                !/\s$/.test(lastItem.content) &&
-                !/^\s/.test(text);
-
-              lastItem.content += (needsSpace ? ' ' : '') + text;
+              lastItem.content = appendThoughtChunk(lastItem.content, text);
             } else {
               recentActivity.push({
                 id: randomUUID(),

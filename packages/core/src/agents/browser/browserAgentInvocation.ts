@@ -35,6 +35,7 @@ import {
   createBrowserAgentDefinition,
   cleanupBrowserAgent,
 } from './browserAgentFactory.js';
+import { appendThoughtChunk } from '../../utils/thoughtUtils.js';
 
 const INPUT_PREVIEW_MAX_LENGTH = 50;
 const DESCRIPTION_MAX_LENGTH = 200;
@@ -284,13 +285,8 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
               lastItem.type === 'thought' &&
               lastItem.status === 'running'
             ) {
-              const needsSpace =
-                lastItem.content.length > 0 &&
-                !/\s$/.test(lastItem.content) &&
-                !/^\s/.test(text);
-
               lastItem.content = sanitizeThoughtContent(
-                lastItem.content + (needsSpace ? ' ' : '') + text,
+                appendThoughtChunk(lastItem.content, text),
               );
             } else {
               recentActivity.push({
