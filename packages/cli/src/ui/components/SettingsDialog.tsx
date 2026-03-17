@@ -43,6 +43,8 @@ import {
   BaseSettingsDialog,
   type SettingsDialogItem,
 } from './shared/BaseSettingsDialog.js';
+import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
 
 interface FzfResult {
   item: string;
@@ -336,6 +338,15 @@ export function SettingsDialog({
     onSelect(undefined, selectedScope as SettingScope);
   }, [onSelect, selectedScope]);
 
+  const globalKeyMatchers = useKeyMatchers();
+  const settingsKeyMatchers = useMemo(() => ({
+      ...globalKeyMatchers,
+      [Command.DIALOG_NAVIGATION_UP]: (key: Key) =>
+        key.name === 'up' || (key.ctrl && key.name === 'p'),
+      [Command.DIALOG_NAVIGATION_DOWN]: (key: Key) =>
+        key.name === 'down' || (key.ctrl && key.name === 'n'),
+    }), [globalKeyMatchers]);
+
   // Custom key handler for restart key
   const handleKeyPress = useCallback(
     (key: Key, _currentItem: SettingsDialogItem | undefined): boolean => {
@@ -371,6 +382,7 @@ export function SettingsDialog({
       onItemClear={handleItemClear}
       onClose={handleClose}
       onKeyPress={handleKeyPress}
+      keyMatchers={settingsKeyMatchers}
       footer={
         showRestartPrompt
           ? {
