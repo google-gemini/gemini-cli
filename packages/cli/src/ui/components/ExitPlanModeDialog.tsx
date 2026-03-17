@@ -22,8 +22,9 @@ import { useConfig } from '../contexts/ConfigContext.js';
 import { AskUserDialog } from './AskUserDialog.js';
 import { openFileInEditor } from '../utils/editorUtils.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
-import { formatCommand } from '../utils/keybindingUtils.js';
+import { Command } from '../key/keyMatchers.js';
+import { formatCommand } from '../key/keybindingUtils.js';
+import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
 export interface ExitPlanModeDialogProps {
   planPath: string;
@@ -147,6 +148,7 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
   width,
   availableHeight,
 }) => {
+  const keyMatchers = useKeyMatchers();
   const config = useConfig();
   const { stdin, setRawMode } = useStdin();
   const planState = usePlanContent(planPath, config);
@@ -156,11 +158,15 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
   const handleOpenEditor = useCallback(async () => {
     try {
       await openFileInEditor(planPath, stdin, setRawMode, getPreferredEditor());
+
+      onFeedback(
+        'I have edited the plan or annotated it with feedback. Review the edited plan, update if necessary, and present it again for approval.',
+      );
       refresh();
     } catch (err) {
       debugLogger.error('Failed to open plan in editor:', err);
     }
-  }, [planPath, stdin, setRawMode, getPreferredEditor, refresh]);
+  }, [planPath, stdin, setRawMode, getPreferredEditor, refresh, onFeedback]);
 
   useKeypress(
     (key) => {
@@ -243,6 +249,7 @@ export const ExitPlanModeDialog: React.FC<ExitPlanModeDialogProps> = ({
             ],
             placeholder: 'Type your feedback...',
             multiSelect: false,
+            unconstrainedHeight: false,
           },
         ]}
         onSubmit={(answers) => {

@@ -5,12 +5,14 @@
  */
 
 import type React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useStdout } from 'ink';
 import { ThemedGradient } from './ThemedGradient.js';
 import { theme } from '../semantic-colors.js';
 import { formatDuration, formatResetTime } from '../utils/formatters.js';
-import type { ModelMetrics } from '../contexts/SessionContext.js';
-import { useSessionStats } from '../contexts/SessionContext.js';
+import {
+  useSessionStats,
+  type ModelMetrics,
+} from '../contexts/SessionContext.js';
 import {
   getStatusColor,
   TOOL_SUCCESS_RATE_HIGH,
@@ -19,9 +21,13 @@ import {
   USER_AGREEMENT_RATE_MEDIUM,
   CACHE_EFFICIENCY_HIGH,
   CACHE_EFFICIENCY_MEDIUM,
+  getUsedStatusColor,
+  QUOTA_USED_WARNING_THRESHOLD,
+  QUOTA_USED_CRITICAL_THRESHOLD,
 } from '../utils/displayUtils.js';
 import { computeSessionStats } from '../utils/computeStats.js';
 import {
+  type Config,
   type RetrieveUserQuotaResponse,
   isActiveModel,
   getDisplayString,
@@ -83,13 +89,16 @@ const Section: React.FC<SectionProps> = ({ title, children }) => (
 // Logic for building the unified list of table rows
 const buildModelRows = (
   models: Record<string, ModelMetrics>,
+  config: Config,
   quotas?: RetrieveUserQuotaResponse,
   useGemini3_1 = false,
   useCustomToolModel = false,
 ) => {
   const getBaseModelName = (name: string) => name.replace('-001', '');
   const usedModelNames = new Set(
-    Object.keys(models).map(getBaseModelName).map(getDisplayString),
+    Object.keys(models)
+      .map(getBaseModelName)
+      .map((name) => getDisplayString(name, config)),
   );
 
   // 1. Models with active usage
@@ -99,7 +108,7 @@ const buildModelRows = (
     const inputTokens = metrics.tokens.input;
     return {
       key: name,
-      modelName: getDisplayString(modelName),
+      modelName: getDisplayString(modelName, config),
       requests: metrics.api.totalRequests,
       cachedTokens: cachedTokens.toLocaleString(),
       inputTokens: inputTokens.toLocaleString(),
@@ -116,11 +125,11 @@ const buildModelRows = (
         (b) =>
           b.modelId &&
           isActiveModel(b.modelId, useGemini3_1, useCustomToolModel) &&
-          !usedModelNames.has(getDisplayString(b.modelId)),
+          !usedModelNames.has(getDisplayString(b.modelId, config)),
       )
       .map((bucket) => ({
         key: bucket.modelId!,
-        modelName: getDisplayString(bucket.modelId!),
+        modelName: getDisplayString(bucket.modelId!, config),
         requests: '-',
         cachedTokens: '-',
         inputTokens: '-',
@@ -134,6 +143,7 @@ const buildModelRows = (
 
 const ModelUsageTable: React.FC<{
   models: Record<string, ModelMetrics>;
+  config: Config;
   quotas?: RetrieveUserQuotaResponse;
   cacheEfficiency: number;
   totalCachedTokens: number;
@@ -145,6 +155,7 @@ const ModelUsageTable: React.FC<{
   useCustomToolModel?: boolean;
 }> = ({
   models,
+  config,
   quotas,
   cacheEfficiency,
   totalCachedTokens,
@@ -155,7 +166,15 @@ const ModelUsageTable: React.FC<{
   useGemini3_1,
   useCustomToolModel,
 }) => {
-  const rows = buildModelRows(models, quotas, useGemini3_1, useCustomToolModel);
+  const { stdout } = useStdout();
+  const terminalWidth = stdout?.columns ?? 84;
+  const rows = buildModelRows(
+    models,
+    config,
+    quotas,
+    useGemini3_1,
+    useCustomToolModel,
+  );
 
   if (rows.length === 0) {
     return null;
@@ -163,12 +182,47 @@ const ModelUsageTable: React.FC<{
 
   const showQuotaColumn = !!quotas && rows.some((row) => !!row.bucket);
 
-  const nameWidth = 25;
-  const requestsWidth = 7;
+  const nameWidth = 23;
+  const requestsWidth = 5;
   const uncachedWidth = 15;
   const cachedWidth = 14;
   const outputTokensWidth = 15;
-  const usageLimitWidth = showQuotaColumn ? 28 : 0;
+  const percentageWidth = showQuotaColumn ? 6 : 0;
+  const resetWidth = 22;
+
+  // Total width of other columns (including parent box paddingX={2})
+  const fixedWidth = nameWidth + requestsWidth + percentageWidth + resetWidth;
+  const outerPadding = 4;
+  const availableForUsage = terminalWidth - outerPadding - fixedWidth;
+
+  const usageLimitWidth = showQuotaColumn
+    ? Math.max(10, Math.min(24, availableForUsage))
+    : 0;
+  const progressBarWidth = Math.max(2, usageLimitWidth - 4);
+
+  const renderProgressBar = (
+    usedFraction: number,
+    color: string,
+    totalSteps = 20,
+  ) => {
+    let filledSteps = Math.round(usedFraction * totalSteps);
+
+    // If something is used (fraction > 0) but rounds to 0, show 1 tick.
+    // If < 100% (fraction < 1) but rounds to 20, show 19 ticks.
+    if (usedFraction > 0 && usedFraction < 1) {
+      filledSteps = Math.min(Math.max(filledSteps, 1), totalSteps - 1);
+    }
+
+    const emptySteps = Math.max(0, totalSteps - filledSteps);
+    return (
+      <Box flexDirection="row" flexShrink={0}>
+        <Text wrap="truncate-end">
+          <Text color={color}>{'▬'.repeat(filledSteps)}</Text>
+          <Text color={theme.border.default}>{'▬'.repeat(emptySteps)}</Text>
+        </Text>
+      </Box>
+    );
+  };
 
   const cacheEfficiencyColor = getStatusColor(cacheEfficiency, {
     green: CACHE_EFFICIENCY_HIGH,
@@ -179,25 +233,13 @@ const ModelUsageTable: React.FC<{
     nameWidth +
     requestsWidth +
     (showQuotaColumn
-      ? usageLimitWidth
+      ? usageLimitWidth + percentageWidth + resetWidth
       : uncachedWidth + cachedWidth + outputTokensWidth);
 
   const isAuto = currentModel && isAutoModel(currentModel);
-  const modelUsageTitle = isAuto
-    ? `${getDisplayString(currentModel)} Usage`
-    : `Model Usage`;
 
   return (
     <Box flexDirection="column" marginBottom={1}>
-      {/* Header */}
-      <Box alignItems="flex-end">
-        <Box width={nameWidth}>
-          <Text bold color={theme.text.primary} wrap="truncate-end">
-            {modelUsageTitle}
-          </Text>
-        </Box>
-      </Box>
-
       {isAuto &&
         showQuotaColumn &&
         pooledRemaining !== undefined &&
@@ -216,7 +258,7 @@ const ModelUsageTable: React.FC<{
         )}
 
       <Box alignItems="flex-end">
-        <Box width={nameWidth}>
+        <Box width={nameWidth} flexShrink={0}>
           <Text bold color={theme.text.primary}>
             Model
           </Text>
@@ -267,15 +309,31 @@ const ModelUsageTable: React.FC<{
           </>
         )}
         {showQuotaColumn && (
-          <Box
-            width={usageLimitWidth}
-            flexDirection="column"
-            alignItems="flex-end"
-          >
-            <Text bold color={theme.text.primary}>
-              Usage remaining
-            </Text>
-          </Box>
+          <>
+            <Box
+              width={usageLimitWidth}
+              flexDirection="column"
+              alignItems="flex-start"
+              paddingLeft={4}
+              flexShrink={0}
+            >
+              <Text bold color={theme.text.primary}>
+                Model usage
+              </Text>
+            </Box>
+            <Box width={percentageWidth} flexShrink={0} />
+            <Box
+              width={resetWidth}
+              flexDirection="column"
+              alignItems="flex-start"
+              paddingLeft={2}
+              flexShrink={0}
+            >
+              <Text bold color={theme.text.primary} wrap="truncate-end">
+                Usage resets
+              </Text>
+            </Box>
+          </>
         )}
       </Box>
 
@@ -290,84 +348,150 @@ const ModelUsageTable: React.FC<{
         width={totalWidth}
       ></Box>
 
-      {rows.map((row) => (
-        <Box key={row.key}>
-          <Box width={nameWidth}>
-            <Text
-              color={row.isActive ? theme.text.primary : theme.text.secondary}
-              wrap="truncate-end"
+      {rows.map((row) => {
+        let effectiveUsedFraction = 0;
+        let usedPercentage = 0;
+        let statusColor = theme.ui.comment;
+        let percentageText = '';
+
+        if (row.bucket && row.bucket.remainingFraction != null) {
+          const actualUsedFraction = 1 - row.bucket.remainingFraction;
+          effectiveUsedFraction =
+            actualUsedFraction === 0 && row.isActive
+              ? 0.001
+              : actualUsedFraction;
+          usedPercentage = effectiveUsedFraction * 100;
+          statusColor =
+            getUsedStatusColor(usedPercentage, {
+              warning: QUOTA_USED_WARNING_THRESHOLD,
+              critical: QUOTA_USED_CRITICAL_THRESHOLD,
+            }) ?? (row.isActive ? theme.text.primary : theme.ui.comment);
+          percentageText =
+            usedPercentage > 0 && usedPercentage < 1
+              ? `${usedPercentage.toFixed(1)}%`
+              : `${usedPercentage.toFixed(0)}%`;
+        }
+
+        return (
+          <Box key={row.key}>
+            <Box width={nameWidth} flexShrink={0}>
+              <Text
+                color={row.isActive ? theme.text.primary : theme.text.secondary}
+                wrap="truncate-end"
+              >
+                {row.modelName}
+              </Text>
+            </Box>
+            <Box
+              width={requestsWidth}
+              flexDirection="column"
+              alignItems="flex-end"
+              flexShrink={0}
             >
-              {row.modelName}
-            </Text>
-          </Box>
-          <Box
-            width={requestsWidth}
-            flexDirection="column"
-            alignItems="flex-end"
-            flexShrink={0}
-          >
-            <Text
-              color={row.isActive ? theme.text.primary : theme.text.secondary}
-            >
-              {row.requests}
-            </Text>
-          </Box>
-          {!showQuotaColumn && (
-            <>
-              <Box
-                width={uncachedWidth}
-                flexDirection="column"
-                alignItems="flex-end"
-                flexShrink={0}
+              <Text
+                color={row.isActive ? theme.text.primary : theme.text.secondary}
               >
-                <Text
-                  color={
-                    row.isActive ? theme.text.primary : theme.text.secondary
-                  }
+                {row.requests}
+              </Text>
+            </Box>
+            {!showQuotaColumn && (
+              <>
+                <Box
+                  width={uncachedWidth}
+                  flexDirection="column"
+                  alignItems="flex-end"
+                  flexShrink={0}
                 >
-                  {row.inputTokens}
-                </Text>
-              </Box>
-              <Box
-                width={cachedWidth}
-                flexDirection="column"
-                alignItems="flex-end"
-                flexShrink={0}
-              >
-                <Text color={theme.text.secondary}>{row.cachedTokens}</Text>
-              </Box>
-              <Box
-                width={outputTokensWidth}
-                flexDirection="column"
-                alignItems="flex-end"
-                flexShrink={0}
-              >
-                <Text
-                  color={
-                    row.isActive ? theme.text.primary : theme.text.secondary
-                  }
+                  <Text
+                    color={
+                      row.isActive ? theme.text.primary : theme.text.secondary
+                    }
+                  >
+                    {row.inputTokens}
+                  </Text>
+                </Box>
+                <Box
+                  width={cachedWidth}
+                  flexDirection="column"
+                  alignItems="flex-end"
+                  flexShrink={0}
                 >
-                  {row.outputTokens}
-                </Text>
-              </Box>
-            </>
-          )}
-          <Box
-            width={usageLimitWidth}
-            flexDirection="column"
-            alignItems="flex-end"
-          >
-            {row.bucket &&
-              row.bucket.remainingFraction != null &&
-              row.bucket.resetTime && (
-                <Text color={theme.text.secondary} wrap="truncate-end">
-                  {(row.bucket.remainingFraction * 100).toFixed(1)}%{' '}
-                  {formatResetTime(row.bucket.resetTime)}
-                </Text>
-              )}
+                  <Text color={theme.text.secondary}>{row.cachedTokens}</Text>
+                </Box>
+                <Box
+                  width={outputTokensWidth}
+                  flexDirection="column"
+                  alignItems="flex-end"
+                  flexShrink={0}
+                >
+                  <Text
+                    color={
+                      row.isActive ? theme.text.primary : theme.text.secondary
+                    }
+                  >
+                    {row.outputTokens}
+                  </Text>
+                </Box>
+              </>
+            )}
+            {showQuotaColumn && (
+              <>
+                <Box
+                  width={usageLimitWidth}
+                  flexDirection="column"
+                  alignItems="flex-start"
+                  paddingLeft={4}
+                  flexShrink={0}
+                >
+                  {row.bucket && row.bucket.remainingFraction != null && (
+                    <Box flexDirection="row" flexShrink={0}>
+                      {renderProgressBar(
+                        effectiveUsedFraction,
+                        statusColor,
+                        progressBarWidth,
+                      )}
+                    </Box>
+                  )}
+                </Box>
+                <Box
+                  width={percentageWidth}
+                  flexDirection="column"
+                  alignItems="flex-end"
+                  flexShrink={0}
+                >
+                  {row.bucket && row.bucket.remainingFraction != null && (
+                    <Box>
+                      {row.bucket.remainingFraction === 0 ? (
+                        <Text color={theme.status.error} wrap="truncate-end">
+                          Limit
+                        </Text>
+                      ) : (
+                        <Text color={statusColor} wrap="truncate-end">
+                          {percentageText}
+                        </Text>
+                      )}
+                    </Box>
+                  )}
+                </Box>
+                <Box
+                  width={resetWidth}
+                  flexDirection="column"
+                  alignItems="flex-start"
+                  paddingLeft={2}
+                  flexShrink={0}
+                >
+                  <Text color={theme.text.secondary} wrap="truncate-end">
+                    {row.bucket?.resetTime &&
+                    formatResetTime(row.bucket.resetTime, 'column')
+                      ? formatResetTime(row.bucket.resetTime, 'column')
+                      : ''}
+                  </Text>
+                </Box>
+              </>
+            )}
           </Box>
-        </Box>
-      ))}
+        );
+      })}
 
       {cacheEfficiency > 0 && !showQuotaColumn && (
         <Box flexDirection="column" marginTop={1}>
@@ -479,8 +603,8 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
             <Text color={theme.text.primary}>
               {selectedAuthType.startsWith('oauth')
                 ? userEmail
-                  ? `Logged in with Google (${userEmail})`
-                  : 'Logged in with Google'
+                  ? `Signed in with Google (${userEmail})`
+                  : 'Signed in with Google'
                 : selectedAuthType}
             </Text>
           </StatRow>
@@ -564,6 +688,7 @@ export const StatsDisplay: React.FC<StatsDisplayProps> = ({
       </Section>
       <ModelUsageTable
         models={models}
+        config={config}
         quotas={quotas}
         cacheEfficiency={computed.cacheEfficiency}
         totalCachedTokens={computed.totalCachedTokens}

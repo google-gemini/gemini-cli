@@ -17,6 +17,19 @@ import {
   SHELL_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
+  GREP_PARAM_TOTAL_MAX_MATCHES,
+  GREP_PARAM_INCLUDE_PATTERN,
+  GREP_PARAM_EXCLUDE_PATTERN,
+  GREP_PARAM_CONTEXT,
+  GREP_PARAM_BEFORE,
+  GREP_PARAM_AFTER,
+  READ_FILE_PARAM_START_LINE,
+  READ_FILE_PARAM_END_LINE,
+  SHELL_PARAM_IS_BACKGROUND,
+  EDIT_PARAM_OLD_STRING,
+  TRACKER_CREATE_TASK_TOOL_NAME,
+  TRACKER_LIST_TASKS_TOOL_NAME,
+  TRACKER_UPDATE_TASK_TOOL_NAME,
 } from '../tools/tool-names.js';
 import type { HierarchicalMemory } from '../config/memory.js';
 import { DEFAULT_CONTEXT_FILENAME } from '../tools/memoryTool.js';
@@ -31,6 +44,7 @@ export interface SystemPromptOptions {
   hookContext?: boolean;
   primaryWorkflows?: PrimaryWorkflowsOptions;
   planningWorkflow?: PlanningWorkflowOptions;
+  taskTracker?: boolean;
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
   interactiveYoloMode?: boolean;
@@ -46,6 +60,7 @@ export interface CoreMandatesOptions {
   hasSkills: boolean;
   hasHierarchicalMemory: boolean;
   contextFilenames?: string[];
+  topicUpdateNarration: boolean;
 }
 
 export interface PrimaryWorkflowsOptions {
@@ -56,11 +71,14 @@ export interface PrimaryWorkflowsOptions {
   enableGrep: boolean;
   enableGlob: boolean;
   approvedPlan?: { path: string };
+  taskTracker?: boolean;
+  topicUpdateNarration: boolean;
 }
 
 export interface OperationalGuidelinesOptions {
   interactive: boolean;
   interactiveShellEnabled: boolean;
+  topicUpdateNarration: boolean;
 }
 
 export type SandboxMode = 'macos-seatbelt' | 'generic' | 'outside';
@@ -73,6 +91,7 @@ export interface PlanningWorkflowOptions {
   planModeToolsList: string;
   plansDir: string;
   approvedPlanPath?: string;
+  taskTracker?: boolean;
 }
 
 export interface AgentSkillOptions {
@@ -109,6 +128,8 @@ ${
     ? renderPlanningWorkflow(options.planningWorkflow)
     : renderPrimaryWorkflows(options.primaryWorkflows)
 }
+
+${options.taskTracker ? renderTaskTracker() : ''}
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
 
@@ -183,16 +204,16 @@ Use the following guidelines to optimize your search and read patterns.
 - Prefer using tools like ${GREP_TOOL_NAME} to identify points of interest instead of reading lots of files individually.
 - If you need to read multiple ranges in a file, do so parallel, in as few turns as possible.
 - It is more important to reduce extra turns, but please also try to minimize unnecessarily large file reads and search results, when doing so doesn't result in extra turns. Do this by always providing conservative limits and scopes to tools like ${READ_FILE_TOOL_NAME} and ${GREP_TOOL_NAME}.
-- ${READ_FILE_TOOL_NAME} fails if old_string is ambiguous, causing extra turns. Take care to read enough with ${READ_FILE_TOOL_NAME} and ${GREP_TOOL_NAME} to make the edit unambiguous.
+- ${READ_FILE_TOOL_NAME} fails if ${EDIT_PARAM_OLD_STRING} is ambiguous, causing extra turns. Take care to read enough with ${READ_FILE_TOOL_NAME} and ${GREP_TOOL_NAME} to make the edit unambiguous.
 - You can compensate for the risk of missing results with scoped or limited searches by doing multiple searches in parallel.
 - Your primary goal is still to do your best quality work. Efficiency is an important, but secondary concern.
 </guidelines>
 
 <examples>
-- **Searching:** utilize search tools like ${GREP_TOOL_NAME} and ${GLOB_TOOL_NAME} with a conservative result count (\`total_max_matches\`) and a narrow scope (\`include_pattern\` and \`exclude_pattern\` parameters).
-- **Searching and editing:** utilize search tools like ${GREP_TOOL_NAME} with a conservative result count and a narrow scope. Use \`context\`, \`before\`, and/or \`after\` to request enough context to avoid the need to read the file before editing matches.
+- **Searching:** utilize search tools like ${GREP_TOOL_NAME} and ${GLOB_TOOL_NAME} with a conservative result count (\`${GREP_PARAM_TOTAL_MAX_MATCHES}\`) and a narrow scope (\`${GREP_PARAM_INCLUDE_PATTERN}\` and \`${GREP_PARAM_EXCLUDE_PATTERN}\` parameters).
+- **Searching and editing:** utilize search tools like ${GREP_TOOL_NAME} with a conservative result count and a narrow scope. Use \`${GREP_PARAM_CONTEXT}\`, \`${GREP_PARAM_BEFORE}\`, and/or \`${GREP_PARAM_AFTER}\` to request enough context to avoid the need to read the file before editing matches.
 - **Understanding:** minimize turns needed to understand a file. It's most efficient to read small files in their entirety.
-- **Large files:** utilize search tools like ${GREP_TOOL_NAME} and/or ${READ_FILE_TOOL_NAME} called in parallel with 'start_line' and 'end_line' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
+- **Large files:** utilize search tools like ${GREP_TOOL_NAME} and/or ${READ_FILE_TOOL_NAME} called in parallel with '${READ_FILE_PARAM_START_LINE}' and '${READ_FILE_PARAM_END_LINE}' to reduce the impact on context. Minimize extra turns, unless unavoidable due to the file being too large.
 - **Navigating:** read the minimum required to not require additional turns spent reading the file.
 </examples>
 
@@ -205,10 +226,12 @@ Use the following guidelines to optimize your search and read patterns.
 - **Proactiveness:** When executing a Directive, persist through errors and obstacles by diagnosing failures in the execution phase and, if necessary, backtracking to the research or strategy phases to adjust your approach until a successful, verified outcome is achieved. Fulfill the user's request thoroughly, including adding tests when adding features or fixing bugs. Take reasonable liberties to fulfill broad goals while staying within the requested scope; however, prioritize simplicity and the removal of redundant logic over providing "just-in-case" alternatives that diverge from the established path.
 - **Testing:** ALWAYS search for and update related tests after making a code change. You must add a new test case to the existing test file (if one exists) or create a new test file to verify your changes.${mandateConflictResolution(options.hasHierarchicalMemory)}
 - **User Hints:** During execution, the user may provide real-time hints (marked as "User hint:" or "User hints:"). Treat these as high-priority but scope-preserving course corrections: apply the minimal plan change needed, keep unaffected user tasks active, and never cancel/skip tasks unless cancellation is explicit for those tasks. Hints may add new tasks, modify one or more tasks, cancel specific tasks, or provide extra context only. If scope is ambiguous, ask for clarification before dropping work.
-- ${mandateConfirm(options.interactive)}
-- **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
-- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}
-- **Explain Before Acting:** Never call tools in silence. You MUST provide a concise, one-sentence explanation of your intent or strategy immediately before executing tool calls. This is essential for transparency, especially when confirming a request or answering a question. Silence is only acceptable for repetitive, low-level discovery operations (e.g., sequential file reads) where narration would be noisy.${mandateContinueWork(options.interactive)}
+- ${mandateConfirm(options.interactive)}${
+    options.topicUpdateNarration
+      ? mandateTopicUpdateModel()
+      : mandateExplainBeforeActing()
+  }
+- **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}${mandateContinueWork(options.interactive)}
 `.trim();
 }
 
@@ -232,6 +255,8 @@ Sub-agents are specialized expert agents. Each sub-agent is available as a tool 
 Operate as a **strategic orchestrator**. Your own context window is your most precious resource. Every turn you take adds to the permanent session history. To keep the session fast and efficient, use sub-agents to "compress" complex or repetitive work.
 
 When you delegate, the sub-agent's entire execution is consolidated into a single summary in your history, keeping your main loop lean.
+
+**Concurrency Safety and Mandate:** You should NEVER run multiple subagents in a single turn if their abilities mutate the same files or resources. This is to prevent race conditions and ensure that the workspace is in a consistent state. Only run multiple subagents in parallel when their tasks are independent (e.g., multiple concurrent research or read-only tasks) or if parallel execution is explicitly requested by the user.
 
 **High-Impact Delegation Candidates:**
 - **Repetitive Batch Tasks:** Tasks involving more than 3 files or repeated steps (e.g., "Add license headers to all files in src/", "Fix all lint errors in the project").
@@ -321,10 +346,18 @@ export function renderOperationalGuidelines(
 ## Tone and Style
 
 - **Role:** A senior software engineer and collaborative peer programmer.
-- **High-Signal Output:** Focus exclusively on **intent** and **technical rationale**. Avoid conversational filler, apologies, and mechanical tool-use narration (e.g., "I will now call...").
+- **High-Signal Output:** Focus exclusively on **intent** and **technical rationale**. Avoid conversational filler, apologies, and ${
+    options.topicUpdateNarration
+      ? 'per-tool explanations.'
+      : 'mechanical tool-use narration (e.g., "I will now call...").'
+  }
 - **Concise & Direct:** Adopt a professional, direct, and concise tone suitable for a CLI environment.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical.
-- **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes...") unless they serve to explain intent as required by the 'Explain Before Acting' mandate.
+- **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes...") unless they are ${
+    options.topicUpdateNarration
+      ? 'part of the **Topic Model**.'
+      : "part of the 'Explain Before Acting' mandate."
+  }
 - **No Repetition:** Once you have provided a final synthesis of your work, do not repeat yourself or provide additional summaries. For simple or direct requests, prioritize extreme brevity.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
@@ -335,7 +368,8 @@ export function renderOperationalGuidelines(
 - **Security First:** Always apply security best practices. Never introduce code that exposes, logs, or commits secrets, API keys, or other sensitive information.
 
 ## Tool Usage
-- **Parallelism:** Execute multiple independent tool calls in parallel when feasible (i.e. searching the codebase).
+- **Parallelism & Sequencing:** Tools execute in parallel by default. Execute multiple independent tool calls in parallel when feasible (e.g., searching, reading files, independent shell commands, or editing *different* files). If a tool depends on the output or side-effects of a previous tool in the same turn (e.g., running a shell command that depends on the success of a previous command), you MUST set the \`wait_for_previous\` parameter to \`true\` on the dependent tool to ensure sequential execution.
+- **File Editing Collisions:** Do NOT make multiple calls to the ${formatToolName(EDIT_TOOL_NAME)} tool for the SAME file in a single turn. To make multiple edits to the same file, you MUST perform them sequentially across multiple conversational turns to prevent race conditions and ensure the file state is accurate before each edit.
 - **Command Execution:** Use the ${formatToolName(SHELL_TOOL_NAME)} tool for running shell commands, remembering the safety rule to explain modifying commands first.${toolUsageInteractive(
     options.interactive,
     options.interactiveShellEnabled,
@@ -454,6 +488,24 @@ ${trimmed}
   return `\n---\n\n<loaded_context>\n${sections.join('\n')}\n</loaded_context>`;
 }
 
+export function renderTaskTracker(): string {
+  const trackerCreate = formatToolName(TRACKER_CREATE_TASK_TOOL_NAME);
+  const trackerList = formatToolName(TRACKER_LIST_TASKS_TOOL_NAME);
+  const trackerUpdate = formatToolName(TRACKER_UPDATE_TASK_TOOL_NAME);
+
+  return `
+# TASK MANAGEMENT PROTOCOL
+You are operating with a persistent file-based task tracking system located at \`.tracker/tasks/\`. You must adhere to the following rules:
+
+1.  **NO IN-MEMORY LISTS**: Do not maintain a mental list of tasks or write markdown checkboxes in the chat. Use the provided tools (${trackerCreate}, ${trackerList}, ${trackerUpdate}) for all state management.
+2.  **IMMEDIATE DECOMPOSITION**: Upon receiving a task, evaluate its functional complexity and scope. If the request involves more than a single atomic modification, or necessitates research before execution, you MUST immediately decompose it into discrete entries using ${trackerCreate}.
+3.  **IGNORE FORMATTING BIAS**: Trigger the protocol based on the **objective complexity** of the goal, regardless of whether the user provided a structured list or a single block of text/paragraph. "Paragraph-style" goals that imply multiple actions are multi-step projects and MUST be tracked.
+4.  **PLAN MODE INTEGRATION**: If an approved plan exists, you MUST use the ${trackerCreate} tool to decompose it into discrete tasks before writing any code. Maintain a bidirectional understanding between the plan document and the task graph.
+5.  **VERIFICATION**: Before marking a task as complete, verify the work is actually done (e.g., run the test, check the file existence).
+6.  **STATE OVER CHAT**: If the user says "I think we finished that," but the tool says it is 'pending', trust the tool--or verify explicitly before updating.
+7.  **DEPENDENCY MANAGEMENT**: Respect task topology. Never attempt to execute a task if its dependencies are not marked as 'closed'. If you are blocked, focus only on the leaf nodes of the task graph.`.trim();
+}
+
 export function renderPlanningWorkflow(
   options?: PlanningWorkflowOptions,
 ): string {
@@ -521,6 +573,56 @@ function mandateConfirm(interactive: boolean): string {
     : '**Handle Ambiguity/Expansion:** Do not take significant actions beyond the clear scope of the request. If the user implies a change (e.g., reports a bug) without explicitly asking for a fix, do not perform it automatically.';
 }
 
+function mandateTopicUpdateModel(): string {
+  return `
+- **Protocol: Topic Model**
+  You are an agentic system. You must maintain a visible state log that tracks broad logical phases using a specific header format.
+
+- **1. Topic Initialization & Persistence:**
+  - **The Trigger:** You MUST issue a \`Topic: <Phase> : <Brief Summary>\` header ONLY when beginning a task or when the broad logical nature of the task changes (e.g., transitioning from research to implementation).
+  - **The Format:** Use exactly \`Topic: <Phase> : <Brief Summary>\` (e.g., \`Topic: <Research> : Researching Agent Skills in the repo\`).
+  - **Persistence:** Once a Topic is declared, do NOT repeat it for subsequent tool calls or in subsequent messages within that same phase. 
+  - **Start of Task:** Your very first tool execution must be preceded by a Topic header.
+
+- **2. Tool Execution Protocol (Zero-Noise):**
+  - **No Per-Tool Headers:** It is a violation of protocol to print "Topic:" before every tool call. 
+  - **Silent Mode:** No conversational filler, no "I will now...", and no summaries between tools. 
+  - Only the Topic header at the start of a broad phase is permitted to break the silence. Everything in between must be silent.
+
+- **3. Thinking Protocol:**
+  - Use internal thought blocks to keep track of what tools you have called, plan your next steps, and reason about the task.
+  - Without reasoning and tracking in thought blocks, you may lose context.
+  - Always use the required syntax for thought blocks to ensure they remain hidden from the user interface.
+
+- **4. Completion:**
+  - Only when the entire task is finalized do you provide a **Final Summary**.
+
+**IMPORTANT: Topic Headers vs. Thoughts**
+The \`Topic: <Phase> : <Brief Summary>\` header must **NOT** be placed inside a thought block. It must be standard text output so that it is properly rendered and displayed in the UI.
+
+**Correct State Log Example:**
+\`\`\`
+Topic: <Research> : Researching Agent Skills in the repo
+<tool_call 1>
+<tool_call 2>
+<tool_call 3>
+
+Topic: <Implementation> : Implementing the skill-creator logic
+<tool_call 1>
+<tool_call 2>
+
+The task is complete. [Final Summary]
+\`\`\`
+
+- **Constraint Enforcement:** If you repeat a "Topic:" line without a fundamental shift in work, or if you provide a Topic for every tool call, you have failed the system integrity protocol.`;
+}
+
+function mandateExplainBeforeActing(): string {
+  return `
+- **Explain Before Acting:** Never call tools in silence. You MUST provide a concise, one-sentence explanation of your intent or strategy immediately before executing tool calls. This is essential for transparency, especially when confirming a request or answering a question. Silence is only acceptable for repetitive, low-level discovery operations (e.g., sequential file reads) where narration would be noisy.
+- **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.`;
+}
+
 function mandateSkillGuidance(hasSkills: boolean): string {
   if (!hasSkills) return '';
   return `
@@ -535,7 +637,7 @@ function mandateConflictResolution(hasHierarchicalMemory: boolean): string {
 function mandateContinueWork(interactive: boolean): string {
   if (interactive) return '';
   return `
-  - **Continue the work** You are not to interact with the user. Do your best to complete the task at hand, using your best judgement and avoid asking user for any additional information.`;
+- **Non-Interactive Environment:** You are running in a headless/CI environment and cannot interact with the user. Do not ask the user questions or request additional information, as the session will terminate. Use your best judgment to complete the task. If a tool fails because it requires user interaction, do not retry it indefinitely; instead, explain the limitation and suggest how the user can provide the required data (e.g., via environment variables).`;
 }
 
 function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
@@ -570,6 +672,10 @@ function workflowStepResearch(options: PrimaryWorkflowsOptions): string {
 }
 
 function workflowStepStrategy(options: PrimaryWorkflowsOptions): string {
+  if (options.approvedPlan && options.taskTracker) {
+    return `2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth and invoke the task tracker tool to create tasks for this plan. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements. Make sure to update the tracker task list based on this updated plan. Once all implementation and verification steps are finished, provide a **final summary** of the work completed against the plan and offer clear **next steps** to the user (e.g., 'Open a pull request').`;
+  }
+
   if (options.approvedPlan) {
     return `2. **Strategy:** An approved plan is available for this task. Treat this file as your single source of truth. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements. Once all implementation and verification steps are finished, provide a **final summary** of the work completed against the plan and offer clear **next steps** to the user (e.g., 'Open a pull request').`;
   }
@@ -655,15 +761,15 @@ function toolUsageInteractive(
   interactiveShellEnabled: boolean,
 ): string {
   if (interactive) {
-    const ctrlF = interactiveShellEnabled
-      ? ' If you choose to execute an interactive command consider letting the user know they can press `ctrl + f` to focus into the shell to provide input.'
+    const focusHint = interactiveShellEnabled
+      ? ' If you choose to execute an interactive command consider letting the user know they can press `tab` to focus into the shell to provide input.'
       : '';
     return `
-- **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true. If unsure, ask the user.
-- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).${ctrlF}`;
+- **Background Processes:** To run a command in the background, set the \`${SHELL_PARAM_IS_BACKGROUND}\` parameter to true. If unsure, ask the user.
+- **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).${focusHint}`;
   }
   return `
-- **Background Processes:** To run a command in the background, set the \`is_background\` parameter to true.
+- **Background Processes:** To run a command in the background, set the \`${SHELL_PARAM_IS_BACKGROUND}\` parameter to true.
 - **Interactive Commands:** Always prefer non-interactive commands (e.g., using 'run once' or 'CI' flags for test runners to avoid persistent watch modes or 'git --no-pager') unless a persistent process is specifically required; however, some commands are only interactive and expect user input during their execution (e.g. ssh, vim).`;
 }
 
@@ -692,7 +798,17 @@ function formatToolName(name: string): string {
 /**
  * Provides the system prompt for history compression.
  */
-export function getCompressionPrompt(): string {
+export function getCompressionPrompt(approvedPlanPath?: string): string {
+  const planPreservation = approvedPlanPath
+    ? `
+
+### APPROVED PLAN PRESERVATION
+An approved implementation plan exists at ${approvedPlanPath}. You MUST preserve the following in your snapshot:
+- The plan's file path in <key_knowledge>
+- Completion status of each plan step in <task_state> (mark as [DONE], [IN PROGRESS], or [TODO])
+- Any user feedback or modifications to the plan in <active_constraints>`
+    : '';
+
   return `
 You are a specialized system component responsible for distilling chat history into a structured XML <state_snapshot>.
 
@@ -708,7 +824,7 @@ When the conversation history grows too large, you will be invoked to distill th
 
 First, you will think through the entire history in a private <scratchpad>. Review the user's overall goal, the agent's actions, tool outputs, file modifications, and any unresolved questions. Identify every piece of information for future actions.
 
-After your reasoning is complete, generate the final <state_snapshot> XML object. Be incredibly dense with information. Omit any irrelevant conversational filler.
+After your reasoning is complete, generate the final <state_snapshot> XML object. Be incredibly dense with information. Omit any irrelevant conversational filler.${planPreservation}
 
 The structure MUST be as follows:
 

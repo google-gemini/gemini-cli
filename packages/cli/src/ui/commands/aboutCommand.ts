@@ -4,8 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { CommandContext, SlashCommand } from './types.js';
-import { CommandKind } from './types.js';
+import {
+  CommandKind,
+  type CommandContext,
+  type SlashCommand,
+} from './types.js';
 import process from 'node:process';
 import { MessageType, type HistoryItemAbout } from '../types.js';
 import {
@@ -20,10 +23,15 @@ export const aboutCommand: SlashCommand = {
   description: 'Show version info',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+ fix/about-email-redaction
   action: async (context, args) => {
     const showFull = args?.trim() === '--full';
     const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 
+
+  isSafeConcurrent: true,
+  action: async (context) => {
+ main
     const osVersion = process.platform;
     let sandboxEnv = 'no sandbox';
     if (process.env['SANDBOX'] && process.env['SANDBOX'] !== 'sandbox-exec') {
