@@ -244,10 +244,11 @@ export async function parseArguments(
             // When --resume passed without a value (`gemini --resume`): value = "" (string)
             // When --resume not passed at all: this `coerce` function is not called at all, and
             //   `yargsInstance.argv.resume` is undefined.
-            if (value === '') {
+            const trimmed = value.trim();
+            if (trimmed === '') {
               return RESUME_LATEST;
             }
-            return value;
+            return trimmed;
           },
         })
         .option('list-sessions', {
