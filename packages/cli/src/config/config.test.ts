@@ -3347,7 +3347,10 @@ describe('Policy Engine Integration in loadCliConfig', () => {
 
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.objectContaining({
-        policyPaths: ['/path/to/policy1.toml', '/path/to/policy2.toml'],
+        policyPaths: [
+          path.normalize('/path/to/policy1.toml'),
+          path.normalize('/path/to/policy2.toml'),
+        ],
       }),
       expect.anything(),
     );
