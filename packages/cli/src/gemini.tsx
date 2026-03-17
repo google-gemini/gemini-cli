@@ -647,7 +647,7 @@ export async function main() {
       process.exit(ExitCodes.FATAL_INPUT_ERROR);
     }
 
-    const prompt_id = Math.random().toString(16).slice(2);
+    const prompt_id = sessionId;
     logUserPrompt(
       config,
       new UserPromptEvent(
