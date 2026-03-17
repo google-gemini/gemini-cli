@@ -5,11 +5,12 @@
  */
 
 import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
+import { makeFakeConfig, ExitCodes } from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
 import { act } from 'react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { FolderTrustDialog } from './FolderTrustDialog.js';
-import { ExitCodes } from '@google/gemini-cli-core';
 import * as processUtils from '../../utils/processUtils.js';
 
 vi.mock('../../utils/processUtils.js', () => ({
@@ -78,7 +79,10 @@ describe('FolderTrustDialog', () => {
       />,
       {
         width: 80,
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({
+          merged: { ui: { useAlternateBuffer: false } },
+        }),
         uiState: { constrainHeight: true, terminalHeight: 24 },
       },
     );
@@ -108,7 +112,10 @@ describe('FolderTrustDialog', () => {
       />,
       {
         width: 80,
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({
+          merged: { ui: { useAlternateBuffer: false } },
+        }),
         uiState: { constrainHeight: true, terminalHeight: 14 },
       },
     );
@@ -139,7 +146,10 @@ describe('FolderTrustDialog', () => {
       />,
       {
         width: 80,
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({
+          merged: { ui: { useAlternateBuffer: false } },
+        }),
         uiState: { constrainHeight: true, terminalHeight: 10 },
       },
     );
@@ -168,7 +178,10 @@ describe('FolderTrustDialog', () => {
       />,
       {
         width: 80,
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({
+          merged: { ui: { useAlternateBuffer: false } },
+        }),
         // Initially constrained
         uiState: { constrainHeight: true, terminalHeight: 24 },
       },
@@ -194,7 +207,10 @@ describe('FolderTrustDialog', () => {
         />,
         {
           width: 80,
-          useAlternateBuffer: false,
+          config: makeFakeConfig({ useAlternateBuffer: false }),
+          settings: createMockSettings({
+            merged: { ui: { useAlternateBuffer: false } },
+          }),
           uiState: { constrainHeight: false, terminalHeight: 24 },
         },
       );
@@ -434,7 +450,10 @@ describe('FolderTrustDialog', () => {
         />,
         {
           width: 80,
-          useAlternateBuffer: true,
+          config: makeFakeConfig({ useAlternateBuffer: true }),
+          settings: createMockSettings({
+            merged: { ui: { useAlternateBuffer: true } },
+          }),
           uiState: { constrainHeight: false, terminalHeight: 15 },
         },
       );

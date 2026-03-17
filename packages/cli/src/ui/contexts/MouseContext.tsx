@@ -25,6 +25,7 @@ import {
   DOUBLE_CLICK_THRESHOLD_MS,
   DOUBLE_CLICK_DISTANCE_TOLERANCE,
 } from '../utils/mouse.js';
+import { useSettingsStore } from './SettingsContext.js';
 
 export type { MouseEvent, MouseEventName, MouseHandler };
 
@@ -61,12 +62,13 @@ export function useMouse(handler: MouseHandler, { isActive = true } = {}) {
 export function MouseProvider({
   children,
   mouseEventsEnabled,
-  debugKeystrokeLogging,
 }: {
   children: React.ReactNode;
   mouseEventsEnabled?: boolean;
-  debugKeystrokeLogging?: boolean;
 }) {
+  const { settings } = useSettingsStore();
+  const debugKeystrokeLogging = settings.merged.general.debugKeystrokeLogging;
+
   const { stdin } = useStdin();
   const subscribers = useRef<Set<MouseHandler>>(new Set()).current;
   const lastClickRef = useRef<{
