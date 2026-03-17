@@ -493,7 +493,7 @@ function mandateSkillGuidance(hasSkills: boolean): string {
 
 function mandateConflictResolution(hasHierarchicalMemory: boolean): string {
   if (!hasHierarchicalMemory) return '';
-  return '\\n- **Conflict Resolution:** Instructions are provided in hierarchical context tags: `<global_context>`, `<extension_context>`, and `<project_context>`. In case of contradictory instructions, follow this priority: `<project_context>` (highest) > `<extension_context>` > `<global_context>` (lowest).';
+  return '\n- **Conflict Resolution:** Instructions are provided in hierarchical context tags: `<global_context>`, `<extension_context>`, and `<project_context>`. In case of contradictory instructions, follow this priority: `<project_context>` (highest) > `<extension_context>` > `<global_context>` (lowest).';
 }
 
 function mandateExplainBeforeActing(isGemini3: boolean): string {
