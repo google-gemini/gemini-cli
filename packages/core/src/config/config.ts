@@ -1335,13 +1335,6 @@ export class Config implements McpContext, AgentLoopContext {
     // Fetch admin controls
     const experiments = await this.experimentsPromise;
 
-    if (
-      experiments?.flags[ExperimentFlags.PRO_MODEL_NO_ACCESS]?.boolValue &&
-      this.model === PREVIEW_GEMINI_MODEL_AUTO
-    ) {
-      this.setModel(PREVIEW_GEMINI_FLASH_MODEL);
-    }
-
     const adminControlsEnabled =
       experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]?.boolValue ??
       false;
