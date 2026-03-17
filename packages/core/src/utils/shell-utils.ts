@@ -548,7 +548,7 @@ export function getShellConfiguration(): ShellConfiguration {
   if (isWindows()) {
     // -NonInteractive prevents PSReadLine from intercepting console input
     // events inside the ConPTY session, which otherwise causes interactive
-    // TUI tools (e.g. pnpm create vite) to receive malformed key events
+    // TUI tools (e.g. pnpm create vite, vim) to receive malformed key events
     // and exit when arrow keys are pressed.
     const powershellArgsPrefix = ['-NoProfile', '-NonInteractive', '-Command'];
 
