@@ -6,5 +6,10 @@
   },
   "general": {
     "devtools": true
+  },
+  "tools": {
+    "sandbox": {
+      "networkAccess": true
+    }
   }
 }
