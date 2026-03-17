@@ -144,7 +144,11 @@ describe('ConsolePatcher', () => {
 
     it('should ignore log and info when debugMode is false', () => {
       const spyError = vi.spyOn(console, 'error').mockImplementation(() => {});
-      patcher = new ConsolePatcher({ debugMode: false, stderr: true });
+      patcher = new ConsolePatcher({
+        debugMode: false,
+        stderr: true,
+        headlessMode: true,
+      });
       patcher.patch();
 
       console.log('test log');
