@@ -41,6 +41,10 @@ Tips for getting started:
 │ ✓  tool2 Description for tool 2                                          │
 │                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────╮
+│ o  tool3 Description for tool 3                                          │
+│                                                                          │
+╰──────────────────────────────────────────────────────────────────────────╯
 "
 `;
 
@@ -97,6 +101,10 @@ Tips for getting started:
 2. /help for more information
 3. Ask coding questions, edit code or run commands
 4. Be specific for the best results
+╭──────────────────────────────────────────────────────────────────────────╮
+│ o  tool3 Description for tool 3                                          │
+│                                                                          │
+╰──────────────────────────────────────────────────────────────────────────╯
 "
 `;
 

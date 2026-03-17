@@ -37,6 +37,7 @@ import {
   buildUserSteeringHintPrompt,
   GeminiCliOperation,
   getPlanModeExitMessage,
+  isBackgroundExecutionData,
 } from '@google/gemini-cli-core';
 import type {
   Config,
@@ -94,10 +95,10 @@ type ToolResponseWithParts = ToolCallResponseInfo & {
   llmContent?: PartListUnion;
 };
 
-interface ShellToolData {
-  pid?: number;
-  command?: string;
-  initialOutput?: string;
+interface BackgroundedToolInfo {
+  pid: number;
+  command: string;
+  initialOutput: string;
 }
 
 enum StreamProcessingStatus {
@@ -111,15 +112,32 @@ const SUPPRESSED_TOOL_ERRORS_NOTE =
 const LOW_VERBOSITY_FAILURE_NOTE =
   'This request failed. Press F12 for diagnostics, or run /settings and change "Error Verbosity" to full for full details.';
 
-function isShellToolData(data: unknown): data is ShellToolData {
-  if (typeof data !== 'object' || data === null) {
-    return false;
+function getBackgroundedToolInfo(
+  toolCall: TrackedCompletedToolCall | TrackedCancelledToolCall,
+): BackgroundedToolInfo | undefined {
+  const response = toolCall.response as ToolResponseWithParts;
+  const rawData: unknown = response?.data;
+  if (!isBackgroundExecutionData(rawData)) {
+    return undefined;
   }
-  const d = data as Partial<ShellToolData>;
+
+  if (rawData.pid === undefined) {
+    return undefined;
+  }
+
+  return {
+    pid: rawData.pid,
+    command: rawData.command ?? toolCall.request.name,
+    initialOutput: rawData.initialOutput ?? '',
+  };
+}
+
+function isBackgroundableExecutingToolCall(
+  toolCall: TrackedToolCall,
+): toolCall is TrackedExecutingToolCall {
   return (
-    (d.pid === undefined || typeof d.pid === 'number') &&
-    (d.command === undefined || typeof d.command === 'string') &&
-    (d.initialOutput === undefined || typeof d.initialOutput === 'string')
+    toolCall.status === CoreToolCallStatus.Executing &&
+    typeof toolCall.pid === 'number'
   );
 }
 
@@ -319,13 +337,11 @@ export const useGeminiStream = (
     getPreferredEditor,
   );
 
-  const activeToolPtyId = useMemo(() => {
-    const executingShellTool = toolCalls.find(
-      (tc) =>
-        tc.status === 'executing' && tc.request.name === 'run_shell_command',
+  const activeBackgroundExecutionId = useMemo(() => {
+    const executingBackgroundableTool = toolCalls.find(
+      isBackgroundableExecutingToolCall,
     );
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    return (executingShellTool as TrackedExecutingToolCall | undefined)?.pid;
+    return executingBackgroundableTool?.pid;
   }, [toolCalls]);
 
   const onExec = useCallback(
@@ -358,7 +374,7 @@ export const useGeminiStream = (
     setShellInputFocused,
     terminalWidth,
     terminalHeight,
-    activeToolPtyId,
+    activeBackgroundExecutionId,
   );
 
   const streamingState = useMemo(
@@ -536,7 +552,8 @@ export const useGeminiStream = (
     onComplete: (result: { userSelection: 'disable' | 'keep' }) => void;
   } | null>(null);
 
-  const activePtyId = activeShellPtyId || activeToolPtyId;
+  const activePtyId =
+    activeShellPtyId ?? activeBackgroundExecutionId ?? undefined;
 
   const prevActiveShellPtyIdRef = useRef<number | null>(null);
   useEffect(() => {
@@ -820,8 +837,8 @@ export const useGeminiStream = (
             onDebugMessage,
             messageId: userMessageTimestamp,
             signal: abortSignal,
+            escapePastedAtSymbols: settings.merged.ui?.escapePastedAtSymbols,
           });
-
           if (atCommandResult.error) {
             onDebugMessage(atCommandResult.error);
             return { queryToSend: null, shouldProceed: false };
@@ -857,6 +874,7 @@ export const useGeminiStream = (
       logger,
       shellModeActive,
       scheduleToolCalls,
+      settings,
     ],
   );
 
@@ -1678,26 +1696,16 @@ export const useGeminiStream = (
           !processedMemoryToolsRef.current.has(t.request.callId),
       );
 
-      // Handle backgrounded shell tools
-      completedAndReadyToSubmitTools.forEach((t) => {
-        const isShell = t.request.name === 'run_shell_command';
-        // Access result from the tracked tool call response
-        const response = t.response as ToolResponseWithParts;
-        const rawData = response?.data;
-        const data = isShellToolData(rawData) ? rawData : undefined;
-
-        // Use data.pid for shell commands moved to the background.
-        const pid = data?.pid;
-
-        if (isShell && pid) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const command = (data?.['command'] as string) ?? 'shell';
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-          const initialOutput = (data?.['initialOutput'] as string) ?? '';
-
-          registerBackgroundShell(pid, command, initialOutput);
+      for (const toolCall of completedAndReadyToSubmitTools) {
+        const backgroundedTool = getBackgroundedToolInfo(toolCall);
+        if (backgroundedTool) {
+          registerBackgroundShell(
+            backgroundedTool.pid,
+            backgroundedTool.command,
+            backgroundedTool.initialOutput,
+          );
         }
-      });
+      }
 
       if (newSuccessfulMemorySaves.length > 0) {
         // Perform the refresh only if there are new ones.

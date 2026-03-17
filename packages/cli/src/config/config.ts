@@ -494,11 +494,12 @@ export async function loadCliConfig(
     .getExtensions()
     .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
 
-  const experimentalJitContext = settings.experimental?.jitContext ?? false;
+  const experimentalJitContext = settings.experimental.jitContext;
 
-  let extensionRegistryURI: string | undefined = trustedFolder
-    ? settings.experimental?.extensionRegistryURI
-    : undefined;
+  let extensionRegistryURI =
+    process.env['GEMINI_CLI_EXTENSION_REGISTRY_URI'] ??
+    (trustedFolder ? settings.experimental?.extensionRegistryURI : undefined);
+
   if (extensionRegistryURI && !extensionRegistryURI.startsWith('http')) {
     extensionRegistryURI = resolveToRealPath(
       path.resolve(cwd, resolvePath(extensionRegistryURI)),
@@ -730,11 +731,14 @@ export async function loadCliConfig(
     clientVersion: await getVersion(),
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
+    toolSandboxing: settings.security?.toolSandboxing ?? false,
     targetDir: cwd,
     includeDirectoryTree,
     includeDirectories,
     loadMemoryFromIncludeDirectories:
       settings.context?.loadMemoryFromIncludeDirectories || false,
+    discoveryMaxDirs: settings.context?.discoveryMaxDirs,
+    importFormat: settings.context?.importFormat,
     debugMode,
     question,
 
@@ -770,6 +774,9 @@ export async function loadCliConfig(
     approvalMode,
     disableYoloMode:
       settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,
+    disableAlwaysAllow:
+      settings.security?.disableAlwaysAllow ||
+      settings.admin?.secureModeEnabled,
     showMemoryUsage: settings.ui?.showMemoryUsage || false,
     accessibility: {
       ...settings.ui?.accessibility,
@@ -809,6 +816,7 @@ export async function loadCliConfig(
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     modelSteering: settings.experimental?.modelSteering,
+    topicUpdateNarration: settings.experimental?.topicUpdateNarration,
     toolOutputMasking: settings.experimental?.toolOutputMasking,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
@@ -843,6 +851,7 @@ export async function loadCliConfig(
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
     rawOutput: argv.rawOutput,
     acceptRawOutputRisk: argv.acceptRawOutputRisk,
+    dynamicModelConfiguration: settings.experimental?.dynamicModelConfiguration,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
     enableHooks: settings.hooksConfig.enabled,
