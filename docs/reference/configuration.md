@@ -688,7 +688,7 @@ their corresponding top-level category object in your `settings.json` file.
         "tier": "pro",
         "family": "gemini-3",
         "isPreview": true,
-        "dialogLocation": "manual",
+        "isVisible": true,
         "features": {
           "thinking": true,
           "multimodalToolUse": true
@@ -698,6 +698,7 @@ their corresponding top-level category object in your `settings.json` file.
         "tier": "pro",
         "family": "gemini-3",
         "isPreview": true,
+        "isVisible": false,
         "features": {
           "thinking": true,
           "multimodalToolUse": true
@@ -707,7 +708,7 @@ their corresponding top-level category object in your `settings.json` file.
         "tier": "pro",
         "family": "gemini-3",
         "isPreview": true,
-        "dialogLocation": "manual",
+        "isVisible": true,
         "features": {
           "thinking": true,
           "multimodalToolUse": true
@@ -717,7 +718,7 @@ their corresponding top-level category object in your `settings.json` file.
         "tier": "flash",
         "family": "gemini-3",
         "isPreview": true,
-        "dialogLocation": "manual",
+        "isVisible": true,
         "features": {
           "thinking": false,
           "multimodalToolUse": true
@@ -727,7 +728,7 @@ their corresponding top-level category object in your `settings.json` file.
         "tier": "pro",
         "family": "gemini-2.5",
         "isPreview": false,
-        "dialogLocation": "manual",
+        "isVisible": true,
         "features": {
           "thinking": false,
           "multimodalToolUse": false
@@ -737,7 +738,7 @@ their corresponding top-level category object in your `settings.json` file.
         "tier": "flash",
         "family": "gemini-2.5",
         "isPreview": false,
-        "dialogLocation": "manual",
+        "isVisible": true,
         "features": {
           "thinking": false,
           "multimodalToolUse": false
@@ -747,7 +748,7 @@ their corresponding top-level category object in your `settings.json` file.
         "tier": "flash-lite",
         "family": "gemini-2.5",
         "isPreview": false,
-        "dialogLocation": "manual",
+        "isVisible": true,
         "features": {
           "thinking": false,
           "multimodalToolUse": false
@@ -756,6 +757,7 @@ their corresponding top-level category object in your `settings.json` file.
       "auto": {
         "tier": "auto",
         "isPreview": true,
+        "isVisible": false,
         "features": {
           "thinking": true,
           "multimodalToolUse": false
@@ -764,6 +766,7 @@ their corresponding top-level category object in your `settings.json` file.
       "pro": {
         "tier": "pro",
         "isPreview": false,
+        "isVisible": false,
         "features": {
           "thinking": true,
           "multimodalToolUse": false
@@ -772,6 +775,7 @@ their corresponding top-level category object in your `settings.json` file.
       "flash": {
         "tier": "flash",
         "isPreview": false,
+        "isVisible": false,
         "features": {
           "thinking": false,
           "multimodalToolUse": false
@@ -780,6 +784,7 @@ their corresponding top-level category object in your `settings.json` file.
       "flash-lite": {
         "tier": "flash-lite",
         "isPreview": false,
+        "isVisible": false,
         "features": {
           "thinking": false,
           "multimodalToolUse": false
@@ -789,7 +794,7 @@ their corresponding top-level category object in your `settings.json` file.
         "displayName": "Auto (Gemini 3)",
         "tier": "auto",
         "isPreview": true,
-        "dialogLocation": "main",
+        "isVisible": true,
         "dialogDescription": "Let Gemini CLI decide the best model for the task: gemini-3.1-pro, gemini-3-flash",
         "features": {
           "thinking": true,
@@ -800,7 +805,7 @@ their corresponding top-level category object in your `settings.json` file.
         "displayName": "Auto (Gemini 2.5)",
         "tier": "auto",
         "isPreview": false,
-        "dialogLocation": "main",
+        "isVisible": true,
         "dialogDescription": "Let Gemini CLI decide the best model for the task: gemini-2.5-pro, gemini-2.5-flash",
         "features": {
           "thinking": false,

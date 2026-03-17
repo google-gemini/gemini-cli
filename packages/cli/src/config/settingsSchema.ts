@@ -2829,7 +2829,7 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
       tier: { enum: ['pro', 'flash', 'flash-lite', 'custom', 'auto'] },
       family: { type: 'string' },
       isPreview: { type: 'boolean' },
-      dialogLocation: { enum: ['main', 'manual'] },
+      isVisible: { type: 'boolean' },
       dialogDescription: { type: 'string' },
       features: {
         type: 'object',
