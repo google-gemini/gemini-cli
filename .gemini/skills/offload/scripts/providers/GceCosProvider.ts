@@ -83,6 +83,13 @@ export class GceCosProvider implements WorkerProvider {
       '--scopes', 'https://www.googleapis.com/auth/cloud-platform'
     ], { stdio: 'inherit' });
 
+    if (result.status === 0) {
+      console.log('⏳ Waiting for OS Login and SSH to initialize (this takes ~45s)...');
+      // On COS, first boot involves significant background initialization.
+      // A simple sleep provides a better UX than immediate connection failures.
+      await new Promise(r => setTimeout(r, 45000));
+    }
+
     return result.status ?? 1;
   }
 

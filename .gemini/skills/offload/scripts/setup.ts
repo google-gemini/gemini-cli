@@ -34,7 +34,20 @@ async function confirm(question: string): Promise<boolean> {
 }
 
 export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
-  console.log('\n🌟 Initializing Dedicated Offload Worker...');
+  console.log(`
+================================================================================
+🚀 GEMINI CLI: HIGH-PERFORMANCE OFFLOAD SYSTEM
+================================================================================
+The offload system allows you to delegate heavy tasks (PR reviews, agentic fixes,
+and full builds) to a dedicated, high-performance GCP worker.
+
+This script will:
+1. Identify/Provision your dedicated worker (gcli-offload-${env.USER || 'user'})
+2. Configure "Magic" corporate network routing (nic0 + IAP)
+3. Synchronize your local credentials and orchestration logic
+4. Initialize a remote repository for parallel worktree execution
+================================================================================
+  `);
 
   const defaultProject = env.GOOGLE_CLOUD_PROJECT || '';
   const projectId = await prompt('GCP Project ID', defaultProject);
@@ -47,6 +60,7 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   const zone = await prompt('Compute Zone', 'us-west1-a');
   const targetVM = `gcli-offload-${env.USER || 'mattkorwel'}`;
   
+  console.log('\n🔍 Phase 1: Identity & Discovery');
   // Early save of discovery info so fleet commands can work
   const initialSettingsPath = path.join(REPO_ROOT, '.gemini/offload/settings.json');
   if (!fs.existsSync(path.dirname(initialSettingsPath))) fs.mkdirSync(path.dirname(initialSettingsPath), { recursive: true });
@@ -56,21 +70,33 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
 
   const provider = ProviderFactory.getProvider({ projectId, zone, instanceName: targetVM });
 
-  console.log(`🔍 Verifying access and finding worker ${targetVM}...`);
-  const status = await provider.getStatus();
+  console.log(`   - Verifying access and finding worker ${targetVM}...`);
+  let status = await provider.getStatus();
   
   if (status.status === 'UNKNOWN' || status.status === 'ERROR') {
-    console.error(`❌ Worker ${targetVM} not found or error fetching status. Run "npm run offload:fleet provision" first.`);
-    return 1;
+    console.log('\n🏗️  Phase 2: Infrastructure Provisioning');
+    const shouldProvision = await confirm(`   - Worker ${targetVM} not found. Provision it now in project ${projectId}?`);
+    if (!shouldProvision) {
+      console.log('🛑 Aborting setup.');
+      return 1;
+    }
+    const provisionRes = await provider.provision();
+    if (provisionRes !== 0) {
+      console.error('❌ Provisioning failed.');
+      return 1;
+    }
+    // Refresh status after provisioning
+    status = await provider.getStatus();
   }
 
   if (status.status !== 'RUNNING') {
+    console.log('   - Waking up worker...');
     await provider.ensureReady();
   }
 
   // 1. Configure Isolated SSH Alias (Direct Internal Path with IAP Fallback)
-  console.log(`\n🚀 Configuring Isolated SSH Alias...`);
-  const dnsSuffix = await prompt('Internal DNS Suffix', '.internal.gcpnode.com');
+  console.log(`\n🚀 Phase 3: Network & Connectivity`);
+  const dnsSuffix = await prompt('   - Internal DNS Suffix', '.internal.gcpnode.com');
 
   const setupRes = await provider.setup({ projectId, zone, dnsSuffix });
   if (setupRes !== 0) return setupRes;
