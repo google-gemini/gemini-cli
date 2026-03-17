@@ -81,16 +81,24 @@ export function truncateString(
     return str;
   }
 
-  let actualMaxLength = maxLength;
-  const lastCode = str.charCodeAt(maxLength - 1);
-  // If the last character is a high surrogate, it's either the start of a pair
-  // that we're about to slice, or it was already a dangling surrogate.
-  // In either case, we should remove it to ensure a valid UTF-16 string.
-  if (lastCode >= 0xd800 && lastCode <= 0xdbff) {
-    actualMaxLength--;
+  const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+  let truncatedStr = '';
+  for (const { segment } of segmenter.segment(str)) {
+    if (truncatedStr.length + segment.length > maxLength) {
+      break;
+    }
+    truncatedStr += segment;
   }
 
-  return str.slice(0, actualMaxLength) + suffix;
+  // Double-check if we ended with a dangling high surrogate (e.g. if the input was malformed).
+  if (truncatedStr.length > 0) {
+    const lastCode = truncatedStr.charCodeAt(truncatedStr.length - 1);
+    if (lastCode >= 0xd800 && lastCode <= 0xdbff) {
+      truncatedStr = truncatedStr.slice(0, -1);
+    }
+  }
+
+  return truncatedStr + suffix;
 }
 
 /**

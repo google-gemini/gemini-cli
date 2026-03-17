@@ -118,6 +118,16 @@ describe('truncateString', () => {
     const str = 'a\uD83Db';
     expect(truncateString(str, 2, '')).toBe('a');
   });
+
+  it('should handle multi-code-point grapheme clusters like combining marks', () => {
+    const combinedChar = 'e\u0301'; // 'é' (length 2)
+    const str = 'a' + combinedChar; // length 3
+    // Truncating at length 2 would break the 'é'
+    expect(truncateString(str, 2, '')).toBe('a');
+    expect(truncateString(str, 1, '')).toBe('a');
+    expect(truncateString(combinedChar, 1, '')).toBe('');
+    expect(truncateString(combinedChar, 2, '')).toBe(combinedChar);
+  });
 });
 
 describe('safeTemplateReplace', () => {
