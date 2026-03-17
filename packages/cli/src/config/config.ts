@@ -103,6 +103,7 @@ export interface CliArgs {
   fakeResponses: string | undefined;
   recordResponses: string | undefined;
   startupMessages?: string[];
+  workspace: string | undefined;
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
@@ -287,6 +288,12 @@ export async function parseArguments(
           nargs: 1,
           description:
             'Execute the provided prompt and continue in interactive mode',
+        })
+        .option('workspace', {
+          alias: 'w',
+          type: 'string',
+          nargs: 1,
+          description: 'The workspace directory to operate in',
         })
         .option('worktree', {
           alias: 'w',
@@ -492,6 +499,9 @@ export async function parseArguments(
 
   // Keep CliArgs.query as a string for downstream typing
   (result as Record<string, unknown>)['query'] = q || undefined;
+  if (result['workspace']) {
+    startupMessages.push(`Workspace overridden to: ${result['workspace']}`);
+  }
   (result as Record<string, unknown>)['startupMessages'] = startupMessages;
 
   // The import format is now only controlled by settings.memoryImportFormat

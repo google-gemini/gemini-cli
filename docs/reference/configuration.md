@@ -2365,6 +2365,9 @@ for that specific session.
     with screen readers.
 - **`--version`**:
   - Displays the version of the CLI.
+- **`--workspace <path>`** (**`-w <path>`**):
+  - Overrides the current working directory. This enables the CLI to operate on
+    a target project directory regardless of where the command is executed from.
 - **`--yolo`**:
   - Enables YOLO mode, which automatically approves all tool calls.
 
