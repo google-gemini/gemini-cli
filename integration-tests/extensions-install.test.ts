@@ -42,11 +42,10 @@ describe('extension install', () => {
       const listResult = await rig.runCommand(['extensions', 'list']);
       expect(listResult).toContain('test-extension-install');
       writeFileSync(testServerPath, extensionUpdate);
-      const updateResult = await rig.runCommand([
-        'extensions',
-        'update',
-        `test-extension-install`,
-      ]);
+      const updateResult = await rig.runCommand(
+        ['extensions', 'update', `test-extension-install`],
+        { stdin: 'y\n' },
+      );
       expect(updateResult).toContain('0.0.2');
     } finally {
       await rig.runCommand([
