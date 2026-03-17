@@ -26,7 +26,7 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
 
 2.  **Handle Failure:**
     -   If ANY of these files are missing, list the missing files, then you MUST halt the operation immediately.
-    -   Announce: "Conductor is not set up. Please run `/conductor:setup` to set up the environment."
+    -   Announce: "Conductor is not set up. Please run `/spec setup` to set up the environment."
     -   Do NOT proceed to Review Protocol.
 
 ---
