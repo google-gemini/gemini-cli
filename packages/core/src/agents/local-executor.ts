@@ -26,7 +26,6 @@ import {
 } from '../tools/mcp-tool.js';
 import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
-import { type Message } from '../confirmation-bus/types.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
@@ -64,7 +63,11 @@ import { getVersion } from '../utils/version.js';
 import { getToolCallContext } from '../utils/toolCallContext.js';
 import { scheduleAgentTools } from './agent-scheduler.js';
 import { DeadlineTimer } from '../utils/deadlineTimer.js';
-import { formatUserHintsForModel } from '../utils/fastAckHelper.js';
+import {
+  formatUserHintsForModel,
+  formatBackgroundCompletionForModel,
+} from '../utils/fastAckHelper.js';
+import type { InjectionSource } from '../config/injectionService.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -128,19 +131,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     const parentMessageBus = context.messageBus;
 
     // Create an override object to inject the subagent name into tool confirmation requests
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-    const subagentMessageBus = Object.create(
-      parentMessageBus,
-    ) as typeof parentMessageBus;
-    subagentMessageBus.publish = async (message: Message) => {
-      if (message.type === 'tool-confirmation-request') {
-        return parentMessageBus.publish({
-          ...message,
-          subagent: definition.name,
-        });
-      }
-      return parentMessageBus.publish(message);
-    };
+    const subagentMessageBus = parentMessageBus.derive(definition.name);
 
     // Create an isolated tool registry for this agent instance.
     const agentToolRegistry = new ToolRegistry(
@@ -526,18 +517,25 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         : DEFAULT_QUERY_STRING;
 
       const pendingHintsQueue: string[] = [];
-      const hintListener = (hint: string) => {
-        pendingHintsQueue.push(hint);
+      const pendingBgCompletionsQueue: string[] = [];
+      const injectionListener = (text: string, source: InjectionSource) => {
+        if (source === 'user_steering') {
+          pendingHintsQueue.push(text);
+        } else if (source === 'background_completion') {
+          pendingBgCompletionsQueue.push(text);
+        }
       };
       // Capture the index of the last hint before starting to avoid re-injecting old hints.
       // NOTE: Hints added AFTER this point will be broadcast to all currently running
       // local agents via the listener below.
-      const startIndex = this.config.userHintService.getLatestHintIndex();
-      this.config.userHintService.onUserHint(hintListener);
+      const startIndex = this.config.injectionService.getLatestInjectionIndex();
+      this.config.injectionService.onInjection(injectionListener);
 
       try {
-        const initialHints =
-          this.config.userHintService.getUserHintsAfter(startIndex);
+        const initialHints = this.config.injectionService.getInjectionsAfter(
+          startIndex,
+          'user_steering',
+        );
         const formattedInitialHints = formatUserHintsForModel(initialHints);
 
         let currentMessage: Content = formattedInitialHints
@@ -585,20 +583,30 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           // If status is 'continue', update message for the next loop
           currentMessage = turnResult.nextMessage;
 
-          // Check for new user steering hints collected via subscription
+          // Prepend inter-turn injections. User hints are unshifted first so
+          // that bg completions (unshifted second) appear before them in the
+          // final message — the model sees context before the user's reaction.
           if (pendingHintsQueue.length > 0) {
             const hintsToProcess = [...pendingHintsQueue];
             pendingHintsQueue.length = 0;
             const formattedHints = formatUserHintsForModel(hintsToProcess);
             if (formattedHints) {
-              // Append hints to the current message (next turn)
               currentMessage.parts ??= [];
               currentMessage.parts.unshift({ text: formattedHints });
             }
           }
+
+          if (pendingBgCompletionsQueue.length > 0) {
+            const bgText = pendingBgCompletionsQueue.join('\n');
+            pendingBgCompletionsQueue.length = 0;
+            currentMessage.parts ??= [];
+            currentMessage.parts.unshift({
+              text: formatBackgroundCompletionForModel(bgText),
+            });
+          }
         }
       } finally {
-        this.config.userHintService.offUserHint(hintListener);
+        this.config.injectionService.offInjection(injectionListener);
       }
 
       // === UNIFIED RECOVERY BLOCK ===
