@@ -287,7 +287,7 @@ export class AppRig {
 
       const newContentGeneratorConfig = {
         authType: authMethod,
-
+         
         proxy: gcConfig.getProxy(),
         apiKey: process.env['GEMINI_API_KEY'] || 'test-api-key',
       };
@@ -456,7 +456,7 @@ export class AppRig {
     const actualToolName = toolName === '*' ? undefined : toolName;
     this.config
       .getPolicyEngine()
-
+       
       .removeRulesForTool(actualToolName as string, source);
     this.breakpointTools.delete(toolName);
   }
@@ -624,7 +624,7 @@ export class AppRig {
   async addUserHint(hint: string) {
     if (!this.config) throw new Error('AppRig not initialized');
     await act(async () => {
-      this.config!.userHintService.addUserHint(hint);
+      this.config!.injectionService.addInjection(hint, 'user_steering');
     });
   }
 
