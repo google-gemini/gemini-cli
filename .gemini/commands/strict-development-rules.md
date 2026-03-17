@@ -58,16 +58,16 @@ Gemini CLI project.
   reducer whenever practical. NEVER disable `react-hooks/exhaustive-deps`; fix
   the code to correctly declare dependencies instead. Evaluate all the React
   states in a component and ensure that the `useState` calls are necessary and
-  not cases where values could be derived on render. Identify stale closures
-  where a developer may not realize they are relying on a value from a previous
-  render. React Components that modify Settings should effectively use the
-  `useSettingsStore` pattern. If the author intentionally wants to deliver a
-  user experience that is reliant on unsaved changes, then the store should only
-  be updated on save and the dialog should render from UI state. If the author
-  does not have an intentional reason to rely on unsaved changes, then the
-  component can simply render from and update the settings store. Contributors
-  should be able to defend their choice with reasons grounded in intended user
-  experience.
+  not cases where values could be derived on render. Ensure there are no stale
+  closures that are relying on a value from a previous render. React Components
+  that modify Settings should effectively use the `useSettingsStore` pattern.
+  Components that configure application Settings (e.g settings.json) are the
+  only reasonable case for unsaved changes to drive UX; in these cases, the
+  Settings store should only be written to on save. If the user experience does
+  not utilize unsaved changes because there is no option to exit without saving
+  or reverting the unsaved changes, then the component should directly read from
+  and write to the Settings store without holding pending changes in component
+  level UI state.
 - **Effect**: `useEffect` should not be used to synchronize React states, it
   should only be used for genuine side effects that occur outside of React.
   Contributors should be able to strongly justify the need for an effect.
