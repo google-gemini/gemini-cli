@@ -216,6 +216,8 @@ describe('Gemini Client (client.ts)', () => {
       getUserMemory: vi.fn().mockReturnValue(''),
       getGlobalMemory: vi.fn().mockReturnValue(''),
       getEnvironmentMemory: vi.fn().mockReturnValue(''),
+      getSystemInstructionMemory: vi.fn().mockReturnValue(''),
+      getSessionMemory: vi.fn().mockReturnValue(''),
       isJitContextEnabled: vi.fn().mockReturnValue(false),
       getContextManager: vi.fn().mockReturnValue(undefined),
       getToolOutputMaskingEnabled: vi.fn().mockReturnValue(false),
@@ -1961,12 +1963,11 @@ ${JSON.stringify(
       });
     });
 
-    it('should use getGlobalMemory for system instruction when JIT is enabled', async () => {
+    it('should use getSystemInstructionMemory for system instruction when JIT is enabled', async () => {
       vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(true);
-      vi.mocked(mockConfig.getGlobalMemory).mockReturnValue(
+      vi.mocked(mockConfig.getSystemInstructionMemory).mockReturnValue(
         'Global JIT Memory',
       );
-      vi.mocked(mockConfig.getUserMemory).mockReturnValue('Full JIT Memory');
 
       const { getCoreSystemPrompt } = await import('./prompts.js');
       const mockGetCoreSystemPrompt = vi.mocked(getCoreSystemPrompt);
@@ -1975,13 +1976,15 @@ ${JSON.stringify(
 
       expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
         mockConfig,
-        'Full JIT Memory',
+        'Global JIT Memory',
       );
     });
 
-    it('should use getUserMemory for system instruction when JIT is disabled', async () => {
+    it('should use getSystemInstructionMemory for system instruction when JIT is disabled', async () => {
       vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(false);
-      vi.mocked(mockConfig.getUserMemory).mockReturnValue('Legacy Memory');
+      vi.mocked(mockConfig.getSystemInstructionMemory).mockReturnValue(
+        'Legacy Memory',
+      );
 
       const { getCoreSystemPrompt } = await import('./prompts.js');
       const mockGetCoreSystemPrompt = vi.mocked(getCoreSystemPrompt);
