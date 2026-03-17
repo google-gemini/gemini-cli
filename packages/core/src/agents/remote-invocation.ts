@@ -16,10 +16,11 @@ import {
   type RemoteAgentDefinition,
   type AgentInputs,
 } from './types.js';
+import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import {
+import type {
   A2AClientManager,
-  type SendMessageResult,
+  SendMessageResult,
 } from './a2a-client-manager.js';
 import { extractIdsFromResponse, A2AResultReassembler } from './a2aUtils.js';
 import type { AuthenticationHandler } from '@a2a-js/sdk/client';
@@ -47,13 +48,13 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
   // State for the ongoing conversation with the remote agent
   private contextId: string | undefined;
   private taskId: string | undefined;
-  // TODO: See if we can reuse the singleton from AppContainer or similar, but for now use getInstance directly
-  // as per the current pattern in the codebase.
-  private readonly clientManager = A2AClientManager.getInstance();
+
+  private readonly clientManager: A2AClientManager;
   private authHandler: AuthenticationHandler | undefined;
 
   constructor(
     private readonly definition: RemoteAgentDefinition,
+    private readonly context: AgentLoopContext,
     params: AgentInputs,
     messageBus: MessageBus,
     _toolName?: string,
@@ -72,6 +73,13 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       _toolName ?? definition.name,
       _toolDisplayName ?? definition.displayName,
     );
+    const clientManager = this.context.config.getA2AClientManager();
+    if (!clientManager) {
+      throw new Error(
+        `Failed to initialize RemoteAgentInvocation for '${definition.name}': A2AClientManager is not available.`,
+      );
+    }
+    this.clientManager = clientManager;
   }
 
   getDescription(): string {
