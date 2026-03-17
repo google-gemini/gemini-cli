@@ -9,7 +9,7 @@ argsPattern = '"(?:file_path|path)":"\.gemini/specs/[^"]*"'
 # Allow tools used by SDD to set up specs dir
 [[rule]]
 toolName = "run_shell_command"
-commandPrefix = ["git status", "git diff", "ls", "mkdir", "cp", "git init", "git add", "git commit"]
+commandPrefix = ["git status", "git diff", "ls", "mkdir", "cp", "mv", "git init", "git add", "git commit"]
 decision = "ask_user"
 priority = 100 # prioritize over other extension policies
 modes = ["plan"]

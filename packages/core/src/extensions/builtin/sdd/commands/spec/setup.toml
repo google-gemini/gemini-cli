@@ -24,11 +24,32 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
 ## 1.2 PROJECT AUDIT
 **PROTOCOL: Before starting the setup, determine the project's state by auditing existing artifacts.**
 
-1.  **Enter Plan Mode:** Call the `enter_plan_mode` tool with the reason: "Setting up SDD project".
+1.  **Legacy Migration Checks:**
+    a. **Directory Migration:** Check if a legacy `conductor/` directory exists in the root of the project.
+        - If `conductor/` exists and `.gemini/specs/` does NOT exist:
+            - Call the `ask_user` tool (do not repeat the question in the chat):
+                - **questions:**
+                    - **header:** "Migrate Conductor"
+                    - **type:** "yesno"
+                    - **question:** "A legacy `conductor/` directory was detected. SDD now uses `.gemini/specs/` as its default directory. Would you like me to automatically migrate your existing `conductor/` directory to `.gemini/specs/`?"
+            - If the user answers "yes":
+                - Run `mkdir -p .gemini`
+                - Run `mv conductor/ .gemini/specs/`
+                - Announce: "Migration complete."
+            - If the user answers "no":
+                - Announce: "Setup aborted. Please manually rename the directory or configure your settings."
+                - **HALT** operation immediately.
+    b. **Terminology Migration (Tracks -> Specs):** Check if `.gemini/specs/tracks.md` or `.gemini/specs/tracks/` exists.
+        - If either exists, you MUST seamlessly migrate them to the new terminology:
+            - Rename the file `tracks.md` to `specs.md`.
+            - Rename the directory `tracks/` to `specs/`.
+            - Update any references to "tracks" to "specs" inside `.gemini/specs/index.md`.
 
-2.  **Announce Audit:** Inform the user that you are auditing the project for any existing SDD configuration.
+2.  **Enter Plan Mode:** Call the `enter_plan_mode` tool with the reason: "Setting up SDD project".
 
-3.  **Audit Artifacts:** Check the file system for the existence of the following files/directories in the `.gemini/specs/` directory:
+3.  **Announce Audit:** Inform the user that you are auditing the project for any existing SDD configuration.
+
+4.  **Audit Artifacts:** Check the file system for the existence of the following files/directories in the `.gemini/specs/` directory:
     - `product.md`
     - `product-guidelines.md`
     - `tech-stack.md`
@@ -37,7 +58,7 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
     - `index.md`
     - `tracks/*/` (specifically `plan.md` and `index.md`)
 
-4.  **Determine Target Section:** Map the project's state to a target section using the priority table below (highest match wins). **DO NOT JUMP YET.** Keep this target in mind.
+5.  **Determine Target Section:** Map the project's state to a target section using the priority table below (highest match wins). **DO NOT JUMP YET.** Keep this target in mind.
 
 | Artifact Exists | Target Section | Announcement |
 | :--- | :--- | :--- |
@@ -50,7 +71,7 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
 | `product.md` | **Section 2.2** | "Resuming setup: Product Guide is complete. Next: create Product Guidelines." |
 | (None) | **Section 2.0** | (None) |
 
-5. **Proceed to Section 2.0:** You MUST proceed to Section 2.0 to establish the Greenfield/Brownfield context before jumping to your target.
+6. **Proceed to Section 2.0:** You MUST proceed to Section 2.0 to establish the Greenfield/Brownfield context before jumping to your target.
 
 ---
 
