@@ -11,6 +11,7 @@ import type { ShellExecutionConfig } from '../services/shellExecutionService.js'
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { isRecord } from '../utils/markdownUtils.js';
 import { randomUUID } from 'node:crypto';
 import {
   MessageBusType,
@@ -20,6 +21,15 @@ import {
 } from '../confirmation-bus/types.js';
 import { type ApprovalMode } from '../policy/types.js';
 import type { SubagentProgress } from '../agents/types.js';
+
+/**
+ * Options bag for tool execution, replacing positional parameters that are
+ * only relevant to specific tool types.
+ */
+export interface ExecuteOptions {
+  shellExecutionConfig?: ShellExecutionConfig;
+  setExecutionIdCallback?: (executionId: number) => void;
+}
 
 /**
  * Represents a validated and ready-to-execute tool call.
@@ -67,8 +77,7 @@ export interface ToolInvocation<
   execute(
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
-    shellExecutionConfig?: ShellExecutionConfig,
-    setExecutionIdCallback?: (executionId: number) => void,
+    options?: ExecuteOptions,
   ): Promise<TResult>;
 
   /**
@@ -121,6 +130,7 @@ export interface PolicyUpdateOptions {
   argsPattern?: string;
   commandPrefix?: string | string[];
   mcpName?: string;
+  toolName?: string;
 }
 
 /**
@@ -323,7 +333,7 @@ export abstract class BaseToolInvocation<
   abstract execute(
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
-    shellExecutionConfig?: ShellExecutionConfig,
+    options?: ExecuteOptions,
   ): Promise<TResult>;
 }
 
@@ -395,6 +405,15 @@ export interface ToolBuilder<
 }
 
 /**
+ * Represents the expected JSON Schema structure for tool parameters.
+ */
+export interface ToolParameterSchema {
+  type: string;
+  properties?: unknown;
+  [key: string]: unknown;
+}
+
+/**
  * New base class for tools that separates validation from execution.
  * New tools should extend this class.
  */
@@ -416,6 +435,25 @@ export abstract class DeclarativeTool<
     readonly extensionId?: string,
   ) {}
 
+  clone(messageBus?: MessageBus): this {
+    // Note: we cannot use structuredClone() here because it does not preserve
+    // prototype chains or handle non-serializable properties (like functions).
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const cloned = Object.assign(
+      // eslint-disable-next-line no-restricted-syntax
+      Object.create(Object.getPrototypeOf(this)),
+      this,
+    ) as this;
+    if (messageBus) {
+      Object.defineProperty(cloned, 'messageBus', {
+        value: messageBus,
+        writable: false,
+        configurable: true,
+      });
+    }
+    return cloned;
+  }
+
   get isReadOnly(): boolean {
     return READ_ONLY_KINDS.includes(this.kind);
   }
@@ -428,7 +466,49 @@ export abstract class DeclarativeTool<
     return {
       name: this.name,
       description: this.description,
-      parametersJsonSchema: this.parameterSchema,
+      parametersJsonSchema: this.addWaitForPreviousParameter(
+        this.parameterSchema,
+      ),
+    };
+  }
+
+  /**
+   * Type guard to check if an unknown value represents a ToolParameterSchema object.
+   */
+  private isParameterSchema(obj: unknown): obj is ToolParameterSchema {
+    return isRecord(obj) && 'type' in obj;
+  }
+
+  /**
+   * Adds the `wait_for_previous` parameter to the tool's schema.
+   * This allows the model to explicitly control parallel vs sequential execution.
+   */
+  private addWaitForPreviousParameter(schema: unknown): unknown {
+    if (!this.isParameterSchema(schema) || schema.type !== 'object') {
+      return schema;
+    }
+
+    const props = schema.properties;
+    let propertiesObj: Record<string, unknown> = {};
+
+    if (props !== undefined) {
+      if (!isRecord(props)) {
+        // properties exists but is not an object, so it's a malformed schema.
+        return schema;
+      }
+      propertiesObj = props;
+    }
+
+    return {
+      ...schema,
+      properties: {
+        ...propertiesObj,
+        wait_for_previous: {
+          type: 'boolean',
+          description:
+            'Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.',
+        },
+      },
     };
   }
 
@@ -469,10 +549,10 @@ export abstract class DeclarativeTool<
     params: TParams,
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
-    shellExecutionConfig?: ShellExecutionConfig,
+    options?: ExecuteOptions,
   ): Promise<TResult> {
     const invocation = this.build(params);
-    return invocation.execute(signal, updateOutput, shellExecutionConfig);
+    return invocation.execute(signal, updateOutput, options);
   }
 
   /**

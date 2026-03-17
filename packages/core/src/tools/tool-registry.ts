@@ -57,7 +57,28 @@ class DiscoveredToolInvocation extends BaseToolInvocation<
     _updateOutput?: (output: string) => void,
   ): Promise<ToolResult> {
     const callCommand = this.config.getToolCallCommand()!;
-    const child = spawn(callCommand, [this.originalToolName]);
+    const args = [this.originalToolName];
+
+    let finalCommand = callCommand;
+    let finalArgs = args;
+    let finalEnv = process.env;
+
+    const sandboxManager = this.config.sandboxManager;
+    if (sandboxManager) {
+      const prepared = await sandboxManager.prepareCommand({
+        command: callCommand,
+        args,
+        cwd: process.cwd(),
+        env: process.env,
+      });
+      finalCommand = prepared.program;
+      finalArgs = prepared.args;
+      finalEnv = prepared.env;
+    }
+
+    const child = spawn(finalCommand, finalArgs, {
+      env: finalEnv,
+    });
     child.stdin.write(JSON.stringify(this.params));
     child.stdin.end();
 
@@ -201,7 +222,7 @@ export class ToolRegistry {
   // and `isActive` to get only the active tools.
   private allKnownTools: Map<string, AnyDeclarativeTool> = new Map();
   private config: Config;
-  private messageBus: MessageBus;
+  readonly messageBus: MessageBus;
 
   constructor(config: Config, messageBus: MessageBus) {
     this.config = config;
@@ -210,6 +231,15 @@ export class ToolRegistry {
 
   getMessageBus(): MessageBus {
     return this.messageBus;
+  }
+
+  /**
+   * Creates a shallow clone of the registry and its current known tools.
+   */
+  clone(): ToolRegistry {
+    const clone = new ToolRegistry(this.config, this.messageBus);
+    clone.allKnownTools = new Map(this.allKnownTools);
+    return clone;
   }
 
   /**
@@ -222,14 +252,10 @@ export class ToolRegistry {
    */
   registerTool(tool: AnyDeclarativeTool): void {
     if (this.allKnownTools.has(tool.name)) {
-      if (tool instanceof DiscoveredMCPTool) {
-        tool = tool.asFullyQualifiedTool();
-      } else {
-        // Decide on behavior: throw error, log warning, or allow overwrite
-        debugLogger.warn(
-          `Tool with name "${tool.name}" is already registered. Overwriting.`,
-        );
-      }
+      // Decide on behavior: throw error, log warning, or allow overwrite
+      debugLogger.warn(
+        `Tool with name "${tool.name}" is already registered. Overwriting.`,
+      );
     }
     this.allKnownTools.set(tool.name, tool);
   }
@@ -326,8 +352,36 @@ export class ToolRegistry {
           'Tool discovery command is empty or contains only whitespace.',
         );
       }
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const proc = spawn(cmdParts[0] as string, cmdParts.slice(1) as string[]);
+
+      const firstPart = cmdParts[0];
+      if (typeof firstPart !== 'string') {
+        throw new Error(
+          'Tool discovery command must start with a program name.',
+        );
+      }
+
+      let finalCommand: string = firstPart;
+      let finalArgs: string[] = cmdParts
+        .slice(1)
+        .filter((p): p is string => typeof p === 'string');
+      let finalEnv = process.env;
+
+      const sandboxManager = this.config.sandboxManager;
+      if (sandboxManager) {
+        const prepared = await sandboxManager.prepareCommand({
+          command: finalCommand,
+          args: finalArgs,
+          cwd: process.cwd(),
+          env: process.env,
+        });
+        finalCommand = prepared.program;
+        finalArgs = prepared.args;
+        finalEnv = prepared.env;
+      }
+
+      const proc = spawn(finalCommand, finalArgs, {
+        env: finalEnv,
+      });
       let stdout = '';
       const stdoutDecoder = new StringDecoder('utf8');
       let stderr = '';
@@ -594,7 +648,17 @@ export class ToolRegistry {
     for (const name of toolNames) {
       const tool = this.getTool(name);
       if (tool) {
-        declarations.push(tool.getSchema(modelId));
+        let schema = tool.getSchema(modelId);
+
+        // Ensure the schema name matches the qualified name for MCP tools
+        if (tool instanceof DiscoveredMCPTool) {
+          schema = {
+            ...schema,
+            name: tool.getFullyQualifiedName(),
+          };
+        }
+
+        declarations.push(schema);
       }
     }
     return declarations;
@@ -667,17 +731,6 @@ export class ToolRegistry {
         debugLogger.debug(
           `Resolved legacy tool name "${name}" to current name "${currentName}"`,
         );
-      }
-    }
-
-    if (!tool && name.includes('__')) {
-      for (const t of this.allKnownTools.values()) {
-        if (t instanceof DiscoveredMCPTool) {
-          if (t.getFullyQualifiedName() === name) {
-            tool = t;
-            break;
-          }
-        }
       }
     }
 
