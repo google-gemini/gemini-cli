@@ -108,7 +108,7 @@ describe('ask_user', () => {
       ]);
 
       // Handle intermediate planning step
-      if (confirmation?.name === 'enter_plan_mode') {
+      if (confirmation?.toolName === 'enter_plan_mode') {
         rig.acceptConfirmation('enter_plan_mode');
         confirmation = await expectToolCall(rig, 'ask_user');
       }
