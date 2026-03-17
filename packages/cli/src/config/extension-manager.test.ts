@@ -782,12 +782,12 @@ describe('ExtensionManager', () => {
       expect(emitSpy).toHaveBeenCalledWith(
         'warning',
         expect.stringContaining(
-          'The "conductor" extension has been renamed to "sdd"',
+          'The "conductor" extension has been replaced by built-in Spec-Driven Development',
         ),
       );
       expect(emitSpy).toHaveBeenCalledWith(
         'warning',
-        expect.stringContaining('.gemini/specs/'),
+        expect.stringContaining('/spec setup'),
       );
     });
   });
