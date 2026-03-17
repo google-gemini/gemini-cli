@@ -575,6 +575,10 @@ Gemini CLI.
         Indicator".
       - While in shell mode, text you type is interpreted directly as a shell
         command.
+      - If a shell-mode line starts with `?`, Gemini converts the rest of the
+        line from natural language into a single editable shell command inline.
+        The command is inserted into the prompt but is not executed
+        automatically.
     - **Exiting shell mode:**
       - When exited, the UI reverts to its standard appearance and normal Gemini
         CLI behavior resumes.
