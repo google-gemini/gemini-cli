@@ -61,6 +61,7 @@ import {
   DEFAULT_GEMINI_MODEL_AUTO,
   isAutoModel,
   isPreviewModel,
+  isGemini2Model,
   PREVIEW_GEMINI_FLASH_MODEL,
   PREVIEW_GEMINI_MODEL,
   PREVIEW_GEMINI_MODEL_AUTO,
@@ -1066,9 +1067,11 @@ export class Config implements McpContext, AgentLoopContext {
     this.truncateToolOutputThreshold =
       params.truncateToolOutputThreshold ??
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD;
-    this.useWriteTodos = isPreviewModel(this.model, this)
-      ? false
-      : (params.useWriteTodos ?? true);
+    const isGemini2 = isGemini2Model(this.model);
+    this.useWriteTodos =
+      isGemini2 && !isPreviewModel(this.model, this) && !this.trackerEnabled
+        ? (params.useWriteTodos ?? true)
+        : false;
     this.workspacePoliciesDir = params.workspacePoliciesDir;
     this.enableHooksUI = params.enableHooksUI ?? true;
     this.enableHooks = params.enableHooks ?? true;
@@ -1397,6 +1400,7 @@ export class Config implements McpContext, AgentLoopContext {
 
     // Fetch admin controls
     const experiments = await this.experimentsPromise;
+
     const adminControlsEnabled =
       experiments?.flags[ExperimentFlags.ENABLE_ADMIN_CONTROLS]?.boolValue ??
       false;
