@@ -209,6 +209,16 @@ To update an extension's settings:
 gemini extensions config <name> [setting] [--scope <scope>]
 ```
 
+#### Environment Variable Sanitization
+
+For security reasons, the host's `process.env` is aggressively stripped before the extension or its MCP servers are spawned. 
+
+Extensions **will not** inherit the user's full shell environment variables. They will only have access to:
+1. Standard safe variables (e.g., `HOME`, `PATH`, `TMPDIR`).
+2. Variables explicitly declared and requested in the `gemini-extension.json` manifest via the `settings` array (using the `envVar` property).
+
+If your extension requires specific environment variables (like an API key, custom host, or config path), you **must** declare them in the `settings` array so the CLI can whitelist and inject them into the extension's isolated process.
+
 ### Custom commands
 
 Provide [custom commands](../cli/custom-commands.md) by placing TOML files in a
