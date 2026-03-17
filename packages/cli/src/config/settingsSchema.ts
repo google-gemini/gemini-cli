@@ -1053,6 +1053,34 @@ const SETTINGS_SCHEMA = {
           ref: 'ModelDefinition',
         },
       },
+      modelIdResolutions: {
+        type: 'object',
+        label: 'Model ID Resolutions',
+        category: 'Model',
+        requiresRestart: true,
+        default: DEFAULT_MODEL_CONFIGS.modelIdResolutions,
+        description:
+          'Rules for resolving requested model names to concrete model IDs based on context.',
+        showInDialog: false,
+        additionalProperties: {
+          type: 'object',
+          ref: 'ModelResolution',
+        },
+      },
+      classifierIdResolutions: {
+        type: 'object',
+        label: 'Classifier ID Resolutions',
+        category: 'Model',
+        requiresRestart: true,
+        default: DEFAULT_MODEL_CONFIGS.classifierIdResolutions,
+        description:
+          'Rules for resolving classifier tiers (flash, pro) to concrete model IDs.',
+        showInDialog: false,
+        additionalProperties: {
+          type: 'object',
+          ref: 'ModelResolution',
+        },
+      },
     },
   },
 
@@ -2800,13 +2828,41 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
       tier: { enum: ['pro', 'flash', 'flash-lite', 'custom', 'auto'] },
       family: { type: 'string' },
       isPreview: { type: 'boolean' },
-      dialogLocation: { enum: ['main', 'manual'] },
+      isVisible: { type: 'boolean' },
       dialogDescription: { type: 'string' },
       features: {
         type: 'object',
         properties: {
           thinking: { type: 'boolean' },
           multimodalToolUse: { type: 'boolean' },
+        },
+      },
+    },
+  },
+  ModelResolution: {
+    type: 'object',
+    description: 'Model resolution rule.',
+    properties: {
+      default: { type: 'string' },
+      contexts: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            condition: {
+              type: 'object',
+              properties: {
+                useGemini3_1: { type: 'boolean' },
+                useCustomTools: { type: 'boolean' },
+                hasAccessToPreview: { type: 'boolean' },
+                requestedModels: {
+                  type: 'array',
+                  items: { type: 'string' },
+                },
+              },
+            },
+            target: { type: 'string' },
+          },
         },
       },
     },
