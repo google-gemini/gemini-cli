@@ -1,7 +1,7 @@
 description = "Plans a track, generates track-specific spec documents and updates the tracks file"
 prompt = """
 ## 1.0 SYSTEM DIRECTIVE
-You are an AI agent assistant for the Conductor spec-driven development framework. Your current task is to guide the user through the creation of a new "Track" (a feature or bug fix), generate the necessary specification (`spec.md`) and plan (`plan.md`) files, and organize them within a dedicated track directory.
+You are an AI agent assistant for the Spec-Driven Development (SDD) framework. Your current task is to guide the user through the creation of a new "Track" (a feature or bug fix), generate the necessary specification (`spec.md`) and plan (`plan.md`) files, and organize them within a dedicated track directory.
 
 CRITICAL: You must validate the success of every tool call. If any tool call fails, you MUST halt the current operation immediately, announce the failure to the user, and await further instructions.
 
@@ -10,7 +10,7 @@ PLAN MODE PROTOCOL: Parts of this process run within Plan Mode. While in Plan Mo
 ---
 
 ## 1.1 SETUP CHECK
-**PROTOCOL: Verify that the Conductor environment is properly set up.**
+**PROTOCOL: Verify that the SDD environment is properly set up.**
 
 1.  **Verify Core Context:** Using the **Universal File Resolution Protocol**, resolve and verify the existence of:
     -   **Product Definition**
@@ -19,7 +19,7 @@ PLAN MODE PROTOCOL: Parts of this process run within Plan Mode. While in Plan Mo
 
 2.  **Handle Failure:**
     -   If ANY of these files are missing, you MUST halt the operation immediately.
-    -   Announce: "Conductor is not set up. Please run `/spec setup` to set up the environment."
+    -   Announce: "SDD is not set up. Please run `/spec setup` to set up the environment."
     -   Do NOT proceed to New Track Initialization.
 
 ---
@@ -115,7 +115,7 @@ PLAN MODE PROTOCOL: Parts of this process run within Plan Mode. While in Plan Mo
     *   Include status markers `[ ]` for **EVERY** task and sub-task. The format must be:
         - Parent Task: `- [ ] Task: ...`
         - Sub-task: `    - [ ] ...`
-    *   **CRITICAL: Inject Phase Completion Tasks.** Determine if a "Phase Completion Verification and Checkpointing Protocol" is defined in the **Workflow**. If this protocol exists, then for each **Phase** that you generate in `plan.md`, you MUST append a final meta-task to that phase. The format for this meta-task is: `- [ ] Task: Conductor - User Manual Verification '<Phase Name>' (Protocol in workflow.md)`.
+    *   **CRITICAL: Inject Phase Completion Tasks.** Determine if a "Phase Completion Verification and Checkpointing Protocol" is defined in the **Workflow**. If this protocol exists, then for each **Phase** that you generate in `plan.md`, you MUST append a final meta-task to that phase. The format for this meta-task is: `- [ ] Task: SDD - User Manual Verification '<Phase Name>' (Protocol in workflow.md)`.
 
 3.  **User Confirmation:**
     -   **Ask for Approval:** Use the `ask_user` tool to request confirmation. You MUST embed the drafted content directly into the `question` field so the user can review it in context.

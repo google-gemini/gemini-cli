@@ -365,15 +365,14 @@ The standard planner uses an adaptive workflow to analyze your project, consult
 you on trade-offs via [`ask_user`](../tools/ask-user.md), and draft a plan for
 your approval. It is ideal for quick exploration and ad-hoc tasks.
 
-### Conductor
+### Spec-Driven Development (SDD)
 
-[Conductor] is a built-in methodology for spec-driven development, designed for
-managing large features and complex tasks through persistent artifacts. It
-organizes work into tracks and stores them in your project's `conductor/`
-directory.
+[Spec-Driven Development (SDD)] is a built-in methodology for managing large
+features and complex tasks through persistent artifacts. It organizes work into
+tracks and stores them in your project's `conductor/` directory.
 
-Conductor leverages Plan Mode internally to ensure architectural safety during
-the design phase. To get started with Conductor, run `/spec setup`.
+SDD leverages Plan Mode internally to ensure architectural safety during the
+design phase. To get started with SDD, run `/spec setup`.
 
 - **Automate transitions:** Switches to read-only mode via
   [`enter_plan_mode`](../tools/planning.md#1-enter_plan_mode-enterplanmode).
@@ -386,7 +385,7 @@ the design phase. To get started with Conductor, run `/spec setup`.
 
 ### Comparison of planning workflows
 
-| Feature         | Standard                           | Conductor                                         |
+| Feature         | Standard                           | SDD                                               |
 | :-------------- | :--------------------------------- | :------------------------------------------------ |
 | **Persistence** | Ephemeral, session-based           | Persistent, stored in your repository             |
 | **Workflow**    | Lightweight research & design      | Structured Spec -> Plan -> Implement lifecycle    |
@@ -488,5 +487,6 @@ gemini --approval-mode plan -p "Analyze telemetry and suggest improvements"
 
 [`plan.toml`]:
   https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/policy/policies/plan.toml
-[Conductor]: ./conductor.md
+[Spec-Driven Development (SDD)]: ./spec-driven-development.md
+[Conductor]: https://github.com/google-gemini/conductor
 [open an issue]: https://github.com/google-gemini/gemini-cli/issues
