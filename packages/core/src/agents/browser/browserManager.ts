@@ -25,10 +25,12 @@ import type { Config } from '../../config/config.js';
 import { Storage } from '../../config/storage.js';
 import { injectInputBlocker } from './inputBlocker.js';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { injectAutomationOverlay } from './automationOverlay.js';
 
-// Pin chrome-devtools-mcp version for reproducibility.
-const CHROME_DEVTOOLS_MCP_VERSION = '0.17.1';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Default browser profile directory name within ~/.gemini/
 const BROWSER_PROFILE_DIR = 'cli-browser-profile';
@@ -145,6 +147,19 @@ export class BrowserManager {
   ): Promise<McpToolCallResult> {
     if (signal?.aborted) {
       throw signal.reason ?? new Error('Operation cancelled');
+    }
+
+    const errorMessage = this.checkNavigationRestrictions(toolName, args);
+    if (errorMessage) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: errorMessage,
+          },
+        ],
+        isError: true,
+      };
     }
 
     const client = await this.getRawMcpClient();
@@ -266,7 +281,7 @@ export class BrowserManager {
       this.rawMcpClient = undefined;
     }
 
-    // Close transport (this terminates the npx process and browser)
+    // Close transport (this terminates the browser)
     if (this.mcpTransport) {
       try {
         await this.mcpTransport.close();
@@ -284,8 +299,7 @@ export class BrowserManager {
   /**
    * Connects to chrome-devtools-mcp which manages the browser process.
    *
-   * Spawns npx chrome-devtools-mcp with:
-   * - --isolated: Manages its own browser instance
+   * Spawns node with the bundled chrome-devtools-mcp.mjs.
    * - --experimental-vision: Enables visual tools (click_at, etc.)
    *
    * IMPORTANT: This does NOT use McpClientManager and does NOT register
@@ -310,11 +324,7 @@ export class BrowserManager {
     const browserConfig = this.config.getBrowserAgentConfig();
     const sessionMode = browserConfig.customConfig.sessionMode ?? 'persistent';
 
-    const mcpArgs = [
-      '-y',
-      `chrome-devtools-mcp@${CHROME_DEVTOOLS_MCP_VERSION}`,
-      '--experimental-vision',
-    ];
+    const mcpArgs = ['--experimental-vision'];
 
     // Session mode determines how the browser is managed:
     // - "isolated": Temp profile, cleaned up after session (--isolated)
@@ -342,16 +352,46 @@ export class BrowserManager {
       mcpArgs.push('--userDataDir', defaultProfilePath);
     }
 
+    if (
+      browserConfig.customConfig.allowedDomains &&
+      browserConfig.customConfig.allowedDomains.length > 0
+    ) {
+      const exclusionRules = browserConfig.customConfig.allowedDomains
+        .map((domain) => {
+          if (!/^(\*\.)?([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+$/.test(domain)) {
+            throw new Error(`Invalid domain in allowedDomains: ${domain}`);
+          }
+          return `EXCLUDE ${domain}`;
+        })
+        .join(', ');
+      mcpArgs.push(
+        `--chromeArg="--host-rules=MAP * 127.0.0.1, ${exclusionRules}, EXCLUDE 127.0.0.1"`,
+      );
+    }
+
     debugLogger.log(
-      `Launching chrome-devtools-mcp (${sessionMode} mode) with args: ${mcpArgs.join(' ')}`,
+      `Launching bundled chrome-devtools-mcp (${sessionMode} mode) with args: ${mcpArgs.join(' ')}`,
     );
 
-    // Create stdio transport to npx chrome-devtools-mcp.
+    // Create stdio transport to the bundled chrome-devtools-mcp.
     // stderr is piped (not inherited) to prevent MCP server banners and
     // warnings from corrupting the UI in alternate buffer mode.
+    let bundleMcpPath = path.resolve(
+      __dirname,
+      'bundled/chrome-devtools-mcp.mjs',
+    );
+    if (!fs.existsSync(bundleMcpPath)) {
+      bundleMcpPath = path.resolve(
+        __dirname,
+        __dirname.includes(`${path.sep}dist${path.sep}`)
+          ? '../../../bundled/chrome-devtools-mcp.mjs'
+          : '../../../dist/bundled/chrome-devtools-mcp.mjs',
+      );
+    }
+
     this.mcpTransport = new StdioClientTransport({
-      command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
-      args: mcpArgs,
+      command: 'node',
+      args: [bundleMcpPath, ...mcpArgs],
       stderr: 'pipe',
     });
 
@@ -462,8 +502,7 @@ export class BrowserManager {
         `Timed out connecting to Chrome: ${message}\n\n` +
           `Possible causes:\n` +
           `  1. Chrome is not installed or not in PATH\n` +
-          `  2. npx cannot download chrome-devtools-mcp (check network/proxy)\n` +
-          `  3. Chrome failed to start (try setting headless: true in settings.json)`,
+          `  2. Chrome failed to start (try setting headless: true in settings.json)`,
       );
     }
 
@@ -500,6 +539,63 @@ export class BrowserManager {
       `Discovered ${this.discoveredTools.length} tools from chrome-devtools-mcp: ` +
         this.discoveredTools.map((t) => t.name).join(', '),
     );
+  }
+
+  /**
+   * Check navigation restrictions based on tools and the args sent
+   * along with them.
+   *
+   * @returns error message if failed, undefined if passed.
+   */
+  private checkNavigationRestrictions(
+    toolName: string,
+    args: Record<string, unknown>,
+  ): string | undefined {
+    const pageNavigationTools = ['navigate_page', 'new_page'];
+
+    if (!pageNavigationTools.includes(toolName)) {
+      return undefined;
+    }
+
+    const allowedDomains =
+      this.config.getBrowserAgentConfig().customConfig.allowedDomains;
+    if (!allowedDomains || allowedDomains.length === 0) {
+      return undefined;
+    }
+
+    const url = args['url'];
+    if (!url) {
+      return undefined;
+    }
+    if (typeof url !== 'string') {
+      return `Invalid URL: URL must be a string.`;
+    }
+
+    try {
+      const parsedUrl = new URL(url);
+      const urlHostname = parsedUrl.hostname.replace(/\.$/, '');
+
+      for (const domainPattern of allowedDomains) {
+        if (domainPattern.startsWith('*.')) {
+          const baseDomain = domainPattern.substring(2);
+          if (
+            urlHostname === baseDomain ||
+            urlHostname.endsWith(`.${baseDomain}`)
+          ) {
+            return undefined;
+          }
+        } else {
+          if (urlHostname === domainPattern) {
+            return undefined;
+          }
+        }
+      }
+    } catch {
+      return `Invalid URL: Malformed URL string.`;
+    }
+
+    // If none matched, then deny
+    return `Tool '${toolName}' is not permitted for the requested URL/domain based on your current browser settings.`;
   }
 
   /**

@@ -295,6 +295,7 @@ export class ToolExecutor {
         call.request.callId,
         output,
         this.config.getActiveModel(),
+        this.config,
       );
 
       // Inject the cancellation error into the response object
@@ -351,6 +352,7 @@ export class ToolExecutor {
       callId,
       content,
       this.config.getActiveModel(),
+      this.config,
     );
 
     const successResponse: ToolCallResponseInfo = {
