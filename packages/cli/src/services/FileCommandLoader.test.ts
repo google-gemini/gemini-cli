@@ -895,6 +895,66 @@ describe('FileCommandLoader', () => {
       expect(command.extensionName).toBe('my-test-ext');
       expect(command.extensionId).toBe(extensionId);
     });
+
+    it('correctly injects ${extensionPath} into extension commands', async () => {
+      const extensionDir = path.join(
+        process.cwd(),
+        GEMINI_DIR,
+        'extensions',
+        'path-test-ext',
+      );
+
+      mock({
+        [extensionDir]: {
+          'gemini-extension.json': JSON.stringify({
+            name: 'path-test-ext',
+            version: '1.0.0',
+          }),
+          commands: {
+            'path-cmd.toml': 'prompt = "Path: ${extensionPath}/templates"',
+          },
+        },
+      });
+
+      const mockConfig = {
+        getProjectRoot: vi.fn(() => process.cwd()),
+        getExtensions: vi.fn(() => [
+          {
+            name: 'path-test-ext',
+            version: '1.0.0',
+            isActive: true,
+            path: extensionDir,
+          },
+        ]),
+        getFolderTrust: vi.fn(() => false),
+        isTrustedFolder: vi.fn(() => false),
+      } as unknown as Config;
+      const loader = new FileCommandLoader(mockConfig);
+      const commands = await loader.loadCommands(signal);
+
+      expect(commands).toHaveLength(1);
+      const command = commands[0];
+      expect(command.name).toBe('path-cmd');
+
+      const result = await command.action?.(
+        createMockCommandContext({
+          invocation: {
+            raw: '/path-cmd',
+            name: 'path-cmd',
+            args: '',
+          },
+        }),
+        '',
+      );
+
+      if (result?.type === 'submit_prompt') {
+        expect(result.content).toEqual([
+          { text: `Path: ${extensionDir}/templates` },
+        ]);
+      } else {
+        assert.fail('Incorrect action type');
+      }
+    });
   });
 
   describe('Argument Handling Integration (via ShellProcessor)', () => {

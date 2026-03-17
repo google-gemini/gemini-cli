@@ -39,6 +39,7 @@ interface CommandDirectory {
   kind: CommandKind;
   extensionName?: string;
   extensionId?: string;
+  extensionPath?: string;
 }
 
 /**
@@ -114,6 +115,7 @@ export class FileCommandLoader implements ICommandLoader {
             dirInfo.kind,
             dirInfo.extensionName,
             dirInfo.extensionId,
+            dirInfo.extensionPath,
           ),
         );
 
@@ -175,6 +177,7 @@ export class FileCommandLoader implements ICommandLoader {
         kind: CommandKind.EXTENSION_FILE,
         extensionName: ext.name,
         extensionId: ext.id,
+        extensionPath: ext.path,
       }));
 
       dirs.push(...extensionCommandDirs);
@@ -197,6 +200,7 @@ export class FileCommandLoader implements ICommandLoader {
     kind: CommandKind,
     extensionName?: string,
     extensionId?: string,
+    extensionPath?: string,
   ): Promise<SlashCommand | null> {
     let fileContent: string;
     try {
@@ -234,6 +238,14 @@ export class FileCommandLoader implements ICommandLoader {
     }
 
     const validDef = validationResult.data;
+
+    // Hydrate extensionPath if this is an extension command
+    if (extensionPath) {
+      validDef.prompt = validDef.prompt.replace(
+        /\$\{extensionPath\}/g,
+        () => extensionPath,
+      );
+    }
 
     const relativePathWithExt = path.relative(baseDir, filePath);
     const relativePath = relativePathWithExt.substring(
