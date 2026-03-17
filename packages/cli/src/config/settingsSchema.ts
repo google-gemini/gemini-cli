@@ -1955,6 +1955,15 @@ const SETTINGS_SCHEMA = {
         description: 'Enable Plan Mode.',
         showInDialog: true,
       },
+      sdd: {
+        type: 'boolean',
+        label: 'Spec-Driven Development (SDD)',
+        category: 'Experimental',
+        requiresRestart: true,
+        default: false,
+        description: 'Enable built-in Spec-Driven Development (SDD) workflow.',
+        showInDialog: true,
+      },
       taskTracker: {
         type: 'boolean',
         label: 'Task Tracker',

@@ -123,6 +123,11 @@
           },
           { "label": "Plan mode", "slug": "docs/cli/plan-mode" },
           {
+            "label": "Spec-driven development (SDD)",
+            "badge": "🔬",
+            "slug": "docs/cli/spec-driven-development"
+          },
+          {
             "label": "Subagents",
             "badge": "🔬",
             "slug": "docs/core/subagents"
