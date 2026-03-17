@@ -60,6 +60,90 @@ describe('Dynamic Configuration Parity', () => {
     'custom-model',
   ];
 
+  const flagCombos = [
+    { useGemini3_1: false, useCustomToolModel: false },
+    { useGemini3_1: true, useCustomToolModel: false },
+    { useGemini3_1: true, useCustomToolModel: true },
+  ];
+
+  it('resolveModel should match legacy behavior when dynamicModelConfiguration flag enabled.', () => {
+    for (const model of modelsToTest) {
+      for (const flags of flagCombos) {
+        for (const hasAccess of [true, false]) {
+          const mockLegacyConfig = {
+            ...legacyConfig,
+            getHasAccessToPreviewModel: () => hasAccess,
+          } as unknown as Config;
+          const mockDynamicConfig = {
+            ...dynamicConfig,
+            getHasAccessToPreviewModel: () => hasAccess,
+          } as unknown as Config;
+
+          const legacy = resolveModel(
+            model,
+            flags.useGemini3_1,
+            flags.useCustomToolModel,
+            hasAccess,
+            mockLegacyConfig,
+          );
+          const dynamic = resolveModel(
+            model,
+            flags.useGemini3_1,
+            flags.useCustomToolModel,
+            hasAccess,
+            mockDynamicConfig,
+          );
+          expect(dynamic).toBe(legacy);
+        }
+      }
+    }
+  });
+
+  it('resolveClassifierModel should match legacy behavior.', () => {
+    const classifierTiers = [GEMINI_MODEL_ALIAS_PRO, GEMINI_MODEL_ALIAS_FLASH];
+    const anchorModels = [
+      PREVIEW_GEMINI_MODEL_AUTO,
+      DEFAULT_GEMINI_MODEL_AUTO,
+      PREVIEW_GEMINI_MODEL,
+      DEFAULT_GEMINI_MODEL,
+    ];
+
+    for (const hasAccess of [true, false]) {
+      const mockLegacyConfig = {
+        ...legacyConfig,
+        getHasAccessToPreviewModel: () => hasAccess,
+      } as unknown as Config;
+      const mockDynamicConfig = {
+        ...dynamicConfig,
+        getHasAccessToPreviewModel: () => hasAccess,
+      } as unknown as Config;
+
+      for (const tier of classifierTiers) {
+        for (const anchor of anchorModels) {
+          for (const flags of flagCombos) {
+            const legacy = resolveClassifierModel(
+              anchor,
+              tier,
+              flags.useGemini3_1,
+              flags.useCustomToolModel,
+              hasAccess,
+              mockLegacyConfig,
+            );
+            const dynamic = resolveClassifierModel(
+              anchor,
+              tier,
+              flags.useGemini3_1,
+              flags.useCustomToolModel,
+              hasAccess,
+              mockDynamicConfig,
+            );
+            expect(dynamic).toBe(legacy);
+          }
+        }
+      }
+    }
+  });
+
   it('getDisplayString should match legacy behavior', () => {
     for (const model of modelsToTest) {
       const legacy = getDisplayString(model, legacyConfig);

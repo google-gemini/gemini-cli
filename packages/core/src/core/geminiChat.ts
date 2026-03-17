@@ -525,7 +525,13 @@ export class GeminiChat {
       const useGemini3_1 =
         (await this.context.config.getGemini31Launched?.()) ?? false;
       // Default to the last used model (which respects arguments/availability selection)
-      let modelToUse = resolveModel(lastModelToUse, useGemini3_1);
+      let modelToUse = resolveModel(
+        lastModelToUse,
+        useGemini3_1,
+        false,
+        this.context.config.getHasAccessToPreviewModel?.() ?? true,
+        this.context.config,
+      );
 
       // If the active model has changed (e.g. due to a fallback updating the config),
       // we switch to the new active model.
@@ -533,6 +539,9 @@ export class GeminiChat {
         modelToUse = resolveModel(
           this.context.config.getActiveModel(),
           useGemini3_1,
+          false,
+          this.context.config.getHasAccessToPreviewModel?.() ?? true,
+          this.context.config,
         );
       }
 
