@@ -11,6 +11,7 @@ import {
   BaseToolInvocation,
   type ToolResult,
   type AnyDeclarativeTool,
+  type ToolLiveOutput,
 } from '../tools/tools.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { HookSystem } from '../hooks/hookSystem.js';
@@ -33,6 +34,29 @@ class MockInvocation extends BaseToolInvocation<{ key?: string }, ToolResult> {
       returnDisplay: this.params.key
         ? `key: ${this.params.key}`
         : 'success display',
+    };
+  }
+}
+
+class MockBackgroundableInvocation extends BaseToolInvocation<
+  { key?: string },
+  ToolResult
+> {
+  constructor(params: { key?: string }, messageBus: MessageBus) {
+    super(params, messageBus);
+  }
+  getDescription() {
+    return 'mock-pid';
+  }
+  async execute(
+    _signal: AbortSignal,
+    _updateOutput?: (output: ToolLiveOutput) => void,
+    options?: { setExecutionIdCallback?: (executionId: number) => void },
+  ) {
+    options?.setExecutionIdCallback?.(4242);
+    return {
+      llmContent: 'pid',
+      returnDisplay: 'pid',
     };
   }
 }
@@ -86,7 +110,6 @@ describe('executeToolWithHooks', () => {
       mockTool,
       undefined,
       undefined,
-      undefined,
       mockConfig,
     );
 
@@ -109,7 +132,6 @@ describe('executeToolWithHooks', () => {
       'test_tool',
       abortSignal,
       mockTool,
-      undefined,
       undefined,
       undefined,
       mockConfig,
@@ -143,7 +165,6 @@ describe('executeToolWithHooks', () => {
       mockTool,
       undefined,
       undefined,
-      undefined,
       mockConfig,
     );
 
@@ -173,7 +194,6 @@ describe('executeToolWithHooks', () => {
       'test_tool',
       abortSignal,
       mockTool,
-      undefined,
       undefined,
       undefined,
       mockConfig,
@@ -207,7 +227,6 @@ describe('executeToolWithHooks', () => {
       toolName,
       abortSignal,
       mockTool,
-      undefined,
       undefined,
       undefined,
       mockConfig,
@@ -250,12 +269,32 @@ describe('executeToolWithHooks', () => {
       mockTool,
       undefined,
       undefined,
-      undefined,
       mockConfig,
     );
 
     expect(result.llmContent).toBe('key: original');
     expect(invocation.params.key).toBe('original');
     expect(mockTool.build).not.toHaveBeenCalled();
+  });
+
+  it('should pass execution ID callback through for non-shell invocations', async () => {
+    const invocation = new MockBackgroundableInvocation({}, messageBus);
+    const abortSignal = new AbortController().signal;
+    const setExecutionIdCallback = vi.fn();
+
+    vi.mocked(mockHookSystem.fireBeforeToolEvent).mockResolvedValue(undefined);
+    vi.mocked(mockHookSystem.fireAfterToolEvent).mockResolvedValue(undefined);
+
+    await executeToolWithHooks(
+      invocation,
+      'test_tool',
+      abortSignal,
+      mockTool,
+      undefined,
+      { setExecutionIdCallback },
+      mockConfig,
+    );
+
+    expect(setExecutionIdCallback).toHaveBeenCalledWith(4242);
   });
 });

@@ -814,7 +814,9 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
 
   it('should pass extension context file paths to loadServerHierarchicalMemory', async () => {
     process.argv = ['node', 'script.js'];
-    const settings = createTestMergedSettings();
+    const settings = createTestMergedSettings({
+      experimental: { jitContext: false },
+    });
     vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
       {
         path: '/path/to/ext1',
@@ -865,6 +867,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     process.argv = ['node', 'script.js'];
     const includeDir = path.resolve(path.sep, 'path', 'to', 'include');
     const settings = createTestMergedSettings({
+      experimental: { jitContext: false },
       context: {
         includeDirectories: [includeDir],
         loadMemoryFromIncludeDirectories: true,
@@ -892,6 +895,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   it('should NOT pass includeDirectories to loadServerHierarchicalMemory when loadMemoryFromIncludeDirectories is false', async () => {
     process.argv = ['node', 'script.js'];
     const settings = createTestMergedSettings({
+      experimental: { jitContext: false },
       context: {
         includeDirectories: ['/path/to/include'],
         loadMemoryFromIncludeDirectories: false,
@@ -3614,5 +3618,60 @@ describe('loadCliConfig mcpEnabled', () => {
         ),
       );
     });
+  });
+});
+
+describe('loadCliConfig acpMode and clientName', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.mocked(os.homedir).mockReturnValue('/mock/home/user');
+    vi.stubEnv('GEMINI_API_KEY', 'test-api-key');
+    vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('should set acpMode to true and detect clientName when --acp flag is used', async () => {
+    process.argv = ['node', 'script.js', '--acp'];
+    vi.stubEnv('TERM_PROGRAM', 'vscode');
+    vi.stubEnv('VSCODE_GIT_ASKPASS_MAIN', '');
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
+    expect(config.getAcpMode()).toBe(true);
+    expect(config.getClientName()).toBe('acp-vscode');
+  });
+
+  it('should set acpMode to true but leave clientName undefined for generic terminals', async () => {
+    process.argv = ['node', 'script.js', '--acp'];
+    vi.stubEnv('TERM_PROGRAM', 'iTerm.app'); // Generic terminal
+    vi.stubEnv('VSCODE_GIT_ASKPASS_MAIN', '');
+    vi.stubEnv('ANTIGRAVITY_CLI_ALIAS', '');
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
+    expect(config.getAcpMode()).toBe(true);
+    expect(config.getClientName()).toBeUndefined();
+  });
+
+  it('should set acpMode to false and clientName to undefined by default', async () => {
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const config = await loadCliConfig(
+      createTestMergedSettings(),
+      'test-session',
+      argv,
+    );
+    expect(config.getAcpMode()).toBe(false);
+    expect(config.getClientName()).toBeUndefined();
   });
 });

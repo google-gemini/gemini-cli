@@ -110,10 +110,12 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
     () =>
       toolCalls.filter((t) => {
         const displayStatus = mapCoreStatusToDisplayStatus(t.status);
-        return (
-          displayStatus !== ToolCallStatus.Pending &&
-          displayStatus !== ToolCallStatus.Confirming
-        );
+        // We hide Confirming tools from the history log because they are
+        // currently being rendered in the interactive ToolConfirmationQueue.
+        // We show everything else, including Pending (waiting to run) and
+        // Canceled (rejected by user), to ensure the history is complete
+        // and to avoid tools "vanishing" after approval.
+        return displayStatus !== ToolCallStatus.Confirming;
       }),
 
     [toolCalls],

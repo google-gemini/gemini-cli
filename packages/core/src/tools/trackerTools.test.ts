@@ -14,12 +14,14 @@ import {
   TrackerUpdateTaskTool,
   TrackerVisualizeTool,
   TrackerAddDependencyTool,
+  buildTodosReturnDisplay,
 } from './trackerTools.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
 
 import { TaskStatus, TaskType } from '../services/trackerTypes.js';
+import type { TrackerService } from '../services/trackerService.js';
 
 describe('Tracker Tools Integration', () => {
   let tempDir: string;
@@ -141,5 +143,126 @@ describe('Tracker Tools Integration', () => {
     expect(vizResult.llmContent).toContain('Parent Task');
     expect(vizResult.llmContent).toContain('Child Task');
     expect(vizResult.llmContent).toContain(childId);
+  });
+
+  describe('buildTodosReturnDisplay', () => {
+    it('returns empty list for no tasks', async () => {
+      const mockService = {
+        listTasks: async () => [],
+      } as unknown as TrackerService;
+      const result = await buildTodosReturnDisplay(mockService);
+      expect(result.todos).toEqual([]);
+    });
+
+    it('returns formatted todos', async () => {
+      const parent = {
+        id: 'p1',
+        title: 'Parent',
+        type: TaskType.TASK,
+        status: TaskStatus.IN_PROGRESS,
+        dependencies: [],
+      };
+      const child = {
+        id: 'c1',
+        title: 'Child',
+        type: TaskType.EPIC,
+        status: TaskStatus.OPEN,
+        parentId: 'p1',
+        dependencies: [],
+      };
+      const closedLeaf = {
+        id: 'leaf',
+        title: 'Closed Leaf',
+        type: TaskType.BUG,
+        status: TaskStatus.CLOSED,
+        parentId: 'c1',
+        dependencies: [],
+      };
+
+      const mockService = {
+        listTasks: async () => [parent, child, closedLeaf],
+      } as unknown as TrackerService;
+      const display = await buildTodosReturnDisplay(mockService);
+
+      expect(display.todos).toEqual([
+        {
+          description: `task: Parent (p1)`,
+          status: 'in_progress',
+        },
+        {
+          description: `  epic: Child (c1)`,
+          status: 'pending',
+        },
+        {
+          description: `    bug: Closed Leaf (leaf)`,
+          status: 'completed',
+        },
+      ]);
+    });
+
+    it('sorts tasks by status', async () => {
+      const t1 = {
+        id: 't1',
+        title: 'T1',
+        type: TaskType.TASK,
+        status: TaskStatus.CLOSED,
+        dependencies: [],
+      };
+      const t2 = {
+        id: 't2',
+        title: 'T2',
+        type: TaskType.TASK,
+        status: TaskStatus.OPEN,
+        dependencies: [],
+      };
+      const t3 = {
+        id: 't3',
+        title: 'T3',
+        type: TaskType.TASK,
+        status: TaskStatus.IN_PROGRESS,
+        dependencies: [],
+      };
+
+      const mockService = {
+        listTasks: async () => [t1, t2, t3],
+      } as unknown as TrackerService;
+      const display = await buildTodosReturnDisplay(mockService);
+
+      expect(display.todos).toEqual([
+        { description: `task: T3 (t3)`, status: 'in_progress' },
+        { description: `task: T2 (t2)`, status: 'pending' },
+        { description: `task: T1 (t1)`, status: 'completed' },
+      ]);
+    });
+
+    it('detects cycles', async () => {
+      // Since TrackerTask only has a single parentId, a true cycle is unreachable from roots.
+      // We simulate a database corruption (two tasks with same ID, one root, one child)
+      // just to exercise the protective cycle detection branch.
+      const rootP1 = {
+        id: 'p1',
+        title: 'Parent',
+        type: TaskType.TASK,
+        status: TaskStatus.OPEN,
+        dependencies: [],
+      };
+      const childP1 = { ...rootP1, parentId: 'p1' };
+
+      const mockService = {
+        listTasks: async () => [rootP1, childP1],
+      } as unknown as TrackerService;
+      const display = await buildTodosReturnDisplay(mockService);
+
+      expect(display.todos).toEqual([
+        {
+          description: `task: Parent (p1)`,
+          status: 'pending',
+        },
+        {
+          description: `  [CYCLE DETECTED: p1]`,
+          status: 'cancelled',
+        },
+      ]);
+    });
   });
 });
