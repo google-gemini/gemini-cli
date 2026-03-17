@@ -1152,6 +1152,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
     activeBackgroundShellPid,
     setIsBackgroundShellListOpen,
     isBackgroundShellListOpen,
+    isBackgroundShellFullscreen,
+    setIsBackgroundShellFullscreen,
     setActiveBackgroundShellPid,
     backgroundShellHeight,
   } = useBackgroundShellManager({
@@ -1163,6 +1165,9 @@ Logging in with Google... Restarting Gemini CLI to continue.
     setEmbeddedShellFocused,
     terminalHeight,
   });
+
+  const [isForegroundShellFullscreen, setIsForegroundShellFullscreen] =
+    useState(false);
 
   setIsBackgroundShellListOpenRef.current = setIsBackgroundShellListOpen;
 
@@ -1844,6 +1849,29 @@ Logging in with Google... Restarting Gemini CLI to continue.
           setIsBackgroundShellListOpen(true);
         }
         return true;
+      } else if (keyMatchers[Command.TOGGLE_SHELL_FULLSCREEN](key)) {
+        if (
+          settings.merged.experimental.fullscreen &&
+          backgroundShells.size > 0 &&
+          isBackgroundShellVisible
+        ) {
+          setIsBackgroundShellFullscreen((prev) => {
+            const newValue = !prev;
+            if (newValue) {
+              setEmbeddedShellFocused(true);
+            }
+            return newValue;
+          });
+        } else if (settings.merged.experimental.fullscreen && activePtyId) {
+          setIsForegroundShellFullscreen((prev) => {
+            const newValue = !prev;
+            if (newValue) {
+              setEmbeddedShellFocused(true);
+            }
+            return newValue;
+          });
+        }
+        return true;
       }
       return false;
     },
@@ -1874,7 +1902,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
       lastOutputTimeRef,
       showTransientMessage,
       settings.merged.general.devtools,
+      settings.merged.experimental.fullscreen,
       showErrorDetails,
+      setIsBackgroundShellFullscreen,
+      setIsForegroundShellFullscreen,
       triggerExpandHint,
       keyMatchers,
       isHelpDismissKey,
@@ -2302,6 +2333,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       backgroundShells,
       activeBackgroundShellPid,
       backgroundShellHeight,
+      isBackgroundShellFullscreen,
+      isForegroundShellFullscreen,
       isBackgroundShellListOpen,
       adminSettingsChanged,
       newAgents,
@@ -2428,6 +2461,8 @@ Logging in with Google... Restarting Gemini CLI to continue.
       config,
       settingsNonce,
       backgroundShellHeight,
+      isBackgroundShellFullscreen,
+      isForegroundShellFullscreen,
       isBackgroundShellListOpen,
       activeBackgroundShellPid,
       backgroundShells,

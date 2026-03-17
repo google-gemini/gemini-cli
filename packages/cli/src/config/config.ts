@@ -97,6 +97,7 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
+  fullscreen?: boolean;
 }
 
 /**
@@ -297,6 +298,10 @@ export async function parseArguments(
         .option('accept-raw-output-risk', {
           type: 'boolean',
           description: 'Suppress the security warning when using --raw-output.',
+        })
+        .option('fullscreen', {
+          type: 'boolean',
+          description: 'Enable experimental fullscreen mode.',
         }),
     )
     // Register MCP subcommands
@@ -433,6 +438,10 @@ export async function loadCliConfig(
 
   if (argv.sandbox) {
     process.env['GEMINI_SANDBOX'] = 'true';
+  }
+
+  if (argv.fullscreen !== undefined) {
+    settings.experimental.fullscreen = argv.fullscreen;
   }
 
   const memoryImportFormat = settings.context?.importFormat || 'tree';

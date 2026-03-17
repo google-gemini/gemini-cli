@@ -38,37 +38,25 @@ import {
 export interface ShellToolMessageProps extends ToolMessageProps {
   config?: Config;
   isExpandable?: boolean;
+  isFullscreen?: boolean;
 }
 
 export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   name,
-
   description,
-
   resultDisplay,
-
   status,
-
   availableTerminalHeight,
-
   terminalWidth,
-
   emphasis = 'medium',
-
   renderOutputAsMarkdown = true,
-
   ptyId,
-
   config,
-
   isFirst,
-
   borderColor,
-
   borderDimColor,
-
   isExpandable,
-
+  isFullscreen,
   originalRequestName,
 }) => {
   const {
@@ -93,13 +81,17 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
     availableTerminalHeight,
     constrainHeight,
     isExpandable,
+    isFullscreen,
   });
 
   const availableHeight = calculateToolContentMaxLines({
     availableTerminalHeight,
     isAlternateBuffer,
     maxLinesLimit: maxLines,
+    isFullscreen,
   });
+
+  const lastDimensionsRef = React.useRef({ width: 0, height: 0 });
 
   React.useEffect(() => {
     const isExecuting = status === CoreToolCallStatus.Executing;
@@ -109,11 +101,20 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
         const finalHeight =
           availableHeight ?? ACTIVE_SHELL_MAX_LINES - SHELL_CONTENT_OVERHEAD;
 
-        ShellExecutionService.resizePty(
-          ptyId,
-          Math.max(1, childWidth),
-          Math.max(1, finalHeight),
-        );
+        if (
+          lastDimensionsRef.current.width !== childWidth ||
+          lastDimensionsRef.current.height !== finalHeight
+        ) {
+          ShellExecutionService.resizePty(
+            ptyId,
+            Math.max(1, childWidth),
+            Math.max(1, finalHeight),
+          );
+          lastDimensionsRef.current = {
+            width: childWidth,
+            height: finalHeight,
+          };
+        }
       } catch (e) {
         if (
           !(
@@ -142,10 +143,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   }, [isThisShellFocused, embeddedShellFocused, setEmbeddedShellFocused]);
 
   const headerRef = React.useRef<DOMElement>(null);
-
   const contentRef = React.useRef<DOMElement>(null);
-
-  // The shell is focusable if it's the shell command, it's executing, and the interactive shell is enabled.
 
   const isThisShellFocusable = checkIsShellFocusable(name, status, config);
 
@@ -156,7 +154,6 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   };
 
   useMouseClick(headerRef, handleFocus, { isActive: !!isThisShellFocusable });
-
   useMouseClick(contentRef, handleFocus, { isActive: !!isThisShellFocusable });
 
   const { shouldShowFocusHint } = useFocusHint(
@@ -169,7 +166,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
     <>
       <StickyHeader
         width={terminalWidth}
-        isFirst={isFirst}
+        isFirst={isFullscreen ? true : isFirst}
         borderColor={borderColor}
         borderDimColor={borderDimColor}
         containerRef={headerRef}
@@ -216,6 +213,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           renderOutputAsMarkdown={renderOutputAsMarkdown}
           hasFocus={isThisShellFocused}
           maxLines={maxLines}
+          isFullscreen={isFullscreen}
         />
         {isThisShellFocused && config && (
           <ShellInputPrompt

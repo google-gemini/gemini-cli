@@ -49,8 +49,13 @@ export const MainContent = () => {
     mainAreaWidth,
     staticAreaMaxItemHeight,
     cleanUiDetailsVisible,
+    isForegroundShellFullscreen,
+    terminalHeight,
+    activePtyId,
   } = uiState;
   const showHeaderDetails = cleanUiDetailsVisible;
+
+  const fullscreenHeight = Math.max(terminalHeight - FOOTER_RESERVED_HEIGHT, 5);
 
   const lastUserPromptIndex = useMemo(() => {
     for (let i = uiState.history.length - 1; i >= 0; i--) {
@@ -90,9 +95,11 @@ export const MainContent = () => {
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
             availableTerminalHeight={
-              uiState.constrainHeight || !isExpandable
-                ? staticAreaMaxItemHeight
-                : undefined
+              isForegroundShellFullscreen
+                ? fullscreenHeight
+                : uiState.constrainHeight || !isExpandable
+                  ? staticAreaMaxItemHeight
+                  : undefined
             }
             availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
             key={item.id}
@@ -102,6 +109,7 @@ export const MainContent = () => {
             isExpandable={isExpandable}
             isFirstThinking={isFirstThinking}
             isFirstAfterThinking={isFirstAfterThinking}
+            isFullscreen={isForegroundShellFullscreen}
           />
         ),
       ),
@@ -111,6 +119,8 @@ export const MainContent = () => {
       staticAreaMaxItemHeight,
       uiState.slashCommands,
       uiState.constrainHeight,
+      isForegroundShellFullscreen,
+      fullscreenHeight,
     ],
   );
 
@@ -141,7 +151,11 @@ export const MainContent = () => {
             <HistoryItemDisplay
               key={i}
               availableTerminalHeight={
-                uiState.constrainHeight ? staticAreaMaxItemHeight : undefined
+                isForegroundShellFullscreen
+                  ? fullscreenHeight
+                  : uiState.constrainHeight
+                    ? staticAreaMaxItemHeight
+                    : undefined
               }
               terminalWidth={mainAreaWidth}
               item={{ ...item, id: 0 }}
@@ -149,6 +163,7 @@ export const MainContent = () => {
               isExpandable={true}
               isFirstThinking={isFirstThinking}
               isFirstAfterThinking={isFirstAfterThinking}
+              isFullscreen={isForegroundShellFullscreen}
             />
           );
         })}
@@ -165,11 +180,41 @@ export const MainContent = () => {
       showConfirmationQueue,
       confirmingTool,
       uiState.history,
+      isForegroundShellFullscreen,
+      fullscreenHeight,
     ],
   );
 
-  const virtualizedData = useMemo(
-    () => [
+  const virtualizedData = useMemo(() => {
+    if (isForegroundShellFullscreen && activePtyId) {
+      // Find the item that contains the active PTY
+      const historyItem = uiState.history.find(
+        (h) =>
+          h.type === 'tool_group' &&
+          h.tools.some((t) => t.ptyId === activePtyId),
+      );
+      if (historyItem) {
+        return [
+          {
+            type: 'history' as const,
+            item: historyItem,
+            isExpandable: true,
+            isFirstThinking: false,
+            isFirstAfterThinking: false,
+          },
+        ];
+      }
+      const pendingItem = pendingHistoryItems.find(
+        (h) =>
+          h.type === 'tool_group' &&
+          h.tools.some((t) => t.ptyId === activePtyId),
+      );
+      if (pendingItem) {
+        return [{ type: 'pending' as const }];
+      }
+    }
+
+    return [
       { type: 'header' as const },
       ...augmentedHistory.map(
         ({ item, isExpandable, isFirstThinking, isFirstAfterThinking }) => ({
@@ -181,9 +226,14 @@ export const MainContent = () => {
         }),
       ),
       { type: 'pending' as const },
-    ],
-    [augmentedHistory],
-  );
+    ];
+  }, [
+    augmentedHistory,
+    isForegroundShellFullscreen,
+    activePtyId,
+    uiState.history,
+    pendingHistoryItems,
+  ]);
 
   const renderItem = useCallback(
     ({ item }: { item: (typeof virtualizedData)[number] }) => {
@@ -200,9 +250,11 @@ export const MainContent = () => {
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
             availableTerminalHeight={
-              uiState.constrainHeight || !item.isExpandable
-                ? staticAreaMaxItemHeight
-                : undefined
+              isForegroundShellFullscreen
+                ? fullscreenHeight
+                : uiState.constrainHeight || !item.isExpandable
+                  ? staticAreaMaxItemHeight
+                  : undefined
             }
             availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
             key={item.item.id}
@@ -212,9 +264,34 @@ export const MainContent = () => {
             isExpandable={item.isExpandable}
             isFirstThinking={item.isFirstThinking}
             isFirstAfterThinking={item.isFirstAfterThinking}
+            isFullscreen={isForegroundShellFullscreen}
           />
         );
       } else {
+        if (isForegroundShellFullscreen && activePtyId) {
+          const pendingItem = pendingHistoryItems.find(
+            (h) =>
+              h.type === 'tool_group' &&
+              h.tools.some((t) => t.ptyId === activePtyId),
+          );
+          if (pendingItem) {
+            return (
+              <Box flexDirection="column">
+                <HistoryItemDisplay
+                  key={0}
+                  availableTerminalHeight={fullscreenHeight}
+                  terminalWidth={mainAreaWidth}
+                  item={{ ...pendingItem, id: 0 }}
+                  isPending={true}
+                  isExpandable={true}
+                  isFirstThinking={false}
+                  isFirstAfterThinking={false}
+                  isFullscreen={true}
+                />
+              </Box>
+            );
+          }
+        }
         return pendingItems;
       }
     },
@@ -226,8 +303,54 @@ export const MainContent = () => {
       pendingItems,
       uiState.constrainHeight,
       staticAreaMaxItemHeight,
+      isForegroundShellFullscreen,
+      fullscreenHeight,
+      activePtyId,
+      pendingHistoryItems,
     ],
   );
+
+  if (isForegroundShellFullscreen && activePtyId) {
+    const historyItem = uiState.history.find(
+      (h) =>
+        h.type === 'tool_group' && h.tools.some((t) => t.ptyId === activePtyId),
+    );
+    if (historyItem) {
+      return (
+        <Box flexDirection="column" flexGrow={1} display="flex">
+          <HistoryItemDisplay
+            terminalWidth={mainAreaWidth}
+            availableTerminalHeight={fullscreenHeight}
+            key={historyItem.id}
+            item={historyItem}
+            isPending={false}
+            commands={uiState.slashCommands}
+            isExpandable={true}
+            isFullscreen={true}
+          />
+        </Box>
+      );
+    }
+    const pendingItem = pendingHistoryItems.find(
+      (h) =>
+        h.type === 'tool_group' && h.tools.some((t) => t.ptyId === activePtyId),
+    );
+    if (pendingItem) {
+      return (
+        <Box flexDirection="column" flexGrow={1} display="flex">
+          <HistoryItemDisplay
+            key={0}
+            availableTerminalHeight={fullscreenHeight}
+            terminalWidth={mainAreaWidth}
+            item={{ ...pendingItem, id: 0 }}
+            isPending={true}
+            isExpandable={true}
+            isFullscreen={true}
+          />
+        </Box>
+      );
+    }
+  }
 
   if (isAlternateBuffer) {
     return (
