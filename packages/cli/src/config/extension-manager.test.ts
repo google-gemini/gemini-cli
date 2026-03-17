@@ -22,6 +22,7 @@ import {
   getRealPath,
   type CustomTheme,
   IntegrityDataStatus,
+  coreEvents,
 } from '@google/gemini-cli-core';
 
 const mockHomedir = vi.hoisted(() => vi.fn(() => '/tmp/mock-home'));
@@ -694,6 +695,99 @@ describe('ExtensionManager', () => {
 
       expect(newManager.getExtensions().some((e) => e.name === extName)).toBe(
         true,
+      );
+    });
+  });
+
+  describe('Builtin Extensions', () => {
+    let builtinExtensionsDir: string;
+
+    beforeEach(() => {
+      builtinExtensionsDir = fs.mkdtempSync(
+        path.join(tempHomeDir, 'gemini-cli-test-builtin-'),
+      );
+    });
+
+    it('should warn and prefer builtin when names collide', async () => {
+      // 1. Create a manual extension named 'test-ext'
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'test-ext',
+        version: '1.0.0-manual',
+      });
+
+      // 2. Create a builtin extension named 'test-ext'
+      createExtension({
+        extensionsDir: builtinExtensionsDir,
+        name: 'test-ext',
+        version: '1.0.0-builtin',
+      });
+
+      const emitSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+      // Create a FRESH manager to ensure loadExtensions actually runs
+      const manager = new ExtensionManager({
+        settings: createTestMergedSettings(),
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: vi.fn().mockResolvedValue(true),
+        requestSetting: null,
+      });
+
+      const extensions = await manager.loadExtensions(builtinExtensionsDir);
+
+      // Verify builtin took precedence
+      const testExt = extensions.find((e) => e.name === 'test-ext');
+      expect(testExt).toBeDefined();
+      expect(testExt?.version).toBe('1.0.0-builtin');
+
+      // Verify warning was shown
+      expect(emitSpy).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining('Extension "test-ext" is now built-in'),
+      );
+    });
+
+    it('should warn when legacy conductor is found while loading sdd builtin', async () => {
+      // 1. Create a manual extension named 'conductor'
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'conductor',
+        version: '0.1.0',
+      });
+
+      // 2. Create a builtin extension named 'sdd'
+      createExtension({
+        extensionsDir: builtinExtensionsDir,
+        name: 'sdd',
+        version: '1.0.0',
+      });
+
+      const emitSpy = vi.spyOn(coreEvents, 'emitFeedback');
+
+      // Create a FRESH manager
+      const manager = new ExtensionManager({
+        settings: createTestMergedSettings(),
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: vi.fn().mockResolvedValue(true),
+        requestSetting: null,
+      });
+
+      const extensions = await manager.loadExtensions(builtinExtensionsDir);
+
+      // Verify both are loaded (logic currently loads both but warns)
+      expect(extensions.find((e) => e.name === 'conductor')).toBeDefined();
+      expect(extensions.find((e) => e.name === 'sdd')).toBeDefined();
+
+      // Verify warning was shown
+      expect(emitSpy).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining(
+          'The "conductor" extension has been renamed to "sdd"',
+        ),
+      );
+      expect(emitSpy).toHaveBeenCalledWith(
+        'warning',
+        expect.stringContaining('.gemini/specs/'),
       );
     });
   });
