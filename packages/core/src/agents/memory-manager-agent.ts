@@ -6,6 +6,7 @@
 
 import { z } from 'zod';
 import type { LocalAgentDefinition } from './types.js';
+import { WRITE_FILE_TOOL_NAME } from '../tools/tool-names.js';
 
 const MemoryManagerSchema = z.object({
   response: z
@@ -73,8 +74,7 @@ export const MemoryManagerAgent = (): LocalAgentDefinition<
   kind: 'local',
   name: 'save_memory',
   displayName: 'Memory Manager',
-  description:
-    'Manages the global memory file (~/.gemini/GEMINI.md). Use this agent to add, remove, de-duplicate, and organize persistent user memories. It replaces the built-in save_memory tool with structured memory management including categorization and a table of contents.',
+  description: `Writes and reads global preferences or facts across ALL future sessions. Use this for recurring instructions like coding styles or tool aliases. Unlike '${WRITE_FILE_TOOL_NAME}', which is for project-specific files, this performs the described edits to memory files loaded in every workspace.`,
   inputConfig: {
     inputSchema: {
       type: 'object',
