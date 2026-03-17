@@ -475,9 +475,31 @@ export async function loadCliConfig(
     ...settings.context?.fileFiltering,
   };
 
+  //changes the includeDirectories to be absolute paths based on the cwd, and also include any additional directories specified via CLI args
   const includeDirectories = (settings.context?.includeDirectories || [])
     .map(resolvePath)
     .concat((argv.includeDirectories || []).map(resolvePath));
+
+  // When running inside VSCode with multiple workspace folders,
+  // automatically add the other folders as include directories
+  // so Gemini has context of all open folders, not just the cwd.
+  const ideWorkspacePath = process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
+  if (ideWorkspacePath) {
+    const realCwd = resolveToRealPath(cwd);
+    const ideFolders = ideWorkspacePath.split(path.delimiter).filter((p) => {
+      const trimmedPath = p.trim();
+      if (!trimmedPath) return false;
+      try {
+        return resolveToRealPath(trimmedPath) !== realCwd;
+      } catch (e) {
+        debugLogger.debug(
+          `[IDE] Skipping inaccessible workspace folder: ${trimmedPath} (${e instanceof Error ? e.message : String(e)})`,
+        );
+        return false;
+      }
+    });
+    includeDirectories.push(...ideFolders);
+  }
 
   const extensionManager = new ExtensionManager({
     settings,
