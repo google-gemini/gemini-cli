@@ -766,7 +766,7 @@ describe('loadCliConfig', () => {
   it('should add IDE workspace folders from GEMINI_CLI_IDE_WORKSPACE_PATH to include directories', async () => {
     vi.stubEnv(
       'GEMINI_CLI_IDE_WORKSPACE_PATH',
-      '/project/folderA:/project/folderB',
+      ['/project/folderA', '/project/folderB'].join(path.delimiter),
     );
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
