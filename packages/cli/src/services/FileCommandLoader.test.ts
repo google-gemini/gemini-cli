@@ -955,6 +955,64 @@ describe('FileCommandLoader', () => {
         assert.fail('Incorrect action type');
       }
     });
+
+    it('correctly injects ${workspacePath} into extension commands', async () => {
+      const workspaceDir = process.cwd();
+      const extensionDir = path.join(
+        workspaceDir,
+        GEMINI_DIR,
+        'extensions',
+        'ws-test-ext',
+      );
+
+      mock({
+        [extensionDir]: {
+          'gemini-extension.json': JSON.stringify({
+            name: 'ws-test-ext',
+            version: '1.0.0',
+          }),
+          commands: {
+            'ws-cmd.toml': 'prompt = "WS: ${workspacePath}"',
+          },
+        },
+      });
+
+      const mockConfig = {
+        getProjectRoot: vi.fn(() => workspaceDir),
+        getExtensions: vi.fn(() => [
+          {
+            name: 'ws-test-ext',
+            version: '1.0.0',
+            isActive: true,
+            path: extensionDir,
+          },
+        ]),
+        getFolderTrust: vi.fn(() => false),
+        isTrustedFolder: vi.fn(() => false),
+      } as unknown as Config;
+      const loader = new FileCommandLoader(mockConfig);
+      const commands = await loader.loadCommands(signal);
+
+      expect(commands).toHaveLength(1);
+      const command = commands[0];
+
+      const result = await command.action?.(
+        createMockCommandContext({
+          invocation: {
+            raw: '/ws-cmd',
+            name: 'ws-cmd',
+            args: '',
+          },
+        }),
+        '',
+      );
+
+      if (result?.type === 'submit_prompt') {
+        expect(result.content).toEqual([{ text: `WS: ${workspaceDir}` }]);
+      } else {
+        assert.fail('Incorrect action type');
+      }
+    });
   });
 
   describe('Argument Handling Integration (via ShellProcessor)', () => {

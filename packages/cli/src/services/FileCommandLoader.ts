@@ -33,6 +33,7 @@ import {
 } from './prompt-processors/shellProcessor.js';
 import { AtFileProcessor } from './prompt-processors/atFileProcessor.js';
 import { sanitizeForDisplay } from '../ui/utils/textUtils.js';
+import { hydrateString } from '../config/extensions/variables.js';
 
 interface CommandDirectory {
   path: string;
@@ -239,13 +240,13 @@ export class FileCommandLoader implements ICommandLoader {
 
     const validDef = validationResult.data;
 
-    // Hydrate extensionPath if this is an extension command
-    if (extensionPath) {
-      validDef.prompt = validDef.prompt.replace(
-        /\$\{extensionPath\}/g,
-        () => extensionPath,
-      );
-    }
+    // Hydrate variables in the prompt
+    validDef.prompt = hydrateString(validDef.prompt, {
+      extensionPath,
+      workspacePath: this.projectRoot,
+      '/': path.sep,
+      pathSeparator: path.sep,
+    });
 
     const relativePathWithExt = path.relative(baseDir, filePath);
     const relativePath = relativePathWithExt.substring(
