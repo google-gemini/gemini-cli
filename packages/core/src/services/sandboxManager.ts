@@ -1,13 +1,16 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import os from 'node:os';
 import {
   sanitizeEnvironment,
+  getSecureSanitizationConfig,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
+import { LinuxSandboxManager } from '../sandbox/linux/LinuxSandboxManager.js';
 
 /**
  * Request for preparing a command to run in a sandbox.
@@ -37,6 +40,8 @@ export interface SandboxedCommand {
   args: string[];
   /** Sanitized environment variables. */
   env: NodeJS.ProcessEnv;
+  /** The working directory. */
+  cwd?: string;
 }
 
 /**
@@ -59,13 +64,9 @@ export class NoopSandboxManager implements SandboxManager {
    * the original program and arguments.
    */
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
-    const sanitizationConfig: EnvironmentSanitizationConfig = {
-      allowedEnvironmentVariables:
-        req.config?.sanitizationConfig?.allowedEnvironmentVariables ?? [],
-      blockedEnvironmentVariables:
-        req.config?.sanitizationConfig?.blockedEnvironmentVariables ?? [],
-      enableEnvironmentVariableRedaction: true, // Forced for safety
-    };
+    const sanitizationConfig = getSecureSanitizationConfig(
+      req.config?.sanitizationConfig,
+    );
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
@@ -75,4 +76,29 @@ export class NoopSandboxManager implements SandboxManager {
       env: sanitizedEnv,
     };
   }
+}
+
+/**
+ * SandboxManager that implements actual sandboxing.
+ */
+export class LocalSandboxManager implements SandboxManager {
+  async prepareCommand(_req: SandboxRequest): Promise<SandboxedCommand> {
+    throw new Error('Tool sandboxing is not yet implemented.');
+  }
+}
+
+/**
+ * Creates a sandbox manager based on the provided settings.
+ */
+export function createSandboxManager(
+  sandboxingEnabled: boolean,
+  workspace: string,
+): SandboxManager {
+  if (sandboxingEnabled) {
+    if (os.platform() === 'linux') {
+      return new LinuxSandboxManager({ workspace });
+    }
+    return new LocalSandboxManager();
+  }
+  return new NoopSandboxManager();
 }

@@ -814,7 +814,9 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
 
   it('should pass extension context file paths to loadServerHierarchicalMemory', async () => {
     process.argv = ['node', 'script.js'];
-    const settings = createTestMergedSettings();
+    const settings = createTestMergedSettings({
+      experimental: { jitContext: false },
+    });
     vi.spyOn(ExtensionManager.prototype, 'getExtensions').mockReturnValue([
       {
         path: '/path/to/ext1',
@@ -865,6 +867,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
     process.argv = ['node', 'script.js'];
     const includeDir = path.resolve(path.sep, 'path', 'to', 'include');
     const settings = createTestMergedSettings({
+      experimental: { jitContext: false },
       context: {
         includeDirectories: [includeDir],
         loadMemoryFromIncludeDirectories: true,
@@ -892,6 +895,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   it('should NOT pass includeDirectories to loadServerHierarchicalMemory when loadMemoryFromIncludeDirectories is false', async () => {
     process.argv = ['node', 'script.js'];
     const settings = createTestMergedSettings({
+      experimental: { jitContext: false },
       context: {
         includeDirectories: ['/path/to/include'],
         loadMemoryFromIncludeDirectories: false,
@@ -1773,7 +1777,7 @@ describe('loadCliConfig model selection', () => {
   });
 
   it('always prefers model from argv', async () => {
-    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-flash'];
+    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-flash-preview'];
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(
       createTestMergedSettings({
@@ -1785,11 +1789,11 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('gemini-2.5-flash');
+    expect(config.getModel()).toBe('gemini-2.5-flash-preview');
   });
 
   it('selects the model from argv if provided', async () => {
-    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-flash'];
+    process.argv = ['node', 'script.js', '--model', 'gemini-2.5-flash-preview'];
     const argv = await parseArguments(createTestMergedSettings());
     const config = await loadCliConfig(
       createTestMergedSettings({
@@ -1799,7 +1803,7 @@ describe('loadCliConfig model selection', () => {
       argv,
     );
 
-    expect(config.getModel()).toBe('gemini-2.5-flash');
+    expect(config.getModel()).toBe('gemini-2.5-flash-preview');
   });
 
   it('selects the default auto model if provided via auto alias', async () => {
