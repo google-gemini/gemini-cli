@@ -46,6 +46,67 @@ describe('ConsolePatcher', () => {
     expect(console.info).toBe(beforeInfo);
   });
 
+  describe('headlessMode', () => {
+    it('should ignore log and info when headlessMode is true and debugMode is false', () => {
+      patcher = new ConsolePatcher({
+        onNewMessage,
+        debugMode: false,
+        headlessMode: true,
+      });
+      patcher.patch();
+
+      console.log('test log');
+      console.info('test info');
+      expect(onNewMessage).not.toHaveBeenCalled();
+    });
+
+    it('should not ignore log and info when headlessMode is true and debugMode is true', () => {
+      patcher = new ConsolePatcher({
+        onNewMessage,
+        debugMode: true,
+        headlessMode: true,
+      });
+      patcher.patch();
+
+      console.log('test log');
+      expect(onNewMessage).toHaveBeenCalledWith({
+        type: 'log',
+        content: 'test log',
+        count: 1,
+      });
+
+      console.info('test info');
+      expect(onNewMessage).toHaveBeenCalledWith({
+        type: 'info',
+        content: 'test info',
+        count: 1,
+      });
+    });
+
+    it('should not ignore log and info when headlessMode is false', () => {
+      patcher = new ConsolePatcher({
+        onNewMessage,
+        debugMode: false,
+        headlessMode: false,
+      });
+      patcher.patch();
+
+      console.log('test log');
+      expect(onNewMessage).toHaveBeenCalledWith({
+        type: 'log',
+        content: 'test log',
+        count: 1,
+      });
+
+      console.info('test info');
+      expect(onNewMessage).toHaveBeenCalledWith({
+        type: 'info',
+        content: 'test info',
+        count: 1,
+      });
+    });
+  });
+
   describe('when stderr is false', () => {
     it('should call onNewMessage for log, warn, error, and info', () => {
       patcher = new ConsolePatcher({
@@ -140,20 +201,6 @@ describe('ConsolePatcher', () => {
 
       console.error('test error');
       expect(spyError).toHaveBeenCalledWith('test error');
-    });
-
-    it('should ignore log and info when debugMode is false', () => {
-      const spyError = vi.spyOn(console, 'error').mockImplementation(() => {});
-      patcher = new ConsolePatcher({
-        debugMode: false,
-        stderr: true,
-        headlessMode: true,
-      });
-      patcher.patch();
-
-      console.log('test log');
-      console.info('test info');
-      expect(spyError).not.toHaveBeenCalled();
     });
 
     it('should redirect log and info to originalConsoleError when debugMode is true', () => {
