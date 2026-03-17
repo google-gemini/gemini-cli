@@ -27,7 +27,6 @@ import {
   CoreEvent,
   createWorkingStdio,
   recordToolCallInteractions,
-  isHeadlessMode,
   ToolErrorType,
   Scheduler,
   ROOT_SCHEDULER_ID,
@@ -64,10 +63,8 @@ export async function runNonInteractive({
   resumedSessionData,
 }: RunNonInteractiveParams): Promise<void> {
   return promptIdContext.run(prompt_id, async () => {
-    const suppressConsoleOutput = isHeadlessMode() && !config.getDebugMode();
     const consolePatcher = new ConsolePatcher({
       stderr: true,
-      suppressConsoleOutput,
       debugMode: config.getDebugMode(),
       onNewMessage: (msg) => {
         coreEvents.emitConsoleLog(msg.type, msg.content);
