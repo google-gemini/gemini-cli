@@ -467,6 +467,6 @@ those files are not automatically deleted and must be managed manually.
 
 [`plan.toml`]:
   https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/policy/policies/plan.toml
-[Spec-Driven Development (SDD)]: ./spec-driven-development.md
+[Spec-Driven Development (SDD)]: ../cli/spec-driven-development.md
 [Conductor]: https://github.com/gemini-cli-extensions/conductor
 [open an issue]: https://github.com/google-gemini/gemini-cli/issues
