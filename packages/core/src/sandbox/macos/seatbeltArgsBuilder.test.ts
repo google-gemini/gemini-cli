@@ -56,9 +56,11 @@ describe('seatbeltArgsBuilder', () => {
     vi.restoreAllMocks();
   });
 
-  it('should gracefully fallback to original path if realpathSync throws', () => {
+  it('should gracefully fallback to original path if realpathSync throws ENOENT', () => {
     vi.spyOn(fs, 'realpathSync').mockImplementation(() => {
-      throw new Error('ENOENT');
+      const error = new Error('File not found');
+      Object.assign(error, { code: 'ENOENT' });
+      throw error;
     });
 
     const args = buildSeatbeltArgs({
@@ -69,6 +71,22 @@ describe('seatbeltArgsBuilder', () => {
     expect(args).toContain('-D');
     expect(args).toContain('WORKSPACE=/test/missing_workspace');
     expect(args).toContain('ALLOWED_PATH_0=/test/missing_path');
+
+    vi.restoreAllMocks();
+  });
+
+  it('should throw if realpathSync throws a non-ENOENT error', () => {
+    vi.spyOn(fs, 'realpathSync').mockImplementation(() => {
+      const error = new Error('Permission denied');
+      Object.assign(error, { code: 'EACCES' });
+      throw error;
+    });
+
+    expect(() =>
+      buildSeatbeltArgs({
+        workspace: '/test/workspace',
+      }),
+    ).toThrow('Permission denied');
 
     vi.restoreAllMocks();
   });

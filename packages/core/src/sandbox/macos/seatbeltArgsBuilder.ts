@@ -24,13 +24,17 @@ export interface SeatbeltArgsOptions {
 
 /**
  * Attempts to resolve the real path of a given path (resolving symlinks).
- * Falls back to the original path if the file does not exist.
+ * Falls back to the original path ONLY if the file does not exist (ENOENT).
+ * All other errors (e.g. EACCES) are re-thrown to prevent symlink-based sandbox escapes.
  */
 function tryRealpath(p: string): string {
   try {
     return fs.realpathSync(p);
-  } catch {
-    return p;
+  } catch (e) {
+    if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
+      return p;
+    }
+    throw e;
   }
 }
 
