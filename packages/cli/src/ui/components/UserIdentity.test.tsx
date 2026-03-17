@@ -40,7 +40,7 @@ describe('<UserIdentity />', () => {
     vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue(undefined);
 
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <UserIdentity config={mockConfig} />,
+      <UserIdentity context={mockConfig} />,
     );
     await waitUntilReady();
 
@@ -60,7 +60,7 @@ describe('<UserIdentity />', () => {
     vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue(undefined);
 
     const { lastFrameRaw, unmount } = renderWithProviders(
-      <UserIdentity config={mockConfig} />,
+      <UserIdentity context={mockConfig} />,
     );
 
     // Assert immediately on the first available frame before any async ticks happen
@@ -86,7 +86,7 @@ describe('<UserIdentity />', () => {
     vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue(undefined);
 
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <UserIdentity config={mockConfig} />,
+      <UserIdentity context={mockConfig} />,
     );
     await waitUntilReady();
 
@@ -107,7 +107,7 @@ describe('<UserIdentity />', () => {
     vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue('Premium Plan');
 
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <UserIdentity config={mockConfig} />,
+      <UserIdentity context={mockConfig} />,
     );
     await waitUntilReady();
 
@@ -136,7 +136,7 @@ describe('<UserIdentity />', () => {
     );
 
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <UserIdentity config={mockConfig} />,
+      <UserIdentity context={mockConfig} />,
     );
     await waitUntilReady();
 
@@ -153,7 +153,7 @@ describe('<UserIdentity />', () => {
     vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue(undefined);
 
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <UserIdentity config={mockConfig} />,
+      <UserIdentity context={mockConfig} />,
     );
     await waitUntilReady();
 
@@ -173,7 +173,7 @@ describe('<UserIdentity />', () => {
     vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue('Enterprise Tier');
 
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <UserIdentity config={mockConfig} />,
+      <UserIdentity context={mockConfig} />,
     );
     await waitUntilReady();
 
@@ -192,7 +192,7 @@ describe('<UserIdentity />', () => {
     vi.spyOn(mockConfig, 'getUserTierName').mockReturnValue('Advanced Ultra');
 
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <UserIdentity config={mockConfig} />,
+      <UserIdentity context={mockConfig} />,
     );
     await waitUntilReady();
 

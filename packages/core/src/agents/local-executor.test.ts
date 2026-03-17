@@ -313,9 +313,12 @@ describe('LocalAgentExecutor', () => {
       get: () => 'test-prompt-id',
       configurable: true,
     });
-    parentToolRegistry = new ToolRegistry(mockConfig, mockConfig.messageBus);
+    parentToolRegistry = new ToolRegistry(
+      mockConfig,
+      mockConfig.createAgentLoopContext().messageBus,
+    );
     parentToolRegistry.registerTool(
-      new LSTool(mockConfig, mockConfig.messageBus),
+      new LSTool(mockConfig, mockConfig.createAgentLoopContext().messageBus),
     );
     parentToolRegistry.registerTool(
       new MockTool({ name: READ_FILE_TOOL_NAME }),
@@ -521,7 +524,7 @@ describe('LocalAgentExecutor', () => {
         toolName,
         'description',
         {},
-        mockConfig.messageBus,
+        mockConfig.createAgentLoopContext().messageBus,
       );
 
       // Mock getTool to return our real DiscoveredMCPTool instance

@@ -98,7 +98,7 @@ describe('ShellProcessor', () => {
         args: 'default args',
       },
       services: {
-        config: mockConfig as Config,
+        agentContext: mockConfig as any as Config,
       },
       session: {
         sessionShellAllowlist: new Set(),
@@ -120,7 +120,7 @@ describe('ShellProcessor', () => {
     const prompt: PromptPipelineContent = createPromptPipelineContent('!{ls}');
     const contextWithoutConfig = createMockCommandContext({
       services: {
-        config: null,
+        agentContext: null as any,
       },
     });
 

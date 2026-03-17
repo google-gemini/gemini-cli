@@ -25,7 +25,7 @@ describe('GeneralistAgent', () => {
     const mockToolRegistry = {
       getAllToolNames: () => ['tool1', 'tool2', 'agent-tool'],
     } as unknown as ToolRegistry;
-    vi.spyOn(config, 'getToolRegistry').mockReturnValue(mockToolRegistry);
+    vi.spyOn(config, 'toolRegistry', 'get').mockReturnValue(mockToolRegistry);
     Object.defineProperty(config, 'toolRegistry', {
       get: () => mockToolRegistry,
     });

@@ -5,7 +5,7 @@
  */
 
 import type {
-  Config,
+  AgentLoopContext,
   ToolCallRequestInfo,
   ResumedSessionData,
   UserFeedbackPayload,
@@ -48,7 +48,7 @@ import {
 import { TextOutput } from './ui/utils/textOutput.js';
 
 interface RunNonInteractiveParams {
-  config: Config;
+  context: AgentLoopContext;
   settings: LoadedSettings;
   input: string;
   prompt_id: string;
@@ -56,12 +56,13 @@ interface RunNonInteractiveParams {
 }
 
 export async function runNonInteractive({
-  config,
+  context,
   settings,
   input,
   prompt_id,
   resumedSessionData,
 }: RunNonInteractiveParams): Promise<void> {
+  const config = context.config;
   return promptIdContext.run(prompt_id, async () => {
     const consolePatcher = new ConsolePatcher({
       stderr: true,
@@ -209,10 +210,10 @@ export async function runNonInteractive({
         }
       });
 
-      const geminiClient = config.getGeminiClient();
+      const geminiClient = context.geminiClient;
       const scheduler = new Scheduler({
-        context: config,
-        messageBus: config.getMessageBus(),
+        context,
+        messageBus: context.messageBus,
         getPreferredEditor: () => undefined,
         schedulerId: ROOT_SCHEDULER_ID,
       });
@@ -243,7 +244,7 @@ export async function runNonInteractive({
         const slashCommandResult = await handleSlashCommand(
           input,
           abortController,
-          config,
+          context,
           settings,
         );
         // If a slash command is found and returns a prompt, use it.
@@ -258,7 +259,7 @@ export async function runNonInteractive({
       if (!query) {
         const { processedQuery, error } = await handleAtCommand({
           query: input,
-          config,
+          context: config,
           addItem: (_item, _timestamp) => 0,
           onDebugMessage: () => {},
           messageId: Date.now(),

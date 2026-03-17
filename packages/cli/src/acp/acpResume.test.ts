@@ -83,7 +83,7 @@ describe('GeminiAgent Session Resume', () => {
       initialize: vi.fn().mockResolvedValue(undefined),
       getFileSystemService: vi.fn(),
       setFileSystemService: vi.fn(),
-      getGeminiClient: vi.fn().mockReturnValue({
+      geminiClient: vi.fn().mockReturnValue({
         initialize: vi.fn().mockResolvedValue(undefined),
         resumeChat: vi.fn().mockResolvedValue(undefined),
         getChat: vi.fn().mockReturnValue({}),
@@ -158,9 +158,9 @@ describe('GeminiAgent Session Resume', () => {
       ],
     };
 
-    mockConfig.getToolRegistry = vi.fn().mockReturnValue({
+    (mockConfig as any).toolRegistry = {
       getTool: vi.fn().mockReturnValue({ kind: 'read' }),
-    });
+    } as any;
 
     (SessionSelector as unknown as Mock).mockImplementation(() => ({
       resolveSession: vi.fn().mockResolvedValue({
@@ -219,7 +219,9 @@ describe('GeminiAgent Session Resume', () => {
     });
 
     // Verify resumeChat received the correct arguments
-    expect(mockConfig.getGeminiClient().resumeChat).toHaveBeenCalledWith(
+    expect(
+      mockConfig.createAgentLoopContext().geminiClient.resumeChat,
+    ).toHaveBeenCalledWith(
       mockClientHistory,
       expect.objectContaining({
         conversation: sessionData,

@@ -55,7 +55,7 @@ const defaultProps: MultiFolderTrustDialogProps = {
   trustedDirs: [],
   errors: [],
   finishAddingDirectories: mockFinishAddingDirectories,
-  config: mockConfig,
+  context: mockConfig,
   addItem: mockAddItem,
 };
 
@@ -234,7 +234,7 @@ describe('MultiFolderTrustDialog', () => {
       <MultiFolderTrustDialog
         {...defaultProps}
         folders={folders}
-        config={null as unknown as Config}
+        context={null as unknown as Config}
       />,
     );
     await waitUntilReady();

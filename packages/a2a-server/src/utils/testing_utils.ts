@@ -14,9 +14,8 @@ import {
   ApprovalMode,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-  GeminiClient,
+  type GeminiClient,
   HookSystem,
-  type MessageBus,
   PolicyDecision,
   tmpdir,
   type Config,
@@ -38,30 +37,19 @@ export function createMockConfig(
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return this as unknown as Config;
     },
-    get toolRegistry() {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const config = this as unknown as Config;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return config.getToolRegistry?.() as unknown as ToolRegistry;
-    },
-    get messageBus() {
-      return (
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-        (this as unknown as Config).getMessageBus?.() as unknown as MessageBus
-      );
-    },
-    get geminiClient() {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      const config = this as unknown as Config;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-      return config.getGeminiClient?.() as unknown as GeminiClient;
-    },
-    getToolRegistry: vi.fn().mockReturnValue({
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    toolRegistry: {
       getTool: vi.fn(),
       getAllToolNames: vi.fn().mockReturnValue([]),
       getAllTools: vi.fn().mockReturnValue([]),
       getToolsByServer: vi.fn().mockReturnValue([]),
-    }),
+    } as unknown as ToolRegistry,
+    messageBus: createMockMessageBus(),
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    geminiClient: {
+      getChat: vi.fn(),
+    } as unknown as GeminiClient,
+
     getApprovalMode: vi.fn().mockReturnValue(ApprovalMode.DEFAULT),
     getIdeMode: vi.fn().mockReturnValue(false),
     isInteractive: () => true,
@@ -115,14 +103,9 @@ export function createMockConfig(
   (mockConfig as unknown as { config: Config; promptId: string }).promptId =
     'test-prompt-id';
 
-  mockConfig.getMessageBus = vi.fn().mockReturnValue(createMockMessageBus());
   mockConfig.getHookSystem = vi
     .fn()
     .mockReturnValue(new HookSystem(mockConfig));
-
-  mockConfig.getGeminiClient = vi
-    .fn()
-    .mockReturnValue(new GeminiClient(mockConfig));
 
   mockConfig.getPolicyEngine = vi.fn().mockReturnValue({
     check: async () => {

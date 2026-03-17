@@ -139,7 +139,7 @@ describe('useCommandCompletion', () => {
   const mockCommandContext = {} as CommandContext;
   const mockConfig = {
     getEnablePromptCompletion: () => false,
-    getGeminiClient: vi.fn(),
+    geminiClient: vi.fn(),
   } as unknown as Config;
   const testRootDir = '/';
 
@@ -176,7 +176,7 @@ describe('useCommandCompletion', () => {
       commandContext: mockCommandContext,
       reverseSearchActive: false,
       shellModeActive,
-      config: mockConfig,
+      context: mockConfig,
       active,
     });
     hookResult = { ...completion, textBuffer };
@@ -711,7 +711,7 @@ describe('useCommandCompletion', () => {
     it('should not trigger prompt completion for line comments', async () => {
       const mockConfig = {
         getEnablePromptCompletion: () => true,
-        getGeminiClient: vi.fn(),
+        geminiClient: vi.fn(),
       } as unknown as Config;
 
       let hookResult: ReturnType<typeof useCommandCompletion> & {
@@ -727,7 +727,7 @@ describe('useCommandCompletion', () => {
           commandContext: mockCommandContext,
           reverseSearchActive: false,
           shellModeActive: false,
-          config: mockConfig,
+          context: mockConfig,
           active: true,
         });
         hookResult = { ...completion, textBuffer };
@@ -744,7 +744,7 @@ describe('useCommandCompletion', () => {
     it('should not trigger prompt completion for block comments', async () => {
       const mockConfig = {
         getEnablePromptCompletion: () => true,
-        getGeminiClient: vi.fn(),
+        geminiClient: vi.fn(),
       } as unknown as Config;
 
       let hookResult: ReturnType<typeof useCommandCompletion> & {
@@ -762,7 +762,7 @@ describe('useCommandCompletion', () => {
           commandContext: mockCommandContext,
           reverseSearchActive: false,
           shellModeActive: false,
-          config: mockConfig,
+          context: mockConfig,
           active: true,
         });
         hookResult = { ...completion, textBuffer };
@@ -779,7 +779,7 @@ describe('useCommandCompletion', () => {
     it('should trigger prompt completion for regular text when enabled', async () => {
       const mockConfig = {
         getEnablePromptCompletion: () => true,
-        getGeminiClient: vi.fn(),
+        geminiClient: vi.fn(),
       } as unknown as Config;
 
       let hookResult: ReturnType<typeof useCommandCompletion> & {
@@ -797,7 +797,7 @@ describe('useCommandCompletion', () => {
           commandContext: mockCommandContext,
           reverseSearchActive: false,
           shellModeActive: false,
-          config: mockConfig,
+          context: mockConfig,
           active: true,
         });
         hookResult = { ...completion, textBuffer };

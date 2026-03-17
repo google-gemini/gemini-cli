@@ -5,7 +5,7 @@
  */
 
 import {
-  type Config,
+  type AgentLoopContext,
   type ToolCallRequestInfo,
   type ToolCall,
   type CompletedToolCall,
@@ -66,7 +66,7 @@ export type TrackedCancelledToolCall = Extract<
  */
 export function useToolScheduler(
   onComplete: (tools: CompletedToolCall[]) => Promise<void>,
-  config: Config,
+  context: AgentLoopContext,
   getPreferredEditor: () => EditorType | undefined,
 ): [
   TrackedToolCall[],
@@ -82,7 +82,7 @@ export function useToolScheduler(
   >({});
   const [lastToolOutputTime, setLastToolOutputTime] = useState<number>(0);
 
-  const messageBus = useMemo(() => config.getMessageBus(), [config]);
+  const messageBus = useMemo(() => context.messageBus, [context]);
 
   const onCompleteRef = useRef(onComplete);
   useEffect(() => {
@@ -97,12 +97,12 @@ export function useToolScheduler(
   const scheduler = useMemo(
     () =>
       new Scheduler({
-        context: config,
+        context: context,
         messageBus,
         getPreferredEditor: () => getPreferredEditorRef.current(),
         schedulerId: ROOT_SCHEDULER_ID,
       }),
-    [config, messageBus],
+    [context, messageBus],
   );
 
   useEffect(() => () => scheduler.dispose(), [scheduler]);

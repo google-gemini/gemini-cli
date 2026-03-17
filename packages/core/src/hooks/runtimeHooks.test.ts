@@ -39,7 +39,7 @@ describe('Runtime Hooks', () => {
 
     // Stub getMessageBus
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (config as any).getMessageBus = () => undefined;
+    (config as any).messageBus = undefined;
 
     hookSystem = new HookSystem(config);
   });

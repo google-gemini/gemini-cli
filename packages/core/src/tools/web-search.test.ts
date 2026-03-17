@@ -30,10 +30,8 @@ describe('WebSearchTool', () => {
 
   beforeEach(() => {
     const mockConfigInstance = {
-      getGeminiClient: () => mockGeminiClient,
-      get geminiClient() {
-        return mockGeminiClient;
-      },
+      geminiClient: mockGeminiClient,
+
       getProxy: () => undefined,
       generationConfigService: {
         getResolvedConfig: vi.fn().mockImplementation(({ model }) => ({

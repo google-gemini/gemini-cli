@@ -193,7 +193,7 @@ export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
             width={contentWidth}
           >
             {isShellToolCall ? (
-              <ShellToolMessage {...commonProps} config={config} />
+              <ShellToolMessage {...commonProps} context={config} />
             ) : (
               <ToolMessage {...commonProps} />
             )}

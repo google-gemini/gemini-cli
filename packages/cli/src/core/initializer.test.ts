@@ -41,7 +41,7 @@ vi.mock('./theme.js', () => ({
 
 describe('initializer', () => {
   let mockConfig: {
-    getToolRegistry: ReturnType<typeof vi.fn>;
+    toolRegistry: ReturnType<typeof vi.fn>;
     getIdeMode: ReturnType<typeof vi.fn>;
     getGeminiMdFileCount: ReturnType<typeof vi.fn>;
   };
@@ -53,7 +53,7 @@ describe('initializer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockConfig = {
-      getToolRegistry: vi.fn(),
+      toolRegistry: vi.fn(),
       getIdeMode: vi.fn().mockReturnValue(false),
       getGeminiMdFileCount: vi.fn().mockReturnValue(5),
     };
@@ -81,7 +81,10 @@ describe('initializer', () => {
 
   it('should initialize correctly in non-IDE mode', async () => {
     const result = await initializeApp(
-      mockConfig as unknown as Config,
+      {
+        config: mockConfig as unknown as Config,
+        toolRegistry: mockConfig.toolRegistry,
+      } as any,
       mockSettings,
     );
 
@@ -101,7 +104,10 @@ describe('initializer', () => {
   it('should initialize correctly in IDE mode', async () => {
     mockConfig.getIdeMode.mockReturnValue(true);
     const result = await initializeApp(
-      mockConfig as unknown as Config,
+      {
+        config: mockConfig as unknown as Config,
+        toolRegistry: mockConfig.toolRegistry,
+      } as any,
       mockSettings,
     );
 
@@ -126,7 +132,10 @@ describe('initializer', () => {
       accountSuspensionInfo: null,
     });
     const result = await initializeApp(
-      mockConfig as unknown as Config,
+      {
+        config: mockConfig as unknown as Config,
+        toolRegistry: mockConfig.toolRegistry,
+      } as any,
       mockSettings,
     );
 
@@ -137,7 +146,10 @@ describe('initializer', () => {
   it('should handle undefined auth type', async () => {
     mockSettings.merged.security.auth.selectedType = undefined;
     const result = await initializeApp(
-      mockConfig as unknown as Config,
+      {
+        config: mockConfig as unknown as Config,
+        toolRegistry: mockConfig.toolRegistry,
+      } as any,
       mockSettings,
     );
 
@@ -147,7 +159,10 @@ describe('initializer', () => {
   it('should handle theme error', async () => {
     vi.mocked(validateTheme).mockReturnValue('Theme not found');
     const result = await initializeApp(
-      mockConfig as unknown as Config,
+      {
+        config: mockConfig as unknown as Config,
+        toolRegistry: mockConfig.toolRegistry,
+      } as any,
       mockSettings,
     );
 

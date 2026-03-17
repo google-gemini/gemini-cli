@@ -13,7 +13,7 @@ import type { Config } from '../config/config.js';
 
 describe('CliHelpAgent', () => {
   const fakeConfig = {
-    getMessageBus: () => ({}),
+    messageBus: {},
     isAgentsEnabled: () => false,
   } as unknown as Config;
   const localAgent = CliHelpAgent(fakeConfig) as LocalAgentDefinition;

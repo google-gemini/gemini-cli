@@ -10,7 +10,7 @@ import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
 import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
-import type { Config } from '@google/gemini-cli-core';
+import type { AgentLoopContext } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const actual =
@@ -43,14 +43,15 @@ describe('statsCommand', () => {
   it('should display general session stats when run with no subcommand', async () => {
     if (!statsCommand.action) throw new Error('Command has no action');
 
-    mockContext.services.config = {
-      refreshUserQuota: vi.fn(),
-      refreshAvailableCredits: vi.fn(),
-      getUserTierName: vi.fn(),
-      getUserPaidTier: vi.fn(),
-      getModel: vi.fn(),
-    } as unknown as Config;
-
+    mockContext.services.agentContext = {
+      config: {
+        refreshUserQuota: vi.fn(),
+        refreshAvailableCredits: vi.fn(),
+        getUserTierName: vi.fn(),
+        getUserPaidTier: vi.fn(),
+        getModel: vi.fn(),
+      },
+    } as unknown as AgentLoopContext;
     await statsCommand.action(mockContext, '');
 
     const expectedDuration = formatDuration(
@@ -80,16 +81,18 @@ describe('statsCommand', () => {
       .fn()
       .mockReturnValue('2025-01-01T12:00:00Z');
 
-    mockContext.services.config = {
-      refreshUserQuota: mockRefreshUserQuota,
-      getUserTierName: mockGetUserTierName,
-      getModel: mockGetModel,
-      getQuotaRemaining: mockGetQuotaRemaining,
-      getQuotaLimit: mockGetQuotaLimit,
-      getQuotaResetTime: mockGetQuotaResetTime,
-      getUserPaidTier: vi.fn(),
-      refreshAvailableCredits: vi.fn(),
-    } as unknown as Config;
+    mockContext.services.agentContext = {
+      config: {
+        refreshUserQuota: mockRefreshUserQuota,
+        getUserTierName: mockGetUserTierName,
+        getModel: mockGetModel,
+        getQuotaRemaining: mockGetQuotaRemaining,
+        getQuotaLimit: mockGetQuotaLimit,
+        getQuotaResetTime: mockGetQuotaResetTime,
+        getUserPaidTier: vi.fn(),
+        refreshAvailableCredits: vi.fn(),
+      },
+    } as unknown as AgentLoopContext;
 
     await statsCommand.action(mockContext, '');
 

@@ -17,7 +17,6 @@ import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 import type { CallableTool } from '@google/genai';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import type { ToolRegistry } from '../tools/tool-registry.js';
 
 vi.mock('../tools/memoryTool.js', async (importOriginal) => {
   const actual = await importOriginal();
@@ -47,12 +46,8 @@ describe('PromptProvider', () => {
       get config() {
         return this as unknown as Config;
       },
-      get toolRegistry() {
-        return (
-          this as { getToolRegistry: () => ToolRegistry }
-        ).getToolRegistry?.() as unknown as ToolRegistry;
-      },
-      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+
+      toolRegistry: mockToolRegistry,
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
@@ -135,10 +130,10 @@ describe('PromptProvider', () => {
         new MockTool({ name: 'write_file', displayName: 'WriteFile' }),
         new MockTool({ name: 'replace', displayName: 'Replace' }),
       ];
-      (mockConfig.getToolRegistry as ReturnType<typeof vi.fn>).mockReturnValue({
+      (mockConfig as any).toolRegistry = {
         getAllToolNames: vi.fn().mockReturnValue(mockTools.map((t) => t.name)),
         getAllTools: vi.fn().mockReturnValue(mockTools),
-      });
+      };
 
       const provider = new PromptProvider();
       const prompt = provider.getCoreSystemPrompt(mockConfig);
@@ -164,10 +159,10 @@ describe('PromptProvider', () => {
         new MockTool({ name: 'glob', displayName: 'Glob' }),
         mcpTool,
       ];
-      (mockConfig.getToolRegistry as ReturnType<typeof vi.fn>).mockReturnValue({
+      (mockConfig as any).toolRegistry = {
         getAllToolNames: vi.fn().mockReturnValue(mockTools.map((t) => t.name)),
         getAllTools: vi.fn().mockReturnValue(mockTools),
-      });
+      };
 
       const provider = new PromptProvider();
       const prompt = provider.getCoreSystemPrompt(mockConfig);
@@ -181,10 +176,10 @@ describe('PromptProvider', () => {
         new MockTool({ name: 'write_file', displayName: 'WriteFile' }),
         new MockTool({ name: 'replace', displayName: 'Replace' }),
       ];
-      (mockConfig.getToolRegistry as ReturnType<typeof vi.fn>).mockReturnValue({
+      (mockConfig as any).toolRegistry = {
         getAllToolNames: vi.fn().mockReturnValue(mockTools.map((t) => t.name)),
         getAllTools: vi.fn().mockReturnValue(mockTools),
-      });
+      };
 
       const provider = new PromptProvider();
       const prompt = provider.getCoreSystemPrompt(mockConfig);

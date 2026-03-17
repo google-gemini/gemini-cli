@@ -32,7 +32,7 @@ describe('Scheduler waiting callback', () => {
     mockConfig = makeFakeConfig();
 
     // Override methods to use our mocks
-    vi.spyOn(mockConfig, 'getMessageBus').mockReturnValue(messageBus);
+    vi.spyOn(mockConfig, 'messageBus', 'get').mockReturnValue(messageBus);
 
     mockTool = new MockTool({ name: 'test_tool' });
     toolRegistry = new ToolRegistry(mockConfig, messageBus);

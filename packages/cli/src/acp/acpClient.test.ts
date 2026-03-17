@@ -163,10 +163,10 @@ describe('GeminiAgent', () => {
       getContentGeneratorConfig: vi.fn(),
       getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
       getModel: vi.fn().mockReturnValue('gemini-pro'),
-      getGeminiClient: vi.fn().mockReturnValue({
+      geminiClient: vi.fn().mockReturnValue({
         startChat: vi.fn().mockResolvedValue({}),
       }),
-      getMessageBus: vi.fn().mockReturnValue({
+      messageBus: vi.fn().mockReturnValue({
         publish: vi.fn(),
         subscribe: vi.fn(),
         unsubscribe: vi.fn(),
@@ -321,7 +321,7 @@ describe('GeminiAgent', () => {
     expect(response.sessionId).toBe('test-session-id');
     expect(loadCliConfig).toHaveBeenCalled();
     expect(mockConfig.initialize).toHaveBeenCalled();
-    expect(mockConfig.getGeminiClient).toHaveBeenCalled();
+    expect(mockConfig.createAgentLoopContext().geminiClient).toBeDefined();
 
     // Verify deferred call
     await vi.runAllTimersAsync();
@@ -639,7 +639,7 @@ describe('Session', () => {
     mockConfig = {
       getModel: vi.fn().mockReturnValue('gemini-pro'),
       getActiveModel: vi.fn().mockReturnValue('gemini-pro'),
-      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      toolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
       getMcpServers: vi.fn(),
       getFileService: vi.fn().mockReturnValue({
         shouldIgnoreFile: vi.fn().mockReturnValue(false),
@@ -648,7 +648,7 @@ describe('Session', () => {
       getTargetDir: vi.fn().mockReturnValue('/tmp'),
       getEnableRecursiveFileSearch: vi.fn().mockReturnValue(false),
       getDebugMode: vi.fn().mockReturnValue(false),
-      getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
+      messageBus: vi.fn().mockReturnValue(mockMessageBus),
       setApprovalMode: vi.fn(),
       setModel: vi.fn(),
       isPlanEnabled: vi.fn().mockReturnValue(true),

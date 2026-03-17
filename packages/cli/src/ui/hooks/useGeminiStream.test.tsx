@@ -290,7 +290,7 @@ describe('useGeminiStream', () => {
     ),
     getProjectRoot: vi.fn(() => '/test/dir'),
     getCheckpointingEnabled: vi.fn(() => false),
-    getGeminiClient: mockGetGeminiClient,
+    geminiClient: mockGetGeminiClient() as any,
     getMcpClientManager: () => mockMcpClientManager as any,
     getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
     getUsageStatisticsEnabled: () => true,
@@ -380,7 +380,8 @@ describe('useGeminiStream', () => {
     geminiClient?: any,
     loadedSettings: LoadedSettings = mockLoadedSettings,
   ) => {
-    const client = geminiClient || mockConfig.getGeminiClient();
+    const client =
+      geminiClient || mockConfig.createAgentLoopContext().geminiClient;
     let lastToolCalls = initialToolCalls;
 
     const initialProps = {
@@ -1447,7 +1448,7 @@ describe('useGeminiStream', () => {
 
       const { result } = renderHookWithProviders(() =>
         useGeminiStream(
-          mockConfig.getGeminiClient(),
+          mockConfig.createAgentLoopContext().geminiClient,
           [],
           mockAddItem,
           mockConfig,
@@ -1488,7 +1489,7 @@ describe('useGeminiStream', () => {
 
       const { result } = renderHookWithProviders(() =>
         useGeminiStream(
-          mockConfig.getGeminiClient(),
+          mockConfig.createAgentLoopContext().geminiClient,
           [],
           mockAddItem,
           mockConfig,
@@ -2686,7 +2687,7 @@ describe('useGeminiStream', () => {
 
     const { result } = renderHookWithProviders(() =>
       useGeminiStream(
-        mockConfig.getGeminiClient(),
+        mockConfig.createAgentLoopContext().geminiClient,
         [],
         mockAddItem,
         mockConfig,
@@ -3033,7 +3034,7 @@ describe('useGeminiStream', () => {
 
       const { result, rerender } = renderHookWithProviders(() =>
         useGeminiStream(
-          mockConfig.getGeminiClient(),
+          mockConfig.createAgentLoopContext().geminiClient,
           [],
           mockAddItem,
           mockConfig,
@@ -3268,10 +3269,10 @@ describe('useGeminiStream', () => {
       const mockLoopDetectionService = {
         disableForSession: vi.fn(),
       };
-      mockConfig.getGeminiClient = vi.fn().mockReturnValue({
+      (mockConfig as any).geminiClient = {
         ...new MockedGeminiClientClass(mockConfig),
         getLoopDetectionService: () => mockLoopDetectionService,
-      });
+      };
     });
 
     it('should set loopDetectionConfirmationRequest when LoopDetected event is received', async () => {
@@ -3309,7 +3310,7 @@ describe('useGeminiStream', () => {
         ...new MockedGeminiClientClass(mockConfig),
         getLoopDetectionService: () => mockLoopDetectionService,
       };
-      mockConfig.getGeminiClient = vi.fn().mockReturnValue(mockClient);
+      (mockConfig as any).geminiClient = mockClient;
 
       // Mock for the initial request
       mockSendMessageStream.mockReturnValueOnce(
@@ -3389,7 +3390,7 @@ describe('useGeminiStream', () => {
         ...new MockedGeminiClientClass(mockConfig),
         getLoopDetectionService: () => mockLoopDetectionService,
       };
-      mockConfig.getGeminiClient = vi.fn().mockReturnValue(mockClient);
+      (mockConfig as any).geminiClient = mockClient;
 
       mockSendMessageStream.mockReturnValue(
         (async function* () {
@@ -3612,7 +3613,7 @@ describe('useGeminiStream', () => {
           ...new MockedGeminiClientClass(mockConfig),
           getLoopDetectionService: () => mockLoopDetectionService,
         };
-        mockConfig.getGeminiClient = vi.fn().mockReturnValue(mockClient);
+        (mockConfig as any).geminiClient = mockClient;
 
         // First call triggers loop detection
         mockSendMessageStream.mockReturnValueOnce(

@@ -97,15 +97,17 @@ describe('rewindCommand', () => {
 
     mockContext = createMockCommandContext({
       services: {
-        config: {
-          getGeminiClient: () => ({
+        agentContext: {
+          geminiClient: {
             getChatRecordingService: mockGetChatRecordingService,
             setHistory: mockSetHistory,
             sendMessageStream: mockSendMessageStream,
-          }),
-          getSessionId: () => 'test-session-id',
-          getContextManager: () => ({ refresh: mockResetContext }),
-          getProjectRoot: mockGetProjectRoot,
+          } as any,
+          config: {
+            getSessionId: () => 'test-session-id',
+            getContextManager: () => ({ refresh: mockResetContext }),
+            getProjectRoot: mockGetProjectRoot,
+          },
         },
       },
       ui: {
@@ -293,7 +295,7 @@ describe('rewindCommand', () => {
   it('should fail if client is not initialized', () => {
     const context = createMockCommandContext({
       services: {
-        config: { getGeminiClient: () => undefined },
+        agentContext: { geminiClient: undefined as any },
       },
     }) as unknown as CommandContext;
 
@@ -309,8 +311,8 @@ describe('rewindCommand', () => {
   it('should fail if recording service is unavailable', () => {
     const context = createMockCommandContext({
       services: {
-        config: {
-          getGeminiClient: () => ({ getChatRecordingService: () => undefined }),
+        agentContext: {
+          geminiClient: { getChatRecordingService: () => undefined } as any,
         },
       },
     }) as unknown as CommandContext;

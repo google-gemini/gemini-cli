@@ -87,7 +87,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       getAllTools: vi.fn().mockReturnValue([]),
     };
     mockConfig = {
-      getToolRegistry: vi.fn().mockReturnValue(mockRegistry),
+      toolRegistry: mockRegistry,
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
@@ -100,7 +100,7 @@ describe('Core System Prompt (prompts.ts)', () => {
       getPreviewFeatures: vi.fn().mockReturnValue(true),
       getModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL_AUTO),
       getActiveModel: vi.fn().mockReturnValue(DEFAULT_GEMINI_MODEL),
-      getMessageBus: vi.fn(),
+      messageBus: vi.fn(),
       getAgentRegistry: vi.fn().mockReturnValue({
         getDirectoryContext: vi.fn().mockReturnValue('Mock Agent Directory'),
         getAllDefinitions: vi.fn().mockReturnValue([
@@ -118,9 +118,6 @@ describe('Core System Prompt (prompts.ts)', () => {
       isTrackerEnabled: vi.fn().mockReturnValue(false),
       get config() {
         return this;
-      },
-      get toolRegistry() {
-        return mockRegistry;
       },
     } as unknown as Config;
   });
@@ -382,7 +379,9 @@ describe('Core System Prompt (prompts.ts)', () => {
 
   it('should redact grep and glob from the system prompt when they are disabled', () => {
     vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
-    vi.mocked(mockConfig.toolRegistry.getAllToolNames).mockReturnValue([]);
+    vi.mocked(
+      mockConfig.createAgentLoopContext().toolRegistry.getAllToolNames,
+    ).mockReturnValue([]);
     const prompt = getCoreSystemPrompt(mockConfig);
 
     expect(prompt).not.toContain('`grep_search`');
@@ -402,7 +401,7 @@ describe('Core System Prompt (prompts.ts)', () => {
         getAllToolNames: vi.fn().mockReturnValue(toolNames),
       };
       const testConfig = {
-        getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+        toolRegistry: mockToolRegistry,
         getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
         storage: {
           getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
@@ -425,9 +424,6 @@ describe('Core System Prompt (prompts.ts)', () => {
         isTrackerEnabled: vi.fn().mockReturnValue(false),
         get config() {
           return this;
-        },
-        get toolRegistry() {
-          return mockToolRegistry;
         },
       } as unknown as Config;
 
@@ -484,9 +480,9 @@ describe('Core System Prompt (prompts.ts)', () => {
         PREVIEW_GEMINI_MODEL,
       );
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
-      vi.mocked(mockConfig.toolRegistry.getAllTools).mockReturnValue(
-        planModeTools,
-      );
+      vi.mocked(
+        mockConfig.createAgentLoopContext().toolRegistry.getAllTools,
+      ).mockReturnValue(planModeTools);
     };
 
     it('should include PLAN mode instructions', () => {
@@ -538,9 +534,9 @@ describe('Core System Prompt (prompts.ts)', () => {
         PREVIEW_GEMINI_MODEL,
       );
       vi.mocked(mockConfig.getApprovalMode).mockReturnValue(ApprovalMode.PLAN);
-      vi.mocked(mockConfig.toolRegistry.getAllTools).mockReturnValue(
-        subsetTools,
-      );
+      vi.mocked(
+        mockConfig.createAgentLoopContext().toolRegistry.getAllTools,
+      ).mockReturnValue(subsetTools);
 
       const prompt = getCoreSystemPrompt(mockConfig);
 
@@ -683,9 +679,9 @@ describe('Core System Prompt (prompts.ts)', () => {
 
   it('should include planning phase suggestion when enter_plan_mode tool is enabled', () => {
     vi.mocked(mockConfig.getActiveModel).mockReturnValue(PREVIEW_GEMINI_MODEL);
-    vi.mocked(mockConfig.toolRegistry.getAllToolNames).mockReturnValue([
-      'enter_plan_mode',
-    ]);
+    vi.mocked(
+      mockConfig.createAgentLoopContext().toolRegistry.getAllToolNames,
+    ).mockReturnValue(['enter_plan_mode']);
     const prompt = getCoreSystemPrompt(mockConfig);
 
     expect(prompt).toContain(

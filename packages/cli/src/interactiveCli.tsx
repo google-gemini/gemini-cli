@@ -12,7 +12,7 @@ import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { registerCleanup, setupTtyCheck } from './utils/cleanup.js';
 import {
   type StartupWarning,
-  type Config,
+  type AgentLoopContext,
   type ResumedSessionData,
   coreEvents,
   createWorkingStdio,
@@ -50,13 +50,14 @@ import { profiler } from './ui/components/DebugProfiler.js';
 const SLOW_RENDER_MS = 200;
 
 export async function startInteractiveUI(
-  config: Config,
+  context: AgentLoopContext,
   settings: LoadedSettings,
   startupWarnings: StartupWarning[],
   workspaceRoot: string = process.cwd(),
   resumedSessionData: ResumedSessionData | undefined,
   initializationResult: InitializationResult,
 ) {
+  const config = context.config;
   // Never enter Ink alternate buffer mode when screen reader mode is enabled
   // as there is no benefit of alternate buffer mode when using a screen reader
   // and the Ink alternate buffer mode requires line wrapping harmful to
@@ -119,7 +120,7 @@ export async function startInteractiveUI(
                     <SessionStatsProvider>
                       <VimModeProvider>
                         <AppContainer
-                          config={config}
+                          context={context}
                           startupWarnings={startupWarnings}
                           version={version}
                           resumedSessionData={resumedSessionData}

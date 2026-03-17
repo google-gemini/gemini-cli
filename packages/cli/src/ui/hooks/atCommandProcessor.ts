@@ -7,7 +7,10 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { PartListUnion, PartUnion } from '@google/genai';
-import type { AnyToolInvocation, Config } from '@google/gemini-cli-core';
+import type {
+  AnyToolInvocation,
+  AgentLoopContext,
+} from '@google/gemini-cli-core';
 import {
   debugLogger,
   getErrorMessage,
@@ -64,7 +67,7 @@ export const AT_COMMAND_PATH_REGEX_SOURCE =
 
 interface HandleAtCommandParams {
   query: string;
-  config: Config;
+  context: AgentLoopContext;
   addItem: UseHistoryManagerReturn['addItem'];
   onDebugMessage: (message: string) => void;
   messageId: number;
@@ -140,7 +143,7 @@ function parseAllAtCommands(
 
 function categorizeAtCommands(
   commandParts: AtCommandPart[],
-  config: Config,
+  context: AgentLoopContext,
 ): {
   agentParts: AtCommandPart[];
   resourceParts: AtCommandPart[];
@@ -150,8 +153,8 @@ function categorizeAtCommands(
   const resourceParts: AtCommandPart[] = [];
   const fileParts: AtCommandPart[] = [];
 
-  const agentRegistry = config.getAgentRegistry?.();
-  const resourceRegistry = config.getResourceRegistry();
+  const agentRegistry = context.config.getAgentRegistry?.();
+  const resourceRegistry = context.config.getResourceRegistry();
 
   for (const part of commandParts) {
     if (part.type !== 'atPath' || part.content === '@') {
@@ -178,10 +181,10 @@ function categorizeAtCommands(
  */
 export async function checkPermissions(
   query: string,
-  config: Config,
+  context: AgentLoopContext,
 ): Promise<string[]> {
   const commandParts = parseAllAtCommands(query);
-  const { fileParts } = categorizeAtCommands(commandParts, config);
+  const { fileParts } = categorizeAtCommands(commandParts, context);
   const permissionsRequired: string[] = [];
 
   for (const part of fileParts) {
@@ -189,10 +192,10 @@ export async function checkPermissions(
     if (!pathName) continue;
 
     const resolvedPathName = resolveToRealPath(
-      path.resolve(config.getTargetDir(), pathName),
+      path.resolve(context.config.getTargetDir(), pathName),
     );
 
-    if (config.validatePathAccess(resolvedPathName, 'read')) {
+    if (context.config.validatePathAccess(resolvedPathName, 'read')) {
       if (await fileExists(resolvedPathName)) {
         permissionsRequired.push(resolvedPathName);
       }
@@ -218,13 +221,13 @@ interface IgnoredFile {
  */
 async function resolveFilePaths(
   fileParts: AtCommandPart[],
-  config: Config,
+  context: AgentLoopContext,
   onDebugMessage: (message: string) => void,
   signal: AbortSignal,
 ): Promise<{ resolvedFiles: ResolvedFile[]; ignoredFiles: IgnoredFile[] }> {
-  const fileDiscovery = config.getFileService();
-  const respectFileIgnore = config.getFileFilteringOptions();
-  const toolRegistry = config.getToolRegistry();
+  const fileDiscovery = context.config.getFileService();
+  const respectFileIgnore = context.config.getFileFilteringOptions();
+  const toolRegistry = context.toolRegistry;
   const globTool = toolRegistry.getTool('glob');
 
   const resolvedFiles: ResolvedFile[] = [];
@@ -265,7 +268,7 @@ async function resolveFilePaths(
       continue;
     }
 
-    for (const dir of config.getWorkspaceContext().getDirectories()) {
+    for (const dir of context.config.getWorkspaceContext().getDirectories()) {
       try {
         const absolutePath = path.resolve(dir, pathName);
         const stats = await fs.stat(absolutePath);
@@ -299,7 +302,7 @@ async function resolveFilePaths(
         break;
       } catch (error) {
         if (isNodeError(error) && error.code === 'ENOENT') {
-          if (config.getEnableRecursiveFileSearch() && globTool) {
+          if (context.config.getEnableRecursiveFileSearch() && globTool) {
             onDebugMessage(
               `Path ${pathName} not found directly, attempting glob search.`,
             );
@@ -406,15 +409,15 @@ function constructInitialQuery(
  */
 async function readMcpResources(
   resourceParts: AtCommandPart[],
-  config: Config,
+  context: AgentLoopContext,
   signal: AbortSignal,
 ): Promise<{
   parts: PartUnion[];
   displays: IndividualToolCallDisplay[];
   error?: string;
 }> {
-  const resourceRegistry = config.getResourceRegistry();
-  const mcpClientManager = config.getMcpClientManager();
+  const resourceRegistry = context.config.getResourceRegistry();
+  const mcpClientManager = context.config.getMcpClientManager();
   const parts: PartUnion[] = [];
   const displays: IndividualToolCallDisplay[] = [];
 
@@ -501,7 +504,7 @@ async function readMcpResources(
  */
 async function readLocalFiles(
   resolvedFiles: ResolvedFile[],
-  config: Config,
+  context: AgentLoopContext,
   signal: AbortSignal,
   userMessageTimestamp: number,
 ): Promise<{
@@ -514,13 +517,13 @@ async function readLocalFiles(
   }
 
   const readManyFilesTool = new ReadManyFilesTool(
-    config,
-    config.getMessageBus(),
+    context.config,
+    context.messageBus,
   );
 
   const pathSpecsToRead = resolvedFiles.map((rf) => rf.pathSpec);
   const fileLabelsForDisplay = resolvedFiles.map((rf) => rf.displayLabel);
-  const respectFileIgnore = config.getFileFilteringOptions();
+  const respectFileIgnore = context.config.getFileFilteringOptions();
 
   const toolArgs = {
     include: pathSpecsToRead,
@@ -567,7 +570,9 @@ async function readLocalFiles(
 
             if (!displayPath) {
               // Fallback: if no mapping found, try to convert absolute path to relative
-              for (const dir of config.getWorkspaceContext().getDirectories()) {
+              for (const dir of context.config
+                .getWorkspaceContext()
+                .getDirectories()) {
                 if (filePathSpecInContent.startsWith(dir)) {
                   displayPath = path.relative(dir, filePathSpecInContent);
                   break;
@@ -661,7 +666,7 @@ function reportIgnoredFiles(
  */
 export async function handleAtCommand({
   query,
-  config,
+  context,
   addItem,
   onDebugMessage,
   messageId: userMessageTimestamp,
@@ -672,12 +677,12 @@ export async function handleAtCommand({
 
   const { agentParts, resourceParts, fileParts } = categorizeAtCommands(
     commandParts,
-    config,
+    context,
   );
 
   const { resolvedFiles, ignoredFiles } = await resolveFilePaths(
     fileParts,
-    config,
+    context,
     onDebugMessage,
     signal,
   );
@@ -709,8 +714,8 @@ export async function handleAtCommand({
   }
 
   const [mcpResult, fileResult] = await Promise.all([
-    readMcpResources(resourceParts, config, signal),
-    readLocalFiles(resolvedFiles, config, signal, userMessageTimestamp),
+    readMcpResources(resourceParts, context, signal),
+    readLocalFiles(resolvedFiles, context, signal, userMessageTimestamp),
   ]);
 
   const hasContent = mcpResult.parts.length > 0 || fileResult.parts.length > 0;

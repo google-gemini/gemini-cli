@@ -65,7 +65,7 @@ describe('useSessionBrowser', () => {
     },
     setSessionId: vi.fn(),
     getSessionId: vi.fn(),
-    getGeminiClient: vi.fn().mockReturnValue({
+    geminiClient: vi.fn().mockReturnValue({
       getChatRecordingService: vi.fn().mockReturnValue({
         deleteSession: vi.fn(),
       }),

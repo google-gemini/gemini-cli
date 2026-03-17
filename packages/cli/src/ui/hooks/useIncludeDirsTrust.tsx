@@ -5,7 +5,7 @@
  */
 
 import { useEffect } from 'react';
-import { type Config } from '@google/gemini-cli-core';
+import type { AgentLoopContext } from '@google/gemini-cli-core';
 import { loadTrustedFolders } from '../../config/trustedFolders.js';
 import { expandHomeDir, batchAddDirectories } from '../utils/directoryUtils.js';
 import {
@@ -17,7 +17,7 @@ import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { MessageType, type HistoryItem } from '../types.js';
 
 async function finishAddingDirectories(
-  config: Config,
+  context: AgentLoopContext,
   addItem: (
     itemData: Omit<HistoryItem, 'id'>,
     baseTimestamp?: number,
@@ -25,6 +25,7 @@ async function finishAddingDirectories(
   added: string[],
   errors: string[],
 ) {
+  const config = context.config;
   if (!config) {
     addItem({
       type: MessageType.ERROR,
@@ -43,7 +44,8 @@ async function finishAddingDirectories(
   }
 
   if (added.length > 0) {
-    const gemini = config.getGeminiClient();
+    const gemini = context.geminiClient;
+
     if (gemini) {
       await gemini.addDirectoryContext();
     }
@@ -55,11 +57,12 @@ async function finishAddingDirectories(
 }
 
 export function useIncludeDirsTrust(
-  config: Config,
+  context: AgentLoopContext,
   isTrustedFolder: boolean | undefined,
   historyManager: UseHistoryManagerReturn,
   setCustomDialog: (dialog: React.ReactNode | null) => void,
 ) {
+  const config = context.config;
   const { addItem } = historyManager;
 
   useEffect(() => {
@@ -87,7 +90,7 @@ export function useIncludeDirsTrust(
 
       if (added.length > 0 || errors.length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        finishAddingDirectories(config, addItem, added, errors);
+        finishAddingDirectories(context, addItem, added, errors);
       }
       config.clearPendingIncludeDirectories();
       return;
@@ -142,7 +145,7 @@ export function useIncludeDirsTrust(
           trustedDirs={added}
           errors={errors}
           finishAddingDirectories={finishAddingDirectories}
-          config={config}
+          context={context}
           addItem={addItem}
         />,
       );

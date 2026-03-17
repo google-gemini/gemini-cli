@@ -12,9 +12,9 @@ import {
   coreEvents,
   convertSessionToClientHistory,
   uiTelemetryService,
-  type Config,
   type ConversationRecord,
   type ResumedSessionData,
+  type AgentLoopContext,
 } from '@google/gemini-cli-core';
 import {
   convertSessionToHistoryFormats,
@@ -25,13 +25,14 @@ import type { Part } from '@google/genai';
 export { convertSessionToHistoryFormats };
 
 export const useSessionBrowser = (
-  config: Config,
+  context: AgentLoopContext,
   onLoadHistory: (
     uiHistory: HistoryItemWithoutId[],
     clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }>,
     resumedSessionData: ResumedSessionData,
   ) => Promise<void>,
 ) => {
+  const config = context.config;
   const [isSessionBrowserOpen, setIsSessionBrowserOpen] = useState(false);
 
   return {
@@ -104,9 +105,8 @@ export const useSessionBrowser = (
         // The ChatRecordingService.deleteSession API expects this file basename
         // (without the ".json" extension), not the full session UUID.
         try {
-          const chatRecordingService = config
-            .getGeminiClient()
-            ?.getChatRecordingService();
+          const chatRecordingService =
+            context?.geminiClient?.getChatRecordingService();
           if (chatRecordingService) {
             chatRecordingService.deleteSession(session.file);
           }

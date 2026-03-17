@@ -206,7 +206,7 @@ describe('Gemini Client (client.ts)', () => {
       getContentGeneratorConfig: vi
         .fn()
         .mockReturnValue(contentGeneratorConfig),
-      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      toolRegistry: mockToolRegistry,
       getModel: vi.fn().mockReturnValue('test-model'),
       getUserTier: vi.fn().mockReturnValue(undefined),
       getEmbeddingModel: vi.fn().mockReturnValue('test-embedding-model'),
@@ -236,13 +236,13 @@ describe('Gemini Client (client.ts)', () => {
       getWorkspaceContext: vi.fn().mockReturnValue({
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
-      getGeminiClient: vi.fn(),
+      geminiClient: vi.fn(),
       getRetryFetchErrors: vi.fn().mockReturnValue(true),
       getMaxAttempts: vi.fn().mockReturnValue(3),
       getModelRouterService: vi
         .fn()
         .mockReturnValue(mockRouterService as unknown as ModelRouterService),
-      getMessageBus: vi.fn().mockReturnValue(undefined),
+      messageBus: undefined,
       getEnableHooks: vi.fn().mockReturnValue(false),
       getChatCompression: vi.fn().mockReturnValue(undefined),
       getCompressionThreshold: vi.fn().mockReturnValue(undefined),
@@ -297,7 +297,6 @@ describe('Gemini Client (client.ts)', () => {
 
     client = new GeminiClient(mockConfig as unknown as AgentLoopContext);
     await client.initialize();
-    vi.mocked(mockConfig.getGeminiClient).mockReturnValue(client);
     (mockConfig as unknown as { geminiClient: GeminiClient }).geminiClient =
       client;
 
@@ -3328,7 +3327,7 @@ ${JSON.stringify(
 
         // Force override config methods on the client instance
         client['config'].getEnableHooks = vi.fn().mockReturnValue(true);
-        client['config'].getMessageBus = vi
+        (client as any).config.createAgentLoopContext().messageBus = vi
           .fn()
           .mockReturnValue(mockMessageBus);
       });

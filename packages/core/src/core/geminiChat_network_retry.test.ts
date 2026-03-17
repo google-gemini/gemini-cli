@@ -79,19 +79,11 @@ describe('GeminiChat Network Retries', () => {
     // Default mock implementation: execute the function immediately
     mockRetryWithBackoff.mockImplementation(async (apiCall) => apiCall());
 
-    const mockToolRegistry = { getTool: vi.fn() };
-    const testMessageBus = { publish: vi.fn(), subscribe: vi.fn() };
-
     mockConfig = {
       get config() {
         return this;
       },
-      get toolRegistry() {
-        return mockToolRegistry;
-      },
-      get messageBus() {
-        return testMessageBus;
-      },
+
       promptId: 'test-session-id',
       getSessionId: () => 'test-session-id',
       getTelemetryLogPromptsEnabled: () => true,
@@ -109,7 +101,7 @@ describe('GeminiChat Network Retries', () => {
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
       },
-      getToolRegistry: vi.fn().mockReturnValue({ getTool: vi.fn() }),
+      toolRegistry: { getTool: vi.fn() },
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getRetryFetchErrors: vi.fn().mockReturnValue(false), // Default false
       getMaxAttempts: vi.fn().mockReturnValue(10),
@@ -126,7 +118,7 @@ describe('GeminiChat Network Retries', () => {
     } as unknown as Config;
 
     const mockMessageBus = createMockMessageBus();
-    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    (mockConfig as any).messageBus = mockMessageBus;
     mockConfig.getHookSystem = vi
       .fn()
       .mockReturnValue(new HookSystem(mockConfig));

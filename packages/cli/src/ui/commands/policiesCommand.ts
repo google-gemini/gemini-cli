@@ -51,7 +51,7 @@ const listPoliciesCommand: SlashCommand = {
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
   action: async (context) => {
-    const { config } = context.services;
+    const config = context.services.agentContext?.config;
     if (!config) {
       context.ui.addItem(
         {

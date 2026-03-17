@@ -9,8 +9,8 @@ import type React from 'react';
 import { useCallback, useRef } from 'react';
 import {
   PolicyIntegrityManager,
-  type Config,
   type PolicyUpdateConfirmationRequest,
+  type AgentLoopContext,
 } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
 import {
@@ -27,13 +27,13 @@ export enum PolicyUpdateChoice {
 }
 
 interface PolicyUpdateDialogProps {
-  config: Config;
+  context: AgentLoopContext;
   request: PolicyUpdateConfirmationRequest;
   onClose: () => void;
 }
 
 export const PolicyUpdateDialog: React.FC<PolicyUpdateDialogProps> = ({
-  config,
+  context,
   request,
   onClose,
 }) => {
@@ -55,14 +55,14 @@ export const PolicyUpdateDialog: React.FC<PolicyUpdateDialogProps> = ({
             request.identifier,
             request.newHash,
           );
-          await config.loadWorkspacePolicies(request.policyDir);
+          await context.config.loadWorkspacePolicies(request.policyDir);
         }
         onClose();
       } finally {
         isProcessing.current = false;
       }
     },
-    [config, request, onClose],
+    [context, request, onClose],
   );
 
   useKeypress(

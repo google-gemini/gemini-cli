@@ -37,8 +37,10 @@ describe('modelCommand', () => {
     }
 
     const mockRefreshUserQuota = vi.fn();
-    mockContext.services.config = {
-      refreshUserQuota: mockRefreshUserQuota,
+    mockContext.services.agentContext = {
+      config: {
+        refreshUserQuota: mockRefreshUserQuota,
+      },
     } as unknown as Config;
 
     await modelCommand.action(mockContext, '');
@@ -66,8 +68,10 @@ describe('modelCommand', () => {
         (c) => c.name === 'manage',
       );
       const mockRefreshUserQuota = vi.fn();
-      mockContext.services.config = {
-        refreshUserQuota: mockRefreshUserQuota,
+      mockContext.services.agentContext = {
+        config: {
+          refreshUserQuota: mockRefreshUserQuota,
+        },
       } as unknown as Config;
 
       await manageCommand!.action!(mockContext, '');
@@ -84,20 +88,22 @@ describe('modelCommand', () => {
       expect(setCommand).toBeDefined();
 
       const mockSetModel = vi.fn();
-      mockContext.services.config = {
-        setModel: mockSetModel,
-        getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
-        getUserId: vi.fn().mockReturnValue('test-user'),
-        getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
-        getSessionId: vi.fn().mockReturnValue('test-session'),
-        getContentGeneratorConfig: vi
-          .fn()
-          .mockReturnValue({ authType: 'test-auth' }),
-        isInteractive: vi.fn().mockReturnValue(true),
-        getExperiments: vi.fn().mockReturnValue({ experimentIds: [] }),
-        getPolicyEngine: vi.fn().mockReturnValue({
-          getApprovalMode: vi.fn().mockReturnValue('auto'),
-        }),
+      mockContext.services.agentContext = {
+        config: {
+          setModel: mockSetModel,
+          getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
+          getUserId: vi.fn().mockReturnValue('test-user'),
+          getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
+          getSessionId: vi.fn().mockReturnValue('test-session'),
+          getContentGeneratorConfig: vi
+            .fn()
+            .mockReturnValue({ authType: 'test-auth' }),
+          isInteractive: vi.fn().mockReturnValue(true),
+          getExperiments: vi.fn().mockReturnValue({ experimentIds: [] }),
+          getPolicyEngine: vi.fn().mockReturnValue({
+            getApprovalMode: vi.fn().mockReturnValue('auto'),
+          }),
+        },
       } as unknown as Config;
 
       await setCommand!.action!(mockContext, 'gemini-pro');
@@ -116,20 +122,22 @@ describe('modelCommand', () => {
         (c) => c.name === 'set',
       );
       const mockSetModel = vi.fn();
-      mockContext.services.config = {
-        setModel: mockSetModel,
-        getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
-        getUserId: vi.fn().mockReturnValue('test-user'),
-        getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
-        getSessionId: vi.fn().mockReturnValue('test-session'),
-        getContentGeneratorConfig: vi
-          .fn()
-          .mockReturnValue({ authType: 'test-auth' }),
-        isInteractive: vi.fn().mockReturnValue(true),
-        getExperiments: vi.fn().mockReturnValue({ experimentIds: [] }),
-        getPolicyEngine: vi.fn().mockReturnValue({
-          getApprovalMode: vi.fn().mockReturnValue('auto'),
-        }),
+      mockContext.services.agentContext = {
+        config: {
+          setModel: mockSetModel,
+          getHasAccessToPreviewModel: vi.fn().mockReturnValue(true),
+          getUserId: vi.fn().mockReturnValue('test-user'),
+          getUsageStatisticsEnabled: vi.fn().mockReturnValue(true),
+          getSessionId: vi.fn().mockReturnValue('test-session'),
+          getContentGeneratorConfig: vi
+            .fn()
+            .mockReturnValue({ authType: 'test-auth' }),
+          isInteractive: vi.fn().mockReturnValue(true),
+          getExperiments: vi.fn().mockReturnValue({ experimentIds: [] }),
+          getPolicyEngine: vi.fn().mockReturnValue({
+            getApprovalMode: vi.fn().mockReturnValue('auto'),
+          }),
+        },
       } as unknown as Config;
 
       await setCommand!.action!(mockContext, 'gemini-pro --persist');

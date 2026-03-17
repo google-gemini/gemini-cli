@@ -33,7 +33,7 @@ describe('upgradeCommand', () => {
     vi.clearAllMocks();
     mockContext = createMockCommandContext({
       services: {
-        config: {
+        context: {
           getContentGeneratorConfig: vi.fn().mockReturnValue({
             authType: AuthType.LOGIN_WITH_GOOGLE,
           }),
@@ -62,7 +62,7 @@ describe('upgradeCommand', () => {
 
   it('should return an error message when NOT logged in with Google', async () => {
     vi.mocked(
-      mockContext.services.config!.getContentGeneratorConfig,
+      mockContext.services.agentContext!.config!.getContentGeneratorConfig,
     ).mockReturnValue({
       authType: AuthType.USE_GEMINI,
     });
@@ -118,9 +118,9 @@ describe('upgradeCommand', () => {
   });
 
   it('should return info message for ultra tiers', async () => {
-    vi.mocked(mockContext.services.config!.getUserTierName).mockReturnValue(
-      'Advanced Ultra',
-    );
+    vi.mocked(
+      mockContext.services.agentContext!.config!.getUserTierName,
+    ).mockReturnValue('Advanced Ultra');
 
     if (!upgradeCommand.action) {
       throw new Error('The upgrade command must have an action.');

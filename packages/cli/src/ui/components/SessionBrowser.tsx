@@ -12,7 +12,7 @@ import { Colors } from '../colors.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import path from 'node:path';
-import type { Config } from '@google/gemini-cli-core';
+import type { AgentLoopContext } from '@google/gemini-cli-core';
 import type { SessionInfo } from '../../utils/sessionUtils.js';
 import {
   formatRelativeTime,
@@ -24,7 +24,7 @@ import {
  */
 export interface SessionBrowserProps {
   /** Application configuration object */
-  config: Config;
+  context: AgentLoopContext;
   /** Callback when user selects a session to resume */
   onResumeSession: (session: SessionInfo) => void;
   /** Callback when user deletes a session */
@@ -494,7 +494,10 @@ export const useSessionBrowserState = (
 /**
  * Hook to load sessions on mount.
  */
-const useLoadSessions = (config: Config, state: SessionBrowserState) => {
+const useLoadSessions = (
+  context: AgentLoopContext,
+  state: SessionBrowserState,
+) => {
   const {
     setSessions,
     setLoading,
@@ -507,10 +510,13 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
   useEffect(() => {
     const loadSessions = async () => {
       try {
-        const chatsDir = path.join(config.storage.getProjectTempDir(), 'chats');
+        const chatsDir = path.join(
+          context.config.storage.getProjectTempDir(),
+          'chats',
+        );
         const sessionData = await getSessionFiles(
           chatsDir,
-          config.getSessionId(),
+          context.config.getSessionId(),
         );
         setSessions(sessionData);
         setLoading(false);
@@ -524,19 +530,19 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
 
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     loadSessions();
-  }, [config, setSessions, setLoading, setError]);
+  }, [context, setSessions, setLoading, setError]);
 
   useEffect(() => {
     const loadFullContent = async () => {
       if (isSearchMode && !hasLoadedFullContent) {
         try {
           const chatsDir = path.join(
-            config.storage.getProjectTempDir(),
+            context.config.storage.getProjectTempDir(),
             'chats',
           );
           const sessionData = await getSessionFiles(
             chatsDir,
-            config.getSessionId(),
+            context.config.getSessionId(),
             { includeFullContent: true },
           );
           setSessions(sessionData);
@@ -556,7 +562,7 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
   }, [
     isSearchMode,
     hasLoadedFullContent,
-    config,
+    context,
     setSessions,
     setHasLoadedFullContent,
     setError,
@@ -787,14 +793,14 @@ export function SessionBrowserView({
 }
 
 export function SessionBrowser({
-  config,
+  context,
   onResumeSession,
   onDeleteSession,
   onExit,
 }: SessionBrowserProps): React.JSX.Element {
   // Use all our custom hooks
   const state = useSessionBrowserState();
-  useLoadSessions(config, state);
+  useLoadSessions(context, state);
   const moveSelection = useMoveSelection(state);
   const cycleSortOrder = useCycleSortOrder(state);
   useSessionBrowserInput(

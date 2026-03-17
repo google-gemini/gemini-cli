@@ -156,7 +156,7 @@ describe('SessionBrowser component', () => {
 
     const { lastFrame, waitUntilReady } = render(
       <TestSessionBrowser
-        config={config}
+        context={config}
         onResumeSession={onResumeSession}
         onDeleteSession={onDeleteSession}
         onExit={onExit}
@@ -194,7 +194,7 @@ describe('SessionBrowser component', () => {
 
     const { lastFrame, waitUntilReady } = render(
       <TestSessionBrowser
-        config={config}
+        context={config}
         onResumeSession={onResumeSession}
         onDeleteSession={onDeleteSession}
         onExit={onExit}
@@ -247,7 +247,7 @@ describe('SessionBrowser component', () => {
 
     const { lastFrame, waitUntilReady } = render(
       <TestSessionBrowser
-        config={config}
+        context={config}
         onResumeSession={onResumeSession}
         onDeleteSession={onDeleteSession}
         onExit={onExit}
@@ -307,7 +307,7 @@ describe('SessionBrowser component', () => {
 
     const { lastFrame, waitUntilReady } = render(
       <TestSessionBrowser
-        config={config}
+        context={config}
         onResumeSession={onResumeSession}
         onDeleteSession={onDeleteSession}
         onExit={onExit}
@@ -356,7 +356,7 @@ describe('SessionBrowser component', () => {
 
     const { waitUntilReady } = render(
       <TestSessionBrowser
-        config={config}
+        context={config}
         onResumeSession={onResumeSession}
         onDeleteSession={onDeleteSession}
         onExit={onExit}
@@ -384,7 +384,7 @@ describe('SessionBrowser component', () => {
 
     const { lastFrame, waitUntilReady } = render(
       <TestSessionBrowser
-        config={config}
+        context={config}
         onResumeSession={onResumeSession}
         onDeleteSession={onDeleteSession}
         onExit={onExit}

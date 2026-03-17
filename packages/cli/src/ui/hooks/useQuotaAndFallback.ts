@@ -5,8 +5,8 @@
  */
 
 import {
-  AuthType,
   type Config,
+  AuthType,
   type FallbackModelHandler,
   type FallbackIntent,
   type ValidationHandler,
@@ -101,7 +101,7 @@ export function useQuotaAndFallback({
             ? getResetTimeMessage(error.retryDelayMs)
             : undefined;
 
-          const overageStrategy = config.getBillingSettings().overageStrategy;
+          const overageStrategy = config?.getBillingSettings().overageStrategy;
 
           const creditsResult = await handleCreditsFlow({
             config,
@@ -168,7 +168,7 @@ export function useQuotaAndFallback({
       }
 
       setModelSwitchedFromQuotaError(true);
-      config.setQuotaErrorOccurred(true);
+      config?.setQuotaErrorOccurred(true);
 
       if (isDialogPending.current) {
         return 'stop'; // A dialog is already active, so just stop this request.
@@ -192,7 +192,7 @@ export function useQuotaAndFallback({
       return intent;
     };
 
-    config.setFallbackModelHandler(fallbackHandler);
+    config?.setFallbackModelHandler(fallbackHandler);
   }, [
     config,
     historyManager,
@@ -231,7 +231,7 @@ export function useQuotaAndFallback({
       return intent;
     };
 
-    config.setValidationHandler(validationHandler);
+    config?.setValidationHandler(validationHandler);
   }, [config]);
 
   const handleProQuotaChoice = useCallback(
@@ -246,7 +246,7 @@ export function useQuotaAndFallback({
       if (choice === 'retry_always' || choice === 'retry_once') {
         // Reset quota error flags to allow the agent loop to continue.
         setModelSwitchedFromQuotaError(false);
-        config.setQuotaErrorOccurred(false);
+        config?.setQuotaErrorOccurred(false);
 
         if (choice === 'retry_always') {
           historyManager.addItem(

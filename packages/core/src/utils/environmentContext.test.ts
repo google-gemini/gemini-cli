@@ -91,7 +91,7 @@ describe('getEnvironmentContext', () => {
       getIncludeDirectoryTree: vi.fn().mockReturnValue(true),
       getEnvironmentMemory: vi.fn().mockReturnValue('Mock Environment Memory'),
 
-      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      toolRegistry: mockToolRegistry as any,
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/tmp/project-temp'),
       } as unknown as Storage,

@@ -1345,7 +1345,7 @@ describe('Scheduler MCP Progress', () => {
 
     mockConfig = {
       getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
-      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      toolRegistry: mockToolRegistry,
       isInteractive: vi.fn().mockReturnValue(true),
       getEnableHooks: vi.fn().mockReturnValue(true),
       setApprovalMode: vi.fn(),

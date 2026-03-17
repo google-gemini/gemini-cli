@@ -9,10 +9,10 @@ import {
   IdeConnectionEvent,
   IdeConnectionType,
   logIdeConnection,
-  type Config,
   StartSessionEvent,
   logCliConfiguration,
   startupProfiler,
+  type AgentLoopContext,
 } from '@google/gemini-cli-core';
 import { type LoadedSettings } from '../config/settings.js';
 import { performInitialAuth } from './auth.js';
@@ -35,9 +35,10 @@ export interface InitializationResult {
  * @returns The results of the initialization.
  */
 export async function initializeApp(
-  config: Config,
+  context: AgentLoopContext,
   settings: LoadedSettings,
 ): Promise<InitializationResult> {
+  const config = context.config;
   const authHandle = startupProfiler.start('authenticate');
   const { authError, accountSuspensionInfo } = await performInitialAuth(
     config,
@@ -51,7 +52,7 @@ export async function initializeApp(
 
   logCliConfiguration(
     config,
-    new StartSessionEvent(config, config.getToolRegistry()),
+    new StartSessionEvent(config, context.toolRegistry),
   );
 
   if (config.getIdeMode()) {

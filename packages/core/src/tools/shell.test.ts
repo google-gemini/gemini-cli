@@ -466,7 +466,7 @@ describe('ShellTool', () => {
         mockConfig,
         { model: 'summarizer-shell' },
         expect.any(String),
-        mockConfig.geminiClient,
+        mockConfig.createAgentLoopContext().geminiClient,
         mockAbortSignal,
       );
       expect(result.llmContent).toBe('summarized output');

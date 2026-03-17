@@ -87,8 +87,7 @@ describe('HookSystem Integration', () => {
     });
 
     // Provide getMessageBus mock for MessageBus integration tests
-    (config as unknown as { getMessageBus: () => unknown }).getMessageBus =
-      () => undefined;
+    (config as unknown as { messageBus?: unknown }).messageBus = undefined;
 
     hookSystem = new HookSystem(config);
 
@@ -295,9 +294,8 @@ describe('HookSystem Integration', () => {
         disabledHooks: ['echo "disabled-hook"'], // Disable the second hook
       });
 
-      (
-        configWithDisabled as unknown as { getMessageBus: () => unknown }
-      ).getMessageBus = () => undefined;
+      (configWithDisabled as unknown as { messageBus?: unknown }).messageBus =
+        undefined;
 
       const systemWithDisabled = new HookSystem(configWithDisabled);
       await systemWithDisabled.initialize();
@@ -360,9 +358,8 @@ describe('HookSystem Integration', () => {
         },
       });
 
-      (
-        configForDisabling as unknown as { getMessageBus: () => unknown }
-      ).getMessageBus = () => undefined;
+      (configForDisabling as unknown as { messageBus?: unknown }).messageBus =
+        undefined;
 
       const systemForDisabling = new HookSystem(configForDisabling);
       await systemForDisabling.initialize();

@@ -97,7 +97,7 @@ describe('ExtensionManager theme loading', () => {
       getMcpClientManager: () => ({
         startExtension: vi.fn().mockResolvedValue(undefined),
       }),
-      getGeminiClient: () => ({
+      geminiClient: () => ({
         isInitialized: () => false,
         updateSystemInstruction: vi.fn(),
         setTools: vi.fn(),
@@ -129,7 +129,7 @@ describe('ExtensionManager theme loading', () => {
           enableEnvironmentVariableRedaction: false,
         },
       }),
-      getToolRegistry: () => ({
+      toolRegistry: () => ({
         getTools: () => [],
       }),
       getProxy: () => undefined,
@@ -208,7 +208,7 @@ describe('ExtensionManager theme loading', () => {
       setGeminiMdFileCount: vi.fn(),
       setGeminiMdFilePaths: vi.fn(),
       getEnableExtensionReloading: () => true,
-      getGeminiClient: () => ({
+      geminiClient: () => ({
         isInitialized: () => false,
         updateSystemInstruction: vi.fn(),
         setTools: vi.fn(),

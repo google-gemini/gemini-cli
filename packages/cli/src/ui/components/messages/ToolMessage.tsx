@@ -21,7 +21,11 @@ import {
   useFocusHint,
   FocusHint,
 } from './ToolShared.js';
-import { type Config, CoreToolCallStatus, Kind } from '@google/gemini-cli-core';
+import {
+  type AgentLoopContext,
+  CoreToolCallStatus,
+  Kind,
+} from '@google/gemini-cli-core';
 import { ShellInputPrompt } from '../ShellInputPrompt.js';
 import { SUBAGENT_MAX_LINES } from '../../constants.js';
 
@@ -38,7 +42,7 @@ export interface ToolMessageProps extends IndividualToolCallDisplay {
   activeShellPtyId?: number | null;
   embeddedShellFocused?: boolean;
   ptyId?: number;
-  config?: Config;
+  context?: AgentLoopContext;
 }
 
 export const ToolMessage: React.FC<ToolMessageProps> = ({
@@ -57,7 +61,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
   activeShellPtyId,
   embeddedShellFocused,
   ptyId,
-  config,
+  context,
   progressMessage,
   originalRequestName,
   progress,
@@ -71,7 +75,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
     embeddedShellFocused,
   );
 
-  const isThisShellFocusable = checkIsShellFocusable(name, status, config);
+  const isThisShellFocusable = checkIsShellFocusable(name, status, context);
 
   const { shouldShowFocusHint } = useFocusHint(
     isThisShellFocusable,
@@ -142,7 +146,7 @@ export const ToolMessage: React.FC<ToolMessageProps> = ({
           }
           overflowDirection={kind === Kind.Agent ? 'bottom' : 'top'}
         />
-        {isThisShellFocused && config && (
+        {isThisShellFocused && context && (
           <Box paddingLeft={STATUS_INDICATOR_WIDTH} marginTop={1}>
             <ShellInputPrompt
               activeShellPtyId={activeShellPtyId ?? null}

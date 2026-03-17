@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   coreEvents,
-  type Config,
+  type AgentLoopContext,
   type ResumedSessionData,
   convertSessionToClientHistory,
 } from '@google/gemini-cli-core';
@@ -17,7 +17,7 @@ import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import { convertSessionToHistoryFormats } from './useSessionBrowser.js';
 
 interface UseSessionResumeParams {
-  config: Config;
+  context: AgentLoopContext;
   historyManager: UseHistoryManagerReturn;
   refreshStatic: () => void;
   isGeminiClientInitialized: boolean;
@@ -32,7 +32,7 @@ interface UseSessionResumeParams {
  * handles command-line resume on mount.
  */
 export function useSessionResume({
-  config,
+  context,
   historyManager,
   refreshStatic,
   isGeminiClientInitialized,
@@ -40,6 +40,7 @@ export function useSessionResume({
   resumedSessionData,
   isAuthenticating,
 }: UseSessionResumeParams) {
+  const config = context.config;
   const [isResuming, setIsResuming] = useState(false);
 
   // Use refs to avoid dependency chain that causes infinite loop
@@ -84,7 +85,7 @@ export function useSessionResume({
         }
 
         // Give the history to the Gemini client.
-        await config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
+        await context.geminiClient?.resumeChat(clientHistory, resumedData);
       } catch (error) {
         coreEvents.emitFeedback(
           'error',
@@ -95,7 +96,7 @@ export function useSessionResume({
         setIsResuming(false);
       }
     },
-    [config, isGeminiClientInitialized, setQuittingMessages],
+    [config, context, isGeminiClientInitialized, setQuittingMessages],
   );
 
   // Handle interactive resume from the command line (-r/--resume without -p/--prompt-interactive).

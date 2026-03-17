@@ -43,7 +43,6 @@ import { ToolActionsProvider } from './contexts/ToolActionsContext.js';
 import {
   type StartupWarning,
   type EditorType,
-  type Config,
   type IdeInfo,
   type IdeContext,
   type UserTierId,
@@ -85,6 +84,7 @@ import {
   buildUserSteeringHintPrompt,
   logBillingEvent,
   ApiKeyUpdatedEvent,
+  type AgentLoopContext,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -194,7 +194,7 @@ function isToolAwaitingConfirmation(
 }
 
 interface AppContainerProps {
-  config: Config;
+  context: AgentLoopContext;
   startupWarnings?: StartupWarning[];
   version: string;
   initializationResult: InitializationResult;
@@ -223,13 +223,14 @@ const SHELL_HEIGHT_PADDING = 10;
 export const AppContainer = (props: AppContainerProps) => {
   const isHelpDismissKey = useIsHelpDismissKey();
   const keyMatchers = useKeyMatchers();
-  const { config, initializationResult, resumedSessionData } = props;
+  const { context, initializationResult, resumedSessionData } = props;
+  const config = context.config;
   const settings = useSettings();
   const { reset } = useOverflowActions()!;
   const notificationsEnabled = isNotificationsEnabled(settings);
 
   const historyManager = useHistory({
-    chatRecordingService: config.getGeminiClient()?.getChatRecordingService(),
+    chatRecordingService: context.geminiClient?.getChatRecordingService(),
   });
 
   useMemoryMonitor(historyManager);
@@ -453,7 +454,7 @@ export const AppContainer = (props: AppContainerProps) => {
         }
 
         const additionalContext = result.getAdditionalContext();
-        const geminiClient = config.getGeminiClient();
+        const geminiClient = context.geminiClient;
         if (additionalContext && geminiClient) {
           await geminiClient.addHistory({
             role: 'user',
@@ -724,10 +725,10 @@ export const AppContainer = (props: AppContainerProps) => {
   const isAuthenticating = authState === AuthState.Unauthenticated;
 
   // Session browser and resume functionality
-  const isGeminiClientInitialized = config.getGeminiClient()?.isInitialized();
+  const isGeminiClientInitialized = context.geminiClient?.isInitialized();
 
   const { loadHistoryForResume, isResuming } = useSessionResume({
-    config,
+    context,
     historyManager,
     refreshStatic,
     isGeminiClientInitialized,
@@ -1119,10 +1120,10 @@ Logging in with Google... Restarting Gemini CLI to continue.
     dismissBackgroundShell,
     retryStatus,
   } = useGeminiStream(
-    config.getGeminiClient(),
+    context.geminiClient,
     historyManager.history,
     historyManager.addItem,
-    config,
+    context,
     settings,
     setDebugMessage,
     handleSlashCommand,
@@ -1442,7 +1443,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
   // Initial prompt handling
   const initialPrompt = useMemo(() => config.getQuestion(), [config]);
   const initialPromptSubmitted = useRef(false);
-  const geminiClient = config.getGeminiClient();
+  const geminiClient = context.geminiClient;
 
   useEffect(() => {
     if (
@@ -2610,7 +2611,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
               startupWarnings: props.startupWarnings || [],
             }}
           >
-            <ToolActionsProvider config={config} toolCalls={allToolCalls}>
+            <ToolActionsProvider context={context} toolCalls={allToolCalls}>
               <ShellFocusContext.Provider value={isFocused}>
                 <App key={`app-${forceRerenderKey}`} />
               </ShellFocusContext.Provider>

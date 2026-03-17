@@ -15,7 +15,7 @@ import { type PartListUnion } from '@google/genai';
 import process from 'node:process';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
 import type {
-  Config,
+  AgentLoopContext,
   ExtensionsStartingEvent,
   ExtensionsStoppingEvent,
   ToolCallConfirmationDetails,
@@ -93,7 +93,7 @@ interface SlashCommandProcessorActions {
  * Hook to define and process slash commands (e.g., /help, /clear).
  */
 export const useSlashCommandProcessor = (
-  config: Config | null,
+  context: AgentLoopContext | null,
   settings: LoadedSettings,
   addItem: UseHistoryManagerReturn['addItem'],
   clearItems: UseHistoryManagerReturn['clearItems'],
@@ -125,21 +125,24 @@ export const useSlashCommandProcessor = (
     new Set<string>(),
   );
   const gitService = useMemo(() => {
-    if (!config?.getProjectRoot()) {
+    if (!context?.config?.getProjectRoot()) {
       return;
     }
-    return new GitService(config.getProjectRoot(), config.storage);
-  }, [config]);
+    return new GitService(
+      context?.config?.getProjectRoot(),
+      context?.config?.storage,
+    );
+  }, [context]);
 
   const logger = useMemo(() => {
     const l = new Logger(
-      config?.getSessionId() || '',
-      config?.storage ?? new Storage(process.cwd()),
+      context?.config?.getSessionId() || '',
+      context?.config?.storage ?? new Storage(process.cwd()),
     );
     // The logger's initialize is async, but we can create the instance
     // synchronously. Commands that use it will await its initialization.
     return l;
-  }, [config]);
+  }, [context]);
 
   const [pendingItem, setPendingItem] = useState<HistoryItemWithoutId | null>(
     null,
@@ -209,7 +212,7 @@ export const useSlashCommandProcessor = (
   const commandContext = useMemo(
     (): CommandContext => ({
       services: {
-        config,
+        agentContext: context,
         settings,
         git: gitService,
         logger,
@@ -251,7 +254,7 @@ export const useSlashCommandProcessor = (
       },
     }),
     [
-      config,
+      context,
       settings,
       gitService,
       logger,
@@ -274,7 +277,7 @@ export const useSlashCommandProcessor = (
   );
 
   useEffect(() => {
-    if (!config) {
+    if (!context?.config) {
       return;
     }
 
@@ -316,7 +319,7 @@ export const useSlashCommandProcessor = (
       coreEvents.off('extensionsStarting', extensionEventListener);
       coreEvents.off('extensionsStopping', extensionEventListener);
     };
-  }, [config, reloadCommands]);
+  }, [context, reloadCommands]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -325,10 +328,10 @@ export const useSlashCommandProcessor = (
     (async () => {
       const commandService = await CommandService.create(
         [
-          new BuiltinCommandLoader(config),
-          new SkillCommandLoader(config),
-          new McpPromptLoader(config),
-          new FileCommandLoader(config),
+          new BuiltinCommandLoader(context?.config || null),
+          new SkillCommandLoader(context?.config || null),
+          new McpPromptLoader(context?.config || null),
+          new FileCommandLoader(context?.config || null),
         ],
         controller.signal,
       );
@@ -343,7 +346,7 @@ export const useSlashCommandProcessor = (
     return () => {
       controller.abort();
     };
-  }, [config, reloadTrigger, isConfigInitialized]);
+  }, [context, reloadTrigger, isConfigInitialized]);
 
   const handleSlashCommand = useCallback(
     async (
@@ -376,7 +379,7 @@ export const useSlashCommandProcessor = (
       // /home/user/file.txt) and let it be sent to the model.
       if (!commandToExecute) {
         const isMcpLoading =
-          config?.getMcpClientManager()?.getDiscoveryState() ===
+          context?.config?.getMcpClientManager()?.getDiscoveryState() ===
           MCPDiscoveryState.IN_PROGRESS;
         if (isMcpLoading) {
           setIsProcessing(true);
@@ -540,7 +543,7 @@ export const useSlashCommandProcessor = (
                     }
                   }
                 case 'load_history': {
-                  config?.getGeminiClient()?.setHistory(result.clientHistory);
+                  context?.geminiClient?.setHistory(result.clientHistory);
                   fullCommandContext.ui.clear();
                   result.history.forEach((item, index) => {
                     fullCommandContext.ui.addItem(item, index);
@@ -688,14 +691,14 @@ export const useSlashCommandProcessor = (
         return { type: 'handled' };
       } catch (e: unknown) {
         hasError = true;
-        if (config) {
+        if (context?.config) {
           const event = makeSlashCommandEvent({
             command: resolvedCommandPath[0],
             subcommand,
             status: SlashCommandStatus.ERROR,
             extension_id: commandToExecute?.extensionId,
           });
-          logSlashCommand(config, event);
+          logSlashCommand(context?.config || (null as any), event);
         }
         addItem(
           {
@@ -706,20 +709,20 @@ export const useSlashCommandProcessor = (
         );
         return { type: 'handled' };
       } finally {
-        if (config && resolvedCommandPath[0] && !hasError) {
+        if (context?.config && resolvedCommandPath[0] && !hasError) {
           const event = makeSlashCommandEvent({
             command: resolvedCommandPath[0],
             subcommand,
             status: SlashCommandStatus.SUCCESS,
             extension_id: commandToExecute?.extensionId,
           });
-          logSlashCommand(config, event);
+          logSlashCommand(context?.config || (null as any), event);
         }
         setIsProcessing(false);
       }
     },
     [
-      config,
+      context,
       addItem,
       actions,
       commands,

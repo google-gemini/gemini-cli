@@ -16,10 +16,10 @@ import {
   IdeClient,
   ToolConfirmationOutcome,
   MessageBusType,
-  type Config,
   type ToolConfirmationPayload,
   type SerializableConfirmationDetails,
   debugLogger,
+  type AgentLoopContext,
 } from '@google/gemini-cli-core';
 import type { IndividualToolCallDisplay } from '../types.js';
 
@@ -62,14 +62,15 @@ export const useToolActions = () => {
 
 interface ToolActionsProviderProps {
   children: React.ReactNode;
-  config: Config;
+  context: AgentLoopContext;
   toolCalls: IndividualToolCallDisplay[];
 }
 
 export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
   props: ToolActionsProviderProps,
 ) => {
-  const { children, config, toolCalls } = props;
+  const { children, context, toolCalls } = props;
+  const config = context.config;
 
   // Hoist IdeClient logic here to keep UI pure
   const [ideClient, setIdeClient] = useState<IdeClient | null>(null);
@@ -132,7 +133,7 @@ export const ToolActionsProvider: React.FC<ToolActionsProviderProps> = (
 
       // 2. Dispatch via Event Bus
       if (tool.correlationId) {
-        await config.getMessageBus().publish({
+        await context.messageBus.publish({
           type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
           correlationId: tool.correlationId,
           confirmed: outcome !== ToolConfirmationOutcome.Cancel,

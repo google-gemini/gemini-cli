@@ -443,7 +443,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           userMessages={uiState.userMessages}
           setBannerVisible={uiActions.setBannerVisible}
           onClearScreen={uiActions.handleClearScreen}
-          config={config}
+          context={config}
           slashCommands={uiState.slashCommands || []}
           commandContext={uiState.commandContext}
           shellModeActive={uiState.shellModeActive}

@@ -12,10 +12,10 @@ import {
   validatePlanPath,
   validatePlanContent,
   QuestionType,
-  type Config,
   type EditorType,
   processSingleFileContent,
   debugLogger,
+  type AgentLoopContext,
 } from '@google/gemini-cli-core';
 import { theme } from '../semantic-colors.js';
 import { useConfig } from '../contexts/ConfigContext.js';
@@ -61,7 +61,10 @@ const StatusMessage: React.FC<{
   children: React.ReactNode;
 }> = ({ children }) => <Box paddingX={1}>{children}</Box>;
 
-function usePlanContent(planPath: string, config: Config): PlanContentState {
+function usePlanContent(
+  planPath: string,
+  context: AgentLoopContext,
+): PlanContentState {
   const [version, setVersion] = useState(0);
   const [state, setState] = useState<Omit<PlanContentState, 'refresh'>>({
     status: PlanStatus.Loading,
@@ -79,8 +82,8 @@ function usePlanContent(planPath: string, config: Config): PlanContentState {
       try {
         const pathError = await validatePlanPath(
           planPath,
-          config.storage.getPlansDir(),
-          config.getTargetDir(),
+          context.config.storage.getPlansDir(),
+          context.config.getTargetDir(),
         );
         if (ignore) return;
         if (pathError) {
@@ -97,8 +100,8 @@ function usePlanContent(planPath: string, config: Config): PlanContentState {
 
         const result = await processSingleFileContent(
           planPath,
-          config.storage.getPlansDir(),
-          config.getFileSystemService(),
+          context.config.storage.getPlansDir(),
+          context.config.getFileSystemService(),
         );
 
         if (ignore) return;
@@ -134,7 +137,7 @@ function usePlanContent(planPath: string, config: Config): PlanContentState {
     return () => {
       ignore = true;
     };
-  }, [planPath, config, version]);
+  }, [planPath, context, version]);
 
   return { ...state, refresh };
 }

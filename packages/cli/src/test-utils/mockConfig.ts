@@ -34,7 +34,6 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getRemoteAdminSettings: vi.fn(() => undefined),
     initialize: vi.fn().mockResolvedValue(undefined),
     getPolicyEngine: vi.fn(() => ({})),
-    getMessageBus: vi.fn(() => ({ subscribe: vi.fn() })),
     getHookSystem: vi.fn(() => ({
       fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
       fireSessionStartEvent: vi.fn().mockResolvedValue(undefined),
@@ -66,7 +65,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     clientVersion: '1.0.0',
     getModel: vi.fn().mockReturnValue('gemini-pro'),
     getWorkingDir: vi.fn().mockReturnValue('/mock/cwd'),
-    getToolRegistry: vi.fn().mockReturnValue({
+    toolRegistry: vi.fn().mockReturnValue({
       getTools: vi.fn().mockReturnValue([]),
       getAllTools: vi.fn().mockReturnValue([]),
     }),
@@ -90,7 +89,7 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getTelemetryOutfile: vi.fn().mockReturnValue(undefined),
     getTelemetryUseCollector: vi.fn().mockReturnValue(false),
     getTelemetryUseCliAuth: vi.fn().mockReturnValue(false),
-    getGeminiClient: vi.fn().mockReturnValue({
+    geminiClient: vi.fn().mockReturnValue({
       isInitialized: vi.fn().mockReturnValue(true),
     }),
     updateSystemInstructionIfInitialized: vi.fn().mockResolvedValue(undefined),

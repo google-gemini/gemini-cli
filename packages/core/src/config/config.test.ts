@@ -1786,7 +1786,7 @@ describe('setApprovalMode with folder trust', () => {
   it('should update system instruction when entering Plan mode', () => {
     const config = new Config(baseParams);
     vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
-    vi.spyOn(config, 'getToolRegistry').mockReturnValue({
+    vi.spyOn(config, 'toolRegistry', 'get').mockReturnValue({
       getTool: vi.fn().mockReturnValue(undefined),
       unregisterTool: vi.fn(),
       registerTool: vi.fn(),
@@ -1804,7 +1804,7 @@ describe('setApprovalMode with folder trust', () => {
       approvalMode: ApprovalMode.PLAN,
     });
     vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
-    vi.spyOn(config, 'getToolRegistry').mockReturnValue({
+    vi.spyOn(config, 'toolRegistry', 'get').mockReturnValue({
       getTool: vi.fn().mockReturnValue(undefined),
       unregisterTool: vi.fn(),
       registerTool: vi.fn(),
@@ -1819,7 +1819,7 @@ describe('setApprovalMode with folder trust', () => {
   it('should update system instruction when entering YOLO mode', () => {
     const config = new Config(baseParams);
     vi.spyOn(config, 'isTrustedFolder').mockReturnValue(true);
-    vi.spyOn(config, 'getToolRegistry').mockReturnValue({
+    vi.spyOn(config, 'toolRegistry', 'get').mockReturnValue({
       getTool: vi.fn().mockReturnValue(undefined),
       unregisterTool: vi.fn(),
       registerTool: vi.fn(),

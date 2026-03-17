@@ -185,7 +185,7 @@ describe('ChatCompressionService', () => {
         countTokens: vi.fn().mockResolvedValue({ totalTokens: 100 }),
       }),
       getEnableHooks: vi.fn().mockReturnValue(false),
-      getMessageBus: vi.fn().mockReturnValue(undefined),
+      messageBus: undefined,
       getHookSystem: () => undefined,
       getNextCompressionTruncationId: vi.fn().mockReturnValue(1),
       getTruncateToolOutputThreshold: vi.fn().mockReturnValue(40000),

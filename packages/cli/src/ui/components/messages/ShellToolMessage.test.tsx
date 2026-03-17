@@ -33,7 +33,7 @@ describe('<ShellToolMessage />', () => {
     isFirst: true,
     borderColor: 'green',
     borderDimColor: false,
-    config: {
+    context: {
       getEnableInteractiveShell: () => true,
     } as unknown as Config,
   };

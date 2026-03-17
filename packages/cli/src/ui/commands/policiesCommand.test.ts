@@ -32,7 +32,7 @@ describe('policiesCommand', () => {
 
   describe('list subcommand', () => {
     it('should show error if config is missing', async () => {
-      mockContext.services.config = null;
+      mockContext.services.agentContext = null;
       const listCommand = policiesCommand.subCommands![0];
 
       await listCommand.action!(mockContext, '');
@@ -50,8 +50,10 @@ describe('policiesCommand', () => {
       const mockPolicyEngine = {
         getRules: vi.fn().mockReturnValue([]),
       };
-      mockContext.services.config = {
-        getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+      mockContext.services.agentContext = {
+        config: {
+          getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+        },
       } as unknown as Config;
 
       const listCommand = policiesCommand.subCommands![0];
@@ -85,8 +87,10 @@ describe('policiesCommand', () => {
       const mockPolicyEngine = {
         getRules: vi.fn().mockReturnValue(mockRules),
       };
-      mockContext.services.config = {
-        getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+      mockContext.services.agentContext = {
+        config: {
+          getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+        },
       } as unknown as Config;
 
       const listCommand = policiesCommand.subCommands![0];
@@ -142,8 +146,10 @@ describe('policiesCommand', () => {
       const mockPolicyEngine = {
         getRules: vi.fn().mockReturnValue(mockRules),
       };
-      mockContext.services.config = {
-        getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+      mockContext.services.agentContext = {
+        config: {
+          getPolicyEngine: vi.fn().mockReturnValue(mockPolicyEngine),
+        },
       } as unknown as Config;
 
       const listCommand = policiesCommand.subCommands![0];

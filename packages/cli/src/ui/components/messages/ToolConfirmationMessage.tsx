@@ -11,12 +11,12 @@ import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 import {
   type SerializableConfirmationDetails,
-  type Config,
   type ToolConfirmationPayload,
   ToolConfirmationOutcome,
   type EditorType,
   hasRedirection,
   debugLogger,
+  type AgentLoopContext,
 } from '@google/gemini-cli-core';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
 import {
@@ -47,7 +47,7 @@ import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 export interface ToolConfirmationMessageProps {
   callId: string;
   confirmationDetails: SerializableConfirmationDetails;
-  config: Config;
+  context: AgentLoopContext;
   getPreferredEditor: () => EditorType | undefined;
   isFocused?: boolean;
   availableTerminalHeight?: number;
@@ -64,7 +64,7 @@ export const ToolConfirmationMessage: React.FC<
 > = ({
   callId,
   confirmationDetails,
-  config,
+  context,
   getPreferredEditor,
   isFocused = true,
   availableTerminalHeight,
@@ -87,13 +87,13 @@ export const ToolConfirmationMessage: React.FC<
   const settings = useSettings();
   const allowPermanentApproval =
     settings.merged.security.enablePermanentToolApproval &&
-    !config.getDisableAlwaysAllow();
+    !context.config.getDisableAlwaysAllow();
 
   const handlesOwnUI =
     confirmationDetails.type === 'ask_user' ||
     confirmationDetails.type === 'exit_plan_mode';
   const isTrustedFolder =
-    config.isTrustedFolder() && !config.getDisableAlwaysAllow();
+    context.config.isTrustedFolder() && !context.config.getDisableAlwaysAllow();
 
   const handleConfirm = useCallback(
     (outcome: ToolConfirmationOutcome, payload?: ToolConfirmationPayload) => {
@@ -258,7 +258,7 @@ export const ToolConfirmationMessage: React.FC<
         }
         // We hide "Modify with external editor" if IDE mode is active AND
         // the IDE is actually capable of showing a diff (connected).
-        if (!config.getIdeMode() || !isDiffingEnabled) {
+        if (!context.config.getIdeMode() || !isDiffingEnabled) {
           options.push({
             label: 'Modify with external editor',
             value: ToolConfirmationOutcome.ModifyWithEditor,
@@ -359,7 +359,7 @@ export const ToolConfirmationMessage: React.FC<
     confirmationDetails,
     isTrustedFolder,
     allowPermanentApproval,
-    config,
+    context,
     isDiffingEnabled,
   ]);
 

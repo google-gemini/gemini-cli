@@ -70,11 +70,11 @@ const createMockMCPTool = (
 describe('mcpCommand', () => {
   let mockContext: ReturnType<typeof createMockCommandContext>;
   let mockConfig: {
-    getToolRegistry: ReturnType<typeof vi.fn>;
+    toolRegistry: any;
     getMcpServers: ReturnType<typeof vi.fn>;
     getBlockedMcpServers: ReturnType<typeof vi.fn>;
     getPromptRegistry: ReturnType<typeof vi.fn>;
-    getGeminiClient: ReturnType<typeof vi.fn>;
+    geminiClient: any;
     getMcpClientManager: ReturnType<typeof vi.fn>;
     getResourceRegistry: ReturnType<typeof vi.fn>;
     setUserInteractedWithMcp: ReturnType<typeof vi.fn>;
@@ -95,16 +95,16 @@ describe('mcpCommand', () => {
 
     // Create mock config with all necessary methods
     mockConfig = {
-      getToolRegistry: vi.fn().mockReturnValue({
+      toolRegistry: {
         getAllTools: vi.fn().mockReturnValue([]),
-      }),
+      } as any,
       getMcpServers: vi.fn().mockReturnValue({}),
       getBlockedMcpServers: vi.fn().mockReturnValue([]),
       getPromptRegistry: vi.fn().mockReturnValue({
         getAllPrompts: vi.fn().mockReturnValue([]),
         getPromptsByServer: vi.fn().mockReturnValue([]),
       }),
-      getGeminiClient: vi.fn(),
+      geminiClient: {} as any,
       getMcpClientManager: vi.fn().mockImplementation(() => ({
         getBlockedMcpServers: vi.fn().mockReturnValue([]),
         getMcpServers: vi.fn().mockReturnValue({}),
@@ -119,7 +119,7 @@ describe('mcpCommand', () => {
 
     mockContext = createMockCommandContext({
       services: {
-        config: mockConfig,
+        agentContext: mockConfig as any,
       },
     });
   });
@@ -132,7 +132,7 @@ describe('mcpCommand', () => {
     it('should show an error if config is not available', async () => {
       const contextWithoutConfig = createMockCommandContext({
         services: {
-          config: null,
+          agentContext: null as any,
         },
       });
 
@@ -146,7 +146,7 @@ describe('mcpCommand', () => {
     });
 
     it('should show an error if tool registry is not available', async () => {
-      mockConfig.getToolRegistry = vi.fn().mockReturnValue(undefined);
+      (mockConfig as any).toolRegistry = undefined;
 
       const result = await mcpCommand.action!(mockContext, '');
 
@@ -196,9 +196,9 @@ describe('mcpCommand', () => {
         ...mockServer3Tools,
       ];
 
-      mockConfig.getToolRegistry = vi.fn().mockReturnValue({
+      (mockConfig as any).toolRegistry = {
         getAllTools: vi.fn().mockReturnValue(allTools),
-      });
+      };
 
       const resourcesByServer: Record<
         string,

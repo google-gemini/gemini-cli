@@ -40,7 +40,7 @@ import {
   isBackgroundExecutionData,
 } from '@google/gemini-cli-core';
 import type {
-  Config,
+  AgentLoopContext,
   EditorType,
   GeminiClient,
   ServerGeminiChatCompressedEvent,
@@ -201,7 +201,7 @@ export const useGeminiStream = (
   geminiClient: GeminiClient,
   history: HistoryItem[],
   addItem: UseHistoryManagerReturn['addItem'],
-  config: Config,
+  context: AgentLoopContext,
   settings: LoadedSettings,
   onDebugMessage: (message: string) => void,
   handleSlashCommand: (
@@ -220,6 +220,7 @@ export const useGeminiStream = (
   isShellFocused?: boolean,
   consumeUserHint?: () => string | null,
 ) => {
+  const config = context.config;
   const [initError, setInitError] = useState<string | null>(null);
   const [retryStatus, setRetryStatus] = useState<RetryAttemptPayload | null>(
     null,
@@ -307,10 +308,8 @@ export const useGeminiStream = (
         // Record tool calls with full metadata before sending responses.
         try {
           const currentModel =
-            config.getGeminiClient().getCurrentSequenceModel() ??
-            config.getModel();
-          config
-            .getGeminiClient()
+            context.geminiClient.getCurrentSequenceModel() ?? config.getModel();
+          context.geminiClient
             .getChat()
             .recordCompletedToolCalls(
               currentModel,
@@ -832,7 +831,7 @@ export const useGeminiStream = (
 
           const atCommandResult = await handleAtCommand({
             query: trimmedQuery,
-            config,
+            context,
             addItem,
             onDebugMessage,
             messageId: userMessageTimestamp,
@@ -1503,8 +1502,7 @@ export const useGeminiStream = (
                     setLoopDetectionConfirmationRequest(null);
 
                     if (result.userSelection === 'disable') {
-                      config
-                        .getGeminiClient()
+                      context.geminiClient
                         .getLoopDetectionService()
                         .disableForSession();
                       addItem({
@@ -1636,7 +1634,7 @@ export const useGeminiStream = (
         for (const call of awaitingApprovalCalls) {
           if (call.correlationId) {
             try {
-              await config.getMessageBus().publish({
+              await context.messageBus.publish({
                 type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
                 correlationId: call.correlationId,
                 confirmed: true,

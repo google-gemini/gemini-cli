@@ -167,13 +167,13 @@ describe('runNonInteractive', () => {
 
     mockConfig = {
       initialize: vi.fn().mockResolvedValue(undefined),
-      getMessageBus: vi.fn().mockReturnValue({
+      messageBus: {
         subscribe: vi.fn(),
         unsubscribe: vi.fn(),
         publish: vi.fn(),
-      }),
-      getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
-      getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      } as any,
+      geminiClient: mockGeminiClient as any,
+      toolRegistry: mockToolRegistry as any,
       getMaxSessionTurns: vi.fn().mockReturnValue(10),
       getSessionId: vi.fn().mockReturnValue('test-session-id'),
       getProjectRoot: vi.fn().mockReturnValue('/test/project'),
@@ -249,7 +249,7 @@ describe('runNonInteractive', () => {
     );
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: 'Test input',
       prompt_id: 'prompt-id-1',
@@ -281,7 +281,7 @@ describe('runNonInteractive', () => {
     );
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: 'test',
       prompt_id: 'prompt-id-activity-logger',
@@ -304,7 +304,7 @@ describe('runNonInteractive', () => {
     );
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: 'test',
       prompt_id: 'prompt-id-activity-logger-off',
@@ -362,7 +362,7 @@ describe('runNonInteractive', () => {
       .mockReturnValueOnce(createStreamFromEvents(secondCallEvents));
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: 'Use a tool',
       prompt_id: 'prompt-id-2',
@@ -442,7 +442,7 @@ describe('runNonInteractive', () => {
 
     // 4. Run the command.
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: 'Use mock tool multiple times',
       prompt_id: 'prompt-id-multi',
@@ -513,7 +513,7 @@ describe('runNonInteractive', () => {
       .mockReturnValueOnce(createStreamFromEvents(finalResponse));
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: 'Trigger tool error',
       prompt_id: 'prompt-id-3',
@@ -553,7 +553,7 @@ describe('runNonInteractive', () => {
 
     await expect(
       runNonInteractive({
-        config: mockConfig,
+        context: mockConfig.createAgentLoopContext() as any,
         settings: mockSettings,
         input: 'Initial fail',
         prompt_id: 'prompt-id-4',
@@ -608,7 +608,7 @@ describe('runNonInteractive', () => {
       .mockReturnValueOnce(createStreamFromEvents(finalResponse));
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: 'Trigger tool not found',
       prompt_id: 'prompt-id-5',
@@ -626,7 +626,7 @@ describe('runNonInteractive', () => {
     vi.mocked(mockConfig.getMaxSessionTurns).mockReturnValue(0);
     await expect(
       runNonInteractive({
-        config: mockConfig,
+        context: mockConfig.createAgentLoopContext() as any,
         settings: mockSettings,
         input: 'Trigger loop',
         prompt_id: 'prompt-id-6',
@@ -669,7 +669,7 @@ describe('runNonInteractive', () => {
 
     // 4. Run the non-interactive mode with the raw input
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: rawInput,
       prompt_id: 'prompt-id-7',
@@ -706,7 +706,7 @@ describe('runNonInteractive', () => {
     );
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: 'Test input',
       prompt_id: 'prompt-id-1',
@@ -796,7 +796,7 @@ describe('runNonInteractive', () => {
     );
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: 'Execute tool only',
       prompt_id: 'prompt-id-tool-only',
@@ -839,7 +839,7 @@ describe('runNonInteractive', () => {
     );
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: 'Empty response test',
       prompt_id: 'prompt-id-empty',
@@ -879,7 +879,7 @@ describe('runNonInteractive', () => {
     let thrownError: Error | null = null;
     try {
       await runNonInteractive({
-        config: mockConfig,
+        context: mockConfig.createAgentLoopContext() as any,
         settings: mockSettings,
         input: 'Test input',
         prompt_id: 'prompt-id-error',
@@ -921,7 +921,7 @@ describe('runNonInteractive', () => {
     let thrownError: Error | null = null;
     try {
       await runNonInteractive({
-        config: mockConfig,
+        context: mockConfig.createAgentLoopContext() as any,
         settings: mockSettings,
         input: 'Invalid syntax',
         prompt_id: 'prompt-id-fatal',
@@ -975,7 +975,7 @@ describe('runNonInteractive', () => {
     );
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: '/testcommand',
       prompt_id: 'prompt-id-slash',
@@ -1016,7 +1016,7 @@ describe('runNonInteractive', () => {
     );
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: '/help',
       prompt_id: 'prompt-id-slash',
@@ -1095,7 +1095,7 @@ describe('runNonInteractive', () => {
     );
 
     const runPromise = runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: 'Long running query',
       prompt_id: 'prompt-id-cancel',
@@ -1172,7 +1172,7 @@ describe('runNonInteractive', () => {
 
     await expect(
       runNonInteractive({
-        config: mockConfig,
+        context: mockConfig.createAgentLoopContext() as any,
         settings: mockSettings,
         input: '/confirm',
         prompt_id: 'prompt-id-confirm',
@@ -1198,7 +1198,7 @@ describe('runNonInteractive', () => {
     );
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: '/unknowncommand',
       prompt_id: 'prompt-id-unknown',
@@ -1229,7 +1229,7 @@ describe('runNonInteractive', () => {
 
     await expect(
       runNonInteractive({
-        config: mockConfig,
+        context: mockConfig.createAgentLoopContext() as any,
         settings: mockSettings,
         input: '/noaction',
         prompt_id: 'prompt-id-unhandled',
@@ -1263,7 +1263,7 @@ describe('runNonInteractive', () => {
     );
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: '/testargs arg1 arg2',
       prompt_id: 'prompt-id-args',
@@ -1296,7 +1296,7 @@ describe('runNonInteractive', () => {
     );
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: '/mycommand',
       prompt_id: 'prompt-id-loaders',
@@ -1323,14 +1323,14 @@ describe('runNonInteractive', () => {
   it('should allow a normally-excluded tool when --allowed-tools is set', async () => {
     // By default, ShellTool is excluded in non-interactive mode.
     // This test ensures that --allowed-tools overrides this exclusion.
-    vi.mocked(mockConfig.getToolRegistry).mockReturnValue({
+    (mockConfig as any).toolRegistry = {
       getTool: vi.fn().mockReturnValue({
         name: 'ShellTool',
         description: 'A shell tool',
         run: vi.fn(),
       }),
       getFunctionDeclarations: vi.fn().mockReturnValue([{ name: 'ShellTool' }]),
-    } as unknown as ToolRegistry);
+    } as unknown as ToolRegistry;
 
     const toolCallEvent: ServerGeminiStreamEvent = {
       type: GeminiEventType.ToolCallRequest,
@@ -1379,7 +1379,7 @@ describe('runNonInteractive', () => {
       .mockReturnValueOnce(createStreamFromEvents(secondCallEvents));
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: 'List the files',
       prompt_id: 'prompt-id-allowed',
@@ -1405,7 +1405,7 @@ describe('runNonInteractive', () => {
       );
 
       await runNonInteractive({
-        config: mockConfig,
+        context: mockConfig.createAgentLoopContext() as any,
         settings: mockSettings,
         input: 'test',
         prompt_id: 'prompt-id-events',
@@ -1430,7 +1430,7 @@ describe('runNonInteractive', () => {
       );
 
       await runNonInteractive({
-        config: mockConfig,
+        context: mockConfig.createAgentLoopContext() as any,
         settings: mockSettings,
         input: 'test',
         prompt_id: 'prompt-id-events',
@@ -1454,7 +1454,7 @@ describe('runNonInteractive', () => {
       );
 
       await runNonInteractive({
-        config: mockConfig,
+        context: mockConfig.createAgentLoopContext() as any,
         settings: mockSettings,
         input: 'test',
         prompt_id: 'prompt-id-events',
@@ -1491,7 +1491,7 @@ describe('runNonInteractive', () => {
       );
 
       await runNonInteractive({
-        config: mockConfig,
+        context: mockConfig.createAgentLoopContext() as any,
         settings: mockSettings,
         input: 'test',
         prompt_id: 'prompt-id-events',
@@ -1576,7 +1576,7 @@ describe('runNonInteractive', () => {
       .mockReturnValueOnce(createStreamFromEvents(secondCallEvents));
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: 'Stream test',
       prompt_id: 'prompt-id-stream',
@@ -1611,7 +1611,7 @@ describe('runNonInteractive', () => {
     }
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: 'EPIPE test',
       prompt_id: 'prompt-id-epipe',
@@ -1652,7 +1652,7 @@ describe('runNonInteractive', () => {
     };
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: 'Continue',
       prompt_id: 'prompt-id-resume',
@@ -1706,7 +1706,7 @@ describe('runNonInteractive', () => {
 
       try {
         await runNonInteractive({
-          config: mockConfig,
+          context: mockConfig.createAgentLoopContext() as any,
           settings: mockSettings,
           input,
           prompt_id: promptId,
@@ -1790,7 +1790,7 @@ describe('runNonInteractive', () => {
       .mockImplementation(() => {});
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: 'Tool recording error test',
       prompt_id: 'prompt-id-tool-error',
@@ -1846,7 +1846,7 @@ describe('runNonInteractive', () => {
       .mockReturnValueOnce(createStreamFromEvents([]));
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: 'Run stop tool',
       prompt_id: 'prompt-id-stop',
@@ -1905,7 +1905,7 @@ describe('runNonInteractive', () => {
     );
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: 'Run stop tool',
       prompt_id: 'prompt-id-stop-json',
@@ -1966,7 +1966,7 @@ describe('runNonInteractive', () => {
     );
 
     await runNonInteractive({
-      config: mockConfig,
+      context: mockConfig.createAgentLoopContext() as any,
       settings: mockSettings,
       input: 'Run stop tool',
       prompt_id: 'prompt-id-stop-stream',
@@ -1990,7 +1990,7 @@ describe('runNonInteractive', () => {
       );
 
       await runNonInteractive({
-        config: mockConfig,
+        context: mockConfig.createAgentLoopContext() as any,
         settings: mockSettings,
         input: 'test stop',
         prompt_id: 'prompt-id-stop',
@@ -2021,7 +2021,7 @@ describe('runNonInteractive', () => {
       );
 
       await runNonInteractive({
-        config: mockConfig,
+        context: mockConfig.createAgentLoopContext() as any,
         settings: mockSettings,
         input: 'test block',
         prompt_id: 'prompt-id-block',
@@ -2060,7 +2060,7 @@ describe('runNonInteractive', () => {
       vi.mocked(mockConfig.getRawOutput).mockReturnValue(false);
 
       await runNonInteractive({
-        config: mockConfig,
+        context: mockConfig.createAgentLoopContext() as any,
         settings: mockSettings,
         input: 'Test input',
         prompt_id: 'prompt-id-sanitization',
@@ -2087,7 +2087,7 @@ describe('runNonInteractive', () => {
       vi.mocked(mockConfig.getAcceptRawOutputRisk).mockReturnValue(true);
 
       await runNonInteractive({
-        config: mockConfig,
+        context: mockConfig.createAgentLoopContext() as any,
         settings: mockSettings,
         input: 'Test input',
         prompt_id: 'prompt-id-raw',
@@ -2112,7 +2112,7 @@ describe('runNonInteractive', () => {
       vi.mocked(mockConfig.getAcceptRawOutputRisk).mockReturnValue(true);
 
       await runNonInteractive({
-        config: mockConfig,
+        context: mockConfig.createAgentLoopContext() as any,
         settings: mockSettings,
         input: 'Test input',
         prompt_id: 'prompt-id-accept-only',
@@ -2136,7 +2136,7 @@ describe('runNonInteractive', () => {
       vi.mocked(mockConfig.getAcceptRawOutputRisk).mockReturnValue(false);
 
       await runNonInteractive({
-        config: mockConfig,
+        context: mockConfig.createAgentLoopContext() as any,
         settings: mockSettings,
         input: 'Test input',
         prompt_id: 'prompt-id-warn',
@@ -2162,7 +2162,7 @@ describe('runNonInteractive', () => {
       vi.mocked(mockConfig.getAcceptRawOutputRisk).mockReturnValue(true);
 
       await runNonInteractive({
-        config: mockConfig,
+        context: mockConfig.createAgentLoopContext() as any,
         settings: mockSettings,
         input: 'Test input',
         prompt_id: 'prompt-id-no-warn',
@@ -2220,7 +2220,7 @@ describe('runNonInteractive', () => {
       );
 
       await runNonInteractive({
-        config: mockConfig,
+        context: mockConfig.createAgentLoopContext() as any,
         settings: mockSettings,
         input: 'Test input',
         prompt_id: 'prompt-id-cancel',

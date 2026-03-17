@@ -66,7 +66,7 @@ describe('handleAtCommand', () => {
 
     abortController = new AbortController();
 
-    const getToolRegistry = vi.fn();
+    const toolRegistry = vi.fn();
 
     const mockMessageBus = {
       publish: vi.fn(),
@@ -75,7 +75,7 @@ describe('handleAtCommand', () => {
     } as unknown as core.MessageBus;
 
     mockConfig = {
-      getToolRegistry,
+      toolRegistry: toolRegistry as any,
       getTargetDir: () => testRootDir,
       isSandboxed: () => false,
       getExcludeTools: vi.fn(),
@@ -145,13 +145,13 @@ describe('handleAtCommand', () => {
       getMcpClientManager: () => ({
         getClient: () => undefined,
       }),
-      getMessageBus: () => mockMessageBus,
+      messageBus: () => mockMessageBus,
     } as unknown as Config;
 
     const registry = new ToolRegistry(mockConfig, mockMessageBus);
     registry.registerTool(new ReadManyFilesTool(mockConfig, mockMessageBus));
     registry.registerTool(new GlobTool(mockConfig, mockMessageBus));
-    getToolRegistry.mockReturnValue(registry);
+    toolRegistry.mockReturnValue(registry);
   });
 
   afterEach(async () => {
@@ -165,7 +165,7 @@ describe('handleAtCommand', () => {
 
     const result = await handleAtCommand({
       query,
-      config: mockConfig,
+      context: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 123,
@@ -182,7 +182,7 @@ describe('handleAtCommand', () => {
 
     const result = await handleAtCommand({
       query: queryWithSpaces,
-      config: mockConfig,
+      context: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 124,
@@ -205,7 +205,7 @@ describe('handleAtCommand', () => {
 
     const result = await handleAtCommand({
       query,
-      config: mockConfig,
+      context: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 125,
@@ -246,7 +246,7 @@ describe('handleAtCommand', () => {
 
     const result = await handleAtCommand({
       query,
-      config: mockConfig,
+      context: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 126,
@@ -280,7 +280,7 @@ describe('handleAtCommand', () => {
 
     const result = await handleAtCommand({
       query,
-      config: mockConfig,
+      context: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 128,
@@ -309,7 +309,7 @@ describe('handleAtCommand', () => {
 
     const result = await handleAtCommand({
       query,
-      config: mockConfig,
+      context: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 125,
@@ -357,7 +357,7 @@ describe('handleAtCommand', () => {
 
     const result = await handleAtCommand({
       query,
-      config: mockConfig,
+      context: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 126,
@@ -388,7 +388,7 @@ describe('handleAtCommand', () => {
 
     const result = await handleAtCommand({
       query,
-      config: mockConfig,
+      context: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 129,
@@ -420,7 +420,7 @@ describe('handleAtCommand', () => {
 
     const result = await handleAtCommand({
       query,
-      config: mockConfig,
+      context: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 130,
@@ -460,7 +460,7 @@ describe('handleAtCommand', () => {
 
     const result = await handleAtCommand({
       query,
-      config: mockConfig,
+      context: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 131,
@@ -498,7 +498,7 @@ describe('handleAtCommand', () => {
 
     const result = await handleAtCommand({
       query,
-      config: mockConfig,
+      context: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 132,
@@ -531,7 +531,7 @@ describe('handleAtCommand', () => {
 
     const result = await handleAtCommand({
       query,
-      config: mockConfig,
+      context: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 133,
@@ -564,7 +564,7 @@ describe('handleAtCommand', () => {
 
       const result = await handleAtCommand({
         query,
-        config: mockConfig,
+        context: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
         messageId: 200,
@@ -596,7 +596,7 @@ describe('handleAtCommand', () => {
 
       const result = await handleAtCommand({
         query,
-        config: mockConfig,
+        context: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
         messageId: 201,
@@ -628,7 +628,7 @@ describe('handleAtCommand', () => {
 
       const result = await handleAtCommand({
         query,
-        config: mockConfig,
+        context: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
         messageId: 202,
@@ -661,7 +661,7 @@ describe('handleAtCommand', () => {
 
       const result = await handleAtCommand({
         query,
-        config: mockConfig,
+        context: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
         messageId: 203,
@@ -691,7 +691,7 @@ describe('handleAtCommand', () => {
 
       const result = await handleAtCommand({
         query,
-        config: mockConfig,
+        context: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
         messageId: 300,
@@ -721,7 +721,7 @@ describe('handleAtCommand', () => {
 
       const result = await handleAtCommand({
         query,
-        config: mockConfig,
+        context: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
         messageId: 204,
@@ -752,7 +752,7 @@ describe('handleAtCommand', () => {
 
     const result = await handleAtCommand({
       query,
-      config: mockConfig,
+      context: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 205,
@@ -787,7 +787,7 @@ describe('handleAtCommand', () => {
 
     const result = await handleAtCommand({
       query,
-      config: mockConfig,
+      context: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 206,
@@ -914,7 +914,7 @@ describe('handleAtCommand', () => {
 
         const result = await handleAtCommand({
           query,
-          config: mockConfig,
+          context: mockConfig,
           addItem: mockAddItem,
           onDebugMessage: mockOnDebugMessage,
           messageId,
@@ -948,7 +948,7 @@ describe('handleAtCommand', () => {
 
       const result = await handleAtCommand({
         query,
-        config: mockConfig,
+        context: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
         messageId: 411,
@@ -981,7 +981,7 @@ describe('handleAtCommand', () => {
 
       const result = await handleAtCommand({
         query,
-        config: mockConfig,
+        context: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
         messageId: 412,
@@ -1009,7 +1009,7 @@ describe('handleAtCommand', () => {
 
       const result = await handleAtCommand({
         query,
-        config: mockConfig,
+        context: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
         messageId: 413,
@@ -1039,7 +1039,7 @@ describe('handleAtCommand', () => {
 
       const result = await handleAtCommand({
         query,
-        config: mockConfig,
+        context: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
         messageId: 414,
@@ -1069,7 +1069,7 @@ describe('handleAtCommand', () => {
 
       const result = await handleAtCommand({
         query,
-        config: mockConfig,
+        context: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
         messageId: 415,
@@ -1099,7 +1099,7 @@ describe('handleAtCommand', () => {
 
       const result = await handleAtCommand({
         query,
-        config: mockConfig,
+        context: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
         messageId: 416,
@@ -1129,7 +1129,7 @@ describe('handleAtCommand', () => {
 
       const result = await handleAtCommand({
         query,
-        config: mockConfig,
+        context: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
         messageId: 417,
@@ -1157,7 +1157,7 @@ describe('handleAtCommand', () => {
 
       const result = await handleAtCommand({
         query,
-        config: mockConfig,
+        context: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
         messageId: 418,
@@ -1185,7 +1185,7 @@ describe('handleAtCommand', () => {
 
       const result = await handleAtCommand({
         query,
-        config: mockConfig,
+        context: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
         messageId: 421,
@@ -1216,7 +1216,7 @@ describe('handleAtCommand', () => {
 
       const result = await handleAtCommand({
         query,
-        config: mockConfig,
+        context: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
         messageId: 500,
@@ -1252,7 +1252,7 @@ describe('handleAtCommand', () => {
 
       const result = await handleAtCommand({
         query,
-        config: mockConfig,
+        context: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
         messageId: 501,
@@ -1288,7 +1288,7 @@ describe('handleAtCommand', () => {
     // Act
     await handleAtCommand({
       query,
-      config: mockConfig,
+      context: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 999,
@@ -1338,7 +1338,7 @@ describe('handleAtCommand', () => {
 
       const result = await handleAtCommand({
         query: `@${prefixedUri}`,
-        config: mockConfig,
+        context: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
         messageId: 42,
@@ -1385,7 +1385,7 @@ describe('handleAtCommand', () => {
 
       const result = await handleAtCommand({
         query: `@${prefixedUri}`,
-        config: mockConfig,
+        context: mockConfig,
         addItem: mockAddItem,
         onDebugMessage: mockOnDebugMessage,
         messageId: 42,
@@ -1436,7 +1436,7 @@ describe('handleAtCommand', () => {
 
     const result = await handleAtCommand({
       query,
-      config: mockConfig,
+      context: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 134,
@@ -1471,7 +1471,7 @@ describe('handleAtCommand', () => {
 
     const result = await handleAtCommand({
       query,
-      config: mockConfig,
+      context: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 600,

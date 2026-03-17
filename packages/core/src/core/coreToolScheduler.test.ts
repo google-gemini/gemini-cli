@@ -282,10 +282,10 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     },
     getTruncateToolOutputThreshold: () =>
       DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
-    getToolRegistry: () => defaultToolRegistry,
+    toolRegistry: defaultToolRegistry,
     getActiveModel: () => DEFAULT_GEMINI_MODEL,
-    getGeminiClient: () => null,
-    getMessageBus: () => createMockMessageBus(),
+    geminiClient: null,
+    messageBus: createMockMessageBus(),
     getEnableHooks: () => false,
     getExperiments: () => {},
   } as unknown as Config;
@@ -321,13 +321,14 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
   }
 
   Object.defineProperty(finalConfig, 'toolRegistry', {
-    get: () => finalConfig.getToolRegistry?.() || defaultToolRegistry,
+    get: () =>
+      finalConfig.createAgentLoopContext().toolRegistry || defaultToolRegistry,
   });
   Object.defineProperty(finalConfig, 'messageBus', {
-    get: () => finalConfig.getMessageBus?.(),
+    get: () => finalConfig.createAgentLoopContext().messageBus,
   });
   Object.defineProperty(finalConfig, 'geminiClient', {
-    get: () => finalConfig.getGeminiClient?.(),
+    get: () => finalConfig.createAgentLoopContext().geminiClient,
   });
 
   return finalConfig;
@@ -358,7 +359,7 @@ describe('CoreToolScheduler', () => {
     const onToolCallsUpdate = vi.fn();
 
     const mockConfig = createMockConfig({
-      getToolRegistry: () => mockToolRegistry,
+      toolRegistry: mockToolRegistry,
       isInteractive: () => false,
     });
 
@@ -438,7 +439,7 @@ describe('CoreToolScheduler', () => {
     const onToolCallsUpdate = vi.fn();
 
     const mockConfig = createMockConfig({
-      getToolRegistry: () => mockToolRegistry,
+      toolRegistry: mockToolRegistry,
       getHookSystem: () => undefined,
     });
 
@@ -539,7 +540,7 @@ describe('CoreToolScheduler', () => {
     const onToolCallsUpdate = vi.fn();
 
     const mockConfig = createMockConfig({
-      getToolRegistry: () => mockToolRegistry,
+      toolRegistry: mockToolRegistry,
       getHookSystem: () => undefined,
     });
 
@@ -636,7 +637,7 @@ describe('CoreToolScheduler', () => {
     const onToolCallsUpdate = vi.fn();
 
     const mockConfig = createMockConfig({
-      getToolRegistry: () => mockToolRegistry,
+      toolRegistry: mockToolRegistry,
       isInteractive: () => true,
     });
 
@@ -691,7 +692,7 @@ describe('CoreToolScheduler', () => {
     const onToolCallsUpdate = vi.fn();
 
     const mockConfig = createMockConfig({
-      getToolRegistry: () => mockToolRegistry,
+      toolRegistry: mockToolRegistry,
       isInteractive: () => false,
     });
 
@@ -752,10 +753,10 @@ describe('CoreToolScheduler with payload', () => {
     const onToolCallsUpdate = vi.fn();
 
     const mockConfig = createMockConfig({
-      getToolRegistry: () => mockToolRegistry,
+      toolRegistry: mockToolRegistry,
     });
     const mockMessageBus = createMockMessageBus();
-    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    (mockConfig as any).messageBus = mockMessageBus;
     mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
     mockConfig.getHookSystem = vi
       .fn()
@@ -900,10 +901,10 @@ describe('CoreToolScheduler edit cancellation', () => {
     const onToolCallsUpdate = vi.fn();
 
     const mockConfig = createMockConfig({
-      getToolRegistry: () => mockToolRegistry,
+      toolRegistry: mockToolRegistry,
     });
     const mockMessageBus = createMockMessageBus();
-    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    (mockConfig as any).messageBus = mockMessageBus;
     mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
     mockConfig.getHookSystem = vi
       .fn()
@@ -991,12 +992,12 @@ describe('CoreToolScheduler YOLO mode', () => {
 
     // Configure the scheduler for YOLO mode.
     const mockConfig = createMockConfig({
-      getToolRegistry: () => mockToolRegistry,
+      toolRegistry: mockToolRegistry,
       getApprovalMode: () => ApprovalMode.YOLO,
       isInteractive: () => false,
     });
     const mockMessageBus = createMockMessageBus();
-    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    (mockConfig as any).messageBus = mockMessageBus;
     mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
     mockConfig.getHookSystem = vi
       .fn()
@@ -1083,12 +1084,12 @@ describe('CoreToolScheduler request queueing', () => {
     const onToolCallsUpdate = vi.fn();
 
     const mockConfig = createMockConfig({
-      getToolRegistry: () => mockToolRegistry,
+      toolRegistry: mockToolRegistry,
       getApprovalMode: () => ApprovalMode.YOLO, // Use YOLO to avoid confirmation prompts
       isInteractive: () => false,
     });
     const mockMessageBus = createMockMessageBus();
-    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    (mockConfig as any).messageBus = mockMessageBus;
     mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
     mockConfig.getHookSystem = vi
       .fn()
@@ -1204,7 +1205,7 @@ describe('CoreToolScheduler request queueing', () => {
     // Configure the scheduler to auto-approve the specific tool call.
     const mockConfig = createMockConfig({
       getAllowedTools: () => ['mockTool'], // Auto-approve this tool
-      getToolRegistry: () => toolRegistry,
+      toolRegistry: toolRegistry,
       getShellExecutionConfig: () => ({
         terminalWidth: 80,
         terminalHeight: 24,
@@ -1218,7 +1219,7 @@ describe('CoreToolScheduler request queueing', () => {
       isInteractive: () => false,
     });
     const mockMessageBus = createMockMessageBus();
-    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    (mockConfig as any).messageBus = mockMessageBus;
     mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
     mockConfig.getHookSystem = vi
       .fn()
@@ -1325,7 +1326,7 @@ describe('CoreToolScheduler request queueing', () => {
         },
         sandboxManager: new NoopSandboxManager(),
       }),
-      getToolRegistry: () => toolRegistry,
+      toolRegistry: toolRegistry,
       getHookSystem: () => undefined,
       getPolicyEngine: () =>
         ({
@@ -1384,11 +1385,11 @@ describe('CoreToolScheduler request queueing', () => {
     const onToolCallsUpdate = vi.fn();
 
     const mockConfig = createMockConfig({
-      getToolRegistry: () => mockToolRegistry,
+      toolRegistry: mockToolRegistry,
       getApprovalMode: () => ApprovalMode.YOLO,
     });
     const mockMessageBus = createMockMessageBus();
-    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    (mockConfig as any).messageBus = mockMessageBus;
     mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
     mockConfig.getHookSystem = vi
       .fn()
@@ -1448,7 +1449,7 @@ describe('CoreToolScheduler request queueing', () => {
       },
     });
     const mockMessageBus = createMockMessageBus();
-    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    (mockConfig as any).messageBus = mockMessageBus;
     mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
     mockConfig.getHookSystem = vi
       .fn()
@@ -1476,7 +1477,7 @@ describe('CoreToolScheduler request queueing', () => {
       discovery: {},
     } as unknown as ToolRegistry;
 
-    mockConfig.getToolRegistry = () => toolRegistry;
+    (mockConfig as any).toolRegistry = toolRegistry;
 
     const onAllToolCallsComplete = vi.fn();
     const onToolCallsUpdate = vi.fn();
@@ -1622,12 +1623,12 @@ describe('CoreToolScheduler Sequential Execution', () => {
     const onToolCallsUpdate = vi.fn();
 
     const mockConfig = createMockConfig({
-      getToolRegistry: () => mockToolRegistry,
+      toolRegistry: mockToolRegistry,
       getApprovalMode: () => ApprovalMode.YOLO, // Use YOLO to avoid confirmation prompts
       isInteractive: () => false,
     });
     const mockMessageBus = createMockMessageBus();
-    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    (mockConfig as any).messageBus = mockMessageBus;
     mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
     mockConfig.getHookSystem = vi
       .fn()
@@ -1727,12 +1728,12 @@ describe('CoreToolScheduler Sequential Execution', () => {
     const onToolCallsUpdate = vi.fn();
 
     const mockConfig = createMockConfig({
-      getToolRegistry: () => mockToolRegistry,
+      toolRegistry: mockToolRegistry,
       getApprovalMode: () => ApprovalMode.YOLO,
       isInteractive: () => false,
     });
     const mockMessageBus = createMockMessageBus();
-    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    (mockConfig as any).messageBus = mockMessageBus;
     mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
     mockConfig.getHookSystem = vi
       .fn()
@@ -1833,10 +1834,10 @@ describe('CoreToolScheduler Sequential Execution', () => {
     const onToolCallsUpdate = vi.fn();
 
     const mockConfig = createMockConfig({
-      getToolRegistry: () => mockToolRegistry,
+      toolRegistry: mockToolRegistry,
     });
     const mockMessageBus = createMockMessageBus();
-    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    (mockConfig as any).messageBus = mockMessageBus;
     mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
     mockConfig.getHookSystem = vi
       .fn()
@@ -1902,7 +1903,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
     } as unknown as ToolRegistry;
 
     const mockConfig = createMockConfig({
-      getToolRegistry: () => mockToolRegistry,
+      toolRegistry: mockToolRegistry,
       isInteractive: () => true,
     });
     mockConfig.getHookSystem = vi.fn().mockReturnValue(undefined);
@@ -2009,7 +2010,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
     });
 
     const mockConfig = createMockConfig({
-      getToolRegistry: () => mockToolRegistry,
+      toolRegistry: mockToolRegistry,
       getPolicyEngine: () =>
         ({
           check: mockPolicyEngineCheck,
@@ -2071,12 +2072,12 @@ describe('CoreToolScheduler Sequential Execution', () => {
     });
 
     const mockConfig = createMockConfig({
-      getToolRegistry: () => mockToolRegistry,
+      toolRegistry: mockToolRegistry,
       getApprovalMode: () => ApprovalMode.YOLO,
       isInteractive: () => false,
     });
     const mockMessageBus = createMockMessageBus();
-    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    (mockConfig as any).messageBus = mockMessageBus;
     mockConfig.getEnableHooks = vi.fn().mockReturnValue(false);
     mockConfig.getHookSystem = vi
       .fn()
@@ -2145,7 +2146,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
     } as unknown as ToolRegistry;
 
     const mockConfig = createMockConfig({
-      getToolRegistry: () => mockToolRegistry,
+      toolRegistry: mockToolRegistry,
       getApprovalMode: () => ApprovalMode.YOLO,
       isInteractive: () => false,
     });
@@ -2233,7 +2234,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
       const onAllToolCallsComplete = vi.fn();
 
       const mockConfig = createMockConfig({
-        getToolRegistry: () => mockToolRegistry,
+        toolRegistry: mockToolRegistry,
         getApprovalMode: () => ApprovalMode.PLAN,
         getPolicyEngine: () =>
           ({
@@ -2284,7 +2285,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
       const customDenyMessage = 'Custom denial message for testing';
 
       const mockConfig = createMockConfig({
-        getToolRegistry: () => mockToolRegistry,
+        toolRegistry: mockToolRegistry,
         getApprovalMode: () => ApprovalMode.PLAN,
         getPolicyEngine: () =>
           ({
@@ -2347,7 +2348,7 @@ describe('CoreToolScheduler Sequential Execution', () => {
 
       // Set approval mode to PLAN
       const mockConfig = createMockConfig({
-        getToolRegistry: () => mockToolRegistry,
+        toolRegistry: mockToolRegistry,
         getApprovalMode: () => ApprovalMode.PLAN,
         // Ensure policy engine returns ASK_USER to trigger AwaitingApproval state
         getPolicyEngine: () =>

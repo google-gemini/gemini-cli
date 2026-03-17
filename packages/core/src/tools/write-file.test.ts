@@ -78,7 +78,7 @@ const mockConfigInternal = {
   getTargetDir: () => rootDir,
   getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
   setApprovalMode: vi.fn(),
-  getGeminiClient: vi.fn(), // Initialize as a plain mock function
+  geminiClient: vi.fn(), // Initialize as a plain mock function
   getBaseLlmClient: vi.fn(), // Initialize as a plain mock function
   getFileSystemService: () => fsService,
   getIdeMode: vi.fn(() => false),
@@ -98,7 +98,7 @@ const mockConfigInternal = {
   setUserMemory: vi.fn(),
   getGeminiMdFileCount: () => 0,
   setGeminiMdFileCount: vi.fn(),
-  getToolRegistry: () =>
+  toolRegistry: () =>
     ({
       registerTool: vi.fn(),
       discoverTools: vi.fn(),
@@ -188,9 +188,7 @@ describe('WriteFileTool', () => {
     );
 
     // Now that mock instances are initialized, set the mock implementations for config getters
-    mockConfigInternal.getGeminiClient.mockReturnValue(
-      mockGeminiClientInstance,
-    );
+    mockConfigInternal.geminiClient.mockReturnValue(mockGeminiClientInstance);
     mockConfigInternal.getBaseLlmClient.mockReturnValue(
       mockBaseLlmClientInstance,
     );

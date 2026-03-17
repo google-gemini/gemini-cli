@@ -10,7 +10,7 @@ import {
   FatalInputError,
   Logger,
   uiTelemetryService,
-  type Config,
+  type AgentLoopContext,
 } from '@google/gemini-cli-core';
 import { CommandService } from './services/CommandService.js';
 import { BuiltinCommandLoader } from './services/BuiltinCommandLoader.js';
@@ -32,9 +32,10 @@ import type { SessionStatsState } from './ui/contexts/SessionContext.js';
 export const handleSlashCommand = async (
   rawQuery: string,
   abortController: AbortController,
-  config: Config,
+  context: AgentLoopContext,
   settings: LoadedSettings,
 ): Promise<PartListUnion | undefined> => {
+  const config = context.config;
   const trimmed = rawQuery.trim();
   if (!trimmed.startsWith('/')) {
     return;
@@ -65,9 +66,9 @@ export const handleSlashCommand = async (
 
       const logger = new Logger(config?.getSessionId() || '', config?.storage);
 
-      const context: CommandContext = {
+      const commandContext: CommandContext = {
         services: {
-          config,
+          agentContext: context,
           settings,
           git: undefined,
           logger,
@@ -84,7 +85,7 @@ export const handleSlashCommand = async (
         },
       };
 
-      const result = await commandToExecute.action(context, args);
+      const result = await commandToExecute.action(commandContext, args);
 
       if (result) {
         switch (result.type) {

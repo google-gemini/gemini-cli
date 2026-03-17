@@ -51,9 +51,9 @@ describe('McpClientManager', () => {
       getBlockedMcpServers: vi.fn().mockReturnValue([]),
       getMcpServerCommand: vi.fn().mockReturnValue(''),
       getMcpEnablementCallbacks: vi.fn().mockReturnValue(undefined),
-      getGeminiClient: vi.fn().mockReturnValue({
+      geminiClient: {
         isInitialized: vi.fn(),
-      }),
+      },
       refreshMcpContext: vi.fn(),
     } as unknown as Config);
     toolRegistry = {} as ToolRegistry;

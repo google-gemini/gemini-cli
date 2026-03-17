@@ -232,7 +232,7 @@ const createMockConfig = (overrides = {}): Config =>
     getAccessibility: vi.fn(() => ({})),
     getMcpServers: vi.fn(() => ({})),
     isPlanEnabled: vi.fn(() => true),
-    getToolRegistry: () => ({
+    toolRegistry: () => ({
       getTool: vi.fn(),
     }),
     getSkillManager: () => ({

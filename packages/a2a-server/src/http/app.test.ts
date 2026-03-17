@@ -81,11 +81,13 @@ vi.mock('../config/config.js', async () => {
     ...actual,
     loadConfig: vi.fn().mockImplementation(async () => {
       const mockConfig = createMockConfig({
-        getToolRegistry: getToolRegistrySpy,
         getApprovalMode: getApprovalModeSpy,
         getShellExecutionConfig: getShellExecutionConfigSpy,
         getExtensions: getExtensionsSpy,
       });
+      mockConfig.createAgentLoopContext = vi
+        .fn()
+        .mockReturnValue({ toolRegistry: getToolRegistrySpy() } as any);
       config = mockConfig as Config;
       return config;
     }),

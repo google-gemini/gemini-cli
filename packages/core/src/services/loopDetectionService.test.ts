@@ -812,10 +812,8 @@ describe('LoopDetectionService LLM Checks', () => {
       get config() {
         return this;
       },
-      getGeminiClient: () => mockGeminiClient,
-      get geminiClient() {
-        return mockGeminiClient;
-      },
+      geminiClient: mockGeminiClient,
+
       getBaseLlmClient: () => mockBaseLlmClient,
       getDisableLoopDetection: () => false,
       getDebugMode: () => false,

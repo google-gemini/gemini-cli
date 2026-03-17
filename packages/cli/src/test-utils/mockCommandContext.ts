@@ -36,7 +36,7 @@ export const createMockCommandContext = (
       args: '',
     },
     services: {
-      config: null,
+      agentContext: null,
       // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       settings: {
         merged: defaultMergedSettings,

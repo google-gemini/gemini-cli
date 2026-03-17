@@ -27,7 +27,7 @@ import { HooksDialog } from '../components/HooksDialog.js';
 function panelAction(
   context: CommandContext,
 ): MessageActionReturn | OpenCustomDialogActionReturn {
-  const { config } = context.services;
+  const config = context.services.agentContext?.config;
   if (!config) {
     return {
       type: 'message',
@@ -55,7 +55,7 @@ async function enableAction(
   context: CommandContext,
   args: string,
 ): Promise<void | MessageActionReturn> {
-  const { config } = context.services;
+  const config = context.services.agentContext?.config;
   if (!config) {
     return {
       type: 'message',
@@ -108,7 +108,7 @@ async function disableAction(
   context: CommandContext,
   args: string,
 ): Promise<void | MessageActionReturn> {
-  const { config } = context.services;
+  const config = context.services.agentContext?.config;
   if (!config) {
     return {
       type: 'message',
@@ -163,7 +163,7 @@ function completeEnabledHookNames(
   context: CommandContext,
   partialArg: string,
 ): string[] {
-  const { config } = context.services;
+  const config = context.services.agentContext?.config;
   if (!config) return [];
 
   const hookSystem = config.getHookSystem();
@@ -183,7 +183,7 @@ function completeDisabledHookNames(
   context: CommandContext,
   partialArg: string,
 ): string[] {
-  const { config } = context.services;
+  const config = context.services.agentContext?.config;
   if (!config) return [];
 
   const hookSystem = config.getHookSystem();
@@ -209,7 +209,7 @@ function getHookDisplayName(hook: HookRegistryEntry): string {
 async function enableAllAction(
   context: CommandContext,
 ): Promise<void | MessageActionReturn> {
-  const { config } = context.services;
+  const config = context.services.agentContext?.config;
   if (!config) {
     return {
       type: 'message',
@@ -280,7 +280,7 @@ async function enableAllAction(
 async function disableAllAction(
   context: CommandContext,
 ): Promise<void | MessageActionReturn> {
-  const { config } = context.services;
+  const config = context.services.agentContext?.config;
   if (!config) {
     return {
       type: 'message',

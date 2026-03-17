@@ -24,8 +24,8 @@ describe('authCommand', () => {
   beforeEach(() => {
     mockContext = createMockCommandContext({
       services: {
-        config: {
-          getGeminiClient: vi.fn(),
+        agentContext: {
+          geminiClient: {} as any,
         },
       },
     });
@@ -101,12 +101,13 @@ describe('authCommand', () => {
       const mockStripThoughts = vi.fn();
       const mockClient = {
         stripThoughtsFromHistory: mockStripThoughts,
-      } as unknown as ReturnType<
-        NonNullable<typeof mockContext.services.config>['getGeminiClient']
-      >;
+      } as unknown as NonNullable<
+        NonNullable<typeof mockContext.services.agentContext>['config']
+      >['geminiClient'];
 
-      if (mockContext.services.config) {
-        mockContext.services.config.getGeminiClient = vi.fn(() => mockClient);
+      if (mockContext.services.agentContext?.config) {
+        (mockContext.services.agentContext?.config as any).geminiClient =
+          mockClient as any;
       }
 
       await logoutCommand!.action!(mockContext, '');
@@ -123,7 +124,7 @@ describe('authCommand', () => {
 
     it('should handle missing config gracefully', async () => {
       const logoutCommand = authCommand.subCommands?.[1];
-      mockContext.services.config = null;
+      mockContext.services.agentContext = null;
 
       const result = await logoutCommand!.action!(mockContext, '');
 

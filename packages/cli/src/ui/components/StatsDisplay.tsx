@@ -33,6 +33,7 @@ import {
   getDisplayString,
   isAutoModel,
   AuthType,
+  type AgentLoopContext,
 } from '@google/gemini-cli-core';
 import { useSettings } from '../contexts/SettingsContext.js';
 import { useConfig } from '../contexts/ConfigContext.js';
@@ -89,7 +90,7 @@ const Section: React.FC<SectionProps> = ({ title, children }) => (
 // Logic for building the unified list of table rows
 const buildModelRows = (
   models: Record<string, ModelMetrics>,
-  config: Config,
+  context: AgentLoopContext,
   quotas?: RetrieveUserQuotaResponse,
   useGemini3_1 = false,
   useCustomToolModel = false,
@@ -98,7 +99,7 @@ const buildModelRows = (
   const usedModelNames = new Set(
     Object.keys(models)
       .map(getBaseModelName)
-      .map((name) => getDisplayString(name, config)),
+      .map((name) => getDisplayString(name, context.config)),
   );
 
   // 1. Models with active usage
@@ -108,7 +109,7 @@ const buildModelRows = (
     const inputTokens = metrics.tokens.input;
     return {
       key: name,
-      modelName: getDisplayString(modelName, config),
+      modelName: getDisplayString(modelName, context.config),
       requests: metrics.api.totalRequests,
       cachedTokens: cachedTokens.toLocaleString(),
       inputTokens: inputTokens.toLocaleString(),
@@ -125,11 +126,11 @@ const buildModelRows = (
         (b) =>
           b.modelId &&
           isActiveModel(b.modelId, useGemini3_1, useCustomToolModel) &&
-          !usedModelNames.has(getDisplayString(b.modelId, config)),
+          !usedModelNames.has(getDisplayString(b.modelId, context.config)),
       )
       .map((bucket) => ({
         key: bucket.modelId!,
-        modelName: getDisplayString(bucket.modelId!, config),
+        modelName: getDisplayString(bucket.modelId!, context.config),
         requests: '-',
         cachedTokens: '-',
         inputTokens: '-',

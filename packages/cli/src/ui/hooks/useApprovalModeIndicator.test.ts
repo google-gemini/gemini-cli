@@ -56,7 +56,7 @@ interface MockConfigInstanceShape {
   getUserAgent: Mock<() => string>;
   getUserMemory: Mock<() => string>;
   getGeminiMdFileCount: Mock<() => number>;
-  getToolRegistry: Mock<() => { discoverTools: Mock<() => void> }>;
+  toolRegistry: Mock<() => { discoverTools: Mock<() => void> }>;
   getRemoteAdminSettings: Mock<
     () => { strictModeDisabled?: boolean; mcpEnabled?: boolean } | undefined
   >;
@@ -112,7 +112,7 @@ describe('useApprovalModeIndicator', () => {
         >,
         getUserMemory: vi.fn().mockReturnValue('') as Mock<() => string>,
         getGeminiMdFileCount: vi.fn().mockReturnValue(0) as Mock<() => number>,
-        getToolRegistry: vi
+        toolRegistry: vi
           .fn()
           .mockReturnValue({ discoverTools: vi.fn() }) as Mock<
           () => { discoverTools: Mock<() => void> }

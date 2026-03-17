@@ -31,6 +31,7 @@ import {
   debugLogger,
   CoreToolCallStatus,
   IntegrityDataStatus,
+  type AgentLoopContext,
 } from '@google/gemini-cli-core';
 import {
   type MockShellCommand,
@@ -157,6 +158,7 @@ export interface PendingConfirmation {
 export class AppRig {
   private renderResult: ReturnType<typeof renderWithProviders> | undefined;
   private config: Config | undefined;
+  context: AgentLoopContext | undefined;
   private settings: LoadedSettings | undefined;
   private testDir: string;
   private sessionId: string;
@@ -312,7 +314,7 @@ export class AppRig {
 
   private setupMessageBusListeners() {
     if (!this.config) return;
-    const messageBus = this.config.getMessageBus();
+    const messageBus = this.context!.messageBus;
 
     messageBus.subscribe(
       MessageBusType.TOOL_CALLS_UPDATE,
@@ -396,7 +398,7 @@ export class AppRig {
     act(() => {
       this.renderResult = renderWithProviders(
         <AppContainer
-          config={this.config!}
+          context={this.config as any}
           version="test-version"
           initializationResult={{
             authError: null,
@@ -578,7 +580,7 @@ export class AppRig {
     outcome: ToolConfirmationOutcome = ToolConfirmationOutcome.ProceedOnce,
   ): Promise<void> {
     if (!this.config) throw new Error('AppRig not initialized');
-    const messageBus = this.config.getMessageBus();
+    const messageBus = this.context!.messageBus;
 
     let pending: PendingConfirmation;
     if (
@@ -725,9 +727,8 @@ export class AppRig {
 
     // Poison the chat recording service to prevent late writes to the test directory
     if (this.config) {
-      const recordingService = this.config
-        .getGeminiClient()
-        ?.getChatRecordingService();
+      const recordingService =
+        this.context!.geminiClient?.getChatRecordingService();
       if (recordingService) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
         (recordingService as any).conversationFile = null;

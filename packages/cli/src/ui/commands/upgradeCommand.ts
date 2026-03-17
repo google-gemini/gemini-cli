@@ -24,7 +24,8 @@ export const upgradeCommand: SlashCommand = {
   autoExecute: true,
   action: async (context) => {
     const authType =
-      context.services.config?.getContentGeneratorConfig()?.authType;
+      context.services.agentContext?.config?.getContentGeneratorConfig()
+        ?.authType;
     if (authType !== AuthType.LOGIN_WITH_GOOGLE) {
       // This command should ideally be hidden if not logged in with Google,
       // but we add a safety check here just in case.
@@ -36,7 +37,7 @@ export const upgradeCommand: SlashCommand = {
       };
     }
 
-    const tierName = context.services.config?.getUserTierName();
+    const tierName = context.services.agentContext?.config?.getUserTierName();
     if (isUltraTier(tierName)) {
       return {
         type: 'message',

@@ -7,14 +7,14 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import { type Config } from '@google/gemini-cli-core';
+import { type AgentLoopContext } from '@google/gemini-cli-core';
 
 interface TipsProps {
-  config: Config;
+  context: AgentLoopContext;
 }
 
-export const Tips: React.FC<TipsProps> = ({ config }) => {
-  const geminiMdFileCount = config.getGeminiMdFileCount();
+export const Tips: React.FC<TipsProps> = ({ context }) => {
+  const geminiMdFileCount = context.config.getGeminiMdFileCount();
 
   return (
     <Box flexDirection="column" marginTop={1}>

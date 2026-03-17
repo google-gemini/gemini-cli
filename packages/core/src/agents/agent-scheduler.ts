@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import { Scheduler } from '../scheduler/scheduler.js';
 import type {
   ToolCallRequestInfo,
@@ -42,7 +42,7 @@ export interface AgentSchedulingOptions {
  * @returns A promise that resolves to the completed tool calls.
  */
 export async function scheduleAgentTools(
-  config: Config,
+  context: AgentLoopContext,
   requests: ToolCallRequestInfo[],
   options: AgentSchedulingOptions,
 ): Promise<CompletedToolCall[]> {
@@ -58,12 +58,12 @@ export async function scheduleAgentTools(
 
   // Create a proxy/override of the config to provide the agent-specific tool registry.
   const schedulerContext = {
-    config,
-    promptId: config.promptId,
+    config: context.config,
+    promptId: context.config.promptId,
     toolRegistry,
     messageBus: toolRegistry.messageBus,
-    geminiClient: config.geminiClient,
-    sandboxManager: config.sandboxManager,
+    geminiClient: context.geminiClient,
+    sandboxManager: context.config.sandboxManager,
   };
 
   const scheduler = new Scheduler({

@@ -6,10 +6,10 @@
 
 import { useEffect, useState } from 'react';
 import {
-  type Config,
   coreEvents,
   MCPDiscoveryState,
   CoreEvent,
+  type Config,
 } from '@google/gemini-cli-core';
 
 export function useMcpStatus(config: Config) {

@@ -269,7 +269,7 @@ describe('AppContainer State Management', () => {
       <KeypressProvider config={config}>
         <OverflowProvider>
           <AppContainer
-            config={config}
+            context={config.createAgentLoopContext()}
             version={version}
             initializationResult={initResult}
             startupWarnings={startupWarnings}
@@ -1179,9 +1179,8 @@ describe('AppContainer State Management', () => {
       };
 
       const configWithRecording = makeFakeConfig();
-      vi.spyOn(configWithRecording, 'getGeminiClient').mockReturnValue(
-        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
-      );
+      (configWithRecording as any).geminiClient =
+        mockGeminiClient as unknown as Config['geminiClient'];
 
       expect(() => {
         renderAppContainer({
@@ -1213,9 +1212,8 @@ describe('AppContainer State Management', () => {
       };
 
       const configWithRecording = makeFakeConfig();
-      vi.spyOn(configWithRecording, 'getGeminiClient').mockReturnValue(
-        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
-      );
+      (configWithRecording as any).geminiClient =
+        mockGeminiClient as unknown as Config['geminiClient'];
       vi.spyOn(configWithRecording, 'getSessionId').mockReturnValue(
         'test-session-123',
       );
@@ -1230,7 +1228,7 @@ describe('AppContainer State Management', () => {
       }).not.toThrow();
 
       // Verify the recording service structure is correct
-      expect(configWithRecording.getGeminiClient).toBeDefined();
+      expect(configWithRecording.geminiClient).toBeDefined();
       expect(mockGeminiClient.getChatRecordingService).toBeDefined();
       expect(mockChatRecordingService.initialize).toBeDefined();
       expect(mockChatRecordingService.recordMessage).toBeDefined();
@@ -1255,9 +1253,8 @@ describe('AppContainer State Management', () => {
       };
 
       const configWithRecording = makeFakeConfig();
-      vi.spyOn(configWithRecording, 'getGeminiClient').mockReturnValue(
-        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
-      );
+      (configWithRecording as any).geminiClient =
+        mockGeminiClient as unknown as Config['geminiClient'];
 
       renderAppContainer({
         config: configWithRecording,
@@ -1289,9 +1286,8 @@ describe('AppContainer State Management', () => {
       };
 
       const configWithClient = makeFakeConfig();
-      vi.spyOn(configWithClient, 'getGeminiClient').mockReturnValue(
-        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
-      );
+      (configWithClient as any).geminiClient =
+        mockGeminiClient as unknown as Config['geminiClient'];
 
       const resumedData = {
         conversation: {
@@ -1345,9 +1341,8 @@ describe('AppContainer State Management', () => {
       };
 
       const configWithClient = makeFakeConfig();
-      vi.spyOn(configWithClient, 'getGeminiClient').mockReturnValue(
-        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
-      );
+      (configWithClient as any).geminiClient =
+        mockGeminiClient as unknown as Config['geminiClient'];
 
       const resumedData = {
         conversation: {
@@ -1398,9 +1393,8 @@ describe('AppContainer State Management', () => {
       };
 
       const configWithRecording = makeFakeConfig();
-      vi.spyOn(configWithRecording, 'getGeminiClient').mockReturnValue(
-        mockGeminiClient as unknown as ReturnType<Config['getGeminiClient']>,
-      );
+      (configWithRecording as any).geminiClient =
+        mockGeminiClient as unknown as Config['geminiClient'];
 
       renderAppContainer({
         config: configWithRecording,
@@ -2686,10 +2680,10 @@ describe('AppContainer State Management', () => {
 
       const getTree = (settings: LoadedSettings) => (
         <SettingsContext.Provider value={settings}>
-          <KeypressProvider config={mockConfig}>
+          <KeypressProvider config={mockConfig as any}>
             <OverflowProvider>
               <AppContainer
-                config={mockConfig}
+                context={(mockConfig as any).createAgentLoopContext()}
                 version="1.0.0"
                 initializationResult={mockInitResult}
               />

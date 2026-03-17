@@ -782,7 +782,7 @@ export const renderWithProviders = (
                     <UIActionsContext.Provider value={finalUIActions}>
                       <OverflowProvider>
                         <ToolActionsProvider
-                          config={finalConfig}
+                          context={finalConfig.createAgentLoopContext()}
                           toolCalls={allToolCalls}
                         >
                           <AskUserActionsProvider

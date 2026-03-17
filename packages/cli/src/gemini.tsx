@@ -448,7 +448,8 @@ export async function main() {
     registerTelemetryConfig(config);
 
     const policyEngine = config.getPolicyEngine();
-    const messageBus = config.getMessageBus();
+    const context = config.createAgentLoopContext();
+    const messageBus = context.messageBus;
     createPolicyUpdater(policyEngine, messageBus, config.storage);
 
     // Register SessionEnd hook to fire on graceful exit
@@ -517,7 +518,7 @@ export async function main() {
     await setupTerminalAndTheme(config, settings);
 
     const initAppHandle = startupProfiler.start('initialize_app');
-    const initializationResult = await initializeApp(config, settings);
+    const initializationResult = await initializeApp(context, settings);
     initAppHandle?.end();
 
     if (
@@ -673,7 +674,7 @@ export async function main() {
     initializeOutputListenersAndFlush();
 
     await runNonInteractive({
-      config,
+      context,
       settings,
       input,
       prompt_id,

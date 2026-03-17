@@ -40,7 +40,7 @@ describe('ConsecaSafetyChecker', () => {
         return this;
       },
       enableConseca: true,
-      getToolRegistry: vi.fn().mockReturnValue({
+      toolRegistry: vi.fn().mockReturnValue({
         getFunctionDeclarations: vi.fn().mockReturnValue([]),
       }),
     } as unknown as Config;

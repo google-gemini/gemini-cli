@@ -578,7 +578,7 @@ describe('useSlashCommandProcessor', () => {
         setHistory: vi.fn(),
         stripThoughtsFromHistory: vi.fn(),
       } as unknown as GeminiClient;
-      vi.spyOn(mockConfig, 'getGeminiClient').mockReturnValue(mockClient);
+      (mockConfig as any).geminiClient = mockClient;
 
       const command = createTestCommand({
         name: 'load',

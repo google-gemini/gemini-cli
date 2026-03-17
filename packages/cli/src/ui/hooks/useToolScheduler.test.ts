@@ -72,7 +72,7 @@ describe('useToolScheduler', () => {
     vi.clearAllMocks();
     mockMessageBus = createMockMessageBus() as unknown as MessageBus;
     mockConfig = {
-      getMessageBus: () => mockMessageBus,
+      messageBus: () => mockMessageBus,
     } as unknown as Config;
   });
 

@@ -19,7 +19,7 @@ import {
   PROMPT_COMPLETION_MIN_LENGTH,
   type PromptCompletion,
 } from './usePromptCompletion.js';
-import type { Config } from '@google/gemini-cli-core';
+import type { AgentLoopContext } from '@google/gemini-cli-core';
 import { useCompletion } from './useCompletion.js';
 
 export enum CompletionMode {
@@ -69,7 +69,7 @@ export interface UseCommandCompletionOptions {
   commandContext: CommandContext;
   reverseSearchActive?: boolean;
   shellModeActive: boolean;
-  config?: Config;
+  context?: AgentLoopContext;
   active: boolean;
 }
 
@@ -80,7 +80,7 @@ export function useCommandCompletion({
   commandContext,
   reverseSearchActive = false,
   shellModeActive,
-  config,
+  context,
   active,
 }: UseCommandCompletionOptions): UseCommandCompletionReturn {
   const [forceShowShellSuggestions, setForceShowShellSuggestions] =
@@ -211,7 +211,7 @@ export function useCommandCompletion({
   useAtCompletion({
     enabled: active && completionMode === CompletionMode.AT,
     pattern: memoQuery || '',
-    config,
+    context,
     cwd,
     setSuggestions,
     setIsLoadingSuggestions,

@@ -9,7 +9,7 @@ import {
   debugLogger,
   getResponseText,
   LlmRole,
-  type Config,
+  type AgentLoopContext,
 } from '@google/gemini-cli-core';
 import type { Content } from '@google/genai';
 import type { TextBuffer } from '../components/shared/text-buffer.js';
@@ -29,12 +29,12 @@ export interface PromptCompletion {
 
 export interface UsePromptCompletionOptions {
   buffer: TextBuffer;
-  config?: Config;
+  context?: AgentLoopContext;
 }
 
 export function usePromptCompletion({
   buffer,
-  config,
+  context,
 }: UsePromptCompletionOptions): PromptCompletion {
   const [ghostText, setGhostText] = useState<string>('');
   const [isLoadingGhostText, setIsLoadingGhostText] = useState<boolean>(false);
@@ -67,7 +67,7 @@ export function usePromptCompletion({
 
   const generatePromptSuggestions = useCallback(async () => {
     const trimmedText = buffer.text.trim();
-    const geminiClient = config?.getGeminiClient();
+    const geminiClient = context?.geminiClient;
 
     if (trimmedText === lastRequestedTextRef.current) {
       return;
@@ -151,7 +151,7 @@ export function usePromptCompletion({
         setIsLoadingGhostText(false);
       }
     }
-  }, [buffer.text, config, clearGhostText, isPromptCompletionEnabled]);
+  }, [buffer.text, context, clearGhostText, isPromptCompletionEnabled]);
 
   const isCursorAtEnd = useCallback(() => {
     const [cursorRow, cursorCol] = buffer.cursor;

@@ -1173,6 +1173,10 @@ export class Config implements McpContext, AgentLoopContext {
     return this;
   }
 
+  createAgentLoopContext(): AgentLoopContext {
+    return this;
+  }
+
   isInitialized(): boolean {
     return this.initialized;
   }
@@ -1757,11 +1761,6 @@ export class Config implements McpContext, AgentLoopContext {
     return this.acknowledgedAgentsService;
   }
 
-  /** @deprecated Use toolRegistry getter */
-  getToolRegistry(): ToolRegistry {
-    return this.toolRegistry;
-  }
-
   getPromptRegistry(): PromptRegistry {
     return this.promptRegistry;
   }
@@ -2306,11 +2305,6 @@ export class Config implements McpContext, AgentLoopContext {
 
   getTelemetryUseCliAuth(): boolean {
     return this.telemetrySettings.useCliAuth ?? false;
-  }
-
-  /** @deprecated Use geminiClient getter */
-  getGeminiClient(): GeminiClient {
-    return this.geminiClient;
   }
 
   /**
@@ -2936,11 +2930,6 @@ export class Config implements McpContext, AgentLoopContext {
 
   getFileExclusions(): FileExclusions {
     return this.fileExclusions;
-  }
-
-  /** @deprecated Use messageBus getter */
-  getMessageBus(): MessageBus {
-    return this.messageBus;
   }
 
   getPolicyEngine(): PolicyEngine {

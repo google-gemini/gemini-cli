@@ -55,7 +55,7 @@ vi.mock('./auth-provider/factory.js', () => ({
 
 function makeMockedConfig(params?: Partial<ConfigParameters>): Config {
   const config = makeFakeConfig(params);
-  vi.spyOn(config, 'getToolRegistry').mockReturnValue({
+  vi.spyOn(config, 'toolRegistry', 'get').mockReturnValue({
     getAllToolNames: () => ['tool1', 'tool2'],
   } as unknown as ToolRegistry);
   vi.spyOn(config, 'getAgentRegistry').mockReturnValue({

@@ -27,7 +27,7 @@ function useTestHarnessForAtCompletion(
   useAtCompletion({
     enabled,
     pattern,
-    config,
+    context: config,
     cwd,
     setSuggestions,
     setIsLoadingSuggestions,

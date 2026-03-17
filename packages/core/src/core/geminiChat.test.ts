@@ -162,9 +162,9 @@ describe('GeminiChat', () => {
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue('/test/temp'),
       },
-      getToolRegistry: vi.fn().mockReturnValue({
+      toolRegistry: {
         getTool: vi.fn(),
-      }),
+      },
       getContentGenerator: vi.fn().mockReturnValue(mockContentGenerator),
       getRetryFetchErrors: vi.fn().mockReturnValue(false),
       getMaxAttempts: vi.fn().mockReturnValue(10),
@@ -201,7 +201,7 @@ describe('GeminiChat', () => {
 
     // Use proper MessageBus mocking for Phase 3 preparation
     const mockMessageBus = createMockMessageBus();
-    mockConfig.getMessageBus = vi.fn().mockReturnValue(mockMessageBus);
+    (mockConfig as any).messageBus = mockMessageBus;
 
     // Disable 429 simulation for tests
     setSimulate429(false);

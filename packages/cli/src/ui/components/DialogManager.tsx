@@ -146,7 +146,7 @@ export const DialogManager = ({
   if (uiState.isPolicyUpdateDialogOpen) {
     return (
       <PolicyUpdateDialog
-        config={config}
+        context={config}
         request={uiState.policyUpdateConfirmationRequest!}
         onClose={() => uiActions.setIsPolicyUpdateDialogOpen(false)}
       />
@@ -345,7 +345,7 @@ export const DialogManager = ({
   if (uiState.isSessionBrowserOpen) {
     return (
       <SessionBrowser
-        config={config}
+        context={config}
         onResumeSession={uiActions.handleResumeSession}
         onDeleteSession={uiActions.handleDeleteSession}
         onExit={uiActions.closeSessionBrowser}

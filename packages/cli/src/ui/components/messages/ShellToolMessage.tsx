@@ -25,9 +25,9 @@ import { ACTIVE_SHELL_MAX_LINES } from '../../constants.js';
 import { useAlternateBuffer } from '../../hooks/useAlternateBuffer.js';
 import { useUIState } from '../../contexts/UIStateContext.js';
 import {
-  type Config,
   ShellExecutionService,
   CoreToolCallStatus,
+  type AgentLoopContext,
 } from '@google/gemini-cli-core';
 import {
   calculateShellMaxLines,
@@ -36,7 +36,7 @@ import {
 } from '../../utils/toolLayoutUtils.js';
 
 export interface ShellToolMessageProps extends ToolMessageProps {
-  config?: Config;
+  context?: AgentLoopContext;
   isExpandable?: boolean;
 }
 
@@ -59,7 +59,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
 
   ptyId,
 
-  config,
+  context,
 
   isFirst,
 
@@ -147,7 +147,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
 
   // The shell is focusable if it's the shell command, it's executing, and the interactive shell is enabled.
 
-  const isThisShellFocusable = checkIsShellFocusable(name, status, config);
+  const isThisShellFocusable = checkIsShellFocusable(name, status, context);
 
   const handleFocus = () => {
     if (isThisShellFocusable) {
@@ -217,7 +217,7 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
           hasFocus={isThisShellFocused}
           maxLines={maxLines}
         />
-        {isThisShellFocused && config && (
+        {isThisShellFocused && context && (
           <ShellInputPrompt
             activeShellPtyId={activeShellPtyId ?? null}
             focus={embeddedShellFocused}

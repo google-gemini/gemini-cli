@@ -133,7 +133,7 @@ export const ToolConfirmationQueue: React.FC<ToolConfirmationQueueProps> = ({
           <ToolConfirmationMessage
             callId={tool.callId}
             confirmationDetails={tool.confirmationDetails}
-            config={config}
+            context={config}
             getPreferredEditor={getPreferredEditor}
             terminalWidth={mainAreaWidth - 4} // Adjust for parent border/padding
             availableTerminalHeight={availableContentHeight}

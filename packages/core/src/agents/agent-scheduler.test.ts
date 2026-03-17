@@ -64,7 +64,7 @@ describe('agent-scheduler', () => {
     };
 
     const results = await scheduleAgentTools(
-      mockConfig as unknown as Config,
+      mockConfig.createAgentLoopContext() as any,
       requests,
       options,
     );
@@ -134,7 +134,11 @@ describe('agent-scheduler', () => {
       signal: new AbortController().signal,
     };
 
-    await scheduleAgentTools(mockConfig as unknown as Config, [], options);
+    await scheduleAgentTools(
+      mockConfig.createAgentLoopContext() as any,
+      [],
+      options,
+    );
 
     const schedulerContext = vi.mocked(Scheduler).mock.calls[0][0].context;
     expect(schedulerContext.config).toBeDefined();

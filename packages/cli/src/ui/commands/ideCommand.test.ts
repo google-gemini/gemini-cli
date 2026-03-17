@@ -60,7 +60,7 @@ describe('ideCommand', () => {
         settings: {
           setValue: vi.fn(),
         },
-        config: {
+        context: {
           getIdeMode: vi.fn(),
           setIdeMode: vi.fn(),
           getUsageStatisticsEnabled: vi.fn().mockReturnValue(false),

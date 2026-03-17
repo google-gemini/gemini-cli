@@ -38,7 +38,7 @@ describe('ToolActionsContext', () => {
 
   const mockConfig = {
     getIdeMode: vi.fn().mockReturnValue(false),
-    getMessageBus: vi.fn().mockReturnValue(mockMessageBus),
+    messageBus: vi.fn().mockReturnValue(mockMessageBus),
   } as unknown as Config;
 
   const mockToolCalls: IndividualToolCallDisplay[] = [
@@ -75,7 +75,10 @@ describe('ToolActionsContext', () => {
   });
 
   const wrapper = ({ children }: { children: React.ReactNode }) => (
-    <ToolActionsProvider config={mockConfig} toolCalls={mockToolCalls}>
+    <ToolActionsProvider
+      context={mockConfig.createAgentLoopContext()}
+      toolCalls={mockToolCalls}
+    >
       {children}
     </ToolActionsProvider>
   );
@@ -204,7 +207,10 @@ describe('ToolActionsContext', () => {
 
     const { result } = renderHook(() => useToolActions(), {
       wrapper: ({ children }) => (
-        <ToolActionsProvider config={mockConfig} toolCalls={[legacyTool]}>
+        <ToolActionsProvider
+          context={mockConfig.createAgentLoopContext()}
+          toolCalls={[legacyTool]}
+        >
           {children}
         </ToolActionsProvider>
       ),

@@ -57,7 +57,7 @@ const mockConfigInternal = {
   getTargetDir: () => rootDir,
   getApprovalMode: vi.fn(() => ApprovalMode.DEFAULT),
   setApprovalMode: vi.fn(),
-  getGeminiClient: vi.fn(),
+  geminiClient: vi.fn(),
   getBaseLlmClient: vi.fn(),
   getFileSystemService: () => fsService,
   getIdeMode: vi.fn(() => false),
@@ -79,7 +79,7 @@ const mockConfigInternal = {
   getDisableLLMCorrection: vi.fn(() => false),
   getActiveModel: () => 'test-model',
   validatePathAccess: vi.fn().mockReturnValue(null),
-  getToolRegistry: () =>
+  toolRegistry: () =>
     ({
       registerTool: vi.fn(),
       discoverTools: vi.fn(),
@@ -121,9 +121,7 @@ describe('Line Ending Preservation', () => {
       mockEnsureCorrectFileContent,
     );
 
-    mockConfigInternal.getGeminiClient.mockReturnValue(
-      mockGeminiClientInstance,
-    );
+    mockConfigInternal.geminiClient.mockReturnValue(mockGeminiClientInstance);
     mockConfigInternal.getBaseLlmClient.mockReturnValue(
       mockBaseLlmClientInstance,
     );

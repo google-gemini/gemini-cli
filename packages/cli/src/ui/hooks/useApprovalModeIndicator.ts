@@ -6,8 +6,8 @@
 
 import { useState, useEffect } from 'react';
 import {
-  ApprovalMode,
   type Config,
+  ApprovalMode,
   getAdminErrorMessage,
 } from '@google/gemini-cli-core';
 import { useKeypress } from './useKeypress.js';
@@ -31,7 +31,7 @@ export function useApprovalModeIndicator({
   allowPlanMode = false,
 }: UseApprovalModeIndicatorArgs): ApprovalMode {
   const keyMatchers = useKeyMatchers();
-  const currentConfigValue = config.getApprovalMode();
+  const currentConfigValue = config?.getApprovalMode();
   const [showApprovalMode, setApprovalMode] = useState(currentConfigValue);
 
   useEffect(() => {
@@ -44,13 +44,13 @@ export function useApprovalModeIndicator({
 
       if (keyMatchers[Command.TOGGLE_YOLO](key)) {
         if (
-          config.isYoloModeDisabled() &&
-          config.getApprovalMode() !== ApprovalMode.YOLO
+          config?.isYoloModeDisabled() &&
+          config?.getApprovalMode() !== ApprovalMode.YOLO
         ) {
           if (addItem) {
             let text =
               'You cannot enter YOLO mode since it is disabled in your settings.';
-            const adminSettings = config.getRemoteAdminSettings();
+            const adminSettings = config?.getRemoteAdminSettings();
             const hasSettings =
               adminSettings && Object.keys(adminSettings).length > 0;
             if (hasSettings && !adminSettings.strictModeDisabled) {
@@ -68,11 +68,11 @@ export function useApprovalModeIndicator({
           return;
         }
         nextApprovalMode =
-          config.getApprovalMode() === ApprovalMode.YOLO
+          config?.getApprovalMode() === ApprovalMode.YOLO
             ? ApprovalMode.DEFAULT
             : ApprovalMode.YOLO;
       } else if (keyMatchers[Command.CYCLE_APPROVAL_MODE](key)) {
-        const currentMode = config.getApprovalMode();
+        const currentMode = config?.getApprovalMode();
         switch (currentMode) {
           case ApprovalMode.DEFAULT:
             nextApprovalMode = ApprovalMode.AUTO_EDIT;
@@ -94,7 +94,7 @@ export function useApprovalModeIndicator({
 
       if (nextApprovalMode) {
         try {
-          config.setApprovalMode(nextApprovalMode);
+          config?.setApprovalMode(nextApprovalMode);
           // Update local state immediately for responsiveness
           setApprovalMode(nextApprovalMode);
 

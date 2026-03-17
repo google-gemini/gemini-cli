@@ -24,7 +24,7 @@ describe('useSessionResume', () => {
   };
 
   const mockConfig = {
-    getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+    geminiClient: vi.fn().mockReturnValue(mockGeminiClient),
   };
 
   const createMockHistoryManager = (): UseHistoryManagerReturn => ({
@@ -41,7 +41,7 @@ describe('useSessionResume', () => {
   const mockSetQuittingMessages = vi.fn();
 
   const getDefaultProps = () => ({
-    config: mockConfig as unknown as Config,
+    context: mockConfig as unknown as Config,
     historyManager: mockHistoryManager,
     refreshStatic: mockRefreshStatic,
     isGeminiClientInitialized: true,
@@ -193,7 +193,7 @@ describe('useSessionResume', () => {
       const { result } = renderHook(() =>
         useSessionResume({
           ...getDefaultProps(),
-          config: configWithWorkspace as unknown as Config,
+          context: configWithWorkspace as unknown as Config,
         }),
       );
 
@@ -233,7 +233,7 @@ describe('useSessionResume', () => {
       const { result } = renderHook(() =>
         useSessionResume({
           ...getDefaultProps(),
-          config: configWithWorkspace as unknown as Config,
+          context: configWithWorkspace as unknown as Config,
         }),
       );
 
@@ -272,23 +272,23 @@ describe('useSessionResume', () => {
 
     it('should update callback when config changes', () => {
       const { result, rerender } = renderHook(
-        ({ config }: { config: Config }) =>
+        ({ context }: { context: Config }) =>
           useSessionResume({
             ...getDefaultProps(),
-            config,
+            context,
           }),
         {
-          initialProps: { config: mockConfig as unknown as Config },
+          initialProps: { context: mockConfig as unknown as Config },
         },
       );
 
       const initialCallback = result.current.loadHistoryForResume;
 
       const newMockConfig = {
-        getGeminiClient: vi.fn().mockReturnValue(mockGeminiClient),
+        geminiClient: vi.fn().mockReturnValue(mockGeminiClient),
       };
 
-      rerender({ config: newMockConfig as unknown as Config });
+      rerender({ context: newMockConfig as unknown as Config });
 
       expect(result.current.loadHistoryForResume).not.toBe(initialCallback);
     });

@@ -1090,7 +1090,9 @@ describe('loggers', () => {
     const cfg1 = {
       getSessionId: () => 'test-session-id',
       getTargetDir: () => 'target-dir',
-      getGeminiClient: () => mockGeminiClient,
+      get geminiClient() {
+        return mockGeminiClient;
+      },
     } as Config;
     const cfg2 = {
       getSessionId: () => 'test-session-id',
@@ -1114,8 +1116,7 @@ describe('loggers', () => {
         },
       }),
       getQuestion: () => 'test-question',
-      getToolRegistry: () =>
-        new ToolRegistry(cfg1, {} as unknown as MessageBus),
+      toolRegistry: () => new ToolRegistry(cfg1, {} as unknown as MessageBus),
 
       getUserMemory: () => 'user-memory',
     } as unknown as Config;
@@ -1128,7 +1129,9 @@ describe('loggers', () => {
     const mockConfig = {
       getSessionId: () => 'test-session-id',
       getTargetDir: () => 'target-dir',
-      getGeminiClient: () => mockGeminiClient,
+      get geminiClient() {
+        return mockGeminiClient;
+      },
       getUsageStatisticsEnabled: () => true,
       getTelemetryEnabled: () => true,
       getTelemetryLogPromptsEnabled: () => true,

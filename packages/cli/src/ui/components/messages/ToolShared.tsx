@@ -16,11 +16,11 @@ import {
 } from '../../constants.js';
 import { theme } from '../../semantic-colors.js';
 import {
-  type Config,
   SHELL_TOOL_NAME,
   isCompletedAskUserTool,
   type ToolResultDisplay,
   CoreToolCallStatus,
+  type AgentLoopContext,
 } from '@google/gemini-cli-core';
 import { useInactivityTimer } from '../../hooks/useInactivityTimer.js';
 import { formatCommand } from '../../key/keybindingUtils.js';
@@ -45,12 +45,12 @@ export function isShellTool(name: string): boolean {
 export function isThisShellFocusable(
   name: string,
   status: CoreToolCallStatus,
-  config?: Config,
+  context?: AgentLoopContext,
 ): boolean {
   return !!(
     isShellTool(name) &&
     status === CoreToolCallStatus.Executing &&
-    config?.getEnableInteractiveShell()
+    context?.config.getEnableInteractiveShell()
   );
 }
 

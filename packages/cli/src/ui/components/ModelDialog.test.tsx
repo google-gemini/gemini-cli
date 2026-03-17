@@ -23,7 +23,11 @@ import {
   AuthType,
   UserTierId,
 } from '@google/gemini-cli-core';
-import type { Config, ModelSlashCommandEvent } from '@google/gemini-cli-core';
+import type {
+  Config,
+  ModelSlashCommandEvent,
+  AgentLoopContext,
+} from '@google/gemini-cli-core';
 
 // Mock dependencies
 const mockGetDisplayString = vi.fn();
@@ -36,8 +40,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     getDisplayString: (val: string) => mockGetDisplayString(val),
-    logModelSlashCommand: (config: Config, event: ModelSlashCommandEvent) =>
-      mockLogModelSlashCommand(config, event),
+    logModelSlashCommand: (
+      context: AgentLoopContext,
+      event: ModelSlashCommandEvent,
+    ) => mockLogModelSlashCommand(context, event),
     ModelSlashCommandEvent: class {
       constructor(model: string) {
         mockModelSlashCommandEvent(model);

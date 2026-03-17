@@ -17,7 +17,7 @@ import {
 import { MessageType, type HistoryItem } from '../types.js';
 import {
   refreshServerHierarchicalMemory,
-  type Config,
+  type AgentLoopContext,
 } from '@google/gemini-cli-core';
 import {
   expandHomeDir,
@@ -28,7 +28,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 
 async function finishAddingDirectories(
-  config: Config,
+  context: AgentLoopContext,
   addItem: (
     itemData: Omit<HistoryItem, 'id'>,
     baseTimestamp?: number,
@@ -36,7 +36,7 @@ async function finishAddingDirectories(
   added: string[],
   errors: string[],
 ) {
-  if (!config) {
+  if (!context) {
     addItem({
       type: MessageType.ERROR,
       text: 'Configuration is not available.',
@@ -46,8 +46,8 @@ async function finishAddingDirectories(
 
   if (added.length > 0) {
     try {
-      if (config.shouldLoadMemoryFromIncludeDirectories()) {
-        await refreshServerHierarchicalMemory(config);
+      if (context.config.shouldLoadMemoryFromIncludeDirectories()) {
+        await refreshServerHierarchicalMemory(context.config);
       }
       addItem({
         type: MessageType.INFO,
@@ -60,13 +60,13 @@ async function finishAddingDirectories(
   }
 
   if (added.length > 0) {
-    const gemini = config.getGeminiClient();
+    const gemini = context.geminiClient;
     if (gemini) {
       await gemini.addDirectoryContext();
 
       // Persist directories to session file for resume support
       const chatRecordingService = gemini.getChatRecordingService();
-      const workspaceContext = config.getWorkspaceContext();
+      const workspaceContext = context.config.getWorkspaceContext();
       chatRecordingService?.recordDirectories(
         workspaceContext.getDirectories(),
       );
@@ -110,9 +110,9 @@ export const directoryCommand: SlashCommand = {
 
         // Filter out existing directories
         let filteredSuggestions = suggestions;
-        if (context.services.config) {
+        if (context.services.agentContext?.config) {
           const workspaceContext =
-            context.services.config.getWorkspaceContext();
+            context.services.agentContext?.config.getWorkspaceContext();
           const existingDirs = new Set(
             workspaceContext.getDirectories().map((dir) => path.resolve(dir)),
           );
@@ -144,8 +144,9 @@ export const directoryCommand: SlashCommand = {
       action: async (context: CommandContext, args: string) => {
         const {
           ui: { addItem },
-          services: { config, settings },
+          services: { agentContext: agentContext, settings },
         } = context;
+        const config = agentContext?.config;
         const [...rest] = args.split(' ');
 
         if (!config) {
@@ -252,7 +253,7 @@ export const directoryCommand: SlashCommand = {
                   trustedDirs={added}
                   errors={errors}
                   finishAddingDirectories={finishAddingDirectories}
-                  config={config}
+                  context={agentContext!}
                   addItem={addItem}
                 />
               ),
@@ -275,8 +276,9 @@ export const directoryCommand: SlashCommand = {
       action: async (context: CommandContext) => {
         const {
           ui: { addItem },
-          services: { config },
+          services: { agentContext: agentContext },
         } = context;
+        const config = agentContext?.config;
         if (!config) {
           addItem({
             type: MessageType.ERROR,

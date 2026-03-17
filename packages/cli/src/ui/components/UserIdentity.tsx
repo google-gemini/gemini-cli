@@ -9,18 +9,18 @@ import { useMemo } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
 import {
-  type Config,
   UserAccountManager,
   AuthType,
+  type AgentLoopContext,
 } from '@google/gemini-cli-core';
 import { isUltraTier } from '../../utils/tierUtils.js';
 
 interface UserIdentityProps {
-  config: Config;
+  context: AgentLoopContext;
 }
 
-export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
-  const authType = config.getContentGeneratorConfig()?.authType;
+export const UserIdentity: React.FC<UserIdentityProps> = ({ context }) => {
+  const authType = context.config.getContentGeneratorConfig()?.authType;
   const email = useMemo(() => {
     if (authType) {
       const userAccountManager = new UserAccountManager();
@@ -30,8 +30,8 @@ export const UserIdentity: React.FC<UserIdentityProps> = ({ config }) => {
   }, [authType]);
 
   const tierName = useMemo(
-    () => (authType ? config.getUserTierName() : undefined),
-    [config, authType],
+    () => (authType ? context.config.getUserTierName() : undefined),
+    [context, authType],
   );
 
   const isUltra = useMemo(() => isUltraTier(tierName), [tierName]);

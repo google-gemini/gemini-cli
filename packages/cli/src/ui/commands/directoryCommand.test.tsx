@@ -72,7 +72,7 @@ describe('directoryCommand', () => {
     mockConfig = {
       getWorkspaceContext: () => mockWorkspaceContext,
       isRestrictiveSandbox: vi.fn().mockReturnValue(false),
-      getGeminiClient: vi.fn().mockReturnValue({
+      geminiClient: vi.fn().mockReturnValue({
         addDirectoryContext: vi.fn(),
         getChatRecordingService: vi.fn().mockReturnValue({
           recordDirectories: vi.fn(),
@@ -89,7 +89,7 @@ describe('directoryCommand', () => {
 
     mockContext = {
       services: {
-        config: mockConfig,
+        context: mockConfig as any,
         settings: {
           merged: {
             memoryDiscoveryMaxDirs: 1000,

@@ -343,7 +343,7 @@ describe('InputPrompt', () => {
       onSubmit: vi.fn(),
       userMessages: [],
       onClearScreen: vi.fn(),
-      config: {
+      context: {
         getProjectRoot: () => path.join('test', 'project'),
         getTargetDir: () => path.join('test', 'project', 'src'),
         getVimMode: () => false,
@@ -773,10 +773,10 @@ describe('InputPrompt', () => {
       await waitFor(() => {
         expect(clipboardUtils.clipboardHasImage).toHaveBeenCalled();
         expect(clipboardUtils.saveClipboardImage).toHaveBeenCalledWith(
-          props.config.getTargetDir(),
+          props.context.config.getTargetDir(),
         );
         expect(clipboardUtils.cleanupOldClipboardImages).toHaveBeenCalledWith(
-          props.config.getTargetDir(),
+          props.context.config.getTargetDir(),
         );
         expect(mockBuffer.replaceRangeByOffset).toHaveBeenCalled();
       });
@@ -1819,7 +1819,7 @@ describe('InputPrompt', () => {
     });
 
     it('should render with plain borders when useBackgroundColor is false', async () => {
-      props.config.getUseBackgroundColor = () => false;
+      props.context.config.getUseBackgroundColor = () => false;
       const { stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
       );
@@ -2092,7 +2092,7 @@ describe('InputPrompt', () => {
           mockBuffer.lines = [text];
           mockBuffer.viewportVisualLines = [text];
           mockBuffer.visualCursor = visualCursor as [number, number];
-          props.config.getUseBackgroundColor = () => false;
+          props.context.config.getUseBackgroundColor = () => false;
 
           const { stdout, unmount } = renderWithProviders(
             <InputPrompt {...props} />,
@@ -2155,7 +2155,7 @@ describe('InputPrompt', () => {
           mockBuffer.visualToLogicalMap = visualToLogicalMap as Array<
             [number, number]
           >;
-          props.config.getUseBackgroundColor = () => false;
+          props.context.config.getUseBackgroundColor = () => false;
 
           const { stdout, unmount } = renderWithProviders(
             <InputPrompt {...props} />,
@@ -2185,7 +2185,7 @@ describe('InputPrompt', () => {
           [1, 0],
           [2, 0],
         ];
-        props.config.getUseBackgroundColor = () => false;
+        props.context.config.getUseBackgroundColor = () => false;
 
         const { stdout, unmount } = renderWithProviders(
           <InputPrompt {...props} />,
@@ -2217,7 +2217,7 @@ describe('InputPrompt', () => {
         [1, 0],
         [2, 0],
       ];
-      props.config.getUseBackgroundColor = () => false;
+      props.context.config.getUseBackgroundColor = () => false;
 
       const { stdout, unmount } = renderWithProviders(
         <InputPrompt {...props} />,
@@ -3627,7 +3627,7 @@ describe('InputPrompt', () => {
     });
 
     it('should move cursor on mouse click with plain borders', async () => {
-      props.config.getUseBackgroundColor = () => false;
+      props.context.config.getUseBackgroundColor = () => false;
       props.buffer.text = 'hello world';
       props.buffer.lines = ['hello world'];
       props.buffer.viewportVisualLines = ['hello world'];

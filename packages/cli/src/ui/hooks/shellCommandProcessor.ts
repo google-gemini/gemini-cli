@@ -9,7 +9,11 @@ import type {
   IndividualToolCallDisplay,
 } from '../types.js';
 import { useCallback, useReducer, useRef, useEffect } from 'react';
-import type { AnsiOutput, Config, GeminiClient } from '@google/gemini-cli-core';
+import type {
+  AnsiOutput,
+  GeminiClient,
+  AgentLoopContext,
+} from '@google/gemini-cli-core';
 import {
   isBinary,
   ShellExecutionService,
@@ -75,7 +79,7 @@ export const useShellCommandProcessor = (
   >,
   onExec: (command: Promise<void>) => void,
   onDebugMessage: (message: string) => void,
-  config: Config,
+  context: AgentLoopContext,
   geminiClient: GeminiClient,
   setShellInputFocused: (value: boolean) => void,
   terminalWidth?: number,
@@ -83,6 +87,7 @@ export const useShellCommandProcessor = (
   activeBackgroundExecutionId?: number,
   isWaitingForConfirmation?: boolean,
 ) => {
+  const config = context.config;
   const [state, dispatch] = useReducer(shellReducer, initialState);
 
   // Consolidate stable tracking into a single manager object

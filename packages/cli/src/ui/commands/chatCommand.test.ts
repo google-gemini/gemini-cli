@@ -70,18 +70,19 @@ describe('chatCommand', () => {
 
     mockContext = createMockCommandContext({
       services: {
-        config: {
-          getProjectRoot: () => '/project/root',
-          getGeminiClient: () =>
-            ({
+        agentContext: {
+          config: {
+            getProjectRoot: () => '/project/root',
+            geminiClient: {
               getChat: mockGetChat,
-            }) as unknown as GeminiClient,
-          storage: {
-            getProjectTempDir: () => '/project/root/.gemini/tmp/mockhash',
+            } as unknown as GeminiClient,
+            storage: {
+              getProjectTempDir: () => '/project/root/.gemini/tmp/mockhash',
+            },
+            getContentGeneratorConfig: () => ({
+              authType: AuthType.LOGIN_WITH_GOOGLE,
+            }),
           },
-          getContentGeneratorConfig: () => ({
-            authType: AuthType.LOGIN_WITH_GOOGLE,
-          }),
         },
         logger: {
           saveCheckpoint: mockSaveCheckpoint,
@@ -698,8 +699,8 @@ Hi there!`;
 
       beforeEach(() => {
         mockGetLatestApiRequest = vi.fn();
-        mockContext.services.config!.getLatestApiRequest =
-          mockGetLatestApiRequest;
+        const config = mockContext.services.agentContext!.config;
+        config.getLatestApiRequest = mockGetLatestApiRequest;
         vi.spyOn(process, 'cwd').mockReturnValue('/project/root');
         vi.spyOn(Date, 'now').mockReturnValue(1234567890);
         mockFs.writeFile.mockClear();

@@ -5,7 +5,6 @@
  */
 
 import {
-  type Config,
   type FallbackIntent,
   type GeminiUserTier,
   type OverageOption,
@@ -25,6 +24,7 @@ import {
   UserAccountManager,
   recordOverageOptionSelected,
   recordCreditPurchaseClick,
+  type Config,
 } from '@google/gemini-cli-core';
 import { MessageType } from '../types.js';
 import type { UseHistoryManagerReturn } from './useHistoryManager.js';
@@ -128,7 +128,7 @@ async function handleOverageMenu(
   isDialogPending.current = true;
 
   setModelSwitchedFromQuotaError(true);
-  config.setQuotaErrorOccurred(true);
+  config?.setQuotaErrorOccurred(true);
 
   const overageIntent = await new Promise<OverageMenuIntent>((resolve) => {
     setOverageMenuRequest({
@@ -153,8 +153,8 @@ async function handleOverageMenu(
   switch (overageIntent) {
     case 'use_credits':
       setModelSwitchedFromQuotaError(false);
-      config.setQuotaErrorOccurred(false);
-      config.setOverageStrategy('always');
+      config?.setQuotaErrorOccurred(false);
+      config?.setOverageStrategy('always');
       return 'retry_with_credits';
 
     case 'use_fallback':
@@ -212,7 +212,7 @@ async function handleEmptyWalletMenu(
   isDialogPending.current = true;
 
   setModelSwitchedFromQuotaError(true);
-  config.setQuotaErrorOccurred(true);
+  config?.setQuotaErrorOccurred(true);
 
   const emptyWalletIntent = await new Promise<EmptyWalletIntent>((resolve) => {
     setEmptyWalletRequest({

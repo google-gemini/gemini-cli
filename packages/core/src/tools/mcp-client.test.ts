@@ -143,7 +143,7 @@ describe('mcp-client', () => {
         registerTool: vi.fn(),
         sortTools: vi.fn(),
         getToolsByServer: vi.fn().mockReturnValue([]),
-        getMessageBus: vi.fn().mockReturnValue(undefined),
+        messageBus: undefined,
       } as unknown as ToolRegistry;
       const promptRegistry = {
         registerPrompt: vi.fn(),
@@ -227,7 +227,7 @@ describe('mcp-client', () => {
         registerTool: vi.fn(),
         sortTools: vi.fn(),
         getToolsByServer: vi.fn().mockReturnValue([]),
-        getMessageBus: vi.fn().mockReturnValue(undefined),
+        messageBus: undefined,
       } as unknown as ToolRegistry;
       const promptRegistry = {
         registerPrompt: vi.fn(),
@@ -281,7 +281,7 @@ describe('mcp-client', () => {
       );
       const mockedToolRegistry = {
         registerTool: vi.fn(),
-        getMessageBus: vi.fn().mockReturnValue(undefined),
+        messageBus: undefined,
       } as unknown as ToolRegistry;
       const promptRegistry = {
         registerPrompt: vi.fn(),
@@ -337,7 +337,7 @@ describe('mcp-client', () => {
         registerTool: vi.fn(),
         sortTools: vi.fn(),
         getToolsByServer: vi.fn().mockReturnValue([]),
-        getMessageBus: vi.fn().mockReturnValue(undefined),
+        messageBus: undefined,
       } as unknown as ToolRegistry;
       const promptRegistry = {
         registerPrompt: vi.fn(),
@@ -400,7 +400,7 @@ describe('mcp-client', () => {
         registerTool: vi.fn(),
         sortTools: vi.fn(),
         getToolsByServer: vi.fn().mockReturnValue([]),
-        getMessageBus: vi.fn().mockReturnValue(undefined),
+        messageBus: undefined,
       } as unknown as ToolRegistry;
       const promptRegistry = {
         registerPrompt: vi.fn(),
@@ -470,7 +470,7 @@ describe('mcp-client', () => {
       const mockedToolRegistry = {
         registerTool: vi.fn(),
         sortTools: vi.fn(),
-        getMessageBus: vi.fn().mockReturnValue(undefined),
+        messageBus: undefined,
         removeMcpToolsByServer: vi.fn(),
       } as unknown as ToolRegistry;
       const promptRegistry = {
@@ -551,7 +551,7 @@ describe('mcp-client', () => {
       const mockedToolRegistry = {
         registerTool: vi.fn(),
         sortTools: vi.fn(),
-        getMessageBus: vi.fn().mockReturnValue(undefined),
+        messageBus: undefined,
         removeMcpToolsByServer: vi.fn(),
       } as unknown as ToolRegistry;
       const promptRegistry = {
@@ -629,7 +629,7 @@ describe('mcp-client', () => {
       const mockedToolRegistry = {
         registerTool: vi.fn(),
         sortTools: vi.fn(),
-        getMessageBus: vi.fn().mockReturnValue(undefined),
+        messageBus: undefined,
         removeMcpToolsByServer: vi.fn(),
       } as unknown as ToolRegistry;
       const promptRegistry = {
@@ -716,7 +716,7 @@ describe('mcp-client', () => {
         registerTool: vi.fn(),
         sortTools: vi.fn(),
         getToolsByServer: vi.fn().mockReturnValue([]),
-        getMessageBus: vi.fn().mockReturnValue(undefined),
+        messageBus: undefined,
       } as unknown as ToolRegistry;
       const promptRegistry = {
         registerPrompt: vi.fn(),
@@ -801,7 +801,7 @@ describe('mcp-client', () => {
         registerTool: vi.fn(),
         sortTools: vi.fn(),
         getToolsByServer: vi.fn().mockReturnValue([]),
-        getMessageBus: vi.fn().mockReturnValue(undefined),
+        messageBus: undefined,
       } as unknown as ToolRegistry;
       const promptRegistry = {
         registerPrompt: vi.fn(),
@@ -890,7 +890,7 @@ describe('mcp-client', () => {
         registerTool: vi.fn(),
         sortTools: vi.fn(),
         getToolsByServer: vi.fn().mockReturnValue([]),
-        getMessageBus: vi.fn().mockReturnValue(undefined),
+        messageBus: undefined,
       } as unknown as ToolRegistry;
       const promptRegistry = {
         registerPrompt: vi.fn(),
@@ -979,7 +979,7 @@ describe('mcp-client', () => {
         registerTool: vi.fn(),
         sortTools: vi.fn(),
         getToolsByServer: vi.fn().mockReturnValue([]),
-        getMessageBus: vi.fn().mockReturnValue(undefined),
+        messageBus: undefined,
       } as unknown as ToolRegistry;
       const promptRegistry = {
         registerPrompt: vi.fn(),
@@ -1062,7 +1062,7 @@ describe('mcp-client', () => {
       const mockedToolRegistry = {
         registerTool: vi.fn(),
         unregisterTool: vi.fn(),
-        getMessageBus: vi.fn().mockReturnValue(undefined),
+        messageBus: undefined,
         removeMcpToolsByServer: vi.fn(),
         sortTools: vi.fn(),
       } as unknown as ToolRegistry;
@@ -1132,7 +1132,7 @@ describe('mcp-client', () => {
         registerTool: vi.fn(),
         sortTools: vi.fn(),
         getToolsByServer: vi.fn().mockReturnValue([]),
-        getMessageBus: vi.fn().mockReturnValue(undefined),
+        messageBus: undefined,
       } as unknown as ToolRegistry;
 
       const client = new McpClient(
@@ -1299,7 +1299,7 @@ describe('mcp-client', () => {
         registerTool: vi.fn(),
         sortTools: vi.fn(),
         getToolsByServer: vi.fn().mockReturnValue([]),
-        getMessageBus: vi.fn().mockReturnValue(undefined),
+        messageBus: undefined,
       } as unknown as ToolRegistry;
 
       const onContextUpdatedSpy = vi.fn().mockResolvedValue(undefined);
@@ -1382,7 +1382,7 @@ describe('mcp-client', () => {
       const mockedToolRegistry = {
         removeMcpToolsByServer: vi.fn(),
         getToolsByServer: vi.fn().mockReturnValue([]),
-        getMessageBus: vi.fn().mockReturnValue(undefined),
+        messageBus: undefined,
       } as unknown as ToolRegistry;
 
       const client = new McpClient(
@@ -1455,7 +1455,7 @@ describe('mcp-client', () => {
         registerTool: vi.fn(),
         sortTools: vi.fn(),
         getToolsByServer: vi.fn().mockReturnValue([]),
-        getMessageBus: vi.fn().mockReturnValue(undefined),
+        messageBus: undefined,
       } as unknown as ToolRegistry;
 
       const onContextUpdatedSpy = vi.fn().mockResolvedValue(undefined);
@@ -1565,7 +1565,7 @@ describe('mcp-client', () => {
         registerTool: vi.fn(),
         sortTools: vi.fn(),
         getToolsByServer: vi.fn().mockReturnValue([]),
-        getMessageBus: vi.fn().mockReturnValue(undefined),
+        messageBus: undefined,
       } as unknown as ToolRegistry;
 
       const client = new McpClient(
@@ -1640,7 +1640,7 @@ describe('mcp-client', () => {
         registerTool: vi.fn(),
         sortTools: vi.fn(),
         getToolsByServer: vi.fn().mockReturnValue([]),
-        getMessageBus: vi.fn().mockReturnValue(undefined),
+        messageBus: undefined,
       } as unknown as ToolRegistry;
 
       const onContextUpdatedSpy = vi.fn().mockResolvedValue(undefined);

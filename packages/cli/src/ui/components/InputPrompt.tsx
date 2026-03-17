@@ -43,7 +43,7 @@ import {
   ApprovalMode,
   coreEvents,
   debugLogger,
-  type Config,
+  type AgentLoopContext,
 } from '@google/gemini-cli-core';
 import {
   parseInputForHighlighting,
@@ -100,7 +100,7 @@ export interface InputPromptProps {
   onSubmit: (value: string) => void;
   userMessages: readonly string[];
   onClearScreen: () => void;
-  config: Config;
+  context: AgentLoopContext;
   slashCommands: readonly SlashCommand[];
   commandContext: CommandContext;
   placeholder?: string;
@@ -193,7 +193,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   onSubmit,
   userMessages,
   onClearScreen,
-  config,
+  context,
   slashCommands,
   commandContext,
   placeholder = '  Type your message or @path/to/file',
@@ -273,17 +273,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
   ]);
   const [expandedSuggestionIndex, setExpandedSuggestionIndex] =
     useState<number>(-1);
-  const shellHistory = useShellHistory(config.getProjectRoot(), config.storage);
+  const shellHistory = useShellHistory(
+    context.config.getProjectRoot(),
+    context.config.storage,
+  );
   const shellHistoryData = shellHistory.history;
 
   const completion = useCommandCompletion({
     buffer,
-    cwd: config.getTargetDir(),
+    cwd: context.config.getTargetDir(),
     slashCommands,
     commandContext,
     reverseSearchActive,
     shellModeActive,
-    config,
+    context: context,
     active: !suppressCompletion,
   });
 
@@ -479,15 +482,20 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     }
     try {
       if (await clipboardHasImage()) {
-        const imagePath = await saveClipboardImage(config.getTargetDir());
+        const imagePath = await saveClipboardImage(
+          context.config.getTargetDir(),
+        );
         if (imagePath) {
           // Clean up old images
-          cleanupOldClipboardImages(config.getTargetDir()).catch(() => {
+          cleanupOldClipboardImages(context.config.getTargetDir()).catch(() => {
             // Ignore cleanup errors
           });
 
           // Get relative path from current directory
-          const relativePath = path.relative(config.getTargetDir(), imagePath);
+          const relativePath = path.relative(
+            context.config.getTargetDir(),
+            imagePath,
+          );
 
           // Insert @path reference at cursor position
           const insertText = `@${relativePath}`;
@@ -533,7 +541,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     }
   }, [
     buffer,
-    config,
+    context,
     stdout,
     settings,
     shortcutsHelpVisible,
@@ -1430,7 +1438,7 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
 
   const { inlineGhost, additionalLines } = getGhostTextLines();
 
-  const useBackgroundColor = config.getUseBackgroundColor();
+  const useBackgroundColor = context.config.getUseBackgroundColor();
   const isLowColor = isLowColorDepth();
   const terminalBg = theme.background.primary || 'black';
 

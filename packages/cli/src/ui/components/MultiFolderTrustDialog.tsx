@@ -17,7 +17,7 @@ import { loadTrustedFolders, TrustLevel } from '../../config/trustedFolders.js';
 import { expandHomeDir } from '../utils/directoryUtils.js';
 import * as path from 'node:path';
 import { MessageType, type HistoryItem } from '../types.js';
-import { type Config } from '@google/gemini-cli-core';
+import { type AgentLoopContext } from '@google/gemini-cli-core';
 
 export enum MultiFolderTrustChoice {
   YES,
@@ -31,7 +31,7 @@ export interface MultiFolderTrustDialogProps {
   trustedDirs: string[];
   errors: string[];
   finishAddingDirectories: (
-    config: Config,
+    context: AgentLoopContext,
     addItem: (
       itemData: Omit<HistoryItem, 'id'>,
       baseTimestamp?: number,
@@ -39,7 +39,7 @@ export interface MultiFolderTrustDialogProps {
     added: string[],
     errors: string[],
   ) => Promise<void>;
-  config: Config;
+  context: AgentLoopContext;
   addItem: (
     itemData: Omit<HistoryItem, 'id'>,
     baseTimestamp?: number,
@@ -52,7 +52,7 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
   trustedDirs,
   errors: initialErrors,
   finishAddingDirectories,
-  config,
+  context,
   addItem,
 }) => {
   const [submitted, setSubmitted] = useState(false);
@@ -65,7 +65,7 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
         '\n- ',
       )}`,
     );
-    await finishAddingDirectories(config, addItem, trustedDirs, errors);
+    await finishAddingDirectories(context, addItem, trustedDirs, errors);
     onComplete();
   };
 
@@ -102,7 +102,7 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
   const handleSelect = async (choice: MultiFolderTrustChoice) => {
     setSubmitted(true);
 
-    if (!config) {
+    if (!context) {
       addItem({
         type: MessageType.ERROR,
         text: 'Configuration is not available.',
@@ -111,7 +111,7 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
       return;
     }
 
-    const workspaceContext = config.getWorkspaceContext();
+    const workspaceContext = context.config.getWorkspaceContext();
     const trustedFolders = loadTrustedFolders();
     const errors = [...initialErrors];
     const added = [...trustedDirs];
@@ -142,7 +142,7 @@ export const MultiFolderTrustDialog: React.FC<MultiFolderTrustDialogProps> = ({
       }
     }
 
-    await finishAddingDirectories(config, addItem, added, errors);
+    await finishAddingDirectories(context, addItem, added, errors);
     onComplete();
   };
 

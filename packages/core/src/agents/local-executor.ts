@@ -1115,7 +1115,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     // Execute standard tool calls using the new scheduler
     if (toolRequests.length > 0) {
       const completedCalls = await scheduleAgentTools(
-        this.config,
+        this.context,
         toolRequests,
         {
           schedulerId: this.agentId,

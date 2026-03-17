@@ -19,7 +19,7 @@ describe('Tips', () => {
     } as unknown as Config;
 
     const { lastFrame, waitUntilReady, unmount } = render(
-      <Tips config={config} />,
+      <Tips context={config} />,
     );
     await waitUntilReady();
     expect(lastFrame()).toMatchSnapshot();

@@ -11,8 +11,9 @@ import {
   FileSearchFactory,
   escapePath,
   FileDiscoveryService,
-  type Config,
   type FileSearch,
+  type AgentLoopContext,
+  Config,
 } from '@google/gemini-cli-core';
 import {
   MAX_SUGGESTIONS_TO_SHOW,
@@ -104,7 +105,7 @@ function atCompletionReducer(
 export interface UseAtCompletionProps {
   enabled: boolean;
   pattern: string;
-  config: Config | undefined;
+  context: AgentLoopContext | undefined;
   cwd: string;
   setSuggestions: (suggestions: Suggestion[]) => void;
   setIsLoadingSuggestions: (isLoading: boolean) => void;
@@ -205,7 +206,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
   const {
     enabled,
     pattern,
-    config,
+    context,
     cwd,
     setSuggestions,
     setIsLoadingSuggestions,
@@ -232,17 +233,17 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
 
   useEffect(() => {
     resetFileSearchState();
-  }, [cwd, config]);
+  }, [cwd, context]);
 
   useEffect(() => {
-    const workspaceContext = config?.getWorkspaceContext?.();
+    const workspaceContext = context?.config?.getWorkspaceContext?.();
     if (!workspaceContext) return;
 
     const unsubscribe =
       workspaceContext.onDirectoriesChanged(resetFileSearchState);
 
     return unsubscribe;
-  }, [config]);
+  }, [context]);
 
   // Reacts to user input (`pattern`) ONLY.
   useEffect(() => {
@@ -277,7 +278,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
     const initialize = async () => {
       const currentEpoch = initEpoch.current;
       try {
-        const directories = config
+        const directories = context?.config
           ?.getWorkspaceContext?.()
           ?.getDirectories() ?? [cwd];
 
@@ -291,15 +292,15 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
             ignoreDirs: [],
             fileDiscoveryService: new FileDiscoveryService(
               dir,
-              config?.getFileFilteringOptions(),
+              context?.config?.getFileFilteringOptions(),
             ),
             cache: true,
             cacheTtl: 30,
             enableRecursiveFileSearch:
-              config?.getEnableRecursiveFileSearch() ?? true,
+              context?.config?.getEnableRecursiveFileSearch() ?? true,
             enableFuzzySearch:
-              config?.getFileFilteringEnableFuzzySearch() ?? true,
-            maxFiles: config?.getFileFilteringOptions()?.maxFileCount,
+              context?.config?.getFileFilteringEnableFuzzySearch() ?? true,
+            maxFiles: context?.config?.getFileFilteringOptions()?.maxFileCount,
           });
 
           initPromises.push(
@@ -345,7 +346,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
       }, 200);
 
       const timeoutMs =
-        config?.getFileFilteringOptions()?.searchTimeout ??
+        context?.config?.getFileFilteringOptions()?.searchTimeout ??
         DEFAULT_SEARCH_TIMEOUT_MS;
 
       // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -361,7 +362,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
       })();
 
       try {
-        const directories = config
+        const directories = context?.config
           ?.getWorkspaceContext?.()
           ?.getDirectories() ?? [cwd];
         const cwdRealpath = directories[0];
@@ -397,7 +398,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
           value: escapePath(p),
         }));
 
-        const resourceCandidates = buildResourceCandidates(config);
+        const resourceCandidates = buildResourceCandidates(context?.config);
         const resourceSuggestions = (
           await searchResourceCandidates(
             currentPattern ?? '',
@@ -409,7 +410,7 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
           value: suggestion.value.replace(/^@/, ''),
         }));
 
-        const agentCandidates = buildAgentCandidates(config);
+        const agentCandidates = buildAgentCandidates(context?.config);
         const agentSuggestions = await searchAgentCandidates(
           currentPattern ?? '',
           agentCandidates,
@@ -449,5 +450,5 @@ export function useAtCompletion(props: UseAtCompletionProps): void {
         clearTimeout(slowSearchTimer.current);
       }
     };
-  }, [state.status, state.pattern, config, cwd]);
+  }, [state.status, state.pattern, context, cwd]);
 }

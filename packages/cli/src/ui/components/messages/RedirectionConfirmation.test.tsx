@@ -37,7 +37,7 @@ describe('ToolConfirmationMessage Redirection', () => {
       <ToolConfirmationMessage
         callId="test-call-id"
         confirmationDetails={confirmationDetails}
-        config={mockConfig}
+        context={mockConfig}
         getPreferredEditor={vi.fn()}
         availableTerminalHeight={30}
         terminalWidth={100}

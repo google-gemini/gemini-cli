@@ -110,7 +110,7 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
 
             {/* Lines 3 & 4: User Identity info (Email /auth and Plan /upgrade) */}
             {settings.merged.ui.showUserIdentity !== false && (
-              <UserIdentity config={config} />
+              <UserIdentity context={config} />
             )}
           </Box>
         </Box>
@@ -125,7 +125,7 @@ export const AppHeader = ({ version, showDetails = true }: AppHeaderProps) => {
       )}
 
       {!(settings.merged.ui.hideTips || config.getScreenReader()) &&
-        showTips && <Tips config={config} />}
+        showTips && <Tips context={config} />}
     </Box>
   );
 };

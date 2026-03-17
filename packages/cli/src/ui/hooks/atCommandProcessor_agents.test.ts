@@ -42,7 +42,7 @@ describe('handleAtCommand with Agents', () => {
 
     abortController = new AbortController();
 
-    const getToolRegistry = vi.fn();
+    const toolRegistry = vi.fn();
     const mockMessageBus = {
       publish: vi.fn(),
       subscribe: vi.fn(),
@@ -63,7 +63,7 @@ describe('handleAtCommand with Agents', () => {
     };
 
     mockConfig = {
-      getToolRegistry,
+      toolRegistry: toolRegistry as any,
       getTargetDir: () => testRootDir,
       isSandboxed: () => false,
       getExcludeTools: vi.fn(),
@@ -133,7 +133,7 @@ describe('handleAtCommand with Agents', () => {
       getMcpClientManager: () => ({
         getClient: () => undefined,
       }),
-      getMessageBus: () => mockMessageBus,
+      messageBus: () => mockMessageBus,
       interactive: true,
       getAgentRegistry: () => mockAgentRegistry,
     } as unknown as Config;
@@ -141,7 +141,7 @@ describe('handleAtCommand with Agents', () => {
     const registry = new ToolRegistry(mockConfig, mockMessageBus);
     registry.registerTool(new ReadManyFilesTool(mockConfig, mockMessageBus));
     registry.registerTool(new GlobTool(mockConfig, mockMessageBus));
-    getToolRegistry.mockReturnValue(registry);
+    toolRegistry.mockReturnValue(registry);
   });
 
   afterEach(async () => {
@@ -154,7 +154,7 @@ describe('handleAtCommand with Agents', () => {
 
     const result = await handleAtCommand({
       query,
-      config: mockConfig,
+      context: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 123,
@@ -213,7 +213,7 @@ describe('handleAtCommand with Agents', () => {
     const query = '@CodebaseInvestigator and @AnotherAgent';
     const result = await handleAtCommand({
       query,
-      config: mockConfig,
+      context: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 124,
@@ -249,7 +249,7 @@ describe('handleAtCommand with Agents', () => {
 
     const result = await handleAtCommand({
       query,
-      config: mockConfig,
+      context: mockConfig,
       addItem: mockAddItem,
       onDebugMessage: mockOnDebugMessage,
       messageId: 125,
