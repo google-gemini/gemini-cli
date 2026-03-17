@@ -61,14 +61,26 @@ export class GceCosProvider implements WorkerProvider {
     console.log(`🚀 Provisioning GCE COS worker: ${this.instanceName}...`);
 
     const startupScript = `#!/bin/bash
-      echo "🚀 Starting Maintainer Worker Deployment..."
-      docker pull ${imageUri} || echo "❌ Failed to pull image"
-      docker run -d --name maintainer-worker --restart always \\
-        -v ~/.offload:/home/node/.offload:rw \\
-        -v ~/dev:/home/node/dev:rw \\
-        -v ~/.gemini:/home/node/.gemini:rw \\
-        ${imageUri} /bin/bash -c "while true; do sleep 1000; done" || echo "❌ Failed to run container"
-      echo "✅ Deployment script finished."
+      set -e
+      echo "🚀 Starting Maintainer Worker Resilience Loop..."
+      
+      # Wait for Docker to be ready
+      until docker info >/dev/null 2>&1; do echo "Waiting for docker..."; sleep 2; done
+
+      # Pull with retries
+      for i in {1..5}; do
+        docker pull ${imageUri} && break || (echo "Pull failed, retry $i..." && sleep 5)
+      done
+
+      # Run if not already exists
+      if ! docker ps -a | grep -q "maintainer-worker"; then
+        docker run -d --name maintainer-worker --restart always \\
+          -v ~/.offload:/home/node/.offload:rw \\
+          -v ~/dev:/home/node/dev:rw \\
+          -v ~/.gemini:/home/node/.gemini:rw \\
+          ${imageUri} /bin/bash -c "while true; do sleep 1000; done"
+      fi
+      echo "✅ Maintainer Worker is active."
     `;
 
     const result = spawnSync('gcloud', [
@@ -83,13 +95,11 @@ export class GceCosProvider implements WorkerProvider {
       '--metadata', `startup-script=${startupScript},enable-oslogin=TRUE`,
       '--network-interface', `network=${vpcName},subnet=${subnetName},no-address`,
       '--scopes', 'https://www.googleapis.com/auth/cloud-platform',
-      '--quiet' // Silences informational warnings like disk size mismatch
+      '--quiet'
     ], { stdio: 'inherit' });
 
     if (result.status === 0) {
       console.log('⏳ Waiting for OS Login and SSH to initialize (this takes ~45s)...');
-      // On COS, first boot involves significant background initialization.
-      // A simple sleep provides a better UX than immediate connection failures.
       await new Promise(r => setTimeout(r, 45000));
     }
 
@@ -106,7 +116,27 @@ export class GceCosProvider implements WorkerProvider {
         '--zone', this.zone
       ], { stdio: 'inherit' });
       if (res.status !== 0) return res.status ?? 1;
+      
+      console.log('⏳ Waiting for boot...');
+      await new Promise(r => setTimeout(r, 20000));
     }
+
+    // NEW: Verify the container is actually running
+    console.log('   - Verifying remote container health...');
+    const containerCheck = await this.getExecOutput('sudo docker ps -q --filter "name=maintainer-worker"');
+    
+    if (containerCheck.status !== 0 || !containerCheck.stdout.trim()) {
+        console.log('   ⚠️ Container missing or stopped. Attempting emergency restart...');
+        const imageUri = 'us-docker.pkg.dev/gemini-code-dev/gemini-cli/maintainer:latest';
+        const recoverCmd = `sudo docker pull ${imageUri} && (sudo docker rm -f maintainer-worker || true) && sudo docker run -d --name maintainer-worker --restart always -v ~/.offload:/home/node/.offload:rw -v ~/dev:/home/node/dev:rw -v ~/.gemini:/home/node/.gemini:rw ${imageUri} /bin/bash -c "while true; do sleep 1000; done"`;
+        const recoverRes = await this.exec(recoverCmd);
+        if (recoverRes !== 0) {
+            console.error('   ❌ Critical: Failed to recover maintainer container.');
+            return 1;
+        }
+        console.log('   ✅ Container recovered.');
+    }
+
     return 0;
   }
 
