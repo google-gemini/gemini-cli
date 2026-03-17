@@ -17,7 +17,6 @@ import {
  * Creates a mocked Config object with default values and allows overrides.
  */
 export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
-   
   ({
     getSandbox: vi.fn(() => undefined),
     getQuestion: vi.fn(() => ''),
@@ -184,11 +183,9 @@ export function createMockSettings(
   overrides: Record<string, unknown> = {},
 ): LoadedSettings {
   const merged = createTestMergedSettings(
-     
     (overrides['merged'] as Partial<Settings>) || {},
   );
 
-   
   return {
     system: { settings: {} },
     systemDefaults: { settings: {} },
