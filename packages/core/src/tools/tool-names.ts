@@ -266,6 +266,9 @@ export const PLAN_MODE_TOOLS = [
   WEB_SEARCH_TOOL_NAME,
   ASK_USER_TOOL_NAME,
   ACTIVATE_SKILL_TOOL_NAME,
+  GET_INTERNAL_DOCS_TOOL_NAME,
+  'codebase_investigator',
+  'cli_help',
 ] as const;
 
 /**
