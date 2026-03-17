@@ -62,6 +62,11 @@ interface SettingsDialogProps {
 
 const MAX_ITEMS_TO_SHOW = 8;
 
+const KEY_UP = new KeyBinding('up');
+const KEY_CTRL_P = new KeyBinding('ctrl+p');
+const KEY_DOWN = new KeyBinding('down');
+const KEY_CTRL_N = new KeyBinding('ctrl+n');
+
 // Create a snapshot of the initial per-scope state of Restart Required Settings
 // This creates a nested map of the form
 // restartRequiredSetting -> Map { scopeName -> value }
@@ -343,11 +348,9 @@ export function SettingsDialog({
     () => ({
       ...globalKeyMatchers,
       [Command.DIALOG_NAVIGATION_UP]: (key: Key) =>
-        new KeyBinding('up').matches(key) ||
-        new KeyBinding('ctrl+p').matches(key),
+        KEY_UP.matches(key) || KEY_CTRL_P.matches(key),
       [Command.DIALOG_NAVIGATION_DOWN]: (key: Key) =>
-        new KeyBinding('down').matches(key) ||
-        new KeyBinding('ctrl+n').matches(key),
+        KEY_DOWN.matches(key) || KEY_CTRL_N.matches(key),
     }),
     [globalKeyMatchers],
   );
