@@ -1155,6 +1155,60 @@ included directory memory
       // Ensure outer memory is NOT loaded
       expect(result.files.find((f) => f.path === outerMemory)).toBeUndefined();
     });
+
+    it('should resolve file target to its parent directory for traversal', async () => {
+      const rootDir = await createEmptyDir(
+        path.join(testRootDir, 'jit_file_resolve'),
+      );
+      const subDir = await createEmptyDir(path.join(rootDir, 'src'));
+
+      // Create the target file so fs.stat can identify it as a file
+      const targetFile = await createTestFile(
+        path.join(subDir, 'app.ts'),
+        'const x = 1;',
+      );
+
+      const subDirMemory = await createTestFile(
+        path.join(subDir, DEFAULT_CONTEXT_FILENAME),
+        'Src context rules',
+      );
+
+      const result = await loadJitSubdirectoryMemory(
+        targetFile,
+        [rootDir],
+        new Set(),
+      );
+
+      // Should find the GEMINI.md in the same directory as the file
+      expect(result.files).toHaveLength(1);
+      expect(result.files[0].path).toBe(subDirMemory);
+      expect(result.files[0].content).toBe('Src context rules');
+    });
+
+    it('should handle non-existent file target by using parent directory', async () => {
+      const rootDir = await createEmptyDir(
+        path.join(testRootDir, 'jit_nonexistent'),
+      );
+      const subDir = await createEmptyDir(path.join(rootDir, 'src'));
+
+      // Target file does NOT exist (e.g. write_file creating a new file)
+      const targetFile = path.join(subDir, 'new-file.ts');
+
+      const subDirMemory = await createTestFile(
+        path.join(subDir, DEFAULT_CONTEXT_FILENAME),
+        'Rules for new files',
+      );
+
+      const result = await loadJitSubdirectoryMemory(
+        targetFile,
+        [rootDir],
+        new Set(),
+      );
+
+      expect(result.files).toHaveLength(1);
+      expect(result.files[0].path).toBe(subDirMemory);
+      expect(result.files[0].content).toBe('Rules for new files');
+    });
   });
 
   it('refreshServerHierarchicalMemory should refresh memory and update config', async () => {
