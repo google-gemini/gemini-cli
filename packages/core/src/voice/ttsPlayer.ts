@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import os from 'node:os';
 import { EventEmitter } from 'node:events';
 
@@ -26,6 +26,19 @@ export class TtsPlayer extends EventEmitter {
   private readonly channels: number;
   private _playing = false;
 
+  /**
+   * Returns true if the required audio playback tool is available on this
+   * platform. Should be called before constructing a TtsPlayer instance.
+   */
+  static isSupported(): boolean {
+    const cmd = os.platform() === 'linux' ? 'aplay' : 'play';
+    const result = spawnSync(cmd, ['--version'], {
+      stdio: 'ignore',
+      timeout: 2000,
+    });
+    return result.error == null && result.status === 0;
+  }
+
   constructor(opts: { sampleRate?: number; channels?: number } = {}) {
     super();
     this.sampleRate = opts.sampleRate ?? 24000;
@@ -45,9 +58,11 @@ export class TtsPlayer extends EventEmitter {
 
   /** Flush and close the current audio stream. */
   flush(): void {
-    this.player?.stdin?.end();
+    if (!this.player) return;
+    const proc = this.player;
     this.player = null;
     this._playing = false;
+    proc.stdin?.end();
   }
 
   /** Immediately stop playback (for interruption support). */
