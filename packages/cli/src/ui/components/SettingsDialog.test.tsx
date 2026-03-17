@@ -52,6 +52,8 @@ enum TerminalKeys {
   RIGHT_ARROW = '\u001B[C',
   ESCAPE = '\u001B',
   BACKSPACE = '\u0008',
+  CTRL_P = '\u0010',
+  CTRL_N = '\u000E',
 }
 
 vi.mock('../../config/settingsSchema.js', async (importOriginal) => {
@@ -357,9 +359,9 @@ describe('SettingsDialog', () => {
         up: TerminalKeys.UP_ARROW,
       },
       {
-        name: 'vim keys (j/k)',
-        down: 'j',
-        up: 'k',
+        name: 'emacs keys (Ctrl+P/N)',
+        down: TerminalKeys.CTRL_N,
+        up: TerminalKeys.CTRL_P,
       },
     ])('should navigate with $name', async ({ down, up }) => {
       const settings = createMockSettings();
@@ -394,6 +396,31 @@ describe('SettingsDialog', () => {
         expect(lastFrame()).toContain('Vim Mode');
       });
 
+      unmount();
+    });
+
+    it('should allow j and k characters to be typed in search without triggering navigation', async () => {
+      const settings = createMockSettings();
+      const onSelect = vi.fn();
+      const { lastFrame, stdin, waitUntilReady, unmount } = renderDialog(
+        settings,
+        onSelect,
+      );
+      await waitUntilReady();
+
+      // Enter 'j' and 'k' in search
+      await act(async () => stdin.write('j'));
+      await waitUntilReady();
+      await act(async () => stdin.write('k'));
+      await waitUntilReady();
+
+      await waitFor(() => {
+        const frame = lastFrame();
+        // The search box should contain 'jk'
+        expect(frame).toContain('jk');
+        // Since 'jk' doesn't match any setting labels, it should say "No matches found."
+        expect(frame).toContain('No matches found.');
+      });
       unmount();
     });
 
