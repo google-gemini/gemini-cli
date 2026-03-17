@@ -339,13 +339,16 @@ export function SettingsDialog({
   }, [onSelect, selectedScope]);
 
   const globalKeyMatchers = useKeyMatchers();
-  const settingsKeyMatchers = useMemo(() => ({
+  const settingsKeyMatchers = useMemo(
+    () => ({
       ...globalKeyMatchers,
       [Command.DIALOG_NAVIGATION_UP]: (key: Key) =>
         key.name === 'up' || (key.ctrl && key.name === 'p'),
       [Command.DIALOG_NAVIGATION_DOWN]: (key: Key) =>
         key.name === 'down' || (key.ctrl && key.name === 'n'),
-    }), [globalKeyMatchers]);
+    }),
+    [globalKeyMatchers],
+  );
 
   // Custom key handler for restart key
   const handleKeyPress = useCallback(
