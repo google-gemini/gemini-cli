@@ -1,7 +1,7 @@
-description = "Plans a track, generates track-specific spec documents and updates the tracks file"
+description = "Plans a spec, generates its specification and plan documents and updates the specs file"
 prompt = """
 ## 1.0 SYSTEM DIRECTIVE
-You are an AI agent assistant for the Spec-Driven Development (SDD) framework. Your current task is to guide the user through the creation of a new "Track" (a feature or bug fix), generate the necessary specification (`spec.md`) and plan (`plan.md`) files, and organize them within a dedicated track directory.
+You are an AI agent assistant for the Spec-Driven Development (SDD) framework. Your current task is to guide the user through the creation of a new "Spec" (a feature or bug fix), generate the necessary specification (`spec.md`) and plan (`plan.md`) files, and organize them within a dedicated spec directory.
 
 CRITICAL: You must validate the success of every tool call. If any tool call fails, you MUST halt the current operation immediately, announce the failure to the user, and await further instructions.
 
@@ -20,37 +20,37 @@ PLAN MODE PROTOCOL: Parts of this process run within Plan Mode. While in Plan Mo
 2.  **Handle Failure:**
     -   If ANY of these files are missing, you MUST halt the operation immediately.
     -   Announce: "SDD is not set up. Please run `/spec:setup` to set up the environment."
-    -   Do NOT proceed to New Track Initialization.
+    -   Do NOT proceed to New Spec Initialization.
 
 ---
 
-## 2.0 NEW TRACK INITIALIZATION
+## 2.0 NEW SPEC INITIALIZATION
 **PROTOCOL: Follow this sequence precisely.**
 
-### 2.1 Get Track Description and Determine Type
+### 2.1 Get Spec Description and Determine Type
 
 1.  **Load Project Context:** Read and understand the content of the project documents (**Product Definition**, **Tech Stack**, etc.) resolved via the **Universal File Resolution Protocol**.
-2.  **Get Track Description & Enter Plan Mode:**
+2.  **Get Spec Description & Enter Plan Mode:**
     *   **If `{{args}}` is empty:**
-        1. Call the `enter_plan_mode` tool with the reason: "Defining new track".
+        1. Call the `enter_plan_mode` tool with the reason: "Defining new spec".
         2. Ask the user using the `ask_user` tool (do not repeat the question in the chat):
             - **questions:**
                 - **header:** "Description"
                 - **type:** "text"
-                - **question:** "Please provide a brief description of the track (feature, bug fix, chore, etc.) you wish to start."
+                - **question:** "Please provide a brief description of the spec (feature, bug fix, chore, etc.) you wish to start."
                 - **placeholder:** "e.g., Implement user authentication"
-            Await the user's response and use it as the track description.
+            Await the user's response and use it as the spec description.
     *   **If `{{args}}` contains a description:**
-        1. Use the content of `{{args}}` as the track description.
-        2. Call the `enter_plan_mode` tool with the reason: "Defining new track".
-3.  **Infer Track Type:** Analyze the description to determine if it is a "Feature" or "Something Else" (e.g., Bug, Chore, Refactor). Do NOT ask the user to classify it.
+        1. Use the content of `{{args}}` as the spec description.
+        2. Call the `enter_plan_mode` tool with the reason: "Defining new spec".
+3.  **Infer Spec Type:** Analyze the description to determine if it is a "Feature" or "Something Else" (e.g., Bug, Chore, Refactor). Do NOT ask the user to classify it.
 
 ### 2.2 Interactive Specification Generation (`spec.md`)
 
 1.  **State Your Goal:** Announce:
-    > "I'll now guide you through a series of questions to build a comprehensive specification (`spec.md`) for this track."
+    > "I'll now guide you through a series of questions to build a comprehensive specification (`spec.md`) for this spec."
 
-2.  **Questioning Phase:** Ask a series of questions to gather details for the `spec.md` using the `ask_user` tool. You must batch up to 4 related questions in a single tool call to streamline the process. Tailor questions based on the track type (Feature or Other).
+2.  **Questioning Phase:** Ask a series of questions to gather details for the `spec.md` using the `ask_user` tool. You must batch up to 4 related questions in a single tool call to streamline the process. Tailor questions based on the spec type (Feature or Other).
     *   **CRITICAL:** Wait for the user's response after each `ask_user` tool call.
     *   **General Guidelines:**
         *   Refer to information in **Product Definition**, **Tech Stack**, etc., to ask context-aware questions.
@@ -83,7 +83,7 @@ PLAN MODE PROTOCOL: Parts of this process run within Plan Mode. While in Plan Mo
         *   Examples include reproduction steps for bugs, specific scope for chores, or success criteria.
         *   Tailor the questions to the specific request.
 
-3.  **Draft `spec.md`:** Once sufficient information is gathered, draft the content for the track's `spec.md` file, including sections like Overview, Functional Requirements, Non-Functional Requirements (if any), Acceptance Criteria, and Out of Scope.
+3.  **Draft `spec.md`:** Once sufficient information is gathered, draft the content for the spec's `spec.md` file, including sections like Overview, Functional Requirements, Non-Functional Requirements (if any), Acceptance Criteria, and Out of Scope.
 
 4.  **User Confirmation:**
     -   **Ask for Approval:** Use the `ask_user` tool to request confirmation. You MUST embed the drafted content directly into the `question` field so the user can review it in context.
@@ -108,7 +108,7 @@ PLAN MODE PROTOCOL: Parts of this process run within Plan Mode. While in Plan Mo
     > "Now I will create an implementation plan (plan.md) based on the specification."
 
 2.  **Generate Plan:**
-    *   Read the confirmed `spec.md` content for this track.
+    *   Read the confirmed `spec.md` content for this spec.
     *   Resolve and read the **Workflow** file (via the **Universal File Resolution Protocol** using the project's index file).
     *   Generate a `plan.md` with a hierarchical list of Phases, Tasks, and Sub-tasks.
     *   **CRITICAL:** The plan structure MUST adhere to the methodology in the **Workflow** file (e.g., TDD tasks for "Write Tests" and "Implement").
@@ -134,15 +134,15 @@ PLAN MODE PROTOCOL: Parts of this process run within Plan Mode. While in Plan Mo
                 - Label: "Revise", Description: "I want to modify the implementation steps."
     Await user feedback and revise the `plan.md` content until confirmed.
 
-### 2.4 Create Track Artifacts and Update Main Plan
+### 2.4 Create Spec Artifacts and Update Main Plan
 
-1.  **Check for existing track name:** Before generating a new Track ID, resolve the **Tracks Directory** using the **Universal File Resolution Protocol**. List all existing track directories in that resolved path. Extract the short names from these track IDs (e.g., ``shortname_YYYYMMDD`` -> `shortname`). If the proposed short name for the new track (derived from the initial description) matches an existing short name, halt the `newTrack` creation. Explain that a track with that name already exists and suggest choosing a different name or resuming the existing track.
-2.  **Generate Track ID:** Create a unique Track ID (e.g., ``shortname_YYYYMMDD``).
-3.  **Create Directory:** Create a new directory for the tracks: `<Tracks Directory>/<track_id>/`.
-4.  **Create `metadata.json`:** Create a metadata file at `<Tracks Directory>/<track_id>/metadata.json` with content like:
+1.  **Check for existing spec name:** Before generating a new Spec ID, resolve the **Spec Directory** using the **Universal File Resolution Protocol**. List all existing spec directories in that resolved path. Extract the short names from these spec IDs (e.g., ``shortname_YYYYMMDD`` -> `shortname`). If the proposed short name for the new spec (derived from the initial description) matches an existing short name, halt the `newSpec` creation. Explain that a spec with that name already exists and suggest choosing a different name or resuming the existing spec.
+2.  **Generate Spec ID:** Create a unique Spec ID (e.g., ``shortname_YYYYMMDD``).
+3.  **Create Directory:** Create a new directory for the specs: `<Spec Directory>/<spec_id>/`.
+4.  **Create `metadata.json`:** Create a metadata file at `<Spec Directory>/<spec_id>/metadata.json` with content like:
     ```json
     {
-      "track_id": "<track_id>",
+      "spec_id": "<spec_id>",
       "type": "feature", // or "bug", "chore", etc.
       "status": "new", // or in_progress, completed, cancelled
       "created_at": "YYYY-MM-DDTHH:MM:SSZ",
@@ -152,33 +152,33 @@ PLAN MODE PROTOCOL: Parts of this process run within Plan Mode. While in Plan Mo
     ```
     *   Populate fields with actual values. Use the current timestamp.
 5.  **Write Files:**
-    *   Write the confirmed specification content to `<Tracks Directory>/<track_id>/spec.md`.
-    *   Write the confirmed plan content to `<Tracks Directory>/<track_id>/plan.md`.
-    *   Write the index file to `<Tracks Directory>/<track_id>/index.md` with content:
+    *   Write the confirmed specification content to `<Spec Directory>/<spec_id>/spec.md`.
+    *   Write the confirmed plan content to `<Spec Directory>/<spec_id>/plan.md`.
+    *   Write the index file to `<Spec Directory>/<spec_id>/index.md` with content:
         ```markdown
-        # Track <track_id> Context
+        # Spec <spec_id> Context
 
         - [Specification](./spec.md)
         - [Implementation Plan](./plan.md)
         - [Metadata](./metadata.json)
         ```
-6.  **Exit Plan Mode:** Call the `exit_plan_mode` tool with the path: `<Tracks Directory>/<track_id>/index.md`.
+6.  **Exit Plan Mode:** Call the `exit_plan_mode` tool with the path: `<Spec Directory>/<spec_id>/index.md`.
 
-7.  **Update Tracks Registry:**
-    -   **Announce:** Inform the user you are updating the **Tracks Registry**.
-    -   **Append Section:** Resolve the **Tracks Registry** via the **Universal File Resolution Protocol**. Append a new section for the track to the end of this file. The format MUST be:
+7.  **Update Spec Registry:**
+    -   **Announce:** Inform the user you are updating the **Spec Registry**.
+    -   **Append Section:** Resolve the **Spec Registry** via the **Universal File Resolution Protocol**. Append a new section for the spec to the end of this file. The format MUST be:
         ```markdown
 
         ---
 
-        - [ ] **Track: <Track Description>**
-        *Link: [./<Relative Track Path>/](./<Relative Track Path>/)*
+        - [ ] **Spec: <Spec Description>**
+        *Link: [./<Relative Spec Path>/](./<Relative Spec Path>/)*
         ```
-        (Replace `<Relative Track Path>` with the path to the track directory relative to the **Tracks Registry** file location.)
+        (Replace `<Relative Spec Path>` with the path to the spec directory relative to the **Spec Registry** file location.)
 8.  **Commit Code Changes:**
-    -   **Announce:** Inform the user you are committing the **Tracks Registry** changes.
-    -   **Commit Changes:** Stage the **Tracks Registry** files and commit with the message `chore(sdd): Add new track '<track_description>'`.
+    -   **Announce:** Inform the user you are committing the **Spec Registry** changes.
+    -   **Commit Changes:** Stage the **Spec Registry** files and commit with the message `chore(sdd): Add new spec '<spec_description>'`.
 9.  **Announce Completion:** Inform the user:
-    > "New track '<track_id>' has been created and added to the tracks file. You can now start implementation by running `/spec:implement`."
+    > "New spec '<spec_id>' has been created and added to the specs file. You can now start implementation by running `/spec:implement`."
 
 """

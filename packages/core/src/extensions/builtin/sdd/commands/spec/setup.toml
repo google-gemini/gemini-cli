@@ -15,7 +15,7 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
         > 1. **Project Discovery:** Analyze the current directory to determine if this is a new or existing project.
         > 2. **Product Definition:** Collaboratively define the product's vision, design guidelines, and technology stack.
         > 3. **Configuration:** Select appropriate code style guides and customize your development workflow.
-        > 4. **Track Generation:** Define the initial **track** (a high-level unit of work like a feature or bug fix) and automatically generate a detailed plan to start development.
+        > 4. **Spec Generation:** Define the initial **spec** (a high-level unit of work like a feature or bug fix) and automatically generate a detailed plan to start development.
         >
         > Let's get started!"
 
@@ -56,14 +56,14 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
     - `code_styleguides/`
     - `workflow.md`
     - `index.md`
-    - `tracks/*/` (specifically `plan.md` and `index.md`)
+    - `specs/*/` (specifically `plan.md` and `index.md`)
 
 5.  **Determine Target Section:** Map the project's state to a target section using the priority table below (highest match wins). **DO NOT JUMP YET.** Keep this target in mind.
 
 | Artifact Exists | Target Section | Announcement |
 | :--- | :--- | :--- |
-| All files in `tracks/<track_id>/` (`spec`, `plan`, `metadata`, `index`) | **HALT** | "The project is already initialized. Use `/spec:create` or `/spec:implement`." |
-| `index.md` (top-level) | **Section 3.0** | "Resuming setup: Scaffolding is complete. Next: generate the first track. (Note: If an incomplete track folder was detected, we will restart this step to ensure a clean, consistent state)." |
+| All files in `specs/<spec_id>/` (`spec`, `plan`, `metadata`, `index`) | **HALT** | "The project is already initialized. Use `/spec:create` or `/spec:implement`." |
+| `index.md` (top-level) | **Section 3.0** | "Resuming setup: Scaffolding is complete. Next: generate the first spec. (Note: If an incomplete spec folder was detected, we will restart this step to ensure a clean, consistent state)." |
 | `workflow.md` | **Section 2.6** | "Resuming setup: Workflow is defined. Next: generate project index." |
 | `code_styleguides/` | **Section 2.5** | "Resuming setup: Guides/Tech Stack configured. Next: define project workflow." |
 | `tech-stack.md` | **Section 2.4** | "Resuming setup: Tech Stack defined. Next: select Code Styleguides." |
@@ -408,22 +408,22 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
         - [Code Style Guides](./code_styleguides/)
 
         ## Management
-        - [Tracks Registry](./tracks.md)
-        - [Tracks Directory](./tracks/)
+        - [Spec Registry](./specs.md)
+        - [Spec Directory](./specs/)
         ```
     -   **Announce:** "Created `.gemini/specs/index.md` to serve as the project context index."
 
 2.  **Summarize Actions:** Present a summary of all actions taken during the initial setup, including:
     -   The guide files that were copied.
     -   The workflow file that was copied.
-3.  **Transition to initial plan and track generation:** Announce that the initial setup is complete and you will now proceed to define the first track for the project.
+3.  **Transition to initial plan and spec generation:** Announce that the initial setup is complete and you will now proceed to define the first spec for the project.
 
 ---
 
-## 3.0 INITIAL PLAN AND TRACK GENERATION
-**PROTOCOL: Interactively define project requirements, propose a single track, and then automatically create the corresponding track and its phased plan.**
+## 3.0 INITIAL PLAN AND SPEC GENERATION
+**PROTOCOL: Interactively define project requirements, propose a single spec, and then automatically create the corresponding spec and its phased plan.**
 
-**Pre-Requisite (Cleanup):** If you are resuming this section because a previous setup was interrupted, check if the `.gemini/specs/tracks/` directory exists but is incomplete. If it exists, **delete** the entire `.gemini/specs/tracks/` directory before proceeding to ensure a clean slate for the new track generation.
+**Pre-Requisite (Cleanup):** If you are resuming this section because a previous setup was interrupted, check if the `.gemini/specs/specs/` directory exists but is incomplete. If it exists, **delete** the entire `.gemini/specs/specs/` directory before proceeding to ensure a clean slate for the new spec generation.
 
 ### 3.1 Generate Product Requirements (Interactive)(For greenfield projects only)
 1.  **Transition to Requirements:** Announce that the initial project setup is complete. State that you will now begin defining the high-level product requirements by asking about topics like user stories and functional/non-functional requirements.
@@ -464,64 +464,64 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
             - **options:**
                 - Label: "Approve", Description: "The requirements look good, proceed to the next step."
                 - Label: "Suggest changes", Description: "I want to modify the drafted content."
-8.  **Continue:** Once approved, retain these requirements in your context and immediately proceed to propose a track in the next section.
+8.  **Continue:** Once approved, retain these requirements in your context and immediately proceed to propose a spec in the next section.
 
-### 3.2 Propose a Single Initial Track (Automated + Approval)
-1.  **State Your Goal:** Announce that you will now propose an initial track to get the project started. Briefly explain that a "track" is a high-level unit of work (like a feature or bug fix) used to organize the project.
-2.  **Generate Track Title:** Analyze the project context (`product.md`, `tech-stack.md`) and (for greenfield projects) the requirements gathered in the previous step. Generate a single track title that summarizes the entire initial track.
+### 3.2 Propose a Single Initial Spec (Automated + Approval)
+1.  **State Your Goal:** Announce that you will now propose an initial spec to get the project started. Briefly explain that a "spec" is a high-level unit of work (like a feature or bug fix) used to organize the project.
+2.  **Generate Spec Title:** Analyze the project context (`product.md`, `tech-stack.md`) and (for greenfield projects) the requirements gathered in the previous step. Generate a single spec title that summarizes the entire initial spec.
     - **Greenfield:** Focus on the MVP core (e.g., "Build core tip calculator functionality").
     - **Brownfield:** Focus on maintenance or targeted enhancements (e.g., "Implement user authentication flow").
 3.  **Confirm Proposal:** Use the `ask_user` tool to validate the proposal:
     - **questions:**
-        - **header:** "Confirm Track"
+        - **header:** "Confirm Spec"
         - **type:** "choice"
         - **multiSelect:** false
-        - **question:** "To get the project started, I suggest the following track: '<Track Title>'. Do you want to proceed with this track?"
+        - **question:** "To get the project started, I suggest the following spec: '<Spec Title>'. Do you want to proceed with this spec?"
         - **options:**
-            - Label: "Yes", Description: "Proceed with '<Track Title>'."
-            - Label: "Suggest changes", Description: "I want to define a different track."
+            - Label: "Yes", Description: "Proceed with '<Spec Title>'."
+            - Label: "Suggest changes", Description: "I want to define a different spec."
 4.  **Action:**
-    -   **If user chose "Yes":** Use the suggested '<Track Title>' as the track description.
+    -   **If user chose "Yes":** Use the suggested '<Spec Title>' as the spec description.
     -   **If user chose "Suggest changes":**
         -   Immediately call the `ask_user` tool again:
-            - **header:** "New Track"
+            - **header:** "New Spec"
             - **type:** "text"
-            - **question:** "Please enter the description for the initial track:"
+            - **question:** "Please enter the description for the initial spec:"
             - **placeholder:** "e.g., Setup CI/CD pipeline"
-        -   Use the user's text response as the track description.
-    -   Proceed to **Section 3.3** with the determined track description.
+        -   Use the user's text response as the spec description.
+    -   Proceed to **Section 3.3** with the determined spec description.
 
-### 3.3 Convert the Initial Track into Artifacts (Automated)
-1.  **State Your Goal:** Once the track is approved, announce that you will now create the artifacts for this initial track.
-2.  **Initialize Tracks File:** Create the `.gemini/specs/tracks.md` file with the initial header and the first track:
+### 3.3 Convert the Initial Spec into Artifacts (Automated)
+1.  **State Your Goal:** Once the spec is approved, announce that you will now create the artifacts for this initial spec.
+2.  **Initialize Specs File:** Create the `.gemini/specs/specs.md` file with the initial header and the first spec:
     ```markdown
-    # Project Tracks
+    # Project Specs
 
-    This file tracks all major tracks for the project. Each track has its own detailed plan in its respective folder.
+    This file tracks all major specs for the project. Each spec has its own detailed plan in its respective folder.
 
     ---
 
-    - [ ] **Track: <Track Description>**
-      *Link: [./<Tracks Directory Name>/<track_id>/](./<Tracks Directory Name>/<track_id>/)*
+    - [ ] **Spec: <Spec Description>**
+      *Link: [./<Spec Directory Name>/<spec_id>/](./<Spec Directory Name>/<spec_id>/)*
     ```
-    (Replace `<Tracks Directory Name>` with the actual name of the tracks folder resolved via the protocol.)
-3.  **Generate Track Artifacts:**
-    a. **Define Track:** The approved title is the track description.
-    b. **Generate Track-Specific Spec & Plan:**
-        i. Automatically generate a detailed `spec.md` for this track.
-        ii. Automatically generate a `plan.md` for this track.
+    (Replace `<Spec Directory Name>` with the actual name of the specs folder resolved via the protocol.)
+3.  **Generate Spec Artifacts:**
+    a. **Define Spec:** The approved title is the spec description.
+    b. **Generate Specification & Plan:**
+        i. Automatically generate a detailed `spec.md` for this spec.
+        ii. Automatically generate a `plan.md` for this spec.
             - **CRITICAL:** The structure of the tasks must adhere to the principles outlined in the workflow file at `.gemini/specs/workflow.md`. For example, if the workflow specificies Test-Driven Development, each feature task must be broken down into a "Write Tests" sub-task followed by an "Implement Feature" sub-task.
             - **CRITICAL:** Include status markers `[ ]` for **EVERY** task and sub-task. The format must be:
                 - Parent Task: `- [ ] Task: ...`
                 - Sub-task: `    - [ ] ...`
             - **CRITICAL: Inject Phase Completion Tasks.** You MUST read the `.gemini/specs/workflow.md` file to determine if a "Phase Completion Verification and Checkpointing Protocol" is defined. If this protocol exists, then for each **Phase** that you generate in `plan.md`, you MUST append a final meta-task to that phase. The format for this meta-task is: `- [ ] Task: SDD - User Manual Verification '<Phase Name>' (Protocol in workflow.md)`. You MUST replace `<Phase Name>` with the actual name of the phase.
-    c. **Create Track Artifacts:**
-        i. **Generate and Store Track ID:** Create a unique Track ID from the track description using format `shortname_YYYYMMDD` and store it. You MUST use this exact same ID for all subsequent steps for this track.
-        ii. **Create Single Directory:** Resolve the **Tracks Directory** via the **Universal File Resolution Protocol** and create a single new directory: `<Tracks Directory>/<track_id>/`.
-        iii. **Create `metadata.json`:** In the new directory, create a `metadata.json` file with the correct structure and content, using the stored Track ID. An example is:
+    c. **Create Spec Artifacts:**
+        i. **Generate and Store Spec ID:** Create a unique Spec ID from the spec description using format `shortname_YYYYMMDD` and store it. You MUST use this exact same ID for all subsequent steps for this spec.
+        ii. **Create Single Directory:** Resolve the **Spec Directory** via the **Universal File Resolution Protocol** and create a single new directory: `<Spec Directory>/<spec_id>/`.
+        iii. **Create `metadata.json`:** In the new directory, create a `metadata.json` file with the correct structure and content, using the stored Spec ID. An example is:
             - ```json
             {
-            "track_id": "<track_id>",
+            "spec_id": "<spec_id>",
             "type": "feature", // or "bug"
             "status": "new", // or in_progress, completed, cancelled
             "created_at": "YYYY-MM-DDTHH:MM:SSZ",
@@ -533,20 +533,20 @@ PLAN MODE PROTOCOL: This setup process runs entirely within Plan Mode. While in 
         iv. **Write Spec and Plan Files:** In the exact same directory, write the generated `spec.md` and `plan.md` files.
         v.  **Write Index File:** In the exact same directory, write `index.md` with content:
             ```markdown
-            # Track <track_id> Context
+            # Spec <spec_id> Context
 
             - [Specification](./spec.md)
             - [Implementation Plan](./plan.md)
             - [Metadata](./metadata.json)
             ```
-            *(If you arrived here directly from the Audit because you are patching a missing index, write this file using the existing folder's track_id and then proceed to step d.)*
+            *(If you arrived here directly from the Audit because you are patching a missing index, write this file using the existing folder's spec_id and then proceed to step d.)*
 
-    d. **Exit Plan Mode:** Call the `exit_plan_mode` tool with the path: `<Tracks Directory>/<track_id>/index.md`.
+    d. **Exit Plan Mode:** Call the `exit_plan_mode` tool with the path: `<Spec Directory>/<spec_id>/index.md`.
 
-    e. **Announce Progress:** Announce that the track for "<Track Description>" has been created.
+    e. **Announce Progress:** Announce that the spec for "<Spec Description>" has been created.
 
 ### 3.4 Final Announcement
-1.  **Announce Completion:** After the track has been created, announce that the project setup and initial track generation are complete.
+1.  **Announce Completion:** After the spec has been created, announce that the project setup and initial spec generation are complete.
 1.5 **Ensure Artifact Visibility:** If a `.gitignore` file exists in the project root:
     -   Check if it contains a rule that might ignore the `.gemini/specs/` directory (e.g., `.gemini/`).
     -   To ensure these artifacts are always shared with the team, append `!.gemini/specs/` to the end of the `.gitignore` file if it is not already explicitly exempted.
