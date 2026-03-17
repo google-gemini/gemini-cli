@@ -172,11 +172,12 @@ export function SearchableList<T extends GenericListItem>({
     item: T,
     isActive: boolean,
     labelWidth: number,
+    arrowChar?: string,
   ) => (
     <Box flexDirection="row" alignItems="flex-start">
       <Box minWidth={2} flexShrink={0}>
         <Text color={isActive ? theme.status.success : theme.text.secondary}>
-          {isActive ? '●' : ''}
+          {isActive ? '●' : arrowChar || ' '}
         </Text>
       </Box>
       <Box flexDirection="column" flexGrow={1} minWidth={0}>
@@ -226,26 +227,44 @@ export function SearchableList<T extends GenericListItem>({
           </Box>
         ) : (
           <>
-            {filteredItems.length > maxItemsToShow && (
-              <Box marginX={1}>
-                <Text color={theme.text.secondary}>▲</Text>
-              </Box>
-            )}
             {visibleItems.map((item, index) => {
               const isSelected = activeIndex === scrollOffset + index;
+              const hasScrollArrows = filteredItems.length > maxItemsToShow;
+              const canScrollUp = scrollOffset > 0;
+              const canScrollDown =
+                scrollOffset + maxItemsToShow < filteredItems.length;
+
+              // Determine inline scroll arrow for this item position
+              let arrowChar = '';
+              if (
+                hasScrollArrows &&
+                index === 0 &&
+                canScrollUp &&
+                !isSelected
+              ) {
+                arrowChar = '▲';
+              } else if (
+                hasScrollArrows &&
+                index === visibleItems.length - 1 &&
+                canScrollDown &&
+                !isSelected
+              ) {
+                arrowChar = '▼';
+              }
+
               return (
                 <Box key={item.key} marginBottom={1} marginX={1}>
                   {renderItem
                     ? renderItem(item, isSelected, maxLabelWidth)
-                    : defaultRenderItem(item, isSelected, maxLabelWidth)}
+                    : defaultRenderItem(
+                        item,
+                        isSelected,
+                        maxLabelWidth,
+                        arrowChar,
+                      )}
                 </Box>
               );
             })}
-            {filteredItems.length > maxItemsToShow && (
-              <Box marginX={1}>
-                <Text color={theme.text.secondary}>▼</Text>
-              </Box>
-            )}
           </>
         )}
       </Box>

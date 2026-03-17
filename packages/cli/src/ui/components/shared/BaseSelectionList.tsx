@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Text, Box } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import {
@@ -82,35 +82,39 @@ export function BaseSelectionList<
     priority,
   });
 
-  const [scrollOffset, setScrollOffset] = useState(0);
+  const [scrollOffsetState, setScrollOffsetState] = useState(0);
 
-  // Handle scrolling for long lists
-  useEffect(() => {
-    const newScrollOffset = Math.max(
+  // Compute effective scroll offset synchronously during render to avoid flicker
+  let scrollOffset = scrollOffsetState;
+
+  if (activeIndex < scrollOffset) {
+    scrollOffset = activeIndex;
+  } else if (activeIndex >= scrollOffset + maxItemsToShow) {
+    scrollOffset = Math.max(
       0,
       Math.min(activeIndex - maxItemsToShow + 1, items.length - maxItemsToShow),
     );
-    if (activeIndex < scrollOffset) {
-      setScrollOffset(activeIndex);
-    } else if (activeIndex >= scrollOffset + maxItemsToShow) {
-      setScrollOffset(newScrollOffset);
-    }
-  }, [activeIndex, items.length, scrollOffset, maxItemsToShow]);
+  }
+
+  const maxScroll = Math.max(0, items.length - maxItemsToShow);
+  if (scrollOffset > maxScroll) {
+    scrollOffset = maxScroll;
+  }
+
+  // Update state to match derived value if it changed
+  if (scrollOffsetState !== scrollOffset) {
+    setScrollOffsetState(scrollOffset);
+  }
 
   const visibleItems = items.slice(scrollOffset, scrollOffset + maxItemsToShow);
   const numberColumnWidth = String(items.length).length;
 
+  const canScrollUp = scrollOffset > 0;
+  const canScrollDown = scrollOffset + maxItemsToShow < items.length;
+  const hasScrollArrows = showScrollArrows && items.length > maxItemsToShow;
+
   return (
     <Box flexDirection="column">
-      {/* Use conditional coloring instead of conditional rendering */}
-      {showScrollArrows && items.length > maxItemsToShow && (
-        <Text
-          color={scrollOffset > 0 ? theme.text.primary : theme.text.secondary}
-        >
-          ▲
-        </Text>
-      )}
-
       {visibleItems.map((item, index) => {
         const itemIndex = scrollOffset + index;
         const isSelected = activeIndex === itemIndex;
@@ -139,19 +143,35 @@ export function BaseSelectionList<
           numberColumnWidth,
         )}.`;
 
+        // Determine the indicator character for the radio column
+        let indicator = ' ';
+        let indicatorColor = theme.text.primary;
+
+        if (isSelected) {
+          indicator = selectedIndicator;
+          indicatorColor = theme.ui.focus;
+        } else if (hasScrollArrows && index === 0 && canScrollUp) {
+          indicator = '▲';
+          indicatorColor = theme.text.secondary;
+        } else if (
+          hasScrollArrows &&
+          index === visibleItems.length - 1 &&
+          canScrollDown
+        ) {
+          indicator = '▼';
+          indicatorColor = theme.text.secondary;
+        }
+
         return (
           <Box
             key={item.key}
             alignItems="flex-start"
             backgroundColor={isSelected ? theme.background.focus : undefined}
           >
-            {/* Radio button indicator */}
+            {/* Radio button indicator (also shows scroll arrows inline) */}
             <Box minWidth={2} flexShrink={0}>
-              <Text
-                color={isSelected ? theme.ui.focus : theme.text.primary}
-                aria-hidden
-              >
-                {isSelected ? selectedIndicator : ' '}
+              <Text color={indicatorColor} aria-hidden>
+                {indicator}
               </Text>
             </Box>
 
@@ -178,18 +198,6 @@ export function BaseSelectionList<
           </Box>
         );
       })}
-
-      {showScrollArrows && items.length > maxItemsToShow && (
-        <Text
-          color={
-            scrollOffset + maxItemsToShow < items.length
-              ? theme.text.primary
-              : theme.text.secondary
-          }
-        >
-          ▼
-        </Text>
-      )}
     </Box>
   );
 }
