@@ -30,6 +30,7 @@ import {
   IdeClient,
   debugLogger,
   CoreToolCallStatus,
+  IntegrityDataStatus,
 } from '@google/gemini-cli-core';
 import {
   type MockShellCommand,
@@ -118,6 +119,12 @@ class MockExtensionManager extends ExtensionLoader {
   getExtensions = vi.fn().mockReturnValue([]);
   setRequestConsent = vi.fn();
   setRequestSetting = vi.fn();
+  integrityManager = {
+    verifyExtensionIntegrity: vi
+      .fn()
+      .mockResolvedValue(IntegrityDataStatus.VERIFIED),
+    storeExtensionIntegrity: vi.fn().mockResolvedValue(undefined),
+  };
 }
 
 // Mock GeminiRespondingSpinner to disable animations (avoiding 'act()' warnings) without triggering screen reader mode.
@@ -617,7 +624,7 @@ export class AppRig {
   async addUserHint(hint: string) {
     if (!this.config) throw new Error('AppRig not initialized');
     await act(async () => {
-      this.config!.userHintService.addUserHint(hint);
+      this.config!.injectionService.addInjection(hint, 'user_steering');
     });
   }
 
