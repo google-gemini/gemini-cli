@@ -140,7 +140,7 @@ Host ${this.sshAlias}
   getRunCommand(command: string, options: ExecOptions = {}): string {
     let finalCmd = command;
     if (options.wrapContainer) {
-        finalCmd = `docker exec ${options.interactive ? '-it' : ''} ${options.cwd ? `-w ${options.cwd}` : ''} ${options.wrapContainer} sh -c ${this.quote(command)}`;
+        finalCmd = `sudo docker exec ${options.interactive ? '-it' : ''} ${options.cwd ? `-w ${options.cwd}` : ''} ${options.wrapContainer} sh -c ${this.quote(command)}`;
     }
     return this.conn.getRunCommand(finalCmd, { interactive: options.interactive });
   }

@@ -72,7 +72,7 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   
   // We launch a tmux session INSIDE the container for persistence and tool access
   const tmuxCmd = `cd /home/node/dev/worktrees/${sessionName} && ${remoteWorker}; exec $SHELL`;
-  const containerTmux = `docker exec -it maintainer-worker sh -c ${q(`tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'offload' ${q(tmuxCmd)}`)}`;
+  const containerTmux = `sudo docker exec -it maintainer-worker sh -c ${q(`tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'offload' ${q(tmuxCmd)}`)}`;
   
   const finalSSH = provider.getRunCommand(containerTmux, { interactive: true });
 
