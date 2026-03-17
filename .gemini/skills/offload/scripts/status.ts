@@ -1,66 +1,61 @@
 /**
- * Offload Status Inspector (Remote)
+ * Offload Status Inspector (Local)
  * 
- * Scans tmux sessions (host) and logs (container) to provide job status.
+ * Orchestrates remote status retrieval via the WorkerProvider.
  */
-import { spawnSync } from 'child_process';
-import fs from 'fs';
 import path from 'path';
-import os from 'os';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { ProviderFactory } from './providers/ProviderFactory.ts';
 
-const WORKTREE_BASE = '/home/node/dev/worktrees';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
-function getStatus() {
-  console.log('\n🛰️  Offload Mission Control Status (Container Mode):');
-  console.log(''.padEnd(100, '-'));
-  console.log(`${'JOB ID'.padEnd(10)} | ${'ACTION'.padEnd(10)} | ${'STATE'.padEnd(12)} | ${'SESSION'.padEnd(25)}`);
-  console.log(''.padEnd(100, '-'));
-
-  // 1. Get active tmux sessions on the HOST
-  const tmux = spawnSync('tmux', ['ls', '-F', '#{session_name}']);
-  const activeSessions = tmux.stdout.toString().split('\n').filter(s => s.startsWith('offload-'));
-
-  // 2. Scan worktrees inside the CONTAINER
-  const findJobs = spawnSync('docker', ['exec', 'maintainer-worker', 'ls', WORKTREE_BASE], { stdio: 'pipe' });
-  const jobs = findJobs.stdout.toString().split('\n').filter(d => d.startsWith('offload-'));
-
-  if (jobs.length === 0 && activeSessions.length === 0) {
-    console.log('   No jobs found.');
-    return;
+async function runStatus(env: NodeJS.ProcessEnv = process.env) {
+  const settingsPath = path.join(REPO_ROOT, '.gemini/offload/settings.json');
+  if (!fs.existsSync(settingsPath)) {
+    console.error('❌ Settings not found. Run "npm run offload:setup" first.');
+    return 1;
+  }
+  const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  const config = settings.deepReview;
+  if (!config) {
+    console.error('❌ Deep Review configuration not found.');
+    return 1;
   }
 
-  const allJobIds = Array.from(new Set([...jobs, ...activeSessions]));
+  const { projectId, zone } = config;
+  const targetVM = `gcli-offload-${env.USER || 'mattkorwel'}`;
+  const provider = ProviderFactory.getProvider({ projectId, zone, instanceName: targetVM });
 
-  allJobIds.forEach(id => {
-    if (!id) return;
-    const parts = id.split('-'); // offload-123-review
-    const pr = parts[1] || '???';
-    const action = parts[2] || '???';
+  console.log(`\n🛰️  Offload Mission Control: ${targetVM}`);
+  console.log(`--------------------------------------------------------------------------------`);
+  
+  const status = await provider.getStatus();
+  console.log(`   - VM State:   ${status.status}`);
+  console.log(`   - Internal IP: ${status.internalIp || 'N/A'}`);
+
+  if (status.status === 'RUNNING') {
+    console.log(`\n🧵 Active Sessions (tmux):`);
+    // We fetch the list of sessions from the host
+    const tmuxRes = await provider.getExecOutput('tmux list-sessions -F "#S" 2>/dev/null');
     
-    let state = '💤 IDLE';
-    if (activeSessions.includes(id)) {
-      state = '🏃 RUNNING';
+    if (tmuxRes.status === 0 && tmuxRes.stdout.trim()) {
+      const sessions = tmuxRes.stdout.trim().split('\n');
+      sessions.forEach(s => {
+        if (s.startsWith('offload-')) {
+          console.log(`     ✅ ${s}`);
+        } else {
+          console.log(`     🔹 ${s} (Non-offload)`);
+        }
+      });
     } else {
-      // Check logs inside the container
-      const logCheck = spawnSync('docker', ['exec', 'maintainer-worker', 'sh', '-c', `ls ${WORKTREE_BASE}/${id}/.gemini/logs/*.log 2>/dev/null | tail -n 1`], { stdio: 'pipe' });
-      const lastLogFile = logCheck.stdout.toString().trim();
-      
-      if (lastLogFile) {
-          const logContent = spawnSync('docker', ['exec', 'maintainer-worker', 'cat', lastLogFile], { stdio: 'pipe' }).stdout.toString();
-          if (logContent.includes('SUCCESS')) state = '✅ SUCCESS';
-          else if (logContent.includes('FAILED')) state = '❌ FAILED';
-          else state = '🏁 FINISHED';
-      }
+      console.log('     - No active sessions');
     }
+  }
 
-    console.log(`${pr.padEnd(10)} | ${action.padEnd(10)} | ${state.padEnd(12)} | ${id.padEnd(25)}`);
-    if (state === '🏃 RUNNING') {
-        console.log(`           ├─ Attach: npm run offload:attach ${pr} ${action} [--local]`);
-        console.log(`           ├─ Logs:   npm run offload:logs ${pr} ${action}`);
-    }
-    console.log(`           └─ Remove: npm run offload:remove ${pr} ${action}`);
-  });
-  console.log(''.padEnd(100, '-'));
+  console.log(`--------------------------------------------------------------------------------\n`);
+  return 0;
 }
 
-getStatus();
+runStatus().catch(console.error);

@@ -64,7 +64,21 @@ The offload system uses a **Hybrid VM + Docker** architecture designed for maxim
 ### Getting Started (Onboarding)
 For a complete guide on setting up your remote environment, see the [Maintainer Onboarding Guide](../../../MAINTAINER_ONBOARDING.md).
 
-### Technical details
+### Persistence and Job Recovery
+
+The offload system is designed for high reliability and persistence. Jobs use a nested execution model to ensure they continue running even if your local terminal is closed or the connection is lost.
+
+### How it Works
+1.  **Host-Level Persistence**: The orchestrator launches each job in a named **`tmux`** session on the remote VM.
+2.  **Container Isolation**: The actual work is performed inside the persistent `maintainer-worker` Docker container.
+
+### Re-attaching to a Job
+If you lose your connection, you can easily resume your session:
+
+-   **Automatic**: Simply run the exact same command you started with (e.g., `npm run offload 123 review`). The system will automatically detect the existing session and re-attach you.
+-   **Manual**: Use `npm run offload:status` to find the session name, then use `ssh gcli-worker` to jump into the VM and `tmux attach -t <session>` to resume.
+
+## Technical details
 
 This skill uses a **Worker Provider** abstraction (`GceCosProvider`) to manage the remote lifecycle. It uses an isolated Gemini profile on the remote host (`~/.offload/gemini-cli-config`) to ensure that verification tasks do not interfere with your primary configuration.
 
