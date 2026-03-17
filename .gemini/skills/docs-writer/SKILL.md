@@ -1,6 +1,6 @@
 ---
 name: docs-writer
-description: Expert technical documentation suite for Gemini CLI. Use when asked to write, review, or edit .md files in the repository. Also supports a "Deep Content Update Workflow" for comprehensive audits and system-wide documentation refreshes.
+description: Expert technical documentation suite for Gemini CLI. Use when asked to write, review, or edit .md files. Supports a "Deep content update workflow" for comprehensive audits and a "Report-only mode" for documentation analysis without making changes.
 ---
 
 # `docs-writer` skill instructions
@@ -12,11 +12,11 @@ contribution process in `CONTRIBUTING.md` and the
 
 ---
 
-## Standard Workflow: Writing and Reviewing
+## Standard workflow: writing and reviewing
 Use this workflow for standard requests to write new content or review/edit 
 existing documentation.
 
-### Phase 1: Preparation
+### Phase 1: preparation
 Before modifying any documentation, thoroughly investigate the request and the
 surrounding context. 
 
@@ -30,7 +30,7 @@ surrounding context.
     `docs/sidebar.json` needs updates.
 5.  **Plan:** Create a step-by-step plan before making changes.
 
-### Phase 2: Execution
+### Phase 2: execution
 Implement your plan by either updating existing files or creating new ones
 using the appropriate file system tools. Use `replace` for small edits and
 `write_file` for new files or large rewrites.
@@ -48,7 +48,7 @@ using the appropriate file system tools. Use `replace` for small edits and
 - **Consistency:** Check for consistent terminology and style across all edited
   documents.
 
-### Phase 3: Verification and finalization
+### Phase 3: verification and finalization
 1.  **Accuracy:** Ensure content accurately reflects the implementation and
   technical behavior.
 2.  **Self-review:** Re-read changes for formatting, correctness, and flow.
@@ -58,11 +58,12 @@ using the appropriate file system tools. Use `replace` for small edits and
 
 ---
 
-## Feature: Deep Content Update Workflow
-When specifically asked for a **"deep audit," "comprehensive update,"** or 
-**"interactively audit"** the docset, you MUST follow the multi-role procedural 
-guidance in [docs-auditing.md](references/docs-auditing.md).
+## Feature: deep content update workflow
+When specifically asked for a **"deep audit," "comprehensive update,"** 
+**"interactively audit,"** or a **"report-only audit"** of the docset, you MUST 
+follow the multi-role procedural guidance in 
+[docs-auditing.md](references/docs-auditing.md).
 
-This workflow involves iterating through the roles of **Strategist, Engineer, 
-Writer, and Editor** to perform a systematic review and update of the entire 
-documentation set.
+- **Standard audit:** Iterate through strategist, engineer, writer, and editor.
+- **Report-only mode:** Iterate through strategist and engineer only, and 
+  output a final `audit-report-YYYY-MM-DD.md`.

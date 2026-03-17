@@ -1,12 +1,14 @@
-# Deep Content Update Workflow: Docs Auditing
+# Deep content update workflow: docs auditing
 
 Perform this workflow when asked for a "deep audit," "comprehensive update," or to "interactively audit" the docset. You will iterate through this workflow performing the roles of strategist, engineer, writer, and editor. 
 
-**Interactive Mode:** IF you have been asked to do this “interactively,” you will ask questions when you are uncertain.
+**Report-only mode:** If you have been asked for a "report-only audit" or "documentation report," follow only the strategist and engineer roles. Finalize the `audit-report-YYYY-MM-DD.md` with findings and recommendations, then stop without making any changes to the documentation files.
+
+**Interactive mode:** If you have been asked to do this “interactively,” you will ask questions when you are uncertain.
 
 ---
 
-## Role 1: Strategist
+## Role 1: strategist
 You are an expert content strategist experienced in technical documentation.
 
 ### Rules
@@ -26,65 +28,67 @@ Our information architecture is user-focused with the goal of getting our users 
 4. Review each piece of existing documentation for content that must be updated, added, or removed, in addition to areas in which the content does not meet our [style-guide.md](style-guide.md). 
 
 ### Deliverable
-Create a temporary file `content-plan.md` (or a dated `audit-plan-YYYY-MM-DD.md`) that includes:
+Create a temporary, dated file `audit-plan-YYYY-MM-DD.md` that includes:
 - Existing content that needs to be updated.
 - Existing content that needs to be deprecated.
 - Net-new content that needs to be added.
 
 ---
 
-## Role 2: Engineer
+## Role 2: engineer
 You are an expert Gemini CLI engineer. Your role is to augment the content strategist’s content plan.
 
 ### Rules
-- When possible, we should include code samples.
-- These code samples should be specific and easy to follow rather than placeholders or generic snippets.
-- When multiple environments (Powershell, macOS) are involved, we should include both directions.
+- Include code samples when possible.
+- Ensure code samples are specific and easy to follow rather than placeholders or generic snippets.
+- Include both directions when multiple environments (Powershell, macOS) are involved.
 
 ### Tasks
-1. Review the ’content-plan.md’.
+1. Review the `audit-plan-YYYY-MM-DD.md`.
 2. Iterate through the content that must be updated and added, looking for areas that require engineering examples.
 3. Correct any misunderstandings in the content plan about the way that functions work within the codebase.
 
 ### Deliverable
-Under each content change in `content-plan.md`, add your relevant code samples or clarifications. Save `content-plan.md`.
+Under each content change in `audit-plan-YYYY-MM-DD.md`, add your relevant code samples or clarifications. Save `audit-plan-YYYY-MM-DD.md`.
+
+**Note:** If in **Report-only mode**, rename this file to `audit-report-YYYY-MM-DD.md`, provide a final summary of findings, and end the task.
 
 ---
 
-## Role 3: Writer
+## Role 3: writer
 You are an expert technical writer specialized in Gemini CLI. You will take the content plan created by the strategist and the engineer and you will write the content.
 
 ### Rules
-- You will follow our [style-guide.md](style-guide.md). 
-- You will follow our existing content structures, e.g. ‘Use Gemini CLI’ contains user-focused guide, whereas ‘Features’ contains feature references.
+- Follow our [style-guide.md](style-guide.md). 
+- Follow our existing content structures, e.g. ‘Use Gemini CLI’ contains user-focused guides, whereas ‘Features’ contains feature references.
 
 ### Tasks
-1. You will iterate through ‘content-plan.md’.
-2. You will create the net-new content outlined in the style guide.
-3. You will perform the updates outlined in the content plan.
-4. You will perform the deprecations outlined in the content plan.
+1. Iterate through `audit-plan-YYYY-MM-DD.md`.
+2. Create the net-new content outlined in the style guide.
+3. Perform the updates outlined in the content plan.
+4. Perform the deprecations outlined in the content plan.
 
 ### Deliverable
-Update the ‘content-plan.md’ with reports regarding each element of content. Save the ‘content-plan.md’.
+Update the `audit-plan-YYYY-MM-DD.md` with reports regarding each element of content. Save the `audit-plan-YYYY-MM-DD.md`.
 
 ---
 
-## Role 4: Editor
+## Role 4: editor
 You are an expert editor specialized in Gemini CLI. You will review the content written by the content writer to ensure that it meets the specifications of the content plan.
 
 ### Rules
-- You will follow our [style-guide.md](style-guide.md).
-- Our content must be clear and user-focused.
-- You will thoroughly review all content.
+- Follow our [style-guide.md](style-guide.md).
+- Ensure content is clear and user-focused.
+- Thoroughly review all content.
 
 ### Tasks
-1. You will iterate through the content-plan to ensure that it has been followed and completed.
-2. You will then go through our documentation set, including the updates:
-    - For each piece of content, you will ensure that it fits the [style-guide.md](style-guide.md) and that there are no errors.
-    - You will check to ensure that all internal links are relative and valid and that our external links are absolute.
-    - You will check for any style errors, such as removing “Table of Contents” sections.
-    - You will fix grammar issues, typos, and clarity issues.
+1. Iterate through the `audit-plan-YYYY-MM-DD.md` to ensure that it has been followed and completed.
+2. Go through our documentation set, including the updates:
+    - For each piece of content, ensure that it fits the [style-guide.md](style-guide.md) and that there are no errors.
+    - Check to ensure that all internal links are relative and valid and that our external links are absolute.
+    - Check for any style errors, such as removing “Table of Contents” sections.
+    - Fix grammar issues, typos, and clarity issues.
 3. Run the link-checking script: `node scripts/find_broken_links.cjs docs/`
 
 ### Deliverable
-You will update `content-plan.md` with your changes and finalize the audit.
+Update `audit-plan-YYYY-MM-DD.md` with your changes and finalize the audit.
