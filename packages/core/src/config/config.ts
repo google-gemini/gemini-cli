@@ -523,6 +523,7 @@ export interface ConfigParameters {
   question?: string;
 
   coreTools?: string[];
+  mainAgentTools?: string[];
   /** @deprecated Use Policy Engine instead */
   allowedTools?: string[];
   /** @deprecated Use Policy Engine instead */
@@ -678,6 +679,7 @@ export class Config implements McpContext, AgentLoopContext {
   readonly enableConseca: boolean;
 
   private readonly coreTools: string[] | undefined;
+  private readonly mainAgentTools: string[] | undefined;
   /** @deprecated Use Policy Engine instead */
   private readonly allowedTools: string[] | undefined;
   /** @deprecated Use Policy Engine instead */
@@ -891,6 +893,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.question = params.question;
 
     this.coreTools = params.coreTools;
+    this.mainAgentTools = params.mainAgentTools;
     this.allowedTools = params.allowedTools;
     this.excludeTools = params.excludeTools;
     this.toolDiscoveryCommand = params.toolDiscoveryCommand;
@@ -1238,10 +1241,14 @@ export class Config implements McpContext, AgentLoopContext {
     discoverToolsHandle?.end();
     this.mcpClientManager = new McpClientManager(
       this.clientVersion,
-      this._toolRegistry,
       this,
       this.eventEmitter,
     );
+    this.mcpClientManager.setMainRegistries({
+      toolRegistry: this._toolRegistry,
+      promptRegistry: this.promptRegistry,
+      resourceRegistry: this.resourceRegistry,
+    });
     // We do not await this promise so that the CLI can start up even if
     // MCP servers are slow to connect.
     this.mcpInitializationPromise = Promise.allSettled([
@@ -1896,6 +1903,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getCoreTools(): string[] | undefined {
     return this.coreTools;
+  }
+
+  getMainAgentTools(): string[] | undefined {
+    return this.mainAgentTools;
   }
 
   getAllowedTools(): string[] | undefined {
@@ -3054,7 +3065,11 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   async createToolRegistry(): Promise<ToolRegistry> {
-    const registry = new ToolRegistry(this, this.messageBus);
+    const registry = new ToolRegistry(
+      this,
+      this.messageBus,
+      /* isMainRegistry= */ true,
+    );
 
     // helper to create & register core tools that are enabled
     const maybeRegister = (
