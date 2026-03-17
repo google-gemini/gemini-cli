@@ -66,6 +66,7 @@ vi.mock('./tool-modifier.js');
 
 import { Scheduler } from './scheduler.js';
 import type { Config } from '../config/config.js';
+import { MessageBusType } from '../confirmation-bus/types.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
@@ -325,6 +326,15 @@ describe('Scheduler (Orchestrator)', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe('Initialization', () => {
+    it('should NOT subscribe to TOOL_CONFIRMATION_REQUEST on message bus', () => {
+      expect(mockMessageBus.subscribe).not.toHaveBeenCalledWith(
+        MessageBusType.TOOL_CONFIRMATION_REQUEST,
+        expect.any(Function),
+      );
+    });
   });
 
   describe('Phase 1: Ingestion & Resolution', () => {
