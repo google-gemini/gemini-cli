@@ -1240,30 +1240,35 @@ export class Config implements McpContext, AgentLoopContext {
 
     this._toolRegistry = await this.createToolRegistry();
     discoverToolsHandle?.end();
-    this.mcpClientManager = new McpClientManager(
-      this.clientVersion,
-      this._toolRegistry,
-      this,
-      this.eventEmitter,
-    );
-    // We do not await this promise so that the CLI can start up even if
-    // MCP servers are slow to connect.
-    this.mcpInitializationPromise = Promise.allSettled([
-      this.mcpClientManager.startConfiguredMcpServers(),
-      this.getExtensionLoader().start(this),
-    ]).then((results) => {
-      for (const result of results) {
-        if (result.status === 'rejected') {
-          debugLogger.error('Error initializing MCP clients:', result.reason);
+
+    if (this.thinHarness) {
+      this.mcpInitializationPromise = Promise.resolve();
+    } else {
+      this.mcpClientManager = new McpClientManager(
+        this.clientVersion,
+        this._toolRegistry,
+        this,
+        this.eventEmitter,
+      );
+      // We do not await this promise so that the CLI can start up even if
+      // MCP servers are slow to connect.
+      this.mcpInitializationPromise = Promise.allSettled([
+        this.mcpClientManager.startConfiguredMcpServers(),
+        this.getExtensionLoader().start(this),
+      ]).then((results) => {
+        for (const result of results) {
+          if (result.status === 'rejected') {
+            debugLogger.error('Error initializing MCP clients:', result.reason);
+          }
         }
-      }
-    });
+      });
+    }
 
     if (!this.interactive || this.acpMode) {
       await this.mcpInitializationPromise;
     }
 
-    if (this.skillsSupport) {
+    if (this.skillsSupport && !this.thinHarness) {
       this.getSkillManager().setAdminSettings(this.adminSkillsEnabled);
       if (this.adminSkillsEnabled) {
         await this.getSkillManager().discoverSkills(
@@ -2807,7 +2812,7 @@ export class Config implements McpContext, AgentLoopContext {
    * Reloads skills by re-discovering them from extensions and local directories.
    */
   async reloadSkills(): Promise<void> {
-    if (!this.skillsSupport) {
+    if (!this.skillsSupport || this.thinHarness) {
       return;
     }
 
@@ -3059,6 +3064,25 @@ export class Config implements McpContext, AgentLoopContext {
         );
       }
 
+      if (this.thinHarness) {
+        const allowedTools = [
+          'LSTool',
+          'ReadFileTool',
+          'RipGrepTool',
+          'GrepTool',
+          'GlobTool',
+          'EditTool',
+          'WriteFileTool',
+          'WebFetchTool',
+          'ShellTool',
+          'WebSearchTool',
+          'AskUserTool',
+        ];
+        if (!allowedTools.includes(normalizedClassName)) {
+          isEnabled = false;
+        }
+      }
+
       if (isEnabled) {
         registerFn();
       }
@@ -3162,7 +3186,9 @@ export class Config implements McpContext, AgentLoopContext {
     // Register Subagents as Tools
     this.registerSubAgentTools(registry);
 
-    await registry.discoverAllTools();
+    if (!this.thinHarness) {
+      await registry.discoverAllTools();
+    }
     registry.sortTools();
     return registry;
   }
