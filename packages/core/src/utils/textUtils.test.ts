@@ -102,6 +102,22 @@ describe('truncateString', () => {
   it('should handle empty string', () => {
     expect(truncateString('', 5)).toBe('');
   });
+
+  it('should not slice surrogate pairs', () => {
+    const emoji = '😭'; // \uD83D\uDE2D, length 2
+    const str = 'a' + emoji; // length 3
+    // Truncating at length 2 would break the emoji pair
+    expect(truncateString(str, 2, '')).toBe('a');
+    expect(truncateString(str, 1, '')).toBe('a');
+    expect(truncateString(emoji, 1, '')).toBe('');
+    expect(truncateString(emoji, 2, '')).toBe(emoji);
+  });
+
+  it('should handle pre-existing dangling high surrogates at the cut point', () => {
+    // \uD83D is a high surrogate without a following low surrogate
+    const str = 'a\uD83Db';
+    expect(truncateString(str, 2, '')).toBe('a');
+  });
 });
 
 describe('safeTemplateReplace', () => {
