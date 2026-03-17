@@ -44,9 +44,9 @@ consumption in the current session by running `/stats model`.
 
 ### 1. Set Up the Project (Run Once)
 
-When you run `/conductor:setup`, Conductor helps you define the core components
-of your project context. This context is then used for building new components
-or features by you or anyone on your team.
+When you run `/spec setup`, Conductor helps you define the core components of
+your project context. This context is then used for building new components or
+features by you or anyone on your team.
 
 - **Product**: Define project context (e.g. users, product goals, high-level
   features).
@@ -66,14 +66,14 @@ or features by you or anyone on your team.
 - `conductor/tracks.md`
 
 ```bash
-/conductor:setup
+/spec setup
 ```
 
 ### 2. Start a New Track (Feature or Bug)
 
-When you’re ready to take on a new feature or bug fix, run
-`/conductor:newTrack`. This initializes a **track** — a high-level unit of work.
-Conductor helps you generate two critical artifacts:
+When you’re ready to take on a new feature or bug fix, run `/spec create`. This
+initializes a **track** — a high-level unit of work. Conductor helps you
+generate two critical artifacts:
 
 - **Specs**: The detailed requirements for the specific job. What are we
   building and why?
@@ -86,15 +86,15 @@ Conductor helps you generate two critical artifacts:
 - `conductor/tracks/<track_id>/metadata.json`
 
 ```bash
-/conductor:newTrack
+/spec create
 # OR with a description
-/conductor:newTrack "Add a dark mode toggle to the settings page"
+/spec create "Add a dark mode toggle to the settings page"
 ```
 
 ### 3. Implement the Track
 
-Once you approve the plan, run `/conductor:implement`. Your coding agent then
-works through the `plan.md` file, checking off tasks as it completes them.
+Once you approve the plan, run `/spec implement`. Your coding agent then works
+through the `plan.md` file, checking off tasks as it completes them.
 
 **Updated Artifacts:**
 
@@ -103,7 +103,7 @@ works through the `plan.md` file, checking off tasks as it completes them.
 - Project context files (Synchronized on completion)
 
 ```bash
-/conductor:implement
+/spec implement
 ```
 
 Conductor will:
@@ -119,26 +119,26 @@ During implementation, you can also:
 
 - **Check status**: Get a high-level overview of your project's progress.
   ```bash
-  /conductor:status
+  /spec status
   ```
 - **Revert work**: Undo a feature or a specific task if needed.
 
   ```bash
-  /conductor:revert
+  /spec revert
   ```
 
 - **Review work**: Review completed work against guidelines and the plan.
   ```bash
-  /conductor:review
+  /spec review
   ```
 
 ## Commands Reference
 
-| Command                | Description                                                                             | Artifacts                                                                                                                                    |
-| :--------------------- | :-------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/conductor:setup`     | Scaffolds the project and sets up the Conductor environment. Run this once per project. | `conductor/product.md`<br>`conductor/product-guidelines.md`<br>`conductor/tech-stack.md`<br>`conductor/workflow.md`<br>`conductor/tracks.md` |
-| `/conductor:newTrack`  | Starts a new feature or bug track. Generates `spec.md` and `plan.md`.                   | `conductor/tracks/<id>/spec.md`<br>`conductor/tracks/<id>/plan.md`<br>`conductor/tracks.md`                                                  |
-| `/conductor:implement` | Executes the tasks defined in the current track's plan.                                 | `conductor/tracks.md`<br>`conductor/tracks/<id>/plan.md`                                                                                     |
-| `/conductor:status`    | Displays the current progress of the tracks file and active tracks.                     | Reads `conductor/tracks.md`                                                                                                                  |
-| `/conductor:revert`    | Reverts a track, phase, or task by analyzing git history.                               | Reverts git history                                                                                                                          |
-| `/conductor:review`    | Reviews completed work against guidelines and the plan.                                 | Reads `plan.md`, `product-guidelines.md`                                                                                                     |
+| Command           | Description                                                                             | Artifacts                                                                                                                                    |
+| :---------------- | :-------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/spec setup`     | Scaffolds the project and sets up the Conductor environment. Run this once per project. | `conductor/product.md`<br>`conductor/product-guidelines.md`<br>`conductor/tech-stack.md`<br>`conductor/workflow.md`<br>`conductor/tracks.md` |
+| `/spec create`    | Starts a new feature or bug track. Generates `spec.md` and `plan.md`.                   | `conductor/tracks/<id>/spec.md`<br>`conductor/tracks/<id>/plan.md`<br>`conductor/tracks.md`                                                  |
+| `/spec implement` | Executes the tasks defined in the current track's plan.                                 | `conductor/tracks.md`<br>`conductor/tracks/<id>/plan.md`                                                                                     |
+| `/spec status`    | Displays the current progress of the tracks file and active tracks.                     | Reads `conductor/tracks.md`                                                                                                                  |
+| `/spec revert`    | Reverts a track, phase, or task by analyzing git history.                               | Reverts git history                                                                                                                          |
+| `/spec review`    | Reviews completed work against guidelines and the plan.                                 | Reads `plan.md`, `product-guidelines.md`                                                                                                     |

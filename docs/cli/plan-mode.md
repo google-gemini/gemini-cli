@@ -373,7 +373,7 @@ organizes work into tracks and stores them in your project's `conductor/`
 directory.
 
 Conductor leverages Plan Mode internally to ensure architectural safety during
-the design phase. To get started with Conductor, run `/conductor:setup`.
+the design phase. To get started with Conductor, run `/spec setup`.
 
 - **Automate transitions:** Switches to read-only mode via
   [`enter_plan_mode`](../tools/planning.md#1-enter_plan_mode-enterplanmode).
