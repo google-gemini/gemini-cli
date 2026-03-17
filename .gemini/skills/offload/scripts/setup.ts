@@ -14,6 +14,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
 async function prompt(question: string, defaultValue: string): Promise<string> {
+  const autoAccept = process.argv.includes('--yes') || process.argv.includes('-y');
+  if (autoAccept && defaultValue) return defaultValue;
+
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
     rl.question(`${question} (default: ${defaultValue}, <Enter> to use default): `, (answer) => {
@@ -24,6 +27,9 @@ async function prompt(question: string, defaultValue: string): Promise<string> {
 }
 
 async function confirm(question: string): Promise<boolean> {
+  const autoAccept = process.argv.includes('--yes') || process.argv.includes('-y');
+  if (autoAccept) return true;
+
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
     rl.question(`${question} (y/n): `, (answer) => {

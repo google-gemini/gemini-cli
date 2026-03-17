@@ -80,7 +80,8 @@ export class GceCosProvider implements WorkerProvider {
       '--boot-disk-type', 'pd-balanced',
       '--metadata', `startup-script=${startupScript},enable-oslogin=TRUE`,
       '--network-interface', `network=${vpcName},subnet=${subnetName},no-address`,
-      '--scopes', 'https://www.googleapis.com/auth/cloud-platform'
+      '--scopes', 'https://www.googleapis.com/auth/cloud-platform',
+      '--quiet' // Silences informational warnings like disk size mismatch
     ], { stdio: 'inherit' });
 
     if (result.status === 0) {
