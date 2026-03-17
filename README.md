@@ -22,9 +22,9 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
   context window.
 - **🔧 Built-in tools**: Google Search grounding, file operations, shell
   commands, web fetching.
-- **📋 [Spec-Driven Development (SDD)]**: Built-in extension for spec-driven
-  project management (inspired by [Conductor]).
-- **Plug-and-play**: MCP (Model Context Protocol) support for custom
+- **📋 [Spec-Driven Development (SDD)]**: Spec-driven development workflow
+  (inspired by [Conductor]).
+- **🔌 Extensible**: MCP (Model Context Protocol) support for custom
   integrations.
 - **💻 Terminal-first**: Designed for developers who live in the command line.
 - **🛡️ Open source**: Apache 2.0 licensed.
