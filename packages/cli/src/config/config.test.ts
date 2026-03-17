@@ -778,6 +778,16 @@ describe('loadCliConfig', () => {
   });
 
   it('should skip inaccessible workspace folders from GEMINI_CLI_IDE_WORKSPACE_PATH', async () => {
+    const resolveToRealPathSpy = vi
+      .spyOn(ServerConfig, 'resolveToRealPath')
+      .mockImplementation((p) => {
+        if (p.toString().includes('restricted')) {
+          const err = new Error('EACCES: permission denied');
+          (err as NodeJS.ErrnoException).code = 'EACCES';
+          throw err;
+        }
+        return p.toString();
+      });
     vi.stubEnv(
       'GEMINI_CLI_IDE_WORKSPACE_PATH',
       ['/project/folderA', '/nonexistent/restricted/folder'].join(
@@ -790,7 +800,9 @@ describe('loadCliConfig', () => {
     const config = await loadCliConfig(settings, 'test-session', argv);
     const dirs = config.getPendingIncludeDirectories();
     expect(dirs).toContain('/project/folderA');
-    // Should not throw even if folder is inaccessible
+    expect(dirs).not.toContain('/nonexistent/restricted/folder');
+
+    resolveToRealPathSpy.mockRestore();
   });
 
   it('should use default fileFilter options when unconfigured', async () => {
