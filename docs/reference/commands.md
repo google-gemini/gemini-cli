@@ -441,6 +441,9 @@ Slash commands provide meta-level control over the CLI itself.
       counts and quota information.
   - **`tools`**:
     - **Description:** Show tool-specific usage statistics.
+  - **`perf`**:
+    - **Description:** Show current memory usage, startup phase timings, and
+      runtime performance metrics.
 
 ### `/terminal-setup`
 

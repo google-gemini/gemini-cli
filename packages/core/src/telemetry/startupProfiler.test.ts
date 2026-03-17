@@ -57,6 +57,7 @@ describe('StartupProfiler', () => {
 
     // Clear any existing phases and performance entries
     profiler['phases'].clear();
+    profiler['lastFlushResults'] = [];
     performance.clearMarks();
     performance.clearMeasures();
 
@@ -210,6 +211,33 @@ describe('StartupProfiler', () => {
       profiler.flush(mockConfig);
 
       expect(profiler['phases'].size).toBe(0);
+    });
+
+    it('should retain the most recent flush results for later inspection', () => {
+      const handle = profiler.start('test_phase');
+      handle?.end();
+
+      profiler.flush(mockConfig);
+
+      expect(profiler.getLastFlushResults()).toEqual([
+        expect.objectContaining({
+          name: 'test_phase',
+          duration_ms: expect.any(Number),
+          start_time_usec: expect.any(Number),
+          end_time_usec: expect.any(Number),
+        }),
+      ]);
+    });
+
+    it('should reset retained flush results when no phases complete', () => {
+      const handle = profiler.start('test_phase');
+      handle?.end();
+      profiler.flush(mockConfig);
+
+      profiler.start('incomplete_phase');
+      profiler.flush(mockConfig);
+
+      expect(profiler.getLastFlushResults()).toEqual([]);
     });
 
     it('should detect Docker environment', async () => {

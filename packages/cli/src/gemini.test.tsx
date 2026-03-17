@@ -115,6 +115,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
         end: vi.fn(),
       })),
       flush: vi.fn(),
+      getLastFlushResults: vi.fn(() => []),
     },
     ClearcutLogger: {
       getInstance: vi.fn(() => ({

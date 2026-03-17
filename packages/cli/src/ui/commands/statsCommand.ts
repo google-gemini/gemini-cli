@@ -4,16 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import process from 'node:process';
 import type {
   HistoryItemStats,
   HistoryItemModelStats,
   HistoryItemToolStats,
+  HistoryItemPerfStats,
 } from '../types.js';
 import { MessageType } from '../types.js';
 import { formatDuration } from '../utils/formatters.js';
+import { computeSessionStats } from '../utils/computeStats.js';
 import {
   UserAccountManager,
   getG1CreditBalance,
+  startupProfiler,
 } from '@google/gemini-cli-core';
 import {
   type CommandContext,
@@ -78,10 +82,37 @@ async function defaultSessionView(context: CommandContext) {
   context.ui.addItem(statsItem);
 }
 
+function perfSessionView(context: CommandContext) {
+  const memoryUsage = process.memoryUsage();
+  const runtime = computeSessionStats(context.session.stats.metrics);
+
+  context.ui.addItem({
+    type: MessageType.PERF_STATS,
+    memory: {
+      rss: memoryUsage.rss,
+      heapUsed: memoryUsage.heapUsed,
+      heapTotal: memoryUsage.heapTotal,
+      heapUsedPercent:
+        memoryUsage.heapTotal > 0
+          ? (memoryUsage.heapUsed / memoryUsage.heapTotal) * 100
+          : 0,
+      external: memoryUsage.external,
+    },
+    runtime: {
+      apiTimeMs: runtime.totalApiTime,
+      apiTimePercent: runtime.apiTimePercent,
+      toolTimeMs: runtime.totalToolTime,
+      toolTimePercent: runtime.toolTimePercent,
+      cacheEfficiency: runtime.cacheEfficiency,
+    },
+    startupPhases: startupProfiler.getLastFlushResults(),
+  } as HistoryItemPerfStats);
+}
+
 export const statsCommand: SlashCommand = {
   name: 'stats',
   altNames: ['usage'],
-  description: 'Check session stats. Usage: /stats [session|model|tools]',
+  description: 'Check session stats. Usage: /stats [session|model|tools|perf]',
   kind: CommandKind.BUILT_IN,
   autoExecute: false,
   isSafeConcurrent: true,
@@ -133,6 +164,16 @@ export const statsCommand: SlashCommand = {
         context.ui.addItem({
           type: MessageType.TOOL_STATS,
         } as HistoryItemToolStats);
+      },
+    },
+    {
+      name: 'perf',
+      description: 'Show memory, startup timing, and runtime performance stats',
+      kind: CommandKind.BUILT_IN,
+      autoExecute: true,
+      isSafeConcurrent: true,
+      action: (context: CommandContext) => {
+        perfSessionView(context);
       },
     },
   ],

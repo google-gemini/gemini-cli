@@ -188,6 +188,44 @@ describe('<HistoryItemDisplay />', () => {
     unmount();
   });
 
+  it('renders PerfDisplay for "perf_stats" type', async () => {
+    const item: HistoryItem = {
+      ...baseItem,
+      type: 'perf_stats',
+      memory: {
+        rss: 100 * 1024 * 1024,
+        heapUsed: 50 * 1024 * 1024,
+        heapTotal: 100 * 1024 * 1024,
+        heapUsedPercent: 50,
+        external: 5 * 1024 * 1024,
+      },
+      runtime: {
+        apiTimeMs: 1200,
+        apiTimePercent: 60,
+        toolTimeMs: 800,
+        toolTimePercent: 40,
+        cacheEfficiency: 35,
+      },
+      startupPhases: [
+        {
+          name: 'load_settings',
+          duration_ms: 42,
+          cpu_usage_user_usec: 100,
+          cpu_usage_system_usec: 50,
+          start_time_usec: 1000,
+          end_time_usec: 43000,
+        },
+      ],
+    };
+    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
+      <HistoryItemDisplay {...baseItem} item={item} />,
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toContain('Performance Stats');
+    expect(lastFrame()).toContain('load_settings');
+    unmount();
+  });
+
   it('renders SessionSummaryDisplay for "quit" type', async () => {
     const item: HistoryItem = {
       ...baseItem,
