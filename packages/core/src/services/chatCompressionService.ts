@@ -262,6 +262,7 @@ export class ChatCompressionService {
     const originalTokenCount = chat.getLastPromptTokenCount();
 
     // Don't compress if not forced and we are under the limit.
+    // Don't compress if not forced and we are under the limit.
     if (!force) {
       const threshold =
         (await config.getCompressionThreshold()) ??
