@@ -692,7 +692,7 @@ Would you like to attempt to install via "git clone" instead?`,
                     (e) => e.name === 'conductor',
                   );
                   if (conductorIdx !== -1) {
-                    const message = `The "conductor" extension has been replaced by built-in Spec-Driven Development. Your project files in "/conductor" are preserved. Run "/spec setup" to get started.`;
+                    const message = `The "conductor" extension has been replaced by built-in Spec-Driven Development. Your project files in "/conductor" are preserved. Run "/spec:setup" to get started.`;
                     debugLogger.warn(message);
                     coreEvents.emitFeedback('warning', message);
                   }

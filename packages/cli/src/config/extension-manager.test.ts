@@ -791,7 +791,7 @@ describe('ExtensionManager', () => {
       );
       expect(emitSpy).toHaveBeenCalledWith(
         'warning',
-        expect.stringContaining('/spec setup'),
+        expect.stringContaining('/spec:setup'),
       );
     });
 

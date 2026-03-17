@@ -15,7 +15,7 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
     -   **Tech Stack**
     -   **Workflow**
 
-2.  **Handle Failure:** If ANY of these are missing (or their resolved paths do not exist), Announce: "SDD is not set up. Please run `/spec setup`." and HALT.
+2.  **Handle Failure:** If ANY of these are missing (or their resolved paths do not exist), Announce: "SDD is not set up. Please run `/spec:setup`." and HALT.
 
 
 ---
@@ -23,7 +23,7 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
 ## 2.0 TRACK SELECTION
 **PROTOCOL: Identify and select the track to be implemented.**
 
-1.  **Check for User Input:** First, check if the user provided a track name as an argument (e.g., `/spec implement <track_description>`).
+1.  **Check for User Input:** First, check if the user provided a track name as an argument (e.g., `/spec:implement <track_description>`).
 
 2.  **Locate and Parse Tracks Registry:**
     -   Resolve the **Tracks Registry**.
@@ -192,7 +192,7 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
 
 3.  **Handle User Response:**
     *   **If user chooses "Review":**
-        *   Announce: "Please run `/spec review` to verify your changes. You will be able to archive or delete the track after the review."
+        *   Announce: "Please run `/spec:review` to verify your changes. You will be able to archive or delete the track after the review."
     *   **If user chooses "Archive":**
         i.   **Create Archive Directory:** Check for the existence of `.gemini/specs/archive/`. If it does not exist, create it.
         ii.  **Archive Track Folder:** Move the track's folder from its current location (resolved via the **Tracks Directory**) to `.gemini/specs/archive/<track_id>`.
