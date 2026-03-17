@@ -78,7 +78,7 @@ export class GceCosProvider implements WorkerProvider {
           -v ~/.offload:/home/node/.offload:rw \\
           -v ~/dev:/home/node/dev:rw \\
           -v ~/.gemini:/home/node/.gemini:rw \\
-          ${imageUri} /bin/bash -c "while true; do sleep 1000; done"
+          ${imageUri} /bin/bash -c "apt-get update && apt-get install -y tmux && while true; do sleep 1000; done"
       fi
       echo "✅ Maintainer Worker is active."
     `;
@@ -121,20 +121,36 @@ export class GceCosProvider implements WorkerProvider {
       await new Promise(r => setTimeout(r, 20000));
     }
 
-    // NEW: Verify the container is actually running
-    console.log('   - Verifying remote container health...');
+    // NEW: Verify the container is actually running AND up to date
+    console.log('   - Verifying remote container health and image version...');
     const containerCheck = await this.getExecOutput('sudo docker ps -q --filter "name=maintainer-worker"');
     
-    if (containerCheck.status !== 0 || !containerCheck.stdout.trim()) {
-        console.log('   ⚠️ Container missing or stopped. Attempting emergency restart...');
+    let needsUpdate = false;
+    if (containerCheck.status === 0 && containerCheck.stdout.trim()) {
+        // Check if the running image is stale
+        const imageUri = 'us-docker.pkg.dev/gemini-code-dev/gemini-cli/maintainer:latest';
+        const remoteDigest = await this.getExecOutput(`sudo docker inspect --format='{{index .Config.Labels "org.opencontainers.image.revision"}}' maintainer-worker || sudo docker inspect --format='{{.Image}}' maintainer-worker`);
+        // We'll pull the latest tag to see if it's different (or just force pull if it's been a while)
+        // For simplicity in this environment, we'll just check if tmux is missing as a proxy for "stale image"
+        const tmuxCheck = await this.getExecOutput('sudo docker exec maintainer-worker which tmux');
+        if (tmuxCheck.status !== 0) {
+            console.log('   ⚠️ Remote container is stale (missing tmux). Triggering update...');
+            needsUpdate = true;
+        }
+    } else {
+        needsUpdate = true;
+    }
+
+    if (needsUpdate) {
+        console.log('   ⚠️ Container missing or stale. Attempting refresh...');
         const imageUri = 'us-docker.pkg.dev/gemini-code-dev/gemini-cli/maintainer:latest';
         const recoverCmd = `sudo docker pull ${imageUri} && (sudo docker rm -f maintainer-worker || true) && sudo docker run -d --name maintainer-worker --restart always -v ~/.offload:/home/node/.offload:rw -v ~/dev:/home/node/dev:rw -v ~/.gemini:/home/node/.gemini:rw ${imageUri} /bin/bash -c "while true; do sleep 1000; done"`;
         const recoverRes = await this.exec(recoverCmd);
         if (recoverRes !== 0) {
-            console.error('   ❌ Critical: Failed to recover maintainer container.');
+            console.error('   ❌ Critical: Failed to refresh maintainer container.');
             return 1;
         }
-        console.log('   ✅ Container recovered.');
+        console.log('   ✅ Container refreshed.');
     }
 
     return 0;
