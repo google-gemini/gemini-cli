@@ -7,6 +7,7 @@
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
+import * as path from 'node:path';
 import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
@@ -33,11 +34,13 @@ import {
   getAdminErrorMessage,
   isHeadlessMode,
   Config,
+  resolveToRealPath,
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
+  detectIdeFromEnv,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -74,6 +77,7 @@ export interface CliArgs {
   yolo: boolean | undefined;
   approvalMode: string | undefined;
   policy: string[] | undefined;
+  adminPolicy: string[] | undefined;
   allowedMcpServerNames: string[] | undefined;
   allowedTools: string[] | undefined;
   acp?: boolean;
@@ -94,6 +98,21 @@ export interface CliArgs {
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
 }
+
+/**
+ * Helper to coerce comma-separated or multiple flag values into a flat array.
+ */
+const coerceCommaSeparated = (values: string[]): string[] => {
+  if (values.length === 1 && values[0] === '') {
+    return [''];
+  }
+  return values.flatMap((v) =>
+    v
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+};
 
 export async function parseArguments(
   settings: MergedSettings,
@@ -164,14 +183,15 @@ export async function parseArguments(
           nargs: 1,
           description:
             'Additional policy files or directories to load (comma-separated or multiple --policy)',
-          coerce: (policies: string[]) =>
-            // Handle comma-separated values
-            policies.flatMap((p) =>
-              p
-                .split(',')
-                .map((s) => s.trim())
-                .filter(Boolean),
-            ),
+          coerce: coerceCommaSeparated,
+        })
+        .option('admin-policy', {
+          type: 'array',
+          string: true,
+          nargs: 1,
+          description:
+            'Additional admin policy files or directories to load (comma-separated or multiple --admin-policy)',
+          coerce: coerceCommaSeparated,
         })
         .option('acp', {
           type: 'boolean',
@@ -187,11 +207,7 @@ export async function parseArguments(
           string: true,
           nargs: 1,
           description: 'Allowed MCP server names',
-          coerce: (mcpServerNames: string[]) =>
-            // Handle comma-separated values
-            mcpServerNames.flatMap((mcpServerName) =>
-              mcpServerName.split(',').map((m) => m.trim()),
-            ),
+          coerce: coerceCommaSeparated,
         })
         .option('allowed-tools', {
           type: 'array',
@@ -199,9 +215,7 @@ export async function parseArguments(
           nargs: 1,
           description:
             '[DEPRECATED: Use Policy Engine instead See https://geminicli.com/docs/core/policy-engine] Tools that are allowed to run without confirmation',
-          coerce: (tools: string[]) =>
-            // Handle comma-separated values
-            tools.flatMap((tool) => tool.split(',').map((t) => t.trim())),
+          coerce: coerceCommaSeparated,
         })
         .option('extensions', {
           alias: 'e',
@@ -210,11 +224,7 @@ export async function parseArguments(
           nargs: 1,
           description:
             'A list of extensions to use. If not provided, all extensions are used.',
-          coerce: (extensions: string[]) =>
-            // Handle comma-separated values
-            extensions.flatMap((extension) =>
-              extension.split(',').map((e) => e.trim()),
-            ),
+          coerce: coerceCommaSeparated,
         })
         .option('list-extensions', {
           alias: 'l',
@@ -256,9 +266,7 @@ export async function parseArguments(
           nargs: 1,
           description:
             'Additional directories to include in the workspace (comma-separated or multiple --include-directories)',
-          coerce: (dirs: string[]) =>
-            // Handle comma-separated values
-            dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
+          coerce: coerceCommaSeparated,
         })
         .option('screen-reader', {
           type: 'boolean',
@@ -486,7 +494,17 @@ export async function loadCliConfig(
     .getExtensions()
     .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
 
-  const experimentalJitContext = settings.experimental?.jitContext ?? false;
+  const experimentalJitContext = settings.experimental.jitContext;
+
+  let extensionRegistryURI =
+    process.env['GEMINI_CLI_EXTENSION_REGISTRY_URI'] ??
+    (trustedFolder ? settings.experimental?.extensionRegistryURI : undefined);
+
+  if (extensionRegistryURI && !extensionRegistryURI.startsWith('http')) {
+    extensionRegistryURI = resolveToRealPath(
+      path.resolve(cwd, resolvePath(extensionRegistryURI)),
+    );
+  }
 
   let memoryContent: string | HierarchicalMemory = '';
   let fileCount = 0;
@@ -632,7 +650,8 @@ export async function loadCliConfig(
       ...settings.mcp,
       allowed: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
     },
-    policyPaths: argv.policy,
+    policyPaths: argv.policy ?? settings.policyPaths,
+    adminPolicyPaths: argv.adminPolicy ?? settings.adminPolicyPaths,
   };
 
   const { workspacePoliciesDir, policyUpdateConfirmationRequest } =
@@ -693,17 +712,33 @@ export async function loadCliConfig(
     }
   }
 
+  const isAcpMode = !!argv.acp || !!argv.experimentalAcp;
+  let clientName: string | undefined = undefined;
+  if (isAcpMode) {
+    const ide = detectIdeFromEnv();
+    if (
+      ide &&
+      (ide.name !== 'vscode' || process.env['TERM_PROGRAM'] === 'vscode')
+    ) {
+      clientName = `acp-${ide.name}`;
+    }
+  }
+
   return new Config({
-    acpMode: !!argv.acp || !!argv.experimentalAcp,
+    acpMode: isAcpMode,
+    clientName,
     sessionId,
     clientVersion: await getVersion(),
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
+    toolSandboxing: settings.security?.toolSandboxing ?? false,
     targetDir: cwd,
     includeDirectoryTree,
     includeDirectories,
     loadMemoryFromIncludeDirectories:
       settings.context?.loadMemoryFromIncludeDirectories || false,
+    discoveryMaxDirs: settings.context?.discoveryMaxDirs,
+    importFormat: settings.context?.importFormat,
     debugMode,
     question,
 
@@ -739,6 +774,9 @@ export async function loadCliConfig(
     approvalMode,
     disableYoloMode:
       settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,
+    disableAlwaysAllow:
+      settings.security?.disableAlwaysAllow ||
+      settings.admin?.secureModeEnabled,
     showMemoryUsage: settings.ui?.showMemoryUsage || false,
     accessibility: {
       ...settings.ui?.accessibility,
@@ -764,6 +802,7 @@ export async function loadCliConfig(
     deleteSession: argv.deleteSession,
     enabledExtensions: argv.extensions,
     extensionLoader: extensionManager,
+    extensionRegistryURI,
     enableExtensionReloading: settings.experimental?.extensionReloading,
     enableAgents: settings.experimental?.enableAgents,
     plan: settings.experimental?.plan,
@@ -777,6 +816,7 @@ export async function loadCliConfig(
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     modelSteering: settings.experimental?.modelSteering,
+    topicUpdateNarration: settings.experimental?.topicUpdateNarration,
     toolOutputMasking: settings.experimental?.toolOutputMasking,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
@@ -811,6 +851,7 @@ export async function loadCliConfig(
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
     rawOutput: argv.rawOutput,
     acceptRawOutputRisk: argv.acceptRawOutputRisk,
+    dynamicModelConfiguration: settings.experimental?.dynamicModelConfiguration,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
     enableHooks: settings.hooksConfig.enabled,

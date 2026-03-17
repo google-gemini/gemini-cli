@@ -77,6 +77,14 @@ export interface ErrorEvent extends BaseJsonStreamEvent {
   message: string;
 }
 
+export interface ModelStreamStats {
+  total_tokens: number;
+  input_tokens: number;
+  output_tokens: number;
+  cached: number;
+  input: number;
+}
+
 export interface StreamStats {
   total_tokens: number;
   input_tokens: number;
@@ -86,6 +94,7 @@ export interface StreamStats {
   input: number;
   duration_ms: number;
   tool_calls: number;
+  models: Record<string, ModelStreamStats>;
 }
 
 export interface ResultEvent extends BaseJsonStreamEvent {

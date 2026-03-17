@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BrowserManager } from './browserManager.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
 import type { Config } from '../../config/config.js';
+import { injectAutomationOverlay } from './automationOverlay.js';
 
 // Mock the MCP SDK
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
@@ -38,10 +39,29 @@ vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
 vi.mock('../../utils/debugLogger.js', () => ({
   debugLogger: {
     log: vi.fn(),
+    warn: vi.fn(),
     error: vi.fn(),
   },
 }));
 
+vi.mock('./automationOverlay.js', () => ({
+  injectAutomationOverlay: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>();
+  return {
+    ...actual,
+    existsSync: vi.fn((p: string) => {
+      if (p.endsWith('bundled/chrome-devtools-mcp.mjs')) {
+        return false; // Default
+      }
+      return actual.existsSync(p);
+    }),
+  };
+});
+
+import * as fs from 'node:fs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
@@ -50,6 +70,7 @@ describe('BrowserManager', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.mocked(injectAutomationOverlay).mockClear();
 
     // Setup mock config
     mockConfig = makeFakeConfig({
@@ -88,6 +109,40 @@ describe('BrowserManager', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  describe('MCP bundled path resolution', () => {
+    it('should use bundled path if it exists (handles bundled CLI)', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(true);
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+
+      expect(StdioClientTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'node',
+          args: expect.arrayContaining([
+            expect.stringMatching(/bundled\/chrome-devtools-mcp\.mjs$/),
+          ]),
+        }),
+      );
+    });
+
+    it('should fall back to development path if bundled path does not exist', async () => {
+      vi.mocked(fs.existsSync).mockReturnValue(false);
+      const manager = new BrowserManager(mockConfig);
+      await manager.ensureConnection();
+
+      expect(StdioClientTransport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: 'node',
+          args: expect.arrayContaining([
+            expect.stringMatching(
+              /(dist\/)?bundled\/chrome-devtools-mcp\.mjs$/,
+            ),
+          ]),
+        }),
+      );
+    });
   });
 
   describe('getRawMcpClient', () => {
@@ -137,6 +192,75 @@ describe('BrowserManager', () => {
         isError: false,
       });
     });
+
+    it('should block navigate_page to disallowed domain', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['google.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('navigate_page', {
+        url: 'https://evil.com',
+      });
+
+      expect(result.isError).toBe(true);
+      expect((result.content || [])[0]?.text).toContain('not permitted');
+      expect(Client).not.toHaveBeenCalled();
+    });
+
+    it('should allow navigate_page to allowed domain', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['google.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('navigate_page', {
+        url: 'https://google.com/search',
+      });
+
+      expect(result.isError).toBe(false);
+      expect((result.content || [])[0]?.text).toBe('Tool result');
+    });
+
+    it('should allow navigate_page to subdomain when wildcard is used', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['*.google.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('navigate_page', {
+        url: 'https://mail.google.com',
+      });
+
+      expect(result.isError).toBe(false);
+      expect((result.content || [])[0]?.text).toBe('Tool result');
+    });
+
+    it('should block new_page to disallowed domain', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['google.com'],
+          },
+        },
+      });
+      const manager = new BrowserManager(restrictedConfig);
+      const result = await manager.callTool('new_page', {
+        url: 'https://evil.com',
+      });
+
+      expect(result.isError).toBe(true);
+      expect((result.content || [])[0]?.text).toContain('not permitted');
+    });
   });
 
   describe('MCP connection', () => {
@@ -147,10 +271,9 @@ describe('BrowserManager', () => {
       // Verify StdioClientTransport was created with correct args
       expect(StdioClientTransport).toHaveBeenCalledWith(
         expect.objectContaining({
-          command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
+          command: 'node',
           args: expect.arrayContaining([
-            '-y',
-            expect.stringMatching(/chrome-devtools-mcp@/),
+            expect.stringMatching(/chrome-devtools-mcp\.mjs$/),
             '--experimental-vision',
           ]),
         }),
@@ -160,10 +283,45 @@ describe('BrowserManager', () => {
         ?.args as string[];
       expect(args).not.toContain('--isolated');
       expect(args).not.toContain('--autoConnect');
+      expect(args).not.toContain('-y');
       // Persistent mode should set the default --userDataDir under ~/.gemini
       expect(args).toContain('--userDataDir');
       const userDataDirIndex = args.indexOf('--userDataDir');
       expect(args[userDataDirIndex + 1]).toMatch(/cli-browser-profile$/);
+    });
+
+    it('should pass --host-rules when allowedDomains is configured', async () => {
+      const restrictedConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['google.com', '*.openai.com'],
+          },
+        },
+      });
+
+      const manager = new BrowserManager(restrictedConfig);
+      await manager.ensureConnection();
+
+      const args = vi.mocked(StdioClientTransport).mock.calls[0]?.[0]
+        ?.args as string[];
+      expect(args).toContain(
+        '--chromeArg="--host-rules=MAP * 127.0.0.1, EXCLUDE google.com, EXCLUDE *.openai.com, EXCLUDE 127.0.0.1"',
+      );
+    });
+
+    it('should throw error when invalid domain is configured in allowedDomains', async () => {
+      const invalidConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            allowedDomains: ['invalid domain!'],
+          },
+        },
+      });
+
+      const manager = new BrowserManager(invalidConfig);
+      await expect(manager.ensureConnection()).rejects.toThrow(
+        'Invalid domain in allowedDomains: invalid domain!',
+      );
     });
 
     it('should pass headless flag when configured', async () => {
@@ -185,7 +343,7 @@ describe('BrowserManager', () => {
 
       expect(StdioClientTransport).toHaveBeenCalledWith(
         expect.objectContaining({
-          command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
+          command: 'node',
           args: expect.arrayContaining(['--headless']),
         }),
       );
@@ -210,7 +368,7 @@ describe('BrowserManager', () => {
 
       expect(StdioClientTransport).toHaveBeenCalledWith(
         expect.objectContaining({
-          command: process.platform === 'win32' ? 'npx.cmd' : 'npx',
+          command: 'node',
           args: expect.arrayContaining(['--userDataDir', '/path/to/profile']),
         }),
       );
@@ -409,6 +567,83 @@ describe('BrowserManager', () => {
       await manager.close();
 
       expect(client.close).toHaveBeenCalled();
+    });
+  });
+
+  describe('overlay re-injection in callTool', () => {
+    it('should re-inject overlay after click in non-headless mode', async () => {
+      const manager = new BrowserManager(mockConfig);
+      await manager.callTool('click', { uid: '1_2' });
+
+      expect(injectAutomationOverlay).toHaveBeenCalledWith(manager, undefined);
+    });
+
+    it('should re-inject overlay after navigate_page in non-headless mode', async () => {
+      const manager = new BrowserManager(mockConfig);
+      await manager.callTool('navigate_page', { url: 'https://example.com' });
+
+      expect(injectAutomationOverlay).toHaveBeenCalledWith(manager, undefined);
+    });
+
+    it('should re-inject overlay after click_at, new_page, press_key, handle_dialog', async () => {
+      const manager = new BrowserManager(mockConfig);
+      for (const tool of [
+        'click_at',
+        'new_page',
+        'press_key',
+        'handle_dialog',
+      ]) {
+        vi.mocked(injectAutomationOverlay).mockClear();
+        await manager.callTool(tool, {});
+        expect(injectAutomationOverlay).toHaveBeenCalledTimes(1);
+      }
+    });
+
+    it('should NOT re-inject overlay after read-only tools', async () => {
+      const manager = new BrowserManager(mockConfig);
+      for (const tool of [
+        'take_snapshot',
+        'take_screenshot',
+        'get_console_message',
+        'fill',
+      ]) {
+        vi.mocked(injectAutomationOverlay).mockClear();
+        await manager.callTool(tool, {});
+        expect(injectAutomationOverlay).not.toHaveBeenCalled();
+      }
+    });
+
+    it('should NOT re-inject overlay when headless is true', async () => {
+      const headlessConfig = makeFakeConfig({
+        agents: {
+          overrides: { browser_agent: { enabled: true } },
+          browser: { headless: true },
+        },
+      });
+      const manager = new BrowserManager(headlessConfig);
+      await manager.callTool('click', { uid: '1_2' });
+
+      expect(injectAutomationOverlay).not.toHaveBeenCalled();
+    });
+
+    it('should NOT re-inject overlay when tool returns an error result', async () => {
+      vi.mocked(Client).mockImplementation(
+        () =>
+          ({
+            connect: vi.fn().mockResolvedValue(undefined),
+            close: vi.fn().mockResolvedValue(undefined),
+            listTools: vi.fn().mockResolvedValue({ tools: [] }),
+            callTool: vi.fn().mockResolvedValue({
+              content: [{ type: 'text', text: 'Element not found' }],
+              isError: true,
+            }),
+          }) as unknown as InstanceType<typeof Client>,
+      );
+
+      const manager = new BrowserManager(mockConfig);
+      await manager.callTool('click', { uid: 'bad' });
+
+      expect(injectAutomationOverlay).not.toHaveBeenCalled();
     });
   });
 });

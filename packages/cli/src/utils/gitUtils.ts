@@ -61,7 +61,6 @@ export const getLatestGitHubRelease = async (
 
     const endpoint = `https://api.github.com/repos/google-github-actions/run-gemini-cli/releases/latest`;
 
-    // eslint-disable-next-line no-restricted-syntax -- TODO: Migrate to safeFetch for SSRF protection
     const response = await fetch(endpoint, {
       method: 'GET',
       headers: {

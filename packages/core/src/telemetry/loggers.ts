@@ -32,6 +32,7 @@ import {
   type InvalidChunkEvent,
   type ContentRetryEvent,
   type ContentRetryFailureEvent,
+  type NetworkRetryAttemptEvent,
   type RipgrepFallbackEvent,
   type ToolOutputTruncatedEvent,
   type ModelRoutingEvent,
@@ -62,6 +63,7 @@ import {
   recordToolCallMetrics,
   recordChatCompressionMetrics,
   recordFileOperationMetric,
+  recordRetryAttemptMetrics,
   recordContentRetry,
   recordContentRetryFailure,
   recordModelRoutingMetrics,
@@ -83,6 +85,12 @@ import { uiTelemetryService, type UiEvent } from './uiTelemetry.js';
 import { ClearcutLogger } from './clearcut-logger/clearcut-logger.js';
 import { debugLogger } from '../utils/debugLogger.js';
 import type { BillingTelemetryEvent } from './billingEvents.js';
+import {
+  CreditsUsedEvent,
+  OverageOptionSelectedEvent,
+  EmptyWalletMenuShownEvent,
+  CreditPurchaseClickEvent,
+} from './billingEvents.js';
 
 export function logCliConfiguration(
   config: Config,
@@ -485,6 +493,25 @@ export function logInvalidChunk(
   });
 }
 
+export function logNetworkRetryAttempt(
+  config: Config,
+  event: NetworkRetryAttemptEvent,
+): void {
+  ClearcutLogger.getInstance(config)?.logNetworkRetryAttemptEvent(event);
+  bufferTelemetryEvent(() => {
+    const logger = logs.getLogger(SERVICE_NAME);
+    const logRecord: LogRecord = {
+      body: event.toLogBody(),
+      attributes: event.toOpenTelemetryAttributes(config),
+    };
+    logger.emit(logRecord);
+    recordRetryAttemptMetrics(config, {
+      model: event.model,
+      attempt: event.attempt,
+    });
+  });
+}
+
 export function logContentRetry(
   config: Config,
   event: ContentRetryEvent,
@@ -856,4 +883,17 @@ export function logBillingEvent(
     };
     logger.emit(logRecord);
   });
+
+  const cc = ClearcutLogger.getInstance(config);
+  if (cc) {
+    if (event instanceof CreditsUsedEvent) {
+      cc.logCreditsUsedEvent(event);
+    } else if (event instanceof OverageOptionSelectedEvent) {
+      cc.logOverageOptionSelectedEvent(event);
+    } else if (event instanceof EmptyWalletMenuShownEvent) {
+      cc.logEmptyWalletMenuShownEvent(event);
+    } else if (event instanceof CreditPurchaseClickEvent) {
+      cc.logCreditPurchaseClickEvent(event);
+    }
+  }
 }

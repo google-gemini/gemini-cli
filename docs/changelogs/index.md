@@ -18,6 +18,25 @@ on GitHub.
 | [Preview](preview.md) | Experimental features ready for early feedback. |
 | [Stable](latest.md)   | Stable, recommended for general use.            |
 
+## Announcements: v0.33.0 - 2026-03-11
+
+- **Agent Architecture Enhancements:** Introduced HTTP authentication for A2A
+  remote agents and authenticated A2A agent card discovery
+  ([#20510](https://github.com/google-gemini/gemini-cli/pull/20510) by
+  @SandyTao520, [#20622](https://github.com/google-gemini/gemini-cli/pull/20622)
+  by @SandyTao520).
+- **Plan Mode Updates:** Expanded Plan Mode with built-in research subagents,
+  annotation support for feedback, and a new `copy` subcommand
+  ([#20972](https://github.com/google-gemini/gemini-cli/pull/20972) by @Adib234,
+  [#20988](https://github.com/google-gemini/gemini-cli/pull/20988) by
+  @ruomengz).
+- **CLI UX & Admin Controls:** Redesigned the header to be compact with an ASCII
+  icon, inverted context window display to show usage, and enabled a 30-day
+  default retention for chat history
+  ([#18713](https://github.com/google-gemini/gemini-cli/pull/18713) by
+  @keithguerin, [#20853](https://github.com/google-gemini/gemini-cli/pull/20853)
+  by @skeshive).
+
 ## Announcements: v0.32.0 - 2026-03-03
 
 - **Generalist Agent:** The generalist agent is now enabled to improve task
@@ -106,10 +125,6 @@ on GitHub.
 
 ## Announcements: v0.28.0 - 2026-02-10
 
-- **Slash Command:** We've added a new `/prompt-suggest` slash command to help
-  you generate prompt suggestions
-  ([#17264](https://github.com/google-gemini/gemini-cli/pull/17264) by
-  @NTaylorMullen).
 - **IDE Support:** Gemini CLI now supports the Positron IDE
   ([#15047](https://github.com/google-gemini/gemini-cli/pull/15047) by
   @kapsner).
@@ -149,8 +164,8 @@ on GitHub.
   ([#16638](https://github.com/google-gemini/gemini-cli/pull/16638) by
   @joshualitt).
 - **UI/UX Improvements:** You can now "Rewind" through your conversation history
-  ([#15717](https://github.com/google-gemini/gemini-cli/pull/15717) by @Adib234)
-  and use a new `/introspect` command for debugging.
+  ([#15717](https://github.com/google-gemini/gemini-cli/pull/15717) by
+  @Adib234).
 - **Core and Scheduler Refactoring:** The core scheduler has been significantly
   refactored to improve performance and reliability
   ([#16895](https://github.com/google-gemini/gemini-cli/pull/16895) by
