@@ -38,9 +38,13 @@ export class GceConnectionManager {
     ];
   }
 
-  run(command: string, options: { interactive?: boolean; stdio?: 'pipe' | 'inherit' } = {}): { status: number; stdout: string; stderr: string } {
+  getRunCommand(command: string, options: { interactive?: boolean } = {}): string {
     const fullRemote = this.getMagicRemote();
-    const sshCmd = `ssh ${this.getCommonArgs().join(' ')} ${options.interactive ? '-t' : ''} ${fullRemote} ${this.quote(command)}`;
+    return `ssh ${this.getCommonArgs().join(' ')} ${options.interactive ? '-t' : ''} ${fullRemote} ${this.quote(command)}`;
+  }
+
+  run(command: string, options: { interactive?: boolean; stdio?: 'pipe' | 'inherit' } = {}): { status: number; stdout: string; stderr: string } {
+    const sshCmd = this.getRunCommand(command, options);
 
     // 1. Try Direct Path
     const directRes = spawnSync(sshCmd, { stdio: options.stdio || 'pipe', shell: true });

@@ -25,6 +25,11 @@ export interface WorkerProvider {
   setup(options: SetupOptions): Promise<number>;
 
   /**
+   * Returns the raw command string that would be used to execute a command.
+   */
+  getRunCommand(command: string, options?: ExecOptions): string;
+
+  /**
    * Executes a command on the worker.
    */
   exec(command: string, options?: ExecOptions): Promise<number>;

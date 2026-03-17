@@ -1,10 +1,6 @@
-/**
- * Universal Offload Orchestrator (Local)
- * 
- * Automatically connects to your dedicated worker and launches a persistent tmux task.
- */
 import path from 'path';
 import fs from 'fs';
+import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { ProviderFactory } from './providers/ProviderFactory.ts';
 
@@ -78,9 +74,47 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   const tmuxCmd = `docker exec -it -w /home/node/dev/worktrees/${sessionName} maintainer-worker sh -c ${q(`${remoteWorker}; exec $SHELL`)}`;
   const tmuxAttach = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'offload' ${q(tmuxCmd)}`;
   
-  // High-performance primary SSH with IAP fallback via Provider.exec
-  // Note: We use provider.exec for consistency and robustness
-  await provider.exec(tmuxAttach, { interactive: true });
+  const finalSSH = provider.getRunCommand(tmuxAttach, { interactive: true });
+
+  const isWithinGemini = !!env.GEMINI_CLI || !!env.GEMINI_SESSION_ID || !!env.GCLI_SESSION_ID;
+  const terminalTarget = config.terminalTarget || 'tab';
+
+  if (isWithinGemini && env.TERM_PROGRAM === 'iTerm.app') {
+    const tempCmdPath = path.join(process.env.TMPDIR || '/tmp', `offload-ssh-${prNumber}.sh`);
+    fs.writeFileSync(tempCmdPath, `#!/bin/bash\n${finalSSH}\nrm "$0"`, { mode: 0o755 });
+
+    const appleScript = terminalTarget === 'window' ? `
+      on run argv
+        tell application "iTerm"
+          set newWindow to (create window with default profile)
+          tell current session of newWindow
+            write text (item 1 of argv) & return
+          end tell
+          activate
+        end tell
+      end run
+    ` : `
+      on run argv
+        tell application "iTerm"
+          tell current window
+            set newTab to (create tab with default profile)
+            tell current session of newTab
+              write text (item 1 of argv) & return
+            end tell
+          end tell
+          activate
+        end tell
+      end run
+    `;
+    
+    spawnSync('osascript', ['-', tempCmdPath], { input: appleScript });
+    console.log(`✅ iTerm2 ${terminalTarget} opened for job #${prNumber}.`);
+    return 0;
+  }
+
+  // Fallback: Run in current terminal
+  console.log(`📡 Connecting to session ${sessionName}...`);
+  spawnSync(finalSSH, { stdio: 'inherit', shell: true });
 
   return 0;
 }

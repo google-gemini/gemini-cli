@@ -137,6 +137,14 @@ Host ${this.sshAlias}
     return 0;
   }
 
+  getRunCommand(command: string, options: ExecOptions = {}): string {
+    let finalCmd = command;
+    if (options.wrapContainer) {
+        finalCmd = `docker exec ${options.interactive ? '-it' : ''} ${options.cwd ? `-w ${options.cwd}` : ''} ${options.wrapContainer} sh -c ${this.quote(command)}`;
+    }
+    return this.conn.getRunCommand(finalCmd, { interactive: options.interactive });
+  }
+
   async exec(command: string, options: ExecOptions = {}): Promise<number> {
     const res = await this.getExecOutput(command, options);
     return res.status;

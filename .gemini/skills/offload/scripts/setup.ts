@@ -64,6 +64,7 @@ This script will:
   }
 
   const zone = await prompt('Compute Zone', 'us-west1-a');
+  const terminalTarget = await prompt('Terminal UI Target (tab or window)', 'tab');
   const targetVM = `gcli-offload-${env.USER || 'mattkorwel'}`;
   
   console.log('\n🔍 Phase 1: Identity & Discovery');
@@ -71,7 +72,7 @@ This script will:
   const initialSettingsPath = path.join(REPO_ROOT, '.gemini/offload/settings.json');
   if (!fs.existsSync(path.dirname(initialSettingsPath))) fs.mkdirSync(path.dirname(initialSettingsPath), { recursive: true });
   const initialSettings = fs.existsSync(initialSettingsPath) ? JSON.parse(fs.readFileSync(initialSettingsPath, 'utf8')) : {};
-  initialSettings.deepReview = { ...initialSettings.deepReview, projectId, zone };
+  initialSettings.deepReview = { ...initialSettings.deepReview, projectId, zone, terminalTarget };
   fs.writeFileSync(initialSettingsPath, JSON.stringify(initialSettings, null, 2));
 
   const provider = ProviderFactory.getProvider({ projectId, zone, instanceName: targetVM });
