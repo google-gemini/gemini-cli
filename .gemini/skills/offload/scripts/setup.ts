@@ -47,6 +47,13 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   const zone = await prompt('Compute Zone', 'us-west1-a');
   const targetVM = `gcli-offload-${env.USER || 'mattkorwel'}`;
   
+  // Early save of discovery info so fleet commands can work
+  const initialSettingsPath = path.join(REPO_ROOT, '.gemini/offload/settings.json');
+  if (!fs.existsSync(path.dirname(initialSettingsPath))) fs.mkdirSync(path.dirname(initialSettingsPath), { recursive: true });
+  const initialSettings = fs.existsSync(initialSettingsPath) ? JSON.parse(fs.readFileSync(initialSettingsPath, 'utf8')) : {};
+  initialSettings.deepReview = { ...initialSettings.deepReview, projectId, zone };
+  fs.writeFileSync(initialSettingsPath, JSON.stringify(initialSettings, null, 2));
+
   const provider = ProviderFactory.getProvider({ projectId, zone, instanceName: targetVM });
 
   console.log(`🔍 Verifying access and finding worker ${targetVM}...`);
@@ -63,7 +70,7 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
 
   // 1. Configure Isolated SSH Alias (Direct Internal Path with IAP Fallback)
   console.log(`\n🚀 Configuring Isolated SSH Alias...`);
-  const dnsSuffix = await prompt('Internal DNS Suffix', '.internal');
+  const dnsSuffix = await prompt('Internal DNS Suffix', '.internal.gcpnode.com');
 
   const setupRes = await provider.setup({ projectId, zone, dnsSuffix });
   if (setupRes !== 0) return setupRes;

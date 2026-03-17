@@ -10,7 +10,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, '../../../..');
+const REPO_ROOT = path.resolve(__dirname, '../../../../..');
 
 export class ProviderFactory {
   static getProvider(config: { projectId: string; zone: string; instanceName: string }): WorkerProvider {

@@ -51,7 +51,7 @@ export class GceCosProvider implements WorkerProvider {
       '--boot-disk-size', '200GB',
       '--boot-disk-type', 'pd-balanced',
       '--metadata', `startup-script=${startupScript},enable-oslogin=TRUE`,
-      '--network-interface', 'network-tier=PREMIUM,no-address',
+      '--network-interface', 'network=gcli-network,no-address',
       '--scopes', 'https://www.googleapis.com/auth/cloud-platform'
     ], { stdio: 'inherit' });
 
@@ -73,11 +73,11 @@ export class GceCosProvider implements WorkerProvider {
   }
 
   async setup(options: SetupOptions): Promise<number> {
-    const dnsSuffix = options.dnsSuffix || '.internal';
+    const dnsSuffix = options.dnsSuffix || '.internal.gcpnode.com';
     
-    // Construct hostname. We attempt direct internal first.
-    // We've removed 'nic0' by default as it was reported as inconsistent.
-    const internalHostname = `${this.instanceName}.${this.zone}.c.${this.projectId}${dnsSuffix.startsWith('.') ? dnsSuffix : '.' + dnsSuffix}`;
+    // Construct hostname. Restoring verified corporate path requirements:
+    // MUST use 'nic0.' prefix and SHOULD default to '.internal.gcpnode.com'
+    const internalHostname = `nic0.${this.instanceName}.${this.zone}.c.${this.projectId}${dnsSuffix.startsWith('.') ? dnsSuffix : '.' + dnsSuffix}`;
 
     const sshEntry = `
 Host ${this.sshAlias}
