@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from '../config/config.js';
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
@@ -112,19 +111,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private readonly parentCallId?: string;
   private hasFailedCompressionAttempt = false;
 
-  private get config(): Config {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, no-restricted-syntax
-    const agentConfig: Config = Object.create(this.context.config);
-    agentConfig.getToolRegistry = () => this.toolRegistry;
-    agentConfig.getPromptRegistry = () => this.promptRegistry;
-    agentConfig.getResourceRegistry = () => this.resourceRegistry;
-    agentConfig.getMessageBus = () => this.toolRegistry.getMessageBus();
-
-    Object.defineProperty(agentConfig, 'toolRegistry', {
-      get: () => this.toolRegistry,
-      configurable: true,
-    });
-    return agentConfig;
+  private get executionContext(): AgentLoopContext {
+    return {
+      ...this.context,
+      toolRegistry: this.toolRegistry,
+      promptRegistry: this.promptRegistry,
+      resourceRegistry: this.resourceRegistry,
+      messageBus: this.toolRegistry.getMessageBus(),
+    };
   }
 
   /**
@@ -486,7 +480,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     } finally {
       clearTimeout(graceTimeoutId);
       logRecoveryAttempt(
-        this.config,
+        this.context.config,
         new RecoveryAttemptEvent(
           this.agentId,
           this.definition.name,
@@ -545,7 +539,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       const augmentedInputs = {
         ...inputs,
         cliVersion: await getVersion(),
-        activeModel: this.config.getActiveModel(),
+        activeModel: this.context.config.getActiveModel(),
         today: new Date().toLocaleDateString(),
       };
 
@@ -567,14 +561,16 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       // Capture the index of the last hint before starting to avoid re-injecting old hints.
       // NOTE: Hints added AFTER this point will be broadcast to all currently running
       // local agents via the listener below.
-      const startIndex = this.config.injectionService.getLatestInjectionIndex();
-      this.config.injectionService.onInjection(injectionListener);
+      const startIndex =
+        this.context.config.injectionService.getLatestInjectionIndex();
+      this.context.config.injectionService.onInjection(injectionListener);
 
       try {
-        const initialHints = this.config.injectionService.getInjectionsAfter(
-          startIndex,
-          'user_steering',
-        );
+        const initialHints =
+          this.context.config.injectionService.getInjectionsAfter(
+            startIndex,
+            'user_steering',
+          );
         const formattedInitialHints = formatUserHintsForModel(initialHints);
 
         let currentMessage: Content = formattedInitialHints
@@ -645,7 +641,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           }
         }
       } finally {
-        this.config.injectionService.offInjection(injectionListener);
+        this.context.config.injectionService.offInjection(injectionListener);
 
         const globalMcpManager = this.context.config.getMcpClientManager();
         if (globalMcpManager) {
@@ -790,7 +786,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       prompt_id,
       false,
       model,
-      this.config,
+      this.context.config,
       this.hasFailedCompressionAttempt,
     );
 
@@ -828,10 +824,11 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     const modelConfigAlias = getModelConfigAlias(this.definition);
 
     // Resolve the model config early to get the concrete model string (which may be `auto`).
-    const resolvedConfig = this.config.modelConfigService.getResolvedConfig({
-      model: modelConfigAlias,
-      overrideScope: this.definition.name,
-    });
+    const resolvedConfig =
+      this.context.config.modelConfigService.getResolvedConfig({
+        model: modelConfigAlias,
+        overrideScope: this.definition.name,
+      });
     const requestedModel = resolvedConfig.model;
 
     let modelToUse: string;
@@ -848,7 +845,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           signal,
           requestedModel,
         };
-        const router = this.config.getModelRouterService();
+        const router = this.context.config.getModelRouterService();
         const decision = await router.route(routingContext);
         modelToUse = decision.model;
       } catch (error) {
@@ -936,7 +933,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     try {
       return new GeminiChat(
-        this.config,
+        this.executionContext,
         systemInstruction,
         [{ functionDeclarations: tools }],
         startHistory,
@@ -1184,7 +1181,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     // Execute standard tool calls using the new scheduler
     if (toolRequests.length > 0) {
       const completedCalls = await scheduleAgentTools(
-        this.config,
+        this.context.config,
         toolRequests,
         {
           schedulerId: promptId,
@@ -1327,7 +1324,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     let finalPrompt = templateString(promptConfig.systemPrompt, inputs);
 
     // Append environment context (CWD and folder structure).
-    const dirContext = await getDirectoryContextString(this.config);
+    const dirContext = await getDirectoryContextString(this.context.config);
     finalPrompt += `\n\n# Environment Context\n${dirContext}`;
 
     // Append standard rules for non-interactive execution.
