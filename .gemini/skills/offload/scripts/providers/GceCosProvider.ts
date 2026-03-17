@@ -7,8 +7,8 @@
 import { spawnSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
-import os from 'os';
 import { WorkerProvider, SetupOptions, ExecOptions, SyncOptions, WorkerStatus } from './BaseProvider.ts';
+import { GceConnectionManager } from './GceConnectionManager.ts';
 
 export class GceCosProvider implements WorkerProvider {
   private projectId: string;
@@ -17,6 +17,7 @@ export class GceCosProvider implements WorkerProvider {
   private sshConfigPath: string;
   private knownHostsPath: string;
   private sshAlias = 'gcli-worker';
+  private conn: GceConnectionManager;
 
   constructor(projectId: string, zone: string, instanceName: string, repoRoot: string) {
     this.projectId = projectId;
@@ -26,18 +27,45 @@ export class GceCosProvider implements WorkerProvider {
     if (!fs.existsSync(offloadDir)) fs.mkdirSync(offloadDir, { recursive: true });
     this.sshConfigPath = path.join(offloadDir, 'ssh_config');
     this.knownHostsPath = path.join(offloadDir, 'known_hosts');
+    this.conn = new GceConnectionManager(projectId, zone, instanceName);
   }
 
   async provision(): Promise<number> {
     const imageUri = 'us-docker.pkg.dev/gemini-code-dev/gemini-cli/maintainer:latest';
+    const region = this.zone.split('-').slice(0, 2).join('-');
+    const vpcName = 'iap-vpc';
+    const subnetName = 'iap-subnet';
+
+    console.log(`🏗️  Ensuring "Magic" Network Infrastructure in ${this.projectId}...`);
+
+    const vpcCheck = spawnSync('gcloud', ['compute', 'networks', 'describe', vpcName, '--project', this.projectId], { stdio: 'pipe' });
+    if (vpcCheck.status !== 0) {
+        spawnSync('gcloud', ['compute', 'networks', 'create', vpcName, '--project', this.projectId, '--subnet-mode=custom'], { stdio: 'inherit' });
+    }
+
+    const subnetCheck = spawnSync('gcloud', ['compute', 'networks', 'subnets', 'describe', subnetName, '--project', this.projectId, '--region', region], { stdio: 'pipe' });
+    if (subnetCheck.status !== 0) {
+        spawnSync('gcloud', ['compute', 'networks', 'subnets', 'create', subnetName, 
+            '--project', this.projectId, '--network', vpcName, '--region', region, 
+            '--range=10.0.0.0/24', '--enable-private-ip-google-access'], { stdio: 'inherit' });
+    } else {
+        spawnSync('gcloud', ['compute', 'networks', 'subnets', 'update', subnetName, '--project', this.projectId, '--region', region, '--enable-private-ip-google-access'], { stdio: 'pipe' });
+    }
+
+    const fwCheck = spawnSync('gcloud', ['compute', 'firewall-rules', 'describe', 'allow-corporate-ssh', '--project', this.projectId], { stdio: 'pipe' });
+    if (fwCheck.status !== 0) {
+        spawnSync('gcloud', ['compute', 'firewall-rules', 'create', 'allow-corporate-ssh', 
+            '--project', this.projectId, '--network', vpcName, '--allow=tcp:22', '--source-ranges=0.0.0.0/0'], { stdio: 'inherit' });
+    }
+
     console.log(`🚀 Provisioning GCE COS worker: ${this.instanceName}...`);
 
     const startupScript = `#!/bin/bash
       docker pull ${imageUri}
       docker run -d --name maintainer-worker --restart always \\
-        -v /home/node/dev:/home/node/dev:rw \\
-        -v /home/node/.gemini:/home/node/.gemini:rw \\
-        -v /home/node/.offload:/home/node/.offload:rw \\
+        -v ~/.offload:/home/node/.offload:rw \\
+        -v ~/dev:/home/node/dev:rw \\
+        -v ~/.gemini:/home/node/.gemini:rw \\
         ${imageUri} /bin/bash -c "while true; do sleep 1000; done"
     `;
 
@@ -51,7 +79,7 @@ export class GceCosProvider implements WorkerProvider {
       '--boot-disk-size', '200GB',
       '--boot-disk-type', 'pd-balanced',
       '--metadata', `startup-script=${startupScript},enable-oslogin=TRUE`,
-      '--network-interface', 'network=gcli-network,no-address',
+      '--network-interface', `network=${vpcName},subnet=${subnetName},no-address`,
       '--scopes', 'https://www.googleapis.com/auth/cloud-platform'
     ], { stdio: 'inherit' });
 
@@ -74,47 +102,30 @@ export class GceCosProvider implements WorkerProvider {
 
   async setup(options: SetupOptions): Promise<number> {
     const dnsSuffix = options.dnsSuffix || '.internal.gcpnode.com';
-    
-    // Construct hostname. Restoring verified corporate path requirements:
-    // MUST use 'nic0.' prefix and SHOULD default to '.internal.gcpnode.com'
     const internalHostname = `nic0.${this.instanceName}.${this.zone}.c.${this.projectId}${dnsSuffix.startsWith('.') ? dnsSuffix : '.' + dnsSuffix}`;
+    const user = `${process.env.USER || 'node'}_google_com`;
 
     const sshEntry = `
 Host ${this.sshAlias}
     HostName ${internalHostname}
     IdentityFile ~/.ssh/google_compute_engine
-    User ${process.env.USER || 'node'}_google_com
-    UserKnownHostsFile ${this.knownHostsPath}
+    User ${user}
+    UserKnownHostsFile /dev/null
     CheckHostIP no
     StrictHostKeyChecking no
-    ConnectTimeout 5
+    ConnectTimeout 15
 `;
 
     fs.writeFileSync(this.sshConfigPath, sshEntry);
     console.log(`   ✅ Created project SSH config: ${this.sshConfigPath}`);
 
-    console.log('   - Verifying connection and triggering SSO...');
-    const directCheck = spawnSync('ssh', ['-F', this.sshConfigPath, this.sshAlias, 'echo 1'], { stdio: 'pipe', shell: true });
-    
-    if (directCheck.status !== 0) {
-      console.log('   ⚠️ Direct internal SSH failed. Attempting IAP tunnel fallback...');
-      const iapCheck = spawnSync('gcloud', [
-        'compute', 'ssh', this.instanceName,
-        '--project', this.projectId,
-        '--zone', this.zone,
-        '--tunnel-through-iap',
-        '--command', 'echo 1'
-      ], { stdio: 'inherit' });
-
-      if (iapCheck.status !== 0) {
+    console.log('   - Verifying direct connection (may trigger corporate SSO prompt)...');
+    const res = this.conn.run('echo 1');
+    if (res.status !== 0) {
         console.error('\n❌ All connection attempts failed. Please ensure you have "gcert" and IAP permissions.');
         return 1;
-      }
-      console.log('   ✅ IAP connection verified.');
-    } else {
-      console.log('   ✅ Direct internal connection verified.');
     }
-
+    console.log('   ✅ Connection verified.');
     return 0;
   }
 
@@ -129,54 +140,12 @@ Host ${this.sshAlias}
         finalCmd = `docker exec ${options.interactive ? '-it' : ''} ${options.cwd ? `-w ${options.cwd}` : ''} ${options.wrapContainer} sh -c ${this.quote(command)}`;
     }
 
-    const sshBase = ['ssh', '-F', this.sshConfigPath, options.interactive ? '-t' : '', this.sshAlias].filter(Boolean);
-    const iapBase = [
-        'gcloud', 'compute', 'ssh', this.instanceName,
-        '--project', this.projectId,
-        '--zone', this.zone,
-        '--tunnel-through-iap',
-        '--command'
-    ];
-
-    // Try direct first
-    const directRes = spawnSync(sshBase[0], [...sshBase.slice(1), finalCmd], { stdio: options.interactive ? 'inherit' : 'pipe', shell: true });
-    if (directRes.status === 0) {
-      return { 
-        status: 0, 
-        stdout: directRes.stdout?.toString() || '', 
-        stderr: directRes.stderr?.toString() || '' 
-      };
-    }
-
-    console.log('⚠️ Direct SSH failed, falling back to IAP...');
-    const iapRes = spawnSync(iapBase[0], [...iapBase.slice(1), finalCmd], { stdio: options.interactive ? 'inherit' : 'pipe' });
-    return { 
-      status: iapRes.status ?? 1, 
-      stdout: iapRes.stdout?.toString() || '', 
-      stderr: iapRes.stderr?.toString() || '' 
-    };
+    return this.conn.run(finalCmd, { interactive: options.interactive, stdio: options.interactive ? 'inherit' : 'pipe' });
   }
 
   async sync(localPath: string, remotePath: string, options: SyncOptions = {}): Promise<number> {
-    const rsyncArgs = ['-avz', '--exclude=".gemini/settings.json"'];
-    if (options.delete) rsyncArgs.push('--delete');
-    if (options.exclude) {
-      options.exclude.forEach(ex => rsyncArgs.push(`--exclude=${ex}`));
-    }
-
-    const sshCmd = `ssh -F ${this.sshConfigPath} -o StrictHostKeyChecking=no -o UserKnownHostsFile=${this.knownHostsPath}`;
-    
-    // Try direct rsync
-    console.log(`📦 Syncing ${localPath} to ${this.sshAlias}:${remotePath}...`);
-    const directRes = spawnSync('rsync', [...rsyncArgs, '-e', sshCmd, localPath, `${this.sshAlias}:${remotePath}`], { stdio: 'inherit', shell: true });
-    
-    if (directRes.status === 0) return 0;
-
-    console.log('⚠️ Direct rsync failed, falling back to IAP-tunnelled rsync...');
-    const iapSshCmd = `gcloud compute ssh --project ${this.projectId} --zone ${this.zone} --tunnel-through-iap --quiet`;
-    const iapRes = spawnSync('rsync', [...rsyncArgs, '-e', iapSshCmd, localPath, `${this.instanceName}:${remotePath}`], { stdio: 'inherit', shell: true });
-    
-    return iapRes.status ?? 1;
+    console.log(`📦 Syncing ${localPath} to remote:${remotePath}...`);
+    return this.conn.sync(localPath, remotePath, options);
   }
 
   async getStatus(): Promise<WorkerStatus> {

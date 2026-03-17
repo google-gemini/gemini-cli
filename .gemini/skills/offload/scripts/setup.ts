@@ -84,25 +84,25 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   const userFork = upstreamRepo; // Fallback for now
 
   // Resolve Paths
-  const remoteWorkDir = `/home/node/dev/main`;
-  const persistentScripts = `/home/node/.offload/scripts`;
+  const remoteWorkDir = `~/dev/main`;
+  const persistentScripts = `~/.offload/scripts`;
 
   console.log(`\n📦 Performing One-Time Synchronization...`);
   
   // Ensure host directories exist (using provider.exec to handle IAP fallback)
-  await provider.exec(`mkdir -p /home/node/dev/main /home/node/.gemini/policies /home/node/.offload/scripts`);
+  await provider.exec(`mkdir -p ~/dev/main ~/.gemini/policies ~/.offload/scripts`);
 
   // 2. Sync Scripts & Policies
   console.log('   - Pushing offload logic to persistent worker directory...');
   await provider.sync('.gemini/skills/offload/scripts/', `${persistentScripts}/`, { delete: true });
-  await provider.sync('.gemini/skills/offload/policy.toml', `/home/node/.gemini/policies/offload-policy.toml`);
+  await provider.sync('.gemini/skills/offload/policy.toml', `~/.gemini/policies/offload-policy.toml`);
 
   // 3. Sync Auth (Gemini)
   if (await confirm('Sync Gemini accounts credentials?')) {
     const homeDir = env.HOME || '';
     const lp = path.join(homeDir, '.gemini/google_accounts.json');
     if (fs.existsSync(lp)) {
-      await provider.sync(lp, `/home/node/.gemini/google_accounts.json`);
+      await provider.sync(lp, `~/.gemini/google_accounts.json`);
     }
   }
 
