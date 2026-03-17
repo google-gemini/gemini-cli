@@ -18,9 +18,11 @@ import {
   hasRedirection,
   debugLogger,
 } from '@google/gemini-cli-core';
-import type { RadioSelectItem } from '../shared/RadioButtonSelect.js';
 import { useToolActions } from '../../contexts/ToolActionsContext.js';
-import { RadioButtonSelect } from '../shared/RadioButtonSelect.js';
+import {
+  RadioButtonSelect,
+  type RadioSelectItem,
+} from '../shared/RadioButtonSelect.js';
 import { MaxSizedBox, MINIMUM_MAX_HEIGHT } from '../shared/MaxSizedBox.js';
 import {
   sanitizeForDisplay,
@@ -84,12 +86,14 @@ export const ToolConfirmationMessage: React.FC<
 
   const settings = useSettings();
   const allowPermanentApproval =
-    settings.merged.security.enablePermanentToolApproval;
+    settings.merged.security.enablePermanentToolApproval &&
+    !config.getDisableAlwaysAllow();
 
   const handlesOwnUI =
     confirmationDetails.type === 'ask_user' ||
     confirmationDetails.type === 'exit_plan_mode';
-  const isTrustedFolder = config.isTrustedFolder();
+  const isTrustedFolder =
+    config.isTrustedFolder() && !config.getDisableAlwaysAllow();
 
   const handleConfirm = useCallback(
     (outcome: ToolConfirmationOutcome, payload?: ToolConfirmationPayload) => {
