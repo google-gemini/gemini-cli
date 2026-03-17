@@ -73,7 +73,13 @@ export class RemoteAgentInvocation extends BaseToolInvocation<
       _toolName ?? definition.name,
       _toolDisplayName ?? definition.displayName,
     );
-    this.clientManager = this.context.config.getA2AClientManager();
+    const clientManager = this.context.config.getA2AClientManager();
+    if (!clientManager) {
+      throw new Error(
+        `Failed to initialize RemoteAgentInvocation for '${definition.name}': A2AClientManager is not available.`,
+      );
+    }
+    this.clientManager = clientManager;
   }
 
   getDescription(): string {

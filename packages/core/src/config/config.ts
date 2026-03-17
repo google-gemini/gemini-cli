@@ -652,7 +652,7 @@ export interface ConfigParameters {
 export class Config implements McpContext, AgentLoopContext {
   private _toolRegistry!: ToolRegistry;
   private mcpClientManager?: McpClientManager;
-  private readonly a2aClientManager: A2AClientManager;
+  private readonly a2aClientManager?: A2AClientManager;
   private allowedMcpServers: string[];
   private blockedMcpServers: string[];
   private allowedEnvironmentVariables: string[];
@@ -1978,7 +1978,7 @@ export class Config implements McpContext, AgentLoopContext {
     return this.mcpClientManager;
   }
 
-  getA2AClientManager(): A2AClientManager {
+  getA2AClientManager(): A2AClientManager | undefined {
     return this.a2aClientManager;
   }
 
