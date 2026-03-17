@@ -2,9 +2,9 @@
 
 Perform this workflow when asked for a "deep audit," "comprehensive update," or to "interactively audit" the docset. You will iterate through this workflow performing the roles of strategist, engineer, writer, and editor. 
 
-**Report-only mode:** If you have been asked for a "report-only audit" or "documentation report," follow only the strategist and engineer roles. Finalize the `audit-report-YYYY-MM-DD.md` with findings and recommendations, then stop without making any changes to the documentation files.
+**Report-only mode:** If you have been asked for a "report-only audit" or "documentation report," follow only the strategist and engineer roles. Finalize the `audit-report-YYYY-MM-DD.md` (using today's date) with findings and recommendations, then stop without making any changes to the documentation files.
 
-**Interactive mode:** If you have been asked to do this “interactively,” you will ask questions when you are uncertain.
+**Interactive mode:** If you have been asked to do this “interactively,” you will ask questions when you are uncertain. You MUST present the `audit-plan-YYYY-MM-DD.md` to the user for approval after the engineer phase and before the writer phase.
 
 ---
 
@@ -12,26 +12,33 @@ Perform this workflow when asked for a "deep audit," "comprehensive update," or 
 You are an expert content strategist experienced in technical documentation.
 
 ### Rules
-Our information architecture is user-focused with the goal of getting our users to the necessary information with the fewest clicks. We have the following areas of our site:
-- **Get started:** This is our most essential “getting started” material. Content should rarely be added to this section.
-- **Use Gemini CLI:** This section contains user-focused guides based on user journeys, which may touch one or more features.
-- **Features:** This section contains feature documentation and should include all important features.
-- **Configuration:** This section contains configuration options for Gemini CLI. Content should rarely be added to this section.
-- **Development:** This section contains development information for Gemini CLI. Content should rarely be added to this section.
-- **Reference:** This section contains reference information. Net-new pages should rarely be added to this section, but pages may be frequently updated.
-- **Resources:** This section contains resources such as Terms of Service and privacy policies. Content should rarely be added to this section.
+- **Source of truth:** `sidebar.json` is the sole source of truth for the site's Information Architecture (IA). The physical directory structure of the files does NOT need to match the IA. Do NOT propose moving files between directories to match the sidebar's organization.
+- **Deep audit requirement:** You MUST read and audit every single page identified in the `sidebar.json`. A surface-level scan of headings is insufficient. 
+- **Experimental features:** Pay close attention to features that are marked with 🔬 or require a setting to enable. Ensure they follow the [style-guide.md](style-guide.md) rules for experimental content.
+- **Proactive codebase audit:** You MUST audit the codebase to identify new features, tools, or settings that lack documentation.
+
+### Codebase audit strategy
+When auditing the codebase for undocumented changes, prioritize these high-signal areas:
+1. **CLI commands:** Check `packages/cli/src/commands/` for new `.tsx` or `.ts` files and command registrations.
+2. **Built-in tools:** Check `packages/core/src/tools/` for new tool definitions that should be added to the tools reference.
+3. **Configuration settings:** Check `packages/cli/src/config/settings.ts` (or the equivalent settings schema) for new keys in the `Settings` interface.
+4. **Extensions and hooks:** Check `packages/cli/src/commands/extensions/` and `packages/cli/src/commands/hooks/` for new sub-commands.
+5. **Major package additions:** Check the `packages/` root for new directories (e.g., `devtools`, `a2a-server`) that require high-level guides.
 
 ### Tasks
-1. Use ‘sidebar.json’ and the content of the /docs/ page to review the current documentation set.
-2. Review the current codebase to identify gaps in the current documentation set.
-3. Review the documentation for outdated content that no longer exists within the codebase.
-4. Review each piece of existing documentation for content that must be updated, added, or removed, in addition to areas in which the content does not meet our [style-guide.md](style-guide.md). 
+1. Map the documentation scope by reading `sidebar.json`. Identify all pages in the IA.
+2. For EVERY page identified, read the full content to identify style guide violations, clarity issues, or structural errors.
+3. **Proactive audit:** Execute the "Codebase audit strategy" above. Identify any feature, command, or tool that exists in the code but is missing from `sidebar.json` or the existing pages.
+4. Review documentation for outdated content that no longer exists in the codebase.
+5. Identify any "preview" or "enabled by setting" features that lack the mandatory experimental feature notes.
 
 ### Deliverable
-Create a temporary, dated file `audit-plan-YYYY-MM-DD.md` that includes:
-- Existing content that needs to be updated.
+Create a temporary file `audit-plan-YYYY-MM-DD.md` (replace YYYY-MM-DD with today's actual date) that includes:
+- A list of ALL audited pages and their status (Pass/Fail).
+- Specific content that needs to be updated per page.
 - Existing content that needs to be deprecated.
-- Net-new content that needs to be added.
+- **Net-new content:** List all undocumented features identified in the codebase audit.
+- **Handover:** Add a comment stating the strategist phase is complete.
 
 ---
 
@@ -42,16 +49,18 @@ You are an expert Gemini CLI engineer. Your role is to augment the content strat
 - Include code samples when possible.
 - Ensure code samples are specific and easy to follow rather than placeholders or generic snippets.
 - Include both directions when multiple environments (Powershell, macOS) are involved.
+- **Technical deep dive:** For every page flagged by the strategist, verify the technical accuracy against the latest code in `packages/`.
+- **Experimental feature audit:** Identify every feature that requires a setting to be enabled and ensure the documentation correctly identifies it as experimental.
 
 ### Tasks
-1. Review the `audit-plan-YYYY-MM-DD.md`.
-2. Iterate through the content that must be updated and added, looking for areas that require engineering examples.
-3. Correct any misunderstandings in the content plan about the way that functions work within the codebase.
+1. Review the `audit-plan-[DATE].md` created by the strategist.
+2. For every proposed change, verify the implementation details in the codebase using `grep_search` and `read_file`.
+3. Provide precise code snippets and CLI command examples for any updated or new content.
+4. Correct any technical inaccuracies in the strategist's observations.
 
 ### Deliverable
-Under each content change in `audit-plan-YYYY-MM-DD.md`, add your relevant code samples or clarifications. Save `audit-plan-YYYY-MM-DD.md`.
-
-**Note:** If in **Report-only mode**, rename this file to `audit-report-YYYY-MM-DD.md`, provide a final summary of findings, and end the task.
+Under each content change in the audit plan, add your relevant code samples or technical clarifications. Save the file.
+- **Handover:** Add a comment stating the engineer phase is complete and the plan is ready for writing (or user approval if in interactive mode).
 
 ---
 
@@ -63,13 +72,14 @@ You are an expert technical writer specialized in Gemini CLI. You will take the 
 - Follow our existing content structures, e.g. ‘Use Gemini CLI’ contains user-focused guides, whereas ‘Features’ contains feature references.
 
 ### Tasks
-1. Iterate through `audit-plan-YYYY-MM-DD.md`.
+1. Iterate through the approved `audit-plan-[DATE].md`.
 2. Create the net-new content outlined in the style guide.
-3. Perform the updates outlined in the content plan.
-4. Perform the deprecations outlined in the content plan.
+3. Perform the updates outlined in the content plan using surgical edits with `replace`. Do NOT move files; only update content.
+4. Perform the deprecations (content removal) outlined in the content plan.
 
 ### Deliverable
-Update the `audit-plan-YYYY-MM-DD.md` with reports regarding each element of content. Save the `audit-plan-YYYY-MM-DD.md`.
+Update the audit plan with status reports for each element (e.g., "COMPLETED: Added documentation for X"). Save the file.
+- **Handover:** Add a comment stating the writer phase is complete.
 
 ---
 
@@ -82,13 +92,13 @@ You are an expert editor specialized in Gemini CLI. You will review the content 
 - Thoroughly review all content.
 
 ### Tasks
-1. Iterate through the `audit-plan-YYYY-MM-DD.md` to ensure that it has been followed and completed.
-2. Go through our documentation set, including the updates:
-    - For each piece of content, ensure that it fits the [style-guide.md](style-guide.md) and that there are no errors.
-    - Check to ensure that all internal links are relative and valid and that our external links are absolute.
-    - Check for any style errors, such as removing “Table of Contents” sections.
-    - Fix grammar issues, typos, and clarity issues.
-3. Run the link-checking script: `node scripts/find_broken_links.cjs docs/`
+1. Iterate through the audit plan to ensure every item has been completed as specified.
+2. Systematically review the documentation set:
+    - Ensure every document follows the [style-guide.md](style-guide.md).
+    - Verify that all internal links are relative and valid, and external links are absolute.
+    - Remove any "Table of Contents" sections.
+    - Fix grammar, typos, and clarity issues.
+3. Run the link-checking script: `node scripts/find_broken_links.cjs docs/` (run from the skill's root directory).
 
 ### Deliverable
-Update `audit-plan-YYYY-MM-DD.md` with your changes and finalize the audit.
+Update the audit plan with your final edits and a summary of the audit results. Finalize the file.

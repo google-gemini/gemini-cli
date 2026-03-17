@@ -61,15 +61,24 @@ narrative text.
   tables). Provide descriptive alt text for all images.
 - **Media:** Use lowercase hyphenated filenames for all assets.
 
+## Experimental features
+Ensure that users are correctly informed about experimental or preview 
+capabilities. These often require a specific setting to be enabled.
+
+- **Enablement:** Any feature that must be enabled via a setting (e.g., 
+  `general.devtools`) is considered experimental.
+- **Warning note:** If a feature is experimental, add this note 
+  immediately after the introductory paragraph:
+  `> **Note:** This is a preview feature currently under active development.`
+- **Visual indicators:** Use the microscope emoji (🔬) in the heading or 
+  sidebar label for experimental features.
+
 ## Structure
 Follow a consistent structure to support the user journey from introduction to 
 next steps. This hierarchy helps users find information quickly.
 
 - **BLUF:** Start every page with an introduction (Bottom Line Up Front) 
   explaining what the reader can expect to learn.
-- **Experimental features:** If a feature is experimental, add this note 
-  immediately after the introductory paragraph:
-  `> **Note:** This is a preview feature currently under active development.`
 - **Headings:** Use hierarchical headings (H1, H2, H3) to organize content.
 - **Procedures:** 
   - Introduce lists of steps with a complete sentence.
