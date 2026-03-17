@@ -699,6 +699,18 @@ export async function loadServerHierarchicalMemory(
  * Returns the result of the call to `loadHierarchicalGeminiMemory`.
  */
 export async function refreshServerHierarchicalMemory(config: Config) {
+  if (config.isThinHarness()) {
+    const emptyResult: LoadServerHierarchicalMemoryResponse = {
+      memoryContent: { global: '', extension: '', project: '' },
+      fileCount: 0,
+      filePaths: [],
+    };
+    config.setUserMemory(emptyResult.memoryContent);
+    config.setGeminiMdFileCount(0);
+    config.setGeminiMdFilePaths([]);
+    return emptyResult;
+  }
+
   const result = await loadServerHierarchicalMemory(
     config.getWorkingDir(),
     config.shouldLoadMemoryFromIncludeDirectories()

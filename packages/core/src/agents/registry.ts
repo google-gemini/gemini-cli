@@ -104,6 +104,11 @@ export class AgentRegistry {
   private async loadAgents(): Promise<void> {
     this.agents.clear();
     this.allDefinitions.clear();
+
+    if (this.config.isThinHarness()) {
+      return;
+    }
+
     this.loadBuiltInAgents();
 
     if (!this.config.isAgentsEnabled()) {
@@ -240,6 +245,10 @@ export class AgentRegistry {
   }
 
   private loadBuiltInAgents(): void {
+    if (this.config.isThinHarness()) {
+      return;
+    }
+
     this.registerLocalAgent(CodebaseInvestigatorAgent(this.config));
     this.registerLocalAgent(CliHelpAgent(this.config));
     this.registerLocalAgent(GeneralistAgent(this.config));

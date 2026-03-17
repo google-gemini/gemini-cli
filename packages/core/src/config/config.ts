@@ -633,6 +633,7 @@ export interface ConfigParameters {
   tracker?: boolean;
   planSettings?: PlanSettings;
   modelSteering?: boolean;
+  thinHarness?: boolean;
   onModelChange?: (model: string) => void;
   mcpEnabled?: boolean;
   extensionsEnabled?: boolean;
@@ -853,6 +854,7 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly planEnabled: boolean;
   private readonly trackerEnabled: boolean;
   private readonly planModeRoutingEnabled: boolean;
+  private readonly thinHarness: boolean;
   private readonly modelSteering: boolean;
   private contextManager?: ContextManager;
   private terminalBackground: string | undefined = undefined;
@@ -996,6 +998,8 @@ export class Config implements McpContext, AgentLoopContext {
       modelConfigServiceConfig ?? DEFAULT_MODEL_CONFIGS,
     );
 
+    this.thinHarness =
+      params.thinHarness ?? process.env['GEMINI_THIN_HARNESS'] === 'true';
     this.experimentalJitContext = params.experimentalJitContext ?? true;
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
     this.modelSteering = params.modelSteering ?? false;
@@ -2024,6 +2028,10 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getUserMemory(): string | HierarchicalMemory {
+    if (this.thinHarness) {
+      return { global: '', extension: '', project: '' };
+    }
+
     if (this.experimentalJitContext && this.contextManager) {
       return {
         global: this.contextManager.getGlobalMemory(),
@@ -2120,6 +2128,9 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getGeminiMdFileCount(): number {
+    if (this.thinHarness) {
+      return 0;
+    }
     if (this.experimentalJitContext && this.contextManager) {
       return this.contextManager.getLoadedPaths().size;
     }
@@ -2131,6 +2142,9 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   getGeminiMdFilePaths(): string[] {
+    if (this.thinHarness) {
+      return [];
+    }
     if (this.experimentalJitContext && this.contextManager) {
       return Array.from(this.contextManager.getLoadedPaths());
     }
@@ -2493,7 +2507,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   isAgentsEnabled(): boolean {
-    return this.enableAgents;
+    return this.enableAgents && !this.thinHarness;
   }
 
   isEventDrivenSchedulerEnabled(): boolean {
@@ -2786,7 +2800,7 @@ export class Config implements McpContext, AgentLoopContext {
   }
 
   isSkillsSupportEnabled(): boolean {
-    return this.skillsSupport;
+    return this.skillsSupport && !this.thinHarness;
   }
 
   /**
@@ -2841,6 +2855,10 @@ export class Config implements McpContext, AgentLoopContext {
         this.agents = refreshed.agents;
       }
     }
+  }
+
+  isThinHarness(): boolean {
+    return this.thinHarness;
   }
 
   isInteractive(): boolean {
@@ -3153,6 +3171,10 @@ export class Config implements McpContext, AgentLoopContext {
    * Registers SubAgentTools for all available agents.
    */
   private registerSubAgentTools(registry: ToolRegistry): void {
+    if (this.thinHarness) {
+      return;
+    }
+
     const agentsOverrides = this.getAgentsSettings().overrides ?? {};
     const definitions = this.agentRegistry.getAllDefinitions();
 

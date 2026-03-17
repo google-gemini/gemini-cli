@@ -44,6 +44,11 @@ export class PromptProvider {
     userMemory?: string | HierarchicalMemory,
     interactiveOverride?: boolean,
   ): string {
+    const config = context.config;
+    if (config.isThinHarness()) {
+      return 'You are Gemini CLI, a helpful assistant specializing in software engineering tasks.';
+    }
+
     const systemMdResolution = resolvePathFromEnv(
       process.env['GEMINI_SYSTEM_MD'],
     );
@@ -216,11 +221,13 @@ export class PromptProvider {
     }
 
     // --- Finalization (Shell) ---
-    const finalPrompt = activeSnippets.renderFinalShell(
-      basePrompt,
-      userMemory,
-      contextFilenames,
-    );
+    const finalPrompt = context.config.isThinHarness()
+      ? basePrompt
+      : activeSnippets.renderFinalShell(
+          basePrompt,
+          userMemory,
+          contextFilenames,
+        );
 
     // Sanitize erratic newlines from composition
     const sanitizedPrompt = finalPrompt.replace(/\n{3,}/g, '\n\n');
