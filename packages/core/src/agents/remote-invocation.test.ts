@@ -22,6 +22,7 @@ import type { RemoteAgentDefinition } from './types.js';
 import { createMockMessageBus } from '../test-utils/mock-message-bus.js';
 import { A2AAuthProviderFactory } from './auth-provider/factory.js';
 import type { A2AAuthProvider } from './auth-provider/types.js';
+import { ExecutionLifecycleService } from '../services/executionLifecycleService.js';
 
 // Mock A2AClientManager
 vi.mock('./a2a-client-manager.js', () => ({
@@ -58,6 +59,7 @@ describe('RemoteAgentInvocation', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    ExecutionLifecycleService.resetForTest();
     (A2AClientManager.getInstance as Mock).mockReturnValue(mockClientManager);
     (
       RemoteAgentInvocation as unknown as {
@@ -584,6 +586,264 @@ describe('RemoteAgentInvocation', () => {
       expect(updateOutput).toHaveBeenCalledWith(
         'Generating...\n\nArtifact (Result):\nPart 1 Part 2',
       );
+    });
+  });
+
+  describe('Lifecycle Integration', () => {
+    it('should call setExecutionIdCallback with lifecycle execution ID', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+      mockClientManager.sendMessageStream.mockImplementation(
+        async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'msg-1',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Response' }],
+          };
+        },
+      );
+
+      const callback = vi.fn();
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+      await invocation.execute(
+        new AbortController().signal,
+        undefined,
+        undefined,
+        callback,
+      );
+
+      expect(callback).toHaveBeenCalledExactlyOnceWith(expect.any(Number));
+    });
+
+    it('should feed output deltas to lifecycle service subscribers', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+      mockClientManager.sendMessageStream.mockImplementation(
+        async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'msg-1',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Hello' }],
+          };
+          yield {
+            kind: 'message',
+            messageId: 'msg-1',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Hello World' }],
+          };
+        },
+      );
+
+      const receivedChunks: string[] = [];
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+
+      await invocation.execute(
+        new AbortController().signal,
+        undefined,
+        undefined,
+        (id) => {
+          // Subscribe immediately when we get the execution ID
+          ExecutionLifecycleService.subscribe(id, (event) => {
+            if (event.type === 'data' && typeof event.chunk === 'string') {
+              receivedChunks.push(event.chunk);
+            }
+          });
+        },
+      );
+
+      // Lifecycle subscribers should have received output deltas
+      expect(receivedChunks.length).toBeGreaterThan(0);
+      expect(receivedChunks.join('')).toContain('Hello');
+      expect(receivedChunks.join('')).toContain('World');
+    });
+
+    it('should support backgrounding via lifecycle service (Ctrl+B)', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+
+      // Create a controllable stream that blocks between chunks
+      let resolveStream!: () => void;
+      const streamBlocked = new Promise<void>((r) => {
+        resolveStream = r;
+      });
+
+      mockClientManager.sendMessageStream.mockImplementation(
+        async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'msg-1',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Working...' }],
+          };
+          await streamBlocked;
+          yield {
+            kind: 'message',
+            messageId: 'msg-2',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Done' }],
+          };
+        },
+      );
+
+      let capturedId: number | undefined;
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+
+      // Start execution (don't await — we need to background mid-stream)
+      const resultPromise = invocation.execute(
+        new AbortController().signal,
+        undefined,
+        undefined,
+        (id) => {
+          capturedId = id;
+        },
+      );
+
+      // setExecutionIdCallback is called synchronously before first await
+      expect(capturedId).toBeDefined();
+
+      // Flush microtasks so processStream processes the first chunk
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Background the execution (simulates Ctrl+B)
+      ExecutionLifecycleService.background(capturedId!);
+
+      const result = await resultPromise;
+
+      // Should return backgrounded result with execution data
+      expect(result.data).toBeDefined();
+      expect((result.data as Record<string, unknown>)['pid']).toBe(capturedId);
+      expect(result.returnDisplay).toContain('background');
+      expect((result.llmContent as Array<{ text: string }>)[0].text).toContain(
+        'background',
+      );
+
+      // Let the stream finish cleanly in the background
+      resolveStream();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    it('should abort stream when killed via lifecycle service', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+
+      let resolveStream!: () => void;
+      const streamBlocked = new Promise<void>((r) => {
+        resolveStream = r;
+      });
+
+      mockClientManager.sendMessageStream.mockImplementation(
+        async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'msg-1',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Working...' }],
+          };
+          await streamBlocked;
+          yield {
+            kind: 'message',
+            messageId: 'msg-2',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Should not reach' }],
+          };
+        },
+      );
+
+      let capturedId: number | undefined;
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+      const resultPromise = invocation.execute(
+        new AbortController().signal,
+        undefined,
+        undefined,
+        (id) => {
+          capturedId = id;
+        },
+      );
+
+      // Flush microtasks so processStream processes first chunk
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Kill via lifecycle service
+      ExecutionLifecycleService.kill(capturedId!);
+
+      // Unblock stream so processStream can finish cleanup
+      resolveStream();
+
+      const result = await resultPromise;
+
+      // Kill produces an error result
+      expect(result.error).toBeDefined();
+      expect(result.error?.message).toContain('cancelled');
+
+      // Give processStream time to finish cleanup
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    it('should report execution as active while stream is running', async () => {
+      mockClientManager.getClient.mockReturnValue({});
+
+      let resolveStream!: () => void;
+      const streamBlocked = new Promise<void>((r) => {
+        resolveStream = r;
+      });
+
+      mockClientManager.sendMessageStream.mockImplementation(
+        async function* () {
+          yield {
+            kind: 'message',
+            messageId: 'msg-1',
+            role: 'agent',
+            parts: [{ kind: 'text', text: 'Running' }],
+          };
+          await streamBlocked;
+        },
+      );
+
+      let capturedId: number | undefined;
+      const invocation = new RemoteAgentInvocation(
+        mockDefinition,
+        { query: 'hi' },
+        mockMessageBus,
+      );
+      const resultPromise = invocation.execute(
+        new AbortController().signal,
+        undefined,
+        undefined,
+        (id) => {
+          capturedId = id;
+        },
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // While stream is running, execution should be active
+      expect(ExecutionLifecycleService.isActive(capturedId!)).toBe(true);
+
+      // Complete the stream
+      resolveStream();
+      // Wait for processStream to complete — it calls completeExecution
+      // which emits 'exit' and cleans up. Need to let the for-await-of
+      // loop process the generator's {done: true} and the catch/finally
+      // blocks to run. Multiple microtask ticks may be needed.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await resultPromise;
+
+      // After completion, execution should no longer be active
+      expect(ExecutionLifecycleService.isActive(capturedId!)).toBe(false);
     });
   });
 
