@@ -194,6 +194,26 @@ describe('memoryDiscovery', () => {
     });
   });
 
+  it('should silently skip a GEMINI.md path that is a directory (EISDIR)', async () => {
+    // Create a directory named GEMINI.md where a file would normally be expected.
+    const geminiMdDir = path.join(cwd, DEFAULT_CONTEXT_FILENAME);
+    await fsPromises.mkdir(geminiMdDir, { recursive: true });
+
+    // Should not throw and should return empty content gracefully.
+    const result = flattenResult(
+      await loadServerHierarchicalMemory(
+        cwd,
+        [],
+        new FileDiscoveryService(projectRoot),
+        new SimpleExtensionLoader([]),
+        DEFAULT_FOLDER_TRUST,
+      ),
+    );
+
+    expect(result.memoryContent).toBe('');
+    expect(result.fileCount).toBe(0);
+  });
+
   it('should load only the global context file if present and others are not (default filename)', async () => {
     const defaultContextFile = await createTestFile(
       path.join(homedir, GEMINI_DIR, DEFAULT_CONTEXT_FILENAME),
