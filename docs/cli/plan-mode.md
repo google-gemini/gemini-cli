@@ -488,5 +488,5 @@ gemini --approval-mode plan -p "Analyze telemetry and suggest improvements"
 [`plan.toml`]:
   https://github.com/google-gemini/gemini-cli/blob/main/packages/core/src/policy/policies/plan.toml
 [Spec-Driven Development (SDD)]: ./spec-driven-development.md
-[Conductor]: https://github.com/google-gemini/conductor
+[Conductor]: https://github.com/gemini-cli-extensions/conductor
 [open an issue]: https://github.com/google-gemini/gemini-cli/issues
