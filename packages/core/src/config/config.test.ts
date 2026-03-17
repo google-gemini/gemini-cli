@@ -1096,13 +1096,22 @@ describe('Server Config (config.ts)', () => {
       expect(config.getUseWriteTodos()).toBe(false);
     });
 
-    it('should NOT disable useWriteTodos for non-preview models', () => {
+    it('should NOT disable useWriteTodos for non-preview models (Gemini 2.5)', () => {
       const params: ConfigParameters = {
         ...baseParams,
         model: 'gemini-2.5-pro',
       };
       const config = new Config(params);
       expect(config.getUseWriteTodos()).toBe(true);
+    });
+
+    it('should disable useWriteTodos for Gemini 1.5 models', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        model: 'gemini-1.5-pro',
+      };
+      const config = new Config(params);
+      expect(config.getUseWriteTodos()).toBe(false);
     });
   });
 
