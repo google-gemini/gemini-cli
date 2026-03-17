@@ -104,7 +104,10 @@ export class AddMemoryCommand implements Command {
       await context.sendMessage(`Saving memory via ${result.toolName}...`);
 
       await tool.buildAndExecute(result.toolArgs, signal, undefined, {
-        sanitizationConfig: DEFAULT_SANITIZATION_CONFIG,
+        shellExecutionConfig: {
+          sanitizationConfig: DEFAULT_SANITIZATION_CONFIG,
+          sandboxManager: context.config.sandboxManager,
+        },
       });
       await refreshMemory(context.config);
       return {

@@ -12,12 +12,15 @@ import type {
 } from './types.js';
 import { ApiKeyAuthProvider } from './api-key-provider.js';
 import { HttpAuthProvider } from './http-provider.js';
+import { GoogleCredentialsAuthProvider } from './google-credentials-provider.js';
 
 export interface CreateAuthProviderOptions {
   /** Required for OAuth/OIDC token storage. */
   agentName?: string;
   authConfig?: A2AAuthConfig;
   agentCard?: AgentCard;
+  /** Required by some providers (like google-credentials) to determine token audience. */
+  targetUrl?: string;
   /** URL to fetch the agent card from, used for OAuth2 URL discovery. */
   agentCardUrl?: string;
 }
@@ -43,9 +46,14 @@ export class A2AAuthProviderFactory {
     }
 
     switch (authConfig.type) {
-      case 'google-credentials':
-        // TODO: Implement
-        throw new Error('google-credentials auth provider not yet implemented');
+      case 'google-credentials': {
+        const provider = new GoogleCredentialsAuthProvider(
+          authConfig,
+          options.targetUrl,
+        );
+        await provider.initialize();
+        return provider;
+      }
 
       case 'apiKey': {
         const provider = new ApiKeyAuthProvider(authConfig);
