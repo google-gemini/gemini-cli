@@ -212,6 +212,35 @@ describe('BrowserAgentInvocation', () => {
       expect(cleanupBrowserAgent).toHaveBeenCalled();
     });
 
+    it('should render recovered browser agent completions distinctly', async () => {
+      mockExecutor.run.mockResolvedValue({
+        result: JSON.stringify({ success: true }),
+        terminate_reason: 'GOAL',
+        recovered_from: 'TIMEOUT',
+      });
+
+      const invocation = new BrowserAgentInvocation(
+        mockConfig,
+        mockParams,
+        mockMessageBus,
+      );
+
+      const controller = new AbortController();
+      const result = await invocation.execute(controller.signal);
+
+      expect(Array.isArray(result.llmContent)).toBe(true);
+      expect((result.llmContent as Array<{ text: string }>)[0].text).toContain(
+        'Browser agent finished after recovery.',
+      );
+      expect((result.llmContent as Array<{ text: string }>)[0].text).toContain(
+        'Recovered From: TIMEOUT',
+      );
+      expect(result.returnDisplay).toContain(
+        'Browser Agent Finished After Recovery',
+      );
+      expect(result.returnDisplay).toContain('Recovered From: TIMEOUT');
+    });
+
     it('should work without updateOutput (fire-and-forget)', async () => {
       const invocation = new BrowserAgentInvocation(
         mockConfig,

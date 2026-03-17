@@ -26,7 +26,10 @@ import { getConventionAttributes, type FileOperation } from './metrics.js';
 export { ToolCallDecision };
 import type { ToolRegistry } from '../tools/tool-registry.js';
 import type { OutputFormat } from '../output/types.js';
-import type { AgentTerminateMode } from '../agents/types.js';
+import type {
+  AgentTerminateMode,
+  RecoverableAgentTerminateMode,
+} from '../agents/types.js';
 
 import { getCommonAttributes } from './telemetryAttributes.js';
 import { SemanticAttributes } from '@opentelemetry/semantic-conventions';
@@ -2059,6 +2062,7 @@ export class AgentFinishEvent extends BaseAgentEvent {
   duration_ms: number;
   turn_count: number;
   terminate_reason: AgentTerminateMode;
+  recovered_from?: RecoverableAgentTerminateMode;
 
   constructor(
     agent_id: string,
@@ -2066,11 +2070,13 @@ export class AgentFinishEvent extends BaseAgentEvent {
     duration_ms: number,
     turn_count: number,
     terminate_reason: AgentTerminateMode,
+    recovered_from?: RecoverableAgentTerminateMode,
   ) {
     super(agent_id, agent_name);
     this.duration_ms = duration_ms;
     this.turn_count = turn_count;
     this.terminate_reason = terminate_reason;
+    this.recovered_from = recovered_from;
   }
 
   override toOpenTelemetryAttributes(config: Config): LogAttributes {
@@ -2080,11 +2086,15 @@ export class AgentFinishEvent extends BaseAgentEvent {
       duration_ms: this.duration_ms,
       turn_count: this.turn_count,
       terminate_reason: this.terminate_reason,
+      ...(this.recovered_from ? { recovered_from: this.recovered_from } : {}),
     };
   }
 
   toLogBody(): string {
-    return `Agent ${this.agent_name} finished. Reason: ${this.terminate_reason}. Duration: ${this.duration_ms}ms. Turns: ${this.turn_count}.`;
+    const recoveredSuffix = this.recovered_from
+      ? ` Recovered from: ${this.recovered_from}.`
+      : '';
+    return `Agent ${this.agent_name} finished. Reason: ${this.terminate_reason}.${recoveredSuffix} Duration: ${this.duration_ms}ms. Turns: ${this.turn_count}.`;
   }
 }
 

@@ -214,6 +214,7 @@ const COUNTER_DEFINITIONS = {
     attributes: {} as {
       agent_name: string;
       terminate_reason: string;
+      recovered_from?: string;
     },
   },
   [AGENT_RECOVERY_ATTEMPT_COUNT]: {
@@ -962,6 +963,7 @@ export function recordAgentRunMetrics(
     ...commonAttributes,
     agent_name: event.agent_name,
     terminate_reason: event.terminate_reason,
+    ...(event.recovered_from ? { recovered_from: event.recovered_from } : {}),
   });
 
   agentDurationHistogram.record(event.duration_ms, {

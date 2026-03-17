@@ -422,20 +422,33 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
       const output = await executor.run(this.params, signal);
 
       const displayResult = safeJsonToMarkdown(output.result);
+      const statusHeader = output.recovered_from
+        ? 'Browser agent finished after recovery.'
+        : 'Browser agent finished.';
+      const recoveredLine = output.recovered_from
+        ? `Recovered From: ${output.recovered_from}\n`
+        : '';
+      const displayHeader = output.recovered_from
+        ? 'Browser Agent Finished After Recovery'
+        : 'Browser Agent Finished';
+      const displayRecoveredLine = output.recovered_from
+        ? `Recovered From: ${output.recovered_from}\n\n`
+        : '';
 
-      const resultContent = `Browser agent finished.
+      const resultContent = `${statusHeader}
 Termination Reason: ${output.terminate_reason}
-Result:
+${recoveredLine}Result:
 ${output.result}`;
 
       const displayContent = `
-Browser Agent Finished
+${displayHeader}
 
 Termination Reason: ${output.terminate_reason}
 
-Result:
+${displayRecoveredLine}Result:
 ${displayResult}
 `;
+
 
       if (updateOutput) {
         updateOutput({

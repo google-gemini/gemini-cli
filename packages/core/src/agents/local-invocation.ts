@@ -247,17 +247,31 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
       }
 
       const displayResult = safeJsonToMarkdown(output.result);
+      const statusHeader = output.recovered_from
+        ? `Subagent '${this.definition.name}' finished after recovery.`
+        : `Subagent '${this.definition.name}' finished.`;
+      const recoveredLine = output.recovered_from
+        ? `Recovered From: ${output.recovered_from}\n`
+        : '';
 
-      const resultContent = `Subagent '${this.definition.name}' finished.
+      const resultContent = `${statusHeader}
 Termination Reason: ${output.terminate_reason}
-Result:
+${recoveredLine}Result:
 ${output.result}`;
 
-      const displayContent =
-        output.terminate_reason === AgentTerminateMode.GOAL
+      const displayContent = output.recovered_from
+        ? `### Subagent ${this.definition.name} Finished After Recovery
+
+**Termination Reason:** ${output.terminate_reason}
+
+**Recovered From:** ${output.recovered_from}
+
+**Result/Summary:**
+${displayResult}
+`
+        : output.terminate_reason === AgentTerminateMode.GOAL
           ? displayResult
-          : `
-### Subagent ${this.definition.name} Finished Early
+          : `### Subagent ${this.definition.name} Finished Early
 
 **Termination Reason:** ${output.terminate_reason}
 

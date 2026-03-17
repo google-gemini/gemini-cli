@@ -45,6 +45,7 @@ import {
   DEFAULT_QUERY_STRING,
   DEFAULT_MAX_TURNS,
   DEFAULT_MAX_TIME_MINUTES,
+  type RecoverableAgentTerminateMode,
   type LocalAgentDefinition,
   type AgentInputs,
   type OutputObject,
@@ -74,6 +75,16 @@ export type ActivityCallback = (activity: SubagentActivityEvent) => void;
 
 const TASK_COMPLETE_TOOL_NAME = 'complete_task';
 const GRACE_PERIOD_MS = 60 * 1000; // 1 min
+
+function isRecoverableTerminateReason(
+  reason: AgentTerminateMode,
+): reason is RecoverableAgentTerminateMode {
+  return (
+    reason === AgentTerminateMode.TIMEOUT ||
+    reason === AgentTerminateMode.MAX_TURNS ||
+    reason === AgentTerminateMode.ERROR_NO_COMPLETE_TASK_CALL
+  );
+}
 
 /** The possible outcomes of a single agent turn. */
 type AgentTurnResult =
@@ -472,6 +483,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     let turnCounter = 0;
     let terminateReason: AgentTerminateMode = AgentTerminateMode.ERROR;
     let finalResult: string | null = null;
+    let recoveredFrom: RecoverableAgentTerminateMode | undefined;
 
     const maxTimeMinutes =
       this.definition.runConfig.maxTimeMinutes ?? DEFAULT_MAX_TIME_MINUTES;
@@ -627,6 +639,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
         if (recoveryResult !== null) {
           // Recovery Succeeded
+          if (isRecoverableTerminateReason(terminateReason)) {
+            recoveredFrom = terminateReason;
+          }
           terminateReason = AgentTerminateMode.GOAL;
           finalResult = recoveryResult;
         } else {
@@ -663,6 +678,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         return {
           result: finalResult || 'Task completed.',
           terminate_reason: terminateReason,
+          ...(recoveredFrom ? { recovered_from: recoveredFrom } : {}),
         };
       }
 
@@ -693,11 +709,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
           if (recoveryResult !== null) {
             // Recovery Succeeded
+            recoveredFrom = AgentTerminateMode.TIMEOUT;
             terminateReason = AgentTerminateMode.GOAL;
             finalResult = recoveryResult;
             return {
               result: finalResult,
               terminate_reason: terminateReason,
+              recovered_from: recoveredFrom,
             };
           }
         }
@@ -726,6 +744,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           Date.now() - startTime,
           turnCounter,
           terminateReason,
+          recoveredFrom,
         ),
       );
     }
