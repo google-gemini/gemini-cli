@@ -9,7 +9,8 @@ import os from 'os';
 
 /**
  * Centralized SSH/RSYNC management for GCE Workers.
- * Handles Magic Hostname routing, Zero-Knowledge security, and IAP Fallbacks.
+ * Handles Magic Hostname routing with Zero-Knowledge security.
+ * STRICTLY uses Direct Internal connection (Corporate Magic).
  */
 export class GceConnectionManager {
   private projectId: string;
@@ -45,24 +46,11 @@ export class GceConnectionManager {
 
   run(command: string, options: { interactive?: boolean; stdio?: 'pipe' | 'inherit' } = {}): { status: number; stdout: string; stderr: string } {
     const sshCmd = this.getRunCommand(command, options);
-
-    // 1. Try Direct Path
-    const directRes = spawnSync(sshCmd, { stdio: options.stdio || 'pipe', shell: true });
-    if (directRes.status === 0) {
-      return { 
-        status: 0, 
-        stdout: directRes.stdout?.toString() || '', 
-        stderr: directRes.stderr?.toString() || '' 
-      };
-    }
-
-    // 2. Try IAP Fallback
-    const iapCmd = `gcloud compute ssh ${this.instanceName} --project ${this.projectId} --zone ${this.zone} --tunnel-through-iap --command ${this.quote(command)}`;
-    const iapRes = spawnSync(iapCmd, { stdio: options.stdio || 'pipe', shell: true });
-    return {
-      status: iapRes.status ?? 1,
-      stdout: iapRes.stdout?.toString() || '',
-      stderr: iapRes.stderr?.toString() || ''
+    const res = spawnSync(sshCmd, { stdio: options.stdio || 'pipe', shell: true });
+    return { 
+      status: res.status ?? 1, 
+      stdout: res.stdout?.toString() || '', 
+      stderr: res.stderr?.toString() || '' 
     };
   }
 
@@ -72,29 +60,11 @@ export class GceConnectionManager {
     if (options.delete) rsyncArgs.push('--delete');
     if (options.exclude) options.exclude.forEach(ex => rsyncArgs.push(`--exclude="${ex}"`));
 
-    // Ensure remote directory exists
-    const remoteParent = remotePath.endsWith('/') ? remotePath : remotePath.substring(0, remotePath.lastIndexOf('/'));
-    if (remoteParent) {
-        const mkdirRes = this.run(`mkdir -p ${remoteParent}`);
-        if (mkdirRes.status !== 0) {
-            console.error(`   ❌ Failed to create remote directory ${remoteParent}: ${mkdirRes.stderr}`);
-            // We continue anyway as it might be a permission false positive on some OSs
-        }
-    }
-
     const sshCmd = `ssh ${this.getCommonArgs().join(' ')}`;
     const directRsync = `rsync ${rsyncArgs.join(' ')} -e ${this.quote(sshCmd)} ${localPath} ${fullRemote}:${remotePath}`;
     
-    console.log(`   - Attempting direct sync...`);
-    const directRes = spawnSync(directRsync, { stdio: 'inherit', shell: true });
-    if (directRes.status === 0) return 0;
-
-    console.log(`   ⚠️ Direct sync failed, attempting IAP fallback...`);
-    const iapSshCmd = `gcloud compute ssh --project ${this.projectId} --zone ${this.zone} --tunnel-through-iap --quiet`;
-    const iapRsync = `rsync ${rsyncArgs.join(' ')} -e ${this.quote(iapSshCmd)} ${localPath} ${this.instanceName}:${remotePath}`;
-    const iapRes = spawnSync(iapRsync, { stdio: 'inherit', shell: true });
-    
-    return iapRes.status ?? 1;
+    const res = spawnSync(directRsync, { stdio: 'inherit', shell: true });
+    return res.status ?? 1;
   }
 
   private quote(str: string) {

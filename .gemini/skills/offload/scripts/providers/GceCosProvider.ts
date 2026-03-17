@@ -61,12 +61,14 @@ export class GceCosProvider implements WorkerProvider {
     console.log(`🚀 Provisioning GCE COS worker: ${this.instanceName}...`);
 
     const startupScript = `#!/bin/bash
-      docker pull ${imageUri}
+      echo "🚀 Starting Maintainer Worker Deployment..."
+      docker pull ${imageUri} || echo "❌ Failed to pull image"
       docker run -d --name maintainer-worker --restart always \\
         -v ~/.offload:/home/node/.offload:rw \\
         -v ~/dev:/home/node/dev:rw \\
         -v ~/.gemini:/home/node/.gemini:rw \\
-        ${imageUri} /bin/bash -c "while true; do sleep 1000; done"
+        ${imageUri} /bin/bash -c "while true; do sleep 1000; done" || echo "❌ Failed to run container"
+      echo "✅ Deployment script finished."
     `;
 
     const result = spawnSync('gcloud', [
