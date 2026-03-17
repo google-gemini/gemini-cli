@@ -723,11 +723,11 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
       },
     );
 
-    // Add 'All the above' for multi-select
+    // Add 'All of the above' for multi-select
     if (question.multiSelect && questionOptions.length > 1) {
       const allItem: OptionItem = {
         key: 'all',
-        label: 'All the above',
+        label: 'All of the above',
         description: 'Select all options',
         type: 'all',
         index: list.length,
@@ -899,7 +899,7 @@ const ChoiceQuestionView: React.FC<ChoiceQuestionViewProps> = ({
               selectedIndices.has(optionItem.index)) ||
             (optionItem.type === 'other' && isCustomOptionSelected) ||
             (optionItem.type === 'all' &&
-              questionOptions.every((_, i) => selectedIndices.has(i)));
+              selectedIndices.size === questionOptions.length);
           const showCheck =
             question.multiSelect &&
             (optionItem.type === 'option' ||
