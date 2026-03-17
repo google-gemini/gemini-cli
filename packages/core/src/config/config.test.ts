@@ -1115,7 +1115,7 @@ describe('Server Config (config.ts)', () => {
   });
 
   describe('UseWriteTodos Configuration', () => {
-    it('should default useWriteTodos to true when not provided', () => {
+    it('should default useWriteTodos to true when not provided and tracker is disabled', () => {
       const config = new Config(baseParams);
       expect(config.getUseWriteTodos()).toBe(true);
     });
@@ -1129,7 +1129,7 @@ describe('Server Config (config.ts)', () => {
       expect(config.getUseWriteTodos()).toBe(false);
     });
 
-    it('should disable useWriteTodos for preview models', () => {
+    it('should disable useWriteTodos for non-gemini-2 models', () => {
       const params: ConfigParameters = {
         ...baseParams,
         model: 'gemini-3-pro-preview',
@@ -1138,13 +1138,22 @@ describe('Server Config (config.ts)', () => {
       expect(config.getUseWriteTodos()).toBe(false);
     });
 
-    it('should NOT disable useWriteTodos for non-preview models', () => {
+    it('should NOT disable useWriteTodos for gemini-2 models', () => {
       const params: ConfigParameters = {
         ...baseParams,
         model: 'gemini-2.5-pro',
       };
       const config = new Config(params);
       expect(config.getUseWriteTodos()).toBe(true);
+    });
+
+    it('should disable useWriteTodos when tracker is enabled', () => {
+      const params: ConfigParameters = {
+        ...baseParams,
+        tracker: true,
+      };
+      const config = new Config(params);
+      expect(config.getUseWriteTodos()).toBe(false);
     });
   });
 
