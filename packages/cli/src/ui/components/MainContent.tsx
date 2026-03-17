@@ -55,7 +55,7 @@ export const MainContent = () => {
   } = uiState;
   const showHeaderDetails = cleanUiDetailsVisible;
 
-  const fullscreenHeight = Math.max(terminalHeight - 7, 5);
+  const fullscreenHeight = Math.max(terminalHeight - FOOTER_RESERVED_HEIGHT, 5);
 
   const lastUserPromptIndex = useMemo(() => {
     for (let i = uiState.history.length - 1; i >= 0; i--) {
