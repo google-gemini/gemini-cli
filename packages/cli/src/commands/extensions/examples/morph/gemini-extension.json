@@ -1,0 +1,17 @@
+{
+  "name": "morph",
+  "version": "1.0.0",
+  "contextFileName": "GEMINI.md",
+  "mcpServers": {
+    "morph": {
+      "command": "node",
+      "args": ["${extensionPath}${/}morph-server.js"],
+      "cwd": "${workspacePath}",
+      "includeTools": [
+        "morph_edit",
+        "warpgrep_codebase_search",
+        "warpgrep_github_search"
+      ]
+    }
+  }
+}

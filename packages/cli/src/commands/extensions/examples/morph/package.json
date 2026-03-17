@@ -1,0 +1,12 @@
+{
+  "name": "morph-extension-template",
+  "version": "1.0.0",
+  "description": "Morph MCP extension example for Gemini CLI",
+  "type": "module",
+  "main": "morph-server.js",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.23.0",
+    "@morphllm/morphsdk": "^0.2.134",
+    "zod": "^3.22.4"
+  }
+}
