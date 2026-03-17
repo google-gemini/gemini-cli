@@ -22,6 +22,25 @@ describe('NewAgentsNotification', () => {
     {
       name: 'Agent B',
       description: 'Description B',
+      kind: 'local' as const,
+      inputConfig: { inputSchema: {} },
+      promptConfig: {},
+      modelConfig: {},
+      runConfig: {},
+      mcpServers: {
+        github: {
+          command: 'npx',
+          args: ['-y', '@modelcontextprotocol/server-github'],
+        },
+        postgres: {
+          command: 'npx',
+          args: ['-y', '@modelcontextprotocol/server-postgres'],
+        },
+      },
+    },
+    {
+      name: 'Agent C',
+      description: 'Description C',
       kind: 'remote' as const,
       agentCardUrl: '',
       inputConfig: { inputSchema: {} },
