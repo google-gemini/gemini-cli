@@ -18,7 +18,7 @@ import {
 } from '../config/extensions/variables.js';
 
 export function createExtension({
-  extensionsDir = 'extensions-dir',
+  extensionsDir,
   name = 'my-extension',
   version = '1.0.0',
   addContextFile = false,
@@ -27,7 +27,22 @@ export function createExtension({
   installMetadata = undefined as ExtensionInstallMetadata | undefined,
   settings = undefined as ExtensionSetting[] | undefined,
   themes = undefined as CustomTheme[] | undefined,
-} = {}): string {
+}: {
+  extensionsDir: string;
+  name?: string;
+  version?: string;
+  addContextFile?: boolean;
+  contextFileName?: string;
+  mcpServers?: Record<string, MCPServerConfig>;
+  installMetadata?: ExtensionInstallMetadata;
+  settings?: ExtensionSetting[];
+  themes?: CustomTheme[];
+}): string {
+  if (!extensionsDir) {
+    throw new Error(
+      'extensionsDir is required to avoid leaking files during tests',
+    );
+  }
   const extDir = path.join(extensionsDir, name);
   fs.mkdirSync(extDir, { recursive: true });
   fs.writeFileSync(
