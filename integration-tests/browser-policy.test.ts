@@ -92,7 +92,7 @@ describe.skipIf(!chromeAvailable)('browser-policy', () => {
     // Manually trust the folder to avoid the dialog and enable option 3
     const geminiDir = join(rig.homeDir!, '.gemini');
     mkdirSync(geminiDir, { recursive: true });
-    
+
     // Write to trustedFolders.json
     const trustedFoldersPath = join(geminiDir, 'trustedFolders.json');
     const trustedFolders = {
@@ -102,7 +102,9 @@ describe.skipIf(!chromeAvailable)('browser-policy', () => {
 
     // Force confirmation for browser agent and its tools.
     const policyFile = join(rig.testDir!, 'force-confirm.toml');
-    writeFileSync(policyFile, `
+    writeFileSync(
+      policyFile,
+      `
 [[rule]]
 name = "Force confirm browser_agent"
 toolName = "browser_agent"
@@ -114,7 +116,8 @@ name = "Force confirm browser tools"
 toolName = "mcp_browser_agent_*"
 decision = "ask_user"
 priority = 100
-`);
+`,
+    );
 
     // Update settings.json in both project and home directories to point to the policy file
     for (const baseDir of [rig.testDir!, rig.homeDir!]) {
@@ -137,27 +140,31 @@ priority = 100
       },
     });
 
-    await run.sendKeys('Open https://example.com and check if there is a heading\r');
+    await run.sendKeys(
+      'Open https://example.com and check if there is a heading\r',
+    );
     await run.sendKeys('\r');
 
-    // Handle confirmations. 
+    // Handle confirmations.
     // 1. Initial browser_agent delegation (likely only 3 options, so use option 1: Allow once)
     await poll(
       () => stripAnsi(run.output).toLowerCase().includes('action required'),
       60000,
-      1000
+      1000,
     );
-    await run.sendKeys('1'); 
-    await new Promise(r => setTimeout(r, 2000));
+    await run.sendKeys('1');
+    await new Promise((r) => setTimeout(r, 2000));
 
     // 2. new_page (MCP tool, should have 4 options, use option 3: Allow all server tools)
     const foundNewPage = await poll(
       () => {
         const stripped = stripAnsi(run.output).toLowerCase();
-        return stripped.includes('action required') && stripped.includes('new_page');
+        return (
+          stripped.includes('action required') && stripped.includes('new_page')
+        );
       },
       60000,
-      1000
+      1000,
     );
 
     if (!foundNewPage) {
@@ -176,7 +183,7 @@ priority = 100
         return output.includes('take_snapshot');
       },
       60000,
-      1000
+      1000,
     );
 
     const output = stripAnsi(run.output).toLowerCase();
@@ -184,6 +191,5 @@ priority = 100
     expect(output).toContain('browser_agent');
     expect(output).toContain('new_page');
     expect(output).toContain('take_snapshot');
-    });
   });
-
+});
