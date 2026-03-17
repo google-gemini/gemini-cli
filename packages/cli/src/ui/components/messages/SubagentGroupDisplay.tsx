@@ -193,18 +193,24 @@ export const SubagentGroupDisplay: React.FC<SubagentGroupDisplayProps> = ({
               marginLeft={0}
               marginTop={0}
             >
-              <Box minWidth={2}>{renderStatusIcon()}</Box>
+              <Box minWidth={2} flexShrink={0}>
+                {renderStatusIcon()}
+              </Box>
               <Box flexShrink={0}>
                 <Text bold color={theme.text.primary} wrap="truncate">
                   {progress.agentName}
                 </Text>
               </Box>
-              <Text color={theme.text.secondary}> · </Text>
-              <Text color={theme.text.secondary} wrap="truncate">
-                {lastActivity?.type === 'thought' ? '💭' : ''}
-                {content}
-                {displayArgs && ` ${displayArgs}`}
-              </Text>
+              <Box flexShrink={0}>
+                <Text color={theme.text.secondary}> · </Text>
+              </Box>
+              <Box flexShrink={1} minWidth={0}>
+                <Text color={theme.text.secondary} wrap="truncate">
+                  {lastActivity?.type === 'thought' ? '💭' : ''}
+                  {content}
+                  {displayArgs && ` ${displayArgs}`}
+                </Text>
+              </Box>
             </Box>
           );
         }
