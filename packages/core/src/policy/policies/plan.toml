@@ -80,7 +80,8 @@ toolName = [
   "google_web_search",
   "activate_skill",
   "codebase_investigator",
-  "cli_help"
+  "cli_help",
+  "get_internal_docs"
 ]
 decision = "allow"
 priority = 70
