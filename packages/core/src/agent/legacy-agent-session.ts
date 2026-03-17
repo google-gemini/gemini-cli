@@ -21,6 +21,7 @@ import { debugLogger } from '../utils/debugLogger.js';
 import {
   translateEvent,
   createTranslationState,
+  mapResponseParts,
   type TranslationState,
 } from './event-translator.js';
 import type {
@@ -218,7 +219,8 @@ export class LegacyAgentSession implements AgentSession {
           if (
             event.type === GeminiEventType.AgentExecutionStopped ||
             event.type === GeminiEventType.LoopDetected ||
-            event.type === GeminiEventType.AgentExecutionBlocked
+            event.type === GeminiEventType.AgentExecutionBlocked ||
+            event.type === GeminiEventType.MaxSessionTurns
           ) {
             this._streamDone = true;
             return;
@@ -248,7 +250,9 @@ export class LegacyAgentSession implements AgentSession {
             this.makeInternalEvent('tool_response', {
               requestId: request.callId,
               name: request.name,
-              content: mapCompletedToolResponseParts(response.responseParts),
+              content: response.error
+                ? [{ type: 'text', text: response.error.message }]
+                : mapResponseParts(response.responseParts),
               isError: response.error !== undefined,
               ...(response.resultDisplay !== undefined
                 ? {
@@ -440,21 +444,4 @@ function contentPartsToGeminiParts(parts: ContentPart[]): Part[] {
         return { text: JSON.stringify(cp) };
     }
   });
-}
-
-/** Convert @google/genai Part[] → AgentEvent ContentPart[] */
-function mapCompletedToolResponseParts(parts: Part[]): ContentPart[] {
-  const result: ContentPart[] = [];
-  for (const part of parts) {
-    if (part.text !== undefined) {
-      result.push({ type: 'text', text: part.text });
-    } else if (part.inlineData) {
-      result.push({
-        type: 'media',
-        data: part.inlineData.data,
-        mimeType: part.inlineData.mimeType,
-      });
-    }
-  }
-  return result;
 }

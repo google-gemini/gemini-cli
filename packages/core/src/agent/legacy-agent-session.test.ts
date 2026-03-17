@@ -1067,7 +1067,7 @@ describe('LegacyAgentSession', () => {
       expect(resp.isError).toBe(true);
       expect(resp.name).toBe('write_file');
       expect(resp.content).toEqual([
-        { type: 'text', text: 'Permission denied: /bad' },
+        { type: 'text', text: 'Permission denied' },
       ]);
       expect(resp.displayContent).toEqual([
         { type: 'text', text: 'Cannot write to /bad' },
@@ -1140,7 +1140,7 @@ describe('LegacyAgentSession', () => {
     // LoopDetected emits error{fatal:true} + stream_end{failed}
     // ---------------------------------------------------------------------
 
-    it('LoopDetected emits fatal error and stream_end(failed)', async () => {
+    it('LoopDetected emits non-fatal error and stream_end(failed)', async () => {
       const client = makeAsyncClient([
         [
           { type: GeminiEventType.ModelInfo, value: 'gemini-2.5-pro' },
@@ -1163,8 +1163,8 @@ describe('LegacyAgentSession', () => {
       const error = events.find(
         (e) => e.type === 'error',
       ) as AgentEvent<'error'>;
-      expect(error.fatal).toBe(true);
-      expect(error.message).toBe('Loop detected');
+      expect(error.fatal).toBe(false);
+      expect(error.message).toBe('Loop detected, stopping execution');
 
       const end = events[events.length - 1] as AgentEvent<'stream_end'>;
       expect(end.reason).toBe('failed');

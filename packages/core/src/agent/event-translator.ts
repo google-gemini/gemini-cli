@@ -81,7 +81,7 @@ function ensureStreamStart(state: TranslationState, out: AgentEvent[]): void {
  * Converts @google/genai Part[] to ContentPart[].
  * Text parts become text ContentParts; inline data becomes media ContentParts.
  */
-function mapResponseParts(parts: Part[]): ContentPart[] {
+export function mapResponseParts(parts: Part[]): ContentPart[] {
   const result: ContentPart[] = [];
   for (const part of parts) {
     if (part.text !== undefined) {
@@ -285,7 +285,29 @@ export function translateEvent(
           name: state.pendingToolNames.get(event.value.callId) ?? 'unknown',
           content: mapResponseParts(event.value.responseParts),
           isError: event.value.error !== undefined,
-          ...(event.value.data ? { data: event.value.data } : {}),
+          ...(event.value.resultDisplay !== undefined
+            ? {
+                displayContent: [
+                  {
+                    type: 'text',
+                    text:
+                      typeof event.value.resultDisplay === 'string'
+                        ? event.value.resultDisplay
+                        : JSON.stringify(event.value.resultDisplay),
+                  },
+                ],
+              }
+            : {}),
+          ...(event.value.data || event.value.errorType
+            ? {
+                data: {
+                  ...(event.value.data || {}),
+                  ...(event.value.errorType
+                    ? { errorType: event.value.errorType }
+                    : {}),
+                },
+              }
+            : {}),
         }),
       );
       state.pendingToolNames.delete(event.value.callId);
