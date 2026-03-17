@@ -492,6 +492,19 @@ export async function processSingleFileContent(
 
         // Ensure selectedLines doesn't try to slice beyond array bounds
         const actualStart = Math.min(sliceStart, originalLineCount);
+
+        // Guard: if start_line exceeds the file's total line count, return a
+        // structured error so the LLM can self-correct instead of receiving an
+        // inverted range and empty content that looks like valid truncated output.
+        if (startLine !== undefined && actualStart >= originalLineCount) {
+          return {
+            llmContent: `Error: start_line ${startLine} is out of range. The file '${relativePathForDisplay}' only has ${originalLineCount} line${originalLineCount === 1 ? '' : 's'} (lines 1–${originalLineCount}).`,
+            returnDisplay: `start_line out of range for ${relativePathForDisplay}`,
+            error: `start_line ${startLine} exceeds file length (${originalLineCount} lines) for ${filePath}`,
+            errorType: ToolErrorType.INVALID_TOOL_PARAMS,
+          };
+        }
+
         const selectedLines = lines.slice(actualStart, sliceEnd);
 
         let linesWereTruncatedInLength = false;
