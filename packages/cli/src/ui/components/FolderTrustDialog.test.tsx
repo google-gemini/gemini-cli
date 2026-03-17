@@ -66,6 +66,7 @@ describe('FolderTrustDialog', () => {
       mcps: Array.from({ length: 10 }, (_, i) => `mcp${i}`),
       hooks: Array.from({ length: 10 }, (_, i) => `hook${i}`),
       skills: Array.from({ length: 10 }, (_, i) => `skill${i}`),
+      agents: [],
       settings: Array.from({ length: 10 }, (_, i) => `setting${i}`),
       discoveryErrors: [],
       securityWarnings: [],
@@ -95,6 +96,7 @@ describe('FolderTrustDialog', () => {
       mcps: [],
       hooks: [],
       skills: [],
+      agents: [],
       settings: [],
       discoveryErrors: [],
       securityWarnings: [],
@@ -125,6 +127,7 @@ describe('FolderTrustDialog', () => {
       mcps: [],
       hooks: [],
       skills: [],
+      agents: [],
       settings: [],
       discoveryErrors: [],
       securityWarnings: [],
@@ -152,6 +155,7 @@ describe('FolderTrustDialog', () => {
       mcps: [],
       hooks: [],
       skills: [],
+      agents: [],
       settings: [],
       discoveryErrors: [],
       securityWarnings: [],
@@ -332,6 +336,7 @@ describe('FolderTrustDialog', () => {
         mcps: ['mcp1'],
         hooks: ['hook1'],
         skills: ['skill1'],
+        agents: ['agent1'],
         settings: ['general', 'ui'],
         discoveryErrors: [],
         securityWarnings: [],
@@ -355,6 +360,8 @@ describe('FolderTrustDialog', () => {
       expect(lastFrame()).toContain('- hook1');
       expect(lastFrame()).toContain('• Skills (1):');
       expect(lastFrame()).toContain('- skill1');
+      expect(lastFrame()).toContain('• Agents (1):');
+      expect(lastFrame()).toContain('- agent1');
       expect(lastFrame()).toContain('• Setting overrides (2):');
       expect(lastFrame()).toContain('- general');
       expect(lastFrame()).toContain('- ui');
@@ -367,6 +374,7 @@ describe('FolderTrustDialog', () => {
         mcps: [],
         hooks: [],
         skills: [],
+        agents: [],
         settings: [],
         discoveryErrors: [],
         securityWarnings: ['Dangerous setting detected!'],
@@ -390,6 +398,7 @@ describe('FolderTrustDialog', () => {
         mcps: [],
         hooks: [],
         skills: [],
+        agents: [],
         settings: [],
         discoveryErrors: ['Failed to load custom commands'],
         securityWarnings: [],
@@ -413,6 +422,7 @@ describe('FolderTrustDialog', () => {
         mcps: [],
         hooks: [],
         skills: [],
+        agents: [],
         settings: [],
         discoveryErrors: [],
         securityWarnings: [],
@@ -446,6 +456,7 @@ describe('FolderTrustDialog', () => {
         mcps: [`${ansiRed}mcp-with-ansi${ansiReset}`],
         hooks: [`${ansiRed}hook-with-ansi${ansiReset}`],
         skills: [`${ansiRed}skill-with-ansi${ansiReset}`],
+        agents: [],
         settings: [`${ansiRed}setting-with-ansi${ansiReset}`],
         discoveryErrors: [`${ansiRed}error-with-ansi${ansiReset}`],
         securityWarnings: [`${ansiRed}warning-with-ansi${ansiReset}`],
