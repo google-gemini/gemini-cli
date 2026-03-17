@@ -31,6 +31,7 @@ import { ShellTool } from '../tools/shell.js';
 import { WriteFileTool } from '../tools/write-file.js';
 import { WebFetchTool } from '../tools/web-fetch.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
+import { MEMORY_TOOL_NAME } from '../tools/tool-names.js';
 import { WebSearchTool } from '../tools/web-search.js';
 import { AskUserTool } from '../tools/ask-user.js';
 import { ExitPlanModeTool } from '../tools/exit-plan-mode.js';
@@ -1925,6 +1926,10 @@ export class Config implements McpContext, AgentLoopContext {
     );
     for (const tool of policyExclusions) {
       excludeToolsSet.add(tool);
+    }
+
+    if (this.isMemoryManagerEnabled()) {
+      excludeToolsSet.add(MEMORY_TOOL_NAME);
     }
 
     return excludeToolsSet;

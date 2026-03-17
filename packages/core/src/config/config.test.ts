@@ -3113,6 +3113,37 @@ describe('Config JIT Initialization', () => {
       config = new Config(params);
       expect(config.isMemoryManagerEnabled()).toBe(true);
     });
+
+    it('should exclude save_memory tool when memory manager is enabled', async () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalMemoryManager: true,
+      };
+
+      config = new Config(params);
+      const excluded = config.getExcludeTools();
+      expect(excluded).toBeDefined();
+      expect(excluded?.has('save_memory')).toBe(true);
+    });
+
+    it('should NOT exclude save_memory tool when memory manager is disabled', async () => {
+      const params: ConfigParameters = {
+        sessionId: 'test-session',
+        targetDir: '/tmp/test',
+        debugMode: false,
+        model: 'test-model',
+        cwd: '/tmp/test',
+        experimentalMemoryManager: false,
+      };
+
+      config = new Config(params);
+      const excluded = config.getExcludeTools();
+      expect(excluded?.has('save_memory')).toBe(false);
+    });
   });
 
   describe('reloadSkills', () => {
