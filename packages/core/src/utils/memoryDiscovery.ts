@@ -385,12 +385,7 @@ export async function readGeminiMdFiles(
 
           return { filePath, content: processedResult.content };
         } catch (error: unknown) {
-          const isEISDIR =
-            typeof error === 'object' &&
-            error !== null &&
-            'code' in error &&
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-            (error as { code: string }).code === 'EISDIR';
+          const isEISDIR = error instanceof Error && (error as NodeJS.ErrnoException).code === 'EISDIR';
 
           if (isEISDIR) {
             // A directory exists where a GEMINI.md file is expected.
