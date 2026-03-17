@@ -3063,6 +3063,21 @@ describe('Config JIT Initialization', () => {
       project: 'Environment Memory\n\nMCP Instructions',
     });
 
+    // Tier 1: system instruction gets only global memory
+    expect(config.getSystemInstructionMemory()).toBe('Global Memory');
+
+    // Tier 2: session memory gets extension + project formatted with XML tags
+    const sessionMemory = config.getSessionMemory();
+    expect(sessionMemory).toContain('<loaded_context>');
+    expect(sessionMemory).toContain('<extension_context>');
+    expect(sessionMemory).toContain('Extension Memory');
+    expect(sessionMemory).toContain('</extension_context>');
+    expect(sessionMemory).toContain('<project_context>');
+    expect(sessionMemory).toContain('Environment Memory');
+    expect(sessionMemory).toContain('MCP Instructions');
+    expect(sessionMemory).toContain('</project_context>');
+    expect(sessionMemory).toContain('</loaded_context>');
+
     // Verify state update (delegated to ContextManager)
     expect(config.getGeminiMdFileCount()).toBe(1);
     expect(config.getGeminiMdFilePaths()).toEqual(['/path/to/GEMINI.md']);
