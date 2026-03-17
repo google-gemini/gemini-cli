@@ -81,6 +81,33 @@ System prompt content.`);
       });
     });
 
+    it('should parse frontmatter with mcp_servers', async () => {
+      const filePath = await writeAgentMarkdown(`---
+name: mcp-agent
+description: An agent with MCP servers
+mcp_servers:
+  test-server:
+    command: node
+    args: [server.js]
+    include_tools: [tool1, tool2]
+---
+System prompt content.`);
+
+      const result = await parseAgentMarkdown(filePath);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        name: 'mcp-agent',
+        description: 'An agent with MCP servers',
+        mcp_servers: {
+          'test-server': {
+            command: 'node',
+            args: ['server.js'],
+            include_tools: ['tool1', 'tool2'],
+          },
+        },
+      });
+    });
+
     it('should throw AgentLoadError if frontmatter is missing', async () => {
       const filePath = await writeAgentMarkdown(`Just some markdown content.`);
       await expect(parseAgentMarkdown(filePath)).rejects.toThrow(
@@ -272,6 +299,33 @@ Body`);
         markdown,
       ) as LocalAgentDefinition;
       expect(result.modelConfig.model).toBe(GEMINI_MODEL_ALIAS_PRO);
+    });
+
+    it('should convert mcp_servers in local agent', () => {
+      const markdown = {
+        kind: 'local' as const,
+        name: 'mcp-agent',
+        description: 'An agent with MCP servers',
+        mcp_servers: {
+          'test-server': {
+            command: 'node',
+            args: ['server.js'],
+            include_tools: ['tool1'],
+          },
+        },
+        system_prompt: 'prompt',
+      };
+
+      const result = markdownToAgentDefinition(
+        markdown,
+      ) as LocalAgentDefinition;
+      expect(result.kind).toBe('local');
+      expect(result.mcpServers).toBeDefined();
+      expect(result.mcpServers!['test-server']).toMatchObject({
+        command: 'node',
+        args: ['server.js'],
+        includeTools: ['tool1'],
+      });
     });
 
     it('should pass through unknown model names (e.g. auto)', () => {

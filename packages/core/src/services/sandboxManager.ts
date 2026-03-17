@@ -4,10 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import os from 'node:os';
 import {
   sanitizeEnvironment,
+  getSecureSanitizationConfig,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
+import { LinuxSandboxManager } from '../sandbox/linux/LinuxSandboxManager.js';
 
 /**
  * Request for preparing a command to run in a sandbox.
@@ -61,15 +64,9 @@ export class NoopSandboxManager implements SandboxManager {
    * the original program and arguments.
    */
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
-    const sanitizationConfig: EnvironmentSanitizationConfig = {
-      allowedEnvironmentVariables:
-        req.config?.sanitizationConfig?.allowedEnvironmentVariables ?? [],
-      blockedEnvironmentVariables:
-        req.config?.sanitizationConfig?.blockedEnvironmentVariables ?? [],
-      enableEnvironmentVariableRedaction:
-        req.config?.sanitizationConfig?.enableEnvironmentVariableRedaction ??
-        true,
-    };
+    const sanitizationConfig = getSecureSanitizationConfig(
+      req.config?.sanitizationConfig,
+    );
 
     const sanitizedEnv = sanitizeEnvironment(req.env, sanitizationConfig);
 
@@ -95,8 +92,12 @@ export class LocalSandboxManager implements SandboxManager {
  */
 export function createSandboxManager(
   sandboxingEnabled: boolean,
+  workspace: string,
 ): SandboxManager {
   if (sandboxingEnabled) {
+    if (os.platform() === 'linux') {
+      return new LinuxSandboxManager({ workspace });
+    }
     return new LocalSandboxManager();
   }
   return new NoopSandboxManager();
