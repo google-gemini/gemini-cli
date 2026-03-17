@@ -55,14 +55,6 @@ vi.mock('./restore.js', () => ({
   })),
 }));
 
-vi.mock('./acknowledge-agent.js', () => ({
-  AcknowledgeAgentCommand: vi.fn(() => ({
-    name: 'acknowledge-agent',
-    description: 'Acknowledge an agent.',
-    execute: vi.fn(),
-  })),
-}));
-
 import { commandRegistry } from './command-registry.js';
 
 describe('CommandRegistry', () => {
@@ -76,12 +68,6 @@ describe('CommandRegistry', () => {
     const command = commandRegistry.get('extensions');
     expect(command).toBe(mockExtensionsCommandInstance);
   }, 20000);
-
-  it('should register AcknowledgeAgentCommand on initialization', async () => {
-    const command = commandRegistry.get('acknowledge-agent');
-    expect(command).toBeDefined();
-    expect(command?.name).toBe('acknowledge-agent');
-  });
 
   it('should register sub commands on initialization', async () => {
     const command = commandRegistry.get('extensions list');

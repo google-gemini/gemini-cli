@@ -17,7 +17,7 @@ import {
  * Creates a mocked Config object with default values and allows overrides.
  */
 export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
-   
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   ({
     getSandbox: vi.fn(() => undefined),
     getQuestion: vi.fn(() => ''),
@@ -182,11 +182,11 @@ export function createMockSettings(
   overrides: Record<string, unknown> = {},
 ): LoadedSettings {
   const merged = createTestMergedSettings(
-     
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     (overrides['merged'] as Partial<Settings>) || {},
   );
 
-   
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   return {
     system: { settings: {} },
     systemDefaults: { settings: {} },
