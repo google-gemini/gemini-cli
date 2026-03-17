@@ -8,6 +8,7 @@ import {
   MessageType,
   type ContextWindowTurn,
   type ContextWindowTurnKind,
+  type HistoryItemContextWindow,
 } from '../types.js';
 import {
   type CommandContext,
@@ -26,7 +27,7 @@ function estimateTurnTokens(content: Content): number {
   return estimateTokenCountSync(content.parts || []);
 }
 
-function estimateToolDeclarationTokens(tools: Tool[]): number {
+function estimateToolDeclarationTokens(tools: readonly Tool[]): number {
   if (!tools || tools.length === 0) return 0;
   return Math.floor(JSON.stringify(tools).length / 4);
 }
@@ -43,9 +44,9 @@ function classifyTurn(content: Content): ContextWindowTurnKind {
 
   for (const part of parts) {
     if (typeof part.text === 'string' && part.text.length > 0) hasText = true;
-    else if (part.functionCall) hasCall = true;
-    else if (part.functionResponse) hasResult = true;
-    else if ('inlineData' in part || 'fileData' in part) hasMedia = true;
+    if (part.functionCall) hasCall = true;
+    if (part.functionResponse) hasResult = true;
+    if ('inlineData' in part || 'fileData' in part) hasMedia = true;
   }
 
   const count = [hasText, hasCall, hasResult, hasMedia].filter(Boolean).length;
@@ -63,11 +64,14 @@ function getContentPreview(content: Content, maxLen: number = 80): string {
   for (const part of parts) {
     if (typeof part.text === 'string' && part.text.length > 0) {
       segments.push(part.text);
-    } else if (part.functionCall) {
+    }
+    if (part.functionCall) {
       segments.push(`[call: ${part.functionCall.name}]`);
-    } else if (part.functionResponse) {
+    }
+    if (part.functionResponse) {
       segments.push(`[result: ${part.functionResponse.name}]`);
-    } else if ('inlineData' in part || 'fileData' in part) {
+    }
+    if ('inlineData' in part || 'fileData' in part) {
       segments.push('[media]');
     }
   }
@@ -133,7 +137,7 @@ function contextAction(context: CommandContext): void {
   const tokensUsed =
     systemPromptTokens + toolDeclarationTokens + conversationTokens;
 
-  context.ui.addItem({
+  const item: HistoryItemContextWindow = {
     type: MessageType.CONTEXT_WINDOW,
     data: {
       model,
@@ -145,7 +149,8 @@ function contextAction(context: CommandContext): void {
       conversationTokens,
       turns,
     },
-  });
+  };
+  context.ui.addItem(item);
 }
 
 export const contextCommand: SlashCommand = {
