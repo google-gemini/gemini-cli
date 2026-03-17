@@ -5,6 +5,9 @@ prompt = """
 
 Today, our mission is to meticulously review community pull requests (PRs) for this project. We will proceed systematically, evaluating each candidate PR for its quality, adherence to standards, and readiness for merging.
 
+Before you start, load and enforce the shared review rules in:
+!{cat .gemini/commands/strict-development-rules.md}
+
 ### Workflow:
 
 1.  **PR Preparation & Initial Assessment**:
