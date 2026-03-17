@@ -1186,9 +1186,8 @@ input.
   - **Requires restart:** Yes
 
 - **`experimental.enableAgents`** (boolean):
-  - **Description:** Enable local and remote subagents. Warning: Experimental
-    feature, uses YOLO mode for subagents
-  - **Default:** `false`
+  - **Description:** Enable local and remote subagents.
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.extensionManagement`** (boolean):
@@ -1219,7 +1218,7 @@ input.
 
 - **`experimental.jitContext`** (boolean):
   - **Description:** Enable Just-In-Time (JIT) context loading.
-  - **Default:** `false`
+  - **Default:** `true`
   - **Requires restart:** Yes
 
 - **`experimental.useOSC52Paste`** (boolean):
