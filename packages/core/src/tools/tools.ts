@@ -843,6 +843,7 @@ export interface FileDiff {
   newContent: string;
   diffStat?: DiffStat;
   isNewFile?: boolean;
+  diagnostics?: string;
 }
 
 export interface DiffStat {

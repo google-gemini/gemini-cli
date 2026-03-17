@@ -46,10 +46,9 @@ export type SettingsValue =
  * (e.g. an enum or true/false) rather than allowing for free form input
  * (like a number or string).
  */
-export const TOGGLE_TYPES: ReadonlySet<SettingsType | undefined> = new Set([
-  'boolean',
-  'enum',
-]);
+export const TOGGLE_TYPES: ReadonlySet<SettingsType | undefined> = new Set<
+  SettingsType | undefined
+>(['boolean', 'enum']);
 
 export interface SettingEnumOption {
   value: string | number;
@@ -392,6 +391,87 @@ const SETTINGS_SCHEMA = {
           },
         },
         description: 'Settings for automatic session cleanup.',
+      },
+      lsp: {
+        type: 'object',
+        label: 'LSP Diagnostics',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: {},
+        description: oneLine`
+          Language Server Protocol (LSP) diagnostics settings. These allow the
+          CLI to provide real-time feedback on errors and warnings after file
+          edits. Configure language-specific commands like 'pylint', 'flake8',
+          'golangci-lint', or 'tsc --noEmit'.
+        `,
+        showInDialog: false,
+        properties: {
+          lintEnabled: {
+            type: 'boolean',
+            label: 'Enable Linting',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description: 'Enable automatic linting after file edits.',
+            showInDialog: true,
+          },
+          lintCommand: {
+            type: 'string',
+            label: 'Lint Command',
+            category: 'Advanced',
+            requiresRestart: false,
+            default: 'eslint',
+            description:
+              'Command to run for linting (e.g., "eslint"). The file path will be automatically appended to the command.',
+            showInDialog: true,
+          },
+          typeCheckEnabled: {
+            type: 'boolean',
+            label: 'Enable Type Checking',
+            category: 'Advanced',
+            requiresRestart: true,
+            default: false,
+            description: 'Enable automatic type checking after file edits.',
+            showInDialog: true,
+          },
+          typeCheckCommand: {
+            type: 'string',
+            label: 'Type Check Command',
+            category: 'Advanced',
+            requiresRestart: false,
+            default: 'tsc --project tsconfig.json --noEmit --skipLibCheck',
+            description:
+              'Command to run for type checking (e.g., "tsc --project tsconfig.json --noEmit --skipLibCheck"). The file path will be automatically appended to the command.',
+            showInDialog: true,
+          },
+          maxDiagnostics: {
+            type: 'number',
+            label: 'Max Diagnostics',
+            category: 'Advanced',
+            requiresRestart: false,
+            default: 10,
+            description: 'Maximum number of diagnostics to report per file.',
+            showInDialog: true,
+          },
+          runOnEdit: {
+            type: 'boolean',
+            label: 'Run on Edit',
+            category: 'Advanced',
+            requiresRestart: false,
+            default: true,
+            description: 'Run diagnostics automatically after file edits.',
+            showInDialog: true,
+          },
+          runOnDemand: {
+            type: 'boolean',
+            label: 'Run on Demand',
+            category: 'Advanced',
+            requiresRestart: false,
+            default: true,
+            description: 'Allow running diagnostics on demand via commands.',
+            showInDialog: true,
+          },
+        },
       },
     },
   },

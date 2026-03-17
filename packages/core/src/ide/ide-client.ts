@@ -87,7 +87,7 @@ export class IdeClient {
 
   private constructor() {}
 
-  static getInstance(): Promise<IdeClient> {
+  static async getInstance(): Promise<IdeClient> {
     if (!IdeClient.instancePromise) {
       IdeClient.instancePromise = (async () => {
         const client = new IdeClient();
@@ -122,6 +122,16 @@ export class IdeClient {
   }
 
   async connect(options: { logToConsole?: boolean } = {}): Promise<void> {
+    // If getInstance hasn't been called or finished, wait for it
+    if (IdeClient.instancePromise) {
+      await IdeClient.instancePromise;
+    }
+
+    // If we're already connected, don't do anything
+    if (this.state.status === IDEConnectionStatus.Connected) {
+      return;
+    }
+
     const logError = options.logToConsole ?? true;
     if (!this.currentIde) {
       this.setState(

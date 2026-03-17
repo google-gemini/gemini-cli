@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { HookSystem } from './hookSystem.js';
 import { Config } from '../config/config.js';
-import { HookType } from './types.js';
+import { HookType, ConfigSource } from './types.js';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -132,7 +132,11 @@ describe('HookSystem Integration', () => {
         'Hook system initialized successfully',
       );
 
-      expect(hookSystem.getAllHooks().length).toBe(1);
+      expect(
+        hookSystem
+          .getAllHooks()
+          .filter((h) => h.source !== ConfigSource.Runtime).length,
+      ).toBe(1);
     });
 
     it('should not initialize twice', async () => {

@@ -21,6 +21,28 @@ export enum MessageBusType {
   TOOL_CALLS_UPDATE = 'tool-calls-update',
   ASK_USER_REQUEST = 'ask-user-request',
   ASK_USER_RESPONSE = 'ask-user-response',
+  GET_FILE_DIAGNOSTICS_REQUEST = 'get-file-diagnostics-request',
+  GET_FILE_DIAGNOSTICS_RESPONSE = 'get-file-diagnostics-response',
+}
+
+export interface GetFileDiagnosticsRequest {
+  type: MessageBusType.GET_FILE_DIAGNOSTICS_REQUEST;
+  filePath: string;
+  correlationId: string;
+}
+
+export interface GetFileDiagnosticsResponse {
+  type: MessageBusType.GET_FILE_DIAGNOSTICS_RESPONSE;
+  result: Array<{
+    file: string;
+    line: number;
+    column: number;
+    severity: 'error' | 'warning' | 'info';
+    message: string;
+    code?: string;
+    source?: string;
+  }>;
+  correlationId: string;
 }
 
 export interface ToolCallsUpdateMessage {
@@ -194,4 +216,6 @@ export type Message =
   | UpdatePolicy
   | AskUserRequest
   | AskUserResponse
+  | GetFileDiagnosticsRequest
+  | GetFileDiagnosticsResponse
   | ToolCallsUpdateMessage;

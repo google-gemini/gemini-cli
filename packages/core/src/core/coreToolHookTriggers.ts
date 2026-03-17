@@ -235,6 +235,23 @@ export async function executeToolWithHooks(
       }
     }
 
+    // Append diagnostics to returnDisplay if present
+    const diagnostics = afterOutput?.hookSpecificOutput?.['diagnostics'];
+    if (diagnostics && typeof diagnostics === 'string') {
+      if (typeof toolResult.returnDisplay === 'string') {
+        toolResult.returnDisplay += `\n\nLSP Diagnostics:\n${diagnostics}`;
+      } else if (
+        typeof toolResult.returnDisplay === 'object' &&
+        toolResult.returnDisplay !== null &&
+        'fileDiff' in toolResult.returnDisplay
+      ) {
+        toolResult.returnDisplay = {
+          ...toolResult.returnDisplay,
+          diagnostics,
+        };
+      }
+    }
+
     // Check if the hook requested a tail tool call
     const tailToolCallRequest = afterOutput?.getTailToolCallRequest();
     if (tailToolCallRequest) {

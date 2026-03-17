@@ -287,7 +287,14 @@ function createMockConfig(overrides: Partial<Config> = {}): Config {
     getGeminiClient: () => null,
     getMessageBus: () => createMockMessageBus(),
     getEnableHooks: () => false,
-    getExperiments: () => {},
+    getExperiments: () => ({ experimentIds: [] }),
+    getProjectRoot: () => '.',
+    getLspSettings: () => ({
+      lintEnabled: true,
+      lintCommand: 'eslint',
+      typeCheckEnabled: true,
+      typeCheckCommand: 'tsc',
+    }),
   } as unknown as Config;
 
   const finalConfig = { ...baseConfig, ...overrides } as Config;

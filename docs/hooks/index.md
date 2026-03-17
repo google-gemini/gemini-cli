@@ -141,6 +141,15 @@ Hooks are executed with a sanitized environment.
 - `GEMINI_CWD`: The current working directory.
 - `CLAUDE_PROJECT_DIR`: (Alias) Provided for compatibility.
 
+## Built-in hooks
+
+Gemini CLI includes built-in hooks that provide essential functionality without
+requiring manual configuration.
+
+- **`lsp-diagnostics`**: Triggers after a tool modifies a file (such as `edit`
+  or `write_file`). It runs language server diagnostics and provides immediate
+  feedback on any new lint or type errors introduced by the change.
+
 ## Security and risks
 
 <!-- prettier-ignore -->

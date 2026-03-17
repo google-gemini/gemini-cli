@@ -58,8 +58,9 @@ describe('IdeClient', () => {
 
   beforeEach(async () => {
     // Reset singleton instance for test isolation
-    (IdeClient as unknown as { instance: IdeClient | undefined }).instance =
-      undefined;
+    (
+      IdeClient as unknown as { instancePromise: Promise<IdeClient> | null }
+    ).instancePromise = null;
 
     // Mock environment variables
     process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/test/workspace';

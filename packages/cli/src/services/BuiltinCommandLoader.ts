@@ -61,6 +61,10 @@ import { vimCommand } from '../ui/commands/vimCommand.js';
 import { setupGithubCommand } from '../ui/commands/setupGithubCommand.js';
 import { terminalSetupCommand } from '../ui/commands/terminalSetupCommand.js';
 import { upgradeCommand } from '../ui/commands/upgradeCommand.js';
+import {
+  createLintCommand,
+  createTypeCheckCommand,
+} from '../ui/commands/diagnosticsCommands.js';
 
 /**
  * Loads the core, hard-coded slash commands that are an integral part
@@ -155,6 +159,8 @@ export class BuiltinCommandLoader implements ICommandLoader {
           ]
         : [extensionsCommand(this.config?.getEnableExtensionReloading())]),
       helpCommand,
+      createLintCommand(this.config),
+      createTypeCheckCommand(this.config),
       footerCommand,
       shortcutsCommand,
       ...(this.config?.getEnableHooksUI() ? [hooksCommand] : []),

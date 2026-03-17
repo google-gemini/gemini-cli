@@ -14,6 +14,7 @@ export { HookRunner } from './hookRunner.js';
 export { HookAggregator } from './hookAggregator.js';
 export { HookPlanner } from './hookPlanner.js';
 export { HookEventHandler } from './hookEventHandler.js';
+export { createLspDiagnosticsHook } from './lspDiagnostics.js';
 
 // Export interfaces and enums
 export type { HookRegistryEntry } from './hookRegistry.js';

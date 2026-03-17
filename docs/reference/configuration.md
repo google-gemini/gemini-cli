@@ -185,6 +185,39 @@ their corresponding top-level category object in your `settings.json` file.
   - **Description:** Minimum retention period (safety limit, defaults to "1d")
   - **Default:** `"1d"`
 
+- **`general.lsp.lintEnabled`** (boolean):
+  - **Description:** Enable automatic linting after file edits.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`general.lsp.lintCommand`** (string):
+  - **Description:** Command to run for linting (e.g., "eslint"). The file path
+    will be automatically appended to the command.
+  - **Default:** `"eslint"`
+
+- **`general.lsp.typeCheckEnabled`** (boolean):
+  - **Description:** Enable automatic type checking after file edits.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
+- **`general.lsp.typeCheckCommand`** (string):
+  - **Description:** Command to run for type checking (e.g., "tsc --noEmit
+    --skipLibCheck"). The file path will be automatically appended to the
+    command.
+  - **Default:** `"tsc --project tsconfig.json --noEmit --skipLibCheck"`
+
+- **`general.lsp.maxDiagnostics`** (number):
+  - **Description:** Maximum number of diagnostics to report per file.
+  - **Default:** `10`
+
+- **`general.lsp.runOnEdit`** (boolean):
+  - **Description:** Run diagnostics automatically after file edits.
+  - **Default:** `true`
+
+- **`general.lsp.runOnDemand`** (boolean):
+  - **Description:** Allow running diagnostics on demand via commands.
+  - **Default:** `true`
+
 #### `output`
 
 - **`output.format`** (enum):

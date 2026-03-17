@@ -199,6 +199,23 @@ export interface OutputSettings {
   format?: OutputFormat;
 }
 
+export interface LspSettings {
+  /** Whether linting is enabled (default: true) */
+  lintEnabled?: boolean;
+  /** Command to run for linting (e.g., 'eslint') */
+  lintCommand?: string;
+  /** Whether type checking is enabled (default: true) */
+  typeCheckEnabled?: boolean;
+  /** Command to run for type checking (e.g., 'tsc --noEmit') */
+  typeCheckCommand?: string;
+  /** Maximum number of diagnostics to report per file */
+  maxDiagnostics?: number;
+  /** Run diagnostics after edit/write (default: true) */
+  runOnEdit?: boolean;
+  /** Allow running diagnostics on demand via commands (default: true) */
+  runOnDemand?: boolean;
+}
+
 export interface ToolOutputMaskingConfig {
   enabled: boolean;
   toolProtectionThreshold: number;
@@ -669,6 +686,7 @@ export interface ConfigParameters {
     agents?: AgentSettings;
   }>;
   enableConseca?: boolean;
+  lsp?: LspSettings;
   billing?: {
     overageStrategy?: OverageStrategy;
   };
@@ -892,6 +910,8 @@ export class Config implements McpContext, AgentLoopContext {
   readonly injectionService: InjectionService;
   private approvedPlanPath: string | undefined;
 
+  private readonly lspSettings: LspSettings;
+
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
     this.clientName = params.clientName;
@@ -934,6 +954,18 @@ export class Config implements McpContext, AgentLoopContext {
     this.debugMode = params.debugMode;
     this.question = params.question;
     this.worktreeSettings = params.worktreeSettings;
+
+    this.lspSettings = {
+      lintEnabled: params.lsp?.lintEnabled ?? true,
+      lintCommand: params.lsp?.lintCommand ?? 'eslint',
+      typeCheckEnabled: params.lsp?.typeCheckEnabled ?? true,
+      typeCheckCommand:
+        params.lsp?.typeCheckCommand ??
+        'tsc --project tsconfig.json --noEmit --skipLibCheck',
+      maxDiagnostics: params.lsp?.maxDiagnostics ?? 10,
+      runOnEdit: params.lsp?.runOnEdit ?? true,
+      runOnDemand: params.lsp?.runOnDemand ?? true,
+    };
 
     this.coreTools = params.coreTools;
     this.mainAgentTools = params.mainAgentTools;
@@ -1848,6 +1880,14 @@ export class Config implements McpContext, AgentLoopContext {
 
   getAcknowledgedAgentsService(): AcknowledgedAgentsService {
     return this.acknowledgedAgentsService;
+  }
+
+  getLspSettings(): LspSettings {
+    return this.lspSettings;
+  }
+
+  setLspSettings(settings: Partial<LspSettings>): void {
+    Object.assign(this.lspSettings, settings);
   }
 
   /** @deprecated Use toolRegistry getter */

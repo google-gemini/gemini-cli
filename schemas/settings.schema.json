@@ -194,6 +194,73 @@
             }
           },
           "additionalProperties": false
+        },
+        "lsp": {
+          "title": "LSP Diagnostics",
+          "description": "Language Server Protocol (LSP) diagnostics settings. These allow the CLI to provide real-time feedback on errors and warnings after file edits. Configure language-specific commands like 'pylint', 'flake8', 'golangci-lint', or 'tsc --noEmit'.",
+          "markdownDescription": "Language Server Protocol (LSP) diagnostics settings. These allow the CLI to provide real-time feedback on errors and warnings after file edits. Configure language-specific commands like 'pylint', 'flake8', 'golangci-lint', or 'tsc --noEmit'.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `{}`",
+          "default": {},
+          "type": "object",
+          "properties": {
+            "mode": {
+              "title": "Diagnostic Mode",
+              "description": "Diagnostic mode: auto, lsp (IDE/LSP only), cli (command only), or off.",
+              "markdownDescription": "Diagnostic mode: auto, lsp (IDE/LSP only), cli (command only), or off.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `auto`",
+              "default": "auto",
+              "type": "string",
+              "enum": ["auto", "lsp", "cli", "off"]
+            },
+            "lintEnabled": {
+              "title": "Enable Linting",
+              "description": "Enable automatic linting after file edits.",
+              "markdownDescription": "Enable automatic linting after file edits.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "lintCommand": {
+              "title": "Lint Command",
+              "description": "Command to run for linting (e.g., \"eslint\"). The file path will be automatically appended to the command.",
+              "markdownDescription": "Command to run for linting (e.g., \"eslint\"). The file path will be automatically appended to the command.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `eslint`",
+              "default": "eslint",
+              "type": "string"
+            },
+            "typeCheckEnabled": {
+              "title": "Enable Type Checking",
+              "description": "Enable automatic type checking after file edits.",
+              "markdownDescription": "Enable automatic type checking after file edits.\n\n- Category: `Advanced`\n- Requires restart: `yes`\n- Default: `false`",
+              "default": false,
+              "type": "boolean"
+            },
+            "typeCheckCommand": {
+              "title": "Type Check Command",
+              "description": "Command to run for type checking (e.g., \"tsc --project tsconfig.json --noEmit --skipLibCheck\"). The file path will be automatically appended to the command.",
+              "markdownDescription": "Command to run for type checking (e.g., \"tsc --project tsconfig.json --noEmit --skipLibCheck\"). The file path will be automatically appended to the command.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `tsc --project tsconfig.json --noEmit --skipLibCheck`",
+              "default": "tsc --project tsconfig.json --noEmit --skipLibCheck",
+              "type": "string"
+            },
+            "maxDiagnostics": {
+              "title": "Max Diagnostics",
+              "description": "Maximum number of diagnostics to report per file.",
+              "markdownDescription": "Maximum number of diagnostics to report per file.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `10`",
+              "default": 10,
+              "type": "number"
+            },
+            "runOnEdit": {
+              "title": "Run on Edit",
+              "description": "Run diagnostics automatically after file edits.",
+              "markdownDescription": "Run diagnostics automatically after file edits.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            },
+            "runOnDemand": {
+              "title": "Run on Demand",
+              "description": "Allow running diagnostics on demand via commands.",
+              "markdownDescription": "Allow running diagnostics on demand via commands.\n\n- Category: `Advanced`\n- Requires restart: `no`\n- Default: `true`",
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

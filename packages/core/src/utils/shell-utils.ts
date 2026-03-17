@@ -774,7 +774,10 @@ export const spawnAsync = async (
       if (code === 0) {
         resolve({ stdout, stderr });
       } else {
-        reject(new Error(`Command failed with exit code ${code}:\n${stderr}`));
+        const fullOutput = stdout + (stdout && stderr ? '\n' : '') + stderr;
+        reject(
+          new Error(`Command failed with exit code ${code}:\n${fullOutput}`),
+        );
       }
     });
 

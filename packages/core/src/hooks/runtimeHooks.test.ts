@@ -58,7 +58,9 @@ describe('Runtime Hooks', () => {
       { matcher: 'TestTool' },
     );
 
-    const hooks = hookSystem.getAllHooks();
+    const hooks = hookSystem
+      .getAllHooks()
+      .filter((h) => h.config.name === 'test-hook');
     expect(hooks).toHaveLength(1);
     expect(hooks[0].config.name).toBe('test-hook');
     expect(hooks[0].source).toBe(ConfigSource.Runtime);
@@ -130,12 +132,20 @@ describe('Runtime Hooks', () => {
       { matcher: 'TestTool' },
     );
 
-    expect(hookSystem.getAllHooks()).toHaveLength(1);
+    expect(
+      hookSystem.getAllHooks().filter((h) => h.config.name === 'persist-hook'),
+    ).toHaveLength(1);
 
     // Re-initialize
     await hookSystem.initialize();
 
-    expect(hookSystem.getAllHooks()).toHaveLength(1);
-    expect(hookSystem.getAllHooks()[0].config.name).toBe('persist-hook');
+    expect(
+      hookSystem.getAllHooks().filter((h) => h.config.name === 'persist-hook'),
+    ).toHaveLength(1);
+    expect(
+      hookSystem
+        .getAllHooks()
+        .filter((h) => h.config.name === 'persist-hook')[0].config.name,
+    ).toBe('persist-hook');
   });
 });
