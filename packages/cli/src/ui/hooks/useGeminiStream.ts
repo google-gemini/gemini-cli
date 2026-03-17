@@ -1036,8 +1036,10 @@ export const useGeminiStream = (
           'Response stopped due to prohibited image content.',
         [FinishReason.NO_IMAGE]:
           'Response stopped because no image was generated.',
+        // @ts-expect-error IMAGE_RECITATION is missing from the SDK enum
         [FinishReason.IMAGE_RECITATION]:
           'Response stopped due to image recitation policy.',
+        // @ts-expect-error IMAGE_OTHER is missing from the SDK enum
         [FinishReason.IMAGE_OTHER]:
           'Response stopped due to other image-related reasons.',
       };

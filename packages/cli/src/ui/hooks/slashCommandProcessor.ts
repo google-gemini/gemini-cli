@@ -166,6 +166,9 @@ export const useSlashCommandProcessor = (
           selectedAuthType: message.selectedAuthType,
           gcpProject: message.gcpProject,
           ideClient: message.ideClient,
+          userEmail: message.userEmail,
+          tier: message.tier,
+          showEmailWarning: message.showEmailWarning,
         };
       } else if (message.type === MessageType.HELP) {
         historyItemContent = {

@@ -20,7 +20,10 @@ export const aboutCommand: SlashCommand = {
   description: 'Show version info',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
-  action: async (context) => {
+  action: async (context, args) => {
+    const showFull = args?.trim() === '--full';
+    const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+
     const osVersion = process.platform;
     let sandboxEnv = 'no sandbox';
     if (process.env['SANDBOX'] && process.env['SANDBOX'] !== 'sandbox-exec') {
@@ -42,9 +45,16 @@ export const aboutCommand: SlashCommand = {
     debugLogger.log('AboutCommand: Retrieved cached Google account', {
       cachedAccount,
     });
-    const userEmail = cachedAccount ?? undefined;
+    const rawUserEmail = cachedAccount ?? undefined;
 
     const tier = context.services.config?.getUserTierName();
+
+    // Determine email display and whether to show a warning.
+    const emailDetected =
+      rawUserEmail !== undefined && EMAIL_REGEX.test(rawUserEmail);
+    const userEmail =
+      emailDetected && !showFull ? '[email redacted]' : rawUserEmail;
+    const showEmailWarning = emailDetected && !showFull;
 
     const aboutItem: Omit<HistoryItemAbout, 'id'> = {
       type: MessageType.ABOUT,
@@ -57,6 +67,7 @@ export const aboutCommand: SlashCommand = {
       ideClient,
       userEmail,
       tier,
+      showEmailWarning,
     };
 
     context.ui.addItem(aboutItem);
