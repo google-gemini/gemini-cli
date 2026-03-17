@@ -166,7 +166,6 @@ priority = 100
 
     // Select "Allow all server tools for this session" (option 3)
     await run.sendKeys('3');
-    await new Promise(r => setTimeout(r, 5000));
 
     // 3. Since we chose "Allow all server tools", take_snapshot
     // should NOT prompt. We wait for some evidence that
