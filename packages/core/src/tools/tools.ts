@@ -435,6 +435,25 @@ export abstract class DeclarativeTool<
     readonly extensionId?: string,
   ) {}
 
+  clone(messageBus?: MessageBus): this {
+    // Note: we cannot use structuredClone() here because it does not preserve
+    // prototype chains or handle non-serializable properties (like functions).
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const cloned = Object.assign(
+      // eslint-disable-next-line no-restricted-syntax
+      Object.create(Object.getPrototypeOf(this)),
+      this,
+    ) as this;
+    if (messageBus) {
+      Object.defineProperty(cloned, 'messageBus', {
+        value: messageBus,
+        writable: false,
+        configurable: true,
+      });
+    }
+    return cloned;
+  }
+
   get isReadOnly(): boolean {
     return READ_ONLY_KINDS.includes(this.kind);
   }
