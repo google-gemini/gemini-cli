@@ -244,10 +244,11 @@ export async function parseArguments(
             // When --resume passed without a value (`gemini --resume`): value = "" (string)
             // When --resume not passed at all: this `coerce` function is not called at all, and
             //   `yargsInstance.argv.resume` is undefined.
-            if (value === '') {
+            const trimmed = value.trim();
+            if (trimmed === '') {
               return RESUME_LATEST;
             }
-            return value;
+            return trimmed;
           },
         })
         .option('list-sessions', {
@@ -516,7 +517,7 @@ export async function loadCliConfig(
     .getExtensions()
     .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
 
-  const experimentalJitContext = settings.experimental?.jitContext ?? false;
+  const experimentalJitContext = settings.experimental.jitContext;
 
   let extensionRegistryURI =
     process.env['GEMINI_CLI_EXTENSION_REGISTRY_URI'] ??
@@ -672,8 +673,12 @@ export async function loadCliConfig(
       ...settings.mcp,
       allowed: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
     },
-    policyPaths: argv.policy ?? settings.policyPaths,
-    adminPolicyPaths: argv.adminPolicy ?? settings.adminPolicyPaths,
+    policyPaths: (argv.policy ?? settings.policyPaths)?.map((p) =>
+      resolvePath(p),
+    ),
+    adminPolicyPaths: (argv.adminPolicy ?? settings.adminPolicyPaths)?.map(
+      (p) => resolvePath(p),
+    ),
   };
 
   const { workspacePoliciesDir, policyUpdateConfirmationRequest } =
@@ -759,6 +764,8 @@ export async function loadCliConfig(
     includeDirectories,
     loadMemoryFromIncludeDirectories:
       settings.context?.loadMemoryFromIncludeDirectories || false,
+    discoveryMaxDirs: settings.context?.discoveryMaxDirs,
+    importFormat: settings.context?.importFormat,
     debugMode,
     question,
 
