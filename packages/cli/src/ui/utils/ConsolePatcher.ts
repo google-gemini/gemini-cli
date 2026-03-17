@@ -13,6 +13,7 @@ interface ConsolePatcherParams {
   onNewMessage?: (message: Omit<ConsoleMessageItem, 'id'>) => void;
   debugMode: boolean;
   stderr?: boolean;
+  headlessMode?: boolean;
 }
 
 export class ConsolePatcher {
@@ -49,15 +50,15 @@ export class ConsolePatcher {
   private patchConsoleMethod =
     (type: 'log' | 'warn' | 'error' | 'debug' | 'info') =>
     (...args: unknown[]) => {
-      if (this.params.stderr) {
+      if (this.params.headlessMode) {
         if ((type === 'info' || type === 'log') && !this.params.debugMode) {
           return;
         }
-        if (type !== 'debug' || this.params.debugMode) {
+      }
+      if (type !== 'debug' || this.params.debugMode) {
+        if (this.params.stderr) {
           this.originalConsoleError(this.formatArgs(args));
-        }
-      } else {
-        if (type !== 'debug' || this.params.debugMode) {
+        } else {
           this.params.onNewMessage?.({
             type,
             content: this.formatArgs(args),
