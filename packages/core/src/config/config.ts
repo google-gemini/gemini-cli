@@ -2056,6 +2056,43 @@ export class Config implements McpContext, AgentLoopContext {
     this.userMemory = newUserMemory;
   }
 
+  /**
+   * Returns memory for the system instruction.
+   * When JIT is enabled, only global memory (Tier 1) goes in the system
+   * instruction. Extension and project memory (Tier 2) are placed in the
+   * first user message instead, per the tiered context model.
+   */
+  getSystemInstructionMemory(): string | HierarchicalMemory {
+    if (this.experimentalJitContext && this.contextManager) {
+      return this.contextManager.getGlobalMemory();
+    }
+    return this.userMemory;
+  }
+
+  /**
+   * Returns Tier 2 memory (extension + project) for injection into the first
+   * user message when JIT is enabled. Returns empty string when JIT is
+   * disabled (Tier 2 memory is already in the system instruction).
+   */
+  getSessionMemory(): string {
+    if (!this.experimentalJitContext || !this.contextManager) {
+      return '';
+    }
+    const sections: string[] = [];
+    const extension = this.contextManager.getExtensionMemory();
+    const project = this.contextManager.getEnvironmentMemory();
+    if (extension?.trim()) {
+      sections.push(
+        `<extension_context>\n${extension.trim()}\n</extension_context>`,
+      );
+    }
+    if (project?.trim()) {
+      sections.push(`<project_context>\n${project.trim()}\n</project_context>`);
+    }
+    if (sections.length === 0) return '';
+    return `\n<loaded_context>\n${sections.join('\n')}\n</loaded_context>`;
+  }
+
   getGlobalMemory(): string {
     return this.contextManager?.getGlobalMemory() ?? '';
   }
