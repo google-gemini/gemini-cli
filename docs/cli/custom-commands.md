@@ -269,6 +269,25 @@ When you run `/review FileCommandLoader.ts`, the `@{docs/best-practices.md}`
 placeholder is replaced by the content of that file, and `{{args}}` is replaced
 by the text you provided, before the final prompt is sent to the model.
 
+### 5. Using extension paths with `${extensionPath}`
+
+If you are authoring a custom command as part of an
+[extension](../extensions/index.md), you can use the `${extensionPath}` variable
+in your prompt. This allows your command to reference files or resources bundled
+within the extension directory, regardless of where the extension is installed.
+
+**How it works:**
+
+- `${extensionPath}` is replaced with the absolute path to your extension's root
+  directory before any other processing (like `!{...}` or `@{...}`) occurs.
+
+**Example (`/my-extension.toml`):**
+
+```toml
+description = "Uses a local template from the extension."
+prompt = "Please format the code according to this template: ${extensionPath}/templates/code-style.md"
+```
+
 ---
 
 ## Example: A "Pure Function" refactoring command
