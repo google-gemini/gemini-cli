@@ -21,6 +21,7 @@ import {
   FatalInputError,
   CoreEvent,
   CoreToolCallStatus,
+  debugLogger,
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import { runNonInteractive } from './nonInteractiveCli.js';
@@ -1703,6 +1704,9 @@ describe('runNonInteractive', () => {
   );
 
   it('should log error when tool recording fails', async () => {
+    const errorSpy = vi
+      .spyOn(debugLogger, 'error')
+      .mockImplementation(() => {});
     const toolCallEvent: ServerGeminiStreamEvent = {
       type: GeminiEventType.ToolCallRequest,
       value: {
@@ -1769,7 +1773,12 @@ describe('runNonInteractive', () => {
 
     // The LegacyAgentSession silently catches recording failures
     // (they shouldn't break the loop). Verify the loop continued
-    // and produced output.
+    // and logged the error.
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'Error recording completed tool call information',
+      ),
+    );
     expect(getWrittenOutput()).toContain('Done');
   });
 

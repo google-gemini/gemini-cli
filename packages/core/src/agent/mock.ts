@@ -74,6 +74,7 @@ export class MockAgentSession implements AgentSession {
 
     const now = new Date().toISOString();
     for (const eventData of events) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const event: AgentEvent = {
         ...eventData,
         id: eventData.id ?? `e-${this._nextEventId++}`,
@@ -172,6 +173,7 @@ export class MockAgentSession implements AgentSession {
 
     const normalizedResponse: AgentEvent[] = [];
     for (const eventData of response) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const event: AgentEvent = {
         ...eventData,
         id: eventData.id ?? `e-${this._nextEventId++}`,

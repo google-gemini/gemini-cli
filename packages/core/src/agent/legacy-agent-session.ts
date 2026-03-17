@@ -16,6 +16,8 @@ import type { Scheduler } from '../scheduler/scheduler.js';
 import type { Config } from '../config/config.js';
 import type { ToolCallRequestInfo } from '../scheduler/types.js';
 import { ToolErrorType } from '../tools/tool-error.js';
+import { recordToolCallInteractions } from '../code_assist/telemetry.js';
+import { debugLogger } from '../utils/debugLogger.js';
 import {
   translateEvent,
   createTranslationState,
@@ -261,7 +263,16 @@ export class LegacyAgentSession implements AgentSession {
                     ],
                   }
                 : {}),
-              ...(response.data ? { data: response.data } : {}),
+              ...(response.data || response.errorType
+                ? {
+                    data: {
+                      ...(response.data || {}),
+                      ...(response.errorType
+                        ? { errorType: response.errorType }
+                        : {}),
+                    },
+                  }
+                : {}),
             }),
           ]);
 
@@ -277,8 +288,12 @@ export class LegacyAgentSession implements AgentSession {
           this._client
             .getChat()
             .recordCompletedToolCalls(currentModel, completedToolCalls);
-        } catch {
-          // Recording failures shouldn't break the loop
+
+          await recordToolCallInteractions(this._config, completedToolCalls);
+        } catch (error) {
+          debugLogger.error(
+            `Error recording completed tool call information: ${error}`,
+          );
         }
 
         // Check if a tool requested stop execution

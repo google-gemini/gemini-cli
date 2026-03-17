@@ -27,6 +27,7 @@ import {
   Scheduler,
   ROOT_SCHEDULER_ID,
   LegacyAgentSession,
+  ToolErrorType,
 } from '@google/gemini-cli-core';
 
 import type { Part } from '@google/genai';
@@ -381,7 +382,10 @@ export async function runNonInteractive({
                 output: displayText,
                 error: event.isError
                   ? {
-                      type: 'TOOL_EXECUTION_ERROR',
+                      type:
+                        typeof event.data?.['errorType'] === 'string'
+                          ? event.data['errorType']
+                          : 'TOOL_EXECUTION_ERROR',
                       message: errorMsg,
                     }
                   : undefined,
@@ -400,9 +404,20 @@ export async function runNonInteractive({
                 event.name,
                 new Error(errorMsg),
                 config,
-                undefined,
+                typeof event.data?.['errorType'] === 'string'
+                  ? event.data['errorType']
+                  : undefined,
                 displayText,
               );
+            }
+            if (
+              event.isError &&
+              event.data?.['errorType'] === ToolErrorType.STOP_EXECUTION
+            ) {
+              const stopMessage = `Agent execution stopped: ${errorMsg}`;
+              if (config.getOutputFormat() === OutputFormat.TEXT) {
+                process.stderr.write(`${stopMessage}\n`);
+              }
             }
             break;
           }
