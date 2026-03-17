@@ -44,7 +44,9 @@ export const forkCommand: SlashCommand = {
       const shortSessionId = currentSessionId.slice(0, 8);
       const files = await fs.readdir(chatsDir);
       const currentSessionFiles = files.filter(
-        (f) => f.startsWith(SESSION_FILE_PREFIX) && f.includes(shortSessionId),
+        (f) =>
+          f.startsWith(SESSION_FILE_PREFIX) &&
+          f.endsWith(`-${shortSessionId}.json`),
       );
 
       if (currentSessionFiles.length === 0) {
@@ -77,7 +79,7 @@ export const forkCommand: SlashCommand = {
       const newShortId = newSessionId.slice(0, 8);
       const timestamp = new Date()
         .toISOString()
-        .slice(0, 16)
+        .slice(0, 19)
         .replace(/:/g, '-');
       const newFileName = `${SESSION_FILE_PREFIX}${timestamp}-${newShortId}.json`;
       const newFilePath = path.join(chatsDir, newFileName);
