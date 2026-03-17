@@ -120,7 +120,8 @@ These are the only allowed tools:
   [`list_directory`](../tools/file-system.md#1-list_directory-readfolder),
   [`glob`](../tools/file-system.md#4-glob-findfiles)
 - **Search:** [`grep_search`](../tools/file-system.md#5-grep_search-searchtext),
-  [`google_web_search`](../tools/web-search.md)
+  [`google_web_search`](../tools/web-search.md),
+  [`get_internal_docs`](../tools/internal-docs.md)
 - **Research Subagents:**
   [`codebase_investigator`](../core/subagents.md#codebase-investigator),
   [`cli_help`](../core/subagents.md#cli-help-agent)

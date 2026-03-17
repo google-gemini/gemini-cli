@@ -346,6 +346,12 @@ describe('Policy Engine Integration Tests', () => {
       expect(
         (await engine.check({ name: 'list_directory' }, undefined)).decision,
       ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'get_internal_docs' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
+      expect(
+        (await engine.check({ name: 'cli_help' }, undefined)).decision,
+      ).toBe(PolicyDecision.ALLOW);
 
       // Other tools should be denied via catch all
       expect(
