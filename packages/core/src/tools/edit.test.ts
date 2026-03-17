@@ -33,6 +33,14 @@ vi.mock('../utils/editor.js', () => ({
   openDiff: mockOpenDiff,
 }));
 
+vi.mock('./jit-context.js', () => ({
+  discoverJitContext: vi.fn().mockResolvedValue(''),
+  appendJitContext: vi.fn().mockImplementation((content, context) => {
+    if (!context) return content;
+    return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
+  }),
+}));
+
 import {
   describe,
   it,
@@ -934,7 +942,7 @@ function doIt() {
     );
   });
 
-  describe('expected_replacements', () => {
+  describe('allow_multiple', () => {
     const testFile = 'replacements_test.txt';
     let filePath: string;
 
@@ -944,34 +952,70 @@ function doIt() {
 
     it.each([
       {
-        name: 'succeed when occurrences match expected_replacements',
+        name: 'succeed when allow_multiple is true and there are multiple occurrences',
         content: 'foo foo foo',
-        expected: 3,
+        allow_multiple: true,
         shouldSucceed: true,
         finalContent: 'bar bar bar',
       },
       {
-        name: 'fail when occurrences do not match expected_replacements',
-        content: 'foo foo foo',
-        expected: 2,
-        shouldSucceed: false,
+        name: 'succeed when allow_multiple is true and there is exactly 1 occurrence',
+        content: 'foo',
+        allow_multiple: true,
+        shouldSucceed: true,
+        finalContent: 'bar',
       },
       {
-        name: 'default to 1 expected replacement if not specified',
-        content: 'foo foo',
-        expected: undefined,
+        name: 'fail when allow_multiple is false and there are multiple occurrences',
+        content: 'foo foo foo',
+        allow_multiple: false,
         shouldSucceed: false,
+        expectedError: ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
+      },
+      {
+        name: 'default to 1 expected replacement if allow_multiple not specified',
+        content: 'foo foo',
+        allow_multiple: undefined,
+        shouldSucceed: false,
+        expectedError: ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
+      },
+      {
+        name: 'succeed when allow_multiple is false and there is exactly 1 occurrence',
+        content: 'foo',
+        allow_multiple: false,
+        shouldSucceed: true,
+        finalContent: 'bar',
+      },
+      {
+        name: 'fail when allow_multiple is true but there are 0 occurrences',
+        content: 'baz',
+        allow_multiple: true,
+        shouldSucceed: false,
+        expectedError: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
+      },
+      {
+        name: 'fail when allow_multiple is false but there are 0 occurrences',
+        content: 'baz',
+        allow_multiple: false,
+        shouldSucceed: false,
+        expectedError: ToolErrorType.EDIT_NO_OCCURRENCE_FOUND,
       },
     ])(
       'should $name',
-      async ({ content, expected, shouldSucceed, finalContent }) => {
+      async ({
+        content,
+        allow_multiple,
+        shouldSucceed,
+        finalContent,
+        expectedError,
+      }) => {
         fs.writeFileSync(filePath, content, 'utf8');
         const params: EditToolParams = {
           file_path: filePath,
           instruction: 'Replace all foo with bar',
           old_string: 'foo',
           new_string: 'bar',
-          ...(expected !== undefined && { expected_replacements: expected }),
+          ...(allow_multiple !== undefined && { allow_multiple }),
         };
         const invocation = tool.build(params);
         const result = await invocation.execute(new AbortController().signal);
@@ -981,9 +1025,7 @@ function doIt() {
           if (finalContent)
             expect(fs.readFileSync(filePath, 'utf8')).toBe(finalContent);
         } else {
-          expect(result.error?.type).toBe(
-            ToolErrorType.EDIT_EXPECTED_OCCURRENCE_MISMATCH,
-          );
+          expect(result.error?.type).toBe(expectedError);
         }
       },
     );
@@ -1195,6 +1237,66 @@ function doIt() {
       await invocation.execute(new AbortController().signal);
 
       expect(mockFixLLMEditWithInstruction).toHaveBeenCalled();
+    });
+  });
+
+  describe('JIT context discovery', () => {
+    it('should append JIT context to output when enabled and context is found', async () => {
+      const { discoverJitContext, appendJitContext } = await import(
+        './jit-context.js'
+      );
+      vi.mocked(discoverJitContext).mockResolvedValue('Use the useAuth hook.');
+      vi.mocked(appendJitContext).mockImplementation((content, context) => {
+        if (!context) return content;
+        return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
+      });
+
+      const filePath = path.join(rootDir, 'jit-edit-test.txt');
+      const initialContent = 'some old text here';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace old with new',
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(discoverJitContext).toHaveBeenCalled();
+      expect(result.llmContent).toContain('Newly Discovered Project Context');
+      expect(result.llmContent).toContain('Use the useAuth hook.');
+    });
+
+    it('should not append JIT context when disabled', async () => {
+      const { discoverJitContext, appendJitContext } = await import(
+        './jit-context.js'
+      );
+      vi.mocked(discoverJitContext).mockResolvedValue('');
+      vi.mocked(appendJitContext).mockImplementation((content, context) => {
+        if (!context) return content;
+        return `${content}\n\n--- Newly Discovered Project Context ---\n${context}\n--- End Project Context ---`;
+      });
+
+      const filePath = path.join(rootDir, 'jit-disabled-edit-test.txt');
+      const initialContent = 'some old text here';
+      fs.writeFileSync(filePath, initialContent, 'utf8');
+
+      const params: EditToolParams = {
+        file_path: filePath,
+        instruction: 'Replace old with new',
+        old_string: 'old',
+        new_string: 'new',
+      };
+
+      const invocation = tool.build(params);
+      const result = await invocation.execute(new AbortController().signal);
+
+      expect(result.llmContent).not.toContain(
+        'Newly Discovered Project Context',
+      );
     });
   });
 });

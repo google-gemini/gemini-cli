@@ -14,6 +14,7 @@ import {
   GOOGLE_ACCOUNTS_FILENAME,
   isSubpath,
   resolveToRealPath,
+  normalizePath,
 } from '../utils/paths.js';
 import { ProjectRegistry } from './projectRegistry.js';
 import { StorageMigration } from './storageMigration.js';
@@ -61,6 +62,10 @@ export class Storage {
     return path.join(Storage.getGlobalGeminiDir(), 'mcp-oauth-tokens.json');
   }
 
+  static getA2AOAuthTokensPath(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'a2a-oauth-tokens.json');
+  }
+
   static getGlobalSettingsPath(): string {
     return path.join(Storage.getGlobalGeminiDir(), 'settings.json');
   }
@@ -91,6 +96,10 @@ export class Storage {
 
   static getUserPoliciesDir(): string {
     return path.join(Storage.getGlobalGeminiDir(), 'policies');
+  }
+
+  static getUserKeybindingsPath(): string {
+    return path.join(Storage.getGlobalGeminiDir(), 'keybindings.json');
   }
 
   static getUserAgentsDir(): string {
@@ -142,6 +151,17 @@ export class Storage {
     return path.join(this.targetDir, GEMINI_DIR);
   }
 
+  /**
+   * Checks if the current workspace storage location is the same as the global/user storage location.
+   * This handles symlinks and platform-specific path normalization.
+   */
+  isWorkspaceHomeDir(): boolean {
+    return (
+      normalizePath(resolveToRealPath(this.targetDir)) ===
+      normalizePath(resolveToRealPath(homedir()))
+    );
+  }
+
   getAgentsDir(): string {
     return path.join(this.targetDir, AGENTS_DIR_NAME);
   }
@@ -156,11 +176,15 @@ export class Storage {
     return path.join(this.getGeminiDir(), 'policies');
   }
 
-  getAutoSavedPolicyPath(): string {
+  getWorkspaceAutoSavedPolicyPath(): string {
     return path.join(
       this.getWorkspacePoliciesDir(),
       AUTO_SAVED_POLICY_FILENAME,
     );
+  }
+
+  getAutoSavedPolicyPath(): string {
+    return path.join(Storage.getUserPoliciesDir(), AUTO_SAVED_POLICY_FILENAME);
   }
 
   ensureProjectTempDirExists(): void {
@@ -275,6 +299,13 @@ export class Storage {
       return path.join(this.getProjectTempDir(), this.sessionId, 'plans');
     }
     return path.join(this.getProjectTempDir(), 'plans');
+  }
+
+  getProjectTempTrackerDir(): string {
+    if (this.sessionId) {
+      return path.join(this.getProjectTempDir(), this.sessionId, 'tracker');
+    }
+    return path.join(this.getProjectTempDir(), 'tracker');
   }
 
   getPlansDir(): string {

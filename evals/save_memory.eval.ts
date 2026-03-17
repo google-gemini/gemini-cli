@@ -14,7 +14,7 @@ import {
 describe('save_memory', () => {
   const TEST_PREFIX = 'Save memory test: ';
   const rememberingFavoriteColor = "Agent remembers user's favorite color";
-  evalTest('USUALLY_PASSES', {
+  evalTest('ALWAYS_PASSES', {
     name: rememberingFavoriteColor,
     params: {
       settings: { tools: { core: ['save_memory'] } },
@@ -79,7 +79,7 @@ describe('save_memory', () => {
 
   const ignoringTemporaryInformation =
     'Agent ignores temporary conversation details';
-  evalTest('USUALLY_PASSES', {
+  evalTest('ALWAYS_PASSES', {
     name: ignoringTemporaryInformation,
     params: {
       settings: { tools: { core: ['save_memory'] } },
@@ -104,7 +104,7 @@ describe('save_memory', () => {
   });
 
   const rememberingPetName = "Agent remembers user's pet's name";
-  evalTest('USUALLY_PASSES', {
+  evalTest('ALWAYS_PASSES', {
     name: rememberingPetName,
     params: {
       settings: { tools: { core: ['save_memory'] } },
@@ -125,7 +125,7 @@ describe('save_memory', () => {
   });
 
   const rememberingCommandAlias = 'Agent remembers custom command aliases';
-  evalTest('USUALLY_PASSES', {
+  evalTest('ALWAYS_PASSES', {
     name: rememberingCommandAlias,
     params: {
       settings: { tools: { core: ['save_memory'] } },
@@ -178,7 +178,7 @@ describe('save_memory', () => {
 
   const rememberingCodingStyle =
     "Agent remembers user's coding style preference";
-  evalTest('USUALLY_PASSES', {
+  evalTest('ALWAYS_PASSES', {
     name: rememberingCodingStyle,
     params: {
       settings: { tools: { core: ['save_memory'] } },
@@ -260,7 +260,7 @@ describe('save_memory', () => {
   });
 
   const rememberingBirthday = "Agent remembers user's birthday";
-  evalTest('USUALLY_PASSES', {
+  evalTest('ALWAYS_PASSES', {
     name: rememberingBirthday,
     params: {
       settings: { tools: { core: ['save_memory'] } },

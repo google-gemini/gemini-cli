@@ -11,6 +11,7 @@ import type { ShellExecutionConfig } from '../services/shellExecutionService.js'
 import { SchemaValidator } from '../utils/schemaValidator.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
+import { isRecord } from '../utils/markdownUtils.js';
 import { randomUUID } from 'node:crypto';
 import {
   MessageBusType,
@@ -19,6 +20,16 @@ import {
   type Question,
 } from '../confirmation-bus/types.js';
 import { type ApprovalMode } from '../policy/types.js';
+import type { SubagentProgress } from '../agents/types.js';
+
+/**
+ * Options bag for tool execution, replacing positional parameters that are
+ * only relevant to specific tool types.
+ */
+export interface ExecuteOptions {
+  shellExecutionConfig?: ShellExecutionConfig;
+  setExecutionIdCallback?: (executionId: number) => void;
+}
 
 /**
  * Represents a validated and ready-to-execute tool call.
@@ -60,21 +71,66 @@ export interface ToolInvocation<
    * Executes the tool with the validated parameters.
    * @param signal AbortSignal for tool cancellation.
    * @param updateOutput Optional callback to stream output.
+   * @param setExecutionIdCallback Optional callback for tools that expose a background execution handle.
    * @returns Result of the tool execution.
    */
   execute(
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
-    shellExecutionConfig?: ShellExecutionConfig,
+    updateOutput?: (output: ToolLiveOutput) => void,
+    options?: ExecuteOptions,
   ): Promise<TResult>;
+
+  /**
+   * Returns tool-specific options for policy updates.
+   * This is used by the scheduler to narrow policy rules when a tool is approved.
+   */
+  getPolicyUpdateOptions?(
+    outcome: ToolConfirmationOutcome,
+  ): PolicyUpdateOptions | undefined;
+}
+
+/**
+ * Structured payload used by tools to surface background execution metadata to
+ * the CLI UI.
+ *
+ * NOTE: `pid` is used as the canonical identifier for now to stay consistent
+ * with existing types (ExecutingToolCall.pid, ExecutionHandle.pid, etc.).
+ * A future rename to `executionId` is planned once the codebase is fully
+ * migrated — not done in this PR to keep the diff focused on the abstraction.
+ */
+export interface BackgroundExecutionData extends Record<string, unknown> {
+  pid?: number;
+  command?: string;
+  initialOutput?: string;
+}
+
+export function isBackgroundExecutionData(
+  data: unknown,
+): data is BackgroundExecutionData {
+  if (typeof data !== 'object' || data === null) {
+    return false;
+  }
+
+  const pid = 'pid' in data ? data.pid : undefined;
+  const command = 'command' in data ? data.command : undefined;
+  const initialOutput =
+    'initialOutput' in data ? data.initialOutput : undefined;
+
+  return (
+    (pid === undefined || typeof pid === 'number') &&
+    (command === undefined || typeof command === 'string') &&
+    (initialOutput === undefined || typeof initialOutput === 'string')
+  );
 }
 
 /**
  * Options for policy updates that can be customized by tool invocations.
  */
 export interface PolicyUpdateOptions {
+  argsPattern?: string;
   commandPrefix?: string | string[];
   mcpName?: string;
+  toolName?: string;
 }
 
 /**
@@ -91,6 +147,7 @@ export abstract class BaseToolInvocation<
     readonly _toolName?: string,
     readonly _toolDisplayName?: string,
     readonly _serverName?: string,
+    readonly _toolAnnotations?: Record<string, unknown>,
   ) {}
 
   abstract getDescription(): string;
@@ -128,7 +185,7 @@ export abstract class BaseToolInvocation<
    * Subclasses can override this to provide additional options like
    * commandPrefix (for shell) or mcpName (for MCP tools).
    */
-  protected getPolicyUpdateOptions(
+  getPolicyUpdateOptions(
     _outcome: ToolConfirmationOutcome,
   ): PolicyUpdateOptions | undefined {
     return undefined;
@@ -199,6 +256,7 @@ export abstract class BaseToolInvocation<
         args: this.params as Record<string, unknown>,
       },
       serverName: this._serverName,
+      toolAnnotations: this._toolAnnotations,
     };
 
     return new Promise<'ALLOW' | 'DENY' | 'ASK_USER'>((resolve) => {
@@ -274,8 +332,8 @@ export abstract class BaseToolInvocation<
 
   abstract execute(
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
-    shellExecutionConfig?: ShellExecutionConfig,
+    updateOutput?: (output: ToolLiveOutput) => void,
+    options?: ExecuteOptions,
   ): Promise<TResult>;
 }
 
@@ -347,6 +405,15 @@ export interface ToolBuilder<
 }
 
 /**
+ * Represents the expected JSON Schema structure for tool parameters.
+ */
+export interface ToolParameterSchema {
+  type: string;
+  properties?: unknown;
+  [key: string]: unknown;
+}
+
+/**
  * New base class for tools that separates validation from execution.
  * New tools should extend this class.
  */
@@ -372,11 +439,57 @@ export abstract class DeclarativeTool<
     return READ_ONLY_KINDS.includes(this.kind);
   }
 
+  get toolAnnotations(): Record<string, unknown> | undefined {
+    return undefined;
+  }
+
   getSchema(_modelId?: string): FunctionDeclaration {
     return {
       name: this.name,
       description: this.description,
-      parametersJsonSchema: this.parameterSchema,
+      parametersJsonSchema: this.addWaitForPreviousParameter(
+        this.parameterSchema,
+      ),
+    };
+  }
+
+  /**
+   * Type guard to check if an unknown value represents a ToolParameterSchema object.
+   */
+  private isParameterSchema(obj: unknown): obj is ToolParameterSchema {
+    return isRecord(obj) && 'type' in obj;
+  }
+
+  /**
+   * Adds the `wait_for_previous` parameter to the tool's schema.
+   * This allows the model to explicitly control parallel vs sequential execution.
+   */
+  private addWaitForPreviousParameter(schema: unknown): unknown {
+    if (!this.isParameterSchema(schema) || schema.type !== 'object') {
+      return schema;
+    }
+
+    const props = schema.properties;
+    let propertiesObj: Record<string, unknown> = {};
+
+    if (props !== undefined) {
+      if (!isRecord(props)) {
+        // properties exists but is not an object, so it's a malformed schema.
+        return schema;
+      }
+      propertiesObj = props;
+    }
+
+    return {
+      ...schema,
+      properties: {
+        ...propertiesObj,
+        wait_for_previous: {
+          type: 'boolean',
+          description:
+            'Set to true to wait for all previously requested tools in this turn to complete before starting. Set to false (or omit) to run in parallel. Use true when this tool depends on the output of previous tools.',
+        },
+      },
     };
   }
 
@@ -416,11 +529,11 @@ export abstract class DeclarativeTool<
   async buildAndExecute(
     params: TParams,
     signal: AbortSignal,
-    updateOutput?: (output: string | AnsiOutput) => void,
-    shellExecutionConfig?: ShellExecutionConfig,
+    updateOutput?: (output: ToolLiveOutput) => void,
+    options?: ExecuteOptions,
   ): Promise<TResult> {
     const invocation = this.build(params);
-    return invocation.execute(signal, updateOutput, shellExecutionConfig);
+    return invocation.execute(signal, updateOutput, options);
   }
 
   /**
@@ -579,6 +692,15 @@ export interface ToolResult {
    * Optional data payload for passing structured information back to the caller.
    */
   data?: Record<string, unknown>;
+
+  /**
+   * Optional request to execute another tool immediately after this one.
+   * The result of this tail call will replace the original tool's response.
+   */
+  tailToolCallRequest?: {
+    name: string;
+    args: Record<string, unknown>;
+  };
 }
 
 /**
@@ -673,7 +795,14 @@ export interface TodoList {
   todos: Todo[];
 }
 
-export type ToolResultDisplay = string | FileDiff | AnsiOutput | TodoList;
+export type ToolLiveOutput = string | AnsiOutput | SubagentProgress;
+
+export type ToolResultDisplay =
+  | string
+  | FileDiff
+  | AnsiOutput
+  | TodoList
+  | SubagentProgress;
 
 export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 
@@ -757,6 +886,9 @@ export interface ToolMcpConfirmationDetails {
   serverName: string;
   toolName: string;
   toolDisplayName: string;
+  toolArgs?: Record<string, unknown>;
+  toolDescription?: string;
+  toolParameterSchema?: unknown;
   onConfirm: (outcome: ToolConfirmationOutcome) => Promise<void>;
 }
 
@@ -814,9 +946,11 @@ export enum Kind {
   Search = 'search',
   Execute = 'execute',
   Think = 'think',
+  Agent = 'agent',
   Fetch = 'fetch',
   Communicate = 'communicate',
   Plan = 'plan',
+  SwitchMode = 'switch_mode',
   Other = 'other',
 }
 

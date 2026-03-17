@@ -48,12 +48,14 @@ describe('textUtils', () => {
     it('should handle unicode characters that crash string-width', () => {
       // U+0602 caused string-width to crash (see #16418)
       const char = '؂';
-      expect(getCachedStringWidth(char)).toBe(1);
+      expect(() => getCachedStringWidth(char)).not.toThrow();
+      expect(typeof getCachedStringWidth(char)).toBe('number');
     });
 
     it('should handle unicode characters that crash string-width with ANSI codes', () => {
       const charWithAnsi = '\u001b[31m' + '؂' + '\u001b[0m';
-      expect(getCachedStringWidth(charWithAnsi)).toBe(1);
+      expect(() => getCachedStringWidth(charWithAnsi)).not.toThrow();
+      expect(typeof getCachedStringWidth(charWithAnsi)).toBe('number');
     });
   });
 

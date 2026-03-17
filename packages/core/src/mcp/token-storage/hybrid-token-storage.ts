@@ -5,13 +5,15 @@
  */
 
 import { BaseTokenStorage } from './base-token-storage.js';
-import { FileTokenStorage } from './file-token-storage.js';
-import type { TokenStorage, OAuthCredentials } from './types.js';
-import { TokenStorageType } from './types.js';
+import { KeychainTokenStorage } from './keychain-token-storage.js';
+import {
+  TokenStorageType,
+  type TokenStorage,
+  type OAuthCredentials,
+} from './types.js';
 import { coreEvents } from '../../utils/events.js';
 import { TokenStorageInitializationEvent } from '../../telemetry/types.js';
-
-const FORCE_FILE_STORAGE_ENV_VAR = 'GEMINI_FORCE_FILE_STORAGE';
+import { FORCE_FILE_STORAGE_ENV_VAR } from '../../services/keychainService.js';
 
 export class HybridTokenStorage extends BaseTokenStorage {
   private storage: TokenStorage | null = null;
@@ -25,34 +27,20 @@ export class HybridTokenStorage extends BaseTokenStorage {
   private async initializeStorage(): Promise<TokenStorage> {
     const forceFileStorage = process.env[FORCE_FILE_STORAGE_ENV_VAR] === 'true';
 
-    if (!forceFileStorage) {
-      try {
-        const { KeychainTokenStorage } = await import(
-          './keychain-token-storage.js'
-        );
-        const keychainStorage = new KeychainTokenStorage(this.serviceName);
+    const keychainStorage = new KeychainTokenStorage(this.serviceName);
+    this.storage = keychainStorage;
 
-        const isAvailable = await keychainStorage.isAvailable();
-        if (isAvailable) {
-          this.storage = keychainStorage;
-          this.storageType = TokenStorageType.KEYCHAIN;
+    const isUsingFileFallback = await keychainStorage.isUsingFileFallback();
 
-          coreEvents.emitTelemetryTokenStorageType(
-            new TokenStorageInitializationEvent('keychain', forceFileStorage),
-          );
-
-          return this.storage;
-        }
-      } catch (_e) {
-        // Fallback to file storage if keychain fails to initialize
-      }
-    }
-
-    this.storage = new FileTokenStorage(this.serviceName);
-    this.storageType = TokenStorageType.ENCRYPTED_FILE;
+    this.storageType = isUsingFileFallback
+      ? TokenStorageType.ENCRYPTED_FILE
+      : TokenStorageType.KEYCHAIN;
 
     coreEvents.emitTelemetryTokenStorageType(
-      new TokenStorageInitializationEvent('encrypted_file', forceFileStorage),
+      new TokenStorageInitializationEvent(
+        isUsingFileFallback ? 'encrypted_file' : 'keychain',
+        forceFileStorage,
+      ),
     );
 
     return this.storage;

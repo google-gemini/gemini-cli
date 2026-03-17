@@ -65,7 +65,7 @@ describe('McpClientManager', () => {
 
   it('should discover tools from all configured', async () => {
     mockConfig.getMcpServers.mockReturnValue({
-      'test-server': {},
+      'test-server': { command: 'node' },
     });
     const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
     await manager.startConfiguredMcpServers();
@@ -76,9 +76,9 @@ describe('McpClientManager', () => {
 
   it('should batch context refresh when starting multiple servers', async () => {
     mockConfig.getMcpServers.mockReturnValue({
-      'server-1': {},
-      'server-2': {},
-      'server-3': {},
+      'server-1': { command: 'node' },
+      'server-2': { command: 'node' },
+      'server-3': { command: 'node' },
     });
     const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
     await manager.startConfiguredMcpServers();
@@ -93,7 +93,7 @@ describe('McpClientManager', () => {
 
   it('should update global discovery state', async () => {
     mockConfig.getMcpServers.mockReturnValue({
-      'test-server': {},
+      'test-server': { command: 'node' },
     });
     const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
     expect(manager.getDiscoveryState()).toBe(MCPDiscoveryState.NOT_STARTED);
@@ -105,7 +105,7 @@ describe('McpClientManager', () => {
 
   it('should mark discovery completed when all configured servers are user-disabled', async () => {
     mockConfig.getMcpServers.mockReturnValue({
-      'test-server': {},
+      'test-server': { command: 'node' },
     });
     mockConfig.getMcpEnablementCallbacks.mockReturnValue({
       isSessionDisabled: vi.fn().mockReturnValue(false),
@@ -125,7 +125,7 @@ describe('McpClientManager', () => {
 
   it('should mark discovery completed when all configured servers are blocked', async () => {
     mockConfig.getMcpServers.mockReturnValue({
-      'test-server': {},
+      'test-server': { command: 'node' },
     });
     mockConfig.getBlockedMcpServers.mockReturnValue(['test-server']);
 
@@ -142,7 +142,7 @@ describe('McpClientManager', () => {
 
   it('should not discover tools if folder is not trusted', async () => {
     mockConfig.getMcpServers.mockReturnValue({
-      'test-server': {},
+      'test-server': { command: 'node' },
     });
     mockConfig.isTrustedFolder.mockReturnValue(false);
     const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
@@ -153,7 +153,7 @@ describe('McpClientManager', () => {
 
   it('should not start blocked servers', async () => {
     mockConfig.getMcpServers.mockReturnValue({
-      'test-server': {},
+      'test-server': { command: 'node' },
     });
     mockConfig.getBlockedMcpServers.mockReturnValue(['test-server']);
     const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
@@ -164,8 +164,8 @@ describe('McpClientManager', () => {
 
   it('should only start allowed servers if allow list is not empty', async () => {
     mockConfig.getMcpServers.mockReturnValue({
-      'test-server': {},
-      'another-server': {},
+      'test-server': { command: 'node' },
+      'another-server': { command: 'node' },
     });
     mockConfig.getAllowedMcpServers.mockReturnValue(['another-server']);
     const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
@@ -179,7 +179,7 @@ describe('McpClientManager', () => {
     await manager.startExtension({
       name: 'test-extension',
       mcpServers: {
-        'test-server': {},
+        'test-server': { command: 'node' },
       },
       isActive: true,
       version: '1.0.0',
@@ -196,7 +196,7 @@ describe('McpClientManager', () => {
     await manager.startExtension({
       name: 'test-extension',
       mcpServers: {
-        'test-server': {},
+        'test-server': { command: 'node' },
       },
       isActive: false,
       version: '1.0.0',
@@ -210,7 +210,7 @@ describe('McpClientManager', () => {
 
   it('should add blocked servers to the blockedMcpServers list', async () => {
     mockConfig.getMcpServers.mockReturnValue({
-      'test-server': {},
+      'test-server': { command: 'node' },
     });
     mockConfig.getBlockedMcpServers.mockReturnValue(['test-server']);
     const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
@@ -220,12 +220,26 @@ describe('McpClientManager', () => {
     ]);
   });
 
+  it('should skip discovery for servers without connection details', async () => {
+    mockConfig.getMcpServers.mockReturnValue({
+      'test-server': { excludeTools: ['dangerous_tool'] },
+    });
+    const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+    await manager.startConfiguredMcpServers();
+    expect(mockedMcpClient.connect).not.toHaveBeenCalled();
+    expect(mockedMcpClient.discover).not.toHaveBeenCalled();
+
+    // But it should still be tracked in allServerConfigs
+    expect(manager.getMcpServers()).toHaveProperty('test-server');
+  });
+
   describe('restart', () => {
     it('should restart all running servers', async () => {
+      const serverConfig = { command: 'node' };
       mockConfig.getMcpServers.mockReturnValue({
-        'test-server': {},
+        'test-server': serverConfig,
       });
-      mockedMcpClient.getServerConfig.mockReturnValue({});
+      mockedMcpClient.getServerConfig.mockReturnValue(serverConfig);
       const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
       await manager.startConfiguredMcpServers();
 
@@ -241,10 +255,11 @@ describe('McpClientManager', () => {
 
   describe('restartServer', () => {
     it('should restart the specified server', async () => {
+      const serverConfig = { command: 'node' };
       mockConfig.getMcpServers.mockReturnValue({
-        'test-server': {},
+        'test-server': serverConfig,
       });
-      mockedMcpClient.getServerConfig.mockReturnValue({});
+      mockedMcpClient.getServerConfig.mockReturnValue(serverConfig);
       const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
       await manager.startConfiguredMcpServers();
 
@@ -263,6 +278,40 @@ describe('McpClientManager', () => {
       await expect(manager.restartServer('non-existent')).rejects.toThrow(
         'No MCP server registered with the name "non-existent"',
       );
+    });
+
+    it('should create a new McpClient with updated config on restart', async () => {
+      const originalConfig = { command: 'node', args: ['--port', '8000'] };
+      const updatedConfig = { command: 'node', args: ['--port', '9000'] };
+
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': originalConfig,
+      });
+
+      // Track McpClient constructor calls
+      const constructorCalls: unknown[][] = [];
+      vi.mocked(McpClient).mockImplementation((...args: unknown[]) => {
+        constructorCalls.push(args);
+        return mockedMcpClient;
+      });
+      mockedMcpClient.getServerConfig.mockReturnValue(originalConfig);
+
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      await manager.startConfiguredMcpServers();
+
+      // First call should use the original config
+      expect(constructorCalls).toHaveLength(1);
+      expect(constructorCalls[0][1]).toBe(originalConfig);
+
+      // Simulate config file change and hot-reload
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': updatedConfig,
+      });
+      await manager.startConfiguredMcpServers();
+
+      // A NEW McpClient should have been constructed with the updated config
+      expect(constructorCalls).toHaveLength(2);
+      expect(constructorCalls[1][1]).toMatchObject(updatedConfig);
     });
   });
 
@@ -292,8 +341,8 @@ describe('McpClientManager', () => {
       );
 
       mockConfig.getMcpServers.mockReturnValue({
-        'server-with-instructions': {},
-        'server-without-instructions': {},
+        'server-with-instructions': { command: 'node' },
+        'server-without-instructions': { command: 'node' },
       });
       await manager.startConfiguredMcpServers();
 
@@ -321,7 +370,7 @@ describe('McpClientManager', () => {
       });
 
       mockConfig.getMcpServers.mockReturnValue({
-        'test-server': {},
+        'test-server': { command: 'node' },
       });
 
       const manager = new McpClientManager(
@@ -341,10 +390,10 @@ describe('McpClientManager', () => {
           throw new Error('Disconnect failed unexpectedly');
         }
       });
-      mockedMcpClient.getServerConfig.mockReturnValue({});
+      mockedMcpClient.getServerConfig.mockReturnValue({ command: 'node' });
 
       mockConfig.getMcpServers.mockReturnValue({
-        'test-server': {},
+        'test-server': { command: 'node' },
       });
 
       const manager = new McpClientManager(
@@ -381,6 +430,215 @@ describe('McpClientManager', () => {
       expect(manager.getMcpServers()).not.toHaveProperty('test-server');
     });
 
+    it('should merge extension configuration with an existing user-configured server', async () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      const userConfig = { command: 'node', args: ['user-server.js'] };
+
+      mockConfig.getMcpServers.mockReturnValue({
+        'test-server': userConfig,
+      });
+      mockedMcpClient.getServerConfig.mockReturnValue(userConfig);
+
+      await manager.startConfiguredMcpServers();
+      expect(mockedMcpClient.connect).toHaveBeenCalledTimes(1);
+
+      const extension: GeminiCLIExtension = {
+        name: 'test-extension',
+        mcpServers: {
+          'test-server': { command: 'node', args: ['ext-server.js'] },
+        },
+        isActive: true,
+        version: '1.0.0',
+        path: '/some-path',
+        contextFiles: [],
+        id: '123',
+      };
+
+      await manager.startExtension(extension);
+
+      // It should disconnect the user-only version and reconnect with the merged version
+      expect(mockedMcpClient.disconnect).toHaveBeenCalledTimes(1);
+      expect(mockedMcpClient.connect).toHaveBeenCalledTimes(2);
+
+      // Verify user settings (command/args) still win in the merged config
+      const lastCall = vi.mocked(McpClient).mock.calls[1];
+      expect(lastCall[1].command).toBe('node');
+      expect(lastCall[1].args).toEqual(['user-server.js']);
+      expect(lastCall[1].extension).toEqual(extension);
+    });
+
+    it('should securely merge tool lists and env variables regardless of load order', async () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+
+      const userConfig = {
+        excludeTools: ['user-tool'],
+        includeTools: ['shared-inc', 'user-only-inc'],
+        env: { USER_VAR: 'user-val', OVERRIDE_VAR: 'user-override' },
+      };
+
+      const extension: GeminiCLIExtension = {
+        name: 'test-extension',
+        mcpServers: {
+          'test-server': {
+            command: 'node',
+            args: ['ext.js'],
+            excludeTools: ['ext-tool'],
+            includeTools: ['shared-inc', 'ext-only-inc'],
+            env: { EXT_VAR: 'ext-val', OVERRIDE_VAR: 'ext-override' },
+          },
+        },
+        isActive: true,
+        version: '1.0.0',
+        path: '/some-path',
+        contextFiles: [],
+        id: '123',
+      };
+
+      // Case 1: Extension loads first, then User config (e.g. from startConfiguredMcpServers)
+      await manager.startExtension(extension);
+
+      mockedMcpClient.getServerConfig.mockReturnValue({
+        ...extension.mcpServers!['test-server'],
+        extension,
+      });
+
+      await manager.maybeDiscoverMcpServer('test-server', userConfig);
+
+      let lastCall = vi.mocked(McpClient).mock.calls[1]; // Second call due to re-discovery
+      let mergedConfig = lastCall[1];
+
+      // Exclude list should be unioned (most restrictive)
+      expect(mergedConfig.excludeTools).toContain('ext-tool');
+      expect(mergedConfig.excludeTools).toContain('user-tool');
+
+      // Include list should be intersected (most restrictive)
+      expect(mergedConfig.includeTools).toContain('shared-inc');
+      expect(mergedConfig.includeTools).not.toContain('user-only-inc');
+      expect(mergedConfig.includeTools).not.toContain('ext-only-inc');
+
+      expect(mergedConfig.env!['EXT_VAR']).toBe('ext-val');
+      expect(mergedConfig.env!['USER_VAR']).toBe('user-val');
+      expect(mergedConfig.env!['OVERRIDE_VAR']).toBe('user-override');
+      expect(mergedConfig.extension).toBe(extension); // Extension ID preserved!
+
+      // Reset for Case 2
+      vi.mocked(McpClient).mockClear();
+      const manager2 = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+
+      // Case 2: User config loads first, then Extension loads
+      // This call will skip discovery because userConfig has no connection details
+      await manager2.maybeDiscoverMcpServer('test-server', userConfig);
+
+      // In Case 2, the existing client is NOT created yet because discovery was skipped.
+      // So getServerConfig on mockedMcpClient won't be called yet.
+      // However, startExtension will call maybeDiscoverMcpServer which will merge.
+
+      await manager2.startExtension(extension);
+
+      lastCall = vi.mocked(McpClient).mock.calls[0];
+      mergedConfig = lastCall[1];
+
+      expect(mergedConfig.excludeTools).toContain('ext-tool');
+      expect(mergedConfig.excludeTools).toContain('user-tool');
+      expect(mergedConfig.includeTools).toContain('shared-inc');
+      expect(mergedConfig.includeTools).not.toContain('user-only-inc');
+      expect(mergedConfig.includeTools).not.toContain('ext-only-inc');
+
+      expect(mergedConfig.env!['EXT_VAR']).toBe('ext-val');
+      expect(mergedConfig.env!['USER_VAR']).toBe('user-val');
+      expect(mergedConfig.env!['OVERRIDE_VAR']).toBe('user-override');
+      expect(mergedConfig.extension).toBe(extension); // Extension ID preserved!
+    });
+
+    it('should result in empty includeTools if intersection is empty', async () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      const userConfig = { includeTools: ['user-tool'] };
+      const extConfig = {
+        command: 'node',
+        args: ['ext.js'],
+        includeTools: ['ext-tool'],
+      };
+
+      await manager.maybeDiscoverMcpServer('test-server', userConfig);
+      await manager.maybeDiscoverMcpServer('test-server', extConfig);
+
+      const lastCall = vi.mocked(McpClient).mock.calls[0];
+      expect(lastCall[1].includeTools).toEqual([]); // Empty array = no tools allowed
+    });
+
+    it('should respect a single allowlist if only one is provided', async () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      const userConfig = { includeTools: ['user-tool'] };
+      const extConfig = { command: 'node', args: ['ext.js'] };
+
+      await manager.maybeDiscoverMcpServer('test-server', userConfig);
+      await manager.maybeDiscoverMcpServer('test-server', extConfig);
+
+      const lastCall = vi.mocked(McpClient).mock.calls[0];
+      expect(lastCall[1].includeTools).toEqual(['user-tool']);
+    });
+
+    it('should allow partial overrides of connection properties', async () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      const extConfig = { command: 'node', args: ['ext.js'], timeout: 1000 };
+      const userOverride = { args: ['overridden.js'] };
+
+      // Load extension first
+      await manager.maybeDiscoverMcpServer('test-server', extConfig);
+      mockedMcpClient.getServerConfig.mockReturnValue(extConfig);
+
+      // Apply partial user override
+      await manager.maybeDiscoverMcpServer('test-server', userOverride);
+
+      const lastCall = vi.mocked(McpClient).mock.calls[1];
+      const finalConfig = lastCall[1];
+
+      expect(finalConfig.command).toBe('node'); // Preserved from base
+      expect(finalConfig.args).toEqual(['overridden.js']); // Overridden
+      expect(finalConfig.timeout).toBe(1000); // Preserved from base
+    });
+
+    it('should prevent one extension from hijacking another extension server name', async () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+
+      const extension1: GeminiCLIExtension = {
+        name: 'extension-1',
+        isActive: true,
+        id: 'ext-1',
+        version: '1.0.0',
+        path: '/path1',
+        contextFiles: [],
+        mcpServers: {
+          'shared-name': { command: 'node', args: ['server1.js'] },
+        },
+      };
+
+      const extension2: GeminiCLIExtension = {
+        name: 'extension-2',
+        isActive: true,
+        id: 'ext-2',
+        version: '1.0.0',
+        path: '/path2',
+        contextFiles: [],
+        mcpServers: {
+          'shared-name': { command: 'node', args: ['server2.js'] },
+        },
+      };
+
+      // Start extension 1 (discovery begins but is not yet complete)
+      const p1 = manager.startExtension(extension1);
+
+      // Immediately attempt to start extension 2 with the same name
+      await manager.startExtension(extension2);
+
+      await p1;
+
+      // Only extension 1 should have been initialized
+      expect(vi.mocked(McpClient)).toHaveBeenCalledTimes(1);
+      const lastCall = vi.mocked(McpClient).mock.calls[0];
+      expect(lastCall[1].extension).toBe(extension1);
+    });
+
     it('should remove servers from blockedMcpServers when stopExtension is called', async () => {
       mockConfig.getBlockedMcpServers.mockReturnValue(['blocked-server']);
       const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
@@ -408,6 +666,100 @@ describe('McpClientManager', () => {
         name: 'blocked-server',
         extensionName: 'test-extension',
       });
+    });
+  });
+
+  describe('diagnostic reporting', () => {
+    let coreEventsMock: typeof import('../utils/events.js').coreEvents;
+
+    beforeEach(async () => {
+      const eventsModule = await import('../utils/events.js');
+      coreEventsMock = eventsModule.coreEvents;
+      vi.spyOn(coreEventsMock, 'emitFeedback').mockImplementation(() => {});
+    });
+
+    it('should emit hint instead of full error when user has not interacted with MCP', () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      manager.emitDiagnostic(
+        'error',
+        'Something went wrong',
+        new Error('boom'),
+      );
+
+      expect(coreEventsMock.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        'MCP issues detected. Run /mcp list for status.',
+      );
+      expect(coreEventsMock.emitFeedback).not.toHaveBeenCalledWith(
+        'error',
+        'Something went wrong',
+        expect.anything(),
+      );
+    });
+
+    it('should emit full error when user has interacted with MCP', () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      manager.setUserInteractedWithMcp();
+      manager.emitDiagnostic(
+        'error',
+        'Something went wrong',
+        new Error('boom'),
+      );
+
+      expect(coreEventsMock.emitFeedback).toHaveBeenCalledWith(
+        'error',
+        'Something went wrong',
+        expect.any(Error),
+      );
+    });
+
+    it('should still deduplicate diagnostic messages after user interaction', () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+      manager.setUserInteractedWithMcp();
+
+      manager.emitDiagnostic('error', 'Same error');
+      manager.emitDiagnostic('error', 'Same error');
+
+      expect(coreEventsMock.emitFeedback).toHaveBeenCalledTimes(1);
+    });
+
+    it('should only show hint once per session', () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+
+      manager.emitDiagnostic('error', 'Error 1');
+      manager.emitDiagnostic('error', 'Error 2');
+
+      expect(coreEventsMock.emitFeedback).toHaveBeenCalledTimes(1);
+      expect(coreEventsMock.emitFeedback).toHaveBeenCalledWith(
+        'info',
+        'MCP issues detected. Run /mcp list for status.',
+      );
+    });
+
+    it('should capture last error for a server even when silenced', () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+
+      manager.emitDiagnostic(
+        'error',
+        'Error in server (test-server)',
+        undefined,
+        'test-server',
+      );
+
+      expect(manager.getLastError('test-server')).toBe(
+        'Error in server (test-server)',
+      );
+    });
+
+    it('should show previously deduplicated errors after interaction clears state', () => {
+      const manager = new McpClientManager('0.0.1', toolRegistry, mockConfig);
+
+      manager.emitDiagnostic('error', 'Same error');
+      expect(coreEventsMock.emitFeedback).toHaveBeenCalledTimes(1); // The hint
+
+      manager.setUserInteractedWithMcp();
+      manager.emitDiagnostic('error', 'Same error');
+      expect(coreEventsMock.emitFeedback).toHaveBeenCalledTimes(2); // Now the actual error
     });
   });
 });
