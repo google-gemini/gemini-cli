@@ -87,6 +87,31 @@ describe('AskUserDialog', () => {
         writeKey(stdin, '\r'); // Toggle TS
         writeKey(stdin, '\x1b[B'); // Down
         writeKey(stdin, '\r'); // Toggle ESLint
+        writeKey(stdin, '\x1b[B'); // Down to All of the above
+        writeKey(stdin, '\x1b[B'); // Down to Other
+        writeKey(stdin, '\x1b[B'); // Down to Done
+        writeKey(stdin, '\r'); // Done
+      },
+      expectedSubmit: { '0': 'TypeScript, ESLint' },
+    },
+    {
+      name: 'All of the above',
+      questions: [
+        {
+          question: 'Which features?',
+          header: 'Features',
+          type: QuestionType.CHOICE,
+          options: [
+            { label: 'TypeScript', description: '' },
+            { label: 'ESLint', description: '' },
+          ],
+          multiSelect: true,
+        },
+      ] as Question[],
+      actions: (stdin: { write: (data: string) => void }) => {
+        writeKey(stdin, '\x1b[B'); // Down to ESLint
+        writeKey(stdin, '\x1b[B'); // Down to All of the above
+        writeKey(stdin, '\r'); // Toggle All of the above
         writeKey(stdin, '\x1b[B'); // Down to Other
         writeKey(stdin, '\x1b[B'); // Down to Done
         writeKey(stdin, '\r'); // Done
@@ -128,6 +153,42 @@ describe('AskUserDialog', () => {
       await waitFor(async () => {
         expect(onSubmit).toHaveBeenCalledWith(expectedSubmit);
       });
+    });
+  });
+
+  it('verifies "All of the above" visual state with snapshot', async () => {
+    const questions = [
+      {
+        question: 'Which features?',
+        header: 'Features',
+        type: QuestionType.CHOICE,
+        options: [
+          { label: 'TypeScript', description: '' },
+          { label: 'ESLint', description: '' },
+        ],
+        multiSelect: true,
+      },
+    ] as Question[];
+
+    const { stdin, lastFrame, waitUntilReady } = renderWithProviders(
+      <AskUserDialog
+        questions={questions}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+        width={120}
+      />,
+      { width: 120 },
+    );
+
+    // Navigate to "All of the above" and toggle it
+    writeKey(stdin, '\x1b[B'); // Down to ESLint
+    writeKey(stdin, '\x1b[B'); // Down to All of the above
+    writeKey(stdin, '\r'); // Toggle All of the above
+
+    await waitFor(async () => {
+      await waitUntilReady();
+      // Verify visual state (checkmarks on all options)
+      expect(lastFrame()).toMatchSnapshot();
     });
   });
 
