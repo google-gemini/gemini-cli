@@ -116,12 +116,19 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
           case 'THOUGHT_CHUNK': {
             const text = String(activity.data['text']);
             const lastItem = recentActivity[recentActivity.length - 1];
+
             if (
               lastItem &&
               lastItem.type === 'thought' &&
               lastItem.status === 'running'
             ) {
-              lastItem.content += text;
+              // Ensure there is a space if concatenating complete thoughts
+              const needsSpace =
+                lastItem.content.length > 0 &&
+                !/\s$/.test(lastItem.content) &&
+                !/^\s/.test(text);
+
+              lastItem.content += (needsSpace ? ' ' : '') + text;
             } else {
               recentActivity.push({
                 id: randomUUID(),

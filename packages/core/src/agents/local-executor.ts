@@ -782,6 +782,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     const functionCalls: FunctionCall[] = [];
     let textResponse = '';
+    let lastEmittedSubject = '';
 
     for await (const resp of responseStream) {
       if (signal.aborted) break;
@@ -794,8 +795,9 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         const { subject } = parseThought(
           parts?.find((p) => p.thought)?.text || '',
         );
-        if (subject) {
+        if (subject && subject !== lastEmittedSubject) {
           this.emitActivity('THOUGHT_CHUNK', { text: subject });
+          lastEmittedSubject = subject;
         }
 
         // Collect any function calls requested by the model.

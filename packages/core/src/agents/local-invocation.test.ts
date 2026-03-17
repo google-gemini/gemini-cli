@@ -239,6 +239,39 @@ describe('LocalSubagentInvocation', () => {
       );
     });
 
+    it('should add a space when concatenating distinct THOUGHT_CHUNK activities', async () => {
+      mockExecutorInstance.run.mockImplementation(async () => {
+        const onActivity = MockLocalAgentExecutor.create.mock.calls[0][2];
+
+        if (onActivity) {
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'THOUGHT_CHUNK',
+            data: { text: 'I am thinking.' },
+          } as SubagentActivityEvent);
+          onActivity({
+            isSubagentActivityEvent: true,
+            agentName: 'MockAgent',
+            type: 'THOUGHT_CHUNK',
+            data: { text: 'Now I will act.' },
+          } as SubagentActivityEvent);
+        }
+        return { result: 'Done', terminate_reason: AgentTerminateMode.GOAL };
+      });
+
+      await invocation.execute(signal, updateOutput);
+
+      expect(updateOutput).toHaveBeenCalledTimes(3); // Initial + 2 updates
+      const lastCall = updateOutput.mock.calls[2][0] as SubagentProgress;
+      expect(lastCall.recentActivity).toContainEqual(
+        expect.objectContaining({
+          type: 'thought',
+          content: 'I am thinking. Now I will act.',
+        }),
+      );
+    });
+
     it('should stream other activities (e.g., TOOL_CALL_START, ERROR)', async () => {
       mockExecutorInstance.run.mockImplementation(async () => {
         const onActivity = MockLocalAgentExecutor.create.mock.calls[0][2];
