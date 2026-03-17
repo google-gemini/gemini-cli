@@ -22,6 +22,8 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
   context window.
 - **🔧 Built-in tools**: Google Search grounding, file operations, shell
   commands, web fetching.
+- **🏗️ [Plan Mode]**: Secure, read-only environment for architectural research
+  and design.
 - **📋 [Spec-Driven Development (SDD)]**: Spec-driven development workflow
   (inspired by [Conductor]).
 - **🔌 Extensible**: MCP (Model Context Protocol) support for custom
@@ -390,6 +392,7 @@ instructions.
 
 ---
 
+[Plan Mode]: ./docs/cli/plan-mode.md
 [Spec-Driven Development (SDD)]: ./docs/cli/spec-driven-development.md
 [Conductor]: https://github.com/gemini-cli-extensions/conductor
 
