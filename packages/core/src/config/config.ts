@@ -999,7 +999,7 @@ export class Config implements McpContext, AgentLoopContext {
     );
 
     this.thinHarness =
-      params.thinHarness ?? process.env['GEMINI_THIN_HARNESS'] === 'true';
+      params.thinHarness ?? process.env['GEMINI_THIN_HARNESS'] !== 'false';
     this.experimentalJitContext = params.experimentalJitContext ?? true;
     this.topicUpdateNarration = params.topicUpdateNarration ?? false;
     this.modelSteering = params.modelSteering ?? false;
