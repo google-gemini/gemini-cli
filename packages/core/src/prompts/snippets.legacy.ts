@@ -17,6 +17,9 @@ import {
   READ_FILE_TOOL_NAME,
   SHELL_PARAM_IS_BACKGROUND,
   SHELL_TOOL_NAME,
+  TRACKER_CREATE_TASK_TOOL_NAME,
+  TRACKER_LIST_TASKS_TOOL_NAME,
+  TRACKER_UPDATE_TASK_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
   WRITE_TODOS_TOOL_NAME,
 } from '../tools/tool-names.js';
@@ -31,6 +34,7 @@ export interface SystemPromptOptions {
   hookContext?: boolean;
   primaryWorkflows?: PrimaryWorkflowsOptions;
   planningWorkflow?: PlanningWorkflowOptions;
+  taskTracker?: boolean;
   operationalGuidelines?: OperationalGuidelinesOptions;
   sandbox?: SandboxMode;
   interactiveYoloMode?: boolean;
@@ -55,6 +59,7 @@ export interface PrimaryWorkflowsOptions {
   enableWriteTodosTool: boolean;
   enableEnterPlanModeTool: boolean;
   approvedPlan?: { path: string };
+  taskTracker?: boolean;
 }
 
 export interface OperationalGuidelinesOptions {
@@ -78,6 +83,7 @@ export interface PlanningWorkflowOptions {
   planModeToolsList: string;
   plansDir: string;
   approvedPlanPath?: string;
+  taskTracker?: boolean;
 }
 
 export interface AgentSkillOptions {
@@ -113,6 +119,8 @@ ${
     ? renderPlanningWorkflow(options.planningWorkflow)
     : renderPrimaryWorkflows(options.primaryWorkflows)
 }
+
+${options.taskTracker ? renderTaskTracker() : ''}
 
 ${renderOperationalGuidelines(options.operationalGuidelines)}
 
@@ -455,6 +463,20 @@ An approved plan is available for this task.
 `;
 }
 
+export function renderTaskTracker(): string {
+  return `
+# TASK MANAGEMENT PROTOCOL
+You are operating with a persistent file-based task tracking system located at \`.tracker/tasks/\`. You must adhere to the following rules:
+
+1.  **NO IN-MEMORY LISTS**: Do not maintain a mental list of tasks or write markdown checkboxes in the chat. Use the provided tools (\`${TRACKER_CREATE_TASK_TOOL_NAME}\`, \`${TRACKER_LIST_TASKS_TOOL_NAME}\`, \`${TRACKER_UPDATE_TASK_TOOL_NAME}\`) for all state management.
+2.  **IMMEDIATE DECOMPOSITION**: Upon receiving a task, evaluate its functional complexity and scope. If the request involves more than a single atomic modification, or necessitates research before execution, you MUST immediately decompose it into discrete entries using \`${TRACKER_CREATE_TASK_TOOL_NAME}\`.
+3.  **IGNORE FORMATTING BIAS**: Trigger the protocol based on the **objective complexity** of the goal, regardless of whether the user provided a structured list or a single block of text/paragraph. "Paragraph-style" goals that imply multiple actions are multi-step projects and MUST be tracked.
+4.  **PLAN MODE INTEGRATION**: If an approved plan exists, you MUST use the \`${TRACKER_CREATE_TASK_TOOL_NAME}\` tool to decompose it into discrete tasks before writing any code. Maintain a bidirectional understanding between the plan document and the task graph.
+5.  **VERIFICATION**: Before marking a task as complete, verify the work is actually done (e.g., run the test, check the file existence).
+6.  **STATE OVER CHAT**: If the user says "I think we finished that," but the tool says it is 'pending', trust the tool--or verify explicitly before updating.
+7.  **DEPENDENCY MANAGEMENT**: Respect task topology. Never attempt to execute a task if its dependencies are not marked as 'closed'. If you are blocked, focus only on the leaf nodes of the task graph.`.trim();
+}
+
 // --- Leaf Helpers (Strictly strings or simple calls) ---
 
 function mandateConfirm(interactive: boolean): string {
@@ -495,14 +517,24 @@ Use '${READ_FILE_TOOL_NAME}' to understand context and validate any assumptions 
 }
 
 function workflowStepPlan(options: PrimaryWorkflowsOptions): string {
+  if (options.approvedPlan && options.taskTracker) {
+    return `2. **Plan:** An approved plan is available for this task. Treat this file as your single source of truth and invoke the task tracker tool to create tasks for this plan. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements. Make sure to update the tracker task list based on this updated plan.`;
+  }
   if (options.approvedPlan) {
     return `2. **Plan:** An approved plan is available for this task. Use this file as a guide for your implementation. You MUST read this file before proceeding. If you discover new requirements or need to change the approach, confirm with the user and update this plan file to reflect the updated design decisions or discovered requirements.`;
+  }
+
+  if (options.enableCodebaseInvestigator && options.taskTracker) {
+    return `2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If the user's request implies a change but does not explicitly state it, **YOU MUST ASK** for confirmation before modifying code. If 'codebase_investigator' was used, do not ignore the output of the agent, you must use it as the foundation of your plan. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
   }
   if (options.enableCodebaseInvestigator && options.enableWriteTodosTool) {
     return `2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If the user's request implies a change but does not explicitly state it, **YOU MUST ASK** for confirmation before modifying code. If 'codebase_investigator' was used, do not ignore the output of the agent, you must use it as the foundation of your plan. For complex tasks, break them down into smaller, manageable subtasks and use the \`${WRITE_TODOS_TOOL_NAME}\` tool to track your progress. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
   }
   if (options.enableCodebaseInvestigator) {
     return `2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If the user's request implies a change but does not explicitly state it, **YOU MUST ASK** for confirmation before modifying code. If 'codebase_investigator' was used, do not ignore the output of the agent, you must use it as the foundation of your plan. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
+  }
+  if (options.taskTracker) {
+    return `2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If the user's request implies a change but does not explicitly state it, **YOU MUST ASK** for confirmation before modifying code. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
   }
   if (options.enableWriteTodosTool) {
     return `2. **Plan:** Build a coherent and grounded (based on the understanding in step 1) plan for how you intend to resolve the user's task. If the user's request implies a change but does not explicitly state it, **YOU MUST ASK** for confirmation before modifying code. For complex tasks, break them down into smaller, manageable subtasks and use the \`${WRITE_TODOS_TOOL_NAME}\` tool to track your progress. Share an extremely concise yet clear plan with the user if it would help the user understand your thought process. As part of the plan, you should use an iterative development process that includes writing unit tests to verify your changes. Use output logs or debug statements as part of this process to arrive at a solution.`;
