@@ -19,7 +19,7 @@ PLAN MODE PROTOCOL: Parts of this process run within Plan Mode. While in Plan Mo
 
 2.  **Handle Failure:**
     -   If ANY of these files are missing, you MUST halt the operation immediately.
-    -   Announce: "SDD is not set up. Please run `/spec setup` to set up the environment."
+    -   Announce: "SDD is not set up. Please run `/spec:setup` to set up the environment."
     -   Do NOT proceed to New Track Initialization.
 
 ---
@@ -179,6 +179,6 @@ PLAN MODE PROTOCOL: Parts of this process run within Plan Mode. While in Plan Mo
     -   **Announce:** Inform the user you are committing the **Tracks Registry** changes.
     -   **Commit Changes:** Stage the **Tracks Registry** files and commit with the message `chore(conductor): Add new track '<track_description>'`.
 9.  **Announce Completion:** Inform the user:
-    > "New track '<track_id>' has been created and added to the tracks file. You can now start implementation by running `/spec implement`."
+    > "New track '<track_id>' has been created and added to the tracks file. You can now start implementation by running `/spec:implement`."
 
 """

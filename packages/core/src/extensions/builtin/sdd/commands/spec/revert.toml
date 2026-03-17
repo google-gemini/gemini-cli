@@ -20,7 +20,7 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
 
 2.  **Verify Track Exists:** Check if the **Tracks Registry** is not empty.
 
-3.  **Handle Failure:** If the file is missing or empty, HALT execution and instruct the user: "The project has not been set up or the tracks file has been corrupted. Please run `/spec setup` to set up the plan, or restore the tracks file."
+3.  **Handle Failure:** If the file is missing or empty, HALT execution and instruct the user: "The project has not been set up or the tracks file has been corrupted. Please run `/spec:setup` to set up the plan, or restore the tracks file."
 
 ---
 
@@ -29,7 +29,7 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
 
 1.  **Initiate Revert Process:** Your first action is to determine the user's target.
 
-2.  **Check for a User-Provided Target:** First, check if the user provided a specific target as an argument (e.g., `/spec revert track <track_id>`).
+2.  **Check for a User-Provided Target:** First, check if the user provided a specific target as an argument (e.g., `/spec:revert track <track_id>`).
     *   **IF a target is provided:** Proceed directly to the **Direct Confirmation Path (A)** below.
     *   **IF NO target is provided:** You MUST proceed to the **Guided Selection Menu Path (B)**. This is the default behavior.
 

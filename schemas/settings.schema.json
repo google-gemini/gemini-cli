@@ -2733,6 +2733,13 @@
           "default": true,
           "type": "boolean"
         },
+        "sdd": {
+          "title": "Spec-Driven Development (SDD)",
+          "description": "Enable built-in Spec-Driven Development (SDD) workflow.",
+          "markdownDescription": "Enable built-in Spec-Driven Development (SDD) workflow.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "taskTracker": {
           "title": "Task Tracker",
           "description": "Enable task tracker tools.",

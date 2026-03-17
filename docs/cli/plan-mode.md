@@ -372,7 +372,7 @@ features and complex tasks through persistent artifacts. It organizes work into
 tracks and stores them in your project's `.gemini/specs/` directory.
 
 SDD leverages Plan Mode internally to ensure architectural safety during the
-design phase. To get started with SDD, run `/spec setup`.
+design phase. To get started with SDD, run `/spec:setup`.
 
 - **Automate transitions:** Switches to read-only mode via
   [`enter_plan_mode`](../tools/planning.md#1-enter_plan_mode-enterplanmode).

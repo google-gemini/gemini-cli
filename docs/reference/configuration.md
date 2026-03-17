@@ -1580,6 +1580,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`experimental.sdd`** (boolean):
+  - **Description:** Enable built-in Spec-Driven Development (SDD) workflow.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.taskTracker`** (boolean):
   - **Description:** Enable task tracker tools.
   - **Default:** `false`
