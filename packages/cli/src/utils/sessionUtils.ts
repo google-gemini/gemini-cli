@@ -144,8 +144,13 @@ export interface SessionSelectionResult {
  * @param messages - The array of message records to check
  * @returns true if the session has meaningful content
  */
-export const hasUserOrAssistantMessage = (messages: MessageRecord[]): boolean =>
-  messages.some((msg) => msg.type === 'user' || msg.type === 'gemini');
+/**
+ * Modified to always return true so blank/empty sessions
+ * are included in the session list.
+ */
+export const hasUserOrAssistantMessage = (
+  _messages: MessageRecord[],
+): boolean => true;
 
 /**
  * Cleans and sanitizes message content for display by:
@@ -271,11 +276,6 @@ export const getAllSessionFiles = async (
             !content.lastUpdated
           ) {
             // Missing required fields - treat as corrupted
-            return { fileName: file, sessionInfo: null };
-          }
-
-          // Skip sessions that only contain system messages (info, error, warning)
-          if (!hasUserOrAssistantMessage(content.messages)) {
             return { fileName: file, sessionInfo: null };
           }
 
@@ -434,8 +434,8 @@ export class SessionSelector {
     );
 
     // Try to find by UUID first
-    const sessionByUuid = sortedSessions.find(
-      (session) => session.id === trimmedIdentifier,
+    const sessionByUuid = sortedSessions.find((session) =>
+      session.id.startsWith(trimmedIdentifier),
     );
     if (sessionByUuid) {
       return sessionByUuid;
