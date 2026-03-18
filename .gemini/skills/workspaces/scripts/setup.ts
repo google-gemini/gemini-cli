@@ -93,13 +93,22 @@ and full builds) to a dedicated, high-performance GCP worker.
           console.log(`   - Upstream identified: ${upstreamRepo}`);
           console.log(`   - Searching for your forks of ${upstreamRepo}...`);
           
-          // Use gh api to find forks specifically linked to the upstream, which is much more accurate
           const upstreamOwner = upstreamRepo.split('/')[0];
           const upstreamName = upstreamRepo.split('/')[1];
-          const userRes = spawnSync('gh', ['api', 'user', '-q', '.login'], { stdio: 'pipe' });
-          const currentUser = userRes.stdout.toString().trim();
 
-          const forksRes = spawnSync('gh', ['api', `/repos/${upstreamOwner}/${upstreamName}/forks`, '--paginate', '-q', `.[] | select(.owner.login == "${currentUser}") | .full_name`], { stdio: 'pipe' });
+          // Use GraphQL to find your forks specifically. This is much faster than REST pagination.
+          const gqlQuery = `query { 
+            viewer { 
+              repositories(first: 100, isFork: true, affiliations: OWNER) { 
+                nodes { 
+                  nameWithOwner 
+                  parent { nameWithOwner } 
+                } 
+              } 
+            } 
+          }`;
+          
+          const forksRes = spawnSync('gh', ['api', 'graphql', '-f', `query=${gqlQuery}`, '--jq', `.data.viewer.repositories.nodes[] | select(.parent.nameWithOwner == "${upstreamRepo}") | .nameWithOwner`], { stdio: 'pipe' });
           const myForks = forksRes.stdout.toString().trim().split('\n').filter(Boolean);
 
           if (myForks.length > 0) {
