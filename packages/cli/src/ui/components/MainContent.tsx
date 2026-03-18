@@ -48,6 +48,7 @@ export const MainContent = () => {
     pendingHistoryItems,
     mainAreaWidth,
     staticAreaMaxItemHeight,
+    availableTerminalHeight,
     cleanUiDetailsVisible,
   } = uiState;
   const showHeaderDetails = cleanUiDetailsVisible;
@@ -141,7 +142,7 @@ export const MainContent = () => {
             <HistoryItemDisplay
               key={i}
               availableTerminalHeight={
-                uiState.constrainHeight ? staticAreaMaxItemHeight : undefined
+                uiState.constrainHeight ? availableTerminalHeight : undefined
               }
               terminalWidth={mainAreaWidth}
               item={{ ...item, id: 0 }}
@@ -160,7 +161,7 @@ export const MainContent = () => {
     [
       pendingHistoryItems,
       uiState.constrainHeight,
-      staticAreaMaxItemHeight,
+      availableTerminalHeight,
       mainAreaWidth,
       showConfirmationQueue,
       confirmingTool,
