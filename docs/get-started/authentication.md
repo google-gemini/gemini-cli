@@ -348,10 +348,10 @@ persist them with the following methods:
     ```
 
 <!-- prettier-ignore -->
-    > [!WARNING]
-    > Be aware that when you export API keys or service account
-    > paths in your shell configuration file, any process launched from that
-    > shell can read them.
+> [!WARNING]
+> Be aware that when you export API keys or service account
+> paths in your shell configuration file, any process launched from that
+> shell can read them.
 
 2.  **Use a `.env` file:** Create a `.gemini/.env` file in your project
     directory or home directory. Gemini CLI automatically loads variables from
