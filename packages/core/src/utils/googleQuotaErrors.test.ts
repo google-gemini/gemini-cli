@@ -81,6 +81,23 @@ describe('classifyGoogleError', () => {
     }
   });
 
+  it('should return TerminalQuotaError for 429 when status is RESOURCE_EXHAUSTED and details are empty', () => {
+    const apiError: GoogleApiError = {
+      code: 429,
+      status: 'RESOURCE_EXHAUSTED',
+      message: 'Your prepayment funds are depleted.',
+      details: [],
+    };
+    vi.spyOn(errorParser, 'parseGoogleApiError').mockReturnValue(apiError);
+    const originalError = new Error('Your prepayment funds are depleted.');
+    const result = classifyGoogleError(originalError);
+    expect(result).toBeInstanceOf(TerminalQuotaError);
+    if (result instanceof TerminalQuotaError) {
+      expect(result.cause).toBe(apiError);
+      expect(result.message).toBe('Your prepayment funds are depleted.');
+    }
+  });
+
   it('should return original error if code is not 429, 499 or 503', () => {
     const apiError: GoogleApiError = {
       code: 500,
