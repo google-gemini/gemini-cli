@@ -58,6 +58,12 @@ const mockSchedulerSchedule = vi.hoisted(() => vi.fn());
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   const original =
     await importOriginal<typeof import('@google/gemini-cli-core')>();
+  const { LegacyAgentSession } = await import(
+    '../../core/src/agent/legacy-agent-session.js'
+  );
+  const { geminiPartsToContentParts } = await import(
+    '../../core/src/agent/content-utils.js'
+  );
 
   class MockChatRecordingService {
     initialize = vi.fn();
@@ -77,6 +83,8 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     uiTelemetryService: {
       getMetrics: vi.fn(),
     },
+    LegacyAgentSession,
+    geminiPartsToContentParts,
     coreEvents: mockCoreEvents,
     createWorkingStdio: vi.fn(() => ({
       stdout: process.stdout,
@@ -108,6 +116,8 @@ describe('runNonInteractive', () => {
     sendMessageStream: Mock;
     resumeChat: Mock;
     getChatRecordingService: Mock;
+    getChat: Mock;
+    getCurrentSequenceModel: Mock;
   };
   const MOCK_SESSION_METRICS: SessionMetrics = {
     models: {},
@@ -163,6 +173,8 @@ describe('runNonInteractive', () => {
         recordMessageTokens: vi.fn(),
         recordToolCalls: vi.fn(),
       })),
+      getChat: vi.fn(() => ({ recordCompletedToolCalls: vi.fn() })),
+      getCurrentSequenceModel: vi.fn().mockReturnValue(null),
     };
 
     mockConfig = {
@@ -259,9 +271,6 @@ describe('runNonInteractive', () => {
       [{ text: 'Test input' }],
       expect.any(AbortSignal),
       'prompt-id-1',
-      undefined,
-      false,
-      'Test input',
     );
     expect(getWrittenOutput()).toBe('Hello World\n');
     // Note: Telemetry shutdown is now handled in runExitCleanup() in cleanup.ts
@@ -378,9 +387,6 @@ describe('runNonInteractive', () => {
       [{ text: 'Tool response' }],
       expect.any(AbortSignal),
       'prompt-id-2',
-      undefined,
-      false,
-      undefined,
     );
     expect(getWrittenOutput()).toBe('Final answer\n');
   });
@@ -538,9 +544,6 @@ describe('runNonInteractive', () => {
       ],
       expect.any(AbortSignal),
       'prompt-id-3',
-      undefined,
-      false,
-      undefined,
     );
     expect(getWrittenOutput()).toBe('Sorry, let me try again.\n');
   });
@@ -558,7 +561,7 @@ describe('runNonInteractive', () => {
         input: 'Initial fail',
         prompt_id: 'prompt-id-4',
       }),
-    ).rejects.toThrow(apiError);
+    ).rejects.toThrow('API connection failed');
   });
 
   it('should not exit if a tool is not found, and should send error back to model', async () => {
@@ -680,9 +683,6 @@ describe('runNonInteractive', () => {
       processedParts,
       expect.any(AbortSignal),
       'prompt-id-7',
-      undefined,
-      false,
-      rawInput,
     );
 
     // 6. Assert the final output is correct
@@ -716,9 +716,6 @@ describe('runNonInteractive', () => {
       [{ text: 'Test input' }],
       expect.any(AbortSignal),
       'prompt-id-1',
-      undefined,
-      false,
-      'Test input',
     );
     expect(processStdoutSpy).toHaveBeenCalledWith(
       JSON.stringify(
@@ -849,9 +846,6 @@ describe('runNonInteractive', () => {
       [{ text: 'Empty response test' }],
       expect.any(AbortSignal),
       'prompt-id-empty',
-      undefined,
-      false,
-      'Empty response test',
     );
 
     // This should output JSON with empty response but include stats
@@ -941,7 +935,7 @@ describe('runNonInteractive', () => {
         {
           session_id: 'test-session-id',
           error: {
-            type: 'FatalInputError',
+            type: 'Error',
             message: 'Invalid command syntax provided',
             code: 42,
           },
@@ -986,9 +980,6 @@ describe('runNonInteractive', () => {
       [{ text: 'Prompt from command' }],
       expect.any(AbortSignal),
       'prompt-id-slash',
-      undefined,
-      false,
-      '/testcommand',
     );
 
     expect(getWrittenOutput()).toBe('Response from command\n');
@@ -1032,9 +1023,6 @@ describe('runNonInteractive', () => {
       [{ text: 'Slash command output' }],
       expect.any(AbortSignal),
       'prompt-id-slash',
-      undefined,
-      false,
-      '/help',
     );
     expect(getWrittenOutput()).toBe('Response to slash command\n');
     handleSlashCommandSpy.mockRestore();
@@ -1209,9 +1197,6 @@ describe('runNonInteractive', () => {
       [{ text: '/unknowncommand' }],
       expect.any(AbortSignal),
       'prompt-id-unknown',
-      undefined,
-      false,
-      '/unknowncommand',
     );
 
     expect(getWrittenOutput()).toBe('Response to unknown\n');
@@ -1776,15 +1761,13 @@ describe('runNonInteractive', () => {
         throw new Error('Recording failed');
       }),
     };
-    // @ts-expect-error - Mocking internal structure
     mockGeminiClient.getChat = vi.fn().mockReturnValue(mockChat);
-    // @ts-expect-error - Mocking internal structure
     mockGeminiClient.getCurrentSequenceModel = vi
       .fn()
       .mockReturnValue('model-1');
 
     // Mock debugLogger.error
-    const { debugLogger } = await import('@google/gemini-cli-core');
+    const { debugLogger } = await import('../../core/src/utils/debugLogger.js');
     const debugLoggerErrorSpy = vi
       .spyOn(debugLogger, 'error')
       .mockImplementation(() => {});
@@ -1999,7 +1982,6 @@ describe('runNonInteractive', () => {
       expect(processStderrSpy).toHaveBeenCalledWith(
         'Agent execution stopped: Stopped by hook\n',
       );
-      // Should exit without calling sendMessageStream again
       expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
     });
 
@@ -2030,9 +2012,9 @@ describe('runNonInteractive', () => {
       expect(processStderrSpy).toHaveBeenCalledWith(
         '[WARNING] Agent execution blocked: Blocked by hook\n',
       );
-      // sendMessageStream is called once, recursion is internal to it and transparent to the caller
-      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
+      // Stream continues after blocked event — content should be output
       expect(getWrittenOutput()).toBe('Final answer\n');
+      expect(mockGeminiClient.sendMessageStream).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -2171,6 +2153,40 @@ describe('runNonInteractive', () => {
       expect(processStderrSpy).not.toHaveBeenCalledWith(
         expect.stringContaining('[WARNING] --raw-output is enabled'),
       );
+    });
+
+    it('should emit warning event for loop_detected custom event in streaming JSON mode', async () => {
+      vi.mocked(mockConfig.getOutputFormat).mockReturnValue(
+        OutputFormat.STREAM_JSON,
+      );
+      vi.mocked(uiTelemetryService.getMetrics).mockReturnValue(
+        MOCK_SESSION_METRICS,
+      );
+
+      const streamEvents: ServerGeminiStreamEvent[] = [
+        { type: GeminiEventType.LoopDetected } as ServerGeminiStreamEvent,
+        { type: GeminiEventType.Content, value: 'Continuing after loop' },
+        {
+          type: GeminiEventType.Finished,
+          value: { reason: undefined, usageMetadata: { totalTokenCount: 5 } },
+        },
+      ];
+      mockGeminiClient.sendMessageStream.mockReturnValue(
+        createStreamFromEvents(streamEvents),
+      );
+
+      await runNonInteractive({
+        config: mockConfig,
+        settings: mockSettings,
+        input: 'Loop test explicit',
+        prompt_id: 'prompt-id-loop-explicit',
+      });
+
+      const output = getWrittenOutput();
+      // The STREAM_JSON output should contain an error event with warning severity
+      expect(output).toContain('"type":"error"');
+      expect(output).toContain('"severity":"warning"');
+      expect(output).toContain('Loop detected');
     });
 
     it('should report cancelled tool calls as success in stream-json mode (legacy parity)', async () => {

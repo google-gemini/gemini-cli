@@ -179,6 +179,28 @@ export * from './agents/agentLoader.js';
 export * from './agents/local-executor.js';
 export * from './agents/agent-scheduler.js';
 
+// Export agent session interface
+export * from './agent/legacy-agent-session.js';
+export * from './agent/event-translator.js';
+export * from './agent/content-utils.js';
+// Agent event types — namespaced to avoid collisions with existing exports
+export type {
+  AgentEvent,
+  AgentEventCommon,
+  AgentEventData,
+  AgentEvents as AgentEventMap,
+  AgentSend,
+  AgentSession,
+  ContentPart,
+  ErrorData,
+  StreamEnd,
+  StreamEndReason,
+  StreamStart,
+  Trajectory,
+  Usage as AgentUsage,
+  WithMeta,
+} from './agent/types.js';
+
 // Export specific tool logic
 export * from './tools/read-file.js';
 export * from './tools/ls.js';
