@@ -83,7 +83,7 @@ export function sanitizeErrorMessage(message: string): string {
 
   // 1. Redact inline PEM content
   sanitized = sanitized.replace(
-    /-----BEGIN\s+[\w\s]+-----[\s\S]*?-----END\s+[\w\s]+-----/g,
+    /-----BEGIN[^-]+-----[\s\S]*?-----END[^-]+-----/g,
     '[REDACTED_PEM]',
   );
 
