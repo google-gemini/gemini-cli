@@ -120,7 +120,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
               lastItem.type === 'thought' &&
               lastItem.status === 'running'
             ) {
-              lastItem.content += text;
+              lastItem.content = text;
             } else {
               recentActivity.push({
                 id: randomUUID(),
