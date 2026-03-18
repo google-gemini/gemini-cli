@@ -1010,7 +1010,7 @@ export class Config implements McpContext, AgentLoopContext {
       this._sandboxManager = new NoopSandboxManager();
     }
 
-    if (this.sandbox?.enabled && this._sandboxManager) {
+    if (!(this._sandboxManager instanceof NoopSandboxManager)) {
       this.fileSystemService = new SandboxedFileSystemService(
         this._sandboxManager,
         this.cwd,

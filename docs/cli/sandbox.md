@@ -50,7 +50,82 @@ Cross-platform sandboxing with complete process isolation.
 **Note**: Requires building the sandbox image locally or using a published image
 from your organization's registry.
 
-### 3. gVisor / runsc (Linux only)
+### 3. Windows Native Sandbox (Windows only)
+
+Built-in sandboxing for Windows using Restricted Tokens and Job Objects. This
+method provides process isolation without requiring Docker or other container
+runtimes.
+
+**Prerequisites:**
+
+- Windows 10/11 or Windows Server.
+- No additional software required (uses a built-in C# helper).
+
+**How it works:**
+
+The Windows native sandbox leverages:
+
+- **Restricted Tokens**: Strips administrator privileges and high-level SIDs
+  from the process.
+- **Job Objects**: Ensures the entire process tree is terminated when the parent
+  session ends.
+- **Mandatory Integrity Levels (Low)**: Restricts the process to "Low"
+  integrity, preventing it from writing to most of the system and workspace by
+  default.
+
+**Enabling Windows Native Sandbox:**
+
+```json
+{
+  "tools": {
+    "sandbox": {
+      "enabled": true,
+      "command": "windows-native"
+    }
+  }
+}
+```
+
+Or via environment variable:
+
+```bash
+$env:GEMINI_SANDBOX="windows-native"
+```
+
+**Permissions:**
+
+By default, the Windows native sandbox is restricted. If you need it to write to
+specific directories, you must add them to `allowedPaths`:
+
+```json
+{
+  "tools": {
+    "sandbox": {
+      "enabled": true,
+      "command": "windows-native",
+      "allowedPaths": ["C:\\path\\to\\output"]
+    }
+  }
+}
+```
+
+**Network Access:**
+
+Network access is disabled by default in "Strict" mode. To enable it:
+
+```json
+{
+  "tools": {
+    "sandbox": {
+      "enabled": true,
+      "command": "windows-native",
+      "networkAccess": true
+    }
+  }
+}
+```
+
+### 4. gVisor / runsc (Linux only)
 
 Strongest isolation available: runs containers inside a user-space kernel via
 [gVisor](https://github.com/google/gvisor). gVisor intercepts all container

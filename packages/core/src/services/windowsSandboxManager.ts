@@ -30,6 +30,7 @@ export class WindowsSandboxManager implements SandboxManager {
   private readonly helperPath: string;
   private readonly platform: string;
   private initialized = false;
+  private readonly lowIntegrityCache = new Set<string>();
 
   constructor(platform: string = process.platform) {
     this.platform = platform;
@@ -139,10 +140,37 @@ export class WindowsSandboxManager implements SandboxManager {
     if (this.platform !== 'win32') {
       return;
     }
+
+    const resolvedPath = path.resolve(targetPath);
+    if (this.lowIntegrityCache.has(resolvedPath)) {
+      return;
+    }
+
+    // Never modify integrity levels for system directories
+    const systemRoot = process.env['SystemRoot'] || 'C:\\Windows';
+    const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
+    const programFilesX86 =
+      process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+
+    if (
+      resolvedPath.toLowerCase().startsWith(systemRoot.toLowerCase()) ||
+      resolvedPath.toLowerCase().startsWith(programFiles.toLowerCase()) ||
+      resolvedPath.toLowerCase().startsWith(programFilesX86.toLowerCase())
+    ) {
+      return;
+    }
+
     try {
-      spawnSync('icacls', [targetPath, '/setintegritylevel', 'Low'], {
-        stdio: 'ignore',
-      });
+      const result = spawnSync(
+        'icacls',
+        [resolvedPath, '/setintegritylevel', 'Low'],
+        {
+          stdio: 'ignore',
+        },
+      );
+      if (result.status === 0) {
+        this.lowIntegrityCache.add(resolvedPath);
+      }
     } catch (_e) {
       // Best effort
     }
