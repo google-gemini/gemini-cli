@@ -28,7 +28,7 @@ export function getFormattedBannerContent(
       }
       return (
         <ThemedGradient key={index}>
-          <Text>{line}</Text>
+          <Text bold>{line}</Text>
         </ThemedGradient>
       );
     }
