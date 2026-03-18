@@ -38,7 +38,7 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   // 2. Wake Worker & Verify Container
   await provider.ensureReady();
 
-  // Use Absolute Container Paths to avoid ambiguity
+  // Use Absolute Container Paths
   const containerHome = '/home/node';
   const remoteWorkDir = `${containerHome}/dev/main`;
   const remotePolicyPath = `${containerHome}/.gemini/policies/offload-policy.toml`;
@@ -46,76 +46,48 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   const sessionName = `offload-${prNumber}-${action}`;
   const remoteWorktreeDir = `${containerHome}/dev/worktrees/${sessionName}`;
 
-  // 3. Remote Context Setup (Parallel Worktree)
-  console.log(`🚀 Provisioning persistent worktree for ${action} on #${prNumber}...`);
+  // 3. Remote Context Setup
+  console.log(`🚀 Preparing remote environment for ${action} on #${prNumber}...`);
   
-  let setupCmd = '';
-  if (action === 'implement') {
-      const branchName = `impl-${prNumber}`;
-      setupCmd = `
-        mkdir -p ${containerHome}/dev/worktrees && \
-        cd ${remoteWorkDir} && \
-        git fetch upstream main && \
-        git worktree add -f -b ${branchName} ${remoteWorktreeDir} upstream/main
-      `;
+  // Check if worktree exists
+  const check = await provider.getExecOutput(`ls -d ${remoteWorktreeDir}/.git`, { wrapContainer: 'maintainer-worker' });
+  
+  if (check.status !== 0) {
+    console.log('   - Provisioning isolated git worktree...');
+    // Fix permissions first
+    await provider.exec(`sudo docker exec -u root maintainer-worker chown -R node:node ${containerHome}/dev`);
+    
+    const setupCmd = `
+      git config --global --add safe.directory ${remoteWorkDir} && \
+      mkdir -p ${containerHome}/dev/worktrees && \
+      cd ${remoteWorkDir} && \
+      git fetch upstream pull/${prNumber}/head && \
+      git worktree add -f ${remoteWorktreeDir} FETCH_HEAD
+    `;
+    await provider.exec(setupCmd, { wrapContainer: 'maintainer-worker' });
   } else {
-      setupCmd = `
-        mkdir -p ${containerHome}/dev/worktrees && \
-        cd ${remoteWorkDir} && \
-        git fetch upstream pull/${prNumber}/head && \
-        git worktree add -f ${remoteWorktreeDir} FETCH_HEAD
-      `;
+    console.log('   ✅ Remote worktree ready.');
   }
 
-  await provider.exec(setupCmd, { wrapContainer: 'maintainer-worker' });
-
-  // 4. Execution Logic (Persistent Workstation Mode)
-  const remoteWorker = `tsx ${persistentScripts}/entrypoint.ts ${prNumber} remote-branch ${remotePolicyPath} ${action}`;
-  
-  // Launch tmux INSIDE the container
+  // 4. Execution Logic
+  const remoteWorker = `tsx ${persistentScripts}/entrypoint.ts ${prNumber} . ${remotePolicyPath} ${action}`;
   const remoteTmuxCmd = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'offload' 'cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL'`;
   const containerWrap = `sudo docker exec -it maintainer-worker sh -c ${q(remoteTmuxCmd)}`;
   
   const finalSSH = provider.getRunCommand(containerWrap, { interactive: true });
 
   const isWithinGemini = !!env.GEMINI_CLI || !!env.GEMINI_SESSION_ID || !!env.GCLI_SESSION_ID;
-  const terminalTarget = config.terminalTarget || 'tab';
-  const forceMainTerminal = true; // Stay in current terminal for E2E verification
+  const forceMainTerminal = true; // For debugging
 
   if (!forceMainTerminal && isWithinGemini && env.TERM_PROGRAM === 'iTerm.app') {
     const tempCmdPath = path.join(process.env.TMPDIR || '/tmp', `offload-ssh-${prNumber}.sh`);
     fs.writeFileSync(tempCmdPath, `#!/bin/bash\n${finalSSH}\nrm "$0"`, { mode: 0o755 });
-
-    const appleScript = terminalTarget === 'window' ? `
-      on run argv
-        tell application "iTerm"
-          set newWindow to (create window with default profile)
-          tell current session of newWindow
-            write text (item 1 of argv) & return
-          end tell
-          activate
-        end tell
-      end run
-    ` : `
-      on run argv
-        tell application "iTerm"
-          tell current window
-            set newTab to (create tab with default profile)
-            tell current session of newTab
-              write text (item 1 of argv) & return
-            end tell
-          end tell
-          activate
-        end tell
-      end run
-    `;
-    
+    const appleScript = `on run argv\ntell application "iTerm"\ntell current window\nset newTab to (create tab with default profile)\ntell current session of newTab\nwrite text (item 1 of argv) & return\nend tell\nend tell\nactivate\nend tell\nend run`;
     spawnSync('osascript', ['-', tempCmdPath], { input: appleScript });
-    console.log(`✅ iTerm2 ${terminalTarget} opened for job #${prNumber}.`);
+    console.log(`✅ iTerm2 tab opened.`);
     return 0;
   }
 
-  // Fallback: Run in current terminal
   console.log(`📡 Connecting to session ${sessionName}...`);
   spawnSync(finalSSH, { stdio: 'inherit', shell: true });
 

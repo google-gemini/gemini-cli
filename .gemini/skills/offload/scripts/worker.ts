@@ -6,9 +6,9 @@
 import { spawnSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
-import { runReviewPlaybook } from './playbooks/review.js';
-import { runFixPlaybook } from './playbooks/fix.js';
-import { runReadyPlaybook } from './playbooks/ready.js';
+import { runReviewPlaybook } from './playbooks/review.ts';
+import { runFixPlaybook } from './playbooks/fix.ts';
+import { runReadyPlaybook } from './playbooks/ready.ts';
 
 export async function runWorker(args: string[]) {
   const prNumberOrIssue = args[0];
@@ -55,7 +55,7 @@ export async function runWorker(args: string[]) {
     
     case 'implement':
       // Lazy-load implement playbook (to be created)
-      const { runImplementPlaybook } = await import('./playbooks/implement.js');
+      const { runImplementPlaybook } = await import('./playbooks/implement.ts');
       return runImplementPlaybook(prNumberOrIssue, workDir, policyPath, geminiBin);
       
     case 'open':
