@@ -7,9 +7,8 @@ implementation plan is exactly what you need.
 
 <!-- prettier-ignore -->
 > [!NOTE]
-> This is a preview feature under active development. Preview features
-> may only be available in the **Preview** channel or may need to be enabled
-> under `/settings`.
+> This is an experimental feature currently under active development and
+> may need to be enabled under `/settings`.
 
 ## Prerequisites
 
