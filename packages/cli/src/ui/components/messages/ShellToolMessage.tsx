@@ -64,12 +64,10 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
   isFirst,
 
   borderColor,
-
   borderDimColor,
-
   isExpandable,
-
   originalRequestName,
+  progress,
 }) => {
   const {
     activePtyId: activeShellPtyId,
@@ -196,35 +194,39 @@ export const ShellToolMessage: React.FC<ShellToolMessageProps> = ({
         {emphasis === 'high' && <TrailingIndicator />}
       </StickyHeader>
 
-      <Box
-        ref={contentRef}
-        width={terminalWidth}
-        borderStyle="round"
-        borderColor={borderColor}
-        borderDimColor={borderDimColor}
-        borderTop={false}
-        borderBottom={false}
-        borderLeft={true}
-        borderRight={true}
-        paddingX={1}
-        flexDirection="column"
-      >
-        <ToolResultDisplay
-          resultDisplay={resultDisplay}
-          availableTerminalHeight={availableTerminalHeight}
-          terminalWidth={terminalWidth}
-          renderOutputAsMarkdown={renderOutputAsMarkdown}
-          hasFocus={isThisShellFocused}
-          maxLines={maxLines}
-        />
-        {isThisShellFocused && config && (
-          <ShellInputPrompt
-            activeShellPtyId={activeShellPtyId ?? null}
-            focus={embeddedShellFocused}
-            scrollPageSize={availableTerminalHeight ?? ACTIVE_SHELL_MAX_LINES}
+      {(!!resultDisplay ||
+        (status === CoreToolCallStatus.Executing && progress !== undefined) ||
+        (isThisShellFocused && !!config)) && (
+        <Box
+          ref={contentRef}
+          width={terminalWidth}
+          borderStyle="round"
+          borderColor={borderColor}
+          borderDimColor={borderDimColor}
+          borderTop={false}
+          borderBottom={false}
+          borderLeft={true}
+          borderRight={true}
+          paddingX={1}
+          flexDirection="column"
+        >
+          <ToolResultDisplay
+            resultDisplay={resultDisplay}
+            availableTerminalHeight={availableTerminalHeight}
+            terminalWidth={terminalWidth}
+            renderOutputAsMarkdown={renderOutputAsMarkdown}
+            hasFocus={isThisShellFocused}
+            maxLines={maxLines}
           />
-        )}
-      </Box>
+          {isThisShellFocused && config && (
+            <ShellInputPrompt
+              activeShellPtyId={activeShellPtyId ?? null}
+              focus={embeddedShellFocused}
+              scrollPageSize={availableTerminalHeight ?? ACTIVE_SHELL_MAX_LINES}
+            />
+          )}
+        </Box>
+      )}
     </>
   );
 };
