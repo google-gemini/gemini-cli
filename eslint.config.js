@@ -37,6 +37,15 @@ const commonRestrictedSyntaxRules = [
   },
 ];
 
+const typeSafePropertyCheckRules = [
+  {
+    selector:
+      'UnaryExpression[operator="typeof"] > MemberExpression[computed=true][property.type="Literal"]',
+    message:
+      'Do not use typeof to check object properties. Define a TypeScript interface and a type guard function instead.',
+  },
+];
+
 export default tseslint.config(
   {
     // Global ignores
@@ -136,12 +145,7 @@ export default tseslint.config(
       'no-restricted-syntax': [
         'error',
         ...commonRestrictedSyntaxRules,
-        {
-          selector:
-            'UnaryExpression[operator="typeof"] > MemberExpression[computed=true][property.type="Literal"]',
-          message:
-            'Do not use typeof to check object properties. Define a TypeScript interface and a type guard function instead.',
-        },
+        ...typeSafePropertyCheckRules,
       ],
       'no-unsafe-finally': 'error',
       'no-unused-expressions': 'off', // Disable base rule
@@ -189,6 +193,7 @@ export default tseslint.config(
       'no-restricted-syntax': [
         'error',
         ...commonRestrictedSyntaxRules,
+        ...typeSafePropertyCheckRules,
         {
           selector:
             'TSInterfaceDeclaration[id.name=/.+Response$/] TSPropertySignature:not([optional=true])',
@@ -215,6 +220,7 @@ export default tseslint.config(
       'no-restricted-syntax': [
         'error',
         ...commonRestrictedSyntaxRules,
+        ...typeSafePropertyCheckRules,
         {
           selector:
             'CallExpression[callee.object.name="Object"][callee.property.name="create"]',
