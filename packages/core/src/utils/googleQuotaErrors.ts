@@ -242,6 +242,17 @@ export function classifyGoogleError(error: unknown): unknown {
     );
   }
 
+  // Centralized check for RESOURCE_EXHAUSTED errors
+  if (
+    googleApiError?.status === 'RESOURCE_EXHAUSTED' &&
+    (status === 429 || status === 499)
+  ) {
+    const errorMessage =
+      googleApiError?.message ||
+      (error instanceof Error ? error.message : String(error));
+    return new TerminalQuotaError(errorMessage, googleApiError);
+  }
+
   if (
     !googleApiError ||
     (googleApiError.code !== 429 && googleApiError.code !== 499) ||
@@ -268,12 +279,6 @@ export function classifyGoogleError(error: unknown): unknown {
     } else if (status === 429 || status === 499) {
       // Fallback: If it is a 429 or 499 but doesn't have a specific "retry in" message,
       // assume it is a temporary rate limit and retry after 5 sec (same as DEFAULT_RETRY_OPTIONS).
-
-      // However, if the API explicitly returns RESOURCE_EXHAUSTED without details,
-      // it indicates a hard quota exhaustion rather than a transient rate limit.
-      if (googleApiError?.status === 'RESOURCE_EXHAUSTED') {
-        return new TerminalQuotaError(errorMessage, googleApiError);
-      }
 
       return new RetryableQuotaError(
         errorMessage,
@@ -412,10 +417,6 @@ export function classifyGoogleError(error: unknown): unknown {
     const errorMessage =
       googleApiError?.message ||
       (error instanceof Error ? error.message : String(error));
-
-    if (googleApiError?.status === 'RESOURCE_EXHAUSTED') {
-      return new TerminalQuotaError(errorMessage, googleApiError);
-    }
 
     return new RetryableQuotaError(
       errorMessage,
