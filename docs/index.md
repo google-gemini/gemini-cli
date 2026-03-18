@@ -21,8 +21,8 @@ npm install -g @google/gemini-cli
 Ready to boost your productivity? You can get Gemini CLI up and running right
 away.
 
-→ Dive into the [Quickstart Guide](./get-started.md) for your first interactive
-session.
+→ Dive into the [Quickstart Guide](./get-started/index.md) for your first
+interactive session.
 
 ## What Can Gemini CLI Do For You?
 
