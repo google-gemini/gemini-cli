@@ -134,6 +134,20 @@ describe('sessionSummaryUtils', () => {
       expect(result).toEqual([sessionPath]);
     });
 
+    it('should return path if session has alias but NO summary', async () => {
+      vi.mocked(fs.access).mockResolvedValue(undefined);
+      mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
+      const sessionPath =
+        '/tmp/project/chats/session-2024-01-01T10-00-abc12345.json';
+      vi.mocked(fs.readFile).mockResolvedValue(
+        createSessionWithUserMessages(5, { alias: 'existing-alias' }),
+      );
+
+      const result = await getSessionsNeedingSummary(mockConfig);
+
+      expect(result).toEqual([sessionPath]);
+    });
+
     it('should return path if most recent session has 1 or more user messages and no summary', async () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
       mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);

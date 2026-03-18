@@ -142,14 +142,6 @@ export async function getSessionsNeedingSummary(
           continue;
         }
 
-        // If it's not the current session and has an alias, it's immutable
-        if (
-          conversation.alias &&
-          conversation.sessionId !== config.getSessionId()
-        ) {
-          continue;
-        }
-
         // Only generate summaries for sessions with messages
         const userMessageCount = conversation.messages.filter(
           (m) => m.type === 'user',
