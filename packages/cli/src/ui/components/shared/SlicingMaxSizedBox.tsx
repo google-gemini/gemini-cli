@@ -46,7 +46,7 @@ export function SlicingMaxSizedBox<T>({
           text = '...' + text.slice(-MAXIMUM_RESULT_DISPLAY_CHARACTERS);
         }
       }
-      if (maxLines) {
+      if (maxLines !== undefined) {
         const hasTrailingNewline = text.endsWith('\n');
         const contentText = hasTrailingNewline ? text.slice(0, -1) : text;
         const lines = contentText.split('\n');
@@ -71,7 +71,7 @@ export function SlicingMaxSizedBox<T>({
       };
     }
 
-    if (Array.isArray(data) && !isAlternateBuffer && maxLines) {
+    if (Array.isArray(data) && !isAlternateBuffer && maxLines !== undefined) {
       if (data.length > maxLines) {
         // We will have a label from MaxSizedBox. Reserve space for it.
         const targetLines = Math.max(1, maxLines - 1);
