@@ -158,6 +158,10 @@ async function processIntent(
       await handleUpgrade();
       return false;
 
+    case 'change_auth':
+      // The UI has initiated the auth switch flow; stop the current request.
+      return false;
+
     default:
       throw new Error(
         `Unexpected fallback intent received from fallbackModelHandler: "${intent}"`,

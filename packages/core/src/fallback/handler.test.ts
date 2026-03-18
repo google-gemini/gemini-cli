@@ -20,6 +20,7 @@ import type { ModelAvailabilityService } from '../availability/modelAvailability
 import { createAvailabilityServiceMock } from '../availability/testUtils.js';
 import { AuthType } from '../core/contentGenerator.js';
 import {
+  DEFAULT_GEMINI_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
@@ -138,6 +139,7 @@ describe('handleFallback', () => {
 
       expect(availability.selectFirstAvailable).toHaveBeenCalledWith([
         DEFAULT_GEMINI_FLASH_MODEL,
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
       ]);
     });
 
@@ -154,7 +156,7 @@ describe('handleFallback', () => {
 
       expect(policyHandler).toHaveBeenCalledWith(
         MOCK_PRO_MODEL,
-        DEFAULT_GEMINI_FLASH_MODEL,
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
         undefined,
       );
     });
@@ -197,7 +199,7 @@ describe('handleFallback', () => {
     });
 
     it('does not wrap around to upgrade candidates if the current model was selected at the end (e.g. by router)', async () => {
-      // Last-resort failure (Flash) in [Preview, Pro, Flash] checks Preview then Pro (all upstream).
+      // Last-resort failure (Flash Lite) in [Pro, Flash, Flash Lite] checks Pro then Flash (all upstream).
       vi.mocked(policyConfig.getModel).mockReturnValue(
         DEFAULT_GEMINI_MODEL_AUTO,
       );
@@ -210,14 +212,14 @@ describe('handleFallback', () => {
 
       await handleFallback(
         policyConfig,
-        DEFAULT_GEMINI_FLASH_MODEL,
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
         AUTH_OAUTH,
       );
 
       expect(availability.selectFirstAvailable).not.toHaveBeenCalled();
       expect(policyHandler).toHaveBeenCalledWith(
-        DEFAULT_GEMINI_FLASH_MODEL,
-        DEFAULT_GEMINI_FLASH_MODEL,
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
         undefined,
       );
     });
@@ -352,7 +354,7 @@ describe('handleFallback', () => {
 
       const result = await handleFallback(
         policyConfig,
-        DEFAULT_GEMINI_FLASH_MODEL,
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
         AUTH_OAUTH,
       );
 
@@ -360,8 +362,8 @@ describe('handleFallback', () => {
 
       expect(result).not.toBeNull();
       expect(policyHandler).toHaveBeenCalledWith(
-        DEFAULT_GEMINI_FLASH_MODEL,
-        DEFAULT_GEMINI_FLASH_MODEL,
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
+        DEFAULT_GEMINI_FLASH_LITE_MODEL,
         undefined,
       );
     });

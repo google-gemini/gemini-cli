@@ -60,7 +60,12 @@ export interface UIActions {
   handleFinalSubmit: (value: string) => Promise<void>;
   handleClearScreen: () => void;
   handleProQuotaChoice: (
-    choice: 'retry_later' | 'retry_once' | 'retry_always' | 'upgrade',
+    choice:
+      | 'retry_later'
+      | 'retry_once'
+      | 'retry_always'
+      | 'upgrade'
+      | 'change_auth',
   ) => void;
   handleValidationChoice: (choice: 'verify' | 'change_auth' | 'cancel') => void;
   handleOverageMenuChoice: (choice: OverageMenuIntent) => void;
