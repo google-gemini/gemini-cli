@@ -38,6 +38,17 @@ async function confirm(question: string): Promise<boolean> {
   });
 }
 
+async function createFork(upstream: string): Promise<string> {
+    console.log(`   - Creating fork for ${upstream}...`);
+    const forkRes = spawnSync('gh', ['repo', 'fork', upstream, '--clone=false'], { stdio: 'inherit' });
+    if (forkRes.status === 0) {
+        const userRes = spawnSync('gh', ['api', 'user', '-q', '.login'], { stdio: 'pipe' });
+        const user = userRes.stdout.toString().trim();
+        return `${user}/${upstream.split('/')[1]}`;
+    }
+    return upstream;
+}
+
 export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   console.log(`
 ================================================================================
@@ -77,28 +88,33 @@ and full builds) to a dedicated, high-performance GCP worker.
   if (repoInfoRes.status === 0) {
       try {
           const repoInfo = JSON.parse(repoInfoRes.stdout.toString());
-          if (repoInfo.isFork && repoInfo.parent) {
-              upstreamRepo = repoInfo.parent.nameWithOwner;
-              userFork = repoInfo.nameWithOwner;
-              console.log(`   ✅ Detected Existing Fork: ${userFork}`);
-          } else {
-              upstreamRepo = repoInfo.nameWithOwner;
-              console.log(`   ✅ Working on Upstream: ${upstreamRepo}`);
-              
-              const shouldFork = await confirm(`❓ No fork detected. Create a personal fork for sandboxed implementations?`);
-              if (shouldFork) {
-                  console.log(`   - Creating fork for ${upstreamRepo}...`);
-                  const forkRes = spawnSync('gh', ['repo', 'fork', upstreamRepo, '--clone=false'], { stdio: 'inherit' });
-                  if (forkRes.status === 0) {
-                      // Get the new fork name (usually <user>/<repo>)
-                      const userRes = spawnSync('gh', ['api', 'user', '-q', '.login'], { stdio: 'pipe' });
-                      const user = userRes.stdout.toString().trim();
-                      userFork = `${user}/${upstreamRepo.split('/')[1]}`;
-                      console.log(`   ✅ Fork created: ${userFork}`);
-                  }
-              } else {
+          upstreamRepo = repoInfo.isFork && repoInfo.parent ? repoInfo.parent.nameWithOwner : repoInfo.nameWithOwner;
+          
+          console.log(`   - Upstream identified: ${upstreamRepo}`);
+          console.log(`   - Searching for your forks of ${upstreamRepo}...`);
+          
+          const forksRes = spawnSync('gh', ['repo', 'list', '--fork', '--json', 'nameWithOwner', '--limit', '10'], { stdio: 'pipe' });
+          const allForks = JSON.parse(forksRes.stdout.toString());
+          const myForks = allForks.filter((f: any) => f.nameWithOwner.endsWith('/' + upstreamRepo.split('/')[1]));
+
+          if (myForks.length > 0) {
+              console.log('\n🍴 Found existing forks:');
+              myForks.forEach((f: any, i: number) => console.log(`   [${i + 1}] ${f.nameWithOwner}`));
+              console.log(`   [c] Create a new fork`);
+              console.log(`   [u] Use upstream directly (not recommended)`);
+
+              const choice = await prompt('Select an option', '1');
+              if (choice.toLowerCase() === 'c') {
+                  userFork = await createFork(upstreamRepo);
+              } else if (choice.toLowerCase() === 'u') {
                   userFork = upstreamRepo;
+              } else {
+                  const idx = parseInt(choice) - 1;
+                  userFork = myForks[idx] ? myForks[idx].nameWithOwner : upstreamRepo;
               }
+          } else {
+              const shouldFork = await confirm(`❓ No fork detected. Create a personal fork for sandboxed implementations?`);
+              userFork = shouldFork ? await createFork(upstreamRepo) : upstreamRepo;
           }
       } catch (e) {
           userFork = upstreamRepo;
