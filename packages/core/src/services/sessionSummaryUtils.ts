@@ -26,8 +26,16 @@ async function generateAndSaveSummary(
 ): Promise<void> {
   // Read session file
   const content = await fs.readFile(sessionPath, 'utf-8');
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  const conversation: ConversationRecord = JSON.parse(content);
+  let conversation: ConversationRecord;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    conversation = JSON.parse(content);
+  } catch {
+    debugLogger.debug(
+      `[SessionSummary] Could not parse session file ${sessionPath}, skipping`,
+    );
+    return;
+  }
 
   // Skip if summary already exists
   if (conversation.summary) {
@@ -70,8 +78,16 @@ async function generateAndSaveSummary(
 
   // Re-read the file before writing to handle race conditions
   const freshContent = await fs.readFile(sessionPath, 'utf-8');
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-  const freshConversation: ConversationRecord = JSON.parse(freshContent);
+  let freshConversation: ConversationRecord;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    freshConversation = JSON.parse(freshContent);
+  } catch {
+    debugLogger.debug(
+      `[SessionSummary] Could not parse session file on re-read ${sessionPath}, skipping`,
+    );
+    return;
+  }
 
   // Check if summary was added by another process
   if (freshConversation.summary) {

@@ -30,8 +30,14 @@ export class UserAccountManager {
       return defaultState;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    const parsed = JSON.parse(content);
+    let parsed;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      parsed = JSON.parse(content);
+    } catch {
+      debugLogger.log('Malformed accounts file, starting fresh.');
+      return defaultState;
+    }
 
     // Inlined validation logic
     if (typeof parsed !== 'object' || parsed === null) {
