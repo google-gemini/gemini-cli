@@ -74,7 +74,7 @@ export class ShellProcessor implements IPromptProcessor {
       ];
     }
 
-    const config = context.services.config;
+    const config = context.services.agentContext;
     if (!config) {
       throw new Error(
         `Security configuration not loaded. Cannot verify shell command permissions for '${this.commandName}'. Aborting.`,
@@ -124,13 +124,15 @@ export class ShellProcessor implements IPromptProcessor {
       }
 
       // Security check on the final, escaped command string.
-      const { decision } = await config.getPolicyEngine().check(
-        {
-          name: 'run_shell_command',
-          args: { command },
-        },
-        undefined,
-      );
+      const { decision } = await context.services
+        .agentContext!.config.getPolicyEngine()
+        .check(
+          {
+            name: 'run_shell_command',
+            args: { command },
+          },
+          undefined,
+        );
 
       if (decision === PolicyDecision.DENY) {
         throw new Error(
@@ -164,16 +166,16 @@ export class ShellProcessor implements IPromptProcessor {
       if (injection.resolvedCommand) {
         const activeTheme = themeManager.getActiveTheme();
         const shellExecutionConfig = {
-          ...config.getShellExecutionConfig(),
+          ...context.services.agentContext!.config.getShellExecutionConfig(),
           defaultFg: activeTheme.colors.Foreground,
           defaultBg: activeTheme.colors.Background,
         };
         const { result } = await ShellExecutionService.execute(
           injection.resolvedCommand,
-          config.getTargetDir(),
+          context.services.agentContext!.config.getTargetDir(),
           () => {},
           new AbortController().signal,
-          config.getEnableInteractiveShell(),
+          context.services.agentContext!.config.getEnableInteractiveShell(),
           shellExecutionConfig,
         );
 
