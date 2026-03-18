@@ -1,0 +1,120 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+import { waitFor } from '../../../test-utils/async.js';
+import { render } from '../../../test-utils/render.js';
+import { SubagentGroupDisplay } from './SubagentGroupDisplay.js';
+import { Kind, CoreToolCallStatus } from '@google/gemini-cli-core';
+import type { IndividualToolCallDisplay } from '../../types.js';
+import { KeypressProvider } from '../../contexts/KeypressContext.js';
+import { OverflowProvider } from '../../contexts/OverflowContext.js';
+import { vi } from 'vitest';
+import { Text } from 'ink';
+
+vi.mock('../../utils/MarkdownDisplay.js', () => ({
+  MarkdownDisplay: ({ text }: { text: string }) => <Text>{text}</Text>,
+}));
+
+describe('<SubagentGroupDisplay />', () => {
+  const mockToolCalls: IndividualToolCallDisplay[] = [
+    {
+      callId: 'call-1',
+      name: 'agent_1',
+      description: 'Test agent 1',
+      confirmationDetails: undefined,
+      status: CoreToolCallStatus.Executing,
+      kind: Kind.Agent,
+      resultDisplay: {
+        isSubagentProgress: true,
+        agentName: 'api-monitor',
+        state: 'running',
+        recentActivity: [
+          {
+            id: 'act-1',
+            type: 'tool_call',
+            status: 'running',
+            content: '',
+            displayName: 'Action Required',
+            description: 'Verify server is running',
+          },
+        ],
+      },
+    },
+    {
+      callId: 'call-2',
+      name: 'agent_2',
+      description: 'Test agent 2',
+      confirmationDetails: undefined,
+      status: CoreToolCallStatus.Success,
+      kind: Kind.Agent,
+      resultDisplay: {
+        isSubagentProgress: true,
+        agentName: 'db-manager',
+        state: 'completed',
+        result: 'Database schema validated',
+        recentActivity: [
+          {
+            id: 'act-2',
+            type: 'thought',
+            status: 'completed',
+            content: 'Database schema validated',
+          },
+        ],
+      },
+    },
+  ];
+
+  const renderSubagentGroup = (
+    toolCallsToRender: IndividualToolCallDisplay[],
+    height?: number,
+  ) => (
+    <OverflowProvider>
+      <KeypressProvider>
+        <SubagentGroupDisplay
+          toolCalls={toolCallsToRender}
+          terminalWidth={80}
+          availableTerminalHeight={height}
+          isExpandable={true}
+        />
+      </KeypressProvider>
+    </OverflowProvider>
+  );
+
+  it('renders nothing if there are no agent tool calls', async () => {
+    const { lastFrame } = render(renderSubagentGroup([], 40));
+    expect(lastFrame({ allowEmpty: true })).toBe('');
+  });
+
+  it('renders collapsed view by default with correct agent counts and states', async () => {
+    const { lastFrame, waitUntilReady } = render(
+      renderSubagentGroup(mockToolCalls, 40),
+    );
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
+  });
+
+  it('expands when availableTerminalHeight is undefined', async () => {
+    const { lastFrame, rerender } = render(
+      renderSubagentGroup(mockToolCalls, 40),
+    );
+
+    // Default collapsed view
+    await waitFor(() => {
+      expect(lastFrame()).toContain('(ctrl+o to expand)');
+    });
+
+    // Expand view
+    rerender(renderSubagentGroup(mockToolCalls, undefined));
+    await waitFor(() => {
+      expect(lastFrame()).toContain('(ctrl+o to collapse)');
+    });
+
+    // Collapse view
+    rerender(renderSubagentGroup(mockToolCalls, 40));
+    await waitFor(() => {
+      expect(lastFrame()).toContain('(ctrl+o to expand)');
+    });
+  });
+});

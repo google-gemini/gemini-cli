@@ -102,7 +102,12 @@ export const ToolResultDisplay: React.FC<ToolResultDisplayProps> = ({
         </Text>
       );
     } else if (isSubagentProgress(contentData)) {
-      content = <SubagentProgressDisplay progress={contentData} />;
+      content = (
+        <SubagentProgressDisplay
+          progress={contentData}
+          terminalWidth={childWidth}
+        />
+      );
     } else if (typeof contentData === 'string' && renderOutputAsMarkdown) {
       content = (
         <MarkdownDisplay
