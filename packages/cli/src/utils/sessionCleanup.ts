@@ -28,6 +28,12 @@ const MULTIPLIERS = {
 };
 
 /**
+ * Matches a trailing hyphen followed by exactly 8 alphanumeric characters before the .json extension.
+ * Example: session-20250110-abcdef12.json -> captures "abcdef12"
+ */
+const SHORT_ID_REGEX = /-([a-zA-Z0-9]{8})\.json$/;
+
+/**
  * Result of session cleanup operation
  */
 export interface CleanupResult {
@@ -47,14 +53,17 @@ export interface CleanupResult {
  */
 function deriveShortIdFromFileName(fileName: string): string | null {
   if (fileName.startsWith(SESSION_FILE_PREFIX) && fileName.endsWith('.json')) {
-    const withoutExt = fileName.replace('.json', '');
-    const parts = withoutExt.split('-');
-    const shortId = parts[parts.length - 1];
-    if (shortId && shortId.length === 8) {
-      return shortId;
-    }
+    const match = fileName.match(SHORT_ID_REGEX);
+    return match ? match[1] : null;
   }
   return null;
+}
+
+/**
+ * Gets the log path for a session ID.
+ */
+function getSessionLogPath(tempDir: string, safeSessionId: string): string {
+  return path.join(tempDir, 'logs', `session-${safeSessionId}.jsonl`);
 }
 
 /**
@@ -69,7 +78,7 @@ async function deleteSessionArtifactsAsync(
   // Cleanup logs
   const logsDir = path.join(tempDir, 'logs');
   const safeSessionId = sanitizeFilenamePart(sessionId);
-  const logPath = path.join(logsDir, `session-${safeSessionId}.jsonl`);
+  const logPath = getSessionLogPath(tempDir, safeSessionId);
   if (logPath.startsWith(logsDir)) {
     await fs.unlink(logPath).catch(() => {});
   }

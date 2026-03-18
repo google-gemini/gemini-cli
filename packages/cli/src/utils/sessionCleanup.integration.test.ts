@@ -274,7 +274,6 @@ describe('Session Cleanup Integration', () => {
     // The shortId that ties them together
     const sharedShortId = 'abcdef12';
 
-    // 1. Create Parent Session File (Expired)
     const parentSessionId = 'parent-uuid-123';
     const parentFile = path.join(
       chatsDir,
@@ -290,7 +289,6 @@ describe('Session Cleanup Integration', () => {
       }),
     );
 
-    // 2. Create Subagent Session File (Also Expired)
     const subagentSessionId = 'subagent-uuid-456';
     const subagentFile = path.join(
       chatsDir,
@@ -306,7 +304,6 @@ describe('Session Cleanup Integration', () => {
       }),
     );
 
-    // 3. Create Artifacts for Parent
     const parentLogFile = path.join(
       logsDir,
       `session-${parentSessionId}.jsonl`,
@@ -323,7 +320,6 @@ describe('Session Cleanup Integration', () => {
       'data',
     );
 
-    // 4. Create Artifacts for Subagent
     const subagentLogFile = path.join(
       logsDir,
       `session-${subagentSessionId}.jsonl`,
@@ -340,7 +336,6 @@ describe('Session Cleanup Integration', () => {
       'data',
     );
 
-    // 5. Create a current session file that should NOT be deleted, to ensure we don't nuke everything
     const currentShortId = 'current1';
     const currentFile = path.join(
       chatsDir,
