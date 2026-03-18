@@ -54,13 +54,18 @@ export class GceConnectionManager {
     };
   }
 
-  sync(localPath: string, remotePath: string, options: { delete?: boolean; exclude?: string[] } = {}): number {
+  sync(localPath: string, remotePath: string, options: { delete?: boolean; exclude?: string[]; sudo?: boolean } = {}): number {
     const fullRemote = this.getMagicRemote();
     // We use --no-t and --no-perms to avoid "Operation not permitted" errors 
     // when syncing to volumes that might have UID mismatches with the container.
     const rsyncArgs = ['-rvz', '--quiet', '--no-t', '--no-perms', '--no-owner', '--no-group'];
     if (options.delete) rsyncArgs.push('--delete');
     if (options.exclude) options.exclude.forEach(ex => rsyncArgs.push(`--exclude="${ex}"`));
+    
+    // Use sudo on the remote side if requested to bypass permission errors
+    if (options.sudo) {
+        rsyncArgs.push('--rsync-path="sudo rsync"');
+    }
 
     const sshCmd = `ssh ${this.getCommonArgs().join(' ')}`;
     const directRsync = `rsync ${rsyncArgs.join(' ')} -e ${this.quote(sshCmd)} ${localPath} ${fullRemote}:${remotePath}`;

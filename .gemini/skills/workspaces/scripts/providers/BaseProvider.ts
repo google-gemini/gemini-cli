@@ -71,6 +71,7 @@ export interface ExecOptions {
 export interface SyncOptions {
   delete?: boolean;
   exclude?: string[];
+  sudo?: boolean;
 }
 
 export interface WorkspaceStatus {
