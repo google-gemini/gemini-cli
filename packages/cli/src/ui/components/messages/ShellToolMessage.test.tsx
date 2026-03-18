@@ -199,7 +199,7 @@ describe('<ShellToolMessage />', () => {
       [
         'uses full availableTerminalHeight when focused in alternate buffer mode',
         100,
-        98, // 100 - 2
+        98,
         true,
         false,
       ],
