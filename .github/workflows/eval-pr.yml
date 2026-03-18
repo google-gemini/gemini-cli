@@ -14,15 +14,10 @@ permissions:
   pull-requests: 'write'
 
 jobs:
-  eval-run:
-    name: 'Eval Run (${{ matrix.model }}, attempt ${{ matrix.run_attempt }})'
+  eval-impact:
+    name: 'Eval Impact Analysis'
     runs-on: 'gemini-cli-ubuntu-16-core'
     if: "github.repository == 'google-gemini/gemini-cli'"
-    strategy:
-      fail-fast: false
-      matrix:
-        run_attempt: [1, 2, 3]
-        model: ["gemini-3.1-pro-preview-customtools", "gemini-3-flash-preview"]
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@v4'
@@ -39,52 +34,41 @@ jobs:
       - name: 'Build project'
         run: 'npm run build'
 
-      - name: 'Run Evals'
+      - name: 'Run Evals (3 Attempts)'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           RUN_EVALS: 'true'
-          GEMINI_MODEL: '${{ matrix.model }}'
         run: |
-          # Use a unique directory name for this matrix leg
-          DIR_NAME="eval-logs-${{ matrix.model }}-${{ matrix.run_attempt }}"
-          mkdir -p "evals/logs/$DIR_NAME"
-          npm run test:all_evals -- --outputFile.json="evals/logs/$DIR_NAME/report.json" || true
-
-      - name: 'Upload Logs'
-        uses: 'actions/upload-artifact@v4'
-        with:
-          name: 'eval-logs-${{ matrix.model }}-${{ matrix.run_attempt }}'
-          path: 'evals/logs'
-          retention-days: 1
-
-  aggregate-impact:
-    name: 'Aggregate Impact'
-    needs: ['eval-run']
-    if: 'always()'
-    runs-on: 'gemini-cli-ubuntu-16-core'
-    steps:
-      - name: 'Checkout'
-        uses: 'actions/checkout@v4'
-
-      - name: 'Download Logs'
-        uses: 'actions/download-artifact@v4'
-        with:
-          path: 'artifacts'
+          MODELS=("gemini-3.1-pro-preview-customtools" "gemini-3-flash-preview")
+          mkdir -p evals/logs
+          
+          for model in "${MODELS[@]}"; do
+            for attempt in {1..3}; do
+              echo "::group::Running $model (Attempt $attempt)"
+              DIR_NAME="eval-logs-$model-$attempt"
+              mkdir -p "evals/logs/$DIR_NAME"
+              # Run sequentially to keep one clean job in the UI
+              GEMINI_MODEL=$model npm run test:all_evals -- --outputFile.json="evals/logs/$DIR_NAME/report.json" || true
+              echo "::endgroup::"
+            done
+          done
 
       - name: 'Generate Impact Report'
         id: 'generate-report'
+        if: 'always()'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
-          if [ ! -d "artifacts" ]; then
+          if [ ! -d "evals/logs" ]; then
             echo "No logs found, skipping report generation."
             exit 0
           fi
           echo "<!-- eval-impact-report -->" > report.md
-          node scripts/aggregate_evals.js artifacts --compare-main --pr-comment >> report.md
+          node scripts/aggregate_evals.js evals/logs --compare-main --pr-comment >> report.md
           cat report.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: 'Comment on PR'
+        if: 'always()'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
