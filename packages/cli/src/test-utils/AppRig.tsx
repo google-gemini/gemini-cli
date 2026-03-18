@@ -204,6 +204,7 @@ export class AppRig {
       enableEventDrivenScheduler: true,
       extensionLoader: new MockExtensionManager(),
       excludeTools: this.options.configOverrides?.excludeTools,
+      useAlternateBuffer: false,
       ...this.options.configOverrides,
     };
     this.config = makeFakeConfig(configParams);
@@ -274,6 +275,9 @@ export class AppRig {
         ide: {
           enabled: false,
           hasSeenNudge: true,
+        },
+        ui: {
+          useAlternateBuffer: false,
         },
       },
     });
@@ -410,7 +414,6 @@ export class AppRig {
           config: this.config!,
           settings: this.settings!,
           width: this.options.terminalWidth ?? 120,
-          useAlternateBuffer: false,
           uiState: {
             terminalHeight: this.options.terminalHeight ?? 40,
           },

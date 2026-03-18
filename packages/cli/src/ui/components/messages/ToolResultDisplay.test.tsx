@@ -5,9 +5,10 @@
  */
 
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { createMockSettings } from '../../../test-utils/settings.js';
 import { ToolResultDisplay } from './ToolResultDisplay.js';
 import { describe, it, expect, vi } from 'vitest';
-import type { AnsiOutput } from '@google/gemini-cli-core';
+import { makeFakeConfig, type AnsiOutput } from '@google/gemini-cli-core';
 
 describe('ToolResultDisplay', () => {
   beforeEach(() => {
@@ -36,7 +37,12 @@ describe('ToolResultDisplay', () => {
         terminalWidth={80}
         maxLines={10}
       />,
-      { useAlternateBuffer: true },
+      {
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({
+          merged: { ui: { useAlternateBuffer: true } },
+        }),
+      },
     );
     await waitUntilReady();
     const output = lastFrame();
@@ -52,7 +58,12 @@ describe('ToolResultDisplay', () => {
         terminalWidth={80}
         maxLines={10}
       />,
-      { useAlternateBuffer: true },
+      {
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({
+          merged: { ui: { useAlternateBuffer: true } },
+        }),
+      },
     );
     await waitUntilReady();
     const output = lastFrame();
@@ -69,7 +80,12 @@ describe('ToolResultDisplay', () => {
         terminalWidth={80}
         hasFocus={true}
       />,
-      { useAlternateBuffer: true },
+      {
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({
+          merged: { ui: { useAlternateBuffer: true } },
+        }),
+      },
     );
     await waitUntilReady();
 
@@ -80,7 +96,12 @@ describe('ToolResultDisplay', () => {
   it('renders string result as markdown by default', async () => {
     const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
       <ToolResultDisplay resultDisplay="**Some result**" terminalWidth={80} />,
-      { useAlternateBuffer: false },
+      {
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({
+          merged: { ui: { useAlternateBuffer: false } },
+        }),
+      },
     );
     await waitUntilReady();
     const output = lastFrame();
@@ -98,7 +119,10 @@ describe('ToolResultDisplay', () => {
         renderOutputAsMarkdown={false}
       />,
       {
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({
+          merged: { ui: { useAlternateBuffer: false } },
+        }),
         uiState: { constrainHeight: true },
       },
     );
@@ -118,7 +142,10 @@ describe('ToolResultDisplay', () => {
         availableTerminalHeight={20}
       />,
       {
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({
+          merged: { ui: { useAlternateBuffer: false } },
+        }),
         uiState: { constrainHeight: true },
       },
     );
@@ -140,7 +167,12 @@ describe('ToolResultDisplay', () => {
         terminalWidth={80}
         availableTerminalHeight={20}
       />,
-      { useAlternateBuffer: false },
+      {
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({
+          merged: { ui: { useAlternateBuffer: false } },
+        }),
+      },
     );
     await waitUntilReady();
     const output = lastFrame();
@@ -170,7 +202,12 @@ describe('ToolResultDisplay', () => {
         terminalWidth={80}
         availableTerminalHeight={20}
       />,
-      { useAlternateBuffer: false },
+      {
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({
+          merged: { ui: { useAlternateBuffer: false } },
+        }),
+      },
     );
     await waitUntilReady();
     const output = lastFrame();
@@ -189,7 +226,12 @@ describe('ToolResultDisplay', () => {
         terminalWidth={80}
         availableTerminalHeight={20}
       />,
-      { useAlternateBuffer: false },
+      {
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({
+          merged: { ui: { useAlternateBuffer: false } },
+        }),
+      },
     );
     await waitUntilReady();
     const output = lastFrame({ allowEmpty: true });
@@ -208,7 +250,10 @@ describe('ToolResultDisplay', () => {
         renderOutputAsMarkdown={true}
       />,
       {
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({
+          merged: { ui: { useAlternateBuffer: false } },
+        }),
         uiState: { constrainHeight: true },
       },
     );
@@ -226,7 +271,12 @@ describe('ToolResultDisplay', () => {
         availableTerminalHeight={20}
         renderOutputAsMarkdown={true}
       />,
-      { useAlternateBuffer: true },
+      {
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({
+          merged: { ui: { useAlternateBuffer: true } },
+        }),
+      },
     );
     await waitUntilReady();
     const output = lastFrame();
@@ -306,7 +356,10 @@ describe('ToolResultDisplay', () => {
         maxLines={3}
       />,
       {
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({
+          merged: { ui: { useAlternateBuffer: false } },
+        }),
         uiState: { constrainHeight: true },
       },
     );
@@ -342,7 +395,10 @@ describe('ToolResultDisplay', () => {
         availableTerminalHeight={undefined}
       />,
       {
-        useAlternateBuffer: false,
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({
+          merged: { ui: { useAlternateBuffer: false } },
+        }),
         uiState: { constrainHeight: true },
       },
     );

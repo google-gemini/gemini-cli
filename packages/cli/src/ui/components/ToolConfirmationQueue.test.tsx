@@ -9,6 +9,7 @@ import { Box } from 'ink';
 import { ToolConfirmationQueue } from './ToolConfirmationQueue.js';
 import { StreamingState } from '../types.js';
 import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import { waitFor } from '../../test-utils/async.js';
 import { type Config, CoreToolCallStatus } from '@google/gemini-cli-core';
 import type { ConfirmingToolState } from '../hooks/useConfirmingTool.js';
@@ -162,8 +163,13 @@ describe('ToolConfirmationQueue', () => {
         />
       </Box>,
       {
-        config: mockConfig,
-        useAlternateBuffer: true,
+        config: {
+          ...mockConfig,
+          getUseAlternateBuffer: () => true,
+        } as unknown as Config,
+        settings: createMockSettings({
+          merged: { ui: { useAlternateBuffer: true } },
+        }),
         uiState: {
           terminalWidth: 80,
           terminalHeight: 20,
@@ -212,7 +218,9 @@ describe('ToolConfirmationQueue', () => {
       />,
       {
         config: mockConfig,
-        useAlternateBuffer: false,
+        settings: createMockSettings({
+          merged: { ui: { useAlternateBuffer: false } },
+        }),
         uiState: {
           terminalWidth: 80,
           terminalHeight: 40,
