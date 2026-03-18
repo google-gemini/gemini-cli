@@ -29,8 +29,8 @@ export class AcpFileSystemService implements FileSystemService {
       sessionId: this.sessionId,
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return response.content;
+    const content: unknown = response.content;
+    return typeof content === 'string' ? content : '';
   }
 
   async writeTextFile(filePath: string, content: string): Promise<void> {

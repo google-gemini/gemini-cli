@@ -174,7 +174,10 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     }
 
     // --- Pre-wrap and Optimize Widths ---
-    const actualColumnWidths = new Array(numColumns).fill(0);
+    const actualColumnWidths: number[] = [];
+    for (let i = 0; i < numColumns; i++) {
+      actualColumnWidths.push(0);
+    }
 
     const wrapAndProcessRow = (row: StyledChar[][]) => {
       const rowResult: ProcessedLine[][] = [];
@@ -208,11 +211,7 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     const wrappedRows = styledRows.map((row) => wrapAndProcessRow(row));
 
     // Use the TIGHTEST widths that fit the wrapped content + padding
-    const adjustedWidths = actualColumnWidths.map(
-      (w) =>
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-        w + COLUMN_PADDING,
-    );
+    const adjustedWidths = actualColumnWidths.map((w) => w + COLUMN_PADDING);
 
     return { wrappedHeaders, wrappedRows, adjustedWidths };
   }, [styledHeaders, styledRows, terminalWidth]);
@@ -263,7 +262,6 @@ export const TableRenderer: React.FC<TableRendererProps> = ({
     isHeader = false,
   ): React.ReactNode => {
     const renderedCells = cells.map((cell, index) => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const width = adjustedWidths[index] || 0;
       return renderCell(cell, width, isHeader);
     });
