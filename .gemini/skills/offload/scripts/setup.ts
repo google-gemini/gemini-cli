@@ -149,8 +149,11 @@ This script will:
 
     const magicLink = `${baseUrl}?name=${encodeURIComponent(name)}&description=Gemini+CLI+Offload+Worker${repoParams}&contents=write&pull_requests=write&metadata=read`;
 
+    // Use OSC 8 for a proper clickable terminal link (no line wrapping issues)
+    const terminalLink = `\u001b]8;;${magicLink}\u0007${magicLink}\u001b]8;;\u0007`;
+
     console.log('\n🔐 SECURITY: Create a token using the link below:');
-    console.log('\n' + magicLink + '\n');
+    console.log(`\n${terminalLink}\n`);
     console.log('👉 INSTRUCTIONS:');
     console.log('1. Click the link above.');
     console.log('2. Under "Repository access", select "Only select repositories".');
