@@ -152,8 +152,8 @@ export class LoadedTrustedFolders {
       const realEffectivePath = getRealPath(effectivePath);
 
       if (isWithinRoot(realLocation, realEffectivePath)) {
-        if (rulePath.length > longestMatchLen) {
-          longestMatchLen = rulePath.length;
+        if (realEffectivePath.length > longestMatchLen) {
+          longestMatchLen = realEffectivePath.length;
           longestMatchTrust = trustLevel;
         }
       }
