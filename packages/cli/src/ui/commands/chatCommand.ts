@@ -75,6 +75,7 @@ const listCommand: SlashCommand = {
   description: 'List saved manual conversation checkpoints',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  takesArgs: false,
   action: async (context): Promise<void> => {
     const chatDetails = await getSavedChatTags(context, false);
 

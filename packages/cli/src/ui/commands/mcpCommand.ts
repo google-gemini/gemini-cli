@@ -306,6 +306,7 @@ const listCommand: SlashCommand = {
   description: 'List configured MCP servers and tools',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  takesArgs: false,
   action: (context) => listAction(context),
 };
 
@@ -315,6 +316,7 @@ const descCommand: SlashCommand = {
   description: 'List configured MCP servers and tools with descriptions',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  takesArgs: false,
   action: (context) => listAction(context, true),
 };
 
@@ -324,6 +326,7 @@ const schemaCommand: SlashCommand = {
     'List configured MCP servers and tools with descriptions and schemas',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  takesArgs: false,
   action: (context) => listAction(context, true, true),
 };
 
@@ -333,6 +336,7 @@ const reloadCommand: SlashCommand = {
   description: 'Reloads MCP servers',
   kind: CommandKind.BUILT_IN,
   autoExecute: true,
+  takesArgs: false,
   action: async (
     context: CommandContext,
   ): Promise<void | SlashCommandActionReturn> => {

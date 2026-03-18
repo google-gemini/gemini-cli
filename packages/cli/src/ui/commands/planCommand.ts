@@ -109,6 +109,7 @@ export const planCommand: SlashCommand = {
       description: 'Copy the currently approved plan to your clipboard',
       kind: CommandKind.BUILT_IN,
       autoExecute: true,
+      takesArgs: false,
       action: copyAction,
     },
   ],
