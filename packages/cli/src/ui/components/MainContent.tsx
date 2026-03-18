@@ -91,11 +91,9 @@ export const MainContent = () => {
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
             availableTerminalHeight={
-              !isExpandable
+              uiState.constrainHeight || !isExpandable
                 ? staticAreaMaxItemHeight
-                : uiState.constrainHeight
-                  ? availableTerminalHeight
-                  : undefined
+                : undefined
             }
             availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
             key={item.id}
@@ -112,7 +110,6 @@ export const MainContent = () => {
       augmentedHistory,
       mainAreaWidth,
       staticAreaMaxItemHeight,
-      availableTerminalHeight,
       uiState.slashCommands,
       uiState.constrainHeight,
     ],
@@ -204,11 +201,9 @@ export const MainContent = () => {
           <MemoizedHistoryItemDisplay
             terminalWidth={mainAreaWidth}
             availableTerminalHeight={
-              !item.isExpandable
+              uiState.constrainHeight || !item.isExpandable
                 ? staticAreaMaxItemHeight
-                : uiState.constrainHeight
-                  ? availableTerminalHeight
-                  : undefined
+                : undefined
             }
             availableTerminalHeightGemini={MAX_GEMINI_MESSAGE_LINES}
             key={item.item.id}
@@ -232,7 +227,6 @@ export const MainContent = () => {
       pendingItems,
       uiState.constrainHeight,
       staticAreaMaxItemHeight,
-      availableTerminalHeight,
     ],
   );
 

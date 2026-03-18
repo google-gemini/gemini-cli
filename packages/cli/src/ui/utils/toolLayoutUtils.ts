@@ -102,7 +102,7 @@ export function calculateShellMaxLines(options: {
   }
 
   const maxLinesBasedOnHeight = Math.max(
-    0,
+    1,
     availableTerminalHeight - TOOL_RESULT_STANDARD_RESERVED_LINE_COUNT,
   );
 
