@@ -39,7 +39,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && rm -rf /var/lib/apt/lists/*
 
 # Install global dev tools
-RUN npm install -g tsx vitest
+RUN npm install -g tsx vitest @google/gemini-cli@nightly prettier eslint typescript cross-env
 
 # Set up npm global package folder
 RUN mkdir -p /usr/local/share/npm-global \
