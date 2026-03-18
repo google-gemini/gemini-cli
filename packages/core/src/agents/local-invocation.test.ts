@@ -230,7 +230,7 @@ describe('LocalSubagentInvocation', () => {
       expect(display.terminateReason).toBe(AgentTerminateMode.TIMEOUT);
     });
 
-    it('should stream THOUGHT_CHUNK activities from the executor', async () => {
+    it('should stream THOUGHT_CHUNK activities from the executor, replacing the last running thought', async () => {
       mockExecutorInstance.run.mockImplementation(async () => {
         const onActivity = MockLocalAgentExecutor.create.mock.calls[0][2];
 
@@ -245,7 +245,7 @@ describe('LocalSubagentInvocation', () => {
             isSubagentActivityEvent: true,
             agentName: 'MockAgent',
             type: 'THOUGHT_CHUNK',
-            data: { text: ' Still thinking.' },
+            data: { text: 'Thinking about next steps.' },
           } as SubagentActivityEvent);
         }
         return { result: 'Done', terminate_reason: AgentTerminateMode.GOAL };
@@ -258,7 +258,13 @@ describe('LocalSubagentInvocation', () => {
       expect(lastCall.recentActivity).toContainEqual(
         expect.objectContaining({
           type: 'thought',
-          content: 'Analyzing... Still thinking.',
+          content: 'Thinking about next steps.',
+        }),
+      );
+      expect(lastCall.recentActivity).not.toContainEqual(
+        expect.objectContaining({
+          type: 'thought',
+          content: 'Analyzing...',
         }),
       );
     });
