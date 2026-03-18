@@ -278,8 +278,8 @@ gemini
 
 ### Getting Started
 
-- [**Quickstart Guide**](https://www.geminicli.com/docs/get-started/index) - Get
-  up and running quickly.
+- [**Quickstart Guide**](https://www.geminicli.com/docs/get-started) - Get up
+  and running quickly.
 - [**Authentication Setup**](https://www.geminicli.com/docs/get-started/authentication) -
   Detailed auth configuration.
 - [**Configuration Guide**](https://www.geminicli.com/docs/reference/configuration) -
@@ -293,7 +293,7 @@ gemini
   All slash commands (`/help`, `/chat`, etc).
 - [**Custom Commands**](https://www.geminicli.com/docs/cli/custom-commands) -
   Create your own reusable commands.
-- [**Context Files (GEMINI)**](https://www.geminicli.com/docs/cli/gemini-md) -
+- [**Context Files (GEMINI.md)**](https://www.geminicli.com/docs/cli/gemini-md) -
   Provide persistent context to Gemini CLI.
 - [**Checkpointing**](https://www.geminicli.com/docs/cli/checkpointing) - Save
   and resume conversations.
@@ -308,15 +308,15 @@ gemini
   - [Web Fetch & Search](https://www.geminicli.com/docs/tools/web-fetch)
 - [**MCP Server Integration**](https://www.geminicli.com/docs/tools/mcp-server) -
   Extend with custom tools.
-- [**Custom Extensions**](https://www.geminicli.com/docs/extensions/index) -
+- [**Custom Extensions**](https://geminicli.com/docs/extensions/writing-extensions) -
   Build and share your own commands.
 
 ### Advanced Topics
 
 - [**Headless Mode (Scripting)**](https://www.geminicli.com/docs/cli/headless) -
   Use Gemini CLI in automated workflows..
-- [**IDE Integration**](https://www.geminicli.com/docs/ide-integration/index) -
-  VS Code companion.
+- [**IDE Integration**](https://www.geminicli.com/docs/ide-integration) - VS
+  Code companion.
 - [**Sandboxing & Security**](https://www.geminicli.com/docs/cli/sandbox) - Safe
   execution environments.
 - [**Trusted Folders**](https://www.geminicli.com/docs/cli/trusted-folders) -
