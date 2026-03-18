@@ -41,6 +41,9 @@ import {
   loadSkillsFromDir,
   loadAgentsFromDirectory,
   homedir,
+  ExtensionIntegrityManager,
+  type IExtensionIntegrity,
+  type IntegrityDataStatus,
   type ExtensionEvents,
   type MCPServerConfig,
   type ExtensionInstallMetadata,
@@ -89,6 +92,7 @@ interface ExtensionManagerParams {
   workspaceDir: string;
   eventEmitter?: EventEmitter<ExtensionEvents>;
   clientVersion?: string;
+  integrityManager?: IExtensionIntegrity;
 }
 
 /**
@@ -98,6 +102,7 @@ interface ExtensionManagerParams {
  */
 export class ExtensionManager extends ExtensionLoader {
   private extensionEnablementManager: ExtensionEnablementManager;
+  private integrityManager: IExtensionIntegrity;
   private settings: MergedSettings;
   private requestConsent: (consent: string) => Promise<boolean>;
   private requestSetting:
@@ -127,6 +132,26 @@ export class ExtensionManager extends ExtensionLoader {
     });
     this.requestConsent = options.requestConsent;
     this.requestSetting = options.requestSetting ?? undefined;
+    this.integrityManager =
+      options.integrityManager ?? new ExtensionIntegrityManager();
+  }
+
+  getEnablementManager(): ExtensionEnablementManager {
+    return this.extensionEnablementManager;
+  }
+
+  async verifyExtensionIntegrity(
+    extensionName: string,
+    metadata: ExtensionInstallMetadata | undefined,
+  ): Promise<IntegrityDataStatus> {
+    return this.integrityManager.verify(extensionName, metadata);
+  }
+
+  async storeExtensionIntegrity(
+    extensionName: string,
+    metadata: ExtensionInstallMetadata,
+  ): Promise<void> {
+    return this.integrityManager.store(extensionName, metadata);
   }
 
   setRequestConsent(
@@ -153,11 +178,9 @@ export class ExtensionManager extends ExtensionLoader {
   async installOrUpdateExtension(
     installMetadata: ExtensionInstallMetadata,
     previousExtensionConfig?: ExtensionConfig,
+    requestConsentOverride?: (consent: string) => Promise<boolean>,
   ): Promise<GeminiCLIExtension> {
-    if (
-      this.settings.security?.allowedExtensions &&
-      this.settings.security?.allowedExtensions.length > 0
-    ) {
+    if ((this.settings.security?.allowedExtensions?.length ?? 0) > 0) {
       const extensionAllowed = this.settings.security?.allowedExtensions.some(
         (pattern) => {
           try {
@@ -243,7 +266,7 @@ export class ExtensionManager extends ExtensionLoader {
             (result.failureReason === 'no release data' &&
               installMetadata.type === 'git') ||
             // Otherwise ask the user if they would like to try a git clone.
-            (await this.requestConsent(
+            (await (requestConsentOverride ?? this.requestConsent)(
               `Error downloading github release for ${installMetadata.source} with the following error: ${result.errorMessage}.
 
 Would you like to attempt to install via "git clone" instead?`,
@@ -271,16 +294,27 @@ Would you like to attempt to install via "git clone" instead?`,
         newExtensionConfig = await this.loadExtensionConfig(localSourcePath);
 
         const newExtensionName = newExtensionConfig.name;
+        const previousName = previousExtensionConfig?.name ?? newExtensionName;
         const previous = this.getExtensions().find(
-          (installed) => installed.name === newExtensionName,
+          (installed) => installed.name === previousName,
         );
+        const nameConflict = this.getExtensions().find(
+          (installed) =>
+            installed.name === newExtensionName &&
+            installed.name !== previousName,
+        );
+
         if (isUpdate && !previous) {
           throw new Error(
-            `Extension "${newExtensionName}" was not already installed, cannot update it.`,
+            `Extension "${previousName}" was not already installed, cannot update it.`,
           );
         } else if (!isUpdate && previous) {
           throw new Error(
             `Extension "${newExtensionName}" is already installed. Please uninstall it first.`,
+          );
+        } else if (isUpdate && nameConflict) {
+          throw new Error(
+            `Cannot update to "${newExtensionName}" because an extension with that name is already installed.`,
           );
         }
 
@@ -298,28 +332,60 @@ Would you like to attempt to install via "git clone" instead?`,
           path.join(localSourcePath, 'skills'),
         );
         const previousSkills = previous?.skills ?? [];
+        const isMigrating = Boolean(
+          previous &&
+            previous.installMetadata &&
+            previous.installMetadata.source !== installMetadata.source,
+        );
 
         await maybeRequestConsentOrFail(
           newExtensionConfig,
-          this.requestConsent,
+          requestConsentOverride ?? this.requestConsent,
           newHasHooks,
           previousExtensionConfig,
           previousHasHooks,
           newSkills,
           previousSkills,
+          isMigrating,
         );
         const extensionId = getExtensionId(newExtensionConfig, installMetadata);
         const destinationPath = new ExtensionStorage(
           newExtensionName,
         ).getExtensionDir();
+
+        if (
+          (!isUpdate || newExtensionName !== previousName) &&
+          fs.existsSync(destinationPath)
+        ) {
+          throw new Error(
+            `Cannot install extension "${newExtensionName}" because a directory with that name already exists. Please remove it manually.`,
+          );
+        }
+
         let previousSettings: Record<string, string> | undefined;
-        if (isUpdate) {
+        let wasEnabledGlobally = false;
+        let wasEnabledWorkspace = false;
+        if (isUpdate && previousExtensionConfig) {
+          const previousExtensionId = previous?.installMetadata
+            ? getExtensionId(previousExtensionConfig, previous.installMetadata)
+            : extensionId;
           previousSettings = await getEnvContents(
             previousExtensionConfig,
-            extensionId,
+            previousExtensionId,
             this.workspaceDir,
           );
-          await this.uninstallExtension(newExtensionName, isUpdate);
+          if (newExtensionName !== previousName) {
+            wasEnabledGlobally = this.extensionEnablementManager.isEnabled(
+              previousName,
+              homedir(),
+            );
+            wasEnabledWorkspace = this.extensionEnablementManager.isEnabled(
+              previousName,
+              this.workspaceDir,
+            );
+            this.extensionEnablementManager.remove(previousName);
+          }
+          await this.uninstallExtension(previousName, isUpdate);
         }
 
         await fs.promises.mkdir(destinationPath, { recursive: true });
@@ -373,6 +439,12 @@ Would you like to attempt to install via "git clone" instead?`,
         );
         await fs.promises.writeFile(metadataPath, metadataString);
 
+        // Establish trust at point of installation
+        await this.storeExtensionIntegrity(
+          newExtensionConfig.name,
+          installMetadata,
+        );
+
         // TODO: Gracefully handle this call failing, we should back up the old
         // extension prior to overwriting it and then restore and restart it.
         extension = await this.loadExtension(destinationPath);
@@ -392,6 +464,18 @@ Would you like to attempt to install via "git clone" instead?`,
               CoreToolCallStatus.Success,
             ),
           );
+
+          if (newExtensionName !== previousName) {
+            if (wasEnabledGlobally) {
+              await this.enableExtension(newExtensionName, SettingScope.User);
+            }
+            if (wasEnabledWorkspace) {
+              await this.enableExtension(
+                newExtensionName,
+                SettingScope.Workspace,
+              );
+            }
+          }
         } else {
           await logExtensionInstallEvent(
             this.telemetryConfig,
@@ -504,7 +588,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
   protected override async startExtension(extension: GeminiCLIExtension) {
     await super.startExtension(extension);
-    if (extension.themes) {
+    if (extension.themes && !themeManager.hasExtensionThemes(extension.name)) {
       themeManager.registerExtensionThemes(extension.name, extension.themes);
     }
   }
@@ -563,6 +647,13 @@ Would you like to attempt to install via "git clone" instead?`,
         }
 
         this.loadedExtensions = builtExtensions;
+
+        // Register extension themes early so they're available at startup.
+        for (const ext of this.loadedExtensions) {
+          if (ext.isActive && ext.themes) {
+            themeManager.registerExtensionThemes(ext.name, ext.themes);
+          }
+        }
 
         await Promise.all(
           this.loadedExtensions.map((ext) => this.maybeStartExtension(ext)),
@@ -626,10 +717,7 @@ Would you like to attempt to install via "git clone" instead?`,
 
     const installMetadata = loadInstallMetadata(extensionDir);
     let effectiveExtensionPath = extensionDir;
-    if (
-      this.settings.security?.allowedExtensions &&
-      this.settings.security?.allowedExtensions.length > 0
-    ) {
+    if ((this.settings.security?.allowedExtensions?.length ?? 0) > 0) {
       if (!installMetadata?.source) {
         throw new Error(
           `Failed to load extension ${extensionDir}. The ${INSTALL_METADATA_FILENAME} file is missing or misconfigured.`,
@@ -831,9 +919,10 @@ Would you like to attempt to install via "git clone" instead?`,
       let skills = await loadSkillsFromDir(
         path.join(effectiveExtensionPath, 'skills'),
       );
-      skills = skills.map((skill) =>
-        recursivelyHydrateStrings(skill, hydrationContext),
-      );
+      skills = skills.map((skill) => ({
+        ...recursivelyHydrateStrings(skill, hydrationContext),
+        extensionName: config.name,
+      }));
 
       let rules: PolicyRule[] | undefined;
       let checkers: SafetyCheckerRule[] | undefined;
@@ -856,9 +945,10 @@ Would you like to attempt to install via "git clone" instead?`,
       const agentLoadResult = await loadAgentsFromDirectory(
         path.join(effectiveExtensionPath, 'agents'),
       );
-      agentLoadResult.agents = agentLoadResult.agents.map((agent) =>
-        recursivelyHydrateStrings(agent, hydrationContext),
-      );
+      agentLoadResult.agents = agentLoadResult.agents.map((agent) => ({
+        ...recursivelyHydrateStrings(agent, hydrationContext),
+        extensionName: config.name,
+      }));
 
       // Log errors but don't fail the entire extension load
       for (const error of agentLoadResult.errors) {
@@ -873,6 +963,7 @@ Would you like to attempt to install via "git clone" instead?`,
         path: effectiveExtensionPath,
         contextFiles,
         installMetadata,
+        migratedTo: config.migratedTo,
         mcpServers: config.mcpServers,
         excludeTools: config.excludeTools,
         hooks,
@@ -891,11 +982,18 @@ Would you like to attempt to install via "git clone" instead?`,
         plan: config.plan,
       };
     } catch (e) {
-      debugLogger.error(
-        `Warning: Skipping extension in ${effectiveExtensionPath}: ${getErrorMessage(
-          e,
-        )}`,
+      const extName = path.basename(extensionDir);
+      debugLogger.warn(
+        `Warning: Removing broken extension ${extName}: ${getErrorMessage(e)}`,
       );
+      try {
+        await fs.promises.rm(extensionDir, { recursive: true, force: true });
+      } catch (rmError) {
+        debugLogger.error(
+          `Failed to remove broken extension directory ${extensionDir}:`,
+          rmError,
+        );
+      }
       return null;
     }
   }

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Config } from '../config/config.js';
+import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat, StreamEventType } from '../core/geminiChat.js';
 import {
@@ -16,7 +16,15 @@ import {
   type Schema,
 } from '@google/genai';
 import { ToolRegistry } from '../tools/tool-registry.js';
-import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
+import { PromptRegistry } from '../prompts/prompt-registry.js';
+import { ResourceRegistry } from '../resources/resource-registry.js';
+import { type AnyDeclarativeTool } from '../tools/tools.js';
+import {
+  DiscoveredMCPTool,
+  isMcpToolName,
+  parseMcpToolName,
+  MCP_TOOL_PREFIX,
+} from '../tools/mcp-tool.js';
 import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
@@ -56,7 +64,11 @@ import { getVersion } from '../utils/version.js';
 import { getToolCallContext } from '../utils/toolCallContext.js';
 import { scheduleAgentTools } from './agent-scheduler.js';
 import { DeadlineTimer } from '../utils/deadlineTimer.js';
-import { formatUserHintsForModel } from '../utils/fastAckHelper.js';
+import {
+  formatUserHintsForModel,
+  formatBackgroundCompletionForModel,
+} from '../utils/fastAckHelper.js';
+import type { InjectionSource } from '../config/injectionService.js';
 
 /** A callback function to report on agent activity. */
 export type ActivityCallback = (activity: SubagentActivityEvent) => void;
@@ -91,11 +103,23 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
   private readonly agentId: string;
   private readonly toolRegistry: ToolRegistry;
-  private readonly runtimeContext: Config;
+  private readonly promptRegistry: PromptRegistry;
+  private readonly resourceRegistry: ResourceRegistry;
+  private readonly context: AgentLoopContext;
   private readonly onActivity?: ActivityCallback;
   private readonly compressionService: ChatCompressionService;
   private readonly parentCallId?: string;
   private hasFailedCompressionAttempt = false;
+
+  private get executionContext(): AgentLoopContext {
+    return {
+      ...this.context,
+      toolRegistry: this.toolRegistry,
+      promptRegistry: this.promptRegistry,
+      resourceRegistry: this.resourceRegistry,
+      messageBus: this.toolRegistry.getMessageBus(),
+    };
+  }
 
   /**
    * Creates and validates a new `AgentExecutor` instance.
@@ -104,47 +128,97 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
    * safe for non-interactive use before creating the executor.
    *
    * @param definition The definition object for the agent.
-   * @param runtimeContext The global runtime configuration.
+   * @param context The execution context.
    * @param onActivity An optional callback to receive activity events.
    * @returns A promise that resolves to a new `LocalAgentExecutor` instance.
    */
   static async create<TOutput extends z.ZodTypeAny>(
     definition: LocalAgentDefinition<TOutput>,
-    runtimeContext: Config,
+    context: AgentLoopContext,
     onActivity?: ActivityCallback,
   ): Promise<LocalAgentExecutor<TOutput>> {
-    // Create an isolated tool registry for this agent instance.
+    const parentMessageBus = context.messageBus;
+
+    // Create an override object to inject the subagent name into tool confirmation requests
+    const subagentMessageBus = parentMessageBus.derive(definition.name);
+
+    // Create isolated registries for this agent instance.
     const agentToolRegistry = new ToolRegistry(
-      runtimeContext,
-      runtimeContext.getMessageBus(),
+      context.config,
+      subagentMessageBus,
     );
-    const parentToolRegistry = runtimeContext.getToolRegistry();
+    const agentPromptRegistry = new PromptRegistry();
+    const agentResourceRegistry = new ResourceRegistry();
+
+    if (definition.mcpServers) {
+      const globalMcpManager = context.config.getMcpClientManager();
+      if (globalMcpManager) {
+        for (const [name, config] of Object.entries(definition.mcpServers)) {
+          await globalMcpManager.maybeDiscoverMcpServer(name, config, {
+            toolRegistry: agentToolRegistry,
+            promptRegistry: agentPromptRegistry,
+            resourceRegistry: agentResourceRegistry,
+          });
+        }
+      }
+    }
+
+    const parentToolRegistry = context.toolRegistry;
     const allAgentNames = new Set(
-      runtimeContext.getAgentRegistry().getAllAgentNames(),
+      context.config.getAgentRegistry().getAllAgentNames(),
     );
 
-    const registerToolByName = (toolName: string) => {
+    const registerToolInstance = (tool: AnyDeclarativeTool) => {
       // Check if the tool is a subagent to prevent recursion.
       // We do not allow agents to call other agents.
-      if (allAgentNames.has(toolName)) {
+      if (allAgentNames.has(tool.name)) {
         debugLogger.warn(
-          `[LocalAgentExecutor] Skipping subagent tool '${toolName}' for agent '${definition.name}' to prevent recursion.`,
+          `[LocalAgentExecutor] Skipping subagent tool '${tool.name}' for agent '${definition.name}' to prevent recursion.`,
         );
         return;
+      }
+
+      // Clone the tool, so it gets its own state and subagent messageBus
+      const clonedTool = tool.clone(subagentMessageBus);
+      agentToolRegistry.registerTool(clonedTool);
+    };
+
+    const registerToolByName = (toolName: string) => {
+      // Handle global wildcard
+      if (toolName === '*') {
+        for (const tool of parentToolRegistry.getAllTools()) {
+          registerToolInstance(tool);
+        }
+        return;
+      }
+
+      // Handle MCP wildcards
+      if (isMcpToolName(toolName)) {
+        if (toolName === `${MCP_TOOL_PREFIX}*`) {
+          for (const tool of parentToolRegistry.getAllTools()) {
+            if (tool instanceof DiscoveredMCPTool) {
+              registerToolInstance(tool);
+            }
+          }
+          return;
+        }
+
+        const parsed = parseMcpToolName(toolName);
+        if (parsed.serverName && parsed.toolName === '*') {
+          for (const tool of parentToolRegistry.getToolsByServer(
+            parsed.serverName,
+          )) {
+            registerToolInstance(tool);
+          }
+          return;
+        }
       }
 
       // If the tool is referenced by name, retrieve it from the parent
       // registry and register it with the agent's isolated registry.
       const tool = parentToolRegistry.getTool(toolName);
       if (tool) {
-        if (tool instanceof DiscoveredMCPTool) {
-          // Subagents MUST use fully qualified names for MCP tools to ensure
-          // unambiguous tool calls and to comply with policy requirements.
-          // We automatically "upgrade" any MCP tool to its qualified version.
-          agentToolRegistry.registerTool(tool.asFullyQualifiedTool());
-        } else {
-          agentToolRegistry.registerTool(tool);
-        }
+        registerToolInstance(tool);
       }
     };
 
@@ -172,7 +246,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     agentToolRegistry.sortTools();
 
     // Get the parent prompt ID from context
-    const parentPromptId = promptIdContext.getStore();
+    const parentPromptId = context.promptId;
 
     // Get the parent tool call ID from context
     const toolContext = getToolCallContext();
@@ -180,11 +254,13 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     return new LocalAgentExecutor(
       definition,
-      runtimeContext,
-      agentToolRegistry,
+      context,
       parentPromptId,
-      parentCallId,
+      agentToolRegistry,
+      agentPromptRegistry,
+      agentResourceRegistry,
       onActivity,
+      parentCallId,
     );
   }
 
@@ -196,15 +272,19 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
    */
   private constructor(
     definition: LocalAgentDefinition<TOutput>,
-    runtimeContext: Config,
-    toolRegistry: ToolRegistry,
+    context: AgentLoopContext,
     parentPromptId: string | undefined,
-    parentCallId: string | undefined,
+    toolRegistry: ToolRegistry,
+    promptRegistry: PromptRegistry,
+    resourceRegistry: ResourceRegistry,
     onActivity?: ActivityCallback,
+    parentCallId?: string,
   ) {
     this.definition = definition;
-    this.runtimeContext = runtimeContext;
+    this.context = context;
     this.toolRegistry = toolRegistry;
+    this.promptRegistry = promptRegistry;
+    this.resourceRegistry = resourceRegistry;
     this.onActivity = onActivity;
     this.compressionService = new ChatCompressionService();
     this.parentCallId = parentCallId;
@@ -400,7 +480,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     } finally {
       clearTimeout(graceTimeoutId);
       logRecoveryAttempt(
-        this.runtimeContext,
+        this.context.config,
         new RecoveryAttemptEvent(
           this.agentId,
           this.definition.name,
@@ -448,7 +528,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     const combinedSignal = AbortSignal.any([signal, deadlineTimer.signal]);
 
     logAgentStart(
-      this.runtimeContext,
+      this.context.config,
       new AgentStartEvent(this.agentId, this.definition.name),
     );
 
@@ -459,7 +539,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       const augmentedInputs = {
         ...inputs,
         cliVersion: await getVersion(),
-        activeModel: this.runtimeContext.getActiveModel(),
+        activeModel: this.context.config.getActiveModel(),
         today: new Date().toLocaleDateString(),
       };
 
@@ -470,19 +550,27 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         : DEFAULT_QUERY_STRING;
 
       const pendingHintsQueue: string[] = [];
-      const hintListener = (hint: string) => {
-        pendingHintsQueue.push(hint);
+      const pendingBgCompletionsQueue: string[] = [];
+      const injectionListener = (text: string, source: InjectionSource) => {
+        if (source === 'user_steering') {
+          pendingHintsQueue.push(text);
+        } else if (source === 'background_completion') {
+          pendingBgCompletionsQueue.push(text);
+        }
       };
       // Capture the index of the last hint before starting to avoid re-injecting old hints.
       // NOTE: Hints added AFTER this point will be broadcast to all currently running
       // local agents via the listener below.
       const startIndex =
-        this.runtimeContext.userHintService.getLatestHintIndex();
-      this.runtimeContext.userHintService.onUserHint(hintListener);
+        this.context.config.injectionService.getLatestInjectionIndex();
+      this.context.config.injectionService.onInjection(injectionListener);
 
       try {
         const initialHints =
-          this.runtimeContext.userHintService.getUserHintsAfter(startIndex);
+          this.context.config.injectionService.getInjectionsAfter(
+            startIndex,
+            'user_steering',
+          );
         const formattedInitialHints = formatUserHintsForModel(initialHints);
 
         let currentMessage: Content = formattedInitialHints
@@ -530,20 +618,39 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           // If status is 'continue', update message for the next loop
           currentMessage = turnResult.nextMessage;
 
-          // Check for new user steering hints collected via subscription
+          // Prepend inter-turn injections. User hints are unshifted first so
+          // that bg completions (unshifted second) appear before them in the
+          // final message — the model sees context before the user's reaction.
           if (pendingHintsQueue.length > 0) {
             const hintsToProcess = [...pendingHintsQueue];
             pendingHintsQueue.length = 0;
             const formattedHints = formatUserHintsForModel(hintsToProcess);
             if (formattedHints) {
-              // Append hints to the current message (next turn)
               currentMessage.parts ??= [];
               currentMessage.parts.unshift({ text: formattedHints });
             }
           }
+
+          if (pendingBgCompletionsQueue.length > 0) {
+            const bgText = pendingBgCompletionsQueue.join('\n');
+            pendingBgCompletionsQueue.length = 0;
+            currentMessage.parts ??= [];
+            currentMessage.parts.unshift({
+              text: formatBackgroundCompletionForModel(bgText),
+            });
+          }
         }
       } finally {
-        this.runtimeContext.userHintService.offUserHint(hintListener);
+        this.context.config.injectionService.offInjection(injectionListener);
+
+        const globalMcpManager = this.context.config.getMcpClientManager();
+        if (globalMcpManager) {
+          globalMcpManager.removeRegistries({
+            toolRegistry: this.toolRegistry,
+            promptRegistry: this.promptRegistry,
+            resourceRegistry: this.resourceRegistry,
+          });
+        }
       }
 
       // === UNIFIED RECOVERY BLOCK ===
@@ -656,7 +763,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     } finally {
       deadlineTimer.abort();
       logAgentFinish(
-        this.runtimeContext,
+        this.context.config,
         new AgentFinishEvent(
           this.agentId,
           this.definition.name,
@@ -679,7 +786,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       prompt_id,
       false,
       model,
-      this.runtimeContext,
+      this.context.config,
       this.hasFailedCompressionAttempt,
     );
 
@@ -718,7 +825,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     // Resolve the model config early to get the concrete model string (which may be `auto`).
     const resolvedConfig =
-      this.runtimeContext.modelConfigService.getResolvedConfig({
+      this.context.config.modelConfigService.getResolvedConfig({
         model: modelConfigAlias,
         overrideScope: this.definition.name,
       });
@@ -738,7 +845,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           signal,
           requestedModel,
         };
-        const router = this.runtimeContext.getModelRouterService();
+        const router = this.context.config.getModelRouterService();
         const decision = await router.route(routingContext);
         modelToUse = decision.model;
       } catch (error) {
@@ -826,7 +933,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     try {
       return new GeminiChat(
-        this.runtimeContext,
+        this.executionContext,
         systemInstruction,
         [{ functionDeclarations: tools }],
         startHistory,
@@ -902,6 +1009,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         displayName,
         description,
         args,
+        callId,
       });
 
       if (toolName === TASK_COMPLETE_TOOL_NAME) {
@@ -969,6 +1077,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             });
             this.emitActivity('TOOL_CALL_END', {
               name: toolName,
+              id: callId,
               output: 'Output submitted and task completed.',
             });
           } else {
@@ -985,6 +1094,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             this.emitActivity('ERROR', {
               context: 'tool_call',
               name: toolName,
+              callId,
               error,
             });
           }
@@ -1009,6 +1119,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             });
             this.emitActivity('TOOL_CALL_END', {
               name: toolName,
+              id: callId,
               output: 'Result submitted and task completed.',
             });
           } else {
@@ -1026,6 +1137,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             this.emitActivity('ERROR', {
               context: 'tool_call',
               name: toolName,
+              callId,
               error,
             });
           }
@@ -1069,12 +1181,15 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     // Execute standard tool calls using the new scheduler
     if (toolRequests.length > 0) {
       const completedCalls = await scheduleAgentTools(
-        this.runtimeContext,
+        this.context.config,
         toolRequests,
         {
-          schedulerId: this.agentId,
+          schedulerId: promptId,
+          subagent: this.definition.name,
           parentCallId: this.parentCallId,
           toolRegistry: this.toolRegistry,
+          promptRegistry: this.promptRegistry,
+          resourceRegistry: this.resourceRegistry,
           signal,
           onWaitingForConfirmation,
         },
@@ -1086,18 +1201,21 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
         if (call.status === 'success') {
           this.emitActivity('TOOL_CALL_END', {
             name: toolName,
+            id: call.request.callId,
             output: call.response.resultDisplay,
           });
         } else if (call.status === 'error') {
           this.emitActivity('ERROR', {
             context: 'tool_call',
             name: toolName,
+            callId: call.request.callId,
             error: call.response.error?.message || 'Unknown error',
           });
         } else if (call.status === 'cancelled') {
           this.emitActivity('ERROR', {
             context: 'tool_call',
             name: toolName,
+            callId: call.request.callId,
             error: 'Request cancelled.',
           });
           aborted = true;
@@ -1145,22 +1263,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     const { toolConfig, outputConfig } = this.definition;
 
     if (toolConfig) {
-      const toolNamesToLoad: string[] = [];
       for (const toolRef of toolConfig.tools) {
-        if (typeof toolRef === 'string') {
-          toolNamesToLoad.push(toolRef);
-        } else if (typeof toolRef === 'object' && 'schema' in toolRef) {
-          // Tool instance with an explicit schema property.
-          toolsList.push(toolRef.schema);
-        } else {
+        if (typeof toolRef === 'object' && !('schema' in toolRef)) {
           // Raw `FunctionDeclaration` object.
           toolsList.push(toolRef);
         }
       }
-      // Add schemas from tools that were registered by name.
-      toolsList.push(
-        ...this.toolRegistry.getFunctionDeclarationsFiltered(toolNamesToLoad),
-      );
+      // Add schemas from tools that were explicitly registered by name, wildcard, or instance.
+      toolsList.push(...this.toolRegistry.getFunctionDeclarations());
     }
 
     // Always inject complete_task.
@@ -1214,7 +1324,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
     let finalPrompt = templateString(promptConfig.systemPrompt, inputs);
 
     // Append environment context (CWD and folder structure).
-    const dirContext = await getDirectoryContextString(this.runtimeContext);
+    const dirContext = await getDirectoryContextString(this.context.config);
     finalPrompt += `\n\n# Environment Context\n${dirContext}`;
 
     // Append standard rules for non-interactive execution.

@@ -52,8 +52,7 @@ vi.mock('../ui/commands/permissionsCommand.js', async () => {
 
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { BuiltinCommandLoader } from './BuiltinCommandLoader.js';
-import type { Config } from '@google/gemini-cli-core';
-import { isNightly } from '@google/gemini-cli-core';
+import { isNightly, type Config } from '@google/gemini-cli-core';
 import { CommandKind } from '../ui/commands/types.js';
 
 import { restoreCommand } from '../ui/commands/restoreCommand.js';
@@ -142,6 +141,14 @@ vi.mock('../ui/commands/mcpCommand.js', () => ({
   },
 }));
 
+vi.mock('../ui/commands/upgradeCommand.js', () => ({
+  upgradeCommand: {
+    name: 'upgrade',
+    description: 'Upgrade command',
+    kind: 'BUILT_IN',
+  },
+}));
+
 describe('BuiltinCommandLoader', () => {
   let mockConfig: Config;
 
@@ -151,7 +158,7 @@ describe('BuiltinCommandLoader', () => {
     vi.clearAllMocks();
     mockConfig = {
       getFolderTrust: vi.fn().mockReturnValue(true),
-      isPlanEnabled: vi.fn().mockReturnValue(false),
+      isPlanEnabled: vi.fn().mockReturnValue(true),
       getEnableExtensionReloading: () => false,
       getEnableHooks: () => false,
       getEnableHooksUI: () => false,
@@ -163,6 +170,9 @@ describe('BuiltinCommandLoader', () => {
         getAllSkills: vi.fn().mockReturnValue([]),
         isAdminEnabled: vi.fn().mockReturnValue(true),
       }),
+      getContentGeneratorConfig: vi.fn().mockReturnValue({
+        authType: 'other',
+      }),
     } as unknown as Config;
 
     restoreCommandMock.mockReturnValue({
@@ -170,6 +180,27 @@ describe('BuiltinCommandLoader', () => {
       description: 'Restore command',
       kind: CommandKind.BUILT_IN,
     });
+  });
+
+  it('should include upgrade command when authType is login_with_google', async () => {
+    const { AuthType } = await import('@google/gemini-cli-core');
+    (mockConfig.getContentGeneratorConfig as Mock).mockReturnValue({
+      authType: AuthType.LOGIN_WITH_GOOGLE,
+    });
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const upgradeCmd = commands.find((c) => c.name === 'upgrade');
+    expect(upgradeCmd).toBeDefined();
+  });
+
+  it('should exclude upgrade command when authType is NOT login_with_google', async () => {
+    (mockConfig.getContentGeneratorConfig as Mock).mockReturnValue({
+      authType: 'other',
+    });
+    const loader = new BuiltinCommandLoader(mockConfig);
+    const commands = await loader.loadCommands(new AbortController().signal);
+    const upgradeCmd = commands.find((c) => c.name === 'upgrade');
+    expect(upgradeCmd).toBeUndefined();
   });
 
   it('should correctly pass the config object to restore command factory', async () => {
@@ -351,7 +382,7 @@ describe('BuiltinCommandLoader profile', () => {
     vi.resetModules();
     mockConfig = {
       getFolderTrust: vi.fn().mockReturnValue(false),
-      isPlanEnabled: vi.fn().mockReturnValue(false),
+      isPlanEnabled: vi.fn().mockReturnValue(true),
       getCheckpointingEnabled: () => false,
       getEnableExtensionReloading: () => false,
       getEnableHooks: () => false,
@@ -363,6 +394,9 @@ describe('BuiltinCommandLoader profile', () => {
       getSkillManager: vi.fn().mockReturnValue({
         getAllSkills: vi.fn().mockReturnValue([]),
         isAdminEnabled: vi.fn().mockReturnValue(true),
+      }),
+      getContentGeneratorConfig: vi.fn().mockReturnValue({
+        authType: 'other',
       }),
     } as unknown as Config;
   });

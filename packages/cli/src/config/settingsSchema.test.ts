@@ -400,12 +400,10 @@ describe('SettingsSchema', () => {
       expect(setting).toBeDefined();
       expect(setting.type).toBe('boolean');
       expect(setting.category).toBe('Experimental');
-      expect(setting.default).toBe(false);
+      expect(setting.default).toBe(true);
       expect(setting.requiresRestart).toBe(true);
       expect(setting.showInDialog).toBe(false);
-      expect(setting.description).toBe(
-        'Enable local and remote subagents. Warning: Experimental feature, uses YOLO mode for subagents',
-      );
+      expect(setting.description).toBe('Enable local and remote subagents.');
     });
 
     it('should have skills setting enabled by default', () => {
@@ -424,12 +422,10 @@ describe('SettingsSchema', () => {
       expect(setting).toBeDefined();
       expect(setting.type).toBe('boolean');
       expect(setting.category).toBe('Experimental');
-      expect(setting.default).toBe(false);
+      expect(setting.default).toBe(true);
       expect(setting.requiresRestart).toBe(true);
       expect(setting.showInDialog).toBe(true);
-      expect(setting.description).toBe(
-        'Enable planning features (Plan Mode and tools).',
-      );
+      expect(setting.description).toBe('Enable Plan Mode.');
     });
 
     it('should have hooksConfig.notifications setting in schema', () => {

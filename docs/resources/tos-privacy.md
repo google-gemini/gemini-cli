@@ -16,8 +16,8 @@ account.
 Your Gemini CLI Usage Statistics are handled in accordance with Google's Privacy
 Policy.
 
-**Note:** See [quotas and pricing](/docs/resources/quota-and-pricing.md) for the
-quota and pricing details that apply to your usage of the Gemini CLI.
+**Note:** See [quotas and pricing](quota-and-pricing.md) for the quota and
+pricing details that apply to your usage of the Gemini CLI.
 
 ## Supported authentication methods
 
@@ -46,7 +46,7 @@ for further information.
 | Gemini Developer API Key | Gemini API - Paid Services   | [Gemini API Terms of Service - Paid Services](https://ai.google.dev/gemini-api/terms#paid-services)     | [Google Privacy Policy](https://policies.google.com/privacy)                                  |
 | Vertex AI GenAI API Key  | Vertex AI GenAI API          | [Google Cloud Platform Terms of Service](https://cloud.google.com/terms/service-terms/)                 | [Google Cloud Privacy Notice](https://cloud.google.com/terms/cloud-privacy-notice)            |
 
-## 1. If you have logged in with your Google account to Gemini Code Assist
+## 1. If you have signed in with your Google account to Gemini Code Assist
 
 For users who use their Google account to access
 [Gemini Code Assist](https://codeassist.google), these Terms of Service and
@@ -68,7 +68,7 @@ Code Assist Standard or Enterprise edition, the terms and privacy policy of
 Gemini Code Assist Standard or Enterprise edition will apply to all your use of
 Gemini Code Assist._
 
-## 2. If you have logged in with a Gemini API key to the Gemini Developer API
+## 2. If you have signed in with a Gemini API key to the Gemini Developer API
 
 If you are using a Gemini API key for authentication with the
 [Gemini Developer API](https://ai.google.dev/gemini-api/docs), these Terms of
@@ -84,7 +84,7 @@ Service and Privacy Notice documents apply:
 - Privacy Notice: The collection and use of your data is described in the
   [Google Privacy Policy](https://policies.google.com/privacy).
 
-## 3. If you have logged in with a Gemini API key to the Vertex AI GenAI API
+## 3. If you have signed in with a Gemini API key to the Vertex AI GenAI API
 
 If you are using a Gemini API key for authentication with a
 [Vertex AI GenAI API](https://cloud.google.com/vertex-ai/generative-ai/docs/reference/rest)
