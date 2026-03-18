@@ -5,6 +5,8 @@
  */
 
 import { z } from 'zod';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type { LocalAgentDefinition } from './types.js';
 import {
   ASK_USER_TOOL_NAME,
@@ -16,6 +18,7 @@ import {
   WRITE_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { Storage } from '../config/storage.js';
+import { isSubpath, normalizePath } from '../utils/paths.js';
 
 const MemoryManagerSchema = z.object({
   response: z
@@ -31,10 +34,55 @@ const MemoryManagerSchema = z.object({
  * Users can override this agent by placing a custom save_memory.md
  * in ~/.gemini/agents/ or .gemini/agents/.
  */
-export const MemoryManagerAgent = (): LocalAgentDefinition<
-  typeof MemoryManagerSchema
-> => {
+export const MemoryManagerAgent = (
+  projectRoot?: string,
+): LocalAgentDefinition<typeof MemoryManagerSchema> => {
   const globalGeminiDir = Storage.getGlobalGeminiDir();
+
+  const getInitialContext = (): string => {
+    const cwd = process.cwd();
+    const filesToRead = new Set<string>();
+
+    // Global GEMINI.md
+    filesToRead.add(path.join(globalGeminiDir, 'GEMINI.md'));
+
+    if (projectRoot) {
+      // Project root .gemini/GEMINI.md
+      filesToRead.add(path.join(projectRoot, '.gemini', 'GEMINI.md'));
+
+      // GEMINI.md files from cwd up to project root
+      if (
+        isSubpath(projectRoot, cwd) ||
+        normalizePath(projectRoot) === normalizePath(cwd)
+      ) {
+        let current = cwd;
+        while (true) {
+          filesToRead.add(path.join(current, 'GEMINI.md'));
+          if (normalizePath(current) === normalizePath(projectRoot)) break;
+          const parent = path.dirname(current);
+          if (parent === current) break;
+          current = parent;
+        }
+      }
+    }
+
+    let context = '\n# Initial Context\n\n';
+    let foundAny = false;
+
+    for (const file of filesToRead) {
+      try {
+        if (fs.existsSync(file) && fs.statSync(file).isFile()) {
+          const content = fs.readFileSync(file, 'utf-8');
+          context += `## File: ${file}\n\`\`\`markdown\n${content}\n\`\`\`\n\n`;
+          foundAny = true;
+        }
+      } catch {
+        // Ignore errors reading files
+      }
+    }
+
+    return foundAny ? context : '';
+  };
 
   const MEMORY_MANAGER_SYSTEM_PROMPT = `
 You are a memory management agent. You maintain the user's memories stored in
@@ -65,14 +113,10 @@ When adding a memory, route it to the right store:
 
 # Operations
 
-Always read the target file(s) before writing. When editing any memory file,
-use \`grep_search\` to scan related files for duplicates before finishing.
-
-1. **Adding** — Route to the correct store and file. Check for duplicates first.
+1. **Adding** — Route to the correct store and file. Check for duplicates in your provided context first.
 2. **Removing stale entries** — Delete outdated or unwanted entries. Clean up
    dangling references.
-3. **De-duplicating** — Search across related memory files for semantically
-   equivalent entries. Keep the most informative version.
+3. **De-duplicating** — Semantically equivalent entries should be combined. Keep the most informative version.
 4. **Organizing** — Restructure for clarity. Update references between files.
 
 # Guidelines
@@ -80,7 +124,14 @@ use \`grep_search\` to scan related files for duplicates before finishing.
 - Keep GEMINI.md files lean — they are loaded into context every session.
 - Keep entries concise.
 - Edit surgically — preserve existing structure and user-authored content.
-- Always read before write to avoid overwriting concurrent changes.
+
+# Efficiency & Performance
+
+- **Use as few turns as possible.** Execute independent reads and writes to different files in parallel by calling multiple tools in a single turn.
+- **Do not perform any exploration of the codebase. Try to use the provided file context and only search additional GEMINI.md files as needed to accomplish your task.
+- **Minimize file system operations.** You should typically only modify the GEMINI.md files that are already provided in your context. Only read or write to other files if explicitly directed or if you are following a specific reference from an existing memory file.
+- **Context Awareness.** If a file's content is already provided in the "Initial Context" section, you do not need to call \`read_file\` for it.
+${getInitialContext()}
 `.trim();
 
   return {
