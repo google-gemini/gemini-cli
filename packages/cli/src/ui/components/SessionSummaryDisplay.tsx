@@ -18,7 +18,9 @@ export const SessionSummaryDisplay: React.FC<SessionSummaryDisplayProps> = ({
 }) => {
   const { stats } = useSessionStats();
   const { shell } = getShellConfiguration();
-  const footer = `To resume this session: gemini --resume ${escapeShellArg(stats.sessionId, shell)}`;
+  const resumeId = stats.alias || stats.sessionId;
+  const aliasSuffix = stats.alias ? ` (${stats.sessionId})` : '';
+  const footer = `To resume this session: gemini --resume ${escapeShellArg(resumeId, shell)}${aliasSuffix}`;
 
   return (
     <StatsDisplay

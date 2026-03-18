@@ -328,6 +328,36 @@ describe('listSessions', () => {
       expect.stringContaining('How do I add dark mode to my React application'),
     );
   });
+
+  it('should display both alias and uuid in brackets when alias is available', async () => {
+    // Arrange
+    const now = new Date('2025-01-20T12:00:00.000Z');
+    const mockSessions: SessionInfo[] = [
+      {
+        id: 'uuid-123',
+        file: 'session-file',
+        fileName: 'session-file.json',
+        startTime: now.toISOString(),
+        lastUpdated: now.toISOString(),
+        messageCount: 5,
+        displayName: 'Test message',
+        firstUserMessage: 'Test message',
+        isCurrentSession: false,
+        index: 1,
+        alias: 'my-cool-alias',
+      },
+    ];
+
+    mockListSessions.mockResolvedValue(mockSessions);
+
+    // Act
+    await listSessions(mockConfig);
+
+    // Assert
+    expect(mocks.writeToStdout).toHaveBeenCalledWith(
+      expect.stringContaining('1. Test message (some time ago) [my-cool-alias, uuid-123]'),
+    );
+  });
 });
 
 describe('deleteSession', () => {

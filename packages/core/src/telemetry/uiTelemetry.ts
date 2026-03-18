@@ -147,6 +147,7 @@ const createInitialMetrics = (): SessionMetrics => ({
 export class UiTelemetryService extends EventEmitter {
   #metrics: SessionMetrics = createInitialMetrics();
   #lastPromptTokenCount = 0;
+  #alias: string | undefined;
 
   addEvent(event: UiEvent) {
     switch (event['event.name']) {
@@ -167,11 +168,16 @@ export class UiTelemetryService extends EventEmitter {
     this.emit('update', {
       metrics: this.#metrics,
       lastPromptTokenCount: this.#lastPromptTokenCount,
+      alias: this.#alias,
     });
   }
 
   getMetrics(): SessionMetrics {
     return this.#metrics;
+  }
+
+  getAlias(): string | undefined {
+    return this.#alias;
   }
 
   getLastPromptTokenCount(): number {
@@ -183,16 +189,28 @@ export class UiTelemetryService extends EventEmitter {
     this.emit('update', {
       metrics: this.#metrics,
       lastPromptTokenCount: this.#lastPromptTokenCount,
+      alias: this.#alias,
+    });
+  }
+
+  setAlias(alias: string): void {
+    this.#alias = alias;
+    this.emit('update', {
+      metrics: this.#metrics,
+      lastPromptTokenCount: this.#lastPromptTokenCount,
+      alias: this.#alias,
     });
   }
 
   clear(newSessionId?: string): void {
     this.#metrics = createInitialMetrics();
     this.#lastPromptTokenCount = 0;
+    this.#alias = undefined;
     this.emit('clear', newSessionId);
     this.emit('update', {
       metrics: this.#metrics,
       lastPromptTokenCount: this.#lastPromptTokenCount,
+      alias: this.#alias,
     });
   }
 
@@ -202,6 +220,7 @@ export class UiTelemetryService extends EventEmitter {
    */
   hydrate(conversation: ConversationRecord): void {
     this.clear(conversation.sessionId);
+    this.#alias = conversation.alias;
 
     let totalTokensInContext = 0;
 
@@ -273,6 +292,7 @@ export class UiTelemetryService extends EventEmitter {
     this.emit('update', {
       metrics: this.#metrics,
       lastPromptTokenCount: this.#lastPromptTokenCount,
+      alias: this.#alias,
     });
   }
 

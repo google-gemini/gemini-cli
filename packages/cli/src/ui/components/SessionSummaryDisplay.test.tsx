@@ -37,10 +37,12 @@ const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
 const renderWithMockedStats = async (
   metrics: SessionMetrics,
   sessionId = 'test-session',
+  alias?: string,
 ) => {
   useSessionStatsMock.mockReturnValue({
     stats: {
       sessionId,
+      alias,
       sessionStartTime: new Date(),
       metrics,
       lastPromptTokenCount: 0,
@@ -166,6 +168,20 @@ describe('<SessionSummaryDisplay />', () => {
 
       // PowerShell wraps strings in single quotes
       expect(output).toContain("gemini --resume '1234-abcd-5678-efgh'");
+      unmount();
+    });
+
+    it('renders both alias and session ID when alias is present', async () => {
+      const uuidSessionId = '1234-abcd-5678-efgh';
+      const alias = 'my-alias';
+      const { lastFrame, unmount } = await renderWithMockedStats(
+        emptyMetrics,
+        uuidSessionId,
+        alias,
+      );
+      const output = lastFrame();
+
+      expect(output).toContain('gemini --resume my-alias (1234-abcd-5678-efgh)');
       unmount();
     });
 

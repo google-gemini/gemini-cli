@@ -200,6 +200,7 @@ interface AppContainerProps {
   version: string;
   initializationResult: InitializationResult;
   resumedSessionData?: ResumedSessionData;
+  initialSessionBrowserOpen?: boolean;
 }
 
 import { useRepeatedKeyPress } from './hooks/useRepeatedKeyPress.js';
@@ -414,7 +415,7 @@ export const AppContainer = (props: AppContainerProps) => {
   const app: AppProps = useApp();
 
   // Additional hooks moved from App.tsx
-  const { stats: sessionStats } = useSessionStats();
+  const { stats: sessionStats, getPromptCount } = useSessionStats();
   const branchName = useGitBranchName(config.getTargetDir());
 
   // Layout measurements
@@ -742,7 +743,11 @@ export const AppContainer = (props: AppContainerProps) => {
     closeSessionBrowser,
     handleResumeSession,
     handleDeleteSession: handleDeleteSessionSync,
-  } = useSessionBrowser(config, loadHistoryForResume);
+  } = useSessionBrowser(
+    config,
+    loadHistoryForResume,
+    props.initialSessionBrowserOpen,
+  );
   // Wrap handleDeleteSession to return a Promise for UIActions interface
   const handleDeleteSession = useCallback(
     async (session: SessionInfo): Promise<void> => {
@@ -896,6 +901,44 @@ Logging in with Google... Restarting Gemini CLI to continue.
     toggleCleanUiDetailsVisible,
     revealCleanUiDetailsTemporarily,
   } = useVisibilityToggle();
+
+  // Start with a high value for resumed sessions to disable auto-summarization
+  // IF they already have an alias. Resumed sessions with an alias are immutable.
+  const lastSummarizedTurnRef = useRef<number>(
+    props.resumedSessionData?.conversation.alias ? 1000000 : 0,
+  );
+  useEffect(() => {
+    // Only run background summary refinement if the session doesn't have an alias yet.
+    if (props.resumedSessionData?.conversation.alias) {
+      return;
+    }
+    if (streamingState === StreamingState.Idle) {
+      const promptCount = getPromptCount();
+      const milestones = [1, 3, 7, 11, 17];
+
+      if (
+        milestones.includes(promptCount) &&
+        promptCount > lastSummarizedTurnRef.current
+      ) {
+        lastSummarizedTurnRef.current = promptCount;
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        (async () => {
+          const { ChatRecordingService } = await import(
+            '@google/gemini-cli-core'
+          );
+          const chatRecordingService = new ChatRecordingService(config);
+          const currentSessionPath =
+            chatRecordingService.getConversationFilePath();
+          await generateSummary(config, currentSessionPath).catch((e: unknown) => {
+            debugLogger.warn(
+              `Background summary (turn ${promptCount}) failed:`,
+              e instanceof Error ? e : String(e),
+            );
+          });
+        })();
+      }
+    }
+  }, [streamingState, config, props.resumedSessionData, getPromptCount]);
 
   const slashCommandActions = useMemo(
     () => ({

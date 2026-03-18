@@ -51,7 +51,10 @@ import {
 
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
-import { RESUME_LATEST } from '../utils/sessionUtils.js';
+import {
+  RESUME_LATEST,
+  RESUME_INTERACTIVE,
+} from '../utils/sessionUtils.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import {
@@ -84,7 +87,7 @@ export interface CliArgs {
   experimentalAcp?: boolean;
   extensions: string[] | undefined;
   listExtensions: boolean | undefined;
-  resume: string | typeof RESUME_LATEST | undefined;
+  resume: string | typeof RESUME_LATEST | typeof RESUME_INTERACTIVE | undefined;
   listSessions: boolean | undefined;
   deleteSession: string | undefined;
   includeDirectories: string[] | undefined;
@@ -238,15 +241,21 @@ export async function parseArguments(
           // one, and not being passed at all.
           skipValidation: true,
           description:
-            'Resume a previous session. Use "latest" for most recent or index number (e.g. --resume 5)',
-          coerce: (value: string): string => {
+            'Resume a previous session. Use "latest" for most recent, "list" for interactive UI, alias, or index number (e.g. --resume 5)',
+          coerce: (value: string | boolean): string => {
             // When --resume passed with a value (`gemini --resume 123`): value = "123" (string)
-            // When --resume passed without a value (`gemini --resume`): value = "" (string)
+            // When --resume passed without a value (`gemini --resume`): value = "" (string) or true (boolean)
             // When --resume not passed at all: this `coerce` function is not called at all, and
             //   `yargsInstance.argv.resume` is undefined.
-            const trimmed = value.trim();
+            if (value === true) {
+              return RESUME_LATEST;
+            }
+            const trimmed = String(value).trim();
             if (trimmed === '') {
               return RESUME_LATEST;
+            }
+            if (trimmed === 'list') {
+              return RESUME_INTERACTIVE;
             }
             return trimmed;
           },

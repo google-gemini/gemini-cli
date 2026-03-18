@@ -10,6 +10,7 @@ import {
   type Config,
   type ResumedSessionData,
   convertSessionToClientHistory,
+  uiTelemetryService,
 } from '@google/gemini-cli-core';
 import type { Part } from '@google/genai';
 import type { HistoryItemWithoutId } from '../types.js';
@@ -64,6 +65,9 @@ export function useSessionResume({
 
       setIsResuming(true);
       try {
+        // Hydrate telemetry metrics from the historical conversation record.
+        uiTelemetryService.hydrate(resumedData.conversation);
+
         // Now that we have the client, load the history into the UI and the client.
         setQuittingMessages(null);
         historyManagerRef.current.clearItems();

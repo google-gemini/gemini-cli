@@ -60,6 +60,17 @@ export const DialogManager = ({
     terminalWidth: uiTerminalWidth,
   } = uiState;
 
+  if (uiState.isSessionBrowserOpen) {
+    return (
+      <SessionBrowser
+        config={config}
+        onResumeSession={uiActions.handleResumeSession}
+        onDeleteSession={uiActions.handleDeleteSession}
+        onExit={uiActions.closeSessionBrowser}
+      />
+    );
+  }
+
   if (uiState.adminSettingsChanged) {
     return <AdminSettingsChangedDialog />;
   }
@@ -339,16 +350,6 @@ export const DialogManager = ({
       <PrivacyNotice
         onExit={() => uiActions.exitPrivacyNotice()}
         config={config}
-      />
-    );
-  }
-  if (uiState.isSessionBrowserOpen) {
-    return (
-      <SessionBrowser
-        config={config}
-        onResumeSession={uiActions.handleResumeSession}
-        onDeleteSession={uiActions.handleDeleteSession}
-        onExit={uiActions.closeSessionBrowser}
       />
     );
   }

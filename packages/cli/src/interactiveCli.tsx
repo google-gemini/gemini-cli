@@ -56,6 +56,7 @@ export async function startInteractiveUI(
   workspaceRoot: string = process.cwd(),
   resumedSessionData: ResumedSessionData | undefined,
   initializationResult: InitializationResult,
+  initialSessionBrowserOpen: boolean = false,
 ) {
   // Never enter Ink alternate buffer mode when screen reader mode is enabled
   // as there is no benefit of alternate buffer mode when using a screen reader
@@ -124,6 +125,7 @@ export async function startInteractiveUI(
                           version={version}
                           resumedSessionData={resumedSessionData}
                           initializationResult={initializationResult}
+                          initialSessionBrowserOpen={initialSessionBrowserOpen}
                         />
                       </VimModeProvider>
                     </SessionStatsProvider>

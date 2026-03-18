@@ -24,7 +24,14 @@ describe('SessionSummaryService', () => {
       candidates: [
         {
           content: {
-            parts: [{ text: 'Add dark mode to the app' }],
+            parts: [
+              {
+                text: JSON.stringify({
+                  summary: 'Add dark mode to the app',
+                  alias: 'add-dark-mode',
+                }),
+              },
+            ],
           },
         },
       ],
@@ -65,7 +72,8 @@ describe('SessionSummaryService', () => {
 
       const summary = await service.generateSummary({ messages });
 
-      expect(summary).toBe('Add dark mode to the app');
+      expect(summary?.summary).toBe('Add dark mode to the app');
+      expect(summary?.alias).toBe('add-dark-mode');
       expect(mockGenerateContent).toHaveBeenCalledTimes(1);
       expect(mockGenerateContent).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -452,7 +460,10 @@ describe('SessionSummaryService', () => {
             content: {
               parts: [
                 {
-                  text: 'Add dark mode\n\nto   the   app',
+                  text: JSON.stringify({
+                    summary: 'Add dark mode\n\nto   the   app',
+                    alias: 'add-dark-mode',
+                  }),
                 },
               ],
             },
@@ -471,7 +482,8 @@ describe('SessionSummaryService', () => {
 
       const summary = await service.generateSummary({ messages });
 
-      expect(summary).toBe('Add dark mode to the app');
+      expect(summary?.summary).toBe('Add dark mode to the app');
+      expect(summary?.alias).toBe('add-dark-mode');
     });
 
     it('should remove surrounding quotes', async () => {
@@ -479,7 +491,14 @@ describe('SessionSummaryService', () => {
         candidates: [
           {
             content: {
-              parts: [{ text: '"Add dark mode to the app"' }],
+              parts: [
+                {
+                  text: JSON.stringify({
+                    summary: '"Add dark mode to the app"',
+                    alias: 'add-dark-mode',
+                  }),
+                },
+              ],
             },
           },
         ],
@@ -496,7 +515,8 @@ describe('SessionSummaryService', () => {
 
       const summary = await service.generateSummary({ messages });
 
-      expect(summary).toBe('Add dark mode to the app');
+      expect(summary?.summary).toBe('Add dark mode to the app');
+      expect(summary?.alias).toBe('add-dark-mode');
     });
 
     it('should handle messages longer than 500 chars', async () => {
@@ -812,7 +832,14 @@ describe('SessionSummaryService', () => {
         candidates: [
           {
             content: {
-              parts: [{ text: '添加深色模式到应用' }],
+              parts: [
+                {
+                  text: JSON.stringify({
+                    summary: '添加深色模式到应用',
+                    alias: 'add-dark-mode-chinese',
+                  }),
+                },
+              ],
             },
           },
         ],
@@ -829,7 +856,7 @@ describe('SessionSummaryService', () => {
 
       const summary = await service.generateSummary({ messages });
 
-      expect(summary).toBe('添加深色模式到应用');
+      expect(summary?.summary).toBe('添加深色模式到应用');
     });
 
     it('should preserve international characters (Arabic)', async () => {
@@ -837,7 +864,14 @@ describe('SessionSummaryService', () => {
         candidates: [
           {
             content: {
-              parts: [{ text: 'إضافة الوضع الداكن' }],
+              parts: [
+                {
+                  text: JSON.stringify({
+                    summary: 'إضافة الوضع الداكن',
+                    alias: 'add-dark-mode-arabic',
+                  }),
+                },
+              ],
             },
           },
         ],
@@ -854,7 +888,7 @@ describe('SessionSummaryService', () => {
 
       const summary = await service.generateSummary({ messages });
 
-      expect(summary).toBe('إضافة الوضع الداكن');
+      expect(summary?.summary).toBe('إضافة الوضع الداكن');
     });
 
     it('should preserve accented characters', async () => {
@@ -862,7 +896,14 @@ describe('SessionSummaryService', () => {
         candidates: [
           {
             content: {
-              parts: [{ text: 'Añadir modo oscuro à la aplicación' }],
+              parts: [
+                {
+                  text: JSON.stringify({
+                    summary: 'Añadir modo oscuro à la aplicación',
+                    alias: 'add-dark-mode-accented',
+                  }),
+                },
+              ],
             },
           },
         ],
@@ -879,7 +920,7 @@ describe('SessionSummaryService', () => {
 
       const summary = await service.generateSummary({ messages });
 
-      expect(summary).toBe('Añadir modo oscuro à la aplicación');
+      expect(summary?.summary).toBe('Añadir modo oscuro à la aplicación');
     });
 
     it('should preserve emojis in summaries', async () => {
@@ -887,7 +928,14 @@ describe('SessionSummaryService', () => {
         candidates: [
           {
             content: {
-              parts: [{ text: '🌙 Add dark mode 🎨 to the app ✨' }],
+              parts: [
+                {
+                  text: JSON.stringify({
+                    summary: '🌙 Add dark mode 🎨 to the app ✨',
+                    alias: 'add-dark-mode-emojis',
+                  }),
+                },
+              ],
             },
           },
         ],
@@ -905,10 +953,10 @@ describe('SessionSummaryService', () => {
       const summary = await service.generateSummary({ messages });
 
       // Emojis are preserved
-      expect(summary).toBe('🌙 Add dark mode 🎨 to the app ✨');
-      expect(summary).toContain('🌙');
-      expect(summary).toContain('🎨');
-      expect(summary).toContain('✨');
+      expect(summary?.summary).toBe('🌙 Add dark mode 🎨 to the app ✨');
+      expect(summary?.summary).toContain('🌙');
+      expect(summary?.summary).toContain('🎨');
+      expect(summary?.summary).toContain('✨');
     });
 
     it('should preserve zero-width characters for language rendering', async () => {
@@ -917,7 +965,14 @@ describe('SessionSummaryService', () => {
         candidates: [
           {
             content: {
-              parts: [{ text: 'كلمة\u200Dمتصلة' }], // Contains ZWJ
+              parts: [
+                {
+                  text: JSON.stringify({
+                    summary: 'كلمة\u200Dمتصلة',
+                    alias: 'zwj-test',
+                  }),
+                },
+              ],
             },
           },
         ],
@@ -935,8 +990,8 @@ describe('SessionSummaryService', () => {
       const summary = await service.generateSummary({ messages });
 
       // ZWJ is preserved (it's not considered whitespace)
-      expect(summary).toBe('كلمة\u200Dمتصلة');
-      expect(summary).toContain('\u200D'); // ZWJ should be preserved
+      expect(summary?.summary).toBe('كلمة\u200Dمتصلة');
+      expect(summary?.summary).toContain('\u200D'); // ZWJ should be preserved
     });
   });
 });

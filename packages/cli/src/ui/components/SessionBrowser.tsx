@@ -250,14 +250,23 @@ const SessionItem = ({
 
   const truncatedMessage =
     matchDisplay ||
-    (session.displayName.length === 0 ? (
+    (session.displayName.length === 0 && !session.alias ? (
       <Text color={textColor(Colors.Gray)} dimColor>
         (No messages)
       </Text>
-    ) : session.displayName.length > availableMessageWidth ? (
-      session.displayName.slice(0, availableMessageWidth - 1) + '…'
     ) : (
-      session.displayName
+      <>
+        {session.alias && (
+          <Text color={textColor(Colors.AccentPurple)} bold>
+            [{session.alias}]{' '}
+          </Text>
+        )}
+        {session.displayName.length > availableMessageWidth ? (
+          session.displayName.slice(0, availableMessageWidth - 1) + '…'
+        ) : (
+          session.displayName
+        )}
+      </>
     ));
 
   return (

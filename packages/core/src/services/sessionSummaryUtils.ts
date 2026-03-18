@@ -8,6 +8,7 @@ import type { Config } from '../config/config.js';
 import { SessionSummaryService } from './sessionSummaryService.js';
 import { BaseLlmClient } from '../core/baseLlmClient.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
 import {
   SESSION_FILE_PREFIX,
   type ConversationRecord,
@@ -29,10 +30,10 @@ async function generateAndSaveSummary(
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const conversation: ConversationRecord = JSON.parse(content);
 
-  // Skip if summary already exists
-  if (conversation.summary) {
+  // Skip if both summary and alias already exist
+  if (conversation.summary && conversation.alias) {
     debugLogger.debug(
-      `[SessionSummary] Summary already exists for ${sessionPath}, skipping`,
+      `[SessionSummary] Summary and alias already exist for ${sessionPath}, skipping`,
     );
     return;
   }
@@ -56,47 +57,60 @@ async function generateAndSaveSummary(
   const baseLlmClient = new BaseLlmClient(contentGenerator, config);
   const summaryService = new SessionSummaryService(baseLlmClient);
 
-  // Generate summary
-  const summary = await summaryService.generateSummary({
+  // Generate summary and alias
+  const result = await summaryService.generateSummary({
     messages: conversation.messages,
   });
 
-  if (!summary) {
+  if (!result) {
     debugLogger.warn(
-      `[SessionSummary] Failed to generate summary for ${sessionPath}`,
+      `[SessionSummary] Failed to generate summary/alias for ${sessionPath}`,
     );
     return;
   }
+
+  const { summary, alias } = result;
 
   // Re-read the file before writing to handle race conditions
   const freshContent = await fs.readFile(sessionPath, 'utf-8');
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   const freshConversation: ConversationRecord = JSON.parse(freshContent);
 
-  // Check if summary was added by another process
-  if (freshConversation.summary) {
+  // Skip if both summary and alias already exist AND it's not the current session.
+  // We allow overwriting during the current session to refine the name as conversation deepens.
+  if (
+    freshConversation.summary &&
+    freshConversation.alias &&
+    freshConversation.sessionId !== config.getSessionId()
+  ) {
     debugLogger.debug(
-      `[SessionSummary] Summary was added by another process for ${sessionPath}`,
+      `[SessionSummary] Summary and alias already exist for ${sessionPath}, skipping`,
     );
     return;
   }
 
-  // Add summary and write back
+  // Add summary and alias, then write back
   freshConversation.summary = summary;
+  freshConversation.alias = alias;
   freshConversation.lastUpdated = new Date().toISOString();
   await fs.writeFile(sessionPath, JSON.stringify(freshConversation, null, 2));
   debugLogger.debug(
-    `[SessionSummary] Saved summary for ${sessionPath}: "${summary}"`,
+    `[SessionSummary] Saved summary for ${sessionPath}: "${summary}", alias: "${alias}"`,
   );
+
+  // Update live telemetry if this is the current active session
+  if (freshConversation.sessionId === config.getSessionId()) {
+    uiTelemetryService.setAlias(alias);
+  }
 }
 
 /**
- * Finds the most recently created session that needs a summary.
- * Returns the path if it needs a summary, null otherwise.
+ * Finds all sessions that need a summary or alias.
+ * Returns an array of paths, newest first.
  */
-export async function getPreviousSession(
+export async function getSessionsNeedingSummary(
   config: Config,
-): Promise<string | null> {
+): Promise<string[]> {
   try {
     const chatsDir = path.join(config.storage.getProjectTempDir(), 'chats');
 
@@ -105,72 +119,79 @@ export async function getPreviousSession(
       await fs.access(chatsDir);
     } catch {
       debugLogger.debug('[SessionSummary] No chats directory found');
-      return null;
+      return [];
     }
 
     // List session files
     const allFiles = await fs.readdir(chatsDir);
-    const sessionFiles = allFiles.filter(
-      (f) => f.startsWith(SESSION_FILE_PREFIX) && f.endsWith('.json'),
-    );
+    const sessionFiles = allFiles
+      .filter((f) => f.startsWith(SESSION_FILE_PREFIX) && f.endsWith('.json'))
+      .sort((a, b) => b.localeCompare(a)); // Newest first
 
-    if (sessionFiles.length === 0) {
-      debugLogger.debug('[SessionSummary] No session files found');
-      return null;
+    const paths: string[] = [];
+
+    for (const file of sessionFiles) {
+      const filePath = path.join(chatsDir, file);
+      try {
+        const content = await fs.readFile(filePath, 'utf-8');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const conversation: ConversationRecord = JSON.parse(content);
+
+        // Skip if both summary and alias already exist
+        if (conversation.summary && conversation.alias) {
+          continue;
+        }
+
+        // If it's not the current session and has an alias, it's immutable
+        if (
+          conversation.alias &&
+          conversation.sessionId !== config.getSessionId()
+        ) {
+          continue;
+        }
+
+        // Only generate summaries for sessions with messages
+        const userMessageCount = conversation.messages.filter(
+          (m) => m.type === 'user',
+        ).length;
+        if (userMessageCount < MIN_MESSAGES_FOR_SUMMARY) {
+          continue;
+        }
+
+        paths.push(filePath);
+      } catch {
+        continue;
+      }
     }
 
-    // Sort by filename descending (most recently created first)
-    // Filename format: session-YYYY-MM-DDTHH-MM-XXXXXXXX.json
-    sessionFiles.sort((a, b) => b.localeCompare(a));
-
-    // Check the most recently created session
-    const mostRecentFile = sessionFiles[0];
-    const filePath = path.join(chatsDir, mostRecentFile);
-
-    try {
-      const content = await fs.readFile(filePath, 'utf-8');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      const conversation: ConversationRecord = JSON.parse(content);
-
-      if (conversation.summary) {
-        debugLogger.debug(
-          '[SessionSummary] Most recent session already has summary',
-        );
-        return null;
-      }
-
-      // Only generate summaries for sessions with more than 1 user message
-      const userMessageCount = conversation.messages.filter(
-        (m) => m.type === 'user',
-      ).length;
-      if (userMessageCount <= MIN_MESSAGES_FOR_SUMMARY) {
-        debugLogger.debug(
-          `[SessionSummary] Most recent session has ${userMessageCount} user message(s), skipping (need more than ${MIN_MESSAGES_FOR_SUMMARY})`,
-        );
-        return null;
-      }
-
-      return filePath;
-    } catch {
-      debugLogger.debug('[SessionSummary] Could not read most recent session');
-      return null;
-    }
+    return paths;
   } catch (error) {
     debugLogger.debug(
-      `[SessionSummary] Error finding previous session: ${error instanceof Error ? error.message : String(error)}`,
+      `[SessionSummary] Error finding sessions: ${error instanceof Error ? error.message : String(error)}`,
     );
-    return null;
+    return [];
   }
 }
 
 /**
- * Generates summary for the previous session if it lacks one.
- * This is designed to be called fire-and-forget on startup.
+ * Generates summary for previous sessions if they lack one.
+ * If sessionPath is provided, it summarizes that specific session.
+ * This is designed to be called fire-and-forget.
  */
-export async function generateSummary(config: Config): Promise<void> {
+export async function generateSummary(
+  config: Config,
+  sessionPath?: string,
+): Promise<void> {
   try {
-    const sessionPath = await getPreviousSession(config);
     if (sessionPath) {
+      await generateAndSaveSummary(config, sessionPath);
+      return;
+    }
+
+    const sessionPaths = await getSessionsNeedingSummary(config);
+    // Limit to 5 at a time to avoid hammering the API on startup
+    const limit = sessionPaths.slice(0, 5);
+    for (const sessionPath of limit) {
       await generateAndSaveSummary(config, sessionPath);
     }
   } catch (error) {

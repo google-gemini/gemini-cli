@@ -114,6 +114,44 @@ describe('SessionSelector', () => {
     expect(result2.sessionData.messages[0].content).toBe('Test message 2');
   });
 
+  it('should resolve session by alias', async () => {
+    const sessionId = randomUUID();
+    const alias = 'test-alias';
+
+    const chatsDir = path.join(tmpDir, 'chats');
+    await fs.mkdir(chatsDir, { recursive: true });
+
+    const session = {
+      sessionId,
+      projectHash: 'test-hash',
+      alias,
+      startTime: '2024-01-01T10:00:00.000Z',
+      lastUpdated: '2024-01-01T10:30:00.000Z',
+      messages: [
+        {
+          type: 'user',
+          content: 'Test message',
+          id: 'msg1',
+          timestamp: '2024-01-01T10:00:00.000Z',
+        },
+      ],
+    };
+
+    await fs.writeFile(
+      path.join(
+        chatsDir,
+        `${SESSION_FILE_PREFIX}2024-01-01T10-00-${sessionId.slice(0, 8)}.json`,
+      ),
+      JSON.stringify(session, null, 2),
+    );
+
+    const sessionSelector = new SessionSelector(config);
+    const result = await sessionSelector.resolveSession(alias);
+
+    expect(result.sessionData.sessionId).toBe(sessionId);
+    expect(result.sessionData.alias).toBe(alias);
+  });
+
   it('should resolve session by index', async () => {
     const sessionId1 = randomUUID();
     const sessionId2 = randomUUID();
