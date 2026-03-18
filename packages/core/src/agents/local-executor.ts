@@ -113,7 +113,10 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
   private get executionContext(): AgentLoopContext {
     return {
-      ...this.context,
+      config: this.context.config,
+      promptId: this.context.promptId,
+      geminiClient: this.context.geminiClient,
+      sandboxManager: this.context.sandboxManager,
       toolRegistry: this.toolRegistry,
       promptRegistry: this.promptRegistry,
       resourceRegistry: this.resourceRegistry,
