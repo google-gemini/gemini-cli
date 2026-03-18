@@ -465,9 +465,7 @@ describe('<ToolMessage />', () => {
           },
           width: 80,
           config: makeFakeConfig({ useAlternateBuffer: false }),
-          settings: createMockSettings({
-            merged: { ui: { useAlternateBuffer: false } },
-          }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         },
       );
       await waitUntilReady();
@@ -501,9 +499,7 @@ describe('<ToolMessage />', () => {
           uiState: { streamingState: StreamingState.Idle },
           width: 80,
           config: makeFakeConfig({ useAlternateBuffer: false }),
-          settings: createMockSettings({
-            merged: { ui: { useAlternateBuffer: false } },
-          }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         },
       );
       await waitUntilReady();
@@ -532,9 +528,7 @@ describe('<ToolMessage />', () => {
           uiState: { streamingState: StreamingState.Idle },
           width: 80,
           config: makeFakeConfig({ useAlternateBuffer: false }),
-          settings: createMockSettings({
-            merged: { ui: { useAlternateBuffer: false } },
-          }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         },
       );
       await waitUntilReady();
