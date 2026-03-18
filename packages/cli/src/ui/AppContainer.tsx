@@ -1149,16 +1149,21 @@ Logging in with Google... Restarting Gemini CLI to continue.
     consumePendingHints,
   );
 
-  // Start with a high value for resumed sessions to disable auto-summarization
-  // IF they already have an alias. Resumed sessions with an alias are immutable.
-  const lastSummarizedTurnRef = useRef<number>(
-    props.resumedSessionData?.conversation.alias ? 1000000 : 0,
-  );
+  const lastSummarizedTurnRef = useRef<number>(0);
+  const lastSessionIdRef = useRef<string | undefined>(undefined);
+
   useEffect(() => {
+    if (lastSessionIdRef.current !== sessionStats.sessionId) {
+      // New session has started, reset summarization state.
+      lastSessionIdRef.current = sessionStats.sessionId;
+      lastSummarizedTurnRef.current = sessionStats.alias ? 1000000 : 0;
+    }
+
     // Only run background summary refinement if the session doesn't have an alias yet.
-    if (props.resumedSessionData?.conversation.alias) {
+    if (sessionStats.alias) {
       return;
     }
+
     if (streamingState === StreamingState.Idle) {
       const promptCount = getPromptCount();
       const milestones = [1, 3, 7, 11, 17];
@@ -1187,7 +1192,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
         })();
       }
     }
-  }, [streamingState, config, props.resumedSessionData, getPromptCount]);
+  }, [streamingState, config, sessionStats, getPromptCount]);
 
   toggleBackgroundShellRef.current = toggleBackgroundShell;
   isBackgroundShellVisibleRef.current = isBackgroundShellVisible;
