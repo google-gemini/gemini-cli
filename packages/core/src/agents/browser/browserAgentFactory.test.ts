@@ -325,7 +325,6 @@ describe('browserAgentFactory', () => {
     });
 
     it('should register sensitive action rules', async () => {
-      // 1. Enabling confirmSensitiveActions to ensure upload_file/evaluate_script are added
       mockConfig = makeFakeConfig({
         agents: {
           browser: {
@@ -339,7 +338,6 @@ describe('browserAgentFactory', () => {
 
       await createBrowserAgentDefinition(mockConfig, mockMessageBus);
 
-      // Check for fill rule (always added)
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
         expect.objectContaining({
           toolName: 'fill',
@@ -349,7 +347,6 @@ describe('browserAgentFactory', () => {
         }),
       );
 
-      // Check for upload_file rule (added when confirmSensitiveActions is true)
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
         expect.objectContaining({
           toolName: 'upload_file',
@@ -359,7 +356,6 @@ describe('browserAgentFactory', () => {
         }),
       );
 
-      // Check for evaluate_script rule (added when confirmSensitiveActions is true)
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
         expect.objectContaining({
           toolName: 'evaluate_script',
@@ -371,7 +367,6 @@ describe('browserAgentFactory', () => {
     });
 
     it('should register fill rule even when confirmSensitiveActions is disabled', async () => {
-      // confirmSensitiveActions is false by default in makeFakeConfig
       await createBrowserAgentDefinition(mockConfig, mockMessageBus);
 
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
@@ -380,7 +375,6 @@ describe('browserAgentFactory', () => {
         }),
       );
 
-      // But upload_file should not be there
       expect(mockPolicyEngine.addRule).not.toHaveBeenCalledWith(
         expect.objectContaining({
           toolName: 'upload_file',
@@ -394,6 +388,22 @@ describe('browserAgentFactory', () => {
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
         expect.objectContaining({
           toolName: 'take_snapshot',
+          decision: PolicyDecision.ALLOW,
+          priority: PRIORITY_SUBAGENT_TOOL,
+        }),
+      );
+
+      expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'take_screenshot',
+          decision: PolicyDecision.ALLOW,
+          priority: PRIORITY_SUBAGENT_TOOL,
+        }),
+      );
+
+      expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'list_pages',
           decision: PolicyDecision.ALLOW,
           priority: PRIORITY_SUBAGENT_TOOL,
         }),
