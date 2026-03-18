@@ -41,7 +41,7 @@ export const compressCommand: SlashCommand = {
       const promptId = `compress-${Date.now()}`;
       const compressed = await context.services.config
         ?.getGeminiClient()
-        ?.tryCompressChat(promptId, true);
+        ?.tryCompressChat(promptId, true, context.ui.abortSignal);
       if (compressed) {
         ui.addItem(
           {
