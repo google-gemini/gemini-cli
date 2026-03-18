@@ -375,6 +375,8 @@ priority = 200
 Specify only the `mcpName` to apply a rule to every tool provided by that
 server.
 
+**Note:** This applies to all decision types (`allow`, `deny`, `ask_user`).
+
 ```toml
 # Denies all tools from the `untrusted-server` MCP
 [[rule]]
