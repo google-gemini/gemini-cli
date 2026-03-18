@@ -38,6 +38,10 @@ Alternatively, add the following to your `settings.json`:
 
 ## How to use Git worktrees
 
+There are two ways to use Git worktrees: at startup or mid-session.
+
+### Using the startup flag
+
 Use the `--worktree` (`-w`) flag to create an isolated worktree and start Gemini
 CLI in it.
 
@@ -54,6 +58,33 @@ CLI in it.
   ```bash
   gemini --worktree
   ```
+
+### Using the slash command
+
+If you are already in a Gemini session, you can switch to a new isolated
+worktree without restarting using the `/worktree` command.
+
+- **Switch with a specific name:**
+
+  ```text
+  /worktree feature-auth
+  ```
+
+- **Switch with a random name:**
+  ```text
+  /worktree
+  ```
+
+When you use `/worktree`, Gemini:
+
+1.  **Checks your current environment:** If you are already in a worktree, it
+    automatically cleans it up if there are no changes, or preserves it if there
+    are.
+2.  **Creates the new worktree:** Sets up a fresh copy of the codebase and a new
+    branch.
+3.  **Pivots the session:** Switches its working directory and reloads the
+    project context (memory and tools) so you can immediately start working in
+    isolation.
 
 > **Note:** Remember to initialize your development environment in each new
 > worktree according to your project's setup. Depending on your stack, this

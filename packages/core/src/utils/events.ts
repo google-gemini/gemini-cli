@@ -190,8 +190,16 @@ export enum CoreEvent {
   EditorSelected = 'editor-selected',
   SlashCommandConflicts = 'slash-command-conflicts',
   QuotaChanged = 'quota-changed',
+  WorkingDirectoryChanged = 'working-directory-changed',
   TelemetryKeychainAvailability = 'telemetry-keychain-availability',
   TelemetryTokenStorageType = 'telemetry-token-storage-type',
+}
+
+/**
+ * Payload for the 'working-directory-changed' event.
+ */
+export interface WorkingDirectoryChangedPayload {
+  newPath: string;
 }
 
 /**
@@ -223,6 +231,7 @@ export interface CoreEvents extends ExtensionEvents {
   [CoreEvent.RequestEditorSelection]: never[];
   [CoreEvent.EditorSelected]: [EditorSelectedPayload];
   [CoreEvent.SlashCommandConflicts]: [SlashCommandConflictsPayload];
+  [CoreEvent.WorkingDirectoryChanged]: [WorkingDirectoryChangedPayload];
   [CoreEvent.TelemetryKeychainAvailability]: [KeychainAvailabilityEvent];
   [CoreEvent.TelemetryTokenStorageType]: [TokenStorageInitializationEvent];
 }

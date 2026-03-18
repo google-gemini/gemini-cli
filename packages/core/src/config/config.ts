@@ -682,11 +682,11 @@ export class Config implements McpContext, AgentLoopContext {
   readonly modelConfigService: ModelConfigService;
   private readonly embeddingModel: string;
   private readonly sandbox: SandboxConfig | undefined;
-  private readonly targetDir: string;
+  private targetDir: string;
   private workspaceContext: WorkspaceContext;
   private readonly debugMode: boolean;
   private readonly question: string | undefined;
-  private readonly worktreeSettings: WorktreeSettings | undefined;
+  private worktreeSettings: WorktreeSettings | undefined;
   readonly enableConseca: boolean;
 
   private readonly coreTools: string[] | undefined;
@@ -728,7 +728,7 @@ export class Config implements McpContext, AgentLoopContext {
   private gitService: GitService | undefined = undefined;
   private readonly checkpointing: boolean;
   private readonly proxy: string | undefined;
-  private readonly cwd: string;
+  private cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private model: string;
   private readonly disableLoopDetection: boolean;
@@ -1533,6 +1533,22 @@ export class Config implements McpContext, AgentLoopContext {
 
   getWorktreeSettings(): WorktreeSettings | undefined {
     return this.worktreeSettings;
+  }
+
+  /**
+   * Switches the active project context to a new Git worktree.
+   * This updates the target directory, reloads the workspace context,
+   * and triggers a directory change event.
+   */
+  switchToWorktree(settings: WorktreeSettings): void {
+    this.targetDir = path.resolve(settings.path);
+    this.worktreeSettings = settings;
+    this.workspaceContext = new WorkspaceContext(this.targetDir, []);
+    this.fileDiscoveryService = null;
+    this.cwd = this.targetDir;
+    coreEvents.emit(CoreEvent.WorkingDirectoryChanged, {
+      newPath: this.targetDir,
+    });
   }
 
   getClientName(): string | undefined {

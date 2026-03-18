@@ -909,9 +909,9 @@ export async function loadCliConfig(
     hooks: settings.hooks || {},
     disabledHooks: settings.hooksConfig?.disabled || [],
     projectHooks: projectHooks || {},
-    onModelChange: (model: string) => saveModelChange(loadSettings(cwd), model),
+    onModelChange: (model: string) => saveModelChange(loadSettings(), model),
     onReload: async () => {
-      const refreshedSettings = loadSettings(cwd);
+      const refreshedSettings = loadSettings();
       return {
         disabledSkills: refreshedSettings.merged.skills.disabled,
         agents: refreshedSettings.merged.agents,

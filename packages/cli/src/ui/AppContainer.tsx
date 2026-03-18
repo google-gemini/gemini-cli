@@ -246,6 +246,19 @@ export const AppContainer = (props: AppContainerProps) => {
     initializationResult.themeError,
   );
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [cwd, setCwd] = useState(() => config.getTargetDir());
+
+  useEffect(() => {
+    const handleDirectoryChange = (payload: { newPath: string }) => {
+      setCwd(payload.newPath);
+    };
+
+    coreEvents.on(CoreEvent.WorkingDirectoryChanged, handleDirectoryChange);
+    return () => {
+      coreEvents.off(CoreEvent.WorkingDirectoryChanged, handleDirectoryChange);
+    };
+  }, []);
+
   const [embeddedShellFocused, setEmbeddedShellFocused] = useState(false);
   const [showDebugProfiler, setShowDebugProfiler] = useState(false);
   const [customDialog, setCustomDialog] = useState<React.ReactNode | null>(
@@ -415,7 +428,7 @@ export const AppContainer = (props: AppContainerProps) => {
 
   // Additional hooks moved from App.tsx
   const { stats: sessionStats } = useSessionStats();
-  const branchName = useGitBranchName(config.getTargetDir());
+  const branchName = useGitBranchName(cwd);
 
   // Layout measurements
   const mainControlsRef = useRef<DOMElement>(null);
