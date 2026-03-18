@@ -49,7 +49,7 @@ You want to run tests and fix any failures.
 6.  Gemini uses `replace` to fix the bug.
 7.  Gemini runs `npm test` again to verify the fix.
 
-This loop allows Gemini to work autonomously.
+This loop lets Gemini work autonomously.
 
 ## How to manage background processes
 
