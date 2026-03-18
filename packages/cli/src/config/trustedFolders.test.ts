@@ -192,6 +192,19 @@ describe('Trusted Folders', () => {
       expect(folders.isPathTrusted('/user/someotherfolder')).toBe(undefined);
     });
 
+    it('uses resolved path length for precedence, not raw rule path length', () => {
+      // TRUST_PARENT's effectivePath is dirname(rulePath), which can be much
+      // shorter than the raw rulePath. A more-specific DO_NOT_TRUST rule must
+      // still win even when the raw TRUST_PARENT rulePath is longer.
+      const folders = setup({
+        '/a/b/very-long-child': TrustLevel.TRUST_PARENT, // effectivePath = '/a/b'
+        '/a/b/c': TrustLevel.DO_NOT_TRUST,
+      });
+
+      expect(folders.isPathTrusted('/a/b/c/secret.txt')).toBe(false);
+      expect(folders.isPathTrusted('/a/b/other/file.txt')).toBe(true);
+    });
+
     it('prioritizes the longest matching path (precedence)', () => {
       const folders = setup({
         '/a': TrustLevel.TRUST_FOLDER,
