@@ -212,6 +212,7 @@ const TreeNodeRenderer: React.FC<TreeNodeRendererProps> = ({
         onToggleCollapse={onToggleCollapse}
       />
       {!isCollapsed &&
+        node.depth < 10 &&
         node.children.map((child, index) => (
           <TreeNodeRenderer
             key={child.tool.callId}

@@ -134,6 +134,12 @@ export function buildTaskTree(
       syntheticStatus = CoreToolCallStatus.Success;
     }
 
+    const incrementDepth = (node: TaskTreeNode): TaskTreeNode => ({
+      ...node,
+      depth: node.depth + 1,
+      children: node.children.map(incrementDepth),
+    });
+
     const syntheticRoot: TaskTreeNode = {
       tool: {
         callId: '__synthetic_turn_root__',
@@ -143,7 +149,7 @@ export function buildTaskTree(
         resultDisplay: undefined,
         confirmationDetails: undefined,
       },
-      children: roots.map((r) => ({ ...r, depth: 1 })),
+      children: roots.map(incrementDepth),
       depth: 0,
     };
     return [syntheticRoot];
