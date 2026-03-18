@@ -18,6 +18,7 @@ import {
 } from '../../policy/types.js';
 import type { Config } from '../../config/config.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
+import type { PolicyEngine } from '../../policy/policy-engine.js';
 import type { BrowserManager } from './browserManager.js';
 
 // Create mock browser manager
@@ -319,11 +320,11 @@ describe('browserAgentFactory', () => {
         removeRulesForTool: vi.fn(),
       };
       vi.spyOn(mockConfig, 'getPolicyEngine').mockReturnValue(
-        mockPolicyEngine as any,
+        mockPolicyEngine as unknown as PolicyEngine,
       );
     });
 
-    it('should register sensitive action rules in YOLO mode', async () => {
+    it('should register sensitive action rules', async () => {
       // 1. Enabling confirmSensitiveActions to ensure upload_file/evaluate_script are added
       mockConfig = makeFakeConfig({
         agents: {
@@ -333,7 +334,7 @@ describe('browserAgentFactory', () => {
         },
       });
       vi.spyOn(mockConfig, 'getPolicyEngine').mockReturnValue(
-        mockPolicyEngine as any,
+        mockPolicyEngine as unknown as PolicyEngine,
       );
 
       await createBrowserAgentDefinition(mockConfig, mockMessageBus);
