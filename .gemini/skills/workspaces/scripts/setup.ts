@@ -64,8 +64,8 @@ and full builds) to a dedicated, high-performance GCP worker.
   const zone = await prompt('Compute Zone', env.WORKSPACE_ZONE || 'us-west1-a', 
     'The physical location of your worker. us-west1-a is the team default.');
 
-  const terminalTarget = await prompt('Terminal UI Target (tab or window)', env.WORKSPACE_TERM_TARGET || 'tab',
-    'When a job starts, should it open in a new iTerm2 tab or a completely new window?');
+  const terminalTarget = await prompt('Terminal UI Target (foreground, background, tab, window)', env.WORKSPACE_TERM_TARGET || 'tab',
+    'When you start a job in gemini-cli, should it run as a foreground shell, background shell (no attach), new iterm2 tab, or new iterm2 window?');
 
   // 2. Repository Discovery (Dynamic)
   console.log('\n🔍 Detecting repository origins...');
