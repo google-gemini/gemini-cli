@@ -355,7 +355,6 @@ export class HookAggregator {
     // Extract additionalContext from various hook types
     if (
       'additionalContext' in specific &&
-      // eslint-disable-next-line no-restricted-syntax
       typeof specific['additionalContext'] === 'string'
     ) {
       contexts.push(specific['additionalContext']);
