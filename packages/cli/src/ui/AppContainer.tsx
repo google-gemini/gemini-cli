@@ -902,44 +902,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
     revealCleanUiDetailsTemporarily,
   } = useVisibilityToggle();
 
-  // Start with a high value for resumed sessions to disable auto-summarization
-  // IF they already have an alias. Resumed sessions with an alias are immutable.
-  const lastSummarizedTurnRef = useRef<number>(
-    props.resumedSessionData?.conversation.alias ? 1000000 : 0,
-  );
-  useEffect(() => {
-    // Only run background summary refinement if the session doesn't have an alias yet.
-    if (props.resumedSessionData?.conversation.alias) {
-      return;
-    }
-    if (streamingState === StreamingState.Idle) {
-      const promptCount = getPromptCount();
-      const milestones = [1, 3, 7, 11, 17];
-
-      if (
-        milestones.includes(promptCount) &&
-        promptCount > lastSummarizedTurnRef.current
-      ) {
-        lastSummarizedTurnRef.current = promptCount;
-        // eslint-disable-next-line @typescript-eslint/no-floating-promises
-        (async () => {
-          const { ChatRecordingService } = await import(
-            '@google/gemini-cli-core'
-          );
-          const chatRecordingService = new ChatRecordingService(config);
-          const currentSessionPath =
-            chatRecordingService.getConversationFilePath();
-          await generateSummary(config, currentSessionPath).catch((e: unknown) => {
-            debugLogger.warn(
-              `Background summary (turn ${promptCount}) failed:`,
-              e instanceof Error ? e : String(e),
-            );
-          });
-        })();
-      }
-    }
-  }, [streamingState, config, props.resumedSessionData, getPromptCount]);
-
   const slashCommandActions = useMemo(
     () => ({
       openAuthDialog: () => setAuthState(AuthState.Updating),
@@ -1186,6 +1148,46 @@ Logging in with Google... Restarting Gemini CLI to continue.
     embeddedShellFocused,
     consumePendingHints,
   );
+
+  // Start with a high value for resumed sessions to disable auto-summarization
+  // IF they already have an alias. Resumed sessions with an alias are immutable.
+  const lastSummarizedTurnRef = useRef<number>(
+    props.resumedSessionData?.conversation.alias ? 1000000 : 0,
+  );
+  useEffect(() => {
+    // Only run background summary refinement if the session doesn't have an alias yet.
+    if (props.resumedSessionData?.conversation.alias) {
+      return;
+    }
+    if (streamingState === StreamingState.Idle) {
+      const promptCount = getPromptCount();
+      const milestones = [1, 3, 7, 11, 17];
+
+      if (
+        milestones.includes(promptCount) &&
+        promptCount > lastSummarizedTurnRef.current
+      ) {
+        lastSummarizedTurnRef.current = promptCount;
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
+        (async () => {
+          const { ChatRecordingService } = await import(
+            '@google/gemini-cli-core'
+          );
+          const chatRecordingService = new ChatRecordingService(config);
+          const currentSessionPath =
+            chatRecordingService.getConversationFilePath();
+          await generateSummary(config, currentSessionPath ?? undefined).catch(
+            (e: unknown) => {
+              debugLogger.warn(
+                `Background summary (turn ${promptCount}) failed:`,
+                e instanceof Error ? e : String(e),
+              );
+            },
+          );
+        })();
+      }
+    }
+  }, [streamingState, config, props.resumedSessionData, getPromptCount]);
 
   toggleBackgroundShellRef.current = toggleBackgroundShell;
   isBackgroundShellVisibleRef.current = isBackgroundShellVisible;
