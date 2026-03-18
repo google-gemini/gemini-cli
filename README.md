@@ -314,7 +314,7 @@ gemini
 ### Advanced Topics
 
 - [**Headless Mode (Scripting)**](https://www.geminicli.com/docs/cli/headless) -
-  Use Gemini CLI in automated workflows..
+  Use Gemini CLI in automated workflows.
 - [**IDE Integration**](https://www.geminicli.com/docs/ide-integration) - VS
   Code companion.
 - [**Sandboxing & Security**](https://www.geminicli.com/docs/cli/sandbox) - Safe

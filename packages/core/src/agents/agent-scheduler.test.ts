@@ -42,6 +42,8 @@ describe('agent-scheduler', () => {
 
   it('should create a scheduler with agent-specific config', async () => {
     const mockConfig = {
+      getPromptRegistry: vi.fn(),
+      getResourceRegistry: vi.fn(),
       messageBus: mockMessageBus,
       toolRegistry: mockToolRegistry,
     } as unknown as Mocked<Config>;
@@ -91,6 +93,8 @@ describe('agent-scheduler', () => {
     } as unknown as Mocked<ToolRegistry>;
 
     const config = {
+      getPromptRegistry: vi.fn(),
+      getResourceRegistry: vi.fn(),
       messageBus: mockMessageBus,
     } as unknown as Mocked<Config>;
     Object.defineProperty(config, 'toolRegistry', {
@@ -123,6 +127,8 @@ describe('agent-scheduler', () => {
 
   it('should create an AgentLoopContext that has a defined .config property', async () => {
     const mockConfig = {
+      getPromptRegistry: vi.fn(),
+      getResourceRegistry: vi.fn(),
       messageBus: mockMessageBus,
       toolRegistry: mockToolRegistry,
       promptId: 'test-prompt',
