@@ -233,6 +233,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
     let browserManager;
     let recentActivity: SubagentActivityItem[] = [];
     let sessionMode: 'persistent' | 'isolated' | 'existing' = 'persistent';
+    let visionEnabled = false;
 
     try {
       if (updateOutput) {
@@ -274,8 +275,9 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
         this.messageBus,
         printOutput,
       );
-      const { definition, visionEnabled } = result;
+      const { definition } = result;
       browserManager = result.browserManager;
+      visionEnabled = result.visionEnabled;
       sessionMode = result.sessionMode;
 
       // Create activity callback for streaming output
@@ -427,8 +429,10 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
 
       let taskSuccess = false;
       try {
-        const parsed = JSON.parse(output.result) as { success?: boolean };
-        taskSuccess = parsed.success === true;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const parsed = JSON.parse(output.result);
+         
+        taskSuccess = parsed?.success === true;
       } catch {
         // non-JSON result -> treat as unknown, default false
       }
@@ -477,6 +481,15 @@ ${displayResult}
         (error instanceof Error && error.name === 'AbortError') ||
         rawErrorMessage.includes('Aborted');
       const errorMessage = sanitizeErrorMessage(rawErrorMessage);
+
+      // Record error outcome for telemetry
+      recordBrowserAgentTaskOutcome(this.config, {
+        success: false,
+        session_mode: sessionMode,
+        vision_enabled: visionEnabled,
+        headless: !!this.config.getBrowserAgentConfig().customConfig.headless,
+        duration_ms: Date.now() - invocationStartMs,
+      });
 
       // Mark any running items as error/cancelled
       for (const item of recentActivity) {

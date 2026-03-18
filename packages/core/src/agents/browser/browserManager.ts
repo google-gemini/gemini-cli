@@ -323,7 +323,11 @@ export class BrowserManager {
 
     // Build args for chrome-devtools-mcp
     const browserConfig = this.config.getBrowserAgentConfig();
-    const sessionMode = browserConfig.customConfig.sessionMode ?? 'persistent';
+    const rawSessionMode = browserConfig.customConfig.sessionMode;
+    const sessionMode: 'persistent' | 'isolated' | 'existing' =
+      rawSessionMode === 'isolated' || rawSessionMode === 'existing'
+        ? rawSessionMode
+        : 'persistent';
 
     const mcpArgs = ['--experimental-vision'];
 
@@ -437,10 +441,7 @@ export class BrowserManager {
             this.config,
             Date.now() - connectStartMs,
             {
-              session_mode: sessionMode as
-                | 'persistent'
-                | 'isolated'
-                | 'existing',
+              session_mode: sessionMode,
               headless: !!browserConfig.customConfig.headless,
               success: true,
             },
@@ -479,7 +480,7 @@ export class BrowserManager {
       }
 
       recordBrowserAgentConnection(this.config, Date.now() - connectStartMs, {
-        session_mode: sessionMode as 'persistent' | 'isolated' | 'existing',
+        session_mode: sessionMode,
         headless: !!browserConfig.customConfig.headless,
         success: false,
         error_type: errorType,

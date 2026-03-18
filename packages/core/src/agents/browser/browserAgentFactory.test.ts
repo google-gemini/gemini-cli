@@ -327,8 +327,8 @@ describe('browserAgentFactory', () => {
 
       expect(recordBrowserAgentToolDiscovery).toHaveBeenCalledWith(
         configWithVision,
-        6, // The 5 mock tools defined in getDiscoveredTools + 1 type_text
-        [], // Empty because the mock tools include required semantic tools
+        6, // 6 mock tools from getDiscoveredTools
+        [], // Empty because all required semantic tools present
         'persistent',
       );
     });
@@ -350,7 +350,7 @@ describe('browserAgentFactory', () => {
 
       expect(recordBrowserAgentToolDiscovery).toHaveBeenCalledWith(
         configWithVision,
-        2, // 1 mock tool + 1 type_text
+        1, // 1 mock tool from getDiscoveredTools
         ['click', 'fill', 'navigate_page'],
         'persistent',
       );
