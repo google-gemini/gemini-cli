@@ -71,7 +71,8 @@ describe('browserAgentFactory', () => {
       { name: 'click', description: 'Click element' },
       { name: 'fill', description: 'Fill form field' },
       { name: 'navigate_page', description: 'Navigate to URL' },
-      { name: 'type_text', description: 'Type text into an element' },
+      { name: 'press_key', description: 'Press key' },
+      { name: 'hover', description: 'Hover element' },
       // Visual tools (from --experimental-vision)
       { name: 'click_at', description: 'Click at coordinates' },
     ]);
@@ -270,7 +271,6 @@ describe('browserAgentFactory', () => {
         { name: 'close_page', description: 'Close page' },
         { name: 'select_page', description: 'Select page' },
         { name: 'press_key', description: 'Press key' },
-        { name: 'type_text', description: 'Type text into an element' },
         { name: 'hover', description: 'Hover element' },
       ]);
 
@@ -294,9 +294,9 @@ describe('browserAgentFactory', () => {
       expect(toolNames).toContain('click');
       expect(toolNames).toContain('take_snapshot');
       expect(toolNames).toContain('press_key');
-      expect(toolNames).toContain('type_text');
-      // Total: 9 MCP + 1 type_text (no analyze_screenshot without visualModel)
-      expect(definition.toolConfig?.tools).toHaveLength(10);
+      expect(toolNames).toContain('hover');
+      // Total: 9 MCP tools (no analyze_screenshot without visualModel)
+      expect(definition.toolConfig?.tools).toHaveLength(9);
     });
   });
 

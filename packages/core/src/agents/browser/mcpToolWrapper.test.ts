@@ -352,7 +352,7 @@ describe('mcpToolWrapper', () => {
         2,
         'evaluate_script',
         expect.objectContaining({
-          function: expect.stringContaining('__gemini_click'),
+          function: expect.stringContaining('dot.animate'),
         }),
         expect.any(AbortSignal),
       );
@@ -377,7 +377,9 @@ describe('mcpToolWrapper', () => {
         1,
         'evaluate_script',
         expect.objectContaining({
-          function: expect.stringContaining('__gemini_click_listener'),
+          function: expect.stringContaining(
+            '__geminiCursorClickListenerActive',
+          ),
         }),
         expect.any(AbortSignal),
       );
@@ -430,7 +432,7 @@ describe('mcpToolWrapper', () => {
         2,
         'evaluate_script',
         expect.objectContaining({
-          function: expect.stringContaining('__gemini_scroll_arrow_down'),
+          function: expect.stringContaining('__gemini_scroll_panel'),
         }),
         expect.any(AbortSignal),
       );
