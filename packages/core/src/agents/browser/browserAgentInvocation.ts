@@ -36,7 +36,6 @@ import {
   createBrowserAgentDefinition,
   cleanupBrowserAgent,
 } from './browserAgentFactory.js';
-import { appendThoughtChunk } from '../../utils/thoughtUtils.js';
 import { removeInputBlocker } from './inputBlocker.js';
 import {
   sanitizeThoughtContent,
@@ -169,9 +168,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
               lastItem.type === 'thought' &&
               lastItem.status === 'running'
             ) {
-              lastItem.content = sanitizeThoughtContent(
-                appendThoughtChunk(lastItem.content, text),
-              );
+              lastItem.content = sanitizeThoughtContent(text);
             } else {
               recentActivity.push({
                 id: randomUUID(),

@@ -21,7 +21,6 @@ import {
 } from './types.js';
 import { randomUUID } from 'node:crypto';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
-import { appendThoughtChunk } from '../utils/thoughtUtils.js';
 import {
   sanitizeThoughtContent,
   sanitizeToolArgs,
@@ -127,9 +126,7 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
               lastItem.type === 'thought' &&
               lastItem.status === 'running'
             ) {
-              lastItem.content = sanitizeThoughtContent(
-                appendThoughtChunk(lastItem.content, text),
-              );
+              lastItem.content = sanitizeThoughtContent(text);
             } else {
               recentActivity.push({
                 id: randomUUID(),

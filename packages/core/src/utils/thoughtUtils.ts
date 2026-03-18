@@ -52,18 +52,3 @@ export function parseThought(rawText: string): ThoughtSummary {
 
   return { subject, description };
 }
-
-/**
- * Appends a thought chunk to existing content, ensuring proper spacing.
- *
- * @param existing The existing thought content.
- * @param chunk The new chunk to append.
- * @returns The combined string with appropriate spacing.
- */
-export function appendThoughtChunk(existing: string, chunk: string): string {
-  if (existing.length === 0) {
-    return chunk;
-  }
-  const needsSpace = !/\s$/.test(existing) && !/^\s/.test(chunk);
-  return existing + (needsSpace ? ' ' : '') + chunk;
-}

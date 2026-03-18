@@ -389,7 +389,7 @@ describe('BrowserAgentInvocation', () => {
       expect(lastCall.recentActivity).toContainEqual(
         expect.objectContaining({
           type: 'thought',
-          content: 'I am thinking. Now I will act.',
+          content: 'Now I will act.',
         }),
       );
     });
