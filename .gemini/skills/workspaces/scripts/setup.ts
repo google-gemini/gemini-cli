@@ -70,14 +70,9 @@ and full builds) to a dedicated, high-performance GCP worker.
   // 2. Repository Discovery (Dynamic)
   console.log('\n🔍 Detecting repository origins...');
   
-  // Get remote URL
-  const remoteUrlRes = spawnSync('git', ['remote', 'get-url', 'origin'], { stdio: 'pipe' });
-  const remoteUrl = remoteUrlRes.stdout.toString().trim();
-  
-  // Use gh to get full details
   const repoInfoRes = spawnSync('gh', ['repo', 'view', '--json', 'nameWithOwner,parent,isFork'], { stdio: 'pipe' });
-  let upstreamRepo = 'google-gemini/gemini-cli'; // Fallback
-  let userFork = upstreamRepo;
+  let upstreamRepo = 'google-gemini/gemini-cli'; 
+  let userFork = '';
 
   if (repoInfoRes.status === 0) {
       try {
@@ -85,15 +80,33 @@ and full builds) to a dedicated, high-performance GCP worker.
           if (repoInfo.isFork && repoInfo.parent) {
               upstreamRepo = repoInfo.parent.nameWithOwner;
               userFork = repoInfo.nameWithOwner;
+              console.log(`   ✅ Detected Existing Fork: ${userFork}`);
           } else {
               upstreamRepo = repoInfo.nameWithOwner;
-              userFork = repoInfo.nameWithOwner;
+              console.log(`   ✅ Working on Upstream: ${upstreamRepo}`);
+              
+              const shouldFork = await confirm(`❓ No fork detected. Create a personal fork for sandboxed implementations?`);
+              if (shouldFork) {
+                  console.log(`   - Creating fork for ${upstreamRepo}...`);
+                  const forkRes = spawnSync('gh', ['repo', 'fork', upstreamRepo, '--clone=false'], { stdio: 'inherit' });
+                  if (forkRes.status === 0) {
+                      // Get the new fork name (usually <user>/<repo>)
+                      const userRes = spawnSync('gh', ['api', 'user', '-q', '.login'], { stdio: 'pipe' });
+                      const user = userRes.stdout.toString().trim();
+                      userFork = `${user}/${upstreamRepo.split('/')[1]}`;
+                      console.log(`   ✅ Fork created: ${userFork}`);
+                  }
+              } else {
+                  userFork = upstreamRepo;
+              }
           }
-      } catch (e) {}
+      } catch (e) {
+          userFork = upstreamRepo;
+      }
   }
   
-  console.log(`   ✅ Target Repo: ${userFork}`);
   console.log(`   ✅ Upstream:    ${upstreamRepo}`);
+  console.log(`   ✅ Workspace:   ${userFork}`);
 
   // 3. Security & Auth
   let githubToken = env.WORKSPACE_GH_TOKEN || '';
