@@ -15,6 +15,7 @@ import {
   ApprovalMode,
   PRIORITY_SUBAGENT_TOOL,
   ALWAYS_ALLOW_PRIORITY_FRACTION,
+  PRIORITY_YOLO_ALLOW_ALL,
 } from './types.js';
 import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision } from '../safety/protocol.js';
@@ -2852,7 +2853,7 @@ describe('PolicyEngine', () => {
         },
         {
           decision: PolicyDecision.ALLOW,
-          priority: 998,
+          priority: PRIORITY_YOLO_ALLOW_ALL,
           modes: [ApprovalMode.YOLO],
         },
       ];
@@ -2879,7 +2880,7 @@ describe('PolicyEngine', () => {
         },
         {
           decision: PolicyDecision.ALLOW,
-          priority: 998,
+          priority: PRIORITY_YOLO_ALLOW_ALL,
           modes: [ApprovalMode.YOLO],
         },
       ];
