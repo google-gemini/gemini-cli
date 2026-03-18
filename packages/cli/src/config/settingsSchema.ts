@@ -2890,35 +2890,24 @@ export const SETTINGS_SCHEMA_DEFINITIONS: Record<
       isLastResort: { type: 'boolean' },
       actions: {
         type: 'object',
-        ref: 'ModelPolicyActionMap',
+        properties: {
+          terminal: { type: 'string', enum: ['silent', 'prompt'] },
+          transient: { type: 'string', enum: ['silent', 'prompt'] },
+          not_found: { type: 'string', enum: ['silent', 'prompt'] },
+          unknown: { type: 'string', enum: ['silent', 'prompt'] },
+        },
       },
       stateTransitions: {
         type: 'object',
-        ref: 'ModelPolicyStateMap',
+        properties: {
+          terminal: { type: 'string', enum: ['terminal', 'sticky_retry'] },
+          transient: { type: 'string', enum: ['terminal', 'sticky_retry'] },
+          not_found: { type: 'string', enum: ['terminal', 'sticky_retry'] },
+          unknown: { type: 'string', enum: ['terminal', 'sticky_retry'] },
+        },
       },
     },
     required: ['model'],
-  },
-  ModelPolicyActionMap: {
-    type: 'object',
-    description: 'Map from model API failure reason to user interaction.',
-    properties: {
-      terminal: { type: 'string', enum: ['silent', 'prompt'] },
-      transient: { type: 'string', enum: ['silent', 'prompt'] },
-      not_found: { type: 'string', enum: ['silent', 'prompt'] },
-      unknown: { type: 'string', enum: ['silent', 'prompt'] },
-    },
-  },
-  ModelPolicyStateMap: {
-    type: 'object',
-    description:
-      "Map from model API failure reason to model's health status transition.",
-    properties: {
-      terminal: { type: 'string', enum: ['terminal', 'sticky_retry'] },
-      transient: { type: 'string', enum: ['terminal', 'sticky_retry'] },
-      not_found: { type: 'string', enum: ['terminal', 'sticky_retry'] },
-      unknown: { type: 'string', enum: ['terminal', 'sticky_retry'] },
-    },
   },
 };
 
