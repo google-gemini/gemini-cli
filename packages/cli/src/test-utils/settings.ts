@@ -52,7 +52,9 @@ export const createMockSettings = (
 
   const loaded = new LoadedSettings(
     (system as any) || { path: '', settings: {}, originalSettings: {} },
+
     (systemDefaults as any) || { path: '', settings: {}, originalSettings: {} },
+
     (user as any) || {
       path: '',
       settings: settingsOverrides,
