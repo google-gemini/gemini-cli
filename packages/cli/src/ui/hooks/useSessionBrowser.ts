@@ -78,12 +78,17 @@ export const useSessionBrowser = (
 
           // We've loaded it; tell the UI about it.
           setIsSessionBrowserOpen(false);
+          const compressionIndex = conversation.lastCompressionIndex;
           const historyData = convertSessionToHistoryFormats(
             conversation.messages,
+            compressionIndex,
           );
           await onLoadHistory(
             historyData.uiHistory,
-            convertSessionToClientHistory(conversation.messages),
+            convertSessionToClientHistory(
+              conversation.messages,
+              compressionIndex,
+            ),
             resumedSessionData,
           );
         } catch (error) {

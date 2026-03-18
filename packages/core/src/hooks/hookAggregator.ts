@@ -158,6 +158,11 @@ export class HookAggregator {
         merged.suppressOutput = true;
       }
 
+      // Handle refreshContext (any true wins)
+      if (output.refreshContext) {
+        merged.refreshContext = true;
+      }
+
       // Handle clearContext (any true wins) - for AfterAgent hooks
       if (output.hookSpecificOutput?.['clearContext'] === true) {
         merged.hookSpecificOutput = {
@@ -355,7 +360,7 @@ export class HookAggregator {
     // Extract additionalContext from various hook types
     if (
       'additionalContext' in specific &&
-      // eslint-disable-next-line no-restricted-syntax
+       
       typeof specific['additionalContext'] === 'string'
     ) {
       contexts.push(specific['additionalContext']);

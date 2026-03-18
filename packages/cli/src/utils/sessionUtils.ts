@@ -539,12 +539,24 @@ export class SessionSelector {
  */
 export function convertSessionToHistoryFormats(
   messages: ConversationRecord['messages'],
+  startIndex?: number,
 ): {
   uiHistory: HistoryItemWithoutId[];
 } {
   const uiHistory: HistoryItemWithoutId[] = [];
 
-  for (const msg of messages) {
+  const hasCompressedHistory =
+    startIndex != null && startIndex > 0 && startIndex < messages.length;
+  const slice = hasCompressedHistory ? messages.slice(startIndex) : messages;
+
+  if (hasCompressedHistory) {
+    uiHistory.push({
+      type: MessageType.INFO,
+      text: `ℹ️  Earlier history (${startIndex} messages) was compressed. Showing post-compression messages only.`,
+    });
+  }
+
+  for (const msg of slice) {
     // Add thoughts if present
     if (msg.type === 'gemini' && msg.thoughts && msg.thoughts.length > 0) {
       for (const thought of msg.thoughts) {

@@ -182,6 +182,9 @@ export enum CompressionStatus {
 
   /** The compression was skipped due to previous failure, but content was truncated to budget */
   CONTENT_TRUNCATED,
+
+  /** The compression was replaced by a PreCompress hook */
+  HOOK_REPLACED,
 }
 
 export interface ChatCompressionInfo {

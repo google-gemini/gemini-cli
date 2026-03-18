@@ -8,6 +8,12 @@ import { useState, useRef, useCallback, useMemo } from 'react';
 import type { HistoryItem } from '../types.js';
 import type { ChatRecordingService } from '@google/gemini-cli-core/src/services/chatRecordingService.js';
 
+/**
+ * Number of history items to keep when pruning after context compression.
+ * Exported for testing purposes.
+ */
+export const PRUNE_KEEP_COUNT = 50;
+
 // Type for the updater function passed to updateHistoryItem
 type HistoryItemUpdater = (
   prevItem: HistoryItem,
@@ -26,6 +32,7 @@ export interface UseHistoryManagerReturn {
   ) => void;
   clearItems: () => void;
   loadHistory: (newHistory: HistoryItem[]) => void;
+  pruneItems: () => void;
 }
 
 /**
@@ -156,6 +163,25 @@ export function useHistory({
     messageIdCounterRef.current = 0;
   }, []);
 
+  // Prunes old history items, keeping only the most recent PRUNE_KEEP_COUNT.
+  // Intended to be called after context compression to free memory in
+  // long-running sessions.
+  const pruneItems = useCallback(() => {
+    setHistory((prevHistory) => {
+      if (prevHistory.length <= PRUNE_KEEP_COUNT) {
+        return prevHistory;
+      }
+      const kept = prevHistory.slice(-PRUNE_KEEP_COUNT);
+
+      const marker = {
+        id: getNextMessageId(Date.now()),
+        type: 'info',
+        text: `ℹ️  Earlier history was pruned after context compression.`,
+      } as HistoryItem;
+      return [marker, ...kept];
+    });
+  }, [getNextMessageId]);
+
   return useMemo(
     () => ({
       history,
@@ -163,7 +189,8 @@ export function useHistory({
       updateItem,
       clearItems,
       loadHistory,
+      pruneItems,
     }),
-    [history, addItem, updateItem, clearItems, loadHistory],
+    [history, addItem, updateItem, clearItems, loadHistory, pruneItems],
   );
 }

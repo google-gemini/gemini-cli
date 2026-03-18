@@ -173,6 +173,14 @@ export const createMockConfig = (overrides: Partial<Config> = {}): Config =>
     getHasAccessToPreviewModel: vi.fn().mockReturnValue(false),
     validatePathAccess: vi.fn().mockReturnValue(null),
     getUseAlternateBuffer: vi.fn().mockReturnValue(false),
+    getIsForeverMode: vi.fn().mockReturnValue(false),
+    getWorkScheduler: vi.fn().mockReturnValue({
+      on: vi.fn(),
+      off: vi.fn(),
+      serialize: vi.fn().mockReturnValue([]),
+      restore: vi.fn(),
+      dispose: vi.fn(),
+    }),
     ...overrides,
   }) as unknown as Config;
 

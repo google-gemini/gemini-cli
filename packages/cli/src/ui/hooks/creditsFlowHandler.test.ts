@@ -57,6 +57,7 @@ describe('handleCreditsFlow', () => {
       updateItem: vi.fn(),
       clearItems: vi.fn(),
       loadHistory: vi.fn(),
+      pruneItems: vi.fn(),
     };
     isDialogPending = { current: false };
     mockSetOverageMenuRequest = vi.fn();

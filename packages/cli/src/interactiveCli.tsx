@@ -10,6 +10,8 @@ import { basename } from 'node:path';
 import { AppContainer } from './ui/AppContainer.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { registerCleanup, setupTtyCheck } from './utils/cleanup.js';
+import { startExternalListener } from './external-listener.js';
+import { appEvents, AppEvent } from './utils/events.js';
 import {
   type StartupWarning,
   type Config,
@@ -180,6 +182,24 @@ export async function startInteractiveUI(
     });
 
   registerCleanup(() => instance.unmount());
+
+  // Auto-start A2A HTTP listener in Forever Mode
+  if (config.getIsForeverMode()) {
+    try {
+      const listener = await startExternalListener({ port: 0 });
+      registerCleanup(listener.cleanup);
+      appEvents.emit(AppEvent.A2AListenerStarted, listener.port);
+      coreEvents.emitFeedback(
+        'info',
+        `A2A endpoint listening on port ${listener.port}`,
+      );
+    } catch (err) {
+      coreEvents.emitFeedback(
+        'warning',
+        `Failed to start A2A listener: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
 
   registerCleanup(setupTtyCheck());
 }

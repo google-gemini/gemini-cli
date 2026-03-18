@@ -232,8 +232,15 @@ export class HookSystem {
 
   async firePreCompressEvent(
     trigger: PreCompressTrigger,
+    history: Array<{ role: string; parts: Array<{ text?: string }> }>,
   ): Promise<AggregatedHookResult | undefined> {
-    return this.hookEventHandler.firePreCompressEvent(trigger);
+    return this.hookEventHandler.firePreCompressEvent(trigger, history);
+  }
+
+  async fireIdleEvent(
+    idleSeconds: number,
+  ): Promise<AggregatedHookResult | undefined> {
+    return this.hookEventHandler.fireIdleEvent(idleSeconds);
   }
 
   async fireBeforeAgentEvent(

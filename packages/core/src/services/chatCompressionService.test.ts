@@ -186,7 +186,7 @@ describe('ChatCompressionService', () => {
       }),
       getEnableHooks: vi.fn().mockReturnValue(false),
       getMessageBus: vi.fn().mockReturnValue(undefined),
-      getHookSystem: () => undefined,
+      getHookSystem: vi.fn().mockReturnValue(undefined),
       getNextCompressionTruncationId: vi.fn().mockReturnValue(1),
       getTruncateToolOutputThreshold: vi.fn().mockReturnValue(40000),
       storage: {
@@ -894,6 +894,153 @@ describe('ChatCompressionService', () => {
       // Should be truncated because original > 1M tokens
       expect(summarizerGrepResponse?.response?.['output']).toContain(
         'Output too large.',
+      );
+    });
+  });
+
+  describe('PreCompress hook replacement', () => {
+    it('should use hook-provided newHistory and skip built-in compression', async () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'msg1' }] },
+        { role: 'model', parts: [{ text: 'msg2' }] },
+        { role: 'user', parts: [{ text: 'msg3' }] },
+        { role: 'model', parts: [{ text: 'msg4' }] },
+      ];
+      vi.mocked(mockChat.getHistory).mockReturnValue(history);
+      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(600000);
+      vi.mocked(tokenLimit).mockReturnValue(1_000_000);
+
+      const hookReplacementHistory = [
+        {
+          role: 'user',
+          parts: [{ text: 'Archive summary: topics discussed...' }],
+        },
+        {
+          role: 'model',
+          parts: [{ text: 'Understood, continuing from archive.' }],
+        },
+      ];
+
+      const mockHookSystem = {
+        firePreCompressEvent: vi.fn().mockResolvedValue({
+          success: true,
+          finalOutput: {
+            hookSpecificOutput: {
+              hookEventName: 'PreCompress',
+              newHistory: hookReplacementHistory,
+            },
+          },
+          allOutputs: [],
+          errors: [],
+          totalDuration: 100,
+        }),
+      };
+
+      vi.mocked(mockConfig.getHookSystem).mockReturnValue(
+        mockHookSystem as unknown as ReturnType<Config['getHookSystem']>,
+      );
+
+      const result = await service.compress(
+        mockChat,
+        mockPromptId,
+        true,
+        mockModel,
+        mockConfig,
+        false,
+      );
+
+      expect(result.info.compressionStatus).toBe(
+        CompressionStatus.HOOK_REPLACED,
+      );
+      expect(result.newHistory).not.toBeNull();
+      expect(result.newHistory!.length).toBe(2);
+      expect(result.newHistory![0].parts![0].text).toBe(
+        'Archive summary: topics discussed...',
+      );
+      // Built-in LLM compression should NOT have been called
+      expect(
+        mockConfig.getBaseLlmClient().generateContent,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should proceed with built-in compression when hook returns no newHistory', async () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'msg1' }] },
+        { role: 'model', parts: [{ text: 'msg2' }] },
+        { role: 'user', parts: [{ text: 'msg3' }] },
+        { role: 'model', parts: [{ text: 'msg4' }] },
+      ];
+      vi.mocked(mockChat.getHistory).mockReturnValue(history);
+      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(600000);
+      vi.mocked(tokenLimit).mockReturnValue(1_000_000);
+
+      const mockHookSystem = {
+        firePreCompressEvent: vi.fn().mockResolvedValue({
+          success: true,
+          finalOutput: {
+            systemMessage: 'Compression starting...',
+          },
+          allOutputs: [],
+          errors: [],
+          totalDuration: 50,
+        }),
+      };
+
+      vi.mocked(mockConfig.getHookSystem).mockReturnValue(
+        mockHookSystem as unknown as ReturnType<Config['getHookSystem']>,
+      );
+
+      const result = await service.compress(
+        mockChat,
+        mockPromptId,
+        true,
+        mockModel,
+        mockConfig,
+        false,
+      );
+
+      // Should fall through to normal compression
+      expect(result.info.compressionStatus).toBe(CompressionStatus.COMPRESSED);
+      expect(mockConfig.getBaseLlmClient().generateContent).toHaveBeenCalled();
+    });
+
+    it('should pass history to the hook', async () => {
+      const history: Content[] = [
+        { role: 'user', parts: [{ text: 'hello' }] },
+        { role: 'model', parts: [{ text: 'world' }] },
+      ];
+      vi.mocked(mockChat.getHistory).mockReturnValue(history);
+      vi.mocked(mockChat.getLastPromptTokenCount).mockReturnValue(600000);
+      vi.mocked(tokenLimit).mockReturnValue(1_000_000);
+
+      const mockHookSystem = {
+        firePreCompressEvent: vi.fn().mockResolvedValue({
+          success: true,
+          allOutputs: [],
+          errors: [],
+          totalDuration: 10,
+        }),
+      };
+
+      vi.mocked(mockConfig.getHookSystem).mockReturnValue(
+        mockHookSystem as unknown as ReturnType<Config['getHookSystem']>,
+      );
+
+      await service.compress(
+        mockChat,
+        mockPromptId,
+        true,
+        mockModel,
+        mockConfig,
+        false,
+      );
+
+      expect(mockHookSystem.firePreCompressEvent).toHaveBeenCalledWith(
+        'manual',
+        [
+          { role: 'user', parts: [{ text: 'hello' }] },
+          { role: 'model', parts: [{ text: 'world' }] },
+        ],
       );
     });
   });

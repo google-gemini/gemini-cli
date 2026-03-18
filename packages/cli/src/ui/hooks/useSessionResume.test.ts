@@ -33,6 +33,7 @@ describe('useSessionResume', () => {
     updateItem: vi.fn(),
     clearItems: vi.fn(),
     loadHistory: vi.fn(),
+    pruneItems: vi.fn(),
   });
 
   let mockHistoryManager: UseHistoryManagerReturn;
@@ -528,6 +529,61 @@ describe('useSessionResume', () => {
 
       // But UI history should have both
       expect(mockHistoryManager.addItem).toHaveBeenCalledTimes(2);
+    });
+
+    it('should restore scheduled work from resumed session data', async () => {
+      const mockRestore = vi.fn();
+      const configWithScheduler = {
+        ...mockConfig,
+        getWorkScheduler: vi.fn().mockReturnValue({
+          restore: mockRestore,
+        }),
+      };
+
+      const scheduledWork = [
+        {
+          id: 'test-1',
+          prompt: 'check status',
+          fireAt: new Date(Date.now() + 60_000).toISOString(),
+          createdAt: new Date().toISOString(),
+        },
+      ];
+
+      const conversation: ConversationRecord = {
+        sessionId: 'auto-resume-scheduled',
+        projectHash: 'project-123',
+        startTime: '2025-01-01T00:00:00Z',
+        lastUpdated: '2025-01-01T01:00:00Z',
+        messages: [
+          {
+            id: 'msg-1',
+            timestamp: '2025-01-01T00:01:00Z',
+            content: 'Hello',
+            type: 'user',
+          },
+        ] as MessageRecord[],
+        scheduledWork,
+      };
+
+      await act(async () => {
+        renderHook(() =>
+          useSessionResume({
+            ...getDefaultProps(),
+            config: configWithScheduler as unknown as Config,
+            resumedSessionData: {
+              conversation,
+              filePath: '/path/to/session.json',
+            },
+          }),
+        );
+      });
+
+      await waitFor(() => {
+        expect(mockHistoryManager.clearItems).toHaveBeenCalled();
+      });
+
+      expect(configWithScheduler.getWorkScheduler).toHaveBeenCalled();
+      expect(mockRestore).toHaveBeenCalledWith(scheduledWork);
     });
   });
 });

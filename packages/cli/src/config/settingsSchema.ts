@@ -2312,6 +2312,18 @@ const SETTINGS_SCHEMA = {
         ref: 'HookDefinitionArray',
         mergeStrategy: MergeStrategy.CONCAT,
       },
+      Idle: {
+        type: 'array',
+        label: 'Idle Hooks',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: [],
+        description:
+          'Hooks that execute after a period of inactivity. Can trigger maintenance tasks like memory consolidation.',
+        showInDialog: false,
+        ref: 'HookDefinitionArray',
+        mergeStrategy: MergeStrategy.CONCAT,
+      },
     },
     additionalProperties: {
       type: 'array',

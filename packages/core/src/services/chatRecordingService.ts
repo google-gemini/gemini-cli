@@ -20,6 +20,7 @@ import type {
 import { debugLogger } from '../utils/debugLogger.js';
 import type { ToolResultDisplay } from '../tools/tools.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
+import type { SerializedScheduledItem } from './work-scheduler.js';
 
 export const SESSION_FILE_PREFIX = 'session-';
 
@@ -104,6 +105,10 @@ export interface ConversationRecord {
   directories?: string[];
   /** The kind of conversation (main agent or subagent) */
   kind?: 'main' | 'subagent';
+  /** Index into messages[] after the last compression, used to skip pre-compressed messages on resume */
+  lastCompressionIndex?: number;
+  /** Pending scheduled work items persisted for session resume */
+  scheduledWork?: SerializedScheduledItem[];
 }
 
 /**
@@ -568,6 +573,23 @@ export class ChatRecordingService {
   }
 
   /**
+   * Records pending scheduled work items to the session file.
+   * Called when the work schedule changes so items survive session restart.
+   */
+  recordScheduledWork(items: SerializedScheduledItem[]): void {
+    if (!this.conversationFile) return;
+
+    try {
+      this.updateConversation((conversation) => {
+        conversation.scheduledWork = items.length > 0 ? items : undefined;
+      });
+    } catch (error) {
+      debugLogger.error('Error saving scheduled work to chat history.', error);
+      // Don't throw - we want graceful degradation
+    }
+  }
+
+  /**
    * Gets the current conversation data (for summary generation).
    */
   getConversation(): ConversationRecord | null {
@@ -728,6 +750,17 @@ export class ChatRecordingService {
   }
 
   /**
+   * Stamps the current end of the messages array so that future session
+   * resumes can skip the pre-compression portion of the history.
+   */
+  recordCompressionPoint(): void {
+    if (!this.conversationFile) return;
+    this.updateConversation((conversation) => {
+      conversation.lastCompressionIndex = conversation.messages.length;
+    });
+  }
+
+  /**
    * Rewinds the conversation to the state just before the specified message ID.
    * All messages from (and including) the specified ID onwards are removed.
    */
@@ -759,37 +792,39 @@ export class ChatRecordingService {
   updateMessagesFromHistory(history: readonly Content[]): void {
     if (!this.conversationFile) return;
 
+    // Build the partsMap before touching the file — skip I/O entirely when
+    // there are no tool results to sync.
+    const partsMap = new Map<string, Part[]>();
+    for (const content of history) {
+      if (content.role === 'user' && content.parts) {
+        // Find all unique call IDs in this message
+        const callIds = content.parts
+          .map((p) => p.functionResponse?.id)
+          .filter((id): id is string => !!id);
+
+        if (callIds.length === 0) continue;
+
+        // Use the first ID as a seed to capture any "leading" non-ID parts
+        // in this specific content block.
+        let currentCallId = callIds[0];
+        for (const part of content.parts) {
+          if (part.functionResponse?.id) {
+            currentCallId = part.functionResponse.id;
+          }
+
+          if (!partsMap.has(currentCallId)) {
+            partsMap.set(currentCallId, []);
+          }
+          partsMap.get(currentCallId)!.push(part);
+        }
+      }
+    }
+
+    // No tool results to update — skip file I/O entirely.
+    if (partsMap.size === 0) return;
+
     try {
       this.updateConversation((conversation) => {
-        // Create a map of tool results from the API history for quick lookup by call ID.
-        // We store the full list of parts associated with each tool call ID to preserve
-        // multi-modal data and proper trajectory structure.
-        const partsMap = new Map<string, Part[]>();
-        for (const content of history) {
-          if (content.role === 'user' && content.parts) {
-            // Find all unique call IDs in this message
-            const callIds = content.parts
-              .map((p) => p.functionResponse?.id)
-              .filter((id): id is string => !!id);
-
-            if (callIds.length === 0) continue;
-
-            // Use the first ID as a seed to capture any "leading" non-ID parts
-            // in this specific content block.
-            let currentCallId = callIds[0];
-            for (const part of content.parts) {
-              if (part.functionResponse?.id) {
-                currentCallId = part.functionResponse.id;
-              }
-
-              if (!partsMap.has(currentCallId)) {
-                partsMap.set(currentCallId, []);
-              }
-              partsMap.get(currentCallId)!.push(part);
-            }
-          }
-        }
-
         // Update the conversation records tool results if they've changed.
         for (const message of conversation.messages) {
           if (message.type === 'gemini' && message.toolCalls) {

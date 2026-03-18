@@ -28,6 +28,12 @@ export const StatusDisplay: React.FC<StatusDisplayProps> = ({
     return <Text color={theme.status.error}>|⌐■_■|</Text>;
   }
 
+  if (uiState.a2aListenerPort !== null) {
+    return (
+      <Text color={theme.text.accent}>⚡ A2A :{uiState.a2aListenerPort}</Text>
+    );
+  }
+
   if (
     uiState.activeHooks.length > 0 &&
     settings.merged.hooksConfig.notifications

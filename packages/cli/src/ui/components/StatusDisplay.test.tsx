@@ -52,6 +52,7 @@ const createMockUIState = (overrides: UIStateOverrides = {}): UIState =>
     geminiMdFileCount: 0,
     contextFileNames: [],
     backgroundShellCount: 0,
+    a2aListenerPort: null,
     buffer: { text: '' },
     history: [{ id: 1, type: 'user', text: 'test' }],
     ...overrides,
@@ -169,6 +170,18 @@ describe('StatusDisplay', () => {
       uiState,
     );
     expect(lastFrame()).toContain('Shells: 3');
+    unmount();
+  });
+
+  it('renders A2A listener port when a2aListenerPort is set', async () => {
+    const uiState = createMockUIState({
+      a2aListenerPort: 8080,
+    });
+    const { lastFrame, unmount } = await renderStatusDisplay(
+      { hideContextSummary: false },
+      uiState,
+    );
+    expect(lastFrame()).toContain('A2A :8080');
     unmount();
   });
 });

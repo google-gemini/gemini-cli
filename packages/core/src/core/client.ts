@@ -879,6 +879,12 @@ export class GeminiClient {
       this.hookStateMap.delete(this.lastPromptId);
       this.lastPromptId = prompt_id;
       this.currentSequenceModel = null;
+
+      // In Forever Mode, refresh the system instruction so memory changes
+      // (e.g. GEMINI.md updates from hooks/agents) are picked up immediately.
+      if (this.config.getIsForeverMode()) {
+        this.updateSystemInstruction();
+      }
     }
 
     if (hooksEnabled && messageBus) {
@@ -1178,6 +1184,7 @@ export class GeminiClient {
         // capture current session data before resetting
         const currentRecordingService =
           this.getChat().getChatRecordingService();
+        currentRecordingService.recordCompressionPoint();
         const conversation = currentRecordingService.getConversation();
         const filePath = currentRecordingService.getConversationFilePath();
 

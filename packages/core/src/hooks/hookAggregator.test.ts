@@ -472,5 +472,33 @@ describe('HookAggregator', () => {
         aggregated.finalOutput?.hookSpecificOutput?.['additionalContext'],
       ).toBe('Context from hook 1\nContext from hook 2');
     });
+
+    it('should propagate refreshContext with any-true-wins logic', () => {
+      const results: HookExecutionResult[] = [
+        createHookExecutionResult({ refreshContext: false }),
+        createHookExecutionResult({ refreshContext: true }),
+      ];
+
+      const aggregated = aggregator.aggregateResults(
+        results,
+        HookEventName.AfterAgent,
+      );
+
+      expect(aggregated.finalOutput?.refreshContext).toBe(true);
+    });
+
+    it('should not set refreshContext when no hook requests it', () => {
+      const results: HookExecutionResult[] = [
+        createHookExecutionResult({}),
+        createHookExecutionResult({}),
+      ];
+
+      const aggregated = aggregator.aggregateResults(
+        results,
+        HookEventName.AfterAgent,
+      );
+
+      expect(aggregated.finalOutput?.refreshContext).toBeUndefined();
+    });
   });
 });

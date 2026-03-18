@@ -83,6 +83,16 @@ export function useSessionResume({
           workspaceContext.addDirectories(resumedData.conversation.directories);
         }
 
+        // Restore scheduled work items from the resumed session.
+        // Past-due items fire immediately; future items get timers re-armed.
+        if (
+          resumedData.conversation.scheduledWork &&
+          resumedData.conversation.scheduledWork.length > 0
+        ) {
+          const scheduler = config.getWorkScheduler();
+          scheduler.restore(resumedData.conversation.scheduledWork);
+        }
+
         // Give the history to the Gemini client.
         await config.getGeminiClient()?.resumeChat(clientHistory, resumedData);
       } catch (error) {
@@ -109,12 +119,18 @@ export function useSessionResume({
       !hasLoadedResumedSession.current
     ) {
       hasLoadedResumedSession.current = true;
+      const compressionIndex =
+        resumedSessionData.conversation.lastCompressionIndex;
       const historyData = convertSessionToHistoryFormats(
         resumedSessionData.conversation.messages,
+        compressionIndex,
       );
       void loadHistoryForResume(
         historyData.uiHistory,
-        convertSessionToClientHistory(resumedSessionData.conversation.messages),
+        convertSessionToClientHistory(
+          resumedSessionData.conversation.messages,
+          compressionIndex,
+        ),
         resumedSessionData,
       );
     }

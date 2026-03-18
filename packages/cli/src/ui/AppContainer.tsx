@@ -127,6 +127,7 @@ import { useFolderTrust } from './hooks/useFolderTrust.js';
 import { useIdeTrustListener } from './hooks/useIdeTrustListener.js';
 import { type IdeIntegrationNudgeResult } from './IdeIntegrationNudge.js';
 import { appEvents, AppEvent, TransientMessageType } from '../utils/events.js';
+import { notifyResponse, markTasksWorking } from '../external-listener.js';
 import { type UpdateObject } from './utils/updateCheck.js';
 import { setUpdateHandler } from '../utils/handleAutoUpdate.js';
 import { registerCleanup, runExitCleanup } from '../utils/cleanup.js';
@@ -1142,6 +1143,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
     terminalHeight,
     embeddedShellFocused,
     consumePendingHints,
+    historyManager.pruneItems,
   );
 
   toggleBackgroundShellRef.current = toggleBackgroundShell;
@@ -1212,6 +1214,89 @@ Logging in with Google... Restarting Gemini CLI to continue.
     submitQuery,
     isMcpReady,
   });
+
+  // --- A2A listener integration ---
+  const [a2aListenerPort, setA2aListenerPort] = useState<number | null>(null);
+
+  useEffect(() => {
+    const handler = (port: number) => {
+      setA2aListenerPort(port);
+    };
+    appEvents.on(AppEvent.A2AListenerStarted, handler);
+    return () => {
+      appEvents.off(AppEvent.A2AListenerStarted, handler);
+    };
+  }, []);
+
+  // Bridge external messages from A2A HTTP listener to message queue
+  useEffect(() => {
+    const handler = (text: string) => {
+      addMessage(text);
+    };
+    appEvents.on(AppEvent.ExternalMessage, handler);
+    return () => {
+      appEvents.off(AppEvent.ExternalMessage, handler);
+    };
+  }, [addMessage]);
+
+  // Wire WorkScheduler: inject fired prompts and persist schedule changes
+  useEffect(() => {
+    const scheduler = config.getWorkScheduler();
+
+    const onFire = (prompt: string) => {
+      appEvents.emit(AppEvent.ExternalMessage, prompt);
+    };
+
+    const onChanged = () => {
+      // Persist pending items to the session file
+      const recordingService = config
+        .getGeminiClient()
+        ?.getChatRecordingService();
+      if (recordingService) {
+        recordingService.recordScheduledWork(scheduler.serialize());
+      }
+    };
+
+    scheduler.on('fire', onFire);
+    scheduler.on('changed', onChanged);
+    return () => {
+      scheduler.off('fire', onFire);
+      scheduler.off('changed', onChanged);
+    };
+  }, [config]);
+
+  // Track streaming state transitions for A2A response capture
+  const prevStreamingStateRef = useRef(streamingState);
+
+  useEffect(() => {
+    const prev = prevStreamingStateRef.current;
+    prevStreamingStateRef.current = streamingState;
+
+    // Mark tasks as "working" when streaming starts
+    if (
+      prev === StreamingState.Idle &&
+      streamingState !== StreamingState.Idle
+    ) {
+      markTasksWorking();
+    }
+
+    // Capture response when streaming ends (for A2A tasks or unsolicited output)
+    if (
+      prev !== StreamingState.Idle &&
+      streamingState === StreamingState.Idle
+    ) {
+      const history = historyManager.history;
+      const parts: string[] = [];
+      for (let i = history.length - 1; i >= 0; i--) {
+        const item = history[i];
+        if (item.type !== 'gemini' && item.type !== 'gemini_content') break;
+        if (typeof item.text === 'string' && item.text) {
+          parts.unshift(item.text);
+        }
+      }
+      notifyResponse(parts.join('\n'));
+    }
+  }, [streamingState, historyManager.history]);
 
   cancelHandlerRef.current = useCallback(
     (shouldRestorePrompt: boolean = true) => {
@@ -2300,6 +2385,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       adminSettingsChanged,
       newAgents,
       showIsExpandableHint,
+      a2aListenerPort,
       hintMode:
         config.isModelSteeringEnabled() &&
         isToolExecuting([
@@ -2428,6 +2514,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       adminSettingsChanged,
       newAgents,
       showIsExpandableHint,
+      a2aListenerPort,
     ],
   );
 

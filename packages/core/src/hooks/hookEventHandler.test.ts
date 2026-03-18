@@ -16,6 +16,7 @@ import {
   SessionStartSource,
   HookEventName,
   HookType,
+  DefaultHookOutput,
   type HookConfig,
   type HookExecutionResult,
 } from './types.js';
@@ -889,6 +890,102 @@ describe('HookEventHandler', () => {
         expect.any(Function),
         expect.any(Function),
       );
+    });
+  });
+
+  describe('refreshContext handling', () => {
+    it('should call updateSystemInstructionIfInitialized when refreshContext is true', async () => {
+      const hookConfig = {
+        type: HookType.Command,
+        command: './after-agent.sh',
+      } as HookConfig;
+      const mockResults: HookExecutionResult[] = [
+        {
+          success: true,
+          duration: 100,
+          hookConfig,
+          eventName: HookEventName.AfterAgent,
+          output: { refreshContext: true },
+        },
+      ];
+      const mockAggregated = {
+        success: true,
+        finalOutput: new DefaultHookOutput({ refreshContext: true }),
+        allOutputs: mockResults.map((r) => r.output!),
+        errors: [],
+        totalDuration: 100,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        hookConfigs: [hookConfig],
+        sequential: false,
+        eventName: HookEventName.AfterAgent,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue(
+        mockResults,
+      );
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      const updateSpy = vi.fn();
+      (mockConfig as unknown as Record<string, unknown>)[
+        'updateSystemInstructionIfInitialized'
+      ] = updateSpy;
+
+      await hookEventHandler.fireAfterAgentEvent(
+        'test prompt',
+        'test response',
+      );
+
+      expect(updateSpy).toHaveBeenCalled();
+    });
+
+    it('should not call updateSystemInstructionIfInitialized when refreshContext is not set', async () => {
+      const hookConfig = {
+        type: HookType.Command,
+        command: './after-agent.sh',
+      } as HookConfig;
+      const mockResults: HookExecutionResult[] = [
+        {
+          success: true,
+          duration: 100,
+          hookConfig,
+          eventName: HookEventName.AfterAgent,
+          output: {},
+        },
+      ];
+      const mockAggregated = {
+        success: true,
+        finalOutput: new DefaultHookOutput({}),
+        allOutputs: mockResults.map((r) => r.output!),
+        errors: [],
+        totalDuration: 100,
+      };
+
+      vi.mocked(mockHookPlanner.createExecutionPlan).mockReturnValue({
+        hookConfigs: [hookConfig],
+        sequential: false,
+        eventName: HookEventName.AfterAgent,
+      });
+      vi.mocked(mockHookRunner.executeHooksParallel).mockResolvedValue(
+        mockResults,
+      );
+      vi.mocked(mockHookAggregator.aggregateResults).mockReturnValue(
+        mockAggregated,
+      );
+
+      const updateSpy = vi.fn();
+      (mockConfig as unknown as Record<string, unknown>)[
+        'updateSystemInstructionIfInitialized'
+      ] = updateSpy;
+
+      await hookEventHandler.fireAfterAgentEvent(
+        'test prompt',
+        'test response',
+      );
+
+      expect(updateSpy).not.toHaveBeenCalled();
     });
   });
 });

@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
-import { useHistory } from './useHistoryManager.js';
+import { useHistory, PRUNE_KEEP_COUNT } from './useHistoryManager.js';
 import type { HistoryItem } from '../types.js';
 
 describe('useHistoryManager', () => {
@@ -253,6 +253,84 @@ describe('useHistoryManager', () => {
       expect(result.current.history).toHaveLength(1);
       expect(result.current.history[0].text).toBe(authMessage);
       expect(result.current.history[0].type).toBe('info');
+    });
+  });
+
+  describe('pruneItems', () => {
+    it('should prune history to PRUNE_KEEP_COUNT + 1 (marker) when over limit', () => {
+      const { result } = renderHook(() => useHistory());
+      const itemCount = PRUNE_KEEP_COUNT + 20;
+
+      act(() => {
+        for (let i = 0; i < itemCount; i++) {
+          result.current.addItem({
+            type: 'user',
+            text: `Message ${i}`,
+          });
+        }
+      });
+
+      expect(result.current.history).toHaveLength(itemCount);
+
+      act(() => {
+        result.current.pruneItems();
+      });
+
+      // PRUNE_KEEP_COUNT items + 1 prune marker
+      expect(result.current.history).toHaveLength(PRUNE_KEEP_COUNT + 1);
+      // First item should be the prune marker
+      expect(result.current.history[0].type).toBe('info');
+      expect(result.current.history[0].text).toContain('pruned');
+      // Last item should be the most recent message
+      expect(
+        result.current.history[result.current.history.length - 1].text,
+      ).toBe(`Message ${itemCount - 1}`);
+    });
+
+    it('should be a no-op when history is under the threshold', () => {
+      const { result } = renderHook(() => useHistory());
+      const itemCount = 10;
+
+      act(() => {
+        for (let i = 0; i < itemCount; i++) {
+          result.current.addItem({
+            type: 'user',
+            text: `Message ${i}`,
+          });
+        }
+      });
+
+      const historyBefore = result.current.history;
+
+      act(() => {
+        result.current.pruneItems();
+      });
+
+      // Should be unchanged (same reference)
+      expect(result.current.history).toBe(historyBefore);
+      expect(result.current.history).toHaveLength(itemCount);
+    });
+
+    it('should be a no-op when history is exactly at the threshold', () => {
+      const { result } = renderHook(() => useHistory());
+
+      act(() => {
+        for (let i = 0; i < PRUNE_KEEP_COUNT; i++) {
+          result.current.addItem({
+            type: 'user',
+            text: `Message ${i}`,
+          });
+        }
+      });
+
+      const historyBefore = result.current.history;
+
+      act(() => {
+        result.current.pruneItems();
+      });
+
+      expect(result.current.history).toBe(historyBefore);
+      expect(result.current.history).toHaveLength(PRUNE_KEEP_COUNT);
     });
   });
 });

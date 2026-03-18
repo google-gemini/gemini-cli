@@ -13,6 +13,7 @@ import {
 } from '@google/gemini-cli-core';
 import { LoadingIndicator } from './LoadingIndicator.js';
 import { StatusDisplay } from './StatusDisplay.js';
+import { ScheduledWorkDisplay } from './ScheduledWorkDisplay.js';
 import { ToastDisplay, shouldShowToast } from './ToastDisplay.js';
 import { ApprovalModeIndicator } from './ApprovalModeIndicator.js';
 import { ShellModeIndicator } from './ShellModeIndicator.js';
@@ -336,6 +337,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
         )}
         {showShortcutsHelp && <ShortcutsHelp />}
         {showUiDetails && <HorizontalLine />}
+        <ScheduledWorkDisplay />
         {showUiDetails && (
           <Box
             justifyContent={

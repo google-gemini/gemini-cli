@@ -97,6 +97,7 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
+  forever: boolean | undefined;
 }
 
 /**
@@ -298,6 +299,12 @@ export async function parseArguments(
         .option('accept-raw-output-risk', {
           type: 'boolean',
           description: 'Suppress the security warning when using --raw-output.',
+        })
+        .option('forever', {
+          type: 'boolean',
+          description:
+            'Run as a long-running autonomous agent with auto-resume and schedule_work support.',
+          default: false,
         }),
     )
     // Register MCP subcommands
@@ -893,6 +900,7 @@ export async function loadCliConfig(
       };
     },
     enableConseca: settings.security?.enableConseca,
+    isForeverMode: !!argv.forever,
   });
 }
 

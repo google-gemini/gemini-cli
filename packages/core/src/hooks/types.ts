@@ -43,6 +43,7 @@ export enum HookEventName {
   BeforeModel = 'BeforeModel',
   AfterModel = 'AfterModel',
   BeforeToolSelection = 'BeforeToolSelection',
+  Idle = 'Idle',
 }
 
 /**
@@ -104,6 +105,8 @@ export interface HookDefinition {
   matcher?: string;
   sequential?: boolean;
   hooks: HookConfig[];
+  /** Seconds before the Idle hook fires. Only meaningful for Idle hooks. */
+  idleTimeout?: number;
 }
 
 /**
@@ -147,6 +150,8 @@ export interface HookOutput {
   systemMessage?: string;
   decision?: HookDecision;
   reason?: string;
+  /** When true, refreshes the system instruction after hook execution to pick up context file changes (e.g. GEMINI.md). */
+  refreshContext?: boolean;
   hookSpecificOutput?: Record<string, unknown>;
 }
 
@@ -184,6 +189,7 @@ export class DefaultHookOutput implements HookOutput {
   systemMessage?: string;
   decision?: HookDecision;
   reason?: string;
+  refreshContext?: boolean;
   hookSpecificOutput?: Record<string, unknown>;
 
   constructor(data: Partial<HookOutput> = {}) {
@@ -193,6 +199,7 @@ export class DefaultHookOutput implements HookOutput {
     this.systemMessage = data.systemMessage;
     this.decision = data.decision;
     this.reason = data.reason;
+    this.refreshContext = data.refreshContext;
     this.hookSpecificOutput = data.hookSpecificOutput;
   }
 
@@ -642,14 +649,37 @@ export enum PreCompressTrigger {
  */
 export interface PreCompressInput extends HookInput {
   trigger: PreCompressTrigger;
+  history: Array<{ role: string; parts: Array<{ text?: string }> }>;
 }
-
 /**
  * PreCompress hook output
  */
 export interface PreCompressOutput {
   suppressOutput?: boolean;
   systemMessage?: string;
+  hookSpecificOutput?: {
+    hookEventName: 'PreCompress';
+    newHistory?: Array<{ role: string; parts: Array<{ text?: string }> }>;
+  };
+}
+
+/**
+ * Idle hook input
+ */
+export interface IdleInput extends HookInput {
+  idle_seconds: number;
+}
+
+/**
+ * Idle hook output
+ */
+export interface IdleOutput {
+  suppressOutput?: boolean;
+  systemMessage?: string;
+  hookSpecificOutput?: {
+    hookEventName: 'Idle';
+    prompt?: string;
+  };
 }
 
 /**

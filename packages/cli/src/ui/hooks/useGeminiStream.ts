@@ -220,6 +220,7 @@ export const useGeminiStream = (
   terminalHeight: number,
   isShellFocused?: boolean,
   consumeUserHint?: () => string | null,
+  pruneItems?: () => void,
 ) => {
   const [initError, setInitError] = useState<string | null>(null);
   const [retryStatus, setRetryStatus] = useState<RetryAttemptPayload | null>(
@@ -256,6 +257,7 @@ export const useGeminiStream = (
   const [_isFirstToolInGroup, isFirstToolInGroupRef, setIsFirstToolInGroup] =
     useStateAndRef<boolean>(true);
   const processedMemoryToolsRef = useRef<Set<string>>(new Set());
+
   const { startNewPrompt, getPromptCount } = useSessionStats();
   const storage = config.storage;
   const logger = useLogger(storage);
@@ -1163,8 +1165,12 @@ export const useGeminiStream = (
         } as HistoryItemInfo,
         userMessageTimestamp,
       );
+
+      // Prune old UI history items to prevent unbounded memory growth
+      // in long-running sessions.
+      pruneItems?.();
     },
-    [addItem, pendingHistoryItemRef, setPendingHistoryItem, config],
+    [addItem, pendingHistoryItemRef, setPendingHistoryItem, config, pruneItems],
   );
 
   const handleMaxSessionTurnsEvent = useCallback(
@@ -1506,9 +1512,20 @@ export const useGeminiStream = (
             lastQueryRef.current = queryToSend;
             lastPromptIdRef.current = prompt_id!;
 
+            // Prepend current time (and schedule if items exist) so the
+            // model can reason about time and scheduling in forever mode.
+            let queryWithContext = queryToSend;
+            if (
+              config.getIsForeverMode() &&
+              typeof queryWithContext === 'string'
+            ) {
+              const scheduler = config.getWorkScheduler();
+              queryWithContext = `[${scheduler.formatScheduleSummary()}]\n\n${queryWithContext}`;
+            }
+
             try {
               const stream = geminiClient.sendMessageStream(
-                queryToSend,
+                queryWithContext,
                 abortSignal,
                 prompt_id!,
                 undefined,
@@ -1945,6 +1962,66 @@ export const useGeminiStream = (
     geminiClient,
     storage,
   ]);
+
+  // Idle hook timer: fires after idleTimeout seconds of no activity.
+  // The timeout is read from the Idle hook definitions themselves.
+  // If hooks exist but don't declare a timeout, fall back to 300 seconds.
+  const DEFAULT_IDLE_TIMEOUT = 300;
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    // Clear any existing timer
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+    }
+
+    if (streamingState !== StreamingState.Idle || !config.getEnableHooks()) {
+      return;
+    }
+
+    // Derive timeout from registered Idle hook definitions.
+    const hookSystem = config.getHookSystem();
+    const idleHooks = hookSystem
+      ?.getAllHooks()
+      .filter((h) => h.eventName === 'Idle' && h.enabled);
+
+    if (!idleHooks || idleHooks.length === 0) {
+      return;
+    }
+
+    // Use the max idleTimeout declared by any Idle hook, or the default.
+    const declaredTimeouts = idleHooks
+      .map((h) => h.idleTimeout)
+      .filter((t): t is number => typeof t === 'number' && t > 0);
+    const idleTimeoutSeconds =
+      declaredTimeouts.length > 0
+        ? Math.max(...declaredTimeouts)
+        : DEFAULT_IDLE_TIMEOUT;
+
+    const startTime = Date.now();
+    idleTimerRef.current = setTimeout(async () => {
+      if (!hookSystem) return;
+
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      try {
+        const result = await hookSystem.fireIdleEvent(elapsed);
+        const prompt = result?.finalOutput?.hookSpecificOutput?.['prompt'];
+        if (typeof prompt === 'string' && prompt.trim()) {
+          // Auto-submit the prompt returned by the hook
+          void submitQuery(prompt);
+        }
+      } catch {
+        // Idle hook failures are non-fatal
+      }
+    }, idleTimeoutSeconds * 1000);
+
+    return () => {
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = null;
+      }
+    };
+  }, [streamingState, config, submitQuery]);
 
   const lastOutputTime = Math.max(
     lastToolOutputTime,

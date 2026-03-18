@@ -29,10 +29,16 @@ function ensurePartArray(content: PartListUnion): Part[] {
  */
 export function convertSessionToClientHistory(
   messages: ConversationRecord['messages'],
+  startIndex?: number,
 ): Array<{ role: 'user' | 'model'; parts: Part[] }> {
   const clientHistory: Array<{ role: 'user' | 'model'; parts: Part[] }> = [];
 
-  for (const msg of messages) {
+  const slice =
+    startIndex != null && startIndex > 0
+      ? messages.slice(startIndex)
+      : messages;
+
+  for (const msg of slice) {
     if (msg.type === 'info' || msg.type === 'error' || msg.type === 'warning') {
       continue;
     }

@@ -29,6 +29,7 @@ import {
   type PreCompressTrigger,
   type HookExecutionResult,
   type McpToolContext,
+  type IdleInput,
 } from './types.js';
 import { defaultHookTranslator } from './hookTranslator.js';
 import type {
@@ -204,14 +205,28 @@ export class HookEventHandler {
    */
   async firePreCompressEvent(
     trigger: PreCompressTrigger,
+    history: Array<{ role: string; parts: Array<{ text?: string }> }>,
   ): Promise<AggregatedHookResult> {
     const input: PreCompressInput = {
       ...this.createBaseInput(HookEventName.PreCompress),
       trigger,
+      history,
     };
 
     const context: HookEventContext = { trigger };
     return this.executeHooks(HookEventName.PreCompress, input, context);
+  }
+
+  /**
+   * Fire an Idle event
+   */
+  async fireIdleEvent(idleSeconds: number): Promise<AggregatedHookResult> {
+    const input: IdleInput = {
+      ...this.createBaseInput(HookEventName.Idle),
+      idle_seconds: idleSeconds,
+    };
+
+    return this.executeHooks(HookEventName.Idle, input);
   }
 
   /**
@@ -491,6 +506,11 @@ export class HookEventHandler {
       // Note: The actual stopping of execution must be handled by integration points
       // as they need to interpret this signal in the context of their specific workflow
       // This is just logging the request centrally
+    }
+
+    // Handle refreshContext - reload the system instruction to pick up context file changes
+    if (aggregated.finalOutput.refreshContext) {
+      this.context.config.updateSystemInstructionIfInitialized();
     }
 
     // Other common fields like decision/reason are handled by specific hook output classes

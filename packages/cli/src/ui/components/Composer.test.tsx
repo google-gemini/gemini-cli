@@ -61,6 +61,10 @@ vi.mock('./StatusDisplay.js', () => ({
   StatusDisplay: () => <Text>StatusDisplay</Text>,
 }));
 
+vi.mock('./ScheduledWorkDisplay.js', () => ({
+  ScheduledWorkDisplay: () => null,
+}));
+
 vi.mock('./ToastDisplay.js', () => ({
   ToastDisplay: () => <Text>ToastDisplay</Text>,
   shouldShowToast: (uiState: UIState) =>
@@ -202,6 +206,7 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     activeHooks: [],
     isBackgroundShellVisible: false,
     embeddedShellFocused: false,
+    a2aListenerPort: null,
     quota: {
       userTier: undefined,
       stats: undefined,

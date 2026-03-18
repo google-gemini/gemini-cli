@@ -85,6 +85,7 @@ describe('useQuotaAndFallback', () => {
       updateItem: vi.fn(),
       clearItems: vi.fn(),
       loadHistory: vi.fn(),
+      pruneItems: vi.fn(),
     };
     mockSetModelSwitchedFromQuotaError = vi.fn();
     mockOnShowAuthSelection = vi.fn();

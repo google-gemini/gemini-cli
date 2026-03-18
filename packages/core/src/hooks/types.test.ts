@@ -57,6 +57,7 @@ describe('Hook Types', () => {
         'BeforeModel',
         'AfterModel',
         'BeforeToolSelection',
+        'Idle',
       ];
 
       for (const event of expectedEvents) {
@@ -112,6 +113,7 @@ describe('Hook Output Classes', () => {
         systemMessage: 'test system message',
         decision: 'block' as HookDecision,
         reason: 'test reason',
+        refreshContext: true,
         hookSpecificOutput: { key: 'value' },
       };
       const output = new DefaultHookOutput(data);
@@ -121,6 +123,7 @@ describe('Hook Output Classes', () => {
       expect(output.systemMessage).toBe(data.systemMessage);
       expect(output.decision).toBe(data.decision);
       expect(output.reason).toBe(data.reason);
+      expect(output.refreshContext).toBe(true);
       expect(output.hookSpecificOutput).toEqual(data.hookSpecificOutput);
     });
 

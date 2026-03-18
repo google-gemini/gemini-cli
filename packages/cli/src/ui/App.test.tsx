@@ -82,6 +82,7 @@ describe('App', () => {
       updateItem: vi.fn(),
       clearItems: vi.fn(),
       loadHistory: vi.fn(),
+      pruneItems: vi.fn(),
     },
     history: [],
     pendingHistoryItems: [],

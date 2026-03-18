@@ -26,6 +26,7 @@ export interface HookRegistryEntry {
   matcher?: string;
   sequential?: boolean;
   enabled: boolean;
+  idleTimeout?: number;
 }
 
 /**
@@ -279,6 +280,7 @@ please review the project settings (.gemini/settings.json) and remove them.`;
           matcher: definition.matcher,
           sequential: definition.sequential,
           enabled: !isDisabled,
+          idleTimeout: definition.idleTimeout,
         });
       } else {
         // Invalid hooks are logged and discarded here, they won't reach HookRunner
