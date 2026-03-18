@@ -19,10 +19,10 @@ import * as readline from 'node:readline';
 import { Language, Parser, Query, type Node, type Tree } from 'web-tree-sitter';
 import { loadWasmBinary } from './fileUtils.js';
 import { debugLogger } from './debugLogger.js';
-import {
-  type SandboxManager,
-  type SandboxedCommand,
+import type {
   SandboxProfile,
+  SandboxManager,
+  SandboxedCommand
 } from '../services/sandboxManager.js';
 
 export const SHELL_TOOL_NAMES = ['run_shell_command', 'ShellTool'];

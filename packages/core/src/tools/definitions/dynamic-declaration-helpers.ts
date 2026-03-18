@@ -109,13 +109,13 @@ export function getShellDeclaration(
           description:
             'Set to true if this command should be run in the background (e.g. for long-running servers or watchers). The command will be started, allowed to run for a brief moment to check for immediate errors, and then moved to the background.',
         },
-        sandbox_ephemeral_rules: {
+        required_sandbox_paths: {
           type: 'array',
           items: {
             type: 'string',
           },
           description:
-            'Optional list of paths to allow via ephemeral sandbox rules on a retry. Only provide this if the command previously failed with a Sandbox Violation.',
+            '(OPTIONAL) If you know this command will need to access specific files or directories outside the workspace (e.g. global binaries, homebrew paths, global config files), list their absolute paths here. If the sandbox blocks the command, the user will be asked to approve these broader paths instead of individual files, preventing multiple interruption prompts.',
         },
       },
       required: [SHELL_PARAM_COMMAND],

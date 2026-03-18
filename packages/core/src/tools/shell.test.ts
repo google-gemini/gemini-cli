@@ -275,7 +275,7 @@ describe('ShellTool', () => {
         expect.any(AbortSignal),
         false,
         { pager: 'cat', sanitizationConfig: {} },
-        SandboxProfile.WORKSPACE_WRITE,
+        SandboxProfile.READ_ONLY,
         [],
       );
       expect(result.llmContent).toContain('Background PIDs: 54322');
@@ -302,7 +302,7 @@ describe('ShellTool', () => {
         expect.any(AbortSignal),
         false,
         { pager: 'cat', sanitizationConfig: {} },
-        SandboxProfile.WORKSPACE_WRITE,
+        SandboxProfile.READ_ONLY,
         [],
       );
     });
@@ -325,7 +325,7 @@ describe('ShellTool', () => {
         expect.any(AbortSignal),
         false,
         { pager: 'cat', sanitizationConfig: {} },
-        SandboxProfile.WORKSPACE_WRITE,
+        SandboxProfile.READ_ONLY,
         [],
       );
     });
@@ -373,7 +373,7 @@ describe('ShellTool', () => {
           expect.any(AbortSignal),
           false,
           { pager: 'cat', sanitizationConfig: {} },
-          SandboxProfile.WORKSPACE_WRITE,
+          SandboxProfile.READ_ONLY,
         );
       },
       20000,

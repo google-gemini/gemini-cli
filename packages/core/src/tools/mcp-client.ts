@@ -2263,7 +2263,7 @@ export async function createTransport(
         underlyingTransport instanceof XcodeMcpBridgeFixTransport ||
         underlyingTransport instanceof SandboxedTransport
       ) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-type-assertion
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-type-assertion
         underlyingTransport = (underlyingTransport as any).transport;
       }
 

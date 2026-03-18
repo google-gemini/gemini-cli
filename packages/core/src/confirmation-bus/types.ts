@@ -21,6 +21,8 @@ export enum MessageBusType {
   TOOL_CALLS_UPDATE = 'tool-calls-update',
   ASK_USER_REQUEST = 'ask-user-request',
   ASK_USER_RESPONSE = 'ask-user-response',
+  SANDBOX_EXPANSION_REQUEST = 'sandbox-expansion-request',
+  SANDBOX_EXPANSION_RESPONSE = 'sandbox-expansion-response',
 }
 
 export interface ToolCallsUpdateMessage {
@@ -113,6 +115,11 @@ export type SerializableConfirmationDetails =
       type: 'exit_plan_mode';
       title: string;
       planPath: string;
+    }
+  | {
+      type: 'sandbox_expansion';
+      title: string;
+      blockedPath: string;
     };
 
 export interface UpdatePolicy {
@@ -179,6 +186,19 @@ export interface AskUserResponse {
   cancelled?: boolean;
 }
 
+export interface SandboxExpansionRequest {
+  type: MessageBusType.SANDBOX_EXPANSION_REQUEST;
+  correlationId: string;
+  blockedPath: string;
+  requiresUnsandboxed?: boolean;
+}
+
+export interface SandboxExpansionResponse {
+  type: MessageBusType.SANDBOX_EXPANSION_RESPONSE;
+  correlationId: string;
+  decision: 'Allow Once' | 'Always Allow' | 'Deny';
+}
+
 export type Message =
   | ToolConfirmationRequest
   | ToolConfirmationResponse
@@ -188,4 +208,6 @@ export type Message =
   | UpdatePolicy
   | AskUserRequest
   | AskUserResponse
+  | SandboxExpansionRequest
+  | SandboxExpansionResponse
   | ToolCallsUpdateMessage;

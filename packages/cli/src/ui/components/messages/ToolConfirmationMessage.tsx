@@ -363,6 +363,24 @@ export const ToolConfirmationMessage: React.FC<
         value: ToolConfirmationOutcome.Cancel,
         key: 'No, suggest changes (esc)',
       });
+    } else if (confirmationDetails.type === 'sandbox_expansion') {
+      options.push({
+        label: 'Allow once',
+        value: ToolConfirmationOutcome.ProceedOnce,
+        key: 'Allow once',
+      });
+      if (allowPermanentApproval) {
+        options.push({
+          label: 'Allow for all future sessions',
+          value: ToolConfirmationOutcome.ProceedAlwaysAndSave,
+          key: 'Allow for all future sessions',
+        });
+      }
+      options.push({
+        label: 'No, suggest changes (esc)',
+        value: ToolConfirmationOutcome.Cancel,
+        key: 'No, suggest changes (esc)',
+      });
     }
     return options;
   }, [
@@ -484,6 +502,8 @@ export const ToolConfirmationMessage: React.FC<
       // mcp tool confirmation
       const mcpProps = confirmationDetails;
       question = `Allow execution of MCP tool "${sanitizeForDisplay(mcpProps.toolName)}" from server "${sanitizeForDisplay(mcpProps.serverName)}"?`;
+    } else if (confirmationDetails.type === 'sandbox_expansion') {
+      question = `Sandbox blocked access to ${sanitizeForDisplay(confirmationDetails.blockedPath)}. Allow access?`;
     }
 
     if (confirmationDetails.type === 'edit') {
@@ -640,6 +660,17 @@ export const ToolConfirmationMessage: React.FC<
               )}
             </Box>
           )}
+        </Box>
+      );
+    } else if (confirmationDetails.type === 'sandbox_expansion') {
+      bodyContent = (
+        <Box flexDirection="column">
+          <Text color={theme.text.primary}>
+            The sandbox prevented a command from accessing a file outside the workspace.
+          </Text>
+          <Box marginTop={1}>
+             <Text color={theme.text.link}>{sanitizeForDisplay(confirmationDetails.blockedPath)}</Text>
+          </Box>
         </Box>
       );
     }

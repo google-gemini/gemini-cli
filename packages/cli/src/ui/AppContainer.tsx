@@ -19,6 +19,8 @@ import {
   useStdout,
   useStdin,
   type AppProps,
+  Box,
+  Text,
 } from 'ink';
 import { App } from './App.js';
 import { AppContext } from './contexts/AppContext.js';
@@ -39,7 +41,7 @@ import {
 } from './types.js';
 import { checkPermissions } from './hooks/atCommandProcessor.js';
 import { MessageType, StreamingState } from './types.js';
-import { ToolActionsProvider } from './contexts/ToolActionsContext.js';
+import { ToolActionsProvider, ToolActionsContext } from './contexts/ToolActionsContext.js';
 import {
   type StartupWarning,
   type EditorType,
@@ -86,6 +88,7 @@ import {
   logBillingEvent,
   ApiKeyUpdatedEvent,
   MessageBusType,
+  ToolConfirmationOutcome,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -150,6 +153,9 @@ import { useIncludeDirsTrust } from './hooks/useIncludeDirsTrust.js';
 import { isWorkspaceTrusted } from '../config/trustedFolders.js';
 import { useSettings } from './contexts/SettingsContext.js';
 import { AskUserDialog } from './components/AskUserDialog.js';
+import { ToolConfirmationMessage } from './components/messages/ToolConfirmationMessage.js';
+import { StickyHeader } from './components/StickyHeader.js';
+import { theme } from './semantic-colors.js';
 import { terminalCapabilityManager } from './utils/terminalCapabilityManager.js';
 import { useInputHistoryStore } from './hooks/useInputHistoryStore.js';
 import { useBanner } from './hooks/useBanner.js';
@@ -1583,11 +1589,95 @@ Logging in with Google... Restarting Gemini CLI to continue.
             }}
           />
         );
+      } else if (msg.type === MessageBusType.SANDBOX_EXPANSION_REQUEST) {
+        const customToolActions = {
+          confirm: async (callId: string, outcome: ToolConfirmationOutcome) => {
+            messageBus.publish({
+              type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+              correlationId: msg.correlationId,
+              confirmed: outcome !== ToolConfirmationOutcome.Cancel,
+              outcome,
+            });
+            setCustomDialog(null);
+          },
+          cancel: async (callId: string) => {
+            messageBus.publish({
+              type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
+              correlationId: msg.correlationId,
+              confirmed: false,
+              outcome: ToolConfirmationOutcome.Cancel,
+            });
+            setCustomDialog(null);
+          },
+          isDiffingEnabled: false,
+        };
+
+        setCustomDialog(
+          <Box flexDirection="column" width={terminalWidth} flexShrink={0}>
+            <StickyHeader
+              width={terminalWidth}
+              isFirst={true}
+              borderColor={theme.status.warning}
+              borderDimColor={false}
+            >
+              <Box flexDirection="column" width={terminalWidth - 4}>
+                <Box
+                  marginBottom={1}
+                  justifyContent="space-between"
+                >
+                  <Text color={theme.status.warning} bold>
+                    Action Required
+                  </Text>
+                </Box>
+              </Box>
+            </StickyHeader>
+
+            <Box
+              width={terminalWidth}
+              borderStyle="round"
+              borderColor={theme.status.warning}
+              borderTop={false}
+              borderBottom={false}
+              borderLeft={true}
+              borderRight={true}
+              paddingX={1}
+              flexDirection="column"
+            >
+              <ToolActionsContext.Provider value={customToolActions}>
+                <ToolConfirmationMessage
+                  callId={msg.correlationId}
+                  confirmationDetails={{
+                    type: 'sandbox_expansion',
+                    title: msg.requiresUnsandboxed ? 'Unrestricted Execution Required' : 'Sandbox Violation',
+                    blockedPath: msg.requiresUnsandboxed ? `${msg.blockedPath} (Requires Unsandboxed Execution)` : msg.blockedPath,
+                  }}                  config={config}
+                  getPreferredEditor={() => undefined}
+                  terminalWidth={terminalWidth - 4}
+                  availableTerminalHeight={terminalHeight}
+                  isFocused={true}
+                />
+              </ToolActionsContext.Provider>
+            </Box>
+            <Box
+              height={1}
+              width={terminalWidth}
+              borderLeft={true}
+              borderRight={true}
+              borderTop={false}
+              borderBottom={true}
+              borderStyle="round"
+              borderColor={theme.status.warning}
+              borderDimColor={false}
+            />
+          </Box>
+        );
       }
     };
     messageBus.subscribe(MessageBusType.ASK_USER_REQUEST, handler);
+    messageBus.subscribe(MessageBusType.SANDBOX_EXPANSION_REQUEST, handler);
     return () => {
       messageBus.unsubscribe(MessageBusType.ASK_USER_REQUEST, handler);
+      messageBus.unsubscribe(MessageBusType.SANDBOX_EXPANSION_REQUEST, handler);
     };
   }, [config, setCustomDialog, terminalWidth, terminalHeight]);
 

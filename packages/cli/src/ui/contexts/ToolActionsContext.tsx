@@ -50,7 +50,7 @@ interface ToolActionsContextValue {
   isDiffingEnabled: boolean;
 }
 
-const ToolActionsContext = createContext<ToolActionsContextValue | null>(null);
+export const ToolActionsContext = createContext<ToolActionsContextValue | null>(null);
 
 export const useToolActions = () => {
   const context = useContext(ToolActionsContext);

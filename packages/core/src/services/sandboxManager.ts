@@ -23,6 +23,10 @@ export enum SandboxProfile {
    * Allows both read and write access to the workspace and specified paths.
    */
   WORKSPACE_WRITE = 'WORKSPACE_WRITE',
+  /**
+   * Completely bypasses the sandbox.
+   */
+  UNSANDBOXED = 'UNSANDBOXED',
 }
 
 /**
@@ -93,8 +97,8 @@ export class StandardSandboxManager implements SandboxManager {
   prepareCommandSync(options: SandboxOptions): SandboxedCommand {
     const sandboxConfig = this.config.getSandbox();
 
-    // If sandbox is not enabled or not configured, return the original command.
-    if (!sandboxConfig?.enabled) {
+    // If sandbox is not enabled or not configured, or if profile is UNSANDBOXED, return the original command.
+    if (!sandboxConfig?.enabled || options.profile === SandboxProfile.UNSANDBOXED) {
       return {
         program: options.command,
         args: options.args,
@@ -213,7 +217,9 @@ export class StandardSandboxManager implements SandboxManager {
 
       // Project Workspace and Temp
       `(allow ${workspacePermission} (subpath "${path.resolve(options.cwd)}"))`,
+      `(allow file-map-executable (subpath "${path.resolve(options.cwd)}"))`,
       ...allowedPaths.map(p => `(allow ${workspacePermission} (subpath "${path.resolve(p)}"))`),
+      ...allowedPaths.map(p => `(allow file-map-executable (subpath "${path.resolve(p)}"))`),
       '(allow file-read* file-write* (subpath "/private/tmp"))',
       '(allow file-read* file-write* (subpath "/tmp"))',
       '(allow file-read* file-write* (subpath "/var/tmp"))',
@@ -240,3 +246,4 @@ export class StandardSandboxManager implements SandboxManager {
     return rules.join('\n');
   }
 }
+

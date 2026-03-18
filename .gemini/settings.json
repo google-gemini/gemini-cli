@@ -11,6 +11,10 @@
     "enabled": true
   },
   "tools": {
-    "coreTools": ["ShellTool(echo)"]
+    "coreTools": ["ShellTool(echo)"],
+    "exclude": [
+      "replace",
+      "write_file"
+    ]
   }
 }

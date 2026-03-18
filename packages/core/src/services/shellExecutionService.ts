@@ -5,8 +5,9 @@
  */
 
 import stripAnsi from 'strip-ansi';
+import path from 'node:path';
 import { getPty, type PtyImplementation } from '../utils/getPty.js';
-import { spawn as cpSpawn, exec, type ChildProcess } from 'node:child_process';
+import { spawn as cpSpawn, type ChildProcess } from 'node:child_process';
 import { TextDecoder } from 'node:util';
 import os from 'node:os';
 import type { IPty } from '@lydell/node-pty';
@@ -25,7 +26,7 @@ import {
   type AnsiOutput,
 } from '../utils/terminalSerializer.js';
 import { sanitizeEnvironment, type EnvironmentSanitizationConfig } from './environmentSanitization.js';
-import { type SandboxManager, SandboxProfile } from './sandboxManager.js';
+import type { SandboxProfile, SandboxManager } from './sandboxManager.js';
 import { killProcessGroup } from '../utils/process-utils.js';
 const { Terminal } = pkg;
 
@@ -466,23 +467,9 @@ export class ShellExecutionService {
           const exitCode = code;
           const exitSignal = signal ? os.constants.signals[signal] : null;
 
-          let epermFallback = false;
-          if (exitSignal === 6 && child.pid) {
-            const violation = await ShellExecutionService.extractSandboxViolation(child.pid);
-            if (violation) {
-              finalStrippedOutput += `\n[Sandbox Violation Detected]: ${violation}`;
-            } else {
-              epermFallback = true;
-            }
-          } else if (exitCode !== 0 && exitCode !== null) {
-            epermFallback = true;
-          }
-
-          if (epermFallback) {
-            const epermViolation = ShellExecutionService.extractEpermViolation(finalStrippedOutput);
-            if (epermViolation) {
-              finalStrippedOutput += `\n[Sandbox Violation Detected]: EPERM ${epermViolation}`;
-            }
+          const violation = ShellExecutionService.detectSandboxViolation(exitCode, exitSignal, finalStrippedOutput, cwd);
+          if (violation) {
+            finalStrippedOutput += `\n[Sandbox Violation Detected]${typeof violation === 'string' ? `: ${violation}` : ''}`;
           }
 
           if (child.pid) {
@@ -881,23 +868,10 @@ export class ShellExecutionService {
               }
 
               let finalOutput = getFullBufferText(headlessTerminal);
-              let epermFallback = false;
-              if (signal === 6) {
-                const violation = await ShellExecutionService.extractSandboxViolation(ptyProcess.pid);
-                if (violation) {
-                  finalOutput += `\n[Sandbox Violation Detected]: ${violation}`;
-                } else {
-                  epermFallback = true;
-                }
-              } else if (exitCode !== 0 && exitCode !== null) {
-                epermFallback = true;
-              }
-
-              if (epermFallback) {
-                const epermViolation = ShellExecutionService.extractEpermViolation(stripAnsi(finalOutput).trim());
-                if (epermViolation) {
-                  finalOutput += `\n[Sandbox Violation Detected]: EPERM ${epermViolation}`;
-                }
+              
+              const violation = ShellExecutionService.detectSandboxViolation(exitCode, signal ?? null, stripAnsi(finalOutput).trim(), cwd);
+              if (violation) {
+                finalOutput += `\n[Sandbox Violation Detected]${typeof violation === 'string' ? `: ${violation}` : ''}`;
               }
 
               resolve({
@@ -1268,45 +1242,100 @@ export class ShellExecutionService {
     }
   }
 
-  private static extractEpermViolation(output: string): string | undefined {
-    // Matches patterns like: /bin/bash: /path/to/file: Operation not permitted
-    // or: curl: (23) Failed writing body ... Permission denied
-    // or: fatal: unable to access '/Users/galzahavi/.gitconfig': Operation not permitted
-    const match = output.match(/(.*?):\s+(?:Operation not permitted|Permission denied)/i);
-    if (match) {
-      const text = match[1];
-      const pathMatch = text.match(/['"]([^<>'"]+)['"]/) || text.match(/(?:^|\s)(\/[^\s:]+)/);
-      if (pathMatch) {
-        return pathMatch[1];
-      }
-      // The first capture group usually contains the tool and the path, e.g., "/bin/bash: /path"
-      const parts = text.split(':').map((p) => p.trim());
-      // The last part before the error message is usually the path
-      const path = parts[parts.length - 1];
-      if (path && path.startsWith('/')) {
-        return path;
+  public static detectSandboxViolation(exitCode: number | null, signal: string | number | null, output: string, cwd: string): string | boolean {
+    if (exitCode === 0 && !signal) {
+      return false;
+    }
+
+    let extractedBlockedPath: string | null = null;
+
+    // Attempt to extract the exact path first
+    const gitMatch = output.match(/fatal: not a git repository:\s*([^\s]+)/i);
+    if (gitMatch && gitMatch[1]) {
+      extractedBlockedPath = path.resolve(cwd, gitMatch[1]);
+    }
+
+    if (!extractedBlockedPath) {
+      const dyldMatch = output.match(/'([^']+)'\s+\(file system sandbox blocked/i);
+      if (dyldMatch && dyldMatch[1]) {
+        extractedBlockedPath = path.resolve(cwd, dyldMatch[1]);
       }
     }
-    return undefined;
-  }
 
-  private static async extractSandboxViolation(pid: number): Promise<string | undefined> {
-    if (process.platform !== 'darwin') return undefined;
-    return new Promise((resolve) => {
-      // Allow max 2000ms for log extraction to avoid hanging
-      const child = exec(`log show --predicate 'process == "sandboxd" and eventMessage contains "${pid}"' --last 1m --style compact`, { timeout: 2000 }, (error, stdout) => {
-        if (!error && stdout) {
-          const lines = stdout.split('\n');
-          for (const line of lines) {
-            if (line.includes('System Policy:') && line.includes('deny')) {
-              resolve(line.trim());
-              return;
+    if (!extractedBlockedPath) {
+      const nodeMatch = output.match(/EPERM:\s+(?:operation not permitted|permission denied),\s*(?:[a-z]+)\s+['"]?([^<>'"]+)['"]?/i);
+      if (nodeMatch && nodeMatch[1]) {
+        extractedBlockedPath = path.resolve(cwd, nodeMatch[1]);
+      }
+    }
+
+    if (!extractedBlockedPath) {
+      const match = output.match(/(.*?):\s+(?:Operation not permitted|Permission denied)/i);
+      if (match) {
+        const text = match[1];
+        if (text && !text.includes('Error: EPERM')) {
+          const quotedMatch = text.match(/['"]([^<>'"]+)['"]/);
+          if (quotedMatch && quotedMatch[1]) {
+            extractedBlockedPath = path.resolve(cwd, quotedMatch[1]);
+          } else {
+            const parts = text.split(':').map((p) => p.trim());
+            const extractedPath = parts[parts.length - 1];
+            if (extractedPath) {
+              extractedBlockedPath = path.resolve(cwd, extractedPath);
             }
           }
         }
-        resolve(undefined);
-      });
-      child.on('error', () => resolve(undefined));
-    });
+      }
+    }
+
+    if (extractedBlockedPath) {
+      // Auto-expand .git paths to the root of the .git directory to prevent 
+      // the user from having to approve config, packed-refs, HEAD, etc., one by one.
+      const gitIndex = extractedBlockedPath.indexOf('/.git/');
+      if (gitIndex !== -1) {
+        extractedBlockedPath = extractedBlockedPath.substring(0, gitIndex + 5);
+      }
+
+      // Auto-expand node_modules to the root of the node_modules directory
+      // to prevent individual file approvals for npm and node executions.
+      const nodeModulesIndex = extractedBlockedPath.indexOf('/node_modules/');
+      if (nodeModulesIndex !== -1) {
+        extractedBlockedPath = extractedBlockedPath.substring(0, nodeModulesIndex + 14);
+      }
+
+      return extractedBlockedPath;
+    }
+
+    const QUICK_REJECT_EXIT_CODES = [2, 126, 127];
+    if (exitCode !== null && QUICK_REJECT_EXIT_CODES.includes(exitCode)) {
+      return false;
+    }
+
+    const SANDBOX_DENIED_KEYWORDS = [
+      'operation not permitted',
+      'permission denied',
+      'read-only file system',
+      'seccomp',
+      'sandbox',
+      'landlock',
+      'failed to write file',
+    ];
+
+    const lowerOutput = output.toLowerCase();
+    const hasSandboxKeyword = SANDBOX_DENIED_KEYWORDS.some((keyword) =>
+      lowerOutput.includes(keyword),
+    );
+
+    if (hasSandboxKeyword) {
+      return true;
+    }
+
+    // Signal 6 (SIGABRT) is common for macOS sandbox terminations
+    // Signal 31 (SIGSYS) is common for Linux seccomp terminations
+    if (signal === 6 || signal === 'SIGABRT' || signal === 31 || signal === 'SIGSYS') {
+      return true;
+    }
+
+    return false;
   }
 }

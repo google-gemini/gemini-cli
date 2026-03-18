@@ -11,6 +11,7 @@ import crypto from 'node:crypto';
 import type { Config } from '../config/config.js';
 import { debugLogger } from '../index.js';
 import { ToolErrorType } from './tool-error.js';
+import { ApprovalMode } from '../policy/types.js';
 import {
   BaseDeclarativeTool,
   BaseToolInvocation,
@@ -32,6 +33,7 @@ import {
   type ShellOutputEvent,
 } from '../services/shellExecutionService.js';
 import { SandboxProfile } from '../services/sandboxManager.js';
+import { ExecPolicyEngine } from '../services/execPolicyEngine.js';
 import { formatBytes } from '../utils/formatters.js';
 import type { AnsiOutput } from '../utils/terminalSerializer.js';
 import {
@@ -45,19 +47,18 @@ import { SHELL_TOOL_NAME } from './tool-names.js';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import { getShellDefinition } from './definitions/coreTools.js';
 import { resolveToolDeclaration } from './definitions/resolver.js';
-import { promptSandboxExpansion } from '../utils/sandbox-prompt.js';
+import { promptSandboxExpansion, addToSandboxingToml } from '../utils/sandbox-prompt.js';
 
 export const OUTPUT_UPDATE_INTERVAL_MS = 1000;
 
 // Delay so user does not see the output of the process before the process is moved to the background.
 const BACKGROUND_DELAY_MS = 200;
-
 export interface ShellToolParams {
   command: string;
   description?: string;
   dir_path?: string;
   is_background?: boolean;
-  sandbox_ephemeral_rules?: string[];
+  required_sandbox_paths?: string[];
 }
 
 export class ShellToolInvocation extends BaseToolInvocation<
@@ -122,14 +123,14 @@ export class ShellToolInvocation extends BaseToolInvocation<
   ): Promise<ToolCallConfirmationDetails | false> {
     const command = stripShellWrapper(this.params.command);
 
-    const parsed = await parseCommandDetails(command);
+    const parsed = parseCommandDetails(command);
     let rootCommandDisplay = '';
 
     if (!parsed || parsed.hasError || parsed.details.length === 0) {
       // Fallback if parser fails
       const fallback = command.trim().split(/\s+/)[0];
       rootCommandDisplay = fallback || 'shell command';
-      if (await hasRedirection(command)) {
+      if (hasRedirection(command)) {
         rootCommandDisplay += ', redirection';
       }
     } else {
@@ -138,9 +139,9 @@ export class ShellToolInvocation extends BaseToolInvocation<
         .join(', ');
     }
 
-    const rootCommands = await getCommandRoots(command);
+    const rootCommands = getCommandRoots(command);
     const uniqueRootCommands = [...new Set(rootCommands)];
-    const redirection = await hasRedirection(command);
+    const redirection = hasRedirection(command);
 
     // Rely entirely on PolicyEngine for interactive confirmation.
     // If we are here, it means PolicyEngine returned ASK_USER (or no message bus),
@@ -234,8 +235,20 @@ export class ShellToolInvocation extends BaseToolInvocation<
         once: true,
       });
 
-      let ephemeralRules: string[] = this.params.sandbox_ephemeral_rules ? this.params.sandbox_ephemeral_rules.map(r => r.startsWith('(') ? r : `(allow file-read* file-write* (subpath "${r}"))`) : [];
+      const ephemeralRules: string[] = [];
+      const previouslyPromptedTargets = new Set<string>();
+      const approvedPaths: string[] = [];
+      let isAlwaysAllow = false;
       let result;
+
+      const configDir = path.join(cwd, '.gemini');
+      const policyEngine = new ExecPolicyEngine(configDir);
+      let evaluatedProfile = policyEngine.getProfileForCommand(commandToExecute);
+
+      const mode = this.config.getApprovalMode();
+      if (mode === ApprovalMode.AUTO_EDIT || mode === ApprovalMode.YOLO) {
+        evaluatedProfile = SandboxProfile.WORKSPACE_WRITE;
+      }
 
       while (true) {
         // Start timeout
@@ -295,7 +308,7 @@ export class ShellToolInvocation extends BaseToolInvocation<
                 shellExecutionConfig?.sanitizationConfig ??
                 this.config.sanitizationConfig,
             },
-            SandboxProfile.WORKSPACE_WRITE,
+            evaluatedProfile,
             ephemeralRules,
           );
 
@@ -314,29 +327,152 @@ export class ShellToolInvocation extends BaseToolInvocation<
 
         result = await resultPromise;
 
+        if (result.aborted) {
+          break;
+        }
+
         if (result.output.includes('[Sandbox Violation Detected]')) {
           let blockedPath = null;
-          let match = result.output.match(/\[Sandbox Violation Detected\]:.*?deny\(\d+\) [^\s]+ (.*)/);
-          if (match) {
+          const match = result.output.match(/\[Sandbox Violation Detected\]:?\s*(.*)?/);
+          if (match && match[1]) {
             blockedPath = match[1].trim();
-          } else {
-            match = result.output.match(/\[Sandbox Violation Detected\]: EPERM (.*)/);
-            if (match) {
-              blockedPath = match[1].trim();
+          }
+
+          if (blockedPath && this.params.required_sandbox_paths) {
+            for (const requiredPath of this.params.required_sandbox_paths) {
+              if (blockedPath.startsWith(requiredPath)) {
+                blockedPath = requiredPath;
+                break;
+              }
             }
           }
-          if (blockedPath) {
-            const decision = await promptSandboxExpansion(this.messageBus, blockedPath, cwd);
 
-            if (decision === 'Allow Once' || decision === 'Always Allow') {
-               ephemeralRules.push(`(allow file-read* file-write* (subpath "${blockedPath}"))`);
-               continue;
-            } else {
-               return {
-                 llmContent: `Sandbox Violation: The command was blocked from accessing ${blockedPath}. The user denied the sandbox expansion request.\n\nOriginal output:\n${result.output}`,
-                 returnDisplay: `Sandbox Violation: Blocked access to ${blockedPath}. User denied request.`
-               };
+          const fallbackPrefix = commandToExecute.trim().split(/\s+/)[0] || 'command';
+          let promptTarget = blockedPath || fallbackPrefix;
+
+          // Loop protection MUST run before auto-approval.
+          let requiresUnsandboxed = false;
+          if (previouslyPromptedTargets.has(promptTarget)) {
+             requiresUnsandboxed = true;
+          } else {
+             previouslyPromptedTargets.add(promptTarget);
+          }
+
+          // Check for auto-approval based on similarity with previously approved paths in this run
+          let autoApproved = false;
+          if (!requiresUnsandboxed && blockedPath) {
+            for (const approved of approvedPaths) {
+              if (blockedPath === approved) {
+                continue; // Prevent infinite loop on the exact same path
+              }
+              const p1 = approved.split('/').filter(Boolean);
+              const p2 = blockedPath.split('/').filter(Boolean);
+              let i = 0;
+              while (i < p1.length && i < p2.length && p1[i] === p2[i]) {
+                i++;
+              }
+              // If they share at least 3 directories (e.g., /Users/name/folder)
+              if (i >= 3) {
+                const commonAncestor = '/' + p1.slice(0, i).join('/');
+                ephemeralRules.push(`(allow file-read* file-write* (subpath "${commonAncestor}"))`);
+                ephemeralRules.push(`(allow file-map-executable (subpath "${commonAncestor}"))`);
+                approvedPaths.push(commonAncestor);
+                
+                try {
+                  const realPath = await fsPromises.realpath(commonAncestor);
+                  if (realPath !== commonAncestor) {
+                    ephemeralRules.push(`(allow file-read* file-write* (subpath "${realPath}"))`);
+                    ephemeralRules.push(`(allow file-map-executable (subpath "${realPath}"))`);
+                    approvedPaths.push(realPath);
+                  }
+                } catch (err) {
+                  // Ignore if path doesn't exist
+                }
+
+                if (isAlwaysAllow) {
+                  await addToSandboxingToml(cwd, commonAncestor);
+                }
+                autoApproved = true;
+                break;
+              }
             }
+          }
+
+          if (autoApproved) {
+            evaluatedProfile = SandboxProfile.WORKSPACE_WRITE;
+            continue;
+          }
+
+          // If we've already prompted for this target, the sandbox is fundamentally incompatible. We must ask for completely unsandboxed execution.
+          if (requiresUnsandboxed && evaluatedProfile === SandboxProfile.UNSANDBOXED) {
+             return {
+               llmContent: `Sandbox Violation: The command '${promptTarget}' was executed entirely without the sandbox but still failed. The failure is not sandbox-related. Original output:\n${result.output}`,
+               returnDisplay: `Sandbox Violation: ${promptTarget} failed even when completely un-sandboxed.`
+             };
+          }
+
+          const decision = await promptSandboxExpansion(this.messageBus, promptTarget, cwd, !!blockedPath, requiresUnsandboxed);
+
+          if (decision === 'Allow Once' || decision === 'Always Allow') {
+             if (decision === 'Always Allow') {
+               isAlwaysAllow = true;
+             }
+
+             if (requiresUnsandboxed) {
+               evaluatedProfile = SandboxProfile.UNSANDBOXED;
+               if (isAlwaysAllow) {
+                 const tokens = commandToExecute.trim().split(/\s+/);
+                 let prefix: string[] = [];
+                 if (tokens.length >= 2 && !tokens[0].includes('=')) {
+                    prefix = tokens.slice(0, 2);
+                 } else if (tokens.length > 0) {
+                    prefix = [tokens[0]];
+                 }
+                 if (prefix.length > 0) {
+                    await policyEngine.addRule(prefix, SandboxProfile.UNSANDBOXED);
+                 }
+               }
+               continue;
+             }
+
+             if (blockedPath) {
+               ephemeralRules.push(`(allow file-read* file-write* (subpath "${blockedPath}"))`);
+               ephemeralRules.push(`(allow file-map-executable (subpath "${blockedPath}"))`);
+               approvedPaths.push(blockedPath);
+               
+               try {
+                 const realPath = await fsPromises.realpath(blockedPath);
+                 if (realPath !== blockedPath) {
+                   ephemeralRules.push(`(allow file-read* file-write* (subpath "${realPath}"))`);
+                   ephemeralRules.push(`(allow file-map-executable (subpath "${realPath}"))`);
+                   approvedPaths.push(realPath);
+                 }
+               } catch (err) {
+                 // Ignore if path doesn't exist or can't be resolved
+               }
+             }
+
+             if (isAlwaysAllow) {
+               // Try to add rule to execpolicy to authorize the command itself for the future
+               const tokens = commandToExecute.trim().split(/\s+/);
+               let prefix: string[] = [];
+               if (tokens.length >= 2 && !tokens[0].includes('=')) {
+                  prefix = tokens.slice(0, 2);
+               } else if (tokens.length > 0) {
+                  prefix = [tokens[0]];
+               }
+               if (prefix.length > 0) {
+                  await policyEngine.addRule(prefix, SandboxProfile.WORKSPACE_WRITE);
+               }
+             }
+
+             evaluatedProfile = SandboxProfile.WORKSPACE_WRITE; // Promote to workspace write for retry
+             continue;
+          } else {
+             return {
+               llmContent: `Sandbox Violation: The sandbox prevented '${promptTarget}' from accessing files outside the workspace. The user denied the sandbox expansion request.\n\nOriginal output:\n${result.output}`,
+               returnDisplay: `Sandbox Violation: User denied sandbox expansion for ${promptTarget}.`
+             };
           }
         }
         break;
