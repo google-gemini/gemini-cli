@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2025 Google LLC
+ * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -46,12 +46,12 @@ describe('ConsolePatcher', () => {
     expect(console.info).toBe(beforeInfo);
   });
 
-  describe('headlessMode', () => {
-    it('should ignore log and info when headlessMode is true and debugMode is false', () => {
+  describe('Interactive mode', () => {
+    it('should ignore log and info when it is not interactive and debugMode is false', () => {
       patcher = new ConsolePatcher({
         onNewMessage,
         debugMode: false,
-        headlessMode: true,
+        interactive: false,
       });
       patcher.patch();
 
@@ -60,11 +60,11 @@ describe('ConsolePatcher', () => {
       expect(onNewMessage).not.toHaveBeenCalled();
     });
 
-    it('should not ignore log and info when headlessMode is true and debugMode is true', () => {
+    it('should not ignore log and info when it is not interactive and debugMode is true', () => {
       patcher = new ConsolePatcher({
         onNewMessage,
         debugMode: true,
-        headlessMode: true,
+        interactive: false,
       });
       patcher.patch();
 
@@ -83,11 +83,11 @@ describe('ConsolePatcher', () => {
       });
     });
 
-    it('should not ignore log and info when headlessMode is false', () => {
+    it('should not ignore log and info when it is interactive', () => {
       patcher = new ConsolePatcher({
         onNewMessage,
         debugMode: false,
-        headlessMode: false,
+        interactive: true,
       });
       patcher.patch();
 
