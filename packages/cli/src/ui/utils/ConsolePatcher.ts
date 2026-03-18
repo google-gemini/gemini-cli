@@ -57,14 +57,12 @@ export class ConsolePatcher {
           return;
         }
       }
-      // When it is stderr only mode, all console output redirect to stderr
-      // if it is debug mode.
-      if (this.params.stderr) {
-        if (type !== 'debug' || this.params.debugMode) {
+      // When it is in the debug mode, redirect console output to stderr
+      // depending on if it is stderr only mode.
+      if (type !== 'debug' || this.params.debugMode) {
+        if (this.params.stderr) {
           this.originalConsoleError(this.formatArgs(args));
-        }
-      } else {
-        if (type !== 'debug' || this.params.debugMode) {
+        } else {
           this.params.onNewMessage?.({
             type,
             content: this.formatArgs(args),
