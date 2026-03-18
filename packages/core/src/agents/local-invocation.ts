@@ -172,11 +172,14 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
           case 'ERROR': {
             const error = String(activity.data['error']);
             const isCancellation = error === 'Request cancelled.';
+            const isRejection = error.startsWith(
+              'User rejected this operation.',
+            );
             const toolName = activity.data['name']
               ? String(activity.data['name'])
               : undefined;
 
-            if (toolName && isCancellation) {
+            if (toolName && (isCancellation || isRejection)) {
               for (let i = recentActivity.length - 1; i >= 0; i--) {
                 if (
                   recentActivity[i].type === 'tool_call' &&
@@ -192,9 +195,10 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
 
             recentActivity.push({
               id: randomUUID(),
-              type: 'thought', // Treat errors as thoughts for now, or add an error type
-              content: isCancellation ? error : `Error: ${error}`,
-              status: isCancellation ? 'cancelled' : 'error',
+              type: 'thought',
+              content:
+                isCancellation || isRejection ? error : `Error: ${error}`,
+              status: isCancellation || isRejection ? 'cancelled' : 'error',
             });
             updated = true;
             break;

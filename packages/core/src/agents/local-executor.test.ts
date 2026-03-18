@@ -92,8 +92,16 @@ import {
   type SubagentActivityEvent,
   type OutputConfig,
 } from './types.js';
-import type { AnyDeclarativeTool, AnyToolInvocation } from '../tools/tools.js';
-import type { ToolCallRequestInfo } from '../scheduler/types.js';
+import {
+  ToolConfirmationOutcome,
+  type AnyDeclarativeTool,
+  type AnyToolInvocation,
+} from '../tools/tools.js';
+import {
+  type ToolCallRequestInfo,
+  CoreToolCallStatus,
+} from '../scheduler/types.js';
+
 import { CompressionStatus } from '../core/turn.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import type {
@@ -1161,7 +1169,7 @@ describe('LocalAgentExecutor', () => {
               if (callsStarted === 2) resolveCalls();
               await vi.advanceTimersByTimeAsync(100);
               return {
-                status: 'success',
+                status: CoreToolCallStatus.Success,
                 request: reqInfo,
                 tool: {} as AnyDeclarativeTool,
                 invocation: {} as AnyToolInvocation,
@@ -1179,7 +1187,7 @@ describe('LocalAgentExecutor', () => {
                   ],
                   error: undefined,
                   errorType: undefined,
-                  contentLength: undefined,
+                  contentLength: 0,
                 },
               };
             }),
@@ -1217,10 +1225,10 @@ describe('LocalAgentExecutor', () => {
       expect(parts).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            functionResponse: expect.objectContaining({ id: 'c1' }),
+            functionResponse: expect.objectContaining({ name: LS_TOOL_NAME }),
           }),
           expect.objectContaining({
-            functionResponse: expect.objectContaining({ id: 'c2' }),
+            functionResponse: expect.objectContaining({ name: LS_TOOL_NAME }),
           }),
         ]),
       );
@@ -1418,7 +1426,7 @@ describe('LocalAgentExecutor', () => {
       ]);
       mockScheduleAgentTools.mockResolvedValueOnce([
         {
-          status: 'error',
+          status: CoreToolCallStatus.Error,
           request: {
             callId: 'call1',
             name: LS_TOOL_NAME,
@@ -1490,6 +1498,93 @@ describe('LocalAgentExecutor', () => {
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
       expect(output.result).toBe('Aborted due to tool failure.');
+    });
+
+    it('should handle a soft tool rejection (outcome: Cancel) and provide direct instructions to the model', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME]);
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1: Model calls a tool that will be rejected
+      mockModelResponse([
+        { name: LS_TOOL_NAME, args: { path: '/secret' }, id: 'call1' },
+      ]);
+      mockScheduleAgentTools.mockResolvedValueOnce([
+        {
+          status: 'cancelled',
+          request: {
+            callId: 'call1',
+            name: LS_TOOL_NAME,
+            args: { path: '/secret' },
+            isClientInitiated: false,
+            prompt_id: 'test-prompt',
+          },
+          tool: {} as AnyDeclarativeTool,
+          invocation: {} as AnyToolInvocation,
+          outcome: ToolConfirmationOutcome.Cancel, // Soft rejection
+          response: {
+            callId: 'call1',
+            resultDisplay: '',
+            responseParts: [
+              {
+                functionResponse: {
+                  name: LS_TOOL_NAME,
+                  response: {
+                    error:
+                      '[Operation Cancelled] Reason: User denied execution.',
+                  },
+                  id: 'call1',
+                },
+              },
+            ],
+            error: undefined,
+            errorType: undefined,
+            contentLength: 0,
+          },
+        },
+      ]);
+
+      // Turn 2: Model sees the rejection + consolidated instructions and completes
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'User rejected access to /secret.' },
+          id: 'call2',
+        },
+      ]);
+
+      const output = await executor.run(
+        { goal: 'Soft rejection test' },
+        signal,
+      );
+
+      // Verify the activity stream reported the consolidated instruction
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'ERROR',
+          data: expect.objectContaining({
+            context: 'tool_call',
+            name: LS_TOOL_NAME,
+            error: expect.stringContaining('User rejected this operation'),
+          }),
+        }),
+      );
+
+      // Verify the instruction was sent back to the model as the tool error
+      const turn2Params = getMockMessageParams(1);
+      const parts = turn2Params.message as Part[];
+      const errorMsg = parts[0].functionResponse?.response?.['error'];
+      expect(typeof errorMsg).toBe('string');
+      if (typeof errorMsg === 'string') {
+        expect(errorMsg).toContain('User rejected this operation');
+        expect(errorMsg).toContain('acknowledge this, rethink your strategy');
+      }
+
+      expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
+      expect(output.result).toBe('User rejected access to /secret.');
     });
   });
 

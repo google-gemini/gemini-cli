@@ -18,7 +18,10 @@ import {
 import { ToolRegistry } from '../tools/tool-registry.js';
 import { PromptRegistry } from '../prompts/prompt-registry.js';
 import { ResourceRegistry } from '../resources/resource-registry.js';
-import { type AnyDeclarativeTool } from '../tools/tools.js';
+import {
+  type AnyDeclarativeTool,
+  ToolConfirmationOutcome,
+} from '../tools/tools.js';
 import {
   DiscoveredMCPTool,
   isMcpToolName,
@@ -1215,16 +1218,41 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
             error: call.response.error?.message || 'Unknown error',
           });
         } else if (call.status === 'cancelled') {
-          this.emitActivity('ERROR', {
-            context: 'tool_call',
-            name: toolName,
-            callId: call.request.callId,
-            error: 'Request cancelled.',
-          });
-          aborted = true;
+          const isSoftRejection =
+            call.outcome === ToolConfirmationOutcome.Cancel;
+
+          if (isSoftRejection) {
+            const error = `User rejected this operation. Please acknowledge this, rethink your strategy, and try a different approach. If you cannot proceed without the rejected operation, summarize the issue and use \`${TASK_COMPLETE_TOOL_NAME}\` to report your findings and the blocker.`;
+            this.emitActivity('ERROR', {
+              context: 'tool_call',
+              name: toolName,
+              callId: call.request.callId,
+              error,
+            });
+            // Soft rejection: we do NOT set aborted=true, allowing the agent to rethink.
+
+            // Provide the direct instruction to the model as the tool error response.
+            syncResults.set(call.request.callId, {
+              functionResponse: {
+                name: toolName,
+                id: call.request.callId,
+                response: { error },
+              },
+            });
+            continue; // Skip the generic syncResults.set below
+          } else {
+            // Hard abort (Ctrl+C)
+            this.emitActivity('ERROR', {
+              context: 'tool_call',
+              name: toolName,
+              callId: call.request.callId,
+              error: 'Request cancelled.',
+            });
+            aborted = true;
+          }
         }
 
-        // Add result to syncResults to preserve order later
+        // Add result to syncResults for other statuses (success, error, hard abort)
         syncResults.set(call.request.callId, call.response.responseParts[0]);
       }
     }
@@ -1335,7 +1363,8 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 Important Rules:
 * You are running in a non-interactive mode. You CANNOT ask the user for input or clarification.
 * Work systematically using available tools to complete your task.
-* Always use absolute paths for file operations. Construct them using the provided "Environment Context".`;
+* Always use absolute paths for file operations. Construct them using the provided "Environment Context".
+* If a tool call is rejected by the user, acknowledge the rejection, rethink your strategy, and try a different approach. Do not repeatedly attempt the same rejected operation.`;
 
     if (this.definition.outputConfig) {
       finalPrompt += `
