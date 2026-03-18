@@ -215,12 +215,13 @@ and full builds) to a dedicated, high-performance GCP worker.
 
   console.log(`\n📦 Synchronizing Logic & Credentials...`);
   await provider.exec(`mkdir -p ~/dev/main ~/.gemini/policies ~/.workspaces/scripts`);
-  await provider.sync('.gemini/skills/workspaces/scripts/', `${persistentScripts}/`, { delete: true });
-  await provider.sync('.gemini/skills/workspaces/policy.toml', `~/.gemini/policies/workspace-policy.toml`);
+  await provider.sync('.gemini/skills/workspaces/scripts/', `${persistentScripts}/`, { delete: true, sudo: true });
+  await provider.sync('.gemini/skills/workspaces/policy.toml', `~/.gemini/policies/workspace-policy.toml`, { sudo: true });
 
   if (fs.existsSync(path.join(env.HOME || '', '.gemini/google_accounts.json'))) {
-    await provider.sync(path.join(env.HOME || '', '.gemini/google_accounts.json'), `~/.gemini/google_accounts.json`);
+    await provider.sync(path.join(env.HOME || '', '.gemini/google_accounts.json'), `${remoteConfigDir}/google_accounts.json`, { sudo: true });
   }
+
 
   if (githubToken) {
     await provider.exec(`mkdir -p ~/.workspaces && echo ${githubToken} > ~/.workspaces/.gh_token && chmod 600 ~/.workspaces/.gh_token`);
@@ -239,12 +240,12 @@ and full builds) to a dedicated, high-performance GCP worker.
   };
   const tmpSettingsPath = path.join(os.tmpdir(), `remote-settings-${Date.now()}.json`);
   fs.writeFileSync(tmpSettingsPath, JSON.stringify(remoteSettings, null, 2));
-  await provider.sync(tmpSettingsPath, `${remoteConfigDir}/settings.json`);
+  await provider.sync(tmpSettingsPath, `${remoteConfigDir}/settings.json`, { sudo: true });
   fs.unlinkSync(tmpSettingsPath);
 
   // Sync credentials into the isolated config as well
   if (fs.existsSync(path.join(env.HOME || '', '.gemini/google_accounts.json'))) {
-    await provider.sync(path.join(env.HOME || '', '.gemini/google_accounts.json'), `${remoteConfigDir}/google_accounts.json`);
+    await provider.sync(path.join(env.HOME || '', '.gemini/google_accounts.json'), `${remoteConfigDir}/google_accounts.json`, { sudo: true });
   }
 
   // Final Repo Sync
