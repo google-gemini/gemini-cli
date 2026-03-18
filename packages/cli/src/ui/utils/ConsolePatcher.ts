@@ -50,14 +50,15 @@ export class ConsolePatcher {
   private patchConsoleMethod =
     (type: 'log' | 'warn' | 'error' | 'debug' | 'info') =>
     (...args: unknown[]) => {
-      // When it is non interactive mode, do not show info logging.
-      // default to true if it is undefined
+      // When it is non interactive mode, do not show info logging unless
+      // it is debug mode. default to true if it is undefined.
       if (this.params.interactive === false) {
         if ((type === 'info' || type === 'log') && !this.params.debugMode) {
           return;
         }
       }
       // When it is stderr only mode, all console output redirect to stderr
+      // if it is debug mode.
       if (this.params.stderr) {
         if (type !== 'debug' || this.params.debugMode) {
           this.originalConsoleError(this.formatArgs(args));
