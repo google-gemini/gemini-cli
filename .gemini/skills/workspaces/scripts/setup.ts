@@ -9,7 +9,7 @@ import { ProviderFactory } from './providers/ProviderFactory.ts';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
-async function prompt(question: string, defaultValue: string, explanation?: string): Promise<string> {
+async function prompt(question: string, defaultValue: string, explanation?: string, sensitive: boolean = false): Promise<string> {
   const autoAccept = process.argv.includes('--yes') || process.argv.includes('-y');
   if (autoAccept && defaultValue) return defaultValue;
 
@@ -17,9 +17,10 @@ async function prompt(question: string, defaultValue: string, explanation?: stri
       console.log(`\n📖 ${explanation}`);
   }
 
+  const displayDefault = sensitive && defaultValue ? `${defaultValue.substring(0, 4)}...${defaultValue.substring(defaultValue.length - 4)}` : defaultValue;
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
-    rl.question(`❓ ${question} (default: ${defaultValue}, <Enter> to use default): `, (answer) => {
+    rl.question(`❓ ${question} (default: ${displayDefault || 'none'}, <Enter> to use default): `, (answer) => {
       rl.close();
       resolve(answer.trim() || defaultValue);
     });
@@ -195,7 +196,7 @@ and full builds) to a dedicated, high-performance GCP worker.
 
   if (authStrategy === 'gemini-api-key' && !geminiApiKey) {
       console.log('\n📖 In API Key mode, the remote worker needs your Gemini API Key to authenticate.');
-      geminiApiKey = await prompt('Paste Gemini API Key', '');
+      geminiApiKey = await prompt('Paste Gemini API Key', '', undefined, true);
   }
 
   // 5. Save Confirmed State
