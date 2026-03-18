@@ -60,7 +60,7 @@ export class GceCosProvider implements WorkerProvider {
 
     console.log(`🚀 Provisioning GCE COS worker: ${this.instanceName}...`);
 
-    const startupScript = `#!/bin/bash
+    const startupScriptContent = `#!/bin/bash
       set -e
       echo "🚀 Starting Maintainer Worker Resilience Loop..."
 
@@ -83,6 +83,8 @@ export class GceCosProvider implements WorkerProvider {
       echo "✅ Maintainer Worker is active."
     `;
 
+    const tmpScriptPath = path.join(os.tmpdir(), `gcli-startup-${Date.now()}.sh`);
+    fs.writeFileSync(tmpScriptPath, startupScriptContent);
 
     const result = spawnSync('gcloud', [
       'compute', 'instances', 'create', this.instanceName,
@@ -93,11 +95,15 @@ export class GceCosProvider implements WorkerProvider {
       '--image-project', 'cos-cloud',
       '--boot-disk-size', '200GB',
       '--boot-disk-type', 'pd-balanced',
-      '--metadata', `startup-script=${startupScript},enable-oslogin=TRUE`,
+      '--metadata-from-file', `startup-script=${tmpScriptPath}`,
+      '--metadata', 'enable-oslogin=TRUE',
       '--network-interface', `network=${vpcName},subnet=${subnetName},no-address`,
       '--scopes', 'https://www.googleapis.com/auth/cloud-platform',
       '--quiet'
     ], { stdio: 'inherit' });
+
+    fs.unlinkSync(tmpScriptPath);
+
 
     if (result.status === 0) {
       console.log('⏳ Waiting for OS Login and SSH to initialize (this takes ~45s)...');
