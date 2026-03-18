@@ -91,6 +91,7 @@ import {
   type LocalAgentDefinition,
   type SubagentActivityEvent,
   type OutputConfig,
+  SubagentActivityErrorType,
 } from './types.js';
 import {
   ToolConfirmationOutcome,
@@ -1021,6 +1022,7 @@ describe('LocalAgentExecutor', () => {
           data: expect.objectContaining({
             context: 'protocol_violation',
             error: expectedError,
+            errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
       );
@@ -1066,6 +1068,7 @@ describe('LocalAgentExecutor', () => {
             context: 'tool_call',
             name: TASK_COMPLETE_TOOL_NAME,
             error: expectedError,
+            errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
       );
@@ -1299,6 +1302,7 @@ describe('LocalAgentExecutor', () => {
           data: expect.objectContaining({
             context: 'tool_call_unauthorized',
             name: READ_FILE_TOOL_NAME,
+            errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
       );
@@ -1352,6 +1356,7 @@ describe('LocalAgentExecutor', () => {
             context: 'tool_call',
             name: TASK_COMPLETE_TOOL_NAME,
             error: expect.stringContaining('Output validation failed'),
+            errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
       );
@@ -1398,6 +1403,7 @@ describe('LocalAgentExecutor', () => {
           type: 'ERROR',
           data: expect.objectContaining({
             error: `Error: Failed to create chat object: ${getErrorMessage(initError)}`,
+            errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
       );
@@ -1477,6 +1483,7 @@ describe('LocalAgentExecutor', () => {
             context: 'tool_call',
             name: LS_TOOL_NAME,
             error: toolErrorMessage,
+            errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
       );
@@ -1569,6 +1576,7 @@ describe('LocalAgentExecutor', () => {
             context: 'tool_call',
             name: LS_TOOL_NAME,
             error: expect.stringContaining('User rejected this operation'),
+            errorType: SubagentActivityErrorType.REJECTED,
           }),
         }),
       );
@@ -1585,6 +1593,69 @@ describe('LocalAgentExecutor', () => {
 
       expect(output.terminate_reason).toBe(AgentTerminateMode.GOAL);
       expect(output.result).toBe('User rejected access to /secret.');
+    });
+
+    it('should handle a hard tool abort (cancelled with no outcome) and terminate the agent', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME]);
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        mockConfig,
+        onActivity,
+      );
+
+      // Turn 1: Model calls a tool that will be aborted (e.g. Ctrl+C)
+      mockModelResponse([
+        { name: LS_TOOL_NAME, args: { path: '/secret' }, id: 'call1' },
+      ]);
+      mockScheduleAgentTools.mockResolvedValueOnce([
+        {
+          status: 'cancelled',
+          request: {
+            callId: 'call1',
+            name: LS_TOOL_NAME,
+            args: { path: '/secret' },
+            isClientInitiated: false,
+            prompt_id: 'test-prompt',
+          },
+          tool: {} as AnyDeclarativeTool,
+          invocation: {} as AnyToolInvocation,
+          outcome: undefined, // Hard abort
+          response: {
+            callId: 'call1',
+            resultDisplay: '',
+            responseParts: [
+              {
+                functionResponse: {
+                  name: LS_TOOL_NAME,
+                  response: { error: 'Request cancelled.' },
+                  id: 'call1',
+                },
+              },
+            ],
+            error: undefined,
+            errorType: undefined,
+            contentLength: 0,
+          },
+        },
+      ]);
+
+      const output = await executor.run({ goal: 'Hard abort test' }, signal);
+
+      // Verify the activity stream reported the cancellation
+      expect(activities).toContainEqual(
+        expect.objectContaining({
+          type: 'ERROR',
+          data: expect.objectContaining({
+            context: 'tool_call',
+            name: LS_TOOL_NAME,
+            error: 'Request cancelled.',
+            errorType: SubagentActivityErrorType.CANCELLED,
+          }),
+        }),
+      );
+
+      // Agent should terminate with ABORTED status
+      expect(output.terminate_reason).toBe(AgentTerminateMode.ABORTED);
     });
   });
 
@@ -1780,6 +1851,7 @@ describe('LocalAgentExecutor', () => {
           data: expect.objectContaining({
             context: 'timeout',
             error: 'Agent timed out after 0.5 minutes.',
+            errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
       );
@@ -1968,6 +2040,7 @@ describe('LocalAgentExecutor', () => {
           data: expect.objectContaining({
             context: 'recovery_turn',
             error: 'Graceful recovery attempt failed. Reason: stop',
+            errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
       );
@@ -2051,6 +2124,7 @@ describe('LocalAgentExecutor', () => {
           data: expect.objectContaining({
             context: 'recovery_turn',
             error: 'Graceful recovery attempt failed. Reason: stop',
+            errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
       );
@@ -2172,6 +2246,7 @@ describe('LocalAgentExecutor', () => {
           data: expect.objectContaining({
             context: 'recovery_turn',
             error: 'Graceful recovery attempt failed. Reason: stop',
+            errorType: SubagentActivityErrorType.GENERIC,
           }),
         }),
       );

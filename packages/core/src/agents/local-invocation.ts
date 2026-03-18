@@ -18,6 +18,9 @@ import {
   type SubagentProgress,
   type SubagentActivityItem,
   AgentTerminateMode,
+  SubagentActivityErrorType,
+  SUBAGENT_REJECTED_ERROR_PREFIX,
+  SUBAGENT_CANCELLED_ERROR_MESSAGE,
 } from './types.js';
 import { randomUUID } from 'node:crypto';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
@@ -171,10 +174,14 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
           }
           case 'ERROR': {
             const error = String(activity.data['error']);
-            const isCancellation = error === 'Request cancelled.';
-            const isRejection = error.startsWith(
-              'User rejected this operation.',
-            );
+            const errorType = activity.data['errorType'];
+            const isCancellation =
+              errorType === SubagentActivityErrorType.CANCELLED ||
+              error === SUBAGENT_CANCELLED_ERROR_MESSAGE;
+            const isRejection =
+              errorType === SubagentActivityErrorType.REJECTED ||
+              error.startsWith(SUBAGENT_REJECTED_ERROR_PREFIX);
+
             const toolName = activity.data['name']
               ? String(activity.data['name'])
               : undefined;
@@ -187,6 +194,19 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
                   recentActivity[i].status === 'running'
                 ) {
                   recentActivity[i].status = 'cancelled';
+                  updated = true;
+                  break;
+                }
+              }
+            } else if (toolName) {
+              // Mark non-rejection/non-cancellation errors as 'error'
+              for (let i = recentActivity.length - 1; i >= 0; i--) {
+                if (
+                  recentActivity[i].type === 'tool_call' &&
+                  recentActivity[i].content === toolName &&
+                  recentActivity[i].status === 'running'
+                ) {
+                  recentActivity[i].status = 'error';
                   updated = true;
                   break;
                 }

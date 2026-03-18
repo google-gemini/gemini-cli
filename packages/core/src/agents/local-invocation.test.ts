@@ -19,6 +19,8 @@ import {
   type SubagentActivityEvent,
   type AgentInputs,
   type SubagentProgress,
+  SubagentActivityErrorType,
+  SUBAGENT_REJECTED_ERROR_PREFIX,
 } from './types.js';
 import { LocalSubagentInvocation } from './local-invocation.js';
 import { LocalAgentExecutor } from './local-executor.js';
@@ -321,8 +323,8 @@ describe('LocalSubagentInvocation', () => {
             data: {
               name: 'ls',
               callId: 'call1',
-              error:
-                'User rejected this operation. Please acknowledge this, rethink your strategy, and try a different approach. If you cannot proceed without the rejected operation, summarize the issue and use `complete_task` to report your findings and the blocker.',
+              error: `${SUBAGENT_REJECTED_ERROR_PREFIX} Please acknowledge this, rethink your strategy, and try a different approach. If you cannot proceed without the rejected operation, summarize the issue and use \`complete_task\` to report your findings and the blocker.`,
+              errorType: SubagentActivityErrorType.REJECTED,
             },
           } as SubagentActivityEvent);
         }
@@ -335,7 +337,7 @@ describe('LocalSubagentInvocation', () => {
       await invocation.execute(signal, updateOutput);
 
       expect(updateOutput).toHaveBeenCalledTimes(4);
-      const lastCall = updateOutput.mock.calls[3][0];
+      const lastCall = updateOutput.mock.calls[3][0] as SubagentProgress;
       expect(lastCall.recentActivity).toContainEqual(
         expect.objectContaining({
           type: 'tool_call',
