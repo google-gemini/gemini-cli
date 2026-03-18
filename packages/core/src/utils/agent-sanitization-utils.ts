@@ -81,11 +81,33 @@ export function sanitizeErrorMessage(message: string): string {
 
   let sanitized = message;
 
-  // 1. Redact inline PEM content
-  sanitized = sanitized.replace(
-    /-----BEGIN[^-]+-----[\s\S]*?-----END[^-]+-----/g,
-    '[REDACTED_PEM]',
-  );
+  // 1. Redact inline PEM content (Safe iterative approach to avoid ReDoS)
+  let startIndex = 0;
+  while ((startIndex = sanitized.indexOf('-----BEGIN', startIndex)) !== -1) {
+    const endOfBegin = sanitized.indexOf('-----', startIndex + 10);
+    if (endOfBegin === -1) {
+      break; // No closing dashes for the BEGIN header
+    }
+
+    // Find the END header
+    const endHeaderStart = sanitized.indexOf('-----END', endOfBegin + 5);
+    if (endHeaderStart === -1) {
+      break; // No END header found
+    }
+
+    const endHeaderEnd = sanitized.indexOf('-----', endHeaderStart + 8);
+    if (endHeaderEnd === -1) {
+      break; // No closing dashes for the END header
+    }
+
+    // We found a complete block. Replace it.
+    const before = sanitized.substring(0, startIndex);
+    const after = sanitized.substring(endHeaderEnd + 5);
+    sanitized = before + '[REDACTED_PEM]' + after;
+
+    // Resume searching after the redacted block
+    startIndex = before.length + 14; // length of '[REDACTED_PEM]'
+  }
 
   const unquotedValue = `[^\\s]+(?:\\s+(?![a-zA-Z0-9_.-]+(?:=|:))[^\\s=:<>]+)*`;
   const valuePattern = `(?:"[^"]*"|'[^']*'|${unquotedValue})`;
