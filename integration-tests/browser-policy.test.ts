@@ -140,24 +140,18 @@ priority = 100
       },
     });
 
-    await run.type(
+    await run.sendKeys(
       'Open https://example.com and check if there is a heading\r',
     );
+    await run.sendKeys('\r');
 
     // Handle confirmations.
     // 1. Initial browser_agent delegation (likely only 3 options, so use option 1: Allow once)
     await poll(
-      () => {
-        const output = stripAnsi(run.output).toLowerCase();
-        return (
-          output.includes('action required') && output.includes('browser_agent')
-        );
-      },
+      () => stripAnsi(run.output).toLowerCase().includes('action required'),
       60000,
       1000,
     );
-    // Add a small delay to ensure UI is ready for input
-    await new Promise((r) => setTimeout(r, 1000));
     await run.sendKeys('1');
     await new Promise((r) => setTimeout(r, 2000));
 
@@ -166,12 +160,10 @@ priority = 100
       () => {
         const stripped = stripAnsi(run.output).toLowerCase();
         return (
-          stripped.includes('action required') &&
-          stripped.includes('new_page') &&
-          stripped.includes('browser_agent')
+          stripped.includes('action required') && stripped.includes('new_page')
         );
       },
-      120000,
+      60000,
       1000,
     );
 
@@ -179,8 +171,6 @@ priority = 100
       throw new Error('Timed out waiting for new_page confirmation');
     }
 
-    // Add a small delay to ensure UI is ready for input
-    await new Promise((r) => setTimeout(r, 1000));
     // Select "Allow all server tools for this session" (option 3)
     await run.sendKeys('3');
     await new Promise((r) => setTimeout(r, 5000));
