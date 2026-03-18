@@ -6,6 +6,7 @@
 
 import { renderWithProviders } from '../../test-utils/render.js';
 import { createMockSettings } from '../../test-utils/settings.js';
+import { makeFakeConfig } from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
 import { act, useState } from 'react';
 import {
@@ -3512,7 +3513,10 @@ describe('InputPrompt', () => {
         <TestWrapper />,
         {
           mouseEventsEnabled: true,
-          useAlternateBuffer: true,
+          config: makeFakeConfig({ useAlternateBuffer: true }),
+          settings: createMockSettings({
+            merged: { ui: { useAlternateBuffer: true } },
+          }),
           uiActions,
         },
       );
@@ -3603,7 +3607,10 @@ describe('InputPrompt', () => {
         <TestWrapper />,
         {
           mouseEventsEnabled: true,
-          useAlternateBuffer: true,
+          config: makeFakeConfig({ useAlternateBuffer: true }),
+          settings: createMockSettings({
+            merged: { ui: { useAlternateBuffer: true } },
+          }),
           uiActions,
         },
       );

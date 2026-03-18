@@ -4,10 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { renderHook } from '../../test-utils/render.js';
-import type React from 'react';
+import { renderHookWithProviders } from '../../test-utils/render.js';
 import { act } from 'react';
-import { MouseProvider, useMouseContext, useMouse } from './MouseContext.js';
+import { useMouseContext, useMouse } from './MouseContext.js';
 import { vi, type Mock } from 'vitest';
 import { useStdin } from 'ink';
 import { EventEmitter } from 'node:events';
@@ -49,7 +48,6 @@ class MockStdin extends EventEmitter {
 
 describe('MouseContext', () => {
   let stdin: MockStdin;
-  let wrapper: React.FC<{ children: React.ReactNode }>;
 
   beforeEach(() => {
     stdin = new MockStdin();
@@ -57,9 +55,6 @@ describe('MouseContext', () => {
       stdin,
       setRawMode: vi.fn(),
     });
-    wrapper = ({ children }: { children: React.ReactNode }) => (
-      <MouseProvider mouseEventsEnabled={true}>{children}</MouseProvider>
-    );
     vi.mocked(appEvents.emit).mockClear();
   });
 
@@ -69,7 +64,9 @@ describe('MouseContext', () => {
 
   it('should subscribe and unsubscribe a handler', () => {
     const handler = vi.fn();
-    const { result } = renderHook(() => useMouseContext(), { wrapper });
+    const { result } = renderHookWithProviders(() => useMouseContext(), {
+      mouseEventsEnabled: true,
+    });
 
     act(() => {
       result.current.subscribe(handler);
@@ -94,8 +91,8 @@ describe('MouseContext', () => {
 
   it('should not call handler if not active', () => {
     const handler = vi.fn();
-    renderHook(() => useMouse(handler, { isActive: false }), {
-      wrapper,
+    renderHookWithProviders(() => useMouse(handler, { isActive: false }), {
+      mouseEventsEnabled: true,
     });
 
     act(() => {
@@ -106,7 +103,9 @@ describe('MouseContext', () => {
   });
 
   it('should emit SelectionWarning when move event is unhandled and has coordinates', () => {
-    renderHook(() => useMouseContext(), { wrapper });
+    renderHookWithProviders(() => useMouseContext(), {
+      mouseEventsEnabled: true,
+    });
 
     act(() => {
       // Move event (32) at 10, 20
@@ -118,7 +117,9 @@ describe('MouseContext', () => {
 
   it('should not emit SelectionWarning when move event is handled', () => {
     const handler = vi.fn().mockReturnValue(true);
-    const { result } = renderHook(() => useMouseContext(), { wrapper });
+    const { result } = renderHookWithProviders(() => useMouseContext(), {
+      mouseEventsEnabled: true,
+    });
 
     act(() => {
       result.current.subscribe(handler);
@@ -218,7 +219,9 @@ describe('MouseContext', () => {
       'should recognize sequence "$sequence" as $expected.name',
       ({ sequence, expected }) => {
         const mouseHandler = vi.fn();
-        const { result } = renderHook(() => useMouseContext(), { wrapper });
+        const { result } = renderHookWithProviders(() => useMouseContext(), {
+          mouseEventsEnabled: true,
+        });
         act(() => result.current.subscribe(mouseHandler));
 
         act(() => stdin.write(sequence));
@@ -232,7 +235,9 @@ describe('MouseContext', () => {
 
   it('should emit a double-click event when two left-presses occur quickly at the same position', () => {
     const handler = vi.fn();
-    const { result } = renderHook(() => useMouseContext(), { wrapper });
+    const { result } = renderHookWithProviders(() => useMouseContext(), {
+      mouseEventsEnabled: true,
+    });
 
     act(() => {
       result.current.subscribe(handler);
@@ -262,7 +267,9 @@ describe('MouseContext', () => {
 
   it('should NOT emit a double-click event if clicks are too far apart', () => {
     const handler = vi.fn();
-    const { result } = renderHook(() => useMouseContext(), { wrapper });
+    const { result } = renderHookWithProviders(() => useMouseContext(), {
+      mouseEventsEnabled: true,
+    });
 
     act(() => {
       result.current.subscribe(handler);
@@ -287,7 +294,9 @@ describe('MouseContext', () => {
   it('should NOT emit a double-click event if too much time passes', async () => {
     vi.useFakeTimers();
     const handler = vi.fn();
-    const { result } = renderHook(() => useMouseContext(), { wrapper });
+    const { result } = renderHookWithProviders(() => useMouseContext(), {
+      mouseEventsEnabled: true,
+    });
 
     act(() => {
       result.current.subscribe(handler);

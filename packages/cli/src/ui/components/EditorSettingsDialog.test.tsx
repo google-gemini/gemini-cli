@@ -4,11 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { render } from '../../test-utils/render.js';
+import { renderWithProviders } from '../../test-utils/render.js';
 import { EditorSettingsDialog } from './EditorSettingsDialog.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SettingScope, type LoadedSettings } from '../../config/settings.js';
-import { KeypressProvider } from '../contexts/KeypressContext.js';
 import { act } from 'react';
 import { waitFor } from '../../test-utils/async.js';
 import { debugLogger } from '@google/gemini-cli-core';
@@ -52,8 +51,8 @@ describe('EditorSettingsDialog', () => {
     vi.clearAllMocks();
   });
 
-  const renderWithProvider = (ui: React.ReactNode) =>
-    render(<KeypressProvider>{ui}</KeypressProvider>);
+  const renderWithProvider = (ui: React.ReactElement) =>
+    renderWithProviders(ui);
 
   it('renders correctly', async () => {
     const { lastFrame, waitUntilReady } = renderWithProvider(
