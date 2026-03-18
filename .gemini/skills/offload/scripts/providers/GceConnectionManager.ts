@@ -56,7 +56,9 @@ export class GceConnectionManager {
 
   sync(localPath: string, remotePath: string, options: { delete?: boolean; exclude?: string[] } = {}): number {
     const fullRemote = this.getMagicRemote();
-    const rsyncArgs = ['-avz', '--quiet'];
+    // We use --no-t and --no-perms to avoid "Operation not permitted" errors 
+    // when syncing to volumes that might have UID mismatches with the container.
+    const rsyncArgs = ['-rvz', '--quiet', '--no-t', '--no-perms', '--no-owner', '--no-group'];
     if (options.delete) rsyncArgs.push('--delete');
     if (options.exclude) options.exclude.forEach(ex => rsyncArgs.push(`--exclude="${ex}"`));
 

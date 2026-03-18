@@ -54,8 +54,8 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   
   if (check.status !== 0) {
     console.log('   - Provisioning isolated git worktree...');
-    // Fix permissions first
-    await provider.exec(`sudo docker exec -u root maintainer-worker chown -R node:node ${containerHome}/dev`);
+    // Only re-own the worktrees directory, NOT the entire home dir or scripts
+    await provider.exec(`sudo docker exec -u root maintainer-worker mkdir -p ${containerHome}/dev/worktrees && sudo docker exec -u root maintainer-worker chown -R node:node ${containerHome}/dev/worktrees`);
     
     const setupCmd = `
       git config --global --add safe.directory ${remoteWorkDir} && \
