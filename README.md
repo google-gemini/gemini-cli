@@ -121,6 +121,8 @@ npm install -g @google/gemini-cli@nightly
     Strategy".
   - **\_ux_finish-pr**: Co-author assistant for authors to cross the finish line
     with UX polish and CI fixes.
+  - **\_ux_designer**: Lead UX Designer expert to review React/Ink components
+    against the v1.0 Design Principles (Density, Progressive Disclosure, State).
 - Automate operational tasks like querying pull requests or handling complex
   rebases
 - Use MCP servers to connect new capabilities, including

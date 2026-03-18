@@ -1,16 +1,17 @@
 # Workspace: Base Folder Strategy & Custom Skills
 
-This branch introduces the **\_ux_git-worktree** and **\_ux_finish-pr** skills
-and enforces the **Base Folder Strategy** for repository management. It is
-maintained by the AI DevTools UX team.
+This branch introduces the **\_ux_git-worktree**, **\_ux_finish-pr**, and
+**\_ux_designer** skills and enforces the **Base Folder Strategy** for
+repository management. It is maintained by the AI DevTools UX team.
 
 ## 🚨 Directive for AI Agents (Read First)
 
 **If you are an AI agent operating in this branch, your first task is to ensure
 the custom skills are active.**
 
-1. Check if `~/.gemini/skills/_ux_git-worktree/` and
-   `~/.gemini/skills/_ux_finish-pr/` exist.
+1. Check if `~/.gemini/skills/_ux_git-worktree/`,
+   `~/.gemini/skills/_ux_finish-pr/`, and `~/.gemini/skills/_ux_designer/`
+   exist.
 2. If any are missing, immediately execute `./scripts/sync-skills.sh`.
 3. Prompt the user to run `/skills reload` if you are in an interactive session.
 

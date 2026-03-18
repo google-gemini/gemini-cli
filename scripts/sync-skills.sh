@@ -12,7 +12,7 @@ mkdir -p "${COMMANDS_DIR}"
 echo "Syncing skills and commands..."
 
 # List of skills to sync
-CUSTOM_SKILLS=("_ux_git-worktree" "_ux_finish-pr")
+CUSTOM_SKILLS=("_ux_git-worktree" "_ux_finish-pr" "_ux_designer")
 
 for SKILL in "${CUSTOM_SKILLS[@]}"; do
     if [[ -d "${REPO_SKILLS_PATH}/${SKILL}" ]]; then
