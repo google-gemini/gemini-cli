@@ -639,7 +639,7 @@ export class GeminiChat {
       return this.context.config.getContentGenerator().generateContentStream(
         {
           model: modelToUse,
-          contents: contentsToUse,
+          contents: sanitizeContentsForApi(contentsToUse),
           config,
         },
         prompt_id,
@@ -1072,4 +1072,36 @@ export function isSchemaDepthError(errorMessage: string): boolean {
 
 export function isInvalidArgumentError(errorMessage: string): boolean {
   return errorMessage.includes('Request contains an invalid argument');
+}
+
+/**
+ * Strips the `id` field from `functionResponse` parts before sending to the
+ * Gemini API. The `id` field is used internally for call tracking but is not
+ * accepted by the v1 API endpoint, which causes 400 INVALID_ARGUMENT errors.
+ *
+ * See: https://github.com/google-gemini/gemini-cli/issues/13972
+ * See: https://github.com/google-gemini/gemini-cli/issues/22183
+ */
+/** Visible for Testing */
+export function sanitizeContentsForApi(contents: Content[]): Content[] {
+  return contents.map((content) => {
+    if (!content.parts?.some((part) => part.functionResponse?.id)) {
+      return content;
+    }
+
+    return {
+      ...content,
+      parts: content.parts.map((part) => {
+        if (!part.functionResponse?.id) {
+          return part;
+        }
+
+        const { id: _id, ...sanitizedResponse } = part.functionResponse;
+        return {
+          ...part,
+          functionResponse: sanitizedResponse,
+        };
+      }),
+    };
+  });
 }
