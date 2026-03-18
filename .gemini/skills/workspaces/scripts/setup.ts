@@ -141,21 +141,26 @@ and full builds) to a dedicated, high-performance GCP worker.
   // 3. Security & Auth
   let githubToken = env.WORKSPACE_GH_TOKEN || '';
   if (!githubToken) {
-      const shouldGenToken = await confirm('\nGenerate a scoped GitHub token for the remote agent? (Highly Recommended)');
-      if (shouldGenToken) {
-          const baseUrl = 'https://github.com/settings/personal-access-tokens/new';
-          const name = `Workspace-${env.USER}`;
-          const repoParams = userFork !== upstreamRepo 
-              ? `&repositories[]=${encodeURIComponent(upstreamRepo)}&repositories[]=${encodeURIComponent(userFork)}`
-              : `&repositories[]=${encodeURIComponent(upstreamRepo)}`;
-
-          const magicLink = `${baseUrl}?name=${encodeURIComponent(name)}&description=Gemini+Workspaces+Worker${repoParams}&contents=write&pull_requests=write&metadata=read`;
-          const terminalLink = `\u001b]8;;${magicLink}\u0007${magicLink}\u001b]8;;\u0007`;
-
-          console.log(`\n🔐 ACTION REQUIRED: Create a token with "Read/Write" access to contents & PRs:`);
-          console.log(`\n${terminalLink}\n`);
-          
+      const hasToken = await confirm('\nDo you already have a GitHub Personal Access Token (PAT) with "Read/Write" access to contents & PRs?');
+      if (hasToken) {
           githubToken = await prompt('Paste Scoped Token', '');
+      } else {
+          const shouldGenToken = await confirm('Would you like to generate a new scoped token now? (Highly Recommended)');
+          if (shouldGenToken) {
+              const baseUrl = 'https://github.com/settings/personal-access-tokens/new';
+              const name = `Workspace-${env.USER}`;
+              const repoParams = userFork !== upstreamRepo 
+                  ? `&repositories[]=${encodeURIComponent(upstreamRepo)}&repositories[]=${encodeURIComponent(userFork)}`
+                  : `&repositories[]=${encodeURIComponent(upstreamRepo)}`;
+
+              const magicLink = `${baseUrl}?name=${encodeURIComponent(name)}&description=Gemini+Workspaces+Worker${repoParams}&contents=write&pull_requests=write&metadata=read`;
+              const terminalLink = `\u001b]8;;${magicLink}\u0007${magicLink}\u001b]8;;\u0007`;
+
+              console.log(`\n🔐 ACTION REQUIRED: Create a token with the required permissions:`);
+              console.log(`\n${terminalLink}\n`);
+              
+              githubToken = await prompt('Paste Scoped Token', '');
+          }
       }
   } else {
       console.log('   ✅ Using GitHub token from environment (WORKSPACE_GH_TOKEN).');
