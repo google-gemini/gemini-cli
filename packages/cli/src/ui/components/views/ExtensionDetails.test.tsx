@@ -5,11 +5,10 @@
  */
 
 import React from 'react';
-import { render } from '../../../test-utils/render.js';
+import { renderWithProviders } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ExtensionDetails } from './ExtensionDetails.js';
-import { KeypressProvider } from '../../contexts/KeypressContext.js';
 import { type RegistryExtension } from '../../../config/extensionRegistryClient.js';
 
 const mockExtension: RegistryExtension = {
@@ -43,15 +42,13 @@ describe('ExtensionDetails', () => {
   });
 
   const renderDetails = (isInstalled = false) =>
-    render(
-      <KeypressProvider>
-        <ExtensionDetails
-          extension={mockExtension}
-          onBack={mockOnBack}
-          onInstall={mockOnInstall}
-          isInstalled={isInstalled}
-        />
-      </KeypressProvider>,
+    renderWithProviders(
+      <ExtensionDetails
+        extension={mockExtension}
+        onBack={mockOnBack}
+        onInstall={mockOnInstall}
+        isInstalled={isInstalled}
+      />,
     );
 
   it('should render extension details correctly', async () => {
