@@ -63,6 +63,7 @@ import {
   registerTelemetryConfig,
   setupSignalHandlers,
 } from './utils/cleanup.js';
+import { setupWorktree } from './utils/worktreeSetup.js';
 import {
   cleanupToolOutputFiles,
   cleanupExpiredSessions,
@@ -207,7 +208,7 @@ export async function main() {
   registerCleanup(() => slashCommandConflictHandler.stop());
 
   const loadSettingsHandle = startupProfiler.start('load_settings');
-  const settings = loadSettings();
+  let settings = loadSettings();
   loadSettingsHandle?.end();
 
   // Report settings errors once during startup
@@ -232,6 +233,10 @@ export async function main() {
   const parseArgsHandle = startupProfiler.start('parse_arguments');
   const argv = await parseArguments(settings.merged);
   parseArgsHandle?.end();
+
+  if (argv.worktree) {
+    settings = await setupWorktree(argv.worktree, settings);
+  }
 
   if (
     (argv.allowedTools && argv.allowedTools.length > 0) ||

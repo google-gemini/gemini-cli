@@ -19,6 +19,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 
 const mocks = vi.hoisted(() => ({
   writeToStderr: vi.fn(),
+  runExitCleanup: vi.fn(),
 }));
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -29,6 +30,10 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
     writeToStderr: mocks.writeToStderr,
   };
 });
+
+vi.mock('./cleanup.js', () => ({
+  runExitCleanup: mocks.runExitCleanup,
+}));
 
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
@@ -71,6 +76,7 @@ describe('relaunchOnExitCode', () => {
     );
 
     expect(runner).toHaveBeenCalledTimes(1);
+    expect(mocks.runExitCleanup).toHaveBeenCalled();
     expect(processExitSpy).toHaveBeenCalledWith(0);
   });
 
@@ -88,6 +94,7 @@ describe('relaunchOnExitCode', () => {
     );
 
     expect(runner).toHaveBeenCalledTimes(3);
+    expect(mocks.runExitCleanup).toHaveBeenCalled();
     expect(processExitSpy).toHaveBeenCalledWith(0);
   });
 
@@ -106,6 +113,7 @@ describe('relaunchOnExitCode', () => {
       ),
     );
     expect(stdinResumeSpy).toHaveBeenCalled();
+    expect(mocks.runExitCleanup).toHaveBeenCalled();
     expect(processExitSpy).toHaveBeenCalledWith(1);
   });
 });

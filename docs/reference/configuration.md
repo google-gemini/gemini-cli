@@ -1345,6 +1345,11 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `true`
   - **Requires restart:** Yes
 
+- **`experimental.worktrees`** (boolean):
+  - **Description:** Enable git worktrees.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.extensionManagement`** (boolean):
   - **Description:** Enable extension management features.
   - **Default:** `true`

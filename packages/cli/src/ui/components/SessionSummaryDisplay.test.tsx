@@ -6,12 +6,15 @@
 
 import { renderWithProviders } from '../../test-utils/render.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { act } from 'react';
 import { SessionSummaryDisplay } from './SessionSummaryDisplay.js';
 import * as SessionContext from '../contexts/SessionContext.js';
 import { type SessionMetrics } from '../contexts/SessionContext.js';
+import * as ConfigContext from '../contexts/ConfigContext.js';
 import {
   ToolCallDecision,
   getShellConfiguration,
+  hasWorktreeChanges,
 } from '@google/gemini-cli-core';
 
 vi.mock('@google/gemini-cli-core', async (importOriginal) => {
@@ -20,6 +23,7 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     getShellConfiguration: vi.fn(),
+    hasWorktreeChanges: vi.fn(),
   };
 });
 
@@ -31,12 +35,23 @@ vi.mock('../contexts/SessionContext.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../contexts/ConfigContext.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof ConfigContext>();
+  return {
+    ...actual,
+    useConfig: vi.fn(),
+  };
+});
+
 const getShellConfigurationMock = vi.mocked(getShellConfiguration);
 const useSessionStatsMock = vi.mocked(SessionContext.useSessionStats);
+const useConfigMock = vi.mocked(ConfigContext.useConfig);
+const hasWorktreeChangesMock = vi.mocked(hasWorktreeChanges);
 
 const renderWithMockedStats = async (
   metrics: SessionMetrics,
   sessionId = 'test-session',
+  worktreeSettings?: object,
 ) => {
   useSessionStatsMock.mockReturnValue({
     stats: {
@@ -49,7 +64,11 @@ const renderWithMockedStats = async (
 
     getPromptCount: () => 5,
     startNewPrompt: vi.fn(),
-  });
+  } as unknown as ReturnType<typeof SessionContext.useSessionStats>);
+
+  useConfigMock.mockReturnValue({
+    getWorktreeSettings: () => worktreeSettings,
+  } as unknown as ReturnType<typeof ConfigContext.useConfig>);
 
   const result = renderWithProviders(
     <SessionSummaryDisplay duration="1h 23m 45s" />,
@@ -89,6 +108,7 @@ describe('<SessionSummaryDisplay />', () => {
       argsPrefix: ['-c'],
       shell: 'bash',
     });
+    hasWorktreeChangesMock.mockReset();
   });
 
   it('renders the summary display with a title', async () => {
@@ -186,6 +206,79 @@ describe('<SessionSummaryDisplay />', () => {
       // PowerShell wraps in single quotes and escapes internal single quotes by doubling them
       expect(output).toContain("gemini --resume '''; rm -rf / #'");
       unmount();
+    });
+  });
+
+  describe('Worktree status', () => {
+    const worktreeSettings = {
+      name: 'foo-bar',
+      path: '/path/to/foo-bar',
+      baseSha: 'base-sha',
+    };
+
+    interface RenderResult {
+      lastFrame: () => string;
+      unmount: () => void;
+    }
+
+    it('renders an additive cleanup message when worktree is clean', async () => {
+      hasWorktreeChangesMock.mockResolvedValue(false);
+
+      let renderResult: RenderResult | null = null;
+      await act(async () => {
+        const result = await renderWithMockedStats(
+          emptyMetrics,
+          'test-session',
+          worktreeSettings,
+        );
+        renderResult = result as unknown as RenderResult;
+      });
+
+      // Wait for re-render triggered by useEffect
+      await vi.waitFor(
+        () => {
+          const output = renderResult!.lastFrame();
+          expect(output).toContain(
+            'To resume this session: gemini --resume test-session',
+          );
+          expect(output).toContain(
+            'Worktree foo-bar has no changes and will be automatically removed.',
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      renderResult!.unmount();
+    });
+
+    it('renders resumption instructions when worktree is dirty', async () => {
+      hasWorktreeChangesMock.mockResolvedValue(true);
+
+      let renderResult: RenderResult | null = null;
+      await act(async () => {
+        const result = await renderWithMockedStats(
+          emptyMetrics,
+          'test-session',
+          worktreeSettings,
+        );
+        renderResult = result as unknown as RenderResult;
+      });
+
+      await vi.waitFor(
+        () => {
+          const output = renderResult!.lastFrame();
+          expect(output).toContain('To resume work in this worktree:');
+          expect(output).toContain(
+            'cd /path/to/foo-bar && gemini --resume test-session',
+          );
+          expect(output).toContain(
+            'To remove manually: git worktree remove /path/to/foo-bar',
+          );
+        },
+        { timeout: 3000 },
+      );
+
+      renderResult!.unmount();
     });
   });
 });

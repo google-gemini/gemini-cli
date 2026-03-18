@@ -152,7 +152,7 @@ async function findProjectRoot(startDir: string): Promise<string | null> {
     const gitPath = path.join(currentDir, '.git');
     try {
       const stats = await fs.lstat(gitPath);
-      if (stats.isDirectory()) {
+      if (stats.isDirectory() || stats.isFile()) {
         return currentDir;
       }
     } catch (error: unknown) {

@@ -2319,6 +2319,13 @@
           "default": true,
           "type": "boolean"
         },
+        "worktrees": {
+          "title": "Enable Git Worktrees",
+          "description": "Enable git worktrees.",
+          "markdownDescription": "Enable git worktrees.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "extensionManagement": {
           "title": "Extension Management",
           "description": "Enable extension management features.",

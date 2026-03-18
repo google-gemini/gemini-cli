@@ -8,6 +8,7 @@ import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import * as path from 'node:path';
+import { execa } from 'execa';
 import { mcpCommand } from '../commands/mcp.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
@@ -37,6 +38,9 @@ import {
   resolveToRealPath,
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
+  getProjectRootForWorktree,
+  isGeminiWorktree,
+  type WorktreeSettings,
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
@@ -73,6 +77,7 @@ export interface CliArgs {
   debug: boolean | undefined;
   prompt: string | undefined;
   promptInteractive: string | undefined;
+  worktree?: string;
 
   yolo: boolean | undefined;
   approvalMode: string | undefined;
@@ -156,6 +161,20 @@ export async function parseArguments(
           nargs: 1,
           description:
             'Execute the provided prompt and continue in interactive mode',
+        })
+        .option('worktree', {
+          alias: 'w',
+          type: 'string',
+          skipValidation: true,
+          description:
+            'Start Gemini in a new git worktree. If no name is provided, one is generated automatically.',
+          coerce: (value: unknown): string => {
+            const trimmed = typeof value === 'string' ? value.trim() : '';
+            if (trimmed === '') {
+              return Math.random().toString(36).substring(2, 10);
+            }
+            return trimmed;
+          },
         })
         .option('sandbox', {
           alias: 's',
@@ -334,6 +353,9 @@ export async function parseArguments(
       ) {
         return `Invalid values:\n  Argument: output-format, Given: "${argv['outputFormat']}", Choices: "text", "json", "stream-json"`;
       }
+      if (argv['worktree'] && !settings.experimental?.worktrees) {
+        return 'The --worktree flag is only available when experimental.worktrees is enabled in your settings.';
+      }
       return true;
     });
 
@@ -429,6 +451,8 @@ export async function loadCliConfig(
 ): Promise<Config> {
   const { cwd = process.cwd(), projectHooks } = options;
   const debugMode = isDebugMode(argv);
+
+  const worktreeSettings = await resolveWorktreeSettings(cwd);
 
   if (argv.sandbox) {
     process.env['GEMINI_SANDBOX'] = 'true';
@@ -766,6 +790,7 @@ export async function loadCliConfig(
     importFormat: settings.context?.importFormat,
     debugMode,
     question,
+    worktreeSettings,
 
     coreTools: settings.tools?.core || undefined,
     allowedTools: allowedTools.length > 0 ? allowedTools : undefined,
@@ -905,4 +930,39 @@ function mergeExcludeTools(
     ...extraExcludes,
   ]);
   return Array.from(allExcludeTools);
+}
+
+async function resolveWorktreeSettings(
+  cwd: string,
+): Promise<WorktreeSettings | undefined> {
+  const projectRoot = await getProjectRootForWorktree(cwd);
+  const worktreePath = isGeminiWorktree(cwd, projectRoot) ? cwd : undefined;
+
+  if (!worktreePath) {
+    return undefined;
+  }
+
+  let worktreeBaseSha = process.env['GEMINI_CLI_WORKTREE_BASE_SHA'];
+  if (!worktreeBaseSha) {
+    try {
+      const { stdout } = await execa('git', ['rev-parse', 'HEAD'], {
+        cwd: worktreePath,
+      });
+      worktreeBaseSha = stdout.trim();
+    } catch (e: unknown) {
+      debugLogger.debug(
+        `Failed to resolve worktree base SHA at ${worktreePath}: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  }
+
+  if (!worktreeBaseSha) {
+    return undefined;
+  }
+
+  return {
+    name: path.basename(worktreePath),
+    path: worktreePath,
+    baseSha: worktreeBaseSha,
+  };
 }
