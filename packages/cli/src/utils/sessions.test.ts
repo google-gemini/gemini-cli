@@ -333,7 +333,7 @@ describe('listSessions', () => {
 describe('deleteSession', () => {
   let mockConfig: Config;
   let mockListSessions: ReturnType<typeof vi.fn>;
-  let mockDeleteSession: ReturnType<typeof vi.fn>;
+  let mockDeleteSessionFiles: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     // Create mock config
@@ -346,7 +346,7 @@ describe('deleteSession', () => {
 
     // Create mock methods
     mockListSessions = vi.fn();
-    mockDeleteSession = vi.fn();
+    mockDeleteSessionFiles = vi.fn();
 
     // Mock SessionSelector constructor
     vi.mocked(SessionSelector).mockImplementation(
@@ -356,13 +356,10 @@ describe('deleteSession', () => {
         }) as unknown as InstanceType<typeof SessionSelector>,
     );
 
-    // Mock ChatRecordingService
-    vi.mocked(ChatRecordingService).mockImplementation(
-      () =>
-        ({
-          deleteSession: mockDeleteSession,
-        }) as unknown as InstanceType<typeof ChatRecordingService>,
-    );
+    // Mock ChatRecordingService static method
+    (ChatRecordingService as unknown as Record<string, unknown>)[
+      'deleteSessionFiles'
+    ] = mockDeleteSessionFiles;
   });
 
   afterEach(() => {
@@ -381,7 +378,7 @@ describe('deleteSession', () => {
     expect(mocks.writeToStderr).toHaveBeenCalledWith(
       'No sessions found for this project.',
     );
-    expect(mockDeleteSession).not.toHaveBeenCalled();
+    expect(mockDeleteSessionFiles).not.toHaveBeenCalled();
   });
 
   it('should delete session by UUID', async () => {
@@ -403,14 +400,17 @@ describe('deleteSession', () => {
     ];
 
     mockListSessions.mockResolvedValue(mockSessions);
-    mockDeleteSession.mockImplementation(() => {});
+    mockDeleteSessionFiles.mockImplementation(() => {});
 
     // Act
     await deleteSession(mockConfig, 'session-uuid-123');
 
     // Assert
     expect(mockListSessions).toHaveBeenCalledOnce();
-    expect(mockDeleteSession).toHaveBeenCalledWith('session-file-123');
+    expect(mockDeleteSessionFiles).toHaveBeenCalledWith(
+      mockConfig,
+      'session-file-123',
+    );
     expect(mocks.writeToStdout).toHaveBeenCalledWith(
       'Deleted session 1: Test session (some time ago)',
     );
@@ -450,14 +450,17 @@ describe('deleteSession', () => {
     ];
 
     mockListSessions.mockResolvedValue(mockSessions);
-    mockDeleteSession.mockImplementation(() => {});
+    mockDeleteSessionFiles.mockImplementation(() => {});
 
     // Act
     await deleteSession(mockConfig, '2');
 
     // Assert
     expect(mockListSessions).toHaveBeenCalledOnce();
-    expect(mockDeleteSession).toHaveBeenCalledWith('session-file-2');
+    expect(mockDeleteSessionFiles).toHaveBeenCalledWith(
+      mockConfig,
+      'session-file-2',
+    );
     expect(mocks.writeToStdout).toHaveBeenCalledWith(
       'Deleted session 2: Second session (some time ago)',
     );
@@ -490,7 +493,7 @@ describe('deleteSession', () => {
     expect(mocks.writeToStderr).toHaveBeenCalledWith(
       'Invalid session identifier "invalid-id". Use --list-sessions to see available sessions.',
     );
-    expect(mockDeleteSession).not.toHaveBeenCalled();
+    expect(mockDeleteSessionFiles).not.toHaveBeenCalled();
   });
 
   it('should display error for invalid session identifier (out of range)', async () => {
@@ -520,7 +523,7 @@ describe('deleteSession', () => {
     expect(mocks.writeToStderr).toHaveBeenCalledWith(
       'Invalid session identifier "999". Use --list-sessions to see available sessions.',
     );
-    expect(mockDeleteSession).not.toHaveBeenCalled();
+    expect(mockDeleteSessionFiles).not.toHaveBeenCalled();
   });
 
   it('should display error for invalid session identifier (zero)', async () => {
@@ -550,7 +553,7 @@ describe('deleteSession', () => {
     expect(mocks.writeToStderr).toHaveBeenCalledWith(
       'Invalid session identifier "0". Use --list-sessions to see available sessions.',
     );
-    expect(mockDeleteSession).not.toHaveBeenCalled();
+    expect(mockDeleteSessionFiles).not.toHaveBeenCalled();
   });
 
   it('should prevent deletion of current session', async () => {
@@ -580,7 +583,7 @@ describe('deleteSession', () => {
     expect(mocks.writeToStderr).toHaveBeenCalledWith(
       'Cannot delete the current active session.',
     );
-    expect(mockDeleteSession).not.toHaveBeenCalled();
+    expect(mockDeleteSessionFiles).not.toHaveBeenCalled();
   });
 
   it('should prevent deletion of current session by UUID', async () => {
@@ -610,7 +613,7 @@ describe('deleteSession', () => {
     expect(mocks.writeToStderr).toHaveBeenCalledWith(
       'Cannot delete the current active session.',
     );
-    expect(mockDeleteSession).not.toHaveBeenCalled();
+    expect(mockDeleteSessionFiles).not.toHaveBeenCalled();
   });
 
   it('should handle deletion errors gracefully', async () => {
@@ -632,7 +635,7 @@ describe('deleteSession', () => {
     ];
 
     mockListSessions.mockResolvedValue(mockSessions);
-    mockDeleteSession.mockImplementation(() => {
+    mockDeleteSessionFiles.mockImplementation(() => {
       throw new Error('File deletion failed');
     });
 
@@ -640,7 +643,10 @@ describe('deleteSession', () => {
     await deleteSession(mockConfig, '1');
 
     // Assert
-    expect(mockDeleteSession).toHaveBeenCalledWith('session-file-1');
+    expect(mockDeleteSessionFiles).toHaveBeenCalledWith(
+      mockConfig,
+      'session-file-1',
+    );
     expect(mocks.writeToStderr).toHaveBeenCalledWith(
       'Failed to delete session: File deletion failed',
     );
@@ -665,7 +671,7 @@ describe('deleteSession', () => {
     ];
 
     mockListSessions.mockResolvedValue(mockSessions);
-    mockDeleteSession.mockImplementation(() => {
+    mockDeleteSessionFiles.mockImplementation(() => {
       // eslint-disable-next-line no-restricted-syntax
       throw 'Unknown error type';
     });
@@ -725,13 +731,16 @@ describe('deleteSession', () => {
     ];
 
     mockListSessions.mockResolvedValue(mockSessions);
-    mockDeleteSession.mockImplementation(() => {});
+    mockDeleteSessionFiles.mockImplementation(() => {});
 
     // Act - delete index 1 (should be oldest session after sorting)
     await deleteSession(mockConfig, '1');
 
     // Assert
-    expect(mockDeleteSession).toHaveBeenCalledWith('session-file-1');
+    expect(mockDeleteSessionFiles).toHaveBeenCalledWith(
+      mockConfig,
+      'session-file-1',
+    );
     expect(mocks.writeToStdout).toHaveBeenCalledWith(
       expect.stringContaining('Oldest session'),
     );
