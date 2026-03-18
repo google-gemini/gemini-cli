@@ -21,6 +21,15 @@ describe('detectOmissionPlaceholders', () => {
     expect(detectOmissionPlaceholders('// rest of methods ...')).toEqual([
       'rest of methods ...',
     ]);
+    expect(detectOmissionPlaceholders('# rest of methods ...')).toEqual([
+      'rest of methods ...',
+    ]);
+    expect(detectOmissionPlaceholders('-- rest of methods ...')).toEqual([
+      'rest of methods ...',
+    ]);
+    expect(detectOmissionPlaceholders('/* rest of methods ... */')).toEqual([
+      'rest of methods ...',
+    ]);
   });
 
   it('detects case-insensitive placeholders', () => {

@@ -58,6 +58,18 @@ function normalizePlaceholder(line: string): string | null {
     text = text.slice(2).trim();
   }
 
+  if (text.startsWith('#')) {
+    text = text.slice(1).trim();
+  }
+
+  if (text.startsWith('--')) {
+    text = text.slice(2).trim();
+  }
+
+  if (text.startsWith('/*') && text.endsWith('*/')) {
+    text = text.slice(2, -2).trim();
+  }
+
   if (text.startsWith('(') && text.endsWith(')')) {
     text = text.slice(1, -1).trim();
   }
