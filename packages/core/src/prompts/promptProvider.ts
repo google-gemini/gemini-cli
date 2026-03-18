@@ -148,6 +148,7 @@ export class PromptProvider {
             })),
           skills.length > 0,
         ),
+        taskTracker: context.config.isTrackerEnabled(),
         hookContext: isSectionEnabled('hookContext') || undefined,
         primaryWorkflows: this.withSection(
           'primaryWorkflows',
@@ -174,6 +175,7 @@ export class PromptProvider {
         planningWorkflow: this.withSection(
           'planningWorkflow',
           () => ({
+            interactive: interactiveMode,
             planModeToolsList,
             plansDir: context.config.storage.getPlansDir(),
             approvedPlanPath: context.config.getApprovedPlanPath(),
@@ -181,7 +183,6 @@ export class PromptProvider {
           }),
           isPlanMode,
         ),
-        taskTracker: context.config.isTrackerEnabled(),
         operationalGuidelines: this.withSection(
           'operationalGuidelines',
           () => ({
