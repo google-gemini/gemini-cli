@@ -57,8 +57,8 @@ import {
   type ToolOutputMaskingEvent,
   type KeychainAvailabilityEvent,
   type TokenStorageInitializationEvent,
-  type GoogleAuthStartEvent,
-  type GoogleAuthEndEvent,
+  type OnboardingStartEvent,
+  type OnboardingSuccessEvent,
 } from './types.js';
 import {
   recordApiErrorMetrics,
@@ -81,8 +81,8 @@ import {
   recordKeychainAvailability,
   recordTokenStorageInitialization,
   recordInvalidChunk,
-  recordGoogleAuthStart,
-  recordGoogleAuthEnd,
+  recordOnboardingStart,
+  recordOnboardingSuccess,
 } from './metrics.js';
 import { bufferTelemetryEvent } from './sdk.js';
 import { uiTelemetryService, type UiEvent } from './uiTelemetry.js';
@@ -875,11 +875,11 @@ export function logTokenStorageInitialization(
   });
 }
 
-export function logGoogleAuthStart(
+export function logOnboardingStart(
   config: Config,
-  event: GoogleAuthStartEvent,
+  event: OnboardingStartEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logGoogleAuthStartEvent(event);
+  ClearcutLogger.getInstance(config)?.logOnboardingStartEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {
@@ -888,15 +888,15 @@ export function logGoogleAuthStart(
     };
     logger.emit(logRecord);
 
-    recordGoogleAuthStart(config);
+    recordOnboardingStart(config);
   });
 }
 
-export function logGoogleAuthEnd(
+export function logOnboardingSuccess(
   config: Config,
-  event: GoogleAuthEndEvent,
+  event: OnboardingSuccessEvent,
 ): void {
-  ClearcutLogger.getInstance(config)?.logGoogleAuthEndEvent(event);
+  ClearcutLogger.getInstance(config)?.logOnboardingSuccessEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {
@@ -905,7 +905,7 @@ export function logGoogleAuthEnd(
     };
     logger.emit(logRecord);
 
-    recordGoogleAuthEnd(config);
+    recordOnboardingSuccess(config);
   });
 }
 

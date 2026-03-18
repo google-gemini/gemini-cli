@@ -26,7 +26,10 @@ import {
   clearOauthClientCache,
   authEvents,
 } from './oauth2.js';
-import { logGoogleAuthStart, logGoogleAuthEnd } from '../telemetry/loggers.js';
+import {
+  logOnboardingStart,
+  logOnboardingSuccess,
+} from '../telemetry/loggers.js';
 import { UserAccountManager } from '../utils/userAccountManager.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -107,8 +110,8 @@ vi.mock('../mcp/token-storage/hybrid-token-storage.js', () => ({
 }));
 
 vi.mock('../telemetry/loggers.js', () => ({
-  logGoogleAuthStart: vi.fn(),
-  logGoogleAuthEnd: vi.fn(),
+  logOnboardingStart: vi.fn(),
+  logOnboardingSuccess: vi.fn(),
 }));
 
 const mockConfig = {
@@ -1392,8 +1395,79 @@ describe('oauth2', () => {
       });
     });
 
-    describe('onboarding telemetry', () => {
-      it('should record onboarding start and end events for LOGIN_WITH_GOOGLE', async () => {
+    describe('GE onboarding telemetry', () => {
+      it('should record google auth events for LOGIN_WITH_GOOGLE during initial sign-in', async () => {
+        const mockConfigWithNoBrowser = {
+          getNoBrowser: () => true,
+          getProxy: () => 'http://test.proxy.com:8080',
+          isBrowserLaunchSuppressed: () => true,
+          isInteractive: () => true,
+        } as unknown as Config;
+
+        const mockCodeVerifier = {
+          codeChallenge: 'test-challenge',
+          codeVerifier: 'test-verifier',
+        };
+        const mockAuthUrl = 'https://example.com/auth-user-code';
+        const mockCode = 'test-user-code';
+        const mockTokens = {
+          access_token: 'test-access-token-user-code',
+          refresh_token: 'test-refresh-token-user-code',
+        };
+
+        const mockOAuth2Client = {
+          generateAuthUrl: vi.fn().mockReturnValue(mockAuthUrl),
+          getToken: vi.fn().mockResolvedValue({ tokens: mockTokens }),
+          generateCodeVerifierAsync: vi
+            .fn()
+            .mockResolvedValue(mockCodeVerifier),
+          getAccessToken: vi
+            .fn()
+            .mockResolvedValue({ token: 'test-access-token-user-code' }),
+          on: vi.fn(),
+          credentials: {},
+        } as unknown as OAuth2Client;
+        mockOAuth2Client.setCredentials = vi
+          .fn()
+          .mockImplementation((creds) => {
+            mockOAuth2Client.credentials = creds;
+          });
+        vi.mocked(OAuth2Client).mockImplementation(() => mockOAuth2Client);
+
+        vi.spyOn(crypto, 'randomBytes').mockReturnValue('test-state' as never);
+
+        const mockReadline = {
+          question: vi.fn((_query, callback) => callback(mockCode)),
+          close: vi.fn(),
+          on: vi.fn(),
+        };
+        (readline.createInterface as Mock).mockReturnValue(mockReadline);
+
+        // Mock User Info API
+        vi.mocked(global.fetch).mockResolvedValue({
+          ok: true,
+          json: vi
+            .fn()
+            .mockResolvedValue({ email: 'test-user-code-account@gmail.com' }),
+        } as unknown as Response);
+
+        // Run auth flow WITHOUT cached credentials
+        await getOauthClient(
+          AuthType.LOGIN_WITH_GOOGLE,
+          mockConfigWithNoBrowser,
+        );
+
+        expect(vi.mocked(logOnboardingStart)).toHaveBeenCalledWith(
+          mockConfigWithNoBrowser,
+          expect.any(Object),
+        );
+        expect(vi.mocked(logOnboardingSuccess)).toHaveBeenCalledWith(
+          mockConfigWithNoBrowser,
+          expect.any(Object),
+        );
+      });
+
+      it('should NOT record google auth events for LOGIN_WITH_GOOGLE when using cached credentials', async () => {
         const mockOAuth2Client = {
           setCredentials: vi.fn(),
           getAccessToken: vi.fn().mockResolvedValue({ token: 'mock-token' }),
@@ -1413,14 +1487,8 @@ describe('oauth2', () => {
 
         await getOauthClient(AuthType.LOGIN_WITH_GOOGLE, mockConfig);
 
-        expect(logGoogleAuthStart).toHaveBeenCalledWith(
-          mockConfig,
-          expect.any(Object),
-        );
-        expect(logGoogleAuthEnd).toHaveBeenCalledWith(
-          mockConfig,
-          expect.any(Object),
-        );
+        expect(logOnboardingStart).not.toHaveBeenCalled();
+        expect(logOnboardingSuccess).not.toHaveBeenCalled();
       });
 
       it('should NOT record google auth events for non-LOGIN_WITH_GOOGLE auth types', async () => {
@@ -1443,8 +1511,8 @@ describe('oauth2', () => {
 
         await getOauthClient(AuthType.COMPUTE_ADC, mockConfig);
 
-        expect(recordGoogleAuthStart).not.toHaveBeenCalled();
-        expect(recordGoogleAuthEnd).not.toHaveBeenCalled();
+        expect(logOnboardingStart).not.toHaveBeenCalled();
+        expect(logOnboardingSuccess).not.toHaveBeenCalled();
       });
     });
 

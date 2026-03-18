@@ -2360,20 +2360,20 @@ export class KeychainAvailabilityEvent implements BaseTelemetryEvent {
   }
 }
 
-export const EVENT_GOOGLE_AUTH_START = 'gemini_cli.google_auth.start';
-export class GoogleAuthStartEvent implements BaseTelemetryEvent {
-  'event.name': 'google_auth_start';
+export const EVENT_ONBOARDING_START = 'gemini_cli.onboarding.start';
+export class OnboardingStartEvent implements BaseTelemetryEvent {
+  'event.name': 'onboarding_start';
   'event.timestamp': string;
 
   constructor() {
-    this['event.name'] = 'google_auth_start';
+    this['event.name'] = 'onboarding_start';
     this['event.timestamp'] = new Date().toISOString();
   }
 
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
       ...getCommonAttributes(config),
-      'event.name': EVENT_GOOGLE_AUTH_START,
+      'event.name': EVENT_ONBOARDING_START,
       'event.timestamp': this['event.timestamp'],
     };
   }
@@ -2383,20 +2383,20 @@ export class GoogleAuthStartEvent implements BaseTelemetryEvent {
   }
 }
 
-export const EVENT_GOOGLE_AUTH_END = 'gemini_cli.google_auth.end';
-export class GoogleAuthEndEvent implements BaseTelemetryEvent {
-  'event.name': 'google_auth_end';
+export const EVENT_ONBOARDING_SUCCESS = 'gemini_cli.onboarding.success';
+export class OnboardingSuccessEvent implements BaseTelemetryEvent {
+  'event.name': 'onboarding_success';
   'event.timestamp': string;
 
   constructor() {
-    this['event.name'] = 'google_auth_end';
+    this['event.name'] = 'onboarding_success';
     this['event.timestamp'] = new Date().toISOString();
   }
 
   toOpenTelemetryAttributes(config: Config): LogAttributes {
     return {
       ...getCommonAttributes(config),
-      'event.name': EVENT_GOOGLE_AUTH_END,
+      'event.name': EVENT_ONBOARDING_SUCCESS,
       'event.timestamp': this['event.timestamp'],
     };
   }

@@ -21,10 +21,13 @@ import { EventEmitter } from 'node:events';
 import open from 'open';
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
-import { logGoogleAuthStart, logGoogleAuthEnd } from '../telemetry/loggers.js';
 import {
-  GoogleAuthStartEvent,
-  GoogleAuthEndEvent,
+  logOnboardingStart,
+  logOnboardingSuccess,
+} from '../telemetry/loggers.js';
+import {
+  OnboardingStartEvent,
+  OnboardingSuccessEvent,
 } from '../telemetry/types.js';
 import type { Config } from '../config/config.js';
 import {
@@ -118,11 +121,7 @@ async function initOauthClient(
   authType: AuthType,
   config: Config,
 ): Promise<AuthClient> {
-  const logGoogleAuthEndIfApplicable = () => {
-    if (authType === AuthType.LOGIN_WITH_GOOGLE) {
-      logGoogleAuthEnd(config, new GoogleAuthEndEvent());
-    }
-  };
+  let hasLoggedOnboardingStart = false;
 
   const credentials = await fetchCachedCredentials();
 
@@ -154,10 +153,6 @@ async function initOauthClient(
     },
   });
 
-  if (authType === AuthType.LOGIN_WITH_GOOGLE) {
-    logGoogleAuthStart(config, new GoogleAuthStartEvent());
-  }
-
   const useEncryptedStorage = getUseEncryptedStorageFlag();
 
   if (
@@ -168,9 +163,6 @@ async function initOauthClient(
       access_token: process.env['GOOGLE_CLOUD_ACCESS_TOKEN'],
     });
     await fetchAndCacheUserInfo(client);
-    if (authType === AuthType.LOGIN_WITH_GOOGLE) {
-      recordGoogleAuthEnd(config);
-    }
     return client;
   }
 
@@ -206,8 +198,6 @@ async function initOauthClient(
         }
         debugLogger.log('Loaded cached credentials.');
         await triggerPostAuthCallbacks(credentials as Credentials);
-
-        logGoogleAuthEndIfApplicable();
         return client;
       }
     } catch (error) {
@@ -243,6 +233,11 @@ async function initOauthClient(
         )}`,
       );
     }
+  }
+
+  if (authType === AuthType.LOGIN_WITH_GOOGLE) {
+    logOnboardingStart(config, new OnboardingStartEvent());
+    hasLoggedOnboardingStart = true;
   }
 
   if (config.isBrowserLaunchSuppressed()) {
@@ -299,7 +294,6 @@ async function initOauthClient(
     }
 
     await triggerPostAuthCallbacks(client.credentials);
-    logGoogleAuthEndIfApplicable();
   } else {
     // In ACP mode, we skip the interactive consent and directly open the browser
     if (!config.getAcpMode()) {
@@ -406,9 +400,10 @@ async function initOauthClient(
     });
 
     await triggerPostAuthCallbacks(client.credentials);
-    logGoogleAuthEndIfApplicable();
   }
-
+  if (hasLoggedOnboardingStart) {
+    logOnboardingSuccess(config, new OnboardingSuccessEvent());
+  }
   return client;
 }
 

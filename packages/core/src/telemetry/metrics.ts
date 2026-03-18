@@ -51,8 +51,8 @@ const KEYCHAIN_AVAILABILITY_COUNT = 'gemini_cli.keychain.availability.count';
 const TOKEN_STORAGE_TYPE_COUNT = 'gemini_cli.token_storage.type.count';
 const OVERAGE_OPTION_COUNT = 'gemini_cli.overage_option.count';
 const CREDIT_PURCHASE_COUNT = 'gemini_cli.credit_purchase.count';
-const EVENT_GOOGLE_AUTH_START = 'gemini_cli.google_auth.start';
-const EVENT_GOOGLE_AUTH_END = 'gemini_cli.google_auth.end';
+const EVENT_ONBOARDING_START = 'gemini_cli.onboarding.start';
+const EVENT_ONBOARDING_SUCCESS = 'gemini_cli.onboarding.success';
 
 // Agent Metrics
 const AGENT_RUN_COUNT = 'gemini_cli.agent.run.count';
@@ -301,16 +301,16 @@ const COUNTER_DEFINITIONS = {
       model: string;
     },
   },
-  [EVENT_GOOGLE_AUTH_START]: {
+  [EVENT_ONBOARDING_START]: {
     description: 'Counts auth "Login with Google" started.',
     valueType: ValueType.INT,
-    assign: (c: Counter) => (googleAuthStartCounter = c),
+    assign: (c: Counter) => (onboardingStartCounter = c),
     attributes: {} as Record<string, never>,
   },
-  [EVENT_GOOGLE_AUTH_END]: {
+  [EVENT_ONBOARDING_SUCCESS]: {
     description: 'Counts auth "Login with Google" succeeded.',
     valueType: ValueType.INT,
-    assign: (c: Counter) => (googleAuthEndCounter = c),
+    assign: (c: Counter) => (onboardingSuccessCounter = c),
     attributes: {} as Record<string, never>,
   },
 } as const;
@@ -654,8 +654,8 @@ let keychainAvailabilityCounter: Counter | undefined;
 let tokenStorageTypeCounter: Counter | undefined;
 let overageOptionCounter: Counter | undefined;
 let creditPurchaseCounter: Counter | undefined;
-let googleAuthStartCounter: Counter | undefined;
-let googleAuthEndCounter: Counter | undefined;
+let onboardingStartCounter: Counter | undefined;
+let onboardingSuccessCounter: Counter | undefined;
 
 // OpenTelemetry GenAI Semantic Convention Metrics
 let genAiClientTokenUsageHistogram: Histogram | undefined;
@@ -831,9 +831,9 @@ export function recordLinesChanged(
 /**
  * Records a metric for when the Google auth process starts.
  */
-export function recordGoogleAuthStart(config: Config): void {
-  if (!googleAuthStartCounter || !isMetricsInitialized) return;
-  googleAuthStartCounter.add(
+export function recordOnboardingStart(config: Config): void {
+  if (!onboardingStartCounter || !isMetricsInitialized) return;
+  onboardingStartCounter.add(
     1,
     baseMetricDefinition.getCommonAttributes(config),
   );
@@ -842,9 +842,12 @@ export function recordGoogleAuthStart(config: Config): void {
 /**
  * Records a metric for when the Google auth process ends successfully.
  */
-export function recordGoogleAuthEnd(config: Config): void {
-  if (!googleAuthEndCounter || !isMetricsInitialized) return;
-  googleAuthEndCounter.add(1, baseMetricDefinition.getCommonAttributes(config));
+export function recordOnboardingSuccess(config: Config): void {
+  if (!onboardingSuccessCounter || !isMetricsInitialized) return;
+  onboardingSuccessCounter.add(
+    1,
+    baseMetricDefinition.getCommonAttributes(config),
+  );
 }
 
 /**
@@ -1424,7 +1427,6 @@ export function recordTokenStorageInitialization(
     ...baseMetricDefinition.getCommonAttributes(config),
     type: event.type,
     forced: event.forced,
-    type: event.type,
   });
 }
 
