@@ -11,7 +11,7 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
 ## 1.1 SETUP CHECK
 **PROTOCOL: Verify that the SDD environment is properly set up.**
 
-1.  **Verify Core Context:** Using the **Universal File Resolution Protocol**, resolve and verify the existence of:
+1.  **Verify Core Context:** Read `.gemini/specs/index.md` to resolve the current file paths for the following artifacts. Verify they exist:
     -   **Spec Registry**
     -   **Product Definition**
     -   **Tech Stack**
@@ -28,11 +28,11 @@ CRITICAL: You must validate the success of every tool call. If any tool call fai
 **PROTOCOL: Follow this sequence to provide a status overview.**
 
 ### 2.1 Read Project Plan
-1.  **Locate and Read:** Read the content of the **Spec Registry** (resolved via **Universal File Resolution Protocol**).
+1.  **Locate and Read:** Read the content of the **Spec Registry** by resolving its path via `.gemini/specs/index.md`.
 2.  **Locate and Read Specs:**
     -   Parse the **Spec Registry** to identify all registered specs and their paths.
         *   **Parsing Logic:** When reading the **Spec Registry** to identify specs, look for lines matching either the new standard format `- [ ] **Spec:` or the legacy format `## [ ] Spec:`.
-    -   For each spec, resolve and read its **Implementation Plan** (using **Universal File Resolution Protocol** via the spec's index file).
+    -   For each spec, resolve and read its **Implementation Plan** by following the path in its respective index file.
 
 ### 2.2 Parse and Summarize Plan
 1.  **Parse Content:**

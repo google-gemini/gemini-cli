@@ -12,7 +12,7 @@ PLAN MODE PROTOCOL: Parts of this process run within Plan Mode. While in Plan Mo
 ## 1.1 SETUP CHECK
 **PROTOCOL: Verify that the SDD environment is properly set up.**
 
-1.  **Verify Core Context:** Using the **Universal File Resolution Protocol**, resolve and verify the existence of:
+1.  **Verify Core Context:** Read `.gemini/specs/index.md` to resolve the current file paths for the following artifacts. Verify they exist:
     -   **Product Definition**
     -   **Tech Stack**
     -   **Workflow**
@@ -29,7 +29,7 @@ PLAN MODE PROTOCOL: Parts of this process run within Plan Mode. While in Plan Mo
 
 ### 2.1 Get Spec Description and Determine Type
 
-1.  **Load Project Context:** Read and understand the content of the project documents (**Product Definition**, **Tech Stack**, etc.) resolved via the **Universal File Resolution Protocol**.
+1.  **Load Project Context:** Read and understand the content of the project documents (**Product Definition**, **Tech Stack**, etc.) by resolving their paths via `.gemini/specs/index.md`.
 2.  **Get Spec Description & Enter Plan Mode:**
     *   **If `{{args}}` is empty:**
         1. Call the `enter_plan_mode` tool with the reason: "Defining new spec".
@@ -109,7 +109,7 @@ PLAN MODE PROTOCOL: Parts of this process run within Plan Mode. While in Plan Mo
 
 2.  **Generate Plan:**
     *   Read the confirmed `spec.md` content for this spec.
-    *   Resolve and read the **Workflow** file (via the **Universal File Resolution Protocol** using the project's index file).
+    *   Resolve and read the **Workflow** file by following the path in `.gemini/specs/index.md`.
     *   Generate a `plan.md` with a hierarchical list of Phases, Tasks, and Sub-tasks.
     *   **CRITICAL:** The plan structure MUST adhere to the methodology in the **Workflow** file (e.g., TDD tasks for "Write Tests" and "Implement").
     *   Include status markers `[ ]` for **EVERY** task and sub-task. The format must be:
@@ -136,7 +136,7 @@ PLAN MODE PROTOCOL: Parts of this process run within Plan Mode. While in Plan Mo
 
 ### 2.4 Create Spec Artifacts and Update Main Plan
 
-1.  **Check for existing spec name:** Before generating a new Spec ID, resolve the **Spec Directory** using the **Universal File Resolution Protocol**. List all existing spec directories in that resolved path. Extract the short names from these spec IDs (e.g., ``shortname_YYYYMMDD`` -> `shortname`). If the proposed short name for the new spec (derived from the initial description) matches an existing short name, halt the `newSpec` creation. Explain that a spec with that name already exists and suggest choosing a different name or resuming the existing spec.
+1.  **Check for existing spec name:** Before generating a new Spec ID, resolve the **Spec Directory** by reading `.gemini/specs/index.md`. List all existing spec directories in that resolved path. Extract the short names from these spec IDs (e.g., ``shortname_YYYYMMDD`` -> `shortname`). If the proposed short name for the new spec (derived from the initial description) matches an existing short name, halt the `newSpec` creation. Explain that a spec with that name already exists and suggest choosing a different name or resuming the existing spec.
 2.  **Generate Spec ID:** Create a unique Spec ID (e.g., ``shortname_YYYYMMDD``).
 3.  **Create Directory:** Create a new directory for the specs: `<Spec Directory>/<spec_id>/`.
 4.  **Create `metadata.json`:** Create a metadata file at `<Spec Directory>/<spec_id>/metadata.json` with content like:
@@ -166,7 +166,7 @@ PLAN MODE PROTOCOL: Parts of this process run within Plan Mode. While in Plan Mo
 
 7.  **Update Spec Registry:**
     -   **Announce:** Inform the user you are updating the **Spec Registry**.
-    -   **Append Section:** Resolve the **Spec Registry** via the **Universal File Resolution Protocol**. Append a new section for the spec to the end of this file. The format MUST be:
+    -   **Append Section:** Resolve the **Spec Registry** by reading `.gemini/specs/index.md`. Append a new section for the spec to the end of this file. The format MUST be:
         ```markdown
 
         ---
