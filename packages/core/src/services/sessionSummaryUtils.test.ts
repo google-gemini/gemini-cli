@@ -123,7 +123,8 @@ describe('sessionSummaryUtils', () => {
     it('should return path if session has summary but NO alias', async () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
       mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
-      const sessionPath = '/tmp/project/chats/session-2024-01-01T10-00-abc12345.json';
+      const sessionPath =
+        '/tmp/project/chats/session-2024-01-01T10-00-abc12345.json';
       vi.mocked(fs.readFile).mockResolvedValue(
         createSessionWithUserMessages(5, { summary: 'Existing summary' }),
       );
@@ -136,7 +137,8 @@ describe('sessionSummaryUtils', () => {
     it('should return path if most recent session has 1 or more user messages and no summary', async () => {
       vi.mocked(fs.access).mockResolvedValue(undefined);
       mockReaddir.mockResolvedValue(['session-2024-01-01T10-00-abc12345.json']);
-      const sessionPath = '/tmp/project/chats/session-2024-01-01T10-00-abc12345.json';
+      const sessionPath =
+        '/tmp/project/chats/session-2024-01-01T10-00-abc12345.json';
       vi.mocked(fs.readFile).mockResolvedValue(
         createSessionWithUserMessages(1),
       );
@@ -151,7 +153,7 @@ describe('sessionSummaryUtils', () => {
       const olderFile = 'session-2024-01-01T10-00-older000.json';
       const newerFile = 'session-2024-01-02T10-00-newer000.json';
       mockReaddir.mockResolvedValue([olderFile, newerFile]);
-      
+
       // Return unsummarized for both
       vi.mocked(fs.readFile).mockResolvedValue(
         createSessionWithUserMessages(2),

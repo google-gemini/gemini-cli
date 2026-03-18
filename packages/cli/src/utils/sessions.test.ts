@@ -355,7 +355,9 @@ describe('listSessions', () => {
 
     // Assert
     expect(mocks.writeToStdout).toHaveBeenCalledWith(
-      expect.stringContaining('1. Test message (some time ago) [my-cool-alias, uuid-123]'),
+      expect.stringContaining(
+        '1. Test message (some time ago) [my-cool-alias, uuid-123]',
+      ),
     );
   });
 });

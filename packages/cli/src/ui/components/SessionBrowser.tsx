@@ -261,11 +261,9 @@ const SessionItem = ({
             [{session.alias}]{' '}
           </Text>
         )}
-        {session.displayName.length > availableMessageWidth ? (
-          session.displayName.slice(0, availableMessageWidth - 1) + '…'
-        ) : (
-          session.displayName
-        )}
+        {session.displayName.length > availableMessageWidth
+          ? session.displayName.slice(0, availableMessageWidth - 1) + '…'
+          : session.displayName}
       </>
     ));
 

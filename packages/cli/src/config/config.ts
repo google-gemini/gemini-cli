@@ -51,10 +51,7 @@ import {
 
 import { loadSandboxConfig } from './sandboxConfig.js';
 import { resolvePath } from '../utils/resolvePath.js';
-import {
-  RESUME_LATEST,
-  RESUME_INTERACTIVE,
-} from '../utils/sessionUtils.js';
+import { RESUME_LATEST, RESUME_INTERACTIVE } from '../utils/sessionUtils.js';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import {

@@ -181,7 +181,9 @@ describe('<SessionSummaryDisplay />', () => {
       );
       const output = lastFrame();
 
-      expect(output).toContain('gemini --resume my-alias (1234-abcd-5678-efgh)');
+      expect(output).toContain(
+        'gemini --resume my-alias (1234-abcd-5678-efgh)',
+      );
       unmount();
     });
 

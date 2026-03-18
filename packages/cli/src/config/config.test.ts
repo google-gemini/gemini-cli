@@ -32,10 +32,7 @@ import * as ServerConfig from '@google/gemini-cli-core';
 
 import { isWorkspaceTrusted } from './trustedFolders.js';
 import { ExtensionManager } from './extension-manager.js';
-import {
-  RESUME_LATEST,
-  RESUME_INTERACTIVE,
-} from '../utils/sessionUtils.js';
+import { RESUME_LATEST, RESUME_INTERACTIVE } from '../utils/sessionUtils.js';
 
 vi.mock('./trustedFolders.js', () => ({
   isWorkspaceTrusted: vi.fn(() => ({ isTrusted: true, source: 'file' })), // Default to trusted
