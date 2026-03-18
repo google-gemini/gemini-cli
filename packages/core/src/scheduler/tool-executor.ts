@@ -17,7 +17,6 @@ import {
   type ToolLiveOutput,
 } from '../index.js';
 import { isAbortError } from '../utils/errors.js';
-import { SHELL_TOOL_NAME } from '../tools/tool-names.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { executeToolWithHooks } from '../core/coreToolHookTriggers.js';
 import {
@@ -182,88 +181,64 @@ export class ToolExecutor {
   ): Promise<{ truncatedContent: PartListUnion; outputFile?: string }> {
     const toolName = call.request.name;
     const callId = call.request.callId;
-    let outputFile: string | undefined;
+    const threshold = this.config.getTruncateToolOutputThreshold();
 
-    if (typeof content === 'string' && toolName === SHELL_TOOL_NAME) {
-      const threshold = this.config.getTruncateToolOutputThreshold();
+    if (threshold <= 0) {
+      return { truncatedContent: content, outputFile: undefined };
+    }
 
-      if (threshold > 0 && content.length > threshold) {
-        const originalContentLength = content.length;
-        const { outputFile: savedPath } = await saveTruncatedToolOutput(
-          content,
-          toolName,
-          callId,
-          this.config.storage.getProjectTempDir(),
-          this.context.promptId,
-        );
-        outputFile = savedPath;
-        const truncatedContent = formatTruncatedToolOutput(
-          content,
-          outputFile,
-          threshold,
-        );
+    let textToTruncate: string | undefined;
+    let isMCP = false;
+    let firstPart: Part | undefined;
 
-        logToolOutputTruncated(
-          this.config,
-          new ToolOutputTruncatedEvent(call.request.prompt_id, {
-            toolName,
-            originalContentLength,
-            truncatedContentLength: truncatedContent.length,
-            threshold,
-          }),
-        );
-
-        return { truncatedContent, outputFile };
-      }
+    if (typeof content === 'string') {
+      textToTruncate = content;
     } else if (
       Array.isArray(content) &&
       content.length === 1 &&
       'tool' in call &&
       call.tool instanceof DiscoveredMCPTool
     ) {
-      const firstPart = content[0];
+      firstPart = content[0];
       if (typeof firstPart === 'object' && typeof firstPart.text === 'string') {
-        const textContent = firstPart.text;
-        const threshold = this.config.getTruncateToolOutputThreshold();
-
-        if (threshold > 0 && textContent.length > threshold) {
-          const originalContentLength = textContent.length;
-          const { outputFile: savedPath } = await saveTruncatedToolOutput(
-            textContent,
-            toolName,
-            callId,
-            this.config.storage.getProjectTempDir(),
-            this.context.promptId,
-          );
-          outputFile = savedPath;
-          const truncatedText = formatTruncatedToolOutput(
-            textContent,
-            outputFile,
-            threshold,
-          );
-
-          // We need to return a NEW array to avoid mutating the original toolResult if it matters,
-          // though here we are creating the response so it's probably fine to mutate or return new.
-          const truncatedContent: Part[] = [
-            { ...firstPart, text: truncatedText },
-          ];
-
-          logToolOutputTruncated(
-            this.config,
-            new ToolOutputTruncatedEvent(call.request.prompt_id, {
-              toolName,
-              originalContentLength,
-              truncatedContentLength: truncatedText.length,
-              threshold,
-            }),
-          );
-
-          return { truncatedContent, outputFile };
-        }
+        textToTruncate = firstPart.text;
+        isMCP = true;
       }
     }
 
-    return { truncatedContent: content, outputFile };
+    if (textToTruncate && textToTruncate.length > threshold) {
+      const originalContentLength = textToTruncate.length;
+      const { outputFile: savedPath } = await saveTruncatedToolOutput(
+        textToTruncate,
+        toolName,
+        callId,
+        this.config.storage.getProjectTempDir(),
+        this.context.promptId,
+      );
+      const truncatedText = formatTruncatedToolOutput(
+        textToTruncate,
+        savedPath,
+        threshold,
+      );
+
+      logToolOutputTruncated(
+        this.config,
+        new ToolOutputTruncatedEvent(call.request.prompt_id, {
+          toolName,
+          originalContentLength,
+          truncatedContentLength: truncatedText.length,
+          threshold,
+        }),
+      );
+
+      const truncatedContent: PartListUnion = isMCP
+        ? [{ ...firstPart!, text: truncatedText }]
+        : truncatedText;
+
+      return { truncatedContent, outputFile: savedPath };
+    }
+
+    return { truncatedContent: content, outputFile: undefined };
   }
 
   private async createCancelledResult(
