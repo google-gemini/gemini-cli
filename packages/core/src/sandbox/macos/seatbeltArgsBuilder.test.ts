@@ -6,6 +6,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { buildSeatbeltArgs } from './seatbeltArgsBuilder.js';
 import fs from 'node:fs';
+import os from 'node:os';
 
 describe('seatbeltArgsBuilder', () => {
   it('should build a strict allowlist profile allowing the workspace via param', () => {
@@ -24,6 +25,7 @@ describe('seatbeltArgsBuilder', () => {
 
     expect(args).toContain('-D');
     expect(args).toContain('WORKSPACE=/Users/test/workspace');
+    expect(args).toContain(`TMPDIR=${os.tmpdir()}`);
 
     vi.restoreAllMocks();
   });
@@ -56,22 +58,24 @@ describe('seatbeltArgsBuilder', () => {
     vi.restoreAllMocks();
   });
 
-  it('should gracefully fallback to original path if realpathSync throws ENOENT', () => {
-    vi.spyOn(fs, 'realpathSync').mockImplementation(() => {
-      const error = new Error('File not found');
-      Object.assign(error, { code: 'ENOENT' });
-      throw error;
+  it('should resolve parent directories if a file does not exist', () => {
+    vi.spyOn(fs, 'realpathSync').mockImplementation((p) => {
+      if (p === '/test/symlink/nonexistent.txt') {
+        const error = new Error('ENOENT');
+        Object.assign(error, { code: 'ENOENT' });
+        throw error;
+      }
+      if (p === '/test/symlink') {
+        return '/test/real_path';
+      }
+      return p as string;
     });
 
     const args = buildSeatbeltArgs({
-      workspace: '/test/missing_workspace',
-      allowedPaths: ['/test/missing_path'],
+      workspace: '/test/symlink/nonexistent.txt',
     });
 
-    expect(args).toContain('-D');
-    expect(args).toContain('WORKSPACE=/test/missing_workspace');
-    expect(args).toContain('ALLOWED_PATH_0=/test/missing_path');
-
+    expect(args).toContain('WORKSPACE=/test/real_path/nonexistent.txt');
     vi.restoreAllMocks();
   });
 

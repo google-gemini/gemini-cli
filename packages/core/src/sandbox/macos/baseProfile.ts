@@ -49,8 +49,7 @@ export const BASE_SEATBELT_PROFILE = `(version 1)
   (literal "/dev/zero")
   (subpath "/tmp")
   (subpath "/private/tmp")
-  (subpath "/var/folders")
-  (subpath "/private/var/folders")
+  (subpath (param "TMPDIR"))
 )
 
 ; Workspace access using parameterized paths
@@ -83,6 +82,8 @@ export const NETWORK_SEATBELT_PROFILE = `
     (global-name "com.apple.networkd")
     (global-name "com.apple.ocspd")
     (global-name "com.apple.trustd.agent")
+    (global-name "com.apple.mDNSResponder")
+    (global-name "com.apple.mDNSResponderHelper")
     (global-name "com.apple.SystemConfiguration.DNSConfiguration")
     (global-name "com.apple.SystemConfiguration.configd")
 )

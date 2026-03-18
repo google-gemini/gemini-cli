@@ -3,7 +3,15 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type MockInstance,
+} from 'vitest';
 import { MacOsSandboxManager } from './MacOsSandboxManager.js';
 import * as seatbeltArgsBuilder from './seatbeltArgsBuilder.js';
 
@@ -13,7 +21,7 @@ describe('MacOsSandboxManager', () => {
   const mockNetworkAccess = true;
 
   let manager: MacOsSandboxManager;
-  let buildArgsSpy: ReturnType<typeof vi.spyOn>;
+  let buildArgsSpy: MockInstance<typeof seatbeltArgsBuilder.buildSeatbeltArgs>;
 
   beforeEach(() => {
     manager = new MacOsSandboxManager({

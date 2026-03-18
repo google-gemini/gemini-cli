@@ -5,6 +5,8 @@
  */
 
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
   BASE_SEATBELT_PROFILE,
   NETWORK_SEATBELT_PROFILE,
@@ -23,16 +25,20 @@ export interface SeatbeltArgsOptions {
 }
 
 /**
- * Attempts to resolve the real path of a given path (resolving symlinks).
- * Falls back to the original path ONLY if the file does not exist (ENOENT).
- * All other errors (e.g. EACCES) are re-thrown to prevent symlink-based sandbox escapes.
+ * Resolves symlinks for a given path to prevent sandbox escapes.
+ * If a file does not exist (ENOENT), it recursively resolves the parent directory.
+ * Other errors (e.g. EACCES) are re-thrown.
  */
 function tryRealpath(p: string): string {
   try {
     return fs.realpathSync(p);
   } catch (e) {
     if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
-      return p;
+      const parentDir = path.dirname(p);
+      if (parentDir === p) {
+        return p;
+      }
+      return path.join(tryRealpath(parentDir), path.basename(p));
     }
     throw e;
   }
@@ -52,6 +58,9 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
 
   const workspacePath = tryRealpath(options.workspace);
   args.push('-D', `WORKSPACE=${workspacePath}`);
+
+  const tmpPath = tryRealpath(os.tmpdir());
+  args.push('-D', `TMPDIR=${tmpPath}`);
 
   if (options.allowedPaths) {
     for (let i = 0; i < options.allowedPaths.length; i++) {
