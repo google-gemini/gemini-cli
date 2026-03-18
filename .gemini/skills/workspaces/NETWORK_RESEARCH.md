@@ -1,6 +1,6 @@
 # Network Architecture & Troubleshooting Research
 
-This document captures the empirical research and final configuration settled upon for the Gemini CLI Offload system, specifically addressing the challenges of connecting from corporate environments to private GCP workers.
+This document captures the empirical research and final configuration settled upon for the Gemini CLI Workspace system, specifically addressing the challenges of connecting from corporate environments to private GCP workers.
 
 ## 🔍 The Challenge
 The goal was to achieve **Direct internal SSH** access to GCE workers that have **no public IP addresses**, allowing for high-performance file synchronization (`rsync`) and interactive sessions without the overhead of `gcloud` wrappers.

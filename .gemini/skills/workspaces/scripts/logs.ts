@@ -1,5 +1,5 @@
 /**
- * Offload Log Tailer (Local)
+ * Workspace Log Tailer (Local)
  * 
  * Tails the latest remote logs for a specific job.
  */
@@ -16,17 +16,17 @@ export async function runLogs(args: string[]) {
   const action = args[1] || 'review';
   
   if (!prNumber) {
-    console.error('Usage: npm run offload:logs <PR_NUMBER> [action]');
+    console.error('Usage: npm run workspace:logs <PR_NUMBER> [action]');
     return 1;
   }
 
   const settingsPath = path.join(REPO_ROOT, '.gemini/settings.json');
   const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-  const config = settings.maintainer?.deepReview;
+  const config = settings.maintainer?.workspace;
   const { remoteHost, remoteHome } = config;
-  const sshConfigPath = path.join(REPO_ROOT, '.gemini/offload_ssh_config');
+  const sshConfigPath = path.join(REPO_ROOT, '.gemini/workspace_ssh_config');
 
-  const jobDir = `${remoteHome}/dev/worktrees/offload-${prNumber}-${action}`;
+  const jobDir = `${remoteHome}/dev/worktrees/workspace-${prNumber}-${action}`;
   const logDir = `${jobDir}/.gemini/logs`;
 
   console.log(`📋 Tailing latest logs for job ${prNumber}-${action}...`);

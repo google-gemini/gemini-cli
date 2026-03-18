@@ -1,11 +1,11 @@
-# Offload maintainer skill
+# Workspace maintainer skill
 
-The `offload` skill provides a high-performance, parallelized workflow for
-offloading intensive developer tasks to a remote workstation. It leverages a 
+The `workspace` skill provides a high-performance, parallelized workflow for
+workspaceing intensive developer tasks to a remote workstation. It leverages a 
 Node.js orchestrator to run complex validation playbooks concurrently in a 
 dedicated terminal window.
 
-## Why use offload?
+## Why use workspace?
 
 As a maintainer, you eventually reach the limits of how much work you can manage
 at once on a single local machine. Heavy builds, concurrent test suites, and
@@ -13,9 +13,9 @@ multiple PRs in flight can quickly overload local resources, leading to
 performance degradation and developer friction.
 
 While manual remote management is a common workaround, it is often cumbersome
-and context-heavy. The `offload` skill addresses these challenges by providing:
+and context-heavy. The `workspace` skill addresses these challenges by providing:
 
--   **Elastic compute**: Offload resource-intensive build and lint suites to a
+-   **Elastic compute**: Workspace resource-intensive build and lint suites to a
     beefy remote workstation, keeping your local machine responsive.
 -   **Context preservation**: The main Gemini session remains interactive and
     focused on high-level reasoning while automated tasks provide real-time
@@ -25,11 +25,11 @@ and context-heavy. The `offload` skill addresses these challenges by providing:
 -   **True parallelism**: Infrastructure validation, CI checks, and behavioral 
     proofs run simultaneously, compressing a 15-minute process into 3 minutes.
 
-## Agentic skills: Sync or Offload
+## Agentic skills: Sync or Workspace
 
-The `offload` system is designed to work in synergy with specialized agentic 
+The `workspace` system is designed to work in synergy with specialized agentic 
 skills. These skills can be run **synchronously** in your current terminal for
-quick tasks, or **offloaded** to a remote session for complex, iterative loops.
+quick tasks, or **workspaceed** to a remote session for complex, iterative loops.
 
 -   **`review-pr`**: Conducts high-fidelity, behavioral code reviews. It assumes 
     the infrastructure is already validated and focuses on physical proof of 
@@ -37,15 +37,15 @@ quick tasks, or **offloaded** to a remote session for complex, iterative loops.
 -   **`fix-pr`**: An autonomous "Fix-to-Green" loop. It iteratively addresses 
     CI failures, merge conflicts, and review comments until the PR is mergeable.
 
-When you run `npm run offload <PR> fix`, the orchestrator provisions the remote 
+When you run `npm run workspace <PR> fix`, the orchestrator provisions the remote 
 environment and then launches a Gemini CLI session specifically powered by the
 `fix-pr` skill.
 
 ## Architecture: The Hybrid Powerhouse
 
-The offload system uses a **Hybrid VM + Docker** architecture designed for maximum performance and reliability:
+The workspace system uses a **Hybrid VM + Docker** architecture designed for maximum performance and reliability:
 
-1.  **The GCE VM (Raw Power)**: By running on high-performance Google Compute Engine instances, we offload heavy CPU and RAM tasks (like full project builds and massive test suites) from your local machine, keeping your primary workstation responsive.
+1.  **The GCE VM (Raw Power)**: By running on high-performance Google Compute Engine instances, we workspace heavy CPU and RAM tasks (like full project builds and massive test suites) from your local machine, keeping your primary workstation responsive.
 2.  **The Docker Container (Consistency & Resilience)**:
     *   **Source of Truth**: The `.gcp/Dockerfile.maintainer` defines the exact environment. If a tool is added there, every maintainer gets it instantly.
     *   **Zero Drift**: Containers are immutable. Every job starts in a fresh state, preventing the "OS rot" that typically affects persistent VMs.
@@ -66,7 +66,7 @@ For a complete guide on setting up your remote environment, see the [Maintainer 
 
 ### Persistence and Job Recovery
 
-The offload system is designed for high reliability and persistence. Jobs use a nested execution model to ensure they continue running even if your local terminal is closed or the connection is lost.
+The workspace system is designed for high reliability and persistence. Jobs use a nested execution model to ensure they continue running even if your local terminal is closed or the connection is lost.
 
 ### How it Works
 1.  **Host-Level Persistence**: The orchestrator launches each job in a named **`tmux`** session on the remote VM.
@@ -75,12 +75,12 @@ The offload system is designed for high reliability and persistence. Jobs use a 
 ### Re-attaching to a Job
 If you lose your connection, you can easily resume your session:
 
--   **Automatic**: Simply run the exact same command you started with (e.g., `npm run offload 123 review`). The system will automatically detect the existing session and re-attach you.
--   **Manual**: Use `npm run offload:status` to find the session name, then use `ssh gcli-worker` to jump into the VM and `tmux attach -t <session>` to resume.
+-   **Automatic**: Simply run the exact same command you started with (e.g., `npm run workspace 123 review`). The system will automatically detect the existing session and re-attach you.
+-   **Manual**: Use `npm run workspace:status` to find the session name, then use `ssh gcli-worker` to jump into the VM and `tmux attach -t <session>` to resume.
 
 ## Technical details
 
-This skill uses a **Worker Provider** abstraction (`GceCosProvider`) to manage the remote lifecycle. It uses an isolated Gemini profile on the remote host (`~/.offload/gemini-cli-config`) to ensure that verification tasks do not interfere with your primary configuration.
+This skill uses a **Worker Provider** abstraction (`GceCosProvider`) to manage the remote lifecycle. It uses an isolated Gemini profile on the remote host (`~/.workspace/gemini-cli-config`) to ensure that verification tasks do not interfere with your primary configuration.
 
 ### Directory structure
 - `scripts/providers/`: Modular worker implementations (GCE, etc.).
@@ -95,13 +95,13 @@ This skill uses a **Worker Provider** abstraction (`GceCosProvider`) to manage t
 If you want to improve this skill:
 1. Modify the TypeScript scripts in `scripts/`.
 2. Update `SKILL.md` if the agent's instructions need to change.
-3. Test your changes locally using `npm run offload <PR>`.
+3. Test your changes locally using `npm run workspace <PR>`.
 
 ## Testing
 
 The orchestration logic for this skill is fully tested. To run the tests:
 ```bash
-npx vitest .gemini/skills/offload/tests/orchestration.test.ts
+npx vitest .gemini/skills/workspace/tests/orchestration.test.ts
 ```
 These tests mock the external environment (SSH, GitHub CLI, and the file system) to ensure that the orchestration scripts generate the correct commands and handle environment isolation accurately.
 

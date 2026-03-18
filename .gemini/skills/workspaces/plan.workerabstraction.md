@@ -1,4 +1,4 @@
-# Plan: Worker Provider Abstraction for Offload System
+# Plan: Worker Provider Abstraction for Workspace System
 
 ## Objective
 Abstract the remote execution infrastructure (GCE COS, GCE Linux, Cloud Workstations) behind a common `WorkerProvider` interface. This eliminates infrastructure-specific prompts (like "use container mode") and makes the system extensible to new backends.
@@ -11,7 +11,7 @@ Create a modular provider system where each infrastructure type implements a sta
 - **Implementations**:
     - `GceCosProvider`: Handles COS with Cloud-Init and `docker exec` wrapping.
     - `GceLinuxProvider`: Handles standard Linux VMs with direct execution.
-    - `LocalDockerProvider`: (Future) Runs offload tasks in a local container.
+    - `LocalDockerProvider`: (Future) Runs workspace tasks in a local container.
     - `WorkstationProvider`: (Future) Integrates with Google Cloud Workstations.
 
 ### 2. Auto-Discovery
@@ -41,6 +41,6 @@ Refactor `orchestrator.ts` to be provider-agnostic:
 - Ensure "Fast-Path SSH" is still the primary interactive gateway.
 
 ## Verification
-- Run `npm run offload:fleet provision` and ensure it creates a COS-native worker.
-- Run `npm run offload:setup` and verify it no longer asks cryptic infrastructure questions.
+- Run `npm run workspace:fleet provision` and ensure it creates a COS-native worker.
+- Run `npm run workspace:setup` and verify it no longer asks cryptic infrastructure questions.
 - Launch a review and verify it uses `docker exec internally for the COS provider.

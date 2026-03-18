@@ -1,5 +1,5 @@
 /**
- * Offload Attach Utility (Local)
+ * Workspace Attach Utility (Local)
  * 
  * Re-attaches to a running tmux session inside the container on the worker.
  */
@@ -20,27 +20,27 @@ export async function runAttach(args: string[], env: NodeJS.ProcessEnv = process
   const isLocal = args.includes('--local');
   
   if (!prNumber) {
-    console.error('Usage: npm run offload:attach <PR_NUMBER> [action] [--local]');
+    console.error('Usage: npm run workspace:attach <PR_NUMBER> [action] [--local]');
     return 1;
   }
 
-  const settingsPath = path.join(REPO_ROOT, '.gemini/offload/settings.json');
+  const settingsPath = path.join(REPO_ROOT, '.gemini/workspaces/settings.json');
   if (!fs.existsSync(settingsPath)) {
-    console.error('❌ Settings not found. Run "npm run offload:setup" first.');
+    console.error('❌ Settings not found. Run "npm run workspace:setup" first.');
     return 1;
   }
   const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-  const config = settings.deepReview;
+  const config = settings.workspace;
   if (!config) {
     console.error('❌ Deep Review configuration not found.');
     return 1;
   }
 
   const { projectId, zone } = config;
-  const targetVM = `gcli-offload-${env.USER || 'mattkorwel'}`;
+  const targetVM = `gcli-workspace-${env.USER || 'mattkorwel'}`;
   const provider = ProviderFactory.getProvider({ projectId, zone, instanceName: targetVM });
 
-  const sessionName = `offload-${prNumber}-${action}`;
+  const sessionName = `workspace-${prNumber}-${action}`;
   const containerAttach = `sudo docker exec -it maintainer-worker sh -c ${q(`tmux attach-session -t ${sessionName}`)}`;
   const finalSSH = provider.getRunCommand(containerAttach, { interactive: true });
 
@@ -48,7 +48,7 @@ export async function runAttach(args: string[], env: NodeJS.ProcessEnv = process
 
   const isWithinGemini = !!env.GEMINI_CLI || !!env.GEMINI_SESSION_ID || !!env.GCLI_SESSION_ID;
   if (isWithinGemini && !isLocal) {
-    const tempCmdPath = path.join(process.env.TMPDIR || '/tmp', `offload-attach-${prNumber}.sh`);
+    const tempCmdPath = path.join(process.env.TMPDIR || '/tmp', `workspace-attach-${prNumber}.sh`);
     fs.writeFileSync(tempCmdPath, `#!/bin/bash\n${finalSSH}\nrm "$0"`, { mode: 0o755 });
 
     const appleScript = `

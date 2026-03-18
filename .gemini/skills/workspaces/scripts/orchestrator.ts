@@ -14,25 +14,25 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   const action = args[1] || 'review';
   
   if (!prNumber) {
-    console.error('Usage: npm run offload <PR_NUMBER> [action]');
+    console.error('Usage: npm run workspace <PR_NUMBER> [action]');
     return 1;
   }
 
   // 1. Load Settings
-  const settingsPath = path.join(REPO_ROOT, '.gemini/offload/settings.json');
+  const settingsPath = path.join(REPO_ROOT, '.gemini/workspaces/settings.json');
   if (!fs.existsSync(settingsPath)) {
-    console.error('❌ Settings not found. Run "npm run offload:setup" first.');
+    console.error('❌ Settings not found. Run "npm run workspace:setup" first.');
     return 1;
   }
   const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-  const config = settings.deepReview;
+  const config = settings.workspace;
   if (!config) {
     console.error('❌ Deep Review configuration not found.');
     return 1;
   }
 
   const { projectId, zone } = config;
-  const targetVM = `gcli-offload-${env.USER || 'mattkorwel'}`;
+  const targetVM = `gcli-workspace-${env.USER || 'mattkorwel'}`;
   const provider = ProviderFactory.getProvider({ projectId, zone, instanceName: targetVM });
 
   // 2. Wake Worker & Verify Container
@@ -41,9 +41,9 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   // Use Absolute Container Paths
   const containerHome = '/home/node';
   const remoteWorkDir = `${containerHome}/dev/main`;
-  const remotePolicyPath = `${containerHome}/.gemini/policies/offload-policy.toml`;
-  const persistentScripts = `${containerHome}/.offload/scripts`;
-  const sessionName = `offload-${prNumber}-${action}`;
+  const remotePolicyPath = `${containerHome}/.gemini/policies/workspace-policy.toml`;
+  const persistentScripts = `${containerHome}/.workspace/scripts`;
+  const sessionName = `workspace-${prNumber}-${action}`;
   const remoteWorktreeDir = `${containerHome}/dev/worktrees/${sessionName}`;
 
   // 3. Remote Context Setup
@@ -71,7 +71,7 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
 
   // 4. Execution Logic
   const remoteWorker = `tsx ${persistentScripts}/entrypoint.ts ${prNumber} . ${remotePolicyPath} ${action}`;
-  const remoteTmuxCmd = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'offload' 'cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL'`;
+  const remoteTmuxCmd = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'workspace' 'cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL'`;
   const containerWrap = `sudo docker exec -it maintainer-worker sh -c ${q(remoteTmuxCmd)}`;
   
   const finalSSH = provider.getRunCommand(containerWrap, { interactive: true });
@@ -80,7 +80,7 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   const forceMainTerminal = true; // For debugging
 
   if (!forceMainTerminal && isWithinGemini && env.TERM_PROGRAM === 'iTerm.app') {
-    const tempCmdPath = path.join(process.env.TMPDIR || '/tmp', `offload-ssh-${prNumber}.sh`);
+    const tempCmdPath = path.join(process.env.TMPDIR || '/tmp', `workspace-ssh-${prNumber}.sh`);
     fs.writeFileSync(tempCmdPath, `#!/bin/bash\n${finalSSH}\nrm "$0"`, { mode: 0o755 });
     const appleScript = `on run argv\ntell application "iTerm"\ntell current window\nset newTab to (create tab with default profile)\ntell current session of newTab\nwrite text (item 1 of argv) & return\nend tell\nend tell\nactivate\nend tell\nend run`;
     spawnSync('osascript', ['-', tempCmdPath], { input: appleScript });

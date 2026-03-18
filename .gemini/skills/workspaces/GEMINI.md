@@ -1,4 +1,4 @@
-# Architectural Mandate: High-Performance Offload System
+# Architectural Mandate: High-Performance Workspace System
 
 ## Infrastructure Strategy
 - **Base OS**: Always use **Container-Optimized OS (COS)** (`cos-stable` family). It is security-hardened and has Docker pre-installed.
@@ -12,7 +12,7 @@
 - **Mounts**: Standardize on these host-to-container mappings:
     - `~/dev` -> `/home/node/dev` (Persistence for worktrees)
     - `~/.gemini` -> `/home/node/.gemini` (Shared credentials)
-    - `~/.offload` -> `/home/node/.offload` (Shared scripts/logs)
+    - `~/.workspace` -> `/home/node/.workspace` (Shared scripts/logs)
 - **Runtime**: The container runs as a persistent service (`--restart always`) acting as a "Remote Workstation" rather than an ephemeral task.
 
 ## Orchestration Logic

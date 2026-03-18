@@ -8,10 +8,10 @@ import { spawnSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
-import { WorkerProvider, SetupOptions, ExecOptions, SyncOptions, WorkerStatus } from './BaseProvider.ts';
+import { WorkspaceProvider, SetupOptions, ExecOptions, SyncOptions, WorkspaceStatus } from './BaseProvider.ts';
 import { GceConnectionManager } from './GceConnectionManager.ts';
 
-export class GceCosProvider implements WorkerProvider {
+export class GceCosProvider implements WorkspaceProvider {
   private projectId: string;
   private zone: string;
   private instanceName: string;
@@ -24,10 +24,10 @@ export class GceCosProvider implements WorkerProvider {
     this.projectId = projectId;
     this.zone = zone;
     this.instanceName = instanceName;
-    const offloadDir = path.join(repoRoot, '.gemini/offload');
-    if (!fs.existsSync(offloadDir)) fs.mkdirSync(offloadDir, { recursive: true });
-    this.sshConfigPath = path.join(offloadDir, 'ssh_config');
-    this.knownHostsPath = path.join(offloadDir, 'known_hosts');
+    const workspacesDir = path.join(repoRoot, '.gemini/workspaces');
+    if (!fs.existsSync(workspacesDir)) fs.mkdirSync(workspacesDir, { recursive: true });
+    this.sshConfigPath = path.join(workspacesDir, 'ssh_config');
+    this.knownHostsPath = path.join(workspacesDir, 'known_hosts');
     this.conn = new GceConnectionManager(projectId, zone, instanceName);
   }
 
@@ -76,7 +76,7 @@ export class GceCosProvider implements WorkerProvider {
       # Run if not already exists
       if ! docker ps -a | grep -q "maintainer-worker"; then
         docker run -d --name maintainer-worker --restart always \\
-          -v ~/.offload:/home/node/.offload:rw \\
+          -v ~/.workspace:/home/node/.workspace:rw \\
           -v ~/dev:/home/node/dev:rw \\
           -v ~/.gemini:/home/node/.gemini:rw \\
           ${imageUri} /bin/bash -c "while true; do sleep 1000; done"
@@ -149,7 +149,7 @@ export class GceCosProvider implements WorkerProvider {
     if (needsUpdate) {
         console.log('   ⚠️ Container missing or stale. Attempting refresh...');
         const imageUri = 'us-docker.pkg.dev/gemini-code-dev/gemini-cli/maintainer:latest';
-        const recoverCmd = `sudo docker pull ${imageUri} && (sudo docker rm -f maintainer-worker || true) && sudo docker run -d --name maintainer-worker --restart always -v ~/.offload:/home/node/.offload:rw -v ~/dev:/home/node/dev:rw -v ~/.gemini:/home/node/.gemini:rw ${imageUri} /bin/bash -c "while true; do sleep 1000; done"`;
+        const recoverCmd = `sudo docker pull ${imageUri} && (sudo docker rm -f maintainer-worker || true) && sudo docker run -d --name maintainer-worker --restart always -v ~/.workspace:/home/node/.workspace:rw -v ~/dev:/home/node/dev:rw -v ~/.gemini:/home/node/.gemini:rw ${imageUri} /bin/bash -c "while true; do sleep 1000; done"`;
         const recoverRes = await this.exec(recoverCmd);
         if (recoverRes !== 0) {
             console.error('   ❌ Critical: Failed to refresh maintainer container.');

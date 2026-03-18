@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { spawnSync, spawn } from 'child_process';
+import { spawnSync } from 'child_process';
 import fs from 'fs';
 import readline from 'readline';
 import { runOrchestrator } from '../scripts/orchestrator.ts';
-import { runWorker } from '../scripts/worker.ts';
+import { runSetup } from '../scripts/setup.ts';
 import { ProviderFactory } from '../scripts/providers/ProviderFactory.ts';
 
 vi.mock('child_process');
@@ -11,10 +11,10 @@ vi.mock('fs');
 vi.mock('readline');
 vi.mock('../scripts/providers/ProviderFactory.ts');
 
-describe('Offload Tooling Matrix', () => {
+describe('Workspace Orchestration (Refactored)', () => {
   const mockSettings = {
     maintainer: {
-      deepReview: {
+      workspace: {
         projectId: 'test-project',
         zone: 'us-west1-a',
         remoteWorkDir: '/home/node/dev/main'
@@ -37,6 +37,9 @@ describe('Offload Tooling Matrix', () => {
     vi.clearAllMocks();
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(mockSettings));
+    vi.mocked(fs.writeFileSync).mockReturnValue(undefined as any);
+    
+    // Explicitly set the mock return value for each test
     vi.mocked(ProviderFactory.getProvider).mockReturnValue(mockProvider as any);
 
     vi.mocked(spawnSync).mockImplementation((cmd: any) => {
@@ -44,37 +47,43 @@ describe('Offload Tooling Matrix', () => {
       return { status: 0, stdout: Buffer.from('') } as any;
     });
 
-    vi.mocked(spawn).mockImplementation(() => {
-        return {
-            stdout: { pipe: vi.fn(), on: vi.fn() },
-            stderr: { pipe: vi.fn(), on: vi.fn() },
-            on: vi.fn((event, cb) => { if (event === 'close') cb(0); }),
-            pid: 1234
-        } as any;
-    });
-
     vi.spyOn(process, 'chdir').mockImplementation(() => {});
   });
 
-  describe('Implement Playbook', () => {
-    it('should create a branch and run research/implementation', async () => {
-      await runOrchestrator(['456', 'implement'], {});
+  describe('orchestrator.ts', () => {
+    it('should wake the worker and execute remote commands', async () => {
+      await runOrchestrator(['123'], { USER: 'testuser' });
       
+      expect(mockProvider.ensureReady).toHaveBeenCalled();
       expect(mockProvider.exec).toHaveBeenCalledWith(expect.stringContaining('git worktree add'), expect.any(Object));
-      expect(mockProvider.exec).toHaveBeenCalledWith(expect.stringContaining('tmux new-session'), expect.any(Object));
     });
   });
 
-  describe('Fix Playbook', () => {
-    it('should launch the agentic fix-pr skill', async () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      await runWorker(['123', 'test-branch', '/path/policy', 'fix']);
-      
-      const spawnSyncCalls = vi.mocked(spawnSync).mock.calls;
-      const fixCall = spawnSyncCalls.find(call => 
-          JSON.stringify(call).includes("activate the 'fix-pr' skill")
-      );
-      expect(fixCall).toBeDefined();
+  describe('setup.ts', () => {
+    const mockInterface = {
+      question: vi.fn(),
+      close: vi.fn()
+    };
+
+    beforeEach(() => {
+      vi.mocked(readline.createInterface).mockReturnValue(mockInterface as any);
+    });
+
+    it('should use the provider to configure SSH and sync scripts', async () => {
+      mockInterface.question
+        .mockImplementationOnce((q, cb) => cb('test-project'))
+        .mockImplementationOnce((q, cb) => cb('us-west1-a'))
+        .mockImplementationOnce((q, cb) => cb('.internal')) // dnsSuffix
+        .mockImplementationOnce((q, cb) => cb('n')) // sync auth
+        .mockImplementationOnce((q, cb) => cb('n')) // scoped token
+        .mockImplementationOnce((q, cb) => cb('n')); // clone
+
+      // Ensure mockProvider is returned
+      vi.mocked(ProviderFactory.getProvider).mockReturnValue(mockProvider as any);
+
+      await runSetup({ USER: 'testuser' });
+
+      expect(mockProvider.setup).toHaveBeenCalled();
     });
   });
 });

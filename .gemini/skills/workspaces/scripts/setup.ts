@@ -41,9 +41,9 @@ async function confirm(question: string): Promise<boolean> {
 export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
   console.log(`
 ================================================================================
-🚀 GEMINI CLI: HIGH-PERFORMANCE OFFLOAD SYSTEM
+🚀 GEMINI WORKSPACES: HIGH-PERFORMANCE REMOTE DEVELOPMENT
 ================================================================================
-The offload system allows you to delegate heavy tasks (PR reviews, agentic fixes,
+Workspaces allow you to delegate heavy tasks (PR reviews, agentic fixes,
 and full builds) to a dedicated, high-performance GCP worker.
 ================================================================================
   `);
@@ -52,25 +52,31 @@ and full builds) to a dedicated, high-performance GCP worker.
   console.log('--------------------------------------------------------------------------------');
 
   // 1. Project Identity
-  const defaultProject = env.GOOGLE_CLOUD_PROJECT || env.OFFLOAD_PROJECT || '';
+  const defaultProject = env.GOOGLE_CLOUD_PROJECT || env.WORKSPACE_PROJECT || '';
   const projectId = await prompt('GCP Project ID', defaultProject, 
-    'The GCP Project where your offload worker will live. Your personal project is recommended.');
+    'The GCP Project where your workspace worker will live. Your personal project is recommended.');
   
   if (!projectId) {
       console.error('❌ Project ID is required. Set GOOGLE_CLOUD_PROJECT or enter it manually.');
       return 1;
   }
 
-  const zone = await prompt('Compute Zone', env.OFFLOAD_ZONE || 'us-west1-a', 
+  const zone = await prompt('Compute Zone', env.WORKSPACE_ZONE || 'us-west1-a', 
     'The physical location of your worker. us-west1-a is the team default.');
 
-  const terminalTarget = await prompt('Terminal UI Target (tab or window)', env.OFFLOAD_TERM_TARGET || 'tab',
+  const terminalTarget = await prompt('Terminal UI Target (tab or window)', env.WORKSPACE_TERM_TARGET || 'tab',
     'When a job starts, should it open in a new iTerm2 tab or a completely new window?');
 
-  // 2. Repository Discovery
+  // 2. Repository Discovery (Dynamic)
   console.log('\n🔍 Detecting repository origins...');
+  
+  // Get remote URL
+  const remoteUrlRes = spawnSync('git', ['remote', 'get-url', 'origin'], { stdio: 'pipe' });
+  const remoteUrl = remoteUrlRes.stdout.toString().trim();
+  
+  // Use gh to get full details
   const repoInfoRes = spawnSync('gh', ['repo', 'view', '--json', 'nameWithOwner,parent,isFork'], { stdio: 'pipe' });
-  let upstreamRepo = 'google-gemini/gemini-cli';
+  let upstreamRepo = 'google-gemini/gemini-cli'; // Fallback
   let userFork = upstreamRepo;
 
   if (repoInfoRes.status === 0) {
@@ -79,25 +85,28 @@ and full builds) to a dedicated, high-performance GCP worker.
           if (repoInfo.isFork && repoInfo.parent) {
               upstreamRepo = repoInfo.parent.nameWithOwner;
               userFork = repoInfo.nameWithOwner;
-              console.log(`   ✅ Detected Fork: ${userFork} (Upstream: ${upstreamRepo})`);
           } else {
-              console.log(`   ✅ Working on Upstream: ${upstreamRepo}`);
+              upstreamRepo = repoInfo.nameWithOwner;
+              userFork = repoInfo.nameWithOwner;
           }
       } catch (e) {}
   }
+  
+  console.log(`   ✅ Target Repo: ${userFork}`);
+  console.log(`   ✅ Upstream:    ${upstreamRepo}`);
 
   // 3. Security & Auth
-  let githubToken = env.OFFLOAD_GH_TOKEN || '';
+  let githubToken = env.WORKSPACE_GH_TOKEN || '';
   if (!githubToken) {
       const shouldGenToken = await confirm('\nGenerate a scoped GitHub token for the remote agent? (Highly Recommended)');
       if (shouldGenToken) {
           const baseUrl = 'https://github.com/settings/personal-access-tokens/new';
-          const name = `Offload-${env.USER}`;
+          const name = `Workspace-${env.USER}`;
           const repoParams = userFork !== upstreamRepo 
               ? `&repositories[]=${encodeURIComponent(upstreamRepo)}&repositories[]=${encodeURIComponent(userFork)}`
               : `&repositories[]=${encodeURIComponent(upstreamRepo)}`;
 
-          const magicLink = `${baseUrl}?name=${encodeURIComponent(name)}&description=Gemini+CLI+Offload+Worker${repoParams}&contents=write&pull_requests=write&metadata=read`;
+          const magicLink = `${baseUrl}?name=${encodeURIComponent(name)}&description=Gemini+Workspaces+Worker${repoParams}&contents=write&pull_requests=write&metadata=read`;
           const terminalLink = `\u001b]8;;${magicLink}\u0007${magicLink}\u001b]8;;\u0007`;
 
           console.log(`\n🔐 ACTION REQUIRED: Create a token with "Read/Write" access to contents & PRs:`);
@@ -106,16 +115,16 @@ and full builds) to a dedicated, high-performance GCP worker.
           githubToken = await prompt('Paste Scoped Token', '');
       }
   } else {
-      console.log('   ✅ Using GitHub token from environment (OFFLOAD_GH_TOKEN).');
+      console.log('   ✅ Using GitHub token from environment (WORKSPACE_GH_TOKEN).');
   }
 
   // 4. Save Confirmed State
-  const targetVM = `gcli-offload-${env.USER || 'mattkorwel'}`;
-  const settingsPath = path.join(REPO_ROOT, '.gemini/offload/settings.json');
+  const targetVM = `gcli-workspace-${env.USER || 'mattkorwel'}`;
+  const settingsPath = path.join(REPO_ROOT, '.gemini/workspaces/settings.json');
   if (!fs.existsSync(path.dirname(settingsPath))) fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
   
   const settings = {
-      deepReview: { 
+      workspace: { 
           projectId, zone, terminalTarget, 
           userFork, upstreamRepo,
           remoteHost: 'gcli-worker',
@@ -135,7 +144,7 @@ and full builds) to a dedicated, high-performance GCP worker.
   let status = await provider.getStatus();
   
   if (status.status === 'UNKNOWN' || status.status === 'ERROR') {
-    const shouldProvision = await confirm(`❌ Worker ${targetVM} not found. Provision it now?`);
+    const shouldProvision = await confirm(`❓ Worker ${targetVM} not found. Provision it now?`);
     if (!shouldProvision) return 1;
     
     const provisionRes = await provider.provision();
@@ -153,19 +162,19 @@ and full builds) to a dedicated, high-performance GCP worker.
   const setupRes = await provider.setup({ projectId, zone, dnsSuffix: '.internal.gcpnode.com' });
   if (setupRes !== 0) return setupRes;
 
-  const persistentScripts = `~/.offload/scripts`;
+  const persistentScripts = `~/.workspaces/scripts`;
 
   console.log(`\n📦 Synchronizing Logic & Credentials...`);
-  await provider.exec(`mkdir -p ~/dev/main ~/.gemini/policies ~/.offload/scripts`);
-  await provider.sync('.gemini/skills/offload/scripts/', `${persistentScripts}/`, { delete: true });
-  await provider.sync('.gemini/skills/offload/policy.toml', `~/.gemini/policies/offload-policy.toml`);
+  await provider.exec(`mkdir -p ~/dev/main ~/.gemini/policies ~/.workspaces/scripts`);
+  await provider.sync('.gemini/skills/workspaces/scripts/', `${persistentScripts}/`, { delete: true });
+  await provider.sync('.gemini/skills/workspaces/policy.toml', `~/.gemini/policies/workspace-policy.toml`);
 
   if (fs.existsSync(path.join(env.HOME || '', '.gemini/google_accounts.json'))) {
     await provider.sync(path.join(env.HOME || '', '.gemini/google_accounts.json'), `~/.gemini/google_accounts.json`);
   }
 
   if (githubToken) {
-    await provider.exec(`mkdir -p ~/.offload && echo ${githubToken} > ~/.offload/.gh_token && chmod 600 ~/.offload/.gh_token`);
+    await provider.exec(`mkdir -p ~/.workspaces && echo ${githubToken} > ~/.workspaces/.gh_token && chmod 600 ~/.workspaces/.gh_token`);
   }
 
   // Final Repo Sync
@@ -174,7 +183,7 @@ and full builds) to a dedicated, high-performance GCP worker.
   const cloneCmd = `rm -rf ~/dev/main && git clone --filter=blob:none ${repoUrl} ~/dev/main && cd ~/dev/main && git remote add upstream https://github.com/${upstreamRepo}.git && git fetch upstream`;
   await provider.exec(cloneCmd);
 
-  console.log('\n✨ ALL SYSTEMS GO! Your offload environment is ready.');
+  console.log('\n✨ ALL SYSTEMS GO! Your Gemini Workspace is ready.');
   return 0;
 }
 

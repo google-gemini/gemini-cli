@@ -5,22 +5,22 @@
  */
 
 /**
- * WorkerProvider interface defines the contract for different remote
+ * WorkspaceProvider interface defines the contract for different remote
  * execution environments (GCE, Workstations, etc.).
  */
-export interface WorkerProvider {
+export interface WorkspaceProvider {
   /**
    * Provisions the underlying infrastructure.
    */
   provision(): Promise<number>;
 
   /**
-   * Ensures the worker is running and accessible.
+   * Ensures the workspace is running and accessible.
    */
   ensureReady(): Promise<number>;
 
   /**
-   * Performs the initial setup of the worker (SSH, scripts, auth).
+   * Performs the initial setup of the workspace (SSH, scripts, auth).
    */
   setup(options: SetupOptions): Promise<number>;
 
@@ -30,27 +30,27 @@ export interface WorkerProvider {
   getRunCommand(command: string, options?: ExecOptions): string;
 
   /**
-   * Executes a command on the worker.
+   * Executes a command on the workspace.
    */
   exec(command: string, options?: ExecOptions): Promise<number>;
 
   /**
-   * Executes a command on the worker and returns the output.
+   * Executes a command on the workspace and returns the output.
    */
   getExecOutput(command: string, options?: ExecOptions): Promise<{ status: number; stdout: string; stderr: string }>;
 
   /**
-   * Synchronizes local files to the worker.
+   * Synchronizes local files to the workspace.
    */
   sync(localPath: string, remotePath: string, options?: SyncOptions): Promise<number>;
 
   /**
-   * Returns the status of the worker.
+   * Returns the status of the workspace.
    */
-  getStatus(): Promise<WorkerStatus>;
+  getStatus(): Promise<WorkspaceStatus>;
 
   /**
-   * Stops the worker to save costs.
+   * Stops the workspace to save costs.
    */
   stop(): Promise<number>;
 }
@@ -73,7 +73,7 @@ export interface SyncOptions {
   exclude?: string[];
 }
 
-export interface WorkerStatus {
+export interface WorkspaceStatus {
   name: string;
   status: string;
   internalIp?: string;

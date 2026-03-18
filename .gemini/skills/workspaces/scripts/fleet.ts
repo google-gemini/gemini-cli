@@ -1,7 +1,7 @@
 /**
- * Offload Fleet Manager
+ * Workspace Fleet Manager
  * 
- * Manages dynamic GCP workers for offloading tasks.
+ * Manages dynamic GCP workers for workspaces tasks.
  */
 import { spawnSync } from 'child_process';
 import path from 'path';
@@ -13,15 +13,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
 const USER = process.env.USER || 'mattkorwel';
-const INSTANCE_PREFIX = `gcli-offload-${USER}`;
+const INSTANCE_PREFIX = `gcli-workspace-${USER}`;
 const DEFAULT_ZONE = 'us-west1-a';
 
 function getProjectId(): string {
-  const settingsPath = path.join(REPO_ROOT, '.gemini/offload/settings.json');
+  const settingsPath = path.join(REPO_ROOT, '.gemini/workspaces/settings.json');
   if (fs.existsSync(settingsPath)) {
     try {
       const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-      return settings.deepReview?.projectId;
+      return settings.workspace?.projectId;
     } catch (e) {}
   }
   return process.env.GOOGLE_CLOUD_PROJECT || '';
@@ -30,11 +30,11 @@ function getProjectId(): string {
 async function listWorkers() {
   const projectId = getProjectId();
   if (!projectId) {
-    console.error('❌ Project ID not found. Run "npm run offload:setup" first.');
+    console.error('❌ Project ID not found. Run "npm run workspace:setup" first.');
     return;
   }
   
-  console.log(`🔍 Listing Offload Workers for ${USER} in ${projectId}...`);
+  console.log(`🔍 Listing Workspace Workers for ${USER} in ${projectId}...`);
   
   spawnSync('gcloud', [
     'compute', 'instances', 'list',
@@ -47,7 +47,7 @@ async function listWorkers() {
 async function provisionWorker() {
   const projectId = getProjectId();
   if (!projectId) {
-    console.error('❌ Project ID not found. Run "npm run offload:setup" first.');
+    console.error('❌ Project ID not found. Run "npm run workspace:setup" first.');
     return;
   }
 
@@ -74,18 +74,18 @@ async function stopWorker() {
     instanceName: INSTANCE_PREFIX 
   });
   
-  console.log(`🛑 Stopping offload worker: ${INSTANCE_PREFIX}...`);
+  console.log(`🛑 Stopping workspace worker: ${INSTANCE_PREFIX}...`);
   await provider.stop();
 }
 
 async function remoteStatus() {
-  const settingsPath = path.join(REPO_ROOT, '.gemini/offload/settings.json');
+  const settingsPath = path.join(REPO_ROOT, '.gemini/workspaces/settings.json');
   if (!fs.existsSync(settingsPath)) {
-      console.error('❌ Settings not found. Run "npm run offload:setup" first.');
+      console.error('❌ Settings not found. Run "npm run workspace:setup" first.');
       return;
   }
   const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-  const config = settings.deepReview;
+  const config = settings.workspace;
   
   const provider = ProviderFactory.getProvider({ 
     projectId: config?.projectId || getProjectId(), 
@@ -94,14 +94,14 @@ async function remoteStatus() {
   });
 
   console.log(`📡 Fetching remote status from ${INSTANCE_PREFIX}...`);
-  await provider.exec('tsx .offload/scripts/status.ts');
+  await provider.exec('tsx .workspaces/scripts/status.ts');
 }
 
 async function rebuildWorker() {
   const projectId = getProjectId();
   console.log(`🔥 Rebuilding worker ${INSTANCE_PREFIX}...`);
   
-  const knownHostsPath = path.join(REPO_ROOT, '.gemini/offload_known_hosts');
+  const knownHostsPath = path.join(REPO_ROOT, '.gemini/workspaces_known_hosts');
   if (fs.existsSync(knownHostsPath)) {
       console.log(`   - Clearing isolated known_hosts...`);
       fs.unlinkSync(knownHostsPath);

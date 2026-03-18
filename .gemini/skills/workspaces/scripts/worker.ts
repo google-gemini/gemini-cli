@@ -1,5 +1,5 @@
 /**
- * Universal Offload Worker (Remote)
+ * Universal Workspace Worker (Remote)
  * 
  * Stateful orchestrator for complex development loops.
  */

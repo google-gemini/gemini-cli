@@ -1,5 +1,5 @@
 /**
- * Offload Status Inspector (Local)
+ * Workspace Status Inspector (Local)
  * 
  * Orchestrates remote status retrieval via the WorkerProvider.
  */
@@ -12,23 +12,23 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
 async function runStatus(env: NodeJS.ProcessEnv = process.env) {
-  const settingsPath = path.join(REPO_ROOT, '.gemini/offload/settings.json');
+  const settingsPath = path.join(REPO_ROOT, '.gemini/workspaces/settings.json');
   if (!fs.existsSync(settingsPath)) {
-    console.error('❌ Settings not found. Run "npm run offload:setup" first.');
+    console.error('❌ Settings not found. Run "npm run workspace:setup" first.');
     return 1;
   }
   const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-  const config = settings.deepReview;
+  const config = settings.workspace;
   if (!config) {
     console.error('❌ Deep Review configuration not found.');
     return 1;
   }
 
   const { projectId, zone } = config;
-  const targetVM = `gcli-offload-${env.USER || 'mattkorwel'}`;
+  const targetVM = `gcli-workspace-${env.USER || 'mattkorwel'}`;
   const provider = ProviderFactory.getProvider({ projectId, zone, instanceName: targetVM });
 
-  console.log(`\n🛰️  Offload Mission Control: ${targetVM}`);
+  console.log(`\n🛰️  Workspace Mission Control: ${targetVM}`);
   console.log(`--------------------------------------------------------------------------------`);
   
   const status = await provider.getStatus();
@@ -43,10 +43,10 @@ async function runStatus(env: NodeJS.ProcessEnv = process.env) {
     if (tmuxRes.status === 0 && tmuxRes.stdout.trim()) {
       const sessions = tmuxRes.stdout.trim().split('\n');
       sessions.forEach(s => {
-        if (s.startsWith('offload-')) {
+        if (s.startsWith('workspace-')) {
           console.log(`     ✅ ${s}`);
         } else {
-          console.log(`     🔹 ${s} (Non-offload)`);
+          console.log(`     🔹 ${s} (Non-workspace)`);
         }
       });
     } else {

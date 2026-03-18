@@ -8,7 +8,7 @@ import { spawnSync } from 'child_process';
 import fs from 'fs';
 
 export async function runImplementPlaybook(issueNumber: string, workDir: string, policyPath: string, geminiBin: string) {
-  console.log(`🚀 Offload | IMPLEMENT (Supervisor Loop) | Issue #${issueNumber}`);
+  console.log(`🚀 Workspace | IMPLEMENT (Supervisor Loop) | Issue #${issueNumber}`);
   
   const ghView = spawnSync('gh', ['issue', 'view', issueNumber, '--json', 'title,body', '-q', '{title:.title,body:.body}'], { shell: true });
   const meta = JSON.parse(ghView.stdout.toString());

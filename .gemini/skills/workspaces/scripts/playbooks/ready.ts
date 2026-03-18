@@ -3,8 +3,8 @@ import path from 'path';
 
 export async function runReadyPlaybook(prNumber: string, targetDir: string, policyPath: string, geminiBin: string) {
   const runner = new TaskRunner(
-    path.join(targetDir, `.gemini/logs/offload-${prNumber}`),
-    `🚀 Offload | READY | PR #${prNumber}`
+    path.join(targetDir, `.gemini/logs/workspace-${prNumber}`),
+    `🚀 Workspace | READY | PR #${prNumber}`
   );
 
   runner.register([

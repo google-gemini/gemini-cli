@@ -1,8 +1,8 @@
 # Mission: GCE Container-First Refactor 🚀
 
 ## Current State
-- **Architecture**: Persistent GCE VM (`gcli-offload-mattkorwel`) with Fast-Path SSH (`gcli-worker`).
-- **Logic**: Decoupled scripts in `~/.offload/scripts`, using Git Worktrees for concurrency.
+- **Architecture**: Persistent GCE VM (`gcli-workspace-mattkorwel`) with Fast-Path SSH (`gcli-worker`).
+- **Logic**: Decoupled scripts in `~/.workspace/scripts`, using Git Worktrees for concurrency.
 - **Auth**: Scoped GitHub PATs mirrored via setup.
 
 ## The Goal (Container-OS Transition)
@@ -45,13 +45,13 @@ This phase is currently **ARCHIVED** in favor of the Persistent Workstation mode
 The orchestrator should launch isolated containers using this pattern:
 ```bash
 docker run --rm -it \
-  --name offload-job-id \
+  --name workspace-job-id \
   -v ~/dev/worktrees/job-id:/home/node/dev/worktree:rw \
   -v ~/dev/main:/home/node/dev/main:ro \
   -v ~/.gemini:/home/node/.gemini:ro \
   -w /home/node/dev/worktree \
   maintainer-image:latest \
-  sh -c "tsx ~/.offload/scripts/entrypoint.ts ..."
+  sh -c "tsx ~/.workspace/scripts/entrypoint.ts ..."
 ```
 
 ## How to Resume
