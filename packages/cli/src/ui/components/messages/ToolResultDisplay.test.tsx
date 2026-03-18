@@ -39,9 +39,7 @@ describe('ToolResultDisplay', () => {
       />,
       {
         config: makeFakeConfig({ useAlternateBuffer: true }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: true } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
     await waitUntilReady();
@@ -60,9 +58,7 @@ describe('ToolResultDisplay', () => {
       />,
       {
         config: makeFakeConfig({ useAlternateBuffer: true }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: true } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
     await waitUntilReady();
@@ -82,9 +78,7 @@ describe('ToolResultDisplay', () => {
       />,
       {
         config: makeFakeConfig({ useAlternateBuffer: true }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: true } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
     await waitUntilReady();
@@ -98,9 +92,7 @@ describe('ToolResultDisplay', () => {
       <ToolResultDisplay resultDisplay="**Some result**" terminalWidth={80} />,
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: false } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
       },
     );
     await waitUntilReady();
@@ -120,9 +112,7 @@ describe('ToolResultDisplay', () => {
       />,
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: false } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true },
       },
     );
@@ -143,9 +133,7 @@ describe('ToolResultDisplay', () => {
       />,
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: false } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true },
       },
     );
@@ -169,9 +157,7 @@ describe('ToolResultDisplay', () => {
       />,
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: false } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
       },
     );
     await waitUntilReady();
@@ -204,9 +190,7 @@ describe('ToolResultDisplay', () => {
       />,
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: false } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
       },
     );
     await waitUntilReady();
@@ -228,9 +212,7 @@ describe('ToolResultDisplay', () => {
       />,
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: false } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
       },
     );
     await waitUntilReady();
@@ -251,9 +233,7 @@ describe('ToolResultDisplay', () => {
       />,
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: false } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true },
       },
     );
@@ -273,9 +253,7 @@ describe('ToolResultDisplay', () => {
       />,
       {
         config: makeFakeConfig({ useAlternateBuffer: true }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: true } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
     await waitUntilReady();
@@ -357,9 +335,7 @@ describe('ToolResultDisplay', () => {
       />,
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: false } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true },
       },
     );
@@ -396,9 +372,7 @@ describe('ToolResultDisplay', () => {
       />,
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: false } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true },
       },
     );

@@ -673,9 +673,7 @@ describe('<Footer />', () => {
             errorCount: 2,
             showErrorDetails: false,
           },
-          settings: createMockSettings({
-            merged: { ui: { errorVerbosity: 'low' } },
-          }),
+          settings: createMockSettings({ ui: { errorVerbosity: 'low' } }),
         },
       );
       await waitUntilReady();
@@ -694,9 +692,7 @@ describe('<Footer />', () => {
             errorCount: 2,
             showErrorDetails: false,
           },
-          settings: createMockSettings({
-            merged: { ui: { errorVerbosity: 'low' } },
-          }),
+          settings: createMockSettings({ ui: { errorVerbosity: 'low' } }),
         },
       );
       await waitUntilReady();
@@ -715,9 +711,7 @@ describe('<Footer />', () => {
             errorCount: 2,
             showErrorDetails: false,
           },
-          settings: createMockSettings({
-            merged: { ui: { errorVerbosity: 'full' } },
-          }),
+          settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
         },
       );
       await waitUntilReady();
