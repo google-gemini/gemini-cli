@@ -139,8 +139,11 @@ function isResourceForbidden(
   isDirectory: boolean,
   ignoreManager: IgnoreManager,
 ): boolean {
-  // The `ignore` package expects paths to be relative to the workspace root.
-  let relativePath = path.relative(workspacePath, resourcePath);
+  // The `ignore` package expects paths to be relative to the workspace root
+  // and strictly uses forward slashes (/) as directory separators.
+  let relativePath = path
+    .relative(workspacePath, resourcePath)
+    .replace(/\\/g, '/');
 
   // Directories must end with a trailing slash to correctly match
   // directory-only rules.

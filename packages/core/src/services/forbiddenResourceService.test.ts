@@ -75,9 +75,9 @@ describe('forbiddenResourceService', () => {
 
     expect(resources).toEqual(
       expect.arrayContaining([
-        { path: '/workspace/node_modules', isDirectory: true },
-        { path: '/workspace/.env', isDirectory: false },
-        { path: '/workspace/secrets', isDirectory: true },
+        { absolutePath: '/workspace/node_modules', isDirectory: true },
+        { absolutePath: '/workspace/.env', isDirectory: false },
+        { absolutePath: '/workspace/secrets', isDirectory: true },
       ]),
     );
     expect(resources).toHaveLength(3);
