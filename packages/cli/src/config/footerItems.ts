@@ -18,6 +18,11 @@ export const ALL_ITEMS = [
     description: 'Current git branch name (not shown when unavailable)',
   },
   {
+    id: 'pull-request',
+    header: 'pr',
+    description: 'Pull Request associated with the current branch (not shown when unavailable)',
+  },
+  {
     id: 'sandbox',
     header: 'sandbox',
     description: 'Sandbox type and trust indicator',
@@ -64,6 +69,7 @@ export type FooterItemId = (typeof ALL_ITEMS)[number]['id'];
 export const DEFAULT_ORDER = [
   'workspace',
   'git-branch',
+  'pull-request',
   'sandbox',
   'model-name',
   'context-used',

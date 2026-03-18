@@ -416,6 +416,7 @@ export const AppContainer = (props: AppContainerProps) => {
   // Additional hooks moved from App.tsx
   const { stats: sessionStats } = useSessionStats();
   const branchName = useGitBranchName(config.getTargetDir());
+  const pullRequestInfo = usePullRequestInfo(config.getTargetDir(), branchName);
 
   // Layout measurements
   const mainControlsRef = useRef<DOMElement>(null);
@@ -2276,6 +2277,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       pendingHistoryItems,
       nightly,
       branchName,
+      pullRequestInfo,
       sessionStats,
       terminalWidth,
       terminalHeight,
@@ -2400,6 +2402,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       pendingHistoryItems,
       nightly,
       branchName,
+      pullRequestInfo,
       sessionStats,
       terminalWidth,
       terminalHeight,

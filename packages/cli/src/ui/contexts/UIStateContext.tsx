@@ -103,6 +103,8 @@ export interface AccountSuspensionInfo {
   appealLinkText?: string;
 }
 
+import type { PullRequestInfo } from '../hooks/usePullRequestInfo.js';
+
 export interface UIState {
   history: HistoryItem[];
   historyManager: UseHistoryManagerReturn;

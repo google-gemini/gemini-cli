@@ -186,6 +186,7 @@ export const Footer: React.FC = () => {
     targetDir,
     debugMode,
     branchName,
+    pullRequestInfo,
     debugMessage,
     corgiMode,
     errorCount,
@@ -287,6 +288,18 @@ export const Footer: React.FC = () => {
             header,
             () => <Text color={itemColor}>{branchName}</Text>,
             branchName.length,
+          );
+        }
+        break;
+      }
+      case 'pull-request': {
+        if (pullRequestInfo) {
+          const prText = `#${pullRequestInfo.number}`;
+          addCol(
+            id,
+            header,
+            () => <Text color={itemColor}>{prText}</Text>,
+            prText.length,
           );
         }
         break;
