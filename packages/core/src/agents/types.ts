@@ -14,6 +14,7 @@ import { type z } from 'zod';
 import type { ModelConfig } from '../services/modelConfigService.js';
 import type { AnySchema } from 'ajv';
 import type { A2AAuthConfig } from './auth-provider/types.js';
+import type { MCPServerConfig } from '../config/config.js';
 
 /**
  * Describes the possible termination modes for an agent.
@@ -86,6 +87,8 @@ export interface SubagentProgress {
   agentName: string;
   recentActivity: SubagentActivityItem[];
   state?: 'running' | 'completed' | 'error' | 'cancelled';
+  result?: string;
+  terminateReason?: AgentTerminateMode;
 }
 
 export function isSubagentProgress(obj: unknown): obj is SubagentProgress {
@@ -129,6 +132,11 @@ export interface LocalAgentDefinition<
 
   // Optional configs
   toolConfig?: ToolConfig;
+
+  /**
+   * Optional inline MCP servers for this agent.
+   */
+  mcpServers?: Record<string, MCPServerConfig>;
 
   /**
    * An optional function to process the raw output from the agent's final tool
