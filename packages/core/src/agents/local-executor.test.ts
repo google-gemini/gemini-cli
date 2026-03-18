@@ -400,8 +400,7 @@ describe('LocalAgentExecutor', () => {
       await executor.run({ goal: 'test' }, signal);
 
       const chatConstructorArgs = MockedGeminiChat.mock.calls[0];
-      const executionContext =
-        chatConstructorArgs[0];
+      const executionContext = chatConstructorArgs[0];
 
       expect(executionContext).toBeDefined();
       expect(executionContext.config).toBe(extendedContext.config);
