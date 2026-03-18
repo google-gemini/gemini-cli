@@ -309,6 +309,24 @@ describe('ACP extensions commands', () => {
         data: `Extension "active-ext" disabled for scope "${SettingScope.Session}".`,
       });
     });
+
+    it('returns error when disabling fails', async () => {
+      const command = new DisableExtensionCommand();
+      const extensionManager = createExtensionManager([
+        { name: 'missing-ext', isActive: true },
+      ]);
+      extensionManager.disableExtension.mockRejectedValue(
+        new Error('Extension not found.'),
+      );
+      const context = createContext(extensionManager);
+
+      const result = await command.execute(context, ['missing-ext']);
+
+      expect(result).toEqual({
+        name: 'extensions disable',
+        data: 'Failed to disable "missing-ext": Extension not found.',
+      });
+    });
   });
 
   describe('InstallExtensionCommand', () => {
@@ -465,6 +483,22 @@ describe('ACP extensions commands', () => {
       expect(result.data).toContain(
         'Failed to uninstall extension "bad-ext": cannot uninstall',
       );
+    });
+
+    it('returns error when uninstalling a non-existent extension', async () => {
+      const command = new UninstallExtensionCommand();
+      const extensionManager = createExtensionManager();
+      extensionManager.uninstallExtension.mockRejectedValue(
+        new Error('Extension not found.'),
+      );
+      const context = createContext(extensionManager);
+
+      const result = await command.execute(context, ['non-existent-ext']);
+
+      expect(result).toEqual({
+        name: 'extensions uninstall',
+        data: 'Failed to uninstall extension "non-existent-ext": Extension not found.',
+      });
     });
   });
 
