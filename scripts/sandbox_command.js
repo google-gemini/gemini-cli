@@ -70,7 +70,17 @@ if (!geminiSandbox) {
   geminiSandbox = process.env.GEMINI_SANDBOX;
 }
 
-geminiSandbox = (geminiSandbox || '').toLowerCase();
+if (typeof geminiSandbox === 'object' && geminiSandbox !== null) {
+  // If settings.sandbox is an object (e.g. { command: 'docker', network: true }),
+  // use the 'command' property if available, otherwise default to 'true' (enabled).
+  // The object structure allows for more detailed configuration which is handled by
+  // the CLI itself, but here we just need to know if sandbox is enabled and what
+  // the command is (if specified).
+  const sandboxConfig = geminiSandbox;
+  geminiSandbox = sandboxConfig.command || 'true';
+}
+
+geminiSandbox = String(geminiSandbox || '').toLowerCase();
 
 const commandExists = (cmd) => {
   const checkCommand = os.platform() === 'win32' ? 'where' : 'command -v';
