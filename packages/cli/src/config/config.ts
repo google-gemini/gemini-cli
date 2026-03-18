@@ -40,6 +40,7 @@ import {
   type HookDefinition,
   type HookEventName,
   type OutputFormat,
+  detectIdeFromEnv,
 } from '@google/gemini-cli-core';
 import {
   type Settings,
@@ -76,6 +77,7 @@ export interface CliArgs {
   yolo: boolean | undefined;
   approvalMode: string | undefined;
   policy: string[] | undefined;
+  adminPolicy: string[] | undefined;
   allowedMcpServerNames: string[] | undefined;
   allowedTools: string[] | undefined;
   acp?: boolean;
@@ -96,6 +98,21 @@ export interface CliArgs {
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
 }
+
+/**
+ * Helper to coerce comma-separated or multiple flag values into a flat array.
+ */
+const coerceCommaSeparated = (values: string[]): string[] => {
+  if (values.length === 1 && values[0] === '') {
+    return [''];
+  }
+  return values.flatMap((v) =>
+    v
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+};
 
 export async function parseArguments(
   settings: MergedSettings,
@@ -166,14 +183,15 @@ export async function parseArguments(
           nargs: 1,
           description:
             'Additional policy files or directories to load (comma-separated or multiple --policy)',
-          coerce: (policies: string[]) =>
-            // Handle comma-separated values
-            policies.flatMap((p) =>
-              p
-                .split(',')
-                .map((s) => s.trim())
-                .filter(Boolean),
-            ),
+          coerce: coerceCommaSeparated,
+        })
+        .option('admin-policy', {
+          type: 'array',
+          string: true,
+          nargs: 1,
+          description:
+            'Additional admin policy files or directories to load (comma-separated or multiple --admin-policy)',
+          coerce: coerceCommaSeparated,
         })
         .option('acp', {
           type: 'boolean',
@@ -189,11 +207,7 @@ export async function parseArguments(
           string: true,
           nargs: 1,
           description: 'Allowed MCP server names',
-          coerce: (mcpServerNames: string[]) =>
-            // Handle comma-separated values
-            mcpServerNames.flatMap((mcpServerName) =>
-              mcpServerName.split(',').map((m) => m.trim()),
-            ),
+          coerce: coerceCommaSeparated,
         })
         .option('allowed-tools', {
           type: 'array',
@@ -201,9 +215,7 @@ export async function parseArguments(
           nargs: 1,
           description:
             '[DEPRECATED: Use Policy Engine instead See https://geminicli.com/docs/core/policy-engine] Tools that are allowed to run without confirmation',
-          coerce: (tools: string[]) =>
-            // Handle comma-separated values
-            tools.flatMap((tool) => tool.split(',').map((t) => t.trim())),
+          coerce: coerceCommaSeparated,
         })
         .option('extensions', {
           alias: 'e',
@@ -212,11 +224,7 @@ export async function parseArguments(
           nargs: 1,
           description:
             'A list of extensions to use. If not provided, all extensions are used.',
-          coerce: (extensions: string[]) =>
-            // Handle comma-separated values
-            extensions.flatMap((extension) =>
-              extension.split(',').map((e) => e.trim()),
-            ),
+          coerce: coerceCommaSeparated,
         })
         .option('list-extensions', {
           alias: 'l',
@@ -236,10 +244,11 @@ export async function parseArguments(
             // When --resume passed without a value (`gemini --resume`): value = "" (string)
             // When --resume not passed at all: this `coerce` function is not called at all, and
             //   `yargsInstance.argv.resume` is undefined.
-            if (value === '') {
+            const trimmed = value.trim();
+            if (trimmed === '') {
               return RESUME_LATEST;
             }
-            return value;
+            return trimmed;
           },
         })
         .option('list-sessions', {
@@ -258,9 +267,7 @@ export async function parseArguments(
           nargs: 1,
           description:
             'Additional directories to include in the workspace (comma-separated or multiple --include-directories)',
-          coerce: (dirs: string[]) =>
-            // Handle comma-separated values
-            dirs.flatMap((dir) => dir.split(',').map((d) => d.trim())),
+          coerce: coerceCommaSeparated,
         })
         .option('screen-reader', {
           type: 'boolean',
@@ -423,8 +430,6 @@ export async function loadCliConfig(
   const { cwd = process.cwd(), projectHooks } = options;
   const debugMode = isDebugMode(argv);
 
-  const loadedSettings = loadSettings(cwd);
-
   if (argv.sandbox) {
     process.env['GEMINI_SANDBOX'] = 'true';
   }
@@ -468,9 +473,31 @@ export async function loadCliConfig(
     ...settings.context?.fileFiltering,
   };
 
+  //changes the includeDirectories to be absolute paths based on the cwd, and also include any additional directories specified via CLI args
   const includeDirectories = (settings.context?.includeDirectories || [])
     .map(resolvePath)
     .concat((argv.includeDirectories || []).map(resolvePath));
+
+  // When running inside VSCode with multiple workspace folders,
+  // automatically add the other folders as include directories
+  // so Gemini has context of all open folders, not just the cwd.
+  const ideWorkspacePath = process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'];
+  if (ideWorkspacePath) {
+    const realCwd = resolveToRealPath(cwd);
+    const ideFolders = ideWorkspacePath.split(path.delimiter).filter((p) => {
+      const trimmedPath = p.trim();
+      if (!trimmedPath) return false;
+      try {
+        return resolveToRealPath(trimmedPath) !== realCwd;
+      } catch (e) {
+        debugLogger.debug(
+          `[IDE] Skipping inaccessible workspace folder: ${trimmedPath} (${e instanceof Error ? e.message : String(e)})`,
+        );
+        return false;
+      }
+    });
+    includeDirectories.push(...ideFolders);
+  }
 
   const extensionManager = new ExtensionManager({
     settings,
@@ -488,11 +515,12 @@ export async function loadCliConfig(
     .getExtensions()
     .find((ext) => ext.isActive && ext.plan?.directory)?.plan;
 
-  const experimentalJitContext = settings.experimental?.jitContext ?? false;
+  const experimentalJitContext = settings.experimental.jitContext;
 
-  let extensionRegistryURI: string | undefined = trustedFolder
-    ? settings.experimental?.extensionRegistryURI
-    : undefined;
+  let extensionRegistryURI =
+    process.env['GEMINI_CLI_EXTENSION_REGISTRY_URI'] ??
+    (trustedFolder ? settings.experimental?.extensionRegistryURI : undefined);
+
   if (extensionRegistryURI && !extensionRegistryURI.startsWith('http')) {
     extensionRegistryURI = resolveToRealPath(
       path.resolve(cwd, resolvePath(extensionRegistryURI)),
@@ -643,7 +671,12 @@ export async function loadCliConfig(
       ...settings.mcp,
       allowed: argv.allowedMcpServerNames ?? settings.mcp?.allowed,
     },
-    policyPaths: argv.policy,
+    policyPaths: (argv.policy ?? settings.policyPaths)?.map((p) =>
+      resolvePath(p),
+    ),
+    adminPolicyPaths: (argv.adminPolicy ?? settings.adminPolicyPaths)?.map(
+      (p) => resolvePath(p),
+    ),
   };
 
   const { workspacePoliciesDir, policyUpdateConfirmationRequest } =
@@ -704,17 +737,33 @@ export async function loadCliConfig(
     }
   }
 
+  const isAcpMode = !!argv.acp || !!argv.experimentalAcp;
+  let clientName: string | undefined = undefined;
+  if (isAcpMode) {
+    const ide = detectIdeFromEnv();
+    if (
+      ide &&
+      (ide.name !== 'vscode' || process.env['TERM_PROGRAM'] === 'vscode')
+    ) {
+      clientName = `acp-${ide.name}`;
+    }
+  }
+
   return new Config({
-    acpMode: !!argv.acp || !!argv.experimentalAcp,
+    acpMode: isAcpMode,
+    clientName,
     sessionId,
     clientVersion: await getVersion(),
     embeddingModel: DEFAULT_GEMINI_EMBEDDING_MODEL,
     sandbox: sandboxConfig,
+    toolSandboxing: settings.security?.toolSandboxing ?? false,
     targetDir: cwd,
     includeDirectoryTree,
     includeDirectories,
     loadMemoryFromIncludeDirectories:
       settings.context?.loadMemoryFromIncludeDirectories || false,
+    discoveryMaxDirs: settings.context?.discoveryMaxDirs,
+    importFormat: settings.context?.importFormat,
     debugMode,
     question,
 
@@ -750,6 +799,9 @@ export async function loadCliConfig(
     approvalMode,
     disableYoloMode:
       settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,
+    disableAlwaysAllow:
+      settings.security?.disableAlwaysAllow ||
+      settings.admin?.secureModeEnabled,
     showMemoryUsage: settings.ui?.showMemoryUsage || false,
     accessibility: {
       ...settings.ui?.accessibility,
@@ -789,6 +841,7 @@ export async function loadCliConfig(
     disabledSkills: settings.skills?.disabled,
     experimentalJitContext: settings.experimental?.jitContext,
     modelSteering: settings.experimental?.modelSteering,
+    topicUpdateNarration: settings.experimental?.topicUpdateNarration,
     toolOutputMasking: settings.experimental?.toolOutputMasking,
     noBrowser: !!process.env['NO_BROWSER'],
     summarizeToolOutput: settings.model?.summarizeToolOutput,
@@ -823,6 +876,7 @@ export async function loadCliConfig(
     disableLLMCorrection: settings.tools?.disableLLMCorrection,
     rawOutput: argv.rawOutput,
     acceptRawOutputRisk: argv.acceptRawOutputRisk,
+    dynamicModelConfiguration: settings.experimental?.dynamicModelConfiguration,
     modelConfigServiceConfig: settings.modelConfigs,
     // TODO: loading of hooks based on workspace trust
     enableHooks: settings.hooksConfig.enabled,
@@ -830,7 +884,7 @@ export async function loadCliConfig(
     hooks: settings.hooks || {},
     disabledHooks: settings.hooksConfig?.disabled || [],
     projectHooks: projectHooks || {},
-    onModelChange: (model: string) => saveModelChange(loadedSettings, model),
+    onModelChange: (model: string) => saveModelChange(loadSettings(cwd), model),
     onReload: async () => {
       const refreshedSettings = loadSettings(cwd);
       return {
