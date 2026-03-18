@@ -1,6 +1,7 @@
 import { spawnSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import readline from 'readline';
 import { ProviderFactory } from './providers/ProviderFactory.ts';
