@@ -36,6 +36,26 @@ export interface IdeInfo {
   displayName: string;
 }
 
+function normalizeIdeInfoFromFile(ideInfoFromFile?: {
+  name?: unknown;
+  displayName?: unknown;
+}): IdeInfo | undefined {
+  const rawName = ideInfoFromFile?.name;
+  const rawDisplayName = ideInfoFromFile?.displayName;
+  if (typeof rawName !== 'string' || typeof rawDisplayName !== 'string') {
+    return undefined;
+  }
+
+  const name = rawName.trim();
+  const displayName = rawDisplayName.trim();
+
+  if (!name || !displayName) {
+    return undefined;
+  }
+
+  return { name, displayName };
+}
+
 export function isCloudShell(): boolean {
   return !!(process.env['EDITOR_IN_CLOUD_SHELL'] || process.env['CLOUD_SHELL']);
 }
@@ -146,13 +166,11 @@ export function detectIde(
     pid: number;
     command: string;
   },
-  ideInfoFromFile?: { name?: string; displayName?: string },
+  ideInfoFromFile?: { name?: unknown; displayName?: unknown },
 ): IdeInfo | undefined {
-  if (ideInfoFromFile?.name && ideInfoFromFile.displayName) {
-    return {
-      name: ideInfoFromFile.name,
-      displayName: ideInfoFromFile.displayName,
-    };
+  const normalizedIdeInfoFromFile = normalizeIdeInfoFromFile(ideInfoFromFile);
+  if (normalizedIdeInfoFromFile) {
+    return normalizedIdeInfoFromFile;
   }
 
   // Only VS Code, Sublime Text, JetBrains, Zed, and XCode integrations are currently supported.

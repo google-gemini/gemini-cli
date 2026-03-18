@@ -20,6 +20,7 @@ import {
   getConnectionConfigFromFile,
   validateWorkspacePath,
   getIdeServerHost,
+  getConnectionFailureMessage,
 } from './ide-connection-utils.js';
 import { pathToFileURL } from 'node:url';
 
@@ -441,13 +442,15 @@ describe('ide-connection-utils', () => {
         '/test/workspace/sub-dir',
       );
       expect(result.isValid).toBe(false);
-      expect(result.error).toContain('Failed to connect');
+      expect(result.error).toBe(getConnectionFailureMessage('noWorkspacePath'));
     });
 
     it('should return invalid if path is empty', () => {
       const result = validateWorkspacePath('', '/test/workspace/sub-dir');
       expect(result.isValid).toBe(false);
-      expect(result.error).toContain('please open a workspace folder');
+      expect(result.error).toBe(
+        getConnectionFailureMessage('workspaceNotOpen'),
+      );
     });
 
     it('should return invalid if cwd is not within workspace path', () => {
@@ -456,7 +459,45 @@ describe('ide-connection-utils', () => {
         '/test/workspace/sub-dir',
       );
       expect(result.isValid).toBe(false);
-      expect(result.error).toContain('Directory mismatch');
+      expect(result.error).toBe(
+        getConnectionFailureMessage('workspaceMismatch', {
+          workspacePaths: [path.resolve('/other/workspace')],
+        }),
+      );
+    });
+  });
+
+  describe('getConnectionFailureMessage', () => {
+    it('should normalize noWorkspacePath message', () => {
+      expect(getConnectionFailureMessage('noWorkspacePath')).toBe(
+        'Failed to connect to IDE companion extension. Please ensure the extension is running. To install the extension, run /ide install.',
+      );
+    });
+
+    it('should normalize workspaceNotOpen message', () => {
+      expect(getConnectionFailureMessage('workspaceNotOpen')).toBe(
+        'To use this feature, please open a workspace folder in your IDE and try again.',
+      );
+    });
+
+    it('should normalize workspaceMismatch message with paths', () => {
+      expect(
+        getConnectionFailureMessage('workspaceMismatch', {
+          workspacePaths: ['/a/ws', '/b/ws'],
+        }),
+      ).toBe(
+        'Directory mismatch. Gemini CLI is running in a different location than the open workspace in the IDE. Please run the CLI from one of the following directories: /a/ws, /b/ws',
+      );
+    });
+
+    it('should normalize connectFailed message with IDE display name', () => {
+      expect(
+        getConnectionFailureMessage('connectFailed', {
+          ideDisplayName: 'VS Code',
+        }),
+      ).toBe(
+        'Failed to connect to IDE companion extension in VS Code. Please ensure the extension is running. To install the extension, run /ide install.',
+      );
     });
   });
   describe('with special characters and encoding', () => {

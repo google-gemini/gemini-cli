@@ -104,7 +104,52 @@ If connected, this command will show the IDE it's connected to and a list of
 recently opened files it is aware of.
 
 > [!NOTE] The file list is limited to 10 recently accessed files within your
-> workspace and only includes local files on disk.)
+> workspace and only includes local files on disk.
+
+## Custom IDE Companion Quick Start
+
+Use this quick start if you are building a companion for a non-VS Code editor.
+For full protocol details, see the
+[IDE Companion Extension Spec](./ide-companion-spec.md).
+
+1. Start an MCP server in your IDE plugin and expose one HTTP endpoint (for
+   example `/mcp`) on a dynamic local port.
+2. Create the discovery directory:
+   - `os.tmpdir()/gemini/ide/`
+3. Write a discovery file named:
+   - `gemini-ide-server-${PID}-${PORT}.json`
+4. Write at least this JSON payload:
+
+```json
+{
+  "port": 12345,
+  "workspacePath": "/abs/projectA:/abs/projectB",
+  "authToken": "your-secret-token",
+  "ideInfo": {
+    "name": "custom-ide",
+    "displayName": "Custom IDE"
+  }
+}
+```
+
+- `workspacePath` must include all open workspace roots, joined by the OS path
+  delimiter (`:` on macOS/Linux, `;` on Windows).
+- `ideInfo.name` and `ideInfo.displayName` must both be non-empty strings.
+
+5. Open an IDE-integrated terminal inside one listed workspace root, then run:
+
+```bash
+gemini
+/ide enable
+/ide status
+```
+
+Expected result:
+
+- Status shows connected to your `ideInfo.displayName`.
+- If it shows `Disconnected`, check the message:
+  - `Directory mismatch`: run CLI from a listed workspace root.
+  - `Failed to connect`: verify discovery file path, port, and token.
 
 ### Working with diffs
 

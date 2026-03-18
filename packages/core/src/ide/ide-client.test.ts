@@ -28,6 +28,7 @@ import {
   getPortFromEnv,
   validateWorkspacePath,
   getIdeServerHost,
+  getConnectionFailureMessage,
 } from './ide-connection-utils.js';
 
 vi.mock('node:fs', async (importOriginal) => {
@@ -51,6 +52,14 @@ vi.mock('./detect-ide.js');
 vi.mock('node:os');
 vi.mock('./ide-connection-utils.js');
 
+function resetIdeClientSingleton() {
+  (
+    IdeClient as unknown as {
+      instancePromise: Promise<IdeClient> | null;
+    }
+  ).instancePromise = null;
+}
+
 describe('IdeClient', () => {
   let mockClient: Mocked<Client>;
   let mockHttpTransport: Mocked<StreamableHTTPClientTransport>;
@@ -58,8 +67,7 @@ describe('IdeClient', () => {
 
   beforeEach(async () => {
     // Reset singleton instance for test isolation
-    (IdeClient as unknown as { instance: IdeClient | undefined }).instance =
-      undefined;
+    resetIdeClientSingleton();
 
     // Mock environment variables
     process.env['GEMINI_CLI_IDE_WORKSPACE_PATH'] = '/test/workspace';
@@ -105,6 +113,50 @@ describe('IdeClient', () => {
   });
 
   describe('connect', () => {
+    it('should pass valid ideInfo from file to detectIde', async () => {
+      vi.mocked(getConnectionConfigFromFile).mockResolvedValue({
+        ideInfo: { name: 'custom-ide', displayName: 'Custom IDE' },
+      });
+
+      resetIdeClientSingleton();
+      await IdeClient.getInstance();
+
+      expect(detectIde).toHaveBeenLastCalledWith(
+        { pid: 12345, command: 'test-ide' },
+        { name: 'custom-ide', displayName: 'Custom IDE' },
+      );
+    });
+
+    it('should pass partial ideInfo from file to detectIde for fallback handling', async () => {
+      vi.mocked(getConnectionConfigFromFile).mockResolvedValue({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ideInfo: { name: 'custom-ide' } as any,
+      });
+
+      resetIdeClientSingleton();
+      await IdeClient.getInstance();
+
+      expect(detectIde).toHaveBeenLastCalledWith(
+        { pid: 12345, command: 'test-ide' },
+        { name: 'custom-ide' },
+      );
+    });
+
+    it('should pass malformed ideInfo from file to detectIde for fallback handling', async () => {
+      vi.mocked(getConnectionConfigFromFile).mockResolvedValue({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ideInfo: { name: 123, displayName: ['Custom IDE'] } as any,
+      });
+
+      resetIdeClientSingleton();
+      await IdeClient.getInstance();
+
+      expect(detectIde).toHaveBeenLastCalledWith(
+        { pid: 12345, command: 'test-ide' },
+        { name: 123, displayName: ['Custom IDE'] },
+      );
+    });
+
     it('should connect using HTTP when port is provided in config file', async () => {
       const config = { port: '8080' };
       vi.mocked(getConnectionConfigFromFile).mockResolvedValue(config);
@@ -218,6 +270,135 @@ describe('IdeClient', () => {
       );
     });
 
+    it('should attempt connection strategies in deterministic order across file and env fallbacks', async () => {
+      vi.mocked(getConnectionConfigFromFile).mockResolvedValue({
+        port: '8080',
+        stdio: { command: 'file-cmd', args: ['--file'] },
+      });
+      vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
+      vi.mocked(getPortFromEnv).mockReturnValue('9090');
+      vi.mocked(getStdioConfigFromEnv).mockReturnValue({
+        command: 'env-cmd',
+        args: ['--env'],
+      });
+
+      const fileHttpTransport = {
+        close: vi.fn(),
+      } as unknown as Mocked<StreamableHTTPClientTransport>;
+      const fileStdioTransport = {
+        close: vi.fn(),
+      } as unknown as Mocked<StdioClientTransport>;
+      const envHttpTransport = {
+        close: vi.fn(),
+      } as unknown as Mocked<StreamableHTTPClientTransport>;
+      const envStdioTransport = {
+        close: vi.fn(),
+      } as unknown as Mocked<StdioClientTransport>;
+
+      vi.mocked(StreamableHTTPClientTransport)
+        .mockReturnValueOnce(fileHttpTransport)
+        .mockReturnValueOnce(envHttpTransport);
+      vi.mocked(StdioClientTransport)
+        .mockReturnValueOnce(fileStdioTransport)
+        .mockReturnValueOnce(envStdioTransport);
+
+      mockClient.connect
+        .mockRejectedValueOnce(new Error('file-http-fail'))
+        .mockRejectedValueOnce(new Error('file-stdio-fail'))
+        .mockRejectedValueOnce(new Error('env-http-fail'))
+        .mockResolvedValueOnce(undefined);
+
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+
+      expect(mockClient.connect.mock.calls).toEqual([
+        [fileHttpTransport],
+        [fileStdioTransport],
+        [envHttpTransport],
+        [envStdioTransport],
+      ]);
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Connected,
+      );
+    });
+
+    it('should stop after file stdio succeeds and skip env attempts', async () => {
+      vi.mocked(getConnectionConfigFromFile).mockResolvedValue({
+        port: '8080',
+        stdio: { command: 'file-cmd', args: ['--file'] },
+      });
+      vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
+      vi.mocked(getPortFromEnv).mockReturnValue('9090');
+      vi.mocked(getStdioConfigFromEnv).mockReturnValue({
+        command: 'env-cmd',
+        args: ['--env'],
+      });
+
+      const fileHttpTransport = {
+        close: vi.fn(),
+      } as unknown as Mocked<StreamableHTTPClientTransport>;
+      const fileStdioTransport = {
+        close: vi.fn(),
+      } as unknown as Mocked<StdioClientTransport>;
+      vi.mocked(StreamableHTTPClientTransport).mockReturnValueOnce(
+        fileHttpTransport,
+      );
+      vi.mocked(StdioClientTransport).mockReturnValueOnce(fileStdioTransport);
+
+      mockClient.connect
+        .mockRejectedValueOnce(new Error('file-http-fail'))
+        .mockResolvedValueOnce(undefined);
+
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+
+      expect(mockClient.connect.mock.calls).toEqual([
+        [fileHttpTransport],
+        [fileStdioTransport],
+      ]);
+      expect(getPortFromEnv).not.toHaveBeenCalled();
+      expect(getStdioConfigFromEnv).not.toHaveBeenCalled();
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Connected,
+      );
+    });
+
+    it('should try env port before env stdio when file config is unavailable', async () => {
+      vi.mocked(getConnectionConfigFromFile).mockResolvedValue(undefined);
+      vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
+      vi.mocked(getPortFromEnv).mockReturnValue('9090');
+      vi.mocked(getStdioConfigFromEnv).mockReturnValue({
+        command: 'env-cmd',
+        args: ['--env'],
+      });
+
+      const envHttpTransport = {
+        close: vi.fn(),
+      } as unknown as Mocked<StreamableHTTPClientTransport>;
+      const envStdioTransport = {
+        close: vi.fn(),
+      } as unknown as Mocked<StdioClientTransport>;
+      vi.mocked(StreamableHTTPClientTransport).mockReturnValueOnce(
+        envHttpTransport,
+      );
+      vi.mocked(StdioClientTransport).mockReturnValueOnce(envStdioTransport);
+
+      mockClient.connect
+        .mockRejectedValueOnce(new Error('env-http-fail'))
+        .mockResolvedValueOnce(undefined);
+
+      const ideClient = await IdeClient.getInstance();
+      await ideClient.connect();
+
+      expect(mockClient.connect.mock.calls).toEqual([
+        [envHttpTransport],
+        [envStdioTransport],
+      ]);
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Connected,
+      );
+    });
+
     it('should be disconnected if no config is found', async () => {
       vi.mocked(getConnectionConfigFromFile).mockResolvedValue(undefined);
       vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
@@ -230,9 +411,40 @@ describe('IdeClient', () => {
       expect(ideClient.getConnectionStatus().status).toBe(
         IDEConnectionStatus.Disconnected,
       );
-      expect(ideClient.getConnectionStatus().details).toContain(
-        'Failed to connect',
+      expect(ideClient.getConnectionStatus().details).toBe(
+        getConnectionFailureMessage('connectFailed', {
+          ideDisplayName: 'VS Code',
+        }),
       );
+    });
+
+    it('should timeout a hanging HTTP connection attempt and return disconnected', async () => {
+      vi.useFakeTimers();
+      process.env['GEMINI_IDE_CONNECT_TIMEOUT_MS'] = '50';
+      vi.mocked(getConnectionConfigFromFile).mockResolvedValue({
+        port: '8080',
+      });
+      vi.mocked(validateWorkspacePath).mockReturnValue({ isValid: true });
+      mockClient.connect.mockImplementation(
+        () => new Promise<void>(() => undefined),
+      );
+
+      const ideClient = await IdeClient.getInstance();
+      let settled = false;
+      const connectPromise = ideClient.connect().finally(() => {
+        settled = true;
+      });
+
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(settled).toBe(true);
+      await connectPromise;
+      expect(ideClient.getConnectionStatus().status).toBe(
+        IDEConnectionStatus.Disconnected,
+      );
+      expect(mockHttpTransport.close).toHaveBeenCalled();
+      delete process.env['GEMINI_IDE_CONNECT_TIMEOUT_MS'];
+      vi.useRealTimers();
     });
   });
 

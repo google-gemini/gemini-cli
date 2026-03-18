@@ -33,6 +33,33 @@ export type ConnectionConfig = {
   stdio?: StdioConfig;
 };
 
+export type ConnectionFailureReason =
+  | 'noWorkspacePath'
+  | 'workspaceNotOpen'
+  | 'workspaceMismatch'
+  | 'connectFailed';
+
+export function getConnectionFailureMessage(
+  reason: ConnectionFailureReason,
+  options: {
+    ideDisplayName?: string;
+    workspacePaths?: string[];
+  } = {},
+): string {
+  switch (reason) {
+    case 'noWorkspacePath':
+      return `Failed to connect to IDE companion extension. Please ensure the extension is running. To install the extension, run /ide install.`;
+    case 'workspaceNotOpen':
+      return `To use this feature, please open a workspace folder in your IDE and try again.`;
+    case 'workspaceMismatch':
+      return `Directory mismatch. Gemini CLI is running in a different location than the open workspace in the IDE. Please run the CLI from one of the following directories: ${(options.workspacePaths ?? []).join(', ')}`;
+    case 'connectFailed':
+      return `Failed to connect to IDE companion extension in ${options.ideDisplayName ?? 'your IDE'}. Please ensure the extension is running. To install the extension, run /ide install.`;
+    default:
+      return `Failed to connect to IDE companion extension. Please ensure the extension is running. To install the extension, run /ide install.`;
+  }
+}
+
 export function validateWorkspacePath(
   ideWorkspacePath: string | undefined,
   cwd: string,
@@ -40,14 +67,14 @@ export function validateWorkspacePath(
   if (ideWorkspacePath === undefined) {
     return {
       isValid: false,
-      error: `Failed to connect to IDE companion extension. Please ensure the extension is running. To install the extension, run /ide install.`,
+      error: getConnectionFailureMessage('noWorkspacePath'),
     };
   }
 
   if (ideWorkspacePath === '') {
     return {
       isValid: false,
-      error: `To use this feature, please open a workspace folder in your IDE and try again.`,
+      error: getConnectionFailureMessage('workspaceNotOpen'),
     };
   }
 
@@ -63,9 +90,9 @@ export function validateWorkspacePath(
   if (!isWithinWorkspace) {
     return {
       isValid: false,
-      error: `Directory mismatch. Gemini CLI is running in a different location than the open workspace in the IDE. Please run the CLI from one of the following directories: ${ideWorkspacePaths.join(
-        ', ',
-      )}`,
+      error: getConnectionFailureMessage('workspaceMismatch', {
+        workspacePaths: ideWorkspacePaths,
+      }),
     };
   }
   return { isValid: true };
