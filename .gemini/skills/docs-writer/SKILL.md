@@ -95,19 +95,19 @@ accessible.
 
   Example:
 
-  <!-- prettier-ignore -->
-  > [!NOTE]
-  > This is an example of a multi-line note that will be preserved
-  > by Prettier.
+<!-- prettier-ignore -->
+> [!NOTE]
+> This is an example of a multi-line note that will be preserved
+> by Prettier.
 
 ### Structure
 - **BLUF:** Start with an introduction explaining what to expect.
 - **Experimental features:** If a feature is clearly noted as experimental,
   add the following note immediately after the introductory paragraph:
 
-  <!-- prettier-ignore -->
-  > [!NOTE]
-  > This is an experimental feature currently under active development.
+<!-- prettier-ignore -->
+> [!NOTE]
+> This is an experimental feature currently under active development.
 
 - **Headings:** Use hierarchical headings to support the user journey.
 - **Procedures:** 
