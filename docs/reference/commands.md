@@ -60,7 +60,7 @@ Slash commands provide meta-level control over the CLI itself.
     - `list` (selecting this opens the auto-saved session browser)
   - `-- checkpoints --`
     - `list`, `save`, `resume`, `delete`, `share` (manual tagged checkpoints)
-  - Unique prefixes (for example `/chat` or `/resume`) resolve to the same
+  - Unique prefixes (for example `/cha` or `/resu`) resolve to the same
     grouped menu.
 - **Sub-commands:**
   - **`debug`**
