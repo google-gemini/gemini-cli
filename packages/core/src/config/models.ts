@@ -4,6 +4,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export interface ModelResolutionContext {
+  useGemini3_1?: boolean;
+  useCustomTools?: boolean;
+  hasAccessToPreview?: boolean;
+  requestedModel?: string;
+}
+
 /**
  * Interface for the ModelConfigService to break circular dependencies.
  */
@@ -20,6 +27,17 @@ export interface IModelConfigService {
         };
       }
     | undefined;
+
+  resolveModelId(
+    requestedModel: string,
+    context?: ModelResolutionContext,
+  ): string;
+
+  resolveClassifierModelId(
+    tier: string,
+    requestedModel: string,
+    context?: ModelResolutionContext,
+  ): string;
 }
 
 /**
@@ -36,6 +54,8 @@ export const PREVIEW_GEMINI_3_1_MODEL = 'gemini-3.1-pro-preview';
 export const PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL =
   'gemini-3.1-pro-preview-customtools';
 export const PREVIEW_GEMINI_FLASH_MODEL = 'gemini-3-flash-preview';
+export const PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL =
+  'gemini-3.1-flash-lite-preview';
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-pro';
 export const DEFAULT_GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
 export const DEFAULT_GEMINI_FLASH_LITE_MODEL = 'gemini-2.5-flash-lite';
@@ -45,6 +65,7 @@ export const VALID_GEMINI_MODELS = new Set([
   PREVIEW_GEMINI_3_1_MODEL,
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   PREVIEW_GEMINI_FLASH_MODEL,
+  PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL,
   DEFAULT_GEMINI_MODEL,
   DEFAULT_GEMINI_FLASH_MODEL,
   DEFAULT_GEMINI_FLASH_LITE_MODEL,
@@ -78,7 +99,16 @@ export function resolveModel(
   useGemini3_1: boolean = false,
   useCustomToolModel: boolean = false,
   hasAccessToPreview: boolean = true,
+  config?: ModelCapabilityContext,
 ): string {
+  if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
+    return config.modelConfigService.resolveModelId(requestedModel, {
+      useGemini3_1,
+      useCustomTools: useCustomToolModel,
+      hasAccessToPreview,
+    });
+  }
+
   let resolved: string;
   switch (requestedModel) {
     case PREVIEW_GEMINI_MODEL:
@@ -141,6 +171,9 @@ export function resolveModel(
  *
  * @param requestedModel The current requested model (e.g. auto-gemini-2.5).
  * @param modelAlias The alias selected by the classifier ('flash' or 'pro').
+ * @param useGemini3_1 Whether to use Gemini 3.1 Pro Preview.
+ * @param useCustomToolModel Whether to use the custom tool model.
+ * @param config Optional config object for dynamic model configuration.
  * @returns The resolved concrete model name.
  */
 export function resolveClassifierModel(
@@ -148,7 +181,21 @@ export function resolveClassifierModel(
   modelAlias: string,
   useGemini3_1: boolean = false,
   useCustomToolModel: boolean = false,
+  hasAccessToPreview: boolean = true,
+  config?: ModelCapabilityContext,
 ): string {
+  if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
+    return config.modelConfigService.resolveClassifierModelId(
+      modelAlias,
+      requestedModel,
+      {
+        useGemini3_1,
+        useCustomTools: useCustomToolModel,
+        hasAccessToPreview,
+      },
+    );
+  }
+
   if (modelAlias === GEMINI_MODEL_ALIAS_FLASH) {
     if (
       requestedModel === DEFAULT_GEMINI_MODEL_AUTO ||
@@ -166,6 +213,7 @@ export function resolveClassifierModel(
   }
   return resolveModel(requestedModel, useGemini3_1, useCustomToolModel);
 }
+
 export function getDisplayString(
   model: string,
   config?: ModelCapabilityContext,
@@ -216,7 +264,8 @@ export function isPreviewModel(
     model === PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL ||
     model === PREVIEW_GEMINI_FLASH_MODEL ||
     model === PREVIEW_GEMINI_MODEL_AUTO ||
-    model === GEMINI_MODEL_ALIAS_AUTO
+    model === GEMINI_MODEL_ALIAS_AUTO ||
+    model === PREVIEW_GEMINI_3_1_FLASH_LITE_MODEL
   );
 }
 
@@ -285,7 +334,7 @@ export function isCustomModel(
   config?: ModelCapabilityContext,
 ): boolean {
   if (config?.getExperimentalDynamicModelConfiguration?.() === true) {
-    const resolved = resolveModel(model);
+    const resolved = resolveModel(model, false, false, true, config);
     return (
       config.modelConfigService.getModelDefinition(resolved)?.tier ===
         'custom' || !resolved.startsWith('gemini-')
