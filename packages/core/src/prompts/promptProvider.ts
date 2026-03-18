@@ -62,6 +62,9 @@ export class PromptProvider {
     const desiredModel = resolveModel(
       context.config.getActiveModel(),
       context.config.getGemini31LaunchedSync?.() ?? false,
+      false,
+      context.config.getHasAccessToPreviewModel?.() ?? true,
+      context.config,
     );
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
@@ -145,6 +148,7 @@ export class PromptProvider {
             })),
           skills.length > 0,
         ),
+        taskTracker: context.config.isTrackerEnabled(),
         hookContext: isSectionEnabled('hookContext') || undefined,
         primaryWorkflows: this.withSection(
           'primaryWorkflows',
@@ -178,7 +182,6 @@ export class PromptProvider {
           }),
           isPlanMode,
         ),
-        taskTracker: context.config.isTrackerEnabled(),
         operationalGuidelines: this.withSection(
           'operationalGuidelines',
           () => ({
@@ -239,6 +242,9 @@ export class PromptProvider {
     const desiredModel = resolveModel(
       context.config.getActiveModel(),
       context.config.getGemini31LaunchedSync?.() ?? false,
+      false,
+      context.config.getHasAccessToPreviewModel?.() ?? true,
+      context.config,
     );
     const isModernModel = supportsModernFeatures(desiredModel);
     const activeSnippets = isModernModel ? snippets : legacySnippets;
