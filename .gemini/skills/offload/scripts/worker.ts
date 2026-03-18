@@ -39,7 +39,11 @@ export async function runWorker(args: string[]) {
     process.chdir(targetDir);
   }
 
-  const geminiBin = path.join(workDir, 'node_modules/.bin/gemini');
+  // Find gemini binary (try worktree, then fallback to main repo)
+  let geminiBin = path.join(targetDir, 'node_modules/.bin/gemini');
+  if (!fs.existsSync(geminiBin)) {
+    geminiBin = path.join(path.dirname(targetDir), 'main/node_modules/.bin/gemini');
+  }
 
   // 2. Dispatch to Playbook
   switch (action) {

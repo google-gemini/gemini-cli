@@ -1,12 +1,13 @@
 /**
  * Offload Attach Utility (Local)
  * 
- * Re-attaches to a running tmux session on the worker.
+ * Re-attaches to a running tmux session inside the container on the worker.
  */
-import { spawnSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import { ProviderFactory } from './providers/ProviderFactory.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
@@ -23,23 +24,28 @@ export async function runAttach(args: string[], env: NodeJS.ProcessEnv = process
     return 1;
   }
 
-  // ... (load settings)
-  const settingsPath = path.join(REPO_ROOT, '.gemini/settings.json');
-  const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-  const config = settings.maintainer?.deepReview;
-  if (!config) {
+  const settingsPath = path.join(REPO_ROOT, '.gemini/offload/settings.json');
+  if (!fs.existsSync(settingsPath)) {
     console.error('❌ Settings not found. Run "npm run offload:setup" first.');
     return 1;
   }
+  const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  const config = settings.deepReview;
+  if (!config) {
+    console.error('❌ Deep Review configuration not found.');
+    return 1;
+  }
 
-  const { remoteHost } = config;
-  const sshConfigPath = path.join(REPO_ROOT, '.gemini/offload_ssh_config');
+  const { projectId, zone } = config;
+  const targetVM = `gcli-offload-${env.USER || 'mattkorwel'}`;
+  const provider = ProviderFactory.getProvider({ projectId, zone, instanceName: targetVM });
+
   const sessionName = `offload-${prNumber}-${action}`;
-  const finalSSH = `ssh -F ${sshConfigPath} -t ${remoteHost} "tmux attach-session -t ${sessionName}"`;
+  const containerAttach = `sudo docker exec -it maintainer-worker sh -c ${q(`tmux attach-session -t ${sessionName}`)}`;
+  const finalSSH = provider.getRunCommand(containerAttach, { interactive: true });
 
   console.log(`🔗 Attaching to session: ${sessionName}...`);
 
-  // 2. Open in iTerm2 if within Gemini AND NOT --local
   const isWithinGemini = !!env.GEMINI_CLI || !!env.GEMINI_SESSION_ID || !!env.GCLI_SESSION_ID;
   if (isWithinGemini && !isLocal) {
     const tempCmdPath = path.join(process.env.TMPDIR || '/tmp', `offload-attach-${prNumber}.sh`);
@@ -48,16 +54,18 @@ export async function runAttach(args: string[], env: NodeJS.ProcessEnv = process
     const appleScript = `
       on run argv
         tell application "iTerm"
-          set newWindow to (create window with default profile)
-          tell current session of newWindow
-            write text (item 1 of argv) & return
+          tell current window
+            set newTab to (create tab with default profile)
+            tell current session of newTab
+              write text (item 1 of argv) & return
+            end tell
           end tell
           activate
         end tell
       end run
     `;
     spawnSync('osascript', ['-', tempCmdPath], { input: appleScript });
-    console.log(`✅ iTerm2 window opened for ${sessionName}.`);
+    console.log(`✅ iTerm2 tab opened for ${sessionName}.`);
     return 0;
   }
 

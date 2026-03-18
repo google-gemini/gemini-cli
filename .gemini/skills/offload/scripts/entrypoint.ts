@@ -24,19 +24,29 @@ async function main() {
   const workDir = process.cwd(); // This is remoteWorkDir as set in review.ts
   const targetDir = path.join(workDir, branchName);
 
-  // Path to the locally installed binaries in the work directory
-  const tsxBin = path.join(workDir, 'node_modules/.bin/tsx');
-  const geminiBin = path.join(workDir, 'node_modules/.bin/gemini');
+  // Use global tsx or fallback to local
+  const tsxBin = 'tsx'; 
+  // Gemini bin will be needed by the interactive session later
+  // We'll try to find it in the main repo or current worktree
+  const geminiBin = fs.existsSync(path.join(workDir, 'node_modules/.bin/gemini')) 
+    ? path.join(workDir, 'node_modules/.bin/gemini')
+    : path.join(path.dirname(workDir), 'main/node_modules/.bin/gemini');
+
+  const action = process.argv[5] || 'review';
 
   // 1. Run the Parallel Reviewer
   console.log('🚀 Launching Parallel Review Worker...');
-  const workerResult = spawnSync(tsxBin, [path.join(__dirname, 'worker.ts'), prNumber, branchName, policyPath], {
+  console.log(`   - Script: ${path.join(__dirname, 'worker.ts')}`);
+  console.log(`   - Action: ${action}`);
+
+  const workerResult = spawnSync(tsxBin, [path.join(__dirname, 'worker.ts'), prNumber, branchName, policyPath, action], {
     stdio: 'inherit',
     env: { ...process.env, GEMINI_CLI_HOME: ISOLATED_CONFIG }
   });
 
   if (workerResult.status !== 0) {
-    console.error('❌ Worker failed. Check the logs above.');
+    console.error(`❌ Worker failed with exit code ${workerResult.status}.`);
+    if (workerResult.error) console.error('   Error:', workerResult.error.message);
   }
 
   // 2. Launch the Interactive Gemini Session (Local Nightly)
