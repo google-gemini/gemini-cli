@@ -85,6 +85,7 @@ import {
   buildUserSteeringHintPrompt,
   logBillingEvent,
   ApiKeyUpdatedEvent,
+  type InjectionSource,
 } from '@google/gemini-cli-core';
 import { validateAuthMethod } from '../config/auth.js';
 import process from 'node:process';
@@ -1089,13 +1090,16 @@ Logging in with Google... Restarting Gemini CLI to continue.
   }, []);
 
   useEffect(() => {
-    const hintListener = (hint: string) => {
-      pendingHintsRef.current.push(hint);
+    const hintListener = (text: string, source: InjectionSource) => {
+      if (source !== 'user_steering') {
+        return;
+      }
+      pendingHintsRef.current.push(text);
       setPendingHintCount((prev) => prev + 1);
     };
-    config.userHintService.onUserHint(hintListener);
+    config.injectionService.onInjection(hintListener);
     return () => {
-      config.userHintService.offUserHint(hintListener);
+      config.injectionService.offInjection(hintListener);
     };
   }, [config]);
 
@@ -1259,7 +1263,7 @@ Logging in with Google... Restarting Gemini CLI to continue.
       if (!trimmed) {
         return;
       }
-      config.userHintService.addUserHint(trimmed);
+      config.injectionService.addInjection(trimmed, 'user_steering');
       // Render hints with a distinct style.
       historyManager.addItem({
         type: 'hint',
@@ -1673,11 +1677,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
 
   const handleGlobalKeypress = useCallback(
     (key: Key): boolean => {
-      // Debug log keystrokes if enabled
-      if (settings.merged.general.debugKeystrokeLogging) {
-        debugLogger.log('[DEBUG] Keystroke:', JSON.stringify(key));
-      }
-
       if (shortcutsHelpVisible && isHelpDismissKey(key)) {
         setShortcutsHelpVisible(false);
       }
@@ -1856,7 +1855,6 @@ Logging in with Google... Restarting Gemini CLI to continue.
       activePtyId,
       handleSuspend,
       embeddedShellFocused,
-      settings.merged.general.debugKeystrokeLogging,
       refreshStatic,
       setCopyModeEnabled,
       tabFocusTimeoutRef,
