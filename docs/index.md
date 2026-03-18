@@ -1,8 +1,14 @@
-# Gemini CLI documentation
+# Welcome to Gemini CLI
 
-Gemini CLI brings the power of Gemini models directly into your terminal. Use it
-to understand code, automate tasks, and build workflows with your local project
-context.
+Unleash the power of Gemini models directly in your terminal. Gemini CLI is your
+intelligent assistant for coding, automation, and understanding complex
+projects. It seamlessly integrates with your local development environment,
+empowering you to accelerate workflows, tackle challenging tasks, and explore
+codebases with unprecedented ease.
+
+Whether you're refactoring code, debugging issues, or orchestrating complex
+automation, Gemini CLI works alongside you, transforming your terminal into a
+highly productive AI-powered workspace.
 
 ## Install
 
@@ -10,132 +16,60 @@ context.
 npm install -g @google/gemini-cli
 ```
 
-## Get started
+## Get Started in Minutes
 
-Jump in to Gemini CLI.
+Ready to boost your productivity? You can get Gemini CLI up and running right
+away.
 
-- **[Quickstart](./get-started/index.md):** Your first session with Gemini CLI.
-- **[Installation](./get-started/installation.md):** How to install Gemini CLI
-  on your system.
-- **[Authentication](./get-started/authentication.md):** Setup instructions for
-  personal and enterprise accounts.
-- **[Examples](./get-started/examples.md):** Practical examples of Gemini CLI in
-  action.
-- **[CLI cheatsheet](./cli/cli-reference.md):** A quick reference for common
-  commands and options.
-- **[Gemini 3 on Gemini CLI](./get-started/gemini-3.md):** Learn about Gemini 3
-  support in Gemini CLI.
+→ Dive into the [Quickstart Guide](./get-started.md) for your first interactive
+session.
 
-## Use Gemini CLI
+## What Can Gemini CLI Do For You?
 
-User-focused guides and tutorials for daily development workflows.
+Gemini CLI isn't just a chatbot; it's a powerful agent capable of executing a
+wide range of tasks directly within your project context.
 
-- **[File management](./cli/tutorials/file-management.md):** How to work with
-  local files and directories.
-- **[Get started with Agent skills](./cli/tutorials/skills-getting-started.md):**
-  Getting started with specialized expertise.
-- **[Manage context and memory](./cli/tutorials/memory-management.md):**
-  Managing persistent instructions and facts.
-- **[Execute shell commands](./cli/tutorials/shell-commands.md):** Executing
-  system commands safely.
-- **[Manage sessions and history](./cli/tutorials/session-management.md):**
-  Resuming, managing, and rewinding conversations.
-- **[Plan tasks with todos](./cli/tutorials/task-planning.md):** Using todos for
-  complex workflows.
-- **[Web search and fetch](./cli/tutorials/web-tools.md):** Searching and
-  fetching content from the web.
-- **[Set up an MCP server](./cli/tutorials/mcp-setup.md):** Set up an MCP
-  server.
-- **[Automate tasks](./cli/tutorials/automation.md):** Automate tasks.
+### Automate Code Refactoring and Generation
 
-## Features
+Tired of repetitive coding tasks? Let Gemini CLI handle them. It can understand
+your existing code to generate new features or refactor complex sections with
+ease.
 
-Technical documentation for each capability of Gemini CLI.
+→ Learn how to efficiently [Modify Code](./cli/tutorials/file-management.md).
 
-- **[Extensions](./extensions/index.md):** Extend Gemini CLI with new tools and
-  capabilities.
-- **[Agent Skills](./cli/skills.md):** Use specialized agents for specific
-  tasks.
-- **[Checkpointing](./cli/checkpointing.md):** Automatic session snapshots.
-- **[Headless mode](./cli/headless.md):** Programmatic and scripting interface.
-- **[Hooks](./hooks/index.md):** Customize Gemini CLI behavior with scripts.
-- **[IDE integration](./ide-integration/index.md):** Integrate Gemini CLI with
-  your favorite IDE.
-- **[MCP servers](./tools/mcp-server.md):** Connect to and use remote agents.
-- **[Model routing](./cli/model-routing.md):** Automatic fallback resilience.
-- **[Model selection](./cli/model.md):** Choose the best model for your needs.
-- **[Plan mode 🔬](./cli/plan-mode.md):** Use a safe, read-only mode for
-  planning complex changes.
-- **[Subagents 🔬](./core/subagents.md):** Using specialized agents for specific
-  tasks.
-- **[Remote subagents 🔬](./core/remote-agents.md):** Connecting to and using
-  remote agents.
-- **[Rewind](./cli/rewind.md):** Rewind and replay sessions.
-- **[Sandboxing](./cli/sandbox.md):** Isolate tool execution.
-- **[Settings](./cli/settings.md):** Full configuration reference.
-- **[Telemetry](./cli/telemetry.md):** Usage and performance metric details.
-- **[Token caching](./cli/token-caching.md):** Performance optimization.
+### Understand Complex Codebases
 
-## Configuration
+Navigate unfamiliar projects or quickly grasp new architectural patterns. Gemini
+CLI can analyze large code repositories, explaining their purpose, structure,
+and key functionalities.
 
-Settings and customization options for Gemini CLI.
+→ Explore examples of how to
+[Explain a Repository by Reading its Code](./get-started/examples.md).
 
-- **[Custom commands](./cli/custom-commands.md):** Personalized shortcuts.
-- **[Enterprise configuration](./cli/enterprise.md):** Professional environment
-  controls.
-- **[Ignore files (.geminiignore)](./cli/gemini-ignore.md):** Exclusion pattern
-  reference.
-- **[Model configuration](./cli/generation-settings.md):** Fine-tune generation
-  parameters like temperature and thinking budget.
-- **[Project context (GEMINI.md)](./cli/gemini-md.md):** Technical hierarchy of
-  context files.
-- **[System prompt override](./cli/system-prompt.md):** Instruction replacement
-  logic.
-- **[Themes](./cli/themes.md):** UI personalization technical guide.
-- **[Trusted folders](./cli/trusted-folders.md):** Security permission logic.
+### Streamline Your Development Workflows
 
-## Reference
+From planning tasks with TODOs to managing long-running sessions, Gemini CLI
+helps you orchestrate your entire development process, making complex workflows
+simpler and more efficient.
 
-Deep technical documentation and API specifications.
+→ Discover how to [Plan Tasks with ToDos](./cli/tutorials/task-planning.md) or
+[Manage Sessions and History](./cli/tutorials/session-management.md).
 
-- **[Command reference](./reference/commands.md):** Detailed slash command
-  guide.
-- **[Configuration reference](./reference/configuration.md):** Settings and
-  environment variables.
-- **[Keyboard shortcuts](./reference/keyboard-shortcuts.md):** Productivity
-  tips.
-- **[Memory import processor](./reference/memport.md):** How Gemini CLI
-  processes memory from various sources.
-- **[Policy engine](./reference/policy-engine.md):** Fine-grained execution
-  control.
-- **[Tools reference](./reference/tools.md):** Information on how tools are
-  defined, registered, and used.
+## Explore Key Features and Sections
 
-## Resources
+Dive deeper into Gemini CLI's capabilities and comprehensive documentation:
 
-Support, release history, and legal information.
+- **[Agent Skills](./cli/skills.md):** Extend Gemini CLI's intelligence with
+  specialized expertise for any domain or task.
+- **[Extensions](./extensions/index.md):** Customize and enhance your CLI
+  experience by building or installing new tools and functionalities.
+- **[Configuration](./reference/configuration.md):** Fine-tune Gemini CLI to
+  match your preferences and project requirements with detailed settings and
+  options.
+- **[Command Reference](./reference/commands.md):** A complete guide to all
+  available CLI commands, flags, and interactive prompts.
+- **[Resources](./resources/faq.md):** Find answers to frequently asked
+  questions, troubleshooting tips, and support information.
 
-- **[FAQ](./resources/faq.md):** Answers to frequently asked questions.
-- **[Quota and pricing](./resources/quota-and-pricing.md):** Limits and billing
-  details.
-- **[Terms and privacy](./resources/tos-privacy.md):** Official notices and
-  terms.
-- **[Troubleshooting](./resources/troubleshooting.md):** Common issues and
-  solutions.
-- **[Uninstall](./resources/uninstall.md):** How to uninstall Gemini CLI.
-
-## Development
-
-- **[Contribution guide](/docs/contributing):** How to contribute to Gemini CLI.
-- **[Integration testing](./integration-tests.md):** Running integration tests.
-- **[Issue and PR automation](./issue-and-pr-automation.md):** Automation for
-  issues and pull requests.
-- **[Local development](./local-development.md):** Setting up a local
-  development environment.
-- **[NPM package structure](./npm.md):** The structure of the NPM packages.
-
-## Releases
-
-- **[Release notes](./changelogs/index.md):** Release notes for all versions.
-- **[Stable release](./changelogs/latest.md):** The latest stable release.
-- **[Preview release](./changelogs/preview.md):** The latest preview release.
+We're excited for you to experience a new level of terminal productivity with
+Gemini CLI!
