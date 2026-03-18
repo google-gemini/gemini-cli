@@ -24,7 +24,6 @@ import {
   PREVIEW_GEMINI_3_1_CUSTOM_TOOLS_MODEL,
   isProModel,
   UserTierId,
-  debugLogger,
 } from '@google/gemini-cli-core';
 import { useKeypress } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
@@ -120,7 +119,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       config?.getExperimentalDynamicModelConfiguration?.() === true &&
       config.modelConfigService
     ) {
-      debugLogger.log('#################: Using the dynamic main options');
       const list = Object.entries(
         config.modelConfigService.getModelDefinitions?.() ?? {},
       )
@@ -193,7 +191,6 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
       config?.getExperimentalDynamicModelConfiguration?.() === true &&
       config.modelConfigService
     ) {
-      debugLogger.log('#################: Using the dynamic manual options');
       return Object.entries(
         config.modelConfigService.getModelDefinitions?.() ?? {},
       )
