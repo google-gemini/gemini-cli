@@ -568,55 +568,61 @@ describe('Session Cleanup (Refactored)', () => {
   });
 
   describe('Error handling & resilience', () => {
-    it('should handle file system errors gracefully (e.g., EACCES)', async () => {
-      const sessions = await seedSessions();
-      const config = createMockConfig();
-      const settings: Settings = {
-        general: { sessionRetention: { enabled: true, maxAge: '1d' } },
-      };
+    it.skipIf(process.platform === 'win32')(
+      'should handle file system errors gracefully (e.g., EACCES)',
+      async () => {
+        const sessions = await seedSessions();
+        const config = createMockConfig();
+        const settings: Settings = {
+          general: { sessionRetention: { enabled: true, maxAge: '1d' } },
+        };
 
-      // Make one of the files read-only and its parent directory read-only to simulate EACCES during unlink
-      const targetFile = path.join(chatsDir, sessions[1].fileName);
-      await fs.chmod(targetFile, 0o444);
-      // Wait we want unlink to fail, so we make the directory read-only temporarily
-      await fs.chmod(chatsDir, 0o555);
+        // Make one of the files read-only and its parent directory read-only to simulate EACCES during unlink
+        const targetFile = path.join(chatsDir, sessions[1].fileName);
+        await fs.chmod(targetFile, 0o444);
+        // Wait we want unlink to fail, so we make the directory read-only temporarily
+        await fs.chmod(chatsDir, 0o555);
 
-      try {
-        const result = await cleanupExpiredSessions(config, settings);
+        try {
+          const result = await cleanupExpiredSessions(config, settings);
 
-        // It shouldn't crash
-        expect(result.disabled).toBe(false);
-        // It should have tried and failed to delete the old session
-        expect(result.failed).toBeGreaterThan(0);
-      } finally {
-        // Restore permissions so cleanup can proceed in afterEach
-        await fs.chmod(chatsDir, 0o777);
-        await fs.chmod(targetFile, 0o666);
-      }
-    });
+          // It shouldn't crash
+          expect(result.disabled).toBe(false);
+          // It should have tried and failed to delete the old session
+          expect(result.failed).toBeGreaterThan(0);
+        } finally {
+          // Restore permissions so cleanup can proceed in afterEach
+          await fs.chmod(chatsDir, 0o777);
+          await fs.chmod(targetFile, 0o666);
+        }
+      },
+    );
 
-    it('should handle global read errors gracefully', async () => {
-      const config = createMockConfig();
-      const settings: Settings = {
-        general: { sessionRetention: { enabled: true, maxAge: '1d' } },
-      };
+    it.skipIf(process.platform === 'win32')(
+      'should handle global read errors gracefully',
+      async () => {
+        const config = createMockConfig();
+        const settings: Settings = {
+          general: { sessionRetention: { enabled: true, maxAge: '1d' } },
+        };
 
-      // Make the chats directory unreadable
-      await fs.chmod(chatsDir, 0o000);
+        // Make the chats directory unreadable
+        await fs.chmod(chatsDir, 0o000);
 
-      try {
-        const result = await cleanupExpiredSessions(config, settings);
+        try {
+          const result = await cleanupExpiredSessions(config, settings);
 
-        // It shouldn't crash, but it should fail
-        expect(result.disabled).toBe(false);
-        expect(result.failed).toBe(1);
-        expect(debugLogger.warn).toHaveBeenCalledWith(
-          expect.stringContaining('Session cleanup failed'),
-        );
-      } finally {
-        await fs.chmod(chatsDir, 0o777);
-      }
-    });
+          // It shouldn't crash, but it should fail
+          expect(result.disabled).toBe(false);
+          expect(result.failed).toBe(1);
+          expect(debugLogger.warn).toHaveBeenCalledWith(
+            expect.stringContaining('Session cleanup failed'),
+          );
+        } finally {
+          await fs.chmod(chatsDir, 0o777);
+        }
+      },
+    );
 
     it('should handle unexpected errors without throwing (e.g. string errors)', async () => {
       await seedSessions();
