@@ -33,6 +33,7 @@ export const compressCommand: SlashCommand = {
         originalTokenCount: null,
         newTokenCount: null,
         compressionStatus: null,
+        model: context.services.config?.getModel(),
       },
     };
 
@@ -53,6 +54,7 @@ export const compressCommand: SlashCommand = {
               originalTokenCount: compressed.originalTokenCount,
               newTokenCount: compressed.newTokenCount,
               compressionStatus: compressed.compressionStatus,
+              model: context.services.config?.getModel(),
             },
           } as HistoryItemCompression,
           Date.now(),

@@ -20,13 +20,11 @@ import { useVimMode } from '../contexts/VimModeContext.js';
 import { useAlternateBuffer } from '../hooks/useAlternateBuffer.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { isNarrowWidth } from '../utils/isNarrowWidth.js';
-import { isContextUsageHigh } from '../utils/contextUsage.js';
 import { theme } from '../semantic-colors.js';
 import { GENERIC_WORKING_LABEL } from '../textConstants.js';
 import { INTERACTIVE_SHELL_WAITING_PHRASE } from '../hooks/usePhraseCycler.js';
 import { StreamingState, type HistoryItemToolGroup } from '../types.js';
 import { LoadingIndicator } from './LoadingIndicator.js';
-import { ContextUsageDisplay } from './ContextUsageDisplay.js';
 import { StatusDisplay } from './StatusDisplay.js';
 import { HorizontalLine } from './shared/HorizontalLine.js';
 import { ToastDisplay, shouldShowToast } from './ToastDisplay.js';
@@ -257,11 +255,6 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const miniMode_ShowShortcuts = shouldReserveSpaceForShortcutsHint;
   const miniMode_ShowStatus = showLoadingIndicator || hasAnyHooks;
   const miniMode_ShowTip = showTipLine;
-  const miniMode_ShowContext = isContextUsageHigh(
-    uiState.sessionStats.lastPromptTokenCount,
-    uiState.currentModel,
-    settings.merged.model?.compressionThreshold,
-  );
 
   // Composite Mini Mode Triggers
   const showRow1_MiniMode =
@@ -270,7 +263,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
     miniMode_ShowShortcuts ||
     miniMode_ShowTip;
 
-  const showRow2_MiniMode = miniMode_ShowApprovalMode || miniMode_ShowContext;
+  const showRow2_MiniMode = miniMode_ShowApprovalMode;
 
   // Final Display Rules (Stable Footer Architecture)
   const showRow1 = showUiDetails || showRow1_MiniMode;
@@ -488,21 +481,8 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
               alignItems="center"
               marginLeft={isNarrow ? 1 : 0}
             >
-              {(showUiDetails || miniMode_ShowContext) && (
+              {showUiDetails && (
                 <StatusDisplay hideContextSummary={hideContextSummary} />
-              )}
-              {miniMode_ShowContext && !showUiDetails && (
-                <Box marginLeft={1}>
-                  <ContextUsageDisplay
-                    promptTokenCount={uiState.sessionStats.lastPromptTokenCount}
-                    model={
-                      typeof uiState.currentModel === 'string'
-                        ? uiState.currentModel
-                        : undefined
-                    }
-                    terminalWidth={uiState.terminalWidth}
-                  />
-                </Box>
               )}
             </Box>
           </Box>

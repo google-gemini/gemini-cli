@@ -575,9 +575,19 @@ const SETTINGS_SCHEMA = {
         label: 'Hide Context Summary',
         category: 'UI',
         requiresRestart: false,
-        default: false,
+        default: true,
         description:
           'Hide the context summary (GEMINI.md, MCP servers) above the input.',
+        showInDialog: true,
+      },
+      showContextWindowWarning: {
+        type: 'boolean',
+        label: 'Show Context Window Warning',
+        category: 'UI',
+        requiresRestart: false,
+        default: false,
+        description:
+          'Show a warning message when the context window limit is nearly reached.',
         showInDialog: true,
       },
       footer: {

@@ -52,9 +52,9 @@ describe('<CompressionMessage />', () => {
       );
       const output = lastFrame();
 
-      expect(output).toContain('✦');
+      expect(output).not.toContain('✦');
       expect(output).toContain(
-        'Chat history compressed from 100 to 50 tokens.',
+        'Context compressed from 100 tokens to 50 tokens. Change threshold in /settings.',
       );
       unmount();
     });
@@ -76,9 +76,9 @@ describe('<CompressionMessage />', () => {
         );
         const output = lastFrame();
 
-        expect(output).toContain('✦');
+        expect(output).not.toContain('✦');
         expect(output).toContain(
-          `compressed from ${original} to ${newTokens} tokens`,
+          `Context compressed from ${original.toLocaleString()} tokens to ${newTokens.toLocaleString()} tokens. Change threshold in /settings.`,
         );
         expect(output).not.toContain('Skipping compression');
         expect(output).not.toContain('did not reduce size');
@@ -101,7 +101,7 @@ describe('<CompressionMessage />', () => {
       );
       const output = lastFrame();
 
-      expect(output).toContain('✦');
+      expect(output).not.toContain('✦');
       expect(output).toContain(
         'Compression was not beneficial for this history size.',
       );
@@ -133,17 +133,19 @@ describe('<CompressionMessage />', () => {
       {
         original: 200,
         newTokens: 80,
-        expected: 'compressed from 200 to 80 tokens',
+        expected:
+          'Context compressed from 200 tokens to 80 tokens. Change threshold in /settings.',
       },
       {
         original: 500,
         newTokens: 150,
-        expected: 'compressed from 500 to 150 tokens',
+        expected:
+          'Context compressed from 500 tokens to 150 tokens. Change threshold in /settings.',
       },
       {
         original: 1500,
         newTokens: 400,
-        expected: 'compressed from 1500 to 400 tokens',
+        expected: `Context compressed from ${(1500).toLocaleString()} tokens to 400 tokens. Change threshold in /settings.`,
       },
     ])(
       'displays correct compression statistics (from $original to $newTokens)',
@@ -229,9 +231,9 @@ describe('<CompressionMessage />', () => {
       );
       const output = lastFrame();
 
-      expect(output).toContain('✦');
+      expect(output).not.toContain('✦');
       expect(output).toContain(
-        'Chat history compression failed: the model returned an empty summary.',
+        'Chat history compression failed: empty summary.',
       );
       unmount();
     });

@@ -614,7 +614,7 @@ export class GeminiClient {
       yield { type: GeminiEventType.ChatCompressed, value: compressed };
     }
 
-    const remainingTokenCount =
+    let remainingTokenCount =
       tokenLimit(modelForLimitCheck) - this.getChat().getLastPromptTokenCount();
 
     await this.tryMaskToolOutputs(this.getHistory());
@@ -628,11 +628,28 @@ export class GeminiClient {
     );
 
     if (estimatedRequestTokenCount > remainingTokenCount) {
-      yield {
-        type: GeminiEventType.ContextWindowWillOverflow,
-        value: { estimatedRequestTokenCount, remainingTokenCount },
-      };
-      return turn;
+      if (!this.config.getShowContextWindowWarning()) {
+        const forcedCompressed = await this.tryCompressChat(prompt_id, true);
+        if (
+          forcedCompressed.compressionStatus === CompressionStatus.COMPRESSED
+        ) {
+          yield {
+            type: GeminiEventType.ChatCompressed,
+            value: forcedCompressed,
+          };
+          remainingTokenCount =
+            tokenLimit(modelForLimitCheck) -
+            this.getChat().getLastPromptTokenCount();
+        }
+      }
+
+      if (estimatedRequestTokenCount > remainingTokenCount) {
+        yield {
+          type: GeminiEventType.ContextWindowWillOverflow,
+          value: { estimatedRequestTokenCount, remainingTokenCount },
+        };
+        return turn;
+      }
     }
 
     // Prevent context updates from being sent while a tool call is

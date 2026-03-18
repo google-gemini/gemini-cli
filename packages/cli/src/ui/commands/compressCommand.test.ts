@@ -39,6 +39,7 @@ describe('compressCommand', () => {
         originalTokenCount: null,
         newTokenCount: null,
         compressionStatus: null,
+        model: 'test-model',
       },
     };
     await compressCommand.action!(context, '');
@@ -70,6 +71,7 @@ describe('compressCommand', () => {
         compressionStatus: null,
         originalTokenCount: null,
         newTokenCount: null,
+        model: 'test-model',
       },
     });
 
@@ -86,6 +88,7 @@ describe('compressCommand', () => {
           compressionStatus: CompressionStatus.COMPRESSED,
           originalTokenCount: 200,
           newTokenCount: 100,
+          model: 'test-model',
         },
       },
       expect.any(Number),
