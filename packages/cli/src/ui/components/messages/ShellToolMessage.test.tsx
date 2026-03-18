@@ -147,9 +147,7 @@ describe('<ShellToolMessage />', () => {
         },
         {
           config: makeFakeConfig({ useAlternateBuffer: true }),
-          settings: createMockSettings({
-            merged: { ui: { useAlternateBuffer: true } },
-          }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiState: {
             embeddedShellFocused: true,
             activePtyId: 1,
@@ -164,9 +162,7 @@ describe('<ShellToolMessage />', () => {
         },
         {
           config: makeFakeConfig({ useAlternateBuffer: true }),
-          settings: createMockSettings({
-            merged: { ui: { useAlternateBuffer: true } },
-          }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiState: {
             embeddedShellFocused: false,
             activePtyId: 1,
@@ -235,9 +231,7 @@ describe('<ShellToolMessage />', () => {
           {
             uiActions,
             config: makeFakeConfig({ useAlternateBuffer: true }),
-            settings: createMockSettings({
-              merged: { ui: { useAlternateBuffer: true } },
-            }),
+            settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
             uiState: {
               activePtyId: focused ? 1 : 2,
               embeddedShellFocused: focused,
@@ -266,9 +260,7 @@ describe('<ShellToolMessage />', () => {
         {
           uiActions,
           config: makeFakeConfig({ useAlternateBuffer: false }),
-          settings: createMockSettings({
-            merged: { ui: { useAlternateBuffer: false } },
-          }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         },
       );
 
@@ -293,9 +285,7 @@ describe('<ShellToolMessage />', () => {
         {
           uiActions,
           config: makeFakeConfig({ useAlternateBuffer: true }),
-          settings: createMockSettings({
-            merged: { ui: { useAlternateBuffer: true } },
-          }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiState: {
             constrainHeight: false,
           },
@@ -325,9 +315,7 @@ describe('<ShellToolMessage />', () => {
         {
           uiActions,
           config: makeFakeConfig({ useAlternateBuffer: true }),
-          settings: createMockSettings({
-            merged: { ui: { useAlternateBuffer: true } },
-          }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiState: {
             constrainHeight: false,
           },

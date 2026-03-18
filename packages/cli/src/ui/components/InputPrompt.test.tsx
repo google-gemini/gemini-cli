@@ -3514,9 +3514,7 @@ describe('InputPrompt', () => {
         {
           mouseEventsEnabled: true,
           config: makeFakeConfig({ useAlternateBuffer: true }),
-          settings: createMockSettings({
-            merged: { ui: { useAlternateBuffer: true } },
-          }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiActions,
         },
       );
@@ -3608,9 +3606,7 @@ describe('InputPrompt', () => {
         {
           mouseEventsEnabled: true,
           config: makeFakeConfig({ useAlternateBuffer: true }),
-          settings: createMockSettings({
-            merged: { ui: { useAlternateBuffer: true } },
-          }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
           uiActions,
         },
       );

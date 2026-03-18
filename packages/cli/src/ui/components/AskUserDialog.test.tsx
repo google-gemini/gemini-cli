@@ -317,9 +317,7 @@ describe('AskUserDialog', () => {
           />,
           {
             config: makeFakeConfig({ useAlternateBuffer }),
-            settings: createMockSettings({
-              merged: { ui: { useAlternateBuffer } },
-            }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
 
@@ -1300,9 +1298,7 @@ describe('AskUserDialog', () => {
       </UIStateContext.Provider>,
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: false } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
       },
     );
 
@@ -1341,9 +1337,7 @@ describe('AskUserDialog', () => {
       </UIStateContext.Provider>,
       {
         config: makeFakeConfig({ useAlternateBuffer: true }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: true } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
 

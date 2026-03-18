@@ -87,9 +87,7 @@ describe('<HistoryItemDisplay />', () => {
         <HistoryItemDisplay {...baseItem} item={item} />,
         {
           config: makeFakeConfig({ useAlternateBuffer }),
-          settings: createMockSettings({
-            merged: { ui: { useAlternateBuffer } },
-          }),
+          settings: createMockSettings({ ui: { useAlternateBuffer } }),
         },
       );
       await waitUntilReady();
@@ -284,9 +282,7 @@ describe('<HistoryItemDisplay />', () => {
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <HistoryItemDisplay {...baseItem} item={item} />,
         {
-          settings: createMockSettings({
-            merged: { ui: { inlineThinkingMode: 'full' } },
-          }),
+          settings: createMockSettings({ ui: { inlineThinkingMode: 'full' } }),
         },
       );
       await waitUntilReady();
@@ -304,9 +300,7 @@ describe('<HistoryItemDisplay />', () => {
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <HistoryItemDisplay {...baseItem} item={item} isFirstThinking={true} />,
         {
-          settings: createMockSettings({
-            merged: { ui: { inlineThinkingMode: 'full' } },
-          }),
+          settings: createMockSettings({ ui: { inlineThinkingMode: 'full' } }),
         },
       );
       await waitUntilReady();
@@ -324,9 +318,7 @@ describe('<HistoryItemDisplay />', () => {
       const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
         <HistoryItemDisplay {...baseItem} item={item} />,
         {
-          settings: createMockSettings({
-            merged: { ui: { inlineThinkingMode: 'off' } },
-          }),
+          settings: createMockSettings({ ui: { inlineThinkingMode: 'off' } }),
         },
       );
       await waitUntilReady();
@@ -360,9 +352,7 @@ describe('<HistoryItemDisplay />', () => {
           />,
           {
             config: makeFakeConfig({ useAlternateBuffer }),
-            settings: createMockSettings({
-              merged: { ui: { useAlternateBuffer } },
-            }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
         await waitUntilReady();
@@ -387,9 +377,7 @@ describe('<HistoryItemDisplay />', () => {
           />,
           {
             config: makeFakeConfig({ useAlternateBuffer }),
-            settings: createMockSettings({
-              merged: { ui: { useAlternateBuffer } },
-            }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
         await waitUntilReady();
@@ -413,9 +401,7 @@ describe('<HistoryItemDisplay />', () => {
           />,
           {
             config: makeFakeConfig({ useAlternateBuffer }),
-            settings: createMockSettings({
-              merged: { ui: { useAlternateBuffer } },
-            }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
         await waitUntilReady();
@@ -440,9 +426,7 @@ describe('<HistoryItemDisplay />', () => {
           />,
           {
             config: makeFakeConfig({ useAlternateBuffer }),
-            settings: createMockSettings({
-              merged: { ui: { useAlternateBuffer } },
-            }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
         await waitUntilReady();

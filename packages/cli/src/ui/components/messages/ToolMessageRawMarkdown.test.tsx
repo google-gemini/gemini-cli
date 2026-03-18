@@ -74,9 +74,7 @@ describe('<ToolMessage /> - Raw Markdown Display Snapshots', () => {
         {
           uiState: { renderMarkdown, streamingState: StreamingState.Idle },
           config: makeFakeConfig({ useAlternateBuffer }),
-          settings: createMockSettings({
-            merged: { ui: { useAlternateBuffer } },
-          }),
+          settings: createMockSettings({ ui: { useAlternateBuffer } }),
         },
       );
       await waitUntilReady();

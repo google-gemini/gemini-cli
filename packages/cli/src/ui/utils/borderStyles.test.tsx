@@ -20,9 +20,7 @@ vi.mock('../components/CliSpinner.js', () => ({
 
 const altBufferOptions = {
   config: makeFakeConfig({ useAlternateBuffer: true }),
-  settings: createMockSettings({
-    merged: { ui: { useAlternateBuffer: true } },
-  }),
+  settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
 };
 
 describe('getToolGroupBorderAppearance', () => {

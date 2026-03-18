@@ -99,9 +99,7 @@ describe('App', () => {
       {
         uiState: mockUIState,
         config: makeFakeConfig({ useAlternateBuffer: false }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: false } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
       },
     );
     await waitUntilReady();
@@ -123,9 +121,7 @@ describe('App', () => {
       {
         uiState: quittingUIState,
         config: makeFakeConfig({ useAlternateBuffer: false }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: false } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
       },
     );
     await waitUntilReady();
@@ -147,9 +143,7 @@ describe('App', () => {
       {
         uiState: quittingUIState,
         config: makeFakeConfig({ useAlternateBuffer: true }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: true } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
     await waitUntilReady();
@@ -170,9 +164,7 @@ describe('App', () => {
       {
         uiState: dialogUIState,
         config: makeFakeConfig({ useAlternateBuffer: true }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: true } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
     await waitUntilReady();
@@ -200,9 +192,7 @@ describe('App', () => {
         {
           uiState,
           config: makeFakeConfig({ useAlternateBuffer: true }),
-          settings: createMockSettings({
-            merged: { ui: { useAlternateBuffer: true } },
-          }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
         },
       );
       await waitUntilReady();
@@ -220,9 +210,7 @@ describe('App', () => {
       {
         uiState: mockUIState,
         config: makeFakeConfig({ useAlternateBuffer: true }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: true } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
     await waitUntilReady();
@@ -242,9 +230,7 @@ describe('App', () => {
       {
         uiState: mockUIState,
         config: makeFakeConfig({ useAlternateBuffer: true }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: true } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
     await waitUntilReady();
@@ -300,9 +286,7 @@ describe('App', () => {
       {
         uiState: stateWithConfirmingTool,
         config: configWithExperiment,
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: true } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
     await waitUntilReady();
@@ -323,9 +307,7 @@ describe('App', () => {
         {
           uiState: mockUIState,
           config: makeFakeConfig({ useAlternateBuffer: true }),
-          settings: createMockSettings({
-            merged: { ui: { useAlternateBuffer: true } },
-          }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
         },
       );
       await waitUntilReady();
@@ -340,9 +322,7 @@ describe('App', () => {
         {
           uiState: mockUIState,
           config: makeFakeConfig({ useAlternateBuffer: true }),
-          settings: createMockSettings({
-            merged: { ui: { useAlternateBuffer: true } },
-          }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
         },
       );
       await waitUntilReady();
@@ -360,9 +340,7 @@ describe('App', () => {
         {
           uiState: dialogUIState,
           config: makeFakeConfig({ useAlternateBuffer: true }),
-          settings: createMockSettings({
-            merged: { ui: { useAlternateBuffer: true } },
-          }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
         },
       );
       await waitUntilReady();

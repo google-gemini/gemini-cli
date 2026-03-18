@@ -46,9 +46,7 @@ index 0000000..e69de29
           </OverflowProvider>,
           {
             config: makeFakeConfig({ useAlternateBuffer }),
-            settings: createMockSettings({
-              merged: { ui: { useAlternateBuffer } },
-            }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
         await waitFor(() =>
@@ -83,9 +81,7 @@ index 0000000..e69de29
           </OverflowProvider>,
           {
             config: makeFakeConfig({ useAlternateBuffer }),
-            settings: createMockSettings({
-              merged: { ui: { useAlternateBuffer } },
-            }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
         await waitFor(() =>
@@ -116,9 +112,7 @@ index 0000000..e69de29
           </OverflowProvider>,
           {
             config: makeFakeConfig({ useAlternateBuffer }),
-            settings: createMockSettings({
-              merged: { ui: { useAlternateBuffer } },
-            }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
         await waitFor(() =>
@@ -154,9 +148,7 @@ index 0000001..0000002 100644
           </OverflowProvider>,
           {
             config: makeFakeConfig({ useAlternateBuffer }),
-            settings: createMockSettings({
-              merged: { ui: { useAlternateBuffer } },
-            }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
         // colorizeCode is used internally by the line-by-line rendering, not for the whole block
@@ -190,9 +182,7 @@ index 1234567..1234567 100644
           </OverflowProvider>,
           {
             config: makeFakeConfig({ useAlternateBuffer }),
-            settings: createMockSettings({
-              merged: { ui: { useAlternateBuffer } },
-            }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
         await waitFor(() => expect(lastFrame()).toBeDefined());
@@ -207,9 +197,7 @@ index 1234567..1234567 100644
           </OverflowProvider>,
           {
             config: makeFakeConfig({ useAlternateBuffer }),
-            settings: createMockSettings({
-              merged: { ui: { useAlternateBuffer } },
-            }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
         await waitFor(() => expect(lastFrame()).toBeDefined());
@@ -242,9 +230,7 @@ index 123..456 100644
           </OverflowProvider>,
           {
             config: makeFakeConfig({ useAlternateBuffer }),
-            settings: createMockSettings({
-              merged: { ui: { useAlternateBuffer } },
-            }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
         await waitFor(() => expect(lastFrame()).toContain('added line'));
@@ -281,9 +267,7 @@ index abc..def 100644
           </OverflowProvider>,
           {
             config: makeFakeConfig({ useAlternateBuffer }),
-            settings: createMockSettings({
-              merged: { ui: { useAlternateBuffer } },
-            }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
         await waitFor(() => expect(lastFrame()).toContain('context line 15'));
@@ -336,9 +320,7 @@ index 123..789 100644
               </OverflowProvider>,
               {
                 config: makeFakeConfig({ useAlternateBuffer }),
-                settings: createMockSettings({
-                  merged: { ui: { useAlternateBuffer } },
-                }),
+                settings: createMockSettings({ ui: { useAlternateBuffer } }),
               },
             );
             await waitFor(() => expect(lastFrame()).toContain('anotherNew'));
@@ -375,9 +357,7 @@ fileDiff Index: file.txt
           </OverflowProvider>,
           {
             config: makeFakeConfig({ useAlternateBuffer }),
-            settings: createMockSettings({
-              merged: { ui: { useAlternateBuffer } },
-            }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
         await waitFor(() => expect(lastFrame()).toContain('newVar'));
@@ -407,9 +387,7 @@ fileDiff Index: Dockerfile
           </OverflowProvider>,
           {
             config: makeFakeConfig({ useAlternateBuffer }),
-            settings: createMockSettings({
-              merged: { ui: { useAlternateBuffer } },
-            }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
           },
         );
         await waitFor(() => expect(lastFrame()).toContain('RUN npm run build'));

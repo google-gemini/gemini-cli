@@ -167,9 +167,7 @@ Implement a comprehensive authentication system with multiple providers.
           }),
           getUseAlternateBuffer: () => useAlternateBuffer,
         } as unknown as import('@google/gemini-cli-core').Config,
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer } }),
       },
     );
   };
@@ -449,9 +447,7 @@ Implement a comprehensive authentication system with multiple providers.
               getUseAlternateBuffer: () => useAlternateBuffer ?? true,
             } as unknown as import('@google/gemini-cli-core').Config,
             settings: createMockSettings({
-              merged: {
-                ui: { useAlternateBuffer: useAlternateBuffer ?? true },
-              },
+              ui: { useAlternateBuffer: useAlternateBuffer ?? true },
             }),
           },
         );

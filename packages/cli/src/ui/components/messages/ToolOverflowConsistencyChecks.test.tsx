@@ -58,9 +58,7 @@ describe('ToolOverflowConsistencyChecks: ToolGroupMessage and ToolResultDisplay 
           constrainHeight: true,
         },
         config: makeFakeConfig({ useAlternateBuffer: true }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: true } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
 
@@ -111,9 +109,7 @@ describe('ToolOverflowConsistencyChecks: ToolGroupMessage and ToolResultDisplay 
           constrainHeight: true,
         },
         config: makeFakeConfig({ useAlternateBuffer: false }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: false } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
       },
     );
 

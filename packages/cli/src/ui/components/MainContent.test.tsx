@@ -484,9 +484,7 @@ describe('MainContent', () => {
       {
         uiState: uiState as Partial<UIState>,
         config: makeFakeConfig({ useAlternateBuffer: true }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: true } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
 
@@ -514,9 +512,7 @@ describe('MainContent', () => {
       {
         uiState: uiState as unknown as Partial<UIState>,
         config: makeFakeConfig({ useAlternateBuffer: true }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: true } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
       },
     );
 
@@ -742,7 +738,7 @@ describe('MainContent', () => {
             uiState: uiState as Partial<UIState>,
             config: makeFakeConfig({ useAlternateBuffer: isAlternateBuffer }),
             settings: createMockSettings({
-              merged: { ui: { useAlternateBuffer: isAlternateBuffer } },
+              ui: { useAlternateBuffer: isAlternateBuffer },
             }),
           },
         );
