@@ -11,6 +11,11 @@ import {
 } from './browserAgentFactory.js';
 import { injectAutomationOverlay } from './automationOverlay.js';
 import { makeFakeConfig } from '../../test-utils/config.js';
+import {
+  PolicyDecision,
+  ApprovalMode,
+  PRIORITY_SUBAGENT_TOOL,
+} from '../../policy/types.js';
 import type { Config } from '../../config/config.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import type { BrowserManager } from './browserManager.js';
@@ -297,6 +302,101 @@ describe('browserAgentFactory', () => {
       expect(toolNames).toContain('type_text');
       // Total: 9 MCP + 1 type_text (no analyze_screenshot without visualModel)
       expect(definition.toolConfig?.tools).toHaveLength(10);
+    });
+  });
+
+  describe('Policy Registration', () => {
+    let mockPolicyEngine: {
+      addRule: ReturnType<typeof vi.fn>;
+      hasRuleForTool: ReturnType<typeof vi.fn>;
+      removeRulesForTool: ReturnType<typeof vi.fn>;
+    };
+
+    beforeEach(() => {
+      mockPolicyEngine = {
+        addRule: vi.fn(),
+        hasRuleForTool: vi.fn().mockReturnValue(false),
+        removeRulesForTool: vi.fn(),
+      };
+      vi.spyOn(mockConfig, 'getPolicyEngine').mockReturnValue(
+        mockPolicyEngine as any,
+      );
+    });
+
+    it('should register sensitive action rules in YOLO mode', async () => {
+      // 1. Enabling confirmSensitiveActions to ensure upload_file/evaluate_script are added
+      mockConfig = makeFakeConfig({
+        agents: {
+          browser: {
+            confirmSensitiveActions: true,
+          },
+        },
+      });
+      vi.spyOn(mockConfig, 'getPolicyEngine').mockReturnValue(
+        mockPolicyEngine as any,
+      );
+
+      await createBrowserAgentDefinition(mockConfig, mockMessageBus);
+
+      // Check for fill rule (always added)
+      expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'fill',
+          decision: PolicyDecision.ASK_USER,
+          priority: 999,
+          modes: [ApprovalMode.YOLO],
+        }),
+      );
+
+      // Check for upload_file rule (added when confirmSensitiveActions is true)
+      expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'upload_file',
+          decision: PolicyDecision.ASK_USER,
+          priority: 999,
+          modes: [ApprovalMode.YOLO],
+        }),
+      );
+
+      // Check for evaluate_script rule (added when confirmSensitiveActions is true)
+      expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'evaluate_script',
+          decision: PolicyDecision.ASK_USER,
+          priority: 999,
+          modes: [ApprovalMode.YOLO],
+        }),
+      );
+    });
+
+    it('should register fill rule even when confirmSensitiveActions is disabled', async () => {
+      // confirmSensitiveActions is false by default in makeFakeConfig
+      await createBrowserAgentDefinition(mockConfig, mockMessageBus);
+
+      expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'fill',
+        }),
+      );
+
+      // But upload_file should not be there
+      expect(mockPolicyEngine.addRule).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'upload_file',
+        }),
+      );
+    });
+
+    it('should register ALLOW rules for read-only tools', async () => {
+      await createBrowserAgentDefinition(mockConfig, mockMessageBus);
+
+      expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          toolName: 'take_snapshot',
+          decision: PolicyDecision.ALLOW,
+          priority: PRIORITY_SUBAGENT_TOOL,
+        }),
+      );
     });
   });
 
