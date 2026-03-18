@@ -7,6 +7,8 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
+import { makeFakeConfig } from '@google/gemini-cli-core';
 import { waitFor } from '../../test-utils/async.js';
 import { AskUserDialog } from './AskUserDialog.js';
 import { QuestionType, type Question } from '@google/gemini-cli-core';
@@ -313,7 +315,10 @@ describe('AskUserDialog', () => {
             width={80}
             availableHeight={10} // Small height to force scrolling
           />,
-          { useAlternateBuffer },
+          {
+            config: makeFakeConfig({ useAlternateBuffer }),
+            settings: createMockSettings({ ui: { useAlternateBuffer } }),
+          },
         );
 
         await waitFor(async () => {
@@ -1291,7 +1296,10 @@ describe('AskUserDialog', () => {
           width={80}
         />
       </UIStateContext.Provider>,
-      { useAlternateBuffer: false },
+      {
+        config: makeFakeConfig({ useAlternateBuffer: false }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
+      },
     );
 
     // With height 5 and alternate buffer disabled, it should show scroll arrows (▲)
@@ -1327,7 +1335,10 @@ describe('AskUserDialog', () => {
           width={40} // Small width to force wrapping
         />
       </UIStateContext.Provider>,
-      { useAlternateBuffer: true },
+      {
+        config: makeFakeConfig({ useAlternateBuffer: true }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
+      },
     );
 
     // Should NOT contain the truncation message
