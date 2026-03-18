@@ -58,13 +58,13 @@ describe('MemoryManagerAgent', () => {
     const agent = MemoryManagerAgent();
     const prompt = agent.promptConfig.systemPrompt;
     const globalGeminiDir = Storage.getGlobalGeminiDir();
-    expect(prompt).toContain(`Global (${globalGeminiDir})`);
-    expect(prompt).toContain('Project (.gemini/)');
-    expect(prompt).toContain('Table of Contents');
-    expect(prompt).toContain('De-duplicating');
-    expect(prompt).toContain('Adding');
-    expect(prompt).toContain('Removing stale');
-    expect(prompt).toContain('Organizing');
+    expect(prompt).toContain(`Global (${globalGeminiDir}`);
+    expect(prompt).toContain('Project (.gemini/');
+    expect(prompt).toContain('Hierarchy & Routing');
+    expect(prompt).toContain('De-duplicate');
+    expect(prompt).toContain('Add');
+    expect(prompt).toContain('Remove');
+    expect(prompt).toContain('Organize');
     expect(prompt).toContain('Routing');
   });
 
@@ -72,9 +72,9 @@ describe('MemoryManagerAgent', () => {
     const agent = MemoryManagerAgent();
     const prompt = agent.promptConfig.systemPrompt;
     expect(prompt).toContain('Efficiency & Performance');
-    expect(prompt).toContain('Use as few turns as possible');
-    expect(prompt).toContain('Do not perform any exploration');
-    expect(prompt).toContain('Minimize file system operations');
+    expect(prompt).toContain('Minimize Turns');
+    expect(prompt).toContain('Stay Focused');
+    expect(prompt).toContain('Be Decisive');
     expect(prompt).toContain('Context Awareness');
   });
 
@@ -92,10 +92,9 @@ describe('MemoryManagerAgent', () => {
 
     vi.mocked(fs.statSync).mockImplementation((p: fs.PathLike) => {
       if (typeof p === 'string' && (p === globalFile || p === projectFile)) {
-         
         return { isFile: () => true } as fs.Stats;
       }
-       
+
       return { isFile: () => false } as fs.Stats;
     });
 
@@ -132,10 +131,9 @@ describe('MemoryManagerAgent', () => {
 
     vi.mocked(fs.statSync).mockImplementation((p: fs.PathLike) => {
       if (typeof p === 'string' && (p === srcFile || p === moduleFile)) {
-         
         return { isFile: () => true } as fs.Stats;
       }
-       
+
       return { isFile: () => false } as fs.Stats;
     });
 
@@ -181,8 +179,11 @@ describe('MemoryManagerAgent', () => {
     expect(schema['required']).toContain('request');
   });
 
-  it('should inherit the model from the parent agent', () => {
+  it('should use a fast base model to avoid unnecessary thinking', () => {
     const agent = MemoryManagerAgent();
-    expect(agent.modelConfig.model).toBe('inherit');
+    expect(agent.modelConfig.model).toBe('gemini-2.5-flash-base');
+    expect(
+      agent.modelConfig.generateContentConfig?.thinkingConfig?.thinkingBudget,
+    ).toBe(0);
   });
 });

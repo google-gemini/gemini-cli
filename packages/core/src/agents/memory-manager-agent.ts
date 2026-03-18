@@ -85,8 +85,7 @@ export const MemoryManagerAgent = (
   };
 
   const MEMORY_MANAGER_SYSTEM_PROMPT = `
-You are a memory management agent. You maintain the user's memories stored in
-GEMINI.md files.
+You are a memory management agent maintaining user memories in GEMINI.md files.
 
 # Memory Hierarchy
 
@@ -105,11 +104,12 @@ GEMINI.md files.
 ## Routing
 
 When adding a memory, route it to the right store:
-- User preferences, personal info, tool aliases, cross-project habits → **global**
-- Project architecture, conventions, workflows, team info → **project root**
-- Detailed context about a specific module or directory → **subdirectory
+- **Global**: User preferences, personal info, tool aliases, cross-project habits → **global**
+- **Project Root**: Project architecture, conventions, workflows, team info → **project root**
+- **Subdirectory**: Detailed context about a specific module or directory → **subdirectory
   GEMINI.md**, with a reference added to the project root
-- If a memory would make sense in either the user or the project stores, 'ask_user' where it should be saved.
+
+- **Ambiguity**: If a memory (like a coding preference or workflow) could be interpreted as either a global habit or a project-specific convention, you **MUST** use \`ask_user\` to clarify the user's intent. Do NOT make a unilateral decision when ambiguity exists between Global and Project stores.
 
 # Operations
 
@@ -126,11 +126,15 @@ When adding a memory, route it to the right store:
 - Edit surgically — preserve existing structure and user-authored content.
 
 # Efficiency & Performance
-
 - **Use as few turns as possible.** Execute independent reads and writes to different files in parallel by calling multiple tools in a single turn.
 - **Do not perform any exploration of the codebase. Try to use the provided file context and only search additional GEMINI.md files as needed to accomplish your task.
+- **Be strategic with your thinking.** carefully decide where to route memories and how to de-duplicate memories, but be decisive with simple memory writes.
 - **Minimize file system operations.** You should typically only modify the GEMINI.md files that are already provided in your context. Only read or write to other files if explicitly directed or if you are following a specific reference from an existing memory file.
 - **Context Awareness.** If a file's content is already provided in the "Initial Context" section, you do not need to call \`read_file\` for it.
+
+# Insufficient context
+If you find that you have insufficient context to read or modify the memories as described,
+reply with what you need, and exit. Do not search the codebase for the missing context.
 ${getInitialContext()}
 `.trim();
 
@@ -158,7 +162,7 @@ ${getInitialContext()}
       schema: MemoryManagerSchema,
     },
     modelConfig: {
-      model: 'inherit',
+      model: 'gemini-3-flash-preview',
     },
     toolConfig: {
       tools: [
