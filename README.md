@@ -16,7 +16,7 @@ Learn all about Gemini CLI in our [documentation](https://geminicli.com/docs/).
 
 ## 🚀 Why Gemini CLI?
 
-- **🎯 Free tier**: 60 requests/min and 1,000 requests/day with personal Google
+- **🎯 Free tier**: 60 requests/min and 250 requests/day with personal Google
   account.
 - **🧠 Powerful Gemini 3 models**: Access to improved reasoning and 1M token
   context window.
@@ -156,7 +156,7 @@ for details)
 
 **Benefits:**
 
-- **Free tier**: 60 requests/min and 1,000 requests/day
+- **Free tier**: 60 requests/min and 250 requests/day
 - **Gemini 3 models** with 1M token context window
 - **No API key management** - just sign in with your Google account
 - **Automatic updates** to latest models
@@ -181,7 +181,7 @@ gemini
 
 **Benefits:**
 
-- **Free tier**: 1000 requests/day with Gemini 3 (mix of flash and pro)
+- **Free tier**: 250 requests/day with Gemini 3 (flash only)
 - **Model selection**: Choose specific Gemini models
 - **Usage-based billing**: Upgrade for higher limits when needed
 
