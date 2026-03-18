@@ -383,6 +383,12 @@ describe('browserAgentFactory', () => {
     });
 
     it('should register ALLOW rules for read-only tools', async () => {
+      mockBrowserManager.getDiscoveredTools.mockResolvedValue([
+        { name: 'take_snapshot', description: 'Take snapshot' },
+        { name: 'take_screenshot', description: 'Take screenshot' },
+        { name: 'list_pages', description: 'list all pages' },
+      ]);
+
       await createBrowserAgentDefinition(mockConfig, mockMessageBus);
 
       expect(mockPolicyEngine.addRule).toHaveBeenCalledWith(
