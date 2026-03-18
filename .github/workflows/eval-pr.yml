@@ -47,15 +47,20 @@ jobs:
           for model in "${MODELS[@]}"; do
             echo "Running evals for $model..."
             mkdir -p "evals/logs/eval-logs-$model-1"
-            # We redirect to report.json in a subfolder so aggregate_evals.js can find it via subfolder name
-            GEMINI_MODEL=$model npm run test:all_evals -- --outputFile.json="evals/logs/eval-logs-$model-1/report.json"
+            # Use || true to ensure the loop continues even if tests fail
+            GEMINI_MODEL=$model npm run test:all_evals -- --outputFile.json="evals/logs/eval-logs-$model-1/report.json" || true
           done
 
       - name: 'Generate Impact Report'
         id: 'generate-report'
+        if: 'always()'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
+          if [ ! -d "evals/logs" ] || [ -z "$(ls -A evals/logs)" ]; then
+            echo "No logs found, skipping report generation."
+            exit 0
+          fi
           echo "<!-- eval-impact-report -->" > report.md
           node scripts/aggregate_evals.js evals/logs --compare-main --pr-comment >> report.md
           cat report.md >> "$GITHUB_STEP_SUMMARY"
@@ -66,16 +71,18 @@ jobs:
           fi
 
       - name: 'Comment on PR'
+        if: 'always()'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
+          if [ ! -f "report.md" ]; then
+            echo "No report found, skipping comment."
+            exit 0
+          fi
           PR_NUMBER=${{ github.event.pull_request.number }}
-          # Try to find existing comment to avoid spamming
           EXISTING_COMMENT=$(gh pr view $PR_NUMBER --json comments --jq '.comments[] | select(.body | contains("eval-impact-report")) | .id' | head -n 1)
           
           if [ -n "$EXISTING_COMMENT" ]; then
-            # We can't easily edit by ID with 'gh pr comment', so we just post a new one for now
-            # but in the future we could use 'gh api' to update.
             gh pr comment $PR_NUMBER --body-file report.md
           else
             gh pr comment $PR_NUMBER --body-file report.md
