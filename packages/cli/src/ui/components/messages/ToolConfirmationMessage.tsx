@@ -5,7 +5,7 @@
  */
 
 import type React from 'react';
-import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
+import { useMemo, useCallback, useState, useRef } from 'react';
 import { Box, Text, ResizeObserver, type DOMElement } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
@@ -86,7 +86,7 @@ export const ToolConfirmationMessage: React.FC<
 
   const [measuredSecurityWarningsHeight, setMeasuredSecurityWarningsHeight] =
     useState(0);
-  const securityWarningsRef = useRef<DOMElement>(null);
+  const observerRef = useRef<ResizeObserver | null>(null);
 
   const deceptiveUrlWarnings = useMemo(() => {
     const urls: string[] = [];
@@ -119,8 +119,13 @@ export const ToolConfirmationMessage: React.FC<
       .join('\n\n')}`;
   }, [deceptiveUrlWarnings]);
 
-  useEffect(() => {
-    if (securityWarningsRef.current) {
+  const onSecurityWarningsRefChange = useCallback((node: DOMElement | null) => {
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+
+    if (node) {
       const observer = new ResizeObserver((entries) => {
         const entry = entries[0];
         if (entry) {
@@ -130,15 +135,12 @@ export const ToolConfirmationMessage: React.FC<
           );
         }
       });
-      observer.observe(securityWarningsRef.current);
-      return () => {
-        observer.disconnect();
-      };
+      observer.observe(node);
+      observerRef.current = observer;
     } else {
       setMeasuredSecurityWarningsHeight((prev) => (prev !== 0 ? 0 : prev));
-      return undefined;
     }
-  }, [terminalWidth, deceptiveUrlWarningText]);
+  }, []);
 
   const settings = useSettings();
   const allowPermanentApproval =
@@ -767,7 +769,11 @@ export const ToolConfirmationMessage: React.FC<
           </Box>
 
           {securityWarnings && (
-            <Box flexShrink={0} marginBottom={1} ref={securityWarningsRef}>
+            <Box
+              flexShrink={0}
+              marginBottom={1}
+              ref={onSecurityWarningsRefChange}
+            >
               {securityWarnings}
             </Box>
           )}

@@ -7,7 +7,11 @@
 - **Shortcuts**: only define keyboard shortcuts in
   `packages/cli/src/config/keyBindings.ts`
 - Do not implement any logic performing custom string measurement or string
-  truncation. Use Ink layout instead leveraging ResizeObserver as needed.
+  truncation. Use Ink layout instead leveraging ResizeObserver as needed. When
+  using ResizeObserver, DO NOT use `useEffect` to attach it to a ref. Instead,
+  use the `useCallback` ref pattern (like in `MaxSizedBox.tsx`) to ensure the
+  size is measured as soon as the element is available, preventing rendering
+  timing bugs.
 - Avoid prop drilling when at all possible.
 
 ## Testing
