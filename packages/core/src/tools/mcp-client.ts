@@ -870,6 +870,15 @@ async function handleAutomaticOAuth(
     debugLogger.log(`🔐 '${mcpServerName}' requires OAuth authentication`);
 
     const serverUrl = mcpServerConfig.httpUrl || mcpServerConfig.url;
+    if (!serverUrl) {
+      cliConfig.emitMcpDiagnostic(
+        'error',
+        `Could not configure OAuth for '${mcpServerName}' - missing network URL`,
+        undefined,
+        mcpServerName,
+      );
+      return false;
+    }
 
     // Try to discover OAuth config from the WWW-Authenticate header first
     let oauthConfig = await OAuthUtils.discoverOAuthFromWWWAuthenticate(
@@ -879,7 +888,7 @@ async function handleAutomaticOAuth(
 
     if (!oauthConfig && hasNetworkTransport(mcpServerConfig)) {
       // Fallback: try to discover OAuth config from the base URL
-      const baseUrl = OAuthUtils.extractBaseUrl(serverUrl!);
+      const baseUrl = OAuthUtils.extractBaseUrl(serverUrl);
       oauthConfig = await OAuthUtils.discoverOAuthConfig(baseUrl);
     }
 
@@ -1331,6 +1340,9 @@ class McpCallableTool implements CallableTool {
       throw new Error('McpCallableTool only supports single function call');
     }
     const call = functionCalls[0];
+    if (!call.name) {
+      throw new Error('MCP tool call missing function name');
+    }
 
     const progressToken = randomUUID();
     const context = getToolCallContext();
@@ -1344,7 +1356,7 @@ class McpCallableTool implements CallableTool {
     try {
       const result = await this.client.callTool(
         {
-          name: call.name!,
+          name: call.name,
           // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
           arguments: call.args as Record<string, unknown>,
           _meta: { progressToken },
@@ -1569,6 +1581,9 @@ function createSSETransportWithAuth(
   config: MCPServerConfig,
   accessToken?: string | null,
 ): SSEClientTransport {
+  if (!config.url) {
+    throw new Error('SSE transport requires config.url');
+  }
   const headers = {
     ...config.headers,
     ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
@@ -1579,7 +1594,7 @@ function createSSETransportWithAuth(
     options.requestInit = { headers };
   }
 
-  return new SSEClientTransport(new URL(config.url!), options);
+  return new SSEClientTransport(new URL(config.url), options);
 }
 
 /**
@@ -1890,7 +1905,10 @@ export async function connectToMcpServer(
           `No www-authenticate header in error, trying to fetch it from server...`,
         );
         try {
-          const urlToFetch = mcpServerConfig.httpUrl || mcpServerConfig.url!;
+          const urlToFetch = mcpServerConfig.httpUrl || mcpServerConfig.url;
+          if (!urlToFetch) {
+            throw new Error('Network transport URL is missing');
+          }
 
           // Determine correct Accept header based on what transport failed
           let acceptHeader: string;
@@ -1983,9 +2001,11 @@ export async function connectToMcpServer(
         );
 
         if (hasNetworkTransport(mcpServerConfig)) {
-          const serverUrl = new URL(
-            mcpServerConfig.httpUrl || mcpServerConfig.url!,
-          );
+          const networkUrl = mcpServerConfig.httpUrl || mcpServerConfig.url;
+          if (!networkUrl) {
+            throw new Error('Network transport URL is missing');
+          }
+          const serverUrl = new URL(networkUrl);
           const baseUrl = `${serverUrl.protocol}//${serverUrl.host}`;
 
           // Try to discover OAuth configuration from the base URL
