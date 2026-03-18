@@ -11,8 +11,10 @@ import path from 'node:path';
 import { execSync } from 'node:child_process';
 import os from 'node:os';
 
-const artifactsDir = process.argv[2] || '.';
-const MAX_HISTORY = 10;
+const args = process.argv.slice(2);
+const artifactsDir = args.find((arg) => !arg.startsWith('--')) || '.';
+const isPrComment = args.includes('--pr-comment');
+const MAX_HISTORY = isPrComment ? 1 : 10;
 
 // Find all report.json files recursively
 function findReports(dir) {
@@ -87,8 +89,20 @@ function fetchHistoricalData() {
   const history = [];
 
   try {
-    // Determine branch
+    // Check if gh is available
+    try {
+      execSync('gh --version', { stdio: 'ignore' });
+    } catch {
+      if (!isPrComment) {
+        console.warn(
+          'Warning: GitHub CLI (gh) not found. Historical data will be unavailable.',
+        );
+      }
+      return history;
+    }
+
     const branch = 'main';
+    // ... rest of the function ...
 
     // Get recent runs
     const cmd = `gh run list --workflow evals-nightly.yml --branch "${branch}" --limit ${
@@ -145,18 +159,23 @@ function fetchHistoricalData() {
 }
 
 function generateMarkdown(currentStatsByModel, history) {
-  console.log('### Evals Nightly Summary\n');
-  console.log(
-    'See [evals/README.md](https://github.com/google-gemini/gemini-cli/tree/main/evals) for more details.\n',
-  );
+  if (isPrComment) {
+    console.log('### 🤖 Model Steering Impact Report\n');
+    console.log(
+      "This PR modifies files that affect the model's behavior. Below is the impact on behavioral evaluations.\n",
+    );
+  } else {
+    console.log('### Evals Nightly Summary\n');
+    console.log(
+      'See [evals/README.md](https://github.com/google-gemini/gemini-cli/tree/main/evals) for more details.\n',
+    );
+  }
 
-  // Reverse history to show oldest first
   const reversedHistory = [...history].reverse();
-
   const models = Object.keys(currentStatsByModel).sort();
 
   const getPassRate = (statsForModel) => {
-    if (!statsForModel) return '-';
+    if (!statsForModel) return null;
     const totalStats = Object.values(statsForModel).reduce(
       (acc, stats) => {
         acc.passed += stats.passed;
@@ -166,67 +185,89 @@ function generateMarkdown(currentStatsByModel, history) {
       { passed: 0, total: 0 },
     );
     return totalStats.total > 0
-      ? ((totalStats.passed / totalStats.total) * 100).toFixed(1) + '%'
-      : '-';
+      ? (totalStats.passed / totalStats.total) * 100
+      : null;
   };
+
+  const formatPassRate = (rate) =>
+    rate === null ? '-' : rate.toFixed(1) + '%';
 
   for (const model of models) {
     const currentStats = currentStatsByModel[model];
-    const totalPassRate = getPassRate(currentStats);
+    const currentPassRate = getPassRate(currentStats);
+
+    // Baseline is the most recent history entry
+    const baselineStats =
+      reversedHistory.length > 0
+        ? reversedHistory[reversedHistory.length - 1].stats[model]
+        : null;
+    const baselinePassRate = getPassRate(baselineStats);
 
     console.log(`#### Model: ${model}`);
-    console.log(`**Total Pass Rate: ${totalPassRate}**\n`);
+    if (isPrComment && baselinePassRate !== null) {
+      const delta = currentPassRate - baselinePassRate;
+      const deltaStr =
+        delta === 0
+          ? ' (No Change)'
+          : ` (${delta > 0 ? '↑' : '↓'} ${Math.abs(delta).toFixed(1)}%)`;
+      console.log(
+        `**Pass Rate: ${formatPassRate(currentPassRate)}** from ${formatPassRate(baselinePassRate)}${deltaStr}\n`,
+      );
+    } else {
+      console.log(`**Total Pass Rate: ${formatPassRate(currentPassRate)}**\n`);
+    }
 
     // Header
     let header = '| Test Name |';
     let separator = '| :--- |';
-    let passRateRow = '| **Overall Pass Rate** |';
 
-    for (const item of reversedHistory) {
-      header += ` [${item.run.databaseId}](${item.run.url}) |`;
+    if (!isPrComment) {
+      for (const item of reversedHistory) {
+        header += ` [${item.run.databaseId}](${item.run.url}) |`;
+        separator += ' :---: |';
+      }
+    } else if (baselinePassRate !== null) {
+      header += ' Baseline |';
       separator += ' :---: |';
-      passRateRow += ` **${getPassRate(item.stats[model])}** |`;
     }
 
-    // Add Current column last
-    header += ' Current |';
-    separator += ' :---: |';
-    passRateRow += ` **${totalPassRate}** |`;
+    header += ' Current | Impact |';
+    separator += ' :---: | :---: |';
 
     console.log(header);
     console.log(separator);
-    console.log(passRateRow);
 
-    // Collect all test names for this model
     const allTestNames = new Set(Object.keys(currentStats));
-    for (const item of reversedHistory) {
-      if (item.stats[model]) {
-        Object.keys(item.stats[model]).forEach((name) =>
-          allTestNames.add(name),
-        );
-      }
+    if (baselineStats) {
+      Object.keys(baselineStats).forEach((name) => allTestNames.add(name));
     }
 
     for (const name of Array.from(allTestNames).sort()) {
       const searchUrl = `https://github.com/search?q=repo%3Agoogle-gemini%2Fgemini-cli%20%22${encodeURIComponent(name)}%22&type=code`;
       let row = `| [${name}](${searchUrl}) |`;
 
-      // History
-      for (const item of reversedHistory) {
-        const stat = item.stats[model] ? item.stats[model][name] : null;
-        if (stat) {
-          const passRate = ((stat.passed / stat.total) * 100).toFixed(0) + '%';
-          row += ` ${passRate} |`;
-        } else {
-          row += ' - |';
+      const curr = currentStats[name];
+      const base = baselineStats ? baselineStats[name] : null;
+
+      if (!isPrComment) {
+        for (const item of reversedHistory) {
+          const stat = item.stats[model] ? item.stats[model][name] : null;
+          row += ` ${stat ? ((stat.passed / stat.total) * 100).toFixed(0) + '%' : '-'} |`;
         }
+      } else if (baselinePassRate !== null) {
+        row += ` ${base ? ((base.passed / base.total) * 100).toFixed(0) + '%' : '-'} |`;
       }
 
-      // Current
-      const curr = currentStats[name];
-      if (curr) {
-        const passRate = ((curr.passed / curr.total) * 100).toFixed(0) + '%';
-        row += ` ${passRate} |`;
+      const currRate = curr ? (curr.passed / curr.total) * 100 : null;
+      const baseRate = base ? (base.passed / base.total) * 100 : null;
+
+      row += ` ${formatPassRate(currRate)} |`;
+
+      if (currRate !== null && baseRate !== null) {
+        const delta = currRate - baseRate;
+        if (delta > 0) row += ` 🟢 +${delta.toFixed(0)}% |`;
+        else if (delta < 0) row += ` 🔴 ${delta.toFixed(0)}% |`;
+        else row += ' ⚪ 0% |';
       } else {
         row += ' - |';
       }
@@ -242,9 +283,6 @@ function generateMarkdown(currentStatsByModel, history) {
 const currentReports = findReports(artifactsDir);
 if (currentReports.length === 0) {
   console.log('No reports found.');
-  // We don't exit here because we might still want to see history if available,
-  // but practically if current has no reports, something is wrong.
-  // Sticking to original behavior roughly, but maybe we can continue.
   process.exit(0);
 }
 

@@ -1,0 +1,88 @@
+name: 'Evals: PR Impact'
+
+on:
+  pull_request:
+    paths:
+      - 'packages/core/src/prompts/**'
+      - 'packages/core/src/tools/**'
+      - 'packages/core/src/agents/**'
+      - 'evals/**'
+
+permissions:
+  contents: 'read'
+  checks: 'write'
+  pull-requests: 'write'
+
+jobs:
+  eval-impact:
+    name: 'Eval Impact Analysis'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    if: "github.repository == 'google-gemini/gemini-cli'"
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@v4'
+
+      - name: 'Set up Node.js'
+        uses: 'actions/setup-node@v4'
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: 'Install dependencies'
+        run: 'npm ci'
+
+      - name: 'Build project'
+        run: 'npm run build'
+
+      - name: 'Create logs directory'
+        run: 'mkdir -p evals/logs'
+
+      - name: 'Run Evals (Lite)'
+        env:
+          GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
+          RUN_EVALS: 'true'
+        run: |
+          # Run 1 attempt on critical models for speed in PR
+          MODELS=("gemini-3.1-pro-preview-customtools" "gemini-3-flash-preview")
+          for model in "${MODELS[@]}"; do
+            echo "Running evals for $model..."
+            mkdir -p "evals/logs/eval-logs-$model-1"
+            # We redirect to report.json in a subfolder so aggregate_evals.js can find it via subfolder name
+            GEMINI_MODEL=$model npm run test:all_evals -- --outputFile.json="evals/logs/eval-logs-$model-1/report.json"
+          done
+
+      - name: 'Generate Impact Report'
+        id: 'generate-report'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          echo "<!-- eval-impact-report -->" > report.md
+          node scripts/aggregate_evals.js evals/logs --compare-main --pr-comment >> report.md
+          cat report.md >> "$GITHUB_STEP_SUMMARY"
+          
+          # Check if there are any regressions (🔴)
+          if grep -q "🔴" report.md; then
+            echo "REGRESSION_DETECTED=true" >> "$GITHUB_ENV"
+          fi
+
+      - name: 'Comment on PR'
+        env:
+          GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          # Try to find existing comment to avoid spamming
+          EXISTING_COMMENT=$(gh pr view $PR_NUMBER --json comments --jq '.comments[] | select(.body | contains("eval-impact-report")) | .id' | head -n 1)
+          
+          if [ -n "$EXISTING_COMMENT" ]; then
+            # We can't easily edit by ID with 'gh pr comment', so we just post a new one for now
+            # but in the future we could use 'gh api' to update.
+            gh pr comment $PR_NUMBER --body-file report.md
+          else
+            gh pr comment $PR_NUMBER --body-file report.md
+          fi
+
+      - name: 'Fail if regression detected'
+        if: "env.REGRESSION_DETECTED == 'true'"
+        run: |
+          echo "Behavioral evaluation regressions detected. Please check the impact report."
+          exit 1
