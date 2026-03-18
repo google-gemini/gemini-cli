@@ -167,9 +167,7 @@ describe('ToolConfirmationQueue', () => {
           ...mockConfig,
           getUseAlternateBuffer: () => true,
         } as unknown as Config,
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: true } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: true } }),
         uiState: {
           terminalWidth: 80,
           terminalHeight: 20,
@@ -218,9 +216,7 @@ describe('ToolConfirmationQueue', () => {
       />,
       {
         config: mockConfig,
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: false } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: {
           terminalWidth: 80,
           terminalHeight: 40,
