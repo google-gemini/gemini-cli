@@ -24,13 +24,9 @@ async function main() {
   const workDir = process.cwd(); // This is remoteWorkDir as set in review.ts
   const targetDir = path.join(workDir, branchName);
 
-  // Use global tsx or fallback to local
+  // Use global tools pre-installed in the maintainer image
   const tsxBin = 'tsx'; 
-  // Gemini bin will be needed by the interactive session later
-  // We'll try to find it in the main repo or current worktree
-  const geminiBin = fs.existsSync(path.join(workDir, 'node_modules/.bin/gemini')) 
-    ? path.join(workDir, 'node_modules/.bin/gemini')
-    : path.join(path.dirname(workDir), 'main/node_modules/.bin/gemini');
+  const geminiBin = 'gemini';
 
   const action = process.argv[5] || 'review';
 

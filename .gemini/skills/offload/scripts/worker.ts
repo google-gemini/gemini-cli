@@ -39,17 +39,8 @@ export async function runWorker(args: string[]) {
     process.chdir(targetDir);
   }
 
-  // Find gemini binary (try worktree, then fallback to main repo)
-  let geminiBin = path.join(targetDir, 'node_modules/.bin/gemini');
-  if (!fs.existsSync(geminiBin)) {
-    geminiBin = path.join(path.dirname(targetDir), 'main/node_modules/.bin/gemini');
-  }
-
-  console.log(`   - Gemini Bin: ${geminiBin} (Exists: ${fs.existsSync(geminiBin)})`);
-  if (fs.existsSync(geminiBin)) {
-    const versionCheck = spawnSync(geminiBin, ['--version'], { stdio: 'pipe' });
-    console.log(`   - Gemini Version: ${versionCheck.stdout.toString().trim() || 'Error fetching version'}`);
-  }
+  // Use global gemini command pre-installed in the maintainer image
+  const geminiBin = 'gemini';
 
   // 2. Dispatch to Playbook
   switch (action) {

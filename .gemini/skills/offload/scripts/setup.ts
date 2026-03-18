@@ -174,6 +174,9 @@ This script will:
     // Wipe existing dir for a clean clone and use absolute paths
     const cloneCmd = `rm -rf ${remoteWorkDir} && git clone --filter=blob:none ${repoUrl} ${remoteWorkDir} && cd ${remoteWorkDir} && git remote add upstream https://github.com/${upstreamRepo}.git && git fetch upstream`;
     await provider.exec(cloneCmd);
+
+    console.log('📦 Installing remote dependencies (this may take a few minutes)...');
+    await provider.exec(`cd ${remoteWorkDir} && npm ci`);
   }
 
   // Save Settings
