@@ -1248,11 +1248,32 @@ function filterMcpConfig(original: MCPServerConfig): MCPServerConfig {
   return Object.freeze(rest);
 }
 
+/**
+ * Recursively ensures that the owner has write permissions for all files
+ * and directories within the target path.
+ */
+async function makeWritableRecursive(targetPath: string): Promise<void> {
+  const stats = await fs.promises.lstat(targetPath);
+
+  if (stats.isDirectory()) {
+    // Ensure directory is rwx for the owner (0o700)
+    await fs.promises.chmod(targetPath, stats.mode | 0o700);
+    const children = await fs.promises.readdir(targetPath);
+    for (const child of children) {
+      await makeWritableRecursive(path.join(targetPath, child));
+    }
+  } else if (stats.isFile()) {
+    // Ensure file is rw for the owner (0o600)
+    await fs.promises.chmod(targetPath, stats.mode | 0o600);
+  }
+}
+
 export async function copyExtension(
   source: string,
   destination: string,
 ): Promise<void> {
   await fs.promises.cp(source, destination, { recursive: true });
+  await makeWritableRecursive(destination);
 }
 
 function getContextFileNames(config: ExtensionConfig): string[] {
