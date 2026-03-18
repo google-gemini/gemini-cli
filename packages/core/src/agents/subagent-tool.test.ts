@@ -214,7 +214,7 @@ describe('SubAgentInvocation', () => {
   describe('withUserHints', () => {
     it('should NOT modify query for local agents', async () => {
       mockConfig = makeFakeConfig({ modelSteering: true });
-      mockConfig.userHintService.addUserHint('Test Hint');
+      mockConfig.injectionService.addInjection('Test Hint', 'user_steering');
 
       const tool = new SubagentTool(testDefinition, mockConfig, mockMessageBus);
       const params = { query: 'original query' };
@@ -229,7 +229,7 @@ describe('SubAgentInvocation', () => {
 
     it('should NOT modify query for remote agents if model steering is disabled', async () => {
       mockConfig = makeFakeConfig({ modelSteering: false });
-      mockConfig.userHintService.addUserHint('Test Hint');
+      mockConfig.injectionService.addInjection('Test Hint', 'user_steering');
 
       const tool = new SubagentTool(
         testRemoteDefinition,
@@ -276,8 +276,8 @@ describe('SubAgentInvocation', () => {
       // @ts-expect-error - accessing private method for testing
       const invocation = tool.createInvocation(params, mockMessageBus);
 
-      mockConfig.userHintService.addUserHint('Hint 1');
-      mockConfig.userHintService.addUserHint('Hint 2');
+      mockConfig.injectionService.addInjection('Hint 1', 'user_steering');
+      mockConfig.injectionService.addInjection('Hint 2', 'user_steering');
 
       // @ts-expect-error - accessing private method for testing
       const hintedParams = invocation.withUserHints(params);
@@ -289,7 +289,7 @@ describe('SubAgentInvocation', () => {
 
     it('should NOT include legacy hints added before the invocation was created', async () => {
       mockConfig = makeFakeConfig({ modelSteering: true });
-      mockConfig.userHintService.addUserHint('Legacy Hint');
+      mockConfig.injectionService.addInjection('Legacy Hint', 'user_steering');
 
       const tool = new SubagentTool(
         testRemoteDefinition,
@@ -308,7 +308,7 @@ describe('SubAgentInvocation', () => {
       expect(hintedParams.query).toBe('original query');
 
       // Add a new hint after creation
-      mockConfig.userHintService.addUserHint('New Hint');
+      mockConfig.injectionService.addInjection('New Hint', 'user_steering');
       // @ts-expect-error - accessing private method for testing
       hintedParams = invocation.withUserHints(params);
 
@@ -318,7 +318,7 @@ describe('SubAgentInvocation', () => {
 
     it('should NOT modify query if query is missing or not a string', async () => {
       mockConfig = makeFakeConfig({ modelSteering: true });
-      mockConfig.userHintService.addUserHint('Hint');
+      mockConfig.injectionService.addInjection('Hint', 'user_steering');
 
       const tool = new SubagentTool(
         testRemoteDefinition,

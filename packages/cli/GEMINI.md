@@ -5,7 +5,7 @@
 - Always fix react-hooks/exhaustive-deps lint errors by adding the missing
   dependencies.
 - **Shortcuts**: only define keyboard shortcuts in
-  `packages/cli/src/config/keyBindings.ts`
+  `packages/cli/src/ui/key/keyBindings.ts`
 - Do not implement any logic performing custom string measurement or string
   truncation. Use Ink layout instead leveraging ResizeObserver as needed.
 - Avoid prop drilling when at all possible.
