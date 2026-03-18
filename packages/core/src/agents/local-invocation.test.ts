@@ -207,8 +207,11 @@ describe('LocalSubagentInvocation', () => {
           ),
         },
       ]);
-      expect(result.returnDisplay).toBe('Analysis complete.');
-      expect(result.returnDisplay).not.toContain('Termination Reason');
+      const display = result.returnDisplay as SubagentProgress;
+      expect(display.isSubagentProgress).toBe(true);
+      expect(display.state).toBe('completed');
+      expect(display.result).toBe('Analysis complete.');
+      expect(display.terminateReason).toBe(AgentTerminateMode.GOAL);
     });
 
     it('should show detailed UI for non-goal terminations (e.g., TIMEOUT)', async () => {
@@ -220,11 +223,11 @@ describe('LocalSubagentInvocation', () => {
 
       const result = await invocation.execute(signal, updateOutput);
 
-      expect(result.returnDisplay).toContain(
-        '### Subagent MockAgent Finished Early',
-      );
-      expect(result.returnDisplay).toContain('**Termination Reason:** TIMEOUT');
-      expect(result.returnDisplay).toContain('Partial progress...');
+      const display = result.returnDisplay as SubagentProgress;
+      expect(display.isSubagentProgress).toBe(true);
+      expect(display.state).toBe('completed');
+      expect(display.result).toBe('Partial progress...');
+      expect(display.terminateReason).toBe(AgentTerminateMode.TIMEOUT);
     });
 
     it('should stream THOUGHT_CHUNK activities from the executor', async () => {
@@ -250,8 +253,8 @@ describe('LocalSubagentInvocation', () => {
 
       await invocation.execute(signal, updateOutput);
 
-      expect(updateOutput).toHaveBeenCalledTimes(3); // Initial + 2 updates
-      const lastCall = updateOutput.mock.calls[2][0] as SubagentProgress;
+      expect(updateOutput).toHaveBeenCalledTimes(4); // Initial + 2 updates + Final completion
+      const lastCall = updateOutput.mock.calls[3][0] as SubagentProgress;
       expect(lastCall.recentActivity).toContainEqual(
         expect.objectContaining({
           type: 'thought',
@@ -283,8 +286,8 @@ describe('LocalSubagentInvocation', () => {
 
       await invocation.execute(signal, updateOutput);
 
-      expect(updateOutput).toHaveBeenCalledTimes(3);
-      const lastCall = updateOutput.mock.calls[2][0] as SubagentProgress;
+      expect(updateOutput).toHaveBeenCalledTimes(4); // Initial + 2 updates + Final completion
+      const lastCall = updateOutput.mock.calls[3][0] as SubagentProgress;
       expect(lastCall.recentActivity).toContainEqual(
         expect.objectContaining({
           type: 'thought',
@@ -312,7 +315,10 @@ describe('LocalSubagentInvocation', () => {
       // Execute without the optional callback
       const result = await invocation.execute(signal);
       expect(result.error).toBeUndefined();
-      expect(result.returnDisplay).toBe('Done');
+      const display = result.returnDisplay as SubagentProgress;
+      expect(display.isSubagentProgress).toBe(true);
+      expect(display.state).toBe('completed');
+      expect(display.result).toBe('Done');
     });
 
     it('should handle executor run failure', async () => {
