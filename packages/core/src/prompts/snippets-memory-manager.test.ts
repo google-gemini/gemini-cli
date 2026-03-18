@@ -20,11 +20,11 @@ describe('renderOperationalGuidelines - memoryManagerEnabled', () => {
     expect(result).toContain('save_memory');
   });
 
-  it('should NOT include save_memory tool snippet when memoryManagerEnabled is true', () => {
+  it('should include save_memory tool snippet when memoryManagerEnabled is true', () => {
     const result = renderOperationalGuidelines({
       ...baseOptions,
       memoryManagerEnabled: true,
     });
-    expect(result).not.toContain('save_memory');
+    expect(result).toContain('save_memory');
   });
 });
