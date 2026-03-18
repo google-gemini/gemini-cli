@@ -225,6 +225,22 @@ and full builds) to a dedicated, high-performance GCP worker.
     await provider.exec(`mkdir -p ~/.workspaces && echo ${githubToken} > ~/.workspaces/.gh_token && chmod 600 ~/.workspaces/.gh_token`);
   }
 
+  // Initialize Remote Gemini Config with Auth
+  console.log('⚙️  Initializing remote Gemini configuration...');
+  const remoteConfigDir = `~/.workspaces/gemini-cli-config/.gemini`;
+  await provider.exec(`mkdir -p ${remoteConfigDir}`);
+  
+  // Create a minimal settings.json on the remote to enable auth
+  const remoteSettings = {
+    general: {
+      authMethod: 'google_accounts'
+    }
+  };
+  const tmpSettingsPath = path.join(os.tmpdir(), `remote-settings-${Date.now()}.json`);
+  fs.writeFileSync(tmpSettingsPath, JSON.stringify(remoteSettings, null, 2));
+  await provider.sync(tmpSettingsPath, `${remoteConfigDir}/settings.json`);
+  fs.unlinkSync(tmpSettingsPath);
+
   // Final Repo Sync
   console.log(`🚀 Finalizing Remote Repository (${userFork})...`);
   const repoUrl = `https://github.com/${userFork}.git`;
