@@ -6,6 +6,7 @@
 
 import { spawn } from 'node:child_process';
 import { RELAUNCH_EXIT_CODE } from './processUtils.js';
+import { runExitCleanup } from './cleanup.js';
 import {
   writeToStderr,
   type AdminControlsSettings,
@@ -17,6 +18,7 @@ export async function relaunchOnExitCode(runner: () => Promise<number>) {
       const exitCode = await runner();
 
       if (exitCode !== RELAUNCH_EXIT_CODE) {
+        await runExitCleanup();
         process.exit(exitCode);
       }
     } catch (error) {
@@ -26,6 +28,7 @@ export async function relaunchOnExitCode(runner: () => Promise<number>) {
       writeToStderr(
         `Fatal error: Failed to relaunch the CLI process.\n${errorMessage}\n`,
       );
+      await runExitCleanup();
       process.exit(1);
     }
   }

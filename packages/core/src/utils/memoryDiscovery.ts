@@ -151,10 +151,10 @@ async function findProjectRoot(startDir: string): Promise<string | null> {
   while (true) {
     const gitPath = path.join(currentDir, '.git');
     try {
-      // Check for existence only — .git can be a directory (normal repos)
-      // or a file (submodules / worktrees).
-      await fs.access(gitPath);
-      return currentDir;
+      const stats = await fs.lstat(gitPath);
+      if (stats.isDirectory() || stats.isFile()) {
+        return currentDir;
+      }
     } catch (error: unknown) {
       // Don't log ENOENT errors as they're expected when .git doesn't exist
       // Also don't log errors in test environments, which often have mocked fs

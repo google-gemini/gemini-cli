@@ -48,14 +48,14 @@ export interface ProcessImportsResult {
   importTree: MemoryFile;
 }
 
-// Helper to find the project root (looks for .git directory)
+// Helper to find the project root (looks for .git directory or file for worktrees)
 async function findProjectRoot(startDir: string): Promise<string> {
   let currentDir = path.resolve(startDir);
   while (true) {
     const gitPath = path.join(currentDir, '.git');
     try {
       const stats = await fs.lstat(gitPath);
-      if (stats.isDirectory()) {
+      if (stats.isDirectory() || stats.isFile()) {
         return currentDir;
       }
     } catch {
