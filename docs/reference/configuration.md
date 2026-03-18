@@ -821,17 +821,6 @@ their corresponding top-level category object in your `settings.json` file.
           "thinking": false,
           "multimodalToolUse": false
         }
-      },
-      "test-auto": {
-        "displayName": "Test Auto",
-        "tier": "auto",
-        "isPreview": true,
-        "isVisible": true,
-        "dialogDescription": "Let Gemini CLI decide the best model for the task: gemini-3-pro, gemini-2.5-pro",
-        "features": {
-          "thinking": false,
-          "multimodalToolUse": false
-        }
       }
     }
     ```
@@ -990,9 +979,6 @@ their corresponding top-level category object in your `settings.json` file.
       },
       "flash-lite": {
         "default": "gemini-2.5-flash-lite"
-      },
-      "test-auto": {
-        "default": "gemini-3-pro-preview"
       }
     }
     ```
@@ -1059,39 +1045,6 @@ their corresponding top-level category object in your `settings.json` file.
 
     ```json
     {
-      "test-auto": [
-        {
-          "model": "gemini-3-pro-preview",
-          "actions": {
-            "terminal": "prompt",
-            "transient": "prompt",
-            "not_found": "prompt",
-            "unknown": "prompt"
-          },
-          "stateTransitions": {
-            "terminal": "terminal",
-            "transient": "terminal",
-            "not_found": "terminal",
-            "unknown": "terminal"
-          }
-        },
-        {
-          "model": "gemini-2.5-pro",
-          "isLastResort": true,
-          "actions": {
-            "terminal": "prompt",
-            "transient": "prompt",
-            "not_found": "prompt",
-            "unknown": "prompt"
-          },
-          "stateTransitions": {
-            "terminal": "terminal",
-            "transient": "terminal",
-            "not_found": "terminal",
-            "unknown": "terminal"
-          }
-        }
-      ],
       "preview": [
         {
           "model": "gemini-3-pro-preview",
