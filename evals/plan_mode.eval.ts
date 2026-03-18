@@ -18,6 +18,18 @@ describe('plan_mode', () => {
     experimental: { plan: true },
   };
 
+  const getWriteTargets = (logs: any[]) =>
+    logs
+      .filter((log) => ['write_file', 'replace'].includes(log.toolRequest.name))
+      .map((log) => {
+        try {
+          return JSON.parse(log.toolRequest.args).file_path as string;
+        } catch {
+          return '';
+        }
+      })
+      .filter(Boolean);
+
   evalTest('ALWAYS_PASSES', {
     name: 'should refuse file modification when in plan mode',
     approvalMode: ApprovalMode.PLAN,
@@ -32,27 +44,23 @@ describe('plan_mode', () => {
       await rig.waitForTelemetryReady();
       const toolLogs = rig.readToolLogs();
 
-      const writeTargets = toolLogs
-        .filter((log) =>
-          ['write_file', 'replace'].includes(log.toolRequest.name),
-        )
-        .map((log) => {
-          try {
-            return JSON.parse(log.toolRequest.args).file_path;
-          } catch {
-            return null;
-          }
-        });
+      const exitPlanIndex = toolLogs.findIndex(
+        (log) => log.toolRequest.name === 'exit_plan_mode',
+      );
+
+      const writeTargetsBeforeExitPlan = getWriteTargets(
+        toolLogs.slice(0, exitPlanIndex !== -1 ? exitPlanIndex : undefined),
+      );
 
       expect(
-        writeTargets,
+        writeTargetsBeforeExitPlan,
         'Should not attempt to modify README.md in plan mode',
       ).not.toContain('README.md');
 
       assertModelHasOutput(result);
       checkModelOutputContent(result, {
         expectedContent: [/plan mode|read-only|cannot modify|refuse|exiting/i],
-        testName: `${TEST_PREFIX}should refuse file modification`,
+        testName: `${TEST_PREFIX}should refuse file modification in plan mode`,
       });
     },
   });
@@ -69,24 +77,20 @@ describe('plan_mode', () => {
       await rig.waitForTelemetryReady();
       const toolLogs = rig.readToolLogs();
 
-      const writeTargets = toolLogs
-        .filter((log) =>
-          ['write_file', 'replace'].includes(log.toolRequest.name),
-        )
-        .map((log) => {
-          try {
-            return JSON.parse(log.toolRequest.args).file_path;
-          } catch {
-            return null;
-          }
-        });
+      const exitPlanIndex = toolLogs.findIndex(
+        (log) => log.toolRequest.name === 'exit_plan_mode',
+      );
+
+      const writeTargetsBeforeExit = getWriteTargets(
+        toolLogs.slice(0, exitPlanIndex !== -1 ? exitPlanIndex : undefined),
+      );
 
       // It should NOT write to the docs folder or any other repo path
-      const hasRepoWrite = writeTargets.some(
+      const hasRepoWriteBeforeExit = writeTargetsBeforeExit.some(
         (path) => path && !path.includes('/plans/'),
       );
       expect(
-        hasRepoWrite,
+        hasRepoWriteBeforeExit,
         'Should not attempt to create files in the repository while in plan mode',
       ).toBe(false);
 
@@ -162,6 +166,67 @@ describe('plan_mode', () => {
         expect(args.file_path).toContain('/plans/');
         expect(args.file_path).toMatch(/\.md$/);
       }
+
+      assertModelHasOutput(result);
+    },
+  });
+
+  evalTest('USUALLY_PASSES', {
+    name: 'should create a plan in plan mode and implement it for a refactoring task',
+    params: {
+      settings,
+    },
+    files: {
+      'src/mathUtils.ts':
+        'export const sum = (a: number, b: number) => a + b;\nexport const multiply = (a: number, b: number) => a * b;',
+      'src/main.ts':
+        'import { sum } from "./mathUtils";\nconsole.log(sum(1, 2));',
+    },
+    prompt:
+      'I want to refactor our math utilities. Move the `sum` function from `src/mathUtils.ts` to a new file `src/basicMath.ts` and update `src/main.ts` to use the new file. Please create a detailed implementation plan first, then execute it.',
+    assert: async (rig, result) => {
+      const enterPlanCalled = await rig.waitForToolCall('enter_plan_mode');
+      expect(
+        enterPlanCalled,
+        'Expected enter_plan_mode tool to be called',
+      ).toBe(true);
+
+      const exitPlanCalled = await rig.waitForToolCall('exit_plan_mode');
+      expect(exitPlanCalled, 'Expected exit_plan_mode tool to be called').toBe(
+        true,
+      );
+
+      await rig.waitForTelemetryReady();
+      const toolLogs = rig.readToolLogs();
+
+      // Check if plan was written
+      const planWrite = toolLogs.find(
+        (log) =>
+          log.toolRequest.name === 'write_file' &&
+          log.toolRequest.args.includes('/plans/'),
+      );
+      expect(
+        planWrite,
+        'Expected a plan file to be written in the plans directory',
+      ).toBeDefined();
+
+      // Check for implementation files
+      const newFileWrite = toolLogs.find(
+        (log) =>
+          log.toolRequest.name === 'write_file' &&
+          log.toolRequest.args.includes('src/basicMath.ts'),
+      );
+      expect(
+        newFileWrite,
+        'Expected src/basicMath.ts to be created',
+      ).toBeDefined();
+
+      const mainUpdate = toolLogs.find(
+        (log) =>
+          ['write_file', 'replace'].includes(log.toolRequest.name) &&
+          log.toolRequest.args.includes('src/main.ts'),
+      );
+      expect(mainUpdate, 'Expected src/main.ts to be updated').toBeDefined();
 
       assertModelHasOutput(result);
     },
