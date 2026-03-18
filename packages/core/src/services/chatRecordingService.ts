@@ -492,8 +492,6 @@ export class ChatRecordingService {
     try {
       if (!this.conversationFile) return;
       // Don't write the file yet until there's at least one message.
-      // if (conversation.messages.length === 0 && !allowEmpty) {
-      // }
 
       const newContent = JSON.stringify(conversation, null, 2);
       // Skip the disk write if nothing actually changed (e.g.
