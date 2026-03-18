@@ -93,13 +93,18 @@ and full builds) to a dedicated, high-performance GCP worker.
           console.log(`   - Upstream identified: ${upstreamRepo}`);
           console.log(`   - Searching for your forks of ${upstreamRepo}...`);
           
-          const forksRes = spawnSync('gh', ['repo', 'list', '--fork', '--json', 'nameWithOwner', '--limit', '10'], { stdio: 'pipe' });
-          const allForks = JSON.parse(forksRes.stdout.toString());
-          const myForks = allForks.filter((f: any) => f.nameWithOwner.endsWith('/' + upstreamRepo.split('/')[1]));
+          // Use gh api to find forks specifically linked to the upstream, which is much more accurate
+          const upstreamOwner = upstreamRepo.split('/')[0];
+          const upstreamName = upstreamRepo.split('/')[1];
+          const userRes = spawnSync('gh', ['api', 'user', '-q', '.login'], { stdio: 'pipe' });
+          const currentUser = userRes.stdout.toString().trim();
+
+          const forksRes = spawnSync('gh', ['api', `/repos/${upstreamOwner}/${upstreamName}/forks`, '--paginate', '-q', `.[] | select(.owner.login == "${currentUser}") | .full_name`], { stdio: 'pipe' });
+          const myForks = forksRes.stdout.toString().trim().split('\n').filter(Boolean);
 
           if (myForks.length > 0) {
               console.log('\n🍴 Found existing forks:');
-              myForks.forEach((f: any, i: number) => console.log(`   [${i + 1}] ${f.nameWithOwner}`));
+              myForks.forEach((name: string, i: number) => console.log(`   [${i + 1}] ${name}`));
               console.log(`   [c] Create a new fork`);
               console.log(`   [u] Use upstream directly (not recommended)`);
 
@@ -110,7 +115,7 @@ and full builds) to a dedicated, high-performance GCP worker.
                   userFork = upstreamRepo;
               } else {
                   const idx = parseInt(choice) - 1;
-                  userFork = myForks[idx] ? myForks[idx].nameWithOwner : upstreamRepo;
+                  userFork = myForks[idx] || myForks[0];
               }
           } else {
               const shouldFork = await confirm(`❓ No fork detected. Create a personal fork for sandboxed implementations?`);
