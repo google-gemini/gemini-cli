@@ -1,8 +1,3 @@
-/**
- * Universal Offload Onboarding (Local)
- * 
- * Configures the GCP Project and performs one-time initialization of the worker.
- */
 import { spawnSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
@@ -13,13 +8,17 @@ import { ProviderFactory } from './providers/ProviderFactory.ts';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
 
-async function prompt(question: string, defaultValue: string): Promise<string> {
+async function prompt(question: string, defaultValue: string, explanation?: string): Promise<string> {
   const autoAccept = process.argv.includes('--yes') || process.argv.includes('-y');
   if (autoAccept && defaultValue) return defaultValue;
 
+  if (explanation) {
+      console.log(`\n📖 ${explanation}`);
+  }
+
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
-    rl.question(`${question} (default: ${defaultValue}, <Enter> to use default): `, (answer) => {
+    rl.question(`❓ ${question} (default: ${defaultValue}, <Enter> to use default): `, (answer) => {
       rl.close();
       resolve(answer.trim() || defaultValue);
     });
@@ -32,7 +31,7 @@ async function confirm(question: string): Promise<boolean> {
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
-    rl.question(`${question} (y/n): `, (answer) => {
+    rl.question(`❓ ${question} (y/n): `, (answer) => {
       rl.close();
       resolve(answer.trim().toLowerCase() === 'y');
     });
@@ -46,74 +45,30 @@ export async function runSetup(env: NodeJS.ProcessEnv = process.env) {
 ================================================================================
 The offload system allows you to delegate heavy tasks (PR reviews, agentic fixes,
 and full builds) to a dedicated, high-performance GCP worker.
-
-This script will:
-1. Identify/Provision your dedicated worker (gcli-offload-${env.USER || 'user'})
-2. Configure "Magic" corporate network routing (nic0 + IAP)
-3. Synchronize your local credentials and orchestration logic
-4. Initialize a remote repository for parallel worktree execution
 ================================================================================
   `);
 
-  const defaultProject = env.GOOGLE_CLOUD_PROJECT || '';
-  const projectId = await prompt('GCP Project ID', defaultProject);
+  console.log('📝 PHASE 1: CONFIGURATION');
+  console.log('--------------------------------------------------------------------------------');
+
+  // 1. Project Identity
+  const defaultProject = env.GOOGLE_CLOUD_PROJECT || env.OFFLOAD_PROJECT || '';
+  const projectId = await prompt('GCP Project ID', defaultProject, 
+    'The GCP Project where your offload worker will live. Your personal project is recommended.');
   
   if (!projectId) {
       console.error('❌ Project ID is required. Set GOOGLE_CLOUD_PROJECT or enter it manually.');
       return 1;
   }
 
-  const zone = await prompt('Compute Zone', 'us-west1-a');
-  const terminalTarget = await prompt('Terminal UI Target (tab or window)', 'tab');
-  const targetVM = `gcli-offload-${env.USER || 'mattkorwel'}`;
-  
-  console.log('\n🔍 Phase 1: Identity & Discovery');
-  // Early save of discovery info so fleet commands can work
-  const initialSettingsPath = path.join(REPO_ROOT, '.gemini/offload/settings.json');
-  if (!fs.existsSync(path.dirname(initialSettingsPath))) fs.mkdirSync(path.dirname(initialSettingsPath), { recursive: true });
-  const initialSettings = fs.existsSync(initialSettingsPath) ? JSON.parse(fs.readFileSync(initialSettingsPath, 'utf8')) : {};
-  initialSettings.deepReview = { ...initialSettings.deepReview, projectId, zone, terminalTarget };
-  fs.writeFileSync(initialSettingsPath, JSON.stringify(initialSettings, null, 2));
+  const zone = await prompt('Compute Zone', env.OFFLOAD_ZONE || 'us-west1-a', 
+    'The physical location of your worker. us-west1-a is the team default.');
 
-  const provider = ProviderFactory.getProvider({ projectId, zone, instanceName: targetVM });
+  const terminalTarget = await prompt('Terminal UI Target (tab or window)', env.OFFLOAD_TERM_TARGET || 'tab',
+    'When a job starts, should it open in a new iTerm2 tab or a completely new window?');
 
-  console.log(`   - Verifying access and finding worker ${targetVM}...`);
-  let status = await provider.getStatus();
-  
-  if (status.status === 'UNKNOWN' || status.status === 'ERROR') {
-    console.log('\n🏗️  Phase 2: Infrastructure Provisioning');
-    const shouldProvision = await confirm(`   - Worker ${targetVM} not found. Provision it now in project ${projectId}?`);
-    if (!shouldProvision) {
-      console.log('🛑 Aborting setup.');
-      return 1;
-    }
-    const provisionRes = await provider.provision();
-    if (provisionRes !== 0) {
-      console.error('❌ Provisioning failed.');
-      return 1;
-    }
-    // Refresh status after provisioning
-    status = await provider.getStatus();
-  }
-
-  if (status.status !== 'RUNNING') {
-    console.log('   - Waking up worker...');
-    await provider.ensureReady();
-  }
-
-  // 1. Configure Isolated SSH Alias (Direct Internal Path with IAP Fallback)
-  console.log(`\n🚀 Phase 3: Network & Connectivity`);
-  const dnsSuffix = await prompt('   - Internal DNS Suffix', '.internal.gcpnode.com');
-
-  const setupRes = await provider.setup({ projectId, zone, dnsSuffix });
-  if (setupRes !== 0) return setupRes;
-
-  const offloadDir = path.join(REPO_ROOT, '.gemini/offload');
-  const sshConfigPath = path.join(offloadDir, 'ssh_config');
-  const knownHostsPath = path.join(offloadDir, 'known_hosts');
-
-  // 1b. Security Fork Management
-  console.log('🔍 Detecting repository origins...');
+  // 2. Repository Discovery
+  console.log('\n🔍 Detecting repository origins...');
   const repoInfoRes = spawnSync('gh', ['repo', 'view', '--json', 'nameWithOwner,parent,isFork'], { stdio: 'pipe' });
   let upstreamRepo = 'google-gemini/gemini-cli';
   let userFork = upstreamRepo;
@@ -124,98 +79,105 @@ This script will:
           if (repoInfo.isFork && repoInfo.parent) {
               upstreamRepo = repoInfo.parent.nameWithOwner;
               userFork = repoInfo.nameWithOwner;
-              console.log(`   - Detected Fork: ${userFork} (Upstream: ${upstreamRepo})`);
+              console.log(`   ✅ Detected Fork: ${userFork} (Upstream: ${upstreamRepo})`);
           } else {
-              console.log(`   - Working on Upstream: ${upstreamRepo}`);
+              console.log(`   ✅ Working on Upstream: ${upstreamRepo}`);
           }
-      } catch (e) {
-          console.log('   ⚠️ Failed to parse repo info. Using defaults.');
-      }
+      } catch (e) {}
   }
 
-  // Resolve Paths
-  const remoteWorkDir = `~/dev/main`;
+  // 3. Security & Auth
+  let githubToken = env.OFFLOAD_GH_TOKEN || '';
+  if (!githubToken) {
+      const shouldGenToken = await confirm('\nGenerate a scoped GitHub token for the remote agent? (Highly Recommended)');
+      if (shouldGenToken) {
+          const baseUrl = 'https://github.com/settings/personal-access-tokens/new';
+          const name = `Offload-${env.USER}`;
+          const repoParams = userFork !== upstreamRepo 
+              ? `&repositories[]=${encodeURIComponent(upstreamRepo)}&repositories[]=${encodeURIComponent(userFork)}`
+              : `&repositories[]=${encodeURIComponent(upstreamRepo)}`;
+
+          const magicLink = `${baseUrl}?name=${encodeURIComponent(name)}&description=Gemini+CLI+Offload+Worker${repoParams}&contents=write&pull_requests=write&metadata=read`;
+          const terminalLink = `\u001b]8;;${magicLink}\u0007${magicLink}\u001b]8;;\u0007`;
+
+          console.log(`\n🔐 ACTION REQUIRED: Create a token with "Read/Write" access to contents & PRs:`);
+          console.log(`\n${terminalLink}\n`);
+          
+          githubToken = await prompt('Paste Scoped Token', '');
+      }
+  } else {
+      console.log('   ✅ Using GitHub token from environment (OFFLOAD_GH_TOKEN).');
+  }
+
+  // 4. Save Confirmed State
+  const targetVM = `gcli-offload-${env.USER || 'mattkorwel'}`;
+  const settingsPath = path.join(REPO_ROOT, '.gemini/offload/settings.json');
+  if (!fs.existsSync(path.dirname(settingsPath))) fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+  
+  const settings = {
+      deepReview: { 
+          projectId, zone, terminalTarget, 
+          userFork, upstreamRepo,
+          remoteHost: 'gcli-worker',
+          remoteWorkDir: '~/dev/main',
+          useContainer: true
+      }
+  };
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+  console.log(`\n✅ Configuration saved to ${settingsPath}`);
+
+  // Transition to Execution
+  const provider = ProviderFactory.getProvider({ projectId, zone, instanceName: targetVM });
+
+  console.log('\n🏗️  PHASE 2: INFRASTRUCTURE');
+  console.log('--------------------------------------------------------------------------------');
+  console.log(`   - Verifying access and finding worker ${targetVM}...`);
+  let status = await provider.getStatus();
+  
+  if (status.status === 'UNKNOWN' || status.status === 'ERROR') {
+    const shouldProvision = await confirm(`❌ Worker ${targetVM} not found. Provision it now?`);
+    if (!shouldProvision) return 1;
+    
+    const provisionRes = await provider.provision();
+    if (provisionRes !== 0) return 1;
+    status = await provider.getStatus();
+  }
+
+  if (status.status !== 'RUNNING') {
+    console.log('   - Waking up worker...');
+    await provider.ensureReady();
+  }
+
+  console.log('\n🚀 PHASE 3: REMOTE INITIALIZATION');
+  console.log('--------------------------------------------------------------------------------');
+  const setupRes = await provider.setup({ projectId, zone, dnsSuffix: '.internal.gcpnode.com' });
+  if (setupRes !== 0) return setupRes;
+
   const persistentScripts = `~/.offload/scripts`;
 
-  console.log(`\n📦 Performing One-Time Synchronization...`);
-  
-  // Ensure host directories exist (using provider.exec to handle IAP fallback)
+  console.log(`\n📦 Synchronizing Logic & Credentials...`);
   await provider.exec(`mkdir -p ~/dev/main ~/.gemini/policies ~/.offload/scripts`);
-
-  // 2. Sync Scripts & Policies
-  console.log('   - Pushing offload logic to persistent worker directory...');
   await provider.sync('.gemini/skills/offload/scripts/', `${persistentScripts}/`, { delete: true });
   await provider.sync('.gemini/skills/offload/policy.toml', `~/.gemini/policies/offload-policy.toml`);
 
-  // 3. Sync Auth (Gemini)
-  if (await confirm('Sync Gemini accounts credentials?')) {
-    const homeDir = env.HOME || '';
-    const lp = path.join(homeDir, '.gemini/google_accounts.json');
-    if (fs.existsSync(lp)) {
-      await provider.sync(lp, `~/.gemini/google_accounts.json`);
-    }
+  if (fs.existsSync(path.join(env.HOME || '', '.gemini/google_accounts.json'))) {
+    await provider.sync(path.join(env.HOME || '', '.gemini/google_accounts.json'), `~/.gemini/google_accounts.json`);
   }
 
-  // 4. Scoped Token Onboarding
-  if (await confirm('Generate a scoped, secure token for the autonomous agent? (Recommended)')) {
-    const baseUrl = 'https://github.com/settings/personal-access-tokens/new';
-    const name = `Offload-${env.USER}`;
-    const repoParams = userFork !== upstreamRepo 
-        ? `&repositories[]=${encodeURIComponent(upstreamRepo)}&repositories[]=${encodeURIComponent(userFork)}`
-        : `&repositories[]=${encodeURIComponent(upstreamRepo)}`;
-
-    const magicLink = `${baseUrl}?name=${encodeURIComponent(name)}&description=Gemini+CLI+Offload+Worker${repoParams}&contents=write&pull_requests=write&metadata=read`;
-
-    // Use OSC 8 for a proper clickable terminal link (no line wrapping issues)
-    const terminalLink = `\u001b]8;;${magicLink}\u0007${magicLink}\u001b]8;;\u0007`;
-
-    console.log('\n🔐 SECURITY: Create a token using the link below:');
-    console.log(`\n${terminalLink}\n`);
-    console.log('👉 INSTRUCTIONS:');
-    console.log('1. Click the link above.');
-    console.log('2. Under "Repository access", select "Only select repositories".');
-    console.log(`3. Select "${upstreamRepo}" and "${userFork}".`);
-    console.log('4. Click "Generate token" at the bottom.');
-
-    const scopedToken = await prompt('\nPaste Scoped Token', '');
-    if (scopedToken) {
-      await provider.exec(`mkdir -p /home/node/.offload && echo ${scopedToken} > /home/node/.offload/.gh_token && chmod 600 /home/node/.offload/.gh_token`);
-    }
+  if (githubToken) {
+    await provider.exec(`mkdir -p ~/.offload && echo ${githubToken} > ~/.offload/.gh_token && chmod 600 ~/.offload/.gh_token`);
   }
 
-  // 5. Tooling & Clone
-  if (await confirm('Initialize tools and clone repository?')) {
-    console.log(`🚀 Cloning fork ${userFork} on worker...`);
-    const repoUrl = `https://github.com/${userFork}.git`;
-    
-    // Wipe existing dir for a clean clone and use absolute paths
-    const cloneCmd = `rm -rf ${remoteWorkDir} && git clone --filter=blob:none ${repoUrl} ${remoteWorkDir} && cd ${remoteWorkDir} && git remote add upstream https://github.com/${upstreamRepo}.git && git fetch upstream`;
-    await provider.exec(cloneCmd);
+  // Final Repo Sync
+  console.log(`🚀 Finalizing Remote Repository (${userFork})...`);
+  const repoUrl = `https://github.com/${userFork}.git`;
+  const cloneCmd = `rm -rf ~/dev/main && git clone --filter=blob:none ${repoUrl} ~/dev/main && cd ~/dev/main && git remote add upstream https://github.com/${upstreamRepo}.git && git fetch upstream`;
+  await provider.exec(cloneCmd);
 
-    console.log('📦 Installing remote dependencies (this may take a few minutes)...');
-    await provider.exec(`cd ${remoteWorkDir} && npm ci`);
-  }
-
-  // Save Settings
-  const settingsPath = path.join(REPO_ROOT, '.gemini/offload/settings.json');
-  let settings: any = {};
-  if (fs.existsSync(settingsPath)) {
-    try { settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8')); } catch (e) {}
-  }
-  settings.deepReview = { 
-    projectId, zone, 
-    remoteHost: 'gcli-worker', 
-    remoteWorkDir, userFork, upstreamRepo,
-    useContainer: true,
-    terminalType: 'iterm2'
-  };
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
-  
-  console.log('\n✅ Initialization complete!');
+  console.log('\n✨ ALL SYSTEMS GO! Your offload environment is ready.');
   return 0;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   runSetup().catch(console.error);
 }
-
