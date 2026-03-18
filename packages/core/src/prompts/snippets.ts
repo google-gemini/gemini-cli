@@ -576,45 +576,20 @@ function mandateConfirm(interactive: boolean): string {
 function mandateTopicUpdateModel(): string {
   return `
 - **Protocol: Topic Model**
-  You are an agentic system. You must maintain a visible state log that tracks broad logical phases using a specific header format.
+  Maintain a visible state log tracking ONLY high-level macro-phase transitions.
 
-- **1. Topic Initialization & Persistence:**
-  - **The Trigger:** You MUST issue a \`Topic: <Phase> : <Brief Summary>\` header ONLY when beginning a task or when the broad logical nature of the task changes (e.g., transitioning from research to implementation).
-  - **The Format:** Use exactly \`Topic: <Phase> : <Brief Summary>\` (e.g., \`Topic: <Research> : Researching Agent Skills in the repo\`).
-  - **Persistence:** Once a Topic is declared, do NOT repeat it for subsequent tool calls or in subsequent messages within that same phase. 
-  - **Start of Task:** Your very first tool execution must be preceded by a Topic header.
+- **1. Natural Header Format:**
+  - **Format:** \`Gerund and Broad summary of objective\` (e.g., \`Researching the authentication flow\`).
+  - **Mandatory Trigger:** Output this header ONLY at the start of a task or when the broad macro-objective fundamentally shifts.
+  - **Strict Suppression:** Once a header is issued, you are FORBIDDEN from repeating it or issuing a new one until you transition to a DIFFERENT gerund. 
+  - **Anti-Granularity:** Never include filenames, tool names, or specific paths in a header. "Researching tool-registry.ts" is a violation; "Researching the core registration" is the protocol.
 
-- **2. Tool Execution Protocol (Zero-Noise):**
-  - **No Per-Tool Headers:** It is a violation of protocol to print "Topic:" before every tool call. 
-  - **Silent Mode:** No conversational filler, no "I will now...", and no summaries between tools. 
-  - Only the Topic header at the start of a broad phase is permitted to break the silence. Everything in between must be silent.
+- **2. The Silence Constraint:**
+  - **Zero Inter-Turn Text:** If you are continuing an active phase (e.g., still researching), you must output ONLY tool calls. No headers, no "I found...", and no conversational filler.
+  - **Bucket Logic:** Group all micro-actions under macro-gerunds. \`Researching\` includes all Reading, Searching, and Analyzing. \`Implementing\` includes all Writing and Editing.
+  - **Thinking:** Use hidden thought blocks for all file tracking and planning. Headers must remain outside thought blocks for UI visibility.
 
-- **3. Thinking Protocol:**
-  - Use internal thought blocks to keep track of what tools you have called, plan your next steps, and reason about the task.
-  - Without reasoning and tracking in thought blocks, you may lose context.
-  - Always use the required syntax for thought blocks to ensure they remain hidden from the user interface.
-
-- **4. Completion:**
-  - Only when the entire task is finalized do you provide a **Final Summary**.
-
-**IMPORTANT: Topic Headers vs. Thoughts**
-The \`Topic: <Phase> : <Brief Summary>\` header must **NOT** be placed inside a thought block. It must be standard text output so that it is properly rendered and displayed in the UI.
-
-**Correct State Log Example:**
-\`\`\`
-Topic: <Research> : Researching Agent Skills in the repo
-<tool_call 1>
-<tool_call 2>
-<tool_call 3>
-
-Topic: <Implementation> : Implementing the skill-creator logic
-<tool_call 1>
-<tool_call 2>
-
-The task is complete. [Final Summary]
-\`\`\`
-
-- **Constraint Enforcement:** If you repeat a "Topic:" line without a fundamental shift in work, or if you provide a Topic for every tool call, you have failed the system integrity protocol.`;
+**Constraint Enforcement:** Repeating an active header or using granular micro-actions (like "Reading") as headers is a protocol failure. Silence is mandatory until the macro-phase shifts.`;
 }
 
 function mandateExplainBeforeActing(): string {
