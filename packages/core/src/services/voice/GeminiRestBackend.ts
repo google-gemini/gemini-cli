@@ -130,6 +130,20 @@ export class GeminiRestBackend implements VoiceBackend {
     this.isStopping = true;
     const proc = this.recordingProcess;
     this.recordingProcess = null;
+
+    // Ensure the process is terminated, even if it ignores SIGTERM.
+    const closePromise = new Promise<void>((resolve) => {
+      proc.once('close', () => resolve());
+      setTimeout(() => {
+        try {
+          proc.kill('SIGKILL');
+        } catch (_e) {
+          // ignore
+        }
+        resolve();
+      }, 500);
+    });
+
     proc.kill('SIGTERM');
     this.audioChunks = [];
     this.stderrChunks = [];
@@ -138,11 +152,15 @@ export class GeminiRestBackend implements VoiceBackend {
       isTranscribing: false,
       error: null,
     });
+
+    // Don't block the cancel call.
+    void closePromise.then(() => {});
   }
 
   async stop(): Promise<void> {
     if (!this.recordingProcess) return;
 
+    this.isStopping = true;
     const proc = this.recordingProcess;
     this.recordingProcess = null;
     const closePromise = new Promise<void>((resolve) => {

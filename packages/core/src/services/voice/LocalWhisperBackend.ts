@@ -122,6 +122,7 @@ export class LocalWhisperBackend implements VoiceBackend {
     if (!this.recordingProcess) return;
     const proc = this.recordingProcess;
     this.recordingProcess = null;
+
     const closePromise = new Promise<void>((resolve) => {
       proc.once('close', () => resolve());
       setTimeout(() => {
@@ -133,14 +134,16 @@ export class LocalWhisperBackend implements VoiceBackend {
         resolve();
       }, 500);
     });
+
     proc.kill('SIGTERM');
     void this.options.onStateChange({
       isRecording: false,
       isTranscribing: false,
       error: null,
     });
-    await closePromise;
-    await this.cleanup();
+
+    // Don't block the cancel call. Perform cleanup in the background.
+    void closePromise.then(() => this.cleanup());
   }
 
   async stop(): Promise<void> {
