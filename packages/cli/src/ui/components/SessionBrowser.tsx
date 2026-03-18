@@ -241,8 +241,10 @@ const SessionItem = ({
     }
   }
 
-  // Reserve a few characters for metadata like " (current)" so the name doesn't wrap awkwardly.
-  const reservedForMeta = additionalInfo ? additionalInfo.length + 1 : 0;
+  // Reserve a few characters for metadata like " (current)" or aliases so the name doesn't wrap awkwardly.
+  const aliasLen = session.alias ? session.alias.length + 3 : 0; // [alias] + space
+  const reservedForMeta =
+    (additionalInfo ? additionalInfo.length + 1 : 0) + aliasLen;
   const availableMessageWidth = Math.max(
     20,
     terminalWidth - FIXED_SESSION_COLUMNS_WIDTH - reservedForMeta,
