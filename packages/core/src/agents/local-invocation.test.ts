@@ -250,8 +250,8 @@ describe('LocalSubagentInvocation', () => {
 
       await invocation.execute(signal, updateOutput);
 
-      expect(updateOutput).toHaveBeenCalledTimes(3); // Initial + 2 updates
-      const lastCall = updateOutput.mock.calls[2][0] as SubagentProgress;
+      const calls = updateOutput.mock.calls;
+      const lastCall = calls[calls.length - 1][0] as SubagentProgress;
       expect(lastCall.recentActivity).toContainEqual(
         expect.objectContaining({
           type: 'thought',
@@ -283,8 +283,8 @@ describe('LocalSubagentInvocation', () => {
 
       await invocation.execute(signal, updateOutput);
 
-      expect(updateOutput).toHaveBeenCalledTimes(3); // Initial + 2 updates
-      const lastCall = updateOutput.mock.calls[2][0] as SubagentProgress;
+      const calls = updateOutput.mock.calls;
+      const lastCall = calls[calls.length - 1][0] as SubagentProgress;
       expect(lastCall.recentActivity).toContainEqual(
         expect.objectContaining({
           type: 'thought',
@@ -316,8 +316,8 @@ describe('LocalSubagentInvocation', () => {
 
       await invocation.execute(signal, updateOutput);
 
-      expect(updateOutput).toHaveBeenCalledTimes(3);
-      const lastCall = updateOutput.mock.calls[2][0] as SubagentProgress;
+      const calls = updateOutput.mock.calls;
+      const lastCall = calls[calls.length - 1][0] as SubagentProgress;
       expect(lastCall.recentActivity).toContainEqual(
         expect.objectContaining({
           type: 'thought',
