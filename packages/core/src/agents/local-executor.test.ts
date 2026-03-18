@@ -365,6 +365,76 @@ describe('LocalAgentExecutor', () => {
   });
 
   describe('create (Initialization and Validation)', () => {
+    it('should explicitly map execution context properties to prevent unintended propagation', async () => {
+      const definition = createTestDefinition([LS_TOOL_NAME]);
+      const mockGeminiClient =
+        {} as unknown as import('../core/client.js').GeminiClient;
+      const mockSandboxManager =
+        {} as unknown as import('../services/sandboxManager.js').SandboxManager;
+      const extendedContext = {
+        config: mockConfig,
+        promptId: mockConfig.promptId,
+        toolRegistry: parentToolRegistry,
+        promptRegistry: mockConfig.promptRegistry,
+        resourceRegistry: mockConfig.resourceRegistry,
+        messageBus: mockConfig.messageBus,
+        geminiClient: mockGeminiClient,
+        sandboxManager: mockSandboxManager,
+        unintendedProperty: 'should not be here',
+      } as unknown as import('../config/agent-loop-context.js').AgentLoopContext;
+
+      const executor = await LocalAgentExecutor.create(
+        definition,
+        extendedContext,
+        onActivity,
+      );
+
+      mockModelResponse([
+        {
+          name: TASK_COMPLETE_TOOL_NAME,
+          args: { finalResult: 'done' },
+          id: 'call1',
+        },
+      ]);
+
+      await executor.run({ goal: 'test' }, signal);
+
+      const chatConstructorArgs = MockedGeminiChat.mock.calls[0];
+      const executionContext = chatConstructorArgs[0];
+
+      expect(executionContext).toBeDefined();
+      expect(executionContext.config).toBe(extendedContext.config);
+      expect(executionContext.promptId).toBe(extendedContext.promptId);
+      expect(executionContext.geminiClient).toBe(extendedContext.geminiClient);
+      expect(executionContext.sandboxManager).toBe(
+        extendedContext.sandboxManager,
+      );
+
+      const agentToolRegistry = executor['toolRegistry'];
+      const agentPromptRegistry = executor['promptRegistry'];
+      const agentResourceRegistry = executor['resourceRegistry'];
+
+      expect(executionContext.toolRegistry).toBe(agentToolRegistry);
+      expect(executionContext.promptRegistry).toBe(agentPromptRegistry);
+      expect(executionContext.resourceRegistry).toBe(agentResourceRegistry);
+
+      expect(executionContext.messageBus).toBe(
+        agentToolRegistry.getMessageBus(),
+      );
+
+      // Ensure the unintended property was not spread
+      expect(
+        (executionContext as unknown as { unintendedProperty?: string })
+          .unintendedProperty,
+      ).toBeUndefined();
+
+      // Ensure registries and message bus are not the parent's
+      expect(executionContext.toolRegistry).not.toBe(
+        extendedContext.toolRegistry,
+      );
+      expect(executionContext.messageBus).not.toBe(extendedContext.messageBus);
+    });
+
     it('should create successfully with allowed tools', async () => {
       const definition = createTestDefinition([LS_TOOL_NAME]);
       const executor = await LocalAgentExecutor.create(
