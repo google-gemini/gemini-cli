@@ -624,6 +624,27 @@ describe('Session Cleanup (Refactored)', () => {
       },
     );
 
+    it('should NOT delete tempDir if safeSessionId is empty', async () => {
+      const config = createMockConfig();
+      const settings: Settings = {
+        general: { sessionRetention: { enabled: true, maxAge: '1d' } },
+      };
+
+      const sessions = await seedSessions();
+      const targetFile = path.join(chatsDir, sessions[1].fileName);
+
+      // Write a session ID that sanitizeFilenamePart will turn into an empty string ""
+      await fs.writeFile(targetFile, JSON.stringify({ sessionId: '../../..' }));
+
+      const tempDir = config.storage.getProjectTempDir();
+      expect(existsSync(tempDir)).toBe(true);
+
+      await cleanupExpiredSessions(config, settings);
+
+      // It must NOT delete the tempDir root
+      expect(existsSync(tempDir)).toBe(true);
+    });
+
     it('should handle unexpected errors without throwing (e.g. string errors)', async () => {
       await seedSessions();
       const config = createMockConfig({

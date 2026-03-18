@@ -89,7 +89,7 @@ async function deleteSessionArtifactsAsync(
 
   // Cleanup session directory
   const sessionDir = path.join(tempDir, safeSessionId);
-  if (sessionDir.startsWith(tempDir)) {
+  if (safeSessionId && sessionDir.startsWith(tempDir + path.sep)) {
     await fs.rm(sessionDir, { recursive: true, force: true }).catch(() => {});
   }
 }
