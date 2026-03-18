@@ -66,61 +66,38 @@ describe('<SubagentGroupDisplay />', () => {
     },
   ];
 
+  const renderSubagentGroup = (
+    toolCallsToRender: IndividualToolCallDisplay[],
+    height?: number,
+  ) => (
+    <OverflowProvider>
+      <KeypressProvider>
+        <SubagentGroupDisplay
+          toolCalls={toolCallsToRender}
+          terminalWidth={80}
+          availableTerminalHeight={height}
+          isExpandable={true}
+        />
+      </KeypressProvider>
+    </OverflowProvider>
+  );
+
   it('renders nothing if there are no agent tool calls', async () => {
-    const { lastFrame } = render(
-      <OverflowProvider>
-        <KeypressProvider>
-          <SubagentGroupDisplay
-            toolCalls={[]}
-            terminalWidth={80}
-            availableTerminalHeight={40}
-          />
-        </KeypressProvider>
-      </OverflowProvider>,
-    );
+    const { lastFrame } = render(renderSubagentGroup([], 40));
     expect(lastFrame({ allowEmpty: true })).toBe('');
   });
 
   it('renders collapsed view by default with correct agent counts and states', async () => {
-    const { lastFrame } = render(
-      <OverflowProvider>
-        <KeypressProvider>
-          <SubagentGroupDisplay
-            toolCalls={mockToolCalls}
-            terminalWidth={80}
-            availableTerminalHeight={40}
-            isExpandable={true}
-          />
-        </KeypressProvider>
-      </OverflowProvider>,
+    const { lastFrame, waitUntilReady } = render(
+      renderSubagentGroup(mockToolCalls, 40),
     );
-    await waitFor(() => {
-      const output = lastFrame() || '';
-      expect(output).toContain('2 Agents (1 running, 1 completed)...');
-      expect(output).toContain('(ctrl+o to expand)');
-      // Agent 1 Check (displayName is set, description should be secondary arg text)
-      expect(output).toContain('api-monitor');
-      expect(output).toContain('Action Required');
-      expect(output).toContain('Verify server is running');
-      expect(output).toContain('!');
-      expect(output).toContain('db-manager');
-      expect(output).toContain('Completed successfully');
-      expect(output).toContain('✓');
-    });
+    await waitUntilReady();
+    expect(lastFrame()).toMatchSnapshot();
   });
 
   it('expands when availableTerminalHeight is undefined', async () => {
     const { lastFrame, rerender } = render(
-      <OverflowProvider>
-        <KeypressProvider>
-          <SubagentGroupDisplay
-            toolCalls={mockToolCalls}
-            terminalWidth={80}
-            availableTerminalHeight={40}
-            isExpandable={true}
-          />
-        </KeypressProvider>
-      </OverflowProvider>,
+      renderSubagentGroup(mockToolCalls, 40),
     );
 
     // Default collapsed view
@@ -129,35 +106,13 @@ describe('<SubagentGroupDisplay />', () => {
     });
 
     // Expand view
-    rerender(
-      <OverflowProvider>
-        <KeypressProvider>
-          <SubagentGroupDisplay
-            toolCalls={mockToolCalls}
-            terminalWidth={80}
-            availableTerminalHeight={undefined}
-            isExpandable={true}
-          />
-        </KeypressProvider>
-      </OverflowProvider>,
-    );
+    rerender(renderSubagentGroup(mockToolCalls, undefined));
     await waitFor(() => {
       expect(lastFrame()).toContain('(ctrl+o to collapse)');
     });
 
     // Collapse view
-    rerender(
-      <OverflowProvider>
-        <KeypressProvider>
-          <SubagentGroupDisplay
-            toolCalls={mockToolCalls}
-            terminalWidth={80}
-            availableTerminalHeight={40}
-            isExpandable={true}
-          />
-        </KeypressProvider>
-      </OverflowProvider>,
-    );
+    rerender(renderSubagentGroup(mockToolCalls, 40));
     await waitFor(() => {
       expect(lastFrame()).toContain('(ctrl+o to expand)');
     });

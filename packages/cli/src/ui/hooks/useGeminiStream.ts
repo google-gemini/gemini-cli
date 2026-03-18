@@ -418,7 +418,7 @@ export const useGeminiStream = (
         tc.status === 'error' ||
         tc.status === 'cancelled'
       ) {
-        // TODO: This lookahead logic is a tactical UI fix to prevent parallel agents
+        // TODO(#22883): This lookahead logic is a tactical UI fix to prevent parallel agents
         // from tearing visually when they finish at slightly different times.
         // Architecturally, `useGeminiStream` should not be responsible for stitching
         // together semantic batches using timing/refs. `packages/core` should be

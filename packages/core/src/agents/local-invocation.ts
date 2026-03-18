@@ -265,7 +265,7 @@ ${output.result}`;
 
       return {
         llmContent: [{ text: resultContent }],
-        returnDisplay: progress, // Return progress so UI stays consistent
+        returnDisplay: progress,
       };
     } catch (error) {
       const errorMessage =

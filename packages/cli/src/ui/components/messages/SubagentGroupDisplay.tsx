@@ -9,7 +9,11 @@ import { useEffect, useId } from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../../semantic-colors.js';
 import type { IndividualToolCallDisplay } from '../../types.js';
-import { isSubagentProgress, checkExhaustive } from '@google/gemini-cli-core';
+import {
+  isSubagentProgress,
+  checkExhaustive,
+  type SubagentActivityItem,
+} from '@google/gemini-cli-core';
 import {
   SubagentProgressDisplay,
   formatToolArgs,
@@ -38,40 +42,42 @@ export const SubagentGroupDisplay: React.FC<SubagentGroupDisplayProps> = ({
   const isExpanded = availableTerminalHeight === undefined;
   const overflowActions = useOverflowActions();
   const uniqueId = useId();
+  const overflowId = `subagent-${uniqueId}`;
 
   useEffect(() => {
     if (isExpandable && overflowActions) {
       // Register with the global overflow system so "ctrl+o to expand" shows in the sticky footer
       // and AppContainer passes the shortcut through.
-      overflowActions.addOverflowingId(`subagent-${uniqueId}`);
+      overflowActions.addOverflowingId(overflowId);
     }
     return () => {
       if (overflowActions) {
-        overflowActions.removeOverflowingId(`subagent-${uniqueId}`);
+        overflowActions.removeOverflowingId(overflowId);
       }
     };
-  }, [isExpandable, overflowActions, uniqueId]);
+  }, [isExpandable, overflowActions, overflowId]);
 
-  const validAgentCalls = toolCalls.filter((tc) =>
-    isSubagentProgress(tc.resultDisplay),
-  );
-
-  if (validAgentCalls.length === 0) {
+  if (toolCalls.length === 0) {
     return null;
   }
 
   let headerText = '';
-  if (validAgentCalls.length === 1) {
-    const singleAgent = validAgentCalls[0].resultDisplay;
+  if (toolCalls.length === 1) {
+    const singleAgent = toolCalls[0].resultDisplay;
     if (isSubagentProgress(singleAgent)) {
-      if (singleAgent.state === 'completed') {
-        headerText = 'Agent Completed';
-      } else if (singleAgent.state === 'cancelled') {
-        headerText = 'Agent Cancelled';
-      } else if (singleAgent.state === 'error') {
-        headerText = 'Agent Error';
-      } else {
-        headerText = 'Running Agent...';
+      switch (singleAgent.state) {
+        case 'completed':
+          headerText = 'Agent Completed';
+          break;
+        case 'cancelled':
+          headerText = 'Agent Cancelled';
+          break;
+        case 'error':
+          headerText = 'Agent Error';
+          break;
+        default:
+          headerText = 'Running Agent...';
+          break;
       }
     } else {
       headerText = 'Running Agent...';
@@ -79,23 +85,54 @@ export const SubagentGroupDisplay: React.FC<SubagentGroupDisplayProps> = ({
   } else {
     let completedCount = 0;
     let runningCount = 0;
-    for (const tc of validAgentCalls) {
+    for (const tc of toolCalls) {
       const progress = tc.resultDisplay;
       if (isSubagentProgress(progress)) {
         if (progress.state === 'completed') completedCount++;
         else if (progress.state === 'running') runningCount++;
+      } else {
+        // It hasn't emitted progress yet, but it is "running"
+        runningCount++;
       }
     }
 
-    if (completedCount === validAgentCalls.length) {
-      headerText = `${validAgentCalls.length} Agents Completed`;
+    if (completedCount === toolCalls.length) {
+      headerText = `${toolCalls.length} Agents Completed`;
     } else if (completedCount > 0) {
-      headerText = `${validAgentCalls.length} Agents (${runningCount} running, ${completedCount} completed)...`;
+      headerText = `${toolCalls.length} Agents (${runningCount} running, ${completedCount} completed)...`;
     } else {
-      headerText = `Running ${validAgentCalls.length} Agents...`;
+      headerText = `Running ${toolCalls.length} Agents...`;
     }
   }
   const toggleText = `(ctrl+o to ${isExpanded ? 'collapse' : 'expand'})`;
+
+  const renderCollapsedRow = (
+    key: string,
+    agentName: string,
+    icon: React.ReactNode,
+    content: string,
+    displayArgs?: string,
+  ) => (
+    <Box key={key} flexDirection="row" marginLeft={0} marginTop={0}>
+      <Box minWidth={2} flexShrink={0}>
+        {icon}
+      </Box>
+      <Box flexShrink={0}>
+        <Text bold color={theme.text.primary} wrap="truncate">
+          {agentName}
+        </Text>
+      </Box>
+      <Box flexShrink={0}>
+        <Text color={theme.text.secondary}> · </Text>
+      </Box>
+      <Box flexShrink={1} minWidth={0}>
+        <Text color={theme.text.secondary} wrap="truncate">
+          {content}
+          {displayArgs && ` ${displayArgs}`}
+        </Text>
+      </Box>
+    </Box>
+  );
 
   return (
     <Box
@@ -109,7 +146,7 @@ export const SubagentGroupDisplay: React.FC<SubagentGroupDisplayProps> = ({
       borderDimColor={borderDimColor}
       borderStyle="round"
       paddingLeft={1}
-      paddingTop={isFirst ? 0 : 0}
+      paddingTop={0}
       paddingBottom={0}
     >
       <Box flexDirection="row" gap={1} marginBottom={isExpanded ? 1 : 0}>
@@ -120,11 +157,41 @@ export const SubagentGroupDisplay: React.FC<SubagentGroupDisplayProps> = ({
         {isExpandable && <Text color={theme.text.secondary}>{toggleText}</Text>}
       </Box>
 
-      {validAgentCalls.map((toolCall) => {
+      {toolCalls.map((toolCall) => {
         const progress = toolCall.resultDisplay;
-        if (!isSubagentProgress(progress)) return null;
 
-        const lastActivity =
+        if (!isSubagentProgress(progress)) {
+          const agentName = toolCall.name || 'agent';
+          if (!isExpanded) {
+            return renderCollapsedRow(
+              toolCall.callId,
+              agentName,
+              <Text color={theme.text.primary}>!</Text>,
+              'Starting...',
+            );
+          } else {
+            return (
+              <Box
+                key={toolCall.callId}
+                flexDirection="column"
+                marginLeft={0}
+                marginBottom={1}
+              >
+                <Box flexDirection="row" gap={1}>
+                  <Text color={theme.text.primary}>!</Text>
+                  <Text bold color={theme.text.primary}>
+                    {agentName}
+                  </Text>
+                </Box>
+                <Box marginLeft={2}>
+                  <Text color={theme.text.secondary}>Starting...</Text>
+                </Box>
+              </Box>
+            );
+          }
+        }
+
+        const lastActivity: SubagentActivityItem | undefined =
           progress.recentActivity[progress.recentActivity.length - 1];
 
         // Collapsed View: Show single compact line per agent
@@ -144,23 +211,10 @@ export const SubagentGroupDisplay: React.FC<SubagentGroupDisplayProps> = ({
           } else if (lastActivity) {
             // Match expanded view logic exactly:
             // Primary text: displayName || content
-            if (
-              'displayName' in lastActivity &&
-              typeof lastActivity.displayName === 'string'
-            ) {
-              content = lastActivity.displayName;
-            } else if (
-              'content' in lastActivity &&
-              typeof lastActivity.content === 'string'
-            ) {
-              content = lastActivity.content;
-            }
+            content = lastActivity.displayName || lastActivity.content;
 
             // Secondary text: description || formatToolArgs(args)
-            if (
-              'description' in lastActivity &&
-              typeof lastActivity.description === 'string'
-            ) {
+            if (lastActivity.description) {
               formattedArgs = lastActivity.description;
             } else if (lastActivity.type === 'tool_call' && lastActivity.args) {
               formattedArgs = formatToolArgs(lastActivity.args);
@@ -186,32 +240,12 @@ export const SubagentGroupDisplay: React.FC<SubagentGroupDisplayProps> = ({
             }
           };
 
-          return (
-            <Box
-              key={toolCall.callId}
-              flexDirection="row"
-              marginLeft={0}
-              marginTop={0}
-            >
-              <Box minWidth={2} flexShrink={0}>
-                {renderStatusIcon()}
-              </Box>
-              <Box flexShrink={0}>
-                <Text bold color={theme.text.primary} wrap="truncate">
-                  {progress.agentName}
-                </Text>
-              </Box>
-              <Box flexShrink={0}>
-                <Text color={theme.text.secondary}> · </Text>
-              </Box>
-              <Box flexShrink={1} minWidth={0}>
-                <Text color={theme.text.secondary} wrap="truncate">
-                  {lastActivity?.type === 'thought' ? '💭' : ''}
-                  {content}
-                  {displayArgs && ` ${displayArgs}`}
-                </Text>
-              </Box>
-            </Box>
+          return renderCollapsedRow(
+            toolCall.callId,
+            progress.agentName,
+            renderStatusIcon(),
+            lastActivity?.type === 'thought' ? `💭 ${content}` : content,
+            displayArgs,
           );
         }
 
