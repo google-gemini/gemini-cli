@@ -23,6 +23,15 @@ import { type ApprovalMode } from '../policy/types.js';
 import type { SubagentProgress } from '../agents/types.js';
 
 /**
+ * Options bag for tool execution, replacing positional parameters that are
+ * only relevant to specific tool types.
+ */
+export interface ExecuteOptions {
+  shellExecutionConfig?: ShellExecutionConfig;
+  setExecutionIdCallback?: (executionId: number) => void;
+}
+
+/**
  * Represents a validated and ready-to-execute tool call.
  * An instance of this is created by a `ToolBuilder`.
  */
@@ -68,8 +77,7 @@ export interface ToolInvocation<
   execute(
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
-    shellExecutionConfig?: ShellExecutionConfig,
-    setExecutionIdCallback?: (executionId: number) => void,
+    options?: ExecuteOptions,
   ): Promise<TResult>;
 
   /**
@@ -325,7 +333,7 @@ export abstract class BaseToolInvocation<
   abstract execute(
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
-    shellExecutionConfig?: ShellExecutionConfig,
+    options?: ExecuteOptions,
   ): Promise<TResult>;
 }
 
@@ -427,6 +435,25 @@ export abstract class DeclarativeTool<
     readonly extensionId?: string,
   ) {}
 
+  clone(messageBus?: MessageBus): this {
+    // Note: we cannot use structuredClone() here because it does not preserve
+    // prototype chains or handle non-serializable properties (like functions).
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    const cloned = Object.assign(
+      // eslint-disable-next-line no-restricted-syntax
+      Object.create(Object.getPrototypeOf(this)),
+      this,
+    ) as this;
+    if (messageBus) {
+      Object.defineProperty(cloned, 'messageBus', {
+        value: messageBus,
+        writable: false,
+        configurable: true,
+      });
+    }
+    return cloned;
+  }
+
   get isReadOnly(): boolean {
     return READ_ONLY_KINDS.includes(this.kind);
   }
@@ -522,10 +549,10 @@ export abstract class DeclarativeTool<
     params: TParams,
     signal: AbortSignal,
     updateOutput?: (output: ToolLiveOutput) => void,
-    shellExecutionConfig?: ShellExecutionConfig,
+    options?: ExecuteOptions,
   ): Promise<TResult> {
     const invocation = this.build(params);
-    return invocation.execute(signal, updateOutput, shellExecutionConfig);
+    return invocation.execute(signal, updateOutput, options);
   }
 
   /**
@@ -796,7 +823,12 @@ export type ToolResultDisplay =
   | TodoList
   | SubagentProgress;
 
-export type TodoStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type TodoStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled'
+  | 'blocked';
 
 export interface Todo {
   description: string;
