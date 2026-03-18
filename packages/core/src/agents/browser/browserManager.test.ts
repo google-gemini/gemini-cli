@@ -47,6 +47,8 @@ vi.mock('../../utils/debugLogger.js', () => ({
 // Mock browser consent to always grant consent by default
 vi.mock('../../utils/browserConsent.js', () => ({
   getBrowserConsentIfNeeded: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('./automationOverlay.js', () => ({
   injectAutomationOverlay: vi.fn().mockResolvedValue(undefined),
 }));

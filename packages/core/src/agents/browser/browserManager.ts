@@ -366,6 +366,8 @@ export class BrowserManager {
     // Respect the user's privacy.usageStatisticsEnabled setting
     if (!this.config.getUsageStatisticsEnabled()) {
       mcpArgs.push('--no-usage-statistics', '--no-performance-crux');
+    }
+
     if (
       browserConfig.customConfig.allowedDomains &&
       browserConfig.customConfig.allowedDomains.length > 0
