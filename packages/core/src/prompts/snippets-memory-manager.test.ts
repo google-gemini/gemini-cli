@@ -15,16 +15,20 @@ describe('renderOperationalGuidelines - memoryManagerEnabled', () => {
     memoryManagerEnabled: false,
   };
 
-  it('should include save_memory tool snippet when memoryManagerEnabled is false', () => {
+  it('should include standard memory tool guidance when memoryManagerEnabled is false', () => {
     const result = renderOperationalGuidelines(baseOptions);
     expect(result).toContain('save_memory');
+    expect(result).toContain('persistent user-related information');
+    expect(result).not.toContain('subagent');
   });
 
-  it('should include save_memory tool snippet when memoryManagerEnabled is true', () => {
+  it('should include subagent memory guidance when memoryManagerEnabled is true', () => {
     const result = renderOperationalGuidelines({
       ...baseOptions,
       memoryManagerEnabled: true,
     });
     expect(result).toContain('save_memory');
+    expect(result).toContain('subagent');
+    expect(result).not.toContain('persistent user-related information');
   });
 });

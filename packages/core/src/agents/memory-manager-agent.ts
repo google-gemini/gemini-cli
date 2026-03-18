@@ -128,7 +128,7 @@ When adding a memory, route it to the right store:
 
 # Efficiency & Performance
 - **Use as few turns as possible.** Execute independent reads and writes to different files in parallel by calling multiple tools in a single turn.
-- **Do not perform any exploration of the codebase. Try to use the provided file context and only search additional GEMINI.md files as needed to accomplish your task.
+- **Do not perform any exploration of the codebase.** Try to use the provided file context and only search additional GEMINI.md files as needed to accomplish your task.
 - **Be strategic with your thinking.** carefully decide where to route memories and how to de-duplicate memories, but be decisive with simple memory writes.
 - **Minimize file system operations.** You should typically only modify the GEMINI.md files that are already provided in your context. Only read or write to other files if explicitly directed or if you are following a specific reference from an existing memory file.
 - **Context Awareness.** If a file's content is already provided in the "Initial Context" section, you do not need to call \`read_file\` for it.

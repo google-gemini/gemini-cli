@@ -68,7 +68,7 @@ describe('Memory Manager Policy', () => {
     expect(result.decision).toBe(PolicyDecision.ALLOW);
   });
 
-  it('should NOT allow save_memory to read other files', async () => {
+  it('should fall through to global allow rule for save_memory reading non-.gemini files', async () => {
     const toolCall = {
       name: 'read_file',
       args: { file_path: '/etc/passwd' },
@@ -79,12 +79,12 @@ describe('Memory Manager Policy', () => {
       undefined,
       'save_memory',
     );
-    // In the default project policy environment, read_file is allowed (priority 50).
-    // The memory-manager policy does not explicitly deny other files, so it falls through.
+    // The memory-manager policy only matches .gemini/ paths.
+    // Other paths fall through to the global read_file allow rule (priority 50).
     expect(result.decision).toBe(PolicyDecision.ALLOW);
   });
 
-  it('should NOT allow other agents to access ~/.gemini/ automatically', async () => {
+  it('should fall through to global allow rule for other agents accessing ~/.gemini/', async () => {
     const toolCall = {
       name: 'read_file',
       args: { file_path: '~/.gemini/GEMINI.md' },
