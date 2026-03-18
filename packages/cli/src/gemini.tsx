@@ -280,7 +280,7 @@ export async function main() {
     .version(false)
     .parseSync();
 
-  const workspace = bootstrapArgs['workspace'];
+  const workspace = [bootstrapArgs.workspace].flat().pop();
   if (typeof workspace === 'string') {
     try {
       const resolvedPath = bootstrapWorkspace(workspace);
