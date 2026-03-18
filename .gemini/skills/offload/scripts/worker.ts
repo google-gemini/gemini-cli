@@ -45,6 +45,12 @@ export async function runWorker(args: string[]) {
     geminiBin = path.join(path.dirname(targetDir), 'main/node_modules/.bin/gemini');
   }
 
+  console.log(`   - Gemini Bin: ${geminiBin} (Exists: ${fs.existsSync(geminiBin)})`);
+  if (fs.existsSync(geminiBin)) {
+    const versionCheck = spawnSync(geminiBin, ['--version'], { stdio: 'pipe' });
+    console.log(`   - Gemini Version: ${versionCheck.stdout.toString().trim() || 'Error fetching version'}`);
+  }
+
   // 2. Dispatch to Playbook
   switch (action) {
     case 'review':
