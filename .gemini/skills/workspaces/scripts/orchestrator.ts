@@ -31,37 +31,43 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
     return 1;
   }
 
-  const { projectId, zone, remoteWorkDir } = config;
+  const { projectId, zone } = config;
   const targetVM = `gcli-workspace-${env.USER || 'mattkorwel'}`;
   const provider = ProviderFactory.getProvider({ projectId, zone, instanceName: targetVM });
 
   // 2. Wake Worker & Verify Container
   await provider.ensureReady();
 
-  // Use Absolute Container Paths
+  // Paths
+  const hostHome = `~`;
+  const hostWorkDir = `${hostHome}/dev/main`;
   const containerHome = '/home/node';
   const remotePolicyPath = `${containerHome}/.gemini/policies/workspace-policy.toml`;
   const persistentScripts = `${containerHome}/.workspaces/scripts`;
   const sessionName = `workspace-${prNumber}-${action}`;
   const remoteWorktreeDir = `${containerHome}/dev/worktrees/${sessionName}`;
+  const hostWorktreeDir = `${hostHome}/dev/worktrees/${sessionName}`;
 
-  // 3. Remote Context Setup
+  // 3. Remote Context Setup (Executed on HOST for permission simplicity)
   console.log(`🚀 Preparing remote environment for ${action} on #${prNumber}...`);
   
-  const check = await provider.getExecOutput(`ls -d ${remoteWorktreeDir}/.git`, { wrapContainer: 'maintainer-worker' });
+  const check = await provider.getExecOutput(`ls -d ${hostWorktreeDir}/.git`);
   
   if (check.status !== 0) {
     console.log('   - Provisioning isolated git worktree...');
-    await provider.exec(`sudo docker exec -u root maintainer-worker mkdir -p ${containerHome}/dev/worktrees && sudo docker exec -u root maintainer-worker chown -R node:node ${containerHome}/dev/worktrees`);
     
+    // We run these on the host because the host user owns the ~/dev/main directory
     const setupCmd = `
-      git config --global --add safe.directory ${containerHome}/dev/main && \
-      mkdir -p ${containerHome}/dev/worktrees && \
-      cd ${containerHome}/dev/main && \
+      mkdir -p ${hostHome}/dev/worktrees && \
+      cd ${hostWorkDir} && \
       git fetch upstream pull/${prNumber}/head && \
-      git worktree add -f ${remoteWorktreeDir} FETCH_HEAD
+      git worktree add -f ${hostWorktreeDir} FETCH_HEAD
     `;
-    await provider.exec(setupCmd, { wrapContainer: 'maintainer-worker' });
+    const setupRes = await provider.exec(setupCmd);
+    if (setupRes !== 0) {
+        console.error('   ❌ Failed to provision remote worktree.');
+        return 1;
+    }
   } else {
     console.log('   ✅ Remote worktree ready.');
   }
@@ -69,31 +75,21 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   // 4. Execution Logic
   const remoteWorker = `tsx ${persistentScripts}/entrypoint.ts ${prNumber} . ${remotePolicyPath} ${action}`;
   
-  // tmux command inside container
-  const remoteTmuxCmd = `tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'workspace' 'cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL'`;
+  // tmux command inside container. We must ensure the container sees the directory as safe.
+  const remoteTmuxCmd = `git config --global --add safe.directory ${remoteWorktreeDir} && tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'workspace' 'cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL'`;
+  const containerWrap = `sudo docker exec -it maintainer-worker sh -c ${q(remoteTmuxCmd)}`;
   
-  const terminalTarget = config.terminalTarget || 'tab';
+  const finalSSH = provider.getRunCommand(containerWrap, { interactive: true });
+
   const isWithinGemini = !!env.GEMINI_CLI || !!env.GEMINI_SESSION_ID || !!env.GCLI_SESSION_ID;
+  const terminalTarget = config.terminalTarget || 'tab';
+  const forceMainTerminal = true; // Stay in current terminal for E2E verification
 
-  // Handle different UI targets
-  switch (terminalTarget) {
-    case 'background':
-        console.log(`📡 Job #${prNumber} starting in background (session: ${sessionName}).`);
-        // Remove -it for background launch
-        const bgWrap = `sudo docker exec maintainer-worker sh -c ${q(remoteTmuxCmd)}`;
-        await provider.exec(bgWrap);
-        console.log(`✅ Job is running. Attach anytime with: npm run workspace:attach ${prNumber} ${action}`);
-        return 0;
+  if (!forceMainTerminal && isWithinGemini && env.TERM_PROGRAM === 'iTerm.app') {
+    const tempCmdPath = path.join(process.env.TMPDIR || '/tmp', `workspace-ssh-${prNumber}.sh`);
+    fs.writeFileSync(tempCmdPath, `#!/bin/bash\n${finalSSH}\nrm "$0"`, { mode: 0o755 });
 
-    case 'tab':
-    case 'window':
-        if (isWithinGemini && env.TERM_PROGRAM === 'iTerm.app') {
-            const containerWrap = `sudo docker exec -it maintainer-worker sh -c ${q(remoteTmuxCmd)}`;
-            const finalSSH = provider.getRunCommand(containerWrap, { interactive: true });
-            const tempCmdPath = path.join(process.env.TMPDIR || '/tmp', `workspace-ssh-${prNumber}.sh`);
-            fs.writeFileSync(tempCmdPath, `#!/bin/bash\n${finalSSH}\nrm "$0"`, { mode: 0o755 });
-
-            const appleScript = terminalTarget === 'window' ? `
+    const appleScript = terminalTarget === 'window' ? `
                 on run argv
                 tell application "iTerm"
                     set newWindow to (create window with default profile)
@@ -116,21 +112,16 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
                 end tell
                 end run
             `;
-            spawnSync('osascript', ['-', tempCmdPath], { input: appleScript });
-            console.log(`✅ iTerm2 ${terminalTarget} opened for job #${prNumber}.`);
-            return 0;
-        }
-        // Fallthrough to foreground if not in iTerm
-        console.log('   ⚠️ iTerm2 not detected or not in Gemini. Falling back to foreground...');
-
-    case 'foreground':
-    default:
-        console.log(`📡 Connecting to session ${sessionName}...`);
-        const fgWrap = `sudo docker exec -it maintainer-worker sh -c ${q(remoteTmuxCmd)}`;
-        const fgSSH = provider.getRunCommand(fgWrap, { interactive: true });
-        spawnSync(fgSSH, { stdio: 'inherit', shell: true });
-        return 0;
+    spawnSync('osascript', ['-', tempCmdPath], { input: appleScript });
+    console.log(`✅ iTerm2 ${terminalTarget} opened for job #${prNumber}.`);
+    return 0;
   }
+
+  // Fallback: Run in current terminal
+  console.log(`📡 Connecting to session ${sessionName}...`);
+  spawnSync(finalSSH, { stdio: 'inherit', shell: true });
+
+  return 0;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

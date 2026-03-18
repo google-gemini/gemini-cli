@@ -76,7 +76,7 @@ export class GceCosProvider implements WorkspaceProvider {
       # Run if not already exists
       if ! docker ps -a | grep -q "maintainer-worker"; then
         docker run -d --name maintainer-worker --restart always \\
-          -v ~/.workspace:/home/node/.workspace:rw \\
+          -v ~/.workspaces:/home/node/.workspaces:rw \\
           -v ~/dev:/home/node/dev:rw \\
           -v ~/.gemini:/home/node/.gemini:rw \\
           ${imageUri} /bin/bash -c "while true; do sleep 1000; done"
@@ -134,8 +134,6 @@ export class GceCosProvider implements WorkspaceProvider {
     if (containerCheck.status === 0 && containerCheck.stdout.trim()) {
         // Check if the running image is stale
         const imageUri = 'us-docker.pkg.dev/gemini-code-dev/gemini-cli/maintainer:latest';
-        const remoteDigest = await this.getExecOutput(`sudo docker inspect --format='{{index .Config.Labels "org.opencontainers.image.revision"}}' maintainer-worker || sudo docker inspect --format='{{.Image}}' maintainer-worker`);
-        // We'll pull the latest tag to see if it's different (or just force pull if it's been a while)
         // For simplicity in this environment, we'll just check if tmux is missing as a proxy for "stale image"
         const tmuxCheck = await this.getExecOutput('sudo docker exec maintainer-worker which tmux');
         if (tmuxCheck.status !== 0) {
@@ -149,7 +147,7 @@ export class GceCosProvider implements WorkspaceProvider {
     if (needsUpdate) {
         console.log('   ⚠️ Container missing or stale. Attempting refresh...');
         const imageUri = 'us-docker.pkg.dev/gemini-code-dev/gemini-cli/maintainer:latest';
-        const recoverCmd = `sudo docker pull ${imageUri} && (sudo docker rm -f maintainer-worker || true) && sudo docker run -d --name maintainer-worker --restart always -v ~/.workspace:/home/node/.workspace:rw -v ~/dev:/home/node/dev:rw -v ~/.gemini:/home/node/.gemini:rw ${imageUri} /bin/bash -c "while true; do sleep 1000; done"`;
+        const recoverCmd = `sudo docker pull ${imageUri} && (sudo docker rm -f maintainer-worker || true) && sudo docker run -d --name maintainer-worker --restart always -v ~/.workspaces:/home/node/.workspaces:rw -v ~/dev:/home/node/dev:rw -v ~/.gemini:/home/node/.gemini:rw ${imageUri} /bin/bash -c "while true; do sleep 1000; done"`;
         const recoverRes = await this.exec(recoverCmd);
         if (recoverRes !== 0) {
             console.error('   ❌ Critical: Failed to refresh maintainer container.');
@@ -217,7 +215,7 @@ Host ${this.sshAlias}
     return this.conn.sync(localPath, remotePath, options);
   }
 
-  async getStatus(): Promise<WorkerStatus> {
+  async getStatus(): Promise<WorkspaceStatus> {
     const res = spawnSync('gcloud', [
       'compute', 'instances', 'describe', this.instanceName,
       '--project', this.projectId,
