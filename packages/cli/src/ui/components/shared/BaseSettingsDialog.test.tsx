@@ -7,13 +7,16 @@
 import { renderWithProviders } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act } from 'react';
+import { act, useCallback } from 'react';
+import React from 'react';
 import { Text } from 'ink';
 import {
   BaseSettingsDialog,
   type BaseSettingsDialogProps,
   type SettingsDialogItem,
 } from './BaseSettingsDialog.js';
+import { type Key } from '../../contexts/KeypressContext.js';
+import { useKeypress } from '../../hooks/useKeypress.js';
 import { SettingScope } from '../../../config/settings.js';
 
 enum TerminalKeys {
@@ -115,6 +118,52 @@ describe('BaseSettingsDialog', () => {
     return result;
   };
 
+  /**
+   * A wrapper component that registers an outer keypress handler at lower
+   * priority than the dialog, used to verify that Escape events do not bubble.
+   */
+  const OuterHandlerWrapper = ({
+    onOuterKeypress,
+    children,
+  }: {
+    onOuterKeypress: (key: Key) => void;
+    children: React.ReactNode;
+  }) => {
+    const stableHandler = useCallback(
+      (key: Key) => {
+        onOuterKeypress(key);
+      },
+      [onOuterKeypress],
+    );
+    useKeypress(stableHandler, { isActive: true, priority: false });
+    return <>{children}</>;
+  };
+
+  const renderDialogWithOuterHandler = async (
+    outerHandler: (key: Key) => void,
+    props: Partial<BaseSettingsDialogProps> = {},
+  ) => {
+    const defaultProps: BaseSettingsDialogProps = {
+      title: 'Test Settings',
+      items: createMockItems(),
+      selectedScope: SettingScope.User,
+      maxItemsToShow: 8,
+      onItemToggle: mockOnItemToggle,
+      onEditCommit: mockOnEditCommit,
+      onItemClear: mockOnItemClear,
+      onClose: mockOnClose,
+      ...props,
+    };
+
+    const result = renderWithProviders(
+      <OuterHandlerWrapper onOuterKeypress={outerHandler}>
+        <BaseSettingsDialog {...defaultProps} />
+      </OuterHandlerWrapper>,
+    );
+    await result.waitUntilReady();
+    return result;
+  };
+
   describe('rendering', () => {
     it('should render the dialog with title', async () => {
       const { lastFrame, unmount } = await renderDialog();
@@ -191,6 +240,63 @@ describe('BaseSettingsDialog', () => {
       await waitFor(() => {
         expect(mockOnClose).toHaveBeenCalled();
       });
+      unmount();
+    });
+
+    it('should consume Escape key event so it does not bubble to outer handlers', async () => {
+      const outerHandler = vi.fn();
+      const { stdin, waitUntilReady, unmount } =
+        await renderDialogWithOuterHandler(outerHandler);
+
+      await act(async () => {
+        stdin.write(TerminalKeys.ESCAPE);
+      });
+      // Escape key has a 50ms timeout in KeypressContext, so we need to wrap waitUntilReady in act
+      await act(async () => {
+        await waitUntilReady();
+      });
+
+      await waitFor(() => {
+        expect(mockOnClose).toHaveBeenCalled();
+      });
+      // The outer handler must NOT have been called — the dialog consumed the event
+      expect(outerHandler).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'escape' }),
+      );
+      unmount();
+    });
+
+    it('should consume Escape key event in edit mode so it does not bubble to outer handlers', async () => {
+      const outerHandler = vi.fn();
+      const items = createMockItems(4);
+      const stringItem = items.find((i) => i.type === 'string')!;
+      const { stdin, waitUntilReady, unmount } =
+        await renderDialogWithOuterHandler(outerHandler, {
+          items: [stringItem],
+        });
+
+      // Enter edit mode
+      await act(async () => {
+        stdin.write(TerminalKeys.ENTER);
+      });
+      await waitUntilReady();
+
+      // Commit edit with Escape
+      await act(async () => {
+        stdin.write(TerminalKeys.ESCAPE);
+      });
+      // Escape key has a 50ms timeout in KeypressContext, so we need to wrap waitUntilReady in act
+      await act(async () => {
+        await waitUntilReady();
+      });
+
+      await waitFor(() => {
+        expect(mockOnEditCommit).toHaveBeenCalled();
+      });
+      // The outer handler must NOT have been called — the dialog consumed the event
+      expect(outerHandler).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'escape' }),
+      );
       unmount();
     });
 

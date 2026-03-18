@@ -321,7 +321,7 @@ export function BaseSettingsDialog({
         // Escape in edit mode - commit (consistent with SettingsDialog)
         if (keyMatchers[Command.ESCAPE](key)) {
           commitEdit();
-          return;
+          return true;
         }
 
         // Enter in edit mode - commit
@@ -407,7 +407,7 @@ export function BaseSettingsDialog({
       // Escape - close dialog
       if (keyMatchers[Command.ESCAPE](key)) {
         onClose();
-        return;
+        return true;
       }
 
       return;
