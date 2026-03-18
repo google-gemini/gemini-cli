@@ -6,9 +6,8 @@ context, or skip unnecessary steps without having to stop and restart the agent.
 
 <!-- prettier-ignore -->
 > [!NOTE]
-> This is a preview feature under active development. Preview features
-> may only be available in the **Preview** channel or may need to be enabled
-> under `/settings`.
+> This is an experimental feature currently under active development and
+> may need to be enabled under `/settings`.
 
 Model steering is particularly useful during complex [Plan Mode](./plan-mode.md)
 workflows or long-running subagent executions where you want to ensure the agent
