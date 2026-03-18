@@ -229,7 +229,7 @@ public class GeminiSandbox {
                 return RunInImpersonation(hRestrictedToken, () => {
                     try {
                         using (FileStream fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
-                        using (StreamReader sr = new StreamReader(fs)) {
+                        using (StreamReader sr = new StreamReader(fs, System.Text.Encoding.UTF8)) {
                             char[] buffer = new char[4096];
                             int bytesRead;
                             while ((bytesRead = sr.Read(buffer, 0, buffer.Length)) > 0) {
@@ -246,9 +246,9 @@ public class GeminiSandbox {
                 string path = args[3];
                 return RunInImpersonation(hRestrictedToken, () => {
                     try {
-                        using (StreamReader reader = new StreamReader(Console.OpenStandardInput()))
+                        using (StreamReader reader = new StreamReader(Console.OpenStandardInput(), System.Text.Encoding.UTF8))
                         using (FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
-                        using (StreamWriter writer = new StreamWriter(fs)) {
+                        using (StreamWriter writer = new StreamWriter(fs, System.Text.Encoding.UTF8)) {
                             char[] buffer = new char[4096];
                             int bytesRead;
                             while ((bytesRead = reader.Read(buffer, 0, buffer.Length)) > 0) {

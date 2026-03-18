@@ -52,78 +52,21 @@ from your organization's registry.
 
 ### 3. Windows Native Sandbox (Windows only)
 
-Built-in sandboxing for Windows using Restricted Tokens and Job Objects. This
-method provides process isolation without requiring Docker or other container
-runtimes.
+... **Troubleshooting and Side Effects:**
 
-**Prerequisites:**
+The Windows Native sandbox uses the `icacls` command to set a "Low Mandatory
+Level" on files and directories it needs to write to.
 
-- Windows 10/11 or Windows Server.
-- No additional software required (uses a built-in C# helper).
-
-**How it works:**
-
-The Windows native sandbox leverages:
-
-- **Restricted Tokens**: Strips administrator privileges and high-level SIDs
-  from the process.
-- **Job Objects**: Ensures the entire process tree is terminated when the parent
-  session ends.
-- **Mandatory Integrity Levels (Low)**: Restricts the process to "Low"
-  integrity, preventing it from writing to most of the system and workspace by
-  default.
-
-**Enabling Windows Native Sandbox:**
-
-```json
-{
-  "tools": {
-    "sandbox": {
-      "enabled": true,
-      "command": "windows-native"
-    }
-  }
-}
-```
-
-Or via environment variable:
-
-```bash
-$env:GEMINI_SANDBOX="windows-native"
-```
-
-**Permissions:**
-
-By default, the Windows native sandbox is restricted. If you need it to write to
-specific directories, you must add them to `allowedPaths`:
-
-```json
-{
-  "tools": {
-    "sandbox": {
-      "enabled": true,
-      "command": "windows-native",
-      "allowedPaths": ["C:\\path\\to\\output"]
-    }
-  }
-}
-```
-
-**Network Access:**
-
-Network access is disabled by default in "Strict" mode. To enable it:
-
-```json
-{
-  "tools": {
-    "sandbox": {
-      "enabled": true,
-      "command": "windows-native",
-      "networkAccess": true
-    }
-  }
-}
-```
+- **Persistence**: These integrity level changes are persistent on the
+  filesystem. Even after the sandbox session ends, files created or modified by
+  the sandbox will retain their "Low" integrity level.
+- **Manual Reset**: If you need to reset the integrity level of a file or
+  directory, you can use:
+  ```powershell
+  icacls "C:\path\to\dir" /setintegritylevel Medium
+  ```
+- **System Folders**: The sandbox manager automatically skips setting integrity
+  levels on system folders (like `C:\Windows`) for safety.
 
 ### 4. gVisor / runsc (Linux only)
 
