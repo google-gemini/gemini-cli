@@ -63,85 +63,97 @@ and full builds) to a dedicated, high-performance GCP worker.
   console.log('📝 PHASE 1: CONFIGURATION');
   console.log('--------------------------------------------------------------------------------');
 
-  // 1. Project Identity
-  const defaultProject = env.GOOGLE_CLOUD_PROJECT || env.WORKSPACE_PROJECT || '';
-  const projectId = await prompt('GCP Project ID', defaultProject, 
-    'The GCP Project where your workspace worker will live. Your personal project is recommended.');
-  
-  if (!projectId) {
-      console.error('❌ Project ID is required. Set GOOGLE_CLOUD_PROJECT or enter it manually.');
-      return 1;
-  }
+  const settingsPath = path.join(REPO_ROOT, '.gemini/workspaces/settings.json');
+  let settings: any = {};
+  let skipConfig = false;
 
-  const zone = await prompt('Compute Zone', env.WORKSPACE_ZONE || 'us-west1-a', 
-    'The physical location of your worker. us-west1-a is the team default.');
-
-  const terminalTarget = await prompt('Terminal UI Target (foreground, background, tab, window)', env.WORKSPACE_TERM_TARGET || 'tab',
-    'When you start a job in gemini-cli, should it run as a foreground shell, background shell (no attach), new iterm2 tab, or new iterm2 window?');
-
-  // 2. Repository Discovery (Dynamic)
-  console.log('\n🔍 Detecting repository origins...');
-  
-  const repoInfoRes = spawnSync('gh', ['repo', 'view', '--json', 'nameWithOwner,parent,isFork'], { stdio: 'pipe' });
-  let upstreamRepo = 'google-gemini/gemini-cli'; 
-  let userFork = '';
-
-  if (repoInfoRes.status === 0) {
+  if (fs.existsSync(settingsPath)) {
       try {
-          const repoInfo = JSON.parse(repoInfoRes.stdout.toString());
-          upstreamRepo = repoInfo.isFork && repoInfo.parent ? repoInfo.parent.nameWithOwner : repoInfo.nameWithOwner;
-          
-          console.log(`   - Upstream identified: ${upstreamRepo}`);
-          console.log(`   - Searching for your forks of ${upstreamRepo}...`);
-          
-          const upstreamOwner = upstreamRepo.split('/')[0];
-          const upstreamName = upstreamRepo.split('/')[1];
-
-          // Use GraphQL to find your forks specifically. This is much faster than REST pagination.
-          const gqlQuery = `query { 
-            viewer { 
-              repositories(first: 100, isFork: true, affiliations: OWNER) { 
-                nodes { 
-                  nameWithOwner 
-                  parent { nameWithOwner } 
-                } 
-              } 
-            } 
-          }`;
-          
-          const forksRes = spawnSync('gh', ['api', 'graphql', '-f', `query=${gqlQuery}`, '--jq', `.data.viewer.repositories.nodes[] | select(.parent.nameWithOwner == "${upstreamRepo}") | .nameWithOwner`], { stdio: 'pipe' });
-          const myForks = forksRes.stdout.toString().trim().split('\n').filter(Boolean);
-
-          if (myForks.length > 0) {
-              console.log('\n🍴 Found existing forks:');
-              myForks.forEach((name: string, i: number) => console.log(`   [${i + 1}] ${name}`));
-              console.log(`   [c] Create a new fork`);
-              console.log(`   [u] Use upstream directly (not recommended)`);
-
-              const choice = await prompt('Select an option', '1');
-              if (choice.toLowerCase() === 'c') {
-                  userFork = await createFork(upstreamRepo);
-              } else if (choice.toLowerCase() === 'u') {
-                  userFork = upstreamRepo;
-              } else {
-                  const idx = parseInt(choice) - 1;
-                  userFork = myForks[idx] || myForks[0];
+          settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+          if (settings.workspace && !process.argv.includes('--reconfigure')) {
+              console.log('   ✅ Existing configuration found.');
+              const shouldSkip = await confirm('   ❓ Use existing configuration and skip to execution?');
+              if (shouldSkip) {
+                  skipConfig = true;
               }
-          } else {
-              const shouldFork = await confirm(`❓ No fork detected. Create a personal fork for sandboxed implementations?`);
-              userFork = shouldFork ? await createFork(upstreamRepo) : upstreamRepo;
           }
-      } catch (e) {
-          userFork = upstreamRepo;
-      }
+      } catch (e) {}
   }
-  
-  console.log(`   ✅ Upstream:    ${upstreamRepo}`);
-  console.log(`   ✅ Workspace:   ${userFork}`);
 
-  // 3. Security & Auth
+  // 1. Project Identity
+  let projectId = settings.workspace?.projectId || '';
+  let zone = settings.workspace?.zone || 'us-west1-a';
+  let terminalTarget = settings.workspace?.terminalTarget || 'tab';
+  let upstreamRepo = settings.workspace?.upstreamRepo || 'google-gemini/gemini-cli';
+  let userFork = settings.workspace?.userFork || upstreamRepo;
+
+  if (!skipConfig) {
+      const defaultProject = env.GOOGLE_CLOUD_PROJECT || env.WORKSPACE_PROJECT || projectId || '';
+      projectId = await prompt('GCP Project ID', defaultProject, 
+        'The GCP Project where your workspace worker will live. Your personal project is recommended.');
+      
+      if (!projectId) {
+          console.error('❌ Project ID is required. Set GOOGLE_CLOUD_PROJECT or enter it manually.');
+          return 1;
+      }
+
+      zone = await prompt('Compute Zone', env.WORKSPACE_ZONE || zone, 
+        'The physical location of your worker. us-west1-a is the team default.');
+
+      terminalTarget = await prompt('Terminal UI Target (foreground, background, tab, window)', env.WORKSPACE_TERM_TARGET || terminalTarget,
+        'When you start a job in gemini-cli, should it run as a foreground shell, background shell (no attach), new iterm2 tab, or new iterm2 window?');
+
+      // 2. Repository Discovery (Dynamic)
+      console.log('\n🔍 Detecting repository origins...');
+      
+      const repoInfoRes = spawnSync('gh', ['repo', 'view', '--json', 'nameWithOwner,parent,isFork'], { stdio: 'pipe' });
+
+      if (repoInfoRes.status === 0) {
+          try {
+              const repoInfo = JSON.parse(repoInfoRes.stdout.toString());
+              upstreamRepo = repoInfo.isFork && repoInfo.parent ? repoInfo.parent.nameWithOwner : repoInfo.nameWithOwner;
+              
+              console.log(`   - Upstream identified: ${upstreamRepo}`);
+              console.log(`   - Searching for your forks of ${upstreamRepo}...`);
+              
+              const upstreamOwner = upstreamRepo.split('/')[0];
+              const upstreamName = upstreamRepo.split('/')[1];
+
+              const gqlQuery = `query { viewer { repositories(first: 100, isFork: true, affiliations: OWNER) { nodes { nameWithOwner parent { nameWithOwner } } } } }`;
+              const forksRes = spawnSync('gh', ['api', 'graphql', '-f', `query=${gqlQuery}`, '--jq', `.data.viewer.repositories.nodes[] | select(.parent.nameWithOwner == "${upstreamRepo}") | .nameWithOwner`], { stdio: 'pipe' });
+              const myForks = forksRes.stdout.toString().trim().split('\n').filter(Boolean);
+
+              if (myForks.length > 0) {
+                  console.log('\n🍴 Found existing forks:');
+                  myForks.forEach((name: string, i: number) => console.log(`   [${i + 1}] ${name}`));
+                  console.log(`   [c] Create a new fork`);
+                  console.log(`   [u] Use upstream directly (not recommended)`);
+
+                  const choice = await prompt('Select an option', '1');
+                  if (choice.toLowerCase() === 'c') {
+                      userFork = await createFork(upstreamRepo);
+                  } else if (choice.toLowerCase() === 'u') {
+                      userFork = upstreamRepo;
+                  } else {
+                      const idx = parseInt(choice) - 1;
+                      userFork = myForks[idx] || myForks[0];
+                  }
+              } else {
+                  const shouldFork = await confirm(`❓ No fork detected. Create a personal fork for sandboxed implementations?`);
+                  userFork = shouldFork ? await createFork(upstreamRepo) : upstreamRepo;
+              }
+          } catch (e) {
+              userFork = upstreamRepo;
+          }
+      }
+      
+      console.log(`   ✅ Upstream:    ${upstreamRepo}`);
+      console.log(`   ✅ Workspace:   ${userFork}`);
+  }
+
+  // 3. Security & Auth (Always check for token if init is needed)
   let githubToken = env.WORKSPACE_GH_TOKEN || '';
-  if (!githubToken) {
+  if (!githubToken && !skipConfig) {
       const hasToken = await confirm('\nDo you already have a GitHub Personal Access Token (PAT) with "Read/Write" access to contents & PRs?');
       if (hasToken) {
           githubToken = await prompt('Paste Scoped Token', '');
