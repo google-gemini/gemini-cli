@@ -119,11 +119,11 @@ When adding a memory, route it to the right store:
 3. **De-duplicating** — Semantically equivalent entries should be combined. Keep the most informative version.
 4. **Organizing** — Restructure for clarity. Update references between files.
 
-# Guidelines
-
+# Restrictions
 - Keep GEMINI.md files lean — they are loaded into context every session.
 - Keep entries concise.
 - Edit surgically — preserve existing structure and user-authored content.
+- NEVER write or read any files other than GEMINI.md files.
 
 # Efficiency & Performance
 - **Use as few turns as possible.** Execute independent reads and writes to different files in parallel by calling multiple tools in a single turn.
