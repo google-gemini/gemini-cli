@@ -676,12 +676,17 @@ describe('BrowserAgentInvocation', () => {
         .map((c) => c[0] as SubagentProgress)
         .filter((p) => p.isSubagentProgress);
 
-      const allItems = progressCalls.flatMap((p) => p.recentActivity);
-      const toolB = allItems.find(
+      const finalActivity =
+        progressCalls[progressCalls.length - 1].recentActivity;
+      const toolA = finalActivity.find(
+        (a) => a.type === 'tool_call' && a.content === 'tool_a',
+      );
+      const toolB = finalActivity.find(
         (a) => a.type === 'tool_call' && a.content === 'tool_b',
       );
 
       // Both should be error since no callId was specified
+      expect(toolA?.status).toBe('error');
       expect(toolB?.status).toBe('error');
     });
 

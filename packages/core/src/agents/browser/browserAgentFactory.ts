@@ -54,6 +54,16 @@ type VisionDisabledReason =
   | undefined;
 
 /**
+ * Structured return type for vision disabled reasons.
+ * Separates the condition code from the human-readable message.
+ */
+type VisionDisabledReason =
+  | { code: 'no_visual_model'; message: string }
+  | { code: 'missing_visual_tools'; message: string }
+  | { code: 'blocked_auth_type'; message: string }
+  | undefined;
+
+/**
  * Creates a browser agent definition with MCP tools configured.
  *
  * This is called when the browser agent is invoked via delegate_to_agent.
