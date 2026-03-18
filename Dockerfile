@@ -25,6 +25,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   psmisc \
   lsof \
   socat \
+  vi \
+  nano \
   ca-certificates \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
