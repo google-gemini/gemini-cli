@@ -239,7 +239,7 @@ export async function main() {
   ) {
     coreEvents.emitFeedback(
       'warning',
-      'Warning: --allowed-tools cli argument and tools.allowed in settings.json are deprecated and will be removed in 1.0: Migrate to Policy Engine: https://geminicli.com/docs/core/policy-engine/',
+      'Warning: --allowed-tools cli argument and tools.allowed in settings.json are deprecated and will be removed in 1.0: Migrate to Policy Engine: https://geminicli.com/docs/policy-engine',
     );
   }
 
@@ -249,7 +249,7 @@ export async function main() {
   ) {
     coreEvents.emitFeedback(
       'warning',
-      'Warning: tools.exclude in settings.json is deprecated and will be removed in 1.0. Migrate to Policy Engine: https://geminicli.com/docs/core/policy-engine/',
+      'Warning: tools.exclude in settings.json is deprecated and will be removed in 1.0. Migrate to Policy Engine: https://geminicli.com/docs/policy-engine',
     );
   }
 

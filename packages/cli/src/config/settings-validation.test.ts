@@ -323,9 +323,7 @@ describe('settings-validation', () => {
         expect(formatted).toContain('model.name');
         expect(formatted).toContain('Expected: string, but received: object');
         expect(formatted).toContain('Please fix the configuration.');
-        expect(formatted).toContain(
-          'https://geminicli.com/docs/reference/configuration/',
-        );
+        expect(formatted).toContain('https://geminicli.com/docs/configuration');
       }
     });
 
@@ -363,9 +361,7 @@ describe('settings-validation', () => {
       if (result.error) {
         const formatted = formatValidationError(result.error, 'test.json');
 
-        expect(formatted).toContain(
-          'https://geminicli.com/docs/reference/configuration/',
-        );
+        expect(formatted).toContain('https://geminicli.com/docs/configuration');
       }
     });
 

@@ -557,7 +557,7 @@ Before submitting your documentation pull request, please:
 
 If you have questions about contributing documentation:
 
-- Check our [FAQ](https://geminicli.com/docs/resources/faq).
+- Check our [FAQ](https://geminicli.com/docs/faq).
 - Review existing documentation for examples.
 - Open [an issue](https://github.com/google-gemini/gemini-cli/issues) to discuss
   your proposed changes.

@@ -246,7 +246,7 @@ export function AuthDialog({
         </Box>
         <Box marginTop={1}>
           <Text color={theme.text.link}>
-            {'https://geminicli.com/docs/resources/tos-privacy/'}
+            {'https://geminicli.com/docs/tos-privacy'}
           </Text>
         </Box>
       </Box>

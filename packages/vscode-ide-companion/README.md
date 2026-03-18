@@ -31,4 +31,4 @@ To use this extension, you'll need:
 # Terms of Service and Privacy Notice
 
 By installing this extension, you agree to the
-[Terms of Service](https://geminicli.com/docs/resources/tos-privacy/).
+[Terms of Service](https://geminicli.com/docs/tos-privacy).

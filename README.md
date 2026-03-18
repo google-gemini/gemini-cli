@@ -382,7 +382,7 @@ instructions.
 ## 📄 Legal
 
 - **License**: [Apache License 2.0](LICENSE)
-- **Terms of Service**: [Terms & Privacy](./docs/resources/tos-privacy.md)
+- **Terms of Service**: [Terms & Privacy](./docs/tos-privacy)
 - **Security**: [Security Policy](SECURITY.md)
 
 ---

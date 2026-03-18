@@ -214,7 +214,7 @@ export async function parseArguments(
           string: true,
           nargs: 1,
           description:
-            '[DEPRECATED: Use Policy Engine instead See https://geminicli.com/docs/core/policy-engine] Tools that are allowed to run without confirmation',
+            '[DEPRECATED: Use Policy Engine instead See https://geminicli.com/docs/policy-engine] Tools that are allowed to run without confirmation',
           coerce: coerceCommaSeparated,
         })
         .option('extensions', {
