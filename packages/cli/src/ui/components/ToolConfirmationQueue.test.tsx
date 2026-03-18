@@ -422,7 +422,7 @@ describe('ToolConfirmationQueue', () => {
     unmount();
   });
 
-  describe('height allocation and layout (SVG snapshots)', () => {
+  describe('height allocation and layout', () => {
     it('should render the full queue wrapper with borders and content for large edit diffs', async () => {
       let largeDiff = '--- a/file.ts\n+++ b/file.ts\n@@ -1,10 +1,15 @@\n';
       for (let i = 1; i <= 20; i++) {

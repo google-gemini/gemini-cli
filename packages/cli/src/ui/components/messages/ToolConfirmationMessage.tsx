@@ -5,8 +5,8 @@
  */
 
 import type React from 'react';
-import { useMemo, useCallback, useState, useLayoutEffect, useRef } from 'react';
-import { Box, Text, measureElement, type DOMElement } from 'ink';
+import { useMemo, useCallback, useState, useEffect, useRef } from 'react';
+import { Box, Text, ResizeObserver, type DOMElement } from 'ink';
 import { DiffRenderer } from './DiffRenderer.js';
 import { RenderInline } from '../../utils/InlineMarkdownRenderer.js';
 import {
@@ -119,15 +119,24 @@ export const ToolConfirmationMessage: React.FC<
       .join('\n\n')}`;
   }, [deceptiveUrlWarnings]);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (securityWarningsRef.current) {
-      const measurement = measureElement(securityWarningsRef.current);
-      const newHeight = Math.round(measurement.height);
-      setMeasuredSecurityWarningsHeight((prev) =>
-        newHeight > 0 && newHeight !== prev ? newHeight : prev,
-      );
+      const observer = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (entry) {
+          const newHeight = Math.round(entry.contentRect.height);
+          setMeasuredSecurityWarningsHeight((prev) =>
+            newHeight !== prev ? newHeight : prev,
+          );
+        }
+      });
+      observer.observe(securityWarningsRef.current);
+      return () => {
+        observer.disconnect();
+      };
     } else {
       setMeasuredSecurityWarningsHeight((prev) => (prev !== 0 ? 0 : prev));
+      return undefined;
     }
   }, [terminalWidth, deceptiveUrlWarningText]);
 
@@ -393,15 +402,15 @@ export const ToolConfirmationMessage: React.FC<
     const PADDING_OUTER_Y = 1; // Main container has `paddingBottom={1}`.
     const HEIGHT_QUESTION = 1; // The question text is one line.
     const MARGIN_QUESTION_BOTTOM = 1; // Margin on the question container.
+    const SECURITY_WARNING_BOTTOM_MARGIN = 1; // Margin on the securityWarnings container.
 
     const optionsCount = getOptions().length;
 
     // The measured height includes the margin inside WarningMessage (1 line).
     // We also add 1 line for the marginBottom on the securityWarnings container.
-    const securityWarningsHeight =
-      measuredSecurityWarningsHeight > 0
-        ? measuredSecurityWarningsHeight + 1
-        : 0;
+    const securityWarningsHeight = deceptiveUrlWarningText
+      ? measuredSecurityWarningsHeight + SECURITY_WARNING_BOTTOM_MARGIN
+      : 0;
 
     const surroundingElementsHeight =
       PADDING_OUTER_Y +
@@ -416,6 +425,7 @@ export const ToolConfirmationMessage: React.FC<
     handlesOwnUI,
     getOptions,
     measuredSecurityWarningsHeight,
+    deceptiveUrlWarningText,
   ]);
 
   const { question, bodyContent, options, securityWarnings, initialIndex } =

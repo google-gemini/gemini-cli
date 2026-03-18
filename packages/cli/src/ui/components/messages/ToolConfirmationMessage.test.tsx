@@ -241,7 +241,7 @@ describe('ToolConfirmationMessage', () => {
     unmount();
   });
 
-  it('should render multiline shell scripts with correct newlines and syntax highlighting (SVG snapshot)', async () => {
+  it('should render multiline shell scripts with correct newlines and syntax highlighting', async () => {
     const confirmationDetails: SerializableConfirmationDetails = {
       type: 'exec',
       title: 'Confirm Multiline Script',
@@ -648,7 +648,7 @@ describe('ToolConfirmationMessage', () => {
   });
 
   describe('height allocation and layout', () => {
-    it('should expand to available height for large exec commands (SVG snapshot)', async () => {
+    it('should expand to available height for large exec commands', async () => {
       let largeCommand = '';
       for (let i = 1; i <= 50; i++) {
         largeCommand += `echo "Line ${i}"\n`;
@@ -681,7 +681,7 @@ describe('ToolConfirmationMessage', () => {
       renderResult.unmount();
     });
 
-    it('should expand to available height for large edit diffs (SVG snapshot)', async () => {
+    it('should expand to available height for large edit diffs', async () => {
       // Create a large diff string
       let largeDiff = '--- a/file.ts\n+++ b/file.ts\n@@ -1,10 +1,15 @@\n';
       for (let i = 1; i <= 20; i++) {

@@ -42,13 +42,24 @@ exports[`ToolConfirmationQueue > does not render expansion hint when constrainHe
 "
 `;
 
-exports[`ToolConfirmationQueue > height allocation and layout (SVG snapshots) > should handle security warning height correctly 1`] = `
+exports[`ToolConfirmationQueue > height allocation and layout > should handle security warning height correctly 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ Action Required                                                                           3 of 3 │
 │                                                                                                  │
 │ ?  run_shell_command Executes a bash command with a deceptive URL                                │
 │                                                                                                  │
-│ ... first 7 lines hidden (Ctrl+O to show) ...                                                    │
+│ ... first 25 lines hidden (Ctrl+O to show) ...                                                   │
+│ echo "Line 26"                                                                                   │
+│ echo "Line 27"                                                                                   │
+│ echo "Line 28"                                                                                   │
+│ echo "Line 29"                                                                                   │
+│ echo "Line 30"                                                                                   │
+│ echo "Line 31"                                                                                   │
+│ echo "Line 32"                                                                                   │
+│ echo "Line 33"                                                                                   │
+│ echo "Line 34"                                                                                   │
+│ echo "Line 35"                                                                                   │
+│ echo "Line 36"                                                                                   │
 │ echo "Line 37"                                                                                   │
 │ echo "Line 38"                                                                                   │
 │ echo "Line 39"                                                                                   │
@@ -81,7 +92,7 @@ exports[`ToolConfirmationQueue > height allocation and layout (SVG snapshots) > 
 "
 `;
 
-exports[`ToolConfirmationQueue > height allocation and layout (SVG snapshots) > should render the full queue wrapper with borders and content for large edit diffs 1`] = `
+exports[`ToolConfirmationQueue > height allocation and layout > should render the full queue wrapper with borders and content for large edit diffs 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ Action Required                                                                                  │
 │                                                                                                  │
@@ -126,7 +137,7 @@ exports[`ToolConfirmationQueue > height allocation and layout (SVG snapshots) > 
 "
 `;
 
-exports[`ToolConfirmationQueue > height allocation and layout (SVG snapshots) > should render the full queue wrapper with borders and content for large exec commands 1`] = `
+exports[`ToolConfirmationQueue > height allocation and layout > should render the full queue wrapper with borders and content for large exec commands 1`] = `
 "╭──────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ Action Required                                                                           2 of 3 │
 │                                                                                                  │

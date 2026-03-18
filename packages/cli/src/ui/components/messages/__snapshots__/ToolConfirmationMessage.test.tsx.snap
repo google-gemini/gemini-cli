@@ -16,7 +16,7 @@ Apply this change?
 "
 `;
 
-exports[`ToolConfirmationMessage > height allocation and layout > should expand to available height for large edit diffs (SVG snapshot) 1`] = `
+exports[`ToolConfirmationMessage > height allocation and layout > should expand to available height for large edit diffs 1`] = `
 "... first 8 lines hidden (Ctrl+O to show) ...
  5 - const oldLine5 = true;
  5 + const newLine5 = true;
@@ -59,7 +59,7 @@ Apply this change?
 "
 `;
 
-exports[`ToolConfirmationMessage > height allocation and layout > should expand to available height for large exec commands (SVG snapshot) 1`] = `
+exports[`ToolConfirmationMessage > height allocation and layout > should expand to available height for large exec commands 1`] = `
 "... first 17 lines hidden (Ctrl+O to show) ...
 echo "Line 18"
 echo "Line 19"
@@ -139,7 +139,7 @@ Do you want to proceed?
 "
 `;
 
-exports[`ToolConfirmationMessage > should render multiline shell scripts with correct newlines and syntax highlighting (SVG snapshot) 1`] = `
+exports[`ToolConfirmationMessage > should render multiline shell scripts with correct newlines and syntax highlighting 1`] = `
 "echo "hello"
 for i in 1 2 3; do
   echo $i
