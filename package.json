@@ -1,6 +1,6 @@
 {
   "name": "@google/gemini-cli",
-  "version": "0.35.0-nightly.20260313.bb060d7a9",
+  "version": "0.36.0-nightly.20260317.2f90b4653",
   "engines": {
     "node": ">=20.0.0"
   },
@@ -14,7 +14,7 @@
     "url": "git+https://github.com/google-gemini/gemini-cli.git"
   },
   "config": {
-    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.35.0-nightly.20260313.bb060d7a9"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.36.0-nightly.20260317.2f90b4653"
   },
   "scripts": {
     "start": "cross-env NODE_ENV=development node scripts/start.js",
@@ -43,6 +43,7 @@
     "test:ci": "npm run test:ci --workspaces --if-present && npm run test:scripts && npm run test:sea-launch",
     "test:scripts": "vitest run --config ./scripts/tests/vitest.config.ts",
     "test:sea-launch": "vitest run sea/sea-launch.test.js",
+    "posttest": "npm run build",
     "test:always_passing_evals": "vitest run --config evals/vitest.config.ts",
     "test:all_evals": "cross-env RUN_EVALS=1 vitest run --config evals/vitest.config.ts",
     "test:e2e": "cross-env VERBOSE=true KEEP_OUTPUT=true npm run test:integration:sandbox:none",

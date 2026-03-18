@@ -49,6 +49,15 @@ exports[`<ToolGroupMessage /> > Border Color Logic > uses yellow border for shel
 "
 `;
 
+exports[`<ToolGroupMessage /> > Golden Snapshots > renders canceled tool calls > canceled_tool 1`] = `
+"╭──────────────────────────────────────────────────────────────────────────╮
+│ -  canceled-tool A tool for testing                                      │
+│                                                                          │
+│ Test result                                                              │
+╰──────────────────────────────────────────────────────────────────────────╯
+"
+`;
+
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders empty tool calls array 1`] = `""`;
 
 exports[`<ToolGroupMessage /> > Golden Snapshots > renders header when scrolled 1`] = `
