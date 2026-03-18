@@ -95,31 +95,40 @@ export async function createBrowserAgentDefinition(
   );
   const availableToolNames = mcpTools.map((t) => t.name);
 
-  // Register high-priority policy rules for sensitive actions in YOLO mode
+  // Register high-priority policy rules for sensitive actions which is not
+  // able to be overwrite by YOLO mode.
   const policyEngine = config.getPolicyEngine();
   if (policyEngine) {
-    // 1. Hard-block or ASK_USER for upload_file in YOLO
+    // ASK_USER for fill/fill_form in YOLO
     policyEngine.addRule({
-      toolName: 'upload_file',
+      toolName: 'fill',
       decision: PolicyDecision.ASK_USER,
       priority: 999,
       modes: [ApprovalMode.YOLO],
       source: 'BrowserAgent (Sensitive Actions)',
     });
 
-    // 2. ASK_USER for evaluate_script in YOLO
     policyEngine.addRule({
-      toolName: 'evaluate_script',
+      toolName: 'fill_form',
       decision: PolicyDecision.ASK_USER,
       priority: 999,
       modes: [ApprovalMode.YOLO],
       source: 'BrowserAgent (Sensitive Actions)',
     });
 
-    // 3. ASK_USER for fill_form in YOLO (if enabled)
+    // ASK_USER for upload_file and evaluate_script when sensitive action
+    // need confirmation.
     if (browserConfig.customConfig.confirmSensitiveActions) {
       policyEngine.addRule({
-        toolName: 'fill_form',
+        toolName: 'upload_file',
+        decision: PolicyDecision.ASK_USER,
+        priority: 999,
+        modes: [ApprovalMode.YOLO],
+        source: 'BrowserAgent (Sensitive Actions)',
+      });
+
+      policyEngine.addRule({
+        toolName: 'evaluate_script',
         decision: PolicyDecision.ASK_USER,
         priority: 999,
         modes: [ApprovalMode.YOLO],
@@ -130,6 +139,7 @@ export async function createBrowserAgentDefinition(
     // 4. Reduce noise for read-only tools in default mode
     const readOnlyTools = [
       'take_snapshot',
+      'take_screenshot',
       'list_pages',
       'list_network_requests',
     ];
