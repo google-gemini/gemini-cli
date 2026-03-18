@@ -53,6 +53,9 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   
   const check = await provider.getExecOutput(`ls -d ${hostWorktreeDir}/.git`);
   
+  // FIX: Ensure container user (node) owns the workspaces and config directories
+  await provider.exec(`sudo docker exec -u root maintainer-worker chown -R node:node ${containerHome}/.workspaces ${containerHome}/.gemini`);
+
   if (check.status !== 0) {
     console.log('   - Provisioning isolated git worktree...');
     
