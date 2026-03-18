@@ -69,7 +69,11 @@ capabilities. These often require a specific setting to be enabled.
   `general.devtools`) is considered experimental.
 - **Warning note:** If a feature is experimental, add this note 
   immediately after the introductory paragraph:
-  `> **Note:** This is a preview feature currently under active development.`
+
+  > **Note:** This is a preview feature currently under active development.
+  > Preview features may be available on the **Preview** channel or may need to be
+  > enabled under `/settings`.
+  
 - **Visual indicators:** Use the microscope emoji (🔬) in the heading or 
   sidebar label for experimental features.
 
