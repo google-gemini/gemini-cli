@@ -175,6 +175,7 @@ export class PromptProvider {
         planningWorkflow: this.withSection(
           'planningWorkflow',
           () => ({
+            interactive: interactiveMode,
             planModeToolsList,
             plansDir: context.config.storage.getPlansDir(),
             approvedPlanPath: context.config.getApprovedPlanPath(),

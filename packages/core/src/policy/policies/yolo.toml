@@ -45,6 +45,7 @@ toolName = ["enter_plan_mode", "exit_plan_mode"]
 decision = "deny"
 priority = 999
 modes = ["yolo"]
+interactive = true
 
 # Allow everything else in YOLO mode
 [[rule]]

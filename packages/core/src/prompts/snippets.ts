@@ -88,6 +88,7 @@ export interface GitRepoOptions {
 }
 
 export interface PlanningWorkflowOptions {
+  interactive: boolean;
   planModeToolsList: string;
   plansDir: string;
   approvedPlanPath?: string;
@@ -513,7 +514,7 @@ export function renderPlanningWorkflow(
   return `
 # Active Approval Mode: Plan
 
-You are operating in **Plan Mode**. Your goal is to produce an implementation plan in \`${options.plansDir}/\` and get user approval before editing source code.
+You are operating in **Plan Mode**. Your goal is to produce an implementation plan in \`${options.plansDir}/\` and ${options.interactive ? 'get user approval before editing source code.' : 'create a design document before proceeding autonomously.'}
 
 ## Available Tools
 The following tools are available in Plan Mode:
@@ -550,7 +551,7 @@ Write the implementation plan to \`${options.plansDir}/\`. The plan's structure 
 - **Complex Tasks:** Include **Background & Motivation**, **Scope & Impact**, **Proposed Solution**, **Alternatives Considered**, a phased **Implementation Plan**, **Verification**, and **Migration & Rollback** strategies.
 
 ### 4. Review & Approval
-Use the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to present the plan and formally request approval.
+Use the ${formatToolName(EXIT_PLAN_MODE_TOOL_NAME)} tool to present the plan and ${options.interactive ? 'formally request approval.' : 'begin implementation.'}
 
 ${renderApprovedPlanSection(options.approvedPlanPath)}`.trim();
 }
@@ -711,7 +712,7 @@ function newApplicationSteps(options: PrimaryWorkflowsOptions): string {
   // standard 'Execution' loop handle implementation once the plan is approved.
   if (options.enableEnterPlanModeTool) {
     return `
-1. **Mandatory Planning:** You MUST use the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to draft a comprehensive design document and obtain user approval before writing any code.
+1. **Mandatory Planning:** You MUST use the ${formatToolName(ENTER_PLAN_MODE_TOOL_NAME)} tool to draft a comprehensive design document${options.interactive ? ' and obtain user approval' : ''} before writing any code.
 2. **Design Constraints:** When drafting your plan, adhere to these defaults unless explicitly overridden by the user:
    - **Goal:** Autonomously design a visually appealing, substantially complete, and functional prototype with rich aesthetics. Users judge applications by their visual impact; ensure they feel modern, "alive," and polished through consistent spacing, typography, and interactive feedback.
    - **Visuals:** Describe your strategy for sourcing or generating placeholders (e.g., stylized CSS shapes, gradients, procedurally generated patterns) to ensure a visually complete prototype. Never plan for assets that cannot be locally generated.
