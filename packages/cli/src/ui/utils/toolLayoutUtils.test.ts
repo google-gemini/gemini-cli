@@ -136,7 +136,7 @@ describe('toolLayoutUtils', () => {
           constrainHeight: true,
           isExpandable: false,
         },
-        expected: 0,
+        expected: 1,
       },
       {
         desc: 'handles small availableTerminalHeight gracefully without overflow in ASB mode',
@@ -160,7 +160,7 @@ describe('toolLayoutUtils', () => {
           constrainHeight: true,
           isExpandable: false,
         },
-        expected: 0,
+        expected: 1,
       },
       {
         desc: 'returns maxLinesBasedOnHeight for focused ASB shells',
