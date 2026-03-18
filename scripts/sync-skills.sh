@@ -31,3 +31,6 @@ for SKILL in "${CUSTOM_SKILLS[@]}"; do
 done
 
 echo "Done. Run '/skills reload' in your Gemini session to apply changes."
+echo "--------------------------------------------------"
+echo ""
+cat WELCOME.md
