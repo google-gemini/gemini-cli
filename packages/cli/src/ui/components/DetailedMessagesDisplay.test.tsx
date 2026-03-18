@@ -38,9 +38,7 @@ describe('DetailedMessagesDisplay', () => {
         hasFocus={false}
       />,
       {
-        settings: createMockSettings({
-          merged: { ui: { errorVerbosity: 'full' } },
-        }),
+        settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
       },
     );
     await waitUntilReady();
@@ -64,9 +62,7 @@ describe('DetailedMessagesDisplay', () => {
         hasFocus={true}
       />,
       {
-        settings: createMockSettings({
-          merged: { ui: { errorVerbosity: 'full' } },
-        }),
+        settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
       },
     );
     await waitUntilReady();
@@ -89,9 +85,7 @@ describe('DetailedMessagesDisplay', () => {
         hasFocus={true}
       />,
       {
-        settings: createMockSettings({
-          merged: { ui: { errorVerbosity: 'low' } },
-        }),
+        settings: createMockSettings({ ui: { errorVerbosity: 'low' } }),
       },
     );
     await waitUntilReady();
@@ -112,9 +106,7 @@ describe('DetailedMessagesDisplay', () => {
         hasFocus={true}
       />,
       {
-        settings: createMockSettings({
-          merged: { ui: { errorVerbosity: 'full' } },
-        }),
+        settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
       },
     );
     await waitUntilReady();
@@ -135,9 +127,7 @@ describe('DetailedMessagesDisplay', () => {
         hasFocus={false}
       />,
       {
-        settings: createMockSettings({
-          merged: { ui: { errorVerbosity: 'full' } },
-        }),
+        settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
       },
     );
     await waitUntilReady();
