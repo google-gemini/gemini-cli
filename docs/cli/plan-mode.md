@@ -406,7 +406,8 @@ To build a custom planning workflow, you can use:
   [custom policies](#custom-policies).
 
 <!-- prettier-ignore -->
-> [!NOTE] Use [Conductor] as a reference when building your own custom
+> [!TIP]
+> Use [Conductor] as a reference when building your own custom
 > planning workflow.
 
 By using Plan Mode as its execution environment, your custom methodology can
