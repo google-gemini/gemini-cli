@@ -35,29 +35,16 @@
  * used in automationOverlay.ts and inputBlocker.ts.
  *
  * @keyframes rules are injected once into <head> (guarded by an id check)
- * rather than using the Web Animations API, keeping the implementation
- * consistent with inputBlocker.ts.  Each animation element self-removes via
- * the animationend event.
+ * All animations use the Web Animations API (element.animate) to avoid
+ * injecting <style> tags, improving performance and satisfying strict
+ * Content Security Policies (CSPs).
  */
 
-/** Id for the shared <style> element that holds the click @keyframes. */
-const CLICK_STYLE_ID = '__gemini_cursor_style';
+/** Window property used to detect duplicate listeners. */
+const CLICK_LISTENER_PROP = '__geminiCursorClickListenerActive';
 
-/** Id for the shared <style> element that holds the scroll @keyframes. */
-const SCROLL_STYLE_ID = '__gemini_scroll_style';
-
-/** Id used on the one-shot listener sentinel so we can detect double-inject. */
-const CLICK_LISTENER_SENTINEL_ID = '__gemini_click_listener';
-
-/**
- * CSS @keyframes block for the click ripple (injected once per page).
- * Shared between pre-click-listener and direct injection scripts.
- */
-const CLICK_KEYFRAMES = `@keyframes __gemini_click {
-  0%   { transform: scale(0.3); opacity: 1; }
-  60%  { transform: scale(1);   opacity: 0.6; }
-  100% { transform: scale(1.4); opacity: 0; }
-}`;
+/** Window property used to store the listener function reference for cleanup. */
+const CLICK_LISTENER_FN_PROP = '__geminiCursorOnMousedown';
 
 /**
  * Builds a JavaScript function string that registers a **one-shot** mousedown
@@ -68,25 +55,33 @@ const CLICK_KEYFRAMES = `@keyframes __gemini_click {
  * Must be called (and awaited) BEFORE the click tool executes so that the
  * listener is in place by the time the DOM event fires.
  *
- * The sentinel `<span>` attached to `<head>` prevents double-registration if
- * evaluate_script is called twice in quick succession.
+ * Uses a window property to prevent double-registration if
+ * evaluate_script is called twice in quick succession, and sets a 3-second
+ * timeout to ensure cleanup if the click never fires.
  */
 export function buildPreClickListenerScript(): string {
   return `() => {
     // Guard: only one listener at a time.
-    if (document.getElementById('${CLICK_LISTENER_SENTINEL_ID}')) {
+    if (window.${CLICK_LISTENER_PROP}) {
       return 'listener-already-registered';
     }
-    var sentinel = document.createElement('span');
-    sentinel.id = '${CLICK_LISTENER_SENTINEL_ID}';
-    sentinel.setAttribute('aria-hidden', 'true');
-    (document.head || document.documentElement).appendChild(sentinel);
+    window.${CLICK_LISTENER_PROP} = true;
 
-      function onMousedown(e) {
-      // Remove sentinel and listener immediately.
-      var sen = document.getElementById('${CLICK_LISTENER_SENTINEL_ID}');
-      if (sen) sen.remove();
-      document.removeEventListener('mousedown', onMousedown, true);
+    function cleanup() {
+      if (window.${CLICK_LISTENER_FN_PROP}) {
+        document.removeEventListener('mousedown', window.${CLICK_LISTENER_FN_PROP}, true);
+        delete window.${CLICK_LISTENER_FN_PROP};
+      }
+      delete window.${CLICK_LISTENER_PROP};
+    }
+
+    // Safety fallback: if no click happens within 3 seconds, clean up to avoid memory leaks
+    // or intercepting a later, unrelated click.
+    var safetyTimeout = setTimeout(cleanup, 3000);
+
+    function onMousedown(e) {
+      clearTimeout(safetyTimeout);
+      cleanup();
 
       var x = e.clientX;
       var y = e.clientY;
@@ -101,24 +96,28 @@ export function buildPreClickListenerScript(): string {
         'width: 24px',
         'height: 24px',
         'border-radius: 50%',
-        'background: rgba(66, 133, 244, 0.5)',
-        'border: 2px solid rgba(66, 133, 244, 0.8)',
+        'background: rgba(66, 133, 244, 0.85)',
+        'border: 3px solid rgba(66, 133, 244, 1.0)',
         'pointer-events: none',
-        'z-index: 2147483647',
+        'z-index: 2147483647'
       ].join('; ');
 
       (document.body || document.documentElement).appendChild(dot);
       
-      if (!document.getElementById('${CLICK_STYLE_ID}')) {
-        var s = document.createElement('style');
-        s.id = '${CLICK_STYLE_ID}';
-        s.textContent = '${CLICK_KEYFRAMES}';
-        (document.head || document.documentElement).appendChild(s);
-      }
-      dot.style.animation = '__gemini_click 0.6s ease-out forwards';
-      dot.addEventListener('animationend', function() { dot.remove(); }, { once: true });
+      var anim = dot.animate([
+        { transform: 'scale(0.3)', opacity: 1 },
+        { transform: 'scale(1)', opacity: 0.6, offset: 0.6 },
+        { transform: 'scale(1.4)', opacity: 0 }
+      ], {
+        duration: 600,
+        easing: 'ease-out',
+        fill: 'forwards'
+      });
+      
+      anim.onfinish = function() { dot.remove(); };
     }
 
+    window.${CLICK_LISTENER_FN_PROP} = onMousedown;
     // capture: true ensures we receive the event even when elements call
     // stopPropagation. CDP-simulated clicks dispatch real mousedown events.
     document.addEventListener('mousedown', onMousedown, true);
@@ -142,13 +141,6 @@ export function buildClickAnimationScript(x: number, y: number): string {
   const iy = Math.round(y);
 
   return `() => {
-    if (!document.getElementById('${CLICK_STYLE_ID}')) {
-      var s = document.createElement('style');
-      s.id = '${CLICK_STYLE_ID}';
-      s.textContent = '${CLICK_KEYFRAMES}';
-      (document.head || document.documentElement).appendChild(s);
-    }
-
     var dot = document.createElement('div');
     dot.setAttribute('aria-hidden', 'true');
     dot.setAttribute('role', 'presentation');
@@ -159,15 +151,25 @@ export function buildClickAnimationScript(x: number, y: number): string {
       'width: 24px',
       'height: 24px',
       'border-radius: 50%',
-      'background: rgba(66, 133, 244, 0.5)',
-      'border: 2px solid rgba(66, 133, 244, 0.8)',
+      'background: rgba(66, 133, 244, 0.85)',
+      'border: 3px solid rgba(66, 133, 244, 1.0)',
       'pointer-events: none',
-      'z-index: 2147483647',
-      'animation: __gemini_click 0.6s ease-out forwards',
+      'z-index: 2147483647'
     ].join('; ');
 
     (document.body || document.documentElement).appendChild(dot);
-    dot.addEventListener('animationend', function() { dot.remove(); }, { once: true });
+    
+    var anim = dot.animate([
+      { transform: 'scale(0.3)', opacity: 1 },
+      { transform: 'scale(1)', opacity: 0.6, offset: 0.6 },
+      { transform: 'scale(1.4)', opacity: 0 }
+    ], {
+      duration: 600,
+      easing: 'ease-out',
+      fill: 'forwards'
+    });
+    
+    anim.onfinish = function() { dot.remove(); };
     return 'click-animation-injected';
   }`;
 }
@@ -188,38 +190,17 @@ export function buildClickAnimationScript(x: number, y: number): string {
  */
 export function buildScrollAnimationScript(direction: 'up' | 'down'): string {
   const arrowChar = direction === 'down' ? '▼' : '▲';
-  const arrowKeyframe = `__gemini_scroll_arrow_${direction}`;
+
+  // Transform values based on direction
+  const yTransforms =
+    direction === 'down'
+      ? ['-6px', '0px', '5px', '12px']
+      : ['6px', '0px', '-5px', '-12px'];
 
   return `() => {
     // Replace any existing panel to avoid stacking on rapid scrolls.
     var prev = document.getElementById('__gemini_scroll_panel');
     if (prev) prev.remove();
-
-    // Inject @keyframes once per page.
-    if (!document.getElementById('${SCROLL_STYLE_ID}')) {
-      var st = document.createElement('style');
-      st.id = '${SCROLL_STYLE_ID}';
-      st.textContent =
-        '@keyframes __gemini_scroll_arrow_down { ' +
-          '0%   { opacity: 0; transform: translateY(-6px); } ' +
-          '35%  { opacity: 1; transform: translateY(0px); } ' +
-          '65%  { opacity: 1; transform: translateY(5px); } ' +
-          '100% { opacity: 0; transform: translateY(12px); } ' +
-        '} ' +
-        '@keyframes __gemini_scroll_arrow_up { ' +
-          '0%   { opacity: 0; transform: translateY(6px); } ' +
-          '35%  { opacity: 1; transform: translateY(0px); } ' +
-          '65%  { opacity: 1; transform: translateY(-5px); } ' +
-          '100% { opacity: 0; transform: translateY(-12px); } ' +
-        '} ' +
-        '@keyframes __gemini_scroll_panel { ' +
-          '0%   { opacity: 0; transform: translateY(-50%) scale(0.88); } ' +
-          '12%  { opacity: 1; transform: translateY(-50%) scale(1); } ' +
-          '80%  { opacity: 1; transform: translateY(-50%) scale(1); } ' +
-          '100% { opacity: 0; transform: translateY(-50%) scale(0.92); } ' +
-        '}';
-      (document.head || document.documentElement).appendChild(st);
-    }
 
     var panel = document.createElement('div');
     panel.id = '__gemini_scroll_panel';
@@ -239,11 +220,9 @@ export function buildScrollAnimationScript(direction: 'up' | 'down'): string {
       'padding: 12px 16px',
       'pointer-events: none',
       'z-index: 2147483647',
-      'box-shadow: 0 0 18px rgba(66, 133, 244, 0.5), 0 4px 16px rgba(0,0,0,0.4)',
-      'animation: __gemini_scroll_panel 1.5s ease-out forwards',
+      'box-shadow: 0 0 18px rgba(66, 133, 244, 0.5), 0 4px 16px rgba(0,0,0,0.4)'
     ].join('; ');
 
-    var delays = ['0s', '0.22s', '0.44s'];
     for (var i = 0; i < 3; i++) {
       var arrow = document.createElement('div');
       arrow.textContent = '${arrowChar}';
@@ -251,19 +230,38 @@ export function buildScrollAnimationScript(direction: 'up' | 'down'): string {
         'color: rgba(100, 168, 255, 0.95)',
         'font-size: 16px',
         'line-height: 1',
-        'opacity: 0',
-        'animation: ${arrowKeyframe} 0.88s ease-in-out forwards',
-        'animation-delay: ' + delays[i],
+        'opacity: 0'
       ].join('; ');
+      
       panel.appendChild(arrow);
+      
+      arrow.animate([
+        { opacity: 0, transform: 'translateY(${yTransforms[0]})' },
+        { opacity: 1, transform: 'translateY(${yTransforms[1]})', offset: 0.35 },
+        { opacity: 1, transform: 'translateY(${yTransforms[2]})', offset: 0.65 },
+        { opacity: 0, transform: 'translateY(${yTransforms[3]})' }
+      ], {
+        duration: 880,
+        delay: i * 220,
+        easing: 'ease-in-out',
+        fill: 'forwards'
+      });
     }
 
     (document.body || document.documentElement).appendChild(panel);
-
-    // Only remove on the panel's own animationend, not bubbled arrow events.
-    panel.addEventListener('animationend', function(e) {
-      if (e.target === panel) panel.remove();
+    
+    var panelAnim = panel.animate([
+      { opacity: 0, transform: 'translateY(-50%) scale(0.88)' },
+      { opacity: 1, transform: 'translateY(-50%) scale(1)', offset: 0.12 },
+      { opacity: 1, transform: 'translateY(-50%) scale(1)', offset: 0.8 },
+      { opacity: 0, transform: 'translateY(-50%) scale(0.92)' }
+    ], {
+      duration: 1500,
+      easing: 'ease-out',
+      fill: 'forwards'
     });
+
+    panelAnim.onfinish = function() { panel.remove(); };
 
     return 'scroll-animation-injected';
   }`;
