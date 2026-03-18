@@ -13,7 +13,8 @@ export type ChecklistStatus =
   | 'pending'
   | 'in_progress'
   | 'completed'
-  | 'cancelled';
+  | 'cancelled'
+  | 'blocked';
 
 export interface ChecklistItemData {
   status: ChecklistStatus;
@@ -48,6 +49,12 @@ const ChecklistStatusDisplay: React.FC<{ status: ChecklistStatus }> = ({
           ✗
         </Text>
       );
+    case 'blocked':
+      return (
+        <Text color={theme.status.warning} aria-label="Blocked">
+          ⛔
+        </Text>
+      );
     default:
       checkExhaustive(status);
   }
@@ -70,6 +77,7 @@ export const ChecklistItem: React.FC<ChecklistItemProps> = ({
         return theme.text.accent;
       case 'completed':
       case 'cancelled':
+      case 'blocked':
         return theme.text.secondary;
       case 'pending':
         return theme.text.primary;
