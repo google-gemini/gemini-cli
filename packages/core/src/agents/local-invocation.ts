@@ -6,7 +6,6 @@
 
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { LocalAgentExecutor } from './local-executor.js';
-import { safeJsonToMarkdown } from '../utils/markdownUtils.js';
 import {
   BaseToolInvocation,
   type ToolResult,
@@ -246,28 +245,27 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
         throw cancelError;
       }
 
-      const displayResult = safeJsonToMarkdown(output.result);
+      const progress: SubagentProgress = {
+        isSubagentProgress: true,
+        agentName: this.definition.name,
+        recentActivity: [...recentActivity],
+        state: 'completed',
+        result: output.result,
+        terminateReason: output.terminate_reason,
+      };
+
+      if (updateOutput) {
+        updateOutput(progress);
+      }
 
       const resultContent = `Subagent '${this.definition.name}' finished.
 Termination Reason: ${output.terminate_reason}
 Result:
 ${output.result}`;
 
-      const displayContent =
-        output.terminate_reason === AgentTerminateMode.GOAL
-          ? displayResult
-          : `
-### Subagent ${this.definition.name} Finished Early
-
-**Termination Reason:** ${output.terminate_reason}
-
-**Result/Summary:**
-${displayResult}
-`;
-
       return {
         llmContent: [{ text: resultContent }],
-        returnDisplay: displayContent,
+        returnDisplay: progress,
       };
     } catch (error) {
       const errorMessage =
