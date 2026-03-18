@@ -580,6 +580,9 @@ export class GeminiClient {
     // Re-initialize turn (it was empty before if in loop, or new instance)
     let turn = new Turn(this.getChat(), prompt_id);
 
+    // Refresh system instruction to include latest state (e.g. Active Topic)
+    this.updateSystemInstruction();
+
     this.sessionTurnCount++;
     if (
       this.config.getMaxSessionTurns() > 0 &&

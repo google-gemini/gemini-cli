@@ -94,7 +94,7 @@ export class CreateNewTopicTool extends BaseDeclarativeTool<
     super(
       CREATE_NEW_TOPIC_TOOL_NAME,
       'Create New Topic',
-      'Organizes work into a new "Chapter" or "Topic". Call this when transitioning between major phases (e.g., from Research to Implementation).',
+      'Marks the start of a new logical phase or topic. You MUST use this to organize your work into chapters. Call it at the start of every major phase: Researching, Strategy, Execution, and Validation. This tool is CRITICAL for UI organization and cannot be skipped.',
       Kind.Think,
       {
         type: 'object',

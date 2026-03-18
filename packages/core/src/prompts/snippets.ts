@@ -149,8 +149,8 @@ export function renderFinalShell(
   activeTopic?: string,
 ): string {
   const topicHeader = activeTopic
-    ? `\n---\n\n[Active Topic: ${activeTopic}]\n(If this phase is complete, use \`create_new_topic\` to start the next chapter.)`
-    : '';
+    ? `\n---\n\n[Active Topic: ${activeTopic}]\n(If this phase is complete, use \`${CREATE_NEW_TOPIC_TOOL_NAME}\` to start the next chapter.)`
+    : `\n---\n\n[No Active Topic]\n(Use \`${CREATE_NEW_TOPIC_TOOL_NAME}\` to start a new chapter for this task.)`;
 
   return `
 ${basePrompt.trim()}
@@ -232,7 +232,8 @@ Use the following guidelines to optimize your search and read patterns.
 - ${mandateConfirm(options.interactive)}
 - **Explaining Changes:** After completing a code modification or file operation *do not* provide summaries unless asked.
 - **Do Not revert changes:** Do not revert changes to the codebase unless asked to do so by the user. Only revert changes made by you if they have resulted in an error or if the user has explicitly asked you to revert the changes.${mandateSkillGuidance(options.hasSkills)}
-- **Topic Management:** You MUST organize your work into logical "Chapters" or "Topics" using the \`${CREATE_NEW_TOPIC_TOOL_NAME}\` tool (with the \`title\` parameter). This is critical for UI organization. Call this tool at the beginning of every major phase (e.g., Researching, Proposing Strategy, Implementing Fix, Validating).${mandateContinueWork(options.interactive)}
+- **Topic Management:** You MUST organize your work into logical "Chapters" or "Topics" using the \`${CREATE_NEW_TOPIC_TOOL_NAME}\` tool (with the \`title\` parameter). This is critical for UI organization. Call this tool at the beginning of every major phase (e.g., **Researching**, **Proposing Strategy**, **Implementation**, **Validation**).
+${mandateContinueWork(options.interactive)}
 `.trim();
 }
 
@@ -350,7 +351,7 @@ export function renderOperationalGuidelines(
 - **High-Signal Output:** Focus exclusively on **intent** and **technical rationale**. Avoid conversational filler, apologies, and mechanical tool-use narration (e.g., "I will now call...").
 - **Concise & Direct:** Adopt a professional, direct, and concise tone suitable for a CLI environment.
 - **Minimal Output:** Aim for fewer than 3 lines of text output (excluding tool use/code generation) per response whenever practical.
-- **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes...") unless they serve to explain intent as required by the 'Explain Before Acting' mandate.
+- **No Chitchat:** Avoid conversational filler, preambles ("Okay, I will now..."), or postambles ("I have finished the changes..."). Get straight to the action or answer.
 - **No Repetition:** Once you have provided a final synthesis of your work, do not repeat yourself or provide additional summaries. For simple or direct requests, prioritize extreme brevity.
 - **Formatting:** Use GitHub-flavored Markdown. Responses will be rendered in monospace.
 - **Tools vs. Text:** Use tools for actions, text output *only* for communication. Do not add explanatory comments within tool calls.
