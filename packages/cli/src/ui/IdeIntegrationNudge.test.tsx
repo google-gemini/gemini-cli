@@ -43,6 +43,7 @@ describe('IdeIntegrationNudge', () => {
   beforeEach(() => {
     vi.mocked(debugLogger.warn).mockImplementation((...args) => {
       if (
+        // eslint-disable-next-line no-restricted-syntax
         typeof args[0] === 'string' &&
         /was not wrapped in act/.test(args[0])
       ) {
