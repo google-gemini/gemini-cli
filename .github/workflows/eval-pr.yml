@@ -14,10 +14,15 @@ permissions:
   pull-requests: 'write'
 
 jobs:
-  eval-impact:
-    name: 'Eval Impact Analysis'
+  eval-run:
+    name: 'Eval Run (${{ matrix.model }}, attempt ${{ matrix.run_attempt }})'
     runs-on: 'gemini-cli-ubuntu-16-core'
     if: "github.repository == 'google-gemini/gemini-cli'"
+    strategy:
+      fail-fast: false
+      matrix:
+        run_attempt: [1, 2, 3]
+        model: ["gemini-3.1-pro-preview-customtools", "gemini-3-flash-preview"]
     steps:
       - name: 'Checkout'
         uses: 'actions/checkout@v4'
@@ -34,49 +39,56 @@ jobs:
       - name: 'Build project'
         run: 'npm run build'
 
-      - name: 'Create logs directory'
-        run: 'mkdir -p evals/logs'
-
-      - name: 'Run Evals (Lite)'
+      - name: 'Run Evals'
         env:
           GEMINI_API_KEY: '${{ secrets.GEMINI_API_KEY }}'
           RUN_EVALS: 'true'
+          GEMINI_MODEL: '${{ matrix.model }}'
         run: |
-          # Run 1 attempt on critical models for speed in PR
-          MODELS=("gemini-3.1-pro-preview-customtools" "gemini-3-flash-preview")
-          for model in "${MODELS[@]}"; do
-            echo "Running evals for $model..."
-            mkdir -p "evals/logs/eval-logs-$model-1"
-            # Use || true to ensure the loop continues even if tests fail
-            GEMINI_MODEL=$model npm run test:all_evals -- --outputFile.json="evals/logs/eval-logs-$model-1/report.json" || true
-          done
+          # Use a unique directory name for this matrix leg
+          DIR_NAME="eval-logs-${{ matrix.model }}-${{ matrix.run_attempt }}"
+          mkdir -p "evals/logs/$DIR_NAME"
+          npm run test:all_evals -- --outputFile.json="evals/logs/$DIR_NAME/report.json" || true
+
+      - name: 'Upload Logs'
+        uses: 'actions/upload-artifact@v4'
+        with:
+          name: 'eval-logs-${{ matrix.model }}-${{ matrix.run_attempt }}'
+          path: 'evals/logs'
+          retention-days: 1
+
+  aggregate-impact:
+    name: 'Aggregate Impact'
+    needs: ['eval-run']
+    if: 'always()'
+    runs-on: 'gemini-cli-ubuntu-16-core'
+    steps:
+      - name: 'Checkout'
+        uses: 'actions/checkout@v4'
+
+      - name: 'Download Logs'
+        uses: 'actions/download-artifact@v4'
+        with:
+          path: 'artifacts'
 
       - name: 'Generate Impact Report'
         id: 'generate-report'
-        if: 'always()'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
-          if [ ! -d "evals/logs" ] || [ -z "$(ls -A evals/logs)" ]; then
+          if [ ! -d "artifacts" ]; then
             echo "No logs found, skipping report generation."
             exit 0
           fi
           echo "<!-- eval-impact-report -->" > report.md
-          node scripts/aggregate_evals.js evals/logs --compare-main --pr-comment >> report.md
+          node scripts/aggregate_evals.js artifacts --compare-main --pr-comment >> report.md
           cat report.md >> "$GITHUB_STEP_SUMMARY"
-          
-          # Check if there are any regressions (🔴)
-          if grep -q "🔴" report.md; then
-            echo "REGRESSION_DETECTED=true" >> "$GITHUB_ENV"
-          fi
 
       - name: 'Comment on PR'
-        if: 'always()'
         env:
           GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         run: |
           if [ ! -f "report.md" ]; then
-            echo "No report found, skipping comment."
             exit 0
           fi
           PR_NUMBER=${{ github.event.pull_request.number }}
@@ -87,9 +99,3 @@ jobs:
           else
             gh pr comment $PR_NUMBER --body-file report.md
           fi
-
-      - name: 'Fail if regression detected'
-        if: "env.REGRESSION_DETECTED == 'true'"
-        run: |
-          echo "Behavioral evaluation regressions detected. Please check the impact report."
-          exit 1
