@@ -53,7 +53,7 @@ describe('SandboxedFileSystemService', () => {
 
     // Use setImmediate to ensure events are emitted after the promise starts executing
     setImmediate(() => {
-      mockChild.stdout.emit('data', Buffer.from('file content'));
+      mockChild.stdout!.emit('data', Buffer.from('file content'));
       mockChild.emit('close', 0);
     });
 
@@ -85,8 +85,8 @@ describe('SandboxedFileSystemService', () => {
     });
 
     await writePromise;
-    expect(mockChild.stdin.write).toHaveBeenCalledWith('new content');
-    expect(mockChild.stdin.end).toHaveBeenCalled();
+    expect(mockChild.stdin!.write).toHaveBeenCalledWith('new content');
+    expect(mockChild.stdin!.end).toHaveBeenCalled();
     expect(spawn).toHaveBeenCalledWith(
       'sandbox.exe',
       ['0', cwd, '__write', '/test/file.txt'],
@@ -106,7 +106,7 @@ describe('SandboxedFileSystemService', () => {
     const readPromise = service.readTextFile('/test/file.txt');
 
     setImmediate(() => {
-      mockChild.stderr.emit('data', Buffer.from('access denied'));
+      mockChild.stderr!.emit('data', Buffer.from('access denied'));
       mockChild.emit('close', 1);
     });
 
