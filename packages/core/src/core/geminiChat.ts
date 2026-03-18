@@ -1079,6 +1079,12 @@ export function isInvalidArgumentError(errorMessage: string): boolean {
  * Gemini API. The `id` field is used internally for call tracking but is not
  * accepted by the v1 API endpoint, which causes 400 INVALID_ARGUMENT errors.
  *
+ * This helper is non-mutating. It returns the original `Content` objects when
+ * no sanitization is needed, and only shallow-copies `Content` and `Part`
+ * objects that contain a `functionResponse.id`. This keeps the API payload
+ * clean without altering the chat history or paying a cloning cost for
+ * unaffected content.
+ *
  * See: https://github.com/google-gemini/gemini-cli/issues/13972
  * See: https://github.com/google-gemini/gemini-cli/issues/22183
  */

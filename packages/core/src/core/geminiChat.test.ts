@@ -2633,6 +2633,31 @@ describe('GeminiChat', () => {
       expect(sanitizedContents[0]).toBe(contents[0]);
     });
 
+    it('should not mutate the original contents when stripping functionResponse ids', () => {
+      const contents: Content[] = [
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                id: 'call-1',
+                name: 'find_restaurant',
+                response: { name: 'Vesuvio' },
+              },
+            },
+          ],
+        },
+      ];
+
+      const sanitizedContents = sanitizeContentsForApi(contents);
+
+      expect(sanitizedContents[0]).not.toBe(contents[0]);
+      expect(
+        sanitizedContents[0]?.parts?.[0]?.functionResponse,
+      ).not.toHaveProperty('id');
+      expect(contents[0]?.parts?.[0]?.functionResponse?.id).toBe('call-1');
+    });
+
     it('should handle multiple functionResponse parts in one content', () => {
       const contents: Content[] = [
         {
