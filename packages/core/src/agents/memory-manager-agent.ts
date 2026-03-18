@@ -84,7 +84,8 @@ export const MemoryManagerAgent = (
     return foundAny ? context : '';
   };
 
-  const MEMORY_MANAGER_SYSTEM_PROMPT = `
+  const buildSystemPrompt = (): string =>
+    `
 You are a memory management agent maintaining user memories in GEMINI.md files.
 
 # Memory Hierarchy
@@ -175,9 +176,11 @@ ${getInitialContext()}
         ASK_USER_TOOL_NAME,
       ],
     },
-    promptConfig: {
-      systemPrompt: MEMORY_MANAGER_SYSTEM_PROMPT,
-      query: '${request}',
+    get promptConfig() {
+      return {
+        systemPrompt: buildSystemPrompt(),
+        query: '${request}',
+      };
     },
     runConfig: {
       maxTimeMinutes: 5,

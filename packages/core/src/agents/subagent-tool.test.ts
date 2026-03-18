@@ -28,7 +28,7 @@ import {
   GEN_AI_AGENT_DESCRIPTION,
   GEN_AI_AGENT_NAME,
 } from '../telemetry/constants.js';
-import type { ToolRegistry } from '../tools/tool-registry.js';
+import type { ToolRegistry } from 'src/tools/tool-registry.js';
 
 vi.mock('./subagent-tool-wrapper.js');
 
