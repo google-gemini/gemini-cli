@@ -18,7 +18,6 @@ To use custom subagents, you must ensure they are enabled in your
 }
 ```
 
-
 ## What are subagents?
 
 Subagents are "specialists" that the main Gemini agent can hire for a specific
