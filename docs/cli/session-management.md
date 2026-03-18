@@ -212,5 +212,3 @@ becoming too large and expensive.
   across sessions.
 - Learn how to [Checkpoint](./checkpointing.md) your session state.
 - Check out the [CLI reference](./cli-reference.md) for all command-line flags.
-
-[Open an issue]: https://github.com/google-gemini/gemini-cli/issues

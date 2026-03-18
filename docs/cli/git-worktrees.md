@@ -1,4 +1,4 @@
-# Parallel sessions with Git worktrees
+# Parallel sessions with Git worktrees (experimental)
 
 When working on multiple tasks at once, you can use Git worktrees to give each
 Gemini session its own copy of the codebase. Git worktrees create separate
@@ -8,11 +8,13 @@ with another.
 
 Learn more about [session management](./session-management.md).
 
-> **Note:** This is a preview feature currently under active development. Your
+<!-- prettier-ignore -->
+> [!NOTE]
+> This is an experimental feature currently under active development. Your
 > feedback is invaluable as we refine this feature. If you have ideas,
 > suggestions, or encounter issues:
 >
-> - [Open an issue] on GitHub.
+> - [Open an issue](https://github.com/google-gemini/gemini-cli/issues/new?template=bug_report.yml) on GitHub.
 > - Use the **/bug** command within Gemini CLI to file an issue.
 
 Learn more in the official Git worktree
@@ -45,7 +47,7 @@ CLI in it.
   name (within `.gemini/worktrees/`) and the branch name.
 
   ```bash
-  gemini --worktree feature-auth
+  gemini --worktree feature-search
   ```
 
 - **Start with a random name:** If you omit the name, Gemini generates a random
@@ -55,7 +57,9 @@ CLI in it.
   gemini --worktree
   ```
 
-> **Note:** Remember to initialize your development environment in each new
+<!-- prettier-ignore -->
+> [!NOTE]
+> Remember to initialize your development environment in each new
 > worktree according to your project's setup. Depending on your stack, this
 > might include running dependency installation (`npm install`, `yarn`), setting
 > up virtual environments, or following your project's standard build process.
@@ -86,11 +90,11 @@ If a worktree was preserved because it contained changes, Gemini displays
 instructions on how to resume your work when you exit.
 
 To resume a session in a preserved worktree, navigate to the worktree directory
-and start Gemini CLI with the `--resume` flag:
+and start Gemini CLI with the `--resume` flag and the session ID:
 
 ```bash
-cd .gemini/worktrees/feature-auth
-gemini --resume latest
+cd .gemini/worktrees/feature-search
+gemini --resume <session_id>
 ```
 
 ## Managing worktrees manually
@@ -100,13 +104,13 @@ a preserved worktree, you can use Git directly:
 
 - **Clean up a preserved worktree:**
   ```bash
-  git worktree remove .gemini/worktrees/feature-auth --force
-  git branch -D worktree-feature-auth
+  git worktree remove .gemini/worktrees/feature-search --force
+  git branch -D worktree-feature-search
   ```
 - **Create a worktree manually:**
   ```bash
-  git worktree add ../project-feature-a -b feature-a
-  cd ../project-feature-a && gemini
+  git worktree add ../project-feature-search -b feature-search
+  cd ../project-feature-search && gemini
   ```
 
 [Open an issue]: https://github.com/google-gemini/gemini-cli/issues
