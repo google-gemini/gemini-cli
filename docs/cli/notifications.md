@@ -6,9 +6,8 @@ tool call.
 
 <!-- prettier-ignore -->
 > [!NOTE]
-> This is a preview feature currently under active development.
-> Preview features may be available on the **Preview** channel or may need to be
-> enabled under `/settings`.
+> This is an experimental feature currently under active development and
+> may need to be enabled under `/settings`.
 
 Notifications are particularly useful when running long-running tasks or using
 [Plan Mode](./plan-mode.md), letting you switch to other windows while Gemini
