@@ -6,7 +6,15 @@
 
 import { z } from 'zod';
 import type { LocalAgentDefinition } from './types.js';
-import { WRITE_FILE_TOOL_NAME } from '../tools/tool-names.js';
+import {
+  ASK_USER_TOOL_NAME,
+  EDIT_TOOL_NAME,
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
+  LS_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+} from '../tools/tool-names.js';
 
 const MemoryManagerSchema = z.object({
   response: z
@@ -39,6 +47,7 @@ When adding a memory, route it to the right store:
 - Project architecture, conventions, workflows, team info → **project root**
 - Detailed context about a specific module or directory → **subdirectory
   GEMINI.md**, with a reference added to the project root
+- If a memory would make sense in either the user or the project stores, 'ask_user' where it should be saved.
 
 # Operations
 
@@ -74,7 +83,7 @@ export const MemoryManagerAgent = (): LocalAgentDefinition<
   kind: 'local',
   name: 'save_memory',
   displayName: 'Memory Manager',
-  description: `Writes and reads global preferences or facts across ALL future sessions. Use this for recurring instructions like coding styles or tool aliases. Unlike '${WRITE_FILE_TOOL_NAME}', which is for project-specific files, this performs the described edits to memory files loaded in every workspace.`,
+  description: `Writes and reads preferences or facts across ALL future sessions. Use this for recurring instructions like coding styles or tool aliases.`,
   inputConfig: {
     inputSchema: {
       type: 'object',
@@ -98,12 +107,13 @@ export const MemoryManagerAgent = (): LocalAgentDefinition<
   },
   toolConfig: {
     tools: [
-      'read_file',
-      'replace',
-      'write_file',
-      'list_directory',
-      'glob',
-      'grep_search',
+      READ_FILE_TOOL_NAME,
+      EDIT_TOOL_NAME,
+      WRITE_FILE_TOOL_NAME,
+      LS_TOOL_NAME,
+      GLOB_TOOL_NAME,
+      GREP_TOOL_NAME,
+      ASK_USER_TOOL_NAME,
     ],
   },
   promptConfig: {

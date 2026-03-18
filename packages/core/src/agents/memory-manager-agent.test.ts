@@ -6,6 +6,15 @@
 
 import { describe, it, expect } from 'vitest';
 import { MemoryManagerAgent } from './memory-manager-agent.js';
+import {
+  ASK_USER_TOOL_NAME,
+  EDIT_TOOL_NAME,
+  GLOB_TOOL_NAME,
+  GREP_TOOL_NAME,
+  LS_TOOL_NAME,
+  READ_FILE_TOOL_NAME,
+  WRITE_FILE_TOOL_NAME,
+} from '../tools/tool-names.js';
 
 describe('MemoryManagerAgent', () => {
   it('should have the correct name "save_memory"', () => {
@@ -42,10 +51,13 @@ describe('MemoryManagerAgent', () => {
     expect(agent.toolConfig).toBeDefined();
     expect(agent.toolConfig!.tools).toEqual(
       expect.arrayContaining([
-        'read_file',
-        'replace',
-        'write_file',
-        'grep_search',
+        READ_FILE_TOOL_NAME,
+        EDIT_TOOL_NAME,
+        WRITE_FILE_TOOL_NAME,
+        LS_TOOL_NAME,
+        GLOB_TOOL_NAME,
+        GREP_TOOL_NAME,
+        ASK_USER_TOOL_NAME,
       ]),
     );
   });

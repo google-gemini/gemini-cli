@@ -617,10 +617,11 @@ function toolUsageRememberingFacts(
   options: OperationalGuidelinesOptions,
 ): string {
   if (options.memoryManagerEnabled) {
-    return '';
+    return `
+- **Memory Tool:** You MUST use the '${MEMORY_TOOL_NAME}' tool to proactively record facts, preferences, and workflows that apply across all sessions. Whenever the user explicitly tells you to "remember" something, or when they state a preference or workflow (like "always lint after editing"), you MUST immediately call the save_memory subagent. Never save transient session state. Do not use memory to store summaries of code changes, bug fixes, or findings discovered during a task; this tool is strictly for persistent general knowledge.`;
   }
   const base = `
-- **Remembering Facts:** Use the '${MEMORY_TOOL_NAME}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information.`;
+- **Remembering Facts:** Use the '${MEMORY_TOOL_NAME}' tool to remember specific, *user-related* facts or preferences when the user explicitly asks, or when they state a clear, concise piece of information that would help personalize or streamline *your future interactions with them* (e.g., preferred coding style, common project paths they use, personal tool aliases, or a workflow like "always lint after editing"). This tool is for user-specific information that should persist across sessions. Do *not* use it for general project context or information.`;
   const suffix = options.interactive
     ? ' If unsure whether to save something, you can ask the user, "Should I remember that for you?"'
     : '';
