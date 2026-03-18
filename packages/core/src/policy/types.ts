@@ -153,6 +153,13 @@ export interface PolicyRule {
   modes?: ApprovalMode[];
 
   /**
+   * If true, this rule only applies to interactive environments.
+   * If false, this rule only applies to non-interactive environments.
+   * If undefined, it applies to both interactive and non-interactive environments.
+   */
+  interactive?: boolean;
+
+  /**
    * If true, allows command redirection even if the policy engine would normally
    * downgrade ALLOW to ASK_USER for redirected commands.
    * Only applies when decision is ALLOW.
