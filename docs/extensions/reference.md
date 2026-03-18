@@ -217,7 +217,7 @@ Extensions **will not** inherit the user's full shell environment variables. The
 1. Standard safe variables (e.g., `HOME`, `PATH`, `TMPDIR`).
 2. Variables explicitly declared and requested in the `gemini-extension.json` manifest via the `settings` array (using the `envVar` property).
 
-If your extension requires specific environment variables (like an API key, custom host, or config path), you **must** declare them in the `settings` array so the CLI can whitelist and inject them into the extension's isolated process.
+If your extension requires specific environment variables (like an API key, custom host, or config path), you **must** declare them in the `settings` array so the CLI can allowlist them for use within the extension.
 
 ### Custom commands
 
