@@ -106,7 +106,8 @@ If connected, this command will show the IDE it's connected to and a list of
 recently opened files it is aware of.
 
 <!-- prettier-ignore -->
-> [!NOTE] The file list is limited to 10 recently accessed files within your
+> [!NOTE]
+> The file list is limited to 10 recently accessed files within your
 > workspace and only includes local files on disk.)
 
 ### Working with diffs
