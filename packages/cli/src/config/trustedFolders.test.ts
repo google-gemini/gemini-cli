@@ -193,9 +193,6 @@ describe('Trusted Folders', () => {
     });
 
     it('uses resolved path length for precedence, not raw rule path length', () => {
-      // TRUST_PARENT's effectivePath is dirname(rulePath), which can be much
-      // shorter than the raw rulePath. A more-specific DO_NOT_TRUST rule must
-      // still win even when the raw TRUST_PARENT rulePath is longer.
       const folders = setup({
         '/a/b/very-long-child': TrustLevel.TRUST_PARENT, // effectivePath = '/a/b'
         '/a/b/c': TrustLevel.DO_NOT_TRUST,
