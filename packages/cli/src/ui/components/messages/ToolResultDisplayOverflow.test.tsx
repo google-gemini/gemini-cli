@@ -22,9 +22,7 @@ describe('ToolResultDisplay Overflow', () => {
       />,
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: false } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true },
       },
     );
@@ -51,9 +49,7 @@ describe('ToolResultDisplay Overflow', () => {
       />,
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: false } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true },
       },
     );
@@ -91,9 +87,7 @@ describe('ToolResultDisplay Overflow', () => {
       />,
       {
         config: makeFakeConfig({ useAlternateBuffer: false }),
-        settings: createMockSettings({
-          merged: { ui: { useAlternateBuffer: false } },
-        }),
+        settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         uiState: { constrainHeight: true },
       },
     );
