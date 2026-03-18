@@ -181,10 +181,8 @@ and full builds) to a dedicated, high-performance GCP worker.
 
   // 4. Save Confirmed State
   const targetVM = `gcli-workspace-${env.USER || 'mattkorwel'}`;
-  const settingsPath = path.join(REPO_ROOT, '.gemini/workspaces/settings.json');
-  if (!fs.existsSync(path.dirname(settingsPath))) fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
   
-  const settings = {
+  settings = {
       workspace: { 
           projectId, zone, terminalTarget, 
           userFork, upstreamRepo,
@@ -224,9 +222,10 @@ and full builds) to a dedicated, high-performance GCP worker.
   if (setupRes !== 0) return setupRes;
 
   const persistentScripts = `~/.workspaces/scripts`;
+  const remoteConfigDir = `~/.workspaces/gemini-cli-config/.gemini`;
 
   console.log(`\n📦 Synchronizing Logic & Credentials...`);
-  await provider.exec(`mkdir -p ~/dev/main ~/.gemini/policies ~/.workspaces/scripts`);
+  await provider.exec(`mkdir -p ~/dev/main ~/.gemini/policies ~/.workspaces/scripts ${remoteConfigDir}`);
   await provider.sync('.gemini/skills/workspaces/scripts/', `${persistentScripts}/`, { delete: true, sudo: true });
   await provider.sync('.gemini/skills/workspaces/policy.toml', `~/.gemini/policies/workspace-policy.toml`, { sudo: true });
 
@@ -234,15 +233,14 @@ and full builds) to a dedicated, high-performance GCP worker.
     await provider.sync(path.join(env.HOME || '', '.gemini/google_accounts.json'), `${remoteConfigDir}/google_accounts.json`, { sudo: true });
   }
 
-
   if (githubToken) {
     await provider.exec(`mkdir -p ~/.workspaces && echo ${githubToken} > ~/.workspaces/.gh_token && chmod 600 ~/.workspaces/.gh_token`);
   }
 
   // Initialize Remote Gemini Config with Auth
   console.log('⚙️  Initializing remote Gemini configuration...');
-  const remoteConfigDir = `~/.workspaces/gemini-cli-config/.gemini`;
   await provider.exec(`mkdir -p ${remoteConfigDir}`);
+
   
   // Create a minimal settings.json on the remote to enable auth
   const remoteSettings = {
