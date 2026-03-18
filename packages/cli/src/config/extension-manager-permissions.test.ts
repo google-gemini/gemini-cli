@@ -103,4 +103,31 @@ describe('copyExtension permissions', () => {
     await fs.promises.rm(destDir, { recursive: true, force: true });
     expect(fs.existsSync(destDir)).toBe(false);
   });
+
+  it('should not follow symlinks or modify symlink targets', async () => {
+    const symlinkTarget = path.join(tempDir, 'external-target');
+    fs.writeFileSync(symlinkTarget, 'external content');
+    // Target is read-only
+    fs.chmodSync(symlinkTarget, 0o444);
+
+    const symlinkPath = path.join(sourceDir, 'symlink-file');
+    fs.symlinkSync(symlinkTarget, symlinkPath);
+
+    // Perform copy
+    await copyExtension(sourceDir, destDir);
+
+    const destSymlinkPath = path.join(destDir, 'symlink-file');
+    const destSymlinkStats = fs.lstatSync(destSymlinkPath);
+
+    // Verify it is still a symlink in the destination
+    expect(destSymlinkStats.isSymbolicLink()).toBe(true);
+
+    // Verify the target (external to the extension) was NOT modified
+    const targetStats = fs.statSync(symlinkTarget);
+    // Owner write bit should still NOT be set (0o200)
+    expect(targetStats.mode & 0o200).toBe(0o000);
+
+    // Clean up
+    fs.chmodSync(symlinkTarget, 0o644);
+  });
 });
