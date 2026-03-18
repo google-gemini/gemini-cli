@@ -763,6 +763,48 @@ describe('loadCliConfig', () => {
     });
   });
 
+  it('should add IDE workspace folders from GEMINI_CLI_IDE_WORKSPACE_PATH to include directories', async () => {
+    vi.stubEnv(
+      'GEMINI_CLI_IDE_WORKSPACE_PATH',
+      ['/project/folderA', '/project/folderB'].join(path.delimiter),
+    );
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    const dirs = config.getPendingIncludeDirectories();
+    expect(dirs).toContain('/project/folderA');
+    expect(dirs).toContain('/project/folderB');
+  });
+
+  it('should skip inaccessible workspace folders from GEMINI_CLI_IDE_WORKSPACE_PATH', async () => {
+    const resolveToRealPathSpy = vi
+      .spyOn(ServerConfig, 'resolveToRealPath')
+      .mockImplementation((p) => {
+        if (p.toString().includes('restricted')) {
+          const err = new Error('EACCES: permission denied');
+          (err as NodeJS.ErrnoException).code = 'EACCES';
+          throw err;
+        }
+        return p.toString();
+      });
+    vi.stubEnv(
+      'GEMINI_CLI_IDE_WORKSPACE_PATH',
+      ['/project/folderA', '/nonexistent/restricted/folder'].join(
+        path.delimiter,
+      ),
+    );
+    process.argv = ['node', 'script.js'];
+    const argv = await parseArguments(createTestMergedSettings());
+    const settings = createTestMergedSettings();
+    const config = await loadCliConfig(settings, 'test-session', argv);
+    const dirs = config.getPendingIncludeDirectories();
+    expect(dirs).toContain('/project/folderA');
+    expect(dirs).not.toContain('/nonexistent/restricted/folder');
+
+    resolveToRealPathSpy.mockRestore();
+  });
+
   it('should use default fileFilter options when unconfigured', async () => {
     process.argv = ['node', 'script.js'];
     const argv = await parseArguments(createTestMergedSettings());
@@ -798,6 +840,7 @@ describe('loadCliConfig', () => {
 describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.stubEnv('GEMINI_CLI_IDE_WORKSPACE_PATH', '');
     // Restore ExtensionManager mocks that were reset
     ExtensionManager.prototype.getExtensions = vi.fn().mockReturnValue([]);
     ExtensionManager.prototype.loadExtensions = vi
@@ -809,6 +852,7 @@ describe('Hierarchical Memory Loading (config.ts) - Placeholder Suite', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -3347,7 +3391,10 @@ describe('Policy Engine Integration in loadCliConfig', () => {
 
     expect(ServerConfig.createPolicyEngineConfig).toHaveBeenCalledWith(
       expect.objectContaining({
-        policyPaths: ['/path/to/policy1.toml', '/path/to/policy2.toml'],
+        policyPaths: [
+          path.normalize('/path/to/policy1.toml'),
+          path.normalize('/path/to/policy2.toml'),
+        ],
       }),
       expect.anything(),
     );
