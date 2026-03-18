@@ -8,6 +8,7 @@ import {
   render as inkRenderDirect,
   type Instance as InkInstance,
   type RenderOptions,
+  type DOMElement,
 } from 'ink';
 import { EventEmitter } from 'node:events';
 import { Box } from 'ink';
@@ -377,6 +378,7 @@ export type RenderInstance = {
   waitUntilReady: () => Promise<void>;
   capturedOverflowState: OverflowState | undefined;
   capturedOverflowActions: OverflowActions | undefined;
+  rootNode: DOMElement;
 };
 
 const instances: InkInstance[] = [];
@@ -460,8 +462,14 @@ export const render = (
     lastFrameRaw: stdout.lastFrameRaw,
     generateSvg: stdout.generateSvg,
     terminal: state.terminal,
+    get rootNode() {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (instance as any).rootNode as DOMElement;
+    },
     waitUntilReady: () => stdout.waitUntilReady(),
-  };
+    capturedOverflowState: undefined,
+    capturedOverflowActions: undefined,
+  } as RenderInstance;
 };
 
 export const cleanup = () => {

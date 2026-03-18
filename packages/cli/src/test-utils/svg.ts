@@ -5,9 +5,14 @@
  */
 
 import type { Terminal } from '@xterm/headless';
+import { type DOMElement } from 'ink';
 
-export const generateSvgForTerminal = (terminal: Terminal): string => {
+export const generateSvgForTerminal = (
+  terminal: Terminal,
+  options: { rootNode?: DOMElement } = {},
+): string => {
   const activeBuffer = terminal.buffer.active;
+  const { rootNode } = options;
 
   const getHexColor = (
     isRGB: boolean,
@@ -206,6 +211,24 @@ export const generateSvgForTerminal = (terminal: Terminal): string => {
       }
     }
     finalizeBlock(line.length);
+  }
+
+  // Inject unique component names from the tree as comments for auditing
+  if (rootNode) {
+    const components = new Set<string>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const collect = (node: any) => {
+      if (node.internal_componentName)
+        components.add(node.internal_componentName);
+      if (node.internal_testId) components.add(node.internal_testId);
+      if (node.childNodes) {
+        for (const child of node.childNodes) collect(child);
+      }
+    };
+    collect(rootNode);
+    for (const name of components) {
+      svg += `  <!-- component: ${name} -->\n`;
+    }
   }
 
   svg += `  </g>\n</svg>`;
