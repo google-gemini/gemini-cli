@@ -112,9 +112,26 @@ This script will:
   const sshConfigPath = path.join(offloadDir, 'ssh_config');
   const knownHostsPath = path.join(offloadDir, 'known_hosts');
 
-  // 1b. Security Fork Management (Temporarily Disabled)
-  const upstreamRepo = 'google-gemini/gemini-cli';
-  const userFork = upstreamRepo; // Fallback for now
+  // 1b. Security Fork Management
+  console.log('🔍 Detecting repository origins...');
+  const repoInfoRes = spawnSync('gh', ['repo', 'view', '--json', 'nameWithOwner,parent,isFork'], { stdio: 'pipe' });
+  let upstreamRepo = 'google-gemini/gemini-cli';
+  let userFork = upstreamRepo;
+
+  if (repoInfoRes.status === 0) {
+      try {
+          const repoInfo = JSON.parse(repoInfoRes.stdout.toString());
+          if (repoInfo.isFork && repoInfo.parent) {
+              upstreamRepo = repoInfo.parent.nameWithOwner;
+              userFork = repoInfo.nameWithOwner;
+              console.log(`   - Detected Fork: ${userFork} (Upstream: ${upstreamRepo})`);
+          } else {
+              console.log(`   - Working on Upstream: ${upstreamRepo}`);
+          }
+      } catch (e) {
+          console.log('   ⚠️ Failed to parse repo info. Using defaults.');
+      }
+  }
 
   // Resolve Paths
   const remoteWorkDir = `~/dev/main`;
