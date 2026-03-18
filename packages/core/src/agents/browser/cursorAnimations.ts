@@ -270,12 +270,7 @@ export function buildScrollAnimationScript(direction: 'up' | 'down'): string {
 }
 
 /** Keys that represent downward scroll actions. */
-export const SCROLL_DOWN_KEYS = new Set([
-  'ArrowDown',
-  'PageDown',
-  'Space',
-  ' ',
-]);
+export const SCROLL_DOWN_KEYS = new Set(['ArrowDown', 'PageDown', 'Space']);
 
 /** Keys that represent upward scroll actions. */
 export const SCROLL_UP_KEYS = new Set(['ArrowUp', 'PageUp']);
