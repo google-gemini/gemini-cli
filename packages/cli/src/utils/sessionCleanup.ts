@@ -9,6 +9,7 @@ import * as path from 'node:path';
 import {
   debugLogger,
   sanitizeFilenamePart,
+  SESSION_FILE_PREFIX,
   Storage,
   TOOL_OUTPUTS_DIR,
   type Config,
@@ -27,6 +28,12 @@ const MULTIPLIERS = {
 };
 
 /**
+ * Matches a trailing hyphen followed by exactly 8 alphanumeric characters before the .json extension.
+ * Example: session-20250110-abcdef12.json -> captures "abcdef12"
+ */
+const SHORT_ID_REGEX = /-([a-zA-Z0-9]{8})\.json$/;
+
+/**
  * Result of session cleanup operation
  */
 export interface CleanupResult {
@@ -35,6 +42,65 @@ export interface CleanupResult {
   deleted: number;
   skipped: number;
   failed: number;
+}
+
+/**
+ * Helpers for session cleanup.
+ */
+
+/**
+ * Derives an 8-character shortId from a session filename.
+ */
+function deriveShortIdFromFileName(fileName: string): string | null {
+  if (fileName.startsWith(SESSION_FILE_PREFIX) && fileName.endsWith('.json')) {
+    const match = fileName.match(SHORT_ID_REGEX);
+    return match ? match[1] : null;
+  }
+  return null;
+}
+
+/**
+ * Gets the log path for a session ID.
+ */
+function getSessionLogPath(tempDir: string, safeSessionId: string): string {
+  return path.join(tempDir, 'logs', `session-${safeSessionId}.jsonl`);
+}
+
+/**
+ * Cleans up associated artifacts (logs, tool-outputs, directory) for a session.
+ */
+async function deleteSessionArtifactsAsync(
+  sessionId: string,
+  config: Config,
+): Promise<void> {
+  const tempDir = config.storage.getProjectTempDir();
+
+  // Cleanup logs
+  const logsDir = path.join(tempDir, 'logs');
+  const safeSessionId = sanitizeFilenamePart(sessionId);
+  const logPath = getSessionLogPath(tempDir, safeSessionId);
+  if (logPath.startsWith(logsDir)) {
+    await fs.unlink(logPath).catch(() => {});
+  }
+
+  // Cleanup tool outputs
+  const toolOutputDir = path.join(
+    tempDir,
+    TOOL_OUTPUTS_DIR,
+    `session-${safeSessionId}`,
+  );
+  const toolOutputsBase = path.join(tempDir, TOOL_OUTPUTS_DIR);
+  if (toolOutputDir.startsWith(toolOutputsBase)) {
+    await fs
+      .rm(toolOutputDir, { recursive: true, force: true })
+      .catch(() => {});
+  }
+
+  // Cleanup session directory
+  const sessionDir = path.join(tempDir, safeSessionId);
+  if (safeSessionId && sessionDir.startsWith(tempDir + path.sep)) {
+    await fs.rm(sessionDir, { recursive: true, force: true }).catch(() => {});
+  }
 }
 
 /**
@@ -72,7 +138,6 @@ export async function cleanupExpiredSessions(
       return { ...result, disabled: true };
     }
 
-    // Get all session files (including corrupted ones) for this project
     const allFiles = await getAllSessionFiles(chatsDir, config.getSessionId());
     result.scanned = allFiles.length;
 
@@ -86,78 +151,110 @@ export async function cleanupExpiredSessions(
       retentionConfig,
     );
 
+    const processedShortIds = new Set<string>();
+
     // Delete all sessions that need to be deleted
     for (const sessionToDelete of sessionsToDelete) {
       try {
-        const sessionPath = path.join(chatsDir, sessionToDelete.fileName);
-        await fs.unlink(sessionPath);
+        const shortId = deriveShortIdFromFileName(sessionToDelete.fileName);
 
-        // ALSO cleanup Activity logs in the project logs directory
-        const sessionId = sessionToDelete.sessionInfo?.id;
-        if (sessionId) {
-          const logsDir = path.join(config.storage.getProjectTempDir(), 'logs');
-          const logPath = path.join(logsDir, `session-${sessionId}.jsonl`);
-          try {
-            await fs.unlink(logPath);
-          } catch {
-            /* ignore if log doesn't exist */
+        if (shortId) {
+          if (processedShortIds.has(shortId)) {
+            continue;
           }
+          processedShortIds.add(shortId);
 
-          // ALSO cleanup tool outputs for this session
-          const safeSessionId = sanitizeFilenamePart(sessionId);
-          const toolOutputDir = path.join(
-            config.storage.getProjectTempDir(),
-            TOOL_OUTPUTS_DIR,
-            `session-${safeSessionId}`,
-          );
-          try {
-            await fs.rm(toolOutputDir, { recursive: true, force: true });
-          } catch {
-            /* ignore if doesn't exist */
-          }
-
-          // ALSO cleanup the session-specific directory (contains plans, tasks, etc.)
-          const sessionDir = path.join(
-            config.storage.getProjectTempDir(),
-            sessionId,
-          );
-          try {
-            await fs.rm(sessionDir, { recursive: true, force: true });
-          } catch {
-            /* ignore if doesn't exist */
-          }
-        }
-
-        if (config.getDebugMode()) {
-          if (sessionToDelete.sessionInfo === null) {
-            debugLogger.debug(
-              `Deleted corrupted session file: ${sessionToDelete.fileName}`,
+          const matchingFiles = allFiles
+            .map((f) => f.fileName)
+            .filter(
+              (f) =>
+                f.startsWith(SESSION_FILE_PREFIX) &&
+                f.endsWith(`-${shortId}.json`),
             );
-          } else {
+
+          for (const file of matchingFiles) {
+            const filePath = path.join(chatsDir, file);
+            let fullSessionId: string | undefined;
+
+            try {
+              // Try to read file to get full sessionId
+              try {
+                const fileContent = await fs.readFile(filePath, 'utf8');
+                const content: unknown = JSON.parse(fileContent);
+                if (
+                  content &&
+                  typeof content === 'object' &&
+                  'sessionId' in content
+                ) {
+                  const record = content as Record<string, unknown>;
+                  const id = record['sessionId'];
+                  if (typeof id === 'string') {
+                    fullSessionId = id;
+                  }
+                }
+              } catch {
+                // If read/parse fails, skip getting sessionId, just delete the file
+              }
+
+              // Delete the session file
+              if (!fullSessionId || fullSessionId !== config.getSessionId()) {
+                await fs.unlink(filePath);
+
+                if (fullSessionId) {
+                  await deleteSessionArtifactsAsync(fullSessionId, config);
+                }
+                result.deleted++;
+              } else {
+                result.skipped++;
+              }
+            } catch (error) {
+              // Ignore ENOENT (file already deleted)
+              if (
+                error instanceof Error &&
+                'code' in error &&
+                error.code === 'ENOENT'
+              ) {
+                // File already deleted, do nothing.
+              } else {
+                debugLogger.warn(
+                  `Failed to delete matching file ${file}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                );
+                result.failed++;
+              }
+            }
+          }
+        } else {
+          // Fallback to old logic
+          const sessionPath = path.join(chatsDir, sessionToDelete.fileName);
+          await fs.unlink(sessionPath);
+
+          const sessionId = sessionToDelete.sessionInfo?.id;
+          if (sessionId) {
+            await deleteSessionArtifactsAsync(sessionId, config);
+          }
+
+          if (config.getDebugMode()) {
             debugLogger.debug(
-              `Deleted expired session: ${sessionToDelete.sessionInfo.id} (${sessionToDelete.sessionInfo.lastUpdated})`,
+              `Deleted fallback session: ${sessionToDelete.fileName}`,
             );
           }
+          result.deleted++;
         }
-        result.deleted++;
       } catch (error) {
-        // Ignore ENOENT errors (file already deleted)
+        // Ignore ENOENT (file already deleted)
         if (
           error instanceof Error &&
           'code' in error &&
           error.code === 'ENOENT'
         ) {
-          // File already deleted, do nothing.
+          // File already deleted
         } else {
-          // Log error directly to console
           const sessionId =
             sessionToDelete.sessionInfo === null
               ? sessionToDelete.fileName
               : sessionToDelete.sessionInfo.id;
-          const errorMessage =
-            error instanceof Error ? error.message : 'Unknown error';
           debugLogger.warn(
-            `Failed to delete session ${sessionId}: ${errorMessage}`,
+            `Failed to delete session ${sessionId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
           );
           result.failed++;
         }
@@ -182,9 +279,6 @@ export async function cleanupExpiredSessions(
   return result;
 }
 
-/**
- * Identifies sessions that should be deleted (corrupted or expired based on retention policy)
- */
 /**
  * Identifies sessions that should be deleted (corrupted or expired based on retention policy)
  */
@@ -248,13 +342,19 @@ export async function identifySessionsToDelete(
     let shouldDelete = false;
 
     // Age-based retention check
-    if (cutoffDate && new Date(session.lastUpdated) < cutoffDate) {
-      shouldDelete = true;
+    if (cutoffDate) {
+      const lastUpdatedDate = new Date(session.lastUpdated);
+      const isExpired = lastUpdatedDate < cutoffDate;
+      if (isExpired) {
+        shouldDelete = true;
+      }
     }
 
     // Count-based retention check (keep only N most recent deletable sessions)
-    if (maxDeletableSessions !== undefined && i >= maxDeletableSessions) {
-      shouldDelete = true;
+    if (maxDeletableSessions !== undefined) {
+      if (i >= maxDeletableSessions) {
+        shouldDelete = true;
+      }
     }
 
     if (shouldDelete) {
