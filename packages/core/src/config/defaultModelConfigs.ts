@@ -208,6 +208,10 @@ export const DEFAULT_MODEL_CONFIGS: ModelConfigServiceConfig = {
       extends: 'gemini-3-flash-base',
       modelConfig: {},
     },
+    'memory-checker': {
+      extends: 'gemini-3-flash-base',
+      modelConfig: {},
+    },
     'chat-compression-3-pro': {
       modelConfig: {
         model: 'gemini-3-pro-preview',

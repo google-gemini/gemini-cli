@@ -121,6 +121,9 @@ vi.mock('../utils/errorReporting', () => ({ reportError: vi.fn() }));
 vi.mock('../utils/nextSpeakerChecker', () => ({
   checkNextSpeaker: vi.fn().mockResolvedValue(null),
 }));
+vi.mock('../utils/memoryChecker', () => ({
+  checkMemoryConsolidation: vi.fn().mockResolvedValue(null),
+}));
 vi.mock('../utils/generateContentResponseUtilities', () => ({
   getResponseText: (result: GenerateContentResponse) =>
     result.candidates?.[0]?.content?.parts?.map((part) => part.text).join('') ||
@@ -249,6 +252,7 @@ describe('Gemini Client (client.ts)', () => {
       getChatCompression: vi.fn().mockReturnValue(undefined),
       getCompressionThreshold: vi.fn().mockReturnValue(undefined),
       getSkipNextSpeakerCheck: vi.fn().mockReturnValue(false),
+      getExperimentalMemory: vi.fn().mockReturnValue(false),
       getShowModelInfoInChat: vi.fn().mockReturnValue(false),
       getContinueOnFailedApiCall: vi.fn(),
       getProjectRoot: vi.fn().mockReturnValue('/test/project/root'),

@@ -28,6 +28,7 @@ import type { Config } from '../config/config.js';
 import { type AgentLoopContext } from '../config/agent-loop-context.js';
 import { getCoreSystemPrompt } from './prompts.js';
 import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
+import { checkMemoryConsolidation } from '../utils/memoryChecker.js';
 import { reportError } from '../utils/errorReporting.js';
 import { GeminiChat } from './geminiChat.js';
 import {
@@ -993,6 +994,43 @@ export class GeminiClient {
             displayContent,
             true, // stopHookActive: signal retry to AfterAgent hooks
           );
+        }
+      }
+
+      // Memory consolidation check: after all hooks and continuations,
+      // check if the conversation contains soft information worth persisting.
+      if (
+        this.config.getExperimentalMemory() &&
+        !continuationHandled &&
+        !turn.pendingToolCalls.length &&
+        signal &&
+        !signal.aborted
+      ) {
+        const hookState = this.hookStateMap.get(prompt_id);
+        const isOutermostCall = !hookState || hookState.activeCalls <= 1;
+        if (isOutermostCall) {
+          const memoryCheck = await checkMemoryConsolidation(
+            this.getChat(),
+            this.config.getBaseLlmClient(),
+            signal,
+            prompt_id,
+          );
+          if (memoryCheck?.should_consolidate) {
+            const memoryRequest = [
+              {
+                text: 'Based on our conversation, there may be useful information worth remembering for future sessions. Please review the conversation and use the save_memory tool to persist any relevant soft information — such as user preferences, corrections to your behavior, team or project background, external resources, or other context that cannot be inferred from the codebase. Do not save transient task details or information already in your memory.',
+              },
+            ];
+            continuationHandled = true;
+            turn = yield* this.sendMessageStream(
+              memoryRequest,
+              signal,
+              prompt_id,
+              boundedTurns - 1,
+              false,
+              undefined,
+            );
+          }
         }
       }
     } catch (error) {
