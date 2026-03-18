@@ -48,17 +48,7 @@ exports[`ToolConfirmationQueue > height allocation and layout > should handle se
 │                                                                                                  │
 │ ?  run_shell_command Executes a bash command with a deceptive URL                                │
 │                                                                                                  │
-│ ... first 25 lines hidden (Ctrl+O to show) ...                                                   │
-│ echo "Line 26"                                                                                   │
-│ echo "Line 27"                                                                                   │
-│ echo "Line 28"                                                                                   │
-│ echo "Line 29"                                                                                   │
-│ echo "Line 30"                                                                                   │
-│ echo "Line 31"                                                                                   │
-│ echo "Line 32"                                                                                   │
-│ echo "Line 33"                                                                                   │
-│ echo "Line 34"                                                                                   │
-│ echo "Line 35"                                                                                   │
+│ ... first 6 lines hidden (Ctrl+O to show) ...                                                    │
 │ echo "Line 36"                                                                                   │
 │ echo "Line 37"                                                                                   │
 │ echo "Line 38"                                                                                   │
