@@ -352,21 +352,6 @@ npm run lint
 - **Imports:** Pay special attention to import paths. The project uses ESLint to
   enforce restrictions on relative imports between packages.
 
-### Project structure
-
-- `packages/`: Contains the individual sub-packages of the project.
-  - `a2a-server`: A2A server implementation for the Gemini CLI. (Experimental)
-  - `cli/`: The command-line interface.
-  - `core/`: The core backend logic for the Gemini CLI.
-  - `test-utils` Utilities for creating and cleaning temporary file systems for
-    testing.
-  - `vscode-ide-companion/`: The Gemini CLI Companion extension pairs with
-    Gemini CLI.
-- `docs/`: Contains all project documentation.
-- `scripts/`: Utility scripts for building, testing, and development tasks.
-
-For more detailed architecture, see `docs/architecture.md`.
-
 ### Debugging
 
 #### VS Code
