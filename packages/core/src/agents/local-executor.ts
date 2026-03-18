@@ -111,6 +111,14 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
   private readonly parentCallId?: string;
   private hasFailedCompressionAttempt = false;
 
+  /**
+   * The previous use of the spread operator (...this.context) could inadvertently propagate
+   * properties from the parent AgentLoopContext that should be locally managed or overridden
+   * by the sub-agent. This could also lead to subtle circular reference issues or unexpected
+   * behavior if the parent context contained complex objects. Explicitly defining each required
+   * property, as done in this change, significantly improves the clarity and robustness of the
+   * executionContext for the sub-agent, preventing such potential runtime bugs.
+   */
   private get executionContext(): AgentLoopContext {
     return {
       config: this.context.config,
