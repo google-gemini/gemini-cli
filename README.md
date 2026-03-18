@@ -71,7 +71,7 @@ conda activate gemini_env
 npm install -g @google/gemini-cli
 ```
 
-## Release channels
+## Release Channels
 
 See [Releases](https://www.geminicli.com/docs/changelogs) for more details.
 
@@ -127,7 +127,7 @@ npm install -g @google/gemini-cli@nightly
   [Google Search](https://ai.google.dev/gemini-api/docs/grounding) for real-time
   information
 - Conversation checkpointing to save and resume complex sessions
-- Custom context files (GEMINI) to tailor behavior for your projects
+- Custom context files (GEMINI.md) to tailor behavior for your projects
 
 ### GitHub Integration
 
