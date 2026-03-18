@@ -11,6 +11,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
 } from 'react';
 import { ESC } from '../utils/input.js';
@@ -191,8 +192,13 @@ export function MouseProvider({
     };
   }, [stdin, mouseEventsEnabled, subscribers, debugKeystrokeLogging]);
 
+  const contextValue = useMemo(
+    () => ({ subscribe, unsubscribe }),
+    [subscribe, unsubscribe],
+  );
+
   return (
-    <MouseContext.Provider value={{ subscribe, unsubscribe }}>
+    <MouseContext.Provider value={contextValue}>
       {children}
     </MouseContext.Provider>
   );
