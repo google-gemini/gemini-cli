@@ -11,6 +11,7 @@ import {
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
 import { LinuxSandboxManager } from '../sandbox/linux/LinuxSandboxManager.js';
+import { MacOsSandboxManager } from '../sandbox/macos/MacOsSandboxManager.js';
 
 /**
  * Request for preparing a command to run in a sandbox.
@@ -97,6 +98,9 @@ export function createSandboxManager(
   if (sandboxingEnabled) {
     if (os.platform() === 'linux') {
       return new LinuxSandboxManager({ workspace });
+    }
+    if (os.platform() === 'darwin') {
+      return new MacOsSandboxManager({ workspace });
     }
     return new LocalSandboxManager();
   }
