@@ -17,6 +17,7 @@ import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
+import { debugLogger } from '../utils/debugLogger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,42 +45,49 @@ export class WindowsSandboxManager implements SandboxManager {
       return;
     }
 
-    if (!fs.existsSync(this.helperPath)) {
-      // If the exe doesn't exist, we try to compile it from the .cs file
-      const sourcePath = this.helperPath.replace(/\.exe$/, '.cs');
-      if (fs.existsSync(sourcePath)) {
-        const systemRoot = process.env['SystemRoot'] || 'C:\\Windows';
-        const cscPaths = [
-          'csc.exe', // Try in PATH first
-          path.join(
-            systemRoot,
-            'Microsoft.NET',
-            'Framework64',
-            'v4.0.30319',
-            'csc.exe',
-          ),
-          path.join(
-            systemRoot,
-            'Microsoft.NET',
-            'Framework',
-            'v4.0.30319',
-            'csc.exe',
-          ),
-        ];
+    try {
+      if (!fs.existsSync(this.helperPath)) {
+        // If the exe doesn't exist, we try to compile it from the .cs file
+        const sourcePath = this.helperPath.replace(/\.exe$/, '.cs');
+        if (fs.existsSync(sourcePath)) {
+          const systemRoot = process.env['SystemRoot'] || 'C:\\Windows';
+          const cscPaths = [
+            'csc.exe', // Try in PATH first
+            path.join(
+              systemRoot,
+              'Microsoft.NET',
+              'Framework64',
+              'v4.0.30319',
+              'csc.exe',
+            ),
+            path.join(
+              systemRoot,
+              'Microsoft.NET',
+              'Framework',
+              'v4.0.30319',
+              'csc.exe',
+            ),
+          ];
 
-        for (const csc of cscPaths) {
-          const result = spawnSync(
-            csc,
-            ['/out:' + this.helperPath, sourcePath],
-            {
-              stdio: 'ignore',
-            },
-          );
-          if (result.status === 0) {
-            break;
+          for (const csc of cscPaths) {
+            const result = spawnSync(
+              csc,
+              ['/out:' + this.helperPath, sourcePath],
+              {
+                stdio: 'ignore',
+              },
+            );
+            if (result.status === 0) {
+              break;
+            }
           }
         }
       }
+    } catch (e) {
+      debugLogger.log(
+        'WindowsSandboxManager: Failed to initialize sandbox helper:',
+        e,
+      );
     }
 
     this.initialized = true;
@@ -171,8 +179,12 @@ export class WindowsSandboxManager implements SandboxManager {
       if (result.status === 0) {
         this.lowIntegrityCache.add(resolvedPath);
       }
-    } catch (_e) {
-      // Best effort
+    } catch (e) {
+      debugLogger.log(
+        'WindowsSandboxManager: icacls failed for',
+        resolvedPath,
+        e,
+      );
     }
   }
 }

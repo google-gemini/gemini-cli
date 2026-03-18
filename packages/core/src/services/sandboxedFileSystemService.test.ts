@@ -11,8 +11,9 @@ import type {
   SandboxRequest,
   SandboxedCommand,
 } from './sandboxManager.js';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
+import type { Writable } from 'node:stream';
 
 vi.mock('node:child_process', () => ({
   spawn: vi.fn(),
@@ -40,10 +41,11 @@ describe('SandboxedFileSystemService', () => {
   });
 
   it('should read a file through the sandbox', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mockChild = new EventEmitter() as any;
-    mockChild.stdout = new EventEmitter();
-    mockChild.stderr = new EventEmitter();
+    const mockChild = new EventEmitter() as unknown as ChildProcess;
+    Object.assign(mockChild, {
+      stdout: new EventEmitter(),
+      stderr: new EventEmitter(),
+    });
 
     vi.mocked(spawn).mockReturnValue(mockChild);
 
@@ -65,13 +67,14 @@ describe('SandboxedFileSystemService', () => {
   });
 
   it('should write a file through the sandbox', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mockChild = new EventEmitter() as any;
-    mockChild.stdin = {
-      write: vi.fn(),
-      end: vi.fn(),
-    };
-    mockChild.stderr = new EventEmitter();
+    const mockChild = new EventEmitter() as unknown as ChildProcess;
+    Object.assign(mockChild, {
+      stdin: {
+        write: vi.fn(),
+        end: vi.fn(),
+      } as unknown as Writable,
+      stderr: new EventEmitter(),
+    });
 
     vi.mocked(spawn).mockReturnValue(mockChild);
 
@@ -92,10 +95,11 @@ describe('SandboxedFileSystemService', () => {
   });
 
   it('should reject if sandbox command fails', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mockChild = new EventEmitter() as any;
-    mockChild.stdout = new EventEmitter();
-    mockChild.stderr = new EventEmitter();
+    const mockChild = new EventEmitter() as unknown as ChildProcess;
+    Object.assign(mockChild, {
+      stdout: new EventEmitter(),
+      stderr: new EventEmitter(),
+    });
 
     vi.mocked(spawn).mockReturnValue(mockChild);
 
