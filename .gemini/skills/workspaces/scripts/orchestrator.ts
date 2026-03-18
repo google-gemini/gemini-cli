@@ -53,8 +53,9 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   
   const check = await provider.getExecOutput(`ls -d ${hostWorktreeDir}/.git`);
   
-  // FIX: Ensure container user (node) owns the workspaces and config directories
-  await provider.exec(`sudo docker exec -u root maintainer-worker chown -R node:node ${containerHome}/.workspaces ${containerHome}/.gemini`);
+  // FIX: Ensure container user (node) owns the workspaces, config, and dev directories
+  // This resolves EACCES errors across all shared volumes.
+  await provider.exec(`sudo docker exec -u root maintainer-worker chown -R node:node ${containerHome}/.workspaces ${containerHome}/.gemini ${containerHome}/dev`);
 
   if (check.status !== 0) {
     console.log('   - Provisioning isolated git worktree...');
@@ -78,9 +79,8 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   // 4. Execution Logic
   const remoteWorker = `tsx ${persistentScripts}/entrypoint.ts ${prNumber} . ${remotePolicyPath} ${action}`;
   
-  // tmux command inside container. We must ensure the container sees the directory as safe.
-  const remoteTmuxCmd = `git config --global --add safe.directory ${remoteWorktreeDir} && tmux attach-session -t ${sessionName} 2>/dev/null || tmux new-session -s ${sessionName} -n 'workspace' 'cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL'`;
-  const containerWrap = `sudo docker exec -it maintainer-worker sh -c ${q(remoteTmuxCmd)}`;
+  // DEBUG: Run directly in foreground WITHOUT tmux to see immediate errors
+  const containerWrap = `sudo docker exec -it maintainer-worker sh -c 'cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL'`;
   
   const finalSSH = provider.getRunCommand(containerWrap, { interactive: true });
 

@@ -242,6 +242,11 @@ and full builds) to a dedicated, high-performance GCP worker.
   await provider.sync(tmpSettingsPath, `${remoteConfigDir}/settings.json`);
   fs.unlinkSync(tmpSettingsPath);
 
+  // Sync credentials into the isolated config as well
+  if (fs.existsSync(path.join(env.HOME || '', '.gemini/google_accounts.json'))) {
+    await provider.sync(path.join(env.HOME || '', '.gemini/google_accounts.json'), `${remoteConfigDir}/google_accounts.json`);
+  }
+
   // Final Repo Sync
   console.log(`🚀 Finalizing Remote Repository (${userFork})...`);
   const repoUrl = `https://github.com/${userFork}.git`;
