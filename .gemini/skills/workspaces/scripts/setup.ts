@@ -175,12 +175,32 @@ and full builds) to a dedicated, high-performance GCP worker.
               githubToken = await prompt('Paste Scoped Token', '');
           }
       }
-  } else {
+  } else if (githubToken) {
       console.log('   ✅ Using GitHub token from environment (WORKSPACE_GH_TOKEN).');
   }
 
-  // 4. Save Confirmed State
+  // 4. Gemini API Auth Strategy
+  console.log('\n🔐 Detecting Gemini Authentication strategy...');
+  const localSettingsPath = path.join(env.HOME || '', '.gemini/settings.json');
+  let authStrategy = 'google_accounts';
+  let geminiApiKey = env.WORKSPACE_GEMINI_API_KEY || env.GEMINI_API_KEY || '';
+
+  if (fs.existsSync(localSettingsPath)) {
+      try {
+          const localSettings = JSON.parse(fs.readFileSync(localSettingsPath, 'utf8'));
+          authStrategy = localSettings.security?.auth?.selectedType || 'google_accounts';
+          console.log(`   - Local Auth Method: ${authStrategy}`);
+      } catch (e) {}
+  }
+
+  if (authStrategy === 'gemini-api-key' && !geminiApiKey) {
+      console.log('\n📖 In API Key mode, the remote worker needs your Gemini API Key to authenticate.');
+      geminiApiKey = await prompt('Paste Gemini API Key', '');
+  }
+
+  // 5. Save Confirmed State
   const targetVM = `gcli-workspace-${env.USER || 'mattkorwel'}`;
+  if (!fs.existsSync(path.dirname(settingsPath))) fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
   
   settings = {
       workspace: { 
@@ -226,36 +246,39 @@ and full builds) to a dedicated, high-performance GCP worker.
 
   console.log(`\n📦 Synchronizing Logic & Credentials...`);
   await provider.exec(`mkdir -p ~/dev/main ~/.gemini/policies ~/.workspaces/scripts ${remoteConfigDir}`);
+  
+  // 1. Sync Scripts & Policies
   await provider.sync('.gemini/skills/workspaces/scripts/', `${persistentScripts}/`, { delete: true, sudo: true });
   await provider.sync('.gemini/skills/workspaces/policy.toml', `~/.gemini/policies/workspace-policy.toml`, { sudo: true });
 
-  if (fs.existsSync(path.join(env.HOME || '', '.gemini/google_accounts.json'))) {
-    await provider.sync(path.join(env.HOME || '', '.gemini/google_accounts.json'), `${remoteConfigDir}/google_accounts.json`, { sudo: true });
-  }
-
-  if (githubToken) {
-    await provider.exec(`mkdir -p ~/.workspaces && echo ${githubToken} > ~/.workspaces/.gh_token && chmod 600 ~/.workspaces/.gh_token`);
-  }
-
-  // Initialize Remote Gemini Config with Auth
+  // 2. Initialize Remote Gemini Config with Auth
   console.log('⚙️  Initializing remote Gemini configuration...');
-  await provider.exec(`mkdir -p ${remoteConfigDir}`);
-
-  
-  // Create a minimal settings.json on the remote to enable auth
-  const remoteSettings = {
+  const remoteSettings: any = {
     general: {
-      authMethod: 'google_accounts'
+      authMethod: authStrategy
     }
   };
+  
+  if (authStrategy === 'gemini-api-key' && geminiApiKey) {
+      remoteSettings.general.apiKey = geminiApiKey;
+      console.log('   ✅ Configuring remote for API Key authentication.');
+  }
+
   const tmpSettingsPath = path.join(os.tmpdir(), `remote-settings-${Date.now()}.json`);
   fs.writeFileSync(tmpSettingsPath, JSON.stringify(remoteSettings, null, 2));
   await provider.sync(tmpSettingsPath, `${remoteConfigDir}/settings.json`, { sudo: true });
   fs.unlinkSync(tmpSettingsPath);
 
-  // Sync credentials into the isolated config as well
-  if (fs.existsSync(path.join(env.HOME || '', '.gemini/google_accounts.json'))) {
-    await provider.sync(path.join(env.HOME || '', '.gemini/google_accounts.json'), `${remoteConfigDir}/google_accounts.json`, { sudo: true });
+  // 3. Sync credentials for Google Accounts if needed
+  if (authStrategy === 'google_accounts' || authStrategy === 'oauth-personal') {
+      if (fs.existsSync(path.join(env.HOME || '', '.gemini/google_accounts.json'))) {
+        await provider.sync(path.join(env.HOME || '', '.gemini/google_accounts.json'), `${remoteConfigDir}/google_accounts.json`, { sudo: true });
+        console.log('   ✅ Synchronized Google Accounts credentials.');
+      }
+  }
+
+  if (githubToken) {
+    await provider.exec(`mkdir -p ~/.workspaces && echo ${githubToken} > ~/.workspaces/.gh_token && chmod 600 ~/.workspaces/.gh_token`);
   }
 
   // Final Repo Sync
