@@ -15,6 +15,7 @@ import {
   READ_FILE_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
+import { Storage } from '../config/storage.js';
 
 describe('MemoryManagerAgent', () => {
   it('should have the correct name "save_memory"', () => {
@@ -36,7 +37,8 @@ describe('MemoryManagerAgent', () => {
   it('should have a system prompt with memory management instructions', () => {
     const agent = MemoryManagerAgent();
     const prompt = agent.promptConfig.systemPrompt;
-    expect(prompt).toContain('Global (~/.gemini/)');
+    const globalGeminiDir = Storage.getGlobalGeminiDir();
+    expect(prompt).toContain(`Global (${globalGeminiDir})`);
     expect(prompt).toContain('Project (.gemini/)');
     expect(prompt).toContain('Table of Contents');
     expect(prompt).toContain('De-duplicating');

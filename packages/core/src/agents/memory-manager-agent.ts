@@ -15,6 +15,7 @@ import {
   READ_FILE_TOOL_NAME,
   WRITE_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
+import { Storage } from '../config/storage.js';
 
 const MemoryManagerSchema = z.object({
   response: z
@@ -22,14 +23,27 @@ const MemoryManagerSchema = z.object({
     .describe('A summary of the memory operations performed.'),
 });
 
-const MEMORY_MANAGER_SYSTEM_PROMPT = `
+/**
+ * A memory management agent that replaces the built-in save_memory tool.
+ * It provides richer memory operations: adding, removing, de-duplicating,
+ * and organizing memories in the global GEMINI.md file.
+ *
+ * Users can override this agent by placing a custom save_memory.md
+ * in ~/.gemini/agents/ or .gemini/agents/.
+ */
+export const MemoryManagerAgent = (): LocalAgentDefinition<
+  typeof MemoryManagerSchema
+> => {
+  const globalGeminiDir = Storage.getGlobalGeminiDir();
+
+  const MEMORY_MANAGER_SYSTEM_PROMPT = `
 You are a memory management agent. You maintain the user's memories stored in
 GEMINI.md files.
 
 # Memory Hierarchy
 
-## Global (~/.gemini/)
-- \`~/.gemini/GEMINI.md\` — Cross-project user preferences, key personal info,
+## Global (${globalGeminiDir})
+- \`${globalGeminiDir}/GEMINI.md\` — Cross-project user preferences, key personal info,
   and habits that apply everywhere.
 
 ## Project (.gemini/)
@@ -69,59 +83,50 @@ use \`grep_search\` to scan related files for duplicates before finishing.
 - Always read before write to avoid overwriting concurrent changes.
 `.trim();
 
-/**
- * A memory management agent that replaces the built-in save_memory tool.
- * It provides richer memory operations: adding, removing, de-duplicating,
- * and organizing memories in the global GEMINI.md file.
- *
- * Users can override this agent by placing a custom save_memory.md
- * in ~/.gemini/agents/ or .gemini/agents/.
- */
-export const MemoryManagerAgent = (): LocalAgentDefinition<
-  typeof MemoryManagerSchema
-> => ({
-  kind: 'local',
-  name: 'save_memory',
-  displayName: 'Memory Manager',
-  description: `Writes and reads preferences or facts across ALL future sessions. Use this for recurring instructions like coding styles or tool aliases.`,
-  inputConfig: {
-    inputSchema: {
-      type: 'object',
-      properties: {
-        request: {
-          type: 'string',
-          description:
-            'The memory operation to perform. Examples: "Remember that I prefer tabs over spaces", "Clean up stale memories", "De-duplicate my memories", "Organize my memories".',
+  return {
+    kind: 'local',
+    name: 'save_memory',
+    displayName: 'Memory Manager',
+    description: `Writes and reads memory, preferences or facts across ALL future sessions. Use this for recurring instructions like coding styles or tool aliases.`,
+    inputConfig: {
+      inputSchema: {
+        type: 'object',
+        properties: {
+          request: {
+            type: 'string',
+            description:
+              'The memory operation to perform. Examples: "Remember that I prefer tabs over spaces", "Clean up stale memories", "De-duplicate my memories", "Organize my memories".',
+          },
         },
+        required: ['request'],
       },
-      required: ['request'],
     },
-  },
-  outputConfig: {
-    outputName: 'result',
-    description: 'A summary of the memory operations performed.',
-    schema: MemoryManagerSchema,
-  },
-  modelConfig: {
-    model: 'inherit',
-  },
-  toolConfig: {
-    tools: [
-      READ_FILE_TOOL_NAME,
-      EDIT_TOOL_NAME,
-      WRITE_FILE_TOOL_NAME,
-      LS_TOOL_NAME,
-      GLOB_TOOL_NAME,
-      GREP_TOOL_NAME,
-      ASK_USER_TOOL_NAME,
-    ],
-  },
-  promptConfig: {
-    systemPrompt: MEMORY_MANAGER_SYSTEM_PROMPT,
-    query: '${request}',
-  },
-  runConfig: {
-    maxTimeMinutes: 5,
-    maxTurns: 10,
-  },
-});
+    outputConfig: {
+      outputName: 'result',
+      description: 'A summary of the memory operations performed.',
+      schema: MemoryManagerSchema,
+    },
+    modelConfig: {
+      model: 'inherit',
+    },
+    toolConfig: {
+      tools: [
+        READ_FILE_TOOL_NAME,
+        EDIT_TOOL_NAME,
+        WRITE_FILE_TOOL_NAME,
+        LS_TOOL_NAME,
+        GLOB_TOOL_NAME,
+        GREP_TOOL_NAME,
+        ASK_USER_TOOL_NAME,
+      ],
+    },
+    promptConfig: {
+      systemPrompt: MEMORY_MANAGER_SYSTEM_PROMPT,
+      query: '${request}',
+    },
+    runConfig: {
+      maxTimeMinutes: 5,
+      maxTurns: 10,
+    },
+  };
+};
