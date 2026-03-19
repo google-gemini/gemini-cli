@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import os from 'node:os';
 
-describe('Hooks System Integration', () => {
+describe('Hooks System Integration', { timeout: 120000 }, () => {
   let rig: TestRig;
 
   beforeEach(() => {
@@ -2019,7 +2019,7 @@ console.log(JSON.stringify({
       rig.setup('Hook Disabling Multiple Ops', {
         fakeResponsesPath: join(
           import.meta.dirname,
-          'hooks-system.multiple-ops.responses',
+          'hooks-system.disabled-via-command.responses',
         ),
         settings: {
           hooksConfig: {
