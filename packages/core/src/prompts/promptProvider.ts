@@ -192,6 +192,7 @@ export class PromptProvider {
             interactiveShellEnabled: context.config.isInteractiveShellEnabled(),
             topicUpdateNarration:
               context.config.isTopicUpdateNarrationEnabled(),
+            memoryManagerEnabled: context.config.isMemoryManagerEnabled(),
           }),
         ),
         sandbox: this.withSection('sandbox', () => getSandboxMode()),
