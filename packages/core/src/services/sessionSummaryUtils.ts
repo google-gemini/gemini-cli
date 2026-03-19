@@ -19,6 +19,38 @@ import path from 'node:path';
 const MIN_MESSAGES_FOR_SUMMARY = 1;
 
 /**
+ * Gets all existing aliases in the project.
+ */
+async function getAllExistingAliases(
+  chatsDir: string,
+): Promise<Map<string, string>> {
+  const aliases = new Map<string, string>(); // alias -> sessionId
+  try {
+    const allFiles = await fs.readdir(chatsDir);
+    const sessionFiles = allFiles.filter(
+      (f) => f.startsWith(SESSION_FILE_PREFIX) && f.endsWith('.json'),
+    );
+
+    for (const file of sessionFiles) {
+      const filePath = path.join(chatsDir, file);
+      try {
+        const content = await fs.readFile(filePath, 'utf-8');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const conversation: ConversationRecord = JSON.parse(content);
+        if (conversation.alias) {
+          aliases.set(conversation.alias, conversation.sessionId);
+        }
+      } catch {
+        continue;
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+  return aliases;
+}
+
+/**
  * Generates and saves a summary for a session file.
  */
 async function generateAndSaveSummary(
@@ -69,7 +101,21 @@ async function generateAndSaveSummary(
     return;
   }
 
-  const { summary, alias } = result;
+  let { summary, alias } = result;
+
+  // Ensure alias uniqueness
+  const chatsDir = path.dirname(sessionPath);
+  const existingAliases = await getAllExistingAliases(chatsDir);
+  const originalAlias = alias;
+  let suffix = 1;
+
+  while (
+    existingAliases.has(alias) &&
+    existingAliases.get(alias) !== conversation.sessionId
+  ) {
+    suffix++;
+    alias = `${originalAlias}-${suffix}`;
+  }
 
   // Re-read the file before writing to handle race conditions
   const freshContent = await fs.readFile(sessionPath, 'utf-8');
