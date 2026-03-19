@@ -671,6 +671,12 @@ describe('parseArguments', () => {
     const argv = await parseArguments(settings);
     expect(argv.isCommand).toBe(true);
   });
+
+  it('should set isCommand to true for workspace command', async () => {
+    process.argv = ['node', 'script.js', 'workspace', 'list'];
+    const argv = await parseArguments(createTestMergedSettings());
+    expect(argv.isCommand).toBe(true);
+  });
 });
 
 describe('loadCliConfig', () => {

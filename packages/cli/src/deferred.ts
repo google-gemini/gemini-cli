@@ -63,6 +63,18 @@ export async function runDeferredCommand(settings: MergedSettings) {
     process.exit(ExitCodes.FATAL_CONFIG_ERROR);
   }
 
+  if (commandName === 'wsr') {
+    // Inject settings into argv
+    const argvWithSettings = {
+      ...deferredCommand.argv,
+      settings,
+    };
+
+    await deferredCommand.handler(argvWithSettings);
+    await runExitCleanup();
+    process.exit(ExitCodes.SUCCESS);
+  }
+
   // Inject settings into argv
   const argvWithSettings = {
     ...deferredCommand.argv,

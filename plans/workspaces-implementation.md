@@ -17,9 +17,11 @@ Build the foundational container environment and the core management API.
 
 ### Milestone 2: Basic CLI Management (Phase 2)
 
-Enable developers to manage their remote fleet from the local CLI.
+Enable developers to manage their remote fleet from the local CLI. See
+[Milestone 2 Sub-plan](./milestone-2-cli-management.md) for details.
 
 - [ ] Add `gemini workspace create/list/delete` commands.
+
 - [ ] Implement Hub authentication (Google OAuth/IAP).
 - [ ] Add local configuration for Hub discovery (`settings.json`).
 

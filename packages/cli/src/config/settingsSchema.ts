@@ -13,6 +13,7 @@ import {
   DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD,
   DEFAULT_MODEL_CONFIGS,
   type MCPServerConfig,
+  type WorkspaceConfig,
   type BugCommandSettings,
   type TelemetrySettings,
   type AuthType,
@@ -166,6 +167,49 @@ const SETTINGS_SCHEMA = {
     additionalProperties: {
       type: 'object',
       ref: 'MCPServerConfig',
+    },
+  },
+
+  workspaces: {
+    type: 'object',
+    label: 'Workspaces',
+    category: 'Advanced',
+    requiresRestart: false,
+    default: { hubs: {} } as WorkspaceConfig,
+    description: 'Configuration for remote workspaces.',
+    showInDialog: false,
+    mergeStrategy: MergeStrategy.SHALLOW_MERGE,
+    properties: {
+      hubs: {
+        type: 'object',
+        label: 'Workspace Hubs',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: {},
+        description: 'Configured Workspace Hubs.',
+        mergeStrategy: MergeStrategy.SHALLOW_MERGE,
+        additionalProperties: {
+          type: 'object',
+          properties: {
+            url: {
+              type: 'string',
+              label: 'Hub URL',
+              category: 'Advanced',
+              requiresRestart: false,
+              default: 'http://localhost:8080',
+              description: 'The URL of the Workspace Hub.',
+            },
+          },
+        },
+      },
+      defaultHub: {
+        type: 'string',
+        label: 'Default Hub',
+        category: 'Advanced',
+        requiresRestart: false,
+        default: undefined as string | undefined,
+        description: 'The name of the default Workspace Hub to use.',
+      },
     },
   },
 

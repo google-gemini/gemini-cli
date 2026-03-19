@@ -457,6 +457,15 @@ export class MCPServerConfig {
   ) {}
 }
 
+export interface WorkspaceHubConfig {
+  url: string;
+}
+
+export interface WorkspaceConfig {
+  hubs: Record<string, WorkspaceHubConfig>;
+  defaultHub?: string;
+}
+
 export enum AuthProviderType {
   DYNAMIC_DISCOVERY = 'dynamic_discovery',
   GOOGLE_CREDENTIALS = 'google_credentials',
@@ -534,6 +543,7 @@ export interface ConfigParameters {
   toolCallCommand?: string;
   mcpServerCommand?: string;
   mcpServers?: Record<string, MCPServerConfig>;
+  workspaces?: WorkspaceConfig;
   mcpEnablementCallbacks?: McpEnablementCallbacks;
   userMemory?: string | HierarchicalMemory;
   geminiMdFileCount?: number;
@@ -693,7 +703,9 @@ export class Config implements McpContext, AgentLoopContext {
   private readonly mcpEnabled: boolean;
   private readonly extensionsEnabled: boolean;
   private mcpServers: Record<string, MCPServerConfig> | undefined;
-  private readonly mcpEnablementCallbacks?: McpEnablementCallbacks;
+  private workspaces: WorkspaceConfig | undefined;
+  private readonly mcpEnablementCallbacks: McpEnablementCallbacks | undefined;
+
   private userMemory: string | HierarchicalMemory;
   private geminiMdFileCount: number;
   private geminiMdFilePaths: string[];
@@ -903,6 +915,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.toolCallCommand = params.toolCallCommand;
     this.mcpServerCommand = params.mcpServerCommand;
     this.mcpServers = params.mcpServers;
+    this.workspaces = params.workspaces;
     this.mcpEnablementCallbacks = params.mcpEnablementCallbacks;
     this.mcpEnabled = params.mcpEnabled ?? true;
     this.extensionsEnabled = params.extensionsEnabled ?? true;
@@ -1997,6 +2010,10 @@ export class Config implements McpContext, AgentLoopContext {
    */
   getMcpServers(): Record<string, MCPServerConfig> | undefined {
     return this.mcpServers;
+  }
+
+  getWorkspaces(): WorkspaceConfig | undefined {
+    return this.workspaces;
   }
 
   getMcpEnabled(): boolean {

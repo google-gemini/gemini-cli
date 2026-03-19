@@ -28,6 +28,7 @@ export * from './confirmation-bus/message-bus.js';
 // Export Commands logic
 export * from './commands/extensions.js';
 export * from './commands/restore.js';
+export * from './commands/workspace.js';
 export * from './commands/init.js';
 export * from './commands/memory.js';
 export * from './commands/types.js';
@@ -132,6 +133,7 @@ export * from './services/trackerService.js';
 export * from './services/trackerTypes.js';
 export * from './services/keychainService.js';
 export * from './services/keychainTypes.js';
+export * from './services/workspaceHubClient.js';
 export * from './skills/skillManager.js';
 export * from './skills/skillLoader.js';
 

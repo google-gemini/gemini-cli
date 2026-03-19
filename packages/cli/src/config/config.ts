@@ -9,6 +9,7 @@ import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import * as path from 'node:path';
 import { mcpCommand } from '../commands/mcp.js';
+import { remoteWorkspaceCommand as workspaceCommand } from '../commands/workspace.js';
 import { extensionsCommand } from '../commands/extensions.js';
 import { skillsCommand } from '../commands/skills.js';
 import { hooksCommand } from '../commands/hooks.js';
@@ -131,6 +132,7 @@ export async function parseArguments(
       description: 'Run in debug mode (open debug console with F12)',
       default: false,
     })
+    .command(workspaceCommand)
     .command('$0 [query..]', 'Launch Gemini CLI', (yargsInstance) =>
       yargsInstance
         .positional('query', {
@@ -776,6 +778,7 @@ export async function loadCliConfig(
     toolCallCommand: settings.tools?.callCommand,
     mcpServerCommand,
     mcpServers,
+    workspaces: settings.workspaces,
     mcpEnablementCallbacks,
     mcpEnabled,
     extensionsEnabled,
