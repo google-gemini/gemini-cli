@@ -8,6 +8,11 @@ set -e
 if [ -f /dev/shm/.gh_token ]; then
     export GH_TOKEN=$(cat /dev/shm/.gh_token)
     echo "GitHub token injected from memory."
+    # Authenticate gh CLI if possible
+    if command -v gh >/dev/null 2>&1; then
+        echo "$GH_TOKEN" | gh auth login --with-token
+        echo "GitHub CLI authenticated."
+    fi
 fi
 
 # Start shpool daemon in the background and verify it stays up

@@ -49,7 +49,7 @@ describe('SSHService', () => {
         '--tunnel-through-iap',
         '--ssh-flag=-A',
       ],
-      expect.objectContaining({ stdio: 'inherit' })
+      { stdio: 'inherit' }
     );
   });
 
@@ -66,5 +66,35 @@ describe('SSHService', () => {
     setTimeout(() => mockChild.emit('exit', 1), 10);
 
     await expect(promise).rejects.toThrow('gcloud ssh exited with code 1');
+  });
+
+  it('should construct correct gcloud command for pushSecret', async () => {
+    const mockChild = new EventEmitter() as any;
+    vi.mocked(spawn).mockReturnValue(mockChild);
+
+    const secretValue = 'secret-val';
+    const promise = service.pushSecret(
+      { instanceName: 'test-inst', zone: 'z1', project: 'p1' },
+      '.gh_token',
+      secretValue
+    );
+
+    setTimeout(() => mockChild.emit('exit', 0), 10);
+
+    await promise;
+
+    expect(spawn).toHaveBeenCalledWith(
+      'gcloud',
+      [
+        'compute',
+        'ssh',
+        'test-inst',
+        '--zone=z1',
+        '--project=p1',
+        '--tunnel-through-iap',
+        '--command',
+        `cat << 'EOF' > /dev/shm/.gh_token\n${secretValue}\nEOF\nchmod 600 /dev/shm/.gh_token`,
+      ]
+    );
   });
 });

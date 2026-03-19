@@ -14,6 +14,7 @@ import {
 } from '@google-gemini-cli-core';
 import { exitCli } from '../utils.js';
 import chalk from 'chalk';
+import { execSync } from 'node:child_process';
 
 interface ConnectArgs {
   config?: Config;
@@ -21,6 +22,7 @@ interface ConnectArgs {
   forwardAgent?: boolean;
   wait?: boolean;
   sync?: boolean;
+  githubPat?: string;
 }
 
 async function waitForReady(client: WorkspaceHubClient, id: string): Promise<WorkspaceHubInfo> {
@@ -42,6 +44,14 @@ async function waitForReady(client: WorkspaceHubClient, id: string): Promise<Wor
   throw new Error(`Timeout waiting for workspace ${id} to become READY.`);
 }
 
+function getGitHubToken(): string | null {
+    try {
+        return execSync('gh auth token', { encoding: 'utf8' }).trim();
+    } catch (e) {
+        return null;
+    }
+}
+
 export async function connectToWorkspace(args: ArgumentsCamelCase<ConnectArgs>): Promise<void> {
   if (!args.config) {
     // eslint-disable-next-line no-console
@@ -57,7 +67,6 @@ export async function connectToWorkspace(args: ArgumentsCamelCase<ConnectArgs>):
     // eslint-disable-next-line no-console
     console.log(chalk.yellow(`Fetching workspace details for "${args.id}"...`));
     
-    // We need to fetch the workspace info to get the instance name and zone
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const workspaces: WorkspaceHubInfo[] = await client.listWorkspaces();
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
@@ -86,6 +95,7 @@ export async function connectToWorkspace(args: ArgumentsCamelCase<ConnectArgs>):
     const { instance_name: instanceName, zone } = readyWs;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const project = process.env['GOOGLE_CLOUD_PROJECT'] || 'dev-project';
+    const ssh = new SSHService();
 
     // 1. Sync settings if enabled
     if (args.sync !== false) {
@@ -106,9 +116,22 @@ export async function connectToWorkspace(args: ArgumentsCamelCase<ConnectArgs>):
       }
     }
 
-    // 2. Connect via SSH
-    const ssh = new SSHService();
+    // 2. Inject GitHub PAT if available
+    const pat = args.githubPat || getGitHubToken();
+    if (pat) {
+        // eslint-disable-next-line no-console
+        console.log(chalk.yellow('Injecting GitHub credentials...'));
+        try {
+            await ssh.pushSecret({ instanceName, zone, project }, '.gh_token', pat);
+            // eslint-disable-next-line no-console
+            console.log(chalk.green('✓ Credentials injected.'));
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.warn(chalk.red('Warning: Failed to inject GitHub credentials.'), (err as Error).message);
+        }
+    }
 
+    // 3. Connect via SSH
     // eslint-disable-next-line no-console
     console.log(chalk.green(`🚀 Teleporting to ${instanceName} (${zone})...`));
     
@@ -155,6 +178,10 @@ export const connectCommand: CommandModule<object, ConnectArgs> = {
       type: 'boolean',
       describe: 'Synchronize local ~/.gemini settings to the remote workspace',
       default: true,
+    })
+    .option('github-pat', {
+        type: 'string',
+        describe: 'GitHub Personal Access Token to inject',
     }),
   handler: async (argv) => {
     await connectToWorkspace(argv);

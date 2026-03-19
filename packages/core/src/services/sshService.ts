@@ -66,4 +66,41 @@ export class SSHService {
       });
     });
   }
+
+  /**
+   * Pushes a secret string to a temporary, memory-only file on the remote VM.
+   * Uses gcloud compute ssh with a heredoc to write to /dev/shm.
+   */
+  async pushSecret(options: SSHOptions, secretName: string, secretValue: string): Promise<void> {
+    const { instanceName, zone, project } = options;
+    const remotePath = `/dev/shm/${secretName}`;
+
+    // Command to write secret securely without it appearing in process list
+    const remoteCommand = `cat << 'EOF' > ${remotePath}
+${secretValue}
+EOF
+chmod 600 ${remotePath}`;
+
+    const args = [
+      'compute',
+      'ssh',
+      instanceName,
+      `--zone=${zone}`,
+      `--project=${project}`,
+      '--tunnel-through-iap',
+      '--command',
+      remoteCommand,
+    ];
+
+    debugLogger.log(`[SSHService] Pushing secret ${secretName} to ${instanceName}...`);
+
+    return new Promise((resolve, reject) => {
+      const child = spawn('gcloud', args);
+      child.on('exit', (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`Failed to push secret ${secretName}, exit code ${code}`));
+      });
+      child.on('error', (err) => reject(err));
+    });
+  }
 }
