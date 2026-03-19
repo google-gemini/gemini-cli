@@ -100,11 +100,31 @@ describe.skipIf(!chromeAvailable)('browser-policy', () => {
     };
     writeFileSync(trustedFoldersPath, JSON.stringify(trustedFolders, null, 2));
 
+    // Force confirmation for browser agent.
+    // NOTE: We don't force confirm browser tools here because "Allow all server tools"
+    // adds a rule with ALWAYS_ALLOW_PRIORITY (3.9x) which would be overshadowed by
+    // a rule in the user tier (4.x) like the one from this TOML.
+    // By removing the explicit mcp rule, the first MCP tool will still prompt
+    // due to default approvalMode = 'default', and then "Allow all" will correctly
+    // bypass subsequent tools.
+    const policyFile = join(rig.testDir!, 'force-confirm.toml');
+    writeFileSync(
+      policyFile,
+      `
+[[rule]]
+name = "Force confirm browser_agent"
+toolName = "browser_agent"
+decision = "ask_user"
+priority = 200
+`,
+    );
+
     // Update settings.json in both project and home directories to point to the policy file
     for (const baseDir of [rig.testDir!, rig.homeDir!]) {
       const settingsPath = join(baseDir, '.gemini', 'settings.json');
       if (existsSync(settingsPath)) {
         const settings = JSON.parse(readFileSync(settingsPath, 'utf-8'));
+        settings.policyPaths = [policyFile];
         // Ensure folder trust is enabled
         settings.security = settings.security || {};
         settings.security.folderTrust = settings.security.folderTrust || {};
@@ -125,13 +145,23 @@ describe.skipIf(!chromeAvailable)('browser-policy', () => {
     );
     await run.sendKeys('\r');
 
+    // Handle confirmations.
+    // 1. Initial browser_agent delegation (likely only 3 options, so use option 1: Allow once)
+    await poll(
+      () => stripAnsi(run.output).toLowerCase().includes('action required'),
+      60000,
+      1000,
+    );
+    await run.sendKeys('1');
+    await new Promise((r) => setTimeout(r, 2000));
+
     // Handle privacy notice
     await poll(
       () => stripAnsi(run.output).toLowerCase().includes('privacy notice'),
       5000,
       100,
     );
-    await run.sendKeys('1');
+    await run.sendKeys('1\r');
     await new Promise((r) => setTimeout(r, 5000));
 
     // new_page (MCP tool, should have 4 options, use option 3: Allow all server tools)
@@ -148,10 +178,10 @@ describe.skipIf(!chromeAvailable)('browser-policy', () => {
     );
 
     // Select "Allow all server tools for this session" (option 3)
-    await run.sendKeys('3');
+    await run.sendKeys('3\r');
     await new Promise((r) => setTimeout(r, 5000));
 
-    // Since we chose "Allow all server tools", take_snapshot
+    // 3. Since we chose "Allow all server tools", take_snapshot
     // should NOT prompt. We wait for some evidence that
     // take_snapshot was called and the task finished.
     await poll(
