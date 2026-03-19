@@ -291,43 +291,43 @@ export function BaseSettingsDialog({
         // Navigation within edit buffer
         if (keyMatchers[Command.MOVE_LEFT](key)) {
           editDispatch({ type: 'MOVE_LEFT' });
-          return;
+          return true;
         }
         if (keyMatchers[Command.MOVE_RIGHT](key)) {
           editDispatch({ type: 'MOVE_RIGHT' });
-          return;
+          return true;
         }
         if (keyMatchers[Command.HOME](key)) {
           editDispatch({ type: 'HOME' });
-          return;
+          return true;
         }
         if (keyMatchers[Command.END](key)) {
           editDispatch({ type: 'END' });
-          return;
+          return true;
         }
 
         // Backspace
         if (keyMatchers[Command.DELETE_CHAR_LEFT](key)) {
           editDispatch({ type: 'DELETE_LEFT' });
-          return;
+          return true;
         }
 
         // Delete
         if (keyMatchers[Command.DELETE_CHAR_RIGHT](key)) {
           editDispatch({ type: 'DELETE_RIGHT' });
-          return;
+          return true;
         }
 
         // Escape in edit mode - commit (consistent with SettingsDialog)
         if (keyMatchers[Command.ESCAPE](key)) {
           commitEdit();
-          return;
+          return true;
         }
 
         // Enter in edit mode - commit
         if (keyMatchers[Command.RETURN](key)) {
           commitEdit();
-          return;
+          return true;
         }
 
         // Up/Down in edit mode - commit and navigate.
@@ -336,7 +336,7 @@ export function BaseSettingsDialog({
         if (keyMatchers[Command.DIALOG_NAVIGATION_UP](key) && !key.insertable) {
           commitEdit();
           moveUp();
-          return;
+          return true;
         }
         if (
           keyMatchers[Command.DIALOG_NAVIGATION_DOWN](key) &&
@@ -344,7 +344,7 @@ export function BaseSettingsDialog({
         ) {
           commitEdit();
           moveDown();
-          return;
+          return true;
         }
 
         // Character input
@@ -354,8 +354,9 @@ export function BaseSettingsDialog({
             char: key.sequence,
             isNumberType: type === 'number',
           });
+          return true;
         }
-        return;
+        return false;
       }
 
       // Not in edit mode - handle navigation and actions
@@ -410,7 +411,7 @@ export function BaseSettingsDialog({
         return true;
       }
 
-      return;
+      return false;
     },
     {
       isActive: true,
