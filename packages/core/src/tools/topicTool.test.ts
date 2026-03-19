@@ -59,7 +59,7 @@ describe('CreateNewTopicTool', () => {
     const invocation = tool.build({ [TOPIC_PARAM_TITLE]: 'New Chapter' });
     const result = await invocation.execute(new AbortController().signal);
 
-    expect(result.llmContent).toContain('New Chapter');
+    expect(result.llmContent).toBe('Current topic: "New Chapter"');
     expect(TopicManager.getInstance().getTopic()).toBe('New Chapter');
   });
 

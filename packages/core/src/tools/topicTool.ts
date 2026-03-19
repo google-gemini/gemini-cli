@@ -78,8 +78,8 @@ class CreateNewTopicInvocation extends BaseToolInvocation<
     TopicManager.getInstance().setTopic(title.trim());
 
     return {
-      llmContent: `Topic changed to: "${title.trim()}"`,
-      returnDisplay: `Topic changed to: **${title.trim()}**`,
+      llmContent: `Current topic: "${title.trim()}"`,
+      returnDisplay: `Current topic: **${title.trim()}**`,
     };
   }
 }
