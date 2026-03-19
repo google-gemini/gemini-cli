@@ -40,6 +40,20 @@ Gemini API and accessible via HTTP at an endpoint configured in `settings.json`.
 For more details on how to configure local model routing, see
 [Local Model Routing](../core/local-model-routing.md).
 
+### Authentication and model variant routing
+
+Your authentication method affects which model variants are used during routing.
+When authenticating with a Gemini API key from Google AI Studio, the CLI
+automatically uses `gemini-3.1-pro-preview-customtools` instead of
+`gemini-3.1-pro-preview` for requests involving custom tools. This substitution
+happens automatically based on your auth type — no additional configuration
+is required. Users authenticating via Google Sign-in or Vertex AI will use
+`gemini-3.1-pro-preview` for all requests.
+
+> **Note:** If you switch authentication methods, model routing behavior will
+> change accordingly. See [authentication setup](../get-started/authentication.md)
+> for more details.
+
 ### Model selection precedence
 
 The model used by Gemini CLI is determined by the following order of precedence:
