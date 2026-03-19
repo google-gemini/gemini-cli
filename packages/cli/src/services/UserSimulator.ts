@@ -3,10 +3,9 @@
  * Copyright 2026 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import type { Config} from '@google/gemini-cli-core';
-import { debugLogger, LlmRole } from '@google/gemini-cli-core';
+import type { Config } from '@google/gemini-cli-core';
+import { debugLogger, LlmRole, resolveModel } from '@google/gemini-cli-core';
 import type { Writable } from 'node:stream';
-import type { Instance } from 'ink';
 
 export class UserSimulator {
   private isRunning = false;
@@ -16,7 +15,7 @@ export class UserSimulator {
 
   constructor(
     private readonly config: Config,
-    private readonly instance: Instance,
+    private readonly getScreen: () => string | undefined,
     private readonly stdinBuffer: Writable,
   ) {}
 
@@ -42,8 +41,7 @@ export class UserSimulator {
 
     try {
       this.isProcessing = true;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
-      const screen = (this.instance as any).lastFrame() as string | undefined;
+      const screen = this.getScreen();
       if (!screen || screen === this.lastScreenContent) return;
 
       const strippedScreen = screen.replace(
@@ -74,9 +72,17 @@ For example:
 - To enter a new prompt, output the text followed by \n.
 Do NOT output markdown, explanations of your thought process, or quotes. Output ONLY the raw characters to send or <WAIT>.`;
 
+      const model = resolveModel(
+        this.config.getModel(),
+        false, // useGemini3_1
+        false, // useCustomToolModel
+        this.config.getHasAccessToPreviewModel?.() ?? true,
+        this.config,
+      );
+
       const response = await contentGenerator.generateContent(
         {
-          model: this.config.getModel(),
+          model,
           contents: [
             {
               role: 'user',

@@ -12,6 +12,12 @@ import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
 import { UserSimulator } from './services/UserSimulator.js';
 import { registerCleanup, setupTtyCheck } from './utils/cleanup.js';
 import { PassThrough } from 'node:stream';
+
+interface RenderMetrics {
+  renderTime: number;
+  output: string;
+  staticOutput?: string;
+}
 import {
   type StartupWarning,
   type Config,
@@ -137,6 +143,7 @@ export async function startInteractiveUI(
   const simulateUser = config.getSimulateUser();
   const simulatedStdin = new PassThrough({ encoding: 'utf8' });
 
+  let lastFrame: string | undefined;
   const instance = render(
     process.env['DEBUG'] ? (
       <React.StrictMode>
@@ -152,9 +159,10 @@ export async function startInteractiveUI(
       stdin: (simulateUser ? simulatedStdin : process.stdin) as any,
       exitOnCtrlC: false,
       isScreenReaderEnabled: config.getScreenReader(),
-      onRender: ({ renderTime }: { renderTime: number }) => {
-        if (renderTime > SLOW_RENDER_MS) {
-          recordSlowRender(config, renderTime);
+      onRender: (metrics: RenderMetrics) => {
+        lastFrame = metrics.output;
+        if (metrics.renderTime > SLOW_RENDER_MS) {
+          recordSlowRender(config, metrics.renderTime);
         }
         profiler.reportFrameRendered();
       },
@@ -186,7 +194,11 @@ export async function startInteractiveUI(
     });
 
   if (simulateUser) {
-    const simulator = new UserSimulator(config, instance, simulatedStdin);
+    const simulator = new UserSimulator(
+      config,
+      () => lastFrame,
+      simulatedStdin,
+    );
     simulator.start();
     registerCleanup(() => simulator.stop());
   }
