@@ -65,14 +65,10 @@ describe('<ToolGroupMessage />', () => {
     enableInteractiveShell: true,
   });
   const fullVerbositySettings = createMockSettings({
-    merged: {
-      ui: { errorVerbosity: 'full' },
-    },
+    ui: { errorVerbosity: 'full' },
   });
   const lowVerbositySettings = createMockSettings({
-    merged: {
-      ui: { errorVerbosity: 'low' },
-    },
+    ui: { errorVerbosity: 'low' },
   });
 
   describe('Golden Snapshots', () => {
