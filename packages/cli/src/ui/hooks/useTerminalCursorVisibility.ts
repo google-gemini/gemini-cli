@@ -31,20 +31,37 @@ const HIDE_CURSOR = '\x1b[?25l';
  *
  * @see https://github.com/google-gemini/gemini-cli/issues/18868
  */
+
+// Using a module-level counter to correctly handle multiple components
+// that might want to show the cursor at the same time.
+let visibleInstances = 0;
+
+/**
+ * Reset the visible instances counter. Only for use in tests.
+ */
+export function resetVisibleInstancesForTesting(): void {
+  visibleInstances = 0;
+}
+
 export function useTerminalCursorVisibility(visible: boolean): void {
   const { stdout } = useStdout();
 
   useEffect(() => {
     if (visible) {
-      stdout.write(SHOW_CURSOR);
-    } else {
-      stdout.write(HIDE_CURSOR);
-    }
+      if (visibleInstances === 0) {
+        stdout.write(SHOW_CURSOR);
+      }
+      visibleInstances++;
 
-    return () => {
-      // Restore hidden cursor on cleanup to avoid leaving cursor visible
-      // when the component unmounts
-      stdout.write(HIDE_CURSOR);
-    };
+      return () => {
+        visibleInstances--;
+        if (visibleInstances === 0) {
+          stdout.write(HIDE_CURSOR);
+        }
+      };
+    }
+    // When `visible` is false, do nothing. The cleanup from a previous `visible=true`
+    // state will handle hiding the cursor.
+    return undefined;
   }, [visible, stdout]);
 }

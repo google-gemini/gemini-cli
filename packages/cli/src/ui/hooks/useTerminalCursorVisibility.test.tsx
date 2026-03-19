@@ -6,7 +6,10 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '../../test-utils/render.js';
-import { useTerminalCursorVisibility } from './useTerminalCursorVisibility.js';
+import {
+  useTerminalCursorVisibility,
+  resetVisibleInstancesForTesting,
+} from './useTerminalCursorVisibility.js';
 import { useStdout } from 'ink';
 import type { Mock } from 'vitest';
 
@@ -26,6 +29,7 @@ describe('useTerminalCursorVisibility', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetVisibleInstancesForTesting();
     mockWrite = vi.fn();
     (useStdout as Mock).mockReturnValue({
       stdout: { write: mockWrite },
@@ -41,13 +45,13 @@ describe('useTerminalCursorVisibility', () => {
     expect(mockWrite).toHaveBeenCalledWith(SHOW_CURSOR);
   });
 
-  it('should hide cursor when visible is false', () => {
+  it('should not write anything when visible is false', () => {
     function TestComponent() {
       useTerminalCursorVisibility(false);
       return null;
     }
     render(<TestComponent />);
-    expect(mockWrite).toHaveBeenCalledWith(HIDE_CURSOR);
+    expect(mockWrite).not.toHaveBeenCalled();
   });
 
   it('should show cursor when visibility changes from false to true', () => {
@@ -60,8 +64,6 @@ describe('useTerminalCursorVisibility', () => {
     mockWrite.mockClear();
     rerender(<TestComponent visible={true} />);
 
-    // Cleanup of previous effect hides cursor, then new effect shows it
-    expect(mockWrite).toHaveBeenCalledWith(HIDE_CURSOR);
     expect(mockWrite).toHaveBeenCalledWith(SHOW_CURSOR);
   });
 
@@ -75,10 +77,11 @@ describe('useTerminalCursorVisibility', () => {
     mockWrite.mockClear();
     rerender(<TestComponent visible={false} />);
 
+    // Cleanup from previous visible=true effect hides the cursor
     expect(mockWrite).toHaveBeenCalledWith(HIDE_CURSOR);
   });
 
-  it('should hide cursor on unmount', () => {
+  it('should hide cursor on unmount when visible', () => {
     function TestComponent() {
       useTerminalCursorVisibility(true);
       return null;
@@ -89,5 +92,38 @@ describe('useTerminalCursorVisibility', () => {
     unmount();
 
     expect(mockWrite).toHaveBeenCalledWith(HIDE_CURSOR);
+  });
+
+  it('should not hide cursor when one of multiple visible components unmounts', () => {
+    function TestComponentA() {
+      useTerminalCursorVisibility(true);
+      return null;
+    }
+    function TestComponentB() {
+      useTerminalCursorVisibility(true);
+      return null;
+    }
+
+    // Render a wrapper that includes both components
+    function Wrapper({ showA }: { showA: boolean }) {
+      return (
+        <>
+          {showA ? <TestComponentA /> : null}
+          <TestComponentB />
+        </>
+      );
+    }
+
+    const { rerender } = render(<Wrapper showA={true} />);
+
+    // Cursor should have been shown once (first component triggers it)
+    expect(mockWrite).toHaveBeenCalledWith(SHOW_CURSOR);
+
+    mockWrite.mockClear();
+    // Unmount component A, but B still wants cursor visible
+    rerender(<Wrapper showA={false} />);
+
+    // Cursor should NOT be hidden because B still requires visibility
+    expect(mockWrite).not.toHaveBeenCalledWith(HIDE_CURSOR);
   });
 });
