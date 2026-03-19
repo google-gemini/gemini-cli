@@ -61,7 +61,7 @@ describe('mcpToolWrapper Confirmation', () => {
     expect(details).toEqual(
       expect.objectContaining({
         type: 'mcp',
-        serverName: 'browser-agent',
+        serverName: 'browser_agent',
         toolName: 'test_tool',
       }),
     );
@@ -76,7 +76,7 @@ describe('mcpToolWrapper Confirmation', () => {
     expect(mockMessageBus.publish).toHaveBeenCalledWith(
       expect.objectContaining({
         type: MessageBusType.UPDATE_POLICY,
-        mcpName: 'browser-agent',
+        mcpName: 'browser_agent',
         persist: false,
       }),
     );
@@ -94,7 +94,7 @@ describe('mcpToolWrapper Confirmation', () => {
     );
 
     expect(options).toEqual({
-      mcpName: 'browser-agent',
+      mcpName: 'browser_agent',
     });
   });
 });
