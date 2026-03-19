@@ -242,6 +242,50 @@ export abstract class ExtensionLoader {
     await this.stopExtension(extension);
     await this.startExtension(extension);
   }
+
+  /**
+   * Returns the most recent session from all extensions if it's within the threshold.
+   */
+  async getRecentExternalSession(
+    workspaceUri?: string,
+    thresholdMs: number = 10 * 60 * 1000,
+  ): Promise<{ prefix: string; id: string; displayName?: string } | null> {
+    const activeExtensions = this.getExtensions().filter((e) => e.isActive);
+    let mostRecent: {
+      prefix: string;
+      id: string;
+      displayName?: string;
+      mtime: number;
+    } | null = null;
+
+    for (const extension of activeExtensions) {
+      if (extension.trajectoryProviderModule) {
+        try {
+          const sessions =
+            await extension.trajectoryProviderModule.listSessions(workspaceUri);
+          for (const s of sessions) {
+            const mtime = new Date(s.mtime).getTime();
+            if (!mostRecent || mtime > mostRecent.mtime) {
+              mostRecent = {
+                prefix: extension.trajectoryProviderModule.prefix || '',
+                id: s.id,
+                displayName: s.displayName,
+                mtime,
+              };
+            }
+          }
+        } catch (_e) {
+          // Ignore extension errors
+        }
+      }
+    }
+
+    if (mostRecent && Date.now() - mostRecent.mtime < thresholdMs) {
+      return mostRecent;
+    }
+
+    return null;
+  }
 }
 
 export interface ExtensionEvents {

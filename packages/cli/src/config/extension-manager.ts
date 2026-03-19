@@ -51,6 +51,7 @@ import {
   type HookDefinition,
   type HookEventName,
   type ResolvedExtensionSetting,
+  type TrajectoryProvider,
   coreEvents,
   applyAdminAllowlist,
   getAdminBlockedMcpServersMessage,
@@ -957,6 +958,23 @@ Would you like to attempt to install via "git clone" instead?`,
         );
       }
 
+      let trajectoryProviderModule: TrajectoryProvider | undefined;
+      if (config.trajectoryProvider) {
+        try {
+          const expectedPath = path.resolve(
+            effectiveExtensionPath,
+            config.trajectoryProvider,
+          );
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+          trajectoryProviderModule = (await import(expectedPath))
+            .default as TrajectoryProvider;
+        } catch (e) {
+          debugLogger.warn(
+            `Failed to import trajectoryProvider at ${config.trajectoryProvider} for extension ${config.name}: ${getErrorMessage(e)}`,
+          );
+        }
+      }
+
       return {
         name: config.name,
         version: config.version,
@@ -980,6 +998,7 @@ Would you like to attempt to install via "git clone" instead?`,
         rules,
         checkers,
         plan: config.plan,
+        trajectoryProviderModule,
       };
     } catch (e) {
       const extName = path.basename(extensionDir);
