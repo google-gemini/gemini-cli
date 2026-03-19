@@ -10,6 +10,7 @@ import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ExtensionDetails } from './ExtensionDetails.js';
 import { type RegistryExtension } from '../../../config/extensionRegistryClient.js';
+import { KeypressProvider } from '../../contexts/KeypressContext.js';
 
 const mockExtension: RegistryExtension = {
   id: 'ext1',
@@ -30,6 +31,11 @@ const mockExtension: RegistryExtension = {
   hasCustomCommands: true,
   isGoogleOwned: true,
   licenseKey: 'Apache-2.0',
+};
+
+const linkableExtension: RegistryExtension = {
+  ...mockExtension,
+  url: '/local/path/to/extension',
 };
 
 describe('ExtensionDetails', () => {
@@ -124,21 +130,16 @@ describe('ExtensionDetails', () => {
   });
 
   it('should call onLink when "l" is pressed and is linkable', async () => {
-    const linkableExtension = {
-      ...mockExtension,
-      url: '/local/path/to/extension',
-    };
-    const { stdin } = render(
-      <KeypressProvider>
-        <ExtensionDetails
-          extension={linkableExtension}
-          onBack={mockOnBack}
-          onInstall={mockOnInstall}
-          onLink={mockOnLink}
-          isInstalled={false}
-        />
-      </KeypressProvider>,
+    const { stdin, waitUntilReady } = await renderWithProviders(
+      <ExtensionDetails
+        extension={linkableExtension}
+        onBack={mockOnBack}
+        onInstall={mockOnInstall}
+        onLink={mockOnLink}
+        isInstalled={false}
+      />,
     );
+    await waitUntilReady();
     await React.act(async () => {
       stdin.write('l');
     });
@@ -148,28 +149,24 @@ describe('ExtensionDetails', () => {
   });
 
   it('should NOT show "Link" button for GitHub extensions', async () => {
-    const { lastFrame } = renderDetails(false);
+    const { lastFrame, waitUntilReady } = await renderDetails(false);
+    await waitUntilReady();
     await waitFor(() => {
       expect(lastFrame()).not.toContain('[L] Link');
     });
   });
 
   it('should show "Link" button for local extensions', async () => {
-    const linkableExtension = {
-      ...mockExtension,
-      url: '/local/path/to/extension',
-    };
-    const { lastFrame } = render(
-      <KeypressProvider>
-        <ExtensionDetails
-          extension={linkableExtension}
-          onBack={mockOnBack}
-          onInstall={mockOnInstall}
-          onLink={mockOnLink}
-          isInstalled={false}
-        />
-      </KeypressProvider>,
+    const { lastFrame, waitUntilReady } = await renderWithProviders(
+      <ExtensionDetails
+        extension={linkableExtension}
+        onBack={mockOnBack}
+        onInstall={mockOnInstall}
+        onLink={mockOnLink}
+        isInstalled={false}
+      />,
     );
+    await waitUntilReady();
     await waitFor(() => {
       expect(lastFrame()).toContain('[L] Link');
     });
