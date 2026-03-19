@@ -14,11 +14,17 @@ import {
   enableBracketedPasteMode,
   disableBracketedPasteMode,
 } from '@google/gemini-cli-core';
+import ansiEscapes from 'ansi-escapes';
 import { parseColor } from '../themes/color-utils.js';
 
 export type TerminalBackgroundColor = string | undefined;
 
-const TERMINAL_CLEANUP_SEQUENCE = '\x1b[<u\x1b[>4;0m\x1b[?2004l';
+const TERMINAL_CLEANUP_SEQUENCE =
+  '\x1b[<u\x1b[>4;0m\x1b[?2004l\x1b[?1049l\x1b[?1006l\x1b[?7h';
+
+export function clearTerminalScreen(): void {
+  process.stdout.write(ansiEscapes.clearTerminal);
+}
 
 export function cleanupTerminalOnExit() {
   try {

@@ -535,6 +535,7 @@ export const mockSettings = createMockSettings();
 // A minimal mock UIState to satisfy the context provider.
 // Tests that need specific UIState values should provide their own.
 const baseMockUiState = {
+  isAlternateBuffer: false,
   history: [],
   renderMarkdown: true,
   streamingState: StreamingState.Idle,
@@ -646,8 +647,6 @@ export const renderWithProviders = (
     settings = mockSettings,
     uiState: providedUiState,
     width,
-    mouseEventsEnabled = false,
-
     config = configProxy as unknown as Config,
     uiActions,
     persistentState,
@@ -657,7 +656,6 @@ export const renderWithProviders = (
     settings?: LoadedSettings;
     uiState?: Partial<UIState>;
     width?: number;
-    mouseEventsEnabled?: boolean;
     config?: Config;
     uiActions?: Partial<UIActions>;
     persistentState?: {
@@ -753,9 +751,7 @@ export const renderWithProviders = (
                             onCancel={vi.fn()}
                           >
                             <KeypressProvider>
-                              <MouseProvider
-                                mouseEventsEnabled={mouseEventsEnabled}
-                              >
+                              <MouseProvider>
                                 <TerminalProvider>
                                   <ScrollProvider>
                                     <ContextCapture>
@@ -873,7 +869,6 @@ export function renderHookWithProviders<Result, Props>(
     settings?: LoadedSettings;
     uiState?: Partial<UIState>;
     width?: number;
-    mouseEventsEnabled?: boolean;
     config?: Config;
   } = {},
 ): {

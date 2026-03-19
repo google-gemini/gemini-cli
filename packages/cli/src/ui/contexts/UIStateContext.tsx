@@ -213,6 +213,7 @@ export interface UIState {
   bannerVisible: boolean;
   customDialog: React.ReactNode | null;
   terminalBackgroundColor: TerminalBackgroundColor;
+  isAlternateBuffer: boolean;
   settingsNonce: number;
   backgroundShells: Map<number, BackgroundShell>;
   activeBackgroundShellPid: number | null;

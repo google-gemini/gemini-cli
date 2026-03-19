@@ -17,17 +17,18 @@ import { act } from 'react';
 import { renderHook } from '../../test-utils/render.js';
 import { useSuspend } from './useSuspend.js';
 import {
-  writeToStdout,
   disableMouseEvents,
   enableMouseEvents,
   enterAlternateScreen,
   exitAlternateScreen,
   enableLineWrapping,
   disableLineWrapping,
+  type Config,
 } from '@google/gemini-cli-core';
 import {
   cleanupTerminalOnExit,
   terminalCapabilityManager,
+  clearTerminalScreen,
 } from '../utils/terminalCapabilityManager.js';
 import { formatCommand } from '../key/keybindingUtils.js';
 import { Command } from '../key/keyBindings.js';
@@ -36,7 +37,6 @@ vi.mock('@google/gemini-cli-core', async () => {
   const actual = await vi.importActual('@google/gemini-cli-core');
   return {
     ...actual,
-    writeToStdout: vi.fn(),
     disableMouseEvents: vi.fn(),
     enableMouseEvents: vi.fn(),
     enterAlternateScreen: vi.fn(),
@@ -48,6 +48,7 @@ vi.mock('@google/gemini-cli-core', async () => {
 
 vi.mock('../utils/terminalCapabilityManager.js', () => ({
   cleanupTerminalOnExit: vi.fn(),
+  clearTerminalScreen: vi.fn(),
   terminalCapabilityManager: {
     enableSupportedModes: vi.fn(),
   },
@@ -65,6 +66,7 @@ describe('useSuspend', () => {
   };
 
   beforeEach(() => {
+    process.removeAllListeners('SIGCONT');
     vi.useFakeTimers();
     vi.clearAllMocks();
     killSpy = vi
@@ -94,7 +96,8 @@ describe('useSuspend', () => {
         setRawMode,
         refreshStatic,
         setForceRerenderKey,
-        shouldUseAlternateScreen: true,
+        isAlternateBufferRef: { current: true },
+        config: { getScreenReader: () => false } as unknown as Config,
       }),
     );
 
@@ -115,7 +118,7 @@ describe('useSuspend', () => {
 
     expect(exitAlternateScreen).toHaveBeenCalledTimes(1);
     expect(enableLineWrapping).toHaveBeenCalledTimes(1);
-    expect(writeToStdout).toHaveBeenCalledWith('\x1b[2J\x1b[H');
+    expect(clearTerminalScreen).toHaveBeenCalledTimes(1);
     expect(disableMouseEvents).toHaveBeenCalledTimes(1);
     expect(cleanupTerminalOnExit).toHaveBeenCalledTimes(1);
     expect(setRawMode).toHaveBeenCalledWith(false);
@@ -128,6 +131,7 @@ describe('useSuspend', () => {
 
     expect(enterAlternateScreen).toHaveBeenCalledTimes(1);
     expect(disableLineWrapping).toHaveBeenCalledTimes(1);
+    expect(clearTerminalScreen).toHaveBeenCalledTimes(2);
     expect(enableSupportedModes).toHaveBeenCalledTimes(1);
     expect(enableMouseEvents).toHaveBeenCalledTimes(1);
     expect(setRawMode).toHaveBeenCalledWith(true);
@@ -149,7 +153,8 @@ describe('useSuspend', () => {
         setRawMode,
         refreshStatic,
         setForceRerenderKey,
-        shouldUseAlternateScreen: false,
+        isAlternateBufferRef: { current: false },
+        config: { getScreenReader: () => false } as unknown as Config,
       }),
     );
 
@@ -183,7 +188,8 @@ describe('useSuspend', () => {
         setRawMode,
         refreshStatic,
         setForceRerenderKey,
-        shouldUseAlternateScreen: true,
+        isAlternateBufferRef: { current: true },
+        config: { getScreenReader: () => false } as unknown as Config,
       }),
     );
 

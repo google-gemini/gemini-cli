@@ -16,10 +16,8 @@ import {
   type ResumedSessionData,
   coreEvents,
   createWorkingStdio,
-  disableMouseEvents,
   enableMouseEvents,
   disableLineWrapping,
-  enableLineWrapping,
   shouldEnterAlternateScreen,
   recordSlowRender,
   writeToStdout,
@@ -65,12 +63,8 @@ export async function startInteractiveUI(
     isAlternateBufferEnabled(config),
     config.getScreenReader(),
   );
-  const mouseEventsEnabled = useAlternateBuffer;
-  if (mouseEventsEnabled) {
+  if (useAlternateBuffer) {
     enableMouseEvents();
-    registerCleanup(() => {
-      disableMouseEvents();
-    });
   }
 
   const { matchers, errors } = await loadKeyMatchers();
@@ -102,7 +96,7 @@ export async function startInteractiveUI(
       <SettingsContext.Provider value={settings}>
         <KeyMatchersProvider value={matchers}>
           <KeypressProvider config={config}>
-            <MouseProvider mouseEventsEnabled={mouseEventsEnabled}>
+            <MouseProvider>
               <TerminalProvider>
                 <ScrollProvider>
                   <OverflowProvider>
@@ -163,9 +157,6 @@ export async function startInteractiveUI(
 
   if (useAlternateBuffer) {
     disableLineWrapping();
-    registerCleanup(() => {
-      enableLineWrapping();
-    });
   }
 
   checkForUpdates(settings)

@@ -60,13 +60,7 @@ export function useMouse(handler: MouseHandler, { isActive = true } = {}) {
   }, [isActive, handler, subscribe, unsubscribe]);
 }
 
-export function MouseProvider({
-  children,
-  mouseEventsEnabled,
-}: {
-  children: React.ReactNode;
-  mouseEventsEnabled?: boolean;
-}) {
+export function MouseProvider({ children }: { children: React.ReactNode }) {
   const { settings } = useSettingsStore();
   const debugKeystrokeLogging = settings.merged.general.debugKeystrokeLogging;
 
@@ -93,10 +87,6 @@ export function MouseProvider({
   );
 
   useEffect(() => {
-    if (!mouseEventsEnabled) {
-      return;
-    }
-
     let mouseBuffer = '';
 
     const broadcast = (event: MouseEvent) => {
@@ -190,7 +180,7 @@ export function MouseProvider({
     return () => {
       stdin.removeListener('data', handleData);
     };
-  }, [stdin, mouseEventsEnabled, subscribers, debugKeystrokeLogging]);
+  }, [stdin, subscribers, debugKeystrokeLogging]);
 
   const contextValue = useMemo(
     () => ({ subscribe, unsubscribe }),
