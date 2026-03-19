@@ -13,8 +13,10 @@ import {
   type AnsiOutput,
   CoreToolCallStatus,
   Kind,
+  makeFakeConfig,
 } from '@google/gemini-cli-core';
 import { renderWithProviders } from '../../../test-utils/render.js';
+import { createMockSettings } from '../../../test-utils/settings.js';
 import { tryParseJSON } from '../../../utils/jsonoutput.js';
 
 vi.mock('../GeminiRespondingSpinner.js', () => ({
@@ -462,7 +464,8 @@ describe('<ToolMessage />', () => {
             constrainHeight: true,
           },
           width: 80,
-          useAlternateBuffer: false,
+          config: makeFakeConfig({ useAlternateBuffer: false }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         },
       );
       await waitUntilReady();
@@ -495,7 +498,8 @@ describe('<ToolMessage />', () => {
           uiActions,
           uiState: { streamingState: StreamingState.Idle },
           width: 80,
-          useAlternateBuffer: false,
+          config: makeFakeConfig({ useAlternateBuffer: false }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         },
       );
       await waitUntilReady();
@@ -523,7 +527,8 @@ describe('<ToolMessage />', () => {
           uiActions,
           uiState: { streamingState: StreamingState.Idle },
           width: 80,
-          useAlternateBuffer: false,
+          config: makeFakeConfig({ useAlternateBuffer: false }),
+          settings: createMockSettings({ ui: { useAlternateBuffer: false } }),
         },
       );
       await waitUntilReady();
