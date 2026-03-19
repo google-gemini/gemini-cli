@@ -76,7 +76,7 @@ When adding a memory, route it to the right store:
 - **Subdirectory**: Detailed context about a specific module or directory → **subdirectory
   GEMINI.md**, with a reference added to the project root
 
-- **Ambiguity**: If a memory (like a coding preference or workflow) could be interpreted as either a global habit or a project-specific convention, you **MUST** use \`ask_user\` to clarify the user's intent. Do NOT make a unilateral decision when ambiguity exists between Global and Project stores.
+- **Ambiguity**: If a memory (like a coding preference or workflow) could be interpreted as either a global habit or a project-specific convention, you **MUST** use \`${ASK_USER_TOOL_NAME}\` to clarify the user's intent. Do NOT make a unilateral decision when ambiguity exists between Global and Project stores.
 
 # Operations
 
