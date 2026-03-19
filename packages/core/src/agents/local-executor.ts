@@ -32,6 +32,7 @@ import { CompressionStatus } from '../core/turn.js';
 import { type ToolCallRequestInfo } from '../scheduler/types.js';
 import { ChatCompressionService } from '../services/chatCompressionService.js';
 import { getDirectoryContextString } from '../utils/environmentContext.js';
+import { renderUserMemory } from '../prompts/snippets.js';
 import { promptIdContext } from '../utils/promptIdContext.js';
 import {
   logAgentStart,
@@ -585,12 +586,24 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
           );
         const formattedInitialHints = formatUserHintsForModel(initialHints);
 
-        let currentMessage: Content = formattedInitialHints
-          ? {
-              role: 'user',
-              parts: [{ text: formattedInitialHints }, { text: query }],
-            }
-          : { role: 'user', parts: [{ text: query }] };
+        // Inject loaded memory files (JIT + extension/project memory)
+        const environmentMemory = this.context.config.isJitContextEnabled?.()
+          ? this.context.config.getSessionMemory()
+          : this.context.config.getEnvironmentMemory();
+
+        const initialParts: Part[] = [];
+        if (environmentMemory) {
+          initialParts.push({ text: environmentMemory });
+        }
+        if (formattedInitialHints) {
+          initialParts.push({ text: formattedInitialHints });
+        }
+        initialParts.push({ text: query });
+
+        let currentMessage: Content = {
+          role: 'user',
+          parts: initialParts,
+        };
 
         while (true) {
           // Check for termination conditions like max turns.
@@ -1374,6 +1387,12 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
 
     // Inject user inputs into the prompt template.
     let finalPrompt = templateString(promptConfig.systemPrompt, inputs);
+
+    // Append memory context if available.
+    const systemMemory = this.context.config.getSystemInstructionMemory();
+    if (systemMemory) {
+      finalPrompt += `\n\n${renderUserMemory(systemMemory)}`;
+    }
 
     // Append environment context (CWD and folder structure).
     const dirContext = await getDirectoryContextString(this.context.config);

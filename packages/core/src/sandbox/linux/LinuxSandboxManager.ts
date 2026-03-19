@@ -11,6 +11,7 @@ import {
   type SandboxManager,
   type SandboxRequest,
   type SandboxedCommand,
+  GOVERNANCE_FILES,
 } from '../../services/sandboxManager.js';
 import {
   sanitizeEnvironment,
@@ -120,6 +121,14 @@ export class LinuxSandboxManager implements SandboxManager {
       this.options.workspace,
       this.options.workspace,
     ];
+
+    // Protected governance files are bind-mounted as read-only, even if the workspace is RW.
+    // We use --ro-bind-try so that it doesn't fail if the file doesn't exist.
+    // In bwrap, later binds override earlier ones for the same path.
+    for (const file of GOVERNANCE_FILES) {
+      const filePath = join(this.options.workspace, file);
+      bwrapArgs.push('--ro-bind-try', filePath, filePath);
+    }
 
     const allowedPaths = this.options.allowedPaths ?? [];
     for (const path of allowedPaths) {

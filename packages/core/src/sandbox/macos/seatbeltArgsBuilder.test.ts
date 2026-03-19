@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 
 describe('seatbeltArgsBuilder', () => {
-  it('should build a strict allowlist profile allowing the workspace via param', () => {
+  it('should build a strict allowlist profile allowing the workspace via param and protecting governance files', () => {
     // Mock realpathSync to just return the path for testing
     vi.spyOn(fs, 'realpathSync').mockImplementation((p) => p as string);
 
@@ -21,10 +21,22 @@ describe('seatbeltArgsBuilder', () => {
     expect(profile).toContain('(deny default)');
     expect(profile).toContain('(allow process-exec)');
     expect(profile).toContain('(subpath (param "WORKSPACE"))');
+    expect(profile).toContain(
+      '(deny file-write* (literal (param "GOVERNANCE_FILE_0")))',
+    );
+    expect(profile).toContain(
+      '(deny file-write* (literal (param "GOVERNANCE_FILE_1")))',
+    );
     expect(profile).not.toContain('(allow network*)');
 
     expect(args).toContain('-D');
     expect(args).toContain('WORKSPACE=/Users/test/workspace');
+    expect(args).toContain(
+      'GOVERNANCE_FILE_0=/Users/test/workspace/.gitignore',
+    );
+    expect(args).toContain(
+      'GOVERNANCE_FILE_1=/Users/test/workspace/.geminiignore',
+    );
     expect(args).toContain(`TMPDIR=${os.tmpdir()}`);
 
     vi.restoreAllMocks();

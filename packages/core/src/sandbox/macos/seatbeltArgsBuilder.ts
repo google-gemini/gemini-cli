@@ -11,6 +11,7 @@ import {
   BASE_SEATBELT_PROFILE,
   NETWORK_SEATBELT_PROFILE,
 } from './baseProfile.js';
+import { GOVERNANCE_FILES } from '../../services/sandboxManager.js';
 
 /**
  * Options for building macOS Seatbelt arguments.
@@ -58,6 +59,14 @@ export function buildSeatbeltArgs(options: SeatbeltArgsOptions): string[] {
 
   const workspacePath = tryRealpath(options.workspace);
   args.push('-D', `WORKSPACE=${workspacePath}`);
+
+  // Add explicit deny rules for governance files in the workspace.
+  // These are added before the workspace allow rule to ensure they take precedence.
+  for (let i = 0; i < GOVERNANCE_FILES.length; i++) {
+    const governanceFile = path.join(workspacePath, GOVERNANCE_FILES[i]);
+    args.push('-D', `GOVERNANCE_FILE_${i}=${governanceFile}`);
+    profile += `(deny file-write* (literal (param "GOVERNANCE_FILE_${i}")))\n`;
+  }
 
   const tmpPath = tryRealpath(os.tmpdir());
   args.push('-D', `TMPDIR=${tmpPath}`);
