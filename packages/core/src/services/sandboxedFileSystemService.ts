@@ -26,6 +26,8 @@ export class SandboxedFileSystemService implements FileSystemService {
     });
 
     return new Promise((resolve, reject) => {
+      // Direct spawn is necessary here for streaming large file contents.
+       
       const child = spawn(prepared.program, prepared.args, {
         cwd: this.cwd,
         env: prepared.env,
@@ -65,6 +67,8 @@ export class SandboxedFileSystemService implements FileSystemService {
     });
 
     return new Promise((resolve, reject) => {
+      // Direct spawn is necessary here for streaming large file contents.
+       
       const child = spawn(prepared.program, prepared.args, {
         cwd: this.cwd,
         env: prepared.env,

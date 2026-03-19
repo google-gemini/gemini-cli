@@ -5,19 +5,19 @@
  */
 
 import fs from 'node:fs';
-import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  type SandboxManager,
-  type SandboxRequest,
-  type SandboxedCommand,
+import type {
+  SandboxManager,
+  SandboxRequest,
+  SandboxedCommand,
 } from './sandboxManager.js';
 import {
   sanitizeEnvironment,
   type EnvironmentSanitizationConfig,
 } from './environmentSanitization.js';
 import { debugLogger } from '../utils/debugLogger.js';
+import { spawnAsync } from '../utils/shell-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,7 +38,7 @@ export class WindowsSandboxManager implements SandboxManager {
     this.helperPath = path.resolve(__dirname, 'scripts', 'GeminiSandbox.exe');
   }
 
-  private ensureInitialized(): void {
+  private async ensureInitialized(): Promise<void> {
     if (this.initialized) return;
     if (this.platform !== 'win32') {
       this.initialized = true;
@@ -67,18 +67,37 @@ export class WindowsSandboxManager implements SandboxManager {
               'v4.0.30319',
               'csc.exe',
             ),
+            // Added newer framework paths
+            path.join(
+              systemRoot,
+              'Microsoft.NET',
+              'Framework64',
+              'v4.8',
+              'csc.exe',
+            ),
+            path.join(
+              systemRoot,
+              'Microsoft.NET',
+              'Framework',
+              'v4.8',
+              'csc.exe',
+            ),
+            path.join(
+              systemRoot,
+              'Microsoft.NET',
+              'Framework64',
+              'v3.5',
+              'csc.exe',
+            ),
           ];
 
           for (const csc of cscPaths) {
-            const result = spawnSync(
-              csc,
-              ['/out:' + this.helperPath, sourcePath],
-              {
-                stdio: 'ignore',
-              },
-            );
-            if (result.status === 0) {
+            try {
+              // We use spawnAsync but we don't need to capture output
+              await spawnAsync(csc, ['/out:' + this.helperPath, sourcePath]);
               break;
+            } catch (_e) {
+              // Try next path
             }
           }
         }
@@ -97,7 +116,7 @@ export class WindowsSandboxManager implements SandboxManager {
    * Prepares a command for sandboxed execution on Windows.
    */
   async prepareCommand(req: SandboxRequest): Promise<SandboxedCommand> {
-    this.ensureInitialized();
+    await this.ensureInitialized();
 
     const sanitizationConfig: EnvironmentSanitizationConfig = {
       allowedEnvironmentVariables:
@@ -113,12 +132,12 @@ export class WindowsSandboxManager implements SandboxManager {
 
     // 1. Handle filesystem permissions for Low Integrity
     // Grant "Low Mandatory Level" write access to the CWD.
-    this.grantLowIntegrityAccess(req.cwd);
+    await this.grantLowIntegrityAccess(req.cwd);
 
     // Grant "Low Mandatory Level" read access to allowedPaths.
     if (req.config?.allowedPaths) {
       for (const allowedPath of req.config.allowedPaths) {
-        this.grantLowIntegrityAccess(allowedPath);
+        await this.grantLowIntegrityAccess(allowedPath);
       }
     }
 
@@ -144,7 +163,7 @@ export class WindowsSandboxManager implements SandboxManager {
   /**
    * Grants "Low Mandatory Level" access to a path using icacls.
    */
-  private grantLowIntegrityAccess(targetPath: string): void {
+  private async grantLowIntegrityAccess(targetPath: string): Promise<void> {
     if (this.platform !== 'win32') {
       return;
     }
@@ -169,16 +188,8 @@ export class WindowsSandboxManager implements SandboxManager {
     }
 
     try {
-      const result = spawnSync(
-        'icacls',
-        [resolvedPath, '/setintegritylevel', 'Low'],
-        {
-          stdio: 'ignore',
-        },
-      );
-      if (result.status === 0) {
-        this.lowIntegrityCache.add(resolvedPath);
-      }
+      await spawnAsync('icacls', [resolvedPath, '/setintegritylevel', 'Low']);
+      this.lowIntegrityCache.add(resolvedPath);
     } catch (e) {
       debugLogger.log(
         'WindowsSandboxManager: icacls failed for',
