@@ -56,14 +56,6 @@ function normalizePlaceholder(line: string): string | null {
 
   if (text.startsWith('//')) {
     text = text.slice(2).trim();
-  } else if (text.startsWith('#')) {
-    text = text.slice(1).trim();
-  } else if (text.startsWith('/*')) {
-    text = text.slice(2);
-    if (text.endsWith('*/')) {
-      text = text.slice(0, -2);
-    }
-    text = text.trim();
   }
 
   if (text.startsWith('(') && text.endsWith(')')) {
@@ -96,8 +88,6 @@ function normalizePlaceholder(line: string): string | null {
  * - (rest of code ...)
  * - (unchanged code ...)
  * - // rest of methods ...
- * - # rest of code ...
- * - /\* rest of code ... *\/
  *
  * Returns all placeholders found as normalized tokens.
  */

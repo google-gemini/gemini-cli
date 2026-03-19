@@ -2245,12 +2245,39 @@ describe('AppContainer State Management', () => {
         await setupKeypressTest();
 
         pressKey('\x04'); // Ctrl+D
-
-        // Should only be called once, so count is 1, not quitting yet.
         expect(mockHandleSlashCommand).not.toHaveBeenCalled();
 
-        pressKey('\x04'); // Ctrl+D
-        // Now count is 2, it should quit.
+        pressKey('\x04'); // Ctrl+D again
+        // Should still not quit because buffer is non-empty
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+        unmount();
+      });
+
+      it('should quit on second press after buffer becomes empty', async () => {
+        // Start with non-empty buffer
+        const mockReturn = {
+          text: 'some text',
+          setText: vi.fn(),
+          lines: ['some text'],
+          cursor: [0, 9],
+          handleInput: vi.fn().mockReturnValue(false),
+        };
+        mockedUseTextBuffer.mockReturnValue(mockReturn);
+        await setupKeypressTest();
+
+        pressKey('\x04'); // Ctrl+D - ignored (buffer non-empty)
+        expect(mockHandleSlashCommand).not.toHaveBeenCalled();
+
+        // Buffer becomes empty (user deleted all text)
+        mockedUseTextBuffer.mockReturnValue({
+          ...mockReturn,
+          text: '',
+          lines: [''],
+          cursor: [0, 0],
+        });
+        rerender();
+
+        pressKey('\x04', 2); // Ctrl+D twice with empty buffer
         expect(mockHandleSlashCommand).toHaveBeenCalledWith(
           '/quit',
           undefined,
