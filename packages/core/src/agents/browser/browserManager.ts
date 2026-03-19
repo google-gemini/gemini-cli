@@ -388,6 +388,17 @@ export class BrowserManager {
       }
     }
     throw lastError!;
+
+    // Request browser consent if needed (first-run privacy notice)
+    const consentGranted = await getBrowserConsentIfNeeded();
+    if (!consentGranted) {
+      throw new Error(
+        'Browser agent requires user consent to proceed. ' +
+          'Please re-run and accept the privacy notice.',
+      );
+    }
+
+    await this.connectMcp();
   }
 
   /**
