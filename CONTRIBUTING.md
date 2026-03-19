@@ -409,7 +409,7 @@ To debug the CLI's React-based UI, you can use React DevTools.
     ```
 
     Your running CLI application should then connect to React DevTools.
-    ![](./docs/assets/connected_devtools.png)
+    ![](/docs/assets/connected_devtools.png)
 
 ### Sandboxing
 
@@ -505,7 +505,7 @@ code.
 
 ### Documentation structure
 
-Our documentation is organized using [sidebar.json](./docs/sidebar.json) as the
+Our documentation is organized using [sidebar.json](/docs/sidebar.json) as the
 table of contents. When adding new documentation:
 
 1. Create your markdown file **in the appropriate directory** under `/docs`.
