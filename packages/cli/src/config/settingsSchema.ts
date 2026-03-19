@@ -1358,9 +1358,29 @@ const SETTINGS_SCHEMA = {
         description: oneLine`
           Legacy full-process sandbox execution environment.
           Set to a boolean to enable or disable the sandbox, provide a string path to a sandbox profile,
-          or specify an explicit sandbox command (e.g., "docker", "podman", "lxc").
+          or specify an explicit sandbox command (e.g., "docker", "podman", "lxc", "windows-native").
         `,
         showInDialog: false,
+      },
+      sandboxAllowedPaths: {
+        type: 'array',
+        label: 'Sandbox Allowed Paths',
+        category: 'Tools',
+        requiresRestart: true,
+        default: [] as string[],
+        description:
+          'List of additional paths that the sandbox is allowed to access.',
+        showInDialog: true,
+        items: { type: 'string' },
+      },
+      sandboxNetworkAccess: {
+        type: 'boolean',
+        label: 'Sandbox Network Access',
+        category: 'Tools',
+        requiresRestart: true,
+        default: false,
+        description: 'Whether the sandbox is allowed to access the network.',
+        showInDialog: true,
       },
       shell: {
         type: 'object',
