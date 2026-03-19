@@ -107,7 +107,7 @@ and full builds) to a dedicated, high-performance GCP worker.
           settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
           if (settings.workspace && !process.argv.includes('--reconfigure')) {
               console.log('   ✅ Existing configuration found.');
-              const shouldSkip = await confirm('   ❓ Use existing configuration and skip to execution?');
+              const shouldSkip = await confirm('Use existing configuration and skip to execution?');
               if (shouldSkip) {
                   skipConfig = true;
               }
@@ -174,7 +174,7 @@ and full builds) to a dedicated, high-performance GCP worker.
                       userFork = myForks[idx] || myForks[0];
                   }
               } else {
-                  const shouldFork = await confirm(`❓ No fork detected. Create a personal fork for sandboxed implementations?`);
+                  const shouldFork = await confirm('No fork detected. Create a personal fork for sandboxed implementations?');
                   userFork = shouldFork ? await createFork(upstreamRepo) : upstreamRepo;
               }
           } catch (e) {
@@ -270,7 +270,7 @@ and full builds) to a dedicated, high-performance GCP worker.
   let status = await provider.getStatus();
   
   if (status.status === 'UNKNOWN' || status.status === 'ERROR') {
-    const shouldProvision = await confirm(`❓ Worker ${targetVM} not found. Provision it now?`);
+    const shouldProvision = await confirm(`Worker ${targetVM} not found. Provision it now?`);
     if (!shouldProvision) return 1;
     
     const provisionRes = await provider.provision();
