@@ -15,20 +15,80 @@ export interface ProvisionOptions {
 
 export class ComputeService {
   private client: InstancesClient;
+  private projectId: string;
 
   constructor() {
     this.client = new InstancesClient();
+    // In a real GCP environment, this is usually available via metadata server or env
+    this.projectId = process.env['GOOGLE_CLOUD_PROJECT'] || 'dev-project';
   }
 
   /**
    * Provision a new GCE VM with the Workspace Container
    */
   async createWorkspaceInstance(options: ProvisionOptions): Promise<void> {
-    // TODO: Implement actual instancesClient.insert call
-    // For now, we just log and return
+    const { instanceName, machineType, imageTag, zone } = options;
+
+    // TODO: Get the actual base image URL from config
+    const containerImage = `us-west1-docker.pkg.dev/${this.projectId}/workspaces/gemini-workspace:${imageTag}`;
+
+    // The container declaration for Container-Optimized OS
+    const containerDeclaration = `
+spec:
+  containers:
+    - name: workspace
+      image: ${containerImage}
+      securityContext:
+        privileged: false
+      stdin: true
+      tty: true
+  restartPolicy: Always
+`;
+
+    const [operation] = await this.client.insert({
+      project: this.projectId,
+      zone,
+      instanceResource: {
+        name: instanceName,
+        machineType: `zones/${zone}/machineTypes/${machineType}`,
+        disks: [
+          {
+            boot: true,
+            autoDelete: true,
+            initializeParams: {
+              sourceImage: 'projects/cos-cloud/global/images/family/cos-stable',
+            },
+          },
+        ],
+        networkInterfaces: [
+          {
+            network: 'global/networks/default',
+            // We use IAP for access, but a NAT might be needed for outbound internet
+            accessConfigs: [{ name: 'External NAT', type: 'ONE_TO_ONE_NAT' }],
+          },
+        ],
+        metadata: {
+          items: [
+            {
+              key: 'gce-container-declaration',
+              value: containerDeclaration,
+            },
+            {
+              key: 'google-logging-enabled',
+              value: 'true',
+            },
+          ],
+        },
+        // Security: Tag for IAP access
+        tags: {
+          items: ['allow-ssh-iap'],
+        },
+      },
+    });
+
     // eslint-disable-next-line no-console
     console.log(
-      `[ComputeService] Mocking creation of ${options.instanceName} in ${options.zone}`,
+      `[ComputeService] Creation started for ${instanceName}. Op ID: ${operation.latestResponse.name}`,
     );
   }
 
@@ -39,10 +99,15 @@ export class ComputeService {
     instanceName: string,
     zone: string,
   ): Promise<void> {
-    // TODO: Implement actual instancesClient.delete call
+    const [operation] = await this.client.delete({
+      project: this.projectId,
+      zone,
+      instance: instanceName,
+    });
+
     // eslint-disable-next-line no-console
     console.log(
-      `[ComputeService] Mocking deletion of ${instanceName} in ${zone}`,
+      `[ComputeService] Deletion started for ${instanceName}. Op ID: ${operation.latestResponse.name}`,
     );
   }
 }

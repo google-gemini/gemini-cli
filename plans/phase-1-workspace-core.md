@@ -25,8 +25,8 @@ Implement the core API to manage GCE-based workspaces.
 - [x] Initialize `packages/workspace-manager/`.
 - [x] Implement Express server for `/workspaces` (List, Create, Delete).
 - [x] Integrate Firestore to track workspace state (owner, instance_id, status).
-- [ ] Integrate `@google-cloud/compute` for GCE instance lifecycle.
-- [ ] Provision a VM with `Container-on-VM` settings pointing to the
+- [x] Integrate `@google-cloud/compute` for GCE instance lifecycle.
+- [x] Provision a VM with `Container-on-VM` settings pointing to the
       `gemini-workspace` image.
 
 ### Task 1.3: Cloud Run Deployment (v1)
