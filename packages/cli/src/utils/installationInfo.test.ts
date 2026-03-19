@@ -58,6 +58,19 @@ describe('getInstallationInfo', () => {
     process.argv = originalArgv;
   });
 
+  it('should detect running as a standalone binary', () => {
+    vi.stubEnv('IS_BINARY', 'true');
+    process.argv[1] = '/path/to/binary';
+    const info = getInstallationInfo(projectRoot, true);
+    expect(info.packageManager).toBe(PackageManager.BINARY);
+    expect(info.isGlobal).toBe(true);
+    expect(info.updateMessage).toBe(
+      'Running as a standalone binary. Please update by downloading the latest version from GitHub.',
+    );
+    expect(info.updateCommand).toBeUndefined();
+    vi.unstubAllEnvs();
+  });
+
   it('should return UNKNOWN when cliPath is not available', () => {
     process.argv[1] = '';
     const info = getInstallationInfo(projectRoot, true);
