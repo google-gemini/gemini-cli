@@ -7,264 +7,269 @@
 import type React from 'react';
 import { Box, Text } from 'ink';
 import { theme } from '../semantic-colors.js';
-import type { ContextWindowData, ContextWindowTurn } from '../types.js';
+import type { ContextWindowData } from '../types.js';
 
-const BAR_WIDTH = 30;
-const LABEL_WIDTH = 22;
-const TOKEN_WIDTH = 14;
-const PCT_WIDTH = 7;
+const BAR_WIDTH = 60;
 
 /**
- * Renders a visual progress bar using Unicode block characters.
+ * Color mapping for each context category.
+ * Chosen for perceptual distinctness and color-blind accessibility:
+ * blue, purple, yellow, cyan avoid the red-green confusion axis.
  */
-function renderBar(fraction: number, width: number): string {
-  const clamped = Math.max(0, Math.min(1, fraction));
-  const filled = Math.round(clamped * width);
-  const empty = width - filled;
-  return '\u2588'.repeat(filled) + '\u2591'.repeat(empty);
+const categoryColors = {
+  get system() {
+    return theme.text.link;
+  }, // AccentBlue
+  get memory() {
+    return theme.status.warning;
+  }, // AccentYellow
+  get tools() {
+    return theme.text.accent;
+  }, // AccentPurple
+  get conversation() {
+    return theme.ui.symbol;
+  }, // AccentCyan
+  get free() {
+    return theme.ui.dark;
+  }, // DarkGray
+  get marker() {
+    return theme.text.primary;
+  }, // Foreground
+};
+
+/** Format a token count compactly: 1,200 → "1.2k", 48,446 → "48k", 1,048,576 → "1,049k" */
+function fmtCompact(n: number): string {
+  if (n >= 10_000) return `${Math.round(n / 1_000)}k`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return Math.floor(n).toString();
 }
 
-/**
- * Formats a number with thousands separators.
- */
+/** Format a number with thousands separators. */
 function fmtNum(n: number): string {
   return Math.floor(n).toLocaleString();
 }
 
 /**
- * Returns a color based on how full the bar is.
+ * Renders a segmented bar showing proportional usage by category,
+ * with a compression threshold marker.
  */
-function barColor(fraction: number): string {
-  if (fraction >= 0.9) return theme.status.error;
-  if (fraction >= 0.6) return theme.status.warning;
-  return theme.ui.focus;
-}
+const SegmentedBar: React.FC<{ data: ContextWindowData }> = ({ data }) => {
+  const total = data.tokenLimit;
+  if (total <= 0) return null;
 
-/**
- * Returns an icon for a conversation turn based on its kind.
- */
-function turnIcon(turn: ContextWindowTurn): string {
-  switch (turn.kind) {
-    case 'tool_call':
-      return '\u0192'; // ƒ
-    case 'tool_result':
-      return '\u2398'; // ⎘
-    case 'media':
-      return '\u25A3'; // ▣
-    default:
-      return ' ';
+  // Compute character counts for each segment
+  const segments = [
+    { tokens: data.systemPromptTokens, color: categoryColors.system },
+    { tokens: data.memoryTokens, color: categoryColors.memory },
+    { tokens: data.toolDeclarationTokens, color: categoryColors.tools },
+    { tokens: data.conversationTokens, color: categoryColors.conversation },
+  ];
+
+  const usedChars = segments.map((s) => {
+    const fraction = s.tokens / total;
+    return Math.max(fraction > 0 ? 1 : 0, Math.round(fraction * BAR_WIDTH));
+  });
+
+  // Ensure we don't exceed BAR_WIDTH for the used portion
+  let totalUsedChars = usedChars.reduce((a, b) => a + b, 0);
+  while (totalUsedChars > BAR_WIDTH) {
+    const maxIdx = usedChars.indexOf(Math.max(...usedChars));
+    usedChars[maxIdx]--;
+    totalUsedChars--;
   }
-}
+
+  const freeChars = BAR_WIDTH - totalUsedChars;
+
+  // Compression threshold marker position
+  const markerPos = Math.round(data.compressionThreshold * BAR_WIDTH);
+
+  // Build the bar as an array of { char, color } entries
+  const bar: Array<{ char: string; color: string }> = [];
+
+  for (let i = 0; i < segments.length; i++) {
+    for (let j = 0; j < usedChars[i]; j++) {
+      bar.push({ char: '\u2588', color: segments[i].color }); // █
+    }
+  }
+
+  for (let i = 0; i < freeChars; i++) {
+    bar.push({ char: '\u2591', color: categoryColors.free }); // ░
+  }
+
+  // Insert compression marker (replace the character at that position)
+  if (markerPos > 0 && markerPos < BAR_WIDTH) {
+    bar[markerPos] = { char: '\u2502', color: categoryColors.marker }; // │
+  }
+
+  // Group consecutive characters with the same color for efficient rendering
+  const groups: Array<{ text: string; color: string }> = [];
+  for (const entry of bar) {
+    const last = groups[groups.length - 1];
+    if (last && last.color === entry.color) {
+      last.text += entry.char;
+    } else {
+      groups.push({ text: entry.char, color: entry.color });
+    }
+  }
+
+  return (
+    <Box flexDirection="column">
+      <Box flexDirection="row">
+        <Text color={categoryColors.free}>{'\u2590'}</Text>
+        {groups.map((g, i) => (
+          <Text key={i} color={g.color}>
+            {g.text}
+          </Text>
+        ))}
+        <Text color={categoryColors.free}>{'\u258C'}</Text>
+      </Box>
+
+      <Box
+        flexDirection="row"
+        justifyContent="space-between"
+        width={BAR_WIDTH + 2}
+      >
+        <Text color={theme.text.secondary}>
+          {' '}
+          used ({((data.tokensUsed / total) * 100).toFixed(0)}%)
+        </Text>
+        <Text color={theme.text.secondary}>
+          compress at {(data.compressionThreshold * 100).toFixed(0)}%{' \u2518'}
+        </Text>
+      </Box>
+    </Box>
+  );
+};
 
 /**
- * A row in the breakdown section showing a category with a visual bar.
+ * A single row in the breakdown table.
  */
-const BreakdownRow: React.FC<{
+const CategoryRow: React.FC<{
   label: string;
   tokens: number;
-  total: number;
+  pctOfLimit: number;
+  color: string;
   detail?: string;
-}> = ({ label, tokens, total, detail }) => {
-  const fraction = total > 0 ? tokens / total : 0;
-  const pct = (fraction * 100).toFixed(0);
-
-  return (
-    <Box flexDirection="row">
-      <Box width={LABEL_WIDTH}>
-        <Text bold color={theme.text.link}>
-          {label}
-        </Text>
-      </Box>
-      <Box width={BAR_WIDTH + 1}>
-        <Text color={barColor(fraction)}>{renderBar(fraction, BAR_WIDTH)}</Text>
-      </Box>
-      <Box width={PCT_WIDTH} justifyContent="flex-end">
-        <Text color={theme.text.secondary}>{pct}%</Text>
-      </Box>
-      <Box width={TOKEN_WIDTH} justifyContent="flex-end">
-        <Text color={theme.text.primary}>{fmtNum(tokens)}</Text>
-      </Box>
-      {detail && (
-        <Box marginLeft={1}>
-          <Text color={theme.text.secondary}>{detail}</Text>
-        </Box>
-      )}
+}> = ({ label, tokens, pctOfLimit, color, detail }) => (
+  <Box flexDirection="row">
+    <Box width={20}>
+      <Text color={color}>{label}</Text>
     </Box>
-  );
-};
-
-/**
- * A single conversation turn row.
- */
-const TurnRow: React.FC<{
-  turn: ContextWindowTurn;
-}> = ({ turn }) => {
-  const icon = turnIcon(turn);
-  const roleColor = turn.role === 'user' ? theme.ui.focus : theme.text.accent;
-
-  return (
-    <Box flexDirection="row">
-      <Box width={5} justifyContent="flex-end">
-        <Text color={theme.text.secondary}>{turn.index}</Text>
-      </Box>
-      <Box width={2}>
-        <Text color={theme.text.secondary}>{icon}</Text>
-      </Box>
-      <Box width={7}>
-        <Text color={roleColor}>{turn.role}</Text>
-      </Box>
-      <Box width={TOKEN_WIDTH} justifyContent="flex-end">
-        <Text color={theme.text.primary}>{fmtNum(turn.tokens)}</Text>
-      </Box>
-      <Box marginLeft={2} flexShrink={1}>
-        <Text color={theme.text.secondary} wrap="truncate">
-          {turn.preview}
-        </Text>
-      </Box>
+    <Box width={12} justifyContent="flex-end">
+      <Text>{fmtNum(tokens)}</Text>
     </Box>
-  );
-};
+    <Box width={8} justifyContent="flex-end">
+      <Text color={theme.text.secondary}>{pctOfLimit.toFixed(1)}%</Text>
+    </Box>
+    {detail && (
+      <Box marginLeft={3}>
+        <Text color={theme.text.secondary}>{detail}</Text>
+      </Box>
+    )}
+  </Box>
+);
 
 export const ContextWindowDisplay: React.FC<{ data: ContextWindowData }> = ({
   data,
 }) => {
-  const usageFraction =
-    data.tokenLimit > 0 ? data.tokensUsed / data.tokenLimit : 0;
-  const usagePct = (usageFraction * 100).toFixed(1);
+  const pctUsed = data.tokenLimit > 0 ? data.tokensUsed / data.tokenLimit : 0;
+  const remaining = Math.max(0, data.tokenLimit - data.tokensUsed);
 
-  const maxTurnsToShow = 30;
-  const turnsToShow = data.turns.slice(0, maxTurnsToShow);
-  const hiddenTurns = data.turns.length - turnsToShow.length;
+  const turnsEstimate =
+    data.estimatedTurnsRemaining !== null
+      ? ` \u00B7 \u2248 ${fmtNum(data.estimatedTurnsRemaining)} turns at current rate`
+      : '';
 
   return (
-    <Box
-      borderStyle="round"
-      borderColor={theme.border.default}
-      flexDirection="column"
-      padding={1}
-      marginY={1}
-      width={88}
-    >
-      {/* Title */}
-      <Box marginBottom={1}>
-        <Text bold color={theme.text.accent}>
-          Context Window
-        </Text>
-      </Box>
-
-      {/* Model and overall usage */}
-      <Box flexDirection="row">
-        <Text color={theme.text.secondary}>Model: </Text>
-        <Text color={theme.text.primary}>{data.model}</Text>
-      </Box>
-
-      {/* Overall progress bar */}
-      <Box flexDirection="row">
-        <Text color={barColor(usageFraction)}>
-          {renderBar(usageFraction, BAR_WIDTH)}
-        </Text>
-        <Text color={theme.text.secondary}>
-          {' '}
-          {usagePct}% of {fmtNum(data.tokenLimit)}
-        </Text>
-      </Box>
-      <Box marginBottom={1}>
-        <Text bold color={theme.text.primary}>
-          {fmtNum(data.tokensUsed)} tokens used
-        </Text>
-      </Box>
-
-      {/* Divider */}
+    <Box flexDirection="column" marginY={1}>
+      {/* Header */}
       <Box
-        borderStyle="single"
-        borderBottom={true}
-        borderTop={false}
-        borderLeft={false}
-        borderRight={false}
-        borderColor={theme.border.default}
-        width="100%"
-        marginBottom={1}
-      />
-
-      {/* Breakdown header */}
-      <Box marginBottom={1}>
-        <Text bold color={theme.text.primary}>
-          Breakdown
+        flexDirection="row"
+        justifyContent="space-between"
+        width={BAR_WIDTH + 2}
+      >
+        <Box flexDirection="row">
+          <Text bold color={theme.text.primary}>
+            Context
+          </Text>
+          <Text color={theme.text.secondary}>
+            {' \u00B7 '}
+            {data.model}
+          </Text>
+        </Box>
+        <Text color={theme.text.secondary}>
+          {fmtCompact(data.tokensUsed)} / {fmtCompact(data.tokenLimit)} tokens
         </Text>
       </Box>
 
-      {/* Category bars */}
-      <BreakdownRow
-        label="System Prompt"
-        tokens={data.systemPromptTokens}
-        total={data.tokensUsed}
-      />
-      <BreakdownRow
-        label="Tool Declarations"
-        tokens={data.toolDeclarationTokens}
-        total={data.tokensUsed}
-        detail={`${data.toolCount} tools`}
-      />
-      <BreakdownRow
-        label="Conversation"
-        tokens={data.conversationTokens}
-        total={data.tokensUsed}
-        detail={`${data.turns.length} turns`}
-      />
+      {/* Segmented bar */}
+      <Box marginTop={1}>
+        <SegmentedBar data={data} />
+      </Box>
 
-      {/* Conversation turns */}
-      {data.turns.length > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          {/* Divider */}
-          <Box
-            borderStyle="single"
-            borderBottom={true}
-            borderTop={false}
-            borderLeft={false}
-            borderRight={false}
-            borderColor={theme.border.default}
-            width="100%"
-            marginBottom={1}
-          />
+      {/* Remaining headline */}
+      <Box marginTop={1}>
+        <Text
+          bold
+          color={
+            pctUsed >= 0.9
+              ? theme.status.error
+              : pctUsed >= 0.6
+                ? theme.status.warning
+                : theme.text.primary
+          }
+        >
+          {fmtCompact(remaining)} tokens remaining
+        </Text>
+        <Text color={theme.text.secondary}>{turnsEstimate}</Text>
+      </Box>
 
-          <Box>
-            <Text bold color={theme.text.primary}>
-              Conversation History
-            </Text>
-          </Box>
-
-          {/* Column header */}
-          <Box flexDirection="row">
-            <Box width={5} justifyContent="flex-end">
-              <Text color={theme.text.secondary}>#</Text>
-            </Box>
-            <Box width={2}>
-              <Text> </Text>
-            </Box>
-            <Box width={7}>
-              <Text color={theme.text.secondary}>Role</Text>
-            </Box>
-            <Box width={TOKEN_WIDTH} justifyContent="flex-end">
-              <Text color={theme.text.secondary}>Tokens</Text>
-            </Box>
-            <Box marginLeft={2}>
-              <Text color={theme.text.secondary}>Content</Text>
-            </Box>
-          </Box>
-
-          {turnsToShow.map((turn) => (
-            <TurnRow key={turn.index} turn={turn} />
-          ))}
-
-          {hiddenTurns > 0 && (
-            <Box marginLeft={5}>
-              <Text color={theme.text.secondary}>
-                ... and {hiddenTurns} more turns
-              </Text>
-            </Box>
-          )}
-        </Box>
-      )}
+      {/* Breakdown table */}
+      <Box flexDirection="column" marginTop={1}>
+        <CategoryRow
+          label="System prompt"
+          tokens={data.systemPromptTokens}
+          pctOfLimit={
+            data.tokenLimit > 0
+              ? (data.systemPromptTokens / data.tokenLimit) * 100
+              : 0
+          }
+          color={categoryColors.system}
+        />
+        <CategoryRow
+          label="Tool schemas"
+          tokens={data.toolDeclarationTokens}
+          pctOfLimit={
+            data.tokenLimit > 0
+              ? (data.toolDeclarationTokens / data.tokenLimit) * 100
+              : 0
+          }
+          color={categoryColors.tools}
+          detail={`${data.toolCount} tools`}
+        />
+        <CategoryRow
+          label="Memory files"
+          tokens={data.memoryTokens}
+          pctOfLimit={
+            data.tokenLimit > 0
+              ? (data.memoryTokens / data.tokenLimit) * 100
+              : 0
+          }
+          color={categoryColors.memory}
+          detail={`${data.memoryFileCount} files`}
+        />
+        <CategoryRow
+          label="Conversation"
+          tokens={data.conversationTokens}
+          pctOfLimit={
+            data.tokenLimit > 0
+              ? (data.conversationTokens / data.tokenLimit) * 100
+              : 0
+          }
+          color={categoryColors.conversation}
+          detail={`${data.turnCount} turns`}
+        />
+      </Box>
     </Box>
   );
 };

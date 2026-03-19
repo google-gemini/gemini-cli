@@ -352,30 +352,19 @@ export type HistoryItemMcpStatus = HistoryItemBase & {
   showSchema: boolean;
 };
 
-export type ContextWindowTurnKind =
-  | 'text'
-  | 'tool_call'
-  | 'tool_result'
-  | 'media'
-  | 'mixed';
-
-export interface ContextWindowTurn {
-  index: number;
-  role: string;
-  kind: ContextWindowTurnKind;
-  tokens: number;
-  preview: string;
-}
-
 export interface ContextWindowData {
   model: string;
   tokenLimit: number;
   tokensUsed: number;
   systemPromptTokens: number;
+  memoryTokens: number;
+  memoryFileCount: number;
   toolDeclarationTokens: number;
   toolCount: number;
   conversationTokens: number;
-  turns: ContextWindowTurn[];
+  turnCount: number;
+  compressionThreshold: number;
+  estimatedTurnsRemaining: number | null;
 }
 
 export type HistoryItemContextWindow = HistoryItemBase & {

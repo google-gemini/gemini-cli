@@ -4,18 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import {
-  MessageType,
-  type ContextWindowTurn,
-  type ContextWindowTurnKind,
-  type HistoryItemContextWindow,
-} from '../types.js';
+import { MessageType, type HistoryItemContextWindow } from '../types.js';
 import {
   type CommandContext,
   type SlashCommand,
   CommandKind,
 } from './types.js';
-import { tokenLimit, estimateTokenCountSync } from '@google/gemini-cli-core';
+import {
+  tokenLimit,
+  estimateTokenCountSync,
+  flattenMemory,
+} from '@google/gemini-cli-core';
 import type { Content, Tool } from '@google/genai';
 
 function estimateStringTokens(text: string): number {
@@ -32,56 +31,7 @@ function estimateToolDeclarationTokens(tools: readonly Tool[]): number {
   return Math.floor(JSON.stringify(tools).length / 4);
 }
 
-/**
- * Classifies a conversation turn by its dominant content type.
- */
-function classifyTurn(content: Content): ContextWindowTurnKind {
-  const parts = content.parts || [];
-  let hasText = false;
-  let hasCall = false;
-  let hasResult = false;
-  let hasMedia = false;
-
-  for (const part of parts) {
-    if (typeof part.text === 'string' && part.text.length > 0) hasText = true;
-    if (part.functionCall) hasCall = true;
-    if (part.functionResponse) hasResult = true;
-    if ('inlineData' in part || 'fileData' in part) hasMedia = true;
-  }
-
-  const count = [hasText, hasCall, hasResult, hasMedia].filter(Boolean).length;
-  if (count > 1) return 'mixed';
-  if (hasCall) return 'tool_call';
-  if (hasResult) return 'tool_result';
-  if (hasMedia) return 'media';
-  return 'text';
-}
-
-function getContentPreview(content: Content, maxLen: number = 80): string {
-  const parts = content.parts || [];
-  const segments: string[] = [];
-
-  for (const part of parts) {
-    if (typeof part.text === 'string' && part.text.length > 0) {
-      segments.push(part.text);
-    }
-    if (part.functionCall) {
-      segments.push(`[call: ${part.functionCall.name}]`);
-    }
-    if (part.functionResponse) {
-      segments.push(`[result: ${part.functionResponse.name}]`);
-    }
-    if ('inlineData' in part || 'fileData' in part) {
-      segments.push('[media]');
-    }
-  }
-
-  const full = segments.join(' ').replace(/\n+/g, ' ').trim();
-  if (full.length <= maxLen) return full;
-  return full.slice(0, maxLen - 3) + '...';
-}
-
-function contextAction(context: CommandContext): void {
+async function contextAction(context: CommandContext): Promise<void> {
   const config = context.services.config;
   if (!config) {
     context.ui.addItem({
@@ -105,9 +55,20 @@ function contextAction(context: CommandContext): void {
   const model = config.getModel() || 'unknown';
   const limit = tokenLimit(model);
 
+  // System prompt tokens (includes memory content)
   const sysInstruction = chat.getSystemInstruction();
-  const systemPromptTokens = estimateStringTokens(sysInstruction);
+  const totalSystemTokens = estimateStringTokens(sysInstruction);
 
+  // Memory tokens from the *loaded* content (what's actually in the system
+  // instruction), not from disk — files may have been edited since load.
+  const loadedMemory = flattenMemory(config.getUserMemory());
+  const memoryTokens = estimateStringTokens(loadedMemory);
+  const memoryFileCount = config.getGeminiMdFileCount();
+
+  // Core system prompt = total system instruction minus loaded memory
+  const systemPromptTokens = Math.max(0, totalSystemTokens - memoryTokens);
+
+  // Tool declarations
   const tools = chat.getTools();
   const toolDeclarationTokens = estimateToolDeclarationTokens(tools);
   const toolCount = tools.reduce(
@@ -115,27 +76,32 @@ function contextAction(context: CommandContext): void {
     0,
   );
 
-  const turns: ContextWindowTurn[] = [];
+  // Conversation history
+  const turnCount = history.length;
   let conversationTokens = 0;
-
-  for (let i = 0; i < history.length; i++) {
-    const turn = history[i];
-    const tokens = estimateTurnTokens(turn);
-    conversationTokens += tokens;
-    turns.push({
-      index: i + 1,
-      role: turn.role || 'unknown',
-      kind: classifyTurn(turn),
-      tokens,
-      preview: getContentPreview(turn),
-    });
+  for (const turn of history) {
+    conversationTokens += estimateTurnTokens(turn);
   }
 
-  // Sum our estimates for the total — the API-reported
-  // lastPromptTokenCount only covers conversation history, not
-  // system prompt or tool schemas.
+  // Compression threshold
+  const compressionThreshold = (await config.getCompressionThreshold()) ?? 0.5;
+
+  // Estimated turns remaining before compression
   const tokensUsed =
-    systemPromptTokens + toolDeclarationTokens + conversationTokens;
+    systemPromptTokens +
+    memoryTokens +
+    toolDeclarationTokens +
+    conversationTokens;
+  const compressionTokenLimit = compressionThreshold * limit;
+  const tokensUntilCompression = Math.max(
+    0,
+    compressionTokenLimit - tokensUsed,
+  );
+  const avgTokensPerTurn = turnCount > 0 ? conversationTokens / turnCount : 0;
+  const estimatedTurnsRemaining =
+    avgTokensPerTurn > 0
+      ? Math.floor(tokensUntilCompression / avgTokensPerTurn)
+      : null;
 
   const item: HistoryItemContextWindow = {
     type: MessageType.CONTEXT_WINDOW,
@@ -144,10 +110,14 @@ function contextAction(context: CommandContext): void {
       tokenLimit: limit,
       tokensUsed,
       systemPromptTokens,
+      memoryTokens,
+      memoryFileCount,
       toolDeclarationTokens,
       toolCount,
       conversationTokens,
-      turns,
+      turnCount,
+      compressionThreshold,
+      estimatedTurnsRemaining,
     },
   };
   context.ui.addItem(item);
