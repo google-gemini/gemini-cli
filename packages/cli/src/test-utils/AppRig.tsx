@@ -11,7 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { AppContainer } from '../ui/AppContainer.js';
-import { renderWithProviders } from './render.js';
+import { renderWithProviders, type RenderInstance } from './render.js';
 import {
   makeFakeConfig,
   type Config,
@@ -155,7 +155,7 @@ export interface PendingConfirmation {
 }
 
 export class AppRig {
-  private renderResult: ReturnType<typeof renderWithProviders> | undefined;
+  private renderResult: RenderInstance | undefined;
   private config: Config | undefined;
   private settings: LoadedSettings | undefined;
   private testDir: string;
@@ -393,12 +393,12 @@ export class AppRig {
     return isAnyToolActive || isAwaitingConfirmation;
   }
 
-  render() {
+  async render() {
     if (!this.config || !this.settings)
       throw new Error('AppRig not initialized');
 
-    act(() => {
-      this.renderResult = renderWithProviders(
+    await act(async () => {
+      this.renderResult = await renderWithProviders(
         <AppContainer
           config={this.config!}
           version="test-version"

@@ -6,11 +6,16 @@
 
 import { renderWithProviders } from '../../test-utils/render.js';
 import { DetailedMessagesDisplay } from './DetailedMessagesDisplay.js';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ConsoleMessageItem } from '../types.js';
 import { Box } from 'ink';
 import type React from 'react';
 import { createMockSettings } from '../../test-utils/settings.js';
+import { useConsoleMessages } from '../hooks/useConsoleMessages.js';
+
+vi.mock('../hooks/useConsoleMessages.js', () => ({
+  useConsoleMessages: vi.fn(),
+}));
 
 vi.mock('./shared/ScrollableList.js', () => ({
   ScrollableList: ({
@@ -29,14 +34,15 @@ vi.mock('./shared/ScrollableList.js', () => ({
 }));
 
 describe('DetailedMessagesDisplay', () => {
+  beforeEach(() => {
+    vi.mocked(useConsoleMessages).mockReturnValue({
+      consoleMessages: [],
+      clearConsoleMessages: vi.fn(),
+    });
+  });
   it('renders nothing when messages are empty', async () => {
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <DetailedMessagesDisplay
-        messages={[]}
-        maxHeight={10}
-        width={80}
-        hasFocus={false}
-      />,
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      <DetailedMessagesDisplay maxHeight={10} width={80} hasFocus={false} />,
       {
         settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
       },
@@ -53,14 +59,13 @@ describe('DetailedMessagesDisplay', () => {
       { type: 'error', content: 'Error message', count: 1 },
       { type: 'debug', content: 'Debug message', count: 1 },
     ];
+    vi.mocked(useConsoleMessages).mockReturnValue({
+      consoleMessages: messages,
+      clearConsoleMessages: vi.fn(),
+    });
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <DetailedMessagesDisplay
-        messages={messages}
-        maxHeight={20}
-        width={80}
-        hasFocus={true}
-      />,
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      <DetailedMessagesDisplay maxHeight={20} width={80} hasFocus={true} />,
       {
         settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
       },
@@ -76,14 +81,13 @@ describe('DetailedMessagesDisplay', () => {
     const messages: ConsoleMessageItem[] = [
       { type: 'error', content: 'Error message', count: 1 },
     ];
+    vi.mocked(useConsoleMessages).mockReturnValue({
+      consoleMessages: messages,
+      clearConsoleMessages: vi.fn(),
+    });
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <DetailedMessagesDisplay
-        messages={messages}
-        maxHeight={20}
-        width={80}
-        hasFocus={true}
-      />,
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      <DetailedMessagesDisplay maxHeight={20} width={80} hasFocus={true} />,
       {
         settings: createMockSettings({ ui: { errorVerbosity: 'low' } }),
       },
@@ -97,14 +101,13 @@ describe('DetailedMessagesDisplay', () => {
     const messages: ConsoleMessageItem[] = [
       { type: 'error', content: 'Error message', count: 1 },
     ];
+    vi.mocked(useConsoleMessages).mockReturnValue({
+      consoleMessages: messages,
+      clearConsoleMessages: vi.fn(),
+    });
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <DetailedMessagesDisplay
-        messages={messages}
-        maxHeight={20}
-        width={80}
-        hasFocus={true}
-      />,
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      <DetailedMessagesDisplay maxHeight={20} width={80} hasFocus={true} />,
       {
         settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
       },
@@ -118,14 +121,13 @@ describe('DetailedMessagesDisplay', () => {
     const messages: ConsoleMessageItem[] = [
       { type: 'log', content: 'Repeated message', count: 5 },
     ];
+    vi.mocked(useConsoleMessages).mockReturnValue({
+      consoleMessages: messages,
+      clearConsoleMessages: vi.fn(),
+    });
 
-    const { lastFrame, waitUntilReady, unmount } = renderWithProviders(
-      <DetailedMessagesDisplay
-        messages={messages}
-        maxHeight={10}
-        width={80}
-        hasFocus={false}
-      />,
+    const { lastFrame, waitUntilReady, unmount } = await renderWithProviders(
+      <DetailedMessagesDisplay maxHeight={10} width={80} hasFocus={false} />,
       {
         settings: createMockSettings({ ui: { errorVerbosity: 'full' } }),
       },
