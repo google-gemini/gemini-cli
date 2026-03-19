@@ -8,12 +8,11 @@ import { describe, expect, it } from 'vitest';
 import { MockAgentProtocol } from './mock.js';
 import type { AgentEvent, AgentProtocol } from './types.js';
 
-const waitForStreamEnd = (session: AgentProtocol): Promise<AgentEvent[]> =>
-  new Promise((resolve) => {
+const waitForStreamEnd = (session: AgentProtocol): Promise<AgentEvent[]> => new Promise((resolve) => {
     const events: AgentEvent[] = [];
     const unsubscribe = session.subscribe((e) => {
       events.push(e);
-      if (e.type === 'stream_end') {
+      if (e.type === 'agent_end') {
         unsubscribe();
         resolve(events);
       }
@@ -40,14 +39,14 @@ describe('MockAgentProtocol', () => {
 
     const streamedEvents = await streamPromise;
 
-    // Auto stream_start, auto user message, agent message, auto stream_end = 4 events
+    // Ordered: user message, agent_start, agent message, agent_end = 4 events
     expect(streamedEvents).toHaveLength(4);
-    expect(streamedEvents[0].type).toBe('stream_start');
-    expect(streamedEvents[1].type).toBe('message');
-    expect((streamedEvents[1] as AgentEvent<'message'>).role).toBe('user');
+    expect(streamedEvents[0].type).toBe('message');
+    expect((streamedEvents[0] as AgentEvent<'message'>).role).toBe('user');
+    expect(streamedEvents[1].type).toBe('agent_start');
     expect(streamedEvents[2].type).toBe('message');
     expect((streamedEvents[2] as AgentEvent<'message'>).role).toBe('agent');
-    expect(streamedEvents[3].type).toBe('stream_end');
+    expect(streamedEvents[3].type).toBe('agent_end');
 
     expect(session.events).toHaveLength(4);
     expect(session.events).toEqual(streamedEvents);
@@ -70,31 +69,33 @@ describe('MockAgentProtocol', () => {
     // First send
     const stream1Promise = waitForStreamEnd(session);
     const { streamId: s1 } = await session.send({
-      update: {},
+      update: { title: 't1' },
     });
     const events1 = await stream1Promise;
-    expect(events1).toHaveLength(3); // stream_start, session_update, stream_end
-    expect(events1[0].type).toBe('stream_start');
-    expect(events1[1].type).toBe('session_update');
-    expect(events1[2].type).toBe('stream_end');
+    expect(events1).toHaveLength(3); // session_update, agent_start, agent_end
+    expect(events1[0].type).toBe('session_update');
+    expect(events1[1].type).toBe('agent_start');
+    expect(events1[2].type).toBe('agent_end');
 
     // Second send
     const stream2Promise = waitForStreamEnd(session);
     const { streamId: s2 } = await session.send({
-      update: {},
+      update: { title: 't2' },
     });
     expect(s1).not.toBe(s2);
     const events2 = await stream2Promise;
-    expect(events2).toHaveLength(4); // stream_start, session_update, error, stream_end
-    expect(events2[1].type).toBe('session_update');
+    expect(events2).toHaveLength(4); // session_update, agent_start, error, agent_end
+    expect(events2[0].type).toBe('session_update');
+    expect(events2[1].type).toBe('agent_start');
     expect(events2[2].type).toBe('error');
+    expect(events2[3].type).toBe('agent_end');
 
     expect(session.events).toHaveLength(7);
   });
 
   it('should handle abort on a waiting stream', async () => {
     const session = new MockAgentProtocol();
-    // Use keepOpen to prevent auto stream_end
+    // Use keepOpen to prevent auto agent_end
     session.pushResponse([{ type: 'message' }], { keepOpen: true });
 
     const events: AgentEvent[] = [];
@@ -105,27 +106,29 @@ describe('MockAgentProtocol', () => {
 
     session.subscribe((e) => {
       events.push(e);
-      if (e.type === 'stream_end') {
+      if (e.type === 'agent_end') {
         resolveStream(events);
       }
     });
 
-    const { streamId: _streamId } = await session.send({ update: {} });
+    const { streamId: _streamId } = await session.send({
+      update: { title: 't' },
+    });
 
     // Initial events should have been emitted
     expect(events.map((e) => e.type)).toEqual([
-      'stream_start',
       'session_update',
+      'agent_start',
       'message',
     ]);
 
     // At this point, the stream should be "waiting" for more events because it's still active
-    // and hasn't seen a stream_end.
+    // and hasn't seen an agent_end.
     await session.abort();
 
     const finalEvents = await streamPromise;
-    expect(finalEvents[3].type).toBe('stream_end');
-    expect((finalEvents[3] as AgentEvent<'stream_end'>).reason).toBe('aborted');
+    expect(finalEvents[3].type).toBe('agent_end');
+    expect((finalEvents[3] as AgentEvent<'agent_end'>).reason).toBe('aborted');
   });
 
   it('should handle pushToStream on a waiting stream', async () => {
@@ -135,22 +138,22 @@ describe('MockAgentProtocol', () => {
     const events: AgentEvent[] = [];
     session.subscribe((e) => events.push(e));
 
-    const { streamId } = await session.send({ update: {} });
+    const { streamId } = await session.send({ update: { title: 't' } });
 
     expect(events.map((e) => e.type)).toEqual([
-      'stream_start',
       'session_update',
+      'agent_start',
     ]);
 
     // Push new event to active stream
-    session.pushToStream(streamId, [{ type: 'message' }]);
+    session.pushToStream(streamId!, [{ type: 'message' }]);
 
     expect(events).toHaveLength(3);
     expect(events[2].type).toBe('message');
 
     await session.abort();
     expect(events).toHaveLength(4);
-    expect(events[3].type).toBe('stream_end');
+    expect(events[3].type).toBe('agent_end');
   });
 
   it('should handle pushToStream with close option', async () => {
@@ -158,33 +161,33 @@ describe('MockAgentProtocol', () => {
     session.pushResponse([], { keepOpen: true });
 
     const streamPromise = waitForStreamEnd(session);
-    const { streamId } = await session.send({ update: {} });
+    const { streamId } = await session.send({ update: { title: 't' } });
 
     // Push new event and close
-    session.pushToStream(streamId, [{ type: 'message' }], { close: true });
+    session.pushToStream(streamId!, [{ type: 'message' }], { close: true });
 
     const events = await streamPromise;
     expect(events.map((e) => e.type)).toEqual([
-      'stream_start',
       'session_update',
+      'agent_start',
       'message',
-      'stream_end',
+      'agent_end',
     ]);
-    expect((events[3] as AgentEvent<'stream_end'>).reason).toBe('completed');
+    expect((events[3] as AgentEvent<'agent_end'>).reason).toBe('completed');
   });
 
-  it('should not double up on stream_end if provided manually', async () => {
+  it('should not double up on agent_end if provided manually', async () => {
     const session = new MockAgentProtocol();
     session.pushResponse([
       { type: 'message' },
-      { type: 'stream_end', reason: 'completed' },
+      { type: 'agent_end', reason: 'completed' },
     ]);
 
     const streamPromise = waitForStreamEnd(session);
-    await session.send({ update: {} });
+    await session.send({ update: { title: 't' } });
 
     const events = await streamPromise;
-    const endEvents = events.filter((e) => e.type === 'stream_end');
+    const endEvents = events.filter((e) => e.type === 'agent_end');
     expect(endEvents).toHaveLength(1);
   });
 
@@ -200,10 +203,11 @@ describe('MockAgentProtocol', () => {
     });
 
     const events = await streamPromise;
-    expect(events[1].type).toBe('elicitation_response');
-    expect((events[1] as AgentEvent<'elicitation_response'>).requestId).toBe(
+    expect(events[0].type).toBe('elicitation_response');
+    expect((events[0] as AgentEvent<'elicitation_response'>).requestId).toBe(
       'r1',
     );
+    expect(events[1].type).toBe('agent_start');
   });
 
   it('should handle updates and track state', async () => {
@@ -220,7 +224,17 @@ describe('MockAgentProtocol', () => {
     expect(session.config).toEqual({ x: 1 });
 
     const events = await streamPromise;
-    expect(events[1].type).toBe('session_update');
+    expect(events[0].type).toBe('session_update');
+    expect(events[1].type).toBe('agent_start');
+  });
+
+  it('should return streamId: null if no response queued', async () => {
+    const session = new MockAgentProtocol();
+    const { streamId } = await session.send({ update: { title: 'foo' } });
+    expect(streamId).toBeNull();
+    expect(session.events).toHaveLength(1);
+    expect(session.events[0].type).toBe('session_update');
+    expect(session.events[0].streamId).toBeNull();
   });
 
   it('should throw on action', async () => {

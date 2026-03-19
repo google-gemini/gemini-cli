@@ -16,7 +16,7 @@ import type {
 export type MockAgentEvent = Partial<AgentEventCommon> & AgentEventData;
 
 export interface PushResponseOptions {
-  /** If true, does not automatically add a stream_end event. */
+  /** If true, does not automatically add an agent_end event. */
   keepOpen?: boolean;
 }
 
@@ -32,7 +32,7 @@ export class MockAgentProtocol implements AgentProtocol {
   }> = [];
   private _subscribers = new Set<(event: AgentEvent) => void>();
   private _activeStreamIds = new Set<string>();
-  private _lastStreamId?: string;
+  private _lastStreamId?: string | null;
   private _nextEventId = 1;
   private _nextStreamId = 1;
 
@@ -63,8 +63,8 @@ export class MockAgentProtocol implements AgentProtocol {
     for (const callback of this._subscribers) {
       callback(event);
     }
-    if (event.type === 'stream_end') {
-      this._activeStreamIds.delete(event.streamId!);
+    if (event.type === 'agent_end' && event.streamId) {
+      this._activeStreamIds.delete(event.streamId);
     }
   }
 
@@ -97,92 +97,126 @@ export class MockAgentProtocol implements AgentProtocol {
 
     if (
       options?.close &&
-      !events.some((eventData) => eventData.type === 'stream_end')
+      !events.some((eventData) => eventData.type === 'agent_end')
     ) {
       this._emit({
         id: `e-${this._nextEventId++}`,
         timestamp: now,
         streamId,
-        type: 'stream_end',
+        type: 'agent_end',
         reason: 'completed',
       } as AgentEvent);
     }
   }
 
-  async send(payload: AgentSend): Promise<{ streamId: string }> {
-    const { events: response, options } = this._responses.shift() ?? {
+  async send(payload: AgentSend): Promise<{ streamId: string | null }> {
+    const responseData = this._responses.shift();
+    const { events: response, options } = responseData ?? {
       events: [],
     };
-    const streamId =
-      response[0]?.streamId ?? `mock-stream-${this._nextStreamId++}`;
+
+    // If there were queued responses (even if empty array), we trigger a stream.
+    const hasResponseEvents = responseData !== undefined;
+    const streamId = hasResponseEvents
+      ? (response[0]?.streamId ?? `mock-stream-${this._nextStreamId++}`)
+      : null;
 
     const now = new Date().toISOString();
+    const eventsToEmit: AgentEvent[] = [];
 
-    if (!response.some((eventData) => eventData.type === 'stream_start')) {
-      response.unshift({
-        type: 'stream_start',
-        streamId,
-      });
-    }
+    // Helper to normalize and prepare for emission
+    const normalize = (eventData: MockAgentEvent): AgentEvent => ({
+        ...eventData,
+        id: eventData.id ?? `e-${this._nextEventId++}`,
+        timestamp: eventData.timestamp ?? now,
+        streamId: eventData.streamId ?? streamId,
+      } as AgentEvent);
 
-    const startIndex = response.findIndex(
-      (eventData) => eventData.type === 'stream_start',
-    );
-
+    // 1. User/Update event (BEFORE agent_start)
     if ('message' in payload && payload.message) {
-      response.splice(startIndex + 1, 0, {
-        type: 'message',
-        role: 'user',
-        content: payload.message,
-        _meta: payload._meta,
-      });
-    } else if ('elicitations' in payload && payload.elicitations) {
-      payload.elicitations.forEach((elicitation, i) => {
-        response.splice(startIndex + 1 + i, 0, {
-          type: 'elicitation_response',
-          ...elicitation,
+      eventsToEmit.push(
+        normalize({
+          type: 'message',
+          role: 'user',
+          content: payload.message,
           _meta: payload._meta,
-        });
+        }),
+      );
+    } else if ('elicitations' in payload && payload.elicitations) {
+      payload.elicitations.forEach((elicitation) => {
+        eventsToEmit.push(
+          normalize({
+            type: 'elicitation_response',
+            ...elicitation,
+            _meta: payload._meta,
+          }),
+        );
       });
-    } else if ('update' in payload && payload.update) {
+    } else if (
+      'update' in payload &&
+      payload.update &&
+      Object.keys(payload.update).length > 0
+    ) {
       if (payload.update.title) this.title = payload.update.title;
       if (payload.update.model) this.model = payload.update.model;
       if (payload.update.config) {
         this.config = payload.update.config;
       }
-      response.splice(startIndex + 1, 0, {
-        type: 'session_update',
-        ...payload.update,
-        _meta: payload._meta,
-      });
+      eventsToEmit.push(
+        normalize({
+          type: 'session_update',
+          ...payload.update,
+          _meta: payload._meta,
+        }),
+      );
     } else if ('action' in payload && payload.action) {
       throw new Error(
         `Actions not supported in MockAgentProtocol: ${payload.action.type}`,
       );
     }
 
-    if (
-      !options?.keepOpen &&
-      !response.some((eventData) => eventData.type === 'stream_end')
-    ) {
-      response.push({
-        type: 'stream_end',
-        reason: 'completed',
-        streamId,
-      });
+    // 2. agent_start (if stream)
+    if (streamId) {
+      if (!response.some((eventData) => eventData.type === 'agent_start')) {
+        eventsToEmit.push(
+          normalize({
+            type: 'agent_start',
+            streamId,
+          }),
+        );
+      }
     }
 
-    this._activeStreamIds.add(streamId);
+    // 3. Response events
+    for (const eventData of response) {
+      eventsToEmit.push(normalize(eventData));
+    }
+
+    // 4. agent_end (if stream and not manual)
+    if (streamId && !options?.keepOpen) {
+      if (!eventsToEmit.some((e) => e.type === 'agent_end')) {
+        eventsToEmit.push(
+          normalize({
+            type: 'agent_end',
+            reason: 'completed',
+            streamId,
+          }),
+        );
+      }
+    }
+
+    if (streamId) {
+      this._activeStreamIds.add(streamId);
+    }
     this._lastStreamId = streamId;
 
-    for (const eventData of response) {
-      const event: AgentEvent = {
-        ...eventData,
-        id: eventData.id ?? `e-${this._nextEventId++}`,
-        timestamp: eventData.timestamp ?? now,
-        streamId: eventData.streamId ?? streamId,
-      } as AgentEvent;
-      this._emit(event);
+    // Emit events asynchronously so the caller receives the streamId first.
+    if (eventsToEmit.length > 0) {
+      void Promise.resolve().then(() => {
+        for (const event of eventsToEmit) {
+          this._emit(event);
+        }
+      });
     }
 
     return { streamId };
@@ -195,7 +229,7 @@ export class MockAgentProtocol implements AgentProtocol {
         id: `e-${this._nextEventId++}`,
         timestamp: new Date().toISOString(),
         streamId,
-        type: 'stream_end',
+        type: 'agent_end',
         reason: 'aborted',
       } as AgentEvent);
     }
