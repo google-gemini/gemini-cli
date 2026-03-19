@@ -30,5 +30,6 @@ This skill enables the agent to utilize **Gemini Workspaces**—a high-performan
 
 ## ⚠️ Important Constraints
 - **Absolute Paths**: Always use absolute paths (e.g., `/mnt/disks/data/...`) when orchestrating remote commands.
+- **npx tsx**: When running scripts manually from the skill directory, always prefix with `npx tsx` to ensure dependencies are available.
 - **Be Behavioral**: Prioritize results from live execution (behavioral proofs) over static reading.
 - **Multi-tasking**: Remind the user they can continue chatting in the main window while the heavy workspace task runs in the separate terminal window.
