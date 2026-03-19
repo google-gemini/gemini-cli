@@ -407,8 +407,8 @@ describe('E2E Tests', () => {
     expect(events.length).toBe(7);
   });
 
-  it('should handle multiple tool calls sequentially in YOLO mode', async () => {
-    // Set YOLO mode to auto-approve tools and test sequential execution.
+  it('should handle multiple tool calls sequentially with wildcard policy', async () => {
+    // Set wildcard policy to auto-approve tools and test sequential execution.
     getAllowedToolsSpy.mockReturnValue(['*']);
 
     // First call yields the tool request
@@ -680,15 +680,15 @@ describe('E2E Tests', () => {
     expect(events.length).toBe(10);
   });
 
-  it('should bypass tool approval in YOLO mode', async () => {
+  it('should bypass tool approval with wildcard policy', async () => {
     // First call yields the tool request
     sendMessageStreamSpy.mockImplementationOnce(async function* () {
       yield* [
         {
           type: GeminiEventType.ToolCallRequest,
           value: {
-            callId: 'test-call-id-yolo',
-            name: 'test-tool-yolo',
+            callId: 'test-call-id-wildcard',
+            name: 'test-tool-wildcard',
             args: {},
           },
         },
@@ -699,12 +699,12 @@ describe('E2E Tests', () => {
       yield* [{ type: 'content', value: 'Tool executed successfully.' }];
     });
 
-    // Set approval mode to yolo
+    // Set approval mode to wildcard
     getAllowedToolsSpy.mockReturnValue(['*']);
 
     const mockTool = new MockTool({
-      name: 'test-tool-yolo',
-      displayName: 'Test Tool YOLO',
+      name: 'test-tool-wildcard',
+      displayName: 'Test Tool WILDCARD',
       execute: vi.fn().mockResolvedValue({
         llmContent: 'Tool executed successfully.',
         returnDisplay: 'Tool executed successfully.',
@@ -722,8 +722,8 @@ describe('E2E Tests', () => {
       .post('/')
       .send(
         createStreamMessageRequest(
-          'run a tool in yolo mode',
-          'a2a-yolo-mode-test-message',
+          'run a tool in wildcard mode',
+          'a2a-wildcard-mode-test-message',
         ),
       )
       .set('Content-Type', 'application/json')
@@ -746,7 +746,7 @@ describe('E2E Tests', () => {
       {
         data: {
           status: 'validating',
-          request: { callId: 'test-call-id-yolo' },
+          request: { callId: 'test-call-id-wildcard' },
         },
       },
     ]);
@@ -760,7 +760,7 @@ describe('E2E Tests', () => {
       {
         data: {
           status: 'scheduled',
-          request: { callId: 'test-call-id-yolo' },
+          request: { callId: 'test-call-id-wildcard' },
         },
       },
     ]);
@@ -774,7 +774,7 @@ describe('E2E Tests', () => {
       {
         data: {
           status: 'executing',
-          request: { callId: 'test-call-id-yolo' },
+          request: { callId: 'test-call-id-wildcard' },
         },
       },
     ]);
@@ -788,7 +788,7 @@ describe('E2E Tests', () => {
       {
         data: {
           status: 'success',
-          request: { callId: 'test-call-id-yolo' },
+          request: { callId: 'test-call-id-wildcard' },
         },
       },
     ]);

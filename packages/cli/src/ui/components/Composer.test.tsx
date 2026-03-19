@@ -640,7 +640,7 @@ describe('Composer', () => {
       },
     );
 
-    it('shows ApprovalModeIndicator when YOLO mode is active and shell mode is inactive', async () => {
+    it('shows ApprovalModeIndicator when wildcard policy is active and shell mode is inactive', async () => {
       const config = createMockConfig({
         getAllowedTools: vi.fn(() => ['*']),
       });
@@ -703,7 +703,7 @@ describe('Composer', () => {
       },
     );
 
-    it('shows minimal mode badge "YOLO" when clean UI details are hidden and YOLO mode is active', async () => {
+    it('shows minimal mode badge "WILDCARD" when clean UI details are hidden and wildcard policy is active', async () => {
       const config = createMockConfig({
         getAllowedTools: vi.fn(() => ['*']),
       });
@@ -713,7 +713,7 @@ describe('Composer', () => {
       });
 
       const { lastFrame } = await renderComposer(uiState, undefined, config);
-      expect(lastFrame()).toContain('YOLO');
+      expect(lastFrame()).toContain('WILDCARD');
     });
 
     it('hides minimal mode badge while loading in clean mode', async () => {

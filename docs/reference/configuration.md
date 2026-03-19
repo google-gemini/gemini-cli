@@ -1860,8 +1860,8 @@ their corresponding top-level category object in your `settings.json` file.
 #### `admin`
 
 - **`admin.secureModeEnabled`** (boolean):
-  - **Description:** If true, disallows YOLO mode (wildcard policies) and "Always allow" options
-    from being used.
+  - **Description:** If true, disallows YOLO mode (wildcard policies) and
+    "Always allow" options from being used.
   - **Default:** `false`
 
 - **`admin.extensions.enabled`** (boolean):

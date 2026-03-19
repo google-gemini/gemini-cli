@@ -353,16 +353,21 @@ describe('Task Event-Driven Scheduler', () => {
     );
   });
 
-  it('should execute without confirmation in YOLO mode and not transition to input-required', async () => {
-    // Enable YOLO mode
-    const yoloConfig = createMockConfig({
+  it('should execute without confirmation when wildcard policy is enabled and not transition to input-required', async () => {
+    // Enable wildcard policy
+    const wildcardConfig = createMockConfig({
       isEventDrivenSchedulerEnabled: () => true,
       getAllowedTools: () => ['*'],
     }) as Config;
-    const yoloMessageBus = yoloConfig.messageBus;
+    const wildcardMessageBus = wildcardConfig.messageBus;
 
     // @ts-expect-error - Calling private constructor
-    const task = new Task('task-id', 'context-id', yoloConfig, mockEventBus);
+    const task = new Task(
+      'task-id',
+      'context-id',
+      wildcardConfig,
+      mockEventBus,
+    );
     task.setTaskStateAndPublishUpdate = vi.fn();
 
     const toolCall = {
@@ -372,13 +377,13 @@ describe('Task Event-Driven Scheduler', () => {
       confirmationDetails: { type: 'info', title: 'test', prompt: 'test' },
     };
 
-    const handler = (yoloMessageBus.subscribe as Mock).mock.calls.find(
+    const handler = (wildcardMessageBus.subscribe as Mock).mock.calls.find(
       (call: unknown[]) => call[0] === MessageBusType.TOOL_CALLS_UPDATE,
     )?.[1];
     handler({ type: MessageBusType.TOOL_CALLS_UPDATE, toolCalls: [toolCall] });
 
     // Should NOT auto-publish ProceedOnce anymore, because PolicyEngine handles it directly
-    expect(yoloMessageBus.publish).not.toHaveBeenCalledWith(
+    expect(wildcardMessageBus.publish).not.toHaveBeenCalledWith(
       expect.objectContaining({
         type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
       }),

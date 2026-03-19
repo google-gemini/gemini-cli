@@ -359,7 +359,7 @@ export const ALWAYS_ALLOW_PRIORITY_OFFSET =
   ALWAYS_ALLOW_PRIORITY_FRACTION / 1000;
 
 /**
- * Priority for the YOLO "allow all" rule.
- * Matches the raw priority used in yolo.toml.
+ * Priority for the wildcard "allow all" rule.
+ * Matches the raw priority previously used for the wildcard allow all override.
  */
-export const PRIORITY_YOLO_ALLOW_ALL = 998;
+export const PRIORITY_WILDCARD_ALLOW_ALL = 998;

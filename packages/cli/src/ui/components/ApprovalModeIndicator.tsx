@@ -14,13 +14,13 @@ import { Command } from '../key/keyBindings.js';
 interface ApprovalModeIndicatorProps {
   approvalMode: ApprovalMode;
   allowPlanMode?: boolean;
-  isYoloMode?: boolean;
+  isWildcardPolicyEnabled?: boolean;
 }
 
 export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
   approvalMode,
   allowPlanMode,
-  isYoloMode,
+  isWildcardPolicyEnabled,
 }) => {
   let textColor = '';
   let textContent = '';
@@ -28,9 +28,9 @@ export const ApprovalModeIndicator: React.FC<ApprovalModeIndicatorProps> = ({
 
   const cycleHint = formatCommand(Command.CYCLE_APPROVAL_MODE);
 
-  if (isYoloMode) {
+  if (isWildcardPolicyEnabled) {
     textColor = theme.status.error;
-    textContent = 'YOLO';
+    textContent = 'WILDCARD';
     subText = '';
   } else {
     switch (approvalMode) {

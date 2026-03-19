@@ -77,7 +77,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const hasToast = shouldShowToast(uiState);
   const hideUiDetailsForSuggestions =
     suggestionsVisible && suggestionsPosition === 'above';
-  const isYoloMode = config.getAllowedTools()?.includes('*');
+  const isWildcardPolicyEnabled = config.getAllowedTools()?.includes('*');
 
   // Mini Mode VIP Flags (Pure Content Triggers)
   const showMinimalToast = hasToast;
@@ -148,7 +148,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           shellModeActive={uiState.shellModeActive}
           setShellModeActive={uiActions.setShellModeActive}
           approvalMode={uiState.showApprovalModeIndicator}
-          isYoloMode={isYoloMode}
+          isWildcardPolicyEnabled={isWildcardPolicyEnabled}
           onEscapePromptChange={uiActions.onEscapePromptChange}
           focus={isFocused}
           vimHandleInput={uiActions.vimHandleInput}
