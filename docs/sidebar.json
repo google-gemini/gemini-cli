@@ -136,6 +136,33 @@
           { "label": "Sandboxing", "slug": "docs/cli/sandbox" },
           { "label": "Settings", "slug": "docs/cli/settings" },
           { "label": "Telemetry", "slug": "docs/cli/telemetry" },
+          {
+            "label": "Workspaces",
+            "badge": "🔬",
+            "collapsed": true,
+            "items": [
+              {
+                "label": "Architecture Overview",
+                "slug": "docs/architecture/workspaces/overview"
+              },
+              {
+                "label": "Workspace Hub",
+                "slug": "docs/architecture/workspaces/hub-service"
+              },
+              {
+                "label": "Workspace Image",
+                "slug": "docs/architecture/workspaces/container-image"
+              },
+              {
+                "label": "Client & Connectivity",
+                "slug": "docs/architecture/workspaces/client-connectivity"
+              },
+              {
+                "label": "Sync & Authentication",
+                "slug": "docs/architecture/workspaces/sync-and-auth"
+              }
+            ]
+          },
           { "label": "Token caching", "slug": "docs/cli/token-caching" }
         ]
       },
