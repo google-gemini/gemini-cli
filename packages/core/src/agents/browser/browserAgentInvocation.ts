@@ -431,7 +431,7 @@ export class BrowserAgentInvocation extends BaseToolInvocation<
       try {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const parsed = JSON.parse(output.result);
-         
+
         taskSuccess = parsed?.success === true;
       } catch {
         // non-JSON result -> treat as unknown, default false

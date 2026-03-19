@@ -48,6 +48,11 @@ vi.mock('../../telemetry/metrics.js', () => ({
   recordBrowserAgentConnection: vi.fn(),
 }));
 
+// Mock browser consent to always grant consent by default
+vi.mock('../../../utils/browserConsent.js', () => ({
+  getBrowserConsentIfNeeded: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('./automationOverlay.js', () => ({
   injectAutomationOverlay: vi.fn().mockResolvedValue(undefined),
 }));
@@ -69,6 +74,7 @@ import * as fs from 'node:fs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { recordBrowserAgentConnection } from '../../telemetry/metrics.js';
+import { getBrowserConsentIfNeeded } from '../../utils/browserConsent.js';
 
 describe('BrowserManager', () => {
   let mockConfig: Config;
