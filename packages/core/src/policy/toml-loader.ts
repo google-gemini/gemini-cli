@@ -38,6 +38,7 @@ const MAX_TYPO_DISTANCE = 3;
  */
 const PolicyRuleSchema = z.object({
   toolName: z.union([z.string(), z.array(z.string())]).optional(),
+  subagent: z.string().optional(),
   mcpName: z.string().optional(),
   argsPattern: z.string().optional(),
   commandPrefix: z.union([z.string(), z.array(z.string())]).optional(),
@@ -60,6 +61,7 @@ const PolicyRuleSchema = z.object({
         'priority must be <= 999 to prevent tier overflow. Priorities >= 1000 would jump to the next tier.',
     }),
   modes: z.array(z.nativeEnum(ApprovalMode)).optional(),
+  interactive: z.boolean().optional(),
   toolAnnotations: z.record(z.any()).optional(),
   allow_redirection: z.boolean().optional(),
   deny_message: z.string().optional(),
@@ -456,6 +458,11 @@ export async function loadPoliciesFromToml(
                 const mcpName = rule.mcpName;
 
                 if (mcpName) {
+                  // TODO(mcp): Decouple mcpName rules from FQN string parsing
+                  // to support underscores in server aliases natively. Leaving
+                  // mcpName and toolName separate here and relying on metadata
+                  // during policy evaluation will avoid underscore splitting bugs.
+                  // See: https://github.com/google-gemini/gemini-cli/issues/21727
                   effectiveToolName = formatMcpToolName(
                     mcpName,
                     effectiveToolName,
@@ -464,10 +471,12 @@ export async function loadPoliciesFromToml(
 
                 const policyRule: PolicyRule = {
                   toolName: effectiveToolName,
+                  subagent: rule.subagent,
                   mcpName: rule.mcpName,
                   decision: rule.decision,
                   priority: transformPriority(rule.priority, tier),
                   modes: rule.modes,
+                  interactive: rule.interactive,
                   toolAnnotations: rule.toolAnnotations,
                   allowRedirection: rule.allow_redirection,
                   source: `${tierName.charAt(0).toUpperCase() + tierName.slice(1)}: ${file}`,

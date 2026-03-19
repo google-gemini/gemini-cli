@@ -4,8 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Mock } from 'vitest';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { getInstallationInfo, PackageManager } from './installationInfo.js';
 import { updateEventEmitter } from './updateEventEmitter.js';
 import type { UpdateObject } from '../ui/utils/updateCheck.js';
@@ -195,7 +202,12 @@ describe('handleAutoUpdate', () => {
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
-  it.each([PackageManager.NPX, PackageManager.PNPX, PackageManager.BUNX])(
+  it.each([
+    PackageManager.NPX,
+    PackageManager.PNPX,
+    PackageManager.BUNX,
+    PackageManager.BINARY,
+  ])(
     'should suppress update notifications when running via %s',
     (packageManager) => {
       mockGetInstallationInfo.mockReturnValue({

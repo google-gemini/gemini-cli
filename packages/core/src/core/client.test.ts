@@ -23,6 +23,7 @@ import {
 } from './contentGenerator.js';
 import { GeminiChat } from './geminiChat.js';
 import type { Config } from '../config/config.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 import {
   CompressionStatus,
   GeminiEventType,
@@ -51,6 +52,7 @@ import * as policyCatalog from '../availability/policyCatalog.js';
 import { LlmRole, LoopType } from '../telemetry/types.js';
 import { partToString } from '../utils/partUtils.js';
 import { coreEvents } from '../utils/events.js';
+import type { MessageBus } from '../confirmation-bus/message-bus.js';
 
 // Mock fs module to prevent actual file system operations during tests
 const mockFileSystem = new Map<string, string>();
@@ -214,7 +216,10 @@ describe('Gemini Client (client.ts)', () => {
       getUserMemory: vi.fn().mockReturnValue(''),
       getGlobalMemory: vi.fn().mockReturnValue(''),
       getEnvironmentMemory: vi.fn().mockReturnValue(''),
+      getSystemInstructionMemory: vi.fn().mockReturnValue(''),
+      getSessionMemory: vi.fn().mockReturnValue(''),
       isJitContextEnabled: vi.fn().mockReturnValue(false),
+      getContextManager: vi.fn().mockReturnValue(undefined),
       getToolOutputMaskingEnabled: vi.fn().mockReturnValue(false),
       getDisableLoopDetection: vi.fn().mockReturnValue(false),
 
@@ -234,6 +239,8 @@ describe('Gemini Client (client.ts)', () => {
         getDirectories: vi.fn().mockReturnValue(['/test/dir']),
       }),
       getGeminiClient: vi.fn(),
+      getRetryFetchErrors: vi.fn().mockReturnValue(true),
+      getMaxAttempts: vi.fn().mockReturnValue(3),
       getModelRouterService: vi
         .fn()
         .mockReturnValue(mockRouterService as unknown as ModelRouterService),
@@ -278,9 +285,23 @@ describe('Gemini Client (client.ts)', () => {
     } as unknown as Config;
     mockConfig.getHookSystem = vi.fn().mockReturnValue(mockHookSystem);
 
-    client = new GeminiClient(mockConfig);
+    (
+      mockConfig as unknown as { toolRegistry: typeof mockToolRegistry }
+    ).toolRegistry = mockToolRegistry;
+    (mockConfig as unknown as { messageBus: MessageBus }).messageBus = {
+      publish: vi.fn(),
+      subscribe: vi.fn(),
+    } as unknown as MessageBus;
+    (mockConfig as unknown as { config: Config; promptId: string }).config =
+      mockConfig;
+    (mockConfig as unknown as { config: Config; promptId: string }).promptId =
+      'test-prompt-id';
+
+    client = new GeminiClient(mockConfig as unknown as AgentLoopContext);
     await client.initialize();
     vi.mocked(mockConfig.getGeminiClient).mockReturnValue(client);
+    (mockConfig as unknown as { geminiClient: GeminiClient }).geminiClient =
+      client;
 
     vi.mocked(uiTelemetryService.setLastPromptTokenCount).mockClear();
   });
@@ -355,6 +376,23 @@ describe('Gemini Client (client.ts)', () => {
       expect(newChat).not.toBe(initialChat);
       expect(newHistory.length).toBe(initialHistory.length);
       expect(JSON.stringify(newHistory)).not.toContain('some old message');
+    });
+
+    it('should refresh ContextManager to reset JIT loaded paths', async () => {
+      const mockRefresh = vi.fn().mockResolvedValue(undefined);
+      vi.mocked(mockConfig.getContextManager).mockReturnValue({
+        refresh: mockRefresh,
+      } as unknown as ReturnType<typeof mockConfig.getContextManager>);
+
+      await client.resetChat();
+
+      expect(mockRefresh).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not fail when ContextManager is undefined', async () => {
+      vi.mocked(mockConfig.getContextManager).mockReturnValue(undefined);
+
+      await expect(client.resetChat()).resolves.not.toThrow();
     });
   });
 
@@ -1925,12 +1963,11 @@ ${JSON.stringify(
       });
     });
 
-    it('should use getGlobalMemory for system instruction when JIT is enabled', async () => {
+    it('should use getSystemInstructionMemory for system instruction when JIT is enabled', async () => {
       vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(true);
-      vi.mocked(mockConfig.getGlobalMemory).mockReturnValue(
+      vi.mocked(mockConfig.getSystemInstructionMemory).mockReturnValue(
         'Global JIT Memory',
       );
-      vi.mocked(mockConfig.getUserMemory).mockReturnValue('Full JIT Memory');
 
       const { getCoreSystemPrompt } = await import('./prompts.js');
       const mockGetCoreSystemPrompt = vi.mocked(getCoreSystemPrompt);
@@ -1939,13 +1976,15 @@ ${JSON.stringify(
 
       expect(mockGetCoreSystemPrompt).toHaveBeenCalledWith(
         mockConfig,
-        'Full JIT Memory',
+        'Global JIT Memory',
       );
     });
 
-    it('should use getUserMemory for system instruction when JIT is disabled', async () => {
+    it('should use getSystemInstructionMemory for system instruction when JIT is disabled', async () => {
       vi.mocked(mockConfig.isJitContextEnabled).mockReturnValue(false);
-      vi.mocked(mockConfig.getUserMemory).mockReturnValue('Legacy Memory');
+      vi.mocked(mockConfig.getSystemInstructionMemory).mockReturnValue(
+        'Legacy Memory',
+      );
 
       const { getCoreSystemPrompt } = await import('./prompts.js');
       const mockGetCoreSystemPrompt = vi.mocked(getCoreSystemPrompt);

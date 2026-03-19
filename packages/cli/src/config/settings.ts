@@ -14,10 +14,12 @@ import {
   FatalConfigError,
   GEMINI_DIR,
   getErrorMessage,
+  getFsErrorMessage,
   Storage,
   coreEvents,
   homedir,
   type AdminControlsSettings,
+  createCache,
 } from '@google/gemini-cli-core';
 import stripJsonComments from 'strip-json-comments';
 import { DefaultLight } from '../ui/themes/builtin/light/default-light.js';
@@ -615,6 +617,20 @@ export function loadEnvironment(
   }
 }
 
+// Cache to store the results of loadSettings to avoid redundant disk I/O.
+const settingsCache = createCache<string, LoadedSettings>({
+  storage: 'map',
+  defaultTtl: 10000, // 10 seconds
+});
+
+/**
+ * Resets the settings cache. Used exclusively for test isolation.
+ * @internal
+ */
+export function resetSettingsCacheForTesting() {
+  settingsCache.clear();
+}
+
 /**
  * Loads settings from user and workspace directories.
  * Project settings override user settings.
@@ -622,6 +638,16 @@ export function loadEnvironment(
 export function loadSettings(
   workspaceDir: string = process.cwd(),
 ): LoadedSettings {
+  const normalizedWorkspaceDir = path.resolve(workspaceDir);
+  return settingsCache.getOrCreate(normalizedWorkspaceDir, () =>
+    _doLoadSettings(normalizedWorkspaceDir),
+  );
+}
+
+/**
+ * Internal implementation of the settings loading logic.
+ */
+function _doLoadSettings(workspaceDir: string): LoadedSettings {
   let systemSettings: Settings = {};
   let systemDefaultSettings: Settings = {};
   let userSettings: Settings = {};
@@ -1029,6 +1055,9 @@ export function migrateDeprecatedSettings(
 }
 
 export function saveSettings(settingsFile: SettingsFile): void {
+  // Clear the entire cache on any save.
+  settingsCache.clear();
+
   try {
     // Ensure the directory exists
     const dirPath = path.dirname(settingsFile.path);
@@ -1044,9 +1073,10 @@ export function saveSettings(settingsFile: SettingsFile): void {
       settingsToSave as Record<string, unknown>,
     );
   } catch (error) {
+    const detailedErrorMessage = getFsErrorMessage(error);
     coreEvents.emitFeedback(
       'error',
-      'There was an error saving your latest settings changes.',
+      `Failed to save settings: ${detailedErrorMessage}`,
       error,
     );
   }
@@ -1059,9 +1089,10 @@ export function saveModelChange(
   try {
     loadedSettings.setValue(SettingScope.User, 'model.name', model);
   } catch (error) {
+    const detailedErrorMessage = getFsErrorMessage(error);
     coreEvents.emitFeedback(
       'error',
-      'There was an error saving your preferred model.',
+      `Failed to save preferred model: ${detailedErrorMessage}`,
       error,
     );
   }

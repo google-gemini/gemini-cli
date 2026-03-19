@@ -9,18 +9,26 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { ExtensionManager } from './extension-manager.js';
-import { createTestMergedSettings } from './settings.js';
+import { createTestMergedSettings, type MergedSettings } from './settings.js';
 import { createExtension } from '../test-utils/createExtension.js';
 import { EXTENSIONS_DIRECTORY_NAME } from './extensions/variables.js';
+import { themeManager } from '../ui/themes/theme-manager.js';
 import {
   TrustLevel,
   loadTrustedFolders,
   isWorkspaceTrusted,
 } from './trustedFolders.js';
-import { getRealPath } from '@google/gemini-cli-core';
-import type { MergedSettings } from './settings.js';
+import {
+  getRealPath,
+  type CustomTheme,
+  IntegrityDataStatus,
+} from '@google/gemini-cli-core';
 
 const mockHomedir = vi.hoisted(() => vi.fn(() => '/tmp/mock-home'));
+const mockIntegrityManager = vi.hoisted(() => ({
+  verify: vi.fn().mockResolvedValue('verified'),
+  store: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock('os', async (importOriginal) => {
   const mockedOs = await importOriginal<typeof os>();
@@ -36,8 +44,31 @@ vi.mock('@google/gemini-cli-core', async (importOriginal) => {
   return {
     ...actual,
     homedir: mockHomedir,
+    ExtensionIntegrityManager: vi
+      .fn()
+      .mockImplementation(() => mockIntegrityManager),
   };
 });
+
+const testTheme: CustomTheme = {
+  type: 'custom',
+  name: 'MyTheme',
+  background: {
+    primary: '#282828',
+    diff: { added: '#2b3312', removed: '#341212' },
+  },
+  text: {
+    primary: '#ebdbb2',
+    secondary: '#a89984',
+    link: '#83a598',
+    accent: '#d3869b',
+  },
+  status: {
+    success: '#b8bb26',
+    warning: '#fabd2f',
+    error: '#fb4934',
+  },
+};
 
 describe('ExtensionManager', () => {
   let tempHomeDir: string;
@@ -62,10 +93,12 @@ describe('ExtensionManager', () => {
       workspaceDir: tempWorkspaceDir,
       requestConsent: vi.fn().mockResolvedValue(true),
       requestSetting: null,
+      integrityManager: mockIntegrityManager,
     });
   });
 
   afterEach(() => {
+    themeManager.clearExtensionThemes();
     try {
       fs.rmSync(tempHomeDir, { recursive: true, force: true });
     } catch (_e) {
@@ -224,6 +257,7 @@ describe('ExtensionManager', () => {
         } as unknown as MergedSettings,
         requestConsent: () => Promise.resolve(true),
         requestSetting: null,
+        integrityManager: mockIntegrityManager,
       });
 
       // Trust the workspace to allow installation
@@ -269,6 +303,7 @@ describe('ExtensionManager', () => {
         settings,
         requestConsent: () => Promise.resolve(true),
         requestSetting: null,
+        integrityManager: mockIntegrityManager,
       });
 
       const installMetadata = {
@@ -303,6 +338,7 @@ describe('ExtensionManager', () => {
         settings,
         requestConsent: () => Promise.resolve(true),
         requestSetting: null,
+        integrityManager: mockIntegrityManager,
       });
 
       const installMetadata = {
@@ -332,6 +368,7 @@ describe('ExtensionManager', () => {
         settings: settingsOnlySymlink,
         requestConsent: () => Promise.resolve(true),
         requestSetting: null,
+        integrityManager: mockIntegrityManager,
       });
 
       // This should FAIL because it checks the real path against the pattern
@@ -343,6 +380,321 @@ describe('ExtensionManager', () => {
           /is not allowed by the "allowedExtensions" security setting/,
         );
       }
+    });
+  });
+
+  describe('Extension Renaming', () => {
+    it('should support renaming an extension during update', async () => {
+      // 1. Setup existing extension
+      const oldName = 'old-name';
+      const newName = 'new-name';
+      const extDir = path.join(userExtensionsDir, oldName);
+      fs.mkdirSync(extDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(extDir, 'gemini-extension.json'),
+        JSON.stringify({ name: oldName, version: '1.0.0' }),
+      );
+      fs.writeFileSync(
+        path.join(extDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: extDir }),
+      );
+
+      await extensionManager.loadExtensions();
+
+      // 2. Create a temporary "new" version with a different name
+      const newSourceDir = fs.mkdtempSync(
+        path.join(tempHomeDir, 'new-source-'),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'gemini-extension.json'),
+        JSON.stringify({ name: newName, version: '1.1.0' }),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: newSourceDir }),
+      );
+
+      // 3. Update the extension
+      await extensionManager.installOrUpdateExtension(
+        { type: 'local', source: newSourceDir },
+        { name: oldName, version: '1.0.0' },
+      );
+
+      // 4. Verify old directory is gone and new one exists
+      expect(fs.existsSync(path.join(userExtensionsDir, oldName))).toBe(false);
+      expect(fs.existsSync(path.join(userExtensionsDir, newName))).toBe(true);
+
+      // Verify the loaded state is updated
+      const extensions = extensionManager.getExtensions();
+      expect(extensions.some((e) => e.name === newName)).toBe(true);
+      expect(extensions.some((e) => e.name === oldName)).toBe(false);
+    });
+
+    it('should carry over enablement status when renaming', async () => {
+      const oldName = 'old-name';
+      const newName = 'new-name';
+      const extDir = path.join(userExtensionsDir, oldName);
+      fs.mkdirSync(extDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(extDir, 'gemini-extension.json'),
+        JSON.stringify({ name: oldName, version: '1.0.0' }),
+      );
+      fs.writeFileSync(
+        path.join(extDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: extDir }),
+      );
+
+      // Enable it
+      const enablementManager = extensionManager.getEnablementManager();
+      enablementManager.enable(oldName, true, tempHomeDir);
+
+      await extensionManager.loadExtensions();
+      const extension = extensionManager.getExtensions()[0];
+      expect(extension.isActive).toBe(true);
+
+      const newSourceDir = fs.mkdtempSync(
+        path.join(tempHomeDir, 'new-source-'),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'gemini-extension.json'),
+        JSON.stringify({ name: newName, version: '1.1.0' }),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: newSourceDir }),
+      );
+
+      await extensionManager.installOrUpdateExtension(
+        { type: 'local', source: newSourceDir },
+        { name: oldName, version: '1.0.0' },
+      );
+
+      // Verify new name is enabled
+      expect(enablementManager.isEnabled(newName, tempHomeDir)).toBe(true);
+      // Verify old name is removed from enablement
+      expect(enablementManager.readConfig()[oldName]).toBeUndefined();
+    });
+
+    it('should prevent renaming if the new name conflicts with an existing extension', async () => {
+      // Setup two extensions
+      const ext1Dir = path.join(userExtensionsDir, 'ext1');
+      fs.mkdirSync(ext1Dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(ext1Dir, 'gemini-extension.json'),
+        JSON.stringify({ name: 'ext1', version: '1.0.0' }),
+      );
+      fs.writeFileSync(
+        path.join(ext1Dir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: ext1Dir }),
+      );
+
+      const ext2Dir = path.join(userExtensionsDir, 'ext2');
+      fs.mkdirSync(ext2Dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(ext2Dir, 'gemini-extension.json'),
+        JSON.stringify({ name: 'ext2', version: '1.0.0' }),
+      );
+      fs.writeFileSync(
+        path.join(ext2Dir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: ext2Dir }),
+      );
+
+      await extensionManager.loadExtensions();
+
+      // Try to update ext1 to name 'ext2'
+      const newSourceDir = fs.mkdtempSync(
+        path.join(tempHomeDir, 'new-source-'),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'gemini-extension.json'),
+        JSON.stringify({ name: 'ext2', version: '1.1.0' }),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: newSourceDir }),
+      );
+
+      await expect(
+        extensionManager.installOrUpdateExtension(
+          { type: 'local', source: newSourceDir },
+          { name: 'ext1', version: '1.0.0' },
+        ),
+      ).rejects.toThrow(/already installed/);
+    });
+  });
+
+  describe('extension integrity', () => {
+    it('should store integrity data during installation', async () => {
+      const storeSpy = vi.spyOn(extensionManager, 'storeExtensionIntegrity');
+
+      const extDir = path.join(tempHomeDir, 'new-integrity-ext');
+      fs.mkdirSync(extDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(extDir, 'gemini-extension.json'),
+        JSON.stringify({ name: 'integrity-ext', version: '1.0.0' }),
+      );
+
+      const installMetadata = {
+        source: extDir,
+        type: 'local' as const,
+      };
+
+      await extensionManager.loadExtensions();
+      await extensionManager.installOrUpdateExtension(installMetadata);
+
+      expect(storeSpy).toHaveBeenCalledWith('integrity-ext', installMetadata);
+    });
+
+    it('should store integrity data during first update', async () => {
+      const storeSpy = vi.spyOn(extensionManager, 'storeExtensionIntegrity');
+      const verifySpy = vi.spyOn(extensionManager, 'verifyExtensionIntegrity');
+
+      // Setup existing extension
+      const extName = 'update-integrity-ext';
+      const extDir = path.join(userExtensionsDir, extName);
+      fs.mkdirSync(extDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(extDir, 'gemini-extension.json'),
+        JSON.stringify({ name: extName, version: '1.0.0' }),
+      );
+      fs.writeFileSync(
+        path.join(extDir, 'metadata.json'),
+        JSON.stringify({ type: 'local', source: extDir }),
+      );
+
+      await extensionManager.loadExtensions();
+
+      // Ensure no integrity data exists for this extension
+      verifySpy.mockResolvedValueOnce(IntegrityDataStatus.MISSING);
+
+      const initialStatus = await extensionManager.verifyExtensionIntegrity(
+        extName,
+        { type: 'local', source: extDir },
+      );
+      expect(initialStatus).toBe('missing');
+
+      // Create new version of the extension
+      const newSourceDir = fs.mkdtempSync(
+        path.join(tempHomeDir, 'new-source-'),
+      );
+      fs.writeFileSync(
+        path.join(newSourceDir, 'gemini-extension.json'),
+        JSON.stringify({ name: extName, version: '1.1.0' }),
+      );
+
+      const installMetadata = {
+        source: newSourceDir,
+        type: 'local' as const,
+      };
+
+      // Perform update and verify integrity was stored
+      await extensionManager.installOrUpdateExtension(installMetadata, {
+        name: extName,
+        version: '1.0.0',
+      });
+
+      expect(storeSpy).toHaveBeenCalledWith(extName, installMetadata);
+    });
+  });
+
+  describe('early theme registration', () => {
+    it('should register themes with ThemeManager during loadExtensions for active extensions', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'themed-ext',
+        version: '1.0.0',
+        themes: [testTheme],
+      });
+
+      await extensionManager.loadExtensions();
+
+      expect(themeManager.getCustomThemeNames()).toContain(
+        'MyTheme (themed-ext)',
+      );
+    });
+
+    it('should not register themes for inactive extensions', async () => {
+      createExtension({
+        extensionsDir: userExtensionsDir,
+        name: 'disabled-ext',
+        version: '1.0.0',
+        themes: [testTheme],
+      });
+
+      // Disable the extension by creating an enablement override
+      const manager = new ExtensionManager({
+        enabledExtensionOverrides: ['none'],
+        settings: createTestMergedSettings(),
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: vi.fn().mockResolvedValue(true),
+        requestSetting: null,
+      });
+
+      await manager.loadExtensions();
+
+      expect(themeManager.getCustomThemeNames()).not.toContain(
+        'MyTheme (disabled-ext)',
+      );
+    });
+  });
+
+  describe('orphaned extension cleanup', () => {
+    it('should remove broken extension metadata on startup to allow re-installation', async () => {
+      const extName = 'orphaned-ext';
+      const sourceDir = path.join(tempHomeDir, 'valid-source');
+      fs.mkdirSync(sourceDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(sourceDir, 'gemini-extension.json'),
+        JSON.stringify({ name: extName, version: '1.0.0' }),
+      );
+
+      // Link an extension successfully.
+      await extensionManager.loadExtensions();
+      await extensionManager.installOrUpdateExtension({
+        source: sourceDir,
+        type: 'link',
+      });
+
+      const destinationPath = path.join(userExtensionsDir, extName);
+      const metadataPath = path.join(
+        destinationPath,
+        '.gemini-extension-install.json',
+      );
+      expect(fs.existsSync(metadataPath)).toBe(true);
+
+      // Simulate metadata corruption (e.g., pointing to a non-existent source).
+      fs.writeFileSync(
+        metadataPath,
+        JSON.stringify({ source: '/NON_EXISTENT_PATH', type: 'link' }),
+      );
+
+      // Simulate CLI startup. The manager should detect the broken link
+      // and proactively delete the orphaned metadata directory.
+      const newManager = new ExtensionManager({
+        settings: createTestMergedSettings(),
+        workspaceDir: tempWorkspaceDir,
+        requestConsent: vi.fn().mockResolvedValue(true),
+        requestSetting: null,
+        integrityManager: mockIntegrityManager,
+      });
+
+      await newManager.loadExtensions();
+
+      // Verify the extension failed to load and was proactively cleaned up.
+      expect(newManager.getExtensions().some((e) => e.name === extName)).toBe(
+        false,
+      );
+      expect(fs.existsSync(destinationPath)).toBe(false);
+
+      // Verify the system is self-healed and allows re-linking to the valid source.
+      await newManager.installOrUpdateExtension({
+        source: sourceDir,
+        type: 'link',
+      });
+
+      expect(newManager.getExtensions().some((e) => e.name === extName)).toBe(
+        true,
+      );
     });
   });
 });

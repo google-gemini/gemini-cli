@@ -7,10 +7,11 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { act } from 'react';
 import { renderWithProviders } from '../../test-utils/render.js';
+import { createMockSettings } from '../../test-utils/settings.js';
 import { waitFor } from '../../test-utils/async.js';
 import { ExitPlanModeDialog } from './ExitPlanModeDialog.js';
 import { useKeypress } from '../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../keyMatchers.js';
+import { Command } from '../key/keyMatchers.js';
 import {
   ApprovalMode,
   validatePlanContent,
@@ -18,6 +19,7 @@ import {
   type FileSystemService,
 } from '@google/gemini-cli-core';
 import * as fs from 'node:fs';
+import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
 
 vi.mock('../utils/editorUtils.js', () => ({
   openFileInEditor: vi.fn(),
@@ -137,8 +139,9 @@ Implement a comprehensive authentication system with multiple providers.
     vi.restoreAllMocks();
   });
 
-  const renderDialog = (options?: { useAlternateBuffer?: boolean }) =>
-    renderWithProviders(
+  const renderDialog = (options?: { useAlternateBuffer?: boolean }) => {
+    const useAlternateBuffer = options?.useAlternateBuffer ?? true;
+    return renderWithProviders(
       <ExitPlanModeDialog
         planPath={mockPlanFullPath}
         onApprove={onApprove}
@@ -162,10 +165,12 @@ Implement a comprehensive authentication system with multiple providers.
             readTextFile: vi.fn(),
             writeTextFile: vi.fn(),
           }),
-          getUseAlternateBuffer: () => options?.useAlternateBuffer ?? true,
+          getUseAlternateBuffer: () => useAlternateBuffer,
         } as unknown as import('@google/gemini-cli-core').Config,
+        settings: createMockSettings({ ui: { useAlternateBuffer } }),
       },
     );
+  };
 
   describe.each([{ useAlternateBuffer: true }, { useAlternateBuffer: false }])(
     'useAlternateBuffer: $useAlternateBuffer',
@@ -402,6 +407,7 @@ Implement a comprehensive authentication system with multiple providers.
         }: {
           children: React.ReactNode;
         }) => {
+          const keyMatchers = useKeyMatchers();
           useKeypress(
             (key) => {
               if (keyMatchers[Command.QUIT](key)) {
@@ -427,7 +433,6 @@ Implement a comprehensive authentication system with multiple providers.
             />
           </BubbleListener>,
           {
-            useAlternateBuffer,
             config: {
               getTargetDir: () => mockTargetDir,
               getIdeMode: () => false,
@@ -441,6 +446,9 @@ Implement a comprehensive authentication system with multiple providers.
               }),
               getUseAlternateBuffer: () => useAlternateBuffer ?? true,
             } as unknown as import('@google/gemini-cli-core').Config,
+            settings: createMockSettings({
+              ui: { useAlternateBuffer: useAlternateBuffer ?? true },
+            }),
           },
         );
 

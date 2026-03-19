@@ -6,7 +6,6 @@
 
 import type { GenerateContentConfig } from '@google/genai';
 import type { Config } from '../config/config.js';
-import { AuthType } from '../core/contentGenerator.js';
 import type {
   FailureKind,
   FallbackAction,
@@ -46,9 +45,7 @@ export function resolvePolicyChain(
 
   let chain;
   const useGemini31 = config.getGemini31LaunchedSync?.() ?? false;
-  const useCustomToolModel =
-    useGemini31 &&
-    config.getContentGeneratorConfig?.()?.authType === AuthType.USE_GEMINI;
+  const useCustomToolModel = config.getUseCustomToolModelSync?.() ?? false;
   const hasAccessToPreview = config.getHasAccessToPreviewModel?.() ?? true;
 
   const resolvedModel = resolveModel(
@@ -57,19 +54,21 @@ export function resolvePolicyChain(
     useCustomToolModel,
     hasAccessToPreview,
   );
-  const isAutoPreferred = preferredModel ? isAutoModel(preferredModel) : false;
-  const isAutoConfigured = isAutoModel(configuredModel);
+  const isAutoPreferred = preferredModel
+    ? isAutoModel(preferredModel, config)
+    : false;
+  const isAutoConfigured = isAutoModel(configuredModel, config);
 
   if (resolvedModel === DEFAULT_GEMINI_FLASH_LITE_MODEL) {
     chain = getFlashLitePolicyChain();
   } else if (
-    isGemini3Model(resolvedModel) ||
+    isGemini3Model(resolvedModel, config) ||
     isAutoPreferred ||
     isAutoConfigured
   ) {
     if (hasAccessToPreview) {
       const previewEnabled =
-        isGemini3Model(resolvedModel) ||
+        isGemini3Model(resolvedModel, config) ||
         preferredModel === PREVIEW_GEMINI_MODEL_AUTO ||
         configuredModel === PREVIEW_GEMINI_MODEL_AUTO;
       chain = getModelPolicyChain({

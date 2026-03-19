@@ -57,15 +57,17 @@ function hasMeta(obj: unknown): obj is { _meta?: Record<string, unknown> } {
   return typeof obj === 'object' && obj !== null && '_meta' in obj;
 }
 import type { Content, Part, FunctionCall } from '@google/genai';
-import type { LoadedSettings } from '../config/settings.js';
-import { SettingScope, loadSettings } from '../config/settings.js';
+import {
+  SettingScope,
+  loadSettings,
+  type LoadedSettings,
+} from '../config/settings.js';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { z } from 'zod';
 
 import { randomUUID } from 'node:crypto';
-import type { CliArgs } from '../config/config.js';
-import { loadCliConfig } from '../config/config.js';
+import { loadCliConfig, type CliArgs } from '../config/config.js';
 import { runExitCleanup } from '../utils/cleanup.js';
 import { SessionSelector } from '../utils/sessionUtils.js';
 
@@ -906,7 +908,7 @@ export class Session {
 
         const params: acp.RequestPermissionRequest = {
           sessionId: this.id,
-          options: toPermissionOptions(confirmationDetails),
+          options: toPermissionOptions(confirmationDetails, this.config),
           toolCall: {
             toolCallId: callId,
             status: 'pending',
@@ -964,7 +966,10 @@ export class Session {
         sessionUpdate: 'tool_call_update',
         toolCallId: callId,
         status: 'completed',
+        title: invocation.getDescription(),
         content: content ? [content] : [],
+        locations: invocation.toolLocations(),
+        kind: toAcpToolKind(tool.kind),
       });
 
       const durationMs = Date.now() - startTime;
@@ -1002,6 +1007,7 @@ export class Session {
               callId,
               toolResult.llmContent,
               this.config.getActiveModel(),
+              this.config,
             ),
             resultDisplay: toolResult.returnDisplay,
             error: undefined,
@@ -1015,6 +1021,7 @@ export class Session {
         callId,
         toolResult.llmContent,
         this.config.getActiveModel(),
+        this.config,
       );
     } catch (e) {
       const error = e instanceof Error ? e : new Error(String(e));
@@ -1026,6 +1033,7 @@ export class Session {
         content: [
           { type: 'content', content: { type: 'text', text: error.message } },
         ],
+        kind: toAcpToolKind(tool.kind),
       });
 
       this.chat.recordCompletedToolCalls(this.config.getActiveModel(), [
@@ -1320,7 +1328,10 @@ export class Session {
           sessionUpdate: 'tool_call_update',
           toolCallId: callId,
           status: 'completed',
+          title: invocation.getDescription(),
           content: content ? [content] : [],
+          locations: invocation.toolLocations(),
+          kind: toAcpToolKind(readManyFilesTool.kind),
         });
         if (Array.isArray(result.llmContent)) {
           const fileContentRegex = /^--- (.*?) ---\n\n([\s\S]*?)\n\n$/;
@@ -1364,6 +1375,7 @@ export class Session {
               },
             },
           ],
+          kind: toAcpToolKind(readManyFilesTool.kind),
         });
 
         throw error;
@@ -1455,60 +1467,76 @@ const basicPermissionOptions = [
 
 function toPermissionOptions(
   confirmation: ToolCallConfirmationDetails,
+  config: Config,
 ): acp.PermissionOption[] {
-  switch (confirmation.type) {
-    case 'edit':
-      return [
-        {
+  const disableAlwaysAllow = config.getDisableAlwaysAllow();
+  const options: acp.PermissionOption[] = [];
+
+  if (!disableAlwaysAllow) {
+    switch (confirmation.type) {
+      case 'edit':
+        options.push({
           optionId: ToolConfirmationOutcome.ProceedAlways,
           name: 'Allow All Edits',
           kind: 'allow_always',
-        },
-        ...basicPermissionOptions,
-      ];
-    case 'exec':
-      return [
-        {
+        });
+        break;
+      case 'exec':
+        options.push({
           optionId: ToolConfirmationOutcome.ProceedAlways,
           name: `Always Allow ${confirmation.rootCommand}`,
           kind: 'allow_always',
-        },
-        ...basicPermissionOptions,
-      ];
-    case 'mcp':
-      return [
-        {
-          optionId: ToolConfirmationOutcome.ProceedAlwaysServer,
-          name: `Always Allow ${confirmation.serverName}`,
-          kind: 'allow_always',
-        },
-        {
-          optionId: ToolConfirmationOutcome.ProceedAlwaysTool,
-          name: `Always Allow ${confirmation.toolName}`,
-          kind: 'allow_always',
-        },
-        ...basicPermissionOptions,
-      ];
-    case 'info':
-      return [
-        {
+        });
+        break;
+      case 'mcp':
+        options.push(
+          {
+            optionId: ToolConfirmationOutcome.ProceedAlwaysServer,
+            name: `Always Allow ${confirmation.serverName}`,
+            kind: 'allow_always',
+          },
+          {
+            optionId: ToolConfirmationOutcome.ProceedAlwaysTool,
+            name: `Always Allow ${confirmation.toolName}`,
+            kind: 'allow_always',
+          },
+        );
+        break;
+      case 'info':
+        options.push({
           optionId: ToolConfirmationOutcome.ProceedAlways,
           name: `Always Allow`,
           kind: 'allow_always',
-        },
-        ...basicPermissionOptions,
-      ];
+        });
+        break;
+      case 'ask_user':
+      case 'exit_plan_mode':
+        // askuser and exit_plan_mode don't need "always allow" options
+        break;
+      default:
+        // No "always allow" options for other types
+        break;
+    }
+  }
+
+  options.push(...basicPermissionOptions);
+
+  // Exhaustive check
+  switch (confirmation.type) {
+    case 'edit':
+    case 'exec':
+    case 'mcp':
+    case 'info':
     case 'ask_user':
-      // askuser doesn't need "always allow" options since it's asking questions
-      return [...basicPermissionOptions];
     case 'exit_plan_mode':
-      // exit_plan_mode doesn't need "always allow" options since it's a plan approval flow
-      return [...basicPermissionOptions];
+      break;
     default: {
       const unreachable: never = confirmation;
       throw new Error(`Unexpected: ${unreachable}`);
     }
   }
+
+  return options;
 }
 
 /**

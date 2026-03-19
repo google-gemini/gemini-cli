@@ -19,6 +19,7 @@ import {
   type ConfigParameters,
   type SandboxConfig,
 } from './config.js';
+import { createMockSandboxConfig } from '@google/gemini-cli-test-utils';
 import { DEFAULT_MAX_ATTEMPTS } from '../utils/retry.js';
 import { ExperimentFlags } from '../code_assist/experiments/flagNames.js';
 import { debugLogger } from '../utils/debugLogger.js';
@@ -64,8 +65,11 @@ import {
   DEFAULT_GEMINI_MODEL,
   PREVIEW_GEMINI_3_1_MODEL,
   DEFAULT_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_MODEL_AUTO,
+  PREVIEW_GEMINI_FLASH_MODEL,
 } from './models.js';
 import { Storage } from './storage.js';
+import type { AgentLoopContext } from './agent-loop-context.js';
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -96,6 +100,7 @@ vi.mock('../tools/mcp-client-manager.js', () => ({
   McpClientManager: vi.fn().mockImplementation(() => ({
     startConfiguredMcpServers: vi.fn(),
     getMcpInstructions: vi.fn().mockReturnValue('MCP Instructions'),
+    setMainRegistries: vi.fn(),
   })),
 }));
 
@@ -247,10 +252,10 @@ vi.mock('../code_assist/experiments/experiments.js');
 
 describe('Server Config (config.ts)', () => {
   const MODEL = DEFAULT_GEMINI_MODEL;
-  const SANDBOX: SandboxConfig = {
+  const SANDBOX: SandboxConfig = createMockSandboxConfig({
     command: 'docker',
     image: 'gemini-cli-sandbox',
-  };
+  });
   const TARGET_DIR = '/path/to/target';
   const DEBUG_MODE = false;
   const QUESTION = 'test question';
@@ -366,6 +371,7 @@ describe('Server Config (config.ts)', () => {
               mcpStarted = true;
             }),
             getMcpInstructions: vi.fn(),
+            setMainRegistries: vi.fn(),
           }) as Partial<McpClientManager> as McpClientManager,
       );
 
@@ -399,6 +405,7 @@ describe('Server Config (config.ts)', () => {
               mcpStarted = true;
             }),
             getMcpInstructions: vi.fn(),
+            setMainRegistries: vi.fn(),
           }) as Partial<McpClientManager> as McpClientManager,
       );
 
@@ -492,6 +499,95 @@ describe('Server Config (config.ts)', () => {
         expect(await config.getUserCaching()).toBeUndefined();
       });
     });
+
+    describe('getNumericalRoutingEnabled', () => {
+      it('should return true by default if there are no experiments', async () => {
+        const config = new Config(baseParams);
+        expect(await config.getNumericalRoutingEnabled()).toBe(true);
+      });
+
+      it('should return true if the remote flag is set to true', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.ENABLE_NUMERICAL_ROUTING]: {
+                boolValue: true,
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getNumericalRoutingEnabled()).toBe(true);
+      });
+
+      it('should return false if the remote flag is explicitly set to false', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.ENABLE_NUMERICAL_ROUTING]: {
+                boolValue: false,
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getNumericalRoutingEnabled()).toBe(false);
+      });
+    });
+
+    describe('getResolvedClassifierThreshold', () => {
+      it('should return 90 by default if there are no experiments', async () => {
+        const config = new Config(baseParams);
+        expect(await config.getResolvedClassifierThreshold()).toBe(90);
+      });
+
+      it('should return the remote flag value if it is within range (0-100)', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.CLASSIFIER_THRESHOLD]: {
+                intValue: '75',
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getResolvedClassifierThreshold()).toBe(75);
+      });
+
+      it('should return 90 if the remote flag is out of range (less than 0)', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.CLASSIFIER_THRESHOLD]: {
+                intValue: '-10',
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getResolvedClassifierThreshold()).toBe(90);
+      });
+
+      it('should return 90 if the remote flag is out of range (greater than 100)', async () => {
+        const config = new Config({
+          ...baseParams,
+          experiments: {
+            flags: {
+              [ExperimentFlags.CLASSIFIER_THRESHOLD]: {
+                intValue: '110',
+              },
+            },
+            experimentIds: [],
+          },
+        } as unknown as ConfigParameters);
+        expect(await config.getResolvedClassifierThreshold()).toBe(90);
+      });
+    });
   });
 
   describe('refreshAuth', () => {
@@ -551,8 +647,9 @@ describe('Server Config (config.ts)', () => {
 
       await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
 
+      const loopContext: AgentLoopContext = config;
       expect(
-        config.getGeminiClient().stripThoughtsFromHistory,
+        loopContext.geminiClient.stripThoughtsFromHistory,
       ).toHaveBeenCalledWith();
     });
 
@@ -570,8 +667,9 @@ describe('Server Config (config.ts)', () => {
 
       await config.refreshAuth(AuthType.USE_VERTEX_AI);
 
+      const loopContext: AgentLoopContext = config;
       expect(
-        config.getGeminiClient().stripThoughtsFromHistory,
+        loopContext.geminiClient.stripThoughtsFromHistory,
       ).toHaveBeenCalledWith();
     });
 
@@ -589,9 +687,50 @@ describe('Server Config (config.ts)', () => {
 
       await config.refreshAuth(AuthType.USE_GEMINI);
 
+      const loopContext: AgentLoopContext = config;
       expect(
-        config.getGeminiClient().stripThoughtsFromHistory,
+        loopContext.geminiClient.stripThoughtsFromHistory,
       ).not.toHaveBeenCalledWith();
+    });
+
+    it('should switch to flash model if user has no Pro access and model is auto', async () => {
+      vi.mocked(getExperiments).mockResolvedValue({
+        experimentIds: [],
+        flags: {
+          [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
+            boolValue: true,
+          },
+        },
+      });
+
+      const config = new Config({
+        ...baseParams,
+        model: PREVIEW_GEMINI_MODEL_AUTO,
+      });
+
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+
+      expect(config.getModel()).toBe(PREVIEW_GEMINI_FLASH_MODEL);
+    });
+
+    it('should NOT switch to flash model if user has Pro access and model is auto', async () => {
+      vi.mocked(getExperiments).mockResolvedValue({
+        experimentIds: [],
+        flags: {
+          [ExperimentFlags.PRO_MODEL_NO_ACCESS]: {
+            boolValue: false,
+          },
+        },
+      });
+
+      const config = new Config({
+        ...baseParams,
+        model: PREVIEW_GEMINI_MODEL_AUTO,
+      });
+
+      await config.refreshAuth(AuthType.LOGIN_WITH_GOOGLE);
+
+      expect(config.getModel()).toBe(PREVIEW_GEMINI_MODEL_AUTO);
     });
   });
 
@@ -1110,7 +1249,7 @@ describe('Server Config (config.ts)', () => {
       const config = new Config(params);
 
       const mockAgentDefinition = {
-        name: 'codebase-investigator',
+        name: 'codebase_investigator',
         description: 'Agent 1',
         instructions: 'Inst 1',
       };
@@ -1158,7 +1297,7 @@ describe('Server Config (config.ts)', () => {
     it('should register subagents as tools even when they are not in allowedTools', async () => {
       const params: ConfigParameters = {
         ...baseParams,
-        allowedTools: ['read_file'], // codebase-investigator is NOT here
+        allowedTools: ['read_file'], // codebase_investigator is NOT here
         agents: {
           overrides: {
             codebase_investigator: { enabled: true },
@@ -1168,7 +1307,7 @@ describe('Server Config (config.ts)', () => {
       const config = new Config(params);
 
       const mockAgentDefinition = {
-        name: 'codebase-investigator',
+        name: 'codebase_investigator',
         description: 'Agent 1',
         instructions: 'Inst 1',
       };
@@ -1384,7 +1523,7 @@ describe('Server Config (config.ts)', () => {
 
       const paramsWithProxy: ConfigParameters = {
         ...baseParams,
-        proxy: 'invalid-proxy',
+        proxy: 'http://invalid-proxy:8080',
       };
       new Config(paramsWithProxy);
 
@@ -1477,14 +1616,62 @@ describe('Server Config (config.ts)', () => {
       expect(browserConfig.customConfig.sessionMode).toBe('persistent');
     });
   });
+
+  describe('Sandbox Configuration', () => {
+    it('should default sandbox settings when not provided', () => {
+      const config = new Config({
+        ...baseParams,
+        sandbox: undefined,
+      });
+
+      expect(config.getSandboxEnabled()).toBe(false);
+      expect(config.getSandboxAllowedPaths()).toEqual([]);
+      expect(config.getSandboxNetworkAccess()).toBe(false);
+    });
+
+    it('should store provided sandbox settings', () => {
+      const sandbox: SandboxConfig = {
+        enabled: true,
+        allowedPaths: ['/tmp/foo', '/var/bar'],
+        networkAccess: true,
+        command: 'docker',
+        image: 'my-image',
+      };
+      const config = new Config({
+        ...baseParams,
+        sandbox,
+      });
+
+      expect(config.getSandboxEnabled()).toBe(true);
+      expect(config.getSandboxAllowedPaths()).toEqual(['/tmp/foo', '/var/bar']);
+      expect(config.getSandboxNetworkAccess()).toBe(true);
+      expect(config.getSandbox()?.command).toBe('docker');
+      expect(config.getSandbox()?.image).toBe('my-image');
+    });
+
+    it('should partially override default sandbox settings', () => {
+      const config = new Config({
+        ...baseParams,
+        sandbox: {
+          enabled: true,
+          allowedPaths: ['/only/this'],
+          networkAccess: false,
+        } as SandboxConfig,
+      });
+
+      expect(config.getSandboxEnabled()).toBe(true);
+      expect(config.getSandboxAllowedPaths()).toEqual(['/only/this']);
+      expect(config.getSandboxNetworkAccess()).toBe(false);
+    });
+  });
 });
 
 describe('GemmaModelRouterSettings', () => {
   const MODEL = DEFAULT_GEMINI_MODEL;
-  const SANDBOX: SandboxConfig = {
+  const SANDBOX: SandboxConfig = createMockSandboxConfig({
     command: 'docker',
     image: 'gemini-cli-sandbox',
-  };
+  });
   const TARGET_DIR = '/path/to/target';
   const DEBUG_MODE = false;
   const QUESTION = 'test question';
@@ -1861,10 +2048,10 @@ describe('isYoloModeDisabled', () => {
 
 describe('BaseLlmClient Lifecycle', () => {
   const MODEL = 'gemini-pro';
-  const SANDBOX: SandboxConfig = {
+  const SANDBOX: SandboxConfig = createMockSandboxConfig({
     command: 'docker',
     image: 'gemini-cli-sandbox',
-  };
+  });
   const TARGET_DIR = '/path/to/target';
   const DEBUG_MODE = false;
   const QUESTION = 'test question';
@@ -1916,10 +2103,10 @@ describe('BaseLlmClient Lifecycle', () => {
 
 describe('Generation Config Merging (HACK)', () => {
   const MODEL = 'gemini-pro';
-  const SANDBOX: SandboxConfig = {
+  const SANDBOX: SandboxConfig = createMockSandboxConfig({
     command: 'docker',
     image: 'gemini-cli-sandbox',
-  };
+  });
   const TARGET_DIR = '/path/to/target';
   const DEBUG_MODE = false;
   const QUESTION = 'test question';
@@ -2222,10 +2409,10 @@ describe('Config getHooks', () => {
 
 describe('LocalLiteRtLmClient Lifecycle', () => {
   const MODEL = 'gemini-pro';
-  const SANDBOX: SandboxConfig = {
+  const SANDBOX: SandboxConfig = createMockSandboxConfig({
     command: 'docker',
     image: 'gemini-cli-sandbox',
-  };
+  });
   const TARGET_DIR = '/path/to/target';
   const DEBUG_MODE = false;
   const QUESTION = 'test question';
@@ -2540,6 +2727,9 @@ describe('Config Quota & Preview Model Access', () => {
     usageStatisticsEnabled: false,
     embeddingModel: 'gemini-embedding',
     sandbox: {
+      enabled: true,
+      allowedPaths: [],
+      networkAccess: false,
       command: 'docker',
       image: 'gemini-cli-sandbox',
     },
@@ -2788,9 +2978,9 @@ describe('Config Quota & Preview Model Access', () => {
   });
 
   describe('isPlanEnabled', () => {
-    it('should return false by default', () => {
+    it('should return true by default', () => {
       const config = new Config(baseParams);
-      expect(config.isPlanEnabled()).toBe(false);
+      expect(config.isPlanEnabled()).toBe(true);
     });
 
     it('should return true when plan is enabled', () => {
@@ -2876,6 +3066,21 @@ describe('Config JIT Initialization', () => {
       project: 'Environment Memory\n\nMCP Instructions',
     });
 
+    // Tier 1: system instruction gets only global memory
+    expect(config.getSystemInstructionMemory()).toBe('Global Memory');
+
+    // Tier 2: session memory gets extension + project formatted with XML tags
+    const sessionMemory = config.getSessionMemory();
+    expect(sessionMemory).toContain('<loaded_context>');
+    expect(sessionMemory).toContain('<extension_context>');
+    expect(sessionMemory).toContain('Extension Memory');
+    expect(sessionMemory).toContain('</extension_context>');
+    expect(sessionMemory).toContain('<project_context>');
+    expect(sessionMemory).toContain('Environment Memory');
+    expect(sessionMemory).toContain('MCP Instructions');
+    expect(sessionMemory).toContain('</project_context>');
+    expect(sessionMemory).toContain('</loaded_context>');
+
     // Verify state update (delegated to ContextManager)
     expect(config.getGeminiMdFileCount()).toBe(1);
     expect(config.getGeminiMdFilePaths()).toEqual(['/path/to/GEMINI.md']);
@@ -2918,7 +3123,8 @@ describe('Config JIT Initialization', () => {
       await config.initialize();
 
       const skillManager = config.getSkillManager();
-      const toolRegistry = config.getToolRegistry();
+      const loopContext: AgentLoopContext = config;
+      const toolRegistry = loopContext.toolRegistry;
 
       vi.spyOn(skillManager, 'discoverSkills').mockResolvedValue(undefined);
       vi.spyOn(skillManager, 'setDisabledSkills');
@@ -2954,7 +3160,8 @@ describe('Config JIT Initialization', () => {
       await config.initialize();
 
       const skillManager = config.getSkillManager();
-      const toolRegistry = config.getToolRegistry();
+      const loopContext: AgentLoopContext = config;
+      const toolRegistry = loopContext.toolRegistry;
 
       vi.spyOn(skillManager, 'discoverSkills').mockResolvedValue(undefined);
       vi.spyOn(toolRegistry, 'registerTool');
@@ -3173,5 +3380,41 @@ describe('Model Persistence Bug Fix (#19864)', () => {
     // Verify onModelChange was called to persist the model
     expect(onModelChange).toHaveBeenCalledWith(PREVIEW_GEMINI_3_1_MODEL);
     expect(config.getModel()).toBe(PREVIEW_GEMINI_3_1_MODEL);
+  });
+});
+
+describe('ConfigSchema validation', () => {
+  it('should validate a valid sandbox config', async () => {
+    const validConfig = {
+      sandbox: {
+        enabled: true,
+        allowedPaths: ['/tmp'],
+        networkAccess: false,
+        command: 'docker',
+        image: 'node:20',
+      },
+    };
+
+    const { ConfigSchema } = await import('./config.js');
+    const result = ConfigSchema.safeParse(validConfig);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sandbox?.enabled).toBe(true);
+    }
+  });
+
+  it('should apply defaults in ConfigSchema', async () => {
+    const minimalConfig = {
+      sandbox: {},
+    };
+
+    const { ConfigSchema } = await import('./config.js');
+    const result = ConfigSchema.safeParse(minimalConfig);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sandbox?.enabled).toBe(false);
+      expect(result.data.sandbox?.allowedPaths).toEqual([]);
+      expect(result.data.sandbox?.networkAccess).toBe(false);
+    }
   });
 });

@@ -4,14 +4,17 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type React from 'react';
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import type React from 'react';
 import { Text } from 'ink';
 import { AsyncFzf } from 'fzf';
-import type { Key } from '../hooks/useKeypress.js';
+import { type Key } from '../hooks/useKeypress.js';
 import { theme } from '../semantic-colors.js';
-import type { LoadableSettingScope, Settings } from '../../config/settings.js';
-import { SettingScope } from '../../config/settings.js';
+import {
+  SettingScope,
+  type LoadableSettingScope,
+  type Settings,
+} from '../../config/settings.js';
 import { getScopeMessageForSetting } from '../../utils/dialogScopeUtils.js';
 import {
   getDialogSettingKeys,
@@ -40,6 +43,8 @@ import {
   BaseSettingsDialog,
   type SettingsDialogItem,
 } from './shared/BaseSettingsDialog.js';
+import { useKeyMatchers } from '../hooks/useKeyMatchers.js';
+import { Command, KeyBinding } from '../key/keyBindings.js';
 
 interface FzfResult {
   item: string;
@@ -56,6 +61,11 @@ interface SettingsDialogProps {
 }
 
 const MAX_ITEMS_TO_SHOW = 8;
+
+const KEY_UP = new KeyBinding('up');
+const KEY_CTRL_P = new KeyBinding('ctrl+p');
+const KEY_DOWN = new KeyBinding('down');
+const KEY_CTRL_N = new KeyBinding('ctrl+n');
 
 // Create a snapshot of the initial per-scope state of Restart Required Settings
 // This creates a nested map of the form
@@ -333,6 +343,18 @@ export function SettingsDialog({
     onSelect(undefined, selectedScope as SettingScope);
   }, [onSelect, selectedScope]);
 
+  const globalKeyMatchers = useKeyMatchers();
+  const settingsKeyMatchers = useMemo(
+    () => ({
+      ...globalKeyMatchers,
+      [Command.DIALOG_NAVIGATION_UP]: (key: Key) =>
+        KEY_UP.matches(key) || KEY_CTRL_P.matches(key),
+      [Command.DIALOG_NAVIGATION_DOWN]: (key: Key) =>
+        KEY_DOWN.matches(key) || KEY_CTRL_N.matches(key),
+    }),
+    [globalKeyMatchers],
+  );
+
   // Custom key handler for restart key
   const handleKeyPress = useCallback(
     (key: Key, _currentItem: SettingsDialogItem | undefined): boolean => {
@@ -346,94 +368,9 @@ export function SettingsDialog({
     [showRestartPrompt, onRestartRequest],
   );
 
-  // Calculate effective max items and scope visibility based on terminal height
-  const { effectiveMaxItemsToShow, showScopeSelection, showSearch } =
-    useMemo(() => {
-      // Only show scope selector if we have a workspace
-      const hasWorkspace = settings.workspace.path !== undefined;
-
-      // Search box is hidden when restart prompt is shown to save space and avoid key conflicts
-      const shouldShowSearch = !showRestartPrompt;
-
-      if (!availableTerminalHeight) {
-        return {
-          effectiveMaxItemsToShow: Math.min(MAX_ITEMS_TO_SHOW, items.length),
-          showScopeSelection: hasWorkspace,
-          showSearch: shouldShowSearch,
-        };
-      }
-
-      // Layout constants based on BaseSettingsDialog structure:
-      // 4 for border (2) and padding (2)
-      const DIALOG_PADDING = 4;
-      const SETTINGS_TITLE_HEIGHT = 1;
-      // 3 for box + 1 for marginTop + 1 for spacing after
-      const SEARCH_SECTION_HEIGHT = shouldShowSearch ? 5 : 0;
-      const SCROLL_ARROWS_HEIGHT = 2;
-      const ITEMS_SPACING_AFTER = 1;
-      // 1 for Label + 3 for Scope items + 1 for spacing after
-      const SCOPE_SECTION_HEIGHT = hasWorkspace ? 5 : 0;
-      const HELP_TEXT_HEIGHT = 1;
-      const RESTART_PROMPT_HEIGHT = showRestartPrompt ? 1 : 0;
-      const ITEM_HEIGHT = 3; // Label + description + spacing
-
-      const currentAvailableHeight = availableTerminalHeight - DIALOG_PADDING;
-
-      const baseFixedHeight =
-        SETTINGS_TITLE_HEIGHT +
-        SEARCH_SECTION_HEIGHT +
-        SCROLL_ARROWS_HEIGHT +
-        ITEMS_SPACING_AFTER +
-        HELP_TEXT_HEIGHT +
-        RESTART_PROMPT_HEIGHT;
-
-      // Calculate max items with scope selector
-      const heightWithScope = baseFixedHeight + SCOPE_SECTION_HEIGHT;
-      const availableForItemsWithScope =
-        currentAvailableHeight - heightWithScope;
-      const maxItemsWithScope = Math.max(
-        1,
-        Math.floor(availableForItemsWithScope / ITEM_HEIGHT),
-      );
-
-      // Calculate max items without scope selector
-      const availableForItemsWithoutScope =
-        currentAvailableHeight - baseFixedHeight;
-      const maxItemsWithoutScope = Math.max(
-        1,
-        Math.floor(availableForItemsWithoutScope / ITEM_HEIGHT),
-      );
-
-      // In small terminals, hide scope selector if it would allow more items to show
-      let shouldShowScope = hasWorkspace;
-      let maxItems = maxItemsWithScope;
-
-      if (hasWorkspace && availableTerminalHeight < 25) {
-        // Hide scope selector if it gains us more than 1 extra item
-        if (maxItemsWithoutScope > maxItemsWithScope + 1) {
-          shouldShowScope = false;
-          maxItems = maxItemsWithoutScope;
-        }
-      }
-
-      return {
-        effectiveMaxItemsToShow: Math.min(maxItems, items.length),
-        showScopeSelection: shouldShowScope,
-        showSearch: shouldShowSearch,
-      };
-    }, [
-      availableTerminalHeight,
-      items.length,
-      settings.workspace.path,
-      showRestartPrompt,
-    ]);
-
-  const footerContent = showRestartPrompt ? (
-    <Text color={theme.status.warning}>
-      Changes that require a restart have been modified. Press r to exit and
-      apply changes now.
-    </Text>
-  ) : null;
+  // Decisions on what features to enable
+  const hasWorkspace = settings.workspace.path !== undefined;
+  const showSearch = !showRestartPrompt;
 
   return (
     <BaseSettingsDialog
@@ -442,17 +379,31 @@ export function SettingsDialog({
       searchEnabled={showSearch}
       searchBuffer={searchBuffer}
       items={items}
-      showScopeSelector={showScopeSelection}
+      showScopeSelector={hasWorkspace}
       selectedScope={selectedScope}
       onScopeChange={handleScopeChange}
-      maxItemsToShow={effectiveMaxItemsToShow}
+      maxItemsToShow={MAX_ITEMS_TO_SHOW}
+      availableHeight={availableTerminalHeight}
       maxLabelWidth={maxLabelOrDescriptionWidth}
       onItemToggle={handleItemToggle}
       onEditCommit={handleEditCommit}
       onItemClear={handleItemClear}
       onClose={handleClose}
       onKeyPress={handleKeyPress}
-      footerContent={footerContent}
+      keyMatchers={settingsKeyMatchers}
+      footer={
+        showRestartPrompt
+          ? {
+              content: (
+                <Text color={theme.status.warning}>
+                  Changes that require a restart have been modified. Press r to
+                  exit and apply changes now.
+                </Text>
+              ),
+              height: 1,
+            }
+          : undefined
+      }
     />
   );
 }
