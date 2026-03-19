@@ -36,6 +36,7 @@ import {
   Config,
   resolveToRealPath,
   applyAdminAllowlist,
+  applyRequiredServers,
   getAdminBlockedMcpServersMessage,
   type HookDefinition,
   type HookEventName,
@@ -747,6 +748,25 @@ export async function loadCliConfig(
         undefined,
       );
       coreEvents.emitConsoleLog('warn', message);
+    }
+  }
+
+  // Apply admin-required MCP servers (injected regardless of allowlist)
+  if (mcpEnabled) {
+    const requiredMcpConfig = settings.admin?.mcp?.requiredConfig;
+    if (requiredMcpConfig && Object.keys(requiredMcpConfig).length > 0) {
+      const requiredResult = applyRequiredServers(
+        mcpServers ?? {},
+        requiredMcpConfig,
+      );
+      mcpServers = requiredResult.mcpServers;
+
+      if (requiredResult.requiredServerNames.length > 0) {
+        coreEvents.emitConsoleLog(
+          'info',
+          `Admin-required MCP servers injected: ${requiredResult.requiredServerNames.join(', ')}`,
+        );
+      }
     }
   }
 
