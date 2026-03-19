@@ -20,17 +20,36 @@ This skill enables the agent to utilize **Gemini Workspaces**—a high-performan
 - **Environment Isolation**: When you need a clean, high-performance environment to verify a fix without polluting the user's local machine.
 
 ### How to use Workspaces
-1. **Setup**: If the user hasn't initialized their environment, instruct them to run `npm run workspace:setup`.
-2. **Launch**: Use the `workspace` command to start a playbook:
+1. **Setup**: If the user hasn't initialized their environment, instruct them to run the setup script:
    ```bash
-   npm run workspace <PR_NUMBER> [action]
+   npx tsx extensions/workspaces/scripts/setup.ts
+   ```
+2. **Launch**: Start a playbook for a specific PR/issue:
+   ```bash
+   npx tsx extensions/workspaces/scripts/orchestrator.ts <PR_NUMBER> [action]
    ```
    - Actions: `review` (default), `fix`, `ready`.
-3. **Check Status**: See global state and active sessions with `npm run workspace:status`, or deep-dive into specific PR logs with `npm run workspace:check <PR_NUMBER>`.
+3. **Check Status**: See global state and active sessions:
+   ```bash
+   npx tsx extensions/workspaces/scripts/status.ts
+   ```
+   Or deep-dive into specific PR logs:
+   ```bash
+   npx tsx extensions/workspaces/scripts/check.ts <PR_NUMBER>
+   ```
 4. **Cleanup**: 
-   - **Bulk**: Clear all sessions/worktrees with `npm run workspace:clean-all`.
-   - **Surgical**: Kill a specific PR task with `npm run workspace:kill <PR_NUMBER> <action>`.
-5. **Fleet**: Manage VM lifecycle with `npm run workspace:fleet [stop|provision|list]`.
+   - **Bulk**: Clear all sessions/worktrees:
+     ```bash
+     npx tsx extensions/workspaces/scripts/clean.ts --all
+     ```
+   - **Surgical**: Kill a specific PR task:
+     ```bash
+     npx tsx extensions/workspaces/scripts/clean.ts <PR_NUMBER> <action>
+     ```
+5. **Fleet**: Manage VM lifecycle:
+   ```bash
+   npx tsx extensions/workspaces/scripts/fleet.ts [stop|provision|list]
+   ```
 
 ## ⚠️ Important Constraints
 - **Absolute Paths**: Always use absolute paths (e.g., `/mnt/disks/data/...`) when orchestrating remote commands.

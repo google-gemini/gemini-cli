@@ -7,7 +7,7 @@ import readline from 'readline';
 import { ProviderFactory } from './providers/ProviderFactory.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, '../../../..');
+const REPO_ROOT = process.cwd();
 
 /**
  * Loads and parses a local .env file from the repository root and the home directory.
