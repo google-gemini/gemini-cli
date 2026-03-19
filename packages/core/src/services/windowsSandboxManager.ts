@@ -47,6 +47,9 @@ export class WindowsSandboxManager implements SandboxManager {
 
     try {
       if (!fs.existsSync(this.helperPath)) {
+        debugLogger.log(
+          `WindowsSandboxManager: Helper not found at ${this.helperPath}. Attempting to compile...`,
+        );
         // If the exe doesn't exist, we try to compile it from the .cs file
         const sourcePath = this.helperPath.replace(/\.exe$/, '.cs');
         if (fs.existsSync(sourcePath)) {
@@ -91,16 +94,40 @@ export class WindowsSandboxManager implements SandboxManager {
             ),
           ];
 
+          let compiled = false;
           for (const csc of cscPaths) {
             try {
+              debugLogger.log(
+                `WindowsSandboxManager: Trying to compile using ${csc}...`,
+              );
               // We use spawnAsync but we don't need to capture output
               await spawnAsync(csc, ['/out:' + this.helperPath, sourcePath]);
+              debugLogger.log(
+                `WindowsSandboxManager: Successfully compiled sandbox helper at ${this.helperPath}`,
+              );
+              compiled = true;
               break;
-            } catch (_e) {
-              // Try next path
+            } catch (e) {
+              debugLogger.log(
+                `WindowsSandboxManager: Failed to compile using ${csc}: ${e instanceof Error ? e.message : String(e)}`,
+              );
             }
           }
+
+          if (!compiled) {
+            debugLogger.log(
+              'WindowsSandboxManager: Failed to compile sandbox helper from any known CSC path.',
+            );
+          }
+        } else {
+          debugLogger.log(
+            `WindowsSandboxManager: Source file not found at ${sourcePath}. Cannot compile helper.`,
+          );
         }
+      } else {
+        debugLogger.log(
+          `WindowsSandboxManager: Found helper at ${this.helperPath}`,
+        );
       }
     } catch (e) {
       debugLogger.log(

@@ -115,7 +115,7 @@ describe('SandboxedFileSystemService', () => {
     });
 
     await expect(readPromise).rejects.toThrow(
-      'Sandbox Error: Command failed with exit code 1. Details: access denied',
+      "Sandbox Error: read_file failed for '/test/file.txt'. Exit code 1. Details: access denied",
     );
   });
 });

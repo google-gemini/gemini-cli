@@ -50,10 +50,18 @@ export class SandboxedFileSystemService implements FileSystemService {
         } else {
           reject(
             new Error(
-              `Sandbox Error: Command failed with exit code ${code}. ${error ? 'Details: ' + error : ''}`,
+              `Sandbox Error: read_file failed for '${filePath}'. Exit code ${code}. ${error ? 'Details: ' + error : ''}`,
             ),
           );
         }
+      });
+
+      child.on('error', (err) => {
+        reject(
+          new Error(
+            `Sandbox Error: Failed to spawn read_file for '${filePath}': ${err.message}`,
+          ),
+        );
       });
     });
   }
@@ -88,10 +96,18 @@ export class SandboxedFileSystemService implements FileSystemService {
         } else {
           reject(
             new Error(
-              `Sandbox Error: Command failed with exit code ${code}. ${error ? 'Details: ' + error : ''}`,
+              `Sandbox Error: write_file failed for '${filePath}'. Exit code ${code}. ${error ? 'Details: ' + error : ''}`,
             ),
           );
         }
+      });
+
+      child.on('error', (err) => {
+        reject(
+          new Error(
+            `Sandbox Error: Failed to spawn write_file for '${filePath}': ${err.message}`,
+          ),
+        );
       });
     });
   }
