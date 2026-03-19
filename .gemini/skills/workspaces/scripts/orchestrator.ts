@@ -100,15 +100,15 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   // PERSISTENCE: Wrap the entire execution in a tmux session inside the container
   // We also style the tmux bar here to be less intrusive and more informative
   const tmuxStyle = `
-    set -g status-bg colour235; 
-    set -g status-fg colour136; 
-    set -g status-left-length 50;
-    set -g status-left '#[fg=colour235,bg=colour136,bold] WORKSPACE #[fg=colour136,bg=colour235,nobold] PR #${prNumber} (${action}) ';
-    set -g status-right '#[fg=colour245] %H:%M #[fg=colour235,bg=colour245,bold] #H ';
-    setw -g window-status-current-format '#[fg=colour235,bg=colour136,bold] #I:#W #[fg=colour136,bg=colour235,nobold]';
+    tmux set -g status-bg colour238; 
+    tmux set -g status-fg colour136; 
+    tmux set -g status-left-length 50;
+    tmux set -g status-left '#[fg=colour238,bg=colour136,bold] WORKSPACE #[fg=colour136,bg=colour238,nobold] PR #${prNumber} (${action}) ';
+    tmux set -g status-right '#[fg=colour245] %H:%M #[fg=colour238,bg=colour245,bold] #H ';
+    tmux setw -g window-status-current-format '#[fg=colour238,bg=colour136,bold] #I:#W #[fg=colour136,bg=colour238,nobold]';
   `.replace(/\n/g, '');
 
-  const tmuxCmd = `tmux new-session -A -s ${sessionName} ${q(`tmux ${tmuxStyle} ; cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL`)}`;
+  const tmuxCmd = `tmux new-session -A -s ${sessionName} ${q(`${tmuxStyle} cd ${remoteWorktreeDir} && ${remoteWorker}; exec $SHELL`)}`;
   const containerWrap = `sudo docker exec -it ${authEnv}maintainer-worker sh -c ${q(tmuxCmd)}`;
   
   const finalSSH = provider.getRunCommand(containerWrap, { interactive: true });
