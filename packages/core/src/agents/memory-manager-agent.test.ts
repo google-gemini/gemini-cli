@@ -6,8 +6,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { MemoryManagerAgent } from './memory-manager-agent.js';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import {
   ASK_USER_TOOL_NAME,
   EDIT_TOOL_NAME,
@@ -18,16 +16,14 @@ import {
   WRITE_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { Storage } from '../config/storage.js';
+import type { Config } from '../config/config.js';
+import type { HierarchicalMemory } from '../config/memory.js';
 
-vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs')>();
+function createMockConfig(memory: string | HierarchicalMemory = ''): Config {
   return {
-    ...actual,
-    existsSync: vi.fn(),
-    statSync: vi.fn(),
-    readFileSync: vi.fn(),
-  };
-});
+    getUserMemory: vi.fn().mockReturnValue(memory),
+  } as unknown as Config;
+}
 
 describe('MemoryManagerAgent', () => {
   beforeEach(() => {
@@ -39,23 +35,23 @@ describe('MemoryManagerAgent', () => {
   });
 
   it('should have the correct name "save_memory"', () => {
-    const agent = MemoryManagerAgent();
+    const agent = MemoryManagerAgent(createMockConfig());
     expect(agent.name).toBe('save_memory');
   });
 
   it('should be a local agent', () => {
-    const agent = MemoryManagerAgent();
+    const agent = MemoryManagerAgent(createMockConfig());
     expect(agent.kind).toBe('local');
   });
 
   it('should have a description', () => {
-    const agent = MemoryManagerAgent();
+    const agent = MemoryManagerAgent(createMockConfig());
     expect(agent.description).toBeTruthy();
     expect(agent.description).toContain('memory');
   });
 
   it('should have a system prompt with memory management instructions', () => {
-    const agent = MemoryManagerAgent();
+    const agent = MemoryManagerAgent(createMockConfig());
     const prompt = agent.promptConfig.systemPrompt;
     const globalGeminiDir = Storage.getGlobalGeminiDir();
     expect(prompt).toContain(`Global (${globalGeminiDir}`);
@@ -69,7 +65,7 @@ describe('MemoryManagerAgent', () => {
   });
 
   it('should have efficiency guidelines in the system prompt', () => {
-    const agent = MemoryManagerAgent();
+    const agent = MemoryManagerAgent(createMockConfig());
     const prompt = agent.promptConfig.systemPrompt;
     expect(prompt).toContain('Efficiency & Performance');
     expect(prompt).toContain('Use as few turns as possible');
@@ -78,85 +74,56 @@ describe('MemoryManagerAgent', () => {
     expect(prompt).toContain('Context Awareness');
   });
 
-  it('should inject GEMINI.md files from global and project root into initial context', () => {
-    const globalDir = Storage.getGlobalGeminiDir();
-    const projectRoot = '/test/project';
-    const globalFile = path.join(globalDir, 'GEMINI.md');
-    const projectFile = path.join(projectRoot, '.gemini', 'GEMINI.md');
-
-    vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
-      if (typeof p === 'string' && (p === globalFile || p === projectFile))
-        return true;
-      return false;
+  it('should inject hierarchical memory into initial context', () => {
+    const config = createMockConfig({
+      global:
+        '--- Context from: ../../.gemini/GEMINI.md ---\nglobal context\n--- End of Context from: ../../.gemini/GEMINI.md ---',
+      project:
+        '--- Context from: .gemini/GEMINI.md ---\nproject context\n--- End of Context from: .gemini/GEMINI.md ---',
     });
 
-    vi.mocked(fs.statSync).mockImplementation((p: fs.PathLike) => {
-      if (typeof p === 'string' && (p === globalFile || p === projectFile)) {
-        return { isFile: () => true } as fs.Stats;
-      }
-
-      return { isFile: () => false } as fs.Stats;
-    });
-
-    vi.mocked(fs.readFileSync).mockImplementation(
-      (p: fs.PathOrFileDescriptor) => {
-        if (p === globalFile) return 'global context';
-        if (p === projectFile) return 'project context';
-        return '';
-      },
-    );
-
-    const agent = MemoryManagerAgent(projectRoot);
+    const agent = MemoryManagerAgent(config);
     const query = agent.promptConfig.query;
 
     expect(query).toContain('# Initial Context');
-    expect(query).toContain(`## File: ${globalFile}`);
     expect(query).toContain('global context');
-    expect(query).toContain(`## File: ${projectFile}`);
     expect(query).toContain('project context');
   });
 
-  it('should inject GEMINI.md files along the CWD up to project root', () => {
-    const projectRoot = '/test/project';
-    const cwd = '/test/project/src/module';
-    const srcFile = path.join('/test/project/src', 'GEMINI.md');
-    const moduleFile = path.join('/test/project/src/module', 'GEMINI.md');
+  it('should inject flat string memory into initial context', () => {
+    const config = createMockConfig('flat memory content');
 
-    vi.spyOn(process, 'cwd').mockReturnValue(cwd);
-    vi.mocked(fs.existsSync).mockImplementation((p: fs.PathLike) => {
-      if (typeof p === 'string' && (p === srcFile || p === moduleFile))
-        return true;
-      return false;
-    });
-
-    vi.mocked(fs.statSync).mockImplementation((p: fs.PathLike) => {
-      if (typeof p === 'string' && (p === srcFile || p === moduleFile)) {
-        return { isFile: () => true } as fs.Stats;
-      }
-
-      return { isFile: () => false } as fs.Stats;
-    });
-
-    vi.mocked(fs.readFileSync).mockImplementation(
-      (p: fs.PathOrFileDescriptor) => {
-        if (p === srcFile) return 'src context';
-        if (p === moduleFile) return 'module context';
-        return '';
-      },
-    );
-
-    const agent = MemoryManagerAgent(projectRoot);
+    const agent = MemoryManagerAgent(config);
     const query = agent.promptConfig.query;
 
     expect(query).toContain('# Initial Context');
-    expect(query).toContain(`## File: ${srcFile}`);
-    expect(query).toContain('src context');
-    expect(query).toContain(`## File: ${moduleFile}`);
-    expect(query).toContain('module context');
+    expect(query).toContain('flat memory content');
+  });
+
+  it('should exclude extension memory from initial context', () => {
+    const config = createMockConfig({
+      global: 'global context',
+      extension: 'extension context that should be excluded',
+      project: 'project context',
+    });
+
+    const agent = MemoryManagerAgent(config);
+    const query = agent.promptConfig.query;
+
+    expect(query).toContain('global context');
+    expect(query).toContain('project context');
+    expect(query).not.toContain('extension context');
+  });
+
+  it('should not include initial context when memory is empty', () => {
+    const agent = MemoryManagerAgent(createMockConfig());
+    const query = agent.promptConfig.query;
+
+    expect(query).not.toContain('# Initial Context');
   });
 
   it('should have file-management and search tools', () => {
-    const agent = MemoryManagerAgent();
+    const agent = MemoryManagerAgent(createMockConfig());
     expect(agent.toolConfig).toBeDefined();
     expect(agent.toolConfig!.tools).toEqual(
       expect.arrayContaining([
@@ -172,7 +139,7 @@ describe('MemoryManagerAgent', () => {
   });
 
   it('should require a "request" input parameter', () => {
-    const agent = MemoryManagerAgent();
+    const agent = MemoryManagerAgent(createMockConfig());
     const schema = agent.inputConfig.inputSchema as Record<string, unknown>;
     expect(schema).toBeDefined();
     expect(schema['properties']).toHaveProperty('request');
@@ -180,7 +147,7 @@ describe('MemoryManagerAgent', () => {
   });
 
   it('should use a fast model', () => {
-    const agent = MemoryManagerAgent();
+    const agent = MemoryManagerAgent(createMockConfig());
     expect(agent.modelConfig.model).toBe('gemini-3-flash-preview');
   });
 });

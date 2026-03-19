@@ -5,8 +5,6 @@
  */
 
 import { z } from 'zod';
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import type { LocalAgentDefinition } from './types.js';
 import {
   ASK_USER_TOOL_NAME,
@@ -18,7 +16,8 @@ import {
   WRITE_FILE_TOOL_NAME,
 } from '../tools/tool-names.js';
 import { Storage } from '../config/storage.js';
-import { isSubpath, normalizePath } from '../utils/paths.js';
+import { flattenMemory } from '../config/memory.js';
+import type { Config } from '../config/config.js';
 
 const MemoryManagerSchema = z.object({
   response: z
@@ -35,53 +34,20 @@ const MemoryManagerSchema = z.object({
  * in ~/.gemini/agents/ or .gemini/agents/.
  */
 export const MemoryManagerAgent = (
-  projectRoot?: string,
+  config: Config,
 ): LocalAgentDefinition<typeof MemoryManagerSchema> => {
   const globalGeminiDir = Storage.getGlobalGeminiDir();
 
   const getInitialContext = (): string => {
-    const cwd = process.cwd();
-    const filesToRead = new Set<string>();
-
-    // Global GEMINI.md
-    filesToRead.add(path.join(globalGeminiDir, 'GEMINI.md'));
-
-    if (projectRoot) {
-      // Project root .gemini/GEMINI.md
-      filesToRead.add(path.join(projectRoot, '.gemini', 'GEMINI.md'));
-
-      // GEMINI.md files from cwd up to project root
-      if (
-        isSubpath(projectRoot, cwd) ||
-        normalizePath(projectRoot) === normalizePath(cwd)
-      ) {
-        let current = cwd;
-        while (true) {
-          filesToRead.add(path.join(current, 'GEMINI.md'));
-          if (normalizePath(current) === normalizePath(projectRoot)) break;
-          const parent = path.dirname(current);
-          if (parent === current) break;
-          current = parent;
-        }
-      }
-    }
-
-    let context = '\n# Initial Context\n\n';
-    let foundAny = false;
-
-    for (const file of filesToRead) {
-      try {
-        if (fs.existsSync(file) && fs.statSync(file).isFile()) {
-          const content = fs.readFileSync(file, 'utf-8');
-          context += `## File: ${file}\n\`\`\`markdown\n${content}\n\`\`\`\n\n`;
-          foundAny = true;
-        }
-      } catch {
-        // Ignore errors reading files
-      }
-    }
-
-    return foundAny ? context : '';
+    const memory = config.getUserMemory();
+    // Only include global and project memory — extension memory is read-only
+    // and not relevant to the memory manager.
+    const content =
+      typeof memory === 'string'
+        ? memory
+        : flattenMemory({ global: memory.global, project: memory.project });
+    if (!content.trim()) return '';
+    return `\n# Initial Context\n\n${content}\n`;
   };
 
   const buildSystemPrompt = (): string =>

@@ -253,7 +253,7 @@ export class AgentRegistry {
 
     // Register the memory manager agent as a replacement for the save_memory tool.
     if (this.config.isMemoryManagerEnabled()) {
-      this.registerLocalAgent(MemoryManagerAgent(this.config.getProjectRoot()));
+      this.registerLocalAgent(MemoryManagerAgent(this.config));
 
       // Ensure the global .gemini directory is accessible to tools.
       // This allows the save_memory agent to read and write to it.
