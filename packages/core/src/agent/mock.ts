@@ -9,7 +9,8 @@ import type {
   AgentEventCommon,
   AgentEventData,
   AgentSend,
-  AgentSession,
+  AgentProtocol,
+  Unsubscribe,
 } from './types.js';
 
 export type MockAgentEvent = Partial<AgentEventCommon> & AgentEventData;
@@ -20,20 +21,20 @@ export interface PushResponseOptions {
 }
 
 /**
- * A mock implementation of AgentSession for testing.
+ * A mock implementation of AgentProtocol for testing.
  * Allows queuing responses that will be yielded when send() is called.
  */
-export class MockAgentSession implements AgentSession {
+export class MockAgentProtocol implements AgentProtocol {
   private _events: AgentEvent[] = [];
   private _responses: Array<{
     events: MockAgentEvent[];
     options?: PushResponseOptions;
   }> = [];
-  private _streams = new Map<string, AgentEvent[]>();
+  private _subscribers = new Set<(event: AgentEvent) => void>();
   private _activeStreamIds = new Set<string>();
   private _lastStreamId?: string;
   private _nextEventId = 1;
-  private _streamResolvers = new Map<string, Array<() => void>>();
+  private _nextStreamId = 1;
 
   title?: string;
   model?: string;
@@ -50,12 +51,28 @@ export class MockAgentSession implements AgentSession {
     return this._events;
   }
 
+  subscribe(callback: (event: AgentEvent) => void): Unsubscribe {
+    this._subscribers.add(callback);
+    return () => this._subscribers.delete(callback);
+  }
+
+  private _emit(event: AgentEvent) {
+    if (!this._events.some((e) => e.id === event.id)) {
+      this._events.push(event);
+    }
+    for (const callback of this._subscribers) {
+      callback(event);
+    }
+    if (event.type === 'stream_end') {
+      this._activeStreamIds.delete(event.streamId!);
+    }
+  }
+
   /**
    * Queues a sequence of events to be "emitted" by the agent in response to the
    * next send() call.
    */
   pushResponse(events: MockAgentEvent[], options?: PushResponseOptions) {
-    // We store them as data and normalize them when send() is called
     this._responses.push({ events, options });
   }
 
@@ -67,11 +84,6 @@ export class MockAgentSession implements AgentSession {
     events: MockAgentEvent[],
     options?: { close?: boolean },
   ) {
-    const stream = this._streams.get(streamId);
-    if (!stream) {
-      throw new Error(`Stream not found: ${streamId}`);
-    }
-
     const now = new Date().toISOString();
     for (const eventData of events) {
       const event: AgentEvent = {
@@ -80,30 +92,20 @@ export class MockAgentSession implements AgentSession {
         timestamp: eventData.timestamp ?? now,
         streamId: eventData.streamId ?? streamId,
       } as AgentEvent;
-      stream.push(event);
+      this._emit(event);
     }
 
     if (
       options?.close &&
       !events.some((eventData) => eventData.type === 'stream_end')
     ) {
-      stream.push({
+      this._emit({
         id: `e-${this._nextEventId++}`,
         timestamp: now,
         streamId,
         type: 'stream_end',
         reason: 'completed',
       } as AgentEvent);
-    }
-
-    this._notify(streamId);
-  }
-
-  private _notify(streamId: string) {
-    const resolvers = this._streamResolvers.get(streamId);
-    if (resolvers) {
-      this._streamResolvers.delete(streamId);
-      for (const resolve of resolvers) resolve();
     }
   }
 
@@ -112,7 +114,7 @@ export class MockAgentSession implements AgentSession {
       events: [],
     };
     const streamId =
-      response[0]?.streamId ?? `mock-stream-${this._streams.size + 1}`;
+      response[0]?.streamId ?? `mock-stream-${this._nextStreamId++}`;
 
     const now = new Date().toISOString();
 
@@ -155,7 +157,7 @@ export class MockAgentSession implements AgentSession {
       });
     } else if ('action' in payload && payload.action) {
       throw new Error(
-        `Actions not supported in MockAgentSession: ${payload.action.type}`,
+        `Actions not supported in MockAgentProtocol: ${payload.action.type}`,
       );
     }
 
@@ -170,7 +172,9 @@ export class MockAgentSession implements AgentSession {
       });
     }
 
-    const normalizedResponse: AgentEvent[] = [];
+    this._activeStreamIds.add(streamId);
+    this._lastStreamId = streamId;
+
     for (const eventData of response) {
       const event: AgentEvent = {
         ...eventData,
@@ -178,107 +182,22 @@ export class MockAgentSession implements AgentSession {
         timestamp: eventData.timestamp ?? now,
         streamId: eventData.streamId ?? streamId,
       } as AgentEvent;
-      normalizedResponse.push(event);
+      this._emit(event);
     }
-
-    this._streams.set(streamId, normalizedResponse);
-    this._activeStreamIds.add(streamId);
-    this._lastStreamId = streamId;
 
     return { streamId };
   }
 
-  async *stream(options?: {
-    streamId?: string;
-    eventId?: string;
-  }): AsyncIterableIterator<AgentEvent> {
-    let streamId = options?.streamId;
-
-    if (options?.eventId) {
-      const event = this._events.find(
-        (eventData) => eventData.id === options.eventId,
-      );
-      if (!event) {
-        throw new Error(`Event not found: ${options.eventId}`);
-      }
-      streamId = streamId ?? event.streamId;
-    }
-
-    streamId = streamId ?? this._lastStreamId;
-
-    if (!streamId) {
-      return;
-    }
-
-    const events = this._streams.get(streamId);
-    if (!events) {
-      throw new Error(`Stream not found: ${streamId}`);
-    }
-
-    let i = 0;
-    if (options?.eventId) {
-      const idx = events.findIndex(
-        (eventData) => eventData.id === options.eventId,
-      );
-      if (idx !== -1) {
-        i = idx + 1;
-      } else {
-        // This should theoretically not happen if the event was found in this._events
-        // but the trajectories match.
-        throw new Error(
-          `Event ${options.eventId} not found in stream ${streamId}`,
-        );
-      }
-    }
-
-    while (true) {
-      if (i < events.length) {
-        const event = events[i++];
-        // Add to session trajectory if not already present
-        if (!this._events.some((eventData) => eventData.id === event.id)) {
-          this._events.push(event);
-        }
-        yield event;
-
-        // If it's a stream_end, we're done with this stream
-        if (event.type === 'stream_end') {
-          this._activeStreamIds.delete(streamId);
-          return;
-        }
-      } else {
-        // No more events in the array currently. Check if we're still active.
-        if (!this._activeStreamIds.has(streamId)) {
-          // If we weren't terminated by a stream_end but we're no longer active,
-          // it was an abort.
-          const abortEvent: AgentEvent = {
-            id: `e-${this._nextEventId++}`,
-            timestamp: new Date().toISOString(),
-            streamId,
-            type: 'stream_end',
-            reason: 'aborted',
-          } as AgentEvent;
-          if (!this._events.some((e) => e.id === abortEvent.id)) {
-            this._events.push(abortEvent);
-          }
-          yield abortEvent;
-          return;
-        }
-
-        // Wait for notification (new event or abort)
-        await new Promise<void>((resolve) => {
-          const resolvers = this._streamResolvers.get(streamId) ?? [];
-          resolvers.push(resolve);
-          this._streamResolvers.set(streamId, resolvers);
-        });
-      }
-    }
-  }
-
   async abort(): Promise<void> {
-    if (this._lastStreamId) {
+    if (this._lastStreamId && this._activeStreamIds.has(this._lastStreamId)) {
       const streamId = this._lastStreamId;
-      this._activeStreamIds.delete(streamId);
-      this._notify(streamId);
+      this._emit({
+        id: `e-${this._nextEventId++}`,
+        timestamp: new Date().toISOString(),
+        streamId,
+        type: 'stream_end',
+        reason: 'aborted',
+      } as AgentEvent);
     }
   }
 }

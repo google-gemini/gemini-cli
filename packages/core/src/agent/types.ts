@@ -6,25 +6,23 @@
 
 export type WithMeta = { _meta?: Record<string, unknown> };
 
-export interface AgentSession extends Trajectory {
+export type Unsubscribe = () => void;
+
+export interface AgentProtocol extends Trajectory {
   /**
    * Send data to the agent. Promise resolves when action is acknowledged.
-   * Returns the `streamId` of the stream the message was correlated to -- this may
-   * be a new stream if idle or an existing stream.
+   * Returns the `streamId` of the stream the message was correlated to --
+   * this may be a new stream if idle or an existing stream.
    */
   send(payload: AgentSend): Promise<{ streamId: string }>;
+
   /**
-   * Begin listening to actively streaming data. Stream must have the following
-   * properties:
+   * Subscribes the provided callback to all future events emitted by this
+   * session. Returns an unsubscribe function.
    *
-   * - If no arguments are provided, streams events from an active stream.
-   * - If a {streamId} is provided, streams ALL events from that stream.
-   * - If an {eventId} is provided, streams all events AFTER that event.
+   * @param callback The callback function to listen to events.
    */
-  stream(options?: {
-    streamId?: string;
-    eventId?: string;
-  }): AsyncIterableIterator<AgentEvent>;
+  subscribe(callback: (event: AgentEvent) => void): Unsubscribe;
 
   /**
    * Aborts an active stream of agent activity.
@@ -32,7 +30,7 @@ export interface AgentSession extends Trajectory {
   abort(): Promise<void>;
 
   /**
-   * AgentSession implements the Trajectory interface and can retrieve existing events.
+   * AgentProtocol implements the Trajectory interface and can retrieve existing events.
    */
   readonly events: AgentEvent[];
 }
