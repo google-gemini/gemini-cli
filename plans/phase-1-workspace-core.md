@@ -33,8 +33,9 @@ Implement the core API to manage GCE-based workspaces.
 
 Prepare the Hub for self-service deployment.
 
-- [ ] Create `packages/workspace-manager/terraform/` for basic Hub provisioning.
-- [ ] Setup IAP/OAuth authentication on the Cloud Run endpoint.
+- [x] Create `packages/workspace-manager/terraform/` for basic Hub provisioning.
+- [x] Provide a `scripts/deploy-hub.sh` using `gcloud` for a zero-install
+      alternative.
 
 ## 3. Verification & Success Criteria
 
@@ -47,5 +48,5 @@ Prepare the Hub for self-service deployment.
 
 ## 4. Next Steps
 
-- Implement Task 1.2: Integrate `@google-cloud/compute` for GCE instance
-  lifecycle.
+- Milestone 2: Basic CLI Management (Phase 2). Add `workspace` commands to the
+  CLI.
