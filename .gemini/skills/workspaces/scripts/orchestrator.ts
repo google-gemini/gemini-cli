@@ -121,6 +121,9 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
 GEMINI_API_KEY=${remoteApiKey}
 COLORTERM=truecolor
 TERM=xterm-256color
+GEMINI_AUTO_UPDATE=0
+GEMINI_SANDBOX=workspace
+GEMINI_HOST=${targetVM}
 `.trim();
   await provider.exec(`sudo docker exec maintainer-worker sh -c ${q(`echo ${q(dotEnvContent)} > ${remoteWorktreeDir}/.env`)}`);
   
