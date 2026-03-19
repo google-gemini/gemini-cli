@@ -94,7 +94,7 @@ async function remoteStatus() {
   });
 
   console.log(`📡 Fetching remote status from ${INSTANCE_PREFIX}...`);
-  await provider.exec('tsx .workspaces/scripts/status.ts');
+  await provider.exec('tsx /mnt/disks/data/scripts/status.ts');
 }
 
 async function rebuildWorker() {
