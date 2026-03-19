@@ -226,7 +226,9 @@ export class LocalSubagentInvocation extends BaseToolInvocation<
               id: randomUUID(),
               type: 'thought',
               content:
-                isCancellation || isRejection ? sanitizedError : `Error: ${error}`,
+                isCancellation || isRejection
+                  ? sanitizedError
+                  : `Error: ${error}`,
               status: isCancellation || isRejection ? 'cancelled' : 'error',
             });
             updated = true;
