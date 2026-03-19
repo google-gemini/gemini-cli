@@ -139,8 +139,15 @@ export async function runOrchestrator(args: string[], env: NodeJS.ProcessEnv = p
   const finalSSH = provider.getRunCommand(containerWrap, { interactive: true });
 
   const isWithinGemini = !!env.GEMINI_CLI || !!env.GEMINI_SESSION_ID || !!env.GCLI_SESSION_ID;
-  const terminalTarget = config.terminalTarget || 'tab';
-  const forceMainTerminal = true; // Stay in current terminal for E2E verification
+  
+  // 1.5 Handle --open override
+  const openIdx = args.indexOf('--open');
+  let terminalTarget = config.terminalTarget || 'tab';
+  if (openIdx !== -1 && args[openIdx + 1]) {
+      terminalTarget = args[openIdx + 1];
+  }
+
+  const forceMainTerminal = terminalTarget === 'foreground';
 
   if (!forceMainTerminal && isWithinGemini && env.TERM_PROGRAM === 'iTerm.app') {
     const tempCmdPath = path.join(process.env.TMPDIR || '/tmp', `workspace-ssh-${prNumber}.sh`);
