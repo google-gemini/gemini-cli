@@ -6,7 +6,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as os from 'node:os';
 import { inspect } from 'node:util';
 import process from 'node:process';
 import { z } from 'zod';
@@ -43,11 +42,11 @@ import type { HookDefinition, HookEventName } from '../hooks/types.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
 import {
-  createSandboxManager,
   type SandboxManager,
   NoopSandboxManager,
 } from '../services/sandboxManager.js';
-import { WindowsSandboxManager } from '../services/windowsSandboxManager.js';
+import { createSandboxManager } from '../services/sandboxManagerFactory.js';
+import { SandboxedFileSystemService } from '../services/sandboxedFileSystemService.js';
 import {
   initializeTelemetry,
   DEFAULT_TELEMETRY_TARGET,
@@ -78,7 +77,6 @@ import {
   StandardFileSystemService,
   type FileSystemService,
 } from '../services/fileSystemService.js';
-import { SandboxedFileSystemService } from '../services/sandboxedFileSystemService.js';
 import {
   TrackerCreateTaskTool,
   TrackerUpdateTaskTool,
@@ -469,8 +467,8 @@ export enum AuthProviderType {
 
 export interface SandboxConfig {
   enabled: boolean;
-  allowedPaths: string[];
-  networkAccess: boolean;
+  allowedPaths?: string[];
+  networkAccess?: boolean;
   command?:
     | 'docker'
     | 'podman'
@@ -498,6 +496,15 @@ export const ConfigSchema = z.object({
         ])
         .optional(),
       image: z.string().optional(),
+    })
+    .superRefine((data, ctx) => {
+      if (data.enabled && !data.command) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Sandbox command is required when sandbox is enabled',
+          path: ['command'],
+        });
+      }
     })
     .optional(),
 });
@@ -882,7 +889,6 @@ export class Config implements McpContext, AgentLoopContext {
     this.approvedPlanPath = undefined;
     this.embeddingModel =
       params.embeddingModel ?? DEFAULT_GEMINI_EMBEDDING_MODEL;
-    this.fileSystemService = new StandardFileSystemService();
     this.sandbox = params.sandbox
       ? {
           enabled: params.sandbox.enabled ?? false,
@@ -896,6 +902,21 @@ export class Config implements McpContext, AgentLoopContext {
           allowedPaths: [],
           networkAccess: false,
         };
+
+    this._sandboxManager = createSandboxManager(this.sandbox, params.targetDir);
+
+    if (
+      !(this._sandboxManager instanceof NoopSandboxManager) &&
+      this.sandbox.enabled
+    ) {
+      this.fileSystemService = new SandboxedFileSystemService(
+        this._sandboxManager,
+        params.targetDir,
+      );
+    } else {
+      this.fileSystemService = new StandardFileSystemService();
+    }
+
     this.targetDir = path.resolve(params.targetDir);
     this.folderTrust = params.folderTrust ?? false;
     this.workspaceContext = new WorkspaceContext(this.targetDir, []);
@@ -1066,25 +1087,6 @@ export class Config implements McpContext, AgentLoopContext {
     this.useAlternateBuffer = params.useAlternateBuffer ?? false;
     this.enableInteractiveShell = params.enableInteractiveShell ?? false;
     this.skipNextSpeakerCheck = params.skipNextSpeakerCheck ?? true;
-
-    if (
-      os.platform() === 'win32' &&
-      (this.sandbox?.enabled || this.sandbox?.command === 'windows-native')
-    ) {
-      this._sandboxManager = new WindowsSandboxManager();
-    } else {
-      this._sandboxManager = new NoopSandboxManager();
-    }
-
-    if (!(this._sandboxManager instanceof NoopSandboxManager)) {
-      this.fileSystemService = new SandboxedFileSystemService(
-        this._sandboxManager,
-        this.cwd,
-      );
-    } else {
-      this.fileSystemService = new StandardFileSystemService();
-    }
-
     this.shellExecutionConfig = {
       terminalWidth: params.shellExecutionConfig?.terminalWidth ?? 80,
       terminalHeight: params.shellExecutionConfig?.terminalHeight ?? 24,
@@ -1214,12 +1216,7 @@ export class Config implements McpContext, AgentLoopContext {
       }
     }
     this._geminiClient = new GeminiClient(this);
-    this._sandboxManager = createSandboxManager(
-      params.toolSandboxing ?? false,
-      this.targetDir,
-    );
     this.a2aClientManager = new A2AClientManager(this);
-    this.shellExecutionConfig.sandboxManager = this._sandboxManager;
     this.modelRouterService = new ModelRouterService(this);
   }
 

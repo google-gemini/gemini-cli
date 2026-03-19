@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SandboxedFileSystemService } from './sandboxedFileSystemService.js';
 import type {
   SandboxManager,
@@ -38,6 +38,10 @@ describe('SandboxedFileSystemService', () => {
     sandboxManager = new MockSandboxManager();
     service = new SandboxedFileSystemService(sandboxManager, cwd);
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('should read a file through the sandbox', async () => {

@@ -703,12 +703,10 @@ export async function loadCliConfig(
       : specifiedModel || defaultModel;
   const sandboxConfig = await loadSandboxConfig(settings, argv);
   if (sandboxConfig) {
+    const existingPaths = sandboxConfig.allowedPaths || [];
     if (settings.tools.sandboxAllowedPaths?.length) {
       sandboxConfig.allowedPaths = [
-        ...new Set([
-          ...sandboxConfig.allowedPaths,
-          ...settings.tools.sandboxAllowedPaths,
-        ]),
+        ...new Set([...existingPaths, ...settings.tools.sandboxAllowedPaths]),
       ];
     }
     if (settings.tools.sandboxNetworkAccess !== undefined) {
