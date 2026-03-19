@@ -306,6 +306,21 @@ and full builds) to a dedicated, high-performance GCP worker.
 
   // 2. Initialize Remote Gemini Config with Auth
   console.log('⚙️  Initializing remote Gemini configuration...');
+  
+  // NEW: Sync local theme and UI preferences
+  let localTheme = 'Shades Of Purple';
+  let useAlternateBuffer = true;
+  let useBackgroundColor = true;
+
+  if (fs.existsSync(localSettingsPath)) {
+      try {
+          const localSettings = JSON.parse(fs.readFileSync(localSettingsPath, 'utf8'));
+          localTheme = localSettings.ui?.theme || localTheme;
+          useAlternateBuffer = localSettings.ui?.useAlternateBuffer ?? useAlternateBuffer;
+          useBackgroundColor = localSettings.ui?.useBackgroundColor ?? useBackgroundColor;
+      } catch (e) {}
+  }
+
   const remoteSettings: any = {
     security: {
       auth: {
@@ -314,6 +329,11 @@ and full builds) to a dedicated, high-performance GCP worker.
       folderTrust: {
         enabled: false
       }
+    },
+    ui: {
+      theme: localTheme,
+      useAlternateBuffer,
+      useBackgroundColor,
     },
     general: {
       enableAutoUpdate: false
