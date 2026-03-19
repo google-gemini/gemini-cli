@@ -1,0 +1,4 @@
+description = "Show the UX Toolkit welcome guide and documentation."
+prompt = """
+Read the welcome guide at \`packages/extensions/ux-toolkit/WELCOME.md\` and output its contents to the user.
+"""

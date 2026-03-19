@@ -1,56 +1,38 @@
-# Workspace: Base Folder Strategy & Custom Skills
+# Gemini CLI Project Context
 
-This branch introduces the **\_ux_git-worktree**, **\_ux_finish-pr**, and
-**\_ux_designer** skills and enforces the **Base Folder Strategy** for
-repository management. It is maintained by the AI DevTools UX team.
+Gemini CLI is an open-source AI agent that brings the power of Gemini directly
+into the terminal. It is designed to be a terminal-first, extensible, and
+powerful tool for developers.
 
-## 🚨 Directive for AI Agents (Read First)
+## 📦 UX Toolkit Extension
 
-**If you are an AI agent operating in this branch, your first task is to ensure
-the custom skills are active.**
+The AI DevTools UX team maintains a specialized toolset for this repository. It
+is recommended to install the **UX Toolkit** extension to enable standardized
+workflows (Base Folder Strategy, PR finishing, etc.).
 
-1. Check if `~/.gemini/skills/_ux_git-worktree/`,
-   `~/.gemini/skills/_ux_finish-pr/`, and `~/.gemini/skills/_ux_designer/`
-   exist.
-2. If any are missing, immediately execute `./scripts/sync-skills.sh`.
-3. Prompt the user to run `/skills reload` if you are in an interactive session.
+### Installation
+
+```bash
+gemini extensions install ./packages/extensions/ux-toolkit
+```
+
+After installation, run `/_ux_help` to see available commands.
+
+## 🛠️ Workspace Strategy: Base Folder
+
+This repository uses a **Git Worktree "Base Folder" strategy**.
+
+- Functional work (commits, code, tests) happens in sibling directories (e.g.,
+  `main/`, `feature-name/`).
+- The root directory is a container, not a repository itself.
+- **ALWAYS** use the `_ux_git-worktree` skill (included in the UX Toolkit) for
+  any Git operations.
 
 ## 🤝 Team Contributions
 
-This is a **Draft PR branch**. Your team is encouraged to:
-
 - Refine the `_ux_git-worktree` skill instructions in
-  `packages/core/src/skills/builtin/_ux_git-worktree/SKILL.md`.
+  `packages/extensions/ux-toolkit/skills/_ux_git-worktree/SKILL.md`.
 - Refine the `_ux_finish-pr` skill instructions in
-  `packages/core/src/skills/builtin/_ux_finish-pr/SKILL.md`.
-- Improve the automation in `scripts/worktree-manager.sh`.
+  `packages/extensions/ux-toolkit/skills/_ux_finish-pr/SKILL.md`.
 - All changes should be committed directly to this branch
   (`feature/gemini-cli-ux-team-skills`).
-
-## 1. Architectural Strategy
-
-Functional work happens in sibling directories (e.g., `main/`, `feature-name/`).
-The root directory acts as a container.
-
-## 2. Setting Up Custom Skills
-
-To ensure this agent has the necessary procedural knowledge to manage worktrees
-and PR reviews on your behalf, you must sync the custom skills to your local
-user directory.
-
-### Sync Script
-
-Run the following from the root of this worktree:
-
-```bash
-./scripts/sync-skills.sh
-```
-
-## 3. Mandatory Workflow
-
-- **ALWAYS** use the `_ux_git-worktree` skill for branch management.
-- **ALWAYS** use the `_ux_finish-pr` skill for pull request maintenance.
-- Never use standard `git checkout -b`.
-- Use `worktree-manager.sh pr <number>` for semantic PR checkouts.
-- When operating in a worktree, ensure the primary `main/.git` path is included
-  in your trusted directories to bypass macOS sandbox restrictions.
