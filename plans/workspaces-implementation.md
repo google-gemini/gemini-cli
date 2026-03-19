@@ -20,10 +20,9 @@ Build the foundational container environment and the core management API.
 Enable developers to manage their remote fleet from the local CLI. See
 [Milestone 2 Sub-plan](./milestone-2-cli-management.md) for details.
 
-- [ ] Add `gemini workspace create/list/delete` commands.
-
-- [ ] Implement Hub authentication (Google OAuth/IAP).
-- [ ] Add local configuration for Hub discovery (`settings.json`).
+- [x] Add `gemini workspace create/list/delete` commands.
+- [x] Implement Hub authentication (Google OAuth/IAP).
+- [x] Add local configuration for Hub discovery (`settings.json`).
 
 ### Milestone 3: Connectivity & Persistence (Phase 3)
 
