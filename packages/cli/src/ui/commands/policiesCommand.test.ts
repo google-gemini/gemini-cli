@@ -114,9 +114,6 @@ describe('policiesCommand', () => {
         '### Auto Edit Mode Policies (combined with normal mode policies)',
       );
       expect(content).toContain(
-        '### Yolo Mode Policies (combined with normal mode policies)',
-      );
-      expect(content).toContain(
         '### Plan Mode Policies (combined with normal mode policies)',
       );
       expect(content).toContain(

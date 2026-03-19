@@ -72,6 +72,7 @@ describe('PromptProvider', () => {
       }),
       getApprovedPlanPath: vi.fn().mockReturnValue(undefined),
       getApprovalMode: vi.fn(),
+      getAllowedTools: vi.fn().mockReturnValue([]),
       isTrackerEnabled: vi.fn().mockReturnValue(false),
     } as unknown as Config;
   });

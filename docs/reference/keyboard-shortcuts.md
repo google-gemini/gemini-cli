@@ -102,7 +102,6 @@ available combinations.
 | `app.showIdeContextDetail`    | Show IDE context details.                                                                                                                          | `Ctrl+G`           |
 | `app.toggleMarkdown`          | Toggle Markdown rendering.                                                                                                                         | `Alt+M`            |
 | `app.toggleCopyMode`          | Toggle copy mode when in alternate buffer mode.                                                                                                    | `Ctrl+S`           |
-| `app.toggleYolo`              | Toggle YOLO (auto-approval) mode for tool calls.                                                                                                   | `Ctrl+Y`           |
 | `app.cycleApprovalMode`       | Cycle through approval modes: default (prompt), auto_edit (auto-approve edits), and plan (read-only). Plan mode is skipped when the agent is busy. | `Shift+Tab`        |
 | `app.showMoreLines`           | Expand and collapse blocks of content when not in alternate buffer mode.                                                                           | `Ctrl+O`           |
 | `app.expandPaste`             | Expand or collapse a paste placeholder when cursor is over placeholder.                                                                            | `Ctrl+O`           |
@@ -148,7 +147,6 @@ a `key` combination.
   },
   {
     // prefix "-" to unbind a key
-    "command": "-app.toggleYolo",
     "key": "ctrl+y"
   },
   {

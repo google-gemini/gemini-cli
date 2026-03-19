@@ -43,8 +43,6 @@ import {
   AuthType,
   GeminiEventType as ServerGeminiEventType,
   ToolErrorType,
-  ToolConfirmationOutcome,
-  MessageBusType,
   tokenLimit,
   debugLogger,
   coreEvents,
@@ -2200,34 +2198,6 @@ describe('useGeminiStream', () => {
   });
 
   describe('handleApprovalModeChange', () => {
-    it('should auto-approve all pending tool calls when switching to YOLO mode', async () => {
-      const awaitingApprovalToolCalls: TrackedToolCall[] = [
-        createMockToolCall('replace', 'call1', 'edit'),
-        createMockToolCall('read_file', 'call2', 'info'),
-      ];
-
-      const { result } = await renderTestHook(awaitingApprovalToolCalls);
-
-      await act(async () => {
-        await result.current.handleApprovalModeChange(ApprovalMode.YOLO);
-      });
-
-      // Both tool calls should be auto-approved
-      expect(mockMessageBus.publish).toHaveBeenCalledTimes(2);
-      expect(mockMessageBus.publish).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: MessageBusType.TOOL_CONFIRMATION_RESPONSE,
-          correlationId: 'corr-call1',
-          outcome: ToolConfirmationOutcome.ProceedOnce,
-        }),
-      );
-      expect(mockMessageBus.publish).toHaveBeenCalledWith(
-        expect.objectContaining({
-          correlationId: 'corr-call2',
-          outcome: ToolConfirmationOutcome.ProceedOnce,
-        }),
-      );
-    });
 
     it('should only auto-approve edit tools when switching to AUTO_EDIT mode', async () => {
       const awaitingApprovalToolCalls: TrackedToolCall[] = [
@@ -2285,7 +2255,7 @@ describe('useGeminiStream', () => {
       const { result } = await renderTestHook(awaitingApprovalToolCalls);
 
       await act(async () => {
-        await result.current.handleApprovalModeChange(ApprovalMode.YOLO);
+        await result.current.handleApprovalModeChange(ApprovalMode.AUTO_EDIT);
       });
 
       // Both should be attempted despite first error
@@ -2328,7 +2298,7 @@ describe('useGeminiStream', () => {
 
       // Should not throw an error
       await act(async () => {
-        await result.current.handleApprovalModeChange(ApprovalMode.YOLO);
+        await result.current.handleApprovalModeChange(ApprovalMode.AUTO_EDIT);
       });
     });
 
@@ -2370,7 +2340,7 @@ describe('useGeminiStream', () => {
       const { result } = await renderTestHook(mixedStatusToolCalls);
 
       await act(async () => {
-        await result.current.handleApprovalModeChange(ApprovalMode.YOLO);
+        await result.current.handleApprovalModeChange(ApprovalMode.AUTO_EDIT);
       });
 
       // Only the awaiting_approval tool should be processed.

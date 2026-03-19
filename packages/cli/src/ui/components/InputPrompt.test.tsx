@@ -4003,15 +4003,7 @@ describe('InputPrompt', () => {
       unmount();
     });
 
-    it('should render correctly in yolo mode', async () => {
-      props.approvalMode = ApprovalMode.YOLO;
-      const { stdout, unmount } = await renderWithProviders(
-        <InputPrompt {...props} />,
-      );
-      await waitFor(() => expect(stdout.lastFrame()).toContain('*'));
-      expect(stdout.lastFrame()).toMatchSnapshot();
-      unmount();
-    });
+
     it('should not show inverted cursor when shell is focused', async () => {
       props.isEmbeddedShellFocused = true;
       props.focus = false;

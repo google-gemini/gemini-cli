@@ -53,7 +53,7 @@ export class PromptProvider {
     const approvalMode =
       context.config.getApprovalMode?.() ?? ApprovalMode.DEFAULT;
     const isPlanMode = approvalMode === ApprovalMode.PLAN;
-    const isYoloMode = approvalMode === ApprovalMode.YOLO;
+    const isYoloMode = context.config.getAllowedTools()?.includes('*') ?? false;
     const skills = context.config.getSkillManager().getSkills();
     const toolNames = context.toolRegistry.getAllToolNames();
     const enabledToolNames = new Set(toolNames);

@@ -72,6 +72,7 @@ const getToolRegistrySpy = vi.fn().mockReturnValue({
   getToolsByServer: vi.fn().mockReturnValue([]),
 });
 const getApprovalModeSpy = vi.fn();
+const getAllowedToolsSpy = vi.fn();
 const getShellExecutionConfigSpy = vi.fn();
 const getExtensionsSpy = vi.fn();
 
@@ -83,6 +84,7 @@ vi.mock('../config/config.js', async () => {
       const mockConfig = createMockConfig({
         getToolRegistry: getToolRegistrySpy,
         getApprovalMode: getApprovalModeSpy,
+        getAllowedTools: getAllowedToolsSpy,
         getShellExecutionConfig: getShellExecutionConfigSpy,
         getExtensions: getExtensionsSpy,
       });
@@ -118,6 +120,7 @@ describe('E2E Tests', () => {
 
   beforeEach(() => {
     getApprovalModeSpy.mockReturnValue(ApprovalMode.DEFAULT);
+    getAllowedToolsSpy.mockReturnValue([]);
   });
 
   afterAll(
@@ -406,7 +409,7 @@ describe('E2E Tests', () => {
 
   it('should handle multiple tool calls sequentially in YOLO mode', async () => {
     // Set YOLO mode to auto-approve tools and test sequential execution.
-    getApprovalModeSpy.mockReturnValue(ApprovalMode.YOLO);
+    getAllowedToolsSpy.mockReturnValue(['*']);
 
     // First call yields the tool request
     sendMessageStreamSpy.mockImplementationOnce(async function* () {
@@ -697,7 +700,7 @@ describe('E2E Tests', () => {
     });
 
     // Set approval mode to yolo
-    getApprovalModeSpy.mockReturnValue(ApprovalMode.YOLO);
+    getAllowedToolsSpy.mockReturnValue(['*']);
 
     const mockTool = new MockTool({
       name: 'test-tool-yolo',
