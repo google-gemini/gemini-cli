@@ -22,33 +22,33 @@ This skill enables the agent to utilize **Gemini Workspaces**—a high-performan
 ### How to use Workspaces
 1. **Setup**: If the user hasn't initialized their environment, instruct them to run the setup script:
    ```bash
-   npx tsx extensions/workspaces/scripts/setup.ts
+   npx tsx ${extensionPath}/extensions/workspaces/scripts/setup.ts
    ```
 2. **Launch**: Start a playbook for a specific PR/issue:
    ```bash
-   npx tsx extensions/workspaces/scripts/orchestrator.ts <PR_NUMBER> [action]
+   npx tsx ${extensionPath}/extensions/workspaces/scripts/orchestrator.ts <PR_NUMBER> [action]
    ```
    - Actions: `review` (default), `fix`, `ready`.
 3. **Check Status**: See global state and active sessions:
    ```bash
-   npx tsx extensions/workspaces/scripts/status.ts
+   npx tsx ${extensionPath}/extensions/workspaces/scripts/status.ts
    ```
    Or deep-dive into specific PR logs:
    ```bash
-   npx tsx extensions/workspaces/scripts/check.ts <PR_NUMBER>
+   npx tsx ${extensionPath}/extensions/workspaces/scripts/check.ts <PR_NUMBER>
    ```
 4. **Cleanup**: 
    - **Bulk**: Clear all sessions/worktrees:
      ```bash
-     npx tsx extensions/workspaces/scripts/clean.ts --all
+     npx tsx ${extensionPath}/extensions/workspaces/scripts/clean.ts --all
      ```
    - **Surgical**: Kill a specific PR task:
      ```bash
-     npx tsx extensions/workspaces/scripts/clean.ts <PR_NUMBER> <action>
+     npx tsx ${extensionPath}/extensions/workspaces/scripts/clean.ts <PR_NUMBER> <action>
      ```
 5. **Fleet**: Manage VM lifecycle:
    ```bash
-   npx tsx extensions/workspaces/scripts/fleet.ts [stop|provision|list]
+   npx tsx ${extensionPath}/extensions/workspaces/scripts/fleet.ts [stop|provision|list]
    ```
 
 ## ⚠️ Important Constraints
