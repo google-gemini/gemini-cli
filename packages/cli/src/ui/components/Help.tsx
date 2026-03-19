@@ -155,12 +155,6 @@ export const Help: React.FC<Help> = ({ commands }) => (
     </Text>
     <Text color={theme.text.primary}>
       <Text bold color={theme.text.accent}>
-        {formatCommand(Command.TOGGLE_YOLO)}
-      </Text>{' '}
-      - Toggle YOLO mode
-    </Text>
-    <Text color={theme.text.primary}>
-      <Text bold color={theme.text.accent}>
         {formatCommand(Command.SUBMIT)}
       </Text>{' '}
       - Send message

@@ -21,7 +21,6 @@ import type {
   RewindEvent,
   MalformedJsonResponseEvent,
   IdeConnectionEvent,
-  ConversationFinishedEvent,
   ChatCompressionEvent,
   FileOperationEvent,
   InvalidChunkEvent,
@@ -1139,28 +1138,6 @@ export class ClearcutLogger {
         debugLogger.debug('Error flushing to Clearcut:', error);
       });
     });
-  }
-
-  logConversationFinishedEvent(event: ConversationFinishedEvent): void {
-    const data: EventValue[] = [
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_SESSION_ID,
-        value: this.config?.getSessionId() ?? '',
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_CONVERSATION_TURN_COUNT,
-        value: JSON.stringify(event.turnCount),
-      },
-      {
-        gemini_cli_key: EventMetadataKey.GEMINI_CLI_APPROVAL_MODE,
-        value: event.approvalMode,
-      },
-    ];
-
-    this.enqueueLogEvent(
-      this.createLogEvent(EventNames.CONVERSATION_FINISHED, data),
-    );
-    this.flushIfNeeded();
   }
 
   logEndSessionEvent(): void {

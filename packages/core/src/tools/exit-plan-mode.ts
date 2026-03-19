@@ -255,12 +255,12 @@ Ask the user for specific feedback on how to improve the plan.`,
 
   /**
    * Determines the approval mode to switch to when plan mode is exited via a policy ALLOW.
-   * In non-interactive environments, this defaults to YOLO to allow automated execution.
+   * In non-interactive environments, this defaults to AUTO_EDIT to allow automated execution.
    */
   private getAllowApprovalMode(): ApprovalMode {
     if (!this.config.isInteractive()) {
-      // For non-interactive environment requires minimal user action, exit as YOLO mode for plan implementation.
-      return ApprovalMode.YOLO;
+      // For non-interactive environment requires minimal user action, exit as AUTO_EDIT mode for plan implementation.
+      return ApprovalMode.AUTO_EDIT;
     }
     // By default, YOLO mode in interactive environment cannot enter/exit plan mode.
     // Always exit plan mode and move to default approval mode if exit_plan_mode tool is configured with allow decision.

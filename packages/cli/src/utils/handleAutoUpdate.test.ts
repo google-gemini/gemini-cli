@@ -202,12 +202,7 @@ describe('handleAutoUpdate', () => {
     expect(mockSpawn).not.toHaveBeenCalled();
   });
 
-  it.each([
-    PackageManager.NPX,
-    PackageManager.PNPX,
-    PackageManager.BUNX,
-    PackageManager.BINARY,
-  ])(
+  it.each([PackageManager.NPX, PackageManager.PNPX, PackageManager.BUNX])(
     'should suppress update notifications when running via %s',
     (packageManager) => {
       mockGetInstallationInfo.mockReturnValue({

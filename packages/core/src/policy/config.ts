@@ -9,15 +9,14 @@ import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { Storage } from '../config/storage.js';
-import {
+import type {
   ApprovalMode,
-  type PolicyEngineConfig,
-  PolicyDecision,
-  type PolicyRule,
-  type PolicySettings,
-  type SafetyCheckerRule,
-  ALWAYS_ALLOW_PRIORITY_OFFSET,
+  PolicyEngineConfig,
+  PolicyRule,
+  PolicySettings,
+  SafetyCheckerRule,
 } from './types.js';
+import { PolicyDecision, ALWAYS_ALLOW_PRIORITY_OFFSET } from './types.js';
 import type { PolicyEngine } from './policy-engine.js';
 import { loadPoliciesFromToml, type PolicyFileError } from './toml-loader.js';
 import { buildArgsPatterns, isSafeRegExp } from './utils.js';
@@ -217,7 +216,7 @@ async function filterSecurePolicyDirectories(
 
 /**
  * Loads and sanitizes policies from an extension's policies directory.
- * Security: Filters out 'ALLOW' rules and YOLO mode configurations.
+ * Security: Filters out 'ALLOW' rules and Allow-all configurations.
  */
 export async function loadExtensionPolicies(
   extensionName: string,
@@ -241,14 +240,6 @@ export async function loadExtensionPolicies(
       return false;
     }
 
-    // Security: Extensions are not allowed to contribute YOLO mode rules.
-    if (rule.modes?.includes(ApprovalMode.YOLO)) {
-      debugLogger.warn(
-        `[PolicyConfig] Extension "${extensionName}" attempted to contribute a rule for YOLO mode. Ignoring this rule for security.`,
-      );
-      return false;
-    }
-
     // Prefix source with extension name to avoid collisions and double prefixing.
     // toml-loader.ts adds "Extension: file.toml", we transform it to "Extension (name): file.toml".
     rule.source = rule.source?.replace(
@@ -259,14 +250,6 @@ export async function loadExtensionPolicies(
   });
 
   const checkers = result.checkers.filter((checker) => {
-    // Security: Extensions are not allowed to contribute YOLO mode checkers.
-    if (checker.modes?.includes(ApprovalMode.YOLO)) {
-      debugLogger.warn(
-        `[PolicyConfig] Extension "${extensionName}" attempted to contribute a safety checker for YOLO mode. Ignoring this checker for security.`,
-      );
-      return false;
-    }
-
     // Prefix source with extension name.
     checker.source = checker.source?.replace(
       /^Extension: /,
@@ -397,7 +380,7 @@ export async function createPolicyEngineConfig(
   //   50: Read-only tools (becomes 1.050 in default tier)
   //   60: Plan mode catch-all DENY override (becomes 1.060 in default tier)
   //   70: Plan mode explicit ALLOW override (becomes 1.070 in default tier)
-  //   999: YOLO mode allow-all (becomes 1.999 in default tier)
+  //   999: Allow-all (becomes 1.999 in default tier)
 
   // MCP servers that are explicitly excluded in settings.mcp.excluded
   // Priority: MCP_EXCLUDED_PRIORITY (highest in user tier for security - persistent server blocks)
@@ -433,6 +416,17 @@ export async function createPolicyEngineConfig(
   // Priority: ALLOWED_TOOLS_FLAG_PRIORITY (user tier - explicit temporary allows)
   if (settings.tools?.allowed) {
     for (const tool of settings.tools.allowed) {
+      if (tool === '*') {
+        rules.push({
+          toolName: '*',
+          decision: PolicyDecision.ALLOW,
+          priority: ALLOWED_TOOLS_FLAG_PRIORITY,
+          source: 'Settings (Tools Allowed)',
+          allowRedirection: true,
+        });
+        continue;
+      }
+
       // Check for legacy format: toolName(args)
       const match = tool.match(/^([a-zA-Z0-9_-]+)\((.*)\)$/);
       if (match) {

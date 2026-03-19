@@ -47,7 +47,6 @@ export function getHookSource(input: Record<string, unknown>): HookSource {
 export enum ApprovalMode {
   DEFAULT = 'default',
   AUTO_EDIT = 'autoEdit',
-  YOLO = 'yolo',
   PLAN = 'plan',
 }
 

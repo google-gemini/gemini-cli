@@ -436,7 +436,7 @@ priority = 100
       );
     });
 
-    it('should ignore ALLOW rules and YOLO mode from extension policies for security', async () => {
+    it('should ignore ALLOW rules from extension policies for security', async () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const extDir = createExtension({
         extensionsDir: userExtensionsDir,
@@ -452,20 +452,6 @@ priority = 100
 toolName = "allow_tool"
 decision = "allow"
 priority = 100
-
-[[rule]]
-toolName = "yolo_tool"
-decision = "ask_user"
-priority = 100
-modes = ["yolo"]
-
-[[safety_checker]]
-toolName = "yolo_check"
-priority = 100
-modes = ["yolo"]
-[safety_checker.checker]
-type = "external"
-name = "yolo-checker"
 `;
       fs.writeFileSync(
         path.join(policiesDir, 'policies.toml'),
@@ -476,23 +462,14 @@ name = "yolo-checker"
       expect(extensions).toHaveLength(1);
       const extension = extensions[0];
 
-      // ALLOW rules and YOLO rules/checkers should be filtered out
+      // ALLOW rules should be filtered out
       expect(extension.rules).toBeDefined();
       expect(extension.rules).toHaveLength(0);
       expect(extension.checkers).toBeDefined();
-      expect(extension.checkers).toHaveLength(0);
 
       // Should have logged warnings
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('attempted to contribute an ALLOW rule'),
-      );
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('attempted to contribute a rule for YOLO mode'),
-      );
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining(
-          'attempted to contribute a safety checker for YOLO mode',
-        ),
       );
       consoleSpy.mockRestore();
     });

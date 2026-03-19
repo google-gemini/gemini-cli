@@ -115,24 +115,26 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
   const showApprovalIndicator =
     !uiState.shellModeActive && !hideUiDetailsForSuggestions;
   const showRawMarkdownIndicator = !uiState.renderMarkdown;
+  const isYoloMode = config.getAllowedTools()?.includes('*');
   let modeBleedThrough: { text: string; color: string } | null = null;
-  switch (showApprovalModeIndicator) {
-    case ApprovalMode.YOLO:
-      modeBleedThrough = { text: 'YOLO', color: theme.status.error };
-      break;
-    case ApprovalMode.PLAN:
-      modeBleedThrough = { text: 'plan', color: theme.status.success };
-      break;
-    case ApprovalMode.AUTO_EDIT:
-      modeBleedThrough = { text: 'auto edit', color: theme.status.warning };
-      break;
-    case ApprovalMode.DEFAULT:
-      modeBleedThrough = null;
-      break;
-    default:
-      checkExhaustive(showApprovalModeIndicator);
-      modeBleedThrough = null;
-      break;
+  if (isYoloMode) {
+    modeBleedThrough = { text: 'YOLO', color: theme.status.error };
+  } else {
+    switch (showApprovalModeIndicator) {
+      case ApprovalMode.PLAN:
+        modeBleedThrough = { text: 'plan', color: theme.status.success };
+        break;
+      case ApprovalMode.AUTO_EDIT:
+        modeBleedThrough = { text: 'auto edit', color: theme.status.warning };
+        break;
+      case ApprovalMode.DEFAULT:
+        modeBleedThrough = null;
+        break;
+      default:
+        checkExhaustive(showApprovalModeIndicator);
+        modeBleedThrough = null;
+        break;
+    }
   }
 
   const hideMinimalModeHintWhileBusy =
@@ -365,6 +367,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
                     <ApprovalModeIndicator
                       approvalMode={showApprovalModeIndicator}
                       allowPlanMode={uiState.allowPlanMode}
+                      isYoloMode={isYoloMode}
                     />
                   )}
                   {!showLoadingIndicator && (
@@ -449,6 +452,7 @@ export const Composer = ({ isFocused = true }: { isFocused?: boolean }) => {
           shellModeActive={uiState.shellModeActive}
           setShellModeActive={uiActions.setShellModeActive}
           approvalMode={showApprovalModeIndicator}
+          isYoloMode={isYoloMode}
           onEscapePromptChange={uiActions.onEscapePromptChange}
           focus={isFocused}
           vimHandleInput={uiActions.vimHandleInput}

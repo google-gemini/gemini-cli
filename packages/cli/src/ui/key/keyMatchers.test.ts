@@ -403,11 +403,7 @@ describe('keyMatchers', () => {
       positive: [createKey('tab')],
       negative: [createKey('f6'), createKey('f', { ctrl: true })],
     },
-    {
-      command: Command.TOGGLE_YOLO,
-      positive: [createKey('y', { ctrl: true })],
-      negative: [createKey('y'), createKey('y', { alt: true })],
-    },
+
     {
       command: Command.CYCLE_APPROVAL_MODE,
       positive: [createKey('tab', { shift: true })],

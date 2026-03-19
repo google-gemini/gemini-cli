@@ -230,21 +230,21 @@ priority = 100
 toolName = "glob"
 decision = "allow"
 priority = 100
-modes = ["default", "yolo"]
+modes = ["default", "autoEdit"]
 
 [[rule]]
 toolName = "grep"
 decision = "allow"
 priority = 100
-modes = ["yolo"]
+modes = ["autoEdit"]
 `);
 
       // Both rules should be included
       expect(result.rules).toHaveLength(2);
       expect(result.rules[0].toolName).toBe('glob');
-      expect(result.rules[0].modes).toEqual(['default', 'yolo']);
+      expect(result.rules[0].modes).toEqual(['default', 'autoEdit']);
       expect(result.rules[1].toolName).toBe('grep');
-      expect(result.rules[1].modes).toEqual(['yolo']);
+      expect(result.rules[1].modes).toEqual(['autoEdit']);
       expect(getErrors(result)).toHaveLength(0);
     });
 

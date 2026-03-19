@@ -311,13 +311,16 @@ describe('createPolicyEngineConfig', () => {
     expect(excludedRule?.priority).toBe(4.9); // MCP excluded server
   });
 
-  it('should allow all tools in YOLO mode', async () => {
-    const config = await createPolicyEngineConfig({}, ApprovalMode.YOLO);
+  it('should allow all tools with wildcard allowedTools', async () => {
+    const config = await createPolicyEngineConfig(
+      { tools: { allowed: ['*'] } },
+      ApprovalMode.DEFAULT,
+    );
     const rule = config.rules?.find(
-      (r) => r.decision === PolicyDecision.ALLOW && !r.toolName,
+      (r) => r.decision === PolicyDecision.ALLOW && r.toolName === '*',
     );
     expect(rule).toBeDefined();
-    expect(rule?.priority).toBeCloseTo(1.998, 5);
+    expect(rule?.priority).toBeCloseTo(4.3, 5);
   });
 
   it('should allow edit tool in AUTO_EDIT mode', async () => {
@@ -506,14 +509,14 @@ describe('createPolicyEngineConfig', () => {
     expect(explicitFalseRule).toBeUndefined();
   });
 
-  it('should have YOLO allow-all rule beat write tool rules in YOLO mode', async () => {
+  it('should have wildcard allow rule beat write tool rules', async () => {
     const config = await createPolicyEngineConfig(
-      { tools: { exclude: ['dangerous-tool'] } },
-      ApprovalMode.YOLO,
+      { tools: { allowed: ['*'], exclude: ['dangerous-tool'] } },
+      ApprovalMode.DEFAULT,
     );
 
     const wildcardRule = config.rules?.find(
-      (r) => !r.toolName && r.decision === PolicyDecision.ALLOW,
+      (r) => r.toolName === '*' && r.decision === PolicyDecision.ALLOW,
     );
     const writeToolRules = config.rules?.filter(
       (r) =>

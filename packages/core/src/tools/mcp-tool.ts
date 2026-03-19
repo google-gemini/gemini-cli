@@ -108,7 +108,7 @@ export function isMcpToolAnnotation(
   return (
     typeof annotation === 'object' &&
     annotation !== null &&
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion, no-restricted-syntax
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     typeof (annotation as Record<string, unknown>)['_serverName'] === 'string'
   );
 }

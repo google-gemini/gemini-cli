@@ -11,7 +11,8 @@ by the agent when you ask it to "start a plan" using natural language. In this
 mode, the agent is restricted to read-only tools to allow for safe exploration
 and planning.
 
-> **Note:** This tool is not available when the CLI is in YOLO mode.
+> **Note:** This tool is disabled when all tools are auto-approved via `--yolo`
+> or wildcard policies.
 
 - **Tool name:** `enter_plan_mode`
 - **Display name:** Enter Plan Mode

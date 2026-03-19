@@ -107,9 +107,6 @@ describe('policiesCommand', () => {
       expect(content).toContain(
         '### Auto Edit Mode Policies (combined with normal mode policies)',
       );
-      expect(content).toContain(
-        '### Yolo Mode Policies (combined with normal mode policies)',
-      );
       expect(content).toContain('### Plan Mode Policies');
       expect(content).toContain(
         '**DENY** tool: `dangerousTool` [Priority: 10]',

@@ -15,8 +15,6 @@ import {
   UnauthorizedError,
   UserPromptEvent,
   DEFAULT_GEMINI_FLASH_MODEL,
-  logConversationFinishedEvent,
-  ConversationFinishedEvent,
   ApprovalMode,
   parseAndFormatApiError,
   ToolConfirmationOutcome,
@@ -603,27 +601,6 @@ export const useGeminiStream = (
     }
     prevActiveShellPtyIdRef.current = activeShellPtyId;
   }, [activeShellPtyId, addItem, setIsResponding]);
-
-  useEffect(() => {
-    if (
-      config.getApprovalMode() === ApprovalMode.YOLO &&
-      streamingState === StreamingState.Idle
-    ) {
-      const lastUserMessageIndex = history.findLastIndex(
-        (item: HistoryItem) => item.type === MessageType.USER,
-      );
-
-      const turnCount =
-        lastUserMessageIndex === -1 ? 0 : history.length - lastUserMessageIndex;
-
-      if (turnCount > 0) {
-        logConversationFinishedEvent(
-          config,
-          new ConversationFinishedEvent(config.getApprovalMode(), turnCount),
-        );
-      }
-    }
-  }, [streamingState, config, history]);
 
   useEffect(() => {
     if (!isResponding) {
@@ -1652,10 +1629,7 @@ export const useGeminiStream = (
       previousApprovalModeRef.current = newApprovalMode;
 
       // Auto-approve pending tool calls when switching to auto-approval modes
-      if (
-        newApprovalMode === ApprovalMode.YOLO ||
-        newApprovalMode === ApprovalMode.AUTO_EDIT
-      ) {
+      if (newApprovalMode === ApprovalMode.AUTO_EDIT) {
         let awaitingApprovalCalls = toolCalls.filter(
           (call): call is TrackedWaitingToolCall =>
             call.status === 'awaiting_approval',

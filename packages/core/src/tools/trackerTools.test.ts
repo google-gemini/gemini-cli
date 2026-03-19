@@ -37,6 +37,7 @@ describe('Tracker Tools Integration', () => {
       model: 'gemini-3-flash',
       debugMode: false,
     });
+    await config.storage.initialize();
     messageBus = new MessageBus(null as unknown as PolicyEngine, false);
   });
 

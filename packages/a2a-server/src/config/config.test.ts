@@ -19,8 +19,6 @@ import {
   AuthType,
   isHeadlessMode,
   FatalAuthenticationError,
-  PolicyDecision,
-  PRIORITY_YOLO_ALLOW_ALL,
 } from '@google/gemini-cli-core';
 
 // Mock dependencies
@@ -375,35 +373,24 @@ describe('loadConfig', () => {
     });
 
     describe('YOLO mode', () => {
-      it('should enable YOLO mode and add policy rule when GEMINI_YOLO_MODE is true', async () => {
+      it('should enable wildcard allowedTools when GEMINI_YOLO_MODE is true', async () => {
         vi.stubEnv('GEMINI_YOLO_MODE', 'true');
         await loadConfig(mockSettings, mockExtensionLoader, taskId);
         expect(Config).toHaveBeenCalledWith(
           expect.objectContaining({
-            approvalMode: 'yolo',
-            policyEngineConfig: expect.objectContaining({
-              rules: expect.arrayContaining([
-                expect.objectContaining({
-                  decision: PolicyDecision.ALLOW,
-                  priority: PRIORITY_YOLO_ALLOW_ALL,
-                  modes: ['yolo'],
-                  allowRedirection: true,
-                }),
-              ]),
-            }),
+            approvalMode: 'default',
+            allowedTools: expect.arrayContaining(['*']),
           }),
         );
       });
 
-      it('should use default approval mode and empty rules when GEMINI_YOLO_MODE is not true', async () => {
+      it('should use default approval mode and undefined allowedTools when GEMINI_YOLO_MODE is not true', async () => {
         vi.stubEnv('GEMINI_YOLO_MODE', 'false');
         await loadConfig(mockSettings, mockExtensionLoader, taskId);
         expect(Config).toHaveBeenCalledWith(
           expect.objectContaining({
             approvalMode: 'default',
-            policyEngineConfig: expect.objectContaining({
-              rules: [],
-            }),
+            allowedTools: undefined,
           }),
         );
       });

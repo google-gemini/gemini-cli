@@ -26,7 +26,6 @@ import {
   type LoopDetectionDisabledEvent,
   type SlashCommandEvent,
   type RewindEvent,
-  type ConversationFinishedEvent,
   type ChatCompressionEvent,
   type MalformedJsonResponseEvent,
   type InvalidChunkEvent,
@@ -418,21 +417,6 @@ export function logIdeConnection(
   event: IdeConnectionEvent,
 ): void {
   ClearcutLogger.getInstance(config)?.logIdeConnectionEvent(event);
-  bufferTelemetryEvent(() => {
-    const logger = logs.getLogger(SERVICE_NAME);
-    const logRecord: LogRecord = {
-      body: event.toLogBody(),
-      attributes: event.toOpenTelemetryAttributes(config),
-    };
-    logger.emit(logRecord);
-  });
-}
-
-export function logConversationFinishedEvent(
-  config: Config,
-  event: ConversationFinishedEvent,
-): void {
-  ClearcutLogger.getInstance(config)?.logConversationFinishedEvent(event);
   bufferTelemetryEvent(() => {
     const logger = logs.getLogger(SERVICE_NAME);
     const logRecord: LogRecord = {

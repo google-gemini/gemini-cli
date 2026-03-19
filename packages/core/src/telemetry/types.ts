@@ -1181,35 +1181,6 @@ export class IdeConnectionEvent {
   }
 }
 
-export const EVENT_CONVERSATION_FINISHED = 'gemini_cli.conversation_finished';
-export class ConversationFinishedEvent {
-  'event_name': 'conversation_finished';
-  'event.timestamp': string; // ISO 8601;
-  approvalMode: ApprovalMode;
-  turnCount: number;
-
-  constructor(approvalMode: ApprovalMode, turnCount: number) {
-    this['event_name'] = 'conversation_finished';
-    this['event.timestamp'] = new Date().toISOString();
-    this.approvalMode = approvalMode;
-    this.turnCount = turnCount;
-  }
-
-  toOpenTelemetryAttributes(config: Config): LogAttributes {
-    return {
-      ...getCommonAttributes(config),
-      'event.name': EVENT_CONVERSATION_FINISHED,
-      'event.timestamp': this['event.timestamp'],
-      approvalMode: this.approvalMode,
-      turnCount: this.turnCount,
-    };
-  }
-
-  toLogBody(): string {
-    return `Conversation finished.`;
-  }
-}
-
 export const EVENT_FILE_OPERATION = 'gemini_cli.file_operation';
 export class FileOperationEvent implements BaseTelemetryEvent {
   'event.name': 'file_operation';
@@ -1843,7 +1814,6 @@ export type TelemetryEvent =
   | NextSpeakerCheckEvent
   | MalformedJsonResponseEvent
   | IdeConnectionEvent
-  | ConversationFinishedEvent
   | SlashCommandEvent
   | FileOperationEvent
   | InvalidChunkEvent

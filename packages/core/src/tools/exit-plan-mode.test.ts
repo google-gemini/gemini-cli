@@ -361,7 +361,7 @@ Ask the user for specific feedback on how to improve the plan.`,
   });
 
   describe('getAllowApprovalMode (internal)', () => {
-    it('should return YOLO when config.isInteractive() is false', async () => {
+    it('should return AUTO_EDIT when config.isInteractive() is false', async () => {
       mockConfig.isInteractive = vi.fn().mockReturnValue(false);
       const planRelativePath = createPlanFile('test.md', '# Content');
       const invocation = tool.build({ plan_path: planRelativePath });
@@ -369,9 +369,9 @@ Ask the user for specific feedback on how to improve the plan.`,
       // Directly call execute to trigger the internal getAllowApprovalMode
       const result = await invocation.execute(new AbortController().signal);
 
-      expect(result.llmContent).toContain('YOLO mode');
+      expect(result.llmContent).toContain('Auto-Edit mode');
       expect(mockConfig.setApprovalMode).toHaveBeenCalledWith(
-        ApprovalMode.YOLO,
+        ApprovalMode.AUTO_EDIT,
       );
     });
 
@@ -417,10 +417,6 @@ Ask the user for specific feedback on how to improve the plan.`,
       await testMode(
         ApprovalMode.DEFAULT,
         'Default mode (edits will require confirmation)',
-      );
-      await testMode(
-        ApprovalMode.YOLO,
-        'YOLO mode (all tool calls auto-approved)',
       );
     });
 

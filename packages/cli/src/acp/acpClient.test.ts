@@ -355,7 +355,6 @@ describe('GeminiAgent', () => {
           name: 'Auto Edit',
           description: 'Auto-approves edit tools',
         },
-        { id: 'yolo', name: 'YOLO', description: 'Auto-approves all tools' },
       ],
       currentModeId: 'default',
     });
@@ -413,7 +412,7 @@ describe('GeminiAgent', () => {
           name: 'Auto Edit',
           description: 'Auto-approves edit tools',
         },
-        { id: 'yolo', name: 'YOLO', description: 'Auto-approves all tools' },
+
         { id: 'plan', name: 'Plan', description: 'Read-only mode' },
       ],
       currentModeId: 'plan',

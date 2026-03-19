@@ -15,7 +15,6 @@ import {
   ApprovalMode,
   PRIORITY_SUBAGENT_TOOL,
   ALWAYS_ALLOW_PRIORITY_FRACTION,
-  PRIORITY_YOLO_ALLOW_ALL,
 } from './types.js';
 import type { FunctionCall } from '@google/genai';
 import { SafetyCheckDecision } from '../safety/protocol.js';
@@ -336,19 +335,25 @@ describe('PolicyEngine', () => {
       );
     });
 
-    it('should return ALLOW by default in YOLO mode when no rules match', async () => {
-      engine = new PolicyEngine({ approvalMode: ApprovalMode.YOLO });
+    it('should return ALLOW by default when a wildcard ALLOW rule exists', async () => {
+      engine = new PolicyEngine({
+        rules: [{ toolName: '*', decision: PolicyDecision.ALLOW, priority: 1 }],
+      });
 
-      // No rules defined, should return ALLOW in YOLO mode
       const { decision } = await engine.check({ name: 'any-tool' }, undefined);
       expect(decision).toBe(PolicyDecision.ALLOW);
     });
 
-    it('should NOT override explicit DENY rules in YOLO mode', async () => {
+    it('should NOT override explicit DENY rules when a wildcard rule exists', async () => {
       const rules: PolicyRule[] = [
-        { toolName: 'dangerous-tool', decision: PolicyDecision.DENY },
+        { toolName: '*', decision: PolicyDecision.ALLOW, priority: 1 },
+        {
+          toolName: 'dangerous-tool',
+          decision: PolicyDecision.DENY,
+          priority: 10,
+        },
       ];
-      engine = new PolicyEngine({ rules, approvalMode: ApprovalMode.YOLO });
+      engine = new PolicyEngine({ rules });
 
       const { decision } = await engine.check(
         { name: 'dangerous-tool' },
@@ -362,18 +367,18 @@ describe('PolicyEngine', () => {
       ).toBe(PolicyDecision.ALLOW);
     });
 
-    it('should respect rule priority in YOLO mode when a match exists', async () => {
+    it('should respect rule priority when a wildcard match exists', async () => {
       const rules: PolicyRule[] = [
         {
-          toolName: 'test-tool',
-          decision: PolicyDecision.ASK_USER,
+          toolName: '*',
+          decision: PolicyDecision.ALLOW,
           priority: 10,
         },
         { toolName: 'test-tool', decision: PolicyDecision.DENY, priority: 20 },
       ];
-      engine = new PolicyEngine({ rules, approvalMode: ApprovalMode.YOLO });
+      engine = new PolicyEngine({ rules });
 
-      // Priority 20 (DENY) should win over priority 10 (ASK_USER)
+      // Priority 20 (DENY) should win over priority 10 (ALLOW)
       const { decision } = await engine.check({ name: 'test-tool' }, undefined);
       expect(decision).toBe(PolicyDecision.DENY);
     });
@@ -1638,13 +1643,13 @@ describe('PolicyEngine', () => {
   });
 
   describe('shell command parsing failure', () => {
-    it('should return ALLOW in YOLO mode even if shell command parsing fails', async () => {
+    it('should return ALLOW when using wildcard policy even if shell command parsing fails', async () => {
       const { splitCommands } = await import('../utils/shell-utils.js');
       const rules: PolicyRule[] = [
         {
+          toolName: '*',
           decision: PolicyDecision.ALLOW,
           priority: 999,
-          modes: [ApprovalMode.YOLO],
         },
         {
           toolName: 'run_shell_command',
@@ -1653,10 +1658,7 @@ describe('PolicyEngine', () => {
         },
       ];
 
-      engine = new PolicyEngine({
-        rules,
-        approvalMode: ApprovalMode.YOLO,
-      });
+      engine = new PolicyEngine({ rules });
 
       // Simulate parsing failure (splitCommands returning empty array)
       vi.mocked(splitCommands).mockReturnValueOnce([]);
@@ -1671,7 +1673,7 @@ describe('PolicyEngine', () => {
       expect(result.rule?.priority).toBe(999);
     });
 
-    it('should return DENY in YOLO mode if shell command parsing fails and a higher priority rule says DENY', async () => {
+    it('should return DENY when using wildcard policy if shell command parsing fails and a higher priority rule says DENY', async () => {
       const { splitCommands } = await import('../utils/shell-utils.js');
       const rules: PolicyRule[] = [
         {
@@ -1680,16 +1682,13 @@ describe('PolicyEngine', () => {
           priority: 2000, // Very high priority DENY (e.g. Admin)
         },
         {
+          toolName: '*',
           decision: PolicyDecision.ALLOW,
           priority: 999,
-          modes: [ApprovalMode.YOLO],
         },
       ];
 
-      engine = new PolicyEngine({
-        rules,
-        approvalMode: ApprovalMode.YOLO,
-      });
+      engine = new PolicyEngine({ rules });
 
       // Simulate parsing failure
       vi.mocked(splitCommands).mockReturnValueOnce([]);
@@ -2317,16 +2316,16 @@ describe('PolicyEngine', () => {
           {
             decision: PolicyDecision.ALLOW,
             priority: 999,
-            modes: [ApprovalMode.YOLO],
+            modes: [ApprovalMode.AUTO_EDIT],
           },
           {
             toolName: 'dangerous-tool',
             decision: PolicyDecision.DENY,
             priority: 10,
-            modes: [ApprovalMode.YOLO],
+            modes: [ApprovalMode.AUTO_EDIT],
           },
         ],
-        approvalMode: ApprovalMode.YOLO,
+        approvalMode: ApprovalMode.AUTO_EDIT,
         allToolNames: ['dangerous-tool', 'safe-tool'],
         expected: [],
       },
@@ -2842,25 +2841,25 @@ describe('PolicyEngine', () => {
     });
   });
 
-  describe('YOLO mode with ask_user tool', () => {
-    it('should return ASK_USER for ask_user tool even in YOLO mode', async () => {
+  describe('AUTO_EDIT mode with ask_user tool', () => {
+    it('should return ASK_USER for ask_user tool even in AUTO_EDIT mode', async () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'ask_user',
           decision: PolicyDecision.ASK_USER,
           priority: 999,
-          modes: [ApprovalMode.YOLO],
+          modes: [ApprovalMode.AUTO_EDIT],
         },
         {
           decision: PolicyDecision.ALLOW,
-          priority: PRIORITY_YOLO_ALLOW_ALL,
-          modes: [ApprovalMode.YOLO],
+          priority: 998,
+          modes: [ApprovalMode.AUTO_EDIT],
         },
       ];
 
       engine = new PolicyEngine({
         rules,
-        approvalMode: ApprovalMode.YOLO,
+        approvalMode: ApprovalMode.AUTO_EDIT,
       });
 
       const result = await engine.check(
@@ -2870,24 +2869,24 @@ describe('PolicyEngine', () => {
       expect(result.decision).toBe(PolicyDecision.ASK_USER);
     });
 
-    it('should return ALLOW for other tools in YOLO mode', async () => {
+    it('should return ALLOW for other tools in AUTO_EDIT mode', async () => {
       const rules: PolicyRule[] = [
         {
           toolName: 'ask_user',
           decision: PolicyDecision.ASK_USER,
           priority: 999,
-          modes: [ApprovalMode.YOLO],
+          modes: [ApprovalMode.AUTO_EDIT],
         },
         {
           decision: PolicyDecision.ALLOW,
-          priority: PRIORITY_YOLO_ALLOW_ALL,
-          modes: [ApprovalMode.YOLO],
+          priority: 998,
+          modes: [ApprovalMode.AUTO_EDIT],
         },
       ];
 
       engine = new PolicyEngine({
         rules,
-        approvalMode: ApprovalMode.YOLO,
+        approvalMode: ApprovalMode.AUTO_EDIT,
       });
 
       const result = await engine.check(
@@ -2985,19 +2984,19 @@ describe('PolicyEngine', () => {
           toolName: 'enter_plan_mode',
           decision: PolicyDecision.DENY,
           priority: 999,
-          modes: [ApprovalMode.YOLO],
+          modes: [ApprovalMode.AUTO_EDIT],
         },
         {
           toolName: 'exit_plan_mode',
           decision: PolicyDecision.DENY,
           priority: 999,
-          modes: [ApprovalMode.YOLO],
+          modes: [ApprovalMode.AUTO_EDIT],
         },
       ];
 
       engine = new PolicyEngine({
         rules,
-        approvalMode: ApprovalMode.YOLO,
+        approvalMode: ApprovalMode.AUTO_EDIT,
       });
 
       const resultEnter = await engine.check(
