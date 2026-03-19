@@ -407,7 +407,7 @@ export class LocalAgentExecutor<TOutput extends z.ZodTypeAny> {
       // Only validate if it's a real tool with input schema requirements
       if (tool && toolName !== TASK_COMPLETE_TOOL_NAME) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any
-        const toolSchema = (tool as any).inputSchema;
+        const toolSchema = tool.parameterSchema;
         if (toolSchema && typeof toolSchema === 'object') {
           const args = call.args ?? {};
           const validationError = SchemaValidator.validate(toolSchema, args);
