@@ -649,6 +649,7 @@ export interface ConfigParameters {
   billing?: {
     overageStrategy?: OverageStrategy;
   };
+  simulateUser?: boolean;
 }
 
 export class Config implements McpContext, AgentLoopContext {
@@ -866,6 +867,7 @@ export class Config implements McpContext, AgentLoopContext {
   private lastModeSwitchTime: number = performance.now();
   readonly injectionService: InjectionService;
   private approvedPlanPath: string | undefined;
+  private readonly simulateUser: boolean;
 
   constructor(params: ConfigParameters) {
     this._sessionId = params.sessionId;
@@ -1095,6 +1097,7 @@ export class Config implements McpContext, AgentLoopContext {
     this.fileExclusions = new FileExclusions(this);
     this.eventEmitter = params.eventEmitter;
     this.enableConseca = params.enableConseca ?? false;
+    this.simulateUser = params.simulateUser ?? false;
 
     // Initialize Safety Infrastructure
     const contextBuilder = new ContextBuilder(this);
@@ -2507,6 +2510,10 @@ export class Config implements McpContext, AgentLoopContext {
 
   getUsageStatisticsEnabled(): boolean {
     return this.usageStatisticsEnabled;
+  }
+
+  getSimulateUser(): boolean {
+    return this.simulateUser;
   }
 
   getAcpMode(): boolean {

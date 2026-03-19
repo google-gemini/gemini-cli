@@ -97,6 +97,7 @@ export interface CliArgs {
   rawOutput: boolean | undefined;
   acceptRawOutputRisk: boolean | undefined;
   isCommand: boolean | undefined;
+  simulateUser: boolean | undefined;
 }
 
 /**
@@ -298,6 +299,11 @@ export async function parseArguments(
         .option('accept-raw-output-risk', {
           type: 'boolean',
           description: 'Suppress the security warning when using --raw-output.',
+        })
+        .option('simulate-user', {
+          type: 'boolean',
+          description:
+            'Run the user simulation agent in the background for evaluation purposes.',
         }),
     )
     // Register MCP subcommands
@@ -799,6 +805,7 @@ export async function loadCliConfig(
     approvalMode,
     disableYoloMode:
       settings.security?.disableYoloMode || settings.admin?.secureModeEnabled,
+    simulateUser: !!argv.simulateUser,
     disableAlwaysAllow:
       settings.security?.disableAlwaysAllow ||
       settings.admin?.secureModeEnabled,

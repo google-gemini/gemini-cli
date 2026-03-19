@@ -9,7 +9,9 @@ import { render } from 'ink';
 import { basename } from 'node:path';
 import { AppContainer } from './ui/AppContainer.js';
 import { ConsolePatcher } from './ui/utils/ConsolePatcher.js';
+import { UserSimulator } from './services/UserSimulator.js';
 import { registerCleanup, setupTtyCheck } from './utils/cleanup.js';
+import { PassThrough } from 'node:stream';
 import {
   type StartupWarning,
   type Config,
@@ -132,6 +134,9 @@ export async function startInteractiveUI(
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
 
+  const simulateUser = config.getSimulateUser();
+  const simulatedStdin = new PassThrough({ encoding: 'utf8' });
+
   const instance = render(
     process.env['DEBUG'] ? (
       <React.StrictMode>
@@ -143,7 +148,8 @@ export async function startInteractiveUI(
     {
       stdout: inkStdout,
       stderr: inkStderr,
-      stdin: process.stdin,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-unsafe-assignment
+      stdin: (simulateUser ? simulatedStdin : process.stdin) as any,
       exitOnCtrlC: false,
       isScreenReaderEnabled: config.getScreenReader(),
       onRender: ({ renderTime }: { renderTime: number }) => {
@@ -178,6 +184,12 @@ export async function startInteractiveUI(
         debugLogger.warn('Update check failed:', err);
       }
     });
+
+  if (simulateUser) {
+    const simulator = new UserSimulator(config, instance, simulatedStdin);
+    simulator.start();
+    registerCleanup(() => simulator.stop());
+  }
 
   registerCleanup(() => instance.unmount());
 
