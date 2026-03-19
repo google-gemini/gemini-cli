@@ -36,10 +36,12 @@ const mockExtension: RegistryExtension = {
 describe('ExtensionDetails', () => {
   let mockOnBack: ReturnType<typeof vi.fn>;
   let mockOnInstall: ReturnType<typeof vi.fn>;
+  let mockOnLink: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     mockOnBack = vi.fn();
     mockOnInstall = vi.fn();
+    mockOnLink = vi.fn();
   });
 
   const renderDetails = (isInstalled = false) =>
@@ -49,6 +51,7 @@ describe('ExtensionDetails', () => {
           extension={mockExtension}
           onBack={mockOnBack}
           onInstall={mockOnInstall}
+          onLink={mockOnLink}
           isInstalled={isInstalled}
         />
       </KeypressProvider>,
@@ -119,5 +122,57 @@ describe('ExtensionDetails', () => {
     });
     expect(mockOnInstall).not.toHaveBeenCalled();
     vi.useRealTimers();
+  });
+
+  it('should call onLink when "l" is pressed and is linkable', async () => {
+    const linkableExtension = {
+      ...mockExtension,
+      url: '/local/path/to/extension',
+    };
+    const { stdin } = render(
+      <KeypressProvider>
+        <ExtensionDetails
+          extension={linkableExtension}
+          onBack={mockOnBack}
+          onInstall={mockOnInstall}
+          onLink={mockOnLink}
+          isInstalled={false}
+        />
+      </KeypressProvider>,
+    );
+    await React.act(async () => {
+      stdin.write('l');
+    });
+    await waitFor(() => {
+      expect(mockOnLink).toHaveBeenCalled();
+    });
+  });
+
+  it('should NOT show "Link" button for GitHub extensions', async () => {
+    const { lastFrame } = renderDetails(false);
+    await waitFor(() => {
+      expect(lastFrame()).not.toContain('[L] Link');
+    });
+  });
+
+  it('should show "Link" button for local extensions', async () => {
+    const linkableExtension = {
+      ...mockExtension,
+      url: '/local/path/to/extension',
+    };
+    const { lastFrame } = render(
+      <KeypressProvider>
+        <ExtensionDetails
+          extension={linkableExtension}
+          onBack={mockOnBack}
+          onInstall={mockOnInstall}
+          onLink={mockOnLink}
+          isInstalled={false}
+        />
+      </KeypressProvider>,
+    );
+    await waitFor(() => {
+      expect(lastFrame()).toContain('[L] Link');
+    });
   });
 });
