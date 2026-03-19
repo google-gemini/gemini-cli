@@ -139,6 +139,7 @@ describe('ChatCompressionService', () => {
   let testTempDir: string;
   const mockModel = 'gemini-2.5-pro';
   const mockPromptId = 'test-prompt-id';
+  const mockSessionId = 'test-session-id';
 
   beforeEach(() => {
     testTempDir = fs.mkdtempSync(
@@ -189,6 +190,7 @@ describe('ChatCompressionService', () => {
       getHookSystem: () => undefined,
       getNextCompressionTruncationId: vi.fn().mockReturnValue(1),
       getTruncateToolOutputThreshold: vi.fn().mockReturnValue(40000),
+      getSessionId: vi.fn().mockReturnValue(mockSessionId),
       storage: {
         getProjectTempDir: vi.fn().mockReturnValue(testTempDir),
       },
@@ -538,7 +540,7 @@ describe('ChatCompressionService', () => {
             {
               functionResponse: {
                 name: 'grep',
-                response: { content: largeResponse },
+                response: { content: largeResponse, metadata: 'keep-me' },
               },
             },
           ],
@@ -573,12 +575,17 @@ describe('ChatCompressionService', () => {
       // Verify the new history contains the truncated message
       const keptHistory = result.newHistory!.slice(2); // After summary and 'Got it'
       const truncatedPart = keptHistory[1].parts![0].functionResponse;
-      expect(truncatedPart?.response?.['output']).toContain(
+      expect(truncatedPart?.response?.['content']).toContain(
         'Output too large.',
       );
+      expect(truncatedPart?.response).toMatchObject({ metadata: 'keep-me' });
 
       // Verify a file was actually created in the tool_output subdirectory
-      const toolOutputDir = path.join(testTempDir, TOOL_OUTPUTS_DIR);
+      const toolOutputDir = path.join(
+        testTempDir,
+        TOOL_OUTPUTS_DIR,
+        `session-${mockSessionId}`,
+      );
       const files = fs.readdirSync(toolOutputDir);
       expect(files.length).toBeGreaterThan(0);
       expect(files[0]).toMatch(/grep_.*\.txt/);
@@ -705,11 +712,11 @@ describe('ChatCompressionService', () => {
       const rawResponse = keptHistory.find(
         (h) =>
           h.parts?.some((p) => p.functionResponse?.name === 'raw_tool') &&
-          (h.parts?.[0].functionResponse?.response?.['output'] as string)
+          (h.parts?.[0].functionResponse?.response?.['content'] as string)
             ?.length < 100000,
       );
       const truncatedPart = rawResponse!.parts![0].functionResponse;
-      const content = truncatedPart?.response?.['output'] as string;
+      const content = truncatedPart?.response?.['content'] as string;
 
       // DEFAULT_TRUNCATE_TOOL_OUTPUT_THRESHOLD = 40000 -> head=8000 (20%), tail=32000 (80%)
       expect(content).toContain(
@@ -845,7 +852,7 @@ describe('ChatCompressionService', () => {
         h.parts?.some((p) => p.functionResponse?.name === 'massive_preserved'),
       );
       const preservedPart = preservedToolTurn!.parts![0].functionResponse;
-      expect(preservedPart?.response?.['output']).toContain(
+      expect(preservedPart?.response?.['content']).toContain(
         'Output too large.',
       );
     });
@@ -892,7 +899,7 @@ describe('ChatCompressionService', () => {
       const summarizerGrepResponse =
         historySentToSummarizer[0].parts![0].functionResponse;
       // Should be truncated because original > 1M tokens
-      expect(summarizerGrepResponse?.response?.['output']).toContain(
+      expect(summarizerGrepResponse?.response?.['content']).toContain(
         'Output too large.',
       );
     });
