@@ -5,11 +5,10 @@
  */
 
 import React from 'react';
-import { render } from '../../../test-utils/render.js';
+import { renderWithProviders } from '../../../test-utils/render.js';
 import { waitFor } from '../../../test-utils/async.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ExtensionDetails } from './ExtensionDetails.js';
-import { KeypressProvider } from '../../contexts/KeypressContext.js';
 import { type RegistryExtension } from '../../../config/extensionRegistryClient.js';
 
 const mockExtension: RegistryExtension = {
@@ -44,8 +43,8 @@ describe('ExtensionDetails', () => {
     mockOnLink = vi.fn();
   });
 
-  const renderDetails = (isInstalled = false) =>
-    render(
+  const renderDetails = async (isInstalled = false) =>
+    renderWithProviders(
       <KeypressProvider>
         <ExtensionDetails
           extension={mockExtension}
@@ -58,7 +57,7 @@ describe('ExtensionDetails', () => {
     );
 
   it('should render extension details correctly', async () => {
-    const { lastFrame } = renderDetails();
+    const { lastFrame } = await renderDetails();
     await waitFor(() => {
       expect(lastFrame()).toContain('Test Extension');
       expect(lastFrame()).toContain('v1.2.3');
@@ -75,7 +74,7 @@ describe('ExtensionDetails', () => {
   });
 
   it('should show install prompt when not installed', async () => {
-    const { lastFrame } = renderDetails(false);
+    const { lastFrame } = await renderDetails(false);
     await waitFor(() => {
       expect(lastFrame()).toContain('[Enter] Install');
       expect(lastFrame()).not.toContain('Already Installed');
@@ -83,7 +82,7 @@ describe('ExtensionDetails', () => {
   });
 
   it('should show already installed message when installed', async () => {
-    const { lastFrame } = renderDetails(true);
+    const { lastFrame } = await renderDetails(true);
     await waitFor(() => {
       expect(lastFrame()).toContain('Already Installed');
       expect(lastFrame()).not.toContain('[Enter] Install');
@@ -91,7 +90,7 @@ describe('ExtensionDetails', () => {
   });
 
   it('should call onBack when Escape is pressed', async () => {
-    const { stdin } = renderDetails();
+    const { stdin } = await renderDetails();
     await React.act(async () => {
       stdin.write('\x1b'); // Escape
     });
@@ -101,7 +100,7 @@ describe('ExtensionDetails', () => {
   });
 
   it('should call onInstall when Enter is pressed and not installed', async () => {
-    const { stdin } = renderDetails(false);
+    const { stdin } = await renderDetails(false);
     await React.act(async () => {
       stdin.write('\r'); // Enter
     });
@@ -112,7 +111,7 @@ describe('ExtensionDetails', () => {
 
   it('should NOT call onInstall when Enter is pressed and already installed', async () => {
     vi.useFakeTimers();
-    const { stdin } = renderDetails(true);
+    const { stdin } = await renderDetails(true);
     await React.act(async () => {
       stdin.write('\r'); // Enter
     });
