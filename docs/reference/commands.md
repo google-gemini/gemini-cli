@@ -60,8 +60,8 @@ Slash commands provide meta-level control over the CLI itself.
     - `list` (selecting this opens the auto-saved session browser)
   - `-- checkpoints --`
     - `list`, `save`, `resume`, `delete`, `share` (manual tagged checkpoints)
-  - **Note:** Unique prefixes (for example `/cha` or `/resum`) resolve to the
-    same grouped menu.
+  - Unique prefixes (for example `/cha` or `/resu`) resolve to the same grouped
+    menu.
 - **Sub-commands:**
   - **`debug`**
     - **Description:** Export the most recent API request as a JSON payload.

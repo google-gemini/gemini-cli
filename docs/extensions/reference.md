@@ -234,7 +234,9 @@ skill definitions in a `skills/` directory. For example,
 
 ### Sub-agents
 
-> **Note:** Sub-agents are a preview feature currently under active development.
+<!-- prettier-ignore -->
+> [!NOTE]
+> Sub-agents are a preview feature currently under active development.
 
 Provide [sub-agents](../core/subagents.md) that users can delegate tasks to. Add
 agent definition files (`.md`) to an `agents/` directory in your extension root.
@@ -253,7 +255,9 @@ Rules contributed by extensions run in their own tier (tier 2), alongside
 workspace-defined policies. This tier has higher priority than the default rules
 but lower priority than user or admin policies.
 
-> **Warning:** For security, Gemini CLI ignores any `allow` decisions or `yolo`
+<!-- prettier-ignore -->
+> [!WARNING]
+> For security, Gemini CLI ignores any `allow` decisions or `yolo`
 > mode configurations in extension policies. This ensures that an extension
 > cannot automatically approve tool calls or bypass security measures without
 > your confirmation.

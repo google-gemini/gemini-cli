@@ -25,7 +25,9 @@ overridden by higher numbers):
 Gemini CLI uses JSON settings files for persistent configuration. There are four
 locations for these files:
 
-> **Tip:** JSON-aware editors can use autocomplete and validation by pointing to
+<!-- prettier-ignore -->
+> [!TIP]
+> JSON-aware editors can use autocomplete and validation by pointing to
 > the generated schema at `schemas/settings.schema.json` in this repository.
 > When working outside the repo, reference the hosted schema at
 > `https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json`.
@@ -66,9 +68,9 @@ an environment variable `MY_API_TOKEN`, you could use it in `settings.json` like
 this: `"apiKey": "$MY_API_TOKEN"`. Additionally, each extension can have its own
 `.env` file in its directory, which will be loaded automatically.
 
-> **Note for Enterprise Users:** For guidance on deploying and managing Gemini
-> CLI in a corporate environment, please see the
-> [Enterprise Configuration](../cli/enterprise.md) documentation.
+**Note for Enterprise Users:** For guidance on deploying and managing Gemini CLI
+in a corporate environment, please see the
+[Enterprise Configuration](../cli/enterprise.md) documentation.
 
 ### The `.gemini` directory in your project
 
@@ -1566,7 +1568,9 @@ for compatibility. At least one of `command`, `url`, or `httpUrl` must be
 provided. If multiple are specified, the order of precedence is `httpUrl`, then
 `url`, then `command`.
 
-> **Warning:** Avoid using underscores (`_`) in your server aliases (e.g., use
+<!-- prettier-ignore -->
+> [!WARNING]
+> Avoid using underscores (`_`) in your server aliases (e.g., use
 > `my-server` instead of `my_server`). The underlying policy engine parses Fully
 > Qualified Names (`mcp_server_tool`) using the first underscore after the
 > `mcp_` prefix. An underscore in your server alias will cause the parser to
