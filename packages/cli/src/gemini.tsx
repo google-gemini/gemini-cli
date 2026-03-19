@@ -208,13 +208,13 @@ export async function main() {
   registerCleanup(() => slashCommandConflictHandler.stop());
 
   const loadSettingsHandle = startupProfiler.start('load_settings');
-  let settings = loadSettings();
+  const settings = loadSettings();
   loadSettingsHandle?.end();
 
   // If a worktree is requested and enabled, set it up early.
   const requestedWorktree = cliConfig.getRequestedWorktreeName(settings);
   if (requestedWorktree !== undefined) {
-    settings = await setupWorktree(requestedWorktree || undefined, settings);
+    await setupWorktree(requestedWorktree || undefined);
   }
 
   // Report settings errors once during startup
