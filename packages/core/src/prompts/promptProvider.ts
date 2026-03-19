@@ -32,7 +32,6 @@ import { resolveModel, supportsModernFeatures } from '../config/models.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { getAllGeminiMdFilenames } from '../tools/memoryTool.js';
 import type { AgentLoopContext } from '../config/agent-loop-context.js';
-import { TopicManager } from '../tools/topicTool.js';
 
 /**
  * Orchestrates prompt generation by gathering context and building options.
@@ -250,7 +249,7 @@ export class PromptProvider {
 
     // Context Reinjection (Active Topic)
     if (context.config.isTopicUpdateNarrationEnabled()) {
-      const activeTopic = TopicManager.getInstance().getTopic();
+      const activeTopic = context.config.topicState.getTopic();
       if (activeTopic) {
         sanitizedPrompt += `\n\n[Active Topic: ${activeTopic}]`;
       }

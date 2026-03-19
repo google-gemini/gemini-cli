@@ -16,7 +16,7 @@ import { ApprovalMode } from '../policy/types.js';
 import { DiscoveredMCPTool } from '../tools/mcp-tool.js';
 import { MockTool } from '../test-utils/mock-tool.js';
 import { CREATE_NEW_TOPIC_TOOL_NAME } from '../tools/tool-names.js';
-import { TopicManager } from '../tools/topicTool.js';
+import { TopicState } from '../tools/topicTool.js';
 import type { CallableTool } from '@google/genai';
 import type { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { ToolRegistry } from '../tools/tool-registry.js';
@@ -55,6 +55,7 @@ describe('PromptProvider', () => {
         ).getToolRegistry?.() as unknown as ToolRegistry;
       },
       getToolRegistry: vi.fn().mockReturnValue(mockToolRegistry),
+      topicState: new TopicState(),
       getEnableShellOutputEfficiency: vi.fn().mockReturnValue(true),
       getSandboxEnabled: vi.fn().mockReturnValue(false),
       storage: {
@@ -241,25 +242,23 @@ describe('PromptProvider', () => {
 
   describe('Topic & Update Narration', () => {
     beforeEach(() => {
-      TopicManager.getInstance().reset();
+      mockConfig.topicState.reset();
       vi.mocked(mockConfig.isTopicUpdateNarrationEnabled).mockReturnValue(true);
       (mockConfig.getToolRegistry as ReturnType<typeof vi.fn>).mockReturnValue({
         getAllToolNames: vi.fn().mockReturnValue([CREATE_NEW_TOPIC_TOOL_NAME]),
-        getAllTools: vi
-          .fn()
-          .mockReturnValue([
-            new MockTool({
-              name: CREATE_NEW_TOPIC_TOOL_NAME,
-              displayName: 'Topic',
-            }),
-          ]),
+        getAllTools: vi.fn().mockReturnValue([
+          new MockTool({
+            name: CREATE_NEW_TOPIC_TOOL_NAME,
+            displayName: 'Topic',
+          }),
+        ]),
       });
       vi.mocked(mockConfig.getHasAccessToPreviewModel).mockReturnValue(true);
       vi.mocked(mockConfig.getGemini31LaunchedSync).mockReturnValue(true);
     });
 
     it('should include active topic context when narration is enabled', () => {
-      TopicManager.getInstance().setTopic('Active Chapter');
+      mockConfig.topicState.setTopic('Active Chapter');
       const provider = new PromptProvider();
       const prompt = provider.getCoreSystemPrompt(mockConfig);
 
@@ -270,7 +269,7 @@ describe('PromptProvider', () => {
       vi.mocked(mockConfig.isTopicUpdateNarrationEnabled).mockReturnValue(
         false,
       );
-      TopicManager.getInstance().setTopic('Active Chapter');
+      mockConfig.topicState.setTopic('Active Chapter');
       const provider = new PromptProvider();
       const prompt = provider.getCoreSystemPrompt(mockConfig);
 

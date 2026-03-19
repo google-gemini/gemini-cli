@@ -5,49 +5,73 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TopicManager, CreateNewTopicTool } from './topicTool.js';
+import { TopicState, CreateNewTopicTool } from './topicTool.js';
 import { MessageBus } from '../confirmation-bus/message-bus.js';
 import type { PolicyEngine } from '../policy/policy-engine.js';
 import {
   CREATE_NEW_TOPIC_TOOL_NAME,
   TOPIC_PARAM_TITLE,
 } from './definitions/base-declarations.js';
+import type { Config } from '../config/config.js';
 
-describe('TopicManager', () => {
+describe('TopicState', () => {
+  let state: TopicState;
+
   beforeEach(() => {
-    TopicManager.getInstance().reset();
+    state = new TopicState();
   });
 
   it('should store and retrieve topic title', () => {
-    const manager = TopicManager.getInstance();
-    expect(manager.getTopic()).toBeUndefined();
+    expect(state.getTopic()).toBeUndefined();
+    const success = state.setTopic('Test Topic');
+    expect(success).toBe(true);
+    expect(state.getTopic()).toBe('Test Topic');
+  });
 
-    manager.setTopic('Test Topic');
-    expect(manager.getTopic()).toBe('Test Topic');
+  it('should sanitize newlines and carriage returns', () => {
+    state.setTopic('Topic\nWith\r\nLines');
+    expect(state.getTopic()).toBe('Topic With Lines');
+  });
+
+  it('should trim whitespace', () => {
+    state.setTopic('  Spaced Topic   ');
+    expect(state.getTopic()).toBe('Spaced Topic');
+  });
+
+  it('should reject empty or whitespace-only titles', () => {
+    expect(state.setTopic('')).toBe(false);
+    expect(state.setTopic('   ')).toBe(false);
+    expect(state.setTopic('\n\n')).toBe(false);
   });
 
   it('should reset topic', () => {
-    const manager = TopicManager.getInstance();
-    manager.setTopic('Test Topic');
-    manager.reset();
-    expect(manager.getTopic()).toBeUndefined();
+    state.setTopic('Test Topic');
+    state.reset();
+    expect(state.getTopic()).toBeUndefined();
   });
 
-  it('should be a singleton', () => {
-    const manager1 = TopicManager.getInstance();
-    const manager2 = TopicManager.getInstance();
-    expect(manager1).toBe(manager2);
+  it('should be independent across instances', () => {
+    const state1 = new TopicState();
+    const state2 = new TopicState();
+    state1.setTopic('Topic 1');
+    state2.setTopic('Topic 2');
+    expect(state1.getTopic()).toBe('Topic 1');
+    expect(state2.getTopic()).toBe('Topic 2');
   });
 });
 
 describe('CreateNewTopicTool', () => {
   let tool: CreateNewTopicTool;
   let mockMessageBus: MessageBus;
+  let mockConfig: Config;
 
   beforeEach(() => {
     mockMessageBus = new MessageBus(vi.mocked({} as PolicyEngine));
-    tool = new CreateNewTopicTool(mockMessageBus);
-    TopicManager.getInstance().reset();
+    // Mock enough of Config to satisfy the tool
+    mockConfig = {
+      topicState: new TopicState(),
+    } as unknown as Config;
+    tool = new CreateNewTopicTool(mockConfig, mockMessageBus);
   });
 
   it('should have correct name and display name', () => {
@@ -55,21 +79,19 @@ describe('CreateNewTopicTool', () => {
     expect(tool.displayName).toBe('Create New Topic');
   });
 
-  it('should update TopicManager on execute', async () => {
+  it('should update TopicState on execute', async () => {
     const invocation = tool.build({ [TOPIC_PARAM_TITLE]: 'New Chapter' });
     const result = await invocation.execute(new AbortController().signal);
 
     expect(result.llmContent).toBe('Current topic: "New Chapter"');
-    expect(TopicManager.getInstance().getTopic()).toBe('New Chapter');
+    expect(mockConfig.topicState.getTopic()).toBe('New Chapter');
   });
 
-  it('should return error if title is missing', async () => {
-    const invocation = tool.build({ [TOPIC_PARAM_TITLE]: '' } as {
-      [TOPIC_PARAM_TITLE]: string;
-    });
+  it('should return error if title is invalid after sanitization', async () => {
+    const invocation = tool.build({ [TOPIC_PARAM_TITLE]: '  \n  ' });
     const result = await invocation.execute(new AbortController().signal);
 
     expect(result.error).toBeDefined();
-    expect(TopicManager.getInstance().getTopic()).toBeUndefined();
+    expect(mockConfig.topicState.getTopic()).toBeUndefined();
   });
 });

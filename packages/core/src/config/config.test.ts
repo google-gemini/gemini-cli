@@ -1593,6 +1593,17 @@ describe('Server Config (config.ts)', () => {
       const excluded = config.getExcludeTools();
       expect(excluded!.has(CREATE_NEW_TOPIC_TOOL_NAME)).toBe(true);
     });
+
+    it('should have independent TopicState across instances', () => {
+      const config1 = new Config(baseParams);
+      const config2 = new Config(baseParams);
+
+      config1.topicState.setTopic('Topic 1');
+      config2.topicState.setTopic('Topic 2');
+
+      expect(config1.topicState.getTopic()).toBe('Topic 1');
+      expect(config2.topicState.getTopic()).toBe('Topic 2');
+    });
   });
 });
 
