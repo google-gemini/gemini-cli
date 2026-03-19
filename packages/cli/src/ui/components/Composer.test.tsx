@@ -183,7 +183,6 @@ const createMockUIState = (overrides: Partial<UIState> = {}): UIState =>
     ideContextState: null,
     geminiMdFileCount: 0,
     renderMarkdown: true,
-    filteredConsoleMessages: [],
     history: [],
     sessionStats: {
       sessionId: 'test-session',
@@ -757,13 +756,6 @@ describe('Composer', () => {
     it('shows DetailedMessagesDisplay when showErrorDetails is true', async () => {
       const uiState = createMockUIState({
         showErrorDetails: true,
-        filteredConsoleMessages: [
-          {
-            type: 'error',
-            content: 'Test error',
-            count: 1,
-          },
-        ],
       });
 
       const { lastFrame } = await renderComposer(uiState);
