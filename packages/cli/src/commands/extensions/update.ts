@@ -12,9 +12,12 @@ import {
   updateExtension,
 } from '../../config/extensions/update.js';
 import { checkForExtensionUpdate } from '../../config/extensions/github.js';
-import { getErrorMessage } from '../../utils/errors.js';
 import { ExtensionUpdateState } from '../../ui/state/extensions.js';
-import { coreEvents, debugLogger } from '@google/gemini-cli-core';
+import {
+  coreEvents,
+  debugLogger,
+  getErrorMessage,
+} from '@google/gemini-cli-core';
 import { ExtensionManager } from '../../config/extension-manager.js';
 import { requestConsentNonInteractive } from '../../config/extensions/consent.js';
 import { loadSettings } from '../../config/settings.js';
@@ -155,7 +158,9 @@ export const updateCommand: CommandModule = {
       }),
   handler: async (argv) => {
     await handleUpdate({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       name: argv['name'] as string | undefined,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       all: argv['all'] as boolean | undefined,
     });
     await exitCli();

@@ -4,8 +4,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import type { Mock } from 'vitest';
+import {
+  vi,
+  describe,
+  it,
+  expect,
+  beforeEach,
+  afterEach,
+  type Mock,
+} from 'vitest';
 import { directoryCommand } from './directoryCommand.js';
 import {
   expandHomeDir,
@@ -86,6 +93,11 @@ describe('directoryCommand', () => {
         settings: {
           merged: {
             memoryDiscoveryMaxDirs: 1000,
+            security: {
+              folderTrust: {
+                enabled: false,
+              },
+            },
           },
         },
       },

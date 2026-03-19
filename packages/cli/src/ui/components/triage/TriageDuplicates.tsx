@@ -7,10 +7,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import Spinner from 'ink-spinner';
-import type { Config } from '@google/gemini-cli-core';
-import { debugLogger, spawnAsync } from '@google/gemini-cli-core';
+import {
+  debugLogger,
+  spawnAsync,
+  LlmRole,
+  type Config,
+} from '@google/gemini-cli-core';
 import { useKeypress } from '../../hooks/useKeypress.js';
-import { keyMatchers, Command } from '../../keyMatchers.js';
+import { Command } from '../../key/keyMatchers.js';
+import { useKeyMatchers } from '../../hooks/useKeyMatchers.js';
 
 interface Issue {
   number: number;
@@ -80,7 +85,7 @@ const VISIBLE_LINES_COLLAPSED = 6;
 const VISIBLE_LINES_EXPANDED = 20;
 const VISIBLE_LINES_DETAIL = 25;
 const VISIBLE_CANDIDATES = 5;
-const MAX_CONCURRENT_ANALYSIS = 3;
+const MAX_CONCURRENT_ANALYSIS = 10;
 
 const getReactionCount = (issue: Issue | Candidate | undefined) => {
   if (!issue || !issue.reactionGroups) return 0;
@@ -106,6 +111,7 @@ export const TriageDuplicates = ({
   onExit: () => void;
   initialLimit?: number;
 }) => {
+  const keyMatchers = useKeyMatchers();
   const [state, setState] = useState<TriageState>({
     status: 'loading',
     issues: [],
@@ -157,6 +163,7 @@ export const TriageDuplicates = ({
         '--json',
         'number,title,body,state,stateReason,labels,url,comments,author,reactionGroups',
       ]);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       return JSON.parse(stdout) as Candidate;
     } catch (err) {
       debugLogger.error(
@@ -278,8 +285,10 @@ Return a JSON object with:
         },
         abortSignal: new AbortController().signal,
         promptId: 'triage-duplicates',
+        role: LlmRole.UTILITY_TOOL,
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const rec = response as unknown as GeminiRecommendation;
 
       let canonical: Candidate | undefined;
@@ -336,7 +345,7 @@ Return a JSON object with:
       const issuesToAnalyze = state.issues
         .slice(
           state.currentIndex,
-          state.currentIndex + MAX_CONCURRENT_ANALYSIS + 2,
+          state.currentIndex + MAX_CONCURRENT_ANALYSIS + 20,
         ) // Look ahead a bit
         .filter(
           (issue) =>
@@ -448,6 +457,7 @@ Return a JSON object with:
         '--limit',
         String(limit),
       ]);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const issues: Issue[] = JSON.parse(stdout);
       if (issues.length === 0) {
         setState((s) => ({

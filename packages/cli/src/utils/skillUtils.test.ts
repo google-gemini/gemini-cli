@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { installSkill } from './skillUtils.js';
+import { installSkill, linkSkill, uninstallSkill } from './skillUtils.js';
 
 describe('skillUtils', () => {
   let tempDir: string;
@@ -17,11 +17,118 @@ describe('skillUtils', () => {
   beforeEach(async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'skill-utils-test-'));
     vi.spyOn(process, 'cwd').mockReturnValue(tempDir);
+    vi.stubEnv('GEMINI_CLI_HOME', tempDir);
   });
 
   afterEach(async () => {
     await fs.rm(tempDir, { recursive: true, force: true });
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+  });
+
+  const itif = (condition: boolean) => (condition ? it : it.skip);
+
+  describe('linkSkill', () => {
+    // TODO: issue 19388 - Enable linkSkill tests on Windows
+    itif(process.platform !== 'win32')(
+      'should successfully link from a local directory',
+      async () => {
+        // Create a mock skill directory
+        const mockSkillSourceDir = path.join(tempDir, 'mock-skill-source');
+        const skillSubDir = path.join(mockSkillSourceDir, 'test-skill');
+        await fs.mkdir(skillSubDir, { recursive: true });
+        await fs.writeFile(
+          path.join(skillSubDir, 'SKILL.md'),
+          '---\nname: test-skill\ndescription: test\n---\nbody',
+        );
+
+        const skills = await linkSkill(
+          mockSkillSourceDir,
+          'workspace',
+          () => {},
+        );
+        expect(skills.length).toBe(1);
+        expect(skills[0].name).toBe('test-skill');
+
+        const linkedPath = path.join(tempDir, '.gemini/skills', 'test-skill');
+        const stats = await fs.lstat(linkedPath);
+        expect(stats.isSymbolicLink()).toBe(true);
+
+        const linkTarget = await fs.readlink(linkedPath);
+        expect(path.resolve(linkTarget)).toBe(path.resolve(skillSubDir));
+      },
+    );
+
+    itif(process.platform !== 'win32')(
+      'should overwrite existing skill at destination',
+      async () => {
+        const mockSkillSourceDir = path.join(tempDir, 'mock-skill-source');
+        const skillSubDir = path.join(mockSkillSourceDir, 'test-skill');
+        await fs.mkdir(skillSubDir, { recursive: true });
+        await fs.writeFile(
+          path.join(skillSubDir, 'SKILL.md'),
+          '---\nname: test-skill\ndescription: test\n---\nbody',
+        );
+
+        const targetDir = path.join(tempDir, '.gemini/skills');
+        await fs.mkdir(targetDir, { recursive: true });
+        const existingPath = path.join(targetDir, 'test-skill');
+        await fs.mkdir(existingPath);
+
+        const skills = await linkSkill(
+          mockSkillSourceDir,
+          'workspace',
+          () => {},
+        );
+        expect(skills.length).toBe(1);
+
+        const stats = await fs.lstat(existingPath);
+        expect(stats.isSymbolicLink()).toBe(true);
+      },
+    );
+
+    it('should abort linking if consent is rejected', async () => {
+      const mockSkillSourceDir = path.join(tempDir, 'mock-skill-source');
+      const skillSubDir = path.join(mockSkillSourceDir, 'test-skill');
+      await fs.mkdir(skillSubDir, { recursive: true });
+      await fs.writeFile(
+        path.join(skillSubDir, 'SKILL.md'),
+        '---\nname: test-skill\ndescription: test\n---\nbody',
+      );
+
+      const requestConsent = vi.fn().mockResolvedValue(false);
+
+      await expect(
+        linkSkill(mockSkillSourceDir, 'workspace', () => {}, requestConsent),
+      ).rejects.toThrow('Skill linking cancelled by user.');
+
+      expect(requestConsent).toHaveBeenCalled();
+
+      // Verify it was NOT linked
+      const linkedPath = path.join(tempDir, '.gemini/skills', 'test-skill');
+      const exists = await fs.lstat(linkedPath).catch(() => null);
+      expect(exists).toBeNull();
+    });
+
+    it('should throw error if multiple skills with same name are discovered', async () => {
+      const mockSkillSourceDir = path.join(tempDir, 'mock-skill-source');
+      const skillDir1 = path.join(mockSkillSourceDir, 'skill1');
+      const skillDir2 = path.join(mockSkillSourceDir, 'skill2');
+      await fs.mkdir(skillDir1, { recursive: true });
+      await fs.mkdir(skillDir2, { recursive: true });
+      await fs.writeFile(
+        path.join(skillDir1, 'SKILL.md'),
+        '---\nname: duplicate-skill\ndescription: desc1\n---\nbody1',
+      );
+      await fs.writeFile(
+        path.join(skillDir2, 'SKILL.md'),
+        '---\nname: duplicate-skill\ndescription: desc2\n---\nbody2',
+      );
+
+      await expect(
+        linkSkill(mockSkillSourceDir, 'workspace', () => {}),
+      ).rejects.toThrow('Duplicate skill name "duplicate-skill" found');
+    });
   });
 
   it('should successfully install from a .skill file', async () => {
@@ -39,7 +146,7 @@ describe('skillUtils', () => {
       skillPath,
       'workspace',
       undefined,
-      () => {},
+      async () => {},
     );
     expect(skills.length).toBeGreaterThan(0);
     expect(skills[0].name).toBe('weather-skill');
@@ -69,7 +176,7 @@ describe('skillUtils', () => {
       mockSkillDir,
       'workspace',
       undefined,
-      () => {},
+      async () => {},
     );
     expect(skills.length).toBe(1);
     expect(skills[0].name).toBe('test-skill');
@@ -95,7 +202,7 @@ describe('skillUtils', () => {
         mockSkillDir,
         'workspace',
         undefined,
-        () => {},
+        async () => {},
         requestConsent,
       ),
     ).rejects.toThrow('Skill installation cancelled by user.');
@@ -106,5 +213,75 @@ describe('skillUtils', () => {
     const installedPath = path.join(tempDir, '.gemini/skills', 'test-skill');
     const installedExists = await fs.stat(installedPath).catch(() => null);
     expect(installedExists).toBeNull();
+  });
+
+  describe('uninstallSkill', () => {
+    it('should successfully uninstall an existing skill', async () => {
+      const skillsDir = path.join(tempDir, '.gemini/skills');
+      const skillDir = path.join(skillsDir, 'test-skill');
+      await fs.mkdir(skillDir, { recursive: true });
+      await fs.writeFile(
+        path.join(skillDir, 'SKILL.md'),
+        '---\nname: test-skill\ndescription: test\n---\nbody',
+      );
+
+      const result = await uninstallSkill('test-skill', 'user');
+      expect(result?.location).toContain('test-skill');
+
+      const exists = await fs.stat(skillDir).catch(() => null);
+      expect(exists).toBeNull();
+    });
+
+    it('should return null for non-existent skill', async () => {
+      const result = await uninstallSkill('non-existent', 'user');
+      expect(result).toBeNull();
+    });
+
+    itif(process.platform !== 'win32')(
+      'should successfully uninstall a skill even if its name was updated after linking',
+      async () => {
+        // 1. Create source skill
+        const sourceDir = path.join(tempDir, 'source-skill');
+        await fs.mkdir(sourceDir, { recursive: true });
+        const skillMdPath = path.join(sourceDir, 'SKILL.md');
+        await fs.writeFile(
+          skillMdPath,
+          '---\nname: original-name\ndescription: test\n---\nbody',
+        );
+
+        // 2. Link it
+        const skillsDir = path.join(tempDir, '.gemini/skills');
+        await fs.mkdir(skillsDir, { recursive: true });
+        const destPath = path.join(skillsDir, 'original-name');
+        await fs.symlink(sourceDir, destPath, 'dir');
+
+        // 3. Update name in source
+        await fs.writeFile(
+          skillMdPath,
+          '---\nname: updated-name\ndescription: test\n---\nbody',
+        );
+
+        // 4. Uninstall by NEW name (this is the bug fix)
+        const result = await uninstallSkill('updated-name', 'user');
+        expect(result).not.toBeNull();
+        expect(result?.location).toBe(destPath);
+
+        const exists = await fs.lstat(destPath).catch(() => null);
+        expect(exists).toBeNull();
+      },
+    );
+
+    it('should successfully uninstall a skill by directory name if metadata is missing (fallback)', async () => {
+      const skillsDir = path.join(tempDir, '.gemini/skills');
+      const skillDir = path.join(skillsDir, 'test-skill-dir');
+      await fs.mkdir(skillDir, { recursive: true });
+      // No SKILL.md here
+
+      const result = await uninstallSkill('test-skill-dir', 'user');
+      expect(result?.location).toBe(skillDir);
+
+      const exists = await fs.stat(skillDir).catch(() => null);
+      expect(exists).toBeNull();
+    });
   });
 });

@@ -62,6 +62,7 @@ export function useHistory({
       isResuming: boolean = false,
     ): number => {
       const id = getNextMessageId(baseTimestamp);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       const newItem: HistoryItem = { ...itemData, id } as HistoryItem;
 
       setHistory((prevHistory) => {
@@ -139,6 +140,7 @@ export function useHistory({
             // Apply updates based on whether it's an object or a function
             const newUpdates =
               typeof updates === 'function' ? updates(item) : updates;
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
             return { ...item, ...newUpdates } as HistoryItem;
           }
           return item;

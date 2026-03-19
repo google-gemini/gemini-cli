@@ -7,11 +7,12 @@
 import { type JWTInput } from 'google-auth-library';
 import { TraceExporter } from '@google-cloud/opentelemetry-cloud-trace-exporter';
 import { MetricExporter } from '@google-cloud/opentelemetry-cloud-monitoring-exporter';
-import { Logging } from '@google-cloud/logging';
-import type { Log } from '@google-cloud/logging';
-import { hrTimeToMilliseconds } from '@opentelemetry/core';
-import type { ExportResult } from '@opentelemetry/core';
-import { ExportResultCode } from '@opentelemetry/core';
+import { Logging, type Log } from '@google-cloud/logging';
+import {
+  hrTimeToMilliseconds,
+  ExportResultCode,
+  type ExportResult,
+} from '@opentelemetry/core';
 import type {
   ReadableLogRecord,
   LogRecordExporter,
@@ -104,6 +105,7 @@ export class GcpLogExporter implements LogRecordExporter {
     } catch (error) {
       resultCallback({
         code: ExportResultCode.FAILED,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
         error: error as Error,
       });
     }

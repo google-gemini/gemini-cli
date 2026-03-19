@@ -15,6 +15,7 @@ import type { Config } from '../config/config.js';
 describe('Circular Reference Integration Test', () => {
   it('should handle HttpsProxyAgent-like circular references in clearcut logging', () => {
     // Create a mock config with proxy
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     const mockConfig = {
       getTelemetryEnabled: () => true,
       getUsageStatisticsEnabled: () => true,
@@ -35,11 +36,13 @@ describe('Circular Reference Integration Test', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const socketLike: any = {
       _httpMessage: {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         agent: proxyAgentLike,
         socket: null,
       },
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     socketLike._httpMessage.socket = socketLike; // Create circular reference
     proxyAgentLike.sockets['cloudcode-pa.googleapis.com:443'] = [socketLike];
 
@@ -48,6 +51,7 @@ describe('Circular Reference Integration Test', () => {
       error: new Error('Network error'),
       function_args: {
         filePath: '/test/file.txt',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         httpAgent: proxyAgentLike, // This would cause the circular reference
       },
     };
@@ -56,7 +60,7 @@ describe('Circular Reference Integration Test', () => {
     const logger = ClearcutLogger.getInstance(mockConfig);
 
     expect(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-type-assertion
       logger?.enqueueLogEvent(problematicEvent as any);
     }).not.toThrow();
   });

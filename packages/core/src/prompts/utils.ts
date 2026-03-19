@@ -8,7 +8,9 @@ import path from 'node:path';
 import process from 'node:process';
 import { homedir } from '../utils/paths.js';
 import { debugLogger } from '../utils/debugLogger.js';
-import type { Config } from '../config/config.js';
+import * as snippets from './snippets.js';
+import * as legacySnippets from './snippets.legacy.js';
+import type { AgentLoopContext } from '../config/agent-loop-context.js';
 
 export type ResolvedPath = {
   isSwitch: boolean;
@@ -61,18 +63,28 @@ export function resolvePathFromEnv(envVar?: string): ResolvedPath {
  */
 export function applySubstitutions(
   prompt: string,
-  config: Config,
+  context: AgentLoopContext,
   skillsPrompt: string,
+  isGemini3: boolean = false,
 ): string {
   let result = prompt;
 
   result = result.replace(/\${AgentSkills}/g, skillsPrompt);
-  result = result.replace(
-    /\${SubAgents}/g,
-    config.getAgentRegistry().getDirectoryContext(),
+
+  const activeSnippets = isGemini3 ? snippets : legacySnippets;
+  const subAgentsContent = activeSnippets.renderSubAgents(
+    context.config
+      .getAgentRegistry()
+      .getAllDefinitions()
+      .map((d) => ({
+        name: d.name,
+        description: d.description,
+      })),
   );
 
-  const toolRegistry = config.getToolRegistry();
+  result = result.replace(/\${SubAgents}/g, subAgentsContent);
+
+  const toolRegistry = context.toolRegistry;
   const allToolNames = toolRegistry.getAllToolNames();
   const availableToolsList =
     allToolNames.length > 0

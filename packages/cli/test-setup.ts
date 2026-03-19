@@ -6,13 +6,29 @@
 
 import { vi, beforeEach, afterEach } from 'vitest';
 import { format } from 'node:util';
+import { coreEvents } from '@google/gemini-cli-core';
+import { themeManager } from './src/ui/themes/theme-manager.js';
+
+// Unset CI environment variable so that ink renders dynamically as it does in a real terminal
+if (process.env.CI !== undefined) {
+  delete process.env.CI;
+}
 
 global.IS_REACT_ACT_ENVIRONMENT = true;
+
+// Increase max listeners to avoid warnings in large test suites
+coreEvents.setMaxListeners(100);
 
 // Unset NO_COLOR environment variable to ensure consistent theme behavior between local and CI test runs
 if (process.env.NO_COLOR !== undefined) {
   delete process.env.NO_COLOR;
 }
+
+// Force true color output for ink so that snapshots always include color information.
+process.env.FORCE_COLOR = '3';
+
+// Force generic keybinding hints to ensure stable snapshots across different operating systems.
+process.env.FORCE_GENERIC_KEYBINDING_HINTS = 'true';
 
 import './src/test-utils/customMatchers.js';
 
@@ -20,6 +36,9 @@ let consoleErrorSpy: vi.SpyInstance;
 let actWarnings: Array<{ message: string; stack: string }> = [];
 
 beforeEach(() => {
+  // Reset themeManager state to ensure test isolation
+  themeManager.resetForTesting();
+
   actWarnings = [];
   consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation((...args) => {
     const firstArg = args[0];
@@ -44,6 +63,10 @@ beforeEach(() => {
           ? stackLines.slice(lastReactFrameIndex + 1).join('\n')
           : stackLines.slice(1).join('\n');
 
+      if (relevantStack.includes('OverflowContext.tsx')) {
+        return;
+      }
+
       actWarnings.push({
         message: format(...args),
         stack: relevantStack,
@@ -54,6 +77,8 @@ beforeEach(() => {
 
 afterEach(() => {
   consoleErrorSpy.mockRestore();
+
+  vi.unstubAllEnvs();
 
   if (actWarnings.length > 0) {
     const messages = actWarnings

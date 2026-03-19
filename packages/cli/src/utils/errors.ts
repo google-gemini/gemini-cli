@@ -18,15 +18,9 @@ import {
   isFatalToolError,
   debugLogger,
   coreEvents,
+  getErrorMessage,
 } from '@google/gemini-cli-core';
 import { runSyncCleanup } from './cleanup.js';
-
-export function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
-}
 
 interface ErrorWithCode extends Error {
   exitCode?: number;
@@ -38,6 +32,7 @@ interface ErrorWithCode extends Error {
  * Extracts the appropriate error code from an error object.
  */
 function extractErrorCode(error: unknown): string | number {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const errorWithCode = error as ErrorWithCode;
 
   // Prioritize exitCode for FatalError types, fall back to other codes

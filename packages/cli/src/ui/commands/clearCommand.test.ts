@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Mock } from 'vitest';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest';
 import { clearCommand } from './clearCommand.js';
 import { type CommandContext } from './types.js';
 import { createMockCommandContext } from '../../test-utils/mockCommandContext.js';
@@ -17,19 +16,21 @@ vi.mock('@google/gemini-cli-core', async () => {
     ...actual,
     uiTelemetryService: {
       setLastPromptTokenCount: vi.fn(),
+      clear: vi.fn(),
     },
   };
 });
 
-import type { GeminiClient } from '@google/gemini-cli-core';
-import { uiTelemetryService } from '@google/gemini-cli-core';
+import { uiTelemetryService, type GeminiClient } from '@google/gemini-cli-core';
 
 describe('clearCommand', () => {
   let mockContext: CommandContext;
   let mockResetChat: ReturnType<typeof vi.fn>;
+  let mockHintClear: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     mockResetChat = vi.fn().mockResolvedValue(undefined);
+    mockHintClear = vi.fn();
     const mockGetChatRecordingService = vi.fn();
     vi.clearAllMocks();
 
@@ -50,12 +51,15 @@ describe('clearCommand', () => {
             fireSessionEndEvent: vi.fn().mockResolvedValue(undefined),
             fireSessionStartEvent: vi.fn().mockResolvedValue(undefined),
           }),
+          injectionService: {
+            clear: mockHintClear,
+          },
         },
       },
     });
   });
 
-  it('should set debug message, reset chat, reset telemetry, and clear UI when config is available', async () => {
+  it('should set debug message, reset chat, reset telemetry, clear hints, and clear UI when config is available', async () => {
     if (!clearCommand.action) {
       throw new Error('clearCommand must have an action.');
     }
@@ -68,17 +72,17 @@ describe('clearCommand', () => {
     expect(mockContext.ui.setDebugMessage).toHaveBeenCalledTimes(1);
 
     expect(mockResetChat).toHaveBeenCalledTimes(1);
-    expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledWith(0);
-    expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledTimes(1);
+    expect(mockHintClear).toHaveBeenCalledTimes(1);
+    expect(uiTelemetryService.clear).toHaveBeenCalled();
+    expect(uiTelemetryService.clear).toHaveBeenCalledTimes(1);
     expect(mockContext.ui.clear).toHaveBeenCalledTimes(1);
 
     // Check the order of operations.
     const setDebugMessageOrder = (mockContext.ui.setDebugMessage as Mock).mock
       .invocationCallOrder[0];
     const resetChatOrder = mockResetChat.mock.invocationCallOrder[0];
-    const resetTelemetryOrder = (
-      uiTelemetryService.setLastPromptTokenCount as Mock
-    ).mock.invocationCallOrder[0];
+    const resetTelemetryOrder = (uiTelemetryService.clear as Mock).mock
+      .invocationCallOrder[0];
     const clearOrder = (mockContext.ui.clear as Mock).mock
       .invocationCallOrder[0];
 
@@ -104,8 +108,8 @@ describe('clearCommand', () => {
       'Clearing terminal.',
     );
     expect(mockResetChat).not.toHaveBeenCalled();
-    expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledWith(0);
-    expect(uiTelemetryService.setLastPromptTokenCount).toHaveBeenCalledTimes(1);
+    expect(uiTelemetryService.clear).toHaveBeenCalled();
+    expect(uiTelemetryService.clear).toHaveBeenCalledTimes(1);
     expect(nullConfigContext.ui.clear).toHaveBeenCalledTimes(1);
   });
 });
