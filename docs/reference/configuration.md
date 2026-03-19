@@ -1431,6 +1431,13 @@ their corresponding top-level category object in your `settings.json` file.
   - **Default:** `"gemma3-1b-gpu-custom"`
   - **Requires restart:** Yes
 
+- **`experimental.memoryManager`** (boolean):
+  - **Description:** Replace the built-in save_memory tool with a memory manager
+    subagent that supports adding, removing, de-duplicating, and organizing
+    memories.
+  - **Default:** `false`
+  - **Requires restart:** Yes
+
 - **`experimental.topicUpdateNarration`** (boolean):
   - **Description:** Enable the experimental Topic & Update communication model
     for reduced chattiness and structured progress reporting.

@@ -2451,6 +2451,13 @@
           },
           "additionalProperties": false
         },
+        "memoryManager": {
+          "title": "Memory Manager Agent",
+          "description": "Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.",
+          "markdownDescription": "Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.\n\n- Category: `Experimental`\n- Requires restart: `yes`\n- Default: `false`",
+          "default": false,
+          "type": "boolean"
+        },
         "topicUpdateNarration": {
           "title": "Topic & Update Narration",
           "description": "Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.",

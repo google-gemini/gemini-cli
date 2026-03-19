@@ -1,0 +1,10 @@
+# Policy for Memory Manager Agent
+# Allows the save_memory agent to manage memories in the ~/.gemini/ folder.
+
+[[rule]]
+subagent = "save_memory"
+toolName = ["read_file", "write_file", "replace", "list_directory", "glob", "grep_search"]
+decision = "allow"
+priority = 100
+argsPattern = "(^|.*/)\\.gemini/.*"
+deny_message = "Memory Manager is only allowed to access the .gemini folder."

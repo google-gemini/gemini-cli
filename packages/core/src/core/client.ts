@@ -117,6 +117,7 @@ export class GeminiClient {
     this.lastPromptId = this.config.getSessionId();
 
     coreEvents.on(CoreEvent.ModelChanged, this.handleModelChanged);
+    coreEvents.on(CoreEvent.MemoryChanged, this.handleMemoryChanged);
   }
 
   private get config(): Config {
@@ -125,6 +126,10 @@ export class GeminiClient {
 
   private handleModelChanged = () => {
     this.currentSequenceModel = null;
+  };
+
+  private handleMemoryChanged = () => {
+    this.updateSystemInstruction();
   };
 
   // Hook state to deduplicate BeforeAgent calls and track response for
@@ -306,6 +311,7 @@ export class GeminiClient {
 
   dispose() {
     coreEvents.off(CoreEvent.ModelChanged, this.handleModelChanged);
+    coreEvents.off(CoreEvent.MemoryChanged, this.handleMemoryChanged);
   }
 
   async resumeChat(

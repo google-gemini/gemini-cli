@@ -152,6 +152,7 @@ they appear in the UI.
 | Plan                       | `experimental.plan`                      | Enable Plan Mode.                                                                                                                                         | `true`  |
 | Model Steering             | `experimental.modelSteering`             | Enable model steering (user hints) to guide the model during tool execution.                                                                              | `false` |
 | Direct Web Fetch           | `experimental.directWebFetch`            | Enable web fetch behavior that bypasses LLM summarization.                                                                                                | `false` |
+| Memory Manager Agent       | `experimental.memoryManager`             | Replace the built-in save_memory tool with a memory manager subagent that supports adding, removing, de-duplicating, and organizing memories.             | `false` |
 | Topic & Update Narration   | `experimental.topicUpdateNarration`      | Enable the experimental Topic & Update communication model for reduced chattiness and structured progress reporting.                                      | `false` |
 
 ### Skills
