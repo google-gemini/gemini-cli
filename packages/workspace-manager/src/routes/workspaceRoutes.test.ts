@@ -11,9 +11,10 @@ import { app } from '../index.js';
 // Mock the services
 vi.mock('../services/workspaceService.js', () => ({
     WorkspaceService: vi.fn().mockImplementation(() => ({
-      listWorkspaces: vi.fn().mockResolvedValue([]),
+      listWorkspacesForUser: vi.fn().mockResolvedValue([]),
       getWorkspace: vi.fn().mockResolvedValue(null),
       createWorkspace: vi.fn().mockResolvedValue(undefined),
+      updateWorkspace: vi.fn().mockResolvedValue(undefined),
       deleteWorkspace: vi.fn().mockResolvedValue(undefined),
     })),
   }));

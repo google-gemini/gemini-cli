@@ -75,6 +75,7 @@ router.post('/', async (req, res) => {
       machineType,
       imageTag,
       zone,
+      workspaceId,
     }).catch(err => {
         // eslint-disable-next-line no-console
         console.error(`Failed to provision GCE instance ${instanceName}:`, err);
@@ -98,7 +99,11 @@ router.post('/:id/connect', async (req, res) => {
         return;
       }
   
-      if (workspace.owner_id !== authReq.user.id) {
+      // SECURITY: Allow owner OR member of the same org
+      const isOwner = workspace.owner_id === authReq.user.id;
+      const isOrgMember = workspace.org_id && workspace.org_id === authReq.user.org_id;
+
+      if (!isOwner && !isOrgMember) {
         res.status(403).json({ error: 'Unauthorized' });
         return;
       }

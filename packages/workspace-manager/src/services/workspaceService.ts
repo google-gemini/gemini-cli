@@ -96,7 +96,7 @@ export class WorkspaceService {
   }
 
   async getWorkspace(id: string): Promise<WorkspaceRecord | null> {
-    const doc = await this.collection.doc(id).get();
+    const doc = await this.getCollection().doc(id).get();
     if (!doc.exists) return null;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return { id: doc.id, ...(doc.data() as WorkspaceData) };
