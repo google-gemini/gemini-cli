@@ -21,6 +21,7 @@
     "@types/express": "^5.0.0",
     "@types/node": "^20.0.0",
     "@types/uuid": "^10.0.0",
+    "supertest": "^7.2.2",
     "typescript": "^5.7.0",
     "vitest": "^3.2.0"
   }

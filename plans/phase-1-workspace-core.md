@@ -1,35 +1,51 @@
 # Phase 1 Sub-plan: The Workspace Core
 
 ## 1. Objective
-Establish the foundational execution environment (Container Image) and the initial management service (Hub API).
+
+Establish the foundational execution environment (Container Image) and the
+initial management service (Hub API).
 
 ## 2. Tasks
 
 ### Task 1.1: Define and Build Workspace Image
-Create a Dockerfile that provides a complete, persistent development environment for `gemini-cli`.
-- [ ] Create `packages/grid-manager/docker/Dockerfile`.
+
+Create a Dockerfile that provides a complete, persistent development environment
+for `gemini-cli`.
+
+- [ ] Create `packages/workspace-manager/docker/Dockerfile`.
 - [ ] Include: `node:20-slim`, `git`, `gh`, `rsync`, `tmux`, `shpool`.
 - [ ] Add the pre-built `gemini-cli` binary.
 - [ ] Define `entrypoint.sh` with secret injection and `shpool` daemon startup.
 - [ ] Verify image build locally: `docker build -t gemini-workspace:v1 .`.
 
 ### Task 1.2: Workspace Hub API (v1)
+
 Implement the core API to manage GCE-based workspaces.
-- [ ] Initialize `packages/grid-manager/src/hub-service/`.
-- [ ] Implement Express or Fastify server for `/workspaces` (List, Create, Delete).
+
+- [ ] Initialize `packages/workspace-manager/src/hub-service/`.
+- [ ] Implement Express or Fastify server for `/workspaces` (List, Create,
+      Delete).
 - [ ] Integrate Firestore to track workspace state (owner, instance_id, status).
 - [ ] Integrate `@google-cloud/compute` for GCE instance lifecycle.
-- [ ] Provision a VM with `Container-on-VM` settings pointing to the `gemini-workspace` image.
+- [ ] Provision a VM with `Container-on-VM` settings pointing to the
+      `gemini-workspace` image.
 
 ### Task 1.3: Cloud Run Deployment (v1)
+
 Prepare the Hub for self-service deployment.
-- [ ] Create `packages/grid-manager/terraform/` for basic Hub provisioning.
+
+- [ ] Create `packages/workspace-manager/terraform/` for basic Hub provisioning.
 - [ ] Setup IAP/OAuth authentication on the Cloud Run endpoint.
 
 ## 3. Verification & Success Criteria
-- **Image:** A container started from the image must have `gemini --version` and `gh --version` available.
-- **API:** A `POST /workspaces` call must result in a new VM appearing in the specified GCP project with the correct container image.
-- **State:** Firestore must correctly reflect the VM's `PROVISIONING` and `READY` status.
+
+- **Image:** A container started from the image must have `gemini --version` and
+  `gh --version` available.
+- **API:** A `POST /workspaces` call must result in a new VM appearing in the
+  specified GCP project with the correct container image.
+- **State:** Firestore must correctly reflect the VM's `PROVISIONING` and
+  `READY` status.
 
 ## 4. Next Steps
+
 - Implement Task 1.1: Build the Dockerfile.

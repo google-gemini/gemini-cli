@@ -1,6 +1,13 @@
 # Copyright 2026 Google LLC
 # SPDX-License-Identifier: Apache-2.0
 
+# Stage 1: Build shpool
+FROM rust:1.81-slim-bookworm AS builder
+
+RUN apt-get update && apt-get install -y build-essential curl && rm -rf /var/lib/apt/lists/*
+RUN cargo install shpool
+
+# Stage 2: Final Image
 FROM node:20-slim
 
 # Install system dependencies
@@ -11,7 +18,6 @@ RUN apt-get update && apt-get install -y \
     vim \
     tmux \
     procps \
-    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Install GitHub CLI
@@ -21,13 +27,8 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
     && apt-get update \
     && apt-get install gh -y
 
-# Install Rust (to install shpool)
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
-
-# Install shpool
-RUN cargo install shpool \
-    && mv /root/.cargo/bin/shpool /usr/local/bin/shpool
+# Copy shpool from builder
+COPY --from=builder /usr/local/cargo/bin/shpool /usr/local/bin/shpool
 
 # Install global dev tools
 RUN npm install -g tsx eslint vitest typescript prettier @google/gemini-cli@nightly
