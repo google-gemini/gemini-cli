@@ -220,6 +220,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
             useGemini3_1: useGemini31,
             useCustomTools: useCustomToolModel,
           });
+          // Title ID is the resolved ID without custom tools flag
           const titleId = config.modelConfigService.resolveModelId(id, {
             useGemini3_1: useGemini31,
           });
@@ -232,6 +233,7 @@ export function ModelDialog({ onClose }: ModelDialogProps): React.JSX.Element {
         });
 
       // Deduplicate: only show one entry per unique resolved model value.
+      // This is needed because 3 pro and 3.1 pro models can resolve to the same value.
       const seen = new Set<string>();
       return list.filter((option) => {
         if (seen.has(option.value)) return false;
