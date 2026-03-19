@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import yargs from 'yargs/yargs';
+import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import process from 'node:process';
 import * as path from 'node:path';
@@ -52,6 +52,8 @@ import {
   type MergedSettings,
   saveModelChange,
   loadSettings,
+  isWorktreeEnabled,
+  type LoadedSettings,
 } from './settings.js';
 
 import { loadSandboxConfig } from './sandboxConfig.js';
@@ -119,6 +121,36 @@ const coerceCommaSeparated = (values: string[]): string[] => {
       .filter(Boolean),
   );
 };
+
+/**
+ * Pre-parses the command line arguments to find the worktree flag.
+ * Used for early setup before full argument parsing with settings.
+ */
+export function getWorktreeArg(argv: string[]): string | undefined {
+  const result = yargs(hideBin(argv))
+    .help(false)
+    .version(false)
+    .option('worktree', { alias: 'w', type: 'string' })
+    .strict(false)
+    .exitProcess(false)
+    .parseSync();
+
+  if (result.worktree === undefined) return undefined;
+  return typeof result.worktree === 'string' ? result.worktree.trim() : '';
+}
+
+/**
+ * Checks if a worktree is requested via CLI and enabled in settings.
+ * Returns the requested name (can be empty string for auto-generated) or undefined.
+ */
+export function getRequestedWorktreeName(
+  settings: LoadedSettings,
+): string | undefined {
+  if (!isWorktreeEnabled(settings)) {
+    return undefined;
+  }
+  return getWorktreeArg(process.argv);
+}
 
 export async function parseArguments(
   settings: MergedSettings,

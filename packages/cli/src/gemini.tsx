@@ -211,6 +211,12 @@ export async function main() {
   let settings = loadSettings();
   loadSettingsHandle?.end();
 
+  // If a worktree is requested and enabled, set it up early.
+  const requestedWorktree = cliConfig.getRequestedWorktreeName(settings);
+  if (requestedWorktree !== undefined) {
+    settings = await setupWorktree(requestedWorktree || undefined, settings);
+  }
+
   // Report settings errors once during startup
   settings.errors.forEach((error) => {
     coreEvents.emitFeedback('warning', error.message);
@@ -233,10 +239,6 @@ export async function main() {
   const parseArgsHandle = startupProfiler.start('parse_arguments');
   const argv = await parseArguments(settings.merged);
   parseArgsHandle?.end();
-
-  if (argv.worktree) {
-    settings = await setupWorktree(argv.worktree, settings);
-  }
 
   if (
     (argv.allowedTools && argv.allowedTools.length > 0) ||
