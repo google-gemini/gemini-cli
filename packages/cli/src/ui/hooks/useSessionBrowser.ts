@@ -21,6 +21,7 @@ import {
   type SessionInfo,
 } from '../../utils/sessionUtils.js';
 import type { Part } from '@google/genai';
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 
 export { convertSessionToHistoryFormats };
 
@@ -51,20 +52,54 @@ export const useSessionBrowser = (
     handleResumeSession: useCallback(
       async (session: SessionInfo) => {
         try {
-          const chatsDir = path.join(
-            config.storage.getProjectTempDir(),
-            'chats',
-          );
+          let conversation: ConversationRecord;
+          let filePath: string;
 
-          const fileName = session.fileName;
+          if (session.fileName.endsWith('.ext')) {
+            // External session
+            let externalConv: ConversationRecord | null = null;
+            if (config.getEnableExtensionReloading() !== false) {
+              /* eslint-disable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
+              const extensions = (config as any)._extensionLoader?.getExtensions
+                ? (config as any)._extensionLoader.getExtensions()
+                : [];
+              for (const extension of extensions) {
+                if (extension.trajectoryProviderModule) {
+                  const prefix =
+                    extension.trajectoryProviderModule.prefix || '';
+                  if (session.id.startsWith(prefix)) {
+                    const originalId = prefix
+                      ? session.id.slice(prefix.length)
+                      : session.id;
+                    externalConv =
+                      await extension.trajectoryProviderModule.loadSession(
+                        originalId,
+                      );
+                    if (externalConv) break;
+                  }
+                }
+              }
+              /* eslint-enable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
+            }
 
-          const originalFilePath = path.join(chatsDir, fileName);
+            if (!externalConv) {
+              throw new Error(`Could not load external session ${session.id}`);
+            }
+            conversation = externalConv;
+            filePath = session.id + '.ext';
+          } else {
+            // Regular CLI session
+            const chatsDir = path.join(
+              config.storage.getProjectTempDir(),
+              'chats',
+            );
+            const fileName = session.fileName;
+            filePath = path.join(chatsDir, fileName);
 
-          // Load up the conversation.
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-          const conversation: ConversationRecord = JSON.parse(
-            await fs.readFile(originalFilePath, 'utf8'),
-          );
+            // Load up the conversation.
+
+            conversation = JSON.parse(await fs.readFile(filePath, 'utf8'));
+          }
 
           // Use the old session's ID to continue it.
           const existingSessionId = conversation.sessionId;
@@ -73,7 +108,7 @@ export const useSessionBrowser = (
 
           const resumedSessionData = {
             conversation,
-            filePath: originalFilePath,
+            filePath,
           };
 
           // We've loaded it; tell the UI about it.

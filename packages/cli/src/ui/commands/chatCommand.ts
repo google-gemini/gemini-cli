@@ -8,6 +8,7 @@ import * as fsPromises from 'node:fs/promises';
 import React from 'react';
 import { Text } from 'ink';
 import { theme } from '../semantic-colors.js';
+import type { Content, Part } from '@google/genai';
 import type {
   CommandContext,
   SlashCommand,
@@ -18,6 +19,7 @@ import {
   decodeTagName,
   type MessageActionReturn,
   INITIAL_HISTORY_LENGTH,
+  type ConversationRecord,
 } from '@google/gemini-cli-core';
 import path from 'node:path';
 import type {
@@ -174,8 +176,125 @@ const resumeCheckpointCommand: SlashCommand = {
 
     const { logger, config } = context.services;
     await logger.initialize();
-    const checkpoint = await logger.loadCheckpoint(tag);
-    const conversation = checkpoint.history;
+
+    let conversation: readonly Content[] = [];
+    let authType: string | undefined;
+
+    const loadExternalTrajectory = async (
+      prefix: string,
+      id: string,
+    ): Promise<Content[] | null> => {
+      let record: ConversationRecord | null = null;
+      if (config && config.getEnableExtensionReloading() !== false) {
+        /* eslint-disable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
+        const extensions = (config as any)._extensionLoader?.getExtensions
+          ? (config as any)._extensionLoader.getExtensions()
+          : [];
+        for (const extension of extensions) {
+          if (
+            extension.trajectoryProviderModule &&
+            extension.trajectoryProviderModule.prefix === prefix
+          ) {
+            try {
+              record = await extension.trajectoryProviderModule.loadSession(id);
+              if (record) break;
+            } catch (_err) {
+              // Ignore failure
+            }
+          }
+        }
+        /* eslint-enable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
+      }
+      if (!record) return null;
+
+      const conv: Content[] = [];
+      // Add a dummy system message so slice(INITIAL_HISTORY_LENGTH) works correctly
+      conv.push({ role: 'user', parts: [{ text: '' }] });
+
+      for (const m of record.messages) {
+        if (m.type === 'user') {
+          const parts = Array.isArray(m.content)
+            ? m.content.map((c: string | Part) =>
+                typeof c === 'string' ? { text: c } : { text: c.text || '' },
+              )
+            : [{ text: '' }];
+          conv.push({ role: 'user', parts });
+        } else if (m.type === 'gemini') {
+          // 1. Model turn: Text + Function Calls
+          const modelParts: Part[] = [];
+          if (Array.isArray(m.content)) {
+            m.content.forEach((c: string | Part) => {
+              modelParts.push(
+                typeof c === 'string' ? { text: c } : { text: c.text || '' },
+              );
+            });
+          }
+
+          if (m.toolCalls) {
+            for (const tc of m.toolCalls) {
+              modelParts.push({
+                functionCall: {
+                  name: tc.name,
+                  args: tc.args,
+                },
+              });
+            }
+          }
+          conv.push({ role: 'model', parts: modelParts });
+
+          // 2. User turn: Function Responses (if any)
+          if (
+            m.toolCalls &&
+            m.toolCalls.some((tc: { result?: unknown }) => tc.result)
+          ) {
+            const responseParts: Part[] = [];
+            for (const tc of m.toolCalls) {
+              if (tc.result) {
+                responseParts.push({
+                  functionResponse: {
+                    name: tc.name,
+                    response: { result: tc.result },
+                    id: tc.id,
+                  },
+                });
+              }
+            }
+            if (responseParts.length > 0) {
+              conv.push({ role: 'user', parts: responseParts });
+            }
+          }
+        }
+      }
+      return conv;
+    };
+
+    // Check if tag format is prefix:id
+    const prefixMatch = tag.match(/^([a-zA-Z0-9_]+):(.*)$/);
+    if (prefixMatch) {
+      const prefix = prefixMatch[1] + ':';
+      const id = prefixMatch[2];
+      const externalConv = await loadExternalTrajectory(prefix, id);
+      if (!externalConv) {
+        return {
+          type: 'message',
+          messageType: 'error',
+          content: `No external session found with prefix ${prefix} and id: ${id}`,
+        };
+      }
+      conversation = externalConv;
+    } else {
+      const checkpoint = await logger.loadCheckpoint(tag);
+      if (checkpoint.history.length > 0) {
+        conversation = checkpoint.history;
+        authType = checkpoint.authType;
+      } else {
+        // Fallback: Try to load as AGY session even without prefix just in case (legacy support)
+        const legacyConv = await loadExternalTrajectory('agy:', tag);
+        if (legacyConv) {
+          conversation = legacyConv;
+        }
+      }
+    }
 
     if (conversation.length === 0) {
       return {
@@ -186,15 +305,11 @@ const resumeCheckpointCommand: SlashCommand = {
     }
 
     const currentAuthType = config?.getContentGeneratorConfig()?.authType;
-    if (
-      checkpoint.authType &&
-      currentAuthType &&
-      checkpoint.authType !== currentAuthType
-    ) {
+    if (authType && currentAuthType && authType !== currentAuthType) {
       return {
         type: 'message',
         messageType: 'error',
-        content: `Cannot resume chat. It was saved with a different authentication method (${checkpoint.authType}) than the current one (${currentAuthType}).`,
+        content: `Cannot resume chat. It was saved with a different authentication method (${authType}) than the current one (${currentAuthType}).`,
       };
     }
 
@@ -206,11 +321,34 @@ const resumeCheckpointCommand: SlashCommand = {
     const uiHistory: HistoryItemWithoutId[] = [];
 
     for (const item of conversation.slice(INITIAL_HISTORY_LENGTH)) {
-      const text =
-        item.parts
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      const parts = item.parts as Array<{
+        text?: string;
+        functionCall?: { name: string };
+        functionResponse?: { name: string };
+      }>;
+      let text =
+        parts
           ?.filter((m) => !!m.text)
           .map((m) => m.text)
           .join('') || '';
+
+      const toolCalls = parts?.filter((p) => !!p.functionCall);
+      if (toolCalls?.length) {
+        const calls = toolCalls
+          .map((tc) => `[Tool Call: ${tc.functionCall?.name}]`)
+          .join('\n');
+        text = text ? `${text}\n${calls}` : calls;
+      }
+
+      const toolResponses = parts?.filter((p) => !!p.functionResponse);
+      if (toolResponses?.length) {
+        const responses = toolResponses
+          .map((tr) => `[Tool Result: ${tr.functionResponse?.name}]`)
+          .join('\n');
+        text = text ? `${text}\n${responses}` : responses;
+      }
+
       if (!text) {
         continue;
       }

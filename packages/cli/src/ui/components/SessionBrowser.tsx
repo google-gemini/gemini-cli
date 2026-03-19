@@ -12,12 +12,16 @@ import { Colors } from '../colors.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 import { useKeypress } from '../hooks/useKeypress.js';
 import path from 'node:path';
-import type { Config } from '@google/gemini-cli-core';
+import { pathToFileURL } from 'node:url';
+import { type Config } from '@google/gemini-cli-core';
 import type { SessionInfo } from '../../utils/sessionUtils.js';
 import {
   formatRelativeTime,
   getSessionFiles,
 } from '../../utils/sessionUtils.js';
+import { useTabbedNavigation } from '../hooks/useTabbedNavigation.js';
+import { TabHeader, type Tab } from './shared/TabHeader.js';
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
 
 /**
  * Props for the main SessionBrowser component.
@@ -41,6 +45,8 @@ export interface SessionBrowserState {
   // Data state
   /** All loaded sessions */
   sessions: SessionInfo[];
+  /** Extension tabs */
+  extensionTabs: Array<{ name: string; sessions: SessionInfo[] }>;
   /** Sessions after filtering and sorting */
   filteredAndSortedSessions: SessionInfo[];
 
@@ -55,6 +61,8 @@ export interface SessionBrowserState {
   scrollOffset: number;
   /** Terminal width for layout calculations */
   terminalWidth: number;
+  /** Current active tab (0: CLI, 1: Antigravity) */
+  activeTab: number;
 
   // Search state
   /** Current search query string */
@@ -83,6 +91,10 @@ export interface SessionBrowserState {
   // State setters
   /** Update sessions array */
   setSessions: React.Dispatch<React.SetStateAction<SessionInfo[]>>;
+  /** Update extensionTabs array */
+  setExtensionTabs: React.Dispatch<
+    React.SetStateAction<Array<{ name: string; sessions: SessionInfo[] }>>
+  >;
   /** Update loading state */
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
   /** Update error state */
@@ -91,6 +103,8 @@ export interface SessionBrowserState {
   setActiveIndex: React.Dispatch<React.SetStateAction<number>>;
   /** Update scroll offset */
   setScrollOffset: React.Dispatch<React.SetStateAction<number>>;
+  /** Update active tab */
+  setActiveTab: (index: number) => void;
   /** Update search query */
   setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
   /** Update search mode state */
@@ -352,6 +366,9 @@ export const useSessionBrowserState = (
 ): SessionBrowserState => {
   const { columns: terminalWidth } = useTerminalSize();
   const [sessions, setSessions] = useState<SessionInfo[]>(initialSessions);
+  const [extensionTabs, setExtensionTabs] = useState<
+    Array<{ name: string; sessions: SessionInfo[] }>
+  >([]);
   const [loading, setLoading] = useState(initialLoading);
   const [error, setError] = useState<string | null>(initialError);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -365,10 +382,20 @@ export const useSessionBrowserState = (
   const [hasLoadedFullContent, setHasLoadedFullContent] = useState(false);
   const loadingFullContentRef = useRef(false);
 
+  const [activeTab, setActiveTabInternal] = useState(0);
+
+  const setActiveTab = useCallback((index: number) => {
+    setActiveTabInternal(index);
+    setActiveIndex(0);
+    setScrollOffset(0);
+  }, []);
+
   const filteredAndSortedSessions = useMemo(() => {
-    const filtered = filterSessions(sessions, searchQuery);
+    const currentTabSessions =
+      activeTab === 0 ? sessions : extensionTabs[activeTab - 1]?.sessions || [];
+    const filtered = filterSessions(currentTabSessions, searchQuery);
     return sortSessions(filtered, sortOrder, sortReverse);
-  }, [sessions, searchQuery, sortOrder, sortReverse]);
+  }, [sessions, extensionTabs, activeTab, searchQuery, sortOrder, sortReverse]);
 
   // Reset full content flag when search is cleared
   useEffect(() => {
@@ -386,6 +413,8 @@ export const useSessionBrowserState = (
   const state: SessionBrowserState = {
     sessions,
     setSessions,
+    extensionTabs,
+    setExtensionTabs,
     loading,
     setLoading,
     error,
@@ -394,6 +423,8 @@ export const useSessionBrowserState = (
     setActiveIndex,
     scrollOffset,
     setScrollOffset,
+    activeTab,
+    setActiveTab,
     searchQuery,
     setSearchQuery,
     isSearchMode,
@@ -416,11 +447,42 @@ export const useSessionBrowserState = (
 };
 
 /**
+ * Converts Antigravity or external session info to CLI SessionInfo format.
+ */
+type ExternalSessionInfo = {
+  id: string;
+  mtime: string;
+  name?: string;
+  displayName?: string;
+  messageCount?: number;
+  prefix?: string;
+};
+
+function convertExternalToSessionInfo(
+  ext: ExternalSessionInfo,
+  index: number,
+): SessionInfo {
+  return {
+    id: ext.prefix ? `${ext.prefix}${ext.id}` : ext.id,
+    file: ext.id,
+    fileName: ext.id + '.ext',
+    startTime: ext.mtime,
+    lastUpdated: ext.mtime,
+    messageCount: ext.messageCount || 0,
+    displayName: ext.displayName || ext.name || 'External Session',
+    firstUserMessage: ext.displayName || ext.name || '',
+    isCurrentSession: false,
+    index,
+  };
+}
+
+/**
  * Hook to load sessions on mount.
  */
 const useLoadSessions = (config: Config, state: SessionBrowserState) => {
   const {
     setSessions,
+    setExtensionTabs,
     setLoading,
     setError,
     isSearchMode,
@@ -432,11 +494,58 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
     const loadSessions = async () => {
       try {
         const chatsDir = path.join(config.storage.getProjectTempDir(), 'chats');
-        const sessionData = await getSessionFiles(
-          chatsDir,
-          config.getSessionId(),
-        );
+        const workspaceUri = pathToFileURL(process.cwd()).toString();
+
+        const externalTabs: Array<{ name: string; sessions: SessionInfo[] }> =
+          [];
+        if (config.getEnableExtensionReloading() !== false) {
+          /* eslint-disable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
+          const extensions = (config as any)._extensionLoader?.getExtensions
+            ? (config as any)._extensionLoader.getExtensions()
+            : [];
+          for (const extension of extensions) {
+            if (extension.trajectoryProviderModule) {
+              try {
+                const sessions =
+                  await extension.trajectoryProviderModule.listSessions(
+                    workspaceUri,
+                  );
+                const normalizedExt = sessions
+                  .map((ext: any) => ({
+                    ...ext,
+                    prefix: extension.trajectoryProviderModule.prefix,
+                  }))
+                  .sort(
+                    (a: any, b: any) =>
+                      new Date(a.mtime).getTime() - new Date(b.mtime).getTime(),
+                  )
+                  .map((ext: any, i: number) =>
+                    convertExternalToSessionInfo(ext, i + 1),
+                  );
+
+                if (normalizedExt.length > 0) {
+                  externalTabs.push({
+                    name:
+                      extension.trajectoryProviderModule.displayName ||
+                      extension.name,
+                    sessions: normalizedExt,
+                  });
+                }
+              } catch (_e) {
+                // Ignore loader errors
+              }
+            }
+          }
+          /* eslint-enable @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-explicit-any */
+        }
+
+        const [sessionData] = await Promise.all([
+          getSessionFiles(chatsDir, config.getSessionId()),
+        ]);
+
         setSessions(sessionData);
+        setExtensionTabs(externalTabs);
+
         setLoading(false);
       } catch (err) {
         setError(
@@ -448,7 +557,7 @@ const useLoadSessions = (config: Config, state: SessionBrowserState) => {
 
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     loadSessions();
-  }, [config, setSessions, setLoading, setError]);
+  }, [config, setSessions, setExtensionTabs, setLoading, setError]);
 
   useEffect(() => {
     const loadFullContent = async () => {
@@ -610,6 +719,9 @@ export const useSessionBrowserInput = (
         }
         // Delete session control.
         else if (key.sequence === 'x' || key.sequence === 'X') {
+          // Only allow deleting CLI sessions for now
+          if (state.activeTab !== 0) return true;
+
           const selectedSession =
             state.filteredAndSortedSessions[state.activeIndex];
           if (selectedSession && !selectedSession.isCurrentSession) {
@@ -684,6 +796,14 @@ export function SessionBrowserView({
 }: {
   state: SessionBrowserState;
 }): React.JSX.Element {
+  const tabs: Tab[] = [
+    { key: 'cli', header: 'Gemini CLI' },
+    ...state.extensionTabs.map((ext, i) => ({
+      key: `ext-${i}`,
+      header: ext.name,
+    })),
+  ];
+
   if (state.loading) {
     return <SessionBrowserLoading />;
   }
@@ -692,11 +812,20 @@ export function SessionBrowserView({
     return <SessionBrowserError state={state} />;
   }
 
-  if (state.sessions.length === 0) {
+  if (state.sessions.length === 0 && state.extensionTabs.length === 0) {
     return <SessionBrowserEmpty />;
   }
+
   return (
     <Box flexDirection="column" paddingX={1}>
+      <Box marginBottom={1}>
+        <TabHeader
+          tabs={tabs}
+          currentIndex={state.activeTab}
+          showStatusIcons={false}
+        />
+      </Box>
+
       <SessionListHeader state={state} />
 
       {state.isSearchMode && <SearchModeDisplay state={state} />}
@@ -721,6 +850,14 @@ export function SessionBrowser({
   useLoadSessions(config, state);
   const moveSelection = useMoveSelection(state);
   const cycleSortOrder = useCycleSortOrder(state);
+
+  useTabbedNavigation({
+    tabCount: state.extensionTabs.length + 1,
+    isActive: !state.isSearchMode,
+    wrapAround: true,
+    onTabChange: (index) => state.setActiveTab(index),
+  });
+
   useSessionBrowserInput(
     state,
     moveSelection,
