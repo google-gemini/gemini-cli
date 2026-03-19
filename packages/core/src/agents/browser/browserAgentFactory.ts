@@ -21,6 +21,7 @@ import type { LocalAgentDefinition } from '../types.js';
 import type { MessageBus } from '../../confirmation-bus/message-bus.js';
 import type { AnyDeclarativeTool } from '../../tools/tools.js';
 import { BrowserManager } from './browserManager.js';
+import { BROWSER_AGENT_NAME } from './browserAgentDefinition.js';
 import {
   BrowserAgentDefinition,
   type BrowserTaskResultSchema,
@@ -106,6 +107,7 @@ export async function createBrowserAgentDefinition(
       priority: 999,
       modes: [ApprovalMode.YOLO],
       source: 'BrowserAgent (Sensitive Actions)',
+      subagent: BROWSER_AGENT_NAME,
     });
 
     policyEngine.addRule({
@@ -114,6 +116,7 @@ export async function createBrowserAgentDefinition(
       priority: 999,
       modes: [ApprovalMode.YOLO],
       source: 'BrowserAgent (Sensitive Actions)',
+      subagent: BROWSER_AGENT_NAME,
     });
 
     // ASK_USER for upload_file and evaluate_script when sensitive action
