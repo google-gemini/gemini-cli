@@ -32,6 +32,17 @@ const CONTENT_CHUNK_SIZE = 50;
 const MAX_HISTORY_LENGTH = 5000;
 
 /**
+ * Number of times the same tool name (regardless of args) must be called
+ * within a single prompt to trigger an early LLM-based loop check.
+ *
+ * This catches loops where the model repeatedly invokes the same tool with
+ * slightly-varying arguments (e.g. write_todos with different self-correction
+ * text), which would otherwise evade the hash-based identical-call detector
+ * and only be caught after LLM_CHECK_AFTER_TURNS turns.
+ */
+const SAME_TOOL_NAME_EARLY_CHECK_THRESHOLD = 8;
+
+/**
  * The number of recent conversation turns to include in the history when asking the LLM to check for a loop.
  */
 const LLM_LOOP_CHECK_HISTORY_COUNT = 20;
@@ -138,6 +149,8 @@ export class LoopDetectionService {
   // Tool call tracking
   private lastToolCallKey: string | null = null;
   private toolCallRepetitionCount: number = 0;
+  private toolCallFrequency: Map<string, number> = new Map();
+  private shouldCheckLLMEarly = false;
 
   // Content streaming tracking
   private streamContentHistory = '';
@@ -275,11 +288,14 @@ export class LoopDetectionService {
 
     this.turnsInCurrentPrompt++;
 
-    if (
+    const isEarlyCheck = this.shouldCheckLLMEarly;
+    const meetsRegularThreshold =
       this.turnsInCurrentPrompt >= LLM_CHECK_AFTER_TURNS &&
-      this.turnsInCurrentPrompt - this.lastCheckTurn >= this.llmCheckInterval
-    ) {
+      this.turnsInCurrentPrompt - this.lastCheckTurn >= this.llmCheckInterval;
+
+    if (isEarlyCheck || meetsRegularThreshold) {
       this.lastCheckTurn = this.turnsInCurrentPrompt;
+      this.shouldCheckLLMEarly = false;
       const { isLoop, analysis, confirmedByModel } =
         await this.checkForLoopWithLLM(signal);
       if (isLoop) {
@@ -322,6 +338,15 @@ export class LoopDetectionService {
     if (this.toolCallRepetitionCount >= TOOL_CALL_LOOP_THRESHOLD) {
       return true;
     }
+
+    // Track per-name frequency to catch loops where the same tool is called
+    // repeatedly with varying args (e.g. write_todos with different content).
+    const nameCount = (this.toolCallFrequency.get(toolCall.name) ?? 0) + 1;
+    this.toolCallFrequency.set(toolCall.name, nameCount);
+    if (nameCount >= SAME_TOOL_NAME_EARLY_CHECK_THRESHOLD) {
+      this.shouldCheckLLMEarly = true;
+    }
+
     return false;
   }
 
@@ -584,12 +609,12 @@ export class LoopDetectionService {
     }
 
     const flashConfidence =
-      // eslint-disable-next-line no-restricted-syntax
+       
       typeof flashResult['unproductive_state_confidence'] === 'number'
         ? flashResult['unproductive_state_confidence']
         : 0;
     const flashAnalysis =
-      // eslint-disable-next-line no-restricted-syntax
+       
       typeof flashResult['unproductive_state_analysis'] === 'string'
         ? flashResult['unproductive_state_analysis']
         : '';
@@ -636,13 +661,13 @@ export class LoopDetectionService {
 
     const mainModelConfidence =
       mainModelResult &&
-      // eslint-disable-next-line no-restricted-syntax
+       
       typeof mainModelResult['unproductive_state_confidence'] === 'number'
         ? mainModelResult['unproductive_state_confidence']
         : 0;
     const mainModelAnalysis =
       mainModelResult &&
-      // eslint-disable-next-line no-restricted-syntax
+       
       typeof mainModelResult['unproductive_state_analysis'] === 'string'
         ? mainModelResult['unproductive_state_analysis']
         : undefined;
@@ -691,7 +716,7 @@ export class LoopDetectionService {
 
       if (
         result &&
-        // eslint-disable-next-line no-restricted-syntax
+         
         typeof result['unproductive_state_confidence'] === 'number'
       ) {
         return result;
@@ -728,6 +753,8 @@ export class LoopDetectionService {
     this.detectedCount = 0;
     this.lastLoopDetail = undefined;
     this.lastLoopType = undefined;
+    this.toolCallFrequency.clear();
+    this.shouldCheckLLMEarly = false;
   }
 
   /**
