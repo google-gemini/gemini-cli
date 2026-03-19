@@ -63,6 +63,8 @@ ${strippedScreen}
 Look at the screen. Is the CLI waiting for your input (e.g., asking for tool confirmation, presenting a multi-choice question, or waiting for a text prompt with an indicator like "❯")?
 If it is NOT waiting for input (e.g., it is streaming a response or showing a spinner), you MUST output exactly: <WAIT>
 
+If the agent has explicitly stated that the task or implementation is complete, or is asking if there is anything else you need because it has finished its work, you MUST output exactly: <DONE>
+
 If it IS waiting for your input, output ONLY the exact raw characters you would type. 
 Read the screen context carefully. Sometimes you may need to choose a numbered option, answer yes/no, or provide a text explanation.
 For example:
@@ -70,7 +72,7 @@ For example:
 - To answer a simple yes/no confirmation, output: y
 - To provide an explanation or answer an open-ended question, output the text followed by \n: Because it is required for the project\n
 - To enter a new prompt, output the text followed by \n.
-Do NOT output markdown, explanations of your thought process, or quotes. Output ONLY the raw characters to send or <WAIT>.`;
+Do NOT output markdown, explanations of your thought process, or quotes. Output ONLY the raw characters to send, <WAIT>, or <DONE>.`;
 
       const model = resolveModel(
         this.config.getModel(),
@@ -94,7 +96,17 @@ Do NOT output markdown, explanations of your thought process, or quotes. Output 
         LlmRole.UTILITY_SIMULATOR,
       );
 
-      const responseText = (response.text || '').trim();
+      const responseText = (response.text || '')
+        .trim()
+        .replace(/^[`"']+|[`"']+$/g, '');
+      if (responseText === '<DONE>') {
+        debugLogger.log('User simulator detected task completion. Exiting.');
+        // eslint-disable-next-line no-console
+        console.log('\n[SIMULATOR] Task complete. Exiting.');
+        this.stop();
+        process.exit(0);
+      }
+
       if (responseText && responseText !== '<WAIT>') {
         const keys = responseText.replace(/\\n/g, '\n');
         this.stdinBuffer.write(keys);
