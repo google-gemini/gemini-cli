@@ -42,9 +42,11 @@ export async function getBrowserConsentIfNeeded(): Promise<boolean> {
     void 0;
   }
 
-  // Non-interactive mode (no UI listeners): auto-accept.
+  // Non-interactive mode (no UI listeners): skip the dialog for this session
+  // only. Do NOT persist the sentinel file — an interactive user on the same
+  // machine should still see the consent dialog the first time they use the
+  // browser agent.
   if (coreEvents.listenerCount(CoreEvent.ConsentRequest) === 0) {
-    await markConsentAsAcknowledged(consentFilePath);
     return true;
   }
 
